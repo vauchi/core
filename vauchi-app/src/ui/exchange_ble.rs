@@ -65,6 +65,7 @@ pub(super) enum BleActionOutcome {
 
 /// Result of handling a hardware event in the BLE sub-flow.
 #[derive(Debug)]
+#[allow(dead_code)] // card_bytes used when card saving is integrated
 pub(super) enum BleHardwareOutcome {
     /// Step advanced — parent should update screen. May emit commands.
     StepAdvanced { commands: Vec<ExchangeCommand> },
@@ -211,10 +212,12 @@ impl BleExchangeFlow {
         &self.step
     }
 
+    #[allow(dead_code)] // Used when trust scoring is integrated
     pub(super) fn mode(&self) -> ExchangeMode {
         self.mode
     }
 
+    #[allow(dead_code)] // Used when trust scoring is integrated
     pub(super) fn proximity_result(&self) -> Option<&ProximityRunnerResult> {
         self.proximity_runner.as_ref()?.result()
     }
@@ -229,19 +232,19 @@ impl BleExchangeFlow {
         }
 
         // Hardware errors/unavailability for BLE transport
-        if let ExchangeHardwareEvent::HardwareError { transport, error } = event {
-            if transport.eq_ignore_ascii_case("ble") {
-                return BleHardwareOutcome::FailedWithFallback {
-                    reason: error.clone(),
-                };
-            }
+        if let ExchangeHardwareEvent::HardwareError { transport, error } = event
+            && transport.eq_ignore_ascii_case("ble")
+        {
+            return BleHardwareOutcome::FailedWithFallback {
+                reason: error.clone(),
+            };
         }
-        if let ExchangeHardwareEvent::HardwareUnavailable { transport } = event {
-            if transport.eq_ignore_ascii_case("ble") {
-                return BleHardwareOutcome::FailedWithFallback {
-                    reason: "Bluetooth not available".into(),
-                };
-            }
+        if let ExchangeHardwareEvent::HardwareUnavailable { transport } = event
+            && transport.eq_ignore_ascii_case("ble")
+        {
+            return BleHardwareOutcome::FailedWithFallback {
+                reason: "Bluetooth not available".into(),
+            };
         }
 
         match &self.step {
@@ -258,6 +261,7 @@ impl BleExchangeFlow {
     ///
     /// Per spec: 10s for Magic, 30s for Bump/Shake. The timer is managed by
     /// the parent engine, not by this flow.
+    #[allow(dead_code)] // Used when timer events are wired in
     pub(super) fn handle_timeout(&mut self) -> BleHardwareOutcome {
         match self.step {
             BleStep::Discovering | BleStep::Handshaking => BleHardwareOutcome::FailedWithFallback {
@@ -296,51 +300,49 @@ impl BleExchangeFlow {
 
     fn handle_exchanging(&mut self, event: &ExchangeHardwareEvent) -> BleHardwareOutcome {
         // Feed proximity events to runner
-        if is_proximity_event(event) {
-            if let Some(ref mut runner) = self.proximity_runner {
-                let mut commands = runner.feed_event(event);
+        if is_proximity_event(event)
+            && let Some(ref mut runner) = self.proximity_runner
+        {
+            let mut commands = runner.feed_event(event);
 
-                // Shake mode: after samples accumulate, finish recording and send envelope
-                if self.mode == ExchangeMode::Shake
-                    && !self.shake_envelope_sent
-                    && !runner.is_recording_done()
-                {
-                    if let Some((envelope, stop_cmds)) = runner.finish_recording() {
-                        self.shake_envelope_sent = true;
-                        commands.extend(stop_cmds);
-                        commands.push(ExchangeCommand::BleWriteCharacteristic {
-                            uuid: SHAKE_ENVELOPE_CHAR.to_string(),
-                            data: envelope,
-                        });
-                    }
-                }
-
-                if runner.is_done() {
-                    if self.received_card.is_some() {
-                        return self.try_complete(commands);
-                    }
-                    self.step = BleStep::Verifying;
-                    return BleHardwareOutcome::StepAdvanced { commands };
-                }
-                return BleHardwareOutcome::Consumed { commands };
+            // Shake mode: after samples accumulate, finish recording and send envelope
+            if self.mode == ExchangeMode::Shake
+                && !self.shake_envelope_sent
+                && !runner.is_recording_done()
+                && let Some((envelope, stop_cmds)) = runner.finish_recording()
+            {
+                self.shake_envelope_sent = true;
+                commands.extend(stop_cmds);
+                commands.push(ExchangeCommand::BleWriteCharacteristic {
+                    uuid: SHAKE_ENVELOPE_CHAR.to_string(),
+                    data: envelope,
+                });
             }
+
+            if runner.is_done() && self.received_card.is_some() {
+                return self.try_complete(commands);
+            } else if runner.is_done() {
+                self.step = BleStep::Verifying;
+                return BleHardwareOutcome::StepAdvanced { commands };
+            }
+            return BleHardwareOutcome::Consumed { commands };
         }
 
         // BLE characteristic notifications — could be card data or shake envelope
-        if let ExchangeHardwareEvent::BleCharacteristicNotified { uuid, data } = event {
-            if !data.is_empty() {
-                // Shake envelope from peer (on data write characteristic)
-                if self.mode == ExchangeMode::Shake && uuid == SHAKE_ENVELOPE_CHAR {
-                    return self.handle_shake_envelope(data);
-                }
-
-                // Card data
-                self.received_card = Some(data.clone());
-                if self.proximity_runner.as_ref().is_some_and(|r| r.is_done()) {
-                    return self.try_complete(vec![]);
-                }
-                return BleHardwareOutcome::Consumed { commands: vec![] };
+        if let ExchangeHardwareEvent::BleCharacteristicNotified { uuid, data } = event
+            && !data.is_empty()
+        {
+            // Shake envelope from peer (on data write characteristic)
+            if self.mode == ExchangeMode::Shake && uuid == SHAKE_ENVELOPE_CHAR {
+                return self.handle_shake_envelope(data);
             }
+
+            // Card data
+            self.received_card = Some(data.clone());
+            if self.proximity_runner.as_ref().is_some_and(|r| r.is_done()) {
+                return self.try_complete(vec![]);
+            }
+            return BleHardwareOutcome::Consumed { commands: vec![] };
         }
 
         BleHardwareOutcome::Ignored
@@ -364,15 +366,15 @@ impl BleExchangeFlow {
 
     fn handle_verifying(&mut self, event: &ExchangeHardwareEvent) -> BleHardwareOutcome {
         // In verifying, we're waiting for card data (proximity already done)
-        if let ExchangeHardwareEvent::BleCharacteristicNotified { uuid, data } = event {
-            if !data.is_empty() {
-                // Shake envelope in verifying — peer envelope arrived late
-                if self.mode == ExchangeMode::Shake && uuid == SHAKE_ENVELOPE_CHAR {
-                    return self.handle_shake_envelope(data);
-                }
-                self.received_card = Some(data.clone());
-                return self.try_complete(vec![]);
+        if let ExchangeHardwareEvent::BleCharacteristicNotified { uuid, data } = event
+            && !data.is_empty()
+        {
+            // Shake envelope in verifying — peer envelope arrived late
+            if self.mode == ExchangeMode::Shake && uuid == SHAKE_ENVELOPE_CHAR {
+                return self.handle_shake_envelope(data);
             }
+            self.received_card = Some(data.clone());
+            return self.try_complete(vec![]);
         }
         BleHardwareOutcome::Ignored
     }

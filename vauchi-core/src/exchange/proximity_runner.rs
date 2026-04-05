@@ -49,6 +49,8 @@ pub struct ProximityRunner {
     done: bool,
     /// Final result (if done).
     result: Option<ProximityRunnerResult>,
+    /// Whether accelerometer recording is complete (Shake mode).
+    recording_done: bool,
 }
 
 impl ProximityRunner {
@@ -59,6 +61,7 @@ impl ProximityRunner {
             accel_samples: Vec::new(),
             done: false,
             result: None,
+            recording_done: false,
         }
     }
 
@@ -170,6 +173,98 @@ impl ProximityRunner {
             self.done = true;
         }
     }
+
+    /// Whether accelerometer recording is complete (Shake mode only).
+    pub fn is_recording_done(&self) -> bool {
+        self.recording_done
+    }
+
+    /// Finish accelerometer recording and return the encoded envelope
+    /// for BLE transmission to the peer (Shake mode only).
+    ///
+    /// Returns `None` if not in Accelerometer mode, already done, or
+    /// no samples recorded. Emits `AccelerometerStop`.
+    pub fn finish_recording(&mut self) -> Option<(Vec<u8>, Vec<ExchangeCommand>)> {
+        if self.method != ProximityMethod::Accelerometer
+            || self.done
+            || self.accel_samples.is_empty()
+        {
+            return None;
+        }
+        self.recording_done = true;
+        let envelope = super::shake_protocol::encode_envelope(&self.accel_samples);
+        Some((envelope, vec![ExchangeCommand::AccelerometerStop]))
+    }
+
+    /// Receive the peer's magnitude envelope and compute cross-correlation
+    /// (Shake mode only). Produces the final proximity result.
+    ///
+    /// Returns commands to emit (empty — correlation is computed locally).
+    pub fn receive_peer_envelope(&mut self, peer_data: &[u8]) -> Vec<ExchangeCommand> {
+        if self.method != ProximityMethod::Accelerometer || self.done {
+            return vec![];
+        }
+
+        let peer_samples = match super::shake_protocol::decode_envelope(peer_data) {
+            Some(s) => s,
+            None => {
+                // Invalid envelope — treat as failed verification
+                self.result = Some(ProximityRunnerResult {
+                    method: self.method,
+                    confidence: 0.0,
+                    verified: false,
+                });
+                self.done = true;
+                return vec![];
+            }
+        };
+
+        // Cross-correlate: normalized dot product of magnitude envelopes
+        let confidence = cross_correlate(&self.accel_samples, &peer_samples);
+        let verified = confidence >= 0.3; // Threshold for shake correlation
+        self.result = Some(ProximityRunnerResult {
+            method: self.method,
+            confidence: confidence.min(0.5), // Shake capped at 0.5 per spec
+            verified,
+        });
+        self.done = true;
+        vec![]
+    }
+}
+
+/// Normalized cross-correlation of two magnitude envelopes.
+///
+/// Returns 0.0–1.0 where 1.0 means identical motion patterns.
+/// Uses the shorter length if arrays differ in size.
+fn cross_correlate(a: &[f32], b: &[f32]) -> f32 {
+    let len = a.len().min(b.len());
+    if len == 0 {
+        return 0.0;
+    }
+
+    let (a, b) = (&a[..len], &b[..len]);
+
+    let mean_a: f32 = a.iter().sum::<f32>() / len as f32;
+    let mean_b: f32 = b.iter().sum::<f32>() / len as f32;
+
+    let mut cross = 0.0f32;
+    let mut var_a = 0.0f32;
+    let mut var_b = 0.0f32;
+
+    for i in 0..len {
+        let da = a[i] - mean_a;
+        let db = b[i] - mean_b;
+        cross += da * db;
+        var_a += da * da;
+        var_b += db * db;
+    }
+
+    let denom = (var_a * var_b).sqrt();
+    if denom < f32::EPSILON {
+        return 0.0;
+    }
+
+    (cross / denom).clamp(0.0, 1.0)
 }
 
 // INLINE_TEST_REQUIRED: tests exercise private struct fields (accel_samples, done, result)
@@ -326,5 +421,114 @@ mod tests {
             magnitude_milli_g: 10000,
         });
         assert_eq!(runner.result().unwrap().confidence, first_confidence);
+    }
+
+    // ── Shake envelope workflow tests ──────────────────────────────
+
+    fn feed_shake_samples(runner: &mut ProximityRunner, count: usize) {
+        for i in 0..count {
+            runner.feed_event(&ExchangeHardwareEvent::AccelerometerData {
+                x_milli_g: ((i as f32 * 0.1).sin() * 2000.0) as i32,
+                y_milli_g: ((i as f32 * 0.1).cos() * 1500.0) as i32,
+                z_milli_g: 1000,
+                timestamp_ms: i as u64 * 10,
+            });
+        }
+    }
+
+    #[test]
+    fn shake_finish_recording_returns_envelope() {
+        let mut runner = ProximityRunner::new(ProximityMethod::Accelerometer);
+        feed_shake_samples(&mut runner, 100);
+
+        assert!(!runner.is_recording_done());
+        let (envelope, cmds) = runner.finish_recording().unwrap();
+
+        assert!(runner.is_recording_done());
+        assert!(!runner.is_done()); // Not done until peer envelope received
+        assert!(!envelope.is_empty());
+        assert!(
+            cmds.iter()
+                .any(|c| matches!(c, ExchangeCommand::AccelerometerStop))
+        );
+    }
+
+    #[test]
+    fn shake_finish_recording_fails_without_samples() {
+        let mut runner = ProximityRunner::new(ProximityMethod::Accelerometer);
+        assert!(runner.finish_recording().is_none());
+    }
+
+    #[test]
+    fn shake_finish_recording_fails_for_non_accel() {
+        let mut runner = ProximityRunner::new(ProximityMethod::Audio);
+        assert!(runner.finish_recording().is_none());
+    }
+
+    #[test]
+    fn shake_peer_envelope_produces_result() {
+        let mut runner = ProximityRunner::new(ProximityMethod::Accelerometer);
+        feed_shake_samples(&mut runner, 100);
+        let (our_envelope, _) = runner.finish_recording().unwrap();
+
+        // Simulate peer with same data (perfect correlation)
+        runner.receive_peer_envelope(&our_envelope);
+
+        assert!(runner.is_done());
+        let result = runner.result().unwrap();
+        assert!(result.verified);
+        assert!(result.confidence > 0.0);
+        assert!(result.confidence <= 0.5); // Capped per spec
+    }
+
+    #[test]
+    fn shake_uncorrelated_envelopes_unverified() {
+        let mut runner = ProximityRunner::new(ProximityMethod::Accelerometer);
+        feed_shake_samples(&mut runner, 100);
+        runner.finish_recording().unwrap();
+
+        // Peer envelope with constant data (no correlation with sinusoidal)
+        let peer_data = crate::exchange::shake_protocol::encode_envelope(&vec![1.0; 100]);
+        runner.receive_peer_envelope(&peer_data);
+
+        assert!(runner.is_done());
+        let result = runner.result().unwrap();
+        // Constant signal has zero variance → correlation 0.0
+        assert!(!result.verified);
+    }
+
+    #[test]
+    fn shake_invalid_peer_envelope_fails() {
+        let mut runner = ProximityRunner::new(ProximityMethod::Accelerometer);
+        feed_shake_samples(&mut runner, 50);
+        runner.finish_recording().unwrap();
+
+        // Invalid data (wrong version)
+        runner.receive_peer_envelope(&[0xFF, 0x00]);
+
+        assert!(runner.is_done());
+        assert!(!runner.result().unwrap().verified);
+    }
+
+    // ── Cross-correlation unit tests ──────────────────────────────
+
+    #[test]
+    fn cross_correlate_identical_signals() {
+        let a = vec![1.0, 2.0, 3.0, 2.0, 1.0];
+        let r = super::cross_correlate(&a, &a);
+        assert!((r - 1.0).abs() < 1e-5, "Expected ~1.0, got {r}");
+    }
+
+    #[test]
+    fn cross_correlate_empty_signals() {
+        assert_eq!(super::cross_correlate(&[], &[]), 0.0);
+    }
+
+    #[test]
+    fn cross_correlate_constant_signals() {
+        let a = vec![5.0; 10];
+        let b = vec![3.0; 10];
+        // Both constant → zero variance → 0.0
+        assert_eq!(super::cross_correlate(&a, &b), 0.0);
     }
 }

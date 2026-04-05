@@ -417,11 +417,16 @@ mod tests {
         assert_eq!(*flow.step(), BleStep::Exchanging);
         match outcome {
             BleHardwareOutcome::StepAdvanced { commands } => {
-                // Magic mode → Audio proximity → AudioEmitChallenge
+                // Magic mode → Audio proximity → AudioEmitChallenge + AudioListenForResponse
                 assert!(
                     commands
                         .iter()
                         .any(|c| matches!(c, ExchangeCommand::AudioEmitChallenge { .. }))
+                );
+                assert!(
+                    commands
+                        .iter()
+                        .any(|c| matches!(c, ExchangeCommand::AudioListenForResponse { .. }))
                 );
             }
             other => panic!("Expected StepAdvanced, got {other:?}"),
@@ -529,6 +534,84 @@ mod tests {
         // Still exchanging — waiting for proximity
         assert_eq!(*flow.step(), BleStep::Exchanging);
         assert!(matches!(outcome, BleHardwareOutcome::Consumed { .. }));
+    }
+
+    // ── Magic mode audio integration tests ───────────────────────
+
+    #[test]
+    fn magic_audio_response_completes_exchange_with_card() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        advance_to_exchanging(&mut flow);
+
+        // Receive card data
+        flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+            uuid: "card-char".into(),
+            data: vec![10, 20, 30],
+        });
+
+        // Audio response → proximity done → exchange complete
+        let outcome = flow.handle_event(&ExchangeHardwareEvent::AudioResponseReceived {
+            data: vec![1, 2, 3],
+        });
+
+        assert_eq!(*flow.step(), BleStep::Complete);
+        match outcome {
+            BleHardwareOutcome::Complete {
+                card_bytes,
+                commands,
+            } => {
+                assert_eq!(card_bytes, vec![10, 20, 30]);
+                // Should include AudioStop from runner + BleDisconnect from flow
+                assert!(
+                    commands
+                        .iter()
+                        .any(|c| matches!(c, ExchangeCommand::AudioStop))
+                );
+                assert!(
+                    commands
+                        .iter()
+                        .any(|c| matches!(c, ExchangeCommand::BleDisconnect))
+                );
+            }
+            other => panic!("Expected Complete, got {other:?}"),
+        }
+        // Verify proximity result is available
+        let prox = flow.proximity_result().unwrap();
+        assert!(prox.verified);
+        assert!((prox.confidence - 0.85).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn magic_audio_timeout_does_not_block_exchange() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        advance_to_exchanging(&mut flow);
+
+        // Simulate audio timeout (runner times out, producing failed result)
+        flow.proximity_runner.as_mut().unwrap().timeout();
+
+        // Proximity done (failed) — should advance to verifying
+        // since card data isn't here yet
+        assert!(flow.proximity_runner.as_ref().unwrap().result().is_some());
+
+        // Now receive card → should complete (audio failure = lower trust, not blocked)
+        // We need to process a BLE event to trigger the flow check.
+        // Provide card data — flow should detect proximity is done and complete.
+        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+            uuid: "card-char".into(),
+            data: vec![7, 8, 9],
+        });
+
+        assert_eq!(*flow.step(), BleStep::Complete);
+        match outcome {
+            BleHardwareOutcome::Complete { card_bytes, .. } => {
+                assert_eq!(card_bytes, vec![7, 8, 9]);
+            }
+            other => panic!("Expected Complete, got {other:?}"),
+        }
+        // Proximity was a timeout — verified = false but exchange still completed
+        let prox = flow.proximity_result().unwrap();
+        assert!(!prox.verified);
+        assert_eq!(prox.confidence, 0.0);
     }
 
     // ── Failure tests ──────────────────────────────────────────────

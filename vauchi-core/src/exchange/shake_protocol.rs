@@ -61,6 +61,7 @@ pub const MAX_QUANTIZATION_ERROR: f32 = MAX_G / 255.0 / 2.0;
 mod tests {
     use super::*;
 
+    // @internal
     #[test]
     fn encode_decode_roundtrip() {
         let samples = vec![0.0, 1.0, 2.5, 5.0, 8.0];
@@ -76,6 +77,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn encode_empty_samples() {
         let encoded = encode_envelope(&[]);
@@ -86,16 +88,19 @@ mod tests {
         assert!(decoded.is_empty());
     }
 
+    // @internal
     #[test]
     fn decode_empty_data_returns_none() {
         assert!(decode_envelope(&[]).is_none());
     }
 
+    // @internal
     #[test]
     fn decode_wrong_version_returns_none() {
         assert!(decode_envelope(&[0xFF, 0x00]).is_none());
     }
 
+    // @internal
     #[test]
     fn clamps_negative_values_to_zero() {
         let samples = vec![-1.0, -100.0];
@@ -106,6 +111,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn clamps_values_above_max_g() {
         let samples = vec![10.0, 100.0];
@@ -119,6 +125,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn typical_shake_fits_ble_mtu() {
         // 300 samples at 100Hz × 3 seconds
@@ -130,6 +137,7 @@ mod tests {
         assert_eq!(encoded.len(), 301);
     }
 
+    // @internal
     #[test]
     fn quantization_error_within_bounds() {
         // Test across the full range
@@ -145,6 +153,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn format_is_version_plus_raw_bytes() {
         let samples = vec![0.0, MAX_G];

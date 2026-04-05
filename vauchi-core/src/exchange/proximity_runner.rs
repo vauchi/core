@@ -272,6 +272,7 @@ fn cross_correlate(a: &[f32], b: &[f32]) -> f32 {
 mod tests {
     use super::*;
 
+    // @internal
     #[test]
     fn audio_runner_starts_with_emit_challenge_and_listen() {
         let runner = ProximityRunner::new(ProximityMethod::Audio);
@@ -287,6 +288,7 @@ mod tests {
         ));
     }
 
+    // @internal
     #[test]
     fn accelerometer_runner_starts_with_accel_start() {
         let runner = ProximityRunner::new(ProximityMethod::Accelerometer);
@@ -295,6 +297,7 @@ mod tests {
         assert!(matches!(cmds[0], ExchangeCommand::AccelerometerStart));
     }
 
+    // @internal
     #[test]
     fn impact_runner_starts_with_accel_start() {
         let runner = ProximityRunner::new(ProximityMethod::Impact);
@@ -303,6 +306,7 @@ mod tests {
         assert!(matches!(cmds[0], ExchangeCommand::AccelerometerStart));
     }
 
+    // @internal
     #[test]
     fn impact_runner_detects_strong_impact() {
         let mut runner = ProximityRunner::new(ProximityMethod::Impact);
@@ -323,6 +327,7 @@ mod tests {
         assert!(matches!(cmds[0], ExchangeCommand::AccelerometerStop));
     }
 
+    // @internal
     #[test]
     fn impact_runner_rejects_weak_impact() {
         let mut runner = ProximityRunner::new(ProximityMethod::Impact);
@@ -335,6 +340,7 @@ mod tests {
         assert!(!result.verified);
     }
 
+    // @internal
     #[test]
     fn milli_g_to_g_conversion_is_correct() {
         let mut runner = ProximityRunner::new(ProximityMethod::Impact);
@@ -347,6 +353,7 @@ mod tests {
         assert!((result.confidence - 0.6).abs() < f32::EPSILON);
     }
 
+    // @internal
     #[test]
     fn accelerometer_accumulates_samples() {
         let mut runner = ProximityRunner::new(ProximityMethod::Accelerometer);
@@ -366,6 +373,7 @@ mod tests {
         assert!(!runner.is_done());
     }
 
+    // @internal
     #[test]
     fn audio_response_emits_audio_stop() {
         let mut runner = ProximityRunner::new(ProximityMethod::Audio);
@@ -378,6 +386,7 @@ mod tests {
         assert!(matches!(cmds[0], ExchangeCommand::AudioStop));
     }
 
+    // @internal
     #[test]
     fn audio_empty_response_is_unverified() {
         let mut runner = ProximityRunner::new(ProximityMethod::Audio);
@@ -388,6 +397,7 @@ mod tests {
         assert_eq!(result.confidence, 0.0);
     }
 
+    // @internal
     #[test]
     fn timeout_produces_failed_result() {
         let mut runner = ProximityRunner::new(ProximityMethod::Audio);
@@ -399,6 +409,7 @@ mod tests {
         assert_eq!(result.confidence, 0.0);
     }
 
+    // @internal
     #[test]
     fn done_runner_ignores_further_events() {
         let mut runner = ProximityRunner::new(ProximityMethod::Impact);
@@ -430,6 +441,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn shake_finish_recording_returns_envelope() {
         let mut runner = ProximityRunner::new(ProximityMethod::Accelerometer);
@@ -447,18 +459,21 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn shake_finish_recording_fails_without_samples() {
         let mut runner = ProximityRunner::new(ProximityMethod::Accelerometer);
         assert!(runner.finish_recording().is_none());
     }
 
+    // @internal
     #[test]
     fn shake_finish_recording_fails_for_non_accel() {
         let mut runner = ProximityRunner::new(ProximityMethod::Audio);
         assert!(runner.finish_recording().is_none());
     }
 
+    // @internal
     #[test]
     fn shake_peer_envelope_produces_result() {
         let mut runner = ProximityRunner::new(ProximityMethod::Accelerometer);
@@ -475,6 +490,7 @@ mod tests {
         assert!(result.confidence <= 0.5); // Capped per spec
     }
 
+    // @internal
     #[test]
     fn shake_uncorrelated_envelopes_unverified() {
         let mut runner = ProximityRunner::new(ProximityMethod::Accelerometer);
@@ -491,6 +507,7 @@ mod tests {
         assert!(!result.verified);
     }
 
+    // @internal
     #[test]
     fn shake_invalid_peer_envelope_fails() {
         let mut runner = ProximityRunner::new(ProximityMethod::Accelerometer);
@@ -506,6 +523,7 @@ mod tests {
 
     // ── Cross-correlation unit tests ──────────────────────────────
 
+    // @internal
     #[test]
     fn cross_correlate_identical_signals() {
         let a = vec![1.0, 2.0, 3.0, 2.0, 1.0];
@@ -513,11 +531,13 @@ mod tests {
         assert!((r - 1.0).abs() < 1e-5, "Expected ~1.0, got {r}");
     }
 
+    // @internal
     #[test]
     fn cross_correlate_empty_signals() {
         assert_eq!(super::cross_correlate(&[], &[]), 0.0);
     }
 
+    // @internal
     #[test]
     fn cross_correlate_constant_signals() {
         let a = vec![5.0; 10];

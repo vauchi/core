@@ -425,6 +425,7 @@ mod tests {
 
     // ── Discovery tests ────────────────────────────────────────────
 
+    // @internal
     #[test]
     fn discovery_emits_connect_on_device_found() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
@@ -449,6 +450,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn discovery_ignores_non_ble_events() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
@@ -461,6 +463,7 @@ mod tests {
 
     // ── Connection tests ───────────────────────────────────────────
 
+    // @internal
     #[test]
     fn connection_starts_proximity_and_advances_to_exchanging() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
@@ -496,6 +499,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn bump_connection_starts_accelerometer() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
@@ -523,6 +527,7 @@ mod tests {
 
     // ── Proximity + exchange tests ─────────────────────────────────
 
+    // @internal
     #[test]
     fn impact_event_during_exchange_completes_with_card() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
@@ -557,6 +562,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn proximity_done_before_card_advances_to_verifying() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
@@ -584,6 +590,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn card_without_proximity_stays_in_exchanging() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
@@ -601,6 +608,7 @@ mod tests {
 
     // ── Magic mode audio integration tests ───────────────────────
 
+    // @internal
     #[test]
     fn magic_audio_response_completes_exchange_with_card() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
@@ -644,6 +652,7 @@ mod tests {
         assert!((prox.confidence - 0.85).abs() < f32::EPSILON);
     }
 
+    // @internal
     #[test]
     fn magic_audio_timeout_does_not_block_exchange() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
@@ -691,6 +700,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn shake_sends_envelope_after_recording() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Shake);
@@ -708,6 +718,7 @@ mod tests {
         assert_eq!(envelope[0], 0x01); // ENVELOPE_VERSION
     }
 
+    // @internal
     #[test]
     fn shake_peer_envelope_completes_with_card() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Shake);
@@ -743,6 +754,7 @@ mod tests {
         assert!(prox.confidence <= 0.5); // Capped per spec
     }
 
+    // @internal
     #[test]
     fn shake_peer_envelope_before_card_advances_to_verifying() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Shake);
@@ -771,6 +783,7 @@ mod tests {
         assert!(matches!(outcome, BleHardwareOutcome::Complete { .. }));
     }
 
+    // @internal
     #[test]
     fn shake_non_envelope_char_is_card_data() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Shake);
@@ -788,6 +801,7 @@ mod tests {
 
     // ── Timeout / relay fallback tests ───────────────────────────
 
+    // @internal
     #[test]
     fn timeout_during_discovery_triggers_fallback() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
@@ -802,6 +816,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn timeout_during_handshaking_triggers_fallback() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
@@ -819,6 +834,7 @@ mod tests {
         ));
     }
 
+    // @internal
     #[test]
     fn timeout_during_exchanging_is_ignored() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
@@ -829,6 +845,7 @@ mod tests {
         assert!(matches!(outcome, BleHardwareOutcome::Ignored));
     }
 
+    // @internal
     #[test]
     fn timeout_during_complete_is_ignored() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
@@ -849,6 +866,7 @@ mod tests {
 
     // ── Failure tests ──────────────────────────────────────────────
 
+    // @internal
     #[test]
     fn ble_disconnect_fails_at_any_step() {
         for mode in [ExchangeMode::Magic, ExchangeMode::Bump, ExchangeMode::Shake] {
@@ -863,6 +881,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn ble_hardware_error_fails() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
@@ -878,6 +897,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn ble_unavailable_fails() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
@@ -890,6 +910,7 @@ mod tests {
         ));
     }
 
+    // @internal
     #[test]
     fn non_ble_hardware_error_is_ignored() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
@@ -902,6 +923,7 @@ mod tests {
 
     // ── Bump mode edge cases ────────────────────────────────────
 
+    // @internal
     #[test]
     fn bump_weak_impact_completes_with_unverified_proximity() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
@@ -926,6 +948,7 @@ mod tests {
         assert!(prox.confidence < 0.6);
     }
 
+    // @internal
     #[test]
     fn bump_strong_impact_has_capped_confidence() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
@@ -949,6 +972,7 @@ mod tests {
 
     // ── Complete step ignores events ───────────────────────────────
 
+    // @internal
     #[test]
     fn complete_step_ignores_events() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
@@ -975,6 +999,7 @@ mod tests {
 
     // ── Mode-specific proximity method ─────────────────────────────
 
+    // @internal
     #[test]
     fn magic_uses_audio_proximity() {
         assert_eq!(
@@ -983,6 +1008,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn bump_uses_impact_proximity() {
         assert_eq!(
@@ -991,6 +1017,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn shake_uses_accelerometer_proximity() {
         assert_eq!(

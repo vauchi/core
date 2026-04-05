@@ -42,6 +42,13 @@ pub struct HttpTransportAdapter {
     /// Acknowledged blob IDs (sent ACK to relay on next receive cycle).
     /// Stored as (token, blob_id) where token is the first registered mailbox token.
     ack_queue: Vec<(String, String)>,
+    /// Whether we've already polled the relay in this receive cycle.
+    ///
+    /// HTTP polling is single-shot: fetch once, drain the buffer, return None.
+    /// Without this guard, a `while let Some(msg) = adapter.receive()` loop
+    /// refetches the same unACKed blobs on every iteration, creating an
+    /// infinite loop. Reset when new tokens are registered or on reconnect.
+    has_fetched: bool,
 }
 
 impl HttpTransportAdapter {
@@ -53,6 +60,7 @@ impl HttpTransportAdapter {
             registered_tokens: Vec::new(),
             pending_blobs: VecDeque::new(),
             ack_queue: Vec::new(),
+            has_fetched: false,
         }
     }
 
@@ -113,6 +121,7 @@ impl HttpTransportAdapter {
 impl super::transport::Transport for HttpTransportAdapter {
     fn connect(&mut self, _config: &TransportConfig) -> TransportResult<()> {
         self.state = ConnectionState::Connecting;
+        self.has_fetched = false;
         match self.http.health_check() {
             Ok(()) => {
                 self.state = ConnectionState::Connected;
@@ -129,6 +138,7 @@ impl super::transport::Transport for HttpTransportAdapter {
         self.state = ConnectionState::Disconnected;
         self.registered_tokens.clear();
         self.pending_blobs.clear();
+        self.has_fetched = false;
         Ok(())
     }
 
@@ -147,10 +157,16 @@ impl super::transport::Transport for HttpTransportAdapter {
             }
             MessagePayload::RegisterMailbox(rm) => {
                 // Store tokens for polling in receive()
+                let mut added = false;
                 for token in &rm.tokens {
                     if !self.registered_tokens.contains(token) {
                         self.registered_tokens.push(token.clone());
+                        added = true;
                     }
+                }
+                // New tokens registered — allow another fetch cycle
+                if added {
+                    self.has_fetched = false;
                 }
                 Ok(())
             }
@@ -188,10 +204,18 @@ impl super::transport::Transport for HttpTransportAdapter {
             return Self::blob_to_envelope(&blob).map(Some);
         }
 
-        // 3. If no buffered blobs and we have tokens, poll the relay
-        if self.registered_tokens.is_empty() {
+        // 3. If no buffered blobs and we have tokens, poll the relay (once per cycle).
+        //
+        // HTTP polling is single-shot: we fetch once, drain the buffer, then
+        // return None. Without this guard, callers using `while let Some(msg) =
+        // adapter.receive()` refetch the same unACKed blobs on every iteration
+        // because ACKs are queued (not sent inline), creating an infinite loop
+        // that hangs until the process timeout.
+        if self.registered_tokens.is_empty() || self.has_fetched {
             return Ok(None);
         }
+
+        self.has_fetched = true;
 
         // Relay accepts at most 100 tokens per fetch request.
         // On rate-limit errors, return what we have so far rather than failing.
@@ -306,6 +330,81 @@ mod tests {
         adapter.registered_tokens.push("token".into());
         let result = adapter.receive();
         assert!(result.is_err(), "unreachable relay should error");
+    }
+
+    // @internal
+    #[test]
+    fn test_receive_does_not_refetch_after_first_poll() {
+        let mut adapter = make_adapter(true);
+        adapter.registered_tokens.push("token".into());
+
+        // First receive: tries to fetch (fails — unreachable relay)
+        let r1 = adapter.receive();
+        assert!(r1.is_err(), "first receive should attempt fetch and fail");
+        // has_fetched is set to true BEFORE the fetch attempt
+        assert!(
+            adapter.has_fetched,
+            "has_fetched must be true after first poll attempt"
+        );
+
+        // Second receive: should NOT refetch — returns None immediately
+        let r2 = adapter.receive();
+        assert!(
+            r2.is_ok(),
+            "second receive must not re-poll (has_fetched guard)"
+        );
+        assert!(
+            r2.unwrap().is_none(),
+            "second receive must return None after initial poll"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn test_register_new_tokens_resets_fetch_guard() {
+        let mut adapter = make_adapter(true);
+        adapter.registered_tokens.push("token_a".into());
+
+        // Simulate a completed fetch cycle
+        adapter.has_fetched = true;
+
+        // Registering new tokens should reset the guard
+        let envelope = MessageEnvelope {
+            version: PROTOCOL_VERSION,
+            message_id: "reg".to_string(),
+            timestamp: 0,
+            payload: MessagePayload::RegisterMailbox(RegisterMailbox {
+                tokens: vec!["token_b".into()],
+            }),
+        };
+        adapter.send(&envelope).unwrap();
+        assert!(
+            !adapter.has_fetched,
+            "registering new tokens must reset has_fetched"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn test_register_duplicate_tokens_does_not_reset_fetch_guard() {
+        let mut adapter = make_adapter(true);
+        adapter.registered_tokens.push("token_a".into());
+        adapter.has_fetched = true;
+
+        // Registering the same token should NOT reset the guard
+        let envelope = MessageEnvelope {
+            version: PROTOCOL_VERSION,
+            message_id: "reg".to_string(),
+            timestamp: 0,
+            payload: MessagePayload::RegisterMailbox(RegisterMailbox {
+                tokens: vec!["token_a".into()],
+            }),
+        };
+        adapter.send(&envelope).unwrap();
+        assert!(
+            adapter.has_fetched,
+            "registering duplicate tokens must not reset has_fetched"
+        );
     }
 
     #[test]

@@ -498,7 +498,7 @@ mod tests {
         runner.finish_recording().unwrap();
 
         // Peer envelope with constant data (no correlation with sinusoidal)
-        let peer_data = crate::exchange::shake_protocol::encode_envelope(&vec![1.0; 100]);
+        let peer_data = crate::exchange::shake_protocol::encode_envelope(&[1.0; 100]);
         runner.receive_peer_envelope(&peer_data);
 
         assert!(runner.is_done());

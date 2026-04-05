@@ -2019,7 +2019,7 @@ mod tests {
             ..config_no_groups()
         });
         // Simulate BLE failure via apply_ble_outcome
-        engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
+        let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
             reason: "BLE timeout".into(),
         });
         assert_eq!(engine.step, ExchangeStep::Failed);
@@ -2053,7 +2053,7 @@ mod tests {
             mode: Some(ExchangeMode::Magic),
             ..config_no_groups()
         });
-        engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
+        let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
             reason: "timeout".into(),
         });
         assert_eq!(engine.step, ExchangeStep::Failed);
@@ -2083,7 +2083,7 @@ mod tests {
             mode: Some(ExchangeMode::Bump),
             ..config_no_groups()
         });
-        engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
+        let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
             reason: "disconnect".into(),
         });
         assert!(engine.ble_fallback_available);
@@ -2203,7 +2203,7 @@ mod tests {
         );
 
         // Peer shake envelope (use encoded constant data for simplicity)
-        let peer_envelope = vauchi_core::exchange::shake_protocol::encode_envelope(&vec![1.5; 50]);
+        let peer_envelope = vauchi_core::exchange::shake_protocol::encode_envelope(&[1.5; 50]);
         let result = engine.handle_hardware_event(
             vauchi_core::exchange::ExchangeHardwareEvent::BleCharacteristicNotified {
                 uuid: vauchi_core::exchange::CHAR_DATA_WRITE.into(),

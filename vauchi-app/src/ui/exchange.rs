@@ -9,8 +9,9 @@
 //! session is provided, transitions emit `ExchangeCommand`s that frontends
 //! dispatch to platform hardware (camera, BLE, NFC, audio).
 
-#[allow(unused_imports)] // BleHardwareOutcome used in Phase 1
-use crate::ui::exchange_ble::{self, BleActionOutcome, BleHardwareOutcome, BleStep};
+use crate::ui::exchange_ble::{
+    self, BleActionOutcome, BleExchangeFlow, BleHardwareOutcome, BleStep,
+};
 use crate::ui::exchange_field_preview::{self, FieldPreviewConfig, FieldPreviewResult};
 use crate::ui::exchange_link::{self, LinkActionOutcome, LinkHardwareOutcome, LinkStep};
 use crate::ui::exchange_mode_selection::{ModeSelectionEngine, ModeSelectionResult};
@@ -79,6 +80,8 @@ pub struct ExchangeEngine {
     /// Decrypted card bytes from Link mode exchange (set on ExchangeComplete).
     /// Callers check `link_received_card_bytes()` after Success to save the contact.
     link_received_card: Option<Vec<u8>>,
+    /// BLE exchange flow state machine (Magic/Bump/Shake modes).
+    ble_flow: Option<BleExchangeFlow>,
     /// Reciprocity confirmation cascade driver (created on exchange completion).
     reciprocity_confirmer: Option<ReciprocityConfirmer>,
 }
@@ -177,6 +180,7 @@ impl ExchangeEngine {
             pending_link_commands,
             escrow_keys: None,
             link_received_card: None,
+            ble_flow: None,
             reciprocity_confirmer: None,
         }
     }
@@ -215,6 +219,7 @@ impl ExchangeEngine {
                     pending_link_commands: Vec::new(),
                     escrow_keys: None,
                     link_received_card: None,
+                    ble_flow: None,
                     reciprocity_confirmer: None,
                 };
             }
@@ -234,6 +239,7 @@ impl ExchangeEngine {
             pending_link_commands: Vec::new(),
             escrow_keys: None,
             link_received_card: None,
+            ble_flow: None,
             reciprocity_confirmer: None,
         }
     }
@@ -354,20 +360,67 @@ impl ExchangeEngine {
 
     /// Start BLE exchange mode (Magic/Bump/Shake).
     ///
-    /// Emits BLE advertising + scanning commands to begin discovery.
-    /// The session is created on demand when BLE handshake begins.
+    /// Creates a `BleExchangeFlow` and emits BLE advertising + scanning
+    /// commands to begin discovery.
     fn start_ble_mode(&mut self) -> ActionResult {
+        let mode = self.config.mode.unwrap_or(ExchangeMode::Magic);
+        self.ble_flow = Some(BleExchangeFlow::new(mode));
         self.step = ExchangeStep::Ble(BleStep::Discovering);
         let service_uuid = vauchi_core::exchange::VAUCHI_BLE_SERVICE_UUID.to_string();
-        // Emit BLE discovery commands — frontends start advertising + scanning
         ActionResult::ExchangeCommands {
             commands: vec![
                 ExchangeCommand::BleStartAdvertising {
                     service_uuid: service_uuid.clone(),
-                    payload: vec![], // Populated by session in Phase 1
+                    payload: vec![],
                 },
                 ExchangeCommand::BleStartScanning { service_uuid },
             ],
+        }
+    }
+
+    /// Handle BLE mode hardware events via BleExchangeFlow.
+    fn handle_ble_hardware_event(
+        &mut self,
+        event: vauchi_core::exchange::ExchangeHardwareEvent,
+    ) -> Option<ActionResult> {
+        let flow = self.ble_flow.as_mut()?;
+        let outcome = flow.handle_event(&event);
+
+        // Sync engine step from flow step
+        self.step = ExchangeStep::Ble(flow.step().clone());
+
+        Some(self.apply_ble_outcome(outcome))
+    }
+
+    /// Apply a BleHardwareOutcome — translate to ActionResult.
+    fn apply_ble_outcome(&mut self, outcome: BleHardwareOutcome) -> ActionResult {
+        match outcome {
+            BleHardwareOutcome::StepAdvanced { commands }
+            | BleHardwareOutcome::Consumed { commands } => {
+                if commands.is_empty() {
+                    ActionResult::UpdateScreen(self.build_screen())
+                } else {
+                    ActionResult::ExchangeCommands { commands }
+                }
+            }
+            BleHardwareOutcome::Complete {
+                card_bytes: _,
+                commands,
+            } => {
+                // TODO: save card_bytes (Phase 1 integration)
+                self.step = ExchangeStep::Success;
+                if commands.is_empty() {
+                    ActionResult::UpdateScreen(self.build_screen())
+                } else {
+                    ActionResult::ExchangeCommands { commands }
+                }
+            }
+            BleHardwareOutcome::FailedWithFallback { reason } => {
+                self.failure_detail = Some(reason);
+                self.step = ExchangeStep::Failed;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            BleHardwareOutcome::Ignored => ActionResult::UpdateScreen(self.build_screen()),
         }
     }
 
@@ -660,11 +713,9 @@ impl WorkflowEngine for ExchangeEngine {
         &mut self,
         event: vauchi_core::exchange::ExchangeHardwareEvent,
     ) -> Option<ActionResult> {
-        // BLE mode events — handled via BLE sub-flow (Phase 0 skeleton)
+        // BLE mode events — routed through BleExchangeFlow
         if matches!(self.step, ExchangeStep::Ble(_)) {
-            // TODO(tier2-phase1): Route BLE hardware events to BleExchangeFlow
-            // For now, return screen update to acknowledge the event
-            return Some(ActionResult::UpdateScreen(self.build_screen()));
+            return self.handle_ble_hardware_event(event);
         }
 
         // Link mode events — handled without ExchangeSession

@@ -1476,8 +1476,8 @@ update:swift-bindings:
       head -12 Package.swift
 
       # Commit and push
-      git config user.email "ci@vauchi.app"
-      git config user.name "Vauchi CI"
+      git config user.email "${BOT_EMAIL:-${GITLAB_USER_EMAIL}}"
+      git config user.name "${BOT_NAME:-Vauchi CI}"
       git add Package.swift Sources/VauchiPlatform/vauchi_platform.swift
       if git diff --cached --quiet; then
         echo "No changes — bindings already up to date"
@@ -1545,8 +1545,8 @@ trigger:windows:
         echo "✓ cosign.pub updated"
       fi
 
-      git config user.email "ci@vauchi.app"
-      git config user.name "Vauchi CI"
+      git config user.email "${BOT_EMAIL:-${GITLAB_USER_EMAIL}}"
+      git config user.name "${BOT_NAME:-Vauchi CI}"
       git add cabi-version.json cosign.pub
       git diff --cached --quiet && { echo "No changes to push"; exit 0; }
       git commit -m "chore: update CABI DLL to $CLEAN_VERSION

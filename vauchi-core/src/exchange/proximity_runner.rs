@@ -292,10 +292,7 @@ mod tests {
         let runner = ProximityRunner::new(ProximityMethod::Accelerometer);
         let cmds = runner.start();
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(
-            cmds[0],
-            ExchangeCommand::AccelerometerStart { .. }
-        ));
+        assert!(matches!(cmds[0], ExchangeCommand::AccelerometerStart));
     }
 
     #[test]
@@ -303,10 +300,7 @@ mod tests {
         let runner = ProximityRunner::new(ProximityMethod::Impact);
         let cmds = runner.start();
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(
-            cmds[0],
-            ExchangeCommand::AccelerometerStart { .. }
-        ));
+        assert!(matches!(cmds[0], ExchangeCommand::AccelerometerStart));
     }
 
     #[test]

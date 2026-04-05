@@ -169,6 +169,14 @@ impl ExchangeEngine {
             } else {
                 (None, Vec::new())
             };
+        // If starting directly at BLE mode, create the flow now.
+        let ble_flow = if matches!(step, ExchangeStep::Ble(_)) {
+            Some(BleExchangeFlow::new(
+                config.mode.unwrap_or(ExchangeMode::Magic),
+            ))
+        } else {
+            None
+        };
         Self {
             step,
             config,
@@ -183,7 +191,7 @@ impl ExchangeEngine {
             pending_link_commands,
             escrow_keys: None,
             link_received_card: None,
-            ble_flow: None,
+            ble_flow,
             reciprocity_confirmer: None,
         }
     }
@@ -2090,5 +2098,140 @@ mod tests {
             ExchangeStep::Ble(BleStep::Discovering),
             "Retry in Bump mode must return to BLE discovering"
         );
+    }
+
+    // ── Phase 5: BLE mode integration tests (full engine flow) ─────
+
+    /// Helper: create a BLE mode engine and advance through discovery + connection.
+    fn ble_engine_to_exchanging(mode: ExchangeMode) -> ExchangeEngine {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(mode),
+            ..config_no_groups()
+        });
+        assert_eq!(engine.step, ExchangeStep::Ble(BleStep::Discovering));
+
+        // Discovery
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::BleDeviceDiscovered {
+                id: "peer-1".into(),
+                rssi: -45,
+                adv_data: vec![],
+            },
+        );
+        assert!(result.is_some());
+        assert_eq!(engine.step, ExchangeStep::Ble(BleStep::Handshaking));
+
+        // Connection
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::BleConnected {
+                device_id: "peer-1".into(),
+            },
+        );
+        assert!(result.is_some());
+        assert_eq!(engine.step, ExchangeStep::Ble(BleStep::Exchanging));
+        engine
+    }
+
+    // @internal
+    #[test]
+    fn magic_full_flow_discovery_to_success() {
+        let mut engine = ble_engine_to_exchanging(ExchangeMode::Magic);
+
+        // Card data
+        engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::BleCharacteristicNotified {
+                uuid: "card".into(),
+                data: vec![1, 2, 3],
+            },
+        );
+        // Audio response → proximity done → complete
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::AudioResponseReceived {
+                data: vec![0xAA],
+            },
+        );
+        assert!(result.is_some());
+        assert_eq!(engine.step, ExchangeStep::Success);
+    }
+
+    // @internal
+    #[test]
+    fn bump_full_flow_discovery_to_success() {
+        let mut engine = ble_engine_to_exchanging(ExchangeMode::Bump);
+
+        // Card data
+        engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::BleCharacteristicNotified {
+                uuid: "card".into(),
+                data: vec![4, 5, 6],
+            },
+        );
+        // Impact → proximity done → complete
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::ImpactDetected {
+                timestamp_ms: 100,
+                magnitude_milli_g: 3500,
+            },
+        );
+        assert!(result.is_some());
+        assert_eq!(engine.step, ExchangeStep::Success);
+    }
+
+    // @internal
+    #[test]
+    fn shake_full_flow_discovery_to_success() {
+        let mut engine = ble_engine_to_exchanging(ExchangeMode::Shake);
+
+        // Feed accel samples (triggers recording + envelope send)
+        for i in 0..50 {
+            engine.handle_hardware_event(
+                vauchi_core::exchange::ExchangeHardwareEvent::AccelerometerData {
+                    x_milli_g: ((i as f32 * 0.1).sin() * 2000.0) as i32,
+                    y_milli_g: ((i as f32 * 0.1).cos() * 1500.0) as i32,
+                    z_milli_g: 1000,
+                    timestamp_ms: i * 10,
+                },
+            );
+        }
+
+        // Card data
+        engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::BleCharacteristicNotified {
+                uuid: "card".into(),
+                data: vec![7, 8, 9],
+            },
+        );
+
+        // Peer shake envelope (use encoded constant data for simplicity)
+        let peer_envelope = vauchi_core::exchange::shake_protocol::encode_envelope(&vec![1.5; 50]);
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::BleCharacteristicNotified {
+                uuid: vauchi_core::exchange::CHAR_DATA_WRITE.into(),
+                data: peer_envelope,
+            },
+        );
+        assert!(result.is_some());
+        assert_eq!(engine.step, ExchangeStep::Success);
+    }
+
+    // @internal
+    #[test]
+    fn ble_disconnect_during_exchange_offers_relay_fallback() {
+        let mut engine = ble_engine_to_exchanging(ExchangeMode::Magic);
+
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::BleDisconnected {
+                reason: "connection lost".into(),
+            },
+        );
+        assert!(result.is_some());
+        assert_eq!(engine.step, ExchangeStep::Failed);
+        assert!(engine.ble_fallback_available);
+
+        // Accept fallback → switch to Link
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "fallback_relay".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::Link(LinkStep::ShareUrl));
     }
 }

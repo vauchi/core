@@ -247,6 +247,21 @@ impl BleExchangeFlow {
         }
     }
 
+    /// Handle BLE timeout. Called by parent engine when the discovery/connection
+    /// timer expires. Returns a fallback outcome if still waiting for BLE.
+    ///
+    /// Per spec: 10s for Magic, 30s for Bump/Shake. The timer is managed by
+    /// the parent engine, not by this flow.
+    pub(super) fn handle_timeout(&mut self) -> BleHardwareOutcome {
+        match self.step {
+            BleStep::Discovering | BleStep::Handshaking => BleHardwareOutcome::FailedWithFallback {
+                reason: "Bluetooth connection timed out".into(),
+            },
+            // Once exchanging or later, BLE is connected — timeout is not applicable
+            _ => BleHardwareOutcome::Ignored,
+        }
+    }
+
     fn handle_discovering(&mut self, event: &ExchangeHardwareEvent) -> BleHardwareOutcome {
         if let ExchangeHardwareEvent::BleDeviceDiscovered { id, .. } = event {
             self.connected_device = Some(id.clone());
@@ -612,6 +627,67 @@ mod tests {
         let prox = flow.proximity_result().unwrap();
         assert!(!prox.verified);
         assert_eq!(prox.confidence, 0.0);
+    }
+
+    // ── Timeout / relay fallback tests ───────────────────────────
+
+    #[test]
+    fn timeout_during_discovery_triggers_fallback() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        assert_eq!(*flow.step(), BleStep::Discovering);
+
+        let outcome = flow.handle_timeout();
+        match outcome {
+            BleHardwareOutcome::FailedWithFallback { reason } => {
+                assert!(reason.contains("timed out"));
+            }
+            other => panic!("Expected FailedWithFallback, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn timeout_during_handshaking_triggers_fallback() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        flow.handle_event(&ExchangeHardwareEvent::BleDeviceDiscovered {
+            id: "d1".into(),
+            rssi: -40,
+            adv_data: vec![],
+        });
+        assert_eq!(*flow.step(), BleStep::Handshaking);
+
+        let outcome = flow.handle_timeout();
+        assert!(matches!(
+            outcome,
+            BleHardwareOutcome::FailedWithFallback { .. }
+        ));
+    }
+
+    #[test]
+    fn timeout_during_exchanging_is_ignored() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
+        advance_to_exchanging(&mut flow);
+        assert_eq!(*flow.step(), BleStep::Exchanging);
+
+        let outcome = flow.handle_timeout();
+        assert!(matches!(outcome, BleHardwareOutcome::Ignored));
+    }
+
+    #[test]
+    fn timeout_during_complete_is_ignored() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
+        advance_to_exchanging(&mut flow);
+        flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+            uuid: "c".into(),
+            data: vec![1],
+        });
+        flow.handle_event(&ExchangeHardwareEvent::ImpactDetected {
+            timestamp_ms: 0,
+            magnitude_milli_g: 3000,
+        });
+        assert_eq!(*flow.step(), BleStep::Complete);
+
+        let outcome = flow.handle_timeout();
+        assert!(matches!(outcome, BleHardwareOutcome::Ignored));
     }
 
     // ── Failure tests ──────────────────────────────────────────────

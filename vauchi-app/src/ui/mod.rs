@@ -26,6 +26,7 @@ mod duress_pin;
 mod emergency_shred;
 mod engine;
 mod exchange;
+mod exchange_ble;
 mod exchange_field_preview;
 mod exchange_link;
 mod exchange_mode_selection;

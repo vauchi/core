@@ -9,6 +9,8 @@
 //! session is provided, transitions emit `ExchangeCommand`s that frontends
 //! dispatch to platform hardware (camera, BLE, NFC, audio).
 
+#[allow(unused_imports)] // BleHardwareOutcome used in Phase 1
+use crate::ui::exchange_ble::{self, BleActionOutcome, BleHardwareOutcome, BleStep};
 use crate::ui::exchange_field_preview::{self, FieldPreviewConfig, FieldPreviewResult};
 use crate::ui::exchange_link::{self, LinkActionOutcome, LinkHardwareOutcome, LinkStep};
 use crate::ui::exchange_mode_selection::{ModeSelectionEngine, ModeSelectionResult};
@@ -91,6 +93,8 @@ enum ExchangeStep {
     FieldPreview,
     /// QR exchange sub-flow (Glance/Hover modes).
     Qr(QrStep),
+    /// BLE exchange sub-flow (Magic/Bump/Shake modes).
+    Ble(BleStep),
     /// Link exchange sub-flow (async relay-mediated).
     Link(LinkStep),
     Success,
@@ -105,6 +109,7 @@ impl ExchangeStep {
             Self::FieldPreview => 3,
             // Sub-flow steps start at 4 (after mode + group + preview)
             Self::Qr(qr) => qr.step_number(4),
+            Self::Ble(ble) => ble.step_number(4),
             Self::Link(link) => link.step_number(4),
             Self::Success => 4 + QrStep::STEP_COUNT,
             Self::Failed => 5 + QrStep::STEP_COUNT,
@@ -113,8 +118,9 @@ impl ExchangeStep {
 }
 
 // mode + group + preview + sub-flow + success/failed
-// QR and Link sub-flows must have the same step count for consistent progress.
+// All sub-flows must have the same step count for consistent progress.
 const _: () = assert!(QrStep::STEP_COUNT == LinkStep::STEP_COUNT);
+const _: () = assert!(QrStep::STEP_COUNT == BleStep::STEP_COUNT);
 const TOTAL_STEPS: u8 = 3 + QrStep::STEP_COUNT + 2;
 
 impl ExchangeEngine {
@@ -129,6 +135,12 @@ impl ExchangeEngine {
         if config.available_groups.is_empty() {
             if config.mode == Some(ExchangeMode::Link) {
                 return ExchangeStep::Link(LinkStep::ShareUrl);
+            }
+            if matches!(
+                config.mode,
+                Some(ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake)
+            ) {
+                return ExchangeStep::Ble(BleStep::Discovering);
             }
             ExchangeStep::Qr(QrStep::ShowQr)
         } else {
@@ -340,6 +352,25 @@ impl ExchangeEngine {
         }
     }
 
+    /// Start BLE exchange mode (Magic/Bump/Shake).
+    ///
+    /// Emits BLE advertising + scanning commands to begin discovery.
+    /// The session is created on demand when BLE handshake begins.
+    fn start_ble_mode(&mut self) -> ActionResult {
+        self.step = ExchangeStep::Ble(BleStep::Discovering);
+        let service_uuid = vauchi_core::exchange::VAUCHI_BLE_SERVICE_UUID.to_string();
+        // Emit BLE discovery commands — frontends start advertising + scanning
+        ActionResult::ExchangeCommands {
+            commands: vec![
+                ExchangeCommand::BleStartAdvertising {
+                    service_uuid: service_uuid.clone(),
+                    payload: vec![], // Populated by session in Phase 1
+                },
+                ExchangeCommand::BleStartScanning { service_uuid },
+            ],
+        }
+    }
+
     /// Handle Link mode hardware events (ADR-031).
     ///
     /// Routes to handshake-phase or escrow-phase handler depending on
@@ -492,6 +523,22 @@ impl ExchangeEngine {
             ExchangeStep::Qr(QrStep::Verifying) => {
                 exchange_qr::build_verifying_screen(self.progress())
             }
+            ExchangeStep::Ble(BleStep::Discovering) => {
+                let mode = self.config.mode.unwrap_or(ExchangeMode::Magic);
+                exchange_ble::build_discovering_screen(mode, self.progress())
+            }
+            ExchangeStep::Ble(BleStep::Handshaking | BleStep::Exchanging) => {
+                let mode = self.config.mode.unwrap_or(ExchangeMode::Magic);
+                exchange_ble::build_exchanging_screen(mode, self.progress())
+            }
+            ExchangeStep::Ble(BleStep::Verifying) => {
+                let mode = self.config.mode.unwrap_or(ExchangeMode::Magic);
+                exchange_ble::build_verifying_screen(mode, self.progress())
+            }
+            ExchangeStep::Ble(BleStep::Complete) => {
+                // Handled by transition to ExchangeStep::Success
+                ScreenModel::default()
+            }
             ExchangeStep::Link(LinkStep::ShareUrl) => {
                 let url = self
                     .link_initiation
@@ -613,6 +660,13 @@ impl WorkflowEngine for ExchangeEngine {
         &mut self,
         event: vauchi_core::exchange::ExchangeHardwareEvent,
     ) -> Option<ActionResult> {
+        // BLE mode events — handled via BLE sub-flow (Phase 0 skeleton)
+        if matches!(self.step, ExchangeStep::Ble(_)) {
+            // TODO(tier2-phase1): Route BLE hardware events to BleExchangeFlow
+            // For now, return screen update to acknowledge the event
+            return Some(ActionResult::UpdateScreen(self.build_screen()));
+        }
+
         // Link mode events — handled without ExchangeSession
         if matches!(self.step, ExchangeStep::Link(_)) {
             return self.handle_link_hardware_event(event);
@@ -722,6 +776,13 @@ impl WorkflowEngine for ExchangeEngine {
                             if mode == ExchangeMode::Link {
                                 return self.start_link_mode();
                             }
+                            if matches!(
+                                mode,
+                                ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake
+                            ) {
+                                self.step = ExchangeStep::Ble(BleStep::Discovering);
+                                return self.start_ble_mode();
+                            }
                             self.step = ExchangeStep::Qr(QrStep::ShowQr);
                             return self.start_session_if_needed();
                         } else {
@@ -759,7 +820,14 @@ impl WorkflowEngine for ExchangeEngine {
             {
                 if action_id == "skip" {
                     self.selected_groups.clear();
-                    // Skip → go straight to QR (no preview needed)
+                    // Skip → go straight to sub-flow (no preview needed)
+                    if matches!(
+                        self.config.mode,
+                        Some(ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake)
+                    ) {
+                        self.step = ExchangeStep::Ble(BleStep::Discovering);
+                        return self.start_ble_mode();
+                    }
                     self.step = ExchangeStep::Qr(QrStep::ShowQr);
                     return self.start_session_if_needed();
                 }
@@ -778,6 +846,15 @@ impl WorkflowEngine for ExchangeEngine {
                             // Route to sub-flow based on selected mode
                             if self.config.mode == Some(ExchangeMode::Link) {
                                 return self.start_link_mode();
+                            }
+                            if matches!(
+                                self.config.mode,
+                                Some(
+                                    ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake
+                                )
+                            ) {
+                                self.step = ExchangeStep::Ble(BleStep::Discovering);
+                                return self.start_ble_mode();
                             }
                             self.step = ExchangeStep::Qr(QrStep::ShowQr);
                             return self.start_session_if_needed();
@@ -821,6 +898,20 @@ impl WorkflowEngine for ExchangeEngine {
                     ActionResult::UpdateScreen(self.build_screen())
                 }
             }
+            // BLE sub-flow actions
+            (ExchangeStep::Ble(ble_step), ref user_action) => {
+                if let Some(outcome) = exchange_ble::handle_ble_action(ble_step, user_action) {
+                    match outcome {
+                        BleActionOutcome::FallbackToRelay => {
+                            // Switch to relay escrow (Link mode as fallback)
+                            return self.start_link_mode();
+                        }
+                        BleActionOutcome::Cancel => return ActionResult::Complete,
+                        BleActionOutcome::Ignored => {}
+                    }
+                }
+                ActionResult::UpdateScreen(self.build_screen())
+            }
             // Link sub-flow actions
             (ExchangeStep::Link(link_step), ref user_action) => {
                 if let Some(outcome) = exchange_link::handle_link_action(link_step, user_action) {
@@ -856,6 +947,13 @@ impl WorkflowEngine for ExchangeEngine {
                 // Restore to the correct sub-flow based on selected mode
                 if self.config.mode == Some(ExchangeMode::Link) {
                     return self.start_link_mode();
+                }
+                if matches!(
+                    self.config.mode,
+                    Some(ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake)
+                ) {
+                    self.step = ExchangeStep::Ble(BleStep::Discovering);
+                    return self.start_ble_mode();
                 }
                 self.step = ExchangeStep::Qr(QrStep::ShowQr);
                 ActionResult::NavigateTo(self.build_screen())

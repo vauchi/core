@@ -181,6 +181,9 @@ pub(super) fn handle_ble_action(step: &BleStep, action: &UserAction) -> Option<B
 ///
 /// ADR-031: emits `ExchangeCommand`s via outcomes; never calls
 /// hardware directly.
+/// BLE data characteristic UUID used for shake envelope exchange.
+const SHAKE_ENVELOPE_CHAR: &str = vauchi_core::exchange::CHAR_DATA_WRITE;
+
 pub(super) struct BleExchangeFlow {
     mode: ExchangeMode,
     step: BleStep,
@@ -188,6 +191,8 @@ pub(super) struct BleExchangeFlow {
     proximity_runner: Option<ProximityRunner>,
     /// Card bytes received from BLE exchange (set on handshake complete).
     received_card: Option<Vec<u8>>,
+    /// Whether our shake envelope has been sent to the peer.
+    shake_envelope_sent: bool,
 }
 
 impl BleExchangeFlow {
@@ -198,6 +203,7 @@ impl BleExchangeFlow {
             connected_device: None,
             proximity_runner: None,
             received_card: None,
+            shake_envelope_sent: false,
         }
     }
 
@@ -292,9 +298,24 @@ impl BleExchangeFlow {
         // Feed proximity events to runner
         if is_proximity_event(event) {
             if let Some(ref mut runner) = self.proximity_runner {
-                let commands = runner.feed_event(event);
+                let mut commands = runner.feed_event(event);
+
+                // Shake mode: after samples accumulate, finish recording and send envelope
+                if self.mode == ExchangeMode::Shake
+                    && !self.shake_envelope_sent
+                    && !runner.is_recording_done()
+                {
+                    if let Some((envelope, stop_cmds)) = runner.finish_recording() {
+                        self.shake_envelope_sent = true;
+                        commands.extend(stop_cmds);
+                        commands.push(ExchangeCommand::BleWriteCharacteristic {
+                            uuid: SHAKE_ENVELOPE_CHAR.to_string(),
+                            data: envelope,
+                        });
+                    }
+                }
+
                 if runner.is_done() {
-                    // Proximity done — if we also have card data, complete
                     if self.received_card.is_some() {
                         return self.try_complete(commands);
                     }
@@ -305,11 +326,16 @@ impl BleExchangeFlow {
             }
         }
 
-        // BLE characteristic data = card exchange
-        if let ExchangeHardwareEvent::BleCharacteristicNotified { data, .. } = event {
+        // BLE characteristic notifications — could be card data or shake envelope
+        if let ExchangeHardwareEvent::BleCharacteristicNotified { uuid, data } = event {
             if !data.is_empty() {
+                // Shake envelope from peer (on data write characteristic)
+                if self.mode == ExchangeMode::Shake && uuid == SHAKE_ENVELOPE_CHAR {
+                    return self.handle_shake_envelope(data);
+                }
+
+                // Card data
                 self.received_card = Some(data.clone());
-                // If proximity is already done, complete
                 if self.proximity_runner.as_ref().is_some_and(|r| r.is_done()) {
                     return self.try_complete(vec![]);
                 }
@@ -320,10 +346,30 @@ impl BleExchangeFlow {
         BleHardwareOutcome::Ignored
     }
 
+    /// Handle received shake envelope from peer.
+    fn handle_shake_envelope(&mut self, data: &[u8]) -> BleHardwareOutcome {
+        if let Some(ref mut runner) = self.proximity_runner {
+            let commands = runner.receive_peer_envelope(data);
+            if runner.is_done() {
+                if self.received_card.is_some() {
+                    return self.try_complete(commands);
+                }
+                self.step = BleStep::Verifying;
+                return BleHardwareOutcome::StepAdvanced { commands };
+            }
+            return BleHardwareOutcome::Consumed { commands };
+        }
+        BleHardwareOutcome::Ignored
+    }
+
     fn handle_verifying(&mut self, event: &ExchangeHardwareEvent) -> BleHardwareOutcome {
         // In verifying, we're waiting for card data (proximity already done)
-        if let ExchangeHardwareEvent::BleCharacteristicNotified { data, .. } = event {
+        if let ExchangeHardwareEvent::BleCharacteristicNotified { uuid, data } = event {
             if !data.is_empty() {
+                // Shake envelope in verifying — peer envelope arrived late
+                if self.mode == ExchangeMode::Shake && uuid == SHAKE_ENVELOPE_CHAR {
+                    return self.handle_shake_envelope(data);
+                }
                 self.received_card = Some(data.clone());
                 return self.try_complete(vec![]);
             }
@@ -627,6 +673,115 @@ mod tests {
         let prox = flow.proximity_result().unwrap();
         assert!(!prox.verified);
         assert_eq!(prox.confidence, 0.0);
+    }
+
+    // ── Shake mode envelope exchange tests ───────────────────────
+
+    /// Feed accelerometer samples to a Shake flow in Exchanging step.
+    fn feed_accel_samples(flow: &mut BleExchangeFlow, count: usize) {
+        for i in 0..count {
+            flow.handle_event(&ExchangeHardwareEvent::AccelerometerData {
+                x_milli_g: ((i as f32 * 0.1).sin() * 2000.0) as i32,
+                y_milli_g: ((i as f32 * 0.1).cos() * 1500.0) as i32,
+                z_milli_g: 1000,
+                timestamp_ms: i as u64 * 10,
+            });
+        }
+    }
+
+    #[test]
+    fn shake_sends_envelope_after_recording() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Shake);
+        advance_to_exchanging(&mut flow);
+
+        // Feed enough samples
+        feed_accel_samples(&mut flow, 10);
+
+        // Manually finish recording via the runner
+        let runner = flow.proximity_runner.as_mut().unwrap();
+        let (envelope, _) = runner.finish_recording().unwrap();
+
+        // Verify envelope is non-empty and versioned
+        assert!(!envelope.is_empty());
+        assert_eq!(envelope[0], 0x01); // ENVELOPE_VERSION
+    }
+
+    #[test]
+    fn shake_peer_envelope_completes_with_card() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Shake);
+        advance_to_exchanging(&mut flow);
+
+        // Record samples and finish recording
+        feed_accel_samples(&mut flow, 50);
+        let runner = flow.proximity_runner.as_mut().unwrap();
+        let (our_envelope, _) = runner.finish_recording().unwrap();
+        flow.shake_envelope_sent = true;
+
+        // Receive card data
+        flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+            uuid: "card-char".into(),
+            data: vec![10, 20, 30],
+        });
+
+        // Receive peer's envelope (same data = perfect correlation)
+        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+            uuid: SHAKE_ENVELOPE_CHAR.into(),
+            data: our_envelope,
+        });
+
+        assert_eq!(*flow.step(), BleStep::Complete);
+        match outcome {
+            BleHardwareOutcome::Complete { card_bytes, .. } => {
+                assert_eq!(card_bytes, vec![10, 20, 30]);
+            }
+            other => panic!("Expected Complete, got {other:?}"),
+        }
+        let prox = flow.proximity_result().unwrap();
+        assert!(prox.verified);
+        assert!(prox.confidence <= 0.5); // Capped per spec
+    }
+
+    #[test]
+    fn shake_peer_envelope_before_card_advances_to_verifying() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Shake);
+        advance_to_exchanging(&mut flow);
+
+        feed_accel_samples(&mut flow, 50);
+        let runner = flow.proximity_runner.as_mut().unwrap();
+        let (our_envelope, _) = runner.finish_recording().unwrap();
+        flow.shake_envelope_sent = true;
+
+        // Peer envelope first (no card yet)
+        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+            uuid: SHAKE_ENVELOPE_CHAR.into(),
+            data: our_envelope,
+        });
+
+        assert_eq!(*flow.step(), BleStep::Verifying);
+        assert!(matches!(outcome, BleHardwareOutcome::StepAdvanced { .. }));
+
+        // Then card → complete
+        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+            uuid: "card-char".into(),
+            data: vec![1, 2, 3],
+        });
+        assert_eq!(*flow.step(), BleStep::Complete);
+        assert!(matches!(outcome, BleHardwareOutcome::Complete { .. }));
+    }
+
+    #[test]
+    fn shake_non_envelope_char_is_card_data() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Shake);
+        advance_to_exchanging(&mut flow);
+
+        // Data on a non-envelope UUID is treated as card data
+        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+            uuid: "some-other-char".into(),
+            data: vec![1, 2],
+        });
+        assert_eq!(*flow.step(), BleStep::Exchanging); // Still exchanging
+        assert!(matches!(outcome, BleHardwareOutcome::Consumed { .. }));
+        assert!(flow.received_card.is_some());
     }
 
     // ── Timeout / relay fallback tests ───────────────────────────

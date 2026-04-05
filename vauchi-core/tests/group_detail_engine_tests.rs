@@ -48,36 +48,38 @@ fn group_detail_shows_member_count() {
     assert_eq!(detail, "2");
 }
 
+// @internal
 #[test]
-fn group_detail_rename_shows_alert() {
+fn group_detail_rename_opens_form_dialog() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "rename".into(),
     });
     match result {
-        ActionResult::ShowAlert { title, message } => {
-            assert_eq!(title, "Coming Soon");
-            assert_eq!(
-                message,
-                "Group renaming will be available in a future update."
-            );
+        ActionResult::ShowFormDialog {
+            dialog_type,
+            context_id,
+        } => {
+            assert_eq!(dialog_type, "rename_group");
+            assert_eq!(context_id, Some("g1".into()));
         }
-        other => panic!("Expected ShowAlert, got {other:?}"),
+        other => panic!("Expected ShowFormDialog, got {other:?}"),
     }
 }
 
+// @internal
 #[test]
-fn group_detail_delete_shows_alert() {
+fn group_detail_delete_shows_confirmation() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete_group".into(),
     });
     match result {
         ActionResult::ShowAlert { title, message } => {
-            assert_eq!(title, "Coming Soon");
-            assert_eq!(
-                message,
-                "Group deletion will be available in a future update."
+            assert_eq!(title, "Delete Group?");
+            assert!(
+                message.contains("Family"),
+                "Expected group name in message, got: {message}"
             );
         }
         other => panic!("Expected ShowAlert, got {other:?}"),

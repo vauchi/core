@@ -198,9 +198,21 @@ impl WorkflowEngine for GroupsEngine {
                     self.pending_delete = false;
                     ActionResult::UpdateScreen(self.build_screen())
                 }
-                "new_group" | "rename_group" | "merge_groups" => ActionResult::ShowAlert {
-                    title: action_id.replace('_', " "),
-                    message: "This action will be handled by AppEngine.".into(),
+                "new_group" => ActionResult::ShowFormDialog {
+                    dialog_type: "create_group".into(),
+                    context_id: None,
+                },
+                "rename_group" => {
+                    // Use first group if none specifically selected
+                    let group_id = self.groups.first().map(|g| g.id.clone());
+                    ActionResult::ShowFormDialog {
+                        dialog_type: "rename_group".into(),
+                        context_id: group_id,
+                    }
+                }
+                "merge_groups" => ActionResult::ShowAlert {
+                    title: "Coming Soon".into(),
+                    message: "Group merging will be available in a future update.".into(),
                 },
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
@@ -403,13 +415,28 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
-    fn test_new_group_action_returns_alert() {
+    fn test_new_group_action_returns_form_dialog() {
         let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "new_group".into(),
         });
-        assert!(matches!(result, ActionResult::ShowAlert { .. }));
+        assert!(
+            matches!(result, ActionResult::ShowFormDialog { dialog_type, .. } if dialog_type == "create_group")
+        );
+    }
+
+    // @internal
+    #[test]
+    fn test_rename_group_action_returns_form_dialog() {
+        let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "rename_group".into(),
+        });
+        assert!(
+            matches!(result, ActionResult::ShowFormDialog { dialog_type, .. } if dialog_type == "rename_group")
+        );
     }
 
     #[test]

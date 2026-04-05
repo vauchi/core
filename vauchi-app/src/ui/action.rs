@@ -116,4 +116,9 @@ pub enum ActionResult {
     VerifyFingerprint {
         contact_id: String,
     },
+    /// App layer should open a form dialog (create group, rename, etc.).
+    ShowFormDialog {
+        dialog_type: String,
+        context_id: Option<String>,
+    },
 }

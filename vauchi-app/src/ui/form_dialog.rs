@@ -31,6 +31,11 @@ pub enum FormDialogType {
     EditRelayUrl {
         current_url: String,
     },
+    CreateGroup,
+    RenameGroup {
+        group_id: String,
+        current_name: String,
+    },
 }
 
 /// Returns a placeholder hint for a given catalog entry key.
@@ -89,6 +94,12 @@ impl FormDialogEngine {
             }
             FormDialogType::EditRelayUrl { current_url } => {
                 vec![("relay_url".into(), current_url.clone())]
+            }
+            FormDialogType::CreateGroup => {
+                vec![("group_name".into(), String::new())]
+            }
+            FormDialogType::RenameGroup { current_name, .. } => {
+                vec![("group_name".into(), current_name.clone())]
             }
         };
         let catalog_entries = if matches!(dialog_type, FormDialogType::AddField { .. }) {
@@ -363,6 +374,51 @@ impl FormDialogEngine {
                 progress: None,
                 ..Default::default()
             },
+            FormDialogType::CreateGroup => {
+                self.build_group_name_screen("form_create_group", "New Group", "Create")
+            }
+            FormDialogType::RenameGroup { .. } => {
+                self.build_group_name_screen("form_rename_group", "Rename Group", "Rename")
+            }
+        }
+    }
+
+    fn build_group_name_screen(
+        &self,
+        screen_id: &str,
+        title: &str,
+        submit_label: &str,
+    ) -> ScreenModel {
+        let name = self.get_value("group_name");
+        ScreenModel {
+            screen_id: screen_id.into(),
+            title: title.into(),
+            subtitle: None,
+            components: vec![Component::TextInput {
+                id: "group_name".into(),
+                label: "Group Name".into(),
+                value: name.into(),
+                placeholder: Some("e.g. Family, Work, Friends".into()),
+                max_length: Some(50),
+                validation_error: None,
+                input_type: InputType::Text,
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: "submit".into(),
+                    label: submit_label.into(),
+                    style: ActionStyle::Primary,
+                    enabled: !name.is_empty(),
+                },
+                ScreenAction {
+                    id: "cancel".into(),
+                    label: "Cancel".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                },
+            ],
+            progress: None,
+            ..Default::default()
         }
     }
 }
@@ -433,6 +489,9 @@ impl WorkflowEngine for FormDialogEngine {
             }
             FormDialogType::EditName { .. } => Some(self.get_value("display_name").to_string()),
             FormDialogType::EditRelayUrl { .. } => Some(self.get_value("relay_url").to_string()),
+            FormDialogType::CreateGroup | FormDialogType::RenameGroup { .. } => {
+                Some(self.get_value("group_name").to_string())
+            }
         }
     }
 

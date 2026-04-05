@@ -91,13 +91,16 @@ impl WorkflowEngine for GroupDetailEngine {
                     };
                 }
                 match action_id.as_str() {
-                    "rename" => ActionResult::ShowAlert {
-                        title: "Coming Soon".into(),
-                        message: "Group renaming will be available in a future update.".into(),
+                    "rename" => ActionResult::ShowFormDialog {
+                        dialog_type: "rename_group".into(),
+                        context_id: Some(self.group_id.clone()),
                     },
                     "delete_group" => ActionResult::ShowAlert {
-                        title: "Coming Soon".into(),
-                        message: "Group deletion will be available in a future update.".into(),
+                        title: "Delete Group?".into(),
+                        message: format!(
+                            "Are you sure you want to delete \"{}\"? Contacts will not be deleted.",
+                            self.group_name
+                        ),
                     },
                     _ => ActionResult::UpdateScreen(self.build_screen()),
                 }

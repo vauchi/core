@@ -64,13 +64,19 @@ fn groups_list_shows_groups_with_member_counts() {
     }
 }
 
+// @internal
 #[test]
-fn groups_list_new_group_shows_alert() {
+fn groups_list_new_group_opens_form_dialog() {
     let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "new_group".into(),
     });
-    assert!(matches!(result, ActionResult::ShowAlert { .. }));
+    match result {
+        ActionResult::ShowFormDialog { dialog_type, .. } => {
+            assert_eq!(dialog_type, "create_group");
+        }
+        other => panic!("Expected ShowFormDialog for create_group, got {other:?}"),
+    }
 }
 
 #[test]

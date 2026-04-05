@@ -49,6 +49,8 @@ impl AppEngine {
             }
             FormDialogType::EditName { current_name } => input != *current_name,
             FormDialogType::EditRelayUrl { current_url } => input != *current_url,
+            FormDialogType::CreateGroup => !input.is_empty(),
+            FormDialogType::RenameGroup { current_name, .. } => input != *current_name,
         }
     }
 
@@ -382,6 +384,26 @@ impl AppEngine {
                         }
                         result
                     }
+                    FormDialogType::CreateGroup => {
+                        let name = input.unwrap_or_default();
+                        if name.trim().is_empty() {
+                            return ActionResult::ValidationError {
+                                component_id: "group_name".into(),
+                                message: "Group name cannot be empty".into(),
+                            };
+                        }
+                        self.vauchi.create_group(name.trim()).map(|_| ())
+                    }
+                    FormDialogType::RenameGroup { group_id, .. } => {
+                        let name = input.unwrap_or_default();
+                        if name.trim().is_empty() {
+                            return ActionResult::ValidationError {
+                                component_id: "group_name".into(),
+                                message: "Group name cannot be empty".into(),
+                            };
+                        }
+                        self.vauchi.rename_group(group_id, name.trim())
+                    }
                     FormDialogType::EditRelayUrl { .. } => {
                         // Relay URL is TUI-specific config (Backend), not in Vauchi.
                         // Navigate back; TUI handles save via Backend::set_relay_url.
@@ -526,6 +548,35 @@ impl AppEngine {
             ActionResult::ShowContactPicker => {
                 let screen = self.navigate_to(AppScreen::Contacts);
                 ActionResult::NavigateTo(screen)
+            }
+            // Group management: route ShowFormDialog to FormDialog screen
+            ActionResult::ShowFormDialog {
+                dialog_type,
+                context_id,
+            } => {
+                let form_type = match dialog_type.as_str() {
+                    "create_group" => Some(crate::ui::form_dialog::FormDialogType::CreateGroup),
+                    "rename_group" => {
+                        let group_id = context_id.unwrap_or_default();
+                        let current_name = self
+                            .vauchi
+                            .get_group(&group_id)
+                            .ok()
+                            .map(|g| g.name().to_string())
+                            .unwrap_or_default();
+                        Some(crate::ui::form_dialog::FormDialogType::RenameGroup {
+                            group_id,
+                            current_name,
+                        })
+                    }
+                    _ => None,
+                };
+                if let Some(ft) = form_type {
+                    let screen = self.navigate_to(AppScreen::FormDialog { dialog_type: ft });
+                    ActionResult::NavigateTo(screen)
+                } else {
+                    ActionResult::UpdateScreen(self.engine.current_screen())
+                }
             }
             other => other,
         }

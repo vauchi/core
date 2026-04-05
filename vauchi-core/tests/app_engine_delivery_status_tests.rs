@@ -20,8 +20,7 @@ fn now() -> u64 {
         .as_secs()
 }
 
-/// Feature: message_delivery @delivery @status
-/// Scenario: Delivery status screen shows pending and failed records
+// @scenario: message_delivery :: Delivery status screen shows pending and failed records
 #[test]
 fn test_delivery_status_screen_shows_records_from_storage() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -95,8 +94,7 @@ fn test_delivery_status_screen_shows_records_from_storage() {
     );
 }
 
-/// Feature: message_delivery @delivery @status
-/// Scenario: Delivery status screen shows empty state when no records exist
+// @scenario: message_delivery :: Delivery status screen shows empty state when no records
 #[test]
 fn test_delivery_status_screen_empty_when_no_records() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -121,8 +119,7 @@ fn test_delivery_status_screen_empty_when_no_records() {
     );
 }
 
-/// Feature: message_delivery @delivery @status
-/// Scenario: Failed deliveries show retry action
+// @scenario: message_delivery :: Failed deliveries show retry action
 #[test]
 fn test_delivery_status_screen_shows_retry_for_failed() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -158,8 +155,7 @@ fn test_delivery_status_screen_shows_retry_for_failed() {
     );
 }
 
-/// Feature: message_delivery @delivery @status
-/// Scenario: Delivery status maps storage statuses to UI statuses correctly
+// @scenario: message_delivery :: Delivery status maps storage statuses to UI statuses correctly
 #[test]
 fn test_delivery_status_maps_statuses_correctly() {
     let mut vauchi = Vauchi::in_memory().unwrap();

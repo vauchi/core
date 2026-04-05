@@ -994,17 +994,22 @@ build:cabi-windows:
       printf '%s' "$HASH" > dist/vauchi_cabi.dll.sha256
       echo "SHA-256: $HASH"
 
-      # Verify COSIGN_KEY
-      if [ -z "$COSIGN_KEY" ]; then
+      # Sign checksum with cosign (matches package-xcframework.sh pattern)
+      # GitLab masked file variables store base64-encoded content — decode if needed.
+      if [ -z "${COSIGN_KEY:-}" ]; then
         echo "ERROR: COSIGN_KEY is required for DLL signing"
         exit 1
       fi
-
-      # Sign checksum
+      COSIGN_KEY_FILE="$COSIGN_KEY"
+      if ! head -1 "$COSIGN_KEY" | grep -q -- "-----BEGIN"; then
+        COSIGN_KEY_FILE=$(mktemp)
+        base64 -d < "$COSIGN_KEY" > "$COSIGN_KEY_FILE"
+      fi
       cosign sign-blob --yes \
-        --key env://COSIGN_KEY \
+        --key "$COSIGN_KEY_FILE" \
         --bundle dist/vauchi_cabi.dll.sha256.bundle \
         dist/vauchi_cabi.dll.sha256
+      [ "$COSIGN_KEY_FILE" != "$COSIGN_KEY" ] && rm -f "$COSIGN_KEY_FILE"
       echo "DLL checksum signed"
 
       # Upload to generic package registry

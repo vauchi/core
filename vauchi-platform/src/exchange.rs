@@ -480,6 +480,7 @@ pub enum MobileExchangeCommand {
     BleStartScanning {
         service_uuid: String,
     },
+    BleStopScanning,
     BleConnect {
         device_id: String,
     },
@@ -543,6 +544,7 @@ impl From<ExchangeCommand> for MobileExchangeCommand {
             ExchangeCommand::BleStartScanning { service_uuid } => {
                 Self::BleStartScanning { service_uuid }
             }
+            ExchangeCommand::BleStopScanning => Self::BleStopScanning,
             ExchangeCommand::BleConnect { device_id } => Self::BleConnect { device_id },
             ExchangeCommand::BleWriteCharacteristic { uuid, data } => {
                 Self::BleWriteCharacteristic { uuid, data }

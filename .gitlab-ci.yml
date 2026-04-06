@@ -1429,6 +1429,12 @@ update:swift-bindings:
       CLEAN_VERSION="${VERSION#v}"
       echo "Updating vauchi-platform-swift to $VERSION"
 
+      # Resolve bot identity so git author matches GitLab account (pre-receive hook)
+      BOT_USER=$(curl -fsSL --header "PRIVATE-TOKEN: ${PROJECT_ACCESS_TOKEN}" \
+        "${CI_SERVER_URL}/api/v4/user" 2>/dev/null || true)
+      BOT_EMAIL=$(echo "$BOT_USER" | jq -r '.commit_email // .email // empty')
+      BOT_NAME=$(echo "$BOT_USER" | jq -r '.name // empty')
+
       # Read checksum from local artifact (no network download needed)
       CHECKSUM=$(cat dist/VauchiPlatformFFI.xcframework.zip.sha256 | tr -d '[:space:]')
       echo "XCFramework checksum: $CHECKSUM"
@@ -1478,8 +1484,8 @@ update:swift-bindings:
       head -12 Package.swift
 
       # Commit and push
+      git config user.name "${BOT_NAME:-${GITLAB_USER_NAME}}"
       git config user.email "${BOT_EMAIL:-${GITLAB_USER_EMAIL}}"
-      git config user.name "${BOT_NAME:-Vauchi CI}"
       git add Package.swift Sources/VauchiPlatform/vauchi_platform.swift
       if git diff --cached --quiet; then
         echo "No changes — bindings already up to date"
@@ -1507,6 +1513,12 @@ trigger:windows:
       VERSION="${CI_COMMIT_TAG}"
       CLEAN_VERSION="${VERSION#v}"
       echo "Updating windows/ CABI version to $CLEAN_VERSION"
+
+      # Resolve bot identity so git author matches GitLab account (pre-receive hook)
+      BOT_USER=$(curl -fsSL --header "PRIVATE-TOKEN: ${PROJECT_ACCESS_TOKEN}" \
+        "${CI_SERVER_URL}/api/v4/user" 2>/dev/null || true)
+      BOT_EMAIL=$(echo "$BOT_USER" | jq -r '.commit_email // .email // empty')
+      BOT_NAME=$(echo "$BOT_USER" | jq -r '.name // empty')
 
       # Read checksum from build artifact
       DLL_SHA256=$(cat dist/vauchi_cabi.dll.sha256 | tr -d '[:space:]')
@@ -1547,8 +1559,8 @@ trigger:windows:
         echo "✓ cosign.pub updated"
       fi
 
+      git config user.name "${BOT_NAME:-${GITLAB_USER_NAME}}"
       git config user.email "${BOT_EMAIL:-${GITLAB_USER_EMAIL}}"
-      git config user.name "${BOT_NAME:-Vauchi CI}"
       git add cabi-version.json cosign.pub
       git diff --cached --quiet && { echo "No changes to push"; exit 0; }
       git commit -m "chore: update CABI DLL to $CLEAN_VERSION

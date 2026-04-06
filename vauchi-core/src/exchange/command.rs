@@ -38,8 +38,6 @@ pub enum ExchangeCommand {
     },
     /// Start scanning for vauchi BLE peripherals.
     BleStartScanning { service_uuid: String },
-    /// Stop BLE scanning (saves battery after discovery completes).
-    BleStopScanning,
     /// Connect to a discovered BLE device.
     BleConnect { device_id: String },
     /// Write data to a BLE characteristic.
@@ -96,6 +94,11 @@ pub enum ExchangeCommand {
     // ── Link mode ───────────────────────────────────────────────────
     /// Show system share sheet with a URL.
     ShowShareSheet { url: String },
+
+    // ── BLE cleanup ────────────────────────────────────────────────
+    // Appended (not inserted) to preserve serde discriminant ordering.
+    /// Stop BLE scanning (saves battery after discovery completes).
+    BleStopScanning,
 }
 
 /// A hardware event reported by the frontend back to core.

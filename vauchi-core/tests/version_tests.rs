@@ -11,6 +11,7 @@ use vauchi_core::version::{APP_COMPAT_VERSION, AppUpdateStatus, VersionPolicy};
 // APP_COMPAT_VERSION constant
 // ---------------------------------------------------------------------------
 
+// @internal
 #[test]
 fn app_compat_version_starts_at_one() {
     assert_eq!(APP_COMPAT_VERSION, 1);
@@ -20,6 +21,7 @@ fn app_compat_version_starts_at_one() {
 // VersionPolicy::evaluate
 // ---------------------------------------------------------------------------
 
+// @internal
 #[test]
 fn evaluate_up_to_date_when_at_warn_version() {
     let policy = VersionPolicy {
@@ -30,6 +32,7 @@ fn evaluate_up_to_date_when_at_warn_version() {
     assert_eq!(policy.evaluate(2), AppUpdateStatus::UpToDate);
 }
 
+// @internal
 #[test]
 fn evaluate_up_to_date_when_above_warn_version() {
     let policy = VersionPolicy {
@@ -40,6 +43,7 @@ fn evaluate_up_to_date_when_above_warn_version() {
     assert_eq!(policy.evaluate(3), AppUpdateStatus::UpToDate);
 }
 
+// @internal
 #[test]
 fn evaluate_update_available_when_at_min_but_below_warn() {
     let policy = VersionPolicy {
@@ -50,6 +54,7 @@ fn evaluate_update_available_when_at_min_but_below_warn() {
     assert_eq!(policy.evaluate(3), AppUpdateStatus::UpdateAvailable);
 }
 
+// @internal
 #[test]
 fn evaluate_update_available_when_exactly_at_min() {
     let policy = VersionPolicy {
@@ -60,6 +65,7 @@ fn evaluate_update_available_when_exactly_at_min() {
     assert_eq!(policy.evaluate(2), AppUpdateStatus::UpdateAvailable);
 }
 
+// @internal
 #[test]
 fn evaluate_update_required_with_future_grace_deadline() {
     // Grace deadline far in the future (year 2099)
@@ -77,6 +83,7 @@ fn evaluate_update_required_with_future_grace_deadline() {
     );
 }
 
+// @internal
 #[test]
 fn evaluate_update_required_no_deadline() {
     let policy = VersionPolicy {
@@ -92,6 +99,7 @@ fn evaluate_update_required_no_deadline() {
     );
 }
 
+// @internal
 #[test]
 fn evaluate_update_required_with_past_deadline() {
     // Deadline in the past (year 2020)
@@ -113,6 +121,7 @@ fn evaluate_update_required_with_past_deadline() {
 // VersionPolicy::is_none_policy
 // ---------------------------------------------------------------------------
 
+// @internal
 #[test]
 fn is_none_policy_when_both_zero() {
     let policy = VersionPolicy {
@@ -123,6 +132,7 @@ fn is_none_policy_when_both_zero() {
     assert!(policy.is_none_policy());
 }
 
+// @internal
 #[test]
 fn is_not_none_policy_when_min_nonzero() {
     let policy = VersionPolicy {
@@ -133,6 +143,7 @@ fn is_not_none_policy_when_min_nonzero() {
     assert!(!policy.is_none_policy());
 }
 
+// @internal
 #[test]
 fn is_not_none_policy_when_warn_nonzero() {
     let policy = VersionPolicy {
@@ -147,6 +158,7 @@ fn is_not_none_policy_when_warn_nonzero() {
 // VersionPolicy::from_headers
 // ---------------------------------------------------------------------------
 
+// @internal
 #[test]
 fn from_headers_parses_all_values() {
     let policy = VersionPolicy::from_headers(Some("2"), Some("4"), Some("1700000000"));
@@ -155,6 +167,7 @@ fn from_headers_parses_all_values() {
     assert_eq!(policy.grace_deadline, Some(1_700_000_000));
 }
 
+// @internal
 #[test]
 fn from_headers_handles_missing_headers() {
     let policy = VersionPolicy::from_headers(None, None, None);
@@ -164,6 +177,7 @@ fn from_headers_handles_missing_headers() {
     assert!(policy.is_none_policy());
 }
 
+// @internal
 #[test]
 fn from_headers_handles_partial_headers() {
     let policy = VersionPolicy::from_headers(Some("3"), None, None);
@@ -172,6 +186,7 @@ fn from_headers_handles_partial_headers() {
     assert_eq!(policy.grace_deadline, None);
 }
 
+// @internal
 #[test]
 fn from_headers_handles_invalid_numbers_as_zero() {
     let policy = VersionPolicy::from_headers(Some("abc"), Some("xyz"), Some("not-a-number"));
@@ -184,6 +199,7 @@ fn from_headers_handles_invalid_numbers_as_zero() {
 // VersionPolicy::from_cdn_json
 // ---------------------------------------------------------------------------
 
+// @internal
 #[test]
 fn from_cdn_json_parses_complete_json_with_unix_timestamp() {
     let json = r#"{"min_version": 2, "warn_version": 4, "grace_deadline": 1700000000}"#;
@@ -193,6 +209,7 @@ fn from_cdn_json_parses_complete_json_with_unix_timestamp() {
     assert_eq!(policy.grace_deadline, Some(1_700_000_000));
 }
 
+// @internal
 #[test]
 fn from_cdn_json_handles_null_deadline() {
     let json = r#"{"min_version": 1, "warn_version": 3, "grace_deadline": null}"#;
@@ -202,6 +219,7 @@ fn from_cdn_json_handles_null_deadline() {
     assert_eq!(policy.grace_deadline, None);
 }
 
+// @internal
 #[test]
 fn from_cdn_json_handles_missing_deadline_field() {
     let json = r#"{"min_version": 1, "warn_version": 3}"#;
@@ -211,6 +229,7 @@ fn from_cdn_json_handles_missing_deadline_field() {
     assert_eq!(policy.grace_deadline, None);
 }
 
+// @internal
 #[test]
 fn from_cdn_json_handles_iso8601_deadline() {
     // 2024-01-15T00:00:00Z = 1705276800
@@ -221,12 +240,14 @@ fn from_cdn_json_handles_iso8601_deadline() {
     assert_eq!(policy.grace_deadline, Some(1_705_276_800));
 }
 
+// @internal
 #[test]
 fn from_cdn_json_rejects_invalid_json() {
     let result = VersionPolicy::from_cdn_json("not json at all");
     assert!(result.is_err());
 }
 
+// @internal
 #[test]
 fn from_cdn_json_rejects_missing_required_fields() {
     let json = r#"{"min_version": 1}"#;
@@ -234,6 +255,7 @@ fn from_cdn_json_rejects_missing_required_fields() {
     assert!(result.is_err());
 }
 
+// @internal
 #[test]
 fn from_cdn_json_iso8601_epoch_parses_to_zero() {
     let json = r#"{"min_version": 1, "warn_version": 2, "grace_deadline": "1970-01-01T00:00:00Z"}"#;
@@ -241,6 +263,7 @@ fn from_cdn_json_iso8601_epoch_parses_to_zero() {
     assert_eq!(policy.grace_deadline, Some(0));
 }
 
+// @internal
 #[test]
 fn from_cdn_json_rejects_non_utc_iso8601() {
     let json =
@@ -253,6 +276,7 @@ fn from_cdn_json_rejects_non_utc_iso8601() {
 // Derive traits
 // ---------------------------------------------------------------------------
 
+// @internal
 #[test]
 fn version_policy_is_clone_debug_eq() {
     let policy = VersionPolicy {
@@ -266,6 +290,7 @@ fn version_policy_is_clone_debug_eq() {
     let _debug = format!("{:?}", policy);
 }
 
+// @internal
 #[test]
 fn app_update_status_is_clone_debug_eq() {
     let status = AppUpdateStatus::UpToDate;
@@ -278,6 +303,7 @@ fn app_update_status_is_clone_debug_eq() {
 // Truncation and validation regression tests
 // ---------------------------------------------------------------------------
 
+// @internal
 #[test]
 fn from_cdn_json_rejects_min_version_exceeding_u16() {
     let json = r#"{"min_version": 70000, "warn_version": 1}"#;
@@ -289,6 +315,7 @@ fn from_cdn_json_rejects_min_version_exceeding_u16() {
     );
 }
 
+// @internal
 #[test]
 fn from_cdn_json_rejects_warn_version_exceeding_u16() {
     let json = r#"{"min_version": 1, "warn_version": 100000}"#;
@@ -300,6 +327,7 @@ fn from_cdn_json_rejects_warn_version_exceeding_u16() {
     );
 }
 
+// @internal
 #[test]
 fn from_cdn_json_accepts_u16_max() {
     let json = r#"{"min_version": 65535, "warn_version": 65535}"#;
@@ -308,6 +336,7 @@ fn from_cdn_json_accepts_u16_max() {
     assert_eq!(policy.warn_version, 65535);
 }
 
+// @internal
 #[test]
 fn from_cdn_json_rejects_pre_1970_iso8601() {
     let json = r#"{"min_version": 1, "warn_version": 2, "grace_deadline": "1969-12-31T23:59:59Z"}"#;
@@ -319,6 +348,7 @@ fn from_cdn_json_rejects_pre_1970_iso8601() {
     );
 }
 
+// @internal
 #[test]
 fn from_cdn_json_rejects_bad_separators() {
     // Spaces instead of dashes/colons
@@ -327,6 +357,7 @@ fn from_cdn_json_rejects_bad_separators() {
     assert!(result.is_err());
 }
 
+// @internal
 #[test]
 fn from_cdn_json_rejects_hour_24() {
     let json = r#"{"min_version": 1, "warn_version": 2, "grace_deadline": "2024-01-15T24:00:00Z"}"#;
@@ -338,6 +369,7 @@ fn from_cdn_json_rejects_hour_24() {
     );
 }
 
+// @internal
 #[test]
 fn from_cdn_json_rejects_minute_60() {
     let json = r#"{"min_version": 1, "warn_version": 2, "grace_deadline": "2024-01-15T00:60:00Z"}"#;
@@ -345,6 +377,7 @@ fn from_cdn_json_rejects_minute_60() {
     assert!(result.is_err());
 }
 
+// @internal
 #[test]
 fn from_cdn_json_accepts_leap_second() {
     // Second 60 is valid for leap seconds
@@ -353,6 +386,7 @@ fn from_cdn_json_accepts_leap_second() {
     assert!(policy.grace_deadline.is_some());
 }
 
+// @internal
 #[test]
 fn from_cdn_json_rejects_second_61() {
     let json = r#"{"min_version": 1, "warn_version": 2, "grace_deadline": "2024-01-15T00:00:61Z"}"#;
@@ -374,9 +408,11 @@ fn status_rank(s: &AppUpdateStatus) -> u8 {
 }
 
 proptest! {
+    // @internal
     /// For a fixed policy, incrementing the app version must never produce a
     /// "worse" status (monotonicity: version N+1 >= version N).
-    #[test]
+    // @internal
+#[test]
     fn evaluate_monotonicity(
         min_ver in 0u16..=1000,
         warn_ver in 0u16..=1000,
@@ -396,8 +432,10 @@ proptest! {
         );
     }
 
+    // @internal
     /// Generate valid ISO 8601 date strings and verify from_cdn_json doesn't panic.
-    #[test]
+    // @internal
+#[test]
     fn from_cdn_json_valid_iso_no_panic(
         year in 1970u32..2100,
         month in 1u32..=12,
@@ -419,8 +457,10 @@ proptest! {
         prop_assert!(result.is_ok(), "valid ISO date should parse: {} -> {:?}", iso, result);
     }
 
+    // @internal
     /// Random version values in u16 range should always parse from CDN JSON.
-    #[test]
+    // @internal
+#[test]
     fn from_cdn_json_u16_versions(
         min_ver in 0u64..=65535,
         warn_ver in 0u64..=65535,
@@ -436,8 +476,10 @@ proptest! {
         prop_assert_eq!(policy.warn_version, warn_ver as u16);
     }
 
+    // @internal
     /// Values above u16::MAX must be rejected.
-    #[test]
+    // @internal
+#[test]
     fn from_cdn_json_rejects_above_u16(
         big_val in 65536u64..=1_000_000,
     ) {

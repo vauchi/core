@@ -9,10 +9,10 @@ use crate::ui::*;
 /// Engine that displays details of a single contact group.
 #[derive(Clone, Debug)]
 pub struct GroupDetailEngine {
-    #[allow(dead_code)] // Used by future save logic (rename/delete group)
     group_id: String,
     group_name: String,
     members: Vec<ContactItem>,
+    pending_delete: bool,
 }
 
 impl GroupDetailEngine {
@@ -21,31 +21,47 @@ impl GroupDetailEngine {
             group_id,
             group_name,
             members,
+            pending_delete: false,
         }
     }
 
     fn build_screen(&self) -> ScreenModel {
+        let mut components = vec![
+            Component::InfoPanel {
+                id: "group_info".into(),
+                icon: Some("group".into()),
+                title: "Group Info".into(),
+                items: vec![InfoItem {
+                    icon: Some("members".into()),
+                    title: "Members".into(),
+                    detail: format!("{}", self.members.len()),
+                }],
+            },
+            Component::ContactList {
+                id: "members".into(),
+                contacts: self.members.clone(),
+                searchable: false,
+            },
+        ];
+
+        if self.pending_delete {
+            components.push(Component::InlineConfirm {
+                id: "delete_group".into(),
+                warning: format!(
+                    "This will permanently delete \"{}\". Contacts will not be deleted.",
+                    self.group_name
+                ),
+                confirm_text: "Delete Group".into(),
+                cancel_text: "Cancel".into(),
+                destructive: true,
+            });
+        }
+
         ScreenModel {
             screen_id: "group_detail".into(),
             title: self.group_name.clone(),
             subtitle: None,
-            components: vec![
-                Component::InfoPanel {
-                    id: "group_info".into(),
-                    icon: Some("group".into()),
-                    title: "Group Info".into(),
-                    items: vec![InfoItem {
-                        icon: Some("members".into()),
-                        title: "Members".into(),
-                        detail: format!("{}", self.members.len()),
-                    }],
-                },
-                Component::ContactList {
-                    id: "members".into(),
-                    contacts: self.members.clone(),
-                    searchable: false,
-                },
-            ],
+            components,
             actions: {
                 let mut actions: Vec<ScreenAction> = self
                     .members
@@ -95,13 +111,18 @@ impl WorkflowEngine for GroupDetailEngine {
                         dialog_type: "rename_group".into(),
                         context_id: Some(self.group_id.clone()),
                     },
-                    "delete_group" => ActionResult::ShowAlert {
-                        title: "Delete Group?".into(),
-                        message: format!(
-                            "Are you sure you want to delete \"{}\"? Contacts will not be deleted.",
-                            self.group_name
-                        ),
-                    },
+                    "delete_group" => {
+                        self.pending_delete = true;
+                        ActionResult::UpdateScreen(self.build_screen())
+                    }
+                    "confirm_delete_group" => {
+                        self.pending_delete = false;
+                        ActionResult::Complete
+                    }
+                    "cancel_delete_group" => {
+                        self.pending_delete = false;
+                        ActionResult::UpdateScreen(self.build_screen())
+                    }
                     _ => ActionResult::UpdateScreen(self.build_screen()),
                 }
             }

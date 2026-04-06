@@ -67,23 +67,64 @@ fn group_detail_rename_opens_form_dialog() {
     }
 }
 
-// @internal
+// @internal — ADR-022: destructive actions use InlineConfirm, not ShowAlert
 #[test]
-fn group_detail_delete_shows_confirmation() {
+fn group_detail_delete_shows_inline_confirm() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete_group".into(),
     });
-    match result {
-        ActionResult::ShowAlert { title, message } => {
-            assert_eq!(title, "Delete Group?");
-            assert!(
-                message.contains("Family"),
-                "Expected group name in message, got: {message}"
-            );
-        }
-        other => panic!("Expected ShowAlert, got {other:?}"),
-    }
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("Expected UpdateScreen with InlineConfirm, got {result:?}");
+    };
+    let has_inline_confirm = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::InlineConfirm { destructive, .. } if *destructive));
+    assert!(
+        has_inline_confirm,
+        "delete_group should show a destructive InlineConfirm"
+    );
+}
+
+// @internal
+#[test]
+fn group_detail_confirm_delete_completes() {
+    let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
+    // First trigger the delete to enter pending state
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "delete_group".into(),
+    });
+    // Then confirm
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_delete_group".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::Complete),
+        "confirm_delete_group should return Complete, got {result:?}"
+    );
+}
+
+// @internal
+#[test]
+fn group_detail_cancel_delete_removes_inline_confirm() {
+    let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
+    // Trigger delete
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "delete_group".into(),
+    });
+    // Cancel
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel_delete_group".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("Expected UpdateScreen, got {result:?}");
+    };
+    let has_inline_confirm = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::InlineConfirm { .. }));
+    assert!(!has_inline_confirm, "cancel should remove InlineConfirm");
 }
 
 #[test]

@@ -12,10 +12,14 @@ use vauchi_core::api::Vauchi;
 
 /// Helper: enter PIN and submit on the lock screen.
 fn unlock(engine: &mut AppEngine, pin: &str) {
-    engine.handle_action(UserAction::TextChanged {
+    let text_result = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
         value: pin.into(),
     });
+    assert!(
+        matches!(text_result, ActionResult::UpdateScreen(_)),
+        "PIN text entry should update screen, got {text_result:?}"
+    );
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "unlock".into(),
     });

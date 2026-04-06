@@ -44,6 +44,22 @@ impl HelpCategory {
         ]
     }
 
+    /// Resolves a human-friendly alias to a `HelpCategory`.
+    ///
+    /// Accepts lowercase variants, abbreviations, and common synonyms.
+    /// Returns `None` if the alias is not recognized.
+    pub fn from_alias(s: &str) -> Option<HelpCategory> {
+        match s.to_lowercase().as_str() {
+            "getting-started" | "gettingstarted" | "start" => Some(HelpCategory::GettingStarted),
+            "privacy" | "security" => Some(HelpCategory::Privacy),
+            "recovery" => Some(HelpCategory::Recovery),
+            "contacts" | "contact" => Some(HelpCategory::Contacts),
+            "updates" | "sync" => Some(HelpCategory::Updates),
+            "features" | "feature" => Some(HelpCategory::Features),
+            _ => None,
+        }
+    }
+
     /// Get display name for this category
     pub fn display_name(&self) -> &'static str {
         match self {

@@ -218,16 +218,15 @@ impl AppEngine {
                             message: format!("Failed to save contact: {e}"),
                         };
                     }
-                    if let (Some(sk), Some(pk)) = (contact.shared_key(), contact.public_key()) {
-                        if let Err(e) =
+                    if let (Some(sk), Some(pk)) = (contact.shared_key(), contact.public_key())
+                        && let Err(e) =
                             self.vauchi
                                 .create_ratchet_as_initiator(&contact_id, sk, *pk)
-                        {
-                            return ActionResult::ShowAlert {
-                                title: "Exchange Error".into(),
-                                message: format!("Failed to initialize encryption: {e}"),
-                            };
-                        }
+                    {
+                        return ActionResult::ShowAlert {
+                            title: "Exchange Error".into(),
+                            message: format!("Failed to initialize encryption: {e}"),
+                        };
                     }
                     for group_id in &groups {
                         let _ = self.vauchi.add_contact_to_group(group_id, &contact_id);

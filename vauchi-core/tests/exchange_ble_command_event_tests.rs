@@ -62,11 +62,16 @@ fn ble_device_discovered_emits_connect_command() {
         .unwrap();
 
     let cmds = session.drain_commands();
-    assert_eq!(cmds.len(), 1);
+    assert_eq!(cmds.len(), 2, "expected BleStopScanning + BleConnect");
     assert!(
-        matches!(&cmds[0], ExchangeCommand::BleConnect { device_id } if device_id == "peer-1"),
-        "expected BleConnect command, got {:?}",
+        matches!(&cmds[0], ExchangeCommand::BleStopScanning),
+        "expected BleStopScanning first, got {:?}",
         cmds[0]
+    );
+    assert!(
+        matches!(&cmds[1], ExchangeCommand::BleConnect { device_id } if device_id == "peer-1"),
+        "expected BleConnect second, got {:?}",
+        cmds[1]
     );
 }
 

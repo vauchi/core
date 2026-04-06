@@ -47,7 +47,7 @@ impl VersionPolicy {
             AppUpdateStatus::UpdateAvailable
         } else {
             AppUpdateStatus::UpdateRequired {
-                grace_deadline: self.grace_deadline,
+                grace_deadline: self.active_grace_deadline(),
             }
         }
     }
@@ -61,6 +61,17 @@ impl VersionPolicy {
             warn_version: warn.and_then(|v| v.parse().ok()).unwrap_or(0),
             grace_deadline: deadline.and_then(|v| v.parse().ok()),
         }
+    }
+
+    /// Returns the grace deadline only if it is still in the future.
+    ///
+    /// A past deadline means grace has expired — callers should treat `None` as "hard block now".
+    fn active_grace_deadline(&self) -> Option<u64> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock before Unix epoch")
+            .as_secs();
+        self.grace_deadline.filter(|&d| d > now)
     }
 
     /// Returns `true` if this policy carries no version constraints (both thresholds are 0).
@@ -94,14 +105,18 @@ impl VersionPolicy {
         let min_version = obj
             .get("min_version")
             .and_then(|v| v.as_u64())
-            .map(|v| v as u16)
-            .ok_or_else(|| "missing or invalid min_version".to_string())?;
+            .ok_or_else(|| "missing or invalid min_version".to_string())
+            .and_then(|v| {
+                u16::try_from(v).map_err(|_| format!("min_version out of u16 range: {v}"))
+            })?;
 
         let warn_version = obj
             .get("warn_version")
             .and_then(|v| v.as_u64())
-            .map(|v| v as u16)
-            .ok_or_else(|| "missing or invalid warn_version".to_string())?;
+            .ok_or_else(|| "missing or invalid warn_version".to_string())
+            .and_then(|v| {
+                u16::try_from(v).map_err(|_| format!("warn_version out of u16 range: {v}"))
+            })?;
 
         let grace_deadline = match obj.get("grace_deadline") {
             None | Some(serde_json::Value::Null) => None,
@@ -131,6 +146,12 @@ fn parse_iso8601_to_unix(s: &str) -> Result<u64, String> {
     }
 
     let b = s.as_bytes();
+
+    // Validate separators: YYYY-MM-DDThh:mm:ssZ
+    if b[4] != b'-' || b[7] != b'-' || b[10] != b'T' || b[13] != b':' || b[16] != b':' {
+        return Err(format!("unsupported ISO 8601 format: {s}"));
+    }
+
     let year = parse_segment(b, 0, 4, "year")?;
     let month = parse_segment(b, 5, 7, "month")?;
     let day = parse_segment(b, 8, 10, "day")?;
@@ -138,8 +159,14 @@ fn parse_iso8601_to_unix(s: &str) -> Result<u64, String> {
     let minute = parse_segment(b, 14, 16, "minute")?;
     let second = parse_segment(b, 17, 19, "second")?;
 
+    if year < 1970 {
+        return Err(format!("pre-1970 dates are not supported: {s}"));
+    }
     if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
         return Err(format!("invalid date components in: {s}"));
+    }
+    if hour > 23 || minute > 59 || second > 60 {
+        return Err(format!("invalid time components in: {s}"));
     }
 
     // Days from Unix epoch (1970-01-01) to the start of the given date.

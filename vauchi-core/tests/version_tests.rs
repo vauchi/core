@@ -4,6 +4,7 @@
 
 //! Tests for the version module: APP_COMPAT_VERSION constant, VersionPolicy, and AppUpdateStatus.
 
+use proptest::prelude::*;
 use vauchi_core::version::{APP_COMPAT_VERSION, AppUpdateStatus, VersionPolicy};
 
 // ---------------------------------------------------------------------------
@@ -103,7 +104,7 @@ fn evaluate_update_required_with_past_deadline() {
     assert_eq!(
         policy.evaluate(1),
         AppUpdateStatus::UpdateRequired {
-            grace_deadline: Some(past_deadline),
+            grace_deadline: None,
         }
     );
 }
@@ -271,4 +272,185 @@ fn app_update_status_is_clone_debug_eq() {
     let cloned = status.clone();
     assert_eq!(status, cloned);
     let _debug = format!("{:?}", status);
+}
+
+// ---------------------------------------------------------------------------
+// Truncation and validation regression tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn from_cdn_json_rejects_min_version_exceeding_u16() {
+    let json = r#"{"min_version": 70000, "warn_version": 1}"#;
+    let result = VersionPolicy::from_cdn_json(json);
+    assert!(result.is_err());
+    assert!(
+        result.unwrap_err().contains("out of u16 range"),
+        "error should mention u16 range"
+    );
+}
+
+#[test]
+fn from_cdn_json_rejects_warn_version_exceeding_u16() {
+    let json = r#"{"min_version": 1, "warn_version": 100000}"#;
+    let result = VersionPolicy::from_cdn_json(json);
+    assert!(result.is_err());
+    assert!(
+        result.unwrap_err().contains("out of u16 range"),
+        "error should mention u16 range"
+    );
+}
+
+#[test]
+fn from_cdn_json_accepts_u16_max() {
+    let json = r#"{"min_version": 65535, "warn_version": 65535}"#;
+    let policy = VersionPolicy::from_cdn_json(json).expect("u16::MAX should be valid");
+    assert_eq!(policy.min_version, 65535);
+    assert_eq!(policy.warn_version, 65535);
+}
+
+#[test]
+fn from_cdn_json_rejects_pre_1970_iso8601() {
+    let json = r#"{"min_version": 1, "warn_version": 2, "grace_deadline": "1969-12-31T23:59:59Z"}"#;
+    let result = VersionPolicy::from_cdn_json(json);
+    assert!(result.is_err());
+    assert!(
+        result.unwrap_err().contains("pre-1970"),
+        "error should mention pre-1970"
+    );
+}
+
+#[test]
+fn from_cdn_json_rejects_bad_separators() {
+    // Spaces instead of dashes/colons
+    let json = r#"{"min_version": 1, "warn_version": 2, "grace_deadline": "2024 01 15T00 00 00Z"}"#;
+    let result = VersionPolicy::from_cdn_json(json);
+    assert!(result.is_err());
+}
+
+#[test]
+fn from_cdn_json_rejects_hour_24() {
+    let json = r#"{"min_version": 1, "warn_version": 2, "grace_deadline": "2024-01-15T24:00:00Z"}"#;
+    let result = VersionPolicy::from_cdn_json(json);
+    assert!(result.is_err());
+    assert!(
+        result.unwrap_err().contains("invalid time"),
+        "error should mention invalid time"
+    );
+}
+
+#[test]
+fn from_cdn_json_rejects_minute_60() {
+    let json = r#"{"min_version": 1, "warn_version": 2, "grace_deadline": "2024-01-15T00:60:00Z"}"#;
+    let result = VersionPolicy::from_cdn_json(json);
+    assert!(result.is_err());
+}
+
+#[test]
+fn from_cdn_json_accepts_leap_second() {
+    // Second 60 is valid for leap seconds
+    let json = r#"{"min_version": 1, "warn_version": 2, "grace_deadline": "2024-06-30T23:59:60Z"}"#;
+    let policy = VersionPolicy::from_cdn_json(json).expect("leap second should be valid");
+    assert!(policy.grace_deadline.is_some());
+}
+
+#[test]
+fn from_cdn_json_rejects_second_61() {
+    let json = r#"{"min_version": 1, "warn_version": 2, "grace_deadline": "2024-01-15T00:00:61Z"}"#;
+    let result = VersionPolicy::from_cdn_json(json);
+    assert!(result.is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Proptest: evaluate monotonicity (CC-04)
+// ---------------------------------------------------------------------------
+
+/// Helper to rank AppUpdateStatus (higher = "better" / less urgent).
+fn status_rank(s: &AppUpdateStatus) -> u8 {
+    match s {
+        AppUpdateStatus::UpdateRequired { .. } => 0,
+        AppUpdateStatus::UpdateAvailable => 1,
+        AppUpdateStatus::UpToDate => 2,
+    }
+}
+
+proptest! {
+    /// For a fixed policy, incrementing the app version must never produce a
+    /// "worse" status (monotonicity: version N+1 >= version N).
+    #[test]
+    fn evaluate_monotonicity(
+        min_ver in 0u16..=1000,
+        warn_ver in 0u16..=1000,
+        app_ver in 0u16..=999,
+    ) {
+        let policy = VersionPolicy {
+            min_version: min_ver,
+            warn_version: warn_ver,
+            grace_deadline: None,
+        };
+        let rank_n = status_rank(&policy.evaluate(app_ver));
+        let rank_n1 = status_rank(&policy.evaluate(app_ver + 1));
+        prop_assert!(
+            rank_n1 >= rank_n,
+            "version {} rank {} but version {} rank {} — monotonicity violated",
+            app_ver, rank_n, app_ver + 1, rank_n1
+        );
+    }
+
+    /// Generate valid ISO 8601 date strings and verify from_cdn_json doesn't panic.
+    #[test]
+    fn from_cdn_json_valid_iso_no_panic(
+        year in 1970u32..2100,
+        month in 1u32..=12,
+        day in 1u32..=28, // stay safe with day range
+        hour in 0u32..=23,
+        minute in 0u32..=59,
+        second in 0u32..=59,
+    ) {
+        let iso = format!(
+            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+            year, month, day, hour, minute, second
+        );
+        let json = format!(
+            r#"{{"min_version": 1, "warn_version": 2, "grace_deadline": "{}"}}"#,
+            iso
+        );
+        // Must not panic; result should be Ok.
+        let result = VersionPolicy::from_cdn_json(&json);
+        prop_assert!(result.is_ok(), "valid ISO date should parse: {} -> {:?}", iso, result);
+    }
+
+    /// Random version values in u16 range should always parse from CDN JSON.
+    #[test]
+    fn from_cdn_json_u16_versions(
+        min_ver in 0u64..=65535,
+        warn_ver in 0u64..=65535,
+    ) {
+        let json = format!(
+            r#"{{"min_version": {}, "warn_version": {}}}"#,
+            min_ver, warn_ver
+        );
+        let result = VersionPolicy::from_cdn_json(&json);
+        prop_assert!(result.is_ok(), "u16-range values should parse: {}", json);
+        let policy = result.unwrap();
+        prop_assert_eq!(policy.min_version, min_ver as u16);
+        prop_assert_eq!(policy.warn_version, warn_ver as u16);
+    }
+
+    /// Values above u16::MAX must be rejected.
+    #[test]
+    fn from_cdn_json_rejects_above_u16(
+        big_val in 65536u64..=1_000_000,
+    ) {
+        let json_min = format!(
+            r#"{{"min_version": {}, "warn_version": 1}}"#,
+            big_val
+        );
+        prop_assert!(VersionPolicy::from_cdn_json(&json_min).is_err());
+
+        let json_warn = format!(
+            r#"{{"min_version": 1, "warn_version": {}}}"#,
+            big_val
+        );
+        prop_assert!(VersionPolicy::from_cdn_json(&json_warn).is_err());
+    }
 }

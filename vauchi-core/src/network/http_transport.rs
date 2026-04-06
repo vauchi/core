@@ -214,6 +214,7 @@ impl HttpTransport {
     /// Purges all blobs for a recipient.
     ///
     /// Requires Ed25519 signature authentication (same as relay-side verification).
+    /// Returns the number of blobs deleted by the relay, if reported.
     pub fn purge(
         &self,
         recipient_id: &str,
@@ -221,7 +222,7 @@ impl HttpTransport {
         purge_token: &str,
         signature: &str,
         timestamp: u64,
-    ) -> Result<(), NetworkError> {
+    ) -> Result<Option<usize>, NetworkError> {
         let req = V2PurgeRequest {
             recipient_id: recipient_id.to_string(),
             public_key: public_key.to_string(),
@@ -231,7 +232,7 @@ impl HttpTransport {
         };
         let resp = self.post_action("purge", &req)?;
         if resp.status == "ok" {
-            Ok(())
+            Ok(resp.blobs_deleted)
         } else {
             Err(response_error("purge", &resp.error.unwrap_or_default()))
         }

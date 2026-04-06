@@ -191,6 +191,7 @@ fn v2_response_roundtrip() {
         code: None,
         payload: None,
         response: None,
+        blobs_deleted: None,
     };
     let json = serde_json::to_string(&resp).unwrap();
     let parsed: V2Response = serde_json::from_str(&json).unwrap();
@@ -214,6 +215,7 @@ fn v2_response_with_blobs_roundtrip() {
         code: None,
         payload: None,
         response: None,
+        blobs_deleted: None,
     };
     let json = serde_json::to_string(&resp).unwrap();
     let parsed: V2Response = serde_json::from_str(&json).unwrap();

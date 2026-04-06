@@ -102,4 +102,7 @@ pub struct V2Response {
     pub payload: Option<String>,
     #[serde(default)]
     pub response: Option<String>,
+    /// Number of blobs deleted by a purge request.
+    #[serde(default)]
+    pub blobs_deleted: Option<usize>,
 }

@@ -264,6 +264,10 @@ pub struct MobileShredReport {
     pub pre_signed_deleted: bool,
     /// Whether the data directory was removed.
     pub data_dir_deleted: bool,
+    /// Whether purge sender construction failed.
+    pub purge_failed: bool,
+    /// Error message if purge sender failed to construct.
+    pub purge_error: Option<String>,
     /// Whether revocation sender construction failed.
     pub revocation_failed: bool,
     /// Error message if revocation sender failed to construct.
@@ -282,6 +286,8 @@ impl From<&vauchi_core::api::ShredReport> for MobileShredReport {
             sqlite_destroyed: report.sqlite_destroyed,
             pre_signed_deleted: report.pre_signed_deleted,
             data_dir_deleted: report.data_dir_deleted,
+            purge_failed: false,
+            purge_error: None,
             revocation_failed: false,
             revocation_error: None,
         }

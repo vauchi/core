@@ -767,12 +767,42 @@ pub fn widget_panic_shred(
     Ok(MobileShredReport::from(&report))
 }
 
-// === Revocation Sender ===
+// === Shred Network Senders ===
+
+/// Creates a `RelayClient<HttpTransportAdapter>` for shred operations.
+fn create_shred_relay_client(
+    relay_url: &str,
+    sender_id: &str,
+    _pinned_cert: Option<String>,
+) -> Result<
+    vauchi_core::network::RelayClient<vauchi_core::network::HttpTransportAdapter>,
+    vauchi_core::api::ShredError,
+> {
+    use vauchi_core::network::{
+        HttpTransport, HttpTransportAdapter, HttpTransportConfig, ProxyConfig, RelayClient,
+        RelayClientConfig, TransportConfig,
+    };
+
+    let http_url = ws_to_http(relay_url);
+    let transport = HttpTransport::new(HttpTransportConfig {
+        relay_url: http_url.clone(),
+        timeout_ms: 10_000,
+        proxy: ProxyConfig::None,
+        allow_direct: true,
+    });
+    let adapter = HttpTransportAdapter::new(transport);
+    let config = RelayClientConfig {
+        transport: TransportConfig {
+            server_url: http_url,
+            ..TransportConfig::default()
+        },
+        ..RelayClientConfig::default()
+    };
+    let client = RelayClient::new(adapter, config, sender_id.to_string());
+    Ok(client)
+}
 
 /// Sends identity revocation messages to contacts via HTTP transport.
-///
-/// Wraps a `RelayClient<HttpTransportAdapter>` which implements
-/// `RevocationSender` via the Transport trait.
 struct MobileRevocationSender {
     client: vauchi_core::network::RelayClient<vauchi_core::network::HttpTransportAdapter>,
 }
@@ -781,29 +811,9 @@ impl MobileRevocationSender {
     fn new(
         relay_url: &str,
         sender_id: &str,
-        _pinned_cert: Option<String>,
+        pinned_cert: Option<String>,
     ) -> Result<Self, vauchi_core::api::ShredError> {
-        use vauchi_core::network::{
-            HttpTransport, HttpTransportAdapter, HttpTransportConfig, ProxyConfig, RelayClient,
-            RelayClientConfig, TransportConfig,
-        };
-
-        let http_url = ws_to_http(relay_url);
-        let transport = HttpTransport::new(HttpTransportConfig {
-            relay_url: http_url.clone(),
-            timeout_ms: 10_000,
-            proxy: ProxyConfig::None,
-            allow_direct: true,
-        });
-        let adapter = HttpTransportAdapter::new(transport);
-        let config = RelayClientConfig {
-            transport: TransportConfig {
-                server_url: http_url,
-                ..TransportConfig::default()
-            },
-            ..RelayClientConfig::default()
-        };
-        let client = RelayClient::new(adapter, config, sender_id.to_string());
+        let client = create_shred_relay_client(relay_url, sender_id, pinned_cert)?;
         Ok(Self { client })
     }
 }
@@ -817,6 +827,34 @@ impl vauchi_core::api::RevocationSender for MobileRevocationSender {
             .connect()
             .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Connect: {e}")))?;
         self.client.send_revocation(revocation)
+    }
+}
+
+/// Sends relay purge requests via HTTP transport during shred operations.
+struct MobilePurgeSender {
+    client: vauchi_core::network::RelayClient<vauchi_core::network::HttpTransportAdapter>,
+}
+
+impl MobilePurgeSender {
+    fn new(
+        relay_url: &str,
+        sender_id: &str,
+        pinned_cert: Option<String>,
+    ) -> Result<Self, vauchi_core::api::ShredError> {
+        let client = create_shred_relay_client(relay_url, sender_id, pinned_cert)?;
+        Ok(Self { client })
+    }
+}
+
+impl vauchi_core::api::PurgeSender for MobilePurgeSender {
+    fn send_purge(
+        &mut self,
+        purge: &vauchi_core::api::PreSignedPurgeRequest,
+    ) -> Result<bool, vauchi_core::api::ShredError> {
+        self.client
+            .connect()
+            .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Connect: {e}")))?;
+        self.client.send_purge(purge)
     }
 }
 

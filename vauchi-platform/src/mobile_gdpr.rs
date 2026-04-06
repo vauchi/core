@@ -12,7 +12,7 @@ use super::types::{
     MobileGdprExport, MobileShredReport, MobileShredStatus, MobileShredToken,
     MobileShredVerification,
 };
-use super::{MobilePlatformKeychain, MobileRevocationSender, VauchiPlatform};
+use super::{MobilePlatformKeychain, MobilePurgeSender, MobileRevocationSender, VauchiPlatform};
 
 #[uniffi::export]
 impl VauchiPlatform {
@@ -150,6 +150,15 @@ impl VauchiPlatform {
         let core_token = vauchi_core::api::ShredToken::from_created_at(token.created_at);
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
 
+        let (mut purge_sender, purge_error) = match MobilePurgeSender::new(
+            &self.relay_url,
+            &identity.public_id(),
+            lock_or(&self.pinned_cert_pem)?.clone(),
+        ) {
+            Ok(sender) => (Some(sender), None),
+            Err(e) => (None, Some(e.to_string())),
+        };
+
         let (mut revocation_sender, rev_error) = match MobileRevocationSender::new(
             &self.relay_url,
             &identity.public_id(),
@@ -160,16 +169,21 @@ impl VauchiPlatform {
         };
 
         let report = manager
-            // PurgeSender deferred: requires relay-side purge endpoint support.
             .hard_shred(
                 core_token,
-                None,
+                purge_sender
+                    .as_mut()
+                    .map(|s| s as &mut dyn vauchi_core::api::PurgeSender),
                 revocation_sender
                     .as_mut()
                     .map(|s| s as &mut dyn vauchi_core::api::RevocationSender),
             )
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
         let mut mobile_report = MobileShredReport::from(&report);
+        if let Some(err) = purge_error {
+            mobile_report.purge_failed = true;
+            mobile_report.purge_error = Some(err);
+        }
         if let Some(err) = rev_error {
             mobile_report.revocation_failed = true;
             mobile_report.revocation_error = Some(err);
@@ -191,6 +205,15 @@ impl VauchiPlatform {
 
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
 
+        let (mut purge_sender, purge_error) = match MobilePurgeSender::new(
+            &self.relay_url,
+            &identity.public_id(),
+            lock_or(&self.pinned_cert_pem)?.clone(),
+        ) {
+            Ok(sender) => (Some(sender), None),
+            Err(e) => (None, Some(e.to_string())),
+        };
+
         let (mut revocation_sender, rev_error) = match MobileRevocationSender::new(
             &self.relay_url,
             &identity.public_id(),
@@ -201,15 +224,20 @@ impl VauchiPlatform {
         };
 
         let report = manager
-            // PurgeSender deferred: requires relay-side purge endpoint support.
             .panic_shred(
-                None,
+                purge_sender
+                    .as_mut()
+                    .map(|s| s as &mut dyn vauchi_core::api::PurgeSender),
                 revocation_sender
                     .as_mut()
                     .map(|s| s as &mut dyn vauchi_core::api::RevocationSender),
             )
             .map_err(|e| MobileError::ShredError(e.to_string()))?;
         let mut mobile_report = MobileShredReport::from(&report);
+        if let Some(err) = purge_error {
+            mobile_report.purge_failed = true;
+            mobile_report.purge_error = Some(err);
+        }
         if let Some(err) = rev_error {
             mobile_report.revocation_failed = true;
             mobile_report.revocation_error = Some(err);

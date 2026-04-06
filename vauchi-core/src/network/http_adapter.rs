@@ -177,10 +177,18 @@ impl super::transport::Transport for HttpTransportAdapter {
                 }
                 Ok(())
             }
-            MessagePayload::PurgeRequest(_purge) => {
-                // Purge is handled via a direct relay call
-                // The recipient_id comes from the purge request
-                // For now, skip — purge is called separately
+            MessagePayload::PurgeRequest(purge) => {
+                let recipient_id = hex::encode(purge.public_key);
+                let public_key = hex::encode(purge.public_key);
+                let purge_token = hex::encode(purge.purge_token);
+                let signature = hex::encode(&purge.signature);
+                self.http.purge(
+                    &recipient_id,
+                    &public_key,
+                    &purge_token,
+                    &signature,
+                    purge.timestamp,
+                )?;
                 Ok(())
             }
             _ => {

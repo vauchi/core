@@ -508,7 +508,7 @@ pub fn is_blocked_scheme(scheme: String) -> bool {
 // Theme Functions
 // ============================================================
 
-const THEMES_JSON: &[u8] = include_bytes!("../../../themes/themes.json");
+const THEMES_JSON: &[u8] = include_bytes!("../../../themes/generated/themes.json");
 
 /// Get all available themes from themes.json.
 #[uniffi::export]

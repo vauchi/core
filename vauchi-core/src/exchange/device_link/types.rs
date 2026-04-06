@@ -60,6 +60,24 @@ pub enum ProximityProof {
     },
 }
 
+impl ProximityProof {
+    /// Creates a `ManualConfirmation` proof from a link key and confirmation code.
+    ///
+    /// Internally computes the HMAC and captures the current timestamp.
+    /// This replaces manual construction in frontends.
+    pub fn manual_confirmation(link_key: &[u8; 32], confirmation_code: &str) -> Self {
+        let mac = compute_confirmation_mac(link_key, confirmation_code);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("System clock before UNIX epoch")
+            .as_secs();
+        ProximityProof::ManualConfirmation {
+            confirmation_code_mac: mac,
+            confirmed_at: now,
+        }
+    }
+}
+
 /// Confirmation details shown to the initiating device before approving a link.
 ///
 /// Both devices independently compute the same confirmation code. The user

@@ -565,6 +565,11 @@ impl RecoveryProof {
 
     /// Adds a voucher to the proof.
     ///
+    /// During recovery, any valid voucher is accepted regardless of whether
+    /// the voucher's signer is a known contact. This is by design: the new
+    /// identity has no contacts yet, so trust is established by the old
+    /// identity's contacts vouching for the recovery claim.
+    ///
     /// # Errors
     /// - `MismatchedKeys` if voucher keys don't match proof keys
     /// - `InvalidSignature` if voucher signature is invalid

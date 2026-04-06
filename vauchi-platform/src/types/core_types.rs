@@ -143,6 +143,9 @@ pub struct MobileContact {
     pub has_trust_metrics: bool,
     /// Exchange reciprocity status (orthogonal to trust level).
     pub reciprocity: MobileReciprocity,
+    /// Whether this is an imported (non-exchanged) contact.
+    /// Imported contacts use soft-delete; exchanged contacts use archive.
+    pub is_imported: bool,
 }
 
 /// Exchange reciprocity status — whether the other party also completed the exchange.
@@ -216,6 +219,7 @@ impl From<&Contact> for MobileContact {
                     _ => MobileReciprocity::Unknown,
                 }
             },
+            is_imported: contact.is_imported(),
         }
     }
 }

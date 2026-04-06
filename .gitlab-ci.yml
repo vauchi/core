@@ -1477,6 +1477,24 @@ update:swift-bindings:
       sed -i "s/let version = \".*\"/let version = \"$CLEAN_VERSION\"/" Package.swift
       sed -i "s/let checksum = \".*\"/let checksum = \"$CHECKSUM\"/" Package.swift
 
+      # Enforce REMOTE binaryTarget (wire-bindings-local.sh may have switched to LOCAL)
+      # Rewrite the binaryTarget section to always use REMOTE URL mode.
+      # This guards against wire-bindings-local.sh changes being committed.
+      REMOTE_URL='https://gitlab.com/api/v4/projects/vauchi%2Fcore/packages/generic/vauchi-platform/\(version)/VauchiPlatformFFI.xcframework.zip'
+      printf '%s\n' \
+        'import re, sys' \
+        'path, url = sys.argv[1], sys.argv[2]' \
+        'with open(path) as f: content = f.read()' \
+        'content = re.sub(r"[ \t]+// REMOTE \(original.*?\n(?:[ \t]+//[^\n]*\n)*", "", content)' \
+        'content = re.sub(r"[ \t]+// LOCAL \(set by wire-bindings-local\.sh\):\n", "", content)' \
+        'pattern = r"([ \t]+)(?://[^\n]*\n\s*)*\.binaryTarget\(\s*\n?\s*name: .VauchiPlatformFFI.[^)]*\),"' \
+        'repl = r"\g<1>.binaryTarget(\n\g<1>    name: \"VauchiPlatformFFI\",\n\g<1>    url: \"" + url + r"\",\n\g<1>    checksum: checksum\n\g<1>),"' \
+        'content = re.sub(pattern, repl, content)' \
+        'with open(path, "w") as f: f.write(content)' \
+        > /tmp/fix-package-swift.py
+      python3 /tmp/fix-package-swift.py Package.swift "$REMOTE_URL"
+      echo "Ensured Package.swift uses REMOTE binaryTarget"
+
       # Update Swift bindings source
       cp /tmp/swift-bindings/vauchi_platform.swift Sources/VauchiPlatform/vauchi_platform.swift
 

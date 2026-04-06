@@ -17,9 +17,9 @@ pub mod types;
 
 pub mod text;
 pub use types::{
-    AhaMomentTracker, AhaMomentType, AudioCapability, DemoContactState, DuressSettings,
-    EmergencyBroadcastConfig, ExchangeTransport, OnboardingProgress, OnboardingStep,
-    ProximityConfidence,
+    AhaMomentTracker, AhaMomentType, AudioCapability, DEFAULT_EMERGENCY_MESSAGE, DemoContactState,
+    DuressSettings, EmergencyBroadcastConfig, ExchangeTransport, OnboardingProgress,
+    OnboardingStep, ProximityConfidence,
 };
 pub mod contact;
 pub mod contact_card;

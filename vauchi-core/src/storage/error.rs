@@ -27,6 +27,27 @@ pub enum DeletionState {
     },
 }
 
+impl DeletionState {
+    /// Returns the time remaining before scheduled deletion executes.
+    ///
+    /// Returns `None` for `None` or `Executed` states.
+    /// Returns `Duration::ZERO` if the execution time has already passed.
+    pub fn time_remaining(&self) -> Option<std::time::Duration> {
+        match self {
+            DeletionState::Scheduled { execute_at, .. } => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("System clock before UNIX epoch")
+                    .as_secs();
+                Some(std::time::Duration::from_secs(
+                    execute_at.saturating_sub(now),
+                ))
+            }
+            _ => None,
+        }
+    }
+}
+
 /// Storage error types.
 #[derive(Error, Debug)]
 #[non_exhaustive]

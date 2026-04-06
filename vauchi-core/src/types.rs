@@ -96,6 +96,16 @@ pub struct EmergencyBroadcastConfig {
     pub include_location: bool,
 }
 
+/// The default emergency broadcast alert message.
+pub const DEFAULT_EMERGENCY_MESSAGE: &str = "I may be in danger. Please check on me.";
+
+impl EmergencyBroadcastConfig {
+    /// Returns `true` if the alert message is the default (not customized).
+    pub fn is_default_message(&self) -> bool {
+        self.message == DEFAULT_EMERGENCY_MESSAGE
+    }
+}
+
 // --- UX types used by storage and API ---
 
 /// Steps in the onboarding wizard.

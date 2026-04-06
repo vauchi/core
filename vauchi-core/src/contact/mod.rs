@@ -37,6 +37,11 @@ use crate::exchange::TrustMetrics;
 use crate::exchange::reciprocity::{ConfirmationChannel, Reciprocity};
 use crate::types::{ExchangeTransport, ProximityConfidence};
 
+/// The duration of the undo window for soft-delete operations.
+///
+/// After a soft delete, the user has this long to undo before hard deletion.
+pub const SOFT_DELETE_UNDO_WINDOW: std::time::Duration = std::time::Duration::from_secs(30);
+
 /// Error type for contact operations that require a specific contact kind.
 #[derive(Debug, Clone, thiserror::Error)]
 #[non_exhaustive]

@@ -233,3 +233,35 @@ fn test_export_includes_audit_log() {
     assert_eq!(export.audit_log[1]["event_type"], "contact_added");
     assert_eq!(export.audit_log[1]["details"], "alice");
 }
+
+// @scenario: privacy_compliance :: Encrypted GDPR export roundtrip
+#[test]
+fn test_encrypted_export_roundtrip() {
+    use vauchi_core::api::{export_encrypted, import_encrypted};
+
+    let storage = setup_storage_with_contacts();
+    let password = "hunter2-test-password";
+
+    let encrypted = export_encrypted(&storage, password).unwrap();
+
+    // Verify envelope structure: version || salt || ciphertext
+    assert_eq!(encrypted[0], vauchi_core::api::GDPR_EXPORT_VERSION);
+    assert!(encrypted.len() > 1 + vauchi_core::api::GDPR_SALT_LEN);
+
+    let recovered = import_encrypted(&encrypted, password).unwrap();
+    assert_eq!(recovered.version, 3);
+    assert_eq!(recovered.contacts.len(), 1);
+    assert_eq!(recovered.contacts[0].display_name, "Test Contact");
+}
+
+// @scenario: privacy_compliance :: Wrong password fails decryption
+#[test]
+fn test_encrypted_export_wrong_password_fails() {
+    use vauchi_core::api::{export_encrypted, import_encrypted};
+
+    let storage = setup_storage_with_contacts();
+    let encrypted = export_encrypted(&storage, "correct").unwrap();
+
+    let result = import_encrypted(&encrypted, "wrong");
+    assert!(result.is_err(), "Wrong password must fail decryption");
+}

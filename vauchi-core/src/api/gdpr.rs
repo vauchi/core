@@ -6,12 +6,13 @@
 //!
 //! Provides full data export for GDPR compliance (right to data portability).
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use zeroize::Zeroize;
 
 use crate::storage::Storage;
 
 /// Complete GDPR data export.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GdprExport {
     /// Export format version.
     pub version: u32,
@@ -34,7 +35,7 @@ pub struct GdprExport {
 }
 
 /// Identity data for GDPR export (no raw keys).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GdprIdentity {
     pub display_name: String,
     pub public_id: String,
@@ -42,7 +43,7 @@ pub struct GdprIdentity {
 }
 
 /// Contact data for GDPR export.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GdprContact {
     pub display_name: String,
     pub public_key_fingerprint: String,
@@ -52,7 +53,7 @@ pub struct GdprContact {
 }
 
 /// Field data for GDPR export.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GdprField {
     pub field_type: String,
     pub label: String,
@@ -60,13 +61,13 @@ pub struct GdprField {
 }
 
 /// Settings data for GDPR export.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GdprSettings {
     pub consent_records: Vec<serde_json::Value>,
 }
 
 /// Device data for GDPR export.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GdprDevice {
     pub device_name: String,
     pub device_index: u32,
@@ -74,7 +75,7 @@ pub struct GdprDevice {
 }
 
 /// Recovery configuration for GDPR export.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GdprRecoveryConfig {
     pub trusted_contacts_count: usize,
     pub threshold: Option<u32>,
@@ -270,6 +271,105 @@ fn export_devices(storage: &Storage) -> Option<Vec<GdprDevice>> {
         }
         _ => Some(Vec::new()),
     }
+}
+
+// ── Encrypted GDPR export envelope ────────────────────────────────────────
+
+/// Version byte for encrypted GDPR exports.
+pub const GDPR_EXPORT_VERSION: u8 = 0x01;
+
+/// Salt length for Argon2id key derivation (bytes).
+pub const GDPR_SALT_LEN: usize = 16;
+
+/// HKDF domain separation info for GDPR export encryption.
+const GDPR_HKDF_INFO: &[u8] = b"vauchi-gdpr-export-v1";
+
+/// Exports all user data as encrypted GDPR-compliant JSON.
+///
+/// Format: `version_byte (0x01) || salt (16 bytes) || ciphertext`
+///
+/// Uses Argon2id for key derivation with HKDF domain separation,
+/// then XChaCha20-Poly1305 for encryption.
+pub fn export_encrypted(
+    storage: &Storage,
+    password: &str,
+) -> Result<Vec<u8>, crate::storage::StorageError> {
+    let export = export_all_data(storage)?;
+    let json = serde_json::to_string(&export)
+        .map_err(|e| crate::storage::StorageError::Serialization(e.to_string()))?;
+
+    let salt: [u8; GDPR_SALT_LEN] = crate::crypto::random_bytes();
+
+    let base_key = crate::crypto::derive_key_argon2id(password.as_bytes(), &salt)
+        .map_err(|e| crate::storage::StorageError::Encryption(format!("{e:?}")))?;
+
+    // Domain-separated key derivation (ADR-002)
+    let prk = crate::crypto::HKDF::extract(None, base_key.as_bytes());
+    let okm = crate::crypto::HKDF::expand(&prk, GDPR_HKDF_INFO, 32)
+        .map_err(|e| crate::storage::StorageError::Encryption(format!("{e:?}")))?;
+
+    let mut key_bytes: [u8; 32] = okm
+        .as_slice()
+        .try_into()
+        .map_err(|_| crate::storage::StorageError::Encryption("HKDF length".into()))?;
+    let key = crate::crypto::SymmetricKey::try_from_bytes(key_bytes)
+        .map_err(|e| crate::storage::StorageError::Encryption(format!("{e:?}")))?;
+    key_bytes.zeroize();
+
+    let ciphertext = crate::encrypt(&key, json.as_bytes())
+        .map_err(|e| crate::storage::StorageError::Encryption(format!("{e:?}")))?;
+
+    let mut result = Vec::with_capacity(1 + GDPR_SALT_LEN + ciphertext.len());
+    result.push(GDPR_EXPORT_VERSION);
+    result.extend_from_slice(&salt);
+    result.extend_from_slice(&ciphertext);
+
+    Ok(result)
+}
+
+/// Decrypts and deserializes an encrypted GDPR export.
+///
+/// Expects format: `version_byte || salt (16 bytes) || ciphertext`
+pub fn import_encrypted(
+    data: &[u8],
+    password: &str,
+) -> Result<GdprExport, crate::storage::StorageError> {
+    if data.len() < 1 + GDPR_SALT_LEN {
+        return Err(crate::storage::StorageError::InvalidData(
+            "Encrypted GDPR export too short".into(),
+        ));
+    }
+
+    let version = data[0];
+    if version != GDPR_EXPORT_VERSION {
+        return Err(crate::storage::StorageError::InvalidData(format!(
+            "Unsupported GDPR export version: {version}"
+        )));
+    }
+
+    let salt = &data[1..1 + GDPR_SALT_LEN];
+    let ciphertext = &data[1 + GDPR_SALT_LEN..];
+
+    let base_key = crate::crypto::derive_key_argon2id(password.as_bytes(), salt)
+        .map_err(|e| crate::storage::StorageError::Encryption(format!("{e:?}")))?;
+
+    let prk = crate::crypto::HKDF::extract(None, base_key.as_bytes());
+    let okm = crate::crypto::HKDF::expand(&prk, GDPR_HKDF_INFO, 32)
+        .map_err(|e| crate::storage::StorageError::Encryption(format!("{e:?}")))?;
+
+    let mut key_bytes: [u8; 32] = okm
+        .as_slice()
+        .try_into()
+        .map_err(|_| crate::storage::StorageError::Encryption("HKDF length".into()))?;
+    let key = crate::crypto::SymmetricKey::try_from_bytes(key_bytes)
+        .map_err(|e| crate::storage::StorageError::Encryption(format!("{e:?}")))?;
+    key_bytes.zeroize();
+
+    let plaintext = crate::decrypt(&key, ciphertext)
+        .map_err(|e| crate::storage::StorageError::Encryption(format!("{e:?}")))?;
+
+    serde_json::from_slice(&plaintext)
+        .map_err(|e| crate::storage::StorageError::Serialization(e.to_string()))
 }
 
 // INLINE_TEST_REQUIRED: tests private internals

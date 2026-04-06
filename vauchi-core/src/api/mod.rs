@@ -112,7 +112,10 @@ pub use deletion::{DeletionError, DeletionManager, DeletionResult, delete_identi
 pub use consent::{ConsentManager, ConsentRecord, ConsentStatus, ConsentType};
 
 // GDPR
-pub use gdpr::{GdprExport, export_all_data};
+pub use gdpr::{
+    GDPR_EXPORT_VERSION, GDPR_SALT_LEN, GdprExport, export_all_data, export_encrypted,
+    import_encrypted,
+};
 
 // Pre-signed shred messages
 pub use pre_signed::{PreSignedError, PreSignedPurgeRequest, PreSignedShredMessages};

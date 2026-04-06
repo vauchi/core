@@ -7,6 +7,9 @@
 use crate::ui::*;
 use zeroize::Zeroize;
 
+/// Default maximum failed unlock attempts before lockout.
+pub const DEFAULT_LOCK_MAX_ATTEMPTS: usize = 5;
+
 /// Lock screen engine — prompts for a password and tracks failed attempts.
 #[derive(Debug)]
 pub struct LockScreenEngine {

@@ -36,7 +36,7 @@ pub unsafe extern "C" fn vauchi_workflow_create(
         let engine: Box<dyn WorkflowEngineAny> = match wtype.as_str() {
             "onboarding" => Box::new(OnboardingEngine::new()),
             "emergency_shred" => Box::new(EmergencyShredEngine::new()),
-            "lock_screen" => Box::new(LockScreenEngine::new(3)),
+            "lock_screen" => Box::new(LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)),
             _ => return std::ptr::null_mut(),
         };
 

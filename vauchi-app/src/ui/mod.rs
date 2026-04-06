@@ -79,7 +79,7 @@ pub use gdpr::GdprEngine;
 pub use group_detail::GroupDetailEngine;
 pub use groups_list::{GroupInfo, GroupsEngine, GroupsMode};
 pub use help::{HelpEngine, HelpItem};
-pub use lock_screen::LockScreenEngine;
+pub use lock_screen::{DEFAULT_LOCK_MAX_ATTEMPTS, LockScreenEngine};
 pub use more::MoreEngine;
 pub use my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, MyInfoViewMode, OwnFieldInfo};
 pub use my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};

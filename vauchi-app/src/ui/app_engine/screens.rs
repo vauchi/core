@@ -32,7 +32,7 @@ use crate::ui::gdpr::GdprEngine;
 use crate::ui::group_detail::GroupDetailEngine;
 use crate::ui::groups_list::{GroupInfo, GroupsEngine, GroupsMode};
 use crate::ui::help::{HelpEngine, HelpItem};
-use crate::ui::lock_screen::LockScreenEngine;
+use crate::ui::lock_screen::{DEFAULT_LOCK_MAX_ATTEMPTS, LockScreenEngine};
 use crate::ui::more::MoreEngine;
 use crate::ui::my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, OwnFieldInfo};
 use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
@@ -232,7 +232,7 @@ impl AppEngine {
             }
             AppScreen::Help => Box::new(HelpEngine::new(Self::default_help_items())),
             AppScreen::Backup => Box::new(BackupRecoveryEngine::new(None)),
-            AppScreen::Lock => Box::new(LockScreenEngine::new(5)),
+            AppScreen::Lock => Box::new(LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)),
             AppScreen::DeviceLinking => {
                 let qr_data = vauchi
                     .generate_device_link()

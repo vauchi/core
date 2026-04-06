@@ -373,6 +373,25 @@ fn test_contact_trust_for_recovery_rejects_standard_trust() {
     );
 }
 
+// @scenario: identity_management :: Social recovery setup
+#[test]
+fn test_contact_trust_for_recovery_rejects_blocked() {
+    let mut contact = create_test_contact();
+    contact.mark_fingerprint_verified().unwrap();
+    contact.set_blocked(true);
+
+    let result = contact.trust_for_recovery();
+    assert!(
+        result.is_err(),
+        "Blocked contacts must not be recovery-trusted"
+    );
+    assert!(
+        matches!(result, Err(ContactError::ContactIsBlocked)),
+        "Expected ContactIsBlocked error, got {:?}",
+        result
+    );
+}
+
 // @scenario: contact_recovery :: Recovered contact trust lifecycle
 //
 // Principle 2: a recovered identity drops to Cautious. Recovery

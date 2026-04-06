@@ -51,6 +51,10 @@ pub enum ContactError {
          (current level: {0:?})"
     )]
     InsufficientTrustLevel(TrustLevel),
+
+    /// Blocked contacts cannot be trusted for recovery.
+    #[error("Blocked contacts cannot be trusted for recovery")]
+    ContactIsBlocked,
 }
 
 /// A contact obtained through exchange or import.
@@ -696,13 +700,17 @@ impl Contact {
 
     /// Marks this contact as trusted for recovery.
     ///
-    /// Returns `Err` if called on an imported contact or if
-    /// trust level is below High (not in-person verified).
+    /// Returns `Err` if called on an imported contact, a blocked contact,
+    /// or if trust level is below High (not in-person verified).
     pub fn trust_for_recovery(&mut self) -> Result<(), ContactError> {
         let _data = self
             .kind
             .exchanged_data_mut()
             .ok_or(ContactError::OperationRequiresExchangedContact)?;
+
+        if self.is_blocked() {
+            return Err(ContactError::ContactIsBlocked);
+        }
 
         let level = self.trust_level();
         if !matches!(level, TrustLevel::High | TrustLevel::Verified) {

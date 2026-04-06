@@ -132,6 +132,7 @@ fn test_field_type_from_alias_phone() {
     }
 }
 
+// @scenario: contact_card_management :: Field type alias resolution
 #[test]
 fn test_field_type_from_alias_email() {
     for alias in &["email", "mail", "EMAIL"] {
@@ -141,6 +142,7 @@ fn test_field_type_from_alias_email() {
     }
 }
 
+// @scenario: contact_card_management :: Field type alias resolution
 #[test]
 fn test_field_type_from_alias_social_with_label() {
     let (ft, label) = FieldType::from_alias("twitter").unwrap();
@@ -160,6 +162,7 @@ fn test_field_type_from_alias_social_with_label() {
     assert_eq!(label.as_deref(), Some("GitHub"));
 }
 
+// @scenario: contact_card_management :: Field type alias resolution
 #[test]
 fn test_field_type_from_alias_generic_social() {
     let (ft, label) = FieldType::from_alias("social").unwrap();
@@ -167,6 +170,7 @@ fn test_field_type_from_alias_generic_social() {
     assert!(label.is_none());
 }
 
+// @scenario: contact_card_management :: Field type alias resolution
 #[test]
 fn test_field_type_from_alias_unknown_returns_none() {
     assert!(FieldType::from_alias("fax").is_none());
@@ -174,6 +178,7 @@ fn test_field_type_from_alias_unknown_returns_none() {
     assert!(FieldType::from_alias("unknown").is_none());
 }
 
+// @scenario: contact_card_management :: Field type categorization
 #[test]
 fn test_field_type_is_social() {
     assert!(FieldType::Social.is_social());

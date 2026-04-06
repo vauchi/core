@@ -244,6 +244,7 @@ mod tests {
         assert!(is_private_ip(&"::1".parse().unwrap()));
     }
 
+    // @internal
     #[test]
     fn relay_ws_to_http_conversions() {
         assert_eq!(

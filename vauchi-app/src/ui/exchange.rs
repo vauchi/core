@@ -1049,6 +1049,10 @@ impl WorkflowEngine for ExchangeEngine {
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }
     }
+
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
 }
 
 // INLINE_TEST_REQUIRED: Tests access private ExchangeStep enum and ExchangeEngine internals

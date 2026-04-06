@@ -100,20 +100,65 @@ fn settings_reflects_config_values() {
     assert_eq!(relay_value, "wss://relay.vauchi.app");
 }
 
+// ADR-022: irrevocable actions use InlineConfirm, not ShowAlert
 #[test]
-fn settings_emergency_wipe_shows_alert() {
+fn settings_emergency_wipe_shows_inline_confirm() {
     let mut engine = SettingsEngine::new(sample_config());
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "danger".into(),
         item_id: "emergency_wipe".into(),
     });
-    match result {
-        ActionResult::ShowAlert { title, message } => {
-            assert_eq!(title, "Emergency Wipe");
-            assert_eq!(message, "This will permanently delete all data.");
-        }
-        other => panic!("Expected ShowAlert, got {other:?}"),
-    }
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("Expected UpdateScreen with InlineConfirm, got {result:?}");
+    };
+    let has_inline_confirm = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::InlineConfirm { destructive, .. } if *destructive));
+    assert!(
+        has_inline_confirm,
+        "emergency_wipe should show a destructive InlineConfirm"
+    );
+}
+
+#[test]
+fn settings_confirm_emergency_wipe_completes() {
+    let mut engine = SettingsEngine::new(sample_config());
+    // Trigger wipe to enter pending state
+    engine.handle_action(UserAction::ListItemSelected {
+        component_id: "danger".into(),
+        item_id: "emergency_wipe".into(),
+    });
+    // Confirm
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_emergency_wipe".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::Complete),
+        "confirm_emergency_wipe should return Complete, got {result:?}"
+    );
+}
+
+#[test]
+fn settings_cancel_emergency_wipe_removes_inline_confirm() {
+    let mut engine = SettingsEngine::new(sample_config());
+    // Trigger wipe
+    engine.handle_action(UserAction::ListItemSelected {
+        component_id: "danger".into(),
+        item_id: "emergency_wipe".into(),
+    });
+    // Cancel
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel_emergency_wipe".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("Expected UpdateScreen, got {result:?}");
+    };
+    let has_inline_confirm = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::InlineConfirm { .. }));
+    assert!(!has_inline_confirm, "cancel should remove InlineConfirm");
 }
 
 #[test]

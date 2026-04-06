@@ -22,17 +22,21 @@ pub struct SettingsConfig {
 /// Settings screen engine.
 pub struct SettingsEngine {
     config: SettingsConfig,
+    pending_wipe: bool,
 }
 
 impl SettingsEngine {
     pub fn new(config: SettingsConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            pending_wipe: false,
+        }
     }
 }
 
 impl WorkflowEngine for SettingsEngine {
     fn current_screen(&self) -> ScreenModel {
-        let components = vec![
+        let mut components = vec![
             Component::SettingsGroup {
                 id: "profile".into(),
                 label: "Profile".into(),
@@ -122,6 +126,17 @@ impl WorkflowEngine for SettingsEngine {
             },
         ];
 
+        if self.pending_wipe {
+            components.push(Component::InlineConfirm {
+                id: "emergency_wipe".into(),
+                warning: "This will permanently delete all data. This action cannot be undone."
+                    .into(),
+                confirm_text: "Wipe All Data".into(),
+                cancel_text: "Cancel".into(),
+                destructive: true,
+            });
+        }
+
         ScreenModel {
             screen_id: "settings".into(),
             title: "Settings".into(),
@@ -150,10 +165,18 @@ impl WorkflowEngine for SettingsEngine {
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected { ref item_id, .. } if item_id == "emergency_wipe" => {
-                ActionResult::ShowAlert {
-                    title: "Emergency Wipe".into(),
-                    message: "This will permanently delete all data.".into(),
-                }
+                self.pending_wipe = true;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::ActionPressed { ref action_id }
+                if action_id == "confirm_emergency_wipe" =>
+            {
+                self.pending_wipe = false;
+                ActionResult::Complete
+            }
+            UserAction::ActionPressed { ref action_id } if action_id == "cancel_emergency_wipe" => {
+                self.pending_wipe = false;
+                ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected { .. } => ActionResult::NavigateTo(self.current_screen()),
             _ => ActionResult::UpdateScreen(self.current_screen()),

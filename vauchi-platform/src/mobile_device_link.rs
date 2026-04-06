@@ -69,25 +69,18 @@ impl VauchiPlatform {
     /// Generate a device link QR code.
     ///
     /// Display this QR code on the existing device for a new device to scan.
-    /// The QR expires after 10 minutes.
+    /// The QR expires after 5 minutes (per ADR-035).
     pub fn generate_device_link_qr(&self) -> Result<MobileDeviceLinkData, MobileError> {
         let identity = self.get_identity()?;
 
         let qr = DeviceLinkQR::generate(&identity);
         let qr_data = qr.to_data_string();
 
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        let expires_at = timestamp + 600; // 10 minutes
-
         Ok(MobileDeviceLinkData {
             qr_data,
             identity_public_key: hex::encode(identity.signing_public_key()),
-            timestamp,
-            expires_at,
+            timestamp: qr.timestamp(),
+            expires_at: qr.expires_at(),
         })
     }
 

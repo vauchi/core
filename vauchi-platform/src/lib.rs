@@ -156,6 +156,14 @@ impl MobileDeviceLinkInitiator {
         guard.qr().to_data_string()
     }
 
+    /// Returns the Unix timestamp (seconds) when the QR code expires.
+    pub fn expires_at(&self) -> u64 {
+        let Ok(guard) = lock_or(&self.inner) else {
+            return 0;
+        };
+        guard.qr().expires_at()
+    }
+
     /// Returns the 16-byte proximity challenge.
     pub fn proximity_challenge(&self) -> Vec<u8> {
         let Ok(guard) = lock_or(&self.inner) else {

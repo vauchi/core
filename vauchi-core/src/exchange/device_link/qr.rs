@@ -87,6 +87,11 @@ impl DeviceLinkQR {
         self.timestamp
     }
 
+    /// Returns the Unix timestamp (seconds) when this QR code expires.
+    pub fn expires_at(&self) -> u64 {
+        self.timestamp + LINK_QR_EXPIRY_SECONDS
+    }
+
     /// Checks if the QR code has expired.
     pub fn is_expired(&self) -> bool {
         let now = SystemTime::now()

@@ -7,8 +7,10 @@
 //! Users should see whether their card updates have been delivered
 //! to a contact when viewing that contact's detail screen.
 
-use vauchi_app::ui::contact_detail::{ContactDetailEngine, DeliverySummary};
-use vauchi_app::ui::{Component, ContactItem, FieldDisplay, UiFieldVisibility, WorkflowEngine};
+use vauchi_app::ui::{
+    Component, ContactDetailEngine, ContactItem, DeliverySummary, FieldDisplay, UiFieldVisibility,
+    WorkflowEngine,
+};
 
 fn sample_contact() -> ContactItem {
     ContactItem {

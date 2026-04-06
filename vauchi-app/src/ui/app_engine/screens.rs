@@ -11,7 +11,9 @@ use super::AppScreen;
 use super::initials;
 use crate::ui::backup_recovery::BackupRecoveryEngine;
 use crate::ui::component::{ContactItem, FieldDisplay, Status, UiFieldVisibility};
-use crate::ui::contact_detail::{ContactDetailEngine, ContactNotFoundEngine, SharedInfoView};
+use crate::ui::contact_detail::{
+    ContactDetailEngine, ContactNotFoundEngine, DeliverySummary, SharedInfoView,
+};
 use crate::ui::contact_edit::{ContactEditEngine, EditableContact, EditableField};
 use crate::ui::contact_limit::ContactLimitEngine;
 use crate::ui::contact_list::ContactListEngine;
@@ -416,28 +418,64 @@ impl AppEngine {
                         _ => String::new(),
                     };
 
+                    // Delivery status summary (J1: update propagation)
+                    let delivery_summary = vauchi
+                        .get_delivery_status_for_contact(contact_id)
+                        .ok()
+                        .map(|records| {
+                            use vauchi_core::storage::DeliveryStatus;
+                            let total = records.len();
+                            let delivered = records
+                                .iter()
+                                .filter(|r| matches!(r.status, DeliveryStatus::Delivered))
+                                .count();
+                            let failed = records
+                                .iter()
+                                .filter(|r| {
+                                    matches!(
+                                        r.status,
+                                        DeliveryStatus::Failed { .. } | DeliveryStatus::Expired
+                                    )
+                                })
+                                .count();
+                            let pending = total - delivered - failed;
+                            DeliverySummary {
+                                total,
+                                delivered,
+                                pending,
+                                failed,
+                            }
+                        });
+
+                    let build_engine = |engine: ContactDetailEngine| {
+                        let mut e = engine
+                            .with_field_notes(field_notes)
+                            .with_trust(trust_level, proposal_trusted)
+                            .with_reciprocity(reciprocity_status)
+                            .with_hidden(is_hidden)
+                            .with_imported(is_imported);
+                        if let Some(summary) = delivery_summary
+                            && summary.total > 0
+                        {
+                            e = e.with_delivery_summary(summary);
+                        }
+                        e
+                    };
+
                     match shared_info {
-                        Some(info) => Box::new(
-                            ContactDetailEngine::with_shared_info(
+                        Some(info) => {
+                            Box::new(build_engine(ContactDetailEngine::with_shared_info(
                                 item,
                                 fields,
                                 info,
                                 personal_note,
-                            )
-                            .with_field_notes(field_notes)
-                            .with_trust(trust_level, proposal_trusted)
-                            .with_reciprocity(reciprocity_status.clone())
-                            .with_hidden(is_hidden)
-                            .with_imported(is_imported),
-                        ),
-                        None => Box::new(
-                            ContactDetailEngine::new(item, fields, personal_note)
-                                .with_field_notes(field_notes)
-                                .with_trust(trust_level, proposal_trusted)
-                                .with_reciprocity(reciprocity_status)
-                                .with_hidden(is_hidden)
-                                .with_imported(is_imported),
-                        ),
+                            )))
+                        }
+                        None => Box::new(build_engine(ContactDetailEngine::new(
+                            item,
+                            fields,
+                            personal_note,
+                        ))),
                     }
                 }
                 _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),

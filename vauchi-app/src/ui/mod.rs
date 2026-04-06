@@ -59,7 +59,7 @@ pub use component::{
     VisibilityMode,
 };
 pub use contact_detail::{
-    ContactDetailEngine, ContactNotFoundEngine, ContactViewMode, SharedInfoView,
+    ContactDetailEngine, ContactNotFoundEngine, ContactViewMode, DeliverySummary, SharedInfoView,
 };
 pub use contact_edit::{ContactEditEngine, EditableContact, EditableField};
 pub use contact_limit::ContactLimitEngine;

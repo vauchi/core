@@ -32,6 +32,16 @@ pub struct SharedInfoView {
     pub visible_groups: Vec<String>,
 }
 
+/// Summary of card update delivery status for a contact.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct DeliverySummary {
+    pub total: usize,
+    pub delivered: usize,
+    pub pending: usize,
+    pub failed: usize,
+}
+
 /// Read-only engine that displays a single contact's details with a
 /// perspective toggle.
 #[derive(Clone, Debug)]
@@ -54,6 +64,8 @@ pub struct ContactDetailEngine {
     is_hidden: bool,
     /// Whether this is an imported (non-crypto) contact vs. exchanged.
     is_imported: bool,
+    /// Card update delivery status for this contact (J1 MVP).
+    delivery_summary: Option<DeliverySummary>,
 }
 
 impl ContactDetailEngine {
@@ -71,6 +83,7 @@ impl ContactDetailEngine {
             proposal_trusted: false,
             is_hidden: false,
             is_imported: false,
+            delivery_summary: None,
         }
     }
 
@@ -93,7 +106,14 @@ impl ContactDetailEngine {
             proposal_trusted: false,
             is_hidden: false,
             is_imported: false,
+            delivery_summary: None,
         }
+    }
+
+    /// Attach delivery status summary for card updates to this contact.
+    pub fn with_delivery_summary(mut self, summary: DeliverySummary) -> Self {
+        self.delivery_summary = Some(summary);
+        self
     }
 
     /// Attach per-field notes loaded from storage.
@@ -248,6 +268,43 @@ impl ContactDetailEngine {
                         },
                     }],
                 });
+                // Delivery status summary (J1: update propagation)
+                if let Some(ref summary) = self.delivery_summary {
+                    let mut items = Vec::new();
+                    if summary.failed == 0 && summary.pending == 0 {
+                        items.push(InfoItem {
+                            icon: None,
+                            title: "Status".into(),
+                            detail: "All delivered".into(),
+                        });
+                    } else {
+                        items.push(InfoItem {
+                            icon: None,
+                            title: "Delivered".into(),
+                            detail: summary.delivered.to_string(),
+                        });
+                        if summary.pending > 0 {
+                            items.push(InfoItem {
+                                icon: None,
+                                title: "Pending".into(),
+                                detail: summary.pending.to_string(),
+                            });
+                        }
+                        if summary.failed > 0 {
+                            items.push(InfoItem {
+                                icon: None,
+                                title: "Failed".into(),
+                                detail: summary.failed.to_string(),
+                            });
+                        }
+                    }
+                    components.push(Component::InfoPanel {
+                        id: "delivery_status".into(),
+                        icon: None,
+                        title: "Update Delivery".into(),
+                        items,
+                    });
+                }
             }
             ContactViewMode::MyInfoForThem => {
                 if let Some(ref shared) = self.shared_info {

@@ -41,7 +41,7 @@ impl From<Score> for PasswordStrength {
 }
 
 /// Minimum password length requirement.
-const MIN_PASSWORD_LENGTH: usize = 8;
+pub const MIN_PASSWORD_LENGTH: usize = 8;
 
 /// Minimum zxcvbn score required (0-4 scale).
 /// Score 3 means "safely unguessable: moderate protection from offline slow-hash scenario"

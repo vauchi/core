@@ -59,4 +59,10 @@ pub enum NetworkError {
         /// Seconds to wait before retrying. Defaults to 10 if server doesn't specify.
         retry_after_secs: u64,
     },
+
+    #[error("Upgrade required: minimum version {min_version}")]
+    UpgradeRequired {
+        /// The minimum app compat version the relay requires.
+        min_version: u16,
+    },
 }

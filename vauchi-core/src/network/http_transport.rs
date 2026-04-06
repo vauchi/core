@@ -8,6 +8,7 @@
 //! Replaces WebSocket for relay communication — request/response model
 //! suited for contact card sync (not real-time chat).
 
+use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::Serialize;
@@ -17,6 +18,7 @@ use vauchi_protocol::v2::{
 };
 
 use super::error::NetworkError;
+use crate::version::{APP_COMPAT_VERSION, VersionPolicy};
 
 /// Default retry delay when the server doesn't specify Retry-After.
 const DEFAULT_RATE_LIMIT_RETRY_SECS: u64 = 10;
@@ -76,6 +78,7 @@ pub struct HttpTransport {
     config: HttpTransportConfig,
     agent: Result<ureq::Agent, NetworkError>,
     ohttp: Option<OhttpClient>,
+    last_version_policy: Mutex<Option<VersionPolicy>>,
 }
 
 impl HttpTransport {
@@ -89,6 +92,7 @@ impl HttpTransport {
             config,
             agent,
             ohttp: None,
+            last_version_policy: Mutex::new(None),
         }
     }
 
@@ -127,6 +131,25 @@ impl HttpTransport {
         &self.config.proxy
     }
 
+    /// Returns the last version policy received from the relay.
+    ///
+    /// Updated after every successful HTTP response that includes version headers.
+    pub fn last_version_policy(&self) -> Option<VersionPolicy> {
+        self.last_version_policy.lock().ok()?.clone()
+    }
+
+    /// Fetch the version policy from the CDN manifest.
+    ///
+    /// Returns `None` on any failure (network, parse, etc.) — callers
+    /// should fall back to the relay's inline headers.
+    pub fn fetch_cdn_version_policy(&self) -> Option<VersionPolicy> {
+        const CDN_URL: &str = "https://version.vauchi.app/v1/policy.json";
+        let agent = self.agent.as_ref().ok()?;
+        let resp = agent.get(CDN_URL).call().ok()?;
+        let body: String = resp.into_body().read_to_string().ok()?;
+        VersionPolicy::from_cdn_json(&body).ok()
+    }
+
     /// Fetch the relay's OHTTP gateway public key.
     ///
     /// Always uses direct HTTP (not OHTTP) — this is the
@@ -137,8 +160,10 @@ impl HttpTransport {
         let url = format!("{}/v2/ohttp-key", self.config.relay_url);
         let resp = agent
             .get(&url)
+            .header("X-App-Compat-Version", &APP_COMPAT_VERSION.to_string())
             .call()
-            .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))?;
+            .map_err(Self::map_ureq_error)?;
+        self.check_response_status(&resp)?;
         let body = resp
             .into_body()
             .read_to_vec()
@@ -404,9 +429,11 @@ impl HttpTransport {
         let ohttp_url = format!("{}/v2/ohttp", self.config.relay_url);
         let resp = agent
             .post(&ohttp_url)
+            .header("X-App-Compat-Version", &APP_COMPAT_VERSION.to_string())
             .content_type("message/ohttp-req")
             .send(encrypted)
-            .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))?;
+            .map_err(Self::map_ureq_error)?;
+        self.check_response_status(&resp)?;
 
         // Read raw response bytes
         let enc_response = resp
@@ -428,6 +455,58 @@ impl HttpTransport {
             .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))
     }
 
+    /// Map a ureq transport error to [`NetworkError`].
+    fn map_ureq_error(e: ureq::Error) -> NetworkError {
+        NetworkError::ConnectionFailed(e.to_string())
+    }
+
+    /// Check the HTTP status code and extract version policy from headers.
+    ///
+    /// Must be called before consuming the response body.
+    /// Returns `Err(UpgradeRequired)` for 426, extracts version headers on all others.
+    fn check_response_status(
+        &self,
+        resp: &ureq::http::Response<ureq::Body>,
+    ) -> Result<(), NetworkError> {
+        self.extract_version_policy(resp);
+
+        if resp.status().as_u16() == 426 {
+            // Read min_version from header if available, otherwise default to 0.
+            let min_version = resp
+                .headers()
+                .get("X-Min-Version")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u16>().ok())
+                .unwrap_or(0);
+            return Err(NetworkError::UpgradeRequired { min_version });
+        }
+
+        Ok(())
+    }
+
+    /// Extract version policy from response headers and store it.
+    fn extract_version_policy(&self, resp: &ureq::http::Response<ureq::Body>) {
+        let min = resp
+            .headers()
+            .get("X-Min-Version")
+            .and_then(|v| v.to_str().ok());
+        let warn = resp
+            .headers()
+            .get("X-Warn-Version")
+            .and_then(|v| v.to_str().ok());
+        let deadline = resp
+            .headers()
+            .get("X-Upgrade-Deadline")
+            .and_then(|v| v.to_str().ok());
+
+        let policy = VersionPolicy::from_headers(min, warn, deadline);
+        if !policy.is_none_policy()
+            && let Ok(mut stored) = self.last_version_policy.lock()
+        {
+            *stored = Some(policy);
+        }
+    }
+
     fn post_json<Req: Serialize, Resp: serde::de::DeserializeOwned>(
         &self,
         url: &str,
@@ -436,8 +515,10 @@ impl HttpTransport {
         let agent = self.get_agent()?;
         let resp = agent
             .post(url)
+            .header("X-App-Compat-Version", &APP_COMPAT_VERSION.to_string())
             .send_json(body)
-            .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))?;
+            .map_err(Self::map_ureq_error)?;
+        self.check_response_status(&resp)?;
 
         resp.into_body()
             .read_json::<Resp>()
@@ -448,8 +529,10 @@ impl HttpTransport {
         let agent = self.get_agent()?;
         let resp = agent
             .get(url)
+            .header("X-App-Compat-Version", &APP_COMPAT_VERSION.to_string())
             .call()
-            .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))?;
+            .map_err(Self::map_ureq_error)?;
+        self.check_response_status(&resp)?;
 
         resp.into_body()
             .read_json::<Resp>()
@@ -459,7 +542,11 @@ impl HttpTransport {
     /// Build an agent from config. Called once at construction.
     fn build_agent_from_config(config: &HttpTransportConfig) -> Result<ureq::Agent, NetworkError> {
         let timeout = Duration::from_millis(config.timeout_ms);
-        let mut builder = ureq::Agent::config_builder().timeout_global(Some(timeout));
+        let mut builder = ureq::Agent::config_builder()
+            .timeout_global(Some(timeout))
+            // Disable automatic 4xx/5xx → Error conversion so we can read
+            // response headers (version policy) before inspecting the status.
+            .http_status_as_error(false);
 
         if let Some(proxy) = Self::build_proxy_from_config(config)? {
             builder = builder.proxy(Some(proxy));
@@ -533,6 +620,21 @@ mod tests {
         });
         assert_eq!(transport.relay_url(), "http://localhost:8080");
         assert_eq!(transport.proxy(), &ProxyConfig::None);
+    }
+
+    #[test]
+    fn test_last_version_policy_initially_none() {
+        let transport = HttpTransport::new(HttpTransportConfig::default());
+        assert!(
+            transport.last_version_policy().is_none(),
+            "version policy must be None before any request"
+        );
+    }
+
+    #[test]
+    fn test_upgrade_required_error_format() {
+        let err = NetworkError::UpgradeRequired { min_version: 5 };
+        assert_eq!(err.to_string(), "Upgrade required: minimum version 5");
     }
 
     #[test]

@@ -121,6 +121,7 @@ fn settings_emergency_wipe_shows_inline_confirm() {
     );
 }
 
+// @internal
 #[test]
 fn settings_confirm_emergency_wipe_completes() {
     let mut engine = SettingsEngine::new(sample_config());
@@ -139,6 +140,7 @@ fn settings_confirm_emergency_wipe_completes() {
     );
 }
 
+// @internal
 #[test]
 fn settings_cancel_emergency_wipe_removes_inline_confirm() {
     let mut engine = SettingsEngine::new(sample_config());

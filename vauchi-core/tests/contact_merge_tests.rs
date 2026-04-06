@@ -225,3 +225,31 @@ fn different_phones_stay_below_threshold() {
         sim
     );
 }
+
+// @scenario: contact_management :: Preview merge shows unique fields
+#[test]
+fn test_preview_merge_additions() {
+    use vauchi_core::contact::merge::preview_merge_additions;
+
+    let primary = make_contact(
+        "Alice",
+        &[
+            (FieldType::Phone, "Mobile", "+1-555-1234"),
+            (FieldType::Email, "Work", "alice@work.com"),
+        ],
+    );
+    let secondary = make_contact(
+        "Alice A.",
+        &[
+            (FieldType::Phone, "Mobile", "+1-555-1234"), // duplicate
+            (FieldType::Email, "Personal", "alice@home.com"), // unique (diff label)
+            (FieldType::Website, "Blog", "https://alice.dev"), // unique (new type)
+        ],
+    );
+
+    let additions = preview_merge_additions(&primary, &secondary);
+    assert_eq!(additions.len(), 2, "Should find 2 unique fields");
+    let labels: Vec<&str> = additions.iter().map(|f| f.label()).collect();
+    assert!(labels.contains(&"Personal"));
+    assert!(labels.contains(&"Blog"));
+}

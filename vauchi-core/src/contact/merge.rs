@@ -7,7 +7,7 @@
 use std::collections::HashSet;
 
 use crate::contact::Contact;
-use crate::contact_card::FieldType;
+use crate::contact_card::{ContactField, FieldType};
 
 /// A detected duplicate pair with similarity score.
 #[derive(Clone, Debug)]
@@ -123,6 +123,32 @@ pub fn merge_contacts(primary: &Contact, secondary: &Contact) -> Contact {
 
     merged.update_card(merged_card);
     merged
+}
+
+/// Returns fields from the secondary contact that are not present on the primary.
+///
+/// Uses the same deduplication logic as [`merge_contacts`] (field type + label signature).
+/// Useful for showing the user a preview before merging.
+pub fn preview_merge_additions<'a>(
+    primary: &Contact,
+    secondary: &'a Contact,
+) -> Vec<&'a ContactField> {
+    let primary_signatures: HashSet<(String, String)> = primary
+        .card()
+        .fields()
+        .iter()
+        .map(|f| (format!("{:?}", f.field_type()), f.label().to_string()))
+        .collect();
+
+    secondary
+        .card()
+        .fields()
+        .iter()
+        .filter(|f| {
+            let sig = (format!("{:?}", f.field_type()), f.label().to_string());
+            !primary_signatures.contains(&sig)
+        })
+        .collect()
 }
 
 /// Filters duplicate pairs to exclude dismissed ones.

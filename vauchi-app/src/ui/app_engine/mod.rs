@@ -21,6 +21,7 @@ use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 
 use super::action::{ActionResult, UserAction};
+use super::device_linking::DeviceLinkingEngine;
 use super::engine::WorkflowEngine;
 use super::screen::ScreenModel;
 
@@ -272,6 +273,40 @@ impl AppEngine {
             return None;
         }
         Some(self.navigate_to(AppScreen::Lock))
+    }
+
+    /// Signal that a peer device has connected during device linking.
+    ///
+    /// Transitions the `DeviceLinkingEngine` from `ShowQr` to `VerifyCode`.
+    /// Returns the updated screen model, or `None` if the engine is not on
+    /// the device linking screen.
+    pub fn device_link_peer_connected(&mut self, verification_code: String) -> Option<ScreenModel> {
+        if self.screen != AppScreen::DeviceLinking {
+            return None;
+        }
+        let dl = self
+            .engine
+            .as_any_mut()
+            .and_then(|a| a.downcast_mut::<DeviceLinkingEngine>())?;
+        dl.peer_connected(verification_code);
+        Some(dl.current_screen())
+    }
+
+    /// Signal that data sync has completed during device linking.
+    ///
+    /// Transitions the `DeviceLinkingEngine` from `Syncing` to `Complete`.
+    /// Returns the updated screen model, or `None` if the engine is not on
+    /// the device linking screen.
+    pub fn device_link_sync_complete(&mut self) -> Option<ScreenModel> {
+        if self.screen != AppScreen::DeviceLinking {
+            return None;
+        }
+        let dl = self
+            .engine
+            .as_any_mut()
+            .and_then(|a| a.downcast_mut::<DeviceLinkingEngine>())?;
+        dl.sync_complete();
+        Some(dl.current_screen())
     }
 }
 

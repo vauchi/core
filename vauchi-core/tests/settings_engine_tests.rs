@@ -126,10 +126,14 @@ fn settings_emergency_wipe_shows_inline_confirm() {
 fn settings_confirm_emergency_wipe_completes() {
     let mut engine = SettingsEngine::new(sample_config());
     // Trigger wipe to enter pending state
-    engine.handle_action(UserAction::ListItemSelected {
+    let trigger = engine.handle_action(UserAction::ListItemSelected {
         component_id: "danger".into(),
         item_id: "emergency_wipe".into(),
     });
+    assert!(
+        matches!(trigger, ActionResult::UpdateScreen(_)),
+        "trigger should show inline confirm, got {trigger:?}"
+    );
     // Confirm
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "confirm_emergency_wipe".into(),
@@ -145,10 +149,14 @@ fn settings_confirm_emergency_wipe_completes() {
 fn settings_cancel_emergency_wipe_removes_inline_confirm() {
     let mut engine = SettingsEngine::new(sample_config());
     // Trigger wipe
-    engine.handle_action(UserAction::ListItemSelected {
+    let trigger = engine.handle_action(UserAction::ListItemSelected {
         component_id: "danger".into(),
         item_id: "emergency_wipe".into(),
     });
+    assert!(
+        matches!(trigger, ActionResult::UpdateScreen(_)),
+        "trigger should show inline confirm, got {trigger:?}"
+    );
     // Cancel
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel_emergency_wipe".into(),

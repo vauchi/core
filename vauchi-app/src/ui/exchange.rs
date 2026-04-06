@@ -776,6 +776,40 @@ impl WorkflowEngine for ExchangeEngine {
         }
         let mut commands = session.drain_commands();
 
+        // QR auto-advance: after scanning their QR (PeerScanned), drive the
+        // session through the remaining steps to Complete. This mirrors the
+        // sequential calls in MobileExchangeSession.processScannedQr() but
+        // keeps the logic in core per ADR-031.
+        if matches!(
+            session.state(),
+            vauchi_core::exchange::ExchangeState::PeerScanned { .. }
+        ) && session.transport() == vauchi_core::exchange::ExchangeTransport::Qr
+        {
+            if let Err(e) = session
+                .apply(ExchangeEvent::TheyScannedOurQR)
+                .and_then(|()| {
+                    session.run_proximity_check();
+                    session.apply(ExchangeEvent::PerformKeyAgreement)
+                })
+                .and_then(|()| {
+                    let our_card = self
+                        .config
+                        .card_snapshot
+                        .as_ref()
+                        .map(|s| s.card().clone())
+                        .unwrap_or_else(|| {
+                            vauchi_core::contact_card::ContactCard::new(&self.config.own_name)
+                        });
+                    session.apply(ExchangeEvent::CompleteExchange(our_card))
+                })
+            {
+                self.failure_detail = Some(e.user_message().to_string());
+                self.step = ExchangeStep::Failed;
+                return Some(ActionResult::UpdateScreen(self.build_screen()));
+            }
+            commands.extend(session.drain_commands());
+        }
+
         // Route escrow events to reciprocity confirmer if active
         if let Some(ref mut confirmer) = self.reciprocity_confirmer {
             if let Some(ref evt) = event_for_confirmer {
@@ -1361,7 +1395,7 @@ mod tests {
     }
 
     #[test]
-    fn test_qr_scanned_advances_step_to_verifying() {
+    fn test_qr_scanned_auto_advances_to_success() {
         let (mut engine, bob_qr_data) = create_alice_engine_and_bob_qr();
         let _ = engine.drain_commands(); // drain initial QrDisplay
 
@@ -1371,18 +1405,27 @@ mod tests {
         });
         assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
 
-        // Simulate scanning Bob's QR
+        // Simulate scanning Bob's QR — auto-advance drives session to Complete
         let result =
             engine.handle_hardware_event(vauchi_core::exchange::ExchangeHardwareEvent::QrScanned {
                 data: bob_qr_data,
             });
 
-        // Should advance to Verifying
         assert!(result.is_some(), "expected Some value");
         assert_eq!(
             engine.step,
-            ExchangeStep::Qr(QrStep::Verifying),
-            "After QrScanned, engine step should be Verifying"
+            ExchangeStep::Success,
+            "After QrScanned, engine should auto-advance to Success"
+        );
+        // Session should be Complete
+        let session = engine.session().unwrap();
+        assert!(
+            matches!(
+                session.state(),
+                vauchi_core::exchange::ExchangeState::Complete { .. }
+            ),
+            "Session should be Complete after QR auto-advance, got {:?}",
+            session.state()
         );
     }
 
@@ -1449,26 +1492,36 @@ mod tests {
             other => panic!("Expected ExchangeCommands, got {:?}", other),
         }
 
-        // 3. Frontend scans Bob's QR → feed as hardware event
+        // 3. Frontend scans Bob's QR → auto-advance drives to Complete
         let result =
             engine.handle_hardware_event(vauchi_core::exchange::ExchangeHardwareEvent::QrScanned {
                 data: bob_qr_data,
             });
         assert!(result.is_some(), "expected Some value");
 
-        // 4. Engine should be in Verifying step
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::Verifying));
+        // 4. Engine should have auto-advanced to Success
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Success,
+            "QR auto-advance should reach Success"
+        );
 
-        // 5. Session should be in PeerScanned state
+        // 5. Session should be in Complete state with a contact
         let session = engine.session().unwrap();
         assert!(
             matches!(
                 session.state(),
-                vauchi_core::exchange::ExchangeState::PeerScanned { .. }
+                vauchi_core::exchange::ExchangeState::Complete { .. }
             ),
-            "Session should be in PeerScanned state, got {:?}",
+            "Session should be Complete, got {:?}",
             session.state()
         );
+
+        // 6. User presses "done" → Complete
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "done".into(),
+        });
+        assert_eq!(result, ActionResult::Complete);
     }
 
     #[test]

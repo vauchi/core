@@ -212,11 +212,22 @@ impl AppEngine {
                 // Persist exchange result: upsert contact + init ratchet + assign groups
                 if let Some((contact, groups)) = exchange_data {
                     let contact_id = contact.id().to_string();
-                    let _ = self.vauchi.update_contact(&contact);
+                    if let Err(e) = self.vauchi.update_contact(&contact) {
+                        return ActionResult::ShowAlert {
+                            title: "Exchange Error".into(),
+                            message: format!("Failed to save contact: {e}"),
+                        };
+                    }
                     if let (Some(sk), Some(pk)) = (contact.shared_key(), contact.public_key()) {
-                        let _ = self
-                            .vauchi
-                            .create_ratchet_as_initiator(&contact_id, sk, *pk);
+                        if let Err(e) =
+                            self.vauchi
+                                .create_ratchet_as_initiator(&contact_id, sk, *pk)
+                        {
+                            return ActionResult::ShowAlert {
+                                title: "Exchange Error".into(),
+                                message: format!("Failed to initialize encryption: {e}"),
+                            };
+                        }
                     }
                     for group_id in &groups {
                         let _ = self.vauchi.add_contact_to_group(group_id, &contact_id);

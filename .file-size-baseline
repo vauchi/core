@@ -8,7 +8,7 @@
 # SPLIT files are queued for splitting in PRB-2026-032 implementation phases.
 
 # SPLIT — Phase 1: zero-risk type/FFI splits
-vauchi-cabi/src/lib.rs 1799
+vauchi-cabi/src/lib.rs 1841
 vauchi-platform/src/types.rs 1547
 
 # EXEMPT — UniFFI facade: splitting breaks binding generation (trust/notes/preview/import exports added)

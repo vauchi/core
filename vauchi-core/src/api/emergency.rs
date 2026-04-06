@@ -19,6 +19,13 @@ pub const MAX_TRUSTED_CONTACTS: usize = 10;
 /// Default emergency message.
 pub const DEFAULT_EMERGENCY_MESSAGE: &str = "I may be in danger. Please check on me.";
 
+/// Minimum seconds between emergency broadcasts (UX guard).
+///
+/// Prevents accidental double-sends. Frontends should check this before
+/// calling `send_emergency_broadcast()`. A future core version should
+/// enforce this server-side.
+pub const BROADCAST_COOLDOWN_SECS: u64 = 60;
+
 /// Result of a broadcast operation.
 #[derive(Debug, Clone)]
 pub struct BroadcastResult {

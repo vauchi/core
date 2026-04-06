@@ -363,11 +363,19 @@ fn form_dialog_cancel_does_not_save_modified_name() {
         value: "Eve".into(),
     });
 
-    // User presses Cancel — should NOT save "Eve"
+    // User presses Cancel — dirty form shows InlineConfirm first
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "Cancel on dirty form should show InlineConfirm, got {result:?}"
+    );
 
+    // User confirms discard — should NOT save "Eve"
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_discard".into(),
+    });
     assert!(matches!(result, ActionResult::NavigateTo(_)));
 
     // Verify the name is still "Alice" — cancel must not persist
@@ -429,11 +437,19 @@ fn form_dialog_cancel_add_field_does_not_save() {
         value: "+41 79 000 00 00".into(),
     });
 
-    // User presses Cancel — field must NOT be added
+    // User presses Cancel — dirty form shows InlineConfirm first
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "Cancel on dirty form should show InlineConfirm, got {result:?}"
+    );
 
+    // User confirms discard — field must NOT be added
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_discard".into(),
+    });
     assert!(matches!(result, ActionResult::NavigateTo(_)));
 
     let field_count_after = engine

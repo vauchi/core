@@ -94,7 +94,7 @@ fn form_dialog_add_field_submit_completes() {
 }
 
 #[test]
-fn form_dialog_add_field_cancel_navigates() {
+fn form_dialog_add_field_cancel_clean_completes() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField {
         available_groups: vec![],
     });
@@ -105,7 +105,7 @@ fn form_dialog_add_field_cancel_navigates() {
     assert_eq!(
         result,
         ActionResult::Complete,
-        "Cancel should return Complete"
+        "Cancel on clean form should return Complete"
     );
     assert!(
         engine.was_cancelled(),
@@ -367,4 +367,153 @@ fn form_dialog_text_changed_updates_value() {
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
     }
+}
+
+// --- Dirty-cancel → InlineConfirm tests (ADR-022) ---
+
+// @internal
+#[test]
+fn form_dialog_cancel_dirty_edit_shows_inline_confirm() {
+    let mut engine = FormDialogEngine::new(FormDialogType::EditName {
+        current_name: "Alice".into(),
+    });
+    // Make form dirty
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "Bob".into(),
+    });
+    // Cancel on dirty form → InlineConfirm
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("Expected UpdateScreen with InlineConfirm, got {result:?}");
+    };
+    let has_inline_confirm = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::InlineConfirm { id, .. } if id == "discard"));
+    assert!(
+        has_inline_confirm,
+        "Cancel on dirty form should show InlineConfirm"
+    );
+}
+
+// @internal
+#[test]
+fn form_dialog_confirm_discard_completes() {
+    let mut engine = FormDialogEngine::new(FormDialogType::EditName {
+        current_name: "Alice".into(),
+    });
+    // Make dirty
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "Bob".into(),
+    });
+    // Cancel → shows InlineConfirm
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+    // Confirm discard
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_discard".into(),
+    });
+    assert_eq!(
+        result,
+        ActionResult::Complete,
+        "confirm_discard should complete"
+    );
+    assert!(engine.was_cancelled(), "should be marked cancelled");
+}
+
+// @internal
+#[test]
+fn form_dialog_cancel_discard_removes_inline_confirm() {
+    let mut engine = FormDialogEngine::new(FormDialogType::EditName {
+        current_name: "Alice".into(),
+    });
+    // Make dirty
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "Bob".into(),
+    });
+    // Cancel → shows InlineConfirm
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+    // Cancel discard (Esc on InlineConfirm)
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel_discard".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("Expected UpdateScreen, got {result:?}");
+    };
+    let has_inline_confirm = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::InlineConfirm { .. }));
+    assert!(
+        !has_inline_confirm,
+        "cancel_discard should remove InlineConfirm"
+    );
+}
+
+// @internal
+#[test]
+fn form_dialog_cancel_dirty_add_field_shows_inline_confirm() {
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
+    });
+    // Make dirty by entering a value
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "field_value".into(),
+        value: "test@example.com".into(),
+    });
+    // Cancel → InlineConfirm
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("Expected UpdateScreen with InlineConfirm, got {result:?}");
+    };
+    let has_inline_confirm = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::InlineConfirm { .. }));
+    assert!(
+        has_inline_confirm,
+        "Cancel on dirty AddField should show InlineConfirm"
+    );
+}
+
+// @internal — second cancel while InlineConfirm shown removes it
+#[test]
+fn form_dialog_second_cancel_removes_inline_confirm() {
+    let mut engine = FormDialogEngine::new(FormDialogType::EditName {
+        current_name: "Alice".into(),
+    });
+    // Make dirty
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "display_name".into(),
+        value: "Bob".into(),
+    });
+    // First cancel → InlineConfirm
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+    // Second cancel → removes InlineConfirm
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("Expected UpdateScreen, got {result:?}");
+    };
+    let has_inline_confirm = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::InlineConfirm { .. }));
+    assert!(
+        !has_inline_confirm,
+        "Second cancel should remove InlineConfirm"
+    );
 }

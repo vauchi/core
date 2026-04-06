@@ -66,6 +66,9 @@ pub struct FormDialogEngine {
     /// Set to true when the user presses cancel. `handle_completion` checks this
     /// to skip persistence and just navigate back.
     cancelled: bool,
+    /// When true, an InlineConfirm is shown asking the user to confirm discarding
+    /// unsaved changes. Set on cancel when form is dirty.
+    pending_discard: bool,
 }
 
 impl FormDialogEngine {
@@ -116,6 +119,7 @@ impl FormDialogEngine {
             catalog_entries,
             selected_groups: Vec::new(),
             cancelled: false,
+            pending_discard: false,
         }
     }
 
@@ -130,6 +134,37 @@ impl FormDialogEngine {
     fn set_value(&mut self, id: &str, value: String) {
         if let Some(entry) = self.values.iter_mut().find(|(k, _)| k == id) {
             entry.1 = value;
+        }
+    }
+
+    /// Returns true if the form has user-entered data that differs from the
+    /// original values. Used to decide whether to show a discard confirmation.
+    fn is_dirty(&self) -> bool {
+        match &self.dialog_type {
+            FormDialogType::AddField { .. } => {
+                let label = self.get_value("field_label").trim();
+                let value = self.get_value("field_value").trim();
+                !label.is_empty() || !value.is_empty()
+            }
+            FormDialogType::EditField {
+                current_value,
+                current_note,
+                ..
+            } => {
+                let value = self.get_value("field_value");
+                let note = self.get_value("field_note");
+                value != current_value.as_str() || note != current_note.as_deref().unwrap_or("")
+            }
+            FormDialogType::EditName { current_name } => {
+                self.get_value("display_name") != current_name.as_str()
+            }
+            FormDialogType::EditRelayUrl { current_url } => {
+                self.get_value("relay_url") != current_url.as_str()
+            }
+            FormDialogType::CreateGroup => !self.get_value("group_name").is_empty(),
+            FormDialogType::RenameGroup { current_name, .. } => {
+                self.get_value("group_name") != current_name.as_str()
+            }
         }
     }
 
@@ -425,7 +460,17 @@ impl FormDialogEngine {
 
 impl WorkflowEngine for FormDialogEngine {
     fn current_screen(&self) -> ScreenModel {
-        self.build_screen()
+        let mut screen = self.build_screen();
+        if self.pending_discard {
+            screen.components.push(Component::InlineConfirm {
+                id: "discard".into(),
+                warning: "You have unsaved changes. Discard?".into(),
+                confirm_text: "Discard".into(),
+                cancel_text: "Keep Editing".into(),
+                destructive: false,
+            });
+        }
+        screen
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
@@ -435,15 +480,15 @@ impl WorkflowEngine for FormDialogEngine {
                 value,
             } => {
                 self.set_value(&component_id, value);
-                ActionResult::UpdateScreen(self.build_screen())
+                ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected { item_id, .. } => {
                 if matches!(self.dialog_type, FormDialogType::AddField { .. }) {
                     // Type selected from flat list
                     self.selected_entry_type = Some(item_id);
-                    return ActionResult::UpdateScreen(self.build_screen());
+                    return ActionResult::UpdateScreen(self.current_screen());
                 }
-                ActionResult::UpdateScreen(self.build_screen())
+                ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ItemToggled {
                 component_id,
@@ -455,17 +500,37 @@ impl WorkflowEngine for FormDialogEngine {
                 } else {
                     self.selected_groups.push(item_id);
                 }
-                ActionResult::UpdateScreen(self.build_screen())
+                ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
                 s if s == "submit" || s.starts_with("submit_") => ActionResult::Complete,
                 "cancel" => {
+                    if self.pending_discard {
+                        // Second cancel while InlineConfirm shown → dismiss it
+                        self.pending_discard = false;
+                        ActionResult::UpdateScreen(self.current_screen())
+                    } else if self.is_dirty() {
+                        // Dirty form → show InlineConfirm before discarding
+                        self.pending_discard = true;
+                        ActionResult::UpdateScreen(self.current_screen())
+                    } else {
+                        // Clean form → cancel immediately
+                        self.cancelled = true;
+                        ActionResult::Complete
+                    }
+                }
+                "confirm_discard" => {
+                    self.pending_discard = false;
                     self.cancelled = true;
                     ActionResult::Complete
                 }
-                _ => ActionResult::UpdateScreen(self.build_screen()),
+                "cancel_discard" => {
+                    self.pending_discard = false;
+                    ActionResult::UpdateScreen(self.current_screen())
+                }
+                _ => ActionResult::UpdateScreen(self.current_screen()),
             },
-            _ => ActionResult::UpdateScreen(self.build_screen()),
+            _ => ActionResult::UpdateScreen(self.current_screen()),
         }
     }
 

@@ -390,6 +390,48 @@ impl ExchangeSession {
         &self.state
     }
 
+    /// Returns `true` if the exchange completed successfully.
+    pub fn is_complete(&self) -> bool {
+        matches!(self.state, ExchangeState::Complete { .. })
+    }
+
+    /// Returns `true` if the exchange failed.
+    pub fn is_failed(&self) -> bool {
+        matches!(self.state, ExchangeState::Failed { .. })
+    }
+
+    /// Returns the failure reason, if the session is in `Failed` state.
+    pub fn failure_reason(&self) -> Option<&ExchangeError> {
+        match &self.state {
+            ExchangeState::Failed { error } => Some(error),
+            _ => None,
+        }
+    }
+
+    /// Extracts the completed contact, consuming the `Complete` state.
+    ///
+    /// Returns `Some(contact)` if the session is in `Complete` state,
+    /// resetting the state to `Idle`. Returns `None` otherwise.
+    pub fn extract_contact(&mut self) -> Option<Contact> {
+        match std::mem::replace(&mut self.state, ExchangeState::Idle) {
+            ExchangeState::Complete { contact } => Some(*contact),
+            other => {
+                self.state = other;
+                None
+            }
+        }
+    }
+
+    /// Returns the shared key from the `AwaitingCardExchange` state.
+    ///
+    /// Useful for card exchange setup before calling `CompleteExchange`.
+    pub fn shared_key(&self) -> Option<&crate::crypto::SymmetricKey> {
+        match &self.state {
+            ExchangeState::AwaitingCardExchange { shared_key, .. } => Some(shared_key),
+            _ => None,
+        }
+    }
+
     /// Returns the transport mechanism.
     pub fn transport(&self) -> ExchangeTransport {
         self.transport

@@ -516,6 +516,8 @@ validate:content-contracts:
           - "vauchi-core/src/social/**/*.rs"
           - "vauchi-core/src/content/**/*.rs"
           - "scripts/validate-content-contracts.sh"
+    # C4: Run when triggered by content repos (themes/, locales/)
+    - if: $CI_PIPELINE_SOURCE == "pipeline" && $CONTENT_TRIGGER_REPO
 
 lint:module-boundaries:
   extends: [.linux-runner-nocache]

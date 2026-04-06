@@ -151,6 +151,38 @@ impl PlatformAppEngine {
         action_result_to_json(&result)
     }
 
+    /// Handle a hardware event from the frontend during an exchange (ADR-031).
+    ///
+    /// Frontends call this when hardware reports results (QR scanned, BLE
+    /// data received, etc.). Returns the serialized `ActionResult` JSON if
+    /// the event produced a result, or `None` if the current screen doesn't
+    /// handle hardware events.
+    ///
+    /// # Usage from Swift
+    ///
+    /// ```swift
+    /// if let resultJson = try engine.handleHardwareEvent(
+    ///     event: .qrScanned(data: scannedData)
+    /// ) {
+    ///     let result = try decoder.decode(ActionResult.self, from: resultJson.data(using: .utf8)!)
+    ///     applyResult(result)
+    /// }
+    /// ```
+    pub fn handle_hardware_event(
+        &self,
+        event: crate::MobileExchangeHardwareEvent,
+    ) -> Result<Option<String>, MobileError> {
+        let hw_event: vauchi_core::exchange::ExchangeHardwareEvent = event.into();
+        let mut engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        match engine.handle_hardware_event(hw_event) {
+            Some(result) => Ok(Some(action_result_to_json(&result)?)),
+            None => Ok(None),
+        }
+    }
+
     /// Navigate to a screen (as JSON) and return the new screen model as JSON.
     ///
     /// The screen JSON must match the `AppScreen` enum format, e.g.:

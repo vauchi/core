@@ -298,6 +298,52 @@ impl Vauchi {
             .unwrap_or_else(SymmetricKey::generate))
     }
 
+    /// Returns the current Unix timestamp in seconds.
+    fn now_timestamp() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("System clock before UNIX epoch")
+            .as_secs()
+    }
+
+    /// Records a sync item for inter-device synchronization.
+    ///
+    /// Silently succeeds if:
+    /// - No identity is loaded
+    /// - No device registry exists
+    /// - Only one device is registered (nothing to sync to)
+    ///
+    /// This is called automatically by mutation methods (card updates,
+    /// contact deletions, visibility changes, etc.) so that all frontends
+    /// — CLI, TUI, mobile — get sync recording for free.
+    pub(crate) fn record_sync_item(&self, item: crate::sync::SyncItem) {
+        let identity = match &self.identity {
+            Some(id) => id,
+            None => return,
+        };
+
+        let registry = match self.storage.load_device_registry() {
+            Ok(Some(r)) if r.device_count() > 1 => r,
+            _ => return,
+        };
+
+        let mut orchestrator = crate::sync::DeviceSyncOrchestrator::load(
+            &self.storage,
+            identity.create_device_info(),
+            registry.clone(),
+        )
+        .unwrap_or_else(|_| {
+            crate::sync::DeviceSyncOrchestrator::new(
+                &self.storage,
+                identity.create_device_info(),
+                registry,
+            )
+        });
+
+        // Best-effort — sync recording failures should not break mutations
+        let _ = orchestrator.record_local_change(item);
+    }
+
     /// Creates a new Vauchi instance with in-memory storage (for testing).
     pub fn in_memory() -> VauchiResult<Self> {
         let storage_key = SymmetricKey::generate();

@@ -338,19 +338,34 @@ impl Vauchi {
     /// Permanently deletes an imported contact from storage.
     pub fn hard_delete_imported_contact(&self, id: &str) -> VauchiResult<()> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
-        manager.hard_delete_imported_contact(id)
+        manager.hard_delete_imported_contact(id)?;
+        self.record_sync_item(crate::sync::SyncItem::ContactRemoved {
+            contact_id: id.to_string(),
+            timestamp: Self::now_timestamp(),
+        });
+        Ok(())
     }
 
     /// Archives an exchanged contact.
     pub fn archive_contact(&self, id: &str) -> VauchiResult<()> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
-        manager.archive_contact(id)
+        manager.archive_contact(id)?;
+        self.record_sync_item(crate::sync::SyncItem::ContactArchived {
+            contact_id: id.to_string(),
+            timestamp: Self::now_timestamp(),
+        });
+        Ok(())
     }
 
     /// Unarchives an exchanged contact.
     pub fn unarchive_contact(&self, id: &str) -> VauchiResult<()> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
-        manager.unarchive_contact(id)
+        manager.unarchive_contact(id)?;
+        self.record_sync_item(crate::sync::SyncItem::ContactUnarchived {
+            contact_id: id.to_string(),
+            timestamp: Self::now_timestamp(),
+        });
+        Ok(())
     }
 
     /// Lists all archived contacts.

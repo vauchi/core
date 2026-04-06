@@ -241,6 +241,13 @@ impl Vauchi {
         }
 
         self.storage.save_contact(&contact)?;
-        Ok(!current_can_see)
+        let new_visible = !current_can_see;
+        self.record_sync_item(crate::sync::SyncItem::VisibilityChanged {
+            contact_id: contact_id.to_string(),
+            field_label: field_label.to_string(),
+            is_visible: new_visible,
+            timestamp: Self::now_timestamp(),
+        });
+        Ok(new_visible)
     }
 }

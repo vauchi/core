@@ -269,19 +269,51 @@ impl Vauchi {
     /// Updates the user's own contact card.
     pub fn update_own_card(&self, card: &ContactCard) -> VauchiResult<Vec<String>> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
-        manager.update_own_card(card)
+        let changed_labels = manager.update_own_card(card)?;
+        let ts = Self::now_timestamp();
+        for label in &changed_labels {
+            // Look up the current value for the changed field
+            let value = card
+                .fields()
+                .iter()
+                .find(|f| f.label() == label)
+                .map(|f| f.value().to_string())
+                .unwrap_or_default();
+            self.record_sync_item(crate::sync::SyncItem::CardUpdated {
+                field_label: label.clone(),
+                new_value: value,
+                timestamp: ts,
+            });
+        }
+        Ok(changed_labels)
     }
 
     /// Adds a field to the user's own card.
     pub fn add_own_field(&self, field: ContactField) -> VauchiResult<()> {
+        let label = field.label().to_string();
+        let value = field.value().to_string();
         let manager = ContactManager::new(&self.storage, self.events.clone());
-        manager.add_field_to_own_card(field)
+        manager.add_field_to_own_card(field)?;
+        self.record_sync_item(crate::sync::SyncItem::CardUpdated {
+            field_label: label,
+            new_value: value,
+            timestamp: Self::now_timestamp(),
+        });
+        Ok(())
     }
 
     /// Removes a field from the user's own card by label.
     pub fn remove_own_field(&self, label: &str) -> VauchiResult<bool> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
-        manager.remove_field_from_own_card(label)
+        let removed = manager.remove_field_from_own_card(label)?;
+        if removed {
+            self.record_sync_item(crate::sync::SyncItem::CardUpdated {
+                field_label: label.to_string(),
+                new_value: String::new(), // empty = removal
+                timestamp: Self::now_timestamp(),
+            });
+        }
+        Ok(removed)
     }
 
     /// Removes a field from the user's own card by field ID.

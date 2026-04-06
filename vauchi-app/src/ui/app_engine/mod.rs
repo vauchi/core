@@ -250,6 +250,29 @@ impl AppEngine {
     pub fn has_identity(&self) -> bool {
         self.vauchi.has_identity()
     }
+
+    /// Notify core that the app was backgrounded (or is about to resume).
+    ///
+    /// If a password is set and the app is not already locked or in onboarding,
+    /// navigates to the lock screen and returns the lock `ScreenModel`.
+    /// Returns `None` if no action is needed (no password, already locked,
+    /// or onboarding).
+    ///
+    /// Frontends should call this on app lifecycle events:
+    /// - iOS: `scenePhase == .background`
+    /// - Android: `onPause()` or `Lifecycle.Event.ON_STOP`
+    /// - Desktop: window focus lost (optional, configurable)
+    pub fn handle_app_backgrounded(&mut self) -> Option<ScreenModel> {
+        // Don't lock during onboarding (no identity yet) or if already locked
+        if matches!(self.screen, AppScreen::Lock | AppScreen::Onboarding) {
+            return None;
+        }
+        // Only lock if a password is set
+        if !self.vauchi.is_password_enabled().unwrap_or(false) {
+            return None;
+        }
+        Some(self.navigate_to(AppScreen::Lock))
+    }
 }
 
 fn initials(name: &str) -> String {

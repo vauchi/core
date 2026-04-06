@@ -7,10 +7,23 @@
 //! When the app goes to the background and a password is set,
 //! the next foreground event should require re-authentication.
 
-mod common;
-
-use vauchi_app::ui::{AppEngine, AppScreen};
+use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
+
+/// Helper: enter PIN and submit on the lock screen.
+fn unlock(engine: &mut AppEngine, pin: &str) {
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "pin".into(),
+        value: pin.into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "unlock".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "correct PIN should navigate away from lock, got {result:?}"
+    );
+}
 
 /// Helper: create an AppEngine with password enabled and unlocked.
 fn unlocked_engine_with_password() -> AppEngine {
@@ -18,13 +31,12 @@ fn unlocked_engine_with_password() -> AppEngine {
     vauchi.create_identity("Alice").unwrap();
     vauchi.setup_app_password("123456").unwrap();
     let mut engine = AppEngine::new(vauchi);
-    // Engine starts on Lock screen — unlock it
     assert_eq!(
         engine.current_app_screen(),
         &AppScreen::Lock,
         "password-enabled engine should start on Lock"
     );
-    common::app_engine_helpers::enter_pin(&mut engine, "123456");
+    unlock(&mut engine, "123456");
     assert_ne!(
         engine.current_app_screen(),
         &AppScreen::Lock,

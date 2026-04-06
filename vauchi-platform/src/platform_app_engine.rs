@@ -296,6 +296,27 @@ impl PlatformAppEngine {
         Ok(engine.form_has_data())
     }
 
+    /// Notify core that the app was backgrounded.
+    ///
+    /// If a password is set and the app is not already locked,
+    /// returns the lock screen JSON. Otherwise returns null.
+    /// Frontends should call on `scenePhase == .background` (iOS)
+    /// or `onPause()` (Android).
+    pub fn handle_app_backgrounded(&self) -> Result<Option<String>, MobileError> {
+        let mut engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        match engine.handle_app_backgrounded() {
+            Some(screen) => {
+                let json = serde_json::to_string(&screen)
+                    .map_err(|e| MobileError::Internal(e.to_string()))?;
+                Ok(Some(json))
+            }
+            None => Ok(None),
+        }
+    }
+
     /// Report device hardware capabilities.
     ///
     /// Call once at startup after querying platform hardware APIs.

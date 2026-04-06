@@ -1484,11 +1484,12 @@ update:swift-bindings:
       printf '%s\n' \
         'import re, sys' \
         'path, url = sys.argv[1], sys.argv[2]' \
+        'Q = chr(34)' \
         'with open(path) as f: content = f.read()' \
         'content = re.sub(r"[ \t]+// REMOTE \(original.*?\n(?:[ \t]+//[^\n]*\n)*", "", content)' \
         'content = re.sub(r"[ \t]+// LOCAL \(set by wire-bindings-local\.sh\):\n", "", content)' \
-        'pattern = r"([ \t]+)(?://[^\n]*\n\s*)*\.binaryTarget\(\s*\n?\s*name: .VauchiPlatformFFI.[^)]*\),"' \
-        'repl = r"\g<1>.binaryTarget(\n\g<1>    name: \"VauchiPlatformFFI\",\n\g<1>    url: \"" + url + r"\",\n\g<1>    checksum: checksum\n\g<1>),"' \
+        'pattern = r"([ \t]+)(?://[^\n]*\n\s*)*\.binaryTarget\([\s\S]*?\),"' \
+        'repl = r"\g<1>.binaryTarget(" + "\n" + r"\g<1>    name: " + Q + "VauchiPlatformFFI" + Q + "," + "\n" + r"\g<1>    url: " + Q + url + Q + "," + "\n" + r"\g<1>    checksum: checksum" + "\n" + r"\g<1>),"' \
         'content = re.sub(pattern, repl, content)' \
         'with open(path, "w") as f: f.write(content)' \
         > /tmp/fix-package-swift.py

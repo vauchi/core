@@ -189,7 +189,41 @@ impl AppEngine {
                 }
             }
             AppScreen::Exchange => {
+                // ADR-031: Extract exchange result BEFORE navigate_to_internal
+                // replaces the engine (navigation.rs:34 does std::mem::replace).
+                let exchange_data = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::exchange::ExchangeEngine>())
+                    .and_then(|ex| {
+                        let groups = ex.selected_groups().to_vec();
+                        // QR path: contact is in session.state() → Complete { contact }
+                        if let Some(session) = ex.session() {
+                            if let vauchi_core::exchange::ExchangeState::Complete { contact } =
+                                session.state()
+                            {
+                                return Some((*contact.clone(), groups));
+                            }
+                        }
+                        None
+                    });
+
                 let screen = self.navigate_to_internal(AppScreen::Contacts);
+
+                // Persist exchange result: upsert contact + init ratchet + assign groups
+                if let Some((contact, groups)) = exchange_data {
+                    let contact_id = contact.id().to_string();
+                    let _ = self.vauchi.update_contact(&contact);
+                    if let (Some(sk), Some(pk)) = (contact.shared_key(), contact.public_key()) {
+                        let _ = self
+                            .vauchi
+                            .create_ratchet_as_initiator(&contact_id, sk, *pk);
+                    }
+                    for group_id in &groups {
+                        let _ = self.vauchi.add_contact_to_group(group_id, &contact_id);
+                    }
+                }
+
                 ActionResult::NavigateTo(screen)
             }
             AppScreen::ContactVisibility { contact_id } => {

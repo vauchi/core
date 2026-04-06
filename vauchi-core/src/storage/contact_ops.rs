@@ -110,6 +110,7 @@ impl Storage {
     /// Sets the maximum number of contacts allowed.
     ///
     /// Updates the `contact_limits` table (created by migration v4).
+    /// A limit of zero means no contacts are allowed.
     pub fn set_contact_limit(&self, max_contacts: usize) -> Result<(), StorageError> {
         self.conn.execute(
             "INSERT OR REPLACE INTO contact_limits (id, max_contacts) VALUES (1, ?1)",

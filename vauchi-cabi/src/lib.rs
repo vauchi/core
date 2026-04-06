@@ -18,6 +18,7 @@ use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier};
 mod app;
 mod audio;
 mod config;
+mod device_link;
 mod exchange;
 mod i18n;
 pub(crate) mod platform_event;
@@ -25,6 +26,7 @@ mod workflow;
 
 pub use app::*;
 pub use audio::*;
+pub use device_link::*;
 pub use exchange::*;
 pub use i18n::*;
 pub use workflow::*;
@@ -1563,6 +1565,277 @@ mod tests {
             }
 
             let _ = std::fs::remove_dir_all(&tmp);
+        }
+    }
+
+    // ── Device link transition tests ───────────────────────────────
+
+    // @internal
+    #[test]
+    fn device_link_peer_connected_returns_null_when_not_on_device_link_screen() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let handle = vauchi_app_create();
+            let code = CString::new("ABC123").unwrap();
+            let result = vauchi_app_device_link_peer_connected(handle, code.as_ptr());
+            assert!(
+                result.is_null(),
+                "peer_connected on onboarding screen should return null"
+            );
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    // @internal
+    #[test]
+    fn device_link_peer_connected_null_handle_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let code = CString::new("ABC123").unwrap();
+            let result = vauchi_app_device_link_peer_connected(std::ptr::null_mut(), code.as_ptr());
+            assert!(result.is_null());
+        }
+    }
+
+    // @internal
+    #[test]
+    fn device_link_sync_complete_returns_null_when_not_on_device_link_screen() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let handle = vauchi_app_create();
+            let result = vauchi_app_device_link_sync_complete(handle);
+            assert!(
+                result.is_null(),
+                "sync_complete on onboarding screen should return null"
+            );
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    // @internal
+    #[test]
+    fn device_link_sync_complete_null_handle_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let result = vauchi_app_device_link_sync_complete(std::ptr::null_mut());
+            assert!(result.is_null());
+        }
+    }
+
+    // @scenario: device_sync:Device link CABI peer_connected transitions to verify
+    #[test]
+    fn device_link_peer_connected_on_device_link_screen_returns_verify_screen() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let handle = vauchi_app_create();
+
+            // Navigate to device_linking screen
+            let screen_name = CString::new("device_linking").unwrap();
+            let nav_result = vauchi_app_navigate_to(handle, screen_name.as_ptr());
+            assert!(!nav_result.is_null());
+            let nav_json = CStr::from_ptr(nav_result).to_str().unwrap();
+            let nav_screen: serde_json::Value = serde_json::from_str(nav_json).unwrap();
+            assert_eq!(nav_screen["screen_id"], "link_show_qr");
+            vauchi_string_free(nav_result);
+
+            // Signal peer connected
+            let code = CString::new("ABC123").unwrap();
+            let result = vauchi_app_device_link_peer_connected(handle, code.as_ptr());
+            assert!(!result.is_null(), "should return screen JSON");
+            let json = CStr::from_ptr(result).to_str().unwrap();
+            let screen: serde_json::Value = serde_json::from_str(json).unwrap();
+            assert_eq!(screen["screen_id"], "link_verify");
+            vauchi_string_free(result);
+
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    // @scenario: device_sync:Device link CABI full flow QR to complete
+    #[test]
+    fn device_link_full_flow_qr_to_complete() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let handle = vauchi_app_create();
+
+            // Navigate to device_linking
+            let screen_name = CString::new("device_linking").unwrap();
+            let nav_result = vauchi_app_navigate_to(handle, screen_name.as_ptr());
+            vauchi_string_free(nav_result);
+
+            // peer_connected → VerifyCode
+            let code = CString::new("ABC123").unwrap();
+            let result = vauchi_app_device_link_peer_connected(handle, code.as_ptr());
+            assert!(!result.is_null());
+            let json = CStr::from_ptr(result).to_str().unwrap();
+            let screen: serde_json::Value = serde_json::from_str(json).unwrap();
+            assert_eq!(screen["screen_id"], "link_verify");
+            vauchi_string_free(result);
+
+            // User confirms → Syncing
+            let confirm = CString::new(r#"{"ActionPressed":{"action_id":"confirm"}}"#).unwrap();
+            let result = vauchi_app_handle_action(handle, confirm.as_ptr());
+            assert!(!result.is_null());
+            vauchi_string_free(result);
+
+            // sync_complete → Complete
+            let result = vauchi_app_device_link_sync_complete(handle);
+            assert!(!result.is_null());
+            let json = CStr::from_ptr(result).to_str().unwrap();
+            let screen: serde_json::Value = serde_json::from_str(json).unwrap();
+            assert_eq!(screen["screen_id"], "link_complete");
+            vauchi_string_free(result);
+
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    // ── Device link initiator protocol tests ───────────────────────
+
+    // @internal
+    #[test]
+    fn device_link_start_returns_null_without_identity() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let handle = vauchi_app_create();
+            let initiator = vauchi_device_link_start(handle);
+            assert!(
+                initiator.is_null(),
+                "start without identity should return null"
+            );
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    // @internal
+    #[test]
+    fn device_link_start_null_handle_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let initiator = vauchi_device_link_start(std::ptr::null_mut());
+            assert!(initiator.is_null());
+        }
+    }
+
+    // @scenario: device_sync:Device link CABI initiator created with identity
+    #[test]
+    fn device_link_start_with_identity_returns_non_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let handle = create_app_with_identity();
+            let initiator = vauchi_device_link_start(handle);
+            assert!(
+                !initiator.is_null(),
+                "start with identity should return handle"
+            );
+
+            // QR data should be non-empty
+            let qr = vauchi_device_link_qr_data(initiator);
+            assert!(!qr.is_null());
+            let qr_str = CStr::from_ptr(qr).to_str().unwrap();
+            assert!(!qr_str.is_empty(), "QR data should be non-empty");
+            vauchi_string_free(qr);
+
+            // Expiry should be in the future
+            let expires = vauchi_device_link_expires_at(initiator);
+            assert!(expires > 0, "expiry should be non-zero");
+
+            vauchi_device_link_initiator_destroy(initiator);
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    // @internal
+    #[test]
+    fn device_link_destroy_null_is_safe() {
+        // allow(zero_assertions) — no-panic boundary test
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            vauchi_device_link_initiator_destroy(std::ptr::null_mut());
+        }
+    }
+
+    // @internal
+    #[test]
+    fn device_link_qr_data_null_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let result = vauchi_device_link_qr_data(std::ptr::null_mut());
+            assert!(result.is_null());
+        }
+    }
+
+    // @internal
+    #[test]
+    fn device_link_prepare_confirmation_null_inputs() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            // Null initiator
+            let req = CString::new("dGVzdA==").unwrap();
+            let result =
+                vauchi_device_link_prepare_confirmation(std::ptr::null_mut(), req.as_ptr());
+            assert!(result.is_null());
+
+            // Null request
+            let handle = create_app_with_identity();
+            let initiator = vauchi_device_link_start(handle);
+            assert!(!initiator.is_null());
+
+            let result = vauchi_device_link_prepare_confirmation(initiator, std::ptr::null());
+            assert!(result.is_null());
+
+            vauchi_device_link_initiator_destroy(initiator);
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    // @internal
+    #[test]
+    fn device_link_confirm_without_prepare_returns_error() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let handle = create_app_with_identity();
+            let initiator = vauchi_device_link_start(handle);
+            assert!(!initiator.is_null());
+
+            let code = CString::new("123-456").unwrap();
+            let result = vauchi_device_link_confirm_manual(initiator, code.as_ptr(), 1_700_000_000);
+            assert!(!result.is_null());
+            let json = CStr::from_ptr(result).to_str().unwrap();
+            assert!(
+                json.contains("error"),
+                "confirm without prepare should error: {json}"
+            );
+            vauchi_string_free(result);
+
+            vauchi_device_link_initiator_destroy(initiator);
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    // @internal
+    #[test]
+    fn device_link_listen_null_handle_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let result = vauchi_device_link_listen(std::ptr::null_mut(), 1);
+            assert!(result.is_null());
+        }
+    }
+
+    // @internal
+    #[test]
+    fn device_link_send_response_null_inputs_returns_error() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            assert_eq!(
+                vauchi_device_link_send_response(
+                    std::ptr::null_mut(),
+                    std::ptr::null(),
+                    std::ptr::null()
+                ),
+                -1
+            );
         }
     }
 }

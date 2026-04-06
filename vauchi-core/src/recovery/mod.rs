@@ -551,6 +551,18 @@ impl RecoveryProof {
         &self.vouchers
     }
 
+    /// Returns `true` if the proof has met its voucher threshold.
+    pub fn is_complete(&self) -> bool {
+        self.vouchers.len() >= self.threshold as usize
+    }
+
+    /// Returns the number of additional vouchers needed to reach the threshold.
+    ///
+    /// Returns `0` if the proof is already complete.
+    pub fn needed_count(&self) -> u32 {
+        self.threshold.saturating_sub(self.vouchers.len() as u32)
+    }
+
     /// Adds a voucher to the proof.
     ///
     /// # Errors

@@ -274,6 +274,31 @@ fn test_create_recovery_proof() {
     assert_eq!(proof.new_pk(), &new_pk);
     assert_eq!(proof.threshold(), 3);
     assert_eq!(proof.voucher_count(), 0);
+    assert!(!proof.is_complete());
+    assert_eq!(proof.needed_count(), 3);
+}
+
+// @scenario: contact_recovery :: Recovery proof completeness predicate
+#[test]
+fn test_recovery_proof_completeness() {
+    let old_pk = [0x01u8; 32];
+    let new_pk = [0x02u8; 32];
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 2);
+
+    assert!(!proof.is_complete());
+    assert_eq!(proof.needed_count(), 2);
+
+    let kp1 = SigningKeyPair::generate();
+    let v1 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp1);
+    proof.add_voucher(v1).unwrap();
+    assert!(!proof.is_complete());
+    assert_eq!(proof.needed_count(), 1);
+
+    let kp2 = SigningKeyPair::generate();
+    let v2 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp2);
+    proof.add_voucher(v2).unwrap();
+    assert!(proof.is_complete());
+    assert_eq!(proof.needed_count(), 0);
 }
 
 /// Scenario: Collect multiple vouchers

@@ -694,8 +694,9 @@ impl ExchangeSession {
                 Ok(())
             }
             ExchangeHardwareEvent::BleDeviceDiscovered { id, .. } => {
-                // Discovered a peer — mark as initiator and emit connect command.
+                // Discovered a peer — stop scanning (battery), connect.
                 self.ble_is_initiator = true;
+                self.emit_command(ExchangeCommand::BleStopScanning);
                 self.emit_command(ExchangeCommand::BleConnect { device_id: id });
                 Ok(())
             }
@@ -1146,10 +1147,8 @@ impl ExchangeSession {
         } else {
             super::escrow::EscrowRole::Responder
         };
-        let confirm_escrow = super::confirmation_escrow::ConfirmationEscrowKeys::derive(
-            &*shared_bytes,
-            escrow_role,
-        );
+        let confirm_escrow =
+            super::confirmation_escrow::ConfirmationEscrowKeys::derive(&*shared_bytes, escrow_role);
         self.confirmation_gate_hash = Some(confirm_escrow.gate_hash);
         self.confirmation_our_slot = Some(confirm_escrow.our_slot);
         self.confirmation_their_slot = Some(confirm_escrow.their_slot);

@@ -38,6 +38,8 @@ pub enum ExchangeCommand {
     },
     /// Start scanning for vauchi BLE peripherals.
     BleStartScanning { service_uuid: String },
+    /// Stop BLE scanning (saves battery after discovery completes).
+    BleStopScanning,
     /// Connect to a discovered BLE device.
     BleConnect { device_id: String },
     /// Write data to a BLE characteristic.

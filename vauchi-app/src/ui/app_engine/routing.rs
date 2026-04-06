@@ -198,12 +198,11 @@ impl AppEngine {
                     .and_then(|ex| {
                         let groups = ex.selected_groups().to_vec();
                         // QR path: contact is in session.state() → Complete { contact }
-                        if let Some(session) = ex.session() {
-                            if let vauchi_core::exchange::ExchangeState::Complete { contact } =
+                        if let Some(session) = ex.session()
+                            && let vauchi_core::exchange::ExchangeState::Complete { contact } =
                                 session.state()
-                            {
-                                return Some((*contact.clone(), groups));
-                            }
+                        {
+                            return Some((*contact.clone(), groups));
                         }
                         None
                     });

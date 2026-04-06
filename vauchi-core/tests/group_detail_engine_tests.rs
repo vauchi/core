@@ -92,7 +92,7 @@ fn group_detail_delete_shows_inline_confirm() {
 fn group_detail_confirm_delete_completes() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
     // First trigger the delete to enter pending state
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete_group".into(),
     });
     // Then confirm
@@ -110,7 +110,7 @@ fn group_detail_confirm_delete_completes() {
 fn group_detail_cancel_delete_removes_inline_confirm() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
     // Trigger delete
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete_group".into(),
     });
     // Cancel

@@ -54,6 +54,37 @@ pub enum FieldType {
     Custom,
 }
 
+impl FieldType {
+    /// Returns `true` if this is a social network field type.
+    pub fn is_social(&self) -> bool {
+        matches!(self, FieldType::Social)
+    }
+
+    /// Resolves a human-friendly alias to a `FieldType` and optional label.
+    ///
+    /// Social network aliases (e.g. "twitter", "instagram") return the label
+    /// to use for the field. Generic aliases (e.g. "phone", "email") return
+    /// `None` for the label.
+    ///
+    /// Returns `None` if the alias is not recognized.
+    pub fn from_alias(s: &str) -> Option<(FieldType, Option<String>)> {
+        match s.to_lowercase().as_str() {
+            "phone" | "tel" | "telephone" => Some((FieldType::Phone, None)),
+            "email" | "mail" => Some((FieldType::Email, None)),
+            "address" | "addr" | "home" => Some((FieldType::Address, None)),
+            "website" | "web" | "url" => Some((FieldType::Website, None)),
+            "birthday" | "bday" | "dob" => Some((FieldType::Birthday, None)),
+            "social" => Some((FieldType::Social, None)),
+            "twitter" | "x" => Some((FieldType::Social, Some("Twitter".to_string()))),
+            "instagram" | "ig" => Some((FieldType::Social, Some("Instagram".to_string()))),
+            "linkedin" => Some((FieldType::Social, Some("LinkedIn".to_string()))),
+            "github" | "gh" => Some((FieldType::Social, Some("GitHub".to_string()))),
+            "custom" | "other" | "note" => Some((FieldType::Custom, None)),
+            _ => None,
+        }
+    }
+}
+
 /// Returns the current Unix timestamp in seconds.
 fn now_timestamp() -> u64 {
     std::time::SystemTime::now()

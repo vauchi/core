@@ -121,3 +121,63 @@ fn test_field_note_truncated_multibyte_utf8() {
     // All characters should be the same CJK character
     assert!(note.chars().all(|c| c == '\u{4e16}'));
 }
+
+// @scenario: contact_card_management :: Field type alias resolution
+#[test]
+fn test_field_type_from_alias_phone() {
+    for alias in &["phone", "Phone", "tel", "TEL", "telephone"] {
+        let (ft, label) = FieldType::from_alias(alias).unwrap();
+        assert_eq!(ft, FieldType::Phone);
+        assert!(label.is_none());
+    }
+}
+
+#[test]
+fn test_field_type_from_alias_email() {
+    for alias in &["email", "mail", "EMAIL"] {
+        let (ft, label) = FieldType::from_alias(alias).unwrap();
+        assert_eq!(ft, FieldType::Email);
+        assert!(label.is_none());
+    }
+}
+
+#[test]
+fn test_field_type_from_alias_social_with_label() {
+    let (ft, label) = FieldType::from_alias("twitter").unwrap();
+    assert_eq!(ft, FieldType::Social);
+    assert_eq!(label.as_deref(), Some("Twitter"));
+
+    let (ft, label) = FieldType::from_alias("Instagram").unwrap();
+    assert_eq!(ft, FieldType::Social);
+    assert_eq!(label.as_deref(), Some("Instagram"));
+
+    let (ft, label) = FieldType::from_alias("linkedin").unwrap();
+    assert_eq!(ft, FieldType::Social);
+    assert_eq!(label.as_deref(), Some("LinkedIn"));
+
+    let (ft, label) = FieldType::from_alias("github").unwrap();
+    assert_eq!(ft, FieldType::Social);
+    assert_eq!(label.as_deref(), Some("GitHub"));
+}
+
+#[test]
+fn test_field_type_from_alias_generic_social() {
+    let (ft, label) = FieldType::from_alias("social").unwrap();
+    assert_eq!(ft, FieldType::Social);
+    assert!(label.is_none());
+}
+
+#[test]
+fn test_field_type_from_alias_unknown_returns_none() {
+    assert!(FieldType::from_alias("fax").is_none());
+    assert!(FieldType::from_alias("").is_none());
+    assert!(FieldType::from_alias("unknown").is_none());
+}
+
+#[test]
+fn test_field_type_is_social() {
+    assert!(FieldType::Social.is_social());
+    assert!(!FieldType::Phone.is_social());
+    assert!(!FieldType::Email.is_social());
+    assert!(!FieldType::Custom.is_social());
+}

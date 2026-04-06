@@ -182,17 +182,8 @@ fn v2_purge_request_roundtrip() {
 
 #[test]
 fn v2_response_roundtrip() {
-    let resp = V2Response {
-        status: "ok".into(),
-        error: None,
-        blob_id: Some("blob-1".into()),
-        blobs: None,
-        acknowledged: None,
-        code: None,
-        payload: None,
-        response: None,
-        blobs_deleted: None,
-    };
+    let mut resp = V2Response::new("ok");
+    resp.blob_id = Some("blob-1".into());
     let json = serde_json::to_string(&resp).unwrap();
     let parsed: V2Response = serde_json::from_str(&json).unwrap();
     assert_eq!(parsed.status, "ok");
@@ -202,21 +193,12 @@ fn v2_response_roundtrip() {
 
 #[test]
 fn v2_response_with_blobs_roundtrip() {
-    let resp = V2Response {
-        status: "ok".into(),
-        error: None,
-        blob_id: None,
-        blobs: Some(vec![FetchedBlob {
-            blob_id: "b1".into(),
-            ciphertext: "dGVzdA==".into(),
-            created_at: 12345,
-        }]),
-        acknowledged: None,
-        code: None,
-        payload: None,
-        response: None,
-        blobs_deleted: None,
-    };
+    let mut resp = V2Response::new("ok");
+    resp.blobs = Some(vec![FetchedBlob {
+        blob_id: "b1".into(),
+        ciphertext: "dGVzdA==".into(),
+        created_at: 12345,
+    }]);
     let json = serde_json::to_string(&resp).unwrap();
     let parsed: V2Response = serde_json::from_str(&json).unwrap();
     assert_eq!(parsed.status, "ok");

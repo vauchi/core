@@ -86,6 +86,7 @@ pub struct FetchedBlob {
 
 /// Standard V2 response envelope.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct V2Response {
     pub status: String,
     #[serde(default)]
@@ -105,4 +106,21 @@ pub struct V2Response {
     /// Number of blobs deleted by a purge request.
     #[serde(default)]
     pub blobs_deleted: Option<usize>,
+}
+
+impl V2Response {
+    /// Create a response with the given status and all optional fields set to `None`.
+    pub fn new(status: impl Into<String>) -> Self {
+        Self {
+            status: status.into(),
+            error: None,
+            blob_id: None,
+            blobs: None,
+            acknowledged: None,
+            code: None,
+            payload: None,
+            response: None,
+            blobs_deleted: None,
+        }
+    }
 }

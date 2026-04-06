@@ -260,6 +260,18 @@ int32_t vauchi_app_create_identity(struct VauchiApp *handle, const char *display
 char *vauchi_app_handle_hardware_event(struct VauchiApp *handle, const char *event_json);
 
 /**
+ * Notify the engine that the app moved to the background.
+ *
+ * If a password is set and the app is not already locked or in
+ * onboarding, navigates to the lock screen and returns the lock
+ * screen JSON. Otherwise returns null.
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null.
+ */
+char *vauchi_app_handle_app_backgrounded(struct VauchiApp *handle);
+
+/**
  * Register a callback for async state-change notifications.
  *
  * Core calls `callback` when background operations (sync, delivery,

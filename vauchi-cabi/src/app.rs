@@ -491,6 +491,40 @@ pub unsafe extern "C" fn vauchi_app_handle_hardware_event(
     }
 }
 
+/// Notify the engine that the app moved to the background.
+///
+/// If a password is set and the app is not already locked or in
+/// onboarding, navigates to the lock screen and returns the lock
+/// screen JSON. Otherwise returns null.
+///
+/// # Safety
+/// `handle` must be a valid app handle or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_app_handle_app_backgrounded(handle: *mut VauchiApp) -> *mut c_char {
+    // SAFETY: handle is checked non-null; ptr was created by Box::into_raw and has not been freed.
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return std::ptr::null_mut();
+            }
+            let app = &*handle;
+            match app.engine.lock() {
+                Ok(mut engine) => match engine.handle_app_backgrounded() {
+                    Some(screen) => serde_json::to_string(&screen).map_or_else(
+                        |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                        |j| to_c_string(&j),
+                    ),
+                    None => std::ptr::null_mut(),
+                },
+                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            }
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
+        }
+    }
+}
+
 /// Type alias for the C event callback function pointer.
 ///
 /// Called by core when background operations invalidate screen data.

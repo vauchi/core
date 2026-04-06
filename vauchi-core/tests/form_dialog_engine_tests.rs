@@ -378,7 +378,7 @@ fn form_dialog_cancel_dirty_edit_shows_inline_confirm() {
         current_name: "Alice".into(),
     });
     // Make form dirty
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Bob".into(),
     });
@@ -406,12 +406,12 @@ fn form_dialog_confirm_discard_completes() {
         current_name: "Alice".into(),
     });
     // Make dirty
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Bob".into(),
     });
     // Cancel → shows InlineConfirm
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });
     // Confirm discard
@@ -433,12 +433,12 @@ fn form_dialog_cancel_discard_removes_inline_confirm() {
         current_name: "Alice".into(),
     });
     // Make dirty
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Bob".into(),
     });
     // Cancel → shows InlineConfirm
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });
     // Cancel discard (Esc on InlineConfirm)
@@ -465,7 +465,7 @@ fn form_dialog_cancel_dirty_add_field_shows_inline_confirm() {
         available_groups: vec![],
     });
     // Make dirty by entering a value
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
         value: "test@example.com".into(),
     });
@@ -493,12 +493,12 @@ fn form_dialog_second_cancel_removes_inline_confirm() {
         current_name: "Alice".into(),
     });
     // Make dirty
-    engine.handle_action(UserAction::TextChanged {
+    let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Bob".into(),
     });
     // First cancel → InlineConfirm
-    engine.handle_action(UserAction::ActionPressed {
+    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });
     // Second cancel → removes InlineConfirm

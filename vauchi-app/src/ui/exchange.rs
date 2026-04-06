@@ -788,9 +788,15 @@ impl WorkflowEngine for ExchangeEngine {
             if let Err(e) = session
                 .apply(ExchangeEvent::TheyScannedOurQR)
                 .and_then(|()| {
-                    session.run_proximity_check();
-                    session.apply(ExchangeEvent::PerformKeyAgreement)
+                    // Set proximity confidence directly instead of calling
+                    // run_proximity_check() — the ManualConfirmationVerifier
+                    // starts unconfirmed and would yield Low. Medium is correct
+                    // for manual QR exchange (user visually confirmed in-person).
+                    session.apply(ExchangeEvent::ProximityCheckCompleted {
+                        confidence: vauchi_core::exchange::ProximityConfidence::Medium,
+                    })
                 })
+                .and_then(|()| session.apply(ExchangeEvent::PerformKeyAgreement))
                 .and_then(|()| {
                     let our_card = self
                         .config

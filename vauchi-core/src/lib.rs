@@ -97,3 +97,4 @@ pub mod onboarding;
 pub use onboarding::display_name_suggestions;
 pub mod social;
 pub use social::{ProfileValidation, SocialNetwork, SocialNetworkRegistry};
+pub mod version;

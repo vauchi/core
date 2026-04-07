@@ -30,6 +30,7 @@ pub enum EventOrigin {
 #[non_exhaustive]
 pub enum VauchiEvent {
     /// A contact was added.
+    #[non_exhaustive]
     ContactAdded {
         /// The contact ID.
         contact_id: String,
@@ -226,6 +227,15 @@ pub enum VauchiEvent {
         /// The contact ID.
         contact_id: String,
     },
+}
+
+impl VauchiEvent {
+    /// Create a `ContactAdded` event.
+    ///
+    /// Constructor provided because the variant is `#[non_exhaustive]`.
+    pub fn contact_added(contact_id: String, origin: EventOrigin) -> Self {
+        Self::ContactAdded { contact_id, origin }
+    }
 }
 
 /// Type alias for event handler callbacks.

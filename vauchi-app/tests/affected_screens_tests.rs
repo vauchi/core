@@ -12,10 +12,7 @@ use vauchi_core::{ConnectionState, SyncState};
 #[test]
 fn contact_events_invalidate_contacts_and_detail() {
     let events = [
-        VauchiEvent::ContactAdded {
-            contact_id: "c1".into(),
-            origin: EventOrigin::Local,
-        },
+        VauchiEvent::contact_added("c1".into(), EventOrigin::Local),
         VauchiEvent::ContactUpdated {
             contact_id: "c1".into(),
             changed_fields: vec!["name".into()],

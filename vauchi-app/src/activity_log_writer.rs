@@ -70,7 +70,9 @@ impl ActivityLogWriter {
     /// log.
     fn event_to_entry(event: &VauchiEvent, now_secs: u64) -> Option<(String, ActivityLogEntry)> {
         match event {
-            VauchiEvent::ContactAdded { contact_id, origin } => {
+            VauchiEvent::ContactAdded {
+                contact_id, origin, ..
+            } => {
                 let key = format!("contact_added:{contact_id}");
                 let entry = ActivityLogEntry::ContactAdded {
                     contact_id: contact_id.clone(),

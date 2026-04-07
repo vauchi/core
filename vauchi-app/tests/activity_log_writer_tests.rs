@@ -26,10 +26,10 @@ fn contact_added_event_creates_log_entry() {
     let storage = test_storage();
     let contact_id = "contact-abc".to_owned();
 
-    let events = vec![VauchiEvent::ContactAdded {
-        contact_id: contact_id.clone(),
-        origin: EventOrigin::Synced,
-    }];
+    let events = vec![VauchiEvent::contact_added(
+        contact_id.clone(),
+        EventOrigin::Synced,
+    )];
 
     let result = ActivityLogWriter::write(&storage, &events, NOW).unwrap();
 
@@ -65,10 +65,10 @@ fn duplicate_event_returns_empty() {
     let storage = test_storage();
     let contact_id = "contact-dup".to_owned();
 
-    let events = vec![VauchiEvent::ContactAdded {
-        contact_id: contact_id.clone(),
-        origin: EventOrigin::Local,
-    }];
+    let events = vec![VauchiEvent::contact_added(
+        contact_id.clone(),
+        EventOrigin::Local,
+    )];
 
     // First write — should insert.
     let first = ActivityLogWriter::write(&storage, &events, NOW).unwrap();

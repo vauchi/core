@@ -1412,8 +1412,8 @@ release:create:
 #   - Consumer triggers: trigger:ios, trigger:macos, trigger:android (below)
 
 # Update vauchi-platform-swift Package.swift + Swift bindings directly.
-# Uses PROJECT_ACCESS_TOKEN for git push (CI_JOB_TOKEN pushes don't trigger
-# downstream pipelines in ios/macos).
+# Uses CI_PUSH_TOKEN_SWIFT (scoped project access token) for git push —
+# CI_JOB_TOKEN pushes don't trigger downstream pipelines in ios/macos.
 update:swift-bindings:
   extends: [.linux-runner, .timeout-quick]
   stage: trigger
@@ -1430,7 +1430,7 @@ update:swift-bindings:
       echo "Updating vauchi-platform-swift to $VERSION"
 
       # Resolve bot identity so git author matches GitLab account (pre-receive hook)
-      BOT_USER=$(curl -fsSL --header "PRIVATE-TOKEN: ${PROJECT_ACCESS_TOKEN}" \
+      BOT_USER=$(curl -fsSL --header "PRIVATE-TOKEN: ${CI_PUSH_TOKEN_SWIFT}" \
         "${CI_SERVER_URL}/api/v4/user" 2>/dev/null || true)
       BOT_EMAIL=$(echo "$BOT_USER" | jq -r '.commit_email // .email // empty')
       BOT_NAME=$(echo "$BOT_USER" | jq -r '.name // empty')
@@ -1470,7 +1470,7 @@ update:swift-bindings:
 
       # Clone platform-swift repo (clean up stale dir from previous runs on shared runners)
       rm -rf /tmp/platform-swift
-      git clone --depth 1 "https://vauchi-gitlab-runner:${PROJECT_ACCESS_TOKEN}@gitlab.com/vauchi/vauchi-platform-swift.git" /tmp/platform-swift
+      git clone --depth 1 "https://vauchi-gitlab-runner:${CI_PUSH_TOKEN_SWIFT}@gitlab.com/vauchi/vauchi-platform-swift.git" /tmp/platform-swift
       cd /tmp/platform-swift
 
       # Update Package.swift version + checksum
@@ -1534,7 +1534,7 @@ trigger:windows:
       echo "Updating windows/ CABI version to $CLEAN_VERSION"
 
       # Resolve bot identity so git author matches GitLab account (pre-receive hook)
-      BOT_USER=$(curl -fsSL --header "PRIVATE-TOKEN: ${PROJECT_ACCESS_TOKEN}" \
+      BOT_USER=$(curl -fsSL --header "PRIVATE-TOKEN: ${CI_PUSH_TOKEN_WINDOWS}" \
         "${CI_SERVER_URL}/api/v4/user" 2>/dev/null || true)
       BOT_EMAIL=$(echo "$BOT_USER" | jq -r '.commit_email // .email // empty')
       BOT_NAME=$(echo "$BOT_USER" | jq -r '.name // empty')
@@ -1560,7 +1560,7 @@ trigger:windows:
       echo "✓ Cosign signature verified"
 
       # Clone windows/ and update cabi-version.json
-      WINDOWS_REPO="https://project-access-token:${PROJECT_ACCESS_TOKEN}@gitlab.com/vauchi/windows.git"
+      WINDOWS_REPO="https://project-access-token:${CI_PUSH_TOKEN_WINDOWS}@gitlab.com/vauchi/windows.git"
       git clone --depth 1 "$WINDOWS_REPO" windows-checkout
       cd windows-checkout
 

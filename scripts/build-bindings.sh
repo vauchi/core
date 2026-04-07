@@ -170,6 +170,9 @@ if $BUILD_IOS; then
             --language swift \
             --out-dir "$IOS_GENERATED_DIR"
 
+        # Strip trailing whitespace from generated Swift (UniFFI emits `/* ` with trailing space)
+        sed -i.bak 's/[[:space:]]*$//' "$IOS_GENERATED_DIR/vauchi_platform.swift"
+        rm -f "$IOS_GENERATED_DIR/vauchi_platform.swift.bak"
         echo -e "${GREEN}Swift bindings generated at: $IOS_GENERATED_DIR${NC}"
 
         # Package libraries

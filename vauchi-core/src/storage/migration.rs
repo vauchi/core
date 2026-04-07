@@ -464,6 +464,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "reciprocity_confirmation",
             action: MigrationAction::Sql(MIGRATION_V40_RECIPROCITY),
         },
+        Migration {
+            version: 41,
+            name: "activity_log",
+            action: MigrationAction::Sql(MIGRATION_V41_ACTIVITY_LOG),
+        },
     ]
 }
 
@@ -710,6 +715,21 @@ const MIGRATION_V40_RECIPROCITY: &str = "
     ALTER TABLE contacts ADD COLUMN reciprocity TEXT DEFAULT NULL;
     ALTER TABLE contacts ADD COLUMN confirmation_channel TEXT DEFAULT NULL;
     ALTER TABLE contacts ADD COLUMN confirmation_state BLOB DEFAULT NULL;
+";
+
+/// Migration v41: Activity log table for 7-day rolling window of user-visible events.
+///
+/// Stores card updates, exchanges, and emergency alerts. `event_key` is a
+/// caller-generated deduplication key (INSERT OR IGNORE). `created_at` is
+/// Unix seconds and is used for range queries and pruning.
+const MIGRATION_V41_ACTIVITY_LOG: &str = "
+    CREATE TABLE activity_log (
+        event_key   TEXT PRIMARY KEY,
+        category    TEXT NOT NULL,
+        contact_id  TEXT,
+        payload     TEXT NOT NULL,
+        created_at  INTEGER NOT NULL
+    );
 ";
 
 const MIGRATION_V35_LOCAL_GROUPS: &str = "

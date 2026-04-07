@@ -109,6 +109,11 @@ pub mod emergency;
 mod emergency;
 
 #[cfg(feature = "testing")]
+pub mod activity_log;
+#[cfg(not(feature = "testing"))]
+mod activity_log;
+
+#[cfg(feature = "testing")]
 pub mod exchange_state;
 #[cfg(not(feature = "testing"))]
 mod exchange_state;
@@ -118,6 +123,7 @@ pub mod migration;
 mod ohttp_cache;
 pub mod secure;
 
+pub use activity_log::ActivityLogRow;
 pub use error::{
     DeletionState, DeliveryRecord, DeliveryStatus, DeliverySummary, DeviceDeliveryRecord,
     DeviceDeliveryStatus, OfflineQueue, PendingUpdate, RetryEntry, RetryQueue, StorageError,

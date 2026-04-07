@@ -104,6 +104,7 @@ pub use sync_status::SyncStatusEngine;
 /// `VauchiEvent` is `#[non_exhaustive]` — unknown future variants return
 /// an empty slice. When adding a new `VauchiEvent` variant, update this
 /// function to include the relevant screen IDs.
+#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub fn affected_screens(event: &vauchi_core::api::VauchiEvent) -> Vec<&'static str> {
     use vauchi_core::api::VauchiEvent;
 

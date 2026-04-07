@@ -7,6 +7,7 @@
 use crate::contact_card::{ContactCard, ContactField};
 
 use super::super::error::{VauchiError, VauchiResult};
+use super::super::events::VauchiEvent;
 use super::Vauchi;
 
 impl Vauchi {
@@ -541,7 +542,17 @@ impl Vauchi {
         for item in items {
             let result = match item {
                 SyncItem::ContactAdded { contact_data, .. } => match contact_data.to_contact() {
-                    Ok(contact) => self.storage.save_contact(&contact).map_err(|e| e.into()),
+                    Ok(contact) => {
+                        let contact_id = contact.id().to_string();
+                        let result = self.storage.save_contact(&contact).map_err(|e| e.into());
+                        if result.is_ok() {
+                            self.events.dispatch(VauchiEvent::ContactAdded {
+                                contact_id,
+                                origin: crate::api::events::EventOrigin::Synced,
+                            });
+                        }
+                        result
+                    }
                     Err(e) => Err(VauchiError::InvalidState(e.to_string())),
                 },
                 SyncItem::ContactRemoved { ref contact_id, .. } => self

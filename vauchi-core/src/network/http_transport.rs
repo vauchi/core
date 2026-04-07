@@ -622,6 +622,7 @@ mod tests {
         assert_eq!(transport.proxy(), &ProxyConfig::None);
     }
 
+    // @internal
     #[test]
     fn test_last_version_policy_initially_none() {
         let transport = HttpTransport::new(HttpTransportConfig::default());
@@ -631,6 +632,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn test_upgrade_required_error_format() {
         let err = NetworkError::UpgradeRequired { min_version: 5 };

@@ -13,6 +13,7 @@ use vauchi_app::ui::{
 };
 
 // @scenario: activity_log.feature - Empty log shows empty state message
+// @internal
 #[test]
 fn empty_log_shows_empty_state() {
     let engine = ActivityLogEngine::new(vec![]);
@@ -33,6 +34,7 @@ fn empty_log_shows_empty_state() {
 }
 
 // @scenario: activity_log.feature - Entries render as ActionList
+// @internal
 #[test]
 fn entries_render_as_list_items() {
     let items = vec![
@@ -90,6 +92,7 @@ fn entries_render_as_list_items() {
 }
 
 // @scenario: activity_log.feature - Selecting a list item opens the contact
+// @internal
 #[test]
 fn list_item_selected_opens_contact() {
     let items = vec![ActivityLogItem {

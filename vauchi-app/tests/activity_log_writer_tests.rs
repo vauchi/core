@@ -20,6 +20,7 @@ fn test_storage() -> Storage {
 const NOW: u64 = 1_700_000_000;
 
 // @scenario: activity-log.feature - ContactAdded event creates a log entry
+// @internal
 #[test]
 fn contact_added_event_creates_log_entry() {
     let storage = test_storage();
@@ -58,6 +59,7 @@ fn contact_added_event_creates_log_entry() {
 }
 
 // @scenario: activity-log.feature - Duplicate event key is silently skipped
+// @internal
 #[test]
 fn duplicate_event_returns_empty() {
     let storage = test_storage();
@@ -84,6 +86,7 @@ fn duplicate_event_returns_empty() {
 }
 
 // @scenario: activity-log.feature - EmergencyAlertReceived creates a log entry
+// @internal
 #[test]
 fn emergency_alert_creates_log_entry() {
     let storage = test_storage();
@@ -118,6 +121,7 @@ fn emergency_alert_creates_log_entry() {
 }
 
 // @scenario: activity-log.feature - Unrelated events are ignored
+// @internal
 #[test]
 fn unrelated_events_produce_no_entries() {
     let storage = test_storage();
@@ -145,6 +149,7 @@ fn unrelated_events_produce_no_entries() {
 }
 
 // @scenario: activity-log.feature - IncomingUpdate creates a card_received entry
+// @internal
 #[test]
 fn incoming_update_creates_card_received_entry() {
     let storage = test_storage();
@@ -176,6 +181,7 @@ fn incoming_update_creates_card_received_entry() {
 }
 
 // @scenario: activity-log.feature - MessageDelivered creates a card_delivered entry
+// @internal
 #[test]
 fn message_delivered_creates_card_delivered_entry() {
     let storage = test_storage();
@@ -205,6 +211,7 @@ fn message_delivered_creates_card_delivered_entry() {
 }
 
 // @scenario: activity-log.feature - MessageFailed creates a card_failed entry
+// @internal
 #[test]
 fn message_failed_creates_card_failed_entry() {
     let storage = test_storage();

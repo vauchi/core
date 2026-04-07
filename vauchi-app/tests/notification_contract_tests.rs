@@ -10,6 +10,7 @@
 use vauchi_app::notification_types::{ActivityLogEntry, EventOrigin, NotificationPreferences};
 
 // @scenario: notification-types.feature - ActivityLogEntry serializes and deserializes identically
+// @internal
 #[test]
 fn activity_log_entry_serde_roundtrip() {
     let entries = vec![
@@ -44,6 +45,7 @@ fn activity_log_entry_serde_roundtrip() {
 }
 
 // @scenario: notification-types.feature - NotificationPreferences serializes and deserializes identically
+// @internal
 #[test]
 fn notification_preferences_roundtrip() {
     for enabled in [true, false] {
@@ -57,6 +59,7 @@ fn notification_preferences_roundtrip() {
 }
 
 // @scenario: notification-types.feature - EventOrigin serializes and deserializes identically
+// @internal
 #[test]
 fn event_origin_roundtrip() {
     for origin in [EventOrigin::Local, EventOrigin::Synced] {

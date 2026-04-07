@@ -22,6 +22,7 @@ fn test_storage() -> Storage {
 
 // @scenario: activity-log.feature - No duplicate event_keys in activity_log
 proptest! {
+    // @internal
     #[test]
     fn no_duplicate_event_keys(
         keys in prop::collection::vec("[a-z]{3,10}:[a-z0-9]{3,10}", 1..50),
@@ -48,6 +49,7 @@ proptest! {
 
 // @scenario: activity-log.feature - Prune never keeps entries older than retention window
 proptest! {
+    // @internal
     #[test]
     fn prune_never_keeps_old_entries(
         ages_days in prop::collection::vec(0u64..30, 1..20),
@@ -86,6 +88,7 @@ proptest! {
 
 // @scenario: activity-log.feature - Notification count never exceeds new entry count
 proptest! {
+    // @internal
     #[test]
     fn notification_count_lte_new_entries(
         count in 0usize..20,

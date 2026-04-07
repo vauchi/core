@@ -27,6 +27,7 @@ fn prefs_all_off() -> NotificationPreferences {
     }
 }
 
+// @internal
 #[test]
 fn emergency_always_produces_notification() {
     let entries = vec![(
@@ -48,6 +49,7 @@ fn emergency_always_produces_notification() {
     assert_eq!(n.contact_id, "carol");
 }
 
+// @internal
 #[test]
 fn emergency_uses_name_resolver_for_body() {
     let entries = vec![(
@@ -63,6 +65,7 @@ fn emergency_uses_name_resolver_for_body() {
     assert_eq!(results[0].body, "Alice sent an emergency alert");
 }
 
+// @internal
 #[test]
 fn contact_added_synced_with_pref_on_produces_notification() {
     let entries = vec![(
@@ -84,6 +87,7 @@ fn contact_added_synced_with_pref_on_produces_notification() {
     assert_eq!(n.contact_id, "bob");
 }
 
+// @internal
 #[test]
 fn contact_added_local_never_notifies() {
     let entries = vec![(
@@ -103,6 +107,7 @@ fn contact_added_local_never_notifies() {
     );
 }
 
+// @internal
 #[test]
 fn contact_added_pref_off_no_notification() {
     let entries = vec![(
@@ -121,6 +126,7 @@ fn contact_added_pref_off_no_notification() {
     );
 }
 
+// @internal
 #[test]
 fn card_update_never_produces_notification() {
     let entries = vec![(
@@ -139,6 +145,7 @@ fn card_update_never_produces_notification() {
     );
 }
 
+// @internal
 #[test]
 fn multiple_entries_evaluated_independently() {
     let entries = vec![
@@ -181,6 +188,7 @@ fn multiple_entries_evaluated_independently() {
     assert_eq!(results[1].category, NotificationCategory::ContactAdded);
 }
 
+// @internal
 #[test]
 fn empty_entries_produces_no_notifications() {
     let entries: Vec<(String, ActivityLogEntry)> = vec![];

@@ -802,12 +802,12 @@ fn create_shred_relay_client(
     Ok(client)
 }
 
-/// Sends identity revocation messages to contacts via HTTP transport.
-struct MobileRevocationSender {
+/// Sends relay purge and revocation messages via HTTP transport during shred.
+struct MobileRelaySender {
     client: vauchi_core::network::RelayClient<vauchi_core::network::HttpTransportAdapter>,
 }
 
-impl MobileRevocationSender {
+impl MobileRelaySender {
     fn new(
         relay_url: &str,
         sender_id: &str,
@@ -818,7 +818,7 @@ impl MobileRevocationSender {
     }
 }
 
-impl vauchi_core::api::RevocationSender for MobileRevocationSender {
+impl vauchi_core::api::RevocationSender for MobileRelaySender {
     fn send_revocation(
         &mut self,
         revocation: &vauchi_core::network::IdentityRevoked,
@@ -830,23 +830,7 @@ impl vauchi_core::api::RevocationSender for MobileRevocationSender {
     }
 }
 
-/// Sends relay purge requests via HTTP transport during shred operations.
-struct MobilePurgeSender {
-    client: vauchi_core::network::RelayClient<vauchi_core::network::HttpTransportAdapter>,
-}
-
-impl MobilePurgeSender {
-    fn new(
-        relay_url: &str,
-        sender_id: &str,
-        pinned_cert: Option<String>,
-    ) -> Result<Self, vauchi_core::api::ShredError> {
-        let client = create_shred_relay_client(relay_url, sender_id, pinned_cert)?;
-        Ok(Self { client })
-    }
-}
-
-impl vauchi_core::api::PurgeSender for MobilePurgeSender {
+impl vauchi_core::api::PurgeSender for MobileRelaySender {
     fn send_purge(
         &mut self,
         purge: &vauchi_core::api::PreSignedPurgeRequest,
@@ -1574,12 +1558,21 @@ mod tests {
         assert!(partial.has_changes);
     }
 
-    // @scenario: security:Contact card signatures verified
+    // @scenario: privacy_compliance:Identity purge sends relay purge and revocations
     #[test]
-    fn test_mobile_revocation_sender_implements_trait() {
+    fn test_mobile_relay_sender_implements_revocation_trait() {
         fn accepts_sender(_: &mut dyn vauchi_core::api::RevocationSender) {}
-        let mut sender = MobileRevocationSender::new("ws://localhost:8080", "abcd1234", None)
-            .expect("MobileRevocationSender should construct successfully");
+        let mut sender = MobileRelaySender::new("ws://localhost:8080", "abcd1234", None)
+            .expect("MobileRelaySender should construct successfully");
+        accepts_sender(&mut sender);
+    }
+
+    // @scenario: privacy_compliance:Identity purge sends relay purge request
+    #[test]
+    fn test_mobile_relay_sender_implements_purge_trait() {
+        fn accepts_sender(_: &mut dyn vauchi_core::api::PurgeSender) {}
+        let mut sender = MobileRelaySender::new("ws://localhost:8080", "abcd1234", None)
+            .expect("MobileRelaySender should construct successfully");
         accepts_sender(&mut sender);
     }
 

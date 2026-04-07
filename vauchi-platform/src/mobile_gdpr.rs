@@ -12,7 +12,7 @@ use super::types::{
     MobileGdprExport, MobileShredReport, MobileShredStatus, MobileShredToken,
     MobileShredVerification,
 };
-use super::{MobilePlatformKeychain, MobilePurgeSender, MobileRevocationSender, VauchiPlatform};
+use super::{MobilePlatformKeychain, MobileRelaySender, VauchiPlatform};
 
 #[uniffi::export]
 impl VauchiPlatform {
@@ -150,7 +150,7 @@ impl VauchiPlatform {
         let core_token = vauchi_core::api::ShredToken::from_created_at(token.created_at);
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
 
-        let (mut purge_sender, purge_error) = match MobilePurgeSender::new(
+        let (mut purge_sender, purge_error) = match MobileRelaySender::new(
             &self.relay_url,
             &identity.public_id(),
             lock_or(&self.pinned_cert_pem)?.clone(),
@@ -159,7 +159,7 @@ impl VauchiPlatform {
             Err(e) => (None, Some(e.to_string())),
         };
 
-        let (mut revocation_sender, rev_error) = match MobileRevocationSender::new(
+        let (mut revocation_sender, rev_error) = match MobileRelaySender::new(
             &self.relay_url,
             &identity.public_id(),
             lock_or(&self.pinned_cert_pem)?.clone(),
@@ -205,7 +205,7 @@ impl VauchiPlatform {
 
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
 
-        let (mut purge_sender, purge_error) = match MobilePurgeSender::new(
+        let (mut purge_sender, purge_error) = match MobileRelaySender::new(
             &self.relay_url,
             &identity.public_id(),
             lock_or(&self.pinned_cert_pem)?.clone(),
@@ -214,7 +214,7 @@ impl VauchiPlatform {
             Err(e) => (None, Some(e.to_string())),
         };
 
-        let (mut revocation_sender, rev_error) = match MobileRevocationSender::new(
+        let (mut revocation_sender, rev_error) = match MobileRelaySender::new(
             &self.relay_url,
             &identity.public_id(),
             lock_or(&self.pinned_cert_pem)?.clone(),

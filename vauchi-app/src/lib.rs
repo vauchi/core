@@ -33,4 +33,6 @@ pub use aha_moments::{aha_moment_message_localized, aha_moment_title_localized};
 
 pub mod notification_types;
 
+pub mod activity_log_writer;
+
 pub mod ui;

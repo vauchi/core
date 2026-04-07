@@ -127,6 +127,14 @@ pub fn core_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// Return the app compatibility version (monotonic u16).
+///
+/// Mobile apps send this as `X-App-Compat-Version` header.
+#[uniffi::export]
+pub fn app_compat_version() -> u16 {
+    vauchi_core::version::APP_COMPAT_VERSION
+}
+
 // === Device Link Wrapper Objects ===
 
 use vauchi_core::exchange::{

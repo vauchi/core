@@ -257,8 +257,10 @@ impl<'a> ContactManager<'a> {
 
         self.storage.save_contact(&contact)?;
 
-        self.events
-            .dispatch(VauchiEvent::ContactAdded { contact_id });
+        self.events.dispatch(VauchiEvent::ContactAdded {
+            contact_id,
+            origin: crate::api::events::EventOrigin::Local,
+        });
 
         Ok(())
     }

@@ -14,6 +14,7 @@ use vauchi_core::*;
 fn test_vauchi_event_variants() {
     let event = VauchiEvent::ContactAdded {
         contact_id: "test-id".into(),
+        origin: EventOrigin::Local,
     };
     assert!(matches!(event, VauchiEvent::ContactAdded { .. }));
 
@@ -36,6 +37,7 @@ fn test_callback_handler() {
 
     dispatcher.dispatch(VauchiEvent::ContactAdded {
         contact_id: "test".into(),
+        origin: EventOrigin::Local,
     });
 
     assert_eq!(count.load(Ordering::SeqCst), 1);
@@ -66,6 +68,7 @@ fn test_event_dispatcher_dispatch() {
 
     dispatcher.dispatch(VauchiEvent::ContactAdded {
         contact_id: "test".into(),
+        origin: EventOrigin::Local,
     });
 
     assert_eq!(count.load(Ordering::SeqCst), 1);
@@ -87,6 +90,7 @@ fn test_event_dispatcher_multiple_handlers() {
 
     dispatcher.dispatch(VauchiEvent::ContactAdded {
         contact_id: "test".into(),
+        origin: EventOrigin::Local,
     });
 
     // All 3 handlers should be called
@@ -127,6 +131,7 @@ fn test_event_dispatcher_remove_handler() {
     // Both fire on dispatch
     dispatcher.dispatch(VauchiEvent::ContactAdded {
         contact_id: "test".into(),
+        origin: EventOrigin::Local,
     });
     assert_eq!(count_a.load(Ordering::SeqCst), 1);
     assert_eq!(count_b.load(Ordering::SeqCst), 1);
@@ -141,6 +146,7 @@ fn test_event_dispatcher_remove_handler() {
     // Only handler B fires now
     dispatcher.dispatch(VauchiEvent::ContactAdded {
         contact_id: "test2".into(),
+        origin: EventOrigin::Local,
     });
     assert_eq!(
         count_a.load(Ordering::SeqCst),

@@ -76,8 +76,8 @@ pub mod api;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use api::{
     AppPasswordConfig, AuthMode, AuthResult, BroadcastResult, ConsentStatus, DuressAlert,
-    DuressAlertType, EmergencyWipeStatus, HandlerId, RecoveryReadiness, SetupProgress, Vauchi,
-    VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult, VauchiSyncOutcome,
+    DuressAlertType, EmergencyWipeStatus, EventOrigin, HandlerId, RecoveryReadiness, SetupProgress,
+    Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult, VauchiSyncOutcome,
 };
 pub mod aha_moments;
 pub use aha_moments::AhaMoment;

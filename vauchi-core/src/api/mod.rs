@@ -133,7 +133,7 @@ pub use error::{VauchiError, VauchiResult};
 pub use config::{OhttpConfig, RecoveryConfig, RelayConfig, SyncConfig, VauchiConfig};
 
 // Events
-pub use events::{EventCallback, EventDispatcher, HandlerId, VauchiEvent};
+pub use events::{EventCallback, EventDispatcher, EventOrigin, HandlerId, VauchiEvent};
 
 // Contact Manager
 pub use contact_manager::ContactManager;

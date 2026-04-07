@@ -5,7 +5,7 @@
 //! Tests for `affected_screens` — the canonical event→screen-ID mapping.
 
 use vauchi_app::ui::affected_screens;
-use vauchi_core::api::VauchiEvent;
+use vauchi_core::api::{EventOrigin, VauchiEvent};
 use vauchi_core::{ConnectionState, SyncState};
 
 // @internal
@@ -14,6 +14,7 @@ fn contact_events_invalidate_contacts_and_detail() {
     let events = [
         VauchiEvent::ContactAdded {
             contact_id: "c1".into(),
+            origin: EventOrigin::Local,
         },
         VauchiEvent::ContactUpdated {
             contact_id: "c1".into(),

@@ -6,15 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Where an event originated.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-pub enum EventOrigin {
-    /// Exchange completed on this device.
-    Local,
-    /// Arrived via background sync from another device.
-    Synced,
-}
+pub use vauchi_core::api::EventOrigin;
 
 /// Notification categories that produce OS notifications.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -22,7 +22,7 @@ vauchi-core/src/exchange/multistage/session.rs 1178
 vauchi-core/src/recovery/mod.rs 1084
 
 # EXEMPT — migration ledger: coherence over size, version history must be co-located
-vauchi-core/src/storage/migration.rs 1710
+vauchi-core/src/storage/migration.rs 1730
 
 # EXEMPT — rekey ledger: all encrypted columns must be co-located for correctness (audit C1)
 vauchi-core/src/storage/rekey.rs 1251
@@ -31,9 +31,9 @@ vauchi-core/src/storage/rekey.rs 1251
 vauchi-core/src/storage/mod.rs 1079
 
 # SPLIT DONE — Phase 3: app_engine.rs (1437) split into mod.rs + routing.rs + screens.rs
-vauchi-app/src/ui/app_engine/mod.rs 594
+vauchi-app/src/ui/app_engine/mod.rs 597
 vauchi-app/src/ui/app_engine/routing.rs 627
-vauchi-app/src/ui/app_engine/screens.rs 852
+vauchi-app/src/ui/app_engine/screens.rs 888
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

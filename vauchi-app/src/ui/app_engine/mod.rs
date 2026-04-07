@@ -19,13 +19,18 @@ use serde::{Deserialize, Serialize};
 
 use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
-use vauchi_core::version::{APP_COMPAT_VERSION, AppUpdateStatus, VersionPolicy};
+use vauchi_core::version::{
+    APP_COMPAT_VERSION, AppUpdateStatus, VersionPolicy, unix_secs_to_date_string,
+};
 
 use super::action::{ActionResult, UserAction};
 use super::component::{Component, TextStyle};
 use super::device_linking::DeviceLinkingEngine;
 use super::engine::WorkflowEngine;
 use super::screen::{ActionStyle, ScreenAction, ScreenModel};
+
+/// Shared action ID for the update link button/banner.
+const ACTION_OPEN_UPDATE_LINK: &str = "open_update_link";
 
 /// Top-level screens in the application.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -321,8 +326,16 @@ impl AppEngine {
     ///
     /// Evaluates the policy against the current `APP_COMPAT_VERSION` and
     /// resets the dismissed flag if an update becomes required.
+    /// Current time as unix seconds — factored out for testability.
+    fn now_secs() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+    }
+
     pub fn set_version_policy(&mut self, policy: &VersionPolicy) {
-        self.update_status = policy.evaluate(APP_COMPAT_VERSION);
+        self.update_status = policy.evaluate(APP_COMPAT_VERSION, Self::now_secs());
         if matches!(self.update_status, AppUpdateStatus::UpdateRequired { .. }) {
             self.update_dismissed = false;
         }
@@ -346,7 +359,7 @@ impl AppEngine {
                     Component::Banner {
                         text: "A new version is available.".into(),
                         action_label: "Update".into(),
-                        action_id: "open_update_link".into(),
+                        action_id: ACTION_OPEN_UPDATE_LINK.into(),
                     },
                 );
                 screen
@@ -354,13 +367,13 @@ impl AppEngine {
             AppUpdateStatus::UpdateRequired {
                 grace_deadline: Some(deadline),
             } => {
-                let date = format_unix_date(*deadline);
+                let date = unix_secs_to_date_string(*deadline);
                 screen.components.insert(
                     0,
                     Component::Banner {
                         text: format!("Update required by {date}."),
                         action_label: "Update".into(),
-                        action_id: "open_update_link".into(),
+                        action_id: ACTION_OPEN_UPDATE_LINK.into(),
                     },
                 );
                 screen
@@ -376,7 +389,7 @@ impl AppEngine {
                     style: TextStyle::Body,
                 }],
                 vec![ScreenAction {
-                    id: "open_update_link".into(),
+                    id: ACTION_OPEN_UPDATE_LINK.into(),
                     label: "Update Now".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
@@ -384,27 +397,6 @@ impl AppEngine {
             ),
         }
     }
-}
-
-/// Format a unix timestamp (seconds) as a human-readable date (YYYY-MM-DD).
-fn format_unix_date(timestamp: u64) -> String {
-    // Days since epoch
-    let total_days = (timestamp / 86400) as i64;
-
-    // Reverse the days_since_epoch algorithm from version.rs:
-    // Convert from days since 1970-01-01 to a date using the proleptic Gregorian calendar.
-    let adjusted = total_days + 719_468; // days from 0000-03-01
-    let era = adjusted.div_euclid(146_097);
-    let day_of_era = adjusted.rem_euclid(146_097);
-    let year_of_era =
-        (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146_096) / 365;
-    let y = year_of_era + era * 400;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let mp = (5 * day_of_year + 2) / 153;
-    let day = day_of_year - (153 * mp + 2) / 5 + 1;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = if month <= 2 { y + 1 } else { y };
-    format!("{year:04}-{month:02}-{day:02}")
 }
 
 fn initials(name: &str) -> String {
@@ -482,20 +474,10 @@ impl WorkflowEngine for AppEngine {
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
-        // Handle update link action before anything else
-        if matches!(action, UserAction::OpenUpdateLink) {
-            if matches!(self.update_status, AppUpdateStatus::UpdateAvailable) {
-                self.update_dismissed = true;
-            }
-            return ActionResult::OpenUrl {
-                url: "vauchi://update".into(),
-            };
-        }
-
-        // Handle "open_update_link" action_id from banner/button presses
+        // Handle update link action from banner/button presses
         if matches!(
             &action,
-            UserAction::ActionPressed { action_id } if action_id == "open_update_link"
+            UserAction::ActionPressed { action_id } if action_id == ACTION_OPEN_UPDATE_LINK
         ) {
             if matches!(self.update_status, AppUpdateStatus::UpdateAvailable) {
                 self.update_dismissed = true;

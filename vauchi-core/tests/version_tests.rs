@@ -5,7 +5,11 @@
 //! Tests for the version module: APP_COMPAT_VERSION constant, VersionPolicy, and AppUpdateStatus.
 
 use proptest::prelude::*;
-use vauchi_core::version::{APP_COMPAT_VERSION, AppUpdateStatus, VersionPolicy};
+use vauchi_core::version::{
+    APP_COMPAT_VERSION, AppUpdateStatus, VersionPolicy, unix_secs_to_date_string,
+};
+
+const NOW: u64 = 1_700_000_000; // Fixed test time (2023-11-14)
 
 // ---------------------------------------------------------------------------
 // APP_COMPAT_VERSION constant
@@ -29,7 +33,7 @@ fn evaluate_up_to_date_when_at_warn_version() {
         warn_version: 2,
         grace_deadline: None,
     };
-    assert_eq!(policy.evaluate(2), AppUpdateStatus::UpToDate);
+    assert_eq!(policy.evaluate(2, NOW), AppUpdateStatus::UpToDate);
 }
 
 // @internal
@@ -40,7 +44,7 @@ fn evaluate_up_to_date_when_above_warn_version() {
         warn_version: 2,
         grace_deadline: None,
     };
-    assert_eq!(policy.evaluate(3), AppUpdateStatus::UpToDate);
+    assert_eq!(policy.evaluate(3, NOW), AppUpdateStatus::UpToDate);
 }
 
 // @internal
@@ -51,7 +55,7 @@ fn evaluate_update_available_when_at_min_but_below_warn() {
         warn_version: 4,
         grace_deadline: None,
     };
-    assert_eq!(policy.evaluate(3), AppUpdateStatus::UpdateAvailable);
+    assert_eq!(policy.evaluate(3, NOW), AppUpdateStatus::UpdateAvailable);
 }
 
 // @internal
@@ -62,7 +66,7 @@ fn evaluate_update_available_when_exactly_at_min() {
         warn_version: 4,
         grace_deadline: None,
     };
-    assert_eq!(policy.evaluate(2), AppUpdateStatus::UpdateAvailable);
+    assert_eq!(policy.evaluate(2, NOW), AppUpdateStatus::UpdateAvailable);
 }
 
 // @internal
@@ -76,7 +80,7 @@ fn evaluate_update_required_with_future_grace_deadline() {
         grace_deadline: Some(future_deadline),
     };
     assert_eq!(
-        policy.evaluate(2),
+        policy.evaluate(2, NOW),
         AppUpdateStatus::UpdateRequired {
             grace_deadline: Some(future_deadline),
         }
@@ -92,7 +96,7 @@ fn evaluate_update_required_no_deadline() {
         grace_deadline: None,
     };
     assert_eq!(
-        policy.evaluate(1),
+        policy.evaluate(1, NOW),
         AppUpdateStatus::UpdateRequired {
             grace_deadline: None,
         }
@@ -110,7 +114,7 @@ fn evaluate_update_required_with_past_deadline() {
         grace_deadline: Some(past_deadline),
     };
     assert_eq!(
-        policy.evaluate(1),
+        policy.evaluate(1, NOW),
         AppUpdateStatus::UpdateRequired {
             grace_deadline: None,
         }
@@ -423,8 +427,8 @@ proptest! {
             warn_version: warn_ver,
             grace_deadline: None,
         };
-        let rank_n = status_rank(&policy.evaluate(app_ver));
-        let rank_n1 = status_rank(&policy.evaluate(app_ver + 1));
+        let rank_n = status_rank(&policy.evaluate(app_ver, NOW));
+        let rank_n1 = status_rank(&policy.evaluate(app_ver + 1, NOW));
         prop_assert!(
             rank_n1 >= rank_n,
             "version {} rank {} but version {} rank {} — monotonicity violated",
@@ -495,4 +499,42 @@ proptest! {
         );
         prop_assert!(VersionPolicy::from_cdn_json(&json_warn).is_err());
     }
+}
+
+// ---------------------------------------------------------------------------
+// unix_secs_to_date_string
+// ---------------------------------------------------------------------------
+
+// @internal
+#[test]
+fn unix_secs_to_date_string_epoch() {
+    assert_eq!(unix_secs_to_date_string(0), "1970-01-01");
+}
+
+// @internal
+#[test]
+fn unix_secs_to_date_string_known_date() {
+    // 2024-01-15T00:00:00Z = 1705276800
+    assert_eq!(unix_secs_to_date_string(1_705_276_800), "2024-01-15");
+}
+
+// @internal
+#[test]
+fn unix_secs_to_date_string_leap_year() {
+    // 2024-02-29T00:00:00Z = 1709164800
+    assert_eq!(unix_secs_to_date_string(1_709_164_800), "2024-02-29");
+}
+
+// @internal
+#[test]
+fn unix_secs_to_date_string_end_of_day() {
+    // 2024-01-15T23:59:59Z = 1705363199
+    assert_eq!(unix_secs_to_date_string(1_705_363_199), "2024-01-15");
+}
+
+// @internal
+#[test]
+fn unix_secs_to_date_string_far_future() {
+    // 2099-12-31 = some large timestamp
+    assert_eq!(unix_secs_to_date_string(4_102_358_400), "2099-12-31");
 }

@@ -463,25 +463,36 @@ impl HttpTransport {
     /// Check the HTTP status code and extract version policy from headers.
     ///
     /// Must be called before consuming the response body.
-    /// Returns `Err(UpgradeRequired)` for 426, extracts version headers on all others.
+    /// Extracts version headers on every response, then maps non-2xx to errors.
     fn check_response_status(
         &self,
         resp: &ureq::http::Response<ureq::Body>,
     ) -> Result<(), NetworkError> {
         self.extract_version_policy(resp);
 
-        if resp.status().as_u16() == 426 {
-            // Read min_version from header if available, otherwise default to 0.
-            let min_version = resp
-                .headers()
-                .get("X-Min-Version")
-                .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.parse::<u16>().ok())
-                .unwrap_or(0);
-            return Err(NetworkError::UpgradeRequired { min_version });
+        let status = resp.status().as_u16();
+        match status {
+            200..=299 => Ok(()),
+            426 => {
+                let min_version = resp
+                    .headers()
+                    .get("X-Min-Version")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|v| v.parse::<u16>().ok())
+                    .unwrap_or(0);
+                Err(NetworkError::UpgradeRequired { min_version })
+            }
+            429 => {
+                let retry_after_secs = resp
+                    .headers()
+                    .get("Retry-After")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(DEFAULT_RATE_LIMIT_RETRY_SECS);
+                Err(NetworkError::RateLimited { retry_after_secs })
+            }
+            _ => Err(NetworkError::ConnectionFailed(format!("HTTP {status}"))),
         }
-
-        Ok(())
     }
 
     /// Extract version policy from response headers and store it.

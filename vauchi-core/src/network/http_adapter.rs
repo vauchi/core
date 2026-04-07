@@ -82,6 +82,11 @@ impl HttpTransportAdapter {
         self.http.has_ohttp()
     }
 
+    /// Returns the last version policy received from the relay.
+    pub fn last_version_policy(&self) -> Option<crate::version::VersionPolicy> {
+        self.http.last_version_policy()
+    }
+
     /// Set the OHTTP client for encrypted requests.
     pub fn set_ohttp(&mut self, client: OhttpClient) {
         self.http.set_ohttp(client);

@@ -40,14 +40,17 @@ pub enum AppUpdateStatus {
 
 impl VersionPolicy {
     /// Evaluate whether `app_version` needs an update according to this policy.
-    pub fn evaluate(&self, app_version: u16) -> AppUpdateStatus {
+    ///
+    /// `now_secs` is the current time as seconds since the UNIX epoch.
+    /// Pass it explicitly so callers (and tests) control the clock.
+    pub fn evaluate(&self, app_version: u16, now_secs: u64) -> AppUpdateStatus {
         if app_version >= self.warn_version {
             AppUpdateStatus::UpToDate
         } else if app_version >= self.min_version {
             AppUpdateStatus::UpdateAvailable
         } else {
             AppUpdateStatus::UpdateRequired {
-                grace_deadline: self.active_grace_deadline(),
+                grace_deadline: self.active_grace_deadline(now_secs),
             }
         }
     }
@@ -66,12 +69,8 @@ impl VersionPolicy {
     /// Returns the grace deadline only if it is still in the future.
     ///
     /// A past deadline means grace has expired — callers should treat `None` as "hard block now".
-    fn active_grace_deadline(&self) -> Option<u64> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system clock before Unix epoch")
-            .as_secs();
-        self.grace_deadline.filter(|&d| d > now)
+    fn active_grace_deadline(&self, now_secs: u64) -> Option<u64> {
+        self.grace_deadline.filter(|&d| d > now_secs)
     }
 
     /// Returns `true` if this policy carries no version constraints (both thresholds are 0).
@@ -170,7 +169,7 @@ fn parse_iso8601_to_unix(s: &str) -> Result<u64, String> {
     }
 
     // Days from Unix epoch (1970-01-01) to the start of the given date.
-    let days = days_since_epoch(year, month, day);
+    let days = days_since_epoch(year, month, day)?;
     let timestamp =
         days * 86400 + u64::from(hour) * 3600 + u64::from(minute) * 60 + u64::from(second);
     Ok(timestamp)
@@ -185,7 +184,9 @@ fn parse_segment(b: &[u8], start: usize, end: usize, label: &str) -> Result<u32,
 }
 
 /// Days from 1970-01-01 to the given date using the proleptic Gregorian calendar.
-fn days_since_epoch(year: u32, month: u32, day: u32) -> u64 {
+///
+/// Returns an error for dates before the Unix epoch (1970-01-01).
+fn days_since_epoch(year: u32, month: u32, day: u32) -> Result<u64, String> {
     // Adjust so March = month 1 (simplifies leap year handling).
     let (y, m) = if month <= 2 {
         (year as i64 - 1, month as i64 + 9)
@@ -201,5 +202,26 @@ fn days_since_epoch(year: u32, month: u32, day: u32) -> u64 {
     let days_from_zero = y * 365 + leap_days + day_of_year;
 
     // 719468 = days from 0000-03-01 to 1970-01-01 in the Gregorian calendar.
-    (days_from_zero - 719_468) as u64
+    u64::try_from(days_from_zero - 719_468)
+        .map_err(|_| format!("date {year:04}-{month:02}-{day:02} is before Unix epoch"))
+}
+
+/// Format a unix timestamp (seconds) as `YYYY-MM-DD`.
+///
+/// Uses the proleptic Gregorian calendar, inverse of `days_since_epoch`.
+pub fn unix_secs_to_date_string(timestamp: u64) -> String {
+    let total_days = (timestamp / 86400) as i64;
+
+    let adjusted = total_days + 719_468; // days from 0000-03-01
+    let era = adjusted.div_euclid(146_097);
+    let day_of_era = adjusted.rem_euclid(146_097);
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146_096) / 365;
+    let y = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let mp = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if month <= 2 { y + 1 } else { y };
+    format!("{year:04}-{month:02}-{day:02}")
 }

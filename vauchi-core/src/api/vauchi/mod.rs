@@ -86,6 +86,8 @@ pub enum VauchiSyncOutcome {
         sent: usize,
         acknowledged: usize,
         errors: Vec<String>,
+        /// Version policy from relay response headers (if any).
+        version_policy: Option<crate::version::VersionPolicy>,
     },
     /// Called too soon (C1 post-exchange or C2 jitter).
     TooSoon,

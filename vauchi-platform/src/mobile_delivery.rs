@@ -50,6 +50,7 @@ impl VauchiPlatform {
                     sent,
                     acknowledged: _,
                     errors: _,
+                    version_policy: _,
                 } => Ok(MobileSyncResult {
                     contacts_added: 0,
                     cards_updated: received as u32,

@@ -111,6 +111,9 @@ impl Vauchi {
         // Receive phase
         let received = self.run_receive_phase(identity, &contacts, &mut adapter)?;
 
+        // Capture version policy from relay response headers before adapter is moved.
+        let version_policy = adapter.last_version_policy();
+
         // Send phase — adapter moves into RelayClient → SyncController
         let send_result = self.run_send_phase(identity, &contacts, adapter)?;
 
@@ -125,6 +128,7 @@ impl Vauchi {
             sent: send_result.sent,
             acknowledged: send_result.acknowledged,
             errors,
+            version_policy,
         })
     }
 

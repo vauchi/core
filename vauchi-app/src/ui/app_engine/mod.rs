@@ -19,11 +19,13 @@ use serde::{Deserialize, Serialize};
 
 use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
+use vauchi_core::version::{APP_COMPAT_VERSION, AppUpdateStatus, VersionPolicy};
 
 use super::action::{ActionResult, UserAction};
+use super::component::{Component, TextStyle};
 use super::device_linking::DeviceLinkingEngine;
 use super::engine::WorkflowEngine;
-use super::screen::ScreenModel;
+use super::screen::{ActionStyle, ScreenAction, ScreenModel};
 
 /// Top-level screens in the application.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -185,6 +187,10 @@ pub struct AppEngine {
     /// Device hardware capabilities reported by the frontend at startup.
     /// Used to determine exchange mode availability.
     pub(super) device_capabilities: DeviceCapabilities,
+    /// Current app update status from the relay/CDN version policy.
+    update_status: AppUpdateStatus,
+    /// Whether the user has dismissed the "update available" banner.
+    update_dismissed: bool,
 }
 
 impl AppEngine {
@@ -231,6 +237,8 @@ impl AppEngine {
             field_catalog,
             preview_as_contact: None,
             device_capabilities: DeviceCapabilities::default(),
+            update_status: AppUpdateStatus::UpToDate,
+            update_dismissed: false,
         }
     }
 
@@ -308,6 +316,95 @@ impl AppEngine {
         dl.sync_complete();
         Some(dl.current_screen())
     }
+
+    /// Update the app's version status from a relay/CDN version policy.
+    ///
+    /// Evaluates the policy against the current `APP_COMPAT_VERSION` and
+    /// resets the dismissed flag if an update becomes required.
+    pub fn set_version_policy(&mut self, policy: &VersionPolicy) {
+        self.update_status = policy.evaluate(APP_COMPAT_VERSION);
+        if matches!(self.update_status, AppUpdateStatus::UpdateRequired { .. }) {
+            self.update_dismissed = false;
+        }
+    }
+
+    /// Modify a `ScreenModel` to inject update banners or replace with a blocking screen.
+    ///
+    /// - `UpToDate` → no change
+    /// - `UpdateAvailable` + not dismissed → dismissible banner at top
+    /// - `UpdateRequired` with active deadline → non-dismissible banner at top
+    /// - `UpdateRequired` with expired deadline → full blocking screen
+    fn apply_update_overlay(&self, mut screen: ScreenModel) -> ScreenModel {
+        match &self.update_status {
+            AppUpdateStatus::UpToDate => screen,
+            AppUpdateStatus::UpdateAvailable => {
+                if self.update_dismissed {
+                    return screen;
+                }
+                screen.components.insert(
+                    0,
+                    Component::Banner {
+                        text: "A new version is available.".into(),
+                        action_label: "Update".into(),
+                        action_id: "open_update_link".into(),
+                    },
+                );
+                screen
+            }
+            AppUpdateStatus::UpdateRequired {
+                grace_deadline: Some(deadline),
+            } => {
+                let date = format_unix_date(*deadline);
+                screen.components.insert(
+                    0,
+                    Component::Banner {
+                        text: format!("Update required by {date}."),
+                        action_label: "Update".into(),
+                        action_id: "open_update_link".into(),
+                    },
+                );
+                screen
+            }
+            AppUpdateStatus::UpdateRequired {
+                grace_deadline: None,
+            } => ScreenModel::new(
+                "update_required",
+                "Update Required",
+                vec![Component::Text {
+                    id: "update_message".into(),
+                    content: "This version is no longer supported. Please update to continue using the app.".into(),
+                    style: TextStyle::Body,
+                }],
+                vec![ScreenAction {
+                    id: "open_update_link".into(),
+                    label: "Update Now".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                }],
+            ),
+        }
+    }
+}
+
+/// Format a unix timestamp (seconds) as a human-readable date (YYYY-MM-DD).
+fn format_unix_date(timestamp: u64) -> String {
+    // Days since epoch
+    let total_days = (timestamp / 86400) as i64;
+
+    // Reverse the days_since_epoch algorithm from version.rs:
+    // Convert from days since 1970-01-01 to a date using the proleptic Gregorian calendar.
+    let adjusted = total_days + 719_468; // days from 0000-03-01
+    let era = adjusted.div_euclid(146_097);
+    let day_of_era = adjusted.rem_euclid(146_097);
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146_096) / 365;
+    let y = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let mp = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if month <= 2 { y + 1 } else { y };
+    format!("{year:04}-{month:02}-{day:02}")
 }
 
 fn initials(name: &str) -> String {
@@ -380,10 +477,34 @@ mod proptests {
 
 impl WorkflowEngine for AppEngine {
     fn current_screen(&self) -> ScreenModel {
-        self.engine.current_screen()
+        let screen = self.engine.current_screen();
+        self.apply_update_overlay(screen)
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
+        // Handle update link action before anything else
+        if matches!(action, UserAction::OpenUpdateLink) {
+            if matches!(self.update_status, AppUpdateStatus::UpdateAvailable) {
+                self.update_dismissed = true;
+            }
+            return ActionResult::OpenUrl {
+                url: "vauchi://update".into(),
+            };
+        }
+
+        // Handle "open_update_link" action_id from banner/button presses
+        if matches!(
+            &action,
+            UserAction::ActionPressed { action_id } if action_id == "open_update_link"
+        ) {
+            if matches!(self.update_status, AppUpdateStatus::UpdateAvailable) {
+                self.update_dismissed = true;
+            }
+            return ActionResult::OpenUrl {
+                url: "vauchi://update".into(),
+            };
+        }
+
         // Capture display name during onboarding for identity persistence
         if self.screen == AppScreen::Onboarding
             && let UserAction::TextChanged {
@@ -451,7 +572,8 @@ impl WorkflowEngine for AppEngine {
 
         let result = self.engine.handle_action(action);
         let result = self.route_result(result);
-        self.resolve_validation_error(result)
+        let result = self.resolve_validation_error(result);
+        self.apply_update_overlay_to_result(result)
     }
 }
 
@@ -470,6 +592,19 @@ impl AppEngine {
                     .current_screen()
                     .with_validation_error(&component_id, message);
                 ActionResult::UpdateScreen(screen)
+            }
+            other => other,
+        }
+    }
+
+    /// Apply the update overlay to any `ScreenModel` inside an `ActionResult`.
+    fn apply_update_overlay_to_result(&self, result: ActionResult) -> ActionResult {
+        match result {
+            ActionResult::UpdateScreen(screen) => {
+                ActionResult::UpdateScreen(self.apply_update_overlay(screen))
+            }
+            ActionResult::NavigateTo(screen) => {
+                ActionResult::NavigateTo(self.apply_update_overlay(screen))
             }
             other => other,
         }

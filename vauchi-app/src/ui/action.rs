@@ -47,6 +47,8 @@ pub enum UserAction {
     UndoPressed {
         action_id: String,
     },
+    /// User wants to open the platform app store to update.
+    OpenUpdateLink,
 }
 
 /// The result of handling a user action.

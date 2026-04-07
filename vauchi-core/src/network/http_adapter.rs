@@ -5,7 +5,7 @@
 //! HTTP Transport Adapter
 //!
 //! Adapts the stateless [`HttpTransport`] (v2 relay API) to the stateful
-//! [`Transport`] trait used by [`RelayClient`] and [`SyncController`].
+//! `Transport` trait used by `RelayClient` and `SyncController`.
 //!
 //! The adapter translates between the `Transport` trait's `send()`/`receive()`
 //! interface and the HTTP request/response model:
@@ -27,7 +27,7 @@ use super::ohttp_client::OhttpClient;
 use super::transport::{ConnectionState, TransportConfig, TransportResult};
 use vauchi_protocol::v2::FetchedBlob;
 
-/// Adapts [`HttpTransport`] to the [`Transport`] trait.
+/// Adapts [`HttpTransport`] to the `Transport` trait.
 ///
 /// Holds registered mailbox tokens and a buffer of fetched-but-not-yet-returned
 /// blobs. Each `receive()` call returns one buffered blob or polls the relay

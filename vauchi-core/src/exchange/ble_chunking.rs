@@ -77,7 +77,7 @@ pub struct BleReassembler {
 impl BleReassembler {
     /// Create a new reassembler expecting `total` chunks.
     ///
-    /// Returns an error if `total` exceeds [`MAX_TOTAL_CHUNKS`].
+    /// Returns an error if `total` exceeds `MAX_TOTAL_CHUNKS`.
     pub fn new(total: u16) -> Result<Self, ExchangeError> {
         if (total as usize) > MAX_TOTAL_CHUNKS {
             return Err(ExchangeError::BleReassemblyLimitExceeded(format!(

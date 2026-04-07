@@ -65,7 +65,7 @@ impl CardSnapshot {
         serde_json::to_vec(&self.card)
     }
 
-    /// Deserialize a snapshot from bytes previously produced by [`to_bytes`].
+    /// Deserialize a snapshot from bytes previously produced by [`Self::to_bytes`].
     ///
     /// The `created_at` timestamp is set to `now` because the original
     /// timestamp is not encoded in the bytes; callers that need round-trip

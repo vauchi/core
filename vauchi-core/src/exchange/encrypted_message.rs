@@ -68,7 +68,7 @@ pub struct EncryptedExchangeMessage {
     pub ephemeral_public_key: [u8; 32],
 
     /// Encrypted payload containing identity key and display name.
-    /// Format: XChaCha20-Poly1305 tagged (0x02 || nonce[24] || ciphertext || tag[16])
+    /// Format: XChaCha20-Poly1305 tagged (0x02 || nonce\[24\] || ciphertext || tag\[16\])
     pub ciphertext: Vec<u8>,
 }
 

@@ -142,7 +142,7 @@ impl Storage {
 
     /// Re-encrypts all encrypted columns with progress reporting (#166a).
     ///
-    /// See [`rekey`] for details. The `progress` callback, if provided,
+    /// See [`Self::rekey`] for details. The `progress` callback, if provided,
     /// is called after each table completes with `(completed, total, table_name)`.
     #[allow(clippy::type_complexity)]
     pub fn rekey_with_progress(

@@ -18,7 +18,7 @@ pub struct SocialNetwork {
     /// Human-readable display name (e.g., "Twitter", "GitHub").
     display_name: String,
     /// URL template with `{username}` placeholder.
-    /// Example: "https://twitter.com/{username}"
+    /// Example: `"https://twitter.com/{username}"`
     profile_url_template: String,
     /// Optional icon identifier for UI rendering.
     icon: Option<String>,

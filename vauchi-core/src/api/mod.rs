@@ -39,12 +39,12 @@
 //!
 //! # Module Structure
 //!
-//! - [`error`] - Error types for the API layer
-//! - [`config`] - Configuration types
-//! - [`events`] - Event system for callbacks
-//! - [`contact_manager`] - High-level contact operations
-//! - [`sync_controller`] - Sync and network orchestration
-//! - [`vauchi`] - Main Vauchi orchestrator
+//! - `error` - Error types for the API layer
+//! - `config` - Configuration types
+//! - `events` - Event system for callbacks
+//! - `contact_manager` - High-level contact operations
+//! - `sync_controller` - Sync and network orchestration
+//! - `vauchi` - Main Vauchi orchestrator
 
 pub mod app_password;
 pub mod duress;

@@ -498,7 +498,7 @@ const MAX_CLOCK_DRIFT_SECONDS: u64 = 30;
 /// acceptable drift window.
 ///
 /// Returns `Ok(())` if the absolute difference is at most
-/// [`MAX_CLOCK_DRIFT_SECONDS`] (30 seconds). Otherwise returns
+/// `MAX_CLOCK_DRIFT_SECONDS` (30 seconds). Otherwise returns
 /// `ExchangeError::ClockDrift` with the signed delta.
 pub fn check_clock_drift(qr_timestamp: u64) -> Result<(), ExchangeError> {
     let now = SystemTime::now()

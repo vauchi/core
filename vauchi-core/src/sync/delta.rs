@@ -362,7 +362,7 @@ impl CardDelta {
     /// Decompresses a DEFLATE-compressed payload.
     ///
     /// Returns the decompressed bytes, or an error if the data is malformed
-    /// or exceeds [`Self::MAX_DECOMPRESSED_SIZE`].
+    /// or exceeds `Self::MAX_DECOMPRESSED_SIZE`.
     pub fn decompress_payload(compressed: &[u8]) -> Result<Vec<u8>, DeltaError> {
         use flate2::read::DeflateDecoder;
         use std::io::Read;

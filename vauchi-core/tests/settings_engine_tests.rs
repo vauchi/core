@@ -9,6 +9,7 @@ fn sample_config() -> SettingsConfig {
         display_name: "Alice".into(),
         delivery_receipts_enabled: true,
         suppress_presence: false,
+        contact_added_notifications: false,
         relay_url: "wss://relay.vauchi.app".into(),
         device_count: 3,
         password_set: true,
@@ -35,7 +36,14 @@ fn settings_shows_all_groups() {
         .collect();
     assert_eq!(
         groups,
-        vec!["profile", "privacy", "security", "network", "danger"]
+        vec![
+            "profile",
+            "privacy",
+            "notifications",
+            "security",
+            "network",
+            "danger"
+        ]
     );
 }
 

@@ -178,6 +178,7 @@ impl AppEngine {
                     display_name,
                     delivery_receipts_enabled: vauchi.config().delivery_receipts_enabled,
                     suppress_presence: vauchi.config().suppress_presence,
+                    contact_added_notifications: vauchi.config().contact_added_notifications,
                     relay_url: vauchi.config().relay.server_url.clone(),
                     device_count: 1,
                     password_set: vauchi.is_password_enabled().unwrap_or(false),

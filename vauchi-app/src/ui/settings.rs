@@ -14,6 +14,8 @@ pub struct SettingsConfig {
     pub display_name: String,
     pub delivery_receipts_enabled: bool,
     pub suppress_presence: bool,
+    #[serde(default)]
+    pub contact_added_notifications: bool,
     pub relay_url: String,
     pub device_count: usize,
     pub password_set: bool,
@@ -74,6 +76,17 @@ impl WorkflowEngine for SettingsEngine {
                         },
                     },
                 ],
+            },
+            Component::SettingsGroup {
+                id: "notifications".into(),
+                label: "Notifications".into(),
+                items: vec![SettingsItem {
+                    id: "contact_added".into(),
+                    label: "New Contact Added".into(),
+                    kind: SettingsItemKind::Toggle {
+                        enabled: self.config.contact_added_notifications,
+                    },
+                }],
             },
             Component::SettingsGroup {
                 id: "security".into(),
@@ -162,6 +175,13 @@ impl WorkflowEngine for SettingsEngine {
                 ref item_id,
             } if component_id == "privacy" && item_id == "suppress_presence" => {
                 self.config.suppress_presence = !self.config.suppress_presence;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::SettingsToggled {
+                ref component_id,
+                ref item_id,
+            } if component_id == "notifications" && item_id == "contact_added" => {
+                self.config.contact_added_notifications = !self.config.contact_added_notifications;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected { ref item_id, .. } if item_id == "emergency_wipe" => {

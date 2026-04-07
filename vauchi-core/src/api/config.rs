@@ -57,6 +57,10 @@ pub struct VauchiConfig {
 
     /// OHTTP privacy configuration.
     pub ohttp: OhttpConfig,
+
+    /// Whether to send OS notification when a new contact is added via sync.
+    /// Default: false (opt-in).
+    pub contact_added_notifications: bool,
 }
 
 impl Default for VauchiConfig {
@@ -72,6 +76,7 @@ impl Default for VauchiConfig {
             recovery: RecoveryConfig::default(),
             relay_list: None,
             ohttp: OhttpConfig::default(),
+            contact_added_notifications: false,
         }
     }
 }

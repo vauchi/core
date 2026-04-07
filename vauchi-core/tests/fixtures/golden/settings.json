@@ -58,6 +58,23 @@
     },
     {
       "SettingsGroup": {
+        "id": "notifications",
+        "label": "Notifications",
+        "items": [
+          {
+            "id": "contact_added",
+            "label": "New Contact Added",
+            "kind": {
+              "Toggle": {
+                "enabled": false
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "SettingsGroup": {
         "id": "security",
         "label": "Security",
         "items": [

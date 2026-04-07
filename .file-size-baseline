@@ -12,7 +12,7 @@ vauchi-cabi/src/lib.rs 1841
 vauchi-platform/src/types.rs 1547
 
 # EXEMPT — UniFFI facade: splitting breaks binding generation (trust/notes/preview/import exports added)
-vauchi-platform/src/lib.rs 2300
+vauchi-platform/src/lib.rs 2315
 
 # EXEMPT — state machine: scattered transitions create protocol bugs
 vauchi-core/src/exchange/session.rs 1577
@@ -30,8 +30,10 @@ vauchi-core/src/storage/rekey.rs 1251
 # SPLIT — Phase 3: extract connection management
 vauchi-core/src/storage/mod.rs 1079
 
-# SPLIT — Phase 3: extract per-screen handlers into sub-module dir (moved to vauchi-app)
-vauchi-app/src/ui/app_engine.rs 1437
+# SPLIT DONE — Phase 3: app_engine.rs (1437) split into mod.rs + routing.rs + screens.rs
+vauchi-app/src/ui/app_engine/mod.rs 577
+vauchi-app/src/ui/app_engine/routing.rs 627
+vauchi-app/src/ui/app_engine/screens.rs 852
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

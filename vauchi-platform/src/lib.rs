@@ -109,11 +109,12 @@ pub use types::{
     MobileDeviceLinkInfo, MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileDuressSettings,
     MobileEmergencyConfig, MobileExchangeResult, MobileFaqItem, MobileFieldNote, MobileFieldType,
     MobileGdprExport, MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo,
-    MobileMotionTokens, MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryClaim,
-    MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry,
-    MobileShredReport, MobileShredStatus, MobileShredToken, MobileShredVerification,
-    MobileSocialNetwork, MobileSpacingDirectionTokens, MobileSpacingTokens, MobileSyncResult,
-    MobileSyncStatus, MobileTheme, MobileThemeColors, MobileThemeMode, MobileTouchTargetTokens,
+    MobileMotionTokens, MobileNotificationCategory, MobileOnboardingProgress, MobileOnboardingStep,
+    MobilePendingNotification, MobileRecoveryClaim, MobileRecoveryProgress,
+    MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
+    MobileShredStatus, MobileShredToken, MobileShredVerification, MobileSocialNetwork,
+    MobileSpacingDirectionTokens, MobileSpacingTokens, MobileSyncResult, MobileSyncStatus,
+    MobileTheme, MobileThemeColors, MobileThemeMode, MobileTouchTargetTokens,
     MobileTypographyTokens, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 

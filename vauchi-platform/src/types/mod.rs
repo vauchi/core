@@ -9,6 +9,7 @@
 
 mod core_types;
 mod device;
+pub mod notification;
 mod security;
 mod social;
 mod ux;
@@ -24,6 +25,7 @@ pub use device::{
     MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileDeviceType, MobileRetryEntry,
     MobileSyncResult, MobileSyncStatus,
 };
+pub use notification::{MobileNotificationCategory, MobilePendingNotification};
 pub use security::{
     MobileAuthMode, MobileBroadcastResult, MobileConsentRecord, MobileConsentStatus,
     MobileConsentType, MobileDecoyContact, MobileDeletionInfo, MobileDeletionState,

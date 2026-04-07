@@ -25,6 +25,7 @@ use crate::network::{
 /// };
 /// ```
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct VauchiConfig {
     /// Storage directory for identity, contacts, and sync state.
     pub storage_path: PathBuf,

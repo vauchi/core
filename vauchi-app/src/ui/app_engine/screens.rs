@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use super::AppEngine;
 use super::AppScreen;
 use super::initials;
+use crate::ui::activity_log::{ActivityLogEngine, ActivityLogItem};
 use crate::ui::backup_recovery::BackupRecoveryEngine;
 use crate::ui::component::{ContactItem, FieldDisplay, Status, UiFieldVisibility};
 use crate::ui::contact_detail::{
@@ -348,6 +349,40 @@ impl AppEngine {
                 Box::new(FormDialogEngine::new(dialog_type.clone()))
             }
             AppScreen::More => Box::new(MoreEngine::new()),
+            AppScreen::ActivityLog => {
+                use crate::notification_types::ActivityLogEntry;
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let rows = vauchi
+                    .storage()
+                    .activity_log_query_recent(now, 7 * 86400)
+                    .unwrap_or_default();
+                let contacts: std::collections::HashMap<String, String> = vauchi
+                    .list_contacts()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|c| (c.id().to_string(), c.display_name().to_string()))
+                    .collect();
+                let items: Vec<ActivityLogItem> = rows
+                    .into_iter()
+                    .filter_map(|row| {
+                        let entry: ActivityLogEntry = serde_json::from_str(&row.payload).ok()?;
+                        let contact_name = contacts
+                            .get(entry.contact_id())
+                            .cloned()
+                            .unwrap_or_else(|| entry.contact_id().to_string());
+                        Some(ActivityLogItem {
+                            event_key: row.event_key,
+                            contact_name,
+                            created_at: row.created_at,
+                            entry,
+                        })
+                    })
+                    .collect();
+                Box::new(ActivityLogEngine::new(items))
+            }
             AppScreen::ContactDetail { contact_id } => match vauchi.get_contact(contact_id) {
                 Ok(Some(contact)) => {
                     let fields: Vec<FieldDisplay> = contact

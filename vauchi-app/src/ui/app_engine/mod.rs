@@ -83,6 +83,7 @@ pub enum AppScreen {
         contact_id: String,
     },
     More,
+    ActivityLog,
 }
 
 impl AppScreen {
@@ -121,6 +122,7 @@ impl AppScreen {
             Self::ContactLimit => "contact_limit",
             Self::VerifyFingerprint { .. } => "verify_fingerprint",
             Self::More => "more",
+            Self::ActivityLog => "activity_log",
         }
     }
 
@@ -150,6 +152,7 @@ impl AppScreen {
             "contact_duplicates" => Self::ContactDuplicates,
             "contact_limit" => Self::ContactLimit,
             "more" => Self::More,
+            "activity_log" => Self::ActivityLog,
             _ => return None,
         })
     }

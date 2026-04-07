@@ -9,6 +9,7 @@
 //! User interactions flow back as UserAction.
 
 mod action;
+mod activity_log;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 mod app_engine;
 mod backup_recovery;
@@ -50,6 +51,7 @@ mod support;
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 mod sync_status;
 pub use action::{ActionResult, UserAction};
+pub use activity_log::{ActivityLogEngine, ActivityLogItem};
 #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
 pub use app_engine::{AppEngine, AppScreen};
 pub use backup_recovery::{BackupMode, BackupRecoveryEngine};

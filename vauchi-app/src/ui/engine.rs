@@ -5,6 +5,7 @@
 use std::any::Any;
 
 use super::{ActionResult, ScreenModel, UserAction};
+use crate::notification_types::PendingNotification;
 use vauchi_core::exchange::ExchangeHardwareEvent;
 
 /// Trait that all core-driven workflows implement.
@@ -17,6 +18,11 @@ pub trait WorkflowEngine: Send {
 
     /// Handles a user action and returns the result.
     fn handle_action(&mut self, action: UserAction) -> ActionResult;
+
+    /// Poll for any new OS notifications.
+    fn poll_notifications(&mut self) -> Vec<PendingNotification> {
+        Vec::new()
+    }
 
     /// Returns sensitive input collected by this engine (e.g. a PIN).
     ///

@@ -19,6 +19,8 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use crate::types::{MobileNotificationCategory, MobilePendingNotification};
+use vauchi_app::notification_types::NotificationCategory as CoreNotificationCategory;
 use vauchi_app::ui::{AppEngine, WorkflowEngine};
 use vauchi_core::api::{HandlerId, Vauchi, VauchiConfig, VauchiEvent};
 use vauchi_core::crypto::SymmetricKey;
@@ -315,6 +317,33 @@ impl PlatformAppEngine {
             }
             None => Ok(None),
         }
+    }
+
+    /// Poll core for pending OS notifications to render.
+    pub fn poll_notifications(&self) -> Result<Vec<MobilePendingNotification>, MobileError> {
+        let mut engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        let items = engine.poll_notifications();
+        let mapped = items
+            .into_iter()
+            .map(|n| MobilePendingNotification {
+                event_key: n.event_key,
+                category: match n.category {
+                    CoreNotificationCategory::EmergencyAlert => {
+                        MobileNotificationCategory::EmergencyAlert
+                    }
+                    CoreNotificationCategory::ContactAdded => {
+                        MobileNotificationCategory::ContactAdded
+                    }
+                },
+                title: n.title,
+                body: n.body,
+                contact_id: n.contact_id,
+            })
+            .collect();
+        Ok(mapped)
     }
 
     /// Report device hardware capabilities.

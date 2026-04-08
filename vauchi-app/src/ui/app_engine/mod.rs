@@ -14,6 +14,7 @@ mod routing;
 mod screens;
 
 use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
@@ -28,6 +29,8 @@ use super::component::{Component, TextStyle};
 use super::device_linking::DeviceLinkingEngine;
 use super::engine::WorkflowEngine;
 use super::screen::{ActionStyle, ScreenAction, ScreenModel};
+use crate::notification_emitter::NotificationEmitter;
+use crate::notification_types::{ActivityLogEntry, NotificationPreferences, PendingNotification};
 
 /// Shared action ID for the update link button/banner.
 const ACTION_OPEN_UPDATE_LINK: &str = "open_update_link";
@@ -199,6 +202,8 @@ pub struct AppEngine {
     update_status: AppUpdateStatus,
     /// Whether the user has dismissed the "update available" banner.
     update_dismissed: bool,
+    /// Last timestamp (seconds) when activity log was polled for OS notifications.
+    last_poll_time: u64,
 }
 
 impl AppEngine {
@@ -233,6 +238,12 @@ impl AppEngine {
         let engine = Self::create_engine(&vauchi, &screen, None, &caps);
         let registry = vauchi_core::social::SocialNetworkRegistry::with_defaults();
         let field_catalog = vauchi_core::contact_card::FieldTypeCatalog::new(&registry);
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
         Self {
             vauchi,
             screen,
@@ -247,6 +258,7 @@ impl AppEngine {
             device_capabilities: DeviceCapabilities::default(),
             update_status: AppUpdateStatus::UpToDate,
             update_dismissed: false,
+            last_poll_time: now,
         }
     }
 
@@ -556,13 +568,78 @@ impl WorkflowEngine for AppEngine {
         }
 
         let result = self.engine.handle_action(action);
-        let result = self.route_result(result);
+        let mut result = self.route_result(result);
+
+        // Poll for notifications after every action (best effort for UI-triggered changes)
+        let notifications = self.poll_notifications();
+        if !notifications.is_empty() {
+            result = ActionResult::Notify { notifications };
+        }
+
         let result = self.resolve_validation_error(result);
         self.apply_update_overlay_to_result(result)
     }
 }
 
 impl AppEngine {
+    /// Poll the activity log and produce pending OS notifications.
+    /// Public so PlatformAppEngine can expose it via UniFFI.
+    pub fn poll_notifications(&mut self) -> Vec<PendingNotification> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        // Poll core activity log for new entries since last poll
+        let entries = match self.vauchi.activity_log_poll(self.last_poll_time) {
+            Ok(rows) => rows
+                .into_iter()
+                .filter_map(|row| {
+                    let entry = serde_json::from_str::<ActivityLogEntry>(&row.payload).ok()?;
+                    Some((row.event_key, entry))
+                })
+                .collect::<Vec<_>>(),
+            Err(_) => return Vec::new(),
+        };
+
+        if entries.is_empty() {
+            return Vec::new();
+        }
+
+        // Get notification preferences
+        let prefs = match self.vauchi.load_emergency_config() {
+            Ok(Some(_)) => {
+                // For MVP, we use the hardcoded/default preferences
+                // Future: load from storage
+                NotificationPreferences {
+                    contact_added_enabled: self.vauchi.config().contact_added_notifications,
+                }
+            }
+            _ => NotificationPreferences {
+                contact_added_enabled: self.vauchi.config().contact_added_notifications,
+            },
+        };
+
+        // Resolve contact names for body text
+        let name_resolver = |contact_id: &str| {
+            self.vauchi
+                .storage()
+                .load_contact(contact_id)
+                .ok()
+                .flatten()
+                .map(|c| c.display_name().to_string())
+                .unwrap_or_else(|| "Unknown contact".to_string())
+        };
+
+        let notifications = NotificationEmitter::evaluate(&entries, &prefs, name_resolver);
+
+        if !notifications.is_empty() {
+            self.last_poll_time = now;
+        }
+
+        notifications
+    }
+
     /// Convert `ValidationError` into `UpdateScreen` with the error injected
     /// into the matching component. This ensures frontends never receive
     /// `ValidationError` and never need to patch the `ScreenModel` themselves.

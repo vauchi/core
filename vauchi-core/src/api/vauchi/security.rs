@@ -9,6 +9,7 @@ use super::super::duress::{DuressAlert, DuressAlertType};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventCallback, VauchiEvent};
 use super::{AuthMode, Vauchi};
+use crate::storage::ActivityLogRow;
 use crate::types::DuressSettings;
 
 impl Vauchi {
@@ -149,6 +150,18 @@ impl Vauchi {
     /// Returns whether an app password has been configured.
     pub fn is_password_enabled(&self) -> VauchiResult<bool> {
         Ok(self.storage.load_password_config()?.is_some())
+    }
+
+    /// Returns the activity log entries newer than the given timestamp.
+    /// Used for OS notification polling.
+    pub fn activity_log_poll(&self, since_secs: u64) -> VauchiResult<Vec<ActivityLogRow>> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let max_age = now.saturating_sub(since_secs);
+        Ok(self.storage.activity_log_query_recent(now, max_age)?)
     }
 
     /// Returns whether duress mode is enabled.

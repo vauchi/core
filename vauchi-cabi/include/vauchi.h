@@ -190,6 +190,18 @@ void vauchi_app_destroy(struct VauchiApp *handle);
 char *vauchi_app_current_screen(struct VauchiApp *handle);
 
 /**
+ * Poll for any new OS notifications produced by the app engine.
+ *
+ * Returns a JSON-encoded array of `PendingNotification` objects, or
+ * null if there are no new notifications.
+ *
+ * # Safety
+ * `app` must be a valid pointer created by `vauchi_app_create*`.
+ * The caller must free the returned string via `vauchi_free_string`.
+ */
+char *vauchi_app_poll_notifications(struct VauchiApp *app);
+
+/**
  * Handle a user action (JSON) and return the result as JSON.
  *
  * # Safety

@@ -4,7 +4,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::screen::ScreenModel;
+use crate::notification_types::PendingNotification;
+use crate::ui::screen::ScreenModel;
 use vauchi_core::exchange::ExchangeCommand;
 
 /// An action the user performed in the UI.
@@ -120,5 +121,10 @@ pub enum ActionResult {
     ShowFormDialog {
         dialog_type: String,
         context_id: Option<String>,
+    },
+    /// The app engine produced OS notifications that should be rendered.
+    /// These are non-blocking and do not change the current screen.
+    Notify {
+        notifications: Vec<PendingNotification>,
     },
 }

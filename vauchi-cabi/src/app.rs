@@ -228,6 +228,46 @@ pub unsafe extern "C" fn vauchi_app_current_screen(handle: *mut VauchiApp) -> *m
     }
 }
 
+/// Poll for any new OS notifications produced by the app engine.
+///
+/// Returns a JSON-encoded array of `PendingNotification` objects, or
+/// null if there are no new notifications.
+///
+/// # Safety
+/// `app` must be a valid pointer created by `vauchi_app_create*`.
+/// The caller must free the returned string via `vauchi_free_string`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_app_poll_notifications(app: *mut VauchiApp) -> *mut c_char {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if app.is_null() {
+            return std::ptr::null_mut();
+        }
+
+        let app = unsafe { &*app };
+        let mut engine = match app.engine.lock() {
+            Ok(lock) => lock,
+            Err(_) => return std::ptr::null_mut(),
+        };
+
+        let notifications = engine.poll_notifications();
+
+        // Also check if handle_action result should be merged with poll_notifications
+        // but for now, we just return the polled notifications.
+
+        if notifications.is_empty() {
+            return std::ptr::null_mut();
+        }
+
+        match serde_json::to_string(&notifications) {
+            Ok(json) => to_c_string(&json),
+            Err(_) => std::ptr::null_mut(),
+        }
+    })) {
+        Ok(result) => result,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
 /// Handle a user action (JSON) and return the result as JSON.
 ///
 /// # Safety

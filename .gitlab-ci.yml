@@ -585,12 +585,13 @@ bench:compare:
 # ============================================================
 
 mutation:nightly:
-  extends: [.mutation-nightly, .linux-runner, .timeout-extended]
+  extends: [.mutation-nightly, .linux-runner]
+  timeout: 12h
   variables:
     MUTATION_PACKAGE: "vauchi-core"
-    MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs"
-    # Absolute path so cargo-mutants' /tmp/ copies can still find locales
-    VAUCHI_LOCALES_DIR: "$CI_BUILDS_DIR/$CI_PROJECT_PATH/../locales"
+    # --in-place: test in source tree so include_bytes!("../../../themes/...") resolves.
+    # Copying to /tmp/ breaks relative paths to sibling repos (themes/, locales/).
+    MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs --in-place"
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
@@ -602,36 +603,59 @@ mutation:nightly:
 
 # Nightly fuzz run — cycles through all 11 fuzz targets for 5 minutes each
 fuzz:nightly:
-  extends: [.linux-runner, .timeout-extended]
+  extends: [.linux-runner]
+  timeout: 12h
   stage: mutation
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $FUZZ_ENABLED == "true"
   allow_failure: true
   script:
     - |
-      # Install cargo-fuzz if not available (--force handles stale cached binaries)
-      command -v cargo-fuzz >/dev/null 2>&1 || cargo install cargo-fuzz --locked --force
+      # cargo-fuzz requires nightly for -Zsanitizer=address
+      rustup toolchain install nightly --profile minimal --component llvm-tools-preview 2>/dev/null || true
+      command -v cargo-fuzz >/dev/null 2>&1 || cargo +nightly install cargo-fuzz --locked --force
 
       cd vauchi-core/fuzz
       FUZZ_DURATION="${FUZZ_DURATION_SECS:-300}"
       FUZZ_JOBS="${FUZZ_PARALLEL_JOBS:-4}"
+      REPORT_DIR="../fuzz-report"
+      mkdir -p "$REPORT_DIR"
 
       TARGETS="fuzz_decode_message fuzz_qr_payload fuzz_unpad fuzz_delta_decode \
                fuzz_recovery_claim fuzz_nfc_payload fuzz_ble_payload \
                fuzz_ble_advertisement fuzz_exchange_payload fuzz_encrypted_exchange \
                fuzz_ratchet_state"
 
-      echo "=== Fuzzing $(echo $TARGETS | wc -w) targets, ${FUZZ_JOBS} parallel, ${FUZZ_DURATION}s each ==="
+      TARGET_COUNT=$(echo $TARGETS | wc -w | tr -d ' ')
+      echo "=== Fuzzing ${TARGET_COUNT} targets, ${FUZZ_JOBS} parallel, ${FUZZ_DURATION}s each ==="
 
-      FAILED=0
       echo "$TARGETS" | tr ' ' '\n' | grep -v '^$' | \
         xargs -P "$FUZZ_JOBS" -I{} sh -c \
-          'echo "START: {}"; cargo fuzz run {} -- -max_total_time='"$FUZZ_DURATION"' 2>&1 || echo "CRASH:{}"' \
+          'echo "START: {}"; cargo +nightly fuzz run {} -- -max_total_time='"$FUZZ_DURATION"' 2>&1 && echo "PASS:{}" || echo "CRASH:{}"' \
           | tee /tmp/fuzz-output.log
 
       FAILED=$(grep -c '^CRASH:' /tmp/fuzz-output.log || true)
+      PASSED=$(grep -c '^PASS:' /tmp/fuzz-output.log || true)
+
+      # Generate JUnit XML report for GitLab test tab
+      cat > "$REPORT_DIR/fuzz-junit.xml" <<JUNIT_EOF
+      <?xml version="1.0" encoding="UTF-8"?>
+      <testsuites name="fuzz:nightly" tests="${TARGET_COUNT}" failures="${FAILED}">
+        <testsuite name="cargo-fuzz" tests="${TARGET_COUNT}" failures="${FAILED}">
+      JUNIT_EOF
+      for t in $TARGETS; do
+        STATUS=$(grep -E "^(PASS|CRASH):${t}$" /tmp/fuzz-output.log | head -1 | cut -d: -f1)
+        if [ "$STATUS" = "CRASH" ]; then
+          echo "    <testcase name=\"${t}\" classname=\"fuzz\"><failure message=\"Crash found\"/></testcase>" >> "$REPORT_DIR/fuzz-junit.xml"
+        else
+          echo "    <testcase name=\"${t}\" classname=\"fuzz\"/>" >> "$REPORT_DIR/fuzz-junit.xml"
+        fi
+      done
+      echo "  </testsuite>" >> "$REPORT_DIR/fuzz-junit.xml"
+      echo "</testsuites>" >> "$REPORT_DIR/fuzz-junit.xml"
+
       echo "=== Fuzz Summary ==="
-      echo "Targets: 11, Crashes: $FAILED"
+      echo "Targets: ${TARGET_COUNT}, Passed: $PASSED, Crashes: $FAILED"
       [ "$FAILED" -eq 0 ] || exit 1
   cache:
     key: fuzz-corpus-core
@@ -639,10 +663,13 @@ fuzz:nightly:
       - vauchi-core/fuzz/corpus/
     policy: pull-push
   artifacts:
+    when: always
     paths:
       - vauchi-core/fuzz/artifacts/
+      - vauchi-core/fuzz-report/
+    reports:
+      junit: vauchi-core/fuzz-report/fuzz-junit.xml
     expire_in: 1 month
-    when: on_failure
 
 # Slow property tests — timing-sensitive exchange tests with wall-clock jitter.
 # Runs #[ignore] tests that are too slow for per-push CI (~2 min).

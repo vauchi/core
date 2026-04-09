@@ -793,3 +793,42 @@ pub unsafe extern "C" fn vauchi_app_device_link_sync_complete(
         Err(_) => std::ptr::null_mut(),
     }
 }
+
+/// Drain pending OS notifications as a JSON array.
+///
+/// Returns a JSON array of notification objects, e.g.:
+/// `[{"event_key":"...","category":"EmergencyAlert","title":"...","body":"...","contact_id":"..."}]`
+///
+/// Returns `"[]"` if no notifications are pending.
+/// Returns null on error (null handle, lock poisoned).
+///
+/// Frontends should call this after receiving the event callback.
+/// Each call clears the buffer — notifications are never returned twice.
+///
+/// # Safety
+/// `handle` must be a valid app handle or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_app_drain_notifications(handle: *mut VauchiApp) -> *mut c_char {
+    // SAFETY: handle is checked non-null; engine lock prevents concurrent access.
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return std::ptr::null_mut();
+            }
+            let app = &*handle;
+            match app.engine.lock() {
+                Ok(mut engine) => {
+                    let notifications = engine.drain_pending_notifications();
+                    match serde_json::to_string(&notifications) {
+                        Ok(json) => to_c_string(&json),
+                        Err(_) => to_c_string("[]"),
+                    }
+                }
+                Err(_) => std::ptr::null_mut(),
+            }
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
+        }
+    }
+}

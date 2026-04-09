@@ -354,6 +354,23 @@ char *vauchi_app_device_link_peer_connected(struct VauchiApp *handle,
 char *vauchi_app_device_link_sync_complete(struct VauchiApp *handle);
 
 /**
+ * Drain pending OS notifications as a JSON array.
+ *
+ * Returns a JSON array of notification objects, e.g.:
+ * `[{"event_key":"...","category":"EmergencyAlert","title":"...","body":"...","contact_id":"..."}]`
+ *
+ * Returns `"[]"` if no notifications are pending.
+ * Returns null on error (null handle, lock poisoned).
+ *
+ * Frontends should call this after receiving the event callback.
+ * Each call clears the buffer — notifications are never returned twice.
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null.
+ */
+char *vauchi_app_drain_notifications(struct VauchiApp *handle);
+
+/**
  * Check if audio proximity verification is available on this platform.
  *
  * Returns 1 if cpal can enumerate at least one output and one input device,

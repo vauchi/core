@@ -747,7 +747,7 @@ mod tests {
     fn test_merge_pins_empty_target() {
         let pin_a = PinnedCertificate::new([0xAA; 32]);
         let mut target = vec![];
-        merge_pins(&mut target, &[pin_a.clone()]);
+        merge_pins(&mut target, std::slice::from_ref(&pin_a));
         assert_eq!(target.len(), 1, "source pins must be added to empty target");
         assert_eq!(target[0], pin_a);
     }

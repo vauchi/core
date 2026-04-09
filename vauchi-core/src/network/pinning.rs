@@ -57,7 +57,11 @@ impl PinnedCertificate {
 
     /// Creates a pin by hashing raw DER bytes directly (legacy, full-cert hash).
     ///
-    /// Prefer `from_cert_der` for SPKI pinning.
+    /// Prefer `from_cert_der` for SPKI pinning — full-cert hash breaks on
+    /// certificate renewal even when the key stays the same.
+    #[deprecated(
+        note = "Use from_cert_der for SPKI pinning. from_der hashes the full cert and breaks on renewal."
+    )]
     pub fn from_der(cert_der: &[u8]) -> Self {
         let hash = Sha256::digest(cert_der);
         let mut fingerprint = [0u8; 32];
@@ -103,13 +107,13 @@ fn extract_spki(cert_der: &[u8]) -> Option<&[u8]> {
 
     // Skip optional version [0] EXPLICIT
     if pos.first().copied() == Some(0xA0) {
-        let (_, rest) = skip_tlv(pos)?;
+        let (_, rest) = read_tlv(pos)?;
         pos = rest;
     }
 
     // Skip: serialNumber, signatureAlgorithm, issuer, validity, subject (5 fields)
     for _ in 0..5 {
-        let (_, rest) = skip_tlv(pos)?;
+        let (_, rest) = read_tlv(pos)?;
         pos = rest;
     }
 
@@ -125,11 +129,6 @@ fn enter_sequence(data: &[u8]) -> Option<(&[u8], &[u8])> {
     }
     let (content, rest) = read_tlv_content(&data[1..])?;
     Some((content, rest))
-}
-
-/// Skip one TLV element and return rest after it.
-fn skip_tlv(data: &[u8]) -> Option<(&[u8], &[u8])> {
-    read_tlv(data)
 }
 
 /// Read one complete TLV (tag + length + value) from data.
@@ -166,9 +165,17 @@ fn read_tlv_content(data: &[u8]) -> Option<(&[u8], &[u8])> {
             return None;
         }
         let len_data = data.get(1..1 + num_bytes)?;
+        // DER minimality: leading zero byte is forbidden in long form
+        if len_data[0] == 0x00 {
+            return None;
+        }
         let mut len: usize = 0;
         for &b in len_data {
             len = len.checked_shl(8)?.checked_add(b as usize)?;
+        }
+        // DER minimality: value < 0x80 must use short form
+        if len < 0x80 {
+            return None;
         }
         let offset = 1 + num_bytes;
         let content = data.get(offset..offset + len)?;
@@ -190,6 +197,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_from_der_legacy_hash() {
         let cert_der = b"fake DER-encoded certificate data";
         let pin = PinnedCertificate::from_der(cert_der);

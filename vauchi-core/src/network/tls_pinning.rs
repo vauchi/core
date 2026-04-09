@@ -91,21 +91,24 @@ impl ServerCertVerifier for PinningVerifier {
 
 /// Build a `rustls::ClientConfig` with SPKI pin verification.
 fn build_pinned_tls_config(pins: &[PinnedCertificate]) -> Result<rustls::ClientConfig, Error> {
-    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+    let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
 
     let root_store =
         rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 
-    let webpki_verifier = WebPkiServerVerifier::builder(Arc::new(root_store))
-        .build()
-        .map_err(|e| Error::General(format!("failed to build WebPKI verifier: {e}")))?;
+    let webpki_verifier =
+        WebPkiServerVerifier::builder_with_provider(Arc::new(root_store), provider.clone())
+            .build()
+            .map_err(|e| Error::General(format!("failed to build WebPKI verifier: {e}")))?;
 
     let pinning_verifier = PinningVerifier {
         inner: webpki_verifier,
         pins: pins.to_vec(),
     };
 
-    Ok(rustls::ClientConfig::builder()
+    Ok(rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|e| Error::General(format!("TLS protocol versions: {e}")))?
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(pinning_verifier))
         .with_no_client_auth())
@@ -132,7 +135,9 @@ impl<In: Transport> Connector<In> for PinningTlsConnector {
         chained: Option<In>,
     ) -> Result<Option<Self::Out>, ureq::Error> {
         let Some(transport) = chained else {
-            panic!("PinningTlsConnector requires a chained transport");
+            return Err(ureq::Error::Tls(
+                "PinningTlsConnector requires a chained transport",
+            ));
         };
 
         if !details.needs_tls() || transport.is_tls() {

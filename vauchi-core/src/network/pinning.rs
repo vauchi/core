@@ -213,6 +213,7 @@ mod tests {
         assert!(!verify_pin(b"anything", &[]));
     }
 
+    // @internal
     #[test]
     fn test_verify_pin_garbage_cert_returns_false() {
         let wrong_pin = PinnedCertificate::new([0xFF; 32]);

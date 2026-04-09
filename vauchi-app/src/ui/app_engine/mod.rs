@@ -25,14 +25,15 @@ use vauchi_core::version::{
     APP_COMPAT_VERSION, AppUpdateStatus, VersionPolicy, unix_secs_to_date_string,
 };
 
+use crate::activity_log_writer::ActivityLogWriter;
+use crate::notification_emitter::NotificationEmitter;
+use crate::notification_types::{ActivityLogEntry, NotificationPreferences, PendingNotification};
+
 use super::action::{ActionResult, UserAction};
 use super::component::{Component, TextStyle};
 use super::device_linking::DeviceLinkingEngine;
 use super::engine::WorkflowEngine;
 use super::screen::{ActionStyle, ScreenAction, ScreenModel};
-use crate::activity_log_writer::ActivityLogWriter;
-use crate::notification_emitter::NotificationEmitter;
-use crate::notification_types::{ActivityLogEntry, NotificationPreferences, PendingNotification};
 
 /// Shared action ID for the update link button/banner.
 const ACTION_OPEN_UPDATE_LINK: &str = "open_update_link";
@@ -290,6 +291,31 @@ impl AppEngine {
         self.preview_as_contact = Some(contact_id);
         self.invalidate_screen(&AppScreen::MyInfo);
         self.navigate_to(AppScreen::MyInfo)
+    }
+
+    /// Drain pending OS notifications.
+    ///
+    /// Processes buffered events through [`ActivityLogWriter`] and
+    /// [`NotificationEmitter`], returning notifications for the frontend
+    /// to display. Each call clears the buffer, so notifications are
+    /// never returned twice.
+    ///
+    /// Frontends should call this after receiving an event callback.
+    pub fn drain_pending_notifications(&mut self) -> Vec<PendingNotification> {
+        let new_entries = self.drain_events_to_log();
+        if new_entries.is_empty() {
+            return Vec::new();
+        }
+
+        let prefs = NotificationPreferences::default();
+        NotificationEmitter::evaluate(&new_entries, &prefs, |contact_id| {
+            self.vauchi
+                .get_contact(contact_id)
+                .ok()
+                .flatten()
+                .map(|c| c.display_name().to_string())
+                .unwrap_or_else(|| format!("Contact {}", &contact_id[..8.min(contact_id.len())]))
+        })
     }
 
     pub fn current_app_screen(&self) -> &AppScreen {
@@ -689,22 +715,29 @@ impl AppEngine {
 
     /// Drain the event receiver and write all events to the activity log.
     ///
+    /// Returns newly inserted `(event_key, ActivityLogEntry)` pairs.
     /// Called before operations that read from the activity log (notifications)
     /// or when data mutations may have occurred (user actions).
-    fn drain_events_to_log(&mut self) {
+    fn drain_events_to_log(&mut self) -> Vec<(String, ActivityLogEntry)> {
         let mut events = Vec::new();
         while let Ok(event) = self.event_rx.try_recv() {
             events.push(event);
         }
 
-        if !events.is_empty() {
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
+        if events.is_empty() {
+            return Vec::new();
+        }
 
-            if let Err(e) = ActivityLogWriter::write(self.vauchi.storage(), &events, now) {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        match ActivityLogWriter::write(self.vauchi.storage(), &events, now) {
+            Ok(entries) => entries,
+            Err(e) => {
                 log::error!("drain_events_to_log: ActivityLogWriter::write failed: {e}");
+                Vec::new()
             }
         }
     }

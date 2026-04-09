@@ -184,6 +184,42 @@ impl HttpTransport {
         Ok(body)
     }
 
+    /// Fetch the relay's certificate pin configuration.
+    ///
+    /// Returns a list of SPKI SHA-256 fingerprints the relay currently
+    /// advertises. Clients merge these with bundled pins to support
+    /// key rotation without app updates.
+    ///
+    /// Uses direct HTTP (like OHTTP key fetch) — the connection itself
+    /// is already pinned, so the response is trusted.
+    pub fn fetch_pin_config(&self) -> Result<Vec<PinnedCertificate>, NetworkError> {
+        let agent = self.agent.as_ref().map_err(|e| e.clone())?;
+        let url = format!("{}/v2/pin-config", self.config.relay_url);
+        let resp = agent
+            .get(&url)
+            .header("X-App-Compat-Version", &APP_COMPAT_VERSION.to_string())
+            .call()
+            .map_err(Self::map_ureq_error)?;
+        self.check_response_status(&resp)?;
+        let body = resp
+            .into_body()
+            .read_to_vec()
+            .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))?;
+        if body.len() % 32 != 0 {
+            return Err(NetworkError::InvalidMessage(
+                "pin-config response must be a multiple of 32 bytes".into(),
+            ));
+        }
+        Ok(body
+            .chunks_exact(32)
+            .map(|chunk| {
+                let mut fingerprint = [0u8; 32];
+                fingerprint.copy_from_slice(chunk);
+                PinnedCertificate::new(fingerprint)
+            })
+            .collect())
+    }
+
     /// Checks if the relay is reachable.
     pub fn health_check(&self) -> Result<(), NetworkError> {
         let url = format!("{}/v2/health", self.config.relay_url);

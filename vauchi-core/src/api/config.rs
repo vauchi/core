@@ -155,6 +155,13 @@ pub struct RelayConfig {
     /// Pinned relay certificates for TLS certificate pinning.
     /// When non-empty, verifies the server's leaf certificate matches a pin.
     pub pinned_certs: Vec<PinnedCertificate>,
+
+    /// TTL for cached pin configurations in seconds (default 86400 = 24h).
+    ///
+    /// Controls how long relay-served pin updates are trusted before
+    /// the client re-fetches. Shorter = more frequent checks, more
+    /// network traffic. Longer = more risk of stale pins after rotation.
+    pub pin_ttl_secs: u64,
 }
 
 /// SPKI SHA-256 pin for relay.vauchi.app leaf certificate.
@@ -190,6 +197,7 @@ impl Default for RelayConfig {
             proxy: ProxyConfig::None,
             relay_noise_pubkey: None,
             pinned_certs: vec![PinnedCertificate::new(RELAY_PROD_SPKI_PIN)],
+            pin_ttl_secs: 86_400, // 24 hours
         }
     }
 }

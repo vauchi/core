@@ -30,8 +30,8 @@ use crate::contact::Contact;
 use crate::network::mailbox_token::{batch_register_tokens, current_day_epoch};
 use crate::network::{
     AckStatus, Acknowledgment, HttpTransport, HttpTransportAdapter, HttpTransportConfig,
-    MessagePayload, OhttpClient, RegisterMailbox, RelayClient, Transport, TransportConfig,
-    create_envelope,
+    MessagePayload, OhttpClient, PinnedCertificate, RegisterMailbox, RelayClient, Transport,
+    TransportConfig, create_envelope,
 };
 use crate::sync::card_update::process_single_card_update;
 
@@ -503,6 +503,51 @@ impl Vauchi {
         Ok(key_bytes)
     }
 
+    /// Resolve the effective certificate pin set for the relay.
+    ///
+    /// Merges bundled pins (from `RelayConfig`) with cached pins (from
+    /// storage), deduplicating by fingerprint. If the cache is stale
+    /// (beyond `pin_ttl_secs`), attempts a refresh from the relay.
+    ///
+    /// Returns at minimum the bundled pins — cache failures are non-fatal.
+    pub fn resolve_pins(&self) -> Vec<PinnedCertificate> {
+        let relay_url = self.http_relay_url();
+        let mut pins = self.config.relay.pinned_certs.clone();
+
+        // Try loading cached pins (best-effort — cache miss is fine)
+        if let Ok(Some((cached_pins, fetched_at))) = self.storage.load_pin_cache(&relay_url) {
+            if self.is_pin_cache_fresh(fetched_at) {
+                merge_pins(&mut pins, &cached_pins);
+                return pins;
+            }
+        }
+
+        // Cache miss or stale — try refreshing (non-fatal on failure)
+        if let Ok(refreshed) = self.refresh_pin_cache(&relay_url) {
+            merge_pins(&mut pins, &refreshed);
+        }
+
+        pins
+    }
+
+    /// Check whether cached pins are still within their TTL.
+    fn is_pin_cache_fresh(&self, fetched_at_epoch_secs: u64) -> bool {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let age = now.saturating_sub(fetched_at_epoch_secs);
+        age < self.config.relay.pin_ttl_secs
+    }
+
+    /// Fetch fresh pins from the relay and cache them in storage.
+    fn refresh_pin_cache(&self, relay_url: &str) -> VauchiResult<Vec<PinnedCertificate>> {
+        let transport = self.create_bare_transport();
+        let pins = transport.fetch_pin_config().map_err(VauchiError::Network)?;
+        self.storage.save_pin_cache(relay_url, &pins)?;
+        Ok(pins)
+    }
+
     /// Create a bare `HttpTransport` (no OHTTP, direct allowed) for
     /// bootstrap operations: fetching the OHTTP key and health checks.
     fn create_bare_transport(&self) -> HttpTransport {
@@ -533,6 +578,15 @@ fn is_ohttp_key_error(err: &VauchiError) -> bool {
         msg.contains("400") || msg.contains("ohttp")
     } else {
         false
+    }
+}
+
+/// Merge `source` pins into `target`, skipping duplicates.
+fn merge_pins(target: &mut Vec<PinnedCertificate>, source: &[PinnedCertificate]) {
+    for pin in source {
+        if !target.contains(pin) {
+            target.push(pin.clone());
+        }
     }
 }
 
@@ -658,6 +712,75 @@ mod tests {
             v.http_relay_url(),
             "http://relay.local",
             "http:// must pass through unchanged"
+        );
+    }
+
+    // =========================================================================
+    // W-5: merge_pins deduplication
+    // =========================================================================
+
+    // @scenario: pinning :: merge_pins deduplicates
+    #[test]
+    fn test_merge_pins_deduplicates() {
+        let pin_a = PinnedCertificate::new([0xAA; 32]);
+        let pin_b = PinnedCertificate::new([0xBB; 32]);
+
+        let mut target = vec![pin_a.clone()];
+        merge_pins(&mut target, &[pin_a.clone(), pin_b.clone()]);
+
+        assert_eq!(target.len(), 2, "duplicate pin_a must not be added twice");
+        assert_eq!(target[0], pin_a);
+        assert_eq!(target[1], pin_b);
+    }
+
+    // @scenario: pinning :: merge_pins handles empty source
+    #[test]
+    fn test_merge_pins_empty_source() {
+        let pin_a = PinnedCertificate::new([0xAA; 32]);
+        let mut target = vec![pin_a.clone()];
+        merge_pins(&mut target, &[]);
+        assert_eq!(target.len(), 1, "empty source must not change target");
+    }
+
+    // @scenario: pinning :: merge_pins handles empty target
+    #[test]
+    fn test_merge_pins_empty_target() {
+        let pin_a = PinnedCertificate::new([0xAA; 32]);
+        let mut target = vec![];
+        merge_pins(&mut target, &[pin_a.clone()]);
+        assert_eq!(target.len(), 1, "source pins must be added to empty target");
+        assert_eq!(target[0], pin_a);
+    }
+
+    // =========================================================================
+    // W-6: is_pin_cache_fresh TTL logic
+    // =========================================================================
+
+    // @scenario: pinning :: fresh cache within TTL
+    #[test]
+    fn test_is_pin_cache_fresh_within_ttl() {
+        let (v, _dir) = vauchi_with_server_url("wss://relay.example.com");
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        assert!(
+            v.is_pin_cache_fresh(now - 100),
+            "cache fetched 100s ago must be fresh (TTL=86400)"
+        );
+    }
+
+    // @scenario: pinning :: stale cache beyond TTL
+    #[test]
+    fn test_is_pin_cache_stale_beyond_ttl() {
+        let (v, _dir) = vauchi_with_server_url("wss://relay.example.com");
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        assert!(
+            !v.is_pin_cache_fresh(now - 90_000),
+            "cache fetched 90000s ago must be stale (TTL=86400)"
         );
     }
 }

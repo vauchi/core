@@ -712,6 +712,7 @@ fn more_engine_routes_to_help() {
     assert_eq!(engine.current_app_screen(), &AppScreen::Help);
 }
 
+// @internal
 #[test]
 fn more_engine_routes_to_activity_log() {
     let mut vauchi = Vauchi::in_memory().unwrap();

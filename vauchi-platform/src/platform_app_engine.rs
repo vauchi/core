@@ -29,7 +29,6 @@ use crate::error::MobileError;
 use crate::json_helpers::{
     action_result_to_json, app_screen_from_json, screen_to_json, user_action_from_json,
 };
-use crate::types::{MobileNotificationCategory, MobilePendingNotification};
 
 // ── PlatformEventListener ──────────────────────────────────────────
 

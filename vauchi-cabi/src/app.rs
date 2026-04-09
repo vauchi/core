@@ -251,9 +251,6 @@ pub unsafe extern "C" fn vauchi_app_poll_notifications(app: *mut VauchiApp) -> *
 
         let notifications = engine.poll_notifications();
 
-        // Also check if handle_action result should be merged with poll_notifications
-        // but for now, we just return the polled notifications.
-
         if notifications.is_empty() {
             return std::ptr::null_mut();
         }

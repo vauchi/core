@@ -469,6 +469,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "activity_log",
             action: MigrationAction::Sql(MIGRATION_V41_ACTIVITY_LOG),
         },
+        Migration {
+            version: 42,
+            name: "pin_cache",
+            action: MigrationAction::Sql(MIGRATION_V42_PIN_CACHE),
+        },
     ]
 }
 
@@ -729,6 +734,18 @@ const MIGRATION_V41_ACTIVITY_LOG: &str = "
         contact_id  TEXT,
         payload     TEXT NOT NULL,
         created_at  INTEGER NOT NULL
+    );
+";
+
+/// Migration v42: Certificate pin cache for pin rotation.
+///
+/// Stores relay-served pin sets with TTL, enabling pin updates
+/// without app releases. Mirrors the `ohttp_key_cache` pattern.
+const MIGRATION_V42_PIN_CACHE: &str = "
+    CREATE TABLE IF NOT EXISTS pin_cache (
+        relay_url  TEXT PRIMARY KEY,
+        pin_bytes  BLOB NOT NULL,
+        fetched_at INTEGER NOT NULL
     );
 ";
 

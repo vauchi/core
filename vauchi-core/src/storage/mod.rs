@@ -121,6 +121,7 @@ mod exchange_state;
 pub mod local_keys;
 pub mod migration;
 mod ohttp_cache;
+mod pin_cache;
 pub mod secure;
 
 pub use activity_log::ActivityLogRow;

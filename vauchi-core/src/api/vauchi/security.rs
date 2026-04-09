@@ -157,7 +157,11 @@ impl Vauchi {
     /// `now` is the caller's current timestamp so the query window is
     /// consistent with the caller's watermark bookkeeping (no redundant
     /// clock reads).
-    pub fn activity_log_poll(&self, since_secs: u64, now: u64) -> VauchiResult<Vec<ActivityLogRow>> {
+    pub fn activity_log_poll(
+        &self,
+        since_secs: u64,
+        now: u64,
+    ) -> VauchiResult<Vec<ActivityLogRow>> {
         let max_age = now.saturating_sub(since_secs);
         Ok(self.storage.activity_log_query_recent(now, max_age)?)
     }

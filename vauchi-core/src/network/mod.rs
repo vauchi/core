@@ -91,6 +91,8 @@ pub mod ohttp_client;
 pub mod pinning;
 pub mod relay_url;
 pub mod revocation;
+#[cfg(feature = "network-rustls")]
+pub mod tls_pinning;
 
 // Error types
 pub use error::NetworkError;

@@ -15,6 +15,7 @@ fn test_transport() -> HttpTransport {
         timeout_ms: 100,
         proxy: ProxyConfig::None,
         allow_direct: true,
+        pinned_certs: vec![],
     })
 }
 

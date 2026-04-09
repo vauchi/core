@@ -384,6 +384,7 @@ impl Vauchi {
             timeout_ms: self.config.relay.connect_timeout_ms,
             proxy: self.config.relay.proxy.clone(),
             allow_direct: true,
+            pinned_certs: vec![],
         })
     }
 }

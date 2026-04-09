@@ -271,6 +271,7 @@ mod tests {
             timeout_ms: 1000,
             proxy: super::super::transport::ProxyConfig::None,
             allow_direct,
+            pinned_certs: vec![],
         };
         HttpTransportAdapter::new(HttpTransport::new(config))
     }

@@ -414,6 +414,7 @@ impl Vauchi {
             timeout_ms: self.config.relay.connect_timeout_ms,
             proxy: self.config.relay.proxy.clone(),
             allow_direct: self.config.ohttp.allow_direct,
+            pinned_certs: vec![],
         });
         transport.set_ohttp(adapter_ohttp);
         Ok(HttpTransportAdapter::new(transport))
@@ -508,6 +509,7 @@ impl Vauchi {
             timeout_ms: self.config.relay.connect_timeout_ms,
             proxy: self.config.relay.proxy.clone(),
             allow_direct: true,
+            pinned_certs: vec![],
         })
     }
 

@@ -21,6 +21,7 @@ fn test_fetch_ohttp_key_builds_correct_url() {
         timeout_ms: 1000,
         proxy: ProxyConfig::None,
         allow_direct: true,
+        pinned_certs: vec![],
     };
     let transport = HttpTransport::new(config);
     // Will fail with connection refused — but proves
@@ -45,6 +46,7 @@ fn test_fetch_ohttp_key_empty_response_is_error() {
         timeout_ms: 100,
         proxy: ProxyConfig::None,
         allow_direct: true,
+        pinned_certs: vec![],
     };
     let transport = HttpTransport::new(config);
     assert!(transport.fetch_ohttp_key().is_err());

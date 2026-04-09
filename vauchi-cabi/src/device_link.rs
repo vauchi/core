@@ -291,6 +291,7 @@ fn create_transport(relay_url: &str) -> HttpTransport {
         timeout_ms: 10_000,
         proxy: ProxyConfig::None,
         allow_direct: true,
+        pinned_certs: vec![],
     })
 }
 

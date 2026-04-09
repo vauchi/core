@@ -35,6 +35,7 @@ fn response_error(action: &str, error_msg: &str) -> NetworkError {
     }
 }
 use super::ohttp_client::OhttpClient;
+use super::pinning::PinnedCertificate;
 use super::transport::ProxyConfig;
 
 /// Configuration for the HTTP transport.
@@ -53,6 +54,12 @@ pub struct HttpTransportConfig {
     /// configured. This prevents accidental IP leaks. Set to `true` only for
     /// testing or when the user explicitly opts in.
     pub allow_direct: bool,
+    /// SPKI SHA-256 pins for the TLS leaf certificate.
+    ///
+    /// When non-empty, every TLS connection verifies the server's SPKI
+    /// against these pins after standard CA validation. Fail-closed on
+    /// mismatch. Empty means no pinning (CA-only validation).
+    pub pinned_certs: Vec<PinnedCertificate>,
 }
 
 impl Default for HttpTransportConfig {
@@ -62,6 +69,7 @@ impl Default for HttpTransportConfig {
             timeout_ms: 30_000,
             proxy: ProxyConfig::None,
             allow_direct: false,
+            pinned_certs: Vec::new(),
         }
     }
 }
@@ -551,12 +559,21 @@ impl HttpTransport {
     }
 
     /// Build an agent from config. Called once at construction.
+    ///
+    /// When `pinned_certs` is non-empty, uses a custom rustls `ServerCertVerifier`
+    /// that does WebPKI + SPKI pin verification (fail-closed on mismatch).
     fn build_agent_from_config(config: &HttpTransportConfig) -> Result<ureq::Agent, NetworkError> {
         let timeout = Duration::from_millis(config.timeout_ms);
+
+        if !config.pinned_certs.is_empty() {
+            // Use pinned agent with custom TLS verifier
+            let proxy = Self::build_proxy_from_config(config)?;
+            return super::tls_pinning::build_pinned_agent(&config.pinned_certs, timeout, proxy);
+        }
+
+        // Standard agent (no pinning)
         let mut builder = ureq::Agent::config_builder()
             .timeout_global(Some(timeout))
-            // Disable automatic 4xx/5xx → Error conversion so we can read
-            // response headers (version policy) before inspecting the status.
             .http_status_as_error(false);
 
         if let Some(proxy) = Self::build_proxy_from_config(config)? {
@@ -628,6 +645,7 @@ mod tests {
             timeout_ms: 5000,
             proxy: ProxyConfig::None,
             allow_direct: true,
+            pinned_certs: vec![],
         });
         assert_eq!(transport.relay_url(), "http://localhost:8080");
         assert_eq!(transport.proxy(), &ProxyConfig::None);
@@ -657,6 +675,7 @@ mod tests {
             timeout_ms: 5000,
             proxy: ProxyConfig::socks5("127.0.0.1", 1080),
             allow_direct: false,
+            pinned_certs: vec![],
         });
         assert!(matches!(transport.proxy(), ProxyConfig::Socks5 { .. }));
     }
@@ -669,6 +688,7 @@ mod tests {
             timeout_ms: 1000,
             proxy: ProxyConfig::None,
             allow_direct: false,
+            pinned_certs: vec![],
         });
         let result = transport.health_check();
         assert!(result.is_err());
@@ -681,6 +701,7 @@ mod tests {
             timeout_ms: 1000,
             proxy: ProxyConfig::None,
             allow_direct: false,
+            pinned_certs: vec![],
         });
         let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
         assert!(result.is_err());
@@ -698,6 +719,7 @@ mod tests {
             timeout_ms: 1000,
             proxy: ProxyConfig::None,
             allow_direct: true,
+            pinned_certs: vec![],
         });
         let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
         assert!(result.is_err());
@@ -730,6 +752,7 @@ mod tests {
             timeout_ms: 1000,
             proxy: ProxyConfig::None,
             allow_direct: false,
+            pinned_certs: vec![],
         });
         assert!(!transport.has_ohttp());
         transport.set_ohttp(ohttp_client);
@@ -757,6 +780,7 @@ mod tests {
             timeout_ms: 1000,
             proxy: ProxyConfig::None,
             allow_direct: false,
+            pinned_certs: vec![],
         });
         transport.set_ohttp(ohttp_client);
 

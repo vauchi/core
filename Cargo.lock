@@ -4580,6 +4580,7 @@ name = "vauchi-app"
 version = "0.18.15"
 dependencies = [
  "hex",
+ "log",
  "proptest",
  "reqwest",
  "schemars 0.8.22",

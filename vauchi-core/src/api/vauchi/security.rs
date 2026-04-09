@@ -152,14 +152,12 @@ impl Vauchi {
         Ok(self.storage.load_password_config()?.is_some())
     }
 
-    /// Returns the activity log entries newer than the given timestamp.
-    /// Used for OS notification polling.
-    pub fn activity_log_poll(&self, since_secs: u64) -> VauchiResult<Vec<ActivityLogRow>> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-
+    /// Returns the activity log entries newer than `since_secs`.
+    ///
+    /// `now` is the caller's current timestamp so the query window is
+    /// consistent with the caller's watermark bookkeeping (no redundant
+    /// clock reads).
+    pub fn activity_log_poll(&self, since_secs: u64, now: u64) -> VauchiResult<Vec<ActivityLogRow>> {
         let max_age = now.saturating_sub(since_secs);
         Ok(self.storage.activity_log_query_recent(now, max_age)?)
     }

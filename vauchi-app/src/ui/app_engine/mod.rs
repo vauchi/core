@@ -583,34 +583,38 @@ impl AppEngine {
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
-        // Poll core activity log for new entries since last poll
-        let entries = match self.vauchi.activity_log_poll(self.last_poll_time) {
-            Ok(rows) => rows
-                .into_iter()
-                .filter_map(|row| {
-                    let entry = serde_json::from_str::<ActivityLogEntry>(&row.payload).ok()?;
-                    Some((row.event_key, entry))
-                })
-                .collect::<Vec<_>>(),
-            Err(_) => return Vec::new(),
+        // Fetch raw rows from the activity log since the last poll.
+        let rows = match self.vauchi.activity_log_poll(self.last_poll_time, now) {
+            Ok(rows) => rows,
+            Err(e) => {
+                log::warn!("poll_notifications: activity_log_poll failed: {e}");
+                return Vec::new();
+            }
         };
+
+        if rows.is_empty() {
+            return Vec::new();
+        }
+
+        // Advance watermark based on rows *fetched*, not rows that survive
+        // parsing/filtering. Unparsable or filtered rows must not cause
+        // unbounded re-processing on every subsequent poll.
+        self.last_poll_time = now;
+
+        let entries: Vec<_> = rows
+            .into_iter()
+            .filter_map(|row| {
+                let entry = serde_json::from_str::<ActivityLogEntry>(&row.payload).ok()?;
+                Some((row.event_key, entry))
+            })
+            .collect();
 
         if entries.is_empty() {
             return Vec::new();
         }
 
-        // Get notification preferences
-        let prefs = match self.vauchi.load_emergency_config() {
-            Ok(Some(_)) => {
-                // For MVP, we use the hardcoded/default preferences
-                // Future: load from storage
-                NotificationPreferences {
-                    contact_added_enabled: self.vauchi.config().contact_added_notifications,
-                }
-            }
-            _ => NotificationPreferences {
-                contact_added_enabled: self.vauchi.config().contact_added_notifications,
-            },
+        let prefs = NotificationPreferences {
+            contact_added_enabled: self.vauchi.config().contact_added_notifications,
         };
 
         // Resolve contact names for body text
@@ -624,13 +628,7 @@ impl AppEngine {
                 .unwrap_or_else(|| "Unknown contact".to_string())
         };
 
-        let notifications = NotificationEmitter::evaluate(&entries, &prefs, name_resolver);
-
-        if !notifications.is_empty() {
-            self.last_poll_time = now;
-        }
-
-        notifications
+        NotificationEmitter::evaluate(&entries, &prefs, name_resolver)
     }
 
     /// Convert `ValidationError` into `UpdateScreen` with the error injected

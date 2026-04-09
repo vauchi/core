@@ -164,6 +164,90 @@ fn available_screens_returns_nav_bar_items() {
 }
 
 // ============================================================================
+// Notification boundary (CC-05)
+// ============================================================================
+
+// @scenario: notification.feature - Poll notifications returns empty before events
+// @internal
+#[test]
+fn poll_notifications_returns_empty_before_events() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    let notifications = engine.poll_notifications().expect("poll_notifications");
+    assert!(
+        notifications.is_empty(),
+        "poll should return empty when no events dispatched"
+    );
+}
+
+// @scenario: notification.feature - Drain notifications returns empty before events
+// @internal
+#[test]
+fn drain_pending_notifications_returns_empty_before_events() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    let notifications = engine
+        .drain_pending_notifications()
+        .expect("drain_pending_notifications");
+    assert!(
+        notifications.is_empty(),
+        "drain should return empty when no events dispatched"
+    );
+}
+
+// @scenario: notification.feature - Card update produces no OS notification
+// @internal
+#[test]
+fn poll_notifications_after_card_update_returns_no_notification() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+
+    // Add a field to own card — dispatches OwnCardUpdated through the
+    // event pipeline. OwnCardUpdated is activity-log-only, so poll
+    // should return zero notifications while still processing the event.
+    engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "add_field"}}"#.into())
+        .expect("open add field dialog");
+    engine
+        .handle_action_json(
+            r#"{"ListItemSelected": {"component_id": "entry_types", "item_id": "email"}}"#.into(),
+        )
+        .expect("select email type");
+    engine
+        .handle_action_json(
+            r#"{"TextChanged": {"component_id": "field_value", "value": "test@example.com"}}"#
+                .into(),
+        )
+        .expect("enter value");
+    engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "submit"}}"#.into())
+        .expect("submit field");
+
+    let notifications = engine.poll_notifications().expect("poll_notifications");
+    assert!(
+        notifications.is_empty(),
+        "OwnCardUpdated should not produce a notification, got: {notifications:?}"
+    );
+}
+
+// @scenario: notification.feature - Poll and drain are independently callable
+// @internal
+#[test]
+fn poll_and_drain_are_independently_callable() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+
+    // Both methods should work in sequence without interfering
+    let poll_result = engine.poll_notifications().expect("poll");
+    let drain_result = engine.drain_pending_notifications().expect("drain");
+    let poll_again = engine.poll_notifications().expect("poll again");
+
+    assert!(poll_result.is_empty());
+    assert!(drain_result.is_empty());
+    assert!(poll_again.is_empty());
+}
+
+// ============================================================================
 // Error handling
 // ============================================================================
 

@@ -568,14 +568,7 @@ impl WorkflowEngine for AppEngine {
         }
 
         let result = self.engine.handle_action(action);
-        let mut result = self.route_result(result);
-
-        // Poll for notifications after every action (best effort for UI-triggered changes)
-        let notifications = self.poll_notifications();
-        if !notifications.is_empty() {
-            result = ActionResult::Notify { notifications };
-        }
-
+        let result = self.route_result(result);
         let result = self.resolve_validation_error(result);
         self.apply_update_overlay_to_result(result)
     }

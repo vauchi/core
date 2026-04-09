@@ -170,16 +170,7 @@ impl Default for RelayConfig {
             max_retries: 5,
             proxy: ProxyConfig::None,
             relay_noise_pubkey: None,
-            pinned_certs: vec![
-                // relay.vauchi.app (Production) - SHA-256 fingerprint
-                // Valid until 2027-04-06 (Let's Encrypt R11)
-                // Placeholder: must be replaced with the actual relay fingerprint
-                PinnedCertificate::new([
-                    0x2A, 0x5D, 0x4B, 0xC3, 0x82, 0xDF, 0x48, 0x01, 0x92, 0x24, 0xBD, 0x1A, 0x45,
-                    0x93, 0x82, 0x77, 0x98, 0x76, 0x54, 0x32, 0x10, 0xFE, 0xDC, 0xBA, 0x89, 0xAB,
-                    0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67,
-                ]),
-            ],
+            pinned_certs: Vec::new(),
         }
     }
 }

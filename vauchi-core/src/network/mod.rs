@@ -79,15 +79,7 @@ pub mod multi_relay;
 #[cfg(not(feature = "testing"))]
 mod multi_relay;
 
-#[cfg(feature = "testing")]
-pub mod websocket;
-#[cfg(not(feature = "testing"))]
-mod websocket;
-
-#[cfg(feature = "testing")]
-pub mod noise;
-#[cfg(not(feature = "testing"))]
-mod noise;
+// websocket and noise modules removed — relay uses HTTP v2 transport
 
 pub mod forwarding;
 #[cfg(feature = "network-http")]
@@ -123,9 +115,6 @@ pub use transport::{ConnectionState, ProxyConfig, Transport, TransportConfig, Tr
 // Mock transport for testing
 pub use mock::MockTransport;
 
-// WebSocket transport for production
-pub use websocket::WebSocketTransport;
-
 // Connection management
 pub use connection::ConnectionManager;
 
@@ -143,9 +132,6 @@ pub use anonymous::{
     AnonymousSender, SenderIndex, compute_anonymous_id, current_epoch, resolve_sender,
     resolve_sender_id,
 };
-
-// Noise NK inner transport encryption
-pub use noise::{NoiseInitiator, NoiseTransport as NoiseSession, parse_relay_noise_pubkey};
 
 // Certificate pinning
 pub use pinning::{PinnedCertificate, verify_pin};

@@ -10,7 +10,7 @@
 
 mod action;
 mod activity_log;
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 mod app_engine;
 mod backup_recovery;
 mod component;
@@ -48,11 +48,11 @@ mod recovery_status;
 mod screen;
 mod settings;
 mod support;
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 mod sync_status;
 pub use action::{ActionResult, UserAction};
 pub use activity_log::{ActivityLogEngine, ActivityLogItem};
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 pub use app_engine::{AppEngine, AppScreen};
 pub use backup_recovery::{BackupMode, BackupRecoveryEngine};
 pub use component::{
@@ -92,7 +92,7 @@ pub use screen::{
 };
 pub use settings::{SettingsConfig, SettingsEngine};
 pub use support::SupportEngine;
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 pub use sync_status::SyncStatusEngine;
 
 /// Map a [`VauchiEvent`] to the screen IDs it invalidates.
@@ -106,7 +106,7 @@ pub use sync_status::SyncStatusEngine;
 /// `VauchiEvent` is `#[non_exhaustive]` — unknown future variants return
 /// an empty slice. When adding a new `VauchiEvent` variant, update this
 /// function to include the relevant screen IDs.
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 pub fn affected_screens(event: &vauchi_core::api::VauchiEvent) -> Vec<&'static str> {
     use vauchi_core::api::VauchiEvent;
 

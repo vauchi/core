@@ -59,21 +59,21 @@ pub use recovery::{
     RecoveryVoucher, VerificationResult,
 };
 
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 pub mod network;
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 pub use network::{
     ConnectionState, EmergencyAlert, GeoLocation, MessageEnvelope, MessageType, MockTransport,
-    NetworkError, RelayClient, RelayClientConfig, Transport, WebSocketTransport, classify_message,
+    NetworkError, RelayClient, RelayClientConfig, Transport, classify_message,
 };
 #[cfg(feature = "storage")]
 pub mod sync;
 #[cfg(feature = "storage")]
 pub use sync::{CardDelta, DeltaError, FieldChange, SyncError, SyncManager, SyncState};
 
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 pub mod api;
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 pub use api::{
     AppPasswordConfig, AuthMode, AuthResult, BroadcastResult, ConsentStatus, DuressAlert,
     DuressAlertType, EmergencyWipeStatus, EventOrigin, HandlerId, RecoveryReadiness, SetupProgress,

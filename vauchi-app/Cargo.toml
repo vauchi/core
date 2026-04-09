@@ -33,7 +33,6 @@ tokio = { version = "1.0", features = ["rt"], optional = true }
 default = ["storage", "network-rustls", "content-updates"]
 storage = ["vauchi-core/storage"]
 content-updates = ["reqwest", "tokio"]
-network-native-tls = ["vauchi-core/network-native-tls", "storage"]
 network-rustls = ["vauchi-core/network-rustls", "storage"]
 # JSON Schema generation (dev tooling, forwarded from vauchi-core)
 schema-gen = ["schemars", "vauchi-core/schema-gen"]

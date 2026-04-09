@@ -28,7 +28,7 @@ use super::ExchangeError;
 use super::x3dh::X3DHKeyPair;
 use crate::crypto::{PublicKey, Signature};
 use crate::identity::Identity;
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 use crate::network::relay_url::validate_relay_url;
 use crate::text::normalize_text;
 
@@ -416,7 +416,7 @@ impl ExchangeQR {
 
         // Validate relay URL safety (SSRF prevention: reject private hosts,
         // insecure schemes, and malformed URLs from untrusted QR payloads)
-        #[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+        #[cfg(feature = "network-rustls")]
         if let Some(ref url) = qr.relay_url {
             validate_relay_url(url).map_err(|_| ExchangeError::InvalidQRFormat)?;
         }

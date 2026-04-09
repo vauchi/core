@@ -17,9 +17,8 @@ description = "Core library for Vauchi - privacy-focused contact card exchange"
 [features]
 default = ["network", "network-http", "storage"]
 storage = ["rusqlite"]
-network = ["network-native-tls", "storage"]
-network-native-tls = ["tungstenite", "tungstenite/handshake", "tungstenite/native-tls", "native-tls", "snow"]
-network-rustls = ["tungstenite", "tungstenite/handshake", "tungstenite/rustls-tls-native-roots", "rustls", "webpki-roots", "snow", "storage"]
+network = ["network-rustls", "storage"]
+network-rustls = ["rustls", "webpki-roots", "storage"]
 network-http = ["ureq", "ohttp"]
 secure-storage = ["keyring"]
 # Platform-specific keyring backends (consumers pick the right one):
@@ -115,12 +114,7 @@ rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 # UUID generation for IDs
 uuid = { version = "1.0", features = ["v4"] }
 
-# Noise protocol for inner transport encryption (defense-in-depth inside TLS)
-snow = { version = "0.9", optional = true }
-
-# WebSocket transport (optional, not needed for mobile)
-tungstenite = { version = "0.24", default-features = false, optional = true }
-native-tls = { version = "0.2", optional = true }
+# (snow, tungstenite, native-tls removed — WebSocket transport replaced by HTTP v2)
 
 # TLS for rustls feature (aws-lc-rs backend - works on Android/iOS)
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std", "tls12"], optional = true }

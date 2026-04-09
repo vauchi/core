@@ -41,7 +41,7 @@ fn make_detail_engine() -> ContactDetailEngine {
 ///
 /// Verifies that a saved personal note is surfaced as an editable text
 /// component on the ContactDetail screen when it is loaded.
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 #[test]
 fn contact_detail_shows_personal_note() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -99,7 +99,7 @@ fn contact_detail_shows_personal_note() {
 }
 
 /// @scenario: contacts_management :: ContactDetail shows empty note when none saved
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 #[test]
 fn contact_detail_shows_empty_note_when_no_note_saved() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -135,7 +135,7 @@ fn contact_detail_shows_empty_note_when_no_note_saved() {
 }
 
 /// @scenario: contacts_management :: Edit personal note persists via AppEngine
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 #[test]
 fn contact_detail_text_changed_saves_personal_note() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -190,7 +190,7 @@ fn contact_detail_text_changed_saves_personal_note() {
 ///
 /// Verifies that a saved field note is surfaced as an editable text
 /// component (id `field_note:{field_id}`) on the ContactDetail screen.
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 #[test]
 fn contact_detail_shows_field_notes() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -258,7 +258,7 @@ fn contact_detail_shows_field_notes() {
 }
 
 /// @scenario: contacts_management :: ContactDetail shows empty field note when none saved
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 #[test]
 fn contact_detail_shows_empty_field_note_when_none_saved() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -299,7 +299,7 @@ fn contact_detail_shows_empty_field_note_when_none_saved() {
 }
 
 /// @scenario: contacts_management :: Editing a field note via TextChanged persists it
-#[cfg(any(feature = "network-native-tls", feature = "network-rustls"))]
+#[cfg(feature = "network-rustls")]
 #[test]
 fn contact_detail_text_changed_saves_field_note() {
     let mut vauchi = Vauchi::in_memory().unwrap();

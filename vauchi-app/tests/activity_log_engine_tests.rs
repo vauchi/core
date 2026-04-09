@@ -119,3 +119,55 @@ fn list_item_selected_opens_contact() {
         result
     );
 }
+
+// @scenario: activity_log.feature - OwnCardUpdated is not navigable
+// @internal
+#[test]
+fn own_card_updated_is_not_navigable() {
+    let items = vec![ActivityLogItem {
+        event_key: "evt-own".into(),
+        entry: ActivityLogEntry::OwnCardUpdated {
+            changed_fields: vec!["phone".into()],
+        },
+        contact_name: "me".into(),
+        created_at: 1_700_000_300,
+    }];
+
+    let mut engine = ActivityLogEngine::new(items);
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "activity_list".into(),
+        item_id: "evt-own".into(),
+    });
+
+    assert!(
+        matches!(&result, ActionResult::UpdateScreen(_)),
+        "OwnCardUpdated must not navigate, got: {:?}",
+        result
+    );
+}
+
+// @scenario: activity_log.feature - ContactRemoved is not navigable
+// @internal
+#[test]
+fn contact_removed_is_not_navigable() {
+    let items = vec![ActivityLogItem {
+        event_key: "evt-rm".into(),
+        entry: ActivityLogEntry::ContactRemoved {
+            contact_id: "deleted-contact".into(),
+        },
+        contact_name: "deleted-contact".into(),
+        created_at: 1_700_000_400,
+    }];
+
+    let mut engine = ActivityLogEngine::new(items);
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "activity_list".into(),
+        item_id: "evt-rm".into(),
+    });
+
+    assert!(
+        matches!(&result, ActionResult::UpdateScreen(_)),
+        "ContactRemoved must not navigate, got: {:?}",
+        result
+    );
+}

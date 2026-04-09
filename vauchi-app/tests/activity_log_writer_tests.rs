@@ -257,7 +257,7 @@ fn own_card_updated_creates_log_entry() {
 
     assert_eq!(result.len(), 1);
     let (event_key, entry) = &result[0];
-    assert_eq!(event_key, &format!("own_card_updated:{NOW}"));
+    assert_eq!(event_key, &format!("own_card_updated:phone:{NOW}"));
 
     match entry {
         ActivityLogEntry::OwnCardUpdated { changed_fields } => {

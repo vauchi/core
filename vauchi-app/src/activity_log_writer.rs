@@ -118,7 +118,8 @@ impl ActivityLogWriter {
                 Some((key, entry))
             }
             VauchiEvent::OwnCardUpdated { changed_fields } => {
-                let key = format!("own_card_updated:{now_secs}");
+                let fields_tag = changed_fields.join(",");
+                let key = format!("own_card_updated:{fields_tag}:{now_secs}");
                 let entry = ActivityLogEntry::OwnCardUpdated {
                     changed_fields: changed_fields.clone(),
                 };

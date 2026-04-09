@@ -109,6 +109,16 @@ impl WorkflowEngine for ActivityLogEngine {
         match action {
             UserAction::ListItemSelected { item_id, .. } => {
                 if let Some(item) = self.items.iter().find(|i| i.event_key == item_id) {
+                    // OwnCardUpdated and ContactRemoved have no meaningful
+                    // navigation target (own card is not a contact; removed
+                    // contacts no longer exist).
+                    if matches!(
+                        item.entry,
+                        ActivityLogEntry::OwnCardUpdated { .. }
+                            | ActivityLogEntry::ContactRemoved { .. }
+                    ) {
+                        return ActionResult::UpdateScreen(self.build_screen());
+                    }
                     let contact_id = item.entry.contact_id().to_string();
                     return ActionResult::OpenContact { contact_id };
                 }

@@ -13,7 +13,7 @@ The Vauchi team takes security seriously. We appreciate your efforts to responsi
 
 Instead, please report them via email to:
 
-**security@vauchi.app**
+**<security@vauchi.app>**
 
 Include the following information:
 
@@ -103,6 +103,6 @@ For details on Vauchi's security architecture, see:
 
 ## Contact
 
-- Security issues: security@vauchi.app
-- General questions: hello@vauchi.app
-- Project: https://github.com/vauchi
+- Security issues: <security@vauchi.app>
+- General questions: <hello@vauchi.app>
+- Project: <https://github.com/vauchi>

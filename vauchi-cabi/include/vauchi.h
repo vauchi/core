@@ -49,6 +49,10 @@ typedef struct VauchiWorkflow VauchiWorkflow;
  */
 typedef void (*VauchiEventCallback)(const char *screen_ids_json, void *user_data);
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 /**
  * Create a new config builder with data directory and relay URL.
  *
@@ -758,5 +762,9 @@ char *vauchi_workflow_current_screen(struct VauchiWorkflow *handle);
  * `action_json` must be a valid null-terminated C string, or null.
  */
 char *vauchi_workflow_handle_action(struct VauchiWorkflow *handle, const char *action_json);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  /* VAUCHI_CABI_H */

@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 language = "C"
+cpp_compat = true
 include_guard = "VAUCHI_CABI_H"
 tab_width = 4
 documentation_style = "doxy"

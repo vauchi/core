@@ -20,6 +20,7 @@ pub trait WorkflowEngine: Send {
     fn handle_action(&mut self, action: UserAction) -> ActionResult;
 
     /// Poll for any new OS notifications.
+    // @scenario: accessibility.feature:Notifications are announced
     fn poll_notifications(&mut self) -> Vec<PendingNotification> {
         Vec::new()
     }

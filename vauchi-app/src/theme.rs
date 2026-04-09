@@ -330,6 +330,7 @@ mod tests {
     }
 
     #[test]
+    // @scenario: accessibility.feature:Sufficient color contrast
     fn test_contrast_ratio_black_white() {
         let ratio = contrast_ratio((255, 255, 255), (0, 0, 0));
         assert!(ratio > 20.0, "White on black should have high contrast");
@@ -552,6 +553,7 @@ mod tests {
     }
 
     #[test]
+    // @scenario: accessibility.feature:Touch targets are large enough
     fn test_design_tokens_default_touch_target() {
         let tokens = DesignTokens::default();
         assert_eq!(tokens.touch_target.minimum, 44);
@@ -582,6 +584,8 @@ mod tests {
     }
 
     #[test]
+    // @scenario: accessibility.feature:WCAG 2.1 AA compliance on desktop
+    // @scenario: accessibility.feature:High contrast mode support
     fn test_high_contrast_theme_exists_and_accessible() {
         let Some(themes) = load_generated_themes() else {
             return;

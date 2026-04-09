@@ -9,6 +9,7 @@ use vauchi_app::ui::AppEngine;
 use vauchi_core::Vauchi;
 use vauchi_core::api::EventOrigin;
 
+// @internal
 #[test]
 fn app_engine_writes_events_to_activity_log() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -51,6 +52,7 @@ fn app_engine_writes_events_to_activity_log() {
     assert!(rows[0].event_key.contains("contact-123"));
 }
 
+// @internal
 #[test]
 fn app_engine_shows_notifications_from_log() {
     let mut vauchi = Vauchi::in_memory().unwrap();

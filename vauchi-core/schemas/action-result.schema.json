@@ -293,6 +293,57 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "description": "App layer should open a form dialog (create group, rename, etc.).",
+      "type": "object",
+      "required": [
+        "ShowFormDialog"
+      ],
+      "properties": {
+        "ShowFormDialog": {
+          "type": "object",
+          "required": [
+            "dialog_type"
+          ],
+          "properties": {
+            "context_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "dialog_type": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "The app engine produced OS notifications that should be rendered. These are non-blocking and do not change the current screen.",
+      "type": "object",
+      "required": [
+        "Notify"
+      ],
+      "properties": {
+        "Notify": {
+          "type": "object",
+          "required": [
+            "notifications"
+          ],
+          "properties": {
+            "notifications": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PendingNotification"
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
@@ -1392,6 +1443,13 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "description": "Stop BLE scanning (saves battery after discovery completes).",
+          "type": "string",
+          "enum": [
+            "BleStopScanning"
+          ]
         }
       ]
     },
@@ -1501,6 +1559,53 @@
           "type": "integer",
           "format": "uint16",
           "minimum": 0.0
+        }
+      }
+    },
+    "NotificationCategory": {
+      "description": "Notification categories that produce OS notifications.",
+      "oneOf": [
+        {
+          "description": "Always fires, no toggle.",
+          "type": "string",
+          "enum": [
+            "EmergencyAlert"
+          ]
+        },
+        {
+          "description": "Opt-in, off by default.",
+          "type": "string",
+          "enum": [
+            "ContactAdded"
+          ]
+        }
+      ]
+    },
+    "PendingNotification": {
+      "description": "An OS notification for the frontend to render.",
+      "type": "object",
+      "required": [
+        "body",
+        "category",
+        "contact_id",
+        "event_key",
+        "title"
+      ],
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "category": {
+          "$ref": "#/definitions/NotificationCategory"
+        },
+        "contact_id": {
+          "type": "string"
+        },
+        "event_key": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
         }
       }
     },

@@ -299,6 +299,12 @@ pub struct OhttpConfig {
     /// Allow direct (non-OHTTP) data requests.
     /// Only for dev/testing — production must be false.
     pub allow_direct: bool,
+    /// Bundled OHTTP gateway key config bytes (RFC 9458).
+    ///
+    /// When set, used as the initial key without making a direct HTTPS
+    /// connection to the relay (which would leak the client's IP).
+    /// The cached key from storage takes precedence if fresher.
+    pub bundled_gateway_key: Option<Vec<u8>>,
 }
 
 impl Default for OhttpConfig {
@@ -306,6 +312,7 @@ impl Default for OhttpConfig {
         Self {
             key_ttl_secs: 43200,
             allow_direct: false,
+            bundled_gateway_key: None,
         }
     }
 }

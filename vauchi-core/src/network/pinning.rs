@@ -7,13 +7,11 @@
 //! Provides certificate pinning support for relay connections.
 //! Pins are SHA-256 fingerprints of DER-encoded certificates.
 //!
-//! ## Integration Status (Tracker #144)
+//! ## Integration Status
 //!
 //! The pinning primitives (`PinnedCertificate`, `verify_pin`) are implemented
-//! and tested. `TransportConfig` exposes a `pinned_certs` field. However, no
-//! client currently populates this field — the TLS verifier in the WebSocket
-//! transport does not call `verify_pin` during the handshake. Wiring this up
-//! requires a custom `rustls::ServerCertVerifier` or post-handshake check.
+//! and tested. Wiring into `HttpTransport` (ureq/rustls) via a custom
+//! `ServerCertVerifier` is the next step (C7 Phase 2).
 
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;

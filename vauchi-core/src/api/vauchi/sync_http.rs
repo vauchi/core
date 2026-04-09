@@ -71,10 +71,10 @@ impl Vauchi {
                 Ok(outcome)
             }
             Err(ref e) if is_ohttp_key_error(e) => {
-                // Key is stale — evict cache, re-fetch, retry once
+                // Key is stale — evict cache, re-resolve (bundled or direct), retry
                 let relay_url = self.http_relay_url();
                 let _ = self.storage.clear_ohttp_key(&relay_url);
-                let key_bytes = self.fetch_and_cache_ohttp_key(&relay_url)?;
+                let key_bytes = self.resolve_ohttp_key(&relay_url)?;
                 let client = OhttpClient::new(key_bytes).map_err(VauchiError::Network)?;
                 self.ohttp_key = Some(client);
 
@@ -180,29 +180,26 @@ impl Vauchi {
     /// # Flow
     ///
     /// 1. Check identity exists (fail with `IdentityNotInitialized` if not).
-    /// 2. Load cached OHTTP key from storage.
-    /// 3. If cached and fresh (age < `config.ohttp.key_ttl_secs`), reuse it.
-    /// 4. Otherwise fetch from `GET /v2/ohttp-key` and cache.
-    /// 5. Validate key via `OhttpClient::new()`.
-    /// 6. Store in `self.ohttp_key`.
-    /// 7. Run a health check to verify relay reachability.
+    /// 2. Resolve OHTTP key: cached → bundled → direct fetch (if `allow_direct`).
+    /// 3. Validate key via `OhttpClient::new()`.
+    /// 4. Store in `self.ohttp_key`.
+    ///
+    /// No direct health check is performed — the first OHTTP sync request
+    /// serves as an implicit reachability check, avoiding a direct HTTPS
+    /// connection that would leak the client's IP address.
     pub fn connect(&mut self) -> VauchiResult<()> {
         // 1. Identity gate
         if self.identity.is_none() {
             return Err(VauchiError::IdentityNotInitialized);
         }
 
-        // 2-4. Obtain OHTTP key bytes (cached or freshly fetched)
+        // 2. Obtain OHTTP key bytes (cached → bundled → direct fetch)
         let relay_url = self.http_relay_url();
         let key_bytes = self.resolve_ohttp_key(&relay_url)?;
 
-        // 5. Validate and store
+        // 3-4. Validate and store
         let client = OhttpClient::new(key_bytes).map_err(VauchiError::Network)?;
         self.ohttp_key = Some(client);
-
-        // 6. Health check
-        let transport = self.create_bare_transport();
-        transport.health_check().map_err(VauchiError::Network)?;
 
         Ok(())
     }
@@ -446,16 +443,43 @@ impl Vauchi {
         self.next_sync_allowed = Some(deadline);
     }
 
-    /// Resolve the OHTTP key: use cache if fresh, otherwise fetch and cache.
+    /// Resolve the OHTTP key: cached → bundled → direct fetch (if allowed).
+    ///
+    /// Priority order:
+    /// 1. Storage cache (if within TTL)
+    /// 2. Bundled key from `OhttpConfig::bundled_gateway_key`
+    /// 3. Direct fetch from relay (only if `allow_direct` is true)
+    ///
+    /// The bundled key eliminates the need for a direct HTTPS connection
+    /// to the relay on first use, preventing client IP leakage.
     fn resolve_ohttp_key(&self, relay_url: &str) -> VauchiResult<Vec<u8>> {
-        // Try loading from cache — use if still within TTL
+        // 1. Try loading from cache — use if still within TTL
         if let Some((cached_bytes, fetched_at)) = self.storage.load_ohttp_key(relay_url)?
             && self.is_ohttp_key_fresh(fetched_at)
         {
             return Ok(cached_bytes);
         }
-        // Cache miss or stale — fetch fresh key
-        self.fetch_and_cache_ohttp_key(relay_url)
+
+        // 2. Try bundled key (no network, no IP leak)
+        if let Some(ref bundled) = self.config.ohttp.bundled_gateway_key {
+            // Validate the bundled key before using it — skip if corrupt
+            if OhttpClient::new(bundled.clone()).is_ok() {
+                return Ok(bundled.clone());
+            }
+            // Invalid bundled key — fall through to direct fetch
+        }
+
+        // 3. Direct fetch (only for dev/testing — leaks client IP)
+        if self.config.ohttp.allow_direct {
+            return self.fetch_and_cache_ohttp_key(relay_url);
+        }
+
+        Err(VauchiError::Network(
+            crate::network::NetworkError::ConnectionFailed(
+                "no OHTTP key available: cache expired, no bundled key, direct fetch disabled"
+                    .into(),
+            ),
+        ))
     }
 
     /// Check whether a cached OHTTP key is still within its TTL.

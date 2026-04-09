@@ -14,11 +14,12 @@ mod routing;
 mod screens;
 
 use std::collections::HashMap;
+use std::sync::mpsc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-use vauchi_core::api::Vauchi;
+use vauchi_core::api::{HandlerId, Vauchi, VauchiEvent};
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::version::{
     APP_COMPAT_VERSION, AppUpdateStatus, VersionPolicy, unix_secs_to_date_string,
@@ -29,6 +30,7 @@ use super::component::{Component, TextStyle};
 use super::device_linking::DeviceLinkingEngine;
 use super::engine::WorkflowEngine;
 use super::screen::{ActionStyle, ScreenAction, ScreenModel};
+use crate::activity_log_writer::ActivityLogWriter;
 use crate::notification_emitter::NotificationEmitter;
 use crate::notification_types::{ActivityLogEntry, NotificationPreferences, PendingNotification};
 
@@ -204,6 +206,10 @@ pub struct AppEngine {
     update_dismissed: bool,
     /// Last timestamp (seconds) when activity log was polled for OS notifications.
     last_poll_time: u64,
+    /// Channel receiver for events to be persisted to the activity log.
+    event_rx: mpsc::Receiver<VauchiEvent>,
+    /// Active event handler ID, used to unregister on drop.
+    _event_handler_id: HandlerId,
 }
 
 impl AppEngine {
@@ -244,6 +250,18 @@ impl AppEngine {
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
+        // Register a permanent event handler that sends VauchiEvents to a channel
+        // for deferred persistence to the activity log (ADR-031).
+        // Since VauchiEvent handler must be Sync but mpsc::Sender is not Sync,
+        // we wrap it in a Mutex.
+        let (event_tx, event_rx) = mpsc::channel();
+        let event_tx = std::sync::Mutex::new(event_tx);
+        let event_handler_id = vauchi.add_event_handler(std::sync::Arc::new(move |event| {
+            if let Ok(tx) = event_tx.lock() {
+                let _ = tx.send(event);
+            }
+        }));
+
         Self {
             vauchi,
             screen,
@@ -259,6 +277,8 @@ impl AppEngine {
             update_status: AppUpdateStatus::UpToDate,
             update_dismissed: false,
             last_poll_time: now,
+            event_rx,
+            _event_handler_id: event_handler_id,
         }
     }
 
@@ -489,6 +509,8 @@ impl WorkflowEngine for AppEngine {
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
+        self.drain_events_to_log();
+
         // Handle update link action from banner/button presses
         if matches!(
             &action,
@@ -578,6 +600,8 @@ impl AppEngine {
     /// Poll the activity log and produce pending OS notifications.
     /// Public so PlatformAppEngine can expose it via UniFFI.
     pub fn poll_notifications(&mut self) -> Vec<PendingNotification> {
+        self.drain_events_to_log();
+
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
@@ -660,6 +684,28 @@ impl AppEngine {
                 ActionResult::NavigateTo(self.apply_update_overlay(screen))
             }
             other => other,
+        }
+    }
+
+    /// Drain the event receiver and write all events to the activity log.
+    ///
+    /// Called before operations that read from the activity log (notifications)
+    /// or when data mutations may have occurred (user actions).
+    fn drain_events_to_log(&mut self) {
+        let mut events = Vec::new();
+        while let Ok(event) = self.event_rx.try_recv() {
+            events.push(event);
+        }
+
+        if !events.is_empty() {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
+            if let Err(e) = ActivityLogWriter::write(self.vauchi.storage(), &events, now) {
+                log::error!("drain_events_to_log: ActivityLogWriter::write failed: {e}");
+            }
         }
     }
 }

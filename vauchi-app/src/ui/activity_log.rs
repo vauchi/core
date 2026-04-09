@@ -88,6 +88,15 @@ fn format_entry(entry: &ActivityLogEntry, name: &str) -> (String, Option<String>
         ActivityLogEntry::EmergencyAlertReceived { .. } => {
             (format!("Emergency alert from {name}"), None)
         }
+        ActivityLogEntry::OwnCardUpdated { changed_fields } => {
+            let detail = if changed_fields.is_empty() {
+                None
+            } else {
+                Some(changed_fields.join(", "))
+            };
+            ("You updated your card".to_string(), detail)
+        }
+        ActivityLogEntry::ContactRemoved { .. } => (format!("Removed contact: {name}"), None),
     }
 }
 

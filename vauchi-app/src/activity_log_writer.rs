@@ -117,6 +117,20 @@ impl ActivityLogWriter {
                 };
                 Some((key, entry))
             }
+            VauchiEvent::OwnCardUpdated { changed_fields } => {
+                let key = format!("own_card_updated:{now_secs}");
+                let entry = ActivityLogEntry::OwnCardUpdated {
+                    changed_fields: changed_fields.clone(),
+                };
+                Some((key, entry))
+            }
+            VauchiEvent::ContactRemoved { contact_id } => {
+                let key = format!("contact_removed:{contact_id}:{now_secs}");
+                let entry = ActivityLogEntry::ContactRemoved {
+                    contact_id: contact_id.clone(),
+                };
+                Some((key, entry))
+            }
 
             _ => None,
         }

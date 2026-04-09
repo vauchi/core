@@ -63,6 +63,12 @@ pub enum ActivityLogEntry {
     EmergencyAlertReceived {
         contact_id: String,
     },
+    OwnCardUpdated {
+        changed_fields: Vec<String>,
+    },
+    ContactRemoved {
+        contact_id: String,
+    },
 }
 
 impl ActivityLogEntry {
@@ -75,10 +81,14 @@ impl ActivityLogEntry {
             Self::CardUpdateFailed { .. } => "card_update_failed",
             Self::ContactAdded { .. } => "contact_added",
             Self::EmergencyAlertReceived { .. } => "emergency_alert_received",
+            Self::OwnCardUpdated { .. } => "own_card_updated",
+            Self::ContactRemoved { .. } => "contact_removed",
         }
     }
 
     /// Returns the contact_id from any variant.
+    ///
+    /// For `OwnCardUpdated`, returns "me".
     pub fn contact_id(&self) -> &str {
         match self {
             Self::CardUpdateReceived { contact_id, .. }
@@ -86,7 +96,9 @@ impl ActivityLogEntry {
             | Self::CardUpdatePending { contact_id }
             | Self::CardUpdateFailed { contact_id, .. }
             | Self::ContactAdded { contact_id, .. }
-            | Self::EmergencyAlertReceived { contact_id } => contact_id,
+            | Self::EmergencyAlertReceived { contact_id }
+            | Self::ContactRemoved { contact_id } => contact_id,
+            Self::OwnCardUpdated { .. } => "me",
         }
     }
 }

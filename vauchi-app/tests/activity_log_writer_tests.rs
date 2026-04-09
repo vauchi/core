@@ -131,11 +131,13 @@ fn unrelated_events_produce_no_entries() {
             contact_id: "c1".to_owned(),
             changed_fields: vec!["name".to_owned()],
         },
-        VauchiEvent::OwnCardUpdated {
-            changed_fields: vec!["phone".to_owned()],
+        VauchiEvent::RelayHealthChanged {
+            relay_url: "https://relay.example.com".to_string(),
+            healthy: true,
         },
-        VauchiEvent::ContactRemoved {
-            contact_id: "c2".to_owned(),
+        VauchiEvent::RelayFailover {
+            from: "https://relay1.example.com".to_string(),
+            to: "https://relay2.example.com".to_string(),
         },
     ];
 
@@ -224,7 +226,6 @@ fn message_failed_creates_card_failed_entry() {
     }];
 
     let result = ActivityLogWriter::write(&storage, &events, NOW).unwrap();
-
     assert_eq!(result.len(), 1);
     let (event_key, entry) = &result[0];
     assert_eq!(event_key, &format!("card_failed:{contact_id}:{NOW}"));
@@ -236,6 +237,56 @@ fn message_failed_creates_card_failed_entry() {
         } => {
             assert_eq!(cid, &contact_id);
             assert_eq!(reason, &error);
+        }
+        other => panic!("unexpected entry variant: {other:?}"),
+    }
+}
+
+// @scenario: activity-log.feature - OwnCardUpdated creates a log entry
+// @internal
+#[test]
+fn own_card_updated_creates_log_entry() {
+    let storage = test_storage();
+    let fields = vec!["phone".to_string()];
+
+    let events = vec![VauchiEvent::OwnCardUpdated {
+        changed_fields: fields.clone(),
+    }];
+
+    let result = ActivityLogWriter::write(&storage, &events, NOW).unwrap();
+
+    assert_eq!(result.len(), 1);
+    let (event_key, entry) = &result[0];
+    assert_eq!(event_key, &format!("own_card_updated:{NOW}"));
+
+    match entry {
+        ActivityLogEntry::OwnCardUpdated { changed_fields } => {
+            assert_eq!(changed_fields, &fields);
+        }
+        other => panic!("unexpected entry variant: {other:?}"),
+    }
+}
+
+// @scenario: activity-log.feature - ContactRemoved creates a log entry
+// @internal
+#[test]
+fn contact_removed_creates_log_entry() {
+    let storage = test_storage();
+    let contact_id = "removed-id".to_string();
+
+    let events = vec![VauchiEvent::ContactRemoved {
+        contact_id: contact_id.clone(),
+    }];
+
+    let result = ActivityLogWriter::write(&storage, &events, NOW).unwrap();
+
+    assert_eq!(result.len(), 1);
+    let (event_key, entry) = &result[0];
+    assert_eq!(event_key, &format!("contact_removed:{contact_id}:{NOW}"));
+
+    match entry {
+        ActivityLogEntry::ContactRemoved { contact_id: cid } => {
+            assert_eq!(cid, &contact_id);
         }
         other => panic!("unexpected entry variant: {other:?}"),
     }

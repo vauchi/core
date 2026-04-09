@@ -14,6 +14,7 @@ use crate::ui::*;
 
 /// Navigation targets exposed through the More menu.
 const MORE_ITEMS: &[(&str, &str)] = &[
+    ("activity_log", "Activity"),
     ("sync", "Sync"),
     ("device_linking", "Devices"),
     ("settings", "Settings"),

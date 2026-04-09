@@ -648,6 +648,10 @@ fn more_engine_has_expected_navigation_targets() {
         "More must contain sync"
     );
     assert!(
+        action_ids.contains(&"activity_log".to_string()),
+        "More must contain activity_log"
+    );
+    assert!(
         action_ids.contains(&"device_linking".to_string()),
         "More must contain device_linking"
     );
@@ -667,7 +671,7 @@ fn more_engine_has_expected_navigation_targets() {
         action_ids.contains(&"help".to_string()),
         "More must contain help"
     );
-    assert_eq!(action_ids.len(), 6, "More menu should have exactly 6 items");
+    assert_eq!(action_ids.len(), 7, "More menu should have exactly 7 items");
 }
 
 #[test]
@@ -706,6 +710,25 @@ fn more_engine_routes_to_help() {
         other => panic!("Expected NavigateTo help, got {other:?}"),
     }
     assert_eq!(engine.current_app_screen(), &AppScreen::Help);
+}
+
+#[test]
+fn more_engine_routes_to_activity_log() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::More);
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "activity_log".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "activity_log");
+        }
+        other => panic!("Expected NavigateTo activity_log, got {other:?}"),
+    }
+    assert_eq!(engine.current_app_screen(), &AppScreen::ActivityLog);
 }
 
 #[test]

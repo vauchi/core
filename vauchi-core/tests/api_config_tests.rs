@@ -7,6 +7,7 @@
 
 use std::path::PathBuf;
 use vauchi_core::api::*;
+use vauchi_core::network::PinnedCertificate;
 
 #[test]
 fn test_vauchi_config_default() {
@@ -101,4 +102,47 @@ fn test_sync_config_default() {
     assert!(config.auto_sync);
     assert_eq!(config.sync_interval_ms, 60_000);
     assert_eq!(config.max_pending_updates, 50);
+}
+
+// ─── Certificate pinning defaults ───────────────────────────────────
+
+/// relay.vauchi.app SPKI SHA-256 fingerprint.
+/// Extracted via: openssl s_client → x509 pubkey → pkey DER → sha256
+const RELAY_SPKI_SHA256: [u8; 32] = [
+    0xba, 0xae, 0x88, 0x27, 0xcb, 0xce, 0xf3, 0xe5, 0xa1, 0xcc, 0xe3, 0xe0, 0x00, 0x9d, 0x4e, 0x06,
+    0xe1, 0x70, 0x0f, 0xb1, 0x00, 0xeb, 0x37, 0x84, 0xb8, 0xc3, 0x4f, 0x4e, 0x26, 0xb0, 0x6d, 0x00,
+];
+
+/// @internal C7
+#[test]
+fn default_relay_config_has_production_pin() {
+    let config = RelayConfig::default();
+    let expected = PinnedCertificate::new(RELAY_SPKI_SHA256);
+
+    assert_eq!(
+        config.pinned_certs.len(),
+        1,
+        "Default relay config must include exactly one pinned certificate"
+    );
+    assert_eq!(
+        config.pinned_certs[0], expected,
+        "Default pin must match relay.vauchi.app SPKI SHA-256"
+    );
+}
+
+/// @internal C7
+#[test]
+fn relay_config_pin_propagates_to_transport_config() {
+    let relay = RelayConfig::default();
+    let transport = relay.to_transport_config();
+
+    assert_eq!(
+        transport.pinned_certs.len(),
+        relay.pinned_certs.len(),
+        "Transport config must carry same pin count as relay config"
+    );
+    assert_eq!(
+        transport.pinned_certs, relay.pinned_certs,
+        "Transport config pins must match relay config pins"
+    );
 }

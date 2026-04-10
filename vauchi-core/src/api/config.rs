@@ -348,12 +348,28 @@ pub struct OhttpConfig {
     pub bundled_gateway_key: Option<Vec<u8>>,
 }
 
+/// Bundled OHTTP gateway key config (RFC 9458) for relay.vauchi.app.
+///
+/// Fetched from the production OHTTP relay via:
+///   curl -s https://ohttp.vauchi.app/v2/ohttp-key > ohttp-key.bin
+///
+/// Bundling eliminates the bootstrap IP leak — the client uses this
+/// key for the first OHTTP request instead of fetching it directly.
+/// The cached key from storage takes precedence if fresher.
+///
+/// Update when the relay rotates its OHTTP key pair.
+const BUNDLED_OHTTP_KEY: &[u8] = &[
+    0x00, 0x00, 0x20, 0xdc, 0x7a, 0x27, 0xe6, 0x5d, 0xd7, 0x12, 0x50, 0xc9, 0x14, 0xe2, 0xf8, 0xe1,
+    0x78, 0x48, 0xf7, 0xf2, 0xc0, 0xa3, 0xc7, 0xdf, 0xd2, 0x8f, 0x9a, 0x80, 0x56, 0x47, 0x58, 0x66,
+    0xc1, 0xab, 0x41, 0x00, 0x04, 0x00, 0x01, 0x00, 0x01,
+];
+
 impl Default for OhttpConfig {
     fn default() -> Self {
         Self {
             key_ttl_secs: 43200,
             allow_direct: false,
-            bundled_gateway_key: None,
+            bundled_gateway_key: Some(BUNDLED_OHTTP_KEY.to_vec()),
         }
     }
 }

@@ -1743,6 +1743,62 @@ build:dev:
     expire_in: 3 days
 
 # ============================================================
+# Reproducible Build Verification (G3)
+# ============================================================
+# Builds the CLI binary twice from the same source and verifies
+# bit-identical output. Runs on tag pipelines (releases) and
+# manually on MR pipelines. Failure = non-determinism in the
+# build toolchain that needs investigation.
+
+verify:reproducible:
+  extends: [.linux-runner, .validation-rust, .timeout-standard]
+  stage: test
+  needs: []
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+      allow_failure: true
+  variables:
+    CARGO_INCREMENTAL: "0"
+  script:
+    - export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+    - echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+    - echo "Rust toolchain:"
+    - rustc --version --verbose
+
+    # Build 1
+    - echo "=== Build 1 ==="
+    - cargo build --release -p vauchi-core --lib
+    - cp target/release/libvauchi_core.rlib /tmp/build1.rlib 2>/dev/null || true
+    - cp target/release/libvauchi_core.a /tmp/build1.a 2>/dev/null || true
+    - sha256sum target/release/libvauchi_core.* 2>/dev/null | tee /tmp/build1-checksums.txt
+
+    # Clean and rebuild
+    - cargo clean
+    - echo "=== Build 2 ==="
+    - cargo build --release -p vauchi-core --lib
+    - sha256sum target/release/libvauchi_core.* 2>/dev/null | tee /tmp/build2-checksums.txt
+
+    # Compare
+    - echo "=== Comparison ==="
+    - |
+      if diff /tmp/build1-checksums.txt /tmp/build2-checksums.txt; then
+        echo "✓ Reproducible: both builds produced identical output"
+      else
+        echo "✗ NOT reproducible: builds differ"
+        echo "Build 1:" && cat /tmp/build1-checksums.txt
+        echo "Build 2:" && cat /tmp/build2-checksums.txt
+        exit 1
+      fi
+  artifacts:
+    paths:
+      - /tmp/build1-checksums.txt
+      - /tmp/build2-checksums.txt
+    when: always
+    expire_in: 30 days
+
+# ============================================================
 # Cleanup Stage (scheduled or manual)
 # ============================================================
 # Runs periodically to clean up runner disk space

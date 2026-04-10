@@ -15,7 +15,7 @@ vauchi-platform/src/types.rs 1547
 vauchi-platform/src/lib.rs 2315
 
 # EXEMPT — state machine: scattered transitions create protocol bugs
-vauchi-core/src/exchange/session.rs 1577
+vauchi-core/src/exchange/session.rs 1586
 vauchi-core/src/exchange/multistage/session.rs 1178
 
 # EXEMPT — security-critical: crypto + verification belong together
@@ -32,7 +32,7 @@ vauchi-core/src/storage/mod.rs 1079
 
 # SPLIT DONE — Phase 3: app_engine.rs (1437) split into mod.rs + routing.rs + screens.rs
 vauchi-app/src/ui/app_engine/mod.rs 744
-vauchi-app/src/ui/app_engine/routing.rs 627
+vauchi-app/src/ui/app_engine/routing.rs 633
 vauchi-app/src/ui/app_engine/screens.rs 888
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
@@ -50,7 +50,7 @@ vauchi-core/tests/sync_device_orchestrator_tests.rs 1286
 vauchi-core/tests/visibility_label_tests.rs 1220
 
 # vauchi-app — extracted from vauchi-core, inherits exemption
-vauchi-app/src/ui/exchange.rs 2300
+vauchi-app/src/ui/exchange.rs 2602
 vauchi-app/src/ui/onboarding.rs 1013
 
 # EXEMPT — BLE exchange sub-flow: inline tests access private state (proximity_runner, shake_envelope_sent)

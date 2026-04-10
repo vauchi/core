@@ -253,6 +253,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn permission_denied_stores_transport() {
         let evt = ExchangeHardwareEvent::PermissionDenied {
@@ -263,6 +264,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn permission_denied_is_distinct_from_hardware_unavailable() {
         let denied = ExchangeHardwareEvent::PermissionDenied {

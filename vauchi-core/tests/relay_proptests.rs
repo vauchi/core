@@ -226,13 +226,11 @@ proptest! {
     }
 
     #[test]
-    fn non_wss_schemes_fail_validation(
-        scheme in "(http|https|ws|ftp|file)",
+    fn non_https_schemes_fail_validation(
+        scheme in "(http|ws|wss|ftp|file)",
         host in "[a-z]{3,10}\\.[a-z]{2,4}"
     ) {
         let url = format!("{scheme}://{host}");
-        if scheme != "wss" {
-            prop_assert!(validate_relay_url(&url).is_err(), "non-wss URL should be rejected: {}", url);
-        }
+        prop_assert!(validate_relay_url(&url).is_err(), "non-https URL should be rejected: {}", url);
     }
 }

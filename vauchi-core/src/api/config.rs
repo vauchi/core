@@ -157,7 +157,26 @@ pub struct RelayConfig {
     pub pinned_certs: Vec<PinnedCertificate>,
 }
 
+/// SPKI SHA-256 pin for relay.vauchi.app leaf certificate.
+///
+/// Extracted via:
+/// ```sh
+/// echo | openssl s_client -connect relay.vauchi.app:443 -servername relay.vauchi.app 2>/dev/null \
+///   | openssl x509 -pubkey -noout | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | xxd -p
+/// ```
+///
+/// Update when the relay's TLS key pair rotates (not on every cert renewal —
+/// SPKI pinning survives renewals that reuse the same key).
+const RELAY_PROD_SPKI_PIN: [u8; 32] = [
+    0xba, 0xae, 0x88, 0x27, 0xcb, 0xce, 0xf3, 0xe5, 0xa1, 0xcc, 0xe3, 0xe0, 0x00, 0x9d, 0x4e, 0x06,
+    0xe1, 0x70, 0x0f, 0xb1, 0x00, 0xeb, 0x37, 0x84, 0xb8, 0xc3, 0x4f, 0x4e, 0x26, 0xb0, 0x6d, 0x00,
+];
+
 impl Default for RelayConfig {
+    /// Production relay configuration with SPKI certificate pinning.
+    ///
+    /// Self-hosters should use [`RelayConfig::unpinned`] and set their own
+    /// `server_url` and optionally `pinned_certs`.
     fn default() -> Self {
         RelayConfig {
             server_url: "wss://relay.vauchi.app".to_string(),
@@ -170,12 +189,25 @@ impl Default for RelayConfig {
             max_retries: 5,
             proxy: ProxyConfig::None,
             relay_noise_pubkey: None,
-            pinned_certs: Vec::new(),
+            pinned_certs: vec![PinnedCertificate::new(RELAY_PROD_SPKI_PIN)],
         }
     }
 }
 
 impl RelayConfig {
+    /// Creates a relay config with no pinned certificates.
+    ///
+    /// Intended for self-hosted relays where the operator controls the TLS
+    /// certificate. Callers should set `server_url` to their relay address
+    /// and optionally provide their own `pinned_certs`.
+    pub fn unpinned(server_url: String) -> Self {
+        RelayConfig {
+            server_url,
+            pinned_certs: Vec::new(),
+            ..Default::default()
+        }
+    }
+
     /// Converts to TransportConfig for the network layer.
     pub fn to_transport_config(&self) -> TransportConfig {
         TransportConfig {

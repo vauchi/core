@@ -147,6 +147,14 @@ for sbom in "$DIST_DIR"/*.sbom.json; do
     upload_file "${sbom}.sha256.bundle" || UPLOAD_SUCCESS=false
 done
 
+# Upload SLSA provenance (G3)
+if [ -f "$DIST_DIR/provenance.intoto.jsonl" ]; then
+    echo ""
+    echo -e "${YELLOW}=== SLSA Provenance ===${NC}"
+    upload_file "$DIST_DIR/provenance.intoto.jsonl" || UPLOAD_SUCCESS=false
+    upload_file "$DIST_DIR/provenance.intoto.jsonl.bundle" || UPLOAD_SUCCESS=false
+fi
+
 echo ""
 
 if $UPLOAD_SUCCESS; then

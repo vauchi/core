@@ -195,6 +195,15 @@ impl Default for RelayConfig {
 }
 
 impl RelayConfig {
+    /// Returns the production relay certificate pins.
+    ///
+    /// Use this when constructing `HttpTransportConfig` outside of
+    /// `RelayConfig` (e.g. CLI GDPR, TUI health check) to ensure
+    /// the production relay pin is applied.
+    pub fn default_pins() -> Vec<PinnedCertificate> {
+        vec![PinnedCertificate::new(RELAY_PROD_SPKI_PIN)]
+    }
+
     /// Creates a relay config with no pinned certificates.
     ///
     /// Intended for self-hosted relays where the operator controls the TLS

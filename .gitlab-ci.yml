@@ -1120,6 +1120,96 @@ package:sbom:
       - dist/*.sbom.json.sha256.bundle
     expire_in: 1 week
 
+# SLSA L2 provenance attestation (G3)
+# Generates an in-toto v1 provenance statement capturing: who built it,
+# from what source, with what commands, producing what artifacts.
+# Signed with cosign — verifiable by end users with cosign.pub.
+package:slsa-provenance:
+  extends: [.linux-runner, .release-only]
+  stage: package
+  needs: [package:sbom]
+  script:
+    - !reference [.cosign-install, script]
+    - |
+      VERSION="${CI_COMMIT_TAG#v}"
+      echo "Generating SLSA L2 provenance for v${VERSION}..."
+
+      # Collect artifact checksums (SBOMs + any dist files from prior jobs)
+      SUBJECTS="[]"
+      for f in dist/*.sbom.json; do
+        NAME=$(basename "$f")
+        DIGEST=$(sha256sum "$f" | awk '{print $1}')
+        SUBJECTS=$(echo "$SUBJECTS" | jq --arg name "$NAME" --arg digest "$DIGEST" \
+          '. + [{"name": $name, "digest": {"sha256": $digest}}]')
+      done
+
+      # Build the in-toto v1 provenance statement (SLSA v1.0 format)
+      cat > dist/provenance.intoto.jsonl <<PROVENANCE
+      {
+        "_type": "https://in-toto.io/Statement/v1",
+        "subject": ${SUBJECTS},
+        "predicateType": "https://slsa.dev/provenance/v1",
+        "predicate": {
+          "buildDefinition": {
+            "buildType": "https://gitlab.com/vauchi/core/-/blob/main/.gitlab-ci.yml",
+            "externalParameters": {
+              "ref": "${CI_COMMIT_REF_NAME}",
+              "tag": "${CI_COMMIT_TAG}"
+            },
+            "resolvedDependencies": [
+              {
+                "uri": "git+https://gitlab.com/vauchi/core@${CI_COMMIT_SHA}",
+                "digest": {"gitCommit": "${CI_COMMIT_SHA}"}
+              }
+            ]
+          },
+          "runDetails": {
+            "builder": {
+              "id": "${CI_SERVER_URL}/${CI_PROJECT_PATH}/-/runners/${CI_RUNNER_ID}",
+              "version": {
+                "rustc": "$(rustc --version | awk '{print $2}')",
+                "cargo": "$(cargo --version | awk '{print $2}')"
+              }
+            },
+            "metadata": {
+              "invocationId": "${CI_PIPELINE_URL}",
+              "startedOn": "${CI_PIPELINE_CREATED_AT}",
+              "finishedOn": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }
+          }
+        }
+      }
+      PROVENANCE
+
+      # Compact the JSON (remove heredoc indentation)
+      jq -c '.' dist/provenance.intoto.jsonl > dist/provenance.intoto.jsonl.tmp
+      mv dist/provenance.intoto.jsonl.tmp dist/provenance.intoto.jsonl
+
+      # Sign provenance with cosign
+      if [[ -n "${COSIGN_KEY:-}" ]]; then
+        COSIGN_KEY_FILE="$COSIGN_KEY"
+        if ! head -1 "$COSIGN_KEY" | grep -q -- "-----BEGIN"; then
+          COSIGN_KEY_FILE=$(mktemp)
+          base64 -d < "$COSIGN_KEY" > "$COSIGN_KEY_FILE"
+        fi
+        cosign sign-blob --yes --key "$COSIGN_KEY_FILE" \
+          --bundle "dist/provenance.intoto.jsonl.bundle" \
+          "dist/provenance.intoto.jsonl"
+        [[ "$COSIGN_KEY_FILE" != "$COSIGN_KEY" ]] && rm -f "$COSIGN_KEY_FILE"
+        echo "✓ SLSA provenance signed"
+      elif [[ -n "${CI:-}" ]]; then
+        echo "ERROR: COSIGN_KEY required for provenance signing"
+        exit 1
+      fi
+
+      chmod 644 dist/provenance.*
+      echo "SLSA L2 provenance complete"
+  artifacts:
+    paths:
+      - dist/provenance.intoto.jsonl
+      - dist/provenance.intoto.jsonl.bundle
+    expire_in: 1 week
+
 # ============================================================
 # Publish Stage (Tags only)
 # ============================================================
@@ -1380,6 +1470,7 @@ release:create:
     - job: publish:maven
       optional: true
     - package:sbom
+    - package:slsa-provenance
   script:
     - |
       echo "Creating release $CI_COMMIT_TAG"
@@ -1430,6 +1521,7 @@ release:create:
       - [vauchi-core SBOM](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-core/${CI_COMMIT_TAG#v}/vauchi-core-${CI_COMMIT_TAG#v}.sbom.json) (CycloneDX)
       - [vauchi-platform SBOM](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-platform/${CI_COMMIT_TAG#v}/vauchi-platform-${CI_COMMIT_TAG#v}.sbom.json) (CycloneDX)
       - [vauchi-protocol SBOM](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-protocol/${CI_COMMIT_TAG#v}/vauchi-protocol-${CI_COMMIT_TAG#v}.sbom.json) (CycloneDX)
+      - [SLSA L2 Provenance](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-core/${CI_COMMIT_TAG#v}/provenance.intoto.jsonl) ([verify](https://docs.vauchi.app/developers/verify-releases/))
 
       ### Integration
 

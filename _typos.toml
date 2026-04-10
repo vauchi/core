@@ -14,6 +14,8 @@ extend-exclude = [
 ]
 
 [default.extend-words]
+# in-toto attestation format: https://in-toto.io/
+intoto = "intoto"
 # _ba suffix in commutativity test variables (merged_ba, result_ba, etc.)
 ba = "ba"
 # French test strings ("identité" without accents for Unicode boundary tests)

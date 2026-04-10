@@ -665,6 +665,9 @@ pub enum MobileExchangeHardwareEvent {
     HardwareUnavailable {
         transport: String,
     },
+    PermissionDenied {
+        transport: String,
+    },
 }
 
 impl From<MobileExchangeHardwareEvent> for ExchangeHardwareEvent {
@@ -695,6 +698,9 @@ impl From<MobileExchangeHardwareEvent> for ExchangeHardwareEvent {
             }
             MobileExchangeHardwareEvent::HardwareUnavailable { transport } => {
                 Self::HardwareUnavailable { transport }
+            }
+            MobileExchangeHardwareEvent::PermissionDenied { transport } => {
+                Self::PermissionDenied { transport }
             }
             MobileExchangeHardwareEvent::AccelerometerData {
                 timestamp_ms,

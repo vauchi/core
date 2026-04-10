@@ -16,6 +16,8 @@ use vauchi_core::exchange::ExchangeSession;
 pub(super) enum QrStep {
     ShowQr,
     ScanQr,
+    /// Manual code entry — fallback when camera permission is denied.
+    ManualEntry,
     Verifying,
 }
 
@@ -28,7 +30,7 @@ impl QrStep {
     pub(super) fn step_number(&self, base: u8) -> u8 {
         base + match self {
             Self::ShowQr => 0,
-            Self::ScanQr => 1,
+            Self::ScanQr | Self::ManualEntry => 1,
             Self::Verifying => 2,
         }
     }
@@ -92,6 +94,40 @@ pub(super) fn build_scan_qr_screen(progress: Progress) -> ScreenModel {
     }
 }
 
+/// Builds the "Enter Code Manually" screen — fallback when camera is unavailable.
+pub(super) fn build_manual_entry_screen(progress: Progress) -> ScreenModel {
+    ScreenModel {
+        screen_id: "exchange_manual_entry".into(),
+        title: "Enter Code Manually".into(),
+        subtitle: Some("Camera unavailable — ask the other person to read their code".into()),
+        components: vec![Component::TextInput {
+            id: "manual_code".into(),
+            label: "Exchange code".into(),
+            value: String::new(),
+            placeholder: Some("Paste or type the code".into()),
+            max_length: None,
+            validation_error: None,
+            input_type: InputType::Text,
+        }],
+        actions: vec![
+            ScreenAction {
+                id: "submit_code".into(),
+                label: "Submit".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+            },
+            ScreenAction {
+                id: "back".into(),
+                label: "Back".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+            },
+        ],
+        progress: Some(progress),
+        ..Default::default()
+    }
+}
+
 /// Builds the "Verifying" screen.
 pub(super) fn build_verifying_screen(progress: Progress) -> ScreenModel {
     ScreenModel {
@@ -136,6 +172,24 @@ pub(super) fn handle_qr_action(
         ) if component_id == "scanned_data" => Some(QrActionOutcome::QrScanned {
             data: value.clone(),
         }),
+        // Manual entry: submit the typed code
+        (QrStep::ManualEntry, UserAction::ActionPressed { action_id })
+            if action_id == "submit_code" =>
+        {
+            None
+        } // Handled by parent via TextChanged
+        (QrStep::ManualEntry, UserAction::ActionPressed { action_id }) if action_id == "back" => {
+            Some(QrActionOutcome::BackToShowQr)
+        }
+        (
+            QrStep::ManualEntry,
+            UserAction::TextChanged {
+                component_id,
+                value,
+            },
+        ) if component_id == "manual_code" => Some(QrActionOutcome::ManualCodeEntered {
+            data: value.clone(),
+        }),
         _ => None,
     }
 }
@@ -144,8 +198,10 @@ pub(super) fn handle_qr_action(
 pub(super) enum QrActionOutcome {
     /// User pressed "Scan Their Code" — advance to ScanQr step.
     AdvanceToScan { session_active: bool },
-    /// User pressed "Back" on scan screen — return to ShowQr.
+    /// User pressed "Back" on scan/manual screen — return to ShowQr.
     BackToShowQr,
     /// User scanned a QR code — store data and move to Verifying.
     QrScanned { data: String },
+    /// User submitted a code via manual entry (camera permission denied fallback).
+    ManualCodeEntered { data: String },
 }

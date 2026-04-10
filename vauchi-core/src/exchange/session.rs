@@ -765,6 +765,15 @@ impl ExchangeSession {
                 self.attempt_transport_fallback(&transport);
                 Ok(())
             }
+            ExchangeHardwareEvent::PermissionDenied { transport } => {
+                self.debug_event(ExchangeDebugEvent::ExchangeFailed {
+                    error: format!("{} permission denied", transport),
+                });
+                // Same fallback logic — the transport can't be used regardless
+                // of whether hardware is absent or permission was denied.
+                self.attempt_transport_fallback(&transport);
+                Ok(())
+            }
             // New hardware event variants — not yet wired into the session state machine.
             // Frontends may send these; they are acknowledged without state change until
             // the corresponding session logic is implemented.

@@ -90,6 +90,12 @@ impl AppEngine {
                     undo_action_id: None,
                 })
             }
+            ExchangeHardwareEvent::PermissionDenied { transport } => {
+                Some(ActionResult::ShowToast {
+                    message: format!("{} access was denied", transport),
+                    undo_action_id: None,
+                })
+            }
             ExchangeHardwareEvent::HardwareError { transport, error } => {
                 Some(ActionResult::ShowAlert {
                     title: format!("{} error", transport),

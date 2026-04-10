@@ -142,6 +142,12 @@ pub enum ExchangeHardwareEvent {
     HardwareError { transport: String, error: String },
     /// The requested hardware is not available on this platform.
     HardwareUnavailable { transport: String },
+    /// The user denied the required permission for this hardware.
+    ///
+    /// Distinct from `HardwareUnavailable` (hardware absent) — the hardware
+    /// exists but the OS permission was denied. Frontends should send this
+    /// when a runtime permission prompt is rejected (camera, BLE, microphone).
+    PermissionDenied { transport: String },
 
     // ── Accelerometer ───────────────────────────────────────────────
     /// Accelerometer sample from the device.
@@ -248,6 +254,27 @@ mod tests {
     }
 
     #[test]
+    fn permission_denied_stores_transport() {
+        let evt = ExchangeHardwareEvent::PermissionDenied {
+            transport: "camera".into(),
+        };
+        assert!(
+            matches!(evt, ExchangeHardwareEvent::PermissionDenied { transport } if transport == "camera")
+        );
+    }
+
+    #[test]
+    fn permission_denied_is_distinct_from_hardware_unavailable() {
+        let denied = ExchangeHardwareEvent::PermissionDenied {
+            transport: "camera".into(),
+        };
+        let unavailable = ExchangeHardwareEvent::HardwareUnavailable {
+            transport: "camera".into(),
+        };
+        assert_ne!(denied, unavailable);
+    }
+
+    #[test]
     fn hardware_error_stores_details() {
         let evt = ExchangeHardwareEvent::HardwareError {
             transport: "NFC".into(),
@@ -338,6 +365,9 @@ mod tests {
             },
             ExchangeHardwareEvent::HardwareUnavailable {
                 transport: "NFC".into(),
+            },
+            ExchangeHardwareEvent::PermissionDenied {
+                transport: "camera".into(),
             },
             ExchangeHardwareEvent::AccelerometerData {
                 timestamp_ms: 1_000,
@@ -470,6 +500,9 @@ mod tests {
             ExchangeHardwareEvent::HardwareUnavailable {
                 transport: "".into(),
             },
+            ExchangeHardwareEvent::PermissionDenied {
+                transport: "".into(),
+            },
             ExchangeHardwareEvent::AccelerometerData {
                 timestamp_ms: 0,
                 x_milli_g: 0,
@@ -490,7 +523,7 @@ mod tests {
                 peer_public_key: vec![],
             },
         ];
-        // 16 total event variants
-        assert_eq!(variants.len(), 16);
+        // 17 total event variants (16 original + PermissionDenied)
+        assert_eq!(variants.len(), 17);
     }
 }

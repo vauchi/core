@@ -246,6 +246,13 @@ impl BleExchangeFlow {
                 reason: "Bluetooth not available".into(),
             };
         }
+        if let ExchangeHardwareEvent::PermissionDenied { transport } = event
+            && transport.eq_ignore_ascii_case("ble")
+        {
+            return BleHardwareOutcome::FailedWithFallback {
+                reason: "Bluetooth permission denied".into(),
+            };
+        }
 
         match &self.step {
             BleStep::Discovering => self.handle_discovering(event),

@@ -66,6 +66,8 @@ pub struct ExchangeEngine {
     failure_detail: Option<String>,
     /// Whether relay fallback is available on the Failed screen (BLE mode failures).
     ble_fallback_available: bool,
+    /// Whether QR fallback is available on the Failed screen (BLE mode failures with camera).
+    qr_fallback_available: bool,
     /// Mode selection sub-engine (created on demand).
     mode_selection: Option<ModeSelectionEngine>,
     /// Field preview config (built when entering FieldPreview step).
@@ -185,6 +187,7 @@ impl ExchangeEngine {
             session: None,
             failure_detail: None,
             ble_fallback_available: false,
+            qr_fallback_available: false,
             mode_selection,
             field_preview: None,
             link_initiation,
@@ -225,6 +228,7 @@ impl ExchangeEngine {
                     session: None,
                     failure_detail: None,
                     ble_fallback_available: false,
+                    qr_fallback_available: false,
                     mode_selection,
                     field_preview: None,
                     link_initiation: None,
@@ -246,6 +250,7 @@ impl ExchangeEngine {
             session: Some(session),
             failure_detail: None,
             ble_fallback_available: false,
+            qr_fallback_available: false,
             mode_selection,
             field_preview: None,
             link_initiation: None,
@@ -431,6 +436,7 @@ impl ExchangeEngine {
             BleHardwareOutcome::FailedWithFallback { reason } => {
                 self.failure_detail = Some(reason);
                 self.ble_fallback_available = true;
+                self.qr_fallback_available = self.config.device_capabilities.has_camera;
                 self.step = ExchangeStep::Failed;
                 ActionResult::UpdateScreen(self.build_screen())
             }
@@ -587,6 +593,9 @@ impl ExchangeEngine {
                 self.progress(),
             ),
             ExchangeStep::Qr(QrStep::ScanQr) => exchange_qr::build_scan_qr_screen(self.progress()),
+            ExchangeStep::Qr(QrStep::ManualEntry) => {
+                exchange_qr::build_manual_entry_screen(self.progress())
+            }
             ExchangeStep::Qr(QrStep::Verifying) => {
                 exchange_qr::build_verifying_screen(self.progress())
             }
@@ -647,7 +656,15 @@ impl ExchangeEngine {
                     style: ActionStyle::Primary,
                     enabled: true,
                 }];
-                // BLE failures offer relay fallback (Phase 4 degradation)
+                // BLE failures offer QR and relay fallbacks
+                if self.qr_fallback_available {
+                    actions.push(ScreenAction {
+                        id: "fallback_qr".into(),
+                        label: "Switch to QR".into(),
+                        style: ActionStyle::Secondary,
+                        enabled: true,
+                    });
+                }
                 if self.ble_fallback_available {
                     actions.push(ScreenAction {
                         id: "fallback_relay".into(),
@@ -745,6 +762,20 @@ impl WorkflowEngine for ExchangeEngine {
         // Link mode events — handled without ExchangeSession
         if matches!(self.step, ExchangeStep::Link(_)) {
             return self.handle_link_hardware_event(event);
+        }
+
+        // Camera unavailable/denied during QR scan → switch to manual entry
+        if matches!(self.step, ExchangeStep::Qr(QrStep::ScanQr)) {
+            let is_camera_fallback = matches!(
+                &event,
+                vauchi_core::exchange::ExchangeHardwareEvent::HardwareUnavailable { transport }
+                | vauchi_core::exchange::ExchangeHardwareEvent::PermissionDenied { transport }
+                    if transport.eq_ignore_ascii_case("camera")
+            );
+            if is_camera_fallback {
+                self.step = ExchangeStep::Qr(QrStep::ManualEntry);
+                return Some(ActionResult::NavigateTo(self.build_screen()));
+            }
         }
 
         // No session — handle QR scan via legacy TextChanged path
@@ -1008,6 +1039,12 @@ impl WorkflowEngine for ExchangeEngine {
                             self.step = ExchangeStep::Qr(QrStep::Verifying);
                             ActionResult::NavigateTo(self.build_screen())
                         }
+                        QrActionOutcome::ManualCodeEntered { data } => {
+                            // Manual entry is functionally equivalent to scanning
+                            self.scanned_data = Some(data);
+                            self.step = ExchangeStep::Qr(QrStep::Verifying);
+                            ActionResult::NavigateTo(self.build_screen())
+                        }
                     }
                 } else {
                     ActionResult::UpdateScreen(self.build_screen())
@@ -1060,6 +1097,7 @@ impl WorkflowEngine for ExchangeEngine {
                 self.scanned_data = None;
                 self.failure_detail = None;
                 self.ble_fallback_available = false;
+                self.qr_fallback_available = false;
                 // Restore to the correct sub-flow based on selected mode
                 if self.config.mode == Some(ExchangeMode::Link) {
                     return self.start_link_mode();
@@ -1075,9 +1113,20 @@ impl WorkflowEngine for ExchangeEngine {
                 ActionResult::NavigateTo(self.build_screen())
             }
             (ExchangeStep::Failed, UserAction::ActionPressed { action_id })
+                if action_id == "fallback_qr" =>
+            {
+                self.ble_fallback_available = false;
+                self.qr_fallback_available = false;
+                self.failure_detail = None;
+                self.config.mode = Some(ExchangeMode::Glance);
+                self.step = ExchangeStep::Qr(QrStep::ShowQr);
+                self.start_session_if_needed()
+            }
+            (ExchangeStep::Failed, UserAction::ActionPressed { action_id })
                 if action_id == "fallback_relay" =>
             {
                 self.ble_fallback_available = false;
+                self.qr_fallback_available = false;
                 self.failure_detail = None;
                 self.start_link_mode()
             }
@@ -2296,5 +2345,258 @@ mod tests {
             action_id: "fallback_relay".into(),
         });
         assert_eq!(engine.step, ExchangeStep::Link(LinkStep::ShareUrl));
+    }
+
+    // ── Permission degradation fallback tests ─────────────────────────
+
+    fn config_with_camera() -> ExchangeConfig {
+        ExchangeConfig {
+            device_capabilities: DeviceCapabilities {
+                has_camera: true,
+                ..Default::default()
+            },
+            ..config_no_groups()
+        }
+    }
+
+    // @internal
+    #[test]
+    fn camera_unavailable_during_qr_scan_switches_to_manual_entry() {
+        let mut engine = ExchangeEngine::new(config_with_camera());
+        engine.step = ExchangeStep::Qr(QrStep::ScanQr);
+
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::HardwareUnavailable {
+                transport: "camera".into(),
+            },
+        );
+
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Qr(QrStep::ManualEntry),
+            "Camera unavailable must switch to manual entry"
+        );
+        assert!(
+            matches!(result, Some(ActionResult::NavigateTo(_))),
+            "Must navigate to manual entry screen"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn camera_permission_denied_during_qr_scan_switches_to_manual_entry() {
+        let mut engine = ExchangeEngine::new(config_with_camera());
+        engine.step = ExchangeStep::Qr(QrStep::ScanQr);
+
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::PermissionDenied {
+                transport: "camera".into(),
+            },
+        );
+
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Qr(QrStep::ManualEntry),
+            "Camera permission denied must switch to manual entry"
+        );
+        assert!(
+            matches!(result, Some(ActionResult::NavigateTo(_))),
+            "Must navigate to manual entry screen"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn manual_entry_screen_has_text_input_and_submit() {
+        let screen = exchange_qr::build_manual_entry_screen(Progress {
+            current_step: 2,
+            total_steps: TOTAL_STEPS,
+            label: None,
+        });
+
+        assert_eq!(screen.screen_id, "exchange_manual_entry");
+        assert!(
+            screen
+                .components
+                .iter()
+                .any(|c| matches!(c, Component::TextInput { id, .. } if id == "manual_code")),
+            "Manual entry screen must have a text input for the code"
+        );
+        assert!(
+            screen.actions.iter().any(|a| a.id == "submit_code"),
+            "Manual entry screen must have a submit button"
+        );
+        assert!(
+            screen.actions.iter().any(|a| a.id == "back"),
+            "Manual entry screen must have a back button"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn manual_code_entry_advances_to_verifying() {
+        let mut engine = ExchangeEngine::new(config_with_camera());
+        engine.step = ExchangeStep::Qr(QrStep::ManualEntry);
+
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: "manual_code".into(),
+            value: "vauchi://exchange/abc123".into(),
+        });
+
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Qr(QrStep::Verifying),
+            "Submitting manual code must advance to verifying"
+        );
+        assert_eq!(
+            engine.scanned_data.as_deref(),
+            Some("vauchi://exchange/abc123"),
+            "Manual code must be stored as scanned data"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn manual_entry_back_returns_to_show_qr() {
+        let mut engine = ExchangeEngine::new(config_with_camera());
+        engine.step = ExchangeStep::Qr(QrStep::ManualEntry);
+
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "back".into(),
+        });
+
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Qr(QrStep::ShowQr),
+            "Back from manual entry must return to ShowQr"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn ble_failure_with_camera_shows_qr_fallback() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Magic),
+            device_capabilities: DeviceCapabilities {
+                has_camera: true,
+                has_ble: true,
+                ..Default::default()
+            },
+            ..config_no_groups()
+        });
+        let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
+            reason: "BLE timeout".into(),
+        });
+
+        assert!(engine.qr_fallback_available);
+        let screen = engine.build_screen();
+        assert!(
+            screen.actions.iter().any(|a| a.id == "fallback_qr"),
+            "BLE failure with camera must show QR fallback"
+        );
+        assert!(
+            screen.actions.iter().any(|a| a.id == "fallback_relay"),
+            "BLE failure must also show relay fallback"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn ble_failure_without_camera_has_no_qr_fallback() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Magic),
+            device_capabilities: DeviceCapabilities {
+                has_camera: false,
+                has_ble: true,
+                ..Default::default()
+            },
+            ..config_no_groups()
+        });
+        let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
+            reason: "BLE timeout".into(),
+        });
+
+        assert!(!engine.qr_fallback_available);
+        let screen = engine.build_screen();
+        assert!(
+            !screen.actions.iter().any(|a| a.id == "fallback_qr"),
+            "BLE failure without camera must not show QR fallback"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn fallback_qr_action_switches_to_qr_flow() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Magic),
+            device_capabilities: DeviceCapabilities {
+                has_camera: true,
+                has_ble: true,
+                ..Default::default()
+            },
+            ..config_no_groups()
+        });
+        let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
+            reason: "timeout".into(),
+        });
+
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "fallback_qr".into(),
+        });
+
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Qr(QrStep::ShowQr),
+            "Fallback QR must switch to QR flow"
+        );
+        assert!(!engine.ble_fallback_available);
+        assert!(!engine.qr_fallback_available);
+        assert!(engine.failure_detail.is_none());
+    }
+
+    // @internal
+    #[test]
+    fn ble_permission_denied_shows_fallback() {
+        let mut engine = ExchangeEngine::new(ExchangeConfig {
+            mode: Some(ExchangeMode::Magic),
+            device_capabilities: DeviceCapabilities {
+                has_camera: true,
+                has_ble: true,
+                ..Default::default()
+            },
+            ..config_no_groups()
+        });
+
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::PermissionDenied {
+                transport: "BLE".into(),
+            },
+        );
+
+        assert_eq!(engine.step, ExchangeStep::Failed);
+        assert!(engine.ble_fallback_available);
+        assert!(result.is_some());
+    }
+
+    // @internal
+    #[test]
+    fn camera_unavailable_outside_scan_step_is_ignored() {
+        let mut engine = ExchangeEngine::new(config_with_camera());
+        // In ShowQr step — camera unavailable should not trigger manual entry
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
+
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::HardwareUnavailable {
+                transport: "camera".into(),
+            },
+        );
+
+        assert_eq!(
+            engine.step,
+            ExchangeStep::Qr(QrStep::ShowQr),
+            "Camera unavailable in ShowQr should not switch to manual entry"
+        );
+        // Session is None so it returns None
+        assert!(result.is_none());
     }
 }

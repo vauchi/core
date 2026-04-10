@@ -135,13 +135,13 @@ pub fn is_safe_url(url: &str) -> bool {
     }
 }
 
-/// Validate a relay WebSocket URL.
+/// Validate a relay URL.
 ///
 /// Accepts:
-/// - `wss://` with a non-empty host (production relay)
-/// - `ws://` only for localhost/loopback (development)
+/// - `https://` with a non-empty host (production relay)
+/// - `http://` only for localhost/loopback (development)
 ///
-/// Rejects all other schemes, non-loopback `ws://` hosts,
+/// Rejects all other schemes, non-loopback `http://` hosts,
 /// and URLs containing null bytes.
 pub fn is_valid_relay_url(url: &str) -> bool {
     let url = url.trim();
@@ -150,27 +150,29 @@ pub fn is_valid_relay_url(url: &str) -> bool {
     }
     let lower = url.to_lowercase();
 
-    if let Some(rest) = lower.strip_prefix("wss://") {
-        // wss:// requires a non-empty host (reject "wss:///path")
+    if let Some(rest) = lower.strip_prefix("https://") {
         let authority = rest.split('/').next().unwrap_or("");
         !authority.is_empty()
-    } else if let Some(rest) = lower.strip_prefix("ws://") {
-        // ws:// only for loopback
-        let authority = rest.split('/').next().unwrap_or("");
-        // Handle IPv6 bracket notation: [::1]:port
-        let host = if authority.starts_with('[') {
-            authority
-                .split(']')
-                .next()
-                .unwrap_or("")
-                .trim_start_matches('[')
-        } else {
-            authority.split(':').next().unwrap_or("")
-        };
-        host == "localhost" || host == "127.0.0.1" || host == "::1"
+    } else if let Some(rest) = lower.strip_prefix("http://") {
+        is_loopback_authority(rest)
     } else {
         false
     }
+}
+
+/// Check if a URL authority (host:port) is a loopback address.
+fn is_loopback_authority(rest: &str) -> bool {
+    let authority = rest.split('/').next().unwrap_or("");
+    let host = if authority.starts_with('[') {
+        authority
+            .split(']')
+            .next()
+            .unwrap_or("")
+            .trim_start_matches('[')
+    } else {
+        authority.split(':').next().unwrap_or("")
+    };
+    host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
 /// Extract scheme from a URI string.
@@ -606,36 +608,36 @@ mod tests {
     // @scenario: security:Relay URL validation
     #[test]
     fn test_relay_url_wss_requires_host() {
-        assert!(is_valid_relay_url("wss://relay.vauchi.app"));
-        assert!(is_valid_relay_url("wss://relay.example.com/ws"));
-        assert!(is_valid_relay_url("wss://192.168.1.1:8443"));
+        assert!(is_valid_relay_url("https://relay.vauchi.app"));
+        assert!(is_valid_relay_url("https://relay.example.com/ws"));
+        assert!(is_valid_relay_url("https://192.168.1.1:8443"));
         // No host — must be rejected
-        assert!(!is_valid_relay_url("wss://"));
-        assert!(!is_valid_relay_url("wss:///path"));
-        assert!(!is_valid_relay_url("wss:///"));
+        assert!(!is_valid_relay_url("https://"));
+        assert!(!is_valid_relay_url("https:///path"));
+        assert!(!is_valid_relay_url("https:///"));
     }
 
     // @scenario: security:Relay URL validation
     #[test]
     fn test_relay_url_rejects_null_bytes() {
-        assert!(!is_valid_relay_url("wss://relay.vauchi.app\0"));
-        assert!(!is_valid_relay_url("wss://evil\0.example.com"));
+        assert!(!is_valid_relay_url("https://relay.vauchi.app\0"));
+        assert!(!is_valid_relay_url("https://evil\0.example.com"));
     }
 
     // @scenario: security:Relay URL validation
     #[test]
     fn test_relay_url_ws_localhost_only() {
-        assert!(is_valid_relay_url("ws://localhost:9001"));
-        assert!(is_valid_relay_url("ws://127.0.0.1:9001"));
-        assert!(is_valid_relay_url("ws://[::1]:9001"));
-        assert!(!is_valid_relay_url("ws://relay.example.com"));
+        assert!(is_valid_relay_url("http://localhost:9001"));
+        assert!(is_valid_relay_url("http://127.0.0.1:9001"));
+        assert!(is_valid_relay_url("http://[::1]:9001"));
+        assert!(!is_valid_relay_url("http://relay.example.com"));
     }
 
     // @scenario: security:Relay URL validation
     #[test]
     fn test_relay_url_rejects_other_schemes() {
-        assert!(!is_valid_relay_url("https://relay.example.com"));
-        assert!(!is_valid_relay_url("http://localhost:9001"));
+        assert!(!is_valid_relay_url("ftp://relay.example.com"));
+        assert!(!is_valid_relay_url("ssh://relay.example.com"));
         assert!(!is_valid_relay_url(""));
     }
 }

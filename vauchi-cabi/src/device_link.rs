@@ -274,18 +274,8 @@ pub unsafe extern "C" fn vauchi_device_link_confirm_manual(
 
 // ── Relay transport ───────────────────────────────────────────────────
 
-fn ws_to_http(url: &str) -> String {
-    if let Some(rest) = url.strip_prefix("wss://") {
-        format!("https://{rest}")
-    } else if let Some(rest) = url.strip_prefix("ws://") {
-        format!("http://{rest}")
-    } else {
-        url.to_string()
-    }
-}
-
 fn create_transport(relay_url: &str) -> HttpTransport {
-    let http_url = ws_to_http(relay_url);
+    let http_url = relay_url.to_string();
     HttpTransport::new(HttpTransportConfig {
         relay_url: http_url,
         timeout_ms: 10_000,

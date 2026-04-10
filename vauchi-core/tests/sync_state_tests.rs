@@ -340,9 +340,9 @@ fn test_sync_get_ready_grouped_by_relay() {
 
     // Queue updates with different relay URLs directly via storage
     let updates = vec![
-        ("u1", "alice", Some("wss://relay-a.example.com")),
-        ("u2", "bob", Some("wss://relay-a.example.com")),
-        ("u3", "carol", Some("wss://relay-b.example.com")),
+        ("u1", "alice", Some("https://relay-a.example.com")),
+        ("u2", "bob", Some("https://relay-a.example.com")),
+        ("u3", "carol", Some("https://relay-b.example.com")),
         ("u4", "dave", None),
     ];
 
@@ -371,12 +371,12 @@ fn test_sync_get_ready_grouped_by_relay() {
     assert_eq!(grouped.len(), 3);
 
     let relay_a = grouped
-        .get(&Some("wss://relay-a.example.com".to_string()))
+        .get(&Some("https://relay-a.example.com".to_string()))
         .unwrap();
     assert_eq!(relay_a.len(), 2);
 
     let relay_b = grouped
-        .get(&Some("wss://relay-b.example.com".to_string()))
+        .get(&Some("https://relay-b.example.com".to_string()))
         .unwrap();
     assert_eq!(relay_b.len(), 1);
 
@@ -404,7 +404,7 @@ fn test_sync_grouped_excludes_not_ready_failed() {
         created_at: now,
         retry_count: 0,
         status: UpdateStatus::Pending,
-        target_relay_url: Some("wss://relay.example.com".to_string()),
+        target_relay_url: Some("https://relay.example.com".to_string()),
     };
 
     // One failed with retry in the future (not ready)
@@ -419,7 +419,7 @@ fn test_sync_grouped_excludes_not_ready_failed() {
             error: "timeout".to_string(),
             retry_at: now + 9999,
         },
-        target_relay_url: Some("wss://relay.example.com".to_string()),
+        target_relay_url: Some("https://relay.example.com".to_string()),
     };
 
     storage.queue_update(&u1).unwrap();
@@ -429,7 +429,7 @@ fn test_sync_grouped_excludes_not_ready_failed() {
 
     // Only the pending one should be in the result
     let relay = grouped
-        .get(&Some("wss://relay.example.com".to_string()))
+        .get(&Some("https://relay.example.com".to_string()))
         .unwrap();
     assert_eq!(relay.len(), 1);
     assert_eq!(relay[0].id, "u1");

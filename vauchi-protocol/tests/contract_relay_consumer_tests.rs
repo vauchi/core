@@ -124,7 +124,7 @@ fn provider_contract_forwarding_hints_canonical_data_exists() {
     let hints = ForwardingHints {
         hints: vec![ForwardingHintInfo {
             blob_id: "b1".to_string(),
-            relay_url: "wss://test".to_string(),
+            relay_url: "https://test".to_string(),
             expires_at_secs: 100,
         }],
         relay_signing_key: None,

@@ -92,16 +92,16 @@ fn run_qr_exchange(
 #[test]
 fn exchange_with_relay_metadata_populates_contact() {
     let (alice_contact, bob_contact) = run_qr_exchange(
-        Some("wss://alice-relay.com".to_string()),
+        Some("https://alice-relay.com".to_string()),
         Some([11u8; 32]),
-        Some("wss://bob-relay.com".to_string()),
+        Some("https://bob-relay.com".to_string()),
         Some([22u8; 32]),
     );
 
     // Alice's contact (Bob) should have Bob's relay
     assert_eq!(
         alice_contact.relay_url().unwrap(),
-        "wss://bob-relay.com",
+        "https://bob-relay.com",
         "Alice should learn Bob's relay from exchange"
     );
     assert_eq!(
@@ -113,7 +113,7 @@ fn exchange_with_relay_metadata_populates_contact() {
     // Bob's contact (Alice) should have Alice's relay
     assert_eq!(
         bob_contact.relay_url().unwrap(),
-        "wss://alice-relay.com",
+        "https://alice-relay.com",
         "Bob should learn Alice's relay from exchange"
     );
     assert_eq!(
@@ -137,7 +137,7 @@ fn exchange_without_relay_metadata_leaves_contact_fields_empty() {
 fn exchange_with_partial_relay_metadata() {
     // Alice has relay, Bob doesn't
     let (alice_contact, bob_contact) = run_qr_exchange(
-        Some("wss://alice-relay.com".to_string()),
+        Some("https://alice-relay.com".to_string()),
         Some([11u8; 32]),
         None,
         None,
@@ -148,6 +148,6 @@ fn exchange_with_partial_relay_metadata() {
     assert!(alice_contact.relay_noise_pubkey().is_none());
 
     // Bob's contact (Alice) has Alice's relay
-    assert_eq!(bob_contact.relay_url().unwrap(), "wss://alice-relay.com");
+    assert_eq!(bob_contact.relay_url().unwrap(), "https://alice-relay.com");
     assert_eq!(bob_contact.relay_noise_pubkey().unwrap(), &[11u8; 32]);
 }

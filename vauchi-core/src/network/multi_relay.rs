@@ -514,8 +514,8 @@ mod tests {
     #[test]
     fn test_config_builder() {
         let config = MultiRelayConfig::builder()
-            .add_relay("wss://relay1.test")
-            .add_relay("wss://relay2.test")
+            .add_relay("https://relay1.test")
+            .add_relay("https://relay2.test")
             .build()
             .unwrap();
 
@@ -542,8 +542,8 @@ mod tests {
     #[test]
     fn test_multi_relay_manager_select_primary_first() {
         let config = MultiRelayConfig::builder()
-            .primary_relay("wss://primary.test")
-            .add_relay("wss://backup.test")
+            .primary_relay("https://primary.test")
+            .add_relay("https://backup.test")
             .build()
             .unwrap();
 
@@ -552,7 +552,7 @@ mod tests {
 
         assert_eq!(
             selected,
-            Some("wss://primary.test".to_string()),
+            Some("https://primary.test".to_string()),
             "PrimaryFirst strategy should select the primary relay"
         );
     }
@@ -560,18 +560,18 @@ mod tests {
     #[test]
     fn test_multi_relay_manager_fallback_on_unhealthy() {
         let config = MultiRelayConfig::builder()
-            .primary_relay("wss://primary.test")
-            .add_relay("wss://backup.test")
+            .primary_relay("https://primary.test")
+            .add_relay("https://backup.test")
             .build()
             .unwrap();
 
         let mut manager = MultiRelayManager::new(config);
-        manager.mark_unhealthy("wss://primary.test");
+        manager.mark_unhealthy("https://primary.test");
 
         let selected = manager.select_relay();
         assert_eq!(
             selected,
-            Some("wss://backup.test".to_string()),
+            Some("https://backup.test".to_string()),
             "Should fall back to backup when primary is unhealthy"
         );
     }
@@ -579,26 +579,26 @@ mod tests {
     #[test]
     fn test_multi_relay_manager_marks_health() {
         let config = MultiRelayConfig::builder()
-            .add_relay("wss://relay1.test")
+            .add_relay("https://relay1.test")
             .build()
             .unwrap();
 
         let mut manager = MultiRelayManager::new(config);
 
         assert!(
-            manager.is_relay_healthy("wss://relay1.test"),
+            manager.is_relay_healthy("https://relay1.test"),
             "Unknown relay should be considered healthy"
         );
 
-        manager.mark_unhealthy("wss://relay1.test");
+        manager.mark_unhealthy("https://relay1.test");
         assert!(
-            !manager.is_relay_healthy("wss://relay1.test"),
+            !manager.is_relay_healthy("https://relay1.test"),
             "Should be unhealthy after marking"
         );
 
-        manager.mark_healthy("wss://relay1.test");
+        manager.mark_healthy("https://relay1.test");
         assert!(
-            manager.is_relay_healthy("wss://relay1.test"),
+            manager.is_relay_healthy("https://relay1.test"),
             "Should be healthy again after marking healthy"
         );
     }
@@ -606,14 +606,14 @@ mod tests {
     #[test]
     fn test_multi_relay_manager_all_unhealthy_returns_none() {
         let config = MultiRelayConfig::builder()
-            .primary_relay("wss://relay1.test")
-            .add_relay("wss://relay2.test")
+            .primary_relay("https://relay1.test")
+            .add_relay("https://relay2.test")
             .build()
             .unwrap();
 
         let mut manager = MultiRelayManager::new(config);
-        manager.mark_unhealthy("wss://relay1.test");
-        manager.mark_unhealthy("wss://relay2.test");
+        manager.mark_unhealthy("https://relay1.test");
+        manager.mark_unhealthy("https://relay2.test");
 
         let selected = manager.select_relay();
         assert_eq!(

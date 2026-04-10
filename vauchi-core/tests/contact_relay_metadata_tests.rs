@@ -38,8 +38,11 @@ fn new_contact_has_no_relay_metadata() {
 #[test]
 fn set_relay_url() {
     let mut contact = make_test_contact();
-    contact.set_relay_url(Some("wss://relay.bobs-server.com".to_string()));
-    assert_eq!(contact.relay_url().unwrap(), "wss://relay.bobs-server.com");
+    contact.set_relay_url(Some("https://relay.bobs-server.com".to_string()));
+    assert_eq!(
+        contact.relay_url().unwrap(),
+        "https://relay.bobs-server.com"
+    );
 }
 
 #[test]
@@ -53,7 +56,7 @@ fn set_relay_noise_pubkey() {
 #[test]
 fn clear_relay_metadata() {
     let mut contact = make_test_contact();
-    contact.set_relay_url(Some("wss://relay.example.com".to_string()));
+    contact.set_relay_url(Some("https://relay.example.com".to_string()));
     contact.set_relay_noise_pubkey(Some([99u8; 32]));
 
     contact.set_relay_url(None);
@@ -95,13 +98,13 @@ fn from_sync_data_has_no_relay_fields() {
 #[test]
 fn relay_metadata_preserved_after_card_update() {
     let mut contact = make_test_contact();
-    contact.set_relay_url(Some("wss://relay.example.com".to_string()));
+    contact.set_relay_url(Some("https://relay.example.com".to_string()));
     contact.set_relay_noise_pubkey(Some([77u8; 32]));
 
     let new_card = ContactCard::new("Bob Updated");
     contact.update_card(new_card);
 
-    assert_eq!(contact.relay_url().unwrap(), "wss://relay.example.com");
+    assert_eq!(contact.relay_url().unwrap(), "https://relay.example.com");
     assert_eq!(contact.relay_noise_pubkey().unwrap(), &[77u8; 32]);
 }
 
@@ -110,7 +113,7 @@ fn relay_metadata_preserved_after_card_update() {
 #[test]
 fn relay_metadata_preserved_after_recovery() {
     let mut contact = make_test_contact();
-    contact.set_relay_url(Some("wss://relay.example.com".to_string()));
+    contact.set_relay_url(Some("https://relay.example.com".to_string()));
     contact.set_relay_noise_pubkey(Some([88u8; 32]));
 
     contact
@@ -119,6 +122,6 @@ fn relay_metadata_preserved_after_recovery() {
 
     // Relay metadata should persist through recovery — the contact
     // is still reachable at the same relay.
-    assert_eq!(contact.relay_url().unwrap(), "wss://relay.example.com");
+    assert_eq!(contact.relay_url().unwrap(), "https://relay.example.com");
     assert_eq!(contact.relay_noise_pubkey().unwrap(), &[88u8; 32]);
 }

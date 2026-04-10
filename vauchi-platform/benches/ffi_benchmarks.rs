@@ -17,7 +17,7 @@ fn create_test_instance() -> (Arc<VauchiPlatform>, TempDir) {
     let dir = TempDir::new().unwrap();
     let instance = VauchiPlatform::new(
         dir.path().to_string_lossy().to_string(),
-        "ws://localhost:8080".to_string(),
+        "http://localhost:8080".to_string(),
     )
     .unwrap();
     (instance, dir)

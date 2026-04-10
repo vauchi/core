@@ -288,13 +288,13 @@ fn test_get_pending_updates_grouped_by_relay() {
 
     // Updates for different relays
     let mut u1 = create_pending_update("u1", "alice");
-    u1.target_relay_url = Some("wss://relay-a.example.com".to_string());
+    u1.target_relay_url = Some("https://relay-a.example.com".to_string());
 
     let mut u2 = create_pending_update("u2", "bob");
-    u2.target_relay_url = Some("wss://relay-a.example.com".to_string());
+    u2.target_relay_url = Some("https://relay-a.example.com".to_string());
 
     let mut u3 = create_pending_update("u3", "carol");
-    u3.target_relay_url = Some("wss://relay-b.example.com".to_string());
+    u3.target_relay_url = Some("https://relay-b.example.com".to_string());
 
     let mut u4 = create_pending_update("u4", "dave");
     u4.target_relay_url = None; // home relay
@@ -310,12 +310,12 @@ fn test_get_pending_updates_grouped_by_relay() {
     assert_eq!(grouped.len(), 3);
 
     let relay_a = grouped
-        .get(&Some("wss://relay-a.example.com".to_string()))
+        .get(&Some("https://relay-a.example.com".to_string()))
         .unwrap();
     assert_eq!(relay_a.len(), 2);
 
     let relay_b = grouped
-        .get(&Some("wss://relay-b.example.com".to_string()))
+        .get(&Some("https://relay-b.example.com".to_string()))
         .unwrap();
     assert_eq!(relay_b.len(), 1);
     assert_eq!(relay_b[0].contact_id, "carol");
@@ -332,7 +332,7 @@ fn test_grouped_by_relay_all_same_relay() {
 
     for i in 0..3 {
         let mut update = create_pending_update(&format!("u-{i}"), &format!("c-{i}"));
-        update.target_relay_url = Some("wss://relay.example.com".to_string());
+        update.target_relay_url = Some("https://relay.example.com".to_string());
         storage.queue_update(&update).unwrap();
     }
 
@@ -340,7 +340,7 @@ fn test_grouped_by_relay_all_same_relay() {
     assert_eq!(grouped.len(), 1);
 
     let relay = grouped
-        .get(&Some("wss://relay.example.com".to_string()))
+        .get(&Some("https://relay.example.com".to_string()))
         .unwrap();
     assert_eq!(relay.len(), 3);
 }

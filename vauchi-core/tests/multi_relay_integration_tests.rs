@@ -26,9 +26,9 @@ use vauchi_core::network::{MultiRelayConfig, RelayHealth, RelaySelector};
 #[test]
 fn test_multi_relay_config_creation() {
     let config = MultiRelayConfig::builder()
-        .add_relay("wss://relay1.vauchi.app")
-        .add_relay("wss://relay2.vauchi.app")
-        .add_relay("wss://relay3.vauchi.app")
+        .add_relay("https://relay1.vauchi.app")
+        .add_relay("https://relay2.vauchi.app")
+        .add_relay("https://relay3.vauchi.app")
         .build()
         .expect("Should create config");
 
@@ -37,7 +37,7 @@ fn test_multi_relay_config_creation() {
         config
             .relays()
             .iter()
-            .any(|r| r == "wss://relay1.vauchi.app")
+            .any(|r| r == "https://relay1.vauchi.app")
     );
 }
 
@@ -54,9 +54,9 @@ fn test_multi_relay_requires_at_least_one() {
 #[test]
 fn test_multi_relay_deduplicates_urls() {
     let config = MultiRelayConfig::builder()
-        .add_relay("wss://relay.vauchi.app")
-        .add_relay("wss://relay.vauchi.app")
-        .add_relay("wss://relay.vauchi.app")
+        .add_relay("https://relay.vauchi.app")
+        .add_relay("https://relay.vauchi.app")
+        .add_relay("https://relay.vauchi.app")
         .build()
         .unwrap();
 
@@ -68,12 +68,12 @@ fn test_multi_relay_deduplicates_urls() {
 #[test]
 fn test_primary_relay_preference() {
     let config = MultiRelayConfig::builder()
-        .add_relay("wss://secondary.vauchi.app")
-        .primary_relay("wss://primary.vauchi.app")
+        .add_relay("https://secondary.vauchi.app")
+        .primary_relay("https://primary.vauchi.app")
         .build()
         .unwrap();
 
-    assert_eq!(config.primary(), Some("wss://primary.vauchi.app"));
+    assert_eq!(config.primary(), Some("https://primary.vauchi.app"));
     assert_eq!(config.relay_count(), 2);
 }
 
@@ -87,9 +87,9 @@ fn test_primary_relay_preference() {
 #[test]
 fn test_round_robin_selection() {
     let config = MultiRelayConfig::builder()
-        .add_relay("wss://relay1.vauchi.app")
-        .add_relay("wss://relay2.vauchi.app")
-        .add_relay("wss://relay3.vauchi.app")
+        .add_relay("https://relay1.vauchi.app")
+        .add_relay("https://relay2.vauchi.app")
+        .add_relay("https://relay3.vauchi.app")
         .selection_strategy(RelaySelector::RoundRobin)
         .build()
         .unwrap();
@@ -109,9 +109,9 @@ fn test_round_robin_selection() {
 #[test]
 fn test_random_selection() {
     let config = MultiRelayConfig::builder()
-        .add_relay("wss://relay1.vauchi.app")
-        .add_relay("wss://relay2.vauchi.app")
-        .add_relay("wss://relay3.vauchi.app")
+        .add_relay("https://relay1.vauchi.app")
+        .add_relay("https://relay2.vauchi.app")
+        .add_relay("https://relay3.vauchi.app")
         .selection_strategy(RelaySelector::Random)
         .build()
         .unwrap();
@@ -131,15 +131,15 @@ fn test_random_selection() {
 #[test]
 fn test_primary_first_selection() {
     let config = MultiRelayConfig::builder()
-        .add_relay("wss://backup.vauchi.app")
-        .primary_relay("wss://primary.vauchi.app")
+        .add_relay("https://backup.vauchi.app")
+        .primary_relay("https://primary.vauchi.app")
         .selection_strategy(RelaySelector::PrimaryFirst)
         .build()
         .unwrap();
 
     // Should always return primary when healthy
     for _ in 0..5 {
-        assert_eq!(config.select_relay(), "wss://primary.vauchi.app");
+        assert_eq!(config.select_relay(), "https://primary.vauchi.app");
     }
 }
 
@@ -154,12 +154,12 @@ fn test_primary_first_selection() {
 fn test_relay_health_tracking() {
     let mut health = RelayHealth::new();
 
-    health.record_success("wss://relay1.vauchi.app");
-    health.record_success("wss://relay1.vauchi.app");
-    health.record_failure("wss://relay2.vauchi.app");
+    health.record_success("https://relay1.vauchi.app");
+    health.record_success("https://relay1.vauchi.app");
+    health.record_failure("https://relay2.vauchi.app");
 
-    assert!(health.is_healthy("wss://relay1.vauchi.app"));
-    assert!(!health.is_healthy("wss://relay2.vauchi.app"));
+    assert!(health.is_healthy("https://relay1.vauchi.app"));
+    assert!(!health.is_healthy("https://relay2.vauchi.app"));
 }
 
 /// Test: Unknown relay is healthy by default
@@ -167,7 +167,7 @@ fn test_relay_health_tracking() {
 #[test]
 fn test_unknown_relay_healthy() {
     let health = RelayHealth::new();
-    assert!(health.is_healthy("wss://unknown.vauchi.app"));
+    assert!(health.is_healthy("https://unknown.vauchi.app"));
 }
 
 /// Test: Unhealthy relay recovers after cooldown
@@ -176,14 +176,14 @@ fn test_unknown_relay_healthy() {
 fn test_relay_recovery_after_cooldown() {
     let mut health = RelayHealth::with_cooldown(Duration::from_millis(50));
 
-    health.record_failure("wss://relay.vauchi.app");
-    assert!(!health.is_healthy("wss://relay.vauchi.app"));
+    health.record_failure("https://relay.vauchi.app");
+    assert!(!health.is_healthy("https://relay.vauchi.app"));
 
     // Advance time past the maximum possible cooldown (base=50ms, failures=1,
     // so max cooldown = 50ms, jitter range = [25ms, 50ms]). At 100ms past the
     // failure, any jitter value is exceeded — no sleep needed.
     let future = Instant::now() + Duration::from_millis(100);
-    assert!(health.should_retry_at("wss://relay.vauchi.app", future));
+    assert!(health.should_retry_at("https://relay.vauchi.app", future));
 }
 
 /// Test: Consecutive failures increase cooldown
@@ -194,10 +194,10 @@ fn test_exponential_backoff_on_failures() {
 
     // Record multiple failures
     for _ in 0..3 {
-        health.record_failure("wss://relay.vauchi.app");
+        health.record_failure("https://relay.vauchi.app");
     }
 
-    let cooldown = health.cooldown_remaining("wss://relay.vauchi.app");
+    let cooldown = health.cooldown_remaining("https://relay.vauchi.app");
 
     // Cooldown should be longer after multiple failures
     assert!(cooldown > Duration::from_secs(0));
@@ -210,13 +210,13 @@ fn test_success_resets_failures() {
     let mut health = RelayHealth::new();
 
     // Record failures
-    health.record_failure("wss://relay.vauchi.app");
-    health.record_failure("wss://relay.vauchi.app");
-    assert!(!health.is_healthy("wss://relay.vauchi.app"));
+    health.record_failure("https://relay.vauchi.app");
+    health.record_failure("https://relay.vauchi.app");
+    assert!(!health.is_healthy("https://relay.vauchi.app"));
 
     // Success should reset
-    health.record_success("wss://relay.vauchi.app");
-    assert!(health.is_healthy("wss://relay.vauchi.app"));
+    health.record_success("https://relay.vauchi.app");
+    assert!(health.is_healthy("https://relay.vauchi.app"));
 }
 
 // ============================================================
@@ -227,9 +227,9 @@ fn test_success_resets_failures() {
 #[test]
 fn test_config_serialization() {
     let config = MultiRelayConfig::builder()
-        .add_relay("wss://relay1.vauchi.app")
-        .add_relay("wss://relay2.vauchi.app")
-        .primary_relay("wss://relay1.vauchi.app")
+        .add_relay("https://relay1.vauchi.app")
+        .add_relay("https://relay2.vauchi.app")
+        .primary_relay("https://relay1.vauchi.app")
         .selection_strategy(RelaySelector::RoundRobin)
         .build()
         .unwrap();

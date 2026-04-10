@@ -10,7 +10,7 @@ fn sample_config() -> SettingsConfig {
         delivery_receipts_enabled: true,
         suppress_presence: false,
         contact_added_notifications: false,
-        relay_url: "wss://relay.vauchi.app".into(),
+        relay_url: "https://relay.vauchi.app".into(),
         device_count: 3,
         password_set: true,
     }
@@ -105,7 +105,7 @@ fn settings_reflects_config_values() {
     assert_eq!(name_value, "Alice");
 
     let relay_value = find_value(&screen, "network", "relay_url");
-    assert_eq!(relay_value, "wss://relay.vauchi.app");
+    assert_eq!(relay_value, "https://relay.vauchi.app");
 }
 
 // ADR-022: irrevocable actions use InlineConfirm, not ShowAlert

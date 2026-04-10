@@ -20,10 +20,10 @@ use vauchi_core::identity::Identity;
 use vauchi_core::network::relay_url::validate_relay_url;
 use vauchi_core::storage::Storage;
 
-/// Strategy: generate valid wss:// relay URLs with random subdomains.
+/// Strategy: generate valid https:// relay URLs with random subdomains.
 fn valid_relay_url_strategy() -> impl Strategy<Value = String> {
     // Random subdomain (1-50 alphanum chars) + fixed public domain
-    "[a-z0-9]{1,50}".prop_map(|sub| format!("wss://{sub}.relay.example.com"))
+    "[a-z0-9]{1,50}".prop_map(|sub| format!("https://{sub}.relay.example.com"))
 }
 
 /// Strategy: generate random 32-byte Noise pubkeys.
@@ -68,7 +68,7 @@ proptest! {
         let qr = ExchangeQR::generate_with_relay(
             &identity,
             &ephemeral,
-            Some("wss://relay.example.com".to_string()),
+            Some("https://relay.example.com".to_string()),
             Some(pubkey),
         );
 

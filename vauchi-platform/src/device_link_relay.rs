@@ -61,9 +61,8 @@ struct ClaimPayload {
 }
 
 fn create_transport(relay_url: &str) -> HttpTransport {
-    let http_url = super::ws_to_http(relay_url);
     HttpTransport::new(HttpTransportConfig {
-        relay_url: http_url,
+        relay_url: relay_url.to_string(),
         timeout_ms: 10_000,
         proxy: ProxyConfig::None,
         allow_direct: true,

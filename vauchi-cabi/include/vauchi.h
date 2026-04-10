@@ -53,7 +53,7 @@ typedef void (*VauchiEventCallback)(const char *screen_ids_json, void *user_data
  * Create a new config builder with data directory and relay URL.
  *
  * Returns null if `data_dir` is null.
- * If `relay_url` is null, uses the default (`wss://relay.vauchi.app`).
+ * If `relay_url` is null, uses the default (`https://relay.vauchi.app`).
  *
  * # Safety
  * `data_dir` and `relay_url` must be valid null-terminated C strings, or null.
@@ -130,7 +130,7 @@ struct VauchiApp *vauchi_app_create(void);
 /**
  * Create a new AppEngine with a custom relay URL.
  *
- * If `relay_url` is null, uses the default (`wss://relay.vauchi.app`).
+ * If `relay_url` is null, uses the default (`https://relay.vauchi.app`).
  * The caller retains ownership of the `relay_url` string.
  *
  * Returns null on initialization failure.

@@ -106,7 +106,7 @@ fn form_dialog_submit_navigates_back() {
     engine.navigate_to(AppScreen::MyInfo);
     engine.navigate_to(AppScreen::FormDialog {
         dialog_type: FormDialogType::EditRelayUrl {
-            current_url: "wss://old.relay".into(),
+            current_url: "https://old.relay".into(),
         },
     });
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -391,13 +391,13 @@ fn form_dialog_edit_relay_url_navigates_back() {
 
     engine.navigate_to(AppScreen::FormDialog {
         dialog_type: FormDialogType::EditRelayUrl {
-            current_url: "wss://relay.vauchi.app".into(),
+            current_url: "https://relay.vauchi.app".into(),
         },
     });
 
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "relay_url".into(),
-        value: "wss://custom.relay.example.com".into(),
+        value: "https://custom.relay.example.com".into(),
     });
 
     let result = engine.handle_action(UserAction::ActionPressed {

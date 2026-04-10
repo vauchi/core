@@ -30,13 +30,13 @@ fn contact_relay_url_survives_storage_roundtrip() {
     let storage = open_storage();
 
     let mut contact = make_contact("Alice");
-    contact.set_relay_url(Some("wss://alice-relay.example.com".to_string()));
+    contact.set_relay_url(Some("https://alice-relay.example.com".to_string()));
     storage.save_contact(&contact).unwrap();
 
     let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
     assert_eq!(
         loaded.relay_url().unwrap(),
-        "wss://alice-relay.example.com",
+        "https://alice-relay.example.com",
         "Relay URL must survive save/load roundtrip"
     );
 }
@@ -63,12 +63,15 @@ fn contact_with_both_relay_fields_roundtrips() {
     let storage = open_storage();
 
     let mut contact = make_contact("Carol");
-    contact.set_relay_url(Some("wss://carol-relay.example.com".to_string()));
+    contact.set_relay_url(Some("https://carol-relay.example.com".to_string()));
     contact.set_relay_noise_pubkey(Some([99u8; 32]));
     storage.save_contact(&contact).unwrap();
 
     let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
-    assert_eq!(loaded.relay_url().unwrap(), "wss://carol-relay.example.com");
+    assert_eq!(
+        loaded.relay_url().unwrap(),
+        "https://carol-relay.example.com"
+    );
     assert_eq!(loaded.relay_noise_pubkey().unwrap(), &[99u8; 32]);
 }
 
@@ -110,11 +113,11 @@ fn list_contacts_includes_relay_metadata() {
     let storage = open_storage();
 
     let mut alice = make_contact("Alice");
-    alice.set_relay_url(Some("wss://alice.relay".to_string()));
+    alice.set_relay_url(Some("https://alice.relay".to_string()));
     storage.save_contact(&alice).unwrap();
 
     let mut bob = make_contact("Bob");
-    bob.set_relay_url(Some("wss://bob.relay".to_string()));
+    bob.set_relay_url(Some("https://bob.relay".to_string()));
     bob.set_relay_noise_pubkey(Some([11u8; 32]));
     storage.save_contact(&bob).unwrap();
 
@@ -125,11 +128,11 @@ fn list_contacts_includes_relay_metadata() {
         .iter()
         .find(|c| c.display_name() == "Alice")
         .unwrap();
-    assert_eq!(alice_loaded.relay_url().unwrap(), "wss://alice.relay");
+    assert_eq!(alice_loaded.relay_url().unwrap(), "https://alice.relay");
     assert!(alice_loaded.relay_noise_pubkey().is_none());
 
     let bob_loaded = contacts.iter().find(|c| c.display_name() == "Bob").unwrap();
-    assert_eq!(bob_loaded.relay_url().unwrap(), "wss://bob.relay");
+    assert_eq!(bob_loaded.relay_url().unwrap(), "https://bob.relay");
     assert_eq!(bob_loaded.relay_noise_pubkey().unwrap(), &[11u8; 32]);
 }
 
@@ -140,15 +143,15 @@ fn update_contact_relay_url_persists() {
     let storage = open_storage();
 
     let mut contact = make_contact("Eve");
-    contact.set_relay_url(Some("wss://old-relay.example.com".to_string()));
+    contact.set_relay_url(Some("https://old-relay.example.com".to_string()));
     storage.save_contact(&contact).unwrap();
 
     // Update relay URL
-    contact.set_relay_url(Some("wss://new-relay.example.com".to_string()));
+    contact.set_relay_url(Some("https://new-relay.example.com".to_string()));
     storage.save_contact(&contact).unwrap();
 
     let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
-    assert_eq!(loaded.relay_url().unwrap(), "wss://new-relay.example.com");
+    assert_eq!(loaded.relay_url().unwrap(), "https://new-relay.example.com");
 }
 
 #[test]
@@ -156,7 +159,7 @@ fn clear_contact_relay_url_persists() {
     let storage = open_storage();
 
     let mut contact = make_contact("Frank");
-    contact.set_relay_url(Some("wss://frank.relay".to_string()));
+    contact.set_relay_url(Some("https://frank.relay".to_string()));
     storage.save_contact(&contact).unwrap();
 
     // Clear relay URL

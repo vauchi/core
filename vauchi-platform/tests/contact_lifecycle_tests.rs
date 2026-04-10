@@ -18,7 +18,7 @@ fn setup() -> (Arc<VauchiPlatform>, TempDir) {
     let dir = TempDir::new().unwrap();
     let wb = VauchiPlatform::new(
         dir.path().to_string_lossy().to_string(),
-        "ws://localhost:8080".to_string(),
+        "http://localhost:8080".to_string(),
     )
     .unwrap();
     wb.create_identity("Alice".to_string()).unwrap();

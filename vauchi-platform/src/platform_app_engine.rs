@@ -61,7 +61,7 @@ pub trait PlatformEventListener: Send + Sync {
 /// ```swift
 /// let engine = try PlatformAppEngine(
 ///     dataDir: dataDir,
-///     relayUrl: "wss://relay.vauchi.app",
+///     relayUrl: "https://relay.vauchi.app",
 ///     storageKeyBytes: keyBytes
 /// )
 ///

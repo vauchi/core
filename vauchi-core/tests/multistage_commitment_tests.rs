@@ -88,7 +88,7 @@ fn test_commitment_hash_mismatch_detected() {
 #[test]
 fn test_commitment_with_context_binds_relay_url() {
     let plaintext = b"contact card data";
-    let context = b"wss://relay.vauchi.app";
+    let context = b"https://relay.vauchi.app";
 
     let commitment = Commitment::create_with_context(plaintext, context);
 
@@ -101,7 +101,7 @@ fn test_commitment_with_context_binds_relay_url() {
     ));
 
     // Verify with wrong context (swapped relay URL) fails
-    let wrong_context = b"wss://evil-relay.example";
+    let wrong_context = b"https://evil-relay.example";
     assert!(!Commitment::verify_hash_with_context(
         commitment.reveal_key(),
         commitment.ciphertext(),
@@ -130,7 +130,7 @@ fn test_commitment_with_context_empty_context_differs_from_no_context() {
 #[test]
 fn test_commitment_context_includes_relay_and_pubkey() {
     let plaintext = b"card";
-    let relay_url = b"wss://relay.vauchi.app";
+    let relay_url = b"https://relay.vauchi.app";
     let noise_pk = [0xABu8; 32];
 
     // Build context the same way session.rs will
@@ -158,7 +158,7 @@ fn test_commitment_with_context_decryption_unchanged() {
     // Context affects the hash only, not the encryption.
     // Decryption still works with just the reveal key.
     let plaintext = b"secret card";
-    let context = b"wss://relay.vauchi.app";
+    let context = b"https://relay.vauchi.app";
 
     let commitment = Commitment::create_with_context(plaintext, context);
     let decrypted = commitment.open().unwrap();

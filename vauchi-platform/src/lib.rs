@@ -498,7 +498,7 @@ pub fn is_safe_url(url: String) -> bool {
 
 /// Validate a relay WebSocket URL.
 ///
-/// Accepts `wss://` for any host, `ws://` only for localhost/loopback.
+/// Accepts `https://` for any host, `http://` only for localhost/loopback.
 /// Use this to validate user-entered relay URLs before saving.
 #[uniffi::export]
 pub fn is_valid_relay_url(url: String) -> bool {
@@ -792,7 +792,7 @@ fn create_shred_relay_client(
         RelayClientConfig, TransportConfig,
     };
 
-    let http_url = ws_to_http(relay_url);
+    let http_url = relay_url.to_string();
     let transport = HttpTransport::new(HttpTransportConfig {
         relay_url: http_url.clone(),
         timeout_ms: 10_000,
@@ -849,17 +849,6 @@ impl vauchi_core::api::PurgeSender for MobileRelaySender {
             .connect()
             .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Connect: {e}")))?;
         self.client.send_purge(purge)
-    }
-}
-
-/// Convert wss:// to https:// and ws:// to http://.
-fn ws_to_http(url: &str) -> String {
-    if let Some(rest) = url.strip_prefix("wss://") {
-        format!("https://{rest}")
-    } else if let Some(rest) = url.strip_prefix("ws://") {
-        format!("http://{rest}")
-    } else {
-        url.to_string()
     }
 }
 
@@ -1182,7 +1171,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let wb = VauchiPlatform::new(
             dir.path().to_string_lossy().to_string(),
-            "ws://localhost:8080".to_string(),
+            "http://localhost:8080".to_string(),
         )
         .unwrap();
         (wb, dir)
@@ -1310,7 +1299,7 @@ mod tests {
         let dir2 = TempDir::new().unwrap();
         let wb2 = VauchiPlatform::new(
             dir2.path().to_string_lossy().to_string(),
-            "ws://localhost:8080".to_string(),
+            "http://localhost:8080".to_string(),
         )
         .unwrap();
 
@@ -1572,7 +1561,7 @@ mod tests {
     #[test]
     fn test_mobile_relay_sender_implements_revocation_trait() {
         fn accepts_sender(_: &mut dyn vauchi_core::api::RevocationSender) {}
-        let mut sender = MobileRelaySender::new("ws://localhost:8080", "abcd1234", None)
+        let mut sender = MobileRelaySender::new("http://localhost:8080", "abcd1234", None)
             .expect("MobileRelaySender should construct successfully");
         accepts_sender(&mut sender);
     }
@@ -1581,7 +1570,7 @@ mod tests {
     #[test]
     fn test_mobile_relay_sender_implements_purge_trait() {
         fn accepts_sender(_: &mut dyn vauchi_core::api::PurgeSender) {}
-        let mut sender = MobileRelaySender::new("ws://localhost:8080", "abcd1234", None)
+        let mut sender = MobileRelaySender::new("http://localhost:8080", "abcd1234", None)
             .expect("MobileRelaySender should construct successfully");
         accepts_sender(&mut sender);
     }

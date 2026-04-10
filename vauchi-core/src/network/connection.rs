@@ -30,7 +30,7 @@ fn bytes_to_hex(bytes: &[u8]) -> String {
 ///
 /// let transport = MockTransport::new();
 /// let config = TransportConfig {
-///     server_url: "wss://relay.example.com".into(),
+///     server_url: "https://relay.example.com".into(),
 ///     ..Default::default()
 /// };
 ///

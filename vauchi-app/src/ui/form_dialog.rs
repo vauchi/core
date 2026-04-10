@@ -387,7 +387,7 @@ impl FormDialogEngine {
                     id: "relay_url".into(),
                     label: "Relay URL".into(),
                     value: self.get_value("relay_url").into(),
-                    placeholder: Some("wss://relay.example.com".into()),
+                    placeholder: Some("https://relay.example.com".into()),
                     max_length: Some(200),
                     validation_error: None,
                     input_type: InputType::Text,

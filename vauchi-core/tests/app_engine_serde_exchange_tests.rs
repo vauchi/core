@@ -97,7 +97,7 @@ fn form_dialog_type_serde_roundtrip() {
             current_name: "Alice".into(),
         },
         FormDialogType::EditRelayUrl {
-            current_url: "wss://relay.example.com".into(),
+            current_url: "https://relay.example.com".into(),
         },
     ];
     for variant in &variants {

@@ -257,7 +257,7 @@ fn test_queue_100_pending_updates_under_2s() {
             created_at: 1700000000 + u64::from(i) * 3600,
             retry_count: 0,
             status: UpdateStatus::Pending,
-            target_relay_url: Some("wss://relay.vauchi.app".to_string()),
+            target_relay_url: Some("https://relay.vauchi.app".to_string()),
         };
         storage.queue_update(&update).unwrap();
     }

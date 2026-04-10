@@ -35,7 +35,7 @@ fn v3_roundtrip_no_relay_metadata() {
 fn v3_roundtrip_with_relay_url_and_noise_pubkey() {
     let identity = Identity::create("Bob");
     let ephemeral = X3DHKeyPair::generate();
-    let relay_url = "wss://relay.bobs-server.com";
+    let relay_url = "https://relay.bobs-server.com";
     let noise_pubkey = [42u8; 32];
 
     let qr = ExchangeQR::generate_with_relay(
@@ -63,7 +63,7 @@ fn v3_relay_url_without_noise_pubkey_rejected() {
     let qr = ExchangeQR::generate_with_relay(
         &identity,
         &ephemeral,
-        Some("wss://relay.example.com".to_string()),
+        Some("https://relay.example.com".to_string()),
         None,
     );
 
@@ -83,7 +83,7 @@ fn v3_roundtrip_unicode_name_with_relay() {
     let qr = ExchangeQR::generate_with_relay(
         &identity,
         &ephemeral,
-        Some("wss://relay.example.com".to_string()),
+        Some("https://relay.example.com".to_string()),
         Some([99u8; 32]),
     );
 
@@ -91,7 +91,7 @@ fn v3_roundtrip_unicode_name_with_relay() {
     let parsed = ExchangeQR::from_data_string(&data).unwrap();
 
     assert_eq!(parsed.display_name(), "Müller 日本語");
-    assert_eq!(parsed.relay_url().unwrap(), "wss://relay.example.com");
+    assert_eq!(parsed.relay_url().unwrap(), "https://relay.example.com");
     assert!(parsed.verify_signature());
 }
 
@@ -105,7 +105,7 @@ fn v3_signature_covers_relay_fields() {
     let qr = ExchangeQR::generate_with_relay(
         &identity,
         &ephemeral,
-        Some("wss://relay.example.com".to_string()),
+        Some("https://relay.example.com".to_string()),
         Some([55u8; 32]),
     );
 
@@ -140,7 +140,7 @@ fn v3_private_host_relay_url_rejected_on_parse() {
     let qr = ExchangeQR::generate_with_relay(
         &identity,
         &ephemeral,
-        Some("wss://127.0.0.1/evil".to_string()),
+        Some("https://127.0.0.1/evil".to_string()),
         None,
     );
 
@@ -162,17 +162,17 @@ fn v3_insecure_scheme_relay_url_rejected_on_parse() {
     let qr = ExchangeQR::generate_with_relay(
         &identity,
         &ephemeral,
-        Some("ws://relay.evil.com".to_string()),
+        Some("http://relay.evil.com".to_string()),
         None,
     );
 
     let data = qr.to_data_string();
     let result = ExchangeQR::from_data_string(&data);
 
-    // Insecure ws:// scheme must be rejected
+    // Insecure http:// scheme must be rejected
     assert!(
         result.is_err(),
-        "Insecure ws:// relay URL must be rejected during QR parsing"
+        "Insecure http:// relay URL must be rejected during QR parsing"
     );
 }
 
@@ -180,7 +180,7 @@ fn v3_insecure_scheme_relay_url_rejected_on_parse() {
 fn v3_roundtrip_long_relay_url() {
     let identity = Identity::create("Frank");
     let ephemeral = X3DHKeyPair::generate();
-    let long_url = format!("wss://{}.example.com", "a".repeat(200));
+    let long_url = format!("https://{}.example.com", "a".repeat(200));
 
     // Must include Noise pubkey with relay URL (TOFU fail-closed)
     let qr = ExchangeQR::generate_with_relay(
@@ -208,7 +208,7 @@ fn v3_qr_image_generation_with_relay() {
     let qr = ExchangeQR::generate_with_relay(
         &identity,
         &ephemeral,
-        Some("wss://relay.vauchi.app".to_string()),
+        Some("https://relay.vauchi.app".to_string()),
         Some([1u8; 32]),
     );
 

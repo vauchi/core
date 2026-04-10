@@ -37,7 +37,7 @@ pub unsafe extern "C" fn vauchi_app_create() -> *mut VauchiApp {
 
 /// Create a new AppEngine with a custom relay URL.
 ///
-/// If `relay_url` is null, uses the default (`wss://relay.vauchi.app`).
+/// If `relay_url` is null, uses the default (`https://relay.vauchi.app`).
 /// The caller retains ownership of the `relay_url` string.
 ///
 /// Returns null on initialization failure.

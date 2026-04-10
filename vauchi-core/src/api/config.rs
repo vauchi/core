@@ -179,7 +179,7 @@ impl Default for RelayConfig {
     /// `server_url` and optionally `pinned_certs`.
     fn default() -> Self {
         RelayConfig {
-            server_url: "wss://relay.vauchi.app".to_string(),
+            server_url: "https://relay.vauchi.app".to_string(),
             connect_timeout_ms: 10_000,
             io_timeout_ms: 30_000,
             max_reconnect_attempts: 5,

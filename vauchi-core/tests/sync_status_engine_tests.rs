@@ -6,12 +6,12 @@ use vauchi_app::ui::*;
 use vauchi_core::network::ConnectionState;
 
 fn connected_engine() -> SyncStatusEngine {
-    SyncStatusEngine::new("wss://relay.vauchi.app".into(), 5, 2)
+    SyncStatusEngine::new("https://relay.vauchi.app".into(), 5, 2)
         .with_connection_state(ConnectionState::Connected)
 }
 
 fn offline_engine() -> SyncStatusEngine {
-    SyncStatusEngine::new("wss://relay.vauchi.app".into(), 5, 3)
+    SyncStatusEngine::new("https://relay.vauchi.app".into(), 5, 3)
         .with_connection_state(ConnectionState::Disconnected)
 }
 
@@ -37,7 +37,7 @@ fn sync_status_shows_relay_url() {
     let has_relay_url = screen.components.iter().any(|c| match c {
         Component::InfoPanel { items, .. } => items
             .iter()
-            .any(|item| item.detail == "wss://relay.vauchi.app"),
+            .any(|item| item.detail == "https://relay.vauchi.app"),
         _ => false,
     });
     assert!(has_relay_url, "Screen should display the relay URL");
@@ -158,7 +158,7 @@ fn test_connection_returns_complete() {
 
 #[test]
 fn reconnecting_shows_in_progress() {
-    let engine = SyncStatusEngine::new("wss://relay.vauchi.app".into(), 5, 0)
+    let engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 5, 0)
         .with_connection_state(ConnectionState::Reconnecting { attempt: 2 });
     let screen = engine.current_screen();
 
@@ -173,7 +173,7 @@ fn reconnecting_shows_in_progress() {
 
 #[test]
 fn zero_pending_shows_all_up_to_date() {
-    let engine = SyncStatusEngine::new("wss://relay.vauchi.app".into(), 3, 0)
+    let engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 3, 0)
         .with_connection_state(ConnectionState::Connected);
     let screen = engine.current_screen();
 
@@ -193,7 +193,7 @@ fn zero_pending_shows_all_up_to_date() {
 
 #[test]
 fn nonzero_pending_shows_count() {
-    let engine = SyncStatusEngine::new("wss://relay.vauchi.app".into(), 3, 7)
+    let engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 3, 7)
         .with_connection_state(ConnectionState::Disconnected);
     let screen = engine.current_screen();
 

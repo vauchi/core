@@ -304,32 +304,33 @@ fn test_long_url() {
 // @scenario: security:Relay URL validation
 #[test]
 fn test_relay_url_wss_accepted() {
-    assert!(is_valid_relay_url("wss://relay.vauchi.app".to_string()));
-    assert!(is_valid_relay_url("wss://relay.example.com/ws".to_string()));
-    assert!(is_valid_relay_url("wss://192.168.1.1:8443".to_string()));
+    assert!(is_valid_relay_url("https://relay.vauchi.app".to_string()));
+    assert!(is_valid_relay_url(
+        "https://relay.example.com/ws".to_string()
+    ));
+    assert!(is_valid_relay_url("https://192.168.1.1:8443".to_string()));
 }
 
 // @scenario: security:Relay URL validation
 #[test]
 fn test_relay_url_ws_localhost_accepted() {
-    assert!(is_valid_relay_url("ws://localhost:9001".to_string()));
-    assert!(is_valid_relay_url("ws://127.0.0.1:9001".to_string()));
-    assert!(is_valid_relay_url("ws://[::1]:9001".to_string()));
+    assert!(is_valid_relay_url("http://localhost:9001".to_string()));
+    assert!(is_valid_relay_url("http://127.0.0.1:9001".to_string()));
+    assert!(is_valid_relay_url("http://[::1]:9001".to_string()));
 }
 
 // @scenario: security:Relay URL validation
 #[test]
 fn test_relay_url_ws_remote_rejected() {
-    assert!(!is_valid_relay_url("ws://relay.example.com".to_string()));
-    assert!(!is_valid_relay_url("ws://192.168.1.1:9001".to_string()));
+    assert!(!is_valid_relay_url("http://relay.example.com".to_string()));
+    assert!(!is_valid_relay_url("http://192.168.1.1:9001".to_string()));
 }
 
 // @scenario: security:Relay URL validation
 #[test]
 fn test_relay_url_other_schemes_rejected() {
-    assert!(!is_valid_relay_url("https://relay.example.com".to_string()));
-    assert!(!is_valid_relay_url("http://localhost:9001".to_string()));
     assert!(!is_valid_relay_url("ftp://relay.example.com".to_string()));
+    assert!(!is_valid_relay_url("ssh://relay.example.com".to_string()));
     assert!(!is_valid_relay_url("".to_string()));
 }
 

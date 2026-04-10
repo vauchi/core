@@ -315,7 +315,7 @@ fn form_dialog_edit_name_collected_input() {
 #[test]
 fn form_dialog_edit_relay_url_screen_id() {
     let engine = FormDialogEngine::new(FormDialogType::EditRelayUrl {
-        current_url: "wss://relay.vauchi.app".into(),
+        current_url: "https://relay.vauchi.app".into(),
     });
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "form_edit_relay_url");
@@ -324,16 +324,16 @@ fn form_dialog_edit_relay_url_screen_id() {
 #[test]
 fn form_dialog_edit_relay_url_collected_input() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditRelayUrl {
-        current_url: "wss://relay.vauchi.app".into(),
+        current_url: "https://relay.vauchi.app".into(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "relay_url".into(),
-        value: "wss://custom.relay.example".into(),
+        value: "https://custom.relay.example".into(),
     });
     let input = engine
         .collected_input()
         .expect("collected_input should return Some");
-    assert_eq!(input, "wss://custom.relay.example");
+    assert_eq!(input, "https://custom.relay.example");
 }
 
 // --- TextChanged test ---

@@ -13,7 +13,7 @@ use vauchi_core::network::ConnectionState;
 // @scenario: sync.feature - Sync screen shows relay info and actions
 #[test]
 fn test_sync_screen_shows_relay_and_actions() {
-    let engine = SyncStatusEngine::new("wss://relay.vauchi.app".into(), 42, 3);
+    let engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 42, 3);
     let screen = engine.current_screen();
 
     assert_eq!(screen.screen_id, "sync_status");
@@ -37,7 +37,7 @@ fn test_sync_screen_shows_relay_and_actions() {
 // @scenario: sync.feature - Sync now returns Complete with collected input
 #[test]
 fn test_sync_now_returns_complete_with_input() {
-    let mut engine = SyncStatusEngine::new("wss://relay.vauchi.app".into(), 5, 0);
+    let mut engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 5, 0);
 
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "sync_now".into(),
@@ -57,7 +57,7 @@ fn test_sync_now_returns_complete_with_input() {
 // @scenario: sync.feature - Test connection returns Complete with collected input
 #[test]
 fn test_connection_returns_complete_with_input() {
-    let mut engine = SyncStatusEngine::new("wss://relay.vauchi.app".into(), 5, 0);
+    let mut engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 5, 0);
 
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "test_connection".into(),
@@ -77,7 +77,7 @@ fn test_connection_returns_complete_with_input() {
 // @scenario: sync.feature - Offline state disables sync button
 #[test]
 fn test_offline_disables_sync_button() {
-    let engine = SyncStatusEngine::new("wss://relay.vauchi.app".into(), 0, 0)
+    let engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 0, 0)
         .with_connection_state(ConnectionState::Disconnected);
     let screen = engine.current_screen();
 
@@ -101,7 +101,7 @@ fn test_offline_disables_sync_button() {
 // @scenario: sync.feature - Connected state shows success indicator
 #[test]
 fn test_connected_state_shows_success() {
-    let engine = SyncStatusEngine::new("wss://relay.vauchi.app".into(), 10, 0)
+    let engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 10, 0)
         .with_connection_state(ConnectionState::Connected);
     let screen = engine.current_screen();
 
@@ -115,7 +115,7 @@ fn test_connected_state_shows_success() {
 // @scenario: sync.feature - Zero pending shows all up to date
 #[test]
 fn test_zero_pending_shows_up_to_date() {
-    let engine = SyncStatusEngine::new("wss://relay.vauchi.app".into(), 10, 0);
+    let engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 10, 0);
     let screen = engine.current_screen();
 
     let screen_json = serde_json::to_string(&screen).unwrap();

@@ -85,7 +85,7 @@ pub struct VauchiExchange {
 /// Create a new config builder with data directory and relay URL.
 ///
 /// Returns null if `data_dir` is null.
-/// If `relay_url` is null, uses the default (`wss://relay.vauchi.app`).
+/// If `relay_url` is null, uses the default (`https://relay.vauchi.app`).
 ///
 /// # Safety
 /// `data_dir` and `relay_url` must be valid null-terminated C strings, or null.
@@ -99,7 +99,7 @@ pub unsafe extern "C" fn vauchi_config_new(
             Some(s) => s,
             None => return std::ptr::null_mut(),
         };
-        let relay = from_c_str(relay_url).unwrap_or_else(|| "wss://relay.vauchi.app".to_string());
+        let relay = from_c_str(relay_url).unwrap_or_else(|| "https://relay.vauchi.app".to_string());
 
         Box::into_raw(Box::new(CabiConfig::new(dir.into(), relay)))
     })) {
@@ -536,7 +536,7 @@ mod tests {
         unsafe {
             let dir = tempfile::tempdir().unwrap();
             let dir_cstr = CString::new(dir.path().to_str().unwrap()).unwrap();
-            let relay_cstr = CString::new("wss://relay.example.com").unwrap();
+            let relay_cstr = CString::new("https://relay.example.com").unwrap();
             let handle = vauchi_app_create_with_config(dir_cstr.as_ptr(), relay_cstr.as_ptr());
             assert!(
                 !handle.is_null(),
@@ -1327,7 +1327,7 @@ mod tests {
         // SAFETY: Calling FFI with valid C strings.
         unsafe {
             let dir = CString::new("/tmp/vauchi-test").unwrap();
-            let relay = CString::new("wss://relay.vauchi.app").unwrap();
+            let relay = CString::new("https://relay.vauchi.app").unwrap();
             let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
             assert!(
                 !config.is_null(),
@@ -1341,7 +1341,7 @@ mod tests {
     fn config_new_with_null_dir_returns_null() {
         // SAFETY: Calling FFI with null data_dir.
         unsafe {
-            let relay = CString::new("wss://relay.vauchi.app").unwrap();
+            let relay = CString::new("https://relay.vauchi.app").unwrap();
             let config = vauchi_config_new(std::ptr::null(), relay.as_ptr());
             assert!(config.is_null(), "null data_dir should return null");
         }
@@ -1375,7 +1375,7 @@ mod tests {
         // SAFETY: Calling FFI with valid config and 32-byte key.
         unsafe {
             let dir = CString::new("/tmp/vauchi-test").unwrap();
-            let relay = CString::new("wss://relay.vauchi.app").unwrap();
+            let relay = CString::new("https://relay.vauchi.app").unwrap();
             let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
 
             let key: [u8; 32] = [0xAB; 32];
@@ -1391,7 +1391,7 @@ mod tests {
         // SAFETY: Calling FFI with valid config and wrong-length key.
         unsafe {
             let dir = CString::new("/tmp/vauchi-test").unwrap();
-            let relay = CString::new("wss://relay.vauchi.app").unwrap();
+            let relay = CString::new("https://relay.vauchi.app").unwrap();
             let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
 
             let key: [u8; 16] = [0xAB; 16];
@@ -1407,7 +1407,7 @@ mod tests {
         // SAFETY: Calling FFI with valid config and all-zeros key.
         unsafe {
             let dir = CString::new("/tmp/vauchi-test").unwrap();
-            let relay = CString::new("wss://relay.vauchi.app").unwrap();
+            let relay = CString::new("https://relay.vauchi.app").unwrap();
             let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
 
             let key: [u8; 32] = [0; 32];
@@ -1433,7 +1433,7 @@ mod tests {
         // SAFETY: Calling FFI with null key pointer.
         unsafe {
             let dir = CString::new("/tmp/vauchi-test").unwrap();
-            let relay = CString::new("wss://relay.vauchi.app").unwrap();
+            let relay = CString::new("https://relay.vauchi.app").unwrap();
             let config = vauchi_config_new(dir.as_ptr(), relay.as_ptr());
 
             let result = vauchi_config_set_storage_key(config, std::ptr::null(), 32);

@@ -83,12 +83,12 @@ fn test_full_exchange_with_relay_metadata() {
 
     let mut alice = MultiStageSession::new_with_relay(
         alice_card.clone(),
-        Some("wss://alice-relay.example.com".to_string()),
+        Some("https://alice-relay.example.com".to_string()),
         Some([0xAA; 32]),
     );
     let mut bob = MultiStageSession::new_with_relay(
         bob_card.clone(),
-        Some("wss://bob-relay.example.com".to_string()),
+        Some("https://bob-relay.example.com".to_string()),
         Some([0xBB; 32]),
     );
 
@@ -121,10 +121,16 @@ fn test_full_exchange_with_relay_metadata() {
     assert!(matches!(bob.get_state(), ProtocolState::Finalized));
 
     // Verify relay metadata was exchanged
-    assert_eq!(alice.peer_relay_url(), Some("wss://bob-relay.example.com"));
+    assert_eq!(
+        alice.peer_relay_url(),
+        Some("https://bob-relay.example.com")
+    );
     assert_eq!(alice.peer_relay_noise_pubkey(), Some([0xBB; 32]));
 
-    assert_eq!(bob.peer_relay_url(), Some("wss://alice-relay.example.com"));
+    assert_eq!(
+        bob.peer_relay_url(),
+        Some("https://alice-relay.example.com")
+    );
     assert_eq!(bob.peer_relay_noise_pubkey(), Some([0xAA; 32]));
 
     // Card data should still be correct

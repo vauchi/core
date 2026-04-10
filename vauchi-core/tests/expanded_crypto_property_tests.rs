@@ -627,7 +627,7 @@ proptest! {
     #[test]
     fn prop_forwarding_hints_roundtrip(
         blob_id in "[a-f0-9]{16}",
-        relay_url in "wss://[a-z]{3,10}\\.[a-z]{2,4}/relay",
+        relay_url in "https://[a-z]{3,10}\\.[a-z]{2,4}/relay",
         expires_at in timestamp_strategy(),
         msg_id in message_id_strategy(),
         timestamp in timestamp_strategy()

@@ -26,7 +26,7 @@ pub enum RelayUrlError {
     #[error("Relay URL exceeds maximum length of {max} bytes (got {actual})")]
     TooLong { max: usize, actual: usize },
 
-    #[error("Relay URL must use wss:// scheme")]
+    #[error("Relay URL must use https:// scheme")]
     InsecureScheme,
 
     #[error("Relay URL points to private/loopback host")]
@@ -43,7 +43,7 @@ pub enum RelayUrlError {
 ///
 /// Checks:
 /// - Non-empty and within length limit
-/// - wss:// scheme only (no ws://, http://, etc.)
+/// - https:// scheme only (no http://, http://, etc.)
 /// - No private/loopback/link-local hosts (SSRF prevention)
 /// - No userinfo (user:pass@)
 /// - No fragment (#)
@@ -70,8 +70,8 @@ pub fn validate_relay_url(url: &str) -> Result<(), RelayUrlError> {
     // Parse URL
     let parsed = Url::parse(url).map_err(|e| RelayUrlError::InvalidFormat(e.to_string()))?;
 
-    // Scheme must be wss
-    if parsed.scheme() != "wss" {
+    // Scheme must be https (or wss for legacy compat)
+    if parsed.scheme() != "https" {
         return Err(RelayUrlError::InsecureScheme);
     }
 
@@ -199,22 +199,8 @@ pub fn verify_relay_noise_pubkey(
 
 /// Converts a WebSocket relay URL to its HTTP equivalent.
 ///
-/// - `wss://` → `https://`
-/// - `ws://` → `http://`
-/// - Other schemes pass through unchanged.
-///
-/// Useful for relay operations that use HTTP (e.g., GDPR shred, escrow)
-/// when the configuration stores WebSocket URLs.
-pub fn relay_ws_to_http(url: &str) -> String {
-    if let Some(rest) = url.strip_prefix("wss://") {
-        format!("https://{rest}")
-    } else if let Some(rest) = url.strip_prefix("ws://") {
-        format!("http://{rest}")
-    } else {
-        url.to_string()
-    }
-}
-
+/// - `https://` → `https://`
+/// - `http://` → `http://`
 // INLINE_TEST_REQUIRED: tests access private is_private_ip, is_cgn_ip, is_ipv6_ula helpers
 #[cfg(test)]
 mod tests {
@@ -242,26 +228,5 @@ mod tests {
     #[test]
     fn is_private_ip_loopback_v6() {
         assert!(is_private_ip(&"::1".parse().unwrap()));
-    }
-
-    // @internal
-    #[test]
-    fn relay_ws_to_http_conversions() {
-        assert_eq!(
-            relay_ws_to_http("wss://relay.vauchi.app"),
-            "https://relay.vauchi.app"
-        );
-        assert_eq!(
-            relay_ws_to_http("ws://localhost:8080"),
-            "http://localhost:8080"
-        );
-        assert_eq!(
-            relay_ws_to_http("https://already.http"),
-            "https://already.http"
-        );
-        assert_eq!(
-            relay_ws_to_http("wss://relay.vauchi.app/path"),
-            "https://relay.vauchi.app/path"
-        );
     }
 }

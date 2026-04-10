@@ -485,7 +485,7 @@ mod tests {
         let hints = ForwardingHints {
             hints: vec![ForwardingHintInfo {
                 blob_id: "blob1".to_string(),
-                relay_url: "wss://peer.example.com".to_string(),
+                relay_url: "https://peer.example.com".to_string(),
                 expires_at_secs: 9999999999,
             }],
             relay_signing_key: None,
@@ -494,7 +494,7 @@ mod tests {
         let json = serde_json::to_string(&hints).unwrap();
         let decoded: ForwardingHints = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.hints.len(), 1);
-        assert_eq!(decoded.hints[0].relay_url, "wss://peer.example.com");
+        assert_eq!(decoded.hints[0].relay_url, "https://peer.example.com");
         // Unsigned hints should not have signature fields in JSON
         assert!(!json.contains("relay_signing_key"));
         assert!(!json.contains("signature"));
@@ -505,7 +505,7 @@ mod tests {
         let hints = ForwardingHints {
             hints: vec![ForwardingHintInfo {
                 blob_id: "blob1".to_string(),
-                relay_url: "wss://peer.example.com".to_string(),
+                relay_url: "https://peer.example.com".to_string(),
                 expires_at_secs: 9999999999,
             }],
             relay_signing_key: Some("ab".repeat(32)),
@@ -523,12 +523,12 @@ mod tests {
             hints: vec![
                 ForwardingHintInfo {
                     blob_id: "blob-b".to_string(),
-                    relay_url: "wss://relay-2.test".to_string(),
+                    relay_url: "https://relay-2.test".to_string(),
                     expires_at_secs: 2000,
                 },
                 ForwardingHintInfo {
                     blob_id: "blob-a".to_string(),
-                    relay_url: "wss://relay-1.test".to_string(),
+                    relay_url: "https://relay-1.test".to_string(),
                     expires_at_secs: 1000,
                 },
             ],
@@ -540,12 +540,12 @@ mod tests {
             hints: vec![
                 ForwardingHintInfo {
                     blob_id: "blob-a".to_string(),
-                    relay_url: "wss://relay-1.test".to_string(),
+                    relay_url: "https://relay-1.test".to_string(),
                     expires_at_secs: 1000,
                 },
                 ForwardingHintInfo {
                     blob_id: "blob-b".to_string(),
-                    relay_url: "wss://relay-2.test".to_string(),
+                    relay_url: "https://relay-2.test".to_string(),
                     expires_at_secs: 2000,
                 },
             ],
@@ -563,7 +563,7 @@ mod tests {
     fn test_forwarding_hints_backward_compatible_deserialization() {
         // Old format without signature fields
         let json =
-            r#"{"hints":[{"blob_id":"b1","relay_url":"wss://r.test","expires_at_secs":100}]}"#;
+            r#"{"hints":[{"blob_id":"b1","relay_url":"https://r.test","expires_at_secs":100}]}"#;
         let decoded: ForwardingHints = serde_json::from_str(json).unwrap();
         assert_eq!(decoded.hints.len(), 1);
         assert!(decoded.relay_signing_key.is_none());

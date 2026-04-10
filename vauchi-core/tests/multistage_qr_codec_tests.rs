@@ -134,7 +134,7 @@ fn test_init_qr_with_relay_url_but_no_noise_pubkey_is_rejected() {
     let pubkey = [11u8; 32];
     let ephemeral = [12u8; 32];
     let commitment = [13u8; 32];
-    let relay_url = "wss://relay.example.com";
+    let relay_url = "https://relay.example.com";
 
     // Format encodes whatever is given — the fail-closed check is at parse time
     let qr = format_init_qr_with_relay(
@@ -161,7 +161,7 @@ fn test_init_qr_with_relay_url_and_noise_pubkey() {
     let pubkey = [15u8; 32];
     let ephemeral = [16u8; 32];
     let commitment = [17u8; 32];
-    let relay_url = "wss://relay.example.com";
+    let relay_url = "https://relay.example.com";
     let noise_pubkey = [18u8; 32];
 
     let qr = format_init_qr_with_relay(
@@ -234,7 +234,7 @@ fn test_init_qr_rejects_private_host_relay_url() {
         &ephemeral,
         &commitment,
         "Evil",
-        Some("wss://127.0.0.1/evil"),
+        Some("https://127.0.0.1/evil"),
         None,
     );
 
@@ -256,7 +256,7 @@ fn test_init_qr_rejects_insecure_scheme() {
         &ephemeral,
         &commitment,
         "Evil",
-        Some("ws://relay.evil.com"),
+        Some("http://relay.evil.com"),
         None,
     );
 
@@ -337,7 +337,7 @@ fn test_relay_url_without_noise_pubkey_rejected_tofu() {
         &ephemeral,
         &commitment,
         "Test",
-        Some("wss://relay.example.com"),
+        Some("https://relay.example.com"),
         None,
     );
     let result = parse_qr(&qr);

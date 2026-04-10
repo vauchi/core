@@ -268,7 +268,7 @@ fn settings_workflow_returns_screen() {
         "display_name": "Alice",
         "delivery_receipts_enabled": true,
         "suppress_presence": false,
-        "relay_url": "wss://relay.vauchi.app",
+        "relay_url": "https://relay.vauchi.app",
         "device_count": 2,
         "password_set": true
     }"#;

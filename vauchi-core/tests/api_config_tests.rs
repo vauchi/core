@@ -15,17 +15,17 @@ fn test_vauchi_config_default() {
     assert_eq!(config.storage_path, PathBuf::from("./vauchi_data"));
     assert!(config.auto_save);
     assert_eq!(
-        config.relay.server_url, "wss://relay.vauchi.app",
+        config.relay.server_url, "https://relay.vauchi.app",
         "Default relay URL must be the production relay"
     );
 }
 
 #[test]
-fn test_default_relay_url_is_valid_wss() {
+fn test_default_relay_url_is_valid_https() {
     let config = VauchiConfig::default();
     assert!(
-        config.relay.server_url.starts_with("wss://"),
-        "Default relay URL must use wss:// scheme"
+        config.relay.server_url.starts_with("https://"),
+        "Default relay URL must use https:// scheme"
     );
     assert!(
         !config.relay.server_url.is_empty(),
@@ -36,11 +36,11 @@ fn test_default_relay_url_is_valid_wss() {
 #[test]
 fn test_vauchi_config_builder() {
     let config = VauchiConfig::with_storage_path("/tmp/test")
-        .with_relay_url("wss://relay.example.com")
+        .with_relay_url("https://relay.example.com")
         .without_auto_save();
 
     assert_eq!(config.storage_path, PathBuf::from("/tmp/test"));
-    assert_eq!(config.relay.server_url, "wss://relay.example.com");
+    assert_eq!(config.relay.server_url, "https://relay.example.com");
     assert!(!config.auto_save);
 }
 
@@ -48,7 +48,7 @@ fn test_vauchi_config_builder() {
 fn test_relay_config_default() {
     let config = RelayConfig::default();
 
-    assert_eq!(config.server_url, "wss://relay.vauchi.app");
+    assert_eq!(config.server_url, "https://relay.vauchi.app");
     assert_eq!(config.connect_timeout_ms, 10_000);
     assert_eq!(config.io_timeout_ms, 30_000);
     assert_eq!(config.max_reconnect_attempts, 5);
@@ -59,7 +59,7 @@ fn test_relay_config_default() {
 #[test]
 fn test_relay_config_to_transport_config() {
     let relay = RelayConfig {
-        server_url: "wss://test.com".into(),
+        server_url: "https://test.com".into(),
         connect_timeout_ms: 5_000,
         io_timeout_ms: 15_000,
         max_reconnect_attempts: 3,
@@ -69,7 +69,7 @@ fn test_relay_config_to_transport_config() {
 
     let transport = relay.to_transport_config();
 
-    assert_eq!(transport.server_url, "wss://test.com");
+    assert_eq!(transport.server_url, "https://test.com");
     assert_eq!(transport.connect_timeout_ms, 5_000);
     assert_eq!(transport.io_timeout_ms, 15_000);
     assert_eq!(transport.max_reconnect_attempts, 3);
@@ -79,7 +79,7 @@ fn test_relay_config_to_transport_config() {
 #[test]
 fn test_relay_config_to_relay_client_config() {
     let relay = RelayConfig {
-        server_url: "wss://test.com".into(),
+        server_url: "https://test.com".into(),
         max_pending_messages: 50,
         ack_timeout_ms: 15_000,
         max_retries: 3,
@@ -88,7 +88,7 @@ fn test_relay_config_to_relay_client_config() {
 
     let client_config = relay.to_relay_client_config(true, false);
 
-    assert_eq!(client_config.transport.server_url, "wss://test.com");
+    assert_eq!(client_config.transport.server_url, "https://test.com");
     assert_eq!(client_config.max_pending_messages, 50);
     assert_eq!(client_config.ack_timeout_ms, 15_000);
     assert_eq!(client_config.max_retries, 3);

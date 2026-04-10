@@ -513,19 +513,9 @@ impl Vauchi {
         })
     }
 
-    /// Derive the HTTP relay URL from the configured WebSocket URL.
-    ///
-    /// Converts `wss://` to `https://` and `ws://` to `http://`.
-    /// Falls through unchanged for URLs that are already `http(s)://`.
+    /// Returns the relay URL for HTTP requests.
     pub(crate) fn http_relay_url(&self) -> String {
-        let url = &self.config.relay.server_url;
-        if let Some(rest) = url.strip_prefix("wss://") {
-            format!("https://{rest}")
-        } else if let Some(rest) = url.strip_prefix("ws://") {
-            format!("http://{rest}")
-        } else {
-            url.clone()
-        }
+        self.config.relay.server_url.clone()
     }
 }
 
@@ -628,22 +618,22 @@ mod tests {
     // @scenario: ohttp_sync :: URL scheme conversion wss to https
     #[test]
     fn test_http_relay_url_wss_converts_to_https() {
-        let (v, _dir) = vauchi_with_server_url("wss://relay.example.com/ws");
+        let (v, _dir) = vauchi_with_server_url("https://relay.example.com/ws");
         assert_eq!(
             v.http_relay_url(),
             "https://relay.example.com/ws",
-            "wss:// must be converted to https://"
+            "https:// must be converted to https://"
         );
     }
 
     // @scenario: ohttp_sync :: URL scheme conversion ws to http
     #[test]
     fn test_http_relay_url_ws_converts_to_http() {
-        let (v, _dir) = vauchi_with_server_url("ws://relay.local/ws");
+        let (v, _dir) = vauchi_with_server_url("http://relay.local/ws");
         assert_eq!(
             v.http_relay_url(),
             "http://relay.local/ws",
-            "ws:// must be converted to http://"
+            "http:// must be converted to http://"
         );
     }
 

@@ -222,11 +222,11 @@ fn test_vauchi_builder() {
     let db_path = dir.path().join("vauchi.db");
     let wb: Vauchi = VauchiBuilder::new()
         .storage_path(db_path.to_str().unwrap())
-        .relay_url("wss://relay.example.com")
+        .relay_url("https://relay.example.com")
         .build()
         .unwrap();
 
-    assert_eq!(wb.config().relay.server_url, "wss://relay.example.com");
+    assert_eq!(wb.config().relay.server_url, "https://relay.example.com");
 }
 
 #[test]

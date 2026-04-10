@@ -14,7 +14,7 @@ fn create_engine() -> (std::sync::Arc<PlatformAppEngine>, tempfile::TempDir) {
     let key = vauchi_core::crypto::SymmetricKey::generate();
     let engine = PlatformAppEngine::new(
         dir.path().to_string_lossy().to_string(),
-        "wss://relay.test".into(),
+        "https://relay.test".into(),
         key.as_bytes().to_vec(),
     )
     .expect("create engine");

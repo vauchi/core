@@ -177,9 +177,9 @@ mod tests {
     #[test]
     fn test_filter_expired_hints() {
         let hints = make_unsigned_hints(vec![
-            make_hint("blob-1", "wss://relay-a.test", 1000),
-            make_hint("blob-2", "wss://relay-b.test", 2000),
-            make_hint("blob-3", "wss://relay-a.test", 500),
+            make_hint("blob-1", "https://relay-a.test", 1000),
+            make_hint("blob-2", "https://relay-b.test", 2000),
+            make_hint("blob-3", "https://relay-a.test", 500),
         ]);
 
         let active = filter_expired_hints(&hints, 800);
@@ -191,8 +191,8 @@ mod tests {
     #[test]
     fn test_filter_all_expired() {
         let hints = make_unsigned_hints(vec![
-            make_hint("blob-1", "wss://relay-a.test", 100),
-            make_hint("blob-2", "wss://relay-b.test", 200),
+            make_hint("blob-1", "https://relay-a.test", 100),
+            make_hint("blob-2", "https://relay-b.test", 200),
         ]);
 
         let active = filter_expired_hints(&hints, 300);
@@ -202,8 +202,8 @@ mod tests {
     #[test]
     fn test_filter_none_expired() {
         let hints = make_unsigned_hints(vec![
-            make_hint("blob-1", "wss://relay-a.test", 1000),
-            make_hint("blob-2", "wss://relay-b.test", 2000),
+            make_hint("blob-1", "https://relay-a.test", 1000),
+            make_hint("blob-2", "https://relay-b.test", 2000),
         ]);
 
         let active = filter_expired_hints(&hints, 0);
@@ -213,15 +213,15 @@ mod tests {
     #[test]
     fn test_deduplicate_hints() {
         let hints = vec![
-            make_hint("blob-1", "wss://relay-a.test", 1000),
-            make_hint("blob-1", "wss://relay-b.test", 2000), // duplicate blob_id
-            make_hint("blob-2", "wss://relay-a.test", 1500),
+            make_hint("blob-1", "https://relay-a.test", 1000),
+            make_hint("blob-1", "https://relay-b.test", 2000), // duplicate blob_id
+            make_hint("blob-2", "https://relay-a.test", 1500),
         ];
 
         let deduped = deduplicate_hints(&hints);
         assert_eq!(deduped.len(), 2);
         assert_eq!(deduped[0].blob_id, "blob-1");
-        assert_eq!(deduped[0].relay_url, "wss://relay-a.test"); // first occurrence kept
+        assert_eq!(deduped[0].relay_url, "https://relay-a.test"); // first occurrence kept
         assert_eq!(deduped[1].blob_id, "blob-2");
     }
 
@@ -269,11 +269,11 @@ mod tests {
     #[test]
     fn test_group_hints_by_relay() {
         let hints = [
-            make_hint("blob-1", "wss://relay-a.test", 1000),
-            make_hint("blob-2", "wss://relay-b.test", 1000),
-            make_hint("blob-3", "wss://relay-a.test", 1000),
-            make_hint("blob-4", "wss://relay-b.test", 1000),
-            make_hint("blob-5", "wss://relay-c.test", 1000),
+            make_hint("blob-1", "https://relay-a.test", 1000),
+            make_hint("blob-2", "https://relay-b.test", 1000),
+            make_hint("blob-3", "https://relay-a.test", 1000),
+            make_hint("blob-4", "https://relay-b.test", 1000),
+            make_hint("blob-5", "https://relay-c.test", 1000),
         ];
 
         let hint_refs: Vec<&ForwardingHint> = hints.iter().collect();
@@ -284,21 +284,21 @@ mod tests {
         // Find relay-a group
         let relay_a = groups
             .iter()
-            .find(|(url, _)| *url == "wss://relay-a.test")
+            .find(|(url, _)| *url == "https://relay-a.test")
             .unwrap();
         assert_eq!(relay_a.1.len(), 2);
 
         // Find relay-b group
         let relay_b = groups
             .iter()
-            .find(|(url, _)| *url == "wss://relay-b.test")
+            .find(|(url, _)| *url == "https://relay-b.test")
             .unwrap();
         assert_eq!(relay_b.1.len(), 2);
 
         // Find relay-c group
         let relay_c = groups
             .iter()
-            .find(|(url, _)| *url == "wss://relay-c.test")
+            .find(|(url, _)| *url == "https://relay-c.test")
             .unwrap();
         assert_eq!(relay_c.1.len(), 1);
     }
@@ -320,8 +320,8 @@ mod tests {
     #[test]
     fn test_forwarding_hints_serde_roundtrip() {
         let hints = make_unsigned_hints(vec![
-            make_hint("blob-1", "wss://relay-a.test", 1000),
-            make_hint("blob-2", "wss://relay-b.test", 2000),
+            make_hint("blob-1", "https://relay-a.test", 1000),
+            make_hint("blob-2", "https://relay-b.test", 2000),
         ]);
 
         let json = serde_json::to_string(&hints).unwrap();
@@ -329,7 +329,7 @@ mod tests {
 
         assert_eq!(deserialized.hints.len(), 2);
         assert_eq!(deserialized.hints[0].blob_id, "blob-1");
-        assert_eq!(deserialized.hints[1].relay_url, "wss://relay-b.test");
+        assert_eq!(deserialized.hints[1].relay_url, "https://relay-b.test");
     }
 
     #[test]
@@ -340,7 +340,7 @@ mod tests {
             timestamp: 1700000000,
             payload: MessagePayload::ForwardingHints(make_unsigned_hints(vec![make_hint(
                 "blob-1",
-                "wss://relay-a.test",
+                "https://relay-a.test",
                 1000,
             )])),
         };
@@ -361,7 +361,7 @@ mod tests {
 
     #[test]
     fn test_verify_unsigned_hints_returns_error() {
-        let hints = make_unsigned_hints(vec![make_hint("blob-1", "wss://relay.test", 1000)]);
+        let hints = make_unsigned_hints(vec![make_hint("blob-1", "https://relay.test", 1000)]);
         let result = verify_hint_signature(&hints, "deadbeef");
         assert_eq!(result, Err(HintVerificationError::Unsigned));
     }
@@ -369,7 +369,7 @@ mod tests {
     #[test]
     fn test_verify_mismatched_relay_key_returns_error() {
         let hints = ForwardingHints {
-            hints: vec![make_hint("blob-1", "wss://relay.test", 1000)],
+            hints: vec![make_hint("blob-1", "https://relay.test", 1000)],
             relay_signing_key: Some("aa".repeat(32)),
             signature: Some("bb".repeat(64)),
         };
@@ -381,12 +381,12 @@ mod tests {
     #[test]
     fn test_canonical_data_is_order_independent() {
         let hints1 = make_unsigned_hints(vec![
-            make_hint("blob-b", "wss://relay-2.test", 2000),
-            make_hint("blob-a", "wss://relay-1.test", 1000),
+            make_hint("blob-b", "https://relay-2.test", 2000),
+            make_hint("blob-a", "https://relay-1.test", 1000),
         ]);
         let hints2 = make_unsigned_hints(vec![
-            make_hint("blob-a", "wss://relay-1.test", 1000),
-            make_hint("blob-b", "wss://relay-2.test", 2000),
+            make_hint("blob-a", "https://relay-1.test", 1000),
+            make_hint("blob-b", "https://relay-2.test", 2000),
         ]);
         assert_eq!(hints1.canonical_data(), hints2.canonical_data());
     }

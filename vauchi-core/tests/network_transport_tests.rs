@@ -68,10 +68,12 @@ fn test_proxy_config_socks5_custom() {
 // @scenario: relay_network :: SOCKS5 proxy support
 #[test]
 fn test_transport_config_with_proxy_timeouts() {
-    let config =
-        TransportConfig::with_proxy_timeouts("wss://relay.example.com", ProxyConfig::tor_default());
+    let config = TransportConfig::with_proxy_timeouts(
+        "https://relay.example.com",
+        ProxyConfig::tor_default(),
+    );
 
-    assert_eq!(config.server_url, "wss://relay.example.com");
+    assert_eq!(config.server_url, "https://relay.example.com");
     assert!(config.proxy.is_tor());
     // Proxied connections have longer timeouts
     assert_eq!(config.connect_timeout_ms, 60_000);
@@ -82,9 +84,9 @@ fn test_transport_config_with_proxy_timeouts() {
 #[test]
 fn test_transport_config_with_proxy() {
     let proxy = ProxyConfig::socks5("proxy.example.com", 1080);
-    let config = TransportConfig::with_proxy("wss://relay.example.com", proxy);
+    let config = TransportConfig::with_proxy("https://relay.example.com", proxy);
 
-    assert_eq!(config.server_url, "wss://relay.example.com");
+    assert_eq!(config.server_url, "https://relay.example.com");
     assert!(!config.proxy.is_tor());
 }
 

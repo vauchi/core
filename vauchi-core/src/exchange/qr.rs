@@ -606,7 +606,7 @@ mod tests {
 
     #[test]
     fn test_flags_url_only() {
-        assert_eq!(build_flags(Some("wss://relay.example.com"), None), 0x01);
+        assert_eq!(build_flags(Some("https://relay.example.com"), None), 0x01);
     }
 
     #[test]
@@ -617,7 +617,7 @@ mod tests {
     #[test]
     fn test_flags_both() {
         assert_eq!(
-            build_flags(Some("wss://relay.example.com"), Some(&[0u8; 32])),
+            build_flags(Some("https://relay.example.com"), Some(&[0u8; 32])),
             0x03
         );
     }
@@ -631,13 +631,13 @@ mod tests {
         let qr_with_relay = ExchangeQR::generate_with_relay(
             &identity,
             &ephemeral,
-            Some("wss://relay.example.com".to_string()),
+            Some("https://relay.example.com".to_string()),
             Some([1u8; 32]),
         );
 
         // Manually tamper with relay URL
         let mut tampered = qr_with_relay.clone();
-        tampered.relay_url = Some("wss://evil.example.com".to_string());
+        tampered.relay_url = Some("https://evil.example.com".to_string());
         assert!(
             !tampered.verify_signature(),
             "Tampered relay URL must invalidate signature"

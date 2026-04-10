@@ -20,6 +20,8 @@ storage = ["rusqlite"]
 network = ["network-rustls", "storage"]
 network-rustls = ["rustls", "webpki-roots", "storage"]
 network-http = ["ureq", "ohttp"]
+# Compat alias — removed in WS/Noise cleanup, downstream repos still reference it
+network-native-tls = ["network", "network-http"]
 secure-storage = ["keyring"]
 # Platform-specific keyring backends (consumers pick the right one):
 # - Linux: kernel keyutils + D-Bus Secret Service (GNOME Keyring, KDE Wallet, KeePassXC)

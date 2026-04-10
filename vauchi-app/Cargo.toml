@@ -34,6 +34,10 @@ default = ["storage", "network-rustls", "content-updates"]
 storage = ["vauchi-core/storage"]
 content-updates = ["reqwest", "tokio"]
 network-rustls = ["vauchi-core/network-rustls", "storage"]
+network-http = ["vauchi-core/network-http"]
+network = ["network-rustls", "network-http", "storage"]
+# Compat alias — removed in WS/Noise cleanup, downstream repos still reference it
+network-native-tls = ["network"]
 # JSON Schema generation (dev tooling, forwarded from vauchi-core)
 schema-gen = ["schemars", "vauchi-core/schema-gen"]
 

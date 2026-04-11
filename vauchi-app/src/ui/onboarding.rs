@@ -247,7 +247,10 @@ impl OnboardingEngine {
                     max_length: Some(100),
                     validation_error: None,
                     input_type: InputType::Text,
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some("Display name input".into()),
+                        hint: Some("Enter the name others will see on your contact card".into()),
+                    }),
                 },
             ],
             actions: vec![ScreenAction {
@@ -349,7 +352,10 @@ impl OnboardingEngine {
                     max_length: Some(50),
                     validation_error: None,
                     input_type: InputType::Text,
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some("Custom group name input".into()),
+                        hint: Some("Enter a name for a custom contact group".into()),
+                    }),
                 },
             ],
             actions: vec![

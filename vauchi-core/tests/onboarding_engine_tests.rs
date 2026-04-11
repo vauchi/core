@@ -901,6 +901,50 @@ fn data_reflects_selected_groups() {
     assert_eq!(selected, vec!["Family", "Friends"]);
 }
 
+// ── A11y labels ────────────────────────────────────────────────────
+
+#[test]
+fn onboarding_text_input_has_a11y_label() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_default_name(&mut engine);
+
+    let screen = engine.current_screen();
+    let text_input = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::TextInput { id, .. } if id == "display_name"));
+    assert!(text_input.is_some(), "display_name TextInput not found");
+    match text_input.unwrap() {
+        Component::TextInput { a11y, .. } => {
+            let a11y = a11y.as_ref().expect("a11y must be populated");
+            assert_eq!(a11y.label.as_deref(), Some("Display name input"));
+            assert!(a11y.hint.is_some(), "hint should describe what to enter");
+        }
+        _ => unreachable!(),
+    }
+}
+
+#[test]
+fn onboarding_custom_group_text_input_has_a11y_label() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_groups_setup(&mut engine);
+
+    let screen = engine.current_screen();
+    let text_input = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::TextInput { id, .. } if id == "custom_group"));
+    assert!(text_input.is_some(), "custom_group TextInput not found");
+    match text_input.unwrap() {
+        Component::TextInput { a11y, .. } => {
+            let a11y = a11y.as_ref().expect("a11y must be populated");
+            assert_eq!(a11y.label.as_deref(), Some("Custom group name input"));
+            assert!(a11y.hint.is_some(), "hint should describe what to enter");
+        }
+        _ => unreachable!(),
+    }
+}
+
 // ── GroupViewSelected on PreviewCard ─────────────────────────────────
 
 #[test]

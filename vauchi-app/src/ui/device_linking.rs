@@ -79,7 +79,13 @@ impl DeviceLinkingEngine {
                         data: self.qr_data.clone(),
                         mode: QrMode::Display,
                         label: Some("Scan on new device".into()),
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some("Device link QR code".into()),
+                            hint: Some(
+                                "Scan this code on your new device to begin linking.".into(),
+                            ),
+                            role: Some(AccessibilityRole::Image),
+                        }),
                     },
                     Component::Text {
                         id: "join_hint".into(),
@@ -148,7 +154,11 @@ impl DeviceLinkingEngine {
                     title: "Syncing data...".into(),
                     detail: None,
                     status: Status::InProgress,
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some("Syncing data status".into()),
+                        hint: Some("Data is being synced to the new device.".into()),
+                        role: None,
+                    }),
                 }],
                 actions: vec![],
                 progress: self.progress(),
@@ -164,7 +174,11 @@ impl DeviceLinkingEngine {
                     title: "Device Linked".into(),
                     detail: None,
                     status: Status::Success,
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some("Device Linked status".into()),
+                        hint: Some("Your new device has been linked successfully.".into()),
+                        role: None,
+                    }),
                 }],
                 actions: vec![ScreenAction {
                     id: "done".into(),

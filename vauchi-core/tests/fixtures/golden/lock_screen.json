@@ -12,7 +12,11 @@
         "filled": 0,
         "masked": true,
         "validation_error": null,
-        "a11y": null
+        "a11y": {
+          "label": "PIN entry",
+          "hint": "Enter your PIN to unlock",
+          "role": null
+        }
       }
     }
   ],

@@ -65,7 +65,17 @@ impl DeviceManagementEngine {
                         Some("device".into())
                     },
                     detail,
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some(d.device_name.clone()),
+                        hint: if d.is_current {
+                            Some("This is your current device.".into())
+                        } else if !d.is_active {
+                            Some("This device has been revoked.".into())
+                        } else {
+                            Some("Tap to revoke this device.".into())
+                        },
+                        role: None,
+                    }),
                 }
             })
             .collect();
@@ -91,7 +101,14 @@ impl DeviceManagementEngine {
                 confirm_text: "Revoke".into(),
                 cancel_text: "Cancel".into(),
                 destructive: true,
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some(format!("Confirm revoke {}", name)),
+                    hint: Some(
+                        "This device will lose access and must be re-linked to use Vauchi again."
+                            .into(),
+                    ),
+                    role: Some(AccessibilityRole::Alert),
+                }),
             });
         }
 

@@ -22,7 +22,8 @@
         "input_type": "Text",
         "a11y": {
           "label": "Display name input",
-          "hint": "Enter the name others will see on your contact card"
+          "hint": "Enter the name others will see on your contact card",
+          "role": null
         }
       }
     }

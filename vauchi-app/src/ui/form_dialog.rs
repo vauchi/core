@@ -195,7 +195,11 @@ impl FormDialogEngine {
                 } else {
                     None
                 },
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some(e.display_name.clone()),
+                    hint: Some(format!("Select {} as the field type.", e.display_name)),
+                    role: None,
+                }),
             })
             .collect();
 
@@ -223,7 +227,11 @@ impl FormDialogEngine {
             max_length: Some(200),
             validation_error: None,
             input_type,
-            a11y: None,
+            a11y: Some(A11y {
+                label: Some("Value input".into()),
+                hint: Some(placeholder.into()),
+                role: Some(AccessibilityRole::TextField),
+            }),
         });
 
         // Display Name (optional) — the label shown next to the value
@@ -235,7 +243,11 @@ impl FormDialogEngine {
             max_length: Some(50),
             validation_error: None,
             input_type: InputType::Text,
-            a11y: None,
+            a11y: Some(A11y {
+                label: Some("Display Name (optional) input".into()),
+                hint: Some("e.g. Work, Personal, Mobile".into()),
+                role: Some(AccessibilityRole::TextField),
+            }),
         });
 
         // Comment (your eyes only, optional) — private note
@@ -247,7 +259,11 @@ impl FormDialogEngine {
             max_length: Some(100),
             validation_error: None,
             input_type: InputType::Text,
-            a11y: None,
+            a11y: Some(A11y {
+                label: Some("Comment (your eyes only, optional) input".into()),
+                hint: Some("Only visible to you".into()),
+                role: Some(AccessibilityRole::TextField),
+            }),
         });
 
         // Group visibility toggles
@@ -325,7 +341,11 @@ impl FormDialogEngine {
                         max_length: Some(200),
                         validation_error: None,
                         input_type: InputType::Text,
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some("Value input".into()),
+                            hint: Some("Enter new value".into()),
+                            role: Some(AccessibilityRole::TextField),
+                        }),
                     },
                     Component::TextInput {
                         id: "field_note".into(),
@@ -335,7 +355,11 @@ impl FormDialogEngine {
                         max_length: Some(100),
                         validation_error: None,
                         input_type: InputType::Text,
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some("Comment (your eyes only, optional) input".into()),
+                            hint: Some("Only visible to you".into()),
+                            role: Some(AccessibilityRole::TextField),
+                        }),
                     },
                 ],
                 actions: vec![
@@ -367,7 +391,11 @@ impl FormDialogEngine {
                     max_length: Some(50),
                     validation_error: None,
                     input_type: InputType::Text,
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some("Display Name input".into()),
+                        hint: Some("Your name".into()),
+                        role: Some(AccessibilityRole::TextField),
+                    }),
                 }],
                 actions: vec![
                     ScreenAction {
@@ -398,7 +426,11 @@ impl FormDialogEngine {
                     max_length: Some(200),
                     validation_error: None,
                     input_type: InputType::Text,
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some("Relay URL input".into()),
+                        hint: Some("https://relay.example.com".into()),
+                        role: Some(AccessibilityRole::TextField),
+                    }),
                 }],
                 actions: vec![
                     ScreenAction {
@@ -445,7 +477,11 @@ impl FormDialogEngine {
                 max_length: Some(50),
                 validation_error: None,
                 input_type: InputType::Text,
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Group Name input".into()),
+                    hint: Some("e.g. Family, Work, Friends".into()),
+                    role: Some(AccessibilityRole::TextField),
+                }),
             }],
             actions: vec![
                 ScreenAction {
@@ -477,7 +513,11 @@ impl WorkflowEngine for FormDialogEngine {
                 confirm_text: "Discard".into(),
                 cancel_text: "Keep Editing".into(),
                 destructive: false,
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Confirm discard changes".into()),
+                    hint: Some("You have unsaved changes. Confirming will discard them.".into()),
+                    role: Some(AccessibilityRole::Alert),
+                }),
             });
         }
         screen

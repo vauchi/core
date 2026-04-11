@@ -131,7 +131,11 @@ impl DuressPinEngine {
                 confirm_text: "Disable".into(),
                 cancel_text: "Cancel".into(),
                 destructive: true,
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Confirm disable duress PIN".into()),
+                    hint: Some("Disabling removes silent alert protection for your contacts.".into()),
+                    role: Some(AccessibilityRole::Alert),
+                }),
             });
         }
 
@@ -158,7 +162,14 @@ impl DuressPinEngine {
                 filled: self.new_pin.len(),
                 masked: true,
                 validation_error: None,
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Enter duress PIN".into()),
+                    hint: Some(
+                        "Enter a 6-digit PIN that will silently alert your contacts when used."
+                            .into(),
+                    ),
+                    role: None,
+                }),
             }],
             actions: vec![
                 ScreenAction {
@@ -191,7 +202,11 @@ impl DuressPinEngine {
                 filled: self.confirm_pin.len(),
                 masked: true,
                 validation_error: None,
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Confirm duress PIN".into()),
+                    hint: Some("Re-enter the same 6-digit duress PIN to confirm.".into()),
+                    role: None,
+                }),
             }],
             actions: vec![
                 ScreenAction {
@@ -226,7 +241,11 @@ impl DuressPinEngine {
                     max_length: None,
                     validation_error: None,
                     input_type: InputType::Text,
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some("Alert message input".into()),
+                        hint: Some("Message to send when duress PIN is used".into()),
+                        role: Some(AccessibilityRole::TextField),
+                    }),
                 },
                 Component::ToggleList {
                     id: "alerts".into(),

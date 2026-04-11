@@ -7,6 +7,8 @@
 //! Verifies the full exchange ceremony over `TcpDirectTransport`:
 //! payload generation → transport exchange → key agreement → card exchange.
 
+#![cfg(feature = "testing")]
+
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 

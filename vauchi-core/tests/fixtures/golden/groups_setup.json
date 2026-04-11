@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "screen_id": "groups_setup",
   "title": "Choose your groups",
   "subtitle": "Groups let you share different info with different people. Use [Space] to select.",

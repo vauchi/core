@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "screen_id": "backup_prompt",
   "title": "Back up your identity",
   "subtitle": null,

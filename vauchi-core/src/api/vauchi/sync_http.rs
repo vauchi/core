@@ -414,7 +414,7 @@ impl Vauchi {
             timeout_ms: self.config.relay.connect_timeout_ms,
             proxy: self.config.relay.proxy.clone(),
             allow_direct: self.config.ohttp.allow_direct,
-            pinned_certs: self.config.relay.pinned_certs.clone(),
+            pinned_certs: self.resolve_pins(),
         });
         transport.set_ohttp(adapter_ohttp);
         Ok(HttpTransportAdapter::new(transport))
@@ -505,25 +505,34 @@ impl Vauchi {
 
     /// Resolve the effective certificate pin set for the relay.
     ///
-    /// Merges bundled pins (from `RelayConfig`) with cached pins (from
-    /// storage), deduplicating by fingerprint. If the cache is stale
-    /// (beyond `pin_ttl_secs`), attempts a refresh from the relay.
+    /// If `pin_config_verify_key` is configured, merges bundled pins with
+    /// cached/fetched pins from the relay's `/v2/pin-config` endpoint.
+    /// All remote pin responses must be Ed25519-signed by the relay operator.
     ///
-    /// Returns at minimum the bundled pins — cache failures are non-fatal.
-    pub fn resolve_pins(&self) -> Vec<PinnedCertificate> {
-        let relay_url = self.http_relay_url();
+    /// If `pin_config_verify_key` is `None` (default), returns only the
+    /// bundled pins — no remote fetch is attempted.
+    ///
+    /// Returns at minimum the bundled pins — cache/network failures are non-fatal.
+    pub(crate) fn resolve_pins(&self) -> Vec<PinnedCertificate> {
         let mut pins = self.config.relay.pinned_certs.clone();
 
+        // Pin rotation requires a verify key — without it, only bundled pins are used
+        let Some(ref verify_key) = self.config.relay.pin_config_verify_key else {
+            return pins;
+        };
+
+        let relay_url = self.http_relay_url();
+
         // Try loading cached pins (best-effort — cache miss is fine)
-        if let Ok(Some((cached_pins, fetched_at))) = self.storage.load_pin_cache(&relay_url) {
-            if self.is_pin_cache_fresh(fetched_at) {
-                merge_pins(&mut pins, &cached_pins);
-                return pins;
-            }
+        if let Ok(Some((cached_pins, fetched_at))) = self.storage.load_pin_cache(&relay_url)
+            && self.is_pin_cache_fresh(fetched_at)
+        {
+            merge_pins(&mut pins, &cached_pins);
+            return pins;
         }
 
         // Cache miss or stale — try refreshing (non-fatal on failure)
-        if let Ok(refreshed) = self.refresh_pin_cache(&relay_url) {
+        if let Ok(refreshed) = self.refresh_pin_cache(&relay_url, verify_key) {
             merge_pins(&mut pins, &refreshed);
         }
 
@@ -540,16 +549,27 @@ impl Vauchi {
         age < self.config.relay.pin_ttl_secs
     }
 
-    /// Fetch fresh pins from the relay and cache them in storage.
-    fn refresh_pin_cache(&self, relay_url: &str) -> VauchiResult<Vec<PinnedCertificate>> {
+    /// Fetch fresh signed pins from the relay and cache them in storage.
+    fn refresh_pin_cache(
+        &self,
+        relay_url: &str,
+        verify_key: &[u8; 32],
+    ) -> VauchiResult<Vec<PinnedCertificate>> {
         let transport = self.create_bare_transport();
-        let pins = transport.fetch_pin_config().map_err(VauchiError::Network)?;
+        let pins = transport
+            .fetch_pin_config(verify_key)
+            .map_err(VauchiError::Network)?;
         self.storage.save_pin_cache(relay_url, &pins)?;
         Ok(pins)
     }
 
     /// Create a bare `HttpTransport` (no OHTTP, direct allowed) for
-    /// bootstrap operations: fetching the OHTTP key and health checks.
+    /// bootstrap operations: fetching the OHTTP key, health checks,
+    /// and pin-config refresh.
+    ///
+    /// Uses only bundled pins (not `resolve_pins`) to avoid circular
+    /// dependency: pin-config fetch must not depend on cached pins
+    /// from a previous pin-config fetch.
     fn create_bare_transport(&self) -> HttpTransport {
         HttpTransport::new(HttpTransportConfig {
             relay_url: self.http_relay_url(),
@@ -759,7 +779,9 @@ mod tests {
     // @scenario: pinning :: fresh cache within TTL
     #[test]
     fn test_is_pin_cache_fresh_within_ttl() {
-        let (v, _dir) = vauchi_with_server_url("wss://relay.example.com");
+        let (v, _dir) = vauchi_with_server_url("https://relay.example.com");
+        // Default pin_ttl_secs is 86400 (24h)
+        assert_eq!(v.config.relay.pin_ttl_secs, 86_400);
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -773,7 +795,8 @@ mod tests {
     // @scenario: pinning :: stale cache beyond TTL
     #[test]
     fn test_is_pin_cache_stale_beyond_ttl() {
-        let (v, _dir) = vauchi_with_server_url("wss://relay.example.com");
+        let (v, _dir) = vauchi_with_server_url("https://relay.example.com");
+        assert_eq!(v.config.relay.pin_ttl_secs, 86_400);
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -782,5 +805,41 @@ mod tests {
             !v.is_pin_cache_fresh(now - 90_000),
             "cache fetched 90000s ago must be stale (TTL=86400)"
         );
+    }
+
+    // @scenario: pinning :: resolve_pins returns only bundled when no verify key
+    #[test]
+    fn test_resolve_pins_returns_bundled_only_without_verify_key() {
+        let (v, _dir) = vauchi_with_server_url("https://relay.example.com");
+        assert!(
+            v.config.relay.pin_config_verify_key.is_none(),
+            "test assumes no verify key"
+        );
+        let pins = v.resolve_pins();
+        assert_eq!(
+            pins, v.config.relay.pinned_certs,
+            "without verify key, resolve_pins must return only bundled pins"
+        );
+    }
+
+    // @scenario: pinning :: resolve_pins falls back to bundled when refresh fails
+    #[test]
+    fn test_resolve_pins_falls_back_to_bundled_on_refresh_failure() {
+        use crate::api::VauchiConfig;
+        let dir = tempfile::tempdir().expect("tempdir must succeed");
+        let mut cfg = VauchiConfig::with_storage_path(dir.path().join("vauchi.db"))
+            .with_relay_url("https://unreachable.invalid");
+        // Set a verify key so resolve_pins attempts a remote fetch
+        cfg.relay.pin_config_verify_key = Some([0x42; 32]);
+        let v = Vauchi::new(cfg).expect("Vauchi::new must succeed");
+
+        // No cache exists and relay is unreachable — refresh will fail
+        let pins = v.resolve_pins();
+
+        assert_eq!(
+            pins, v.config.relay.pinned_certs,
+            "on refresh failure, resolve_pins must return bundled pins (not empty)"
+        );
+        assert!(!pins.is_empty(), "bundled pins must not be empty");
     }
 }

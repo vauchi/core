@@ -162,6 +162,18 @@ pub struct RelayConfig {
     /// the client re-fetches. Shorter = more frequent checks, more
     /// network traffic. Longer = more risk of stale pins after rotation.
     pub pin_ttl_secs: u64,
+
+    /// Ed25519 public key for verifying signed pin-config responses.
+    ///
+    /// When `Some`, the client fetches and verifies pin updates from
+    /// the relay's `/v2/pin-config` endpoint. The relay must sign
+    /// pin-config responses with the corresponding private key.
+    ///
+    /// When `None` (default), pin rotation is disabled — only the
+    /// bundled `pinned_certs` are used. This is the safe default:
+    /// unauthenticated pin updates would allow a MITM to replace
+    /// the pin set permanently.
+    pub pin_config_verify_key: Option<[u8; 32]>,
 }
 
 /// SPKI SHA-256 pin for relay.vauchi.app leaf certificate.
@@ -197,7 +209,8 @@ impl Default for RelayConfig {
             proxy: ProxyConfig::None,
             relay_noise_pubkey: None,
             pinned_certs: vec![PinnedCertificate::new(RELAY_PROD_SPKI_PIN)],
-            pin_ttl_secs: 86_400, // 24 hours
+            pin_ttl_secs: 86_400,        // 24 hours
+            pin_config_verify_key: None, // disabled until relay signs pin-config
         }
     }
 }

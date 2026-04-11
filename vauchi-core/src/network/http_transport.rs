@@ -23,6 +23,56 @@ use crate::version::{APP_COMPAT_VERSION, VersionPolicy};
 /// Default retry delay when the server doesn't specify Retry-After.
 const DEFAULT_RATE_LIMIT_RETRY_SECS: u64 = 10;
 
+/// Verify and parse a signed pin-config response.
+///
+/// **Wire format**: `[64-byte Ed25519 signature][N * 32-byte SPKI fingerprints]`
+///
+/// The signature covers the pin data (everything after the first 64 bytes).
+/// This prevents a MITM — even one passing the current TLS pin check —
+/// from injecting replacement pins into the cache.
+///
+/// Requires at least one pin (96 bytes minimum: 64 sig + 32 pin).
+pub fn verify_signed_pin_config(
+    body: &[u8],
+    verify_key: &[u8; 32],
+) -> Result<Vec<PinnedCertificate>, NetworkError> {
+    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+
+    // Must have at least a 64-byte signature + at least one 32-byte pin
+    if body.len() < 64 + 32 {
+        return Err(NetworkError::InvalidMessage(
+            "pin-config response too short: need 64-byte signature + at least one pin".into(),
+        ));
+    }
+
+    let (sig_bytes, pin_data) = body.split_at(64);
+    if pin_data.len() % 32 != 0 {
+        return Err(NetworkError::InvalidMessage(
+            "pin-config pin data must be a multiple of 32 bytes".into(),
+        ));
+    }
+
+    // Verify Ed25519 signature over the pin data
+    let vk = VerifyingKey::from_bytes(verify_key)
+        .map_err(|e| NetworkError::InvalidMessage(format!("invalid pin-config verify key: {e}")))?;
+    let sig = Signature::from_slice(sig_bytes)
+        .map_err(|e| NetworkError::InvalidMessage(format!("invalid pin-config signature: {e}")))?;
+    vk.verify(pin_data, &sig).map_err(|_| {
+        NetworkError::InvalidMessage(
+            "pin-config signature verification failed — relay response is not authentic".into(),
+        )
+    })?;
+
+    Ok(pin_data
+        .chunks_exact(32)
+        .map(|chunk| {
+            let mut fingerprint = [0u8; 32];
+            fingerprint.copy_from_slice(chunk);
+            PinnedCertificate::new(fingerprint)
+        })
+        .collect())
+}
+
 /// Convert a relay error response to the appropriate NetworkError.
 /// Detects rate limit errors by checking the error string.
 fn response_error(action: &str, error_msg: &str) -> NetworkError {
@@ -184,15 +234,19 @@ impl HttpTransport {
         Ok(body)
     }
 
-    /// Fetch the relay's certificate pin configuration.
+    /// Fetch the relay's signed certificate pin configuration.
     ///
     /// Returns a list of SPKI SHA-256 fingerprints the relay currently
     /// advertises. Clients merge these with bundled pins to support
     /// key rotation without app updates.
     ///
-    /// Uses direct HTTP (like OHTTP key fetch) — the connection itself
-    /// is already pinned, so the response is trusted.
-    pub fn fetch_pin_config(&self) -> Result<Vec<PinnedCertificate>, NetworkError> {
+    /// The `verify_key` is the relay operator's Ed25519 public key,
+    /// bundled in `RelayConfig::pin_config_verify_key`. See
+    /// [`verify_signed_pin_config`] for the wire format and verification.
+    pub fn fetch_pin_config(
+        &self,
+        verify_key: &[u8; 32],
+    ) -> Result<Vec<PinnedCertificate>, NetworkError> {
         let agent = self.agent.as_ref().map_err(|e| e.clone())?;
         let url = format!("{}/v2/pin-config", self.config.relay_url);
         let resp = agent
@@ -205,19 +259,8 @@ impl HttpTransport {
             .into_body()
             .read_to_vec()
             .map_err(|e| NetworkError::ConnectionFailed(e.to_string()))?;
-        if body.len() % 32 != 0 {
-            return Err(NetworkError::InvalidMessage(
-                "pin-config response must be a multiple of 32 bytes".into(),
-            ));
-        }
-        Ok(body
-            .chunks_exact(32)
-            .map(|chunk| {
-                let mut fingerprint = [0u8; 32];
-                fingerprint.copy_from_slice(chunk);
-                PinnedCertificate::new(fingerprint)
-            })
-            .collect())
+
+        verify_signed_pin_config(&body, verify_key)
     }
 
     /// Checks if the relay is reachable.

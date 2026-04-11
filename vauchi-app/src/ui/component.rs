@@ -4,6 +4,14 @@
 
 use serde::{Deserialize, Serialize};
 
+/// An option in a [`Component::Dropdown`].
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DropdownOption {
+    pub id: String,
+    pub label: String,
+}
+
 /// A UI component that core tells frontends to render.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -105,6 +113,14 @@ pub enum Component {
         text: String,
         action_label: String,
         action_id: String,
+    },
+    /// An inline dropdown for selection UIs (e.g. theme, language).
+    /// Reuses `UserAction::ListItemSelected` — no new action variant needed.
+    Dropdown {
+        id: String,
+        label: String,
+        selected: Option<String>,
+        options: Vec<DropdownOption>,
     },
 }
 

@@ -175,7 +175,7 @@ mod tests {
         // Known SHA-256 hash of "hello world"
         let data = b"hello world";
         let expected = "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
-        assert!(verify_checksum(data, expected).is_ok(), "expected success");
+        verify_checksum(data, expected).expect("valid SHA-256 checksum must pass verification");
     }
 
     // Trace: codebase-review-tracker item #24
@@ -259,12 +259,9 @@ mod tests {
             signature: None,
         };
 
-        let result = verify_manifest_signature(&manifest, &public_key);
-        assert!(result.is_err(), "expected error");
-        assert!(matches!(
-            result.unwrap_err(),
-            IntegrityError::MissingSignature
-        ));
+        let err = verify_manifest_signature(&manifest, &public_key)
+            .expect_err("missing signature must be rejected");
+        assert!(matches!(err, IntegrityError::MissingSignature));
     }
 
     // Trace: codebase-review-tracker item #24
@@ -284,14 +281,18 @@ mod tests {
             signature: None,
         };
 
-        let canonical_json = serde_json::to_vec(&manifest).unwrap();
+        let value = serde_json::to_value(&manifest).unwrap();
+        let canonical_json = serde_json::to_vec(&value).unwrap();
         let signature = signer.sign(&canonical_json);
         manifest.signature = Some(hex::encode(signature.as_bytes()));
 
-        // Verification with wrong key should fail
+        // Verification with wrong key should fail — the signature is valid
+        // (signed with `signer`) but the verify key (`wrong_key`) is different
+        let err = verify_manifest_signature(&manifest, &wrong_key)
+            .expect_err("wrong key must fail verification");
         assert!(
-            verify_manifest_signature(&manifest, &wrong_key).is_err(),
-            "expected error"
+            err.to_string().contains("signature"),
+            "error must mention signature, got: {err}"
         );
     }
 

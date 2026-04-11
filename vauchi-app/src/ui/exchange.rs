@@ -639,6 +639,7 @@ impl ExchangeEngine {
                     title: "Exchange Complete".into(),
                     detail: None,
                     status: Status::Success,
+                    a11y: None,
                 }],
                 actions: vec![ScreenAction {
                     id: "done".into(),
@@ -689,6 +690,7 @@ impl ExchangeEngine {
                         title: "Exchange Failed".into(),
                         detail: self.failure_detail.clone(),
                         status: Status::Failed,
+                        a11y: None,
                     }],
                     actions,
                     progress: Some(self.progress()),

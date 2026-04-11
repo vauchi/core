@@ -170,6 +170,7 @@ impl BackupRecoveryEngine {
                 max_length: None,
                 validation_error: None,
                 input_type: InputType::Password,
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -202,6 +203,7 @@ impl BackupRecoveryEngine {
                 confirm_text: "Replace".into(),
                 cancel_text: "Cancel".into(),
                 destructive: true,
+                a11y: None,
             }],
             actions: vec![],
             progress: self.progress(),
@@ -222,6 +224,7 @@ impl BackupRecoveryEngine {
                 max_length: None,
                 validation_error: None,
                 input_type: InputType::Password,
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -265,6 +268,7 @@ impl BackupRecoveryEngine {
                 title: title.into(),
                 detail: Some(detail.into()),
                 status: Status::InProgress,
+                a11y: None,
             }],
             actions: vec![],
             progress: self.progress(),
@@ -287,6 +291,7 @@ impl BackupRecoveryEngine {
                 title: title.into(),
                 detail: None,
                 status: Status::Success,
+                a11y: None,
             }],
             actions: vec![ScreenAction {
                 id: "done".into(),
@@ -314,6 +319,7 @@ impl BackupRecoveryEngine {
                 title: title.into(),
                 detail: None,
                 status: Status::Failed,
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {

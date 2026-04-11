@@ -229,6 +229,7 @@ fn test_component_text_input_roundtrip() {
         max_length: Some(50),
         validation_error: None,
         input_type: InputType::Text,
+        a11y: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -511,6 +512,7 @@ fn test_component_inline_confirm_roundtrip() {
         confirm_text: "Delete Forever".into(),
         cancel_text: "Cancel".into(),
         destructive: true,
+        a11y: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -542,6 +544,7 @@ fn test_component_inline_confirm_non_destructive_roundtrip() {
         confirm_text: "Yes".into(),
         cancel_text: "No".into(),
         destructive: false,
+        a11y: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -575,6 +578,7 @@ fn test_component_editable_text_display_mode_roundtrip() {
         value: "Alice".into(),
         editing: false,
         validation_error: None,
+        a11y: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -606,6 +610,7 @@ fn test_component_editable_text_editing_with_error_roundtrip() {
         value: "".into(),
         editing: true,
         validation_error: Some("Name cannot be empty".into()),
+        a11y: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -710,4 +715,37 @@ fn test_a11y_default_is_none() {
     let a11y = A11y::default();
     assert_eq!(a11y.label, None);
     assert_eq!(a11y.hint, None);
+}
+
+// === Component a11y field backward-compat ===
+
+#[test]
+fn test_component_text_input_without_a11y_deserializes() {
+    let json = r#"{"TextInput":{"id":"name","label":"Name","value":"","placeholder":"Enter name","max_length":null,"validation_error":null,"input_type":"Text"}}"#;
+    let component: Component = serde_json::from_str(json).unwrap();
+    match component {
+        Component::TextInput { a11y, .. } => assert_eq!(a11y, None),
+        other => panic!("Expected TextInput, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_component_text_input_with_a11y_roundtrip() {
+    let component = Component::TextInput {
+        id: "name".into(),
+        label: "Name".into(),
+        value: "Alice".into(),
+        placeholder: Some("Enter name".into()),
+        max_length: None,
+        validation_error: None,
+        input_type: InputType::Text,
+        a11y: Some(A11y {
+            label: Some("Name field".into()),
+            hint: Some("Enter your display name".into()),
+        }),
+    };
+    let json = serde_json::to_string(&component).unwrap();
+    let parsed: Component = serde_json::from_str(&json).unwrap();
+    assert_eq!(component, parsed);
+    assert!(json.contains("\"a11y\""));
 }

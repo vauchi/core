@@ -129,6 +129,7 @@ impl ContactEditEngine {
                     max_length: None,
                     validation_error: None,
                     input_type: InputType::Text,
+                    a11y: None,
                 },
                 Component::Divider,
                 Component::FieldList {

@@ -9,7 +9,8 @@
         "id": "qr",
         "data": "vauchi://link?token=abc123",
         "mode": "Display",
-        "label": "Scan on new device"
+        "label": "Scan on new device",
+        "a11y": null
       }
     },
     {

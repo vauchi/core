@@ -247,6 +247,7 @@ impl OnboardingEngine {
                     max_length: Some(100),
                     validation_error: None,
                     input_type: InputType::Text,
+                    a11y: None,
                 },
             ],
             actions: vec![ScreenAction {
@@ -348,6 +349,7 @@ impl OnboardingEngine {
                     max_length: Some(50),
                     validation_error: None,
                     input_type: InputType::Text,
+                    a11y: None,
                 },
             ],
             actions: vec![

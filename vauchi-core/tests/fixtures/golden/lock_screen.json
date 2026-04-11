@@ -11,7 +11,8 @@
         "length": 6,
         "filled": 0,
         "masked": true,
-        "validation_error": null
+        "validation_error": null,
+        "a11y": null
       }
     }
   ],

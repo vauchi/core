@@ -120,6 +120,7 @@ fn screen_model_with_validation_error_injects_into_text_input() {
                 max_length: None,
                 validation_error: None,
                 input_type: InputType::Text,
+                a11y: None,
             },
             Component::TextInput {
                 id: "field_b".into(),
@@ -129,6 +130,7 @@ fn screen_model_with_validation_error_injects_into_text_input() {
                 max_length: None,
                 validation_error: None,
                 input_type: InputType::Text,
+                a11y: None,
             },
         ],
         ..Default::default()
@@ -179,6 +181,7 @@ fn screen_model_with_validation_error_injects_into_pin_input() {
             filled: 0,
             masked: true,
             validation_error: None,
+            a11y: None,
         }],
         ..Default::default()
     };

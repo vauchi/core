@@ -59,6 +59,7 @@ pub(super) fn build_show_qr_screen(
             data: qr_data,
             mode: QrMode::Display,
             label: Some(config_name.to_owned()),
+            a11y: None,
         }],
         actions: vec![ScreenAction {
             id: "continue".into(),
@@ -82,6 +83,7 @@ pub(super) fn build_scan_qr_screen(progress: Progress) -> ScreenModel {
             data: String::new(),
             mode: QrMode::Scan,
             label: None,
+            a11y: None,
         }],
         actions: vec![ScreenAction {
             id: "back".into(),
@@ -108,6 +110,7 @@ pub(super) fn build_manual_entry_screen(progress: Progress) -> ScreenModel {
             max_length: None,
             validation_error: None,
             input_type: InputType::Text,
+            a11y: None,
         }],
         actions: vec![
             ScreenAction {
@@ -140,6 +143,7 @@ pub(super) fn build_verifying_screen(progress: Progress) -> ScreenModel {
             title: "Verifying...".into(),
             detail: None,
             status: Status::InProgress,
+            a11y: None,
         }],
         actions: vec![],
         progress: Some(progress),

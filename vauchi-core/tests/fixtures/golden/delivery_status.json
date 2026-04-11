@@ -10,7 +10,8 @@
         "icon": null,
         "title": "Alice",
         "detail": "Delivered 2 min ago",
-        "status": "Success"
+        "status": "Success",
+        "a11y": null
       }
     },
     {
@@ -19,7 +20,8 @@
         "icon": null,
         "title": "Bob",
         "detail": "Relay unreachable",
-        "status": "Failed"
+        "status": "Failed",
+        "a11y": null
       }
     }
   ],

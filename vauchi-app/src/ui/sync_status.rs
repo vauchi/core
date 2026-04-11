@@ -70,6 +70,7 @@ impl SyncStatusEngine {
                 None
             },
             status,
+            a11y: None,
         }];
 
         components.push(Component::InfoPanel {

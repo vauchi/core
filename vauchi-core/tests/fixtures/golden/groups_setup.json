@@ -51,7 +51,8 @@
         "placeholder": "Type a group name and press Enter",
         "max_length": 50,
         "validation_error": null,
-        "input_type": "Text"
+        "input_type": "Text",
+        "a11y": null
       }
     }
   ],

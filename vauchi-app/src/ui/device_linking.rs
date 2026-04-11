@@ -79,6 +79,7 @@ impl DeviceLinkingEngine {
                         data: self.qr_data.clone(),
                         mode: QrMode::Display,
                         label: Some("Scan on new device".into()),
+                        a11y: None,
                     },
                     Component::Text {
                         id: "join_hint".into(),
@@ -147,6 +148,7 @@ impl DeviceLinkingEngine {
                     title: "Syncing data...".into(),
                     detail: None,
                     status: Status::InProgress,
+                    a11y: None,
                 }],
                 actions: vec![],
                 progress: self.progress(),
@@ -162,6 +164,7 @@ impl DeviceLinkingEngine {
                     title: "Device Linked".into(),
                     detail: None,
                     status: Status::Success,
+                    a11y: None,
                 }],
                 actions: vec![ScreenAction {
                     id: "done".into(),

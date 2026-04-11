@@ -30,6 +30,7 @@ fn dropdown_roundtrip_with_selection() {
                 label: "Dark".to_string(),
             },
         ],
+        a11y: None,
     };
 
     let json = serde_json::to_string(&component).expect("serialize Dropdown");
@@ -49,6 +50,7 @@ fn dropdown_roundtrip_no_selection() {
             id: "en".to_string(),
             label: "English".to_string(),
         }],
+        a11y: None,
     };
 
     let json = serde_json::to_string(&component).expect("serialize Dropdown");
@@ -68,6 +70,7 @@ fn dropdown_json_shape() {
             id: "a".to_string(),
             label: "A".to_string(),
         }],
+        a11y: None,
     };
 
     let json = serde_json::to_string(&component).expect("serialize Dropdown");
@@ -99,6 +102,7 @@ fn dropdown_roundtrip_empty_options() {
         label: "Empty".to_string(),
         selected: None,
         options: vec![],
+        a11y: None,
     };
 
     let json = serde_json::to_string(&component).expect("serialize Dropdown");

@@ -222,6 +222,7 @@ impl FormDialogEngine {
             max_length: Some(200),
             validation_error: None,
             input_type,
+            a11y: None,
         });
 
         // Display Name (optional) — the label shown next to the value
@@ -233,6 +234,7 @@ impl FormDialogEngine {
             max_length: Some(50),
             validation_error: None,
             input_type: InputType::Text,
+            a11y: None,
         });
 
         // Comment (your eyes only, optional) — private note
@@ -244,6 +246,7 @@ impl FormDialogEngine {
             max_length: Some(100),
             validation_error: None,
             input_type: InputType::Text,
+            a11y: None,
         });
 
         // Group visibility toggles
@@ -321,6 +324,7 @@ impl FormDialogEngine {
                         max_length: Some(200),
                         validation_error: None,
                         input_type: InputType::Text,
+                        a11y: None,
                     },
                     Component::TextInput {
                         id: "field_note".into(),
@@ -330,6 +334,7 @@ impl FormDialogEngine {
                         max_length: Some(100),
                         validation_error: None,
                         input_type: InputType::Text,
+                        a11y: None,
                     },
                 ],
                 actions: vec![
@@ -361,6 +366,7 @@ impl FormDialogEngine {
                     max_length: Some(50),
                     validation_error: None,
                     input_type: InputType::Text,
+                    a11y: None,
                 }],
                 actions: vec![
                     ScreenAction {
@@ -391,6 +397,7 @@ impl FormDialogEngine {
                     max_length: Some(200),
                     validation_error: None,
                     input_type: InputType::Text,
+                    a11y: None,
                 }],
                 actions: vec![
                     ScreenAction {
@@ -437,6 +444,7 @@ impl FormDialogEngine {
                 max_length: Some(50),
                 validation_error: None,
                 input_type: InputType::Text,
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -468,6 +476,7 @@ impl WorkflowEngine for FormDialogEngine {
                 confirm_text: "Discard".into(),
                 cancel_text: "Keep Editing".into(),
                 destructive: false,
+                a11y: None,
             });
         }
         screen

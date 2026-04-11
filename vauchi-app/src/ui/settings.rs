@@ -308,6 +308,7 @@ impl WorkflowEngine for SettingsEngine {
                 confirm_text: "Wipe All Data".into(),
                 cancel_text: "Cancel".into(),
                 destructive: true,
+                a11y: None,
             });
         }
 

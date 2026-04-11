@@ -90,6 +90,7 @@ impl DeviceManagementEngine {
                 confirm_text: "Revoke".into(),
                 cancel_text: "Cancel".into(),
                 destructive: true,
+                a11y: None,
             });
         }
 

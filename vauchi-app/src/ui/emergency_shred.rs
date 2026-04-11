@@ -109,6 +109,7 @@ impl EmergencyShredEngine {
                 max_length: None,
                 validation_error: None,
                 input_type: InputType::Text,
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -144,6 +145,7 @@ impl EmergencyShredEngine {
                 title: "Wiping data...".into(),
                 detail: None,
                 status: Status::InProgress,
+                a11y: None,
             }],
             actions: vec![],
             progress: Some(Progress {
@@ -166,6 +168,7 @@ impl EmergencyShredEngine {
                 title: "Data Wiped".into(),
                 detail: None,
                 status: Status::Success,
+                a11y: None,
             }],
             actions: vec![ScreenAction {
                 id: "done".into(),

@@ -131,6 +131,7 @@ impl DuressPinEngine {
                 confirm_text: "Disable".into(),
                 cancel_text: "Cancel".into(),
                 destructive: true,
+                a11y: None,
             });
         }
 
@@ -157,6 +158,7 @@ impl DuressPinEngine {
                 filled: self.new_pin.len(),
                 masked: true,
                 validation_error: None,
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -189,6 +191,7 @@ impl DuressPinEngine {
                 filled: self.confirm_pin.len(),
                 masked: true,
                 validation_error: None,
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -223,6 +226,7 @@ impl DuressPinEngine {
                     max_length: None,
                     validation_error: None,
                     input_type: InputType::Text,
+                    a11y: None,
                 },
                 Component::ToggleList {
                     id: "alerts".into(),

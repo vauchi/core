@@ -9,7 +9,8 @@
         "id": "own_qr",
         "data": "vauchi://exchange?token=abc123",
         "mode": "Display",
-        "label": "Alice"
+        "label": "Alice",
+        "a11y": null
       }
     }
   ],

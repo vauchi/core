@@ -83,6 +83,7 @@ pub(super) fn build_waiting_screen(progress: Progress) -> ScreenModel {
             title: "Waiting...".into(),
             detail: Some("They need to open the link to complete the exchange.".into()),
             status: Status::InProgress,
+            a11y: None,
         }],
         actions: vec![ScreenAction {
             id: "cancel".into(),
@@ -107,6 +108,7 @@ pub(super) fn build_retrieving_screen(progress: Progress) -> ScreenModel {
             title: "Retrieving contact...".into(),
             detail: None,
             status: Status::InProgress,
+            a11y: None,
         }],
         actions: vec![],
         progress: Some(progress),

@@ -30,6 +30,8 @@ pub enum Component {
         max_length: Option<usize>,
         validation_error: Option<String>,
         input_type: InputType,
+        #[serde(default)]
+        a11y: Option<A11y>,
     },
     ToggleList {
         id: String,
@@ -74,6 +76,8 @@ pub enum Component {
         title: String,
         detail: Option<String>,
         status: Status,
+        #[serde(default)]
+        a11y: Option<A11y>,
     },
     PinInput {
         id: String,
@@ -82,12 +86,16 @@ pub enum Component {
         filled: usize,
         masked: bool,
         validation_error: Option<String>,
+        #[serde(default)]
+        a11y: Option<A11y>,
     },
     QrCode {
         id: String,
         data: String,
         mode: QrMode,
         label: Option<String>,
+        #[serde(default)]
+        a11y: Option<A11y>,
     },
     /// An inline confirmation for irrevocable actions (expands in place).
     InlineConfirm {
@@ -97,6 +105,8 @@ pub enum Component {
         cancel_text: String,
         /// If true, render confirm button in destructive/red style.
         destructive: bool,
+        #[serde(default)]
+        a11y: Option<A11y>,
     },
     /// A text field that toggles between display and edit mode.
     EditableText {
@@ -106,6 +116,8 @@ pub enum Component {
         /// When true, render as editable input. When false, render as static text with edit button.
         editing: bool,
         validation_error: Option<String>,
+        #[serde(default)]
+        a11y: Option<A11y>,
     },
     Divider,
     /// Informational banner with an optional action button (e.g. preview mode indicator).
@@ -121,6 +133,8 @@ pub enum Component {
         label: String,
         selected: Option<String>,
         options: Vec<DropdownOption>,
+        #[serde(default)]
+        a11y: Option<A11y>,
     },
 }
 

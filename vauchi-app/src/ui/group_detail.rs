@@ -54,6 +54,7 @@ impl GroupDetailEngine {
                 confirm_text: "Delete Group".into(),
                 cancel_text: "Cancel".into(),
                 destructive: true,
+                a11y: None,
             });
         }
 

@@ -45,6 +45,7 @@ impl DeliveryStatusEngine {
                     title: item.contact_name.clone(),
                     detail: item.detail.clone(),
                     status: item.status.clone(),
+                    a11y: None,
                 })
                 .collect()
         };

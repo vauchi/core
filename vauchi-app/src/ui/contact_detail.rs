@@ -250,6 +250,7 @@ impl ContactDetailEngine {
                         value: note_value,
                         editing: false,
                         validation_error: None,
+                        a11y: None,
                     });
                 }
                 // Private note about the contact — only visible to me, never shared
@@ -259,6 +260,7 @@ impl ContactDetailEngine {
                     value: self.personal_note.clone(),
                     editing: false,
                     validation_error: None,
+                    a11y: None,
                 });
                 // Trust & permissions group (local-only, never shared with the contact)
                 components.push(Component::SettingsGroup {
@@ -344,6 +346,7 @@ impl ContactDetailEngine {
                 confirm_text: "Delete".into(),
                 cancel_text: "Cancel".into(),
                 destructive: true,
+                a11y: None,
             });
         }
 

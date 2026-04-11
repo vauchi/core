@@ -250,7 +250,11 @@ impl ContactDetailEngine {
                         value: note_value,
                         editing: false,
                         validation_error: None,
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some("Private field note, editable".into()),
+                            hint: Some("Double tap to edit".into()),
+                            role: Some(AccessibilityRole::TextField),
+                        }),
                     });
                 }
                 // Private note about the contact — only visible to me, never shared
@@ -260,7 +264,11 @@ impl ContactDetailEngine {
                     value: self.personal_note.clone(),
                     editing: false,
                     validation_error: None,
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some("Personal note, editable".into()),
+                        hint: Some("Double tap to edit".into()),
+                        role: Some(AccessibilityRole::TextField),
+                    }),
                 });
                 // Trust & permissions group (local-only, never shared with the contact)
                 components.push(Component::SettingsGroup {
@@ -272,7 +280,13 @@ impl ContactDetailEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.proposal_trusted,
                         },
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some("Can propose contacts toggle".into()),
+                            hint: Some(
+                                "Allow this contact to suggest other people you should connect with".into(),
+                            ),
+                            role: None,
+                        }),
                     }],
                 });
                 // Delivery status summary (J1: update propagation)
@@ -347,7 +361,13 @@ impl ContactDetailEngine {
                 confirm_text: "Delete".into(),
                 cancel_text: "Cancel".into(),
                 destructive: true,
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Confirm contact deletion".into()),
+                    hint: Some(
+                        "This will permanently delete the contact and cannot be undone".into(),
+                    ),
+                    role: Some(AccessibilityRole::Alert),
+                }),
             });
         }
 

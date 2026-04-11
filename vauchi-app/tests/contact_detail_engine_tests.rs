@@ -8,8 +8,8 @@
 //! Exchanged contacts keep ShowToast + undo for archive (unchanged).
 
 use vauchi_app::ui::{
-    ActionResult, Component, ContactDetailEngine, ContactItem, FieldDisplay, UiFieldVisibility,
-    UserAction, WorkflowEngine,
+    AccessibilityRole, ActionResult, Component, ContactDetailEngine, ContactItem, FieldDisplay,
+    UiFieldVisibility, UserAction, WorkflowEngine,
 };
 
 fn sample_contact() -> ContactItem {
@@ -121,6 +121,88 @@ fn cancel_delete_contact_removes_inline_confirm() {
         !has_inline_confirm,
         "InlineConfirm must be removed after cancel"
     );
+}
+
+// @scenario: accessibility :: ContactDetail personal note EditableText has populated a11y
+//
+// Verifies that the personal_note EditableText component carries a meaningful
+// accessibility label and TextField role so screen readers can announce it.
+#[test]
+fn contact_detail_personal_note_has_a11y() {
+    let engine = exchanged_engine();
+    let screen = engine.current_screen();
+
+    let personal_note = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::EditableText { id, .. } if id == "personal_note"));
+
+    let personal_note =
+        personal_note.expect("Screen must contain a personal_note EditableText component");
+
+    match personal_note {
+        Component::EditableText { a11y, .. } => {
+            let a11y = a11y
+                .as_ref()
+                .expect("personal_note EditableText must have a11y populated");
+            assert_eq!(
+                a11y.label.as_deref(),
+                Some("Personal note, editable"),
+                "a11y label must identify the field as editable"
+            );
+            assert_eq!(
+                a11y.hint.as_deref(),
+                Some("Double tap to edit"),
+                "a11y hint must describe how to activate editing"
+            );
+            assert_eq!(
+                a11y.role,
+                Some(AccessibilityRole::TextField),
+                "EditableText role must be TextField"
+            );
+        }
+        other => panic!("expected EditableText, got {:?}", other),
+    }
+}
+
+// @scenario: accessibility :: ContactDetail delete InlineConfirm has populated a11y
+//
+// Verifies that the delete confirmation InlineConfirm carries an Alert role
+// and descriptive label so screen readers announce it as a destructive action.
+#[test]
+fn contact_detail_delete_inline_confirm_has_a11y() {
+    let mut engine = imported_engine();
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "delete_contact".into(),
+    });
+
+    let screen = engine.current_screen();
+    let confirm = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::InlineConfirm { id, .. } if id == "delete_contact"));
+
+    let confirm = confirm.expect("Screen must contain delete_contact InlineConfirm");
+
+    match confirm {
+        Component::InlineConfirm { a11y, .. } => {
+            let a11y = a11y
+                .as_ref()
+                .expect("delete InlineConfirm must have a11y populated");
+            assert_eq!(
+                a11y.label.as_deref(),
+                Some("Confirm contact deletion"),
+                "a11y label must identify the confirmation"
+            );
+            assert_eq!(
+                a11y.role,
+                Some(AccessibilityRole::Alert),
+                "InlineConfirm for destructive action must have Alert role"
+            );
+        }
+        other => panic!("expected InlineConfirm, got {:?}", other),
+    }
 }
 
 // @scenario: contact_detail.feature - Archive exchanged contact still uses ShowToast

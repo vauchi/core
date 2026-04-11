@@ -195,6 +195,7 @@ impl FormDialogEngine {
                 } else {
                     None
                 },
+                a11y: None,
             })
             .collect();
 

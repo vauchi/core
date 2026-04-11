@@ -77,6 +77,7 @@ impl ModeSelectionEngine {
                             label: mode.display_name().to_string(),
                             icon,
                             detail,
+                            a11y: None,
                         }
                     })
                     .collect();

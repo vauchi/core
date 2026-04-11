@@ -123,6 +123,7 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                     label: c.name.clone(),
                     icon: None,
                     detail: Some(format!("via {}", c.via_group)),
+                    a11y: None,
                 })
                 .collect();
 

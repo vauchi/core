@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use vauchi_app::ui::{A11y, *};
+use vauchi_app::ui::{A11y, SettingsItem, *};
 
 #[test]
 fn test_screen_model_serde_roundtrip() {
@@ -718,6 +718,16 @@ fn test_a11y_default_is_none() {
 }
 
 // === Component a11y field backward-compat ===
+
+// === Sub-type struct a11y field backward-compat ===
+
+#[test]
+fn test_settings_item_without_a11y_deserializes() {
+    let json = r#"{"id":"theme","label":"Theme","kind":{"Link":{"detail":"Catppuccin"}}}"#;
+    let item: SettingsItem = serde_json::from_str(json).unwrap();
+    assert_eq!(item.id, "theme");
+    assert_eq!(item.a11y, None);
+}
 
 #[test]
 fn test_component_text_input_without_a11y_deserializes() {

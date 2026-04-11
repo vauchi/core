@@ -75,11 +75,13 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Value {
                             value: self.config.display_name.clone(),
                         },
+                        a11y: None,
                     },
                     SettingsItem {
                         id: "edit_profile".into(),
                         label: "Edit Profile".into(),
                         kind: SettingsItemKind::Link { detail: None },
+                        a11y: None,
                     },
                 ],
             },
@@ -93,6 +95,7 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.config.delivery_receipts_enabled,
                         },
+                        a11y: None,
                     },
                     SettingsItem {
                         id: "suppress_presence".into(),
@@ -100,6 +103,7 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.config.suppress_presence,
                         },
+                        a11y: None,
                     },
                 ],
             },
@@ -112,6 +116,7 @@ impl WorkflowEngine for SettingsEngine {
                     kind: SettingsItemKind::Toggle {
                         enabled: self.config.contact_added_notifications,
                     },
+                    a11y: None,
                 }],
             },
             Component::SettingsGroup {
@@ -124,6 +129,7 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Value {
                             value: self.config.theme.clone(),
                         },
+                        a11y: None,
                     },
                     SettingsItem {
                         id: "language".into(),
@@ -131,6 +137,7 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Value {
                             value: self.config.language.clone(),
                         },
+                        a11y: None,
                     },
                 ],
             },
@@ -144,6 +151,7 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.config.reduce_motion,
                         },
+                        a11y: None,
                     },
                     SettingsItem {
                         id: "high_contrast".into(),
@@ -151,6 +159,7 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.config.high_contrast,
                         },
+                        a11y: None,
                     },
                     SettingsItem {
                         id: "large_touch".into(),
@@ -158,6 +167,7 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.config.large_touch,
                         },
+                        a11y: None,
                     },
                 ],
             },
@@ -169,6 +179,7 @@ impl WorkflowEngine for SettingsEngine {
                         id: "change_password".into(),
                         label: "Change Password".into(),
                         kind: SettingsItemKind::Link { detail: None },
+                        a11y: None,
                     },
                     SettingsItem {
                         id: "devices".into(),
@@ -180,11 +191,13 @@ impl WorkflowEngine for SettingsEngine {
                                 format!("{} devices", self.config.device_count)
                             }),
                         },
+                        a11y: None,
                     },
                     SettingsItem {
                         id: "duress_pin".into(),
                         label: "Duress PIN".into(),
                         kind: SettingsItemKind::Link { detail: None },
+                        a11y: None,
                     },
                 ],
             },
@@ -196,11 +209,13 @@ impl WorkflowEngine for SettingsEngine {
                         id: "backup_export".into(),
                         label: "Create Backup".into(),
                         kind: SettingsItemKind::Link { detail: None },
+                        a11y: None,
                     },
                     SettingsItem {
                         id: "backup_import".into(),
                         label: "Restore Backup".into(),
                         kind: SettingsItemKind::Link { detail: None },
+                        a11y: None,
                     },
                 ],
             },
@@ -213,6 +228,7 @@ impl WorkflowEngine for SettingsEngine {
                     kind: SettingsItemKind::Value {
                         value: self.config.relay_url.clone(),
                     },
+                    a11y: None,
                 }],
             },
             Component::SettingsGroup {
@@ -225,6 +241,7 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Link {
                             detail: Some(self.config.sync_status.clone()),
                         },
+                        a11y: None,
                     },
                     SettingsItem {
                         id: "pending_updates".into(),
@@ -232,6 +249,7 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Value {
                             value: self.config.pending_updates.to_string(),
                         },
+                        a11y: None,
                     },
                     SettingsItem {
                         id: "failed_deliveries".into(),
@@ -239,6 +257,7 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Value {
                             value: self.config.failed_deliveries.to_string(),
                         },
+                        a11y: None,
                     },
                 ],
             },
@@ -250,16 +269,19 @@ impl WorkflowEngine for SettingsEngine {
                         id: "help_center".into(),
                         label: "Help Center".into(),
                         kind: SettingsItemKind::Link { detail: None },
+                        a11y: None,
                     },
                     SettingsItem {
                         id: "funding".into(),
                         label: "Support Development".into(),
                         kind: SettingsItemKind::Link { detail: None },
+                        a11y: None,
                     },
                     SettingsItem {
                         id: "privacy_policy".into(),
                         label: "Privacy Policy".into(),
                         kind: SettingsItemKind::Link { detail: None },
+                        a11y: None,
                     },
                 ],
             },
@@ -277,6 +299,7 @@ impl WorkflowEngine for SettingsEngine {
                                 format!("{} ({})", self.config.version, self.config.build)
                             },
                         },
+                        a11y: None,
                     },
                     SettingsItem {
                         id: "debug_mode".into(),
@@ -284,6 +307,7 @@ impl WorkflowEngine for SettingsEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.config.debug_mode,
                         },
+                        a11y: None,
                     },
                 ],
             },
@@ -296,6 +320,7 @@ impl WorkflowEngine for SettingsEngine {
                     kind: SettingsItemKind::Destructive {
                         label: "Wipe All Data".into(),
                     },
+                    a11y: None,
                 }],
             },
         ];

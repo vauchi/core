@@ -104,6 +104,7 @@ impl GroupsEngine {
                     label: g.name.clone(),
                     icon: Some("group".into()),
                     detail: Some(detail),
+                    a11y: None,
                 }
             })
             .collect();

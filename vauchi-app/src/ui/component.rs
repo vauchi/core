@@ -251,6 +251,8 @@ pub struct ContactItem {
     /// Not displayed directly — used by ContactListEngine for full-text search.
     #[serde(default)]
     pub searchable_fields: Vec<String>,
+    #[serde(default)]
+    pub a11y: Option<A11y>,
 }
 
 /// An item in a settings group.
@@ -260,6 +262,8 @@ pub struct SettingsItem {
     pub id: String,
     pub label: String,
     pub kind: SettingsItemKind,
+    #[serde(default)]
+    pub a11y: Option<A11y>,
 }
 
 /// The kind of a settings item.
@@ -281,6 +285,8 @@ pub struct ActionListItem {
     pub label: String,
     pub icon: Option<String>,
     pub detail: Option<String>,
+    #[serde(default)]
+    pub a11y: Option<A11y>,
 }
 
 /// Status for a status indicator component.

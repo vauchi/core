@@ -143,6 +143,7 @@ impl MyInfoEngine {
                     label: format!("{} ({})", f.value, f.label),
                     icon: Some(f.field_type.clone()),
                     detail,
+                    a11y: None,
                 }
             })
             .collect();
@@ -181,6 +182,7 @@ impl MyInfoEngine {
                 } else {
                     None
                 },
+                a11y: None,
             })
             .collect();
 
@@ -210,6 +212,7 @@ impl MyInfoEngine {
                         label: format!("{} ({})", f.value, f.label),
                         icon: Some(f.field_type.clone()),
                         detail: None,
+                        a11y: None,
                     })
                     .collect();
 

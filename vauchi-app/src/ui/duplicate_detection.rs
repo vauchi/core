@@ -54,6 +54,7 @@ impl DuplicateDetectionEngine {
                                 label: format!("{} <-> {}", pair.name1, pair.name2),
                                 icon: None,
                                 detail: Some(format!("{pct}% similar")),
+                                a11y: None,
                             }
                         })
                         .collect(),

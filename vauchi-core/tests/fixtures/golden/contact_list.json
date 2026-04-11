@@ -14,7 +14,8 @@
             "subtitle": "Friend",
             "avatar_initials": "A",
             "status": null,
-            "searchable_fields": []
+            "searchable_fields": [],
+            "a11y": null
           },
           {
             "id": "c2",
@@ -22,7 +23,8 @@
             "subtitle": null,
             "avatar_initials": "B",
             "status": "Updated",
-            "searchable_fields": []
+            "searchable_fields": [],
+            "a11y": null
           }
         ],
         "searchable": true

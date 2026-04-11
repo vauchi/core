@@ -18,6 +18,7 @@ fn sample_contact() -> ContactItem {
         avatar_initials: "AL".into(),
         status: None,
         searchable_fields: vec![],
+        a11y: None,
     }
 }
 

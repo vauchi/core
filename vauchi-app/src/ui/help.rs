@@ -57,6 +57,7 @@ impl WorkflowEngine for HelpEngine {
                         label: item.question.clone(),
                         icon: None,
                         detail: None,
+                        a11y: None,
                     })
                     .collect();
 

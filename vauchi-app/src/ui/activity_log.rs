@@ -46,6 +46,7 @@ impl ActivityLogEngine {
                         label,
                         icon: None,
                         detail,
+                        a11y: None,
                     }
                 })
                 .collect();

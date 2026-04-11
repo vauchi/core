@@ -288,6 +288,7 @@ impl AppEngine {
                                     avatar_initials: initials(c.display_name()),
                                     status: None,
                                     searchable_fields: vec![],
+                                    a11y: None,
                                 })
                             })
                             .collect();
@@ -353,6 +354,7 @@ impl AppEngine {
                         avatar_initials: initials(c.display_name()),
                         status: None,
                         searchable_fields: vec![],
+                        a11y: None,
                     })
                     .collect();
                 members.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
@@ -446,6 +448,7 @@ impl AppEngine {
                             .iter()
                             .map(|f| f.value().to_string())
                             .collect(),
+                        a11y: None,
                     };
 
                     // Load personal note (stored as raw UTF-8 bytes by the app layer)
@@ -771,6 +774,7 @@ impl AppEngine {
                         avatar_initials: initials(c.display_name()),
                         status,
                         searchable_fields: fields,
+                        a11y: None,
                     }
                 })
                 .collect(),

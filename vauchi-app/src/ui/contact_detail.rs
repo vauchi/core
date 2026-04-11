@@ -272,6 +272,7 @@ impl ContactDetailEngine {
                         kind: SettingsItemKind::Toggle {
                             enabled: self.proposal_trusted,
                         },
+                        a11y: None,
                     }],
                 });
                 // Delivery status summary (J1: update propagation)
@@ -562,6 +563,7 @@ mod tests {
             avatar_initials: "A".into(),
             status: None,
             searchable_fields: vec![],
+            a11y: None,
         }
     }
 

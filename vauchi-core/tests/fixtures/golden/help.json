@@ -12,7 +12,8 @@
             "id": "faq1",
             "label": "How do I exchange contacts?",
             "icon": null,
-            "detail": null
+            "detail": null,
+            "a11y": null
           }
         ]
       }
@@ -25,7 +26,8 @@
             "id": "faq2",
             "label": "What is a duress PIN?",
             "icon": null,
-            "detail": null
+            "detail": null,
+            "a11y": null
           }
         ]
       }

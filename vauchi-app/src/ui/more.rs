@@ -48,6 +48,7 @@ impl WorkflowEngine for MoreEngine {
                 label: (*label).into(),
                 icon: None,
                 detail: None,
+                a11y: None,
             })
             .collect();
 

@@ -65,6 +65,7 @@ impl DeviceManagementEngine {
                         Some("device".into())
                     },
                     detail,
+                    a11y: None,
                 }
             })
             .collect();

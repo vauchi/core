@@ -53,6 +53,11 @@ pub enum ExchangeState {
         their_public_key: [u8; 32],
         shared_key: crate::crypto::SymmetricKey,
     },
+    /// Direct transport (USB/TCP): ready for payload exchange.
+    /// The caller retrieves our payload via `our_exchange_payload()`,
+    /// exchanges it over a `DirectTransport`, then feeds the peer's
+    /// payload back via `DirectPayloadReceived`.
+    AwaitingDirectPayload { our_qr: ExchangeQR },
     /// NFC: waiting for both devices to tap.
     AwaitingNfcTap,
     /// BLE: waiting for GATT connection and payload exchange.
@@ -85,6 +90,11 @@ pub enum ExchangeEvent {
     CompleteExchange(ContactCard),
     /// Explicitly fail the session.
     Fail(ExchangeError),
+
+    // --- Direct transport events (USB/TCP) ---
+    /// Received the peer's exchange payload over a direct transport.
+    /// Contains the raw QR data string received from the peer.
+    DirectPayloadReceived { their_payload: String },
 
     // --- NFC events ---
     /// NFC tap completed; contains their payload bytes.
@@ -385,6 +395,69 @@ impl ExchangeSession {
         }
     }
 
+    /// Creates a new USB/TCP direct transport exchange session.
+    ///
+    /// Used for desktop-to-phone exchange over a physical USB cable or
+    /// local network TCP connection. The session starts in
+    /// `AwaitingDirectPayload` — the caller should:
+    /// 1. Call `our_exchange_payload()` to get the data string to send
+    /// 2. Exchange it over a `DirectTransport` (send ours, receive theirs)
+    /// 3. Feed the peer's payload via `apply(DirectPayloadReceived { .. })`
+    /// 4. Then `PerformKeyAgreement` → `CompleteExchange` as usual
+    pub fn new_usb(
+        identity: Identity,
+        our_card: ContactCard,
+        proximity: impl ProximityVerifier + 'static,
+    ) -> Self {
+        let our_x3dh = X3DHKeyPair::generate();
+        let our_qr = ExchangeQR::generate(&identity, &our_x3dh);
+        ExchangeSession {
+            state: ExchangeState::AwaitingDirectPayload {
+                our_qr: our_qr.clone(),
+            },
+            transport: ExchangeTransport::Usb,
+            identity,
+            our_card,
+            our_x3dh,
+            proximity: Box::new(proximity),
+            proximity_confidence: ProximityConfidence::Unknown,
+            started_at: Instant::now(),
+            interrupted: false,
+            used_qrs: HashSet::new(),
+            their_audio_challenge: None,
+            our_audio_challenge: Some(*our_qr.audio_challenge()),
+            their_display_name: None,
+            nfc_handshake: None,
+            ble_handshake: None,
+            device_capabilities: None,
+            ble_is_initiator: false,
+            ble_pending_handshake: None,
+            ble_pending_card: None,
+            our_relay_url: None,
+            our_relay_noise_pubkey: None,
+            their_relay_url: None,
+            their_relay_noise_pubkey: None,
+            debug_log: None,
+            pending_commands: Vec::new(),
+            our_confirmation_token: None,
+            expected_their_token: None,
+            confirmation_gate_hash: None,
+            confirmation_our_slot: None,
+            confirmation_their_slot: None,
+        }
+    }
+
+    /// Returns the exchange payload data string for sending over a direct transport.
+    ///
+    /// Only available in `AwaitingDirectPayload` state. The returned string
+    /// is the same format as QR data (base64-encoded, signed).
+    pub fn our_exchange_payload(&self) -> Option<String> {
+        match &self.state {
+            ExchangeState::AwaitingDirectPayload { our_qr } => Some(our_qr.to_data_string()),
+            _ => None,
+        }
+    }
+
     /// Returns the current state.
     pub fn state(&self) -> &ExchangeState {
         &self.state
@@ -627,6 +700,10 @@ impl ExchangeSession {
             ExchangeEvent::StartQR => self.handle_start_qr(),
             ExchangeEvent::ProcessQR(qr) => self.handle_process_qr(qr),
             ExchangeEvent::TheyScannedOurQR => self.handle_they_scanned_our_qr(),
+            // Direct transport events (USB/TCP)
+            ExchangeEvent::DirectPayloadReceived { their_payload } => {
+                self.handle_direct_payload_received(their_payload)
+            }
             // Shared events
             ExchangeEvent::PerformKeyAgreement => self.handle_perform_key_agreement(),
             ExchangeEvent::CompleteExchange(card) => {
@@ -1364,6 +1441,55 @@ impl ExchangeSession {
         };
 
         // Transition to shared key agreement path
+        self.state = ExchangeState::AwaitingKeyAgreement {
+            their_public_key,
+            their_exchange_key,
+        };
+        Ok(())
+    }
+
+    // ---- Direct transport handlers (USB/TCP) ----
+
+    fn handle_direct_payload_received(
+        &mut self,
+        their_payload: String,
+    ) -> Result<(), ExchangeError> {
+        if self.transport != ExchangeTransport::Usb {
+            return Err(ExchangeError::InvalidState(
+                "DirectPayloadReceived requires Usb transport".into(),
+            ));
+        }
+        if !matches!(self.state, ExchangeState::AwaitingDirectPayload { .. }) {
+            return Err(ExchangeError::InvalidState(
+                "Can only receive direct payload from AwaitingDirectPayload state".into(),
+            ));
+        }
+
+        // Parse their payload (same format as QR data string)
+        let qr = ExchangeQR::from_data_string(&their_payload)?;
+
+        if qr.is_expired() {
+            return Err(ExchangeError::QRExpired);
+        }
+        if !qr.verify_signature() {
+            return Err(ExchangeError::InvalidSignature);
+        }
+
+        let their_public_key = *qr.public_key();
+        let their_exchange_key = *qr.exchange_key();
+
+        // Self-exchange check
+        if their_public_key == *self.identity.signing_public_key() {
+            return Err(ExchangeError::SelfExchange);
+        }
+
+        // Store peer metadata
+        self.their_audio_challenge = Some(*qr.audio_challenge());
+        self.their_display_name = Some(qr.display_name().to_string());
+        self.their_relay_url = qr.relay_url().map(String::from);
+        self.their_relay_noise_pubkey = qr.relay_noise_pubkey().copied();
+
+        // USB provides physical proximity — skip straight to key agreement
         self.state = ExchangeState::AwaitingKeyAgreement {
             their_public_key,
             their_exchange_key,

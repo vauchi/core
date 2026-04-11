@@ -639,7 +639,11 @@ impl ExchangeEngine {
                     title: "Exchange Complete".into(),
                     detail: None,
                     status: Status::Success,
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some("Exchange complete".into()),
+                        hint: Some("Contact cards have been exchanged successfully".into()),
+                        role: None,
+                    }),
                 }],
                 actions: vec![ScreenAction {
                     id: "done".into(),
@@ -690,7 +694,11 @@ impl ExchangeEngine {
                         title: "Exchange Failed".into(),
                         detail: self.failure_detail.clone(),
                         status: Status::Failed,
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some("Exchange failed".into()),
+                            hint: Some("The exchange did not complete. Retry or cancel.".into()),
+                            role: None,
+                        }),
                     }],
                     actions,
                     progress: Some(self.progress()),

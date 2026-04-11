@@ -242,3 +242,69 @@ fn exchange_failed_cancel_completes() {
 
     assert_eq!(result, ActionResult::Complete);
 }
+
+// @scenario: accessibility :: Exchange success screen StatusIndicator has populated a11y
+//
+// Verifies that the success StatusIndicator carries a meaningful accessibility
+// label so screen readers can announce the outcome to users.
+#[test]
+fn exchange_success_status_indicator_has_a11y() {
+    let mut engine = make_engine();
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".to_string(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "scanned_data".to_string(),
+        value: "bob-qr-payload".to_string(),
+    });
+    engine.mark_success();
+
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "exchange_success");
+
+    match &screen.components[0] {
+        Component::StatusIndicator { a11y, .. } => {
+            let a11y = a11y
+                .as_ref()
+                .expect("success StatusIndicator must have a11y populated");
+            assert_eq!(
+                a11y.label.as_deref(),
+                Some("Exchange complete"),
+                "a11y label should describe the outcome"
+            );
+            assert!(
+                a11y.hint.is_some(),
+                "a11y hint should be present to explain what happened"
+            );
+        }
+        other => panic!("expected StatusIndicator, got {:?}", other),
+    }
+}
+
+// @scenario: accessibility :: Exchange QR display screen has populated a11y
+//
+// Verifies that the own_qr QrCode component carries a meaningful accessibility
+// label and role so screen readers can identify it as an image.
+#[test]
+fn exchange_show_qr_has_a11y() {
+    let engine = make_engine();
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "exchange_show_qr");
+
+    match &screen.components[0] {
+        Component::QrCode { a11y, .. } => {
+            let a11y = a11y.as_ref().expect("QrCode must have a11y populated");
+            assert_eq!(
+                a11y.label.as_deref(),
+                Some("Your exchange QR code"),
+                "a11y label should identify the QR code"
+            );
+            assert_eq!(
+                a11y.role,
+                Some(AccessibilityRole::Image),
+                "QrCode role must be Image"
+            );
+        }
+        other => panic!("expected QrCode, got {:?}", other),
+    }
+}

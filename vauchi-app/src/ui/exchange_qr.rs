@@ -59,7 +59,11 @@ pub(super) fn build_show_qr_screen(
             data: qr_data,
             mode: QrMode::Display,
             label: Some(config_name.to_owned()),
-            a11y: None,
+            a11y: Some(A11y {
+                label: Some("Your exchange QR code".into()),
+                hint: Some("Show this code to the other person to scan".into()),
+                role: Some(AccessibilityRole::Image),
+            }),
         }],
         actions: vec![ScreenAction {
             id: "continue".into(),
@@ -83,7 +87,11 @@ pub(super) fn build_scan_qr_screen(progress: Progress) -> ScreenModel {
             data: String::new(),
             mode: QrMode::Scan,
             label: None,
-            a11y: None,
+            a11y: Some(A11y {
+                label: Some("QR code scanner".into()),
+                hint: Some("Point the camera at the other person's QR code".into()),
+                role: Some(AccessibilityRole::Image),
+            }),
         }],
         actions: vec![ScreenAction {
             id: "back".into(),
@@ -110,7 +118,11 @@ pub(super) fn build_manual_entry_screen(progress: Progress) -> ScreenModel {
             max_length: None,
             validation_error: None,
             input_type: InputType::Text,
-            a11y: None,
+            a11y: Some(A11y {
+                label: Some("Exchange code input".into()),
+                hint: Some("Enter the exchange code shown on the other person's screen".into()),
+                role: Some(AccessibilityRole::TextField),
+            }),
         }],
         actions: vec![
             ScreenAction {
@@ -143,7 +155,11 @@ pub(super) fn build_verifying_screen(progress: Progress) -> ScreenModel {
             title: "Verifying...".into(),
             detail: None,
             status: Status::InProgress,
-            a11y: None,
+            a11y: Some(A11y {
+                label: Some("Verifying exchange".into()),
+                hint: Some("Confirming the other person's identity".into()),
+                role: None,
+            }),
         }],
         actions: vec![],
         progress: Some(progress),

@@ -10,7 +10,11 @@
         "data": "vauchi://exchange?token=abc123",
         "mode": "Display",
         "label": "Alice",
-        "a11y": null
+        "a11y": {
+          "label": "Your exchange QR code",
+          "hint": "Show this code to the other person to scan",
+          "role": "Image"
+        }
       }
     }
   ],

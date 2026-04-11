@@ -38,6 +38,7 @@ fn create_card(identity: &Identity) -> ContactCard {
 
 // ── Session construction ───────────────────────────────────────
 
+// @internal
 #[test]
 fn new_usb_session_starts_in_awaiting_direct_payload() {
     let identity = create_identity("Alice");
@@ -51,6 +52,7 @@ fn new_usb_session_starts_in_awaiting_direct_payload() {
     assert_eq!(session.transport(), ExchangeTransport::Usb);
 }
 
+// @internal
 #[test]
 fn new_usb_session_provides_exchange_payload() {
     let identity = create_identity("Alice");
@@ -67,6 +69,7 @@ fn new_usb_session_provides_exchange_payload() {
 
 // ── Payload exchange over DirectTransport ──────────────────────
 
+// @internal
 #[test]
 fn usb_exchange_payload_roundtrip_over_tcp() {
     let alice_id = create_identity("Alice");
@@ -107,6 +110,7 @@ fn usb_exchange_payload_roundtrip_over_tcp() {
 
 // ── Full exchange ceremony ─────────────────────────────────────
 
+// @internal
 #[test]
 fn full_usb_exchange_ceremony() {
     let alice_id = create_identity("Alice");
@@ -210,6 +214,7 @@ fn full_usb_exchange_ceremony() {
 
 // ── Error cases ────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn usb_self_exchange_is_rejected() {
     let identity = create_identity("Alice");
@@ -231,6 +236,7 @@ fn usb_self_exchange_is_rejected() {
     assert!(result.is_err(), "Self-exchange should be rejected");
 }
 
+// @internal
 #[test]
 fn usb_invalid_payload_is_rejected() {
     let identity = create_identity("Alice");
@@ -244,6 +250,7 @@ fn usb_invalid_payload_is_rejected() {
     assert!(result.is_err(), "Invalid payload should be rejected");
 }
 
+// @internal
 #[test]
 fn usb_direct_payload_in_wrong_state_is_rejected() {
     let identity = create_identity("Alice");
@@ -272,6 +279,7 @@ fn usb_direct_payload_in_wrong_state_is_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn usb_direct_payload_on_qr_session_is_rejected() {
     let identity = create_identity("Alice");

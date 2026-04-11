@@ -57,6 +57,7 @@ fn create_manual_proof(initiator: &DeviceLinkInitiator, confirmation_code: &str)
 
 // ── Full device link over TCP ──────────────────────────────────
 
+// @internal
 #[test]
 fn full_device_link_over_tcp_transport() {
     let identity = create_test_identity();
@@ -142,6 +143,7 @@ fn full_device_link_over_tcp_transport() {
 
 // ── Error cases ────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn recv_device_link_qr_rejects_invalid_data() {
     let (client, server) = loopback_pair();
@@ -156,6 +158,7 @@ fn recv_device_link_qr_rejects_invalid_data() {
     assert!(result.is_err(), "Invalid QR data should be rejected");
 }
 
+// @internal
 #[test]
 fn recv_device_link_qr_rejects_after_disconnect() {
     let (client, server) = loopback_pair();
@@ -166,6 +169,7 @@ fn recv_device_link_qr_rejects_after_disconnect() {
     assert!(result.is_err(), "Should fail on disconnected transport");
 }
 
+// @internal
 #[test]
 fn send_recv_encrypted_blob_roundtrip() {
     let (client, server) = loopback_pair();

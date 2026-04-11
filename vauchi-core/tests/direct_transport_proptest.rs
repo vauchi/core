@@ -34,6 +34,7 @@ fn loopback_pair() -> (TcpStream, TcpStream) {
 
 proptest! {
     /// Arbitrary payloads survive roundtrip over TcpDirectTransport.
+    // @internal
     #[test]
     fn payload_roundtrip(payload in proptest::collection::vec(any::<u8>(), 1..8192)) {
         let (client, server) = loopback_pair();
@@ -52,6 +53,7 @@ proptest! {
     }
 
     /// Bidirectional exchange preserves both payloads for arbitrary data.
+    // @internal
     #[test]
     fn exchange_roundtrip(
         alice_data in proptest::collection::vec(any::<u8>(), 1..4096),
@@ -76,6 +78,7 @@ proptest! {
 
 // ── Adversarial tests (CC-14) ──────────────────────────────────
 
+// @internal
 #[test]
 fn adversarial_empty_direct_payload_rejected() {
     let identity = Identity::create("Alice");
@@ -88,6 +91,7 @@ fn adversarial_empty_direct_payload_rejected() {
     assert!(result.is_err(), "Empty payload should be rejected");
 }
 
+// @internal
 #[test]
 fn adversarial_null_bytes_in_payload_rejected() {
     let identity = Identity::create("Alice");
@@ -100,6 +104,7 @@ fn adversarial_null_bytes_in_payload_rejected() {
     assert!(result.is_err(), "Null bytes payload should be rejected");
 }
 
+// @internal
 #[test]
 fn adversarial_unicode_payload_rejected() {
     let identity = Identity::create("Alice");
@@ -112,6 +117,7 @@ fn adversarial_unicode_payload_rejected() {
     assert!(result.is_err(), "Unicode garbage should be rejected");
 }
 
+// @internal
 #[test]
 fn adversarial_max_length_payload_rejected() {
     let identity = Identity::create("Alice");
@@ -124,6 +130,7 @@ fn adversarial_max_length_payload_rejected() {
     assert!(result.is_err(), "100KB garbage payload should be rejected");
 }
 
+// @internal
 #[test]
 fn adversarial_truncated_valid_payload() {
     let bob = Identity::create("Bob");
@@ -150,6 +157,7 @@ fn adversarial_truncated_valid_payload() {
     }
 }
 
+// @internal
 #[test]
 fn adversarial_corrupted_valid_payload() {
     let bob = Identity::create("Bob");
@@ -173,6 +181,7 @@ fn adversarial_corrupted_valid_payload() {
     assert!(result.is_err(), "Corrupted payload should be rejected");
 }
 
+// @internal
 #[test]
 fn adversarial_replay_same_payload_twice() {
     let alice = Identity::create("Alice");
@@ -208,6 +217,7 @@ fn adversarial_replay_same_payload_twice() {
     );
 }
 
+// @internal
 #[test]
 fn adversarial_tcp_invalid_magic_over_direct_transport() {
     let (mut client, server) = loopback_pair();
@@ -227,6 +237,7 @@ fn adversarial_tcp_invalid_magic_over_direct_transport() {
     );
 }
 
+// @internal
 #[test]
 fn adversarial_tcp_wrong_version_over_direct_transport() {
     let (mut client, server) = loopback_pair();

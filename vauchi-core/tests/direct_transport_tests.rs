@@ -24,6 +24,7 @@ fn loopback_pair() -> (TcpStream, TcpStream) {
 
 // ── ProximityLevel ─────────────────────────────────────────────
 
+// @internal
 #[test]
 fn physical_transport_has_physical_proximity() {
     let (client, _server) = loopback_pair();
@@ -31,6 +32,7 @@ fn physical_transport_has_physical_proximity() {
     assert_eq!(transport.proximity_level(), ProximityLevel::Physical);
 }
 
+// @internal
 #[test]
 fn proximate_transport_has_proximate_proximity() {
     let (client, _server) = loopback_pair();
@@ -40,6 +42,7 @@ fn proximate_transport_has_proximate_proximity() {
 
 // ── DirectTransport send/recv ──────────────────────────────────
 
+// @internal
 #[test]
 fn direct_send_recv_roundtrip() {
     let (client, server) = loopback_pair();
@@ -53,6 +56,7 @@ fn direct_send_recv_roundtrip() {
     assert_eq!(received, payload);
 }
 
+// @internal
 #[test]
 fn direct_send_recv_large_payload() {
     let (client, server) = loopback_pair();
@@ -69,6 +73,7 @@ fn direct_send_recv_large_payload() {
 
 // ── DirectTransport::exchange ──────────────────────────────────
 
+// @internal
 #[test]
 fn direct_exchange_bidirectional() {
     let (client, server) = loopback_pair();
@@ -93,6 +98,7 @@ fn direct_exchange_bidirectional() {
     assert_eq!(received_by_bob, alice_payload);
 }
 
+// @internal
 #[test]
 fn direct_exchange_with_realistic_exchange_payload() {
     let (client, server) = loopback_pair();
@@ -118,6 +124,7 @@ fn direct_exchange_with_realistic_exchange_payload() {
 
 // ── Error handling via DirectTransport ─────────────────────────
 
+// @internal
 #[test]
 fn direct_recv_after_disconnect_returns_error() {
     let (client, server) = loopback_pair();
@@ -128,6 +135,7 @@ fn direct_recv_after_disconnect_returns_error() {
     assert!(result.is_err(), "recv after disconnect should fail");
 }
 
+// @internal
 #[test]
 fn direct_send_after_disconnect_does_not_panic() {
     let (client, server) = loopback_pair();
@@ -152,6 +160,7 @@ fn direct_send_after_disconnect_does_not_panic() {
 
 // ── Trait object safety ────────────────────────────────────────
 
+// @internal
 #[test]
 fn direct_transport_is_object_safe() {
     let (client, _server) = loopback_pair();

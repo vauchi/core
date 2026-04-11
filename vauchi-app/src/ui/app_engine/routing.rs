@@ -583,6 +583,14 @@ impl AppEngine {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)
             }
+            AppScreen::ContactDetail { contact_id } => {
+                // InlineConfirm → hard delete the imported contact and navigate back.
+                let contact_id = contact_id.clone();
+                let _ = self.vauchi.hard_delete_imported_contact(&contact_id);
+                self.engine_cache.remove(&AppScreen::Contacts);
+                let screen = self.navigate_back();
+                ActionResult::NavigateTo(screen)
+            }
             _ => {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)

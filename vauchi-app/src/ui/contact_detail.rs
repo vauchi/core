@@ -66,6 +66,8 @@ pub struct ContactDetailEngine {
     is_imported: bool,
     /// Card update delivery status for this contact (J1 MVP).
     delivery_summary: Option<DeliverySummary>,
+    /// Whether the user has pressed "Delete" and the InlineConfirm is showing.
+    pending_delete: bool,
 }
 
 impl ContactDetailEngine {
@@ -84,6 +86,7 @@ impl ContactDetailEngine {
             is_hidden: false,
             is_imported: false,
             delivery_summary: None,
+            pending_delete: false,
         }
     }
 
@@ -107,6 +110,7 @@ impl ContactDetailEngine {
             is_hidden: false,
             is_imported: false,
             delivery_summary: None,
+            pending_delete: false,
         }
     }
 
@@ -329,6 +333,20 @@ impl ContactDetailEngine {
             }
         }
 
+        // InlineConfirm for irrevocable delete (imported contacts only)
+        if self.pending_delete {
+            components.push(Component::InlineConfirm {
+                id: "delete_contact".into(),
+                warning: format!(
+                    "Permanently delete \"{}\"? This cannot be undone.",
+                    self.contact.name
+                ),
+                confirm_text: "Delete".into(),
+                cancel_text: "Cancel".into(),
+                destructive: true,
+            });
+        }
+
         let title = match self.view_mode {
             ContactViewMode::TheirInfo => self.contact.name.clone(),
             ContactViewMode::MyInfoForThem => {
@@ -454,10 +472,16 @@ impl WorkflowEngine for ContactDetailEngine {
                 }
             }
             UserAction::ActionPressed { action_id } if action_id == "delete_contact" => {
-                ActionResult::ShowToast {
-                    message: "Contact deleted".into(),
-                    undo_action_id: Some(format!("undo_delete_contact:{}", self.contact.id)),
-                }
+                self.pending_delete = true;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            UserAction::ActionPressed { action_id } if action_id == "confirm_delete_contact" => {
+                self.pending_delete = false;
+                ActionResult::Complete
+            }
+            UserAction::ActionPressed { action_id } if action_id == "cancel_delete_contact" => {
+                self.pending_delete = false;
+                ActionResult::UpdateScreen(self.build_screen())
             }
             UserAction::ActionPressed { action_id } if action_id == "archive_contact" => {
                 ActionResult::ShowToast {
@@ -916,19 +940,21 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_action_returns_show_toast_with_undo() {
+    fn test_delete_action_shows_inline_confirm() {
         let mut engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
             .with_imported(true);
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "delete_contact".into(),
         });
-        assert_eq!(
-            result,
-            ActionResult::ShowToast {
-                message: "Contact deleted".into(),
-                undo_action_id: Some("undo_delete_contact:c1".into()),
-            }
-        );
+        // Must return UpdateScreen (not ShowToast) — InlineConfirm flow
+        assert!(matches!(result, ActionResult::UpdateScreen(_)));
+
+        let screen = engine.current_screen();
+        let has_confirm = screen.components.iter().any(|c| {
+            matches!(c, Component::InlineConfirm { id, destructive, .. }
+                if id == "delete_contact" && *destructive)
+        });
+        assert!(has_confirm, "Screen must contain InlineConfirm for delete");
     }
 
     #[test]

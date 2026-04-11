@@ -404,18 +404,9 @@ impl AppEngine {
         };
 
         match action_id.as_str() {
-            "delete_contact" => {
-                let _ = self.vauchi.soft_delete_imported_contact(contact_id);
-                self.pending_contact_undo = Some(super::PendingContactUndo::SoftDelete {
-                    contact_id: contact_id.to_string(),
-                });
-                self.engine_cache.remove(&AppScreen::Contacts);
-                self.navigate_back();
-                Some(ActionResult::ShowToast {
-                    message: "Contact deleted".into(),
-                    undo_action_id: Some(format!("undo_delete_contact:{contact_id}")),
-                })
-            }
+            // delete_contact is now handled by the engine (InlineConfirm flow).
+            // The actual deletion happens in handle_completion for ContactDetail.
+            "delete_contact" | "confirm_delete_contact" | "cancel_delete_contact" => None,
             "archive_contact" => {
                 let _ = self.vauchi.archive_contact(contact_id);
                 self.pending_contact_undo = Some(super::PendingContactUndo::Archive {
@@ -456,15 +447,7 @@ impl AppEngine {
             return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
         }
 
-        if let Some(contact_id) = action_id.strip_prefix("undo_delete_contact:") {
-            let _ = self.vauchi.undo_delete_imported_contact(contact_id);
-            self.pending_contact_undo = None;
-            self.engine_cache.remove(&AppScreen::Contacts);
-            let screen = self.navigate_to(AppScreen::ContactDetail {
-                contact_id: contact_id.to_string(),
-            });
-            return Some(ActionResult::NavigateTo(screen));
-        }
+        // undo_delete_contact removed: delete is now irrevocable (InlineConfirm).
 
         if let Some(contact_id) = action_id.strip_prefix("undo_archive_contact:") {
             let _ = self.vauchi.unarchive_contact(contact_id);

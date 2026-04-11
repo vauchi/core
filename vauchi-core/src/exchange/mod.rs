@@ -63,6 +63,7 @@ pub mod card_snapshot;
 pub mod command;
 pub mod confirmation_escrow;
 pub mod device_link;
+pub mod direct_transport;
 pub mod escrow;
 pub mod exchange_id;
 pub mod exchange_record;
@@ -115,6 +116,7 @@ pub use device_link::{
     DeviceLinkRequest, DeviceLinkResponder, DeviceLinkResponse, ProximityProof,
     compute_confirmation_mac, generate_numeric_code,
 };
+pub use direct_transport::{DirectTransport, ProximityLevel};
 pub use encrypted_message::{DecryptedExchangePayload, EncryptedExchangeMessage};
 pub use error::ExchangeError;
 pub use nfc_active::apdu as nfc_apdu;

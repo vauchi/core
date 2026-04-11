@@ -19,6 +19,9 @@
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
 
+use super::direct_transport::{DirectTransport, ProximityLevel};
+use super::error::ExchangeError;
+
 /// Maximum payload size (64 KB). Exchange payloads are typically ~300 bytes.
 const MAX_PAYLOAD_SIZE: u32 = 65_536;
 
@@ -119,5 +122,64 @@ pub fn exchange_payloads(
         let theirs = recv_payload(stream)?;
         send_payload(stream, our_payload)?;
         Ok(theirs)
+    }
+}
+
+// ── DirectTransport implementation ─────────────────────────────
+
+/// A [`DirectTransport`] over TCP, wrapping the VXCH framing protocol.
+///
+/// Used for USB cable exchange (TCP over USB tethering / usbmuxd) and
+/// local network exchange. Provides `Physical` proximity level since
+/// USB implies a direct cable connection.
+///
+/// For local Wi-Fi TCP (no cable), callers should use [`TcpDirectTransport::proximate`]
+/// which returns `Proximate` level requiring mutual confirmation.
+pub struct TcpDirectTransport {
+    stream: TcpStream,
+    proximity: ProximityLevel,
+}
+
+impl TcpDirectTransport {
+    /// Create a transport with `Physical` proximity (USB cable connection).
+    pub fn physical(stream: TcpStream) -> Self {
+        Self {
+            stream,
+            proximity: ProximityLevel::Physical,
+        }
+    }
+
+    /// Create a transport with `Proximate` proximity (local Wi-Fi, no cable).
+    pub fn proximate(stream: TcpStream) -> Self {
+        Self {
+            stream,
+            proximity: ProximityLevel::Proximate,
+        }
+    }
+}
+
+impl From<TcpTransportError> for ExchangeError {
+    fn from(err: TcpTransportError) -> Self {
+        match err {
+            TcpTransportError::ConnectionClosed => ExchangeError::NetworkDisconnected,
+            TcpTransportError::Io(_) => ExchangeError::NetworkDisconnected,
+            TcpTransportError::InvalidMagic
+            | TcpTransportError::UnsupportedVersion(_)
+            | TcpTransportError::PayloadTooLarge(_) => ExchangeError::InvalidProtocolVersion,
+        }
+    }
+}
+
+impl DirectTransport for TcpDirectTransport {
+    fn proximity_level(&self) -> ProximityLevel {
+        self.proximity
+    }
+
+    fn send(&mut self, payload: &[u8]) -> Result<(), ExchangeError> {
+        send_payload(&mut self.stream, payload).map_err(ExchangeError::from)
+    }
+
+    fn recv(&mut self) -> Result<Vec<u8>, ExchangeError> {
+        recv_payload(&mut self.stream).map_err(ExchangeError::from)
     }
 }

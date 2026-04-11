@@ -171,6 +171,10 @@ impl WorkflowEngine for GroupsEngine {
         Some(self)
     }
 
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        Some(self)
+    }
+
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             // Mode toggle: switch between Members and Visibility

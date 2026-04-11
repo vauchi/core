@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use vauchi_app::ui::*;
+use vauchi_app::ui::{A11y, *};
 
 #[test]
 fn test_screen_model_serde_roundtrip() {
@@ -686,4 +686,28 @@ fn test_user_action_undo_pressed_roundtrip() {
         }
         other => panic!("Expected UndoPressed, got {:?}", other),
     }
+}
+
+// === A11y struct ===
+
+#[test]
+fn test_a11y_struct_roundtrip() {
+    let a11y = A11y {
+        label: Some("Submit button".into()),
+        hint: Some("Double tap to submit the form".into()),
+    };
+    let json = serde_json::to_string(&a11y).unwrap();
+    let parsed: A11y = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.label.as_deref(), Some("Submit button"));
+    assert_eq!(
+        parsed.hint.as_deref(),
+        Some("Double tap to submit the form")
+    );
+}
+
+#[test]
+fn test_a11y_default_is_none() {
+    let a11y = A11y::default();
+    assert_eq!(a11y.label, None);
+    assert_eq!(a11y.hint, None);
 }

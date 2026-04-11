@@ -57,8 +57,8 @@ pub use activity_log::{ActivityLogEngine, ActivityLogItem};
 pub use app_engine::{AppEngine, AppScreen};
 pub use backup_recovery::{BackupMode, BackupRecoveryEngine};
 pub use component::{
-    ActionListItem, Component, ContactItem, DropdownOption, FieldDisplay, GroupCardView, InfoItem,
-    InputType, QrMode, SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem,
+    A11y, ActionListItem, Component, ContactItem, DropdownOption, FieldDisplay, GroupCardView,
+    InfoItem, InputType, QrMode, SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem,
     UiFieldVisibility, VisibilityMode,
 };
 pub use contact_detail::{

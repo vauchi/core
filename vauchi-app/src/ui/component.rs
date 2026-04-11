@@ -124,6 +124,19 @@ pub enum Component {
     },
 }
 
+/// Accessibility metadata for a UI component.
+///
+/// Populated by core engines so frontends can apply consistent a11y
+/// attributes without inventing their own labels.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct A11y {
+    /// Screen-reader label (maps to contentDescription/accessibilityLabel).
+    pub label: Option<String>,
+    /// Usage hint (maps to accessibilityHint/stateDescription).
+    pub hint: Option<String>,
+}
+
 /// Text rendering style.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

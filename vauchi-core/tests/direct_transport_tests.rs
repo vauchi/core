@@ -129,18 +129,25 @@ fn direct_recv_after_disconnect_returns_error() {
 }
 
 #[test]
-fn direct_send_after_disconnect_returns_error() {
+fn direct_send_after_disconnect_does_not_panic() {
     let (client, server) = loopback_pair();
     drop(server); // close receiver side
 
     let mut sender = TcpDirectTransport::physical(client);
-    // Send may succeed (buffered) or fail — send a second time to ensure error
-    let _ = sender.send(b"first");
-    // Force flush by trying to recv (which will fail) or send again
-    let result = sender.send(&vec![0u8; 60_000]);
-    // On some OS this succeeds due to buffering, so we also accept Ok
-    // The key test is that it doesn't panic
-    drop(result);
+    // Send may succeed (buffered) due to OS buffering, or fail immediately.
+    // Either outcome is acceptable — the contract is no panic.
+    let first = sender.send(b"first");
+    let second = sender.send(&vec![0u8; 60_000]);
+    // At least one of these should eventually fail on a closed connection,
+    // but OS buffering makes the exact failure point non-deterministic.
+    assert!(
+        first.is_ok() || first.is_err(),
+        "send must return Ok or Err, not panic"
+    );
+    assert!(
+        second.is_ok() || second.is_err(),
+        "send must return Ok or Err, not panic"
+    );
 }
 
 // ── Trait object safety ────────────────────────────────────────

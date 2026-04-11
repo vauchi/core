@@ -276,6 +276,10 @@ name = "crypto_shredding_integration_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "gdpr_erasure_e2e_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "panic_widget_tests"
 required-features = ["testing"]
 

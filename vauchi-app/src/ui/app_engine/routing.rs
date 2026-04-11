@@ -591,6 +591,26 @@ impl AppEngine {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)
             }
+            AppScreen::GroupDetail { group_id } => {
+                let group_id = group_id.clone();
+                let _ = self.vauchi.delete_group(&group_id);
+                self.engine_cache.remove(&AppScreen::Groups);
+                let screen = self.navigate_back();
+                ActionResult::NavigateTo(screen)
+            }
+            AppScreen::Groups => {
+                if let Some(group_id) = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::groups_list::GroupsEngine>())
+                    .and_then(|e| e.pending_delete_group_id().map(|s| s.to_string()))
+                {
+                    let _ = self.vauchi.delete_group(&group_id);
+                }
+                self.engine_cache.remove(&AppScreen::Groups);
+                let screen = self.navigate_back();
+                ActionResult::NavigateTo(screen)
+            }
             _ => {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)

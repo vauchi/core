@@ -31,7 +31,7 @@ pub struct GroupInfo {
 pub struct GroupsEngine {
     groups: Vec<GroupInfo>,
     mode: GroupsMode,
-    pending_delete: bool,
+    pending_delete_group_id: Option<String>,
 }
 
 impl GroupsEngine {
@@ -39,13 +39,18 @@ impl GroupsEngine {
         Self {
             groups,
             mode,
-            pending_delete: false,
+            pending_delete_group_id: None,
         }
     }
 
     /// Returns the current mode.
     pub fn mode(&self) -> &GroupsMode {
         &self.mode
+    }
+
+    /// Returns the group ID pending deletion, if any.
+    pub fn pending_delete_group_id(&self) -> Option<&str> {
+        self.pending_delete_group_id.as_deref()
     }
 
     fn build_screen(&self) -> ScreenModel {
@@ -108,7 +113,7 @@ impl GroupsEngine {
             items,
         });
 
-        if self.pending_delete {
+        if self.pending_delete_group_id.is_some() {
             components.push(Component::InlineConfirm {
                 id: "delete_group".into(),
                 warning:
@@ -162,6 +167,10 @@ impl WorkflowEngine for GroupsEngine {
         self.build_screen()
     }
 
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             // Mode toggle: switch between Members and Visibility
@@ -187,15 +196,17 @@ impl WorkflowEngine for GroupsEngine {
             // Screen-level actions
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
                 "delete_group" => {
-                    self.pending_delete = true;
+                    if let Some(group) = self.groups.first() {
+                        self.pending_delete_group_id = Some(group.id.clone());
+                    }
                     ActionResult::UpdateScreen(self.build_screen())
                 }
                 "confirm_delete_group" => {
-                    self.pending_delete = false;
+                    // Keep pending_delete_group_id for handle_completion to read
                     ActionResult::Complete
                 }
                 "cancel_delete_group" => {
-                    self.pending_delete = false;
+                    self.pending_delete_group_id = None;
                     ActionResult::UpdateScreen(self.build_screen())
                 }
                 "new_group" => ActionResult::ShowFormDialog {

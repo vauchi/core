@@ -17,7 +17,10 @@
                 "value": "Alice"
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Display Name",
+              "hint": "Your visible name shown to contacts"
+            }
           },
           {
             "id": "edit_profile",
@@ -27,7 +30,10 @@
                 "detail": null
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Edit Profile",
+              "hint": "Opens the profile editor"
+            }
           }
         ]
       }
@@ -45,7 +51,10 @@
                 "enabled": true
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Delivery Receipts toggle",
+              "hint": "When enabled, notifies senders when their messages are delivered"
+            }
           },
           {
             "id": "suppress_presence",
@@ -55,7 +64,10 @@
                 "enabled": false
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Suppress Presence toggle",
+              "hint": "When enabled, hides your online status from contacts"
+            }
           }
         ]
       }
@@ -73,7 +85,10 @@
                 "enabled": false
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "New Contact Added toggle",
+              "hint": "When enabled, sends a notification when a new contact is added"
+            }
           }
         ]
       }
@@ -91,7 +106,10 @@
                 "value": ""
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Theme",
+              "hint": "The current color theme of the app"
+            }
           },
           {
             "id": "language",
@@ -101,7 +119,10 @@
                 "value": ""
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Language",
+              "hint": "The current display language of the app"
+            }
           }
         ]
       }
@@ -119,7 +140,10 @@
                 "enabled": false
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Reduce Motion toggle",
+              "hint": "When enabled, minimizes animations and motion effects"
+            }
           },
           {
             "id": "high_contrast",
@@ -129,7 +153,10 @@
                 "enabled": false
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "High Contrast toggle",
+              "hint": "When enabled, increases color contrast for better visibility"
+            }
           },
           {
             "id": "large_touch",
@@ -139,7 +166,10 @@
                 "enabled": false
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Large Touch Targets toggle",
+              "hint": "When enabled, increases the size of interactive elements"
+            }
           }
         ]
       }
@@ -157,7 +187,10 @@
                 "detail": null
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Change Password",
+              "hint": "Opens the password change screen"
+            }
           },
           {
             "id": "devices",
@@ -167,7 +200,10 @@
                 "detail": "2 devices"
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Devices",
+              "hint": "Opens the list of linked devices"
+            }
           },
           {
             "id": "duress_pin",
@@ -177,7 +213,10 @@
                 "detail": null
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Duress PIN",
+              "hint": "Opens the duress PIN configuration screen"
+            }
           }
         ]
       }
@@ -195,7 +234,10 @@
                 "detail": null
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Create Backup",
+              "hint": "Opens the backup export screen"
+            }
           },
           {
             "id": "backup_import",
@@ -205,7 +247,10 @@
                 "detail": null
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Restore Backup",
+              "hint": "Opens the backup restore screen"
+            }
           }
         ]
       }
@@ -223,7 +268,10 @@
                 "value": "https://relay.vauchi.app"
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Relay URL",
+              "hint": "The relay server used for message delivery"
+            }
           }
         ]
       }
@@ -241,7 +289,10 @@
                 "detail": ""
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Sync Status",
+              "hint": "Opens the sync status detail screen"
+            }
           },
           {
             "id": "pending_updates",
@@ -251,7 +302,10 @@
                 "value": "0"
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Pending Updates",
+              "hint": "Number of contact updates waiting to be delivered"
+            }
           },
           {
             "id": "failed_deliveries",
@@ -261,7 +315,10 @@
                 "value": "0"
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Failed Deliveries",
+              "hint": "Number of updates that failed to deliver"
+            }
           }
         ]
       }
@@ -279,7 +336,10 @@
                 "detail": null
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Help Center",
+              "hint": "Opens the help center"
+            }
           },
           {
             "id": "funding",
@@ -289,7 +349,10 @@
                 "detail": null
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Support Development",
+              "hint": "Opens the funding and support page"
+            }
           },
           {
             "id": "privacy_policy",
@@ -299,7 +362,10 @@
                 "detail": null
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Privacy Policy",
+              "hint": "Opens the privacy policy"
+            }
           }
         ]
       }
@@ -317,7 +383,10 @@
                 "value": ""
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Version",
+              "hint": "The current app version and build number"
+            }
           },
           {
             "id": "debug_mode",
@@ -327,7 +396,10 @@
                 "enabled": false
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Debug Mode toggle",
+              "hint": "When enabled, shows developer diagnostic information"
+            }
           }
         ]
       }
@@ -345,7 +417,10 @@
                 "label": "Wipe All Data"
               }
             },
-            "a11y": null
+            "a11y": {
+              "label": "Emergency Wipe",
+              "hint": "Permanently deletes all app data. This action cannot be undone"
+            }
           }
         ]
       }

@@ -333,6 +333,39 @@ fn settings_backup_section_has_links() {
     assert!(matches!(items[1].kind, SettingsItemKind::Link { .. }));
 }
 
+// @internal
+#[test]
+fn settings_items_have_a11y_labels() {
+    let mut engine = SettingsEngine::new(sample_config());
+    let screen = engine.current_screen();
+
+    // Check every SettingsGroup's items have a11y
+    for component in &screen.components {
+        if let Component::SettingsGroup { id, items, .. } = component {
+            for item in items {
+                assert!(
+                    item.a11y.is_some(),
+                    "SettingsItem '{}' in group '{}' missing a11y label",
+                    item.id,
+                    id
+                );
+            }
+        }
+    }
+
+    // Also check InlineConfirm a11y when pending_wipe is active
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "danger".into(),
+        item_id: "emergency_wipe".into(),
+    });
+    let wipe_screen = engine.current_screen();
+    for component in &wipe_screen.components {
+        if let Component::InlineConfirm { id, a11y, .. } = component {
+            assert!(a11y.is_some(), "InlineConfirm '{}' missing a11y label", id);
+        }
+    }
+}
+
 // --- helpers ---
 
 fn find_settings_group<'a>(screen: &'a ScreenModel, group_id: &str) -> &'a [SettingsItem] {

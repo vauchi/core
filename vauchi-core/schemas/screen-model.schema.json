@@ -724,6 +724,44 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "description": "An inline dropdown for selection UIs (e.g. theme, language). Reuses `UserAction::ListItemSelected` — no new action variant needed.",
+          "type": "object",
+          "required": [
+            "Dropdown"
+          ],
+          "properties": {
+            "Dropdown": {
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "options"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/DropdownOption"
+                  }
+                },
+                "selected": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -796,6 +834,22 @@
         },
         "typography": {
           "$ref": "#/definitions/TypographyTokens"
+        }
+      }
+    },
+    "DropdownOption": {
+      "description": "An option in a [`Component::Dropdown`].",
+      "type": "object",
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
         }
       }
     },

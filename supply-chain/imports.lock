@@ -499,13 +499,6 @@ user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
-[[publisher.openssl-probe]]
-version = "0.1.6"
-when = "2025-01-23"
-user-id = 1
-user-login = "alexcrichton"
-user-name = "Alex Crichton"
-
 [[publisher.password-hash]]
 version = "0.5.0"
 when = "2023-03-04"
@@ -680,13 +673,6 @@ when = "2026-01-31"
 user-id = 6741
 user-login = "Darksonn"
 user-name = "Alice Ryhl"
-
-[[publisher.snow]]
-version = "0.9.6"
-when = "2024-01-26"
-user-id = 4610
-user-login = "mcginty"
-user-name = "Jake McGinty"
 
 [[publisher.socket2]]
 version = "0.6.3"

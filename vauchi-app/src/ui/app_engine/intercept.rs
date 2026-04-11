@@ -84,6 +84,29 @@ impl AppEngine {
                     let screen = self.navigate_to(AppScreen::EmergencyShred);
                     return Some(ActionResult::NavigateTo(screen));
                 }
+                "backup_export" | "backup_import" => {
+                    let screen = self.navigate_to(AppScreen::Backup);
+                    return Some(ActionResult::NavigateTo(screen));
+                }
+                "sync" => {
+                    let screen = self.navigate_to(AppScreen::Sync);
+                    return Some(ActionResult::NavigateTo(screen));
+                }
+                "help_center" => {
+                    return Some(ActionResult::OpenUrl {
+                        url: "https://docs.vauchi.app".into(),
+                    });
+                }
+                "funding" => {
+                    return Some(ActionResult::OpenUrl {
+                        url: "https://vauchi.app/donate".into(),
+                    });
+                }
+                "privacy_policy" => {
+                    return Some(ActionResult::OpenUrl {
+                        url: "https://vauchi.app/privacy".into(),
+                    });
+                }
                 // change_password: not yet implemented
                 _ => {}
             }

@@ -414,7 +414,8 @@ fn device_linking_workflow_returns_screen() {
 
 #[test]
 fn backup_workflow_returns_screen() {
-    let workflow = MobileBackupRecoveryWorkflow::new("null".into()).expect("should construct");
+    let workflow =
+        MobileBackupRecoveryWorkflow::new("null".into(), false).expect("should construct");
     let json = workflow.current_screen_json().expect("should serialize");
     let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
     assert_eq!(screen["screen_id"], "backup_choose");
@@ -423,7 +424,7 @@ fn backup_workflow_returns_screen() {
 #[test]
 fn backup_workflow_create_mode() {
     let workflow =
-        MobileBackupRecoveryWorkflow::new(r#""Create""#.into()).expect("should construct");
+        MobileBackupRecoveryWorkflow::new(r#""Create""#.into(), false).expect("should construct");
     let json = workflow.current_screen_json().expect("should serialize");
     let screen: serde_json::Value = serde_json::from_str(&json).expect("should parse");
     assert_eq!(screen["screen_id"], "backup_password");

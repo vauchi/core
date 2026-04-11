@@ -6,7 +6,7 @@ use vauchi_app::ui::*;
 
 #[test]
 fn backup_starts_at_choose() {
-    let engine = BackupRecoveryEngine::new(None);
+    let engine = BackupRecoveryEngine::new(None, false);
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "backup_choose");
     assert!(screen.progress.is_none());
@@ -19,7 +19,7 @@ fn backup_starts_at_choose() {
 
 #[test]
 fn backup_create_flow_to_password() {
-    let mut engine = BackupRecoveryEngine::new(None);
+    let mut engine = BackupRecoveryEngine::new(None, false);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "create".into(),
     });
@@ -37,7 +37,7 @@ fn backup_create_flow_to_password() {
 
 #[test]
 fn backup_restore_flow_to_password() {
-    let mut engine = BackupRecoveryEngine::new(None);
+    let mut engine = BackupRecoveryEngine::new(None, false);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "restore".into(),
     });
@@ -55,7 +55,7 @@ fn backup_restore_flow_to_password() {
 
 #[test]
 fn backup_password_validation() {
-    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create));
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
 
     // Continue with empty password should fail
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -80,7 +80,7 @@ fn backup_password_validation() {
 
 #[test]
 fn backup_confirm_password_mismatch() {
-    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create));
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
 
     // Enter password
     let _ = engine.handle_action(UserAction::TextChanged {
@@ -114,7 +114,7 @@ fn backup_confirm_password_mismatch() {
 
 #[test]
 fn backup_confirm_match_to_processing() {
-    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create));
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
 
     // Enter password
     let _ = engine.handle_action(UserAction::TextChanged {
@@ -151,7 +151,7 @@ fn backup_confirm_match_to_processing() {
 
 #[test]
 fn backup_restore_skips_confirm() {
-    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore));
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), false);
 
     // Enter password
     let _ = engine.handle_action(UserAction::TextChanged {
@@ -175,7 +175,7 @@ fn backup_restore_skips_confirm() {
 
 #[test]
 fn backup_processing_complete() {
-    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create));
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
 
     // Navigate to processing
     let _ = engine.handle_action(UserAction::TextChanged {
@@ -207,7 +207,7 @@ fn backup_processing_complete() {
     assert_eq!(screen.actions[0].id, "done");
 
     // Done should complete
-    let mut engine_done = BackupRecoveryEngine::new(Some(BackupMode::Create));
+    let mut engine_done = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
     let _ = engine_done.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "pw".into(),
@@ -231,7 +231,7 @@ fn backup_processing_complete() {
 
 #[test]
 fn backup_processing_failed() {
-    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore));
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), false);
 
     // Navigate to processing
     let _ = engine.handle_action(UserAction::TextChanged {
@@ -270,7 +270,7 @@ fn backup_processing_failed() {
 
 #[test]
 fn backup_back_navigation() {
-    let mut engine = BackupRecoveryEngine::new(None);
+    let mut engine = BackupRecoveryEngine::new(None, false);
 
     // Go to create password
     let _ = engine.handle_action(UserAction::ActionPressed {
@@ -315,7 +315,7 @@ fn backup_back_navigation() {
 
 #[test]
 fn backup_processing_complete_guard_ignores_wrong_step() {
-    let mut engine = BackupRecoveryEngine::new(None);
+    let mut engine = BackupRecoveryEngine::new(None, false);
 
     // Calling processing_complete from ChooseMode should be a no-op
     engine.processing_complete();
@@ -328,7 +328,7 @@ fn backup_processing_complete_guard_ignores_wrong_step() {
 
 #[test]
 fn processing_screen_shows_kdf_explanation_for_create() {
-    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create));
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "pw".into(),
@@ -358,7 +358,7 @@ fn processing_screen_shows_kdf_explanation_for_create() {
 
 #[test]
 fn processing_screen_shows_kdf_explanation_for_restore() {
-    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore));
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), false);
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "pw".into(),

@@ -180,7 +180,7 @@ fn make_device_linking() -> DeviceLinkingEngine {
 }
 
 fn make_backup(mode: Option<BackupMode>) -> BackupRecoveryEngine {
-    BackupRecoveryEngine::new(mode)
+    BackupRecoveryEngine::new(mode, false)
 }
 
 fn make_duress() -> DuressPinEngine {

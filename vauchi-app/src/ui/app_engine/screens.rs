@@ -234,7 +234,7 @@ impl AppEngine {
                 }
             }
             AppScreen::Help => Box::new(HelpEngine::new(Self::default_help_items())),
-            AppScreen::Backup => Box::new(BackupRecoveryEngine::new(None)),
+            AppScreen::Backup => Box::new(BackupRecoveryEngine::new(None, vauchi.has_identity())),
             AppScreen::Lock => Box::new(LockScreenEngine::new(DEFAULT_LOCK_MAX_ATTEMPTS)),
             AppScreen::DeviceLinking => {
                 let qr_data = vauchi

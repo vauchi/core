@@ -356,10 +356,10 @@ impl MobileDeviceLinkingWorkflow {
 
 mobile_workflow! {
     MobileBackupRecoveryWorkflow wraps BackupRecoveryEngine {
-        constructor(mode_json: String) -> {
+        constructor(mode_json: String, has_identity: bool) -> {
             let mode: Option<BackupMode> = serde_json::from_str(&mode_json)
                 .map_err(|e| MobileError::InvalidInput(format!("Failed to parse backup mode: {e}")))?;
-            BackupRecoveryEngine::new(mode)
+            BackupRecoveryEngine::new(mode, has_identity)
         }
     }
 }

@@ -22,6 +22,7 @@ pub struct BackupRecoveryEngine {
     mode: BackupMode,
     password: String,
     confirm_password: String,
+    has_identity: bool,
 }
 
 impl Drop for BackupRecoveryEngine {
@@ -35,6 +36,7 @@ impl Drop for BackupRecoveryEngine {
 enum BackupStep {
     ChooseMode,
     EnterPassword,
+    ConfirmReplace,
     ConfirmPassword,
     Processing,
     Complete,
@@ -46,7 +48,7 @@ impl BackupRecoveryEngine {
     ///
     /// If `mode` is `Some`, starts at the password entry step.
     /// If `None`, starts at the mode selection step.
-    pub fn new(mode: Option<BackupMode>) -> Self {
+    pub fn new(mode: Option<BackupMode>, has_identity: bool) -> Self {
         let (step, mode) = match mode {
             Some(m) => (BackupStep::EnterPassword, m),
             None => (BackupStep::ChooseMode, BackupMode::Create),
@@ -56,6 +58,7 @@ impl BackupRecoveryEngine {
             mode,
             password: String::new(),
             confirm_password: String::new(),
+            has_identity,
         }
     }
 
@@ -80,7 +83,13 @@ impl BackupRecoveryEngine {
     fn total_steps(&self) -> u8 {
         match self.mode {
             BackupMode::Create => 4,
-            BackupMode::Restore => 3,
+            BackupMode::Restore => {
+                if self.has_identity {
+                    4
+                } else {
+                    3
+                }
+            }
         }
     }
 
@@ -88,10 +97,17 @@ impl BackupRecoveryEngine {
         let current_step = match self.step {
             BackupStep::ChooseMode => return None,
             BackupStep::EnterPassword => 1,
+            BackupStep::ConfirmReplace => 2,
             BackupStep::ConfirmPassword => 2,
             BackupStep::Processing => match self.mode {
                 BackupMode::Create => 3,
-                BackupMode::Restore => 2,
+                BackupMode::Restore => {
+                    if self.has_identity {
+                        3
+                    } else {
+                        2
+                    }
+                }
             },
             BackupStep::Complete => self.total_steps(),
             BackupStep::Failed => self.total_steps(),
@@ -169,6 +185,25 @@ impl BackupRecoveryEngine {
                     enabled: !self.password.is_empty(),
                 },
             ],
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn confirm_replace_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "backup_confirm_replace".into(),
+            title: "Replace Identity?".into(),
+            subtitle: None,
+            components: vec![Component::InlineConfirm {
+                id: "confirm_replace".into(),
+                warning: "This will permanently replace your current identity and all contacts."
+                    .into(),
+                confirm_text: "Replace".into(),
+                cancel_text: "Cancel".into(),
+                destructive: true,
+            }],
+            actions: vec![],
             progress: self.progress(),
             ..Default::default()
         }
@@ -305,6 +340,7 @@ impl WorkflowEngine for BackupRecoveryEngine {
         match self.step {
             BackupStep::ChooseMode => self.choose_screen(),
             BackupStep::EnterPassword => self.password_screen(),
+            BackupStep::ConfirmReplace => self.confirm_replace_screen(),
             BackupStep::ConfirmPassword => self.confirm_screen(),
             BackupStep::Processing => self.processing_screen(),
             BackupStep::Complete => self.complete_screen(),
@@ -355,7 +391,11 @@ impl WorkflowEngine for BackupRecoveryEngine {
                         self.step = BackupStep::ConfirmPassword;
                     }
                     BackupMode::Restore => {
-                        self.step = BackupStep::Processing;
+                        if self.has_identity {
+                            self.step = BackupStep::ConfirmReplace;
+                        } else {
+                            self.step = BackupStep::Processing;
+                        }
                     }
                 }
                 ActionResult::NavigateTo(self.current_screen())
@@ -364,6 +404,20 @@ impl WorkflowEngine for BackupRecoveryEngine {
                 if action_id == "back" =>
             {
                 self.step = BackupStep::ChooseMode;
+                ActionResult::NavigateTo(self.current_screen())
+            }
+
+            // ConfirmReplace
+            (BackupStep::ConfirmReplace, UserAction::ActionPressed { action_id })
+                if action_id == "confirm_replace" =>
+            {
+                self.step = BackupStep::Processing;
+                ActionResult::NavigateTo(self.current_screen())
+            }
+            (BackupStep::ConfirmReplace, UserAction::ActionPressed { action_id })
+                if action_id == "cancel_replace" =>
+            {
+                self.step = BackupStep::EnterPassword;
                 ActionResult::NavigateTo(self.current_screen())
             }
 

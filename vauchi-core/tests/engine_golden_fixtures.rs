@@ -284,7 +284,7 @@ fn device_linking_fixture_is_fresh() {
 
 #[test]
 fn backup_choose_fixture_is_fresh() {
-    let engine = BackupRecoveryEngine::new(None);
+    let engine = BackupRecoveryEngine::new(None, false);
     assert_fixture_fresh(&engine.current_screen(), "backup_choose.json");
 }
 
@@ -393,7 +393,7 @@ fn regenerate_all_engine_fixtures() {
         ),
         (
             "backup_choose.json",
-            BackupRecoveryEngine::new(None).current_screen(),
+            BackupRecoveryEngine::new(None, false).current_screen(),
         ),
         (
             "duress_overview.json",

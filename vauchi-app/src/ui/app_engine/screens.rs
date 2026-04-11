@@ -22,6 +22,7 @@ use crate::ui::contact_merge::{ContactMergeEngine, MergePreview};
 use crate::ui::contact_visibility::ContactVisibilityEngine;
 use crate::ui::delivery::{DeliveryItem, DeliveryStatusEngine};
 use crate::ui::device_linking::DeviceLinkingEngine;
+use crate::ui::device_management::{DeviceListItem, DeviceManagementEngine};
 use crate::ui::duplicate_detection::DuplicateDetectionEngine;
 use crate::ui::duress_pin::{DuressConfig, DuressPinEngine};
 use crate::ui::emergency_shred::EmergencyShredEngine;
@@ -241,6 +242,21 @@ impl AppEngine {
                     .map(|r| r.data_string)
                     .unwrap_or_default();
                 Box::new(DeviceLinkingEngine::new(qr_data))
+            }
+            AppScreen::DeviceManagement => {
+                let devices = vauchi
+                    .list_devices()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|d| DeviceListItem {
+                        device_index: d.device_index,
+                        device_name: d.device_name,
+                        public_key_prefix: d.public_key_prefix,
+                        is_current: d.is_current,
+                        is_active: d.is_active,
+                    })
+                    .collect();
+                Box::new(DeviceManagementEngine::new(devices))
             }
             AppScreen::DuressPin => {
                 let config = vauchi

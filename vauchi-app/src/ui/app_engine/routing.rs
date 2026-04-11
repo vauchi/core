@@ -555,6 +555,34 @@ impl AppEngine {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)
             }
+            AppScreen::DeviceManagement => {
+                // Read the confirmed index from the engine before navigating away
+                let revoke_index = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| {
+                        a.downcast_ref::<crate::ui::device_management::DeviceManagementEngine>()
+                    })
+                    .and_then(|e| e.confirmed_revoke_index());
+
+                if let Some(idx) = revoke_index {
+                    match self.vauchi.revoke_device(idx as usize) {
+                        Ok(_name) => {
+                            // Refresh the device list after revocation
+                            let screen = self.navigate_to_internal(AppScreen::DeviceManagement);
+                            return ActionResult::NavigateTo(screen);
+                        }
+                        Err(e) => {
+                            return ActionResult::ShowAlert {
+                                title: "Revoke Failed".into(),
+                                message: format!("{e}"),
+                            };
+                        }
+                    }
+                }
+                let screen = self.navigate_back();
+                ActionResult::NavigateTo(screen)
+            }
             _ => {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)

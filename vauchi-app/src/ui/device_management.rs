@@ -139,25 +139,25 @@ impl WorkflowEngine for DeviceManagementEngine {
                 ref component_id,
                 ref item_id,
             } if component_id == "device_list" => {
-                if let Some(idx_str) = item_id.strip_prefix("device:") {
-                    if let Ok(idx) = idx_str.parse::<u32>() {
-                        // Check if revocable
-                        if let Some(device) = self.devices.iter().find(|d| d.device_index == idx) {
-                            if device.is_current {
-                                return ActionResult::ShowToast {
-                                    message: "Cannot revoke the current device".into(),
-                                    undo_action_id: None,
-                                };
-                            }
-                            if !device.is_active {
-                                return ActionResult::ShowToast {
-                                    message: "Device is already revoked".into(),
-                                    undo_action_id: None,
-                                };
-                            }
-                            self.pending_revoke_index = Some(idx);
-                            return ActionResult::UpdateScreen(self.build_screen());
+                if let Some(idx_str) = item_id.strip_prefix("device:")
+                    && let Ok(idx) = idx_str.parse::<u32>()
+                {
+                    // Check if revocable
+                    if let Some(device) = self.devices.iter().find(|d| d.device_index == idx) {
+                        if device.is_current {
+                            return ActionResult::ShowToast {
+                                message: "Cannot revoke the current device".into(),
+                                undo_action_id: None,
+                            };
                         }
+                        if !device.is_active {
+                            return ActionResult::ShowToast {
+                                message: "Device is already revoked".into(),
+                                undo_action_id: None,
+                            };
+                        }
+                        self.pending_revoke_index = Some(idx);
+                        return ActionResult::UpdateScreen(self.build_screen());
                     }
                 }
                 ActionResult::UpdateScreen(self.build_screen())
@@ -165,12 +165,12 @@ impl WorkflowEngine for DeviceManagementEngine {
             UserAction::ActionPressed { ref action_id }
                 if action_id.starts_with("confirm_revoke_device:") =>
             {
-                if let Some(idx_str) = action_id.strip_prefix("confirm_revoke_device:") {
-                    if let Ok(idx) = idx_str.parse::<u32>() {
-                        self.pending_revoke_index = None;
-                        self.confirmed_revoke_index = Some(idx);
-                        return ActionResult::Complete;
-                    }
+                if let Some(idx_str) = action_id.strip_prefix("confirm_revoke_device:")
+                    && let Ok(idx) = idx_str.parse::<u32>()
+                {
+                    self.pending_revoke_index = None;
+                    self.confirmed_revoke_index = Some(idx);
+                    return ActionResult::Complete;
                 }
                 ActionResult::UpdateScreen(self.build_screen())
             }

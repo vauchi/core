@@ -291,6 +291,7 @@ impl AppEngine {
                                     a11y: Some(A11y {
                                         label: Some(format!("Contact: {}", c.display_name())),
                                         hint: Some("Double tap to view contact details".into()),
+                                        role: None,
                                     }),
                                 })
                             })
@@ -360,6 +361,7 @@ impl AppEngine {
                         a11y: Some(A11y {
                             label: Some(format!("Contact: {}", c.display_name())),
                             hint: Some("Double tap to view contact details".into()),
+                            role: None,
                         }),
                     })
                     .collect();
@@ -457,6 +459,7 @@ impl AppEngine {
                         a11y: Some(A11y {
                             label: Some(format!("Contact: {}", contact.display_name())),
                             hint: Some("Double tap to view contact details".into()),
+                            role: None,
                         }),
                     };
 
@@ -786,6 +789,7 @@ impl AppEngine {
                         a11y: Some(A11y {
                             label: Some(format!("Contact: {}", c.display_name())),
                             hint: Some("Double tap to view contact details".into()),
+                            role: None,
                         }),
                     }
                 })

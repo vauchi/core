@@ -138,6 +138,20 @@ pub enum Component {
     },
 }
 
+/// Semantic role hint for screen readers.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum AccessibilityRole {
+    Button,
+    Link,
+    Heading,
+    Image,
+    Toggle,
+    TextField,
+    Alert,
+}
+
 /// Accessibility metadata for a UI component.
 ///
 /// Populated by core engines so frontends can apply consistent a11y
@@ -149,6 +163,9 @@ pub struct A11y {
     pub label: Option<String>,
     /// Usage hint (maps to accessibilityHint/stateDescription).
     pub hint: Option<String>,
+    /// Semantic role for screen readers.
+    #[serde(default)]
+    pub role: Option<AccessibilityRole>,
 }
 
 /// Text rendering style.

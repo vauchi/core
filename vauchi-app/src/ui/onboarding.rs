@@ -250,6 +250,7 @@ impl OnboardingEngine {
                     a11y: Some(A11y {
                         label: Some("Display name input".into()),
                         hint: Some("Enter the name others will see on your contact card".into()),
+                        role: None,
                     }),
                 },
             ],
@@ -355,6 +356,7 @@ impl OnboardingEngine {
                     a11y: Some(A11y {
                         label: Some("Custom group name input".into()),
                         hint: Some("Enter a name for a custom contact group".into()),
+                        role: None,
                     }),
                 },
             ],

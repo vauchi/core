@@ -78,6 +78,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Display Name".into()),
                             hint: Some("Your visible name shown to contacts".into()),
+                            role: None,
                         }),
                     },
                     SettingsItem {
@@ -87,6 +88,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Edit Profile".into()),
                             hint: Some("Opens the profile editor".into()),
+                            role: None,
                         }),
                     },
                 ],
@@ -107,6 +109,7 @@ impl WorkflowEngine for SettingsEngine {
                                 "When enabled, notifies senders when their messages are delivered"
                                     .into(),
                             ),
+                            role: None,
                         }),
                     },
                     SettingsItem {
@@ -120,6 +123,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some(
                                 "When enabled, hides your online status from contacts".into(),
                             ),
+                            role: None,
                         }),
                     },
                 ],
@@ -138,6 +142,7 @@ impl WorkflowEngine for SettingsEngine {
                         hint: Some(
                             "When enabled, sends a notification when a new contact is added".into(),
                         ),
+                        role: None,
                     }),
                 }],
             },
@@ -154,6 +159,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Theme".into()),
                             hint: Some("The current color theme of the app".into()),
+                            role: None,
                         }),
                     },
                     SettingsItem {
@@ -165,6 +171,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Language".into()),
                             hint: Some("The current display language of the app".into()),
+                            role: None,
                         }),
                     },
                 ],
@@ -184,6 +191,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some(
                                 "When enabled, minimizes animations and motion effects".into(),
                             ),
+                            role: None,
                         }),
                     },
                     SettingsItem {
@@ -198,6 +206,7 @@ impl WorkflowEngine for SettingsEngine {
                                 "When enabled, increases color contrast for better visibility"
                                     .into(),
                             ),
+                            role: None,
                         }),
                     },
                     SettingsItem {
@@ -211,6 +220,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some(
                                 "When enabled, increases the size of interactive elements".into(),
                             ),
+                            role: None,
                         }),
                     },
                 ],
@@ -226,6 +236,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Change Password".into()),
                             hint: Some("Opens the password change screen".into()),
+                            role: None,
                         }),
                     },
                     SettingsItem {
@@ -241,6 +252,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Devices".into()),
                             hint: Some("Opens the list of linked devices".into()),
+                            role: None,
                         }),
                     },
                     SettingsItem {
@@ -250,6 +262,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Duress PIN".into()),
                             hint: Some("Opens the duress PIN configuration screen".into()),
+                            role: None,
                         }),
                     },
                 ],
@@ -265,6 +278,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Create Backup".into()),
                             hint: Some("Opens the backup export screen".into()),
+                            role: None,
                         }),
                     },
                     SettingsItem {
@@ -274,6 +288,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Restore Backup".into()),
                             hint: Some("Opens the backup restore screen".into()),
+                            role: None,
                         }),
                     },
                 ],
@@ -290,6 +305,7 @@ impl WorkflowEngine for SettingsEngine {
                     a11y: Some(A11y {
                         label: Some("Relay URL".into()),
                         hint: Some("The relay server used for message delivery".into()),
+                        role: None,
                     }),
                 }],
             },
@@ -306,6 +322,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Sync Status".into()),
                             hint: Some("Opens the sync status detail screen".into()),
+                            role: None,
                         }),
                     },
                     SettingsItem {
@@ -317,6 +334,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Pending Updates".into()),
                             hint: Some("Number of contact updates waiting to be delivered".into()),
+                            role: None,
                         }),
                     },
                     SettingsItem {
@@ -328,6 +346,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Failed Deliveries".into()),
                             hint: Some("Number of updates that failed to deliver".into()),
+                            role: None,
                         }),
                     },
                 ],
@@ -343,6 +362,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Help Center".into()),
                             hint: Some("Opens the help center".into()),
+                            role: None,
                         }),
                     },
                     SettingsItem {
@@ -352,6 +372,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Support Development".into()),
                             hint: Some("Opens the funding and support page".into()),
+                            role: None,
                         }),
                     },
                     SettingsItem {
@@ -361,6 +382,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Privacy Policy".into()),
                             hint: Some("Opens the privacy policy".into()),
+                            role: None,
                         }),
                     },
                 ],
@@ -382,6 +404,7 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Version".into()),
                             hint: Some("The current app version and build number".into()),
+                            role: None,
                         }),
                     },
                     SettingsItem {
@@ -395,6 +418,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some(
                                 "When enabled, shows developer diagnostic information".into(),
                             ),
+                            role: None,
                         }),
                     },
                 ],
@@ -413,6 +437,7 @@ impl WorkflowEngine for SettingsEngine {
                         hint: Some(
                             "Permanently deletes all app data. This action cannot be undone".into(),
                         ),
+                        role: None,
                     }),
                 }],
             },
@@ -429,6 +454,7 @@ impl WorkflowEngine for SettingsEngine {
                 a11y: Some(A11y {
                     label: Some("Confirm emergency data wipe".into()),
                     hint: Some("This action is irreversible and will destroy all data".into()),
+                    role: None,
                 }),
             });
         }

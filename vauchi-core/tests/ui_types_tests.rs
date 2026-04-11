@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use vauchi_app::ui::{A11y, SettingsItem, *};
+use vauchi_app::ui::{A11y, AccessibilityRole, SettingsItem, *};
 
 #[test]
 fn test_screen_model_serde_roundtrip() {
@@ -701,6 +701,7 @@ fn test_a11y_struct_roundtrip() {
     let a11y = A11y {
         label: Some("Submit button".into()),
         hint: Some("Double tap to submit the form".into()),
+        role: None,
     };
     let json = serde_json::to_string(&a11y).unwrap();
     let parsed: A11y = serde_json::from_str(&json).unwrap();
@@ -709,6 +710,7 @@ fn test_a11y_struct_roundtrip() {
         parsed.hint.as_deref(),
         Some("Double tap to submit the form")
     );
+    assert_eq!(parsed.role, None);
 }
 
 // @internal
@@ -717,6 +719,28 @@ fn test_a11y_default_is_none() {
     let a11y = A11y::default();
     assert_eq!(a11y.label, None);
     assert_eq!(a11y.hint, None);
+    assert_eq!(a11y.role, None);
+}
+
+// @internal
+#[test]
+fn test_a11y_with_role_roundtrip() {
+    let a11y = A11y {
+        label: Some("Submit".into()),
+        hint: None,
+        role: Some(AccessibilityRole::Button),
+    };
+    let json = serde_json::to_string(&a11y).unwrap();
+    let parsed: A11y = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.role, Some(AccessibilityRole::Button));
+}
+
+// @internal
+#[test]
+fn test_a11y_without_role_deserializes() {
+    let json = r#"{"label":"test"}"#;
+    let a11y: A11y = serde_json::from_str(json).unwrap();
+    assert_eq!(a11y.role, None);
 }
 
 // === Component a11y field backward-compat ===
@@ -757,6 +781,7 @@ fn test_component_text_input_with_a11y_roundtrip() {
         a11y: Some(A11y {
             label: Some("Name field".into()),
             hint: Some("Enter your display name".into()),
+            role: None,
         }),
     };
     let json = serde_json::to_string(&component).unwrap();

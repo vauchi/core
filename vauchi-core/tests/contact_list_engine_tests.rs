@@ -452,6 +452,7 @@ fn contact_item_a11y_is_preserved_through_engine() {
         a11y: Some(A11y {
             label: Some("Contact: Alice".into()),
             hint: Some("Double tap to view contact details".into()),
+            role: None,
         }),
     }];
     let engine = ContactListEngine::new(contacts);

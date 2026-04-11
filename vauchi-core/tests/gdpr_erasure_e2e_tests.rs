@@ -109,7 +109,6 @@ fn test_erasure_blocked_during_grace_period() {
     );
 }
 
-// @scenario: privacy_compliance :: Execute deletion after grace period sends revocations and purge
 /// C1-2: Full erasure after grace period produces revocations for all contacts.
 ///
 /// Uses `schedule_deletion_with_execute_at` with past timestamps to bypass the
@@ -231,7 +230,6 @@ fn test_cancellation_restores_full_access() {
 // C2 — Crypto-Shredding Key Hierarchy Soundness
 // ============================================================
 
-// @scenario: privacy_compliance :: Crypto-shredding renders card unreadable without key
 /// C2-1: Different SMK seeds produce different SEKs.
 ///
 /// Verifies the foundational property that destroys the SMK makes data
@@ -312,7 +310,7 @@ impl RevocationSender for MockRevocationSender {
     }
 }
 
-// @scenario: privacy_compliance :: Execute deletion after grace period sends revocations and purge
+// @scenario: privacy_compliance :: Hard shred sends purge and revocations
 /// C3-1: `hard_shred` sends purge to relay and revocations for all contacts.
 ///
 /// Sets up ShredManager with mock senders, adds contacts, bypasses the grace

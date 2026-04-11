@@ -20,7 +20,10 @@
         "max_length": 100,
         "validation_error": null,
         "input_type": "Text",
-        "a11y": null
+        "a11y": {
+          "label": "Display name input",
+          "hint": "Enter the name others will see on your contact card"
+        }
       }
     }
   ],

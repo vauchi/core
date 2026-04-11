@@ -11,7 +11,7 @@ use super::AppScreen;
 use super::initials;
 use crate::ui::activity_log::{ActivityLogEngine, ActivityLogItem};
 use crate::ui::backup_recovery::BackupRecoveryEngine;
-use crate::ui::component::{ContactItem, FieldDisplay, Status, UiFieldVisibility};
+use crate::ui::component::{A11y, ContactItem, FieldDisplay, Status, UiFieldVisibility};
 use crate::ui::contact_detail::{
     ContactDetailEngine, ContactNotFoundEngine, DeliverySummary, SharedInfoView,
 };
@@ -288,7 +288,10 @@ impl AppEngine {
                                     avatar_initials: initials(c.display_name()),
                                     status: None,
                                     searchable_fields: vec![],
-                                    a11y: None,
+                                    a11y: Some(A11y {
+                                        label: Some(format!("Contact: {}", c.display_name())),
+                                        hint: Some("Double tap to view contact details".into()),
+                                    }),
                                 })
                             })
                             .collect();
@@ -354,7 +357,10 @@ impl AppEngine {
                         avatar_initials: initials(c.display_name()),
                         status: None,
                         searchable_fields: vec![],
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some(format!("Contact: {}", c.display_name())),
+                            hint: Some("Double tap to view contact details".into()),
+                        }),
                     })
                     .collect();
                 members.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
@@ -448,7 +454,10 @@ impl AppEngine {
                             .iter()
                             .map(|f| f.value().to_string())
                             .collect(),
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some(format!("Contact: {}", contact.display_name())),
+                            hint: Some("Double tap to view contact details".into()),
+                        }),
                     };
 
                     // Load personal note (stored as raw UTF-8 bytes by the app layer)
@@ -774,7 +783,10 @@ impl AppEngine {
                         avatar_initials: initials(c.display_name()),
                         status,
                         searchable_fields: fields,
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some(format!("Contact: {}", c.display_name())),
+                            hint: Some("Double tap to view contact details".into()),
+                        }),
                     }
                 })
                 .collect(),

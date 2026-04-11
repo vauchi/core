@@ -438,3 +438,38 @@ fn available_groups_shown_in_screen() {
     assert_eq!(group_actions[0].label, "Family");
     assert_eq!(group_actions[1].label, "Work");
 }
+
+#[test]
+fn contact_item_a11y_is_preserved_through_engine() {
+    let contacts = vec![ContactItem {
+        id: "c1".into(),
+        name: "Alice".into(),
+        subtitle: None,
+        avatar_initials: "AL".into(),
+        status: None,
+        searchable_fields: vec![],
+        a11y: Some(A11y {
+            label: Some("Contact: Alice".into()),
+            hint: Some("Double tap to view contact details".into()),
+        }),
+    }];
+    let engine = ContactListEngine::new(contacts);
+    let screen = engine.current_screen();
+
+    let items = extract_contacts(&screen);
+    assert_eq!(items.len(), 1);
+    let a11y = items[0]
+        .a11y
+        .as_ref()
+        .expect("ContactItem should carry a11y");
+    assert_eq!(
+        a11y.label.as_deref(),
+        Some("Contact: Alice"),
+        "a11y label should include the contact name"
+    );
+    assert_eq!(
+        a11y.hint.as_deref(),
+        Some("Double tap to view contact details"),
+        "a11y hint should guide screen reader interaction"
+    );
+}

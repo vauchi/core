@@ -19,6 +19,32 @@ pub struct SettingsConfig {
     pub relay_url: String,
     pub device_count: usize,
     pub password_set: bool,
+    #[serde(default)]
+    pub theme: String,
+    #[serde(default)]
+    pub available_themes: Vec<DropdownOption>,
+    #[serde(default)]
+    pub language: String,
+    #[serde(default)]
+    pub available_languages: Vec<DropdownOption>,
+    #[serde(default)]
+    pub reduce_motion: bool,
+    #[serde(default)]
+    pub high_contrast: bool,
+    #[serde(default)]
+    pub large_touch: bool,
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub build: String,
+    #[serde(default)]
+    pub sync_status: String,
+    #[serde(default)]
+    pub pending_updates: u32,
+    #[serde(default)]
+    pub failed_deliveries: u32,
+    #[serde(default)]
+    pub debug_mode: bool,
 }
 
 /// Settings screen engine.
@@ -89,6 +115,53 @@ impl WorkflowEngine for SettingsEngine {
                 }],
             },
             Component::SettingsGroup {
+                id: "appearance".into(),
+                label: "Appearance".into(),
+                items: vec![
+                    SettingsItem {
+                        id: "theme".into(),
+                        label: "Theme".into(),
+                        kind: SettingsItemKind::Value {
+                            value: self.config.theme.clone(),
+                        },
+                    },
+                    SettingsItem {
+                        id: "language".into(),
+                        label: "Language".into(),
+                        kind: SettingsItemKind::Value {
+                            value: self.config.language.clone(),
+                        },
+                    },
+                ],
+            },
+            Component::SettingsGroup {
+                id: "accessibility".into(),
+                label: "Accessibility".into(),
+                items: vec![
+                    SettingsItem {
+                        id: "reduce_motion".into(),
+                        label: "Reduce Motion".into(),
+                        kind: SettingsItemKind::Toggle {
+                            enabled: self.config.reduce_motion,
+                        },
+                    },
+                    SettingsItem {
+                        id: "high_contrast".into(),
+                        label: "High Contrast".into(),
+                        kind: SettingsItemKind::Toggle {
+                            enabled: self.config.high_contrast,
+                        },
+                    },
+                    SettingsItem {
+                        id: "large_touch".into(),
+                        label: "Large Touch Targets".into(),
+                        kind: SettingsItemKind::Toggle {
+                            enabled: self.config.large_touch,
+                        },
+                    },
+                ],
+            },
+            Component::SettingsGroup {
                 id: "security".into(),
                 label: "Security".into(),
                 items: vec![
@@ -116,6 +189,22 @@ impl WorkflowEngine for SettingsEngine {
                 ],
             },
             Component::SettingsGroup {
+                id: "backup".into(),
+                label: "Backup & Recovery".into(),
+                items: vec![
+                    SettingsItem {
+                        id: "backup_export".into(),
+                        label: "Create Backup".into(),
+                        kind: SettingsItemKind::Link { detail: None },
+                    },
+                    SettingsItem {
+                        id: "backup_import".into(),
+                        label: "Restore Backup".into(),
+                        kind: SettingsItemKind::Link { detail: None },
+                    },
+                ],
+            },
+            Component::SettingsGroup {
                 id: "network".into(),
                 label: "Network".into(),
                 items: vec![SettingsItem {
@@ -125,6 +214,78 @@ impl WorkflowEngine for SettingsEngine {
                         value: self.config.relay_url.clone(),
                     },
                 }],
+            },
+            Component::SettingsGroup {
+                id: "delivery".into(),
+                label: "Message Delivery".into(),
+                items: vec![
+                    SettingsItem {
+                        id: "sync".into(),
+                        label: "Sync Status".into(),
+                        kind: SettingsItemKind::Link {
+                            detail: Some(self.config.sync_status.clone()),
+                        },
+                    },
+                    SettingsItem {
+                        id: "pending_updates".into(),
+                        label: "Pending Updates".into(),
+                        kind: SettingsItemKind::Value {
+                            value: self.config.pending_updates.to_string(),
+                        },
+                    },
+                    SettingsItem {
+                        id: "failed_deliveries".into(),
+                        label: "Failed Deliveries".into(),
+                        kind: SettingsItemKind::Value {
+                            value: self.config.failed_deliveries.to_string(),
+                        },
+                    },
+                ],
+            },
+            Component::SettingsGroup {
+                id: "help".into(),
+                label: "Help & Support".into(),
+                items: vec![
+                    SettingsItem {
+                        id: "help_center".into(),
+                        label: "Help Center".into(),
+                        kind: SettingsItemKind::Link { detail: None },
+                    },
+                    SettingsItem {
+                        id: "funding".into(),
+                        label: "Support Development".into(),
+                        kind: SettingsItemKind::Link { detail: None },
+                    },
+                    SettingsItem {
+                        id: "privacy_policy".into(),
+                        label: "Privacy Policy".into(),
+                        kind: SettingsItemKind::Link { detail: None },
+                    },
+                ],
+            },
+            Component::SettingsGroup {
+                id: "about".into(),
+                label: "About".into(),
+                items: vec![
+                    SettingsItem {
+                        id: "version".into(),
+                        label: "Version".into(),
+                        kind: SettingsItemKind::Value {
+                            value: if self.config.build.is_empty() {
+                                self.config.version.clone()
+                            } else {
+                                format!("{} ({})", self.config.version, self.config.build)
+                            },
+                        },
+                    },
+                    SettingsItem {
+                        id: "debug_mode".into(),
+                        label: "Debug Mode".into(),
+                        kind: SettingsItemKind::Toggle {
+                            enabled: self.config.debug_mode,
+                        },
+                    },
+                ],
             },
             Component::SettingsGroup {
                 id: "danger".into(),
@@ -182,6 +343,25 @@ impl WorkflowEngine for SettingsEngine {
                 ref item_id,
             } if component_id == "notifications" && item_id == "contact_added" => {
                 self.config.contact_added_notifications = !self.config.contact_added_notifications;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::SettingsToggled {
+                ref component_id,
+                ref item_id,
+            } if component_id == "accessibility" => {
+                match item_id.as_str() {
+                    "reduce_motion" => self.config.reduce_motion = !self.config.reduce_motion,
+                    "high_contrast" => self.config.high_contrast = !self.config.high_contrast,
+                    "large_touch" => self.config.large_touch = !self.config.large_touch,
+                    _ => {}
+                }
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::SettingsToggled {
+                ref component_id,
+                ref item_id,
+            } if component_id == "about" && item_id == "debug_mode" => {
+                self.config.debug_mode = !self.config.debug_mode;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected { ref item_id, .. } if item_id == "emergency_wipe" => {

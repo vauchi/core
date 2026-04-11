@@ -13,6 +13,19 @@ fn sample_config() -> SettingsConfig {
         relay_url: "https://relay.vauchi.app".into(),
         device_count: 3,
         password_set: true,
+        theme: String::new(),
+        available_themes: vec![],
+        language: String::new(),
+        available_languages: vec![],
+        reduce_motion: false,
+        high_contrast: false,
+        large_touch: false,
+        version: String::new(),
+        build: String::new(),
+        sync_status: String::new(),
+        pending_updates: 0,
+        failed_deliveries: 0,
+        debug_mode: false,
     }
 }
 
@@ -40,8 +53,14 @@ fn settings_shows_all_groups() {
             "profile",
             "privacy",
             "notifications",
+            "appearance",
+            "accessibility",
             "security",
+            "backup",
             "network",
+            "delivery",
+            "help",
+            "about",
             "danger"
         ]
     );
@@ -196,6 +215,108 @@ fn settings_single_device_no_plural() {
     let screen = engine.current_screen();
     let detail = find_link_detail(&screen, "security", "devices");
     assert_eq!(detail.as_deref(), Some("1 device"));
+}
+
+#[test]
+fn settings_appearance_section_has_theme_and_language() {
+    let mut config = sample_config();
+    config.theme = "dark".into();
+    config.language = "English".into();
+    let engine = SettingsEngine::new(config);
+    let screen = engine.current_screen();
+    let theme = find_value(&screen, "appearance", "theme");
+    assert_eq!(theme, "dark");
+    let lang = find_value(&screen, "appearance", "language");
+    assert_eq!(lang, "English");
+}
+
+#[test]
+fn settings_accessibility_toggles() {
+    let mut engine = SettingsEngine::new(sample_config());
+
+    // Initially all false
+    let screen = engine.current_screen();
+    assert!(!find_toggle(&screen, "accessibility", "reduce_motion"));
+    assert!(!find_toggle(&screen, "accessibility", "high_contrast"));
+    assert!(!find_toggle(&screen, "accessibility", "large_touch"));
+
+    // Toggle reduce_motion
+    let result = engine.handle_action(UserAction::SettingsToggled {
+        component_id: "accessibility".into(),
+        item_id: "reduce_motion".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!()
+    };
+    assert!(find_toggle(&screen, "accessibility", "reduce_motion"));
+}
+
+#[test]
+fn settings_about_shows_version() {
+    let mut config = sample_config();
+    config.version = "0.19.0".into();
+    config.build = "42".into();
+    let engine = SettingsEngine::new(config);
+    let screen = engine.current_screen();
+    let version = find_value(&screen, "about", "version");
+    assert_eq!(version, "0.19.0 (42)");
+}
+
+#[test]
+fn settings_about_version_without_build() {
+    let mut config = sample_config();
+    config.version = "0.19.0".into();
+    config.build = String::new();
+    let engine = SettingsEngine::new(config);
+    let screen = engine.current_screen();
+    let version = find_value(&screen, "about", "version");
+    assert_eq!(version, "0.19.0");
+}
+
+#[test]
+fn settings_debug_mode_toggle() {
+    let mut engine = SettingsEngine::new(sample_config());
+    assert!(!find_toggle(
+        &engine.current_screen(),
+        "about",
+        "debug_mode"
+    ));
+
+    let result = engine.handle_action(UserAction::SettingsToggled {
+        component_id: "about".into(),
+        item_id: "debug_mode".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!()
+    };
+    assert!(find_toggle(&screen, "about", "debug_mode"));
+}
+
+#[test]
+fn settings_delivery_section() {
+    let mut config = sample_config();
+    config.sync_status = "Connected".into();
+    config.pending_updates = 3;
+    config.failed_deliveries = 1;
+    let engine = SettingsEngine::new(config);
+    let screen = engine.current_screen();
+
+    let sync = find_link_detail(&screen, "delivery", "sync");
+    assert_eq!(sync.as_deref(), Some("Connected"));
+    let pending = find_value(&screen, "delivery", "pending_updates");
+    assert_eq!(pending, "3");
+    let failed = find_value(&screen, "delivery", "failed_deliveries");
+    assert_eq!(failed, "1");
+}
+
+#[test]
+fn settings_backup_section_has_links() {
+    let engine = SettingsEngine::new(sample_config());
+    let screen = engine.current_screen();
+    let items = find_settings_group(&screen, "backup");
+    assert_eq!(items.len(), 2);
+    assert!(matches!(items[0].kind, SettingsItemKind::Link { .. }));
+    assert!(matches!(items[1].kind, SettingsItemKind::Link { .. }));
 }
 
 // --- helpers ---

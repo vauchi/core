@@ -74,6 +74,19 @@ fn sample_settings_config() -> SettingsConfig {
         relay_url: "https://relay.vauchi.app".into(),
         device_count: 2,
         password_set: true,
+        theme: String::new(),
+        available_themes: vec![],
+        language: String::new(),
+        available_languages: vec![],
+        reduce_motion: false,
+        high_contrast: false,
+        large_touch: false,
+        version: String::new(),
+        build: String::new(),
+        sync_status: String::new(),
+        pending_updates: 0,
+        failed_deliveries: 0,
+        debug_mode: false,
     }
 }
 

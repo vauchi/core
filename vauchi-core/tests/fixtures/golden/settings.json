@@ -75,6 +75,67 @@
     },
     {
       "SettingsGroup": {
+        "id": "appearance",
+        "label": "Appearance",
+        "items": [
+          {
+            "id": "theme",
+            "label": "Theme",
+            "kind": {
+              "Value": {
+                "value": ""
+              }
+            }
+          },
+          {
+            "id": "language",
+            "label": "Language",
+            "kind": {
+              "Value": {
+                "value": ""
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "SettingsGroup": {
+        "id": "accessibility",
+        "label": "Accessibility",
+        "items": [
+          {
+            "id": "reduce_motion",
+            "label": "Reduce Motion",
+            "kind": {
+              "Toggle": {
+                "enabled": false
+              }
+            }
+          },
+          {
+            "id": "high_contrast",
+            "label": "High Contrast",
+            "kind": {
+              "Toggle": {
+                "enabled": false
+              }
+            }
+          },
+          {
+            "id": "large_touch",
+            "label": "Large Touch Targets",
+            "kind": {
+              "Toggle": {
+                "enabled": false
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "SettingsGroup": {
         "id": "security",
         "label": "Security",
         "items": [
@@ -110,6 +171,32 @@
     },
     {
       "SettingsGroup": {
+        "id": "backup",
+        "label": "Backup & Recovery",
+        "items": [
+          {
+            "id": "backup_export",
+            "label": "Create Backup",
+            "kind": {
+              "Link": {
+                "detail": null
+              }
+            }
+          },
+          {
+            "id": "backup_import",
+            "label": "Restore Backup",
+            "kind": {
+              "Link": {
+                "detail": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "SettingsGroup": {
         "id": "network",
         "label": "Network",
         "items": [
@@ -119,6 +206,102 @@
             "kind": {
               "Value": {
                 "value": "https://relay.vauchi.app"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "SettingsGroup": {
+        "id": "delivery",
+        "label": "Message Delivery",
+        "items": [
+          {
+            "id": "sync",
+            "label": "Sync Status",
+            "kind": {
+              "Link": {
+                "detail": ""
+              }
+            }
+          },
+          {
+            "id": "pending_updates",
+            "label": "Pending Updates",
+            "kind": {
+              "Value": {
+                "value": "0"
+              }
+            }
+          },
+          {
+            "id": "failed_deliveries",
+            "label": "Failed Deliveries",
+            "kind": {
+              "Value": {
+                "value": "0"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "SettingsGroup": {
+        "id": "help",
+        "label": "Help & Support",
+        "items": [
+          {
+            "id": "help_center",
+            "label": "Help Center",
+            "kind": {
+              "Link": {
+                "detail": null
+              }
+            }
+          },
+          {
+            "id": "funding",
+            "label": "Support Development",
+            "kind": {
+              "Link": {
+                "detail": null
+              }
+            }
+          },
+          {
+            "id": "privacy_policy",
+            "label": "Privacy Policy",
+            "kind": {
+              "Link": {
+                "detail": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "SettingsGroup": {
+        "id": "about",
+        "label": "About",
+        "items": [
+          {
+            "id": "version",
+            "label": "Version",
+            "kind": {
+              "Value": {
+                "value": ""
+              }
+            }
+          },
+          {
+            "id": "debug_mode",
+            "label": "Debug Mode",
+            "kind": {
+              "Toggle": {
+                "enabled": false
               }
             }
           }

@@ -29,7 +29,7 @@ fn restore_with_identity_shows_confirm_replace() {
     assert_eq!(screen.screen_id, "backup_confirm_replace");
     let has_confirm = screen.components.iter().any(|c| {
         matches!(c, Component::InlineConfirm { id, destructive, .. }
-            if id == "confirm_replace" && *destructive)
+            if id == "replace" && *destructive)
     });
     assert!(has_confirm, "must show destructive InlineConfirm");
 }

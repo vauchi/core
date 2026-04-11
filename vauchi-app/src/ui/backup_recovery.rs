@@ -196,7 +196,7 @@ impl BackupRecoveryEngine {
             title: "Replace Identity?".into(),
             subtitle: None,
             components: vec![Component::InlineConfirm {
-                id: "confirm_replace".into(),
+                id: "replace".into(),
                 warning: "This will permanently replace your current identity and all contacts."
                     .into(),
                 confirm_text: "Replace".into(),

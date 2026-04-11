@@ -461,18 +461,20 @@ impl Vauchi {
             return Ok(cached_bytes);
         }
 
-        // 2. Try bundled key (no network, no IP leak)
+        // 2. Direct fetch (only for dev/testing — leaks client IP).
+        //    Check before bundled key so test relays with ephemeral keys
+        //    aren't shadowed by the compiled-in production key.
+        if self.config.ohttp.allow_direct {
+            return self.fetch_and_cache_ohttp_key(relay_url);
+        }
+
+        // 3. Try bundled key (no network, no IP leak)
         if let Some(ref bundled) = self.config.ohttp.bundled_gateway_key {
             // Validate the bundled key before using it — skip if corrupt
             if OhttpClient::new(bundled.clone()).is_ok() {
                 return Ok(bundled.clone());
             }
-            // Invalid bundled key — fall through to direct fetch
-        }
-
-        // 3. Direct fetch (only for dev/testing — leaks client IP)
-        if self.config.ohttp.allow_direct {
-            return self.fetch_and_cache_ohttp_key(relay_url);
+            // Invalid bundled key — fall through to error
         }
 
         Err(VauchiError::Network(

@@ -111,6 +111,9 @@ fn clear_pin_cache_does_not_affect_other_relays() {
 }
 
 // @scenario: pinning:empty pin list roundtrip
+// Note: the transport layer (fetch_pin_config) rejects empty responses,
+// but the storage layer must handle empty lists gracefully in case
+// a future caller has a legitimate reason to clear cached pins.
 #[test]
 fn save_empty_pin_list_roundtrips() {
     let storage = open_storage();

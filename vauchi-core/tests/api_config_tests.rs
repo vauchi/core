@@ -7,7 +7,6 @@
 
 use std::path::PathBuf;
 use vauchi_core::api::*;
-use vauchi_core::network::PinnedCertificate;
 
 #[test]
 fn test_vauchi_config_default() {
@@ -106,18 +105,11 @@ fn test_sync_config_default() {
 
 // ─── Certificate pinning defaults ───────────────────────────────────
 
-/// relay.vauchi.app SPKI SHA-256 fingerprint.
-/// Extracted via: openssl s_client → x509 pubkey → pkey DER → sha256
-const RELAY_SPKI_SHA256: [u8; 32] = [
-    0xba, 0xae, 0x88, 0x27, 0xcb, 0xce, 0xf3, 0xe5, 0xa1, 0xcc, 0xe3, 0xe0, 0x00, 0x9d, 0x4e, 0x06,
-    0xe1, 0x70, 0x0f, 0xb1, 0x00, 0xeb, 0x37, 0x84, 0xb8, 0xc3, 0x4f, 0x4e, 0x26, 0xb0, 0x6d, 0x00,
-];
-
 /// @internal C7
 #[test]
 fn default_relay_config_has_production_pin() {
     let config = RelayConfig::default();
-    let expected = PinnedCertificate::new(RELAY_SPKI_SHA256);
+    let default_pins = RelayConfig::default_pins();
 
     assert_eq!(
         config.pinned_certs.len(),
@@ -125,8 +117,8 @@ fn default_relay_config_has_production_pin() {
         "Default relay config must include exactly one pinned certificate"
     );
     assert_eq!(
-        config.pinned_certs[0], expected,
-        "Default pin must match relay.vauchi.app SPKI SHA-256"
+        config.pinned_certs, default_pins,
+        "Default pins must match default_pins() — single source of truth"
     );
 }
 
@@ -144,5 +136,25 @@ fn relay_config_pin_propagates_to_transport_config() {
     assert_eq!(
         transport.pinned_certs, relay.pinned_certs,
         "Transport config pins must match relay config pins"
+    );
+}
+
+/// @internal C7
+#[test]
+fn default_relay_config_has_no_pin_rotation_key() {
+    let config = RelayConfig::default();
+    assert!(
+        config.pin_config_verify_key.is_none(),
+        "Pin rotation must be disabled by default (no verify key)"
+    );
+}
+
+/// @internal C7
+#[test]
+fn default_relay_config_has_24h_pin_ttl() {
+    let config = RelayConfig::default();
+    assert_eq!(
+        config.pin_ttl_secs, 86_400,
+        "Default pin TTL must be 24 hours"
     );
 }

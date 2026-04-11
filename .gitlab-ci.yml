@@ -320,10 +320,10 @@ lint:semver:
       echo "Generating current rustdoc JSON for vauchi-core..."
       RUSTDOCFLAGS="-Z unstable-options --output-format json" cargo +nightly doc -p vauchi-core --no-deps
       echo "Generating baseline rustdoc JSON from origin/main..."
-      git worktree remove /tmp/baseline 2>/dev/null || true
+      git worktree remove -f /tmp/baseline 2>/dev/null || true
       git worktree prune
       rm -rf /tmp/baseline
-      git worktree add /tmp/baseline origin/main --detach
+      git worktree add -f /tmp/baseline origin/main --detach
       RUSTDOCFLAGS="-Z unstable-options --output-format json" cargo +nightly doc --manifest-path /tmp/baseline/Cargo.toml -p vauchi-core --no-deps
       cargo semver-checks check-release -p vauchi-core \
         --current-rustdoc target/doc/vauchi_core.json \

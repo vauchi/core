@@ -9,7 +9,7 @@ use crate::theme::DesignTokens;
 
 /// Current schema version. Increment when adding new Component types.
 /// Shells use this to detect unsupported components and degrade gracefully.
-pub const CURRENT_SCHEMA_VERSION: u16 = 1;
+pub const CURRENT_SCHEMA_VERSION: u16 = 2;
 
 /// Describes a full screen to render.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -144,7 +144,7 @@ mod tests {
     fn screen_model_json_includes_schema_version() {
         let m = ScreenModel::new("test", "Title", vec![], vec![]);
         let json = serde_json::to_string(&m).unwrap();
-        assert!(json.contains("\"schema_version\":1"));
+        assert!(json.contains(&format!("\"schema_version\":{CURRENT_SCHEMA_VERSION}")));
     }
 
     #[test]

@@ -1,29 +1,7 @@
 
 # cargo-vet audits file
 
-[[audits.derive-deftly]]
-who = "Mattia Egloff <mattia.egloff@pm.me>"
-criteria = "safe-to-deploy"
-delta = "1.7.0 -> 1.8.0"
-notes = "Proc-macro feature additions (meta/boolean/engine changes). No unsafe, no fs/process access."
-
-[[audits.derive-deftly-macros]]
-who = "Mattia Egloff <mattia.egloff@pm.me>"
-criteria = "safe-to-deploy"
-delta = "1.7.0 -> 1.8.0"
-notes = "Proc-macro internals: boolean simplification, engine context additions, meta node improvements. No unsafe."
-
-[[audits.num_enum]]
-who = "Mattia Egloff <mattia.egloff@pm.me>"
-criteria = "safe-to-deploy"
-delta = "0.7.5 -> 0.7.6"
-notes = "Version bump + test stderr updates only. No code changes."
-
-[[audits.num_enum_derive]]
-who = "Mattia Egloff <mattia.egloff@pm.me>"
-criteria = "safe-to-deploy"
-delta = "0.7.5 -> 0.7.6"
-notes = "Version bump + whitespace formatting. No functional changes."
+[audits]
 
 [[trusted.aead]]
 criteria = "safe-to-deploy"
@@ -819,7 +797,7 @@ end = "2027-03-10"
 
 [[trusted.snow]]
 criteria = "safe-to-deploy"
-user-id = 4610 # Jake McGinty (mcginty)
+user-id = 4610
 start = "2019-02-26"
 end = "2027-03-10"
 

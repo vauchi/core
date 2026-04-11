@@ -13,6 +13,7 @@ mod qr;
 mod request;
 mod responder;
 mod response;
+pub mod transport;
 mod types;
 
 pub use initiator::{DeviceLinkInitiator, DeviceLinkInitiatorRestored};
@@ -20,6 +21,9 @@ pub use qr::DeviceLinkQR;
 pub use request::DeviceLinkRequest;
 pub use responder::DeviceLinkResponder;
 pub use response::DeviceLinkResponse;
+pub use transport::{
+    recv_device_link_qr, recv_encrypted_blob, send_device_link_qr, send_encrypted_blob,
+};
 pub use types::{
     DeviceLinkConfirmation, ProximityProof, compute_confirmation_mac, generate_numeric_code,
 };

@@ -2575,7 +2575,10 @@ mod tests {
 
         assert_eq!(engine.step, ExchangeStep::Failed);
         assert!(engine.ble_fallback_available);
-        assert!(result.is_some());
+        assert!(
+            matches!(result, Some(ActionResult::UpdateScreen(_))),
+            "BLE permission denied must return screen update with failed state"
+        );
     }
 
     // @internal

@@ -108,7 +108,16 @@ impl AppEngine {
         // Delegate to the engine via the WorkflowEngine trait (ADR-031).
         // ExchangeEngine handles session-aware events; other engines return None.
         if let Some(result) = self.engine.handle_hardware_event(event) {
-            // Prefer user-friendly error messages over raw session results
+            // Navigation and command results take priority over informational
+            // toasts — the engine handled the event with a state transition
+            // (e.g., camera denied → ManualEntry). Toasts are only used when
+            // the engine returns a simple screen update.
+            if matches!(
+                result,
+                ActionResult::NavigateTo(_) | ActionResult::ExchangeCommands { .. }
+            ) {
+                return Some(result);
+            }
             return Some(ui_override.unwrap_or(result));
         }
 

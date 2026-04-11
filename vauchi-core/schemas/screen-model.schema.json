@@ -41,7 +41,7 @@
     },
     "schema_version": {
       "description": "Schema version — shells ignore components from higher versions.",
-      "default": 1,
+      "default": 2,
       "type": "integer",
       "format": "uint16",
       "minimum": 0.0

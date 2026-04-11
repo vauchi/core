@@ -695,6 +695,7 @@ fn test_user_action_undo_pressed_roundtrip() {
 
 // === A11y struct ===
 
+// @internal
 #[test]
 fn test_a11y_struct_roundtrip() {
     let a11y = A11y {
@@ -710,6 +711,7 @@ fn test_a11y_struct_roundtrip() {
     );
 }
 
+// @internal
 #[test]
 fn test_a11y_default_is_none() {
     let a11y = A11y::default();
@@ -721,6 +723,7 @@ fn test_a11y_default_is_none() {
 
 // === Sub-type struct a11y field backward-compat ===
 
+// @internal
 #[test]
 fn test_settings_item_without_a11y_deserializes() {
     let json = r#"{"id":"theme","label":"Theme","kind":{"Link":{"detail":"Catppuccin"}}}"#;
@@ -729,6 +732,7 @@ fn test_settings_item_without_a11y_deserializes() {
     assert_eq!(item.a11y, None);
 }
 
+// @internal
 #[test]
 fn test_component_text_input_without_a11y_deserializes() {
     let json = r#"{"TextInput":{"id":"name","label":"Name","value":"","placeholder":"Enter name","max_length":null,"validation_error":null,"input_type":"Text"}}"#;
@@ -739,6 +743,7 @@ fn test_component_text_input_without_a11y_deserializes() {
     }
 }
 
+// @internal
 #[test]
 fn test_component_text_input_with_a11y_roundtrip() {
     let component = Component::TextInput {

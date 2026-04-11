@@ -903,6 +903,7 @@ fn data_reflects_selected_groups() {
 
 // ── A11y labels ────────────────────────────────────────────────────
 
+// @scenario: accessibility :: onboarding text inputs have a11y labels
 #[test]
 fn onboarding_text_input_has_a11y_label() {
     let mut engine = OnboardingEngine::new();
@@ -924,6 +925,7 @@ fn onboarding_text_input_has_a11y_label() {
     }
 }
 
+// @scenario: accessibility :: onboarding custom group input has a11y label
 #[test]
 fn onboarding_custom_group_text_input_has_a11y_label() {
     let mut engine = OnboardingEngine::new();

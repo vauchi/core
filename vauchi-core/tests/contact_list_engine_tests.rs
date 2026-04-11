@@ -439,6 +439,7 @@ fn available_groups_shown_in_screen() {
     assert_eq!(group_actions[1].label, "Work");
 }
 
+// @scenario: accessibility :: contact items preserve a11y through engine
 #[test]
 fn contact_item_a11y_is_preserved_through_engine() {
     let contacts = vec![ContactItem {

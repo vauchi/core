@@ -29,12 +29,14 @@ fn sample_config() -> SettingsConfig {
     }
 }
 
+// @internal
 #[test]
 fn settings_screen_id() {
     let engine = SettingsEngine::new(sample_config());
     assert_eq!(engine.current_screen().screen_id, "settings");
 }
 
+// @internal
 #[test]
 fn settings_shows_all_groups() {
     let engine = SettingsEngine::new(sample_config());
@@ -66,6 +68,7 @@ fn settings_shows_all_groups() {
     );
 }
 
+// @internal
 #[test]
 fn settings_toggle_delivery_receipts() {
     let mut engine = SettingsEngine::new(sample_config());
@@ -92,6 +95,7 @@ fn settings_toggle_delivery_receipts() {
     }
 }
 
+// @internal
 #[test]
 fn settings_toggle_suppress_presence() {
     let mut engine = SettingsEngine::new(sample_config());
@@ -115,6 +119,7 @@ fn settings_toggle_suppress_presence() {
     }
 }
 
+// @internal
 #[test]
 fn settings_reflects_config_values() {
     let engine = SettingsEngine::new(sample_config());
@@ -128,6 +133,7 @@ fn settings_reflects_config_values() {
 }
 
 // ADR-022: irrevocable actions use InlineConfirm, not ShowAlert
+// @internal
 #[test]
 fn settings_emergency_wipe_shows_inline_confirm() {
     let mut engine = SettingsEngine::new(sample_config());
@@ -207,6 +213,7 @@ fn settings_device_count_in_detail() {
     assert_eq!(detail.as_deref(), Some("3 devices"));
 }
 
+// @internal
 #[test]
 fn settings_single_device_no_plural() {
     let mut config = sample_config();
@@ -217,6 +224,7 @@ fn settings_single_device_no_plural() {
     assert_eq!(detail.as_deref(), Some("1 device"));
 }
 
+// @internal
 #[test]
 fn settings_appearance_section_has_theme_and_language() {
     let mut config = sample_config();
@@ -230,6 +238,7 @@ fn settings_appearance_section_has_theme_and_language() {
     assert_eq!(lang, "English");
 }
 
+// @internal
 #[test]
 fn settings_accessibility_toggles() {
     let mut engine = SettingsEngine::new(sample_config());
@@ -251,6 +260,7 @@ fn settings_accessibility_toggles() {
     assert!(find_toggle(&screen, "accessibility", "reduce_motion"));
 }
 
+// @internal
 #[test]
 fn settings_about_shows_version() {
     let mut config = sample_config();
@@ -262,6 +272,7 @@ fn settings_about_shows_version() {
     assert_eq!(version, "0.19.0 (42)");
 }
 
+// @internal
 #[test]
 fn settings_about_version_without_build() {
     let mut config = sample_config();
@@ -273,6 +284,7 @@ fn settings_about_version_without_build() {
     assert_eq!(version, "0.19.0");
 }
 
+// @internal
 #[test]
 fn settings_debug_mode_toggle() {
     let mut engine = SettingsEngine::new(sample_config());
@@ -292,6 +304,7 @@ fn settings_debug_mode_toggle() {
     assert!(find_toggle(&screen, "about", "debug_mode"));
 }
 
+// @internal
 #[test]
 fn settings_delivery_section() {
     let mut config = sample_config();
@@ -309,6 +322,7 @@ fn settings_delivery_section() {
     assert_eq!(failed, "1");
 }
 
+// @internal
 #[test]
 fn settings_backup_section_has_links() {
     let engine = SettingsEngine::new(sample_config());

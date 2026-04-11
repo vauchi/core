@@ -43,6 +43,7 @@ fn sample_groups() -> Vec<GroupInfo> {
 
 // --- GroupDetailEngine tests ---
 
+// @internal
 #[test]
 fn group_detail_delete_shows_inline_confirm() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
@@ -63,6 +64,7 @@ fn group_detail_delete_shows_inline_confirm() {
     );
 }
 
+// @internal
 #[test]
 fn group_detail_confirm_delete_completes() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
@@ -77,6 +79,7 @@ fn group_detail_confirm_delete_completes() {
     assert_eq!(result, ActionResult::Complete);
 }
 
+// @internal
 #[test]
 fn group_detail_cancel_delete_removes_confirm() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
@@ -98,6 +101,7 @@ fn group_detail_cancel_delete_removes_confirm() {
 
 // --- GroupsEngine tests ---
 
+// @internal
 #[test]
 fn groups_engine_delete_tracks_group_id() {
     let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
@@ -110,6 +114,7 @@ fn groups_engine_delete_tracks_group_id() {
     assert_eq!(engine.pending_delete_group_id(), Some("g1"));
 }
 
+// @internal
 #[test]
 fn groups_engine_confirm_delete_returns_complete() {
     let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
@@ -126,6 +131,7 @@ fn groups_engine_confirm_delete_returns_complete() {
     assert!(engine.pending_delete_group_id().is_some());
 }
 
+// @internal
 #[test]
 fn groups_engine_cancel_delete_clears_group_id() {
     let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
@@ -140,6 +146,7 @@ fn groups_engine_cancel_delete_clears_group_id() {
     assert_eq!(engine.pending_delete_group_id(), None);
 }
 
+// @internal
 #[test]
 fn groups_engine_as_any_downcasts() {
     let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);

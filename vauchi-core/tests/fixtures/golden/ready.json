@@ -20,7 +20,8 @@
             "title": "Edit anytime",
             "detail": "Update your card whenever you like."
           }
-        ]
+        ],
+        "a11y": null
       }
     }
   ],

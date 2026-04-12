@@ -31,6 +31,7 @@ fn sample_fields() -> Vec<FieldDisplay> {
         label: "Mobile".into(),
         value: "+41 79 123 45 67".into(),
         visibility: UiFieldVisibility::Shown,
+        a11y: None,
     }]
 }
 

@@ -63,12 +63,14 @@ impl ContactMergeEngine {
                 icon: None,
                 title: format!("{} (keep)", self.preview.primary_name),
                 items: primary_items,
+                a11y: None,
             },
             Component::InfoPanel {
                 id: "secondary_fields".into(),
                 icon: None,
                 title: format!("{} (remove)", self.preview.secondary_name),
                 items: secondary_items,
+                a11y: None,
             },
             Component::Text {
                 id: "merge_note".into(),

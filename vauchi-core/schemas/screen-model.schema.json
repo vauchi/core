@@ -344,6 +344,17 @@
                 "label"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "id": {
                   "type": "string"
                 },
@@ -376,6 +387,17 @@
                 "visibility_mode"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "available_groups": {
                   "type": "array",
                   "items": {
@@ -413,6 +435,17 @@
                 "name"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "fields": {
                   "type": "array",
                   "items": {
@@ -453,6 +486,17 @@
                 "title"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "icon": {
                   "type": [
                     "string",
@@ -833,6 +877,17 @@
                 "text"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "action_id": {
                   "type": "string"
                 },
@@ -1008,6 +1063,17 @@
         "visibility"
       ],
       "properties": {
+        "a11y": {
+          "default": null,
+          "anyOf": [
+            {
+              "$ref": "#/definitions/A11y"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "field_type": {
           "type": "string"
         },
@@ -1392,6 +1458,17 @@
         "selected"
       ],
       "properties": {
+        "a11y": {
+          "default": null,
+          "anyOf": [
+            {
+              "$ref": "#/definitions/A11y"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },

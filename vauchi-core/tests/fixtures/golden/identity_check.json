@@ -20,7 +20,8 @@
             "title": "Multi-device",
             "detail": "Use Vauchi on all your devices with seamless sync."
           }
-        ]
+        ],
+        "a11y": null
       }
     }
   ],

@@ -122,6 +122,7 @@ impl OnboardingEngine {
                         detail: "Use Vauchi on all your devices with seamless sync.".into(),
                     },
                 ],
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -163,6 +164,7 @@ impl OnboardingEngine {
                         detail: "Import your identity from a backup file.".into(),
                     },
                 ],
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -215,6 +217,7 @@ impl OnboardingEngine {
                         detail: "Share different info with different groups".into(),
                     },
                 ],
+                a11y: None,
             }],
             actions: vec![ScreenAction {
                 id: "get_started".into(),
@@ -291,6 +294,7 @@ impl OnboardingEngine {
                         detail: "Choose what each group can see.".into(),
                     },
                 ],
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -321,6 +325,7 @@ impl OnboardingEngine {
                 label: g.name.clone(),
                 selected: g.selected,
                 subtitle: g.name_override.clone(),
+                a11y: None,
             })
             .collect();
 
@@ -344,6 +349,7 @@ impl OnboardingEngine {
                     id: "groups".into(),
                     label: "Suggested groups".into(),
                     items,
+                    a11y: None,
                 },
                 Component::TextInput {
                     id: "custom_group".into(),
@@ -411,6 +417,7 @@ impl OnboardingEngine {
                 } else {
                     UiFieldVisibility::Hidden
                 },
+                a11y: None,
             })
             .collect();
 
@@ -427,6 +434,7 @@ impl OnboardingEngine {
                     VisibilityMode::ShowHide
                 },
                 available_groups: selected,
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -471,6 +479,7 @@ impl OnboardingEngine {
                 } else {
                     UiFieldVisibility::Hidden
                 },
+                a11y: None,
             })
             .collect();
 
@@ -489,6 +498,7 @@ impl OnboardingEngine {
                         label: f.label.clone(),
                         value: f.value.clone(),
                         visibility: UiFieldVisibility::Shown,
+                        a11y: None,
                     })
                     .collect();
 
@@ -517,6 +527,7 @@ impl OnboardingEngine {
                 fields,
                 group_views,
                 selected_group: self.selected_preview_group.clone(),
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -563,6 +574,7 @@ impl OnboardingEngine {
                         detail: "Your cryptographic keys never leave your device.".into(),
                     },
                 ],
+                a11y: None,
             }],
             actions: vec![ScreenAction {
                 id: "continue".into(),
@@ -597,6 +609,7 @@ impl OnboardingEngine {
                         detail: "Backups let you use Vauchi on multiple devices.".into(),
                     },
                 ],
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -638,6 +651,7 @@ impl OnboardingEngine {
                         detail: "Update your card whenever you like.".into(),
                     },
                 ],
+                a11y: None,
             }],
             actions: vec![ScreenAction {
                 id: "start".into(),

@@ -42,6 +42,7 @@ impl SupportEngine {
                         detail: "https://liberapay.com/vauchi".into(),
                     },
                 ],
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {

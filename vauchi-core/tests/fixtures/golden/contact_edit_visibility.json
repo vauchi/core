@@ -13,21 +13,25 @@
             "id": "Family",
             "label": "Family",
             "selected": true,
-            "subtitle": null
+            "subtitle": null,
+            "a11y": null
           },
           {
             "id": "Friends",
             "label": "Friends",
             "selected": false,
-            "subtitle": null
+            "subtitle": null,
+            "a11y": null
           },
           {
             "id": "Work",
             "label": "Work",
             "selected": false,
-            "subtitle": null
+            "subtitle": null,
+            "a11y": null
           }
-        ]
+        ],
+        "a11y": null
       }
     },
     {
@@ -39,21 +43,25 @@
             "id": "Family",
             "label": "Family",
             "selected": false,
-            "subtitle": null
+            "subtitle": null,
+            "a11y": null
           },
           {
             "id": "Friends",
             "label": "Friends",
             "selected": true,
-            "subtitle": null
+            "subtitle": null,
+            "a11y": null
           },
           {
             "id": "Work",
             "label": "Work",
             "selected": true,
-            "subtitle": null
+            "subtitle": null,
+            "a11y": null
           }
-        ]
+        ],
+        "a11y": null
       }
     }
   ],

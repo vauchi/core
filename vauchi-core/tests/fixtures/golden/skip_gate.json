@@ -25,7 +25,8 @@
             "title": "Visibility",
             "detail": "Choose what each group can see."
           }
-        ]
+        ],
+        "a11y": null
       }
     }
   ],

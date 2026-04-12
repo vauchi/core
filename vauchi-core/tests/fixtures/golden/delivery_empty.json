@@ -9,7 +9,8 @@
         "id": "empty",
         "icon": "checkmark",
         "title": "All Delivered",
-        "items": []
+        "items": [],
+        "a11y": null
       }
     }
   ],

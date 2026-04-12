@@ -20,7 +20,8 @@
             "title": "Restore from backup",
             "detail": "Import your identity from a backup file."
           }
-        ]
+        ],
+        "a11y": null
       }
     }
   ],

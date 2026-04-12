@@ -30,7 +30,8 @@
               "Groups": [
                 "Family"
               ]
-            }
+            },
+            "a11y": null
           },
           {
             "id": "f2",
@@ -42,7 +43,8 @@
                 "Friends",
                 "Work"
               ]
-            }
+            },
+            "a11y": null
           }
         ],
         "visibility_mode": "ShowHide",
@@ -50,7 +52,8 @@
           "Family",
           "Friends",
           "Work"
-        ]
+        ],
+        "a11y": null
       }
     }
   ],

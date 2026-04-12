@@ -66,14 +66,17 @@ impl GroupsEngine {
                     label: "Members".into(),
                     selected: self.mode == GroupsMode::Members,
                     subtitle: Some("Which contacts are in each group".into()),
+                    a11y: None,
                 },
                 ToggleItem {
                     id: "visibility".into(),
                     label: "Visibility".into(),
                     selected: self.mode == GroupsMode::Visibility,
                     subtitle: Some("Which of your fields each group sees".into()),
+                    a11y: None,
                 },
             ],
+            a11y: None,
         });
 
         // Group list with mode-dependent detail text

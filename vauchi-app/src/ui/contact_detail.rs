@@ -195,14 +195,17 @@ impl ContactDetailEngine {
                         label: "Their Info".into(),
                         selected: self.view_mode == ContactViewMode::TheirInfo,
                         subtitle: Some("What they share with me".into()),
+                        a11y: None,
                     },
                     ToggleItem {
                         id: "my_info_for_them".into(),
                         label: "My Info for Them".into(),
                         selected: self.view_mode == ContactViewMode::MyInfoForThem,
                         subtitle: Some("What I share with them".into()),
+                        a11y: None,
                     },
                 ],
+                a11y: None,
             });
         }
 
@@ -233,6 +236,7 @@ impl ContactDetailEngine {
                     icon: None,
                     title: self.contact.name.clone(),
                     items: contact_info_items,
+                    a11y: None,
                 });
                 // Their fields — read-only, no visibility column.
                 // Each field is followed by an inline-editable private note.
@@ -242,6 +246,7 @@ impl ContactDetailEngine {
                         fields: vec![field.clone()],
                         visibility_mode: VisibilityMode::ReadOnly,
                         available_groups: vec![],
+                        a11y: None,
                     });
                     let note_value = self.field_notes.get(&field.id).cloned().unwrap_or_default();
                     components.push(Component::EditableText {
@@ -324,6 +329,7 @@ impl ContactDetailEngine {
                         icon: None,
                         title: "Update Delivery".into(),
                         items,
+                        a11y: None,
                     });
                 }
             }
@@ -338,6 +344,7 @@ impl ContactDetailEngine {
                             title: "Display Name".into(),
                             detail: shared.shared_display_name.clone(),
                         }],
+                        a11y: None,
                     });
                     // My fields — show which groups grant visibility
                     components.push(Component::FieldList {
@@ -345,6 +352,7 @@ impl ContactDetailEngine {
                         fields: shared.my_fields.clone(),
                         visibility_mode: VisibilityMode::PerGroup,
                         available_groups: shared.visible_groups.clone(),
+                        a11y: None,
                     });
                 }
             }
@@ -548,6 +556,7 @@ impl WorkflowEngine for ContactNotFoundEngine {
                     title: "Error".into(),
                     detail: format!("Contact '{}' was not found.", self.contact_id),
                 }],
+                a11y: None,
             }],
             actions: vec![ScreenAction {
                 id: "back".into(),
@@ -594,6 +603,7 @@ mod tests {
             label: "Mobile".into(),
             value: "+41 79 123 45 67".into(),
             visibility: UiFieldVisibility::Shown,
+            a11y: None,
         }]
     }
 
@@ -607,6 +617,7 @@ mod tests {
                     label: "Work Email".into(),
                     value: "bob@work.com".into(),
                     visibility: UiFieldVisibility::Shown,
+                    a11y: None,
                 },
                 FieldDisplay {
                     id: "mf2".into(),
@@ -614,6 +625,7 @@ mod tests {
                     label: "Personal".into(),
                     value: "+41 79 999 88 77".into(),
                     visibility: UiFieldVisibility::Hidden,
+                    a11y: None,
                 },
             ],
             visible_groups: vec!["Work".into()],

@@ -20,6 +20,7 @@ fn test_screen_model_serde_roundtrip() {
                     title: "Privacy".to_string(),
                     detail: "Your data stays yours".to_string(),
                 }],
+                a11y: None,
             },
             Component::Divider,
         ],
@@ -268,14 +269,17 @@ fn test_component_toggle_list_roundtrip() {
                 label: "Family".into(),
                 selected: true,
                 subtitle: Some("Close family members".into()),
+                a11y: None,
             },
             ToggleItem {
                 id: "work".into(),
                 label: "Work".into(),
                 selected: false,
                 subtitle: None,
+                a11y: None,
             },
         ],
+        a11y: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -308,9 +312,11 @@ fn test_component_field_list_roundtrip() {
             label: "Email".into(),
             value: "alice@example.com".into(),
             visibility: UiFieldVisibility::Groups(vec!["friends".into()]),
+            a11y: None,
         }],
         visibility_mode: VisibilityMode::PerGroup,
         available_groups: vec!["friends".into(), "family".into()],
+        a11y: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -348,6 +354,7 @@ fn test_component_card_preview_roundtrip() {
             label: "Phone".into(),
             value: "+1234567890".into(),
             visibility: UiFieldVisibility::Shown,
+            a11y: None,
         }],
         group_views: vec![GroupCardView {
             group_name: "family".into(),
@@ -358,9 +365,11 @@ fn test_component_card_preview_roundtrip() {
                 label: "Phone".into(),
                 value: "+1234567890".into(),
                 visibility: UiFieldVisibility::Shown,
+                a11y: None,
             }],
         }],
         selected_group: Some("family".into()),
+        a11y: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();

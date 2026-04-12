@@ -37,24 +37,32 @@ pub enum Component {
         id: String,
         label: String,
         items: Vec<ToggleItem>,
+        #[serde(default)]
+        a11y: Option<A11y>,
     },
     FieldList {
         id: String,
         fields: Vec<FieldDisplay>,
         visibility_mode: VisibilityMode,
         available_groups: Vec<String>,
+        #[serde(default)]
+        a11y: Option<A11y>,
     },
     CardPreview {
         name: String,
         fields: Vec<FieldDisplay>,
         group_views: Vec<GroupCardView>,
         selected_group: Option<String>,
+        #[serde(default)]
+        a11y: Option<A11y>,
     },
     InfoPanel {
         id: String,
         icon: Option<String>,
         title: String,
         items: Vec<InfoItem>,
+        #[serde(default)]
+        a11y: Option<A11y>,
     },
     ContactList {
         id: String,
@@ -125,6 +133,8 @@ pub enum Component {
         text: String,
         action_label: String,
         action_id: String,
+        #[serde(default)]
+        a11y: Option<A11y>,
     },
     /// An inline dropdown for selection UIs (e.g. theme, language).
     /// Reuses `UserAction::ListItemSelected` — no new action variant needed.
@@ -211,6 +221,8 @@ pub struct ToggleItem {
     pub label: String,
     pub selected: bool,
     pub subtitle: Option<String>,
+    #[serde(default)]
+    pub a11y: Option<A11y>,
 }
 
 /// A contact field as displayed in the UI.
@@ -222,6 +234,8 @@ pub struct FieldDisplay {
     pub label: String,
     pub value: String,
     pub visibility: UiFieldVisibility,
+    #[serde(default)]
+    pub a11y: Option<A11y>,
 }
 
 /// UI-level field visibility state.

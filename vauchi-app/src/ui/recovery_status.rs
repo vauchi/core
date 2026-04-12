@@ -46,6 +46,7 @@ impl RecoveryEngine {
                             detail: if quorum_met { "Yes" } else { "No" }.into(),
                         },
                     ],
+                    a11y: None,
                 },
                 Component::ContactList {
                     id: "trusted_contacts".into(),

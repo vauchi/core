@@ -25,7 +25,8 @@
             "title": "This action is irreversible",
             "detail": "There is no way to undo this operation."
           }
-        ]
+        ],
+        "a11y": null
       }
     }
   ],

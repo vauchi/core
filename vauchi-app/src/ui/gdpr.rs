@@ -78,6 +78,7 @@ impl GdprEngine {
                             detail: self.consent_summary.clone(),
                         },
                     ],
+                    a11y: None,
                 },
                 Component::ActionList {
                     id: "consent_actions".into(),
@@ -168,6 +169,7 @@ impl GdprEngine {
                 icon: Some("warning".into()),
                 title: "The following will be deleted".into(),
                 items,
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {

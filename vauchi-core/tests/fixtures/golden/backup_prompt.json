@@ -20,7 +20,8 @@
             "title": "Multi-device",
             "detail": "Backups let you use Vauchi on multiple devices."
           }
-        ]
+        ],
+        "a11y": null
       }
     }
   ],

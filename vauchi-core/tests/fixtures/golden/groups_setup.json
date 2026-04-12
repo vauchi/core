@@ -20,27 +20,32 @@
             "id": "Family",
             "label": "Family",
             "selected": false,
-            "subtitle": null
+            "subtitle": null,
+            "a11y": null
           },
           {
             "id": "Friends",
             "label": "Friends",
             "selected": false,
-            "subtitle": null
+            "subtitle": null,
+            "a11y": null
           },
           {
             "id": "Coworkers",
             "label": "Coworkers",
             "selected": false,
-            "subtitle": null
+            "subtitle": null,
+            "a11y": null
           },
           {
             "id": "Business",
             "label": "Business",
             "selected": false,
-            "subtitle": null
+            "subtitle": null,
+            "a11y": null
           }
-        ]
+        ],
+        "a11y": null
       }
     },
     {

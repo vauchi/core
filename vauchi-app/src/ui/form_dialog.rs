@@ -276,6 +276,7 @@ impl FormDialogEngine {
                     label: gname.clone(),
                     selected: self.selected_groups.contains(gid),
                     subtitle: None,
+                    a11y: None,
                 })
                 .collect();
 
@@ -283,6 +284,7 @@ impl FormDialogEngine {
                 id: "group_visibility".into(),
                 label: "Groups Visibility".into(),
                 items: toggle_items,
+                a11y: None,
             });
         }
 

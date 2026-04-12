@@ -39,6 +39,7 @@ impl ContactVisibilityEngine {
                     id: "field_toggles".into(),
                     label: "Field Visibility".into(),
                     items: self.fields.clone(),
+                    a11y: None,
                 },
             ],
             actions: vec![ScreenAction {

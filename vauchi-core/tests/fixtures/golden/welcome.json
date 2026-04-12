@@ -25,7 +25,8 @@
             "title": "You decide who sees what",
             "detail": "Share different info with different groups"
           }
-        ]
+        ],
+        "a11y": null
       }
     }
   ],

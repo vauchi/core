@@ -725,6 +725,7 @@ fn build_group_selection_screen(
             label: name.clone(),
             selected: selected_groups.contains(id),
             subtitle: None,
+            a11y: None,
         })
         .collect();
     ScreenModel {
@@ -735,6 +736,7 @@ fn build_group_selection_screen(
             id: "group_picker".into(),
             label: "Groups".into(),
             items,
+            a11y: None,
         }],
         actions: vec![
             ScreenAction {

@@ -91,6 +91,7 @@ impl DuressPinEngine {
                              your chosen contacts while appearing to unlock normally."
                         .into(),
                 }],
+                a11y: None,
             },
             Component::ToggleList {
                 id: "duress_toggle".into(),
@@ -100,7 +101,9 @@ impl DuressPinEngine {
                     label: "Duress PIN enabled".into(),
                     selected: self.config.enabled,
                     subtitle: None,
+                    a11y: None,
                 }],
+                a11y: None,
             },
         ];
 
@@ -255,7 +258,9 @@ impl DuressPinEngine {
                         label: "Include Location".into(),
                         selected: self.config.include_location,
                         subtitle: Some("Share your location in the alert".into()),
+                        a11y: None,
                     }],
+                    a11y: None,
                 },
             ],
             actions: vec![

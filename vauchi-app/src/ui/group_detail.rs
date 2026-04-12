@@ -36,6 +36,7 @@ impl GroupDetailEngine {
                     title: "Members".into(),
                     detail: format!("{}", self.members.len()),
                 }],
+                a11y: None,
             },
             Component::ContactList {
                 id: "members".into(),

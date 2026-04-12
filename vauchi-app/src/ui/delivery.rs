@@ -35,6 +35,7 @@ impl DeliveryStatusEngine {
                 icon: Some("checkmark".into()),
                 title: "All Delivered".into(),
                 items: vec![],
+                a11y: None,
             }]
         } else {
             self.items

@@ -98,6 +98,7 @@ impl SyncStatusEngine {
                     },
                 },
             ],
+            a11y: None,
         });
 
         ScreenModel {

@@ -89,6 +89,7 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                     label: gname.clone(),
                     selected: *visible,
                     subtitle: None,
+                    a11y: None,
                 })
                 .collect();
 
@@ -96,6 +97,7 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                 id: "group_visibility".into(),
                 label: "Visible to groups".into(),
                 items: toggle_items,
+                a11y: None,
             });
         }
 

@@ -419,6 +419,7 @@ impl AppEngine {
                         text: "A new version is available.".into(),
                         action_label: "Update".into(),
                         action_id: ACTION_OPEN_UPDATE_LINK.into(),
+                        a11y: None,
                     },
                 );
                 screen
@@ -433,6 +434,7 @@ impl AppEngine {
                         text: format!("Update required by {date}."),
                         action_label: "Update".into(),
                         action_id: ACTION_OPEN_UPDATE_LINK.into(),
+                        a11y: None,
                     },
                 );
                 screen

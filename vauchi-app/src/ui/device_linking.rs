@@ -124,6 +124,7 @@ impl DeviceLinkingEngine {
                                 title: "Compare codes".into(),
                                 detail: "Ensure both devices show the same code".into(),
                             }],
+                            a11y: None,
                         },
                     ],
                     actions: vec![

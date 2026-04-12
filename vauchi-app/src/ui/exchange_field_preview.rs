@@ -54,6 +54,7 @@ pub(super) fn build_field_preview_screen(
                 } else {
                     UiFieldVisibility::Hidden
                 },
+                a11y: None,
             }
         })
         .collect();
@@ -73,6 +74,7 @@ pub(super) fn build_field_preview_screen(
                 fields,
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_groups: vec![],
+                a11y: None,
             },
         ],
         actions: vec![

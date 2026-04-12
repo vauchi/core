@@ -72,6 +72,7 @@ impl EmergencyShredEngine {
                         detail: "There is no way to undo this operation.".into(),
                     },
                 ],
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {

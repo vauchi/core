@@ -435,6 +435,7 @@ impl AppEngine {
                             label: f.label().to_string(),
                             value: f.value().to_string(),
                             visibility: UiFieldVisibility::Shown,
+                            a11y: None,
                         })
                         .collect();
                     let status = if vauchi.is_contact_revoked(contact.id()) {
@@ -573,6 +574,7 @@ impl AppEngine {
                                 label: f.label().to_string(),
                                 selected: true,
                                 subtitle: None,
+                                a11y: None,
                             })
                             .collect();
                         (name, items)
@@ -680,6 +682,7 @@ impl AppEngine {
                     } else {
                         UiFieldVisibility::Hidden
                     },
+                    a11y: None,
                 }
             })
             .collect();

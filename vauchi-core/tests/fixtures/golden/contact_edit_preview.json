@@ -17,7 +17,8 @@
               "Groups": [
                 "Family"
               ]
-            }
+            },
+            "a11y": null
           },
           {
             "id": "f2",
@@ -29,7 +30,8 @@
                 "Friends",
                 "Work"
               ]
-            }
+            },
+            "a11y": null
           }
         ],
         "group_views": [
@@ -46,7 +48,8 @@
                   "Groups": [
                     "Family"
                   ]
-                }
+                },
+                "a11y": null
               }
             ]
           },
@@ -64,7 +67,8 @@
                     "Friends",
                     "Work"
                   ]
-                }
+                },
+                "a11y": null
               }
             ]
           },
@@ -82,12 +86,14 @@
                     "Friends",
                     "Work"
                   ]
-                }
+                },
+                "a11y": null
               }
             ]
           }
         ],
-        "selected_group": null
+        "selected_group": null,
+        "a11y": null
       }
     }
   ],

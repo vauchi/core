@@ -9,7 +9,8 @@
         "name": "Alice",
         "fields": [],
         "group_views": [],
-        "selected_group": null
+        "selected_group": null,
+        "a11y": null
       }
     }
   ],

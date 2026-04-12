@@ -586,6 +586,17 @@
                 "label"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "id": {
                   "type": "string"
                 },
@@ -618,6 +629,17 @@
                 "visibility_mode"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "available_groups": {
                   "type": "array",
                   "items": {
@@ -655,6 +677,17 @@
                 "name"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "fields": {
                   "type": "array",
                   "items": {
@@ -695,6 +728,17 @@
                 "title"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "icon": {
                   "type": [
                     "string",
@@ -1075,6 +1119,17 @@
                 "text"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "action_id": {
                   "type": "string"
                 },
@@ -1648,6 +1703,36 @@
           "enum": [
             "BleStopScanning"
           ]
+        },
+        {
+          "description": "Send an exchange payload over a direct transport (USB cable / local TCP).\n\nThe frontend should: 1. Send `payload` to the peer over the established TCP connection 2. Receive the peer's payload from the same connection 3. Report the peer's data via [`ExchangeHardwareEvent::DirectPayloadReceived`]\n\nThe `is_initiator` flag determines send/recv ordering to avoid deadlock (initiator sends first, responder receives first).",
+          "type": "object",
+          "required": [
+            "DirectSend"
+          ],
+          "properties": {
+            "DirectSend": {
+              "type": "object",
+              "required": [
+                "is_initiator",
+                "payload"
+              ],
+              "properties": {
+                "is_initiator": {
+                  "type": "boolean"
+                },
+                "payload": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -1662,6 +1747,17 @@
         "visibility"
       ],
       "properties": {
+        "a11y": {
+          "default": null,
+          "anyOf": [
+            {
+              "$ref": "#/definitions/A11y"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "field_type": {
           "type": "string"
         },
@@ -2198,6 +2294,17 @@
         "selected"
       ],
       "properties": {
+        "a11y": {
+          "default": null,
+          "anyOf": [
+            {
+              "$ref": "#/definitions/A11y"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },

@@ -234,6 +234,7 @@ impl MyInfoEngine {
             text: format!("Viewing as {contact_name}"),
             action_label: "Exit Preview".into(),
             action_id: "exit-preview".into(),
+            a11y: None,
         });
 
         let Some(ref preview) = self.preview_data else {
@@ -250,6 +251,7 @@ impl MyInfoEngine {
                 title: "Display Name".into(),
                 detail: preview.shared_display_name.clone(),
             }],
+            a11y: None,
         });
 
         // Render each field with its visibility state
@@ -259,6 +261,7 @@ impl MyInfoEngine {
                 fields: vec![field.clone()],
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_groups: vec![],
+                a11y: None,
             });
         }
 
@@ -300,6 +303,7 @@ impl WorkflowEngine for MyInfoEngine {
                     title: "Find someone nearby".into(),
                     detail: "Share your contact card in person — private and secure.".into(),
                 }],
+                a11y: None,
             });
         }
 

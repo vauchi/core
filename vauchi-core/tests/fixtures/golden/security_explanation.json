@@ -25,7 +25,8 @@
             "title": "You own your keys",
             "detail": "Your cryptographic keys never leave your device."
           }
-        ]
+        ],
+        "a11y": null
       }
     }
   ],

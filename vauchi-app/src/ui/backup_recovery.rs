@@ -133,6 +133,7 @@ impl BackupRecoveryEngine {
                     title: "Backup".into(),
                     detail: "Create an encrypted backup of your identity. To preserve contacts, use device linking instead.".into(),
                 }],
+                a11y: None,
             }],
             actions: vec![
                 ScreenAction {

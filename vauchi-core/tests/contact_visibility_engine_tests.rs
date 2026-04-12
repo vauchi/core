@@ -13,12 +13,14 @@ fn sample_fields() -> Vec<ToggleItem> {
             label: "Email".into(),
             selected: true,
             subtitle: None,
+            a11y: None,
         },
         ToggleItem {
             id: "phone".into(),
             label: "Phone".into(),
             selected: false,
             subtitle: None,
+            a11y: None,
         },
     ]
 }

@@ -124,6 +124,7 @@ impl WorkflowEngine for ContactListEngine {
                     title: "Exchange cards in person".into(),
                     detail: "Meet someone nearby and share your contact card securely.".into(),
                 }],
+                a11y: None,
             }]
         } else {
             vec![Component::ContactList {

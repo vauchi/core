@@ -611,6 +611,35 @@ impl AppEngine {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)
             }
+            AppScreen::ContactMerge { .. } => {
+                match self.pending_merge.take() {
+                    Some((primary_id, secondary_id)) => {
+                        match self.vauchi.merge_contacts(&primary_id, &secondary_id) {
+                            Ok(_merged) => {
+                                self.engine_cache.remove(&AppScreen::Contacts);
+                                self.engine_cache.remove(&AppScreen::ContactDuplicates);
+                                // Navigate back to ContactDuplicates (or wherever we came from).
+                                // navigate_back() mutates nav state; ShowToast causes the
+                                // frontend to re-query current_screen() for the updated view.
+                                self.navigate_back();
+                                ActionResult::ShowToast {
+                                    message: "Contacts merged".into(),
+                                    undo_action_id: None,
+                                }
+                            }
+                            Err(e) => ActionResult::ShowAlert {
+                                title: "Merge Failed".into(),
+                                message: format!("{e}"),
+                            },
+                        }
+                    }
+                    None => {
+                        // No pending merge state — just navigate back
+                        let screen = self.navigate_back();
+                        ActionResult::NavigateTo(screen)
+                    }
+                }
+            }
             _ => {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)

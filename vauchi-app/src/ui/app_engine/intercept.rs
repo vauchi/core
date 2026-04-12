@@ -446,6 +446,44 @@ impl AppEngine {
         }
     }
 
+    /// Intercept the "merge" action on the ContactDuplicates screen.
+    ///
+    /// Loads the first duplicate pair, stores IDs as `pending_merge`, and
+    /// navigates to `ContactMerge` with display names and field summaries.
+    /// Returns `None` if there are no pairs to merge.
+    pub(super) fn intercept_merge_action(&mut self) -> Option<ActionResult> {
+        let pairs = self.vauchi.find_duplicates().unwrap_or_default();
+        let pair = pairs.into_iter().next()?;
+
+        let primary = self.vauchi.get_contact(&pair.id1).ok().flatten()?;
+        let secondary = self.vauchi.get_contact(&pair.id2).ok().flatten()?;
+
+        let primary_name = primary.display_name().to_string();
+        let secondary_name = secondary.display_name().to_string();
+        let primary_fields: Vec<String> = primary
+            .card()
+            .fields()
+            .iter()
+            .map(|f| format!("{}: {}", f.label(), f.value()))
+            .collect();
+        let secondary_fields: Vec<String> = secondary
+            .card()
+            .fields()
+            .iter()
+            .map(|f| format!("{}: {}", f.label(), f.value()))
+            .collect();
+
+        self.pending_merge = Some((pair.id1, pair.id2));
+
+        let screen = self.navigate_to(AppScreen::ContactMerge {
+            primary_name,
+            primary_fields,
+            secondary_name,
+            secondary_fields,
+        });
+        Some(ActionResult::NavigateTo(screen))
+    }
+
     /// Handle undo actions (field delete restoration, contact delete/archive undo).
     pub(super) fn handle_undo(&mut self, action: &UserAction) -> Option<ActionResult> {
         let UserAction::UndoPressed { action_id } = action else {

@@ -212,6 +212,10 @@ pub struct AppEngine {
     event_rx: mpsc::Receiver<VauchiEvent>,
     /// Active event handler ID, used to unregister on drop.
     _event_handler_id: HandlerId,
+    /// IDs of the two contacts selected for merge (primary_id, secondary_id).
+    /// Set when the user confirms a merge from DuplicateDetection; consumed by
+    /// handle_completion for ContactMerge.
+    pub(super) pending_merge: Option<(String, String)>,
 }
 
 impl AppEngine {
@@ -281,6 +285,7 @@ impl AppEngine {
             last_poll_time: now,
             event_rx,
             _event_handler_id: event_handler_id,
+            pending_merge: None,
         }
     }
 
@@ -632,6 +637,14 @@ impl WorkflowEngine for AppEngine {
         {
             let screen = self.navigate_to(AppScreen::ContactDuplicates);
             return ActionResult::NavigateTo(screen);
+        }
+
+        // "merge" from ContactDuplicates → store pending pair and navigate to ContactMerge
+        if self.screen == AppScreen::ContactDuplicates
+            && matches!(&action, UserAction::ActionPressed { action_id } if action_id == "merge")
+            && let Some(result) = self.intercept_merge_action()
+        {
+            return result;
         }
 
         // Unarchive from ArchivedContacts screen

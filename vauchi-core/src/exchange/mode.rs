@@ -529,6 +529,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn cable_mode_exists_and_is_categorized() {
         let mode = ExchangeMode::Cable;
@@ -538,6 +539,7 @@ mod tests {
         assert!(mode.requires_proximity());
     }
 
+    // @internal
     #[test]
     fn cable_config_uses_usb_bootstrap_with_wired_proximity() {
         let cfg = ExchangeMode::Cable.config();

@@ -924,6 +924,7 @@ mod tests {
     // Remaining session-level tests moved to tests/exchange_session_mobile_tests.rs
     // (they use only the public MobileExchangeSession API, not ProximityBridge internals)
 
+    // @internal
     #[test]
     fn direct_send_roundtrips_through_mobile_enum() {
         let cmd = ExchangeCommand::DirectSend {
@@ -943,6 +944,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn direct_payload_received_roundtrips_through_mobile_enum() {
         let evt = MobileExchangeHardwareEvent::DirectPayloadReceived {

@@ -21,7 +21,11 @@
             "detail": "Use Vauchi on all your devices with seamless sync."
           }
         ],
-        "a11y": null
+        "a11y": {
+          "label": "Welcome to Vauchi",
+          "hint": null,
+          "role": "Heading"
+        }
       }
     }
   ],

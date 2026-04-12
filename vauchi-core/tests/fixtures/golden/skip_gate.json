@@ -26,7 +26,11 @@
             "detail": "Choose what each group can see."
           }
         ],
-        "a11y": null
+        "a11y": {
+          "label": "What you'll set up next",
+          "hint": null,
+          "role": "Heading"
+        }
       }
     }
   ],

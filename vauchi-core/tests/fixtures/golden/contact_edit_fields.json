@@ -31,7 +31,11 @@
                 "Family"
               ]
             },
-            "a11y": null
+            "a11y": {
+              "label": "Mobile: +1-555-0100",
+              "hint": "Visible to specific groups",
+              "role": null
+            }
           },
           {
             "id": "f2",
@@ -44,7 +48,11 @@
                 "Work"
               ]
             },
-            "a11y": null
+            "a11y": {
+              "label": "Work: alice@example.com",
+              "hint": "Visible to specific groups",
+              "role": null
+            }
           }
         ],
         "visibility_mode": "ShowHide",
@@ -53,7 +61,11 @@
           "Friends",
           "Work"
         ],
-        "a11y": null
+        "a11y": {
+          "label": "Contact fields",
+          "hint": "Toggle field visibility",
+          "role": null
+        }
       }
     }
   ],

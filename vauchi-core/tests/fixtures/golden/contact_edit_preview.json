@@ -18,7 +18,11 @@
                 "Family"
               ]
             },
-            "a11y": null
+            "a11y": {
+              "label": "Mobile: +1-555-0100",
+              "hint": "Visible to specific groups",
+              "role": null
+            }
           },
           {
             "id": "f2",
@@ -31,7 +35,11 @@
                 "Work"
               ]
             },
-            "a11y": null
+            "a11y": {
+              "label": "Work: alice@example.com",
+              "hint": "Visible to specific groups",
+              "role": null
+            }
           }
         ],
         "group_views": [
@@ -49,7 +57,11 @@
                     "Family"
                   ]
                 },
-                "a11y": null
+                "a11y": {
+                  "label": "Mobile: +1-555-0100",
+                  "hint": "Visible to specific groups",
+                  "role": null
+                }
               }
             ]
           },
@@ -68,7 +80,11 @@
                     "Work"
                   ]
                 },
-                "a11y": null
+                "a11y": {
+                  "label": "Work: alice@example.com",
+                  "hint": "Visible to specific groups",
+                  "role": null
+                }
               }
             ]
           },
@@ -87,13 +103,21 @@
                     "Work"
                   ]
                 },
-                "a11y": null
+                "a11y": {
+                  "label": "Work: alice@example.com",
+                  "hint": "Visible to specific groups",
+                  "role": null
+                }
               }
             ]
           }
         ],
         "selected_group": null,
-        "a11y": null
+        "a11y": {
+          "label": "Card preview: Alice",
+          "hint": "Shows how your card appears to others",
+          "role": null
+        }
       }
     }
   ],

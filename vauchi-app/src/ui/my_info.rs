@@ -234,7 +234,11 @@ impl MyInfoEngine {
             text: format!("Viewing as {contact_name}"),
             action_label: "Exit Preview".into(),
             action_id: "exit-preview".into(),
-            a11y: None,
+            a11y: Some(A11y {
+                label: Some(format!("Viewing as {contact_name}")),
+                hint: Some("Action: Exit Preview".into()),
+                role: Some(AccessibilityRole::Alert),
+            }),
         });
 
         let Some(ref preview) = self.preview_data else {
@@ -251,7 +255,11 @@ impl MyInfoEngine {
                 title: "Display Name".into(),
                 detail: preview.shared_display_name.clone(),
             }],
-            a11y: None,
+            a11y: Some(A11y {
+                label: Some("They see you as".into()),
+                hint: None,
+                role: Some(AccessibilityRole::Heading),
+            }),
         });
 
         // Render each field with its visibility state
@@ -261,7 +269,11 @@ impl MyInfoEngine {
                 fields: vec![field.clone()],
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_groups: vec![],
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Contact fields".into()),
+                    hint: None,
+                    role: None,
+                }),
             });
         }
 
@@ -303,7 +315,11 @@ impl WorkflowEngine for MyInfoEngine {
                     title: "Find someone nearby".into(),
                     detail: "Share your contact card in person — private and secure.".into(),
                 }],
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Ready to exchange?".into()),
+                    hint: None,
+                    role: Some(AccessibilityRole::Heading),
+                }),
             });
         }
 

@@ -21,7 +21,11 @@
             "detail": "Import your identity from a backup file."
           }
         ],
-        "a11y": null
+        "a11y": {
+          "label": "Restore your identity",
+          "hint": null,
+          "role": "Heading"
+        }
       }
     }
   ],

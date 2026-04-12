@@ -26,7 +26,11 @@
             "detail": "Share different info with different groups"
           }
         ],
-        "a11y": null
+        "a11y": {
+          "label": "Why Vauchi?",
+          "hint": null,
+          "role": "Heading"
+        }
       }
     }
   ],

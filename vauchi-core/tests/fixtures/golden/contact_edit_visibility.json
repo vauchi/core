@@ -14,24 +14,40 @@
             "label": "Family",
             "selected": true,
             "subtitle": null,
-            "a11y": null
+            "a11y": {
+              "label": "Family, selected",
+              "hint": "Double tap to toggle",
+              "role": "Toggle"
+            }
           },
           {
             "id": "Friends",
             "label": "Friends",
             "selected": false,
             "subtitle": null,
-            "a11y": null
+            "a11y": {
+              "label": "Friends, not selected",
+              "hint": "Double tap to toggle",
+              "role": "Toggle"
+            }
           },
           {
             "id": "Work",
             "label": "Work",
             "selected": false,
             "subtitle": null,
-            "a11y": null
+            "a11y": {
+              "label": "Work, not selected",
+              "hint": "Double tap to toggle",
+              "role": "Toggle"
+            }
           }
         ],
-        "a11y": null
+        "a11y": {
+          "label": "Mobile options",
+          "hint": "Select items to include",
+          "role": null
+        }
       }
     },
     {
@@ -44,24 +60,40 @@
             "label": "Family",
             "selected": false,
             "subtitle": null,
-            "a11y": null
+            "a11y": {
+              "label": "Family, not selected",
+              "hint": "Double tap to toggle",
+              "role": "Toggle"
+            }
           },
           {
             "id": "Friends",
             "label": "Friends",
             "selected": true,
             "subtitle": null,
-            "a11y": null
+            "a11y": {
+              "label": "Friends, selected",
+              "hint": "Double tap to toggle",
+              "role": "Toggle"
+            }
           },
           {
             "id": "Work",
             "label": "Work",
             "selected": true,
             "subtitle": null,
-            "a11y": null
+            "a11y": {
+              "label": "Work, selected",
+              "hint": "Double tap to toggle",
+              "role": "Toggle"
+            }
           }
         ],
-        "a11y": null
+        "a11y": {
+          "label": "Work options",
+          "hint": "Select items to include",
+          "role": null
+        }
       }
     }
   ],

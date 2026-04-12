@@ -10,7 +10,11 @@
         "fields": [],
         "visibility_mode": "ShowHide",
         "available_groups": [],
-        "a11y": null
+        "a11y": {
+          "label": "Contact fields",
+          "hint": "Toggle field visibility",
+          "role": null
+        }
       }
     }
   ],

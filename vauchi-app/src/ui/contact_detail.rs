@@ -186,6 +186,8 @@ impl ContactDetailEngine {
 
         // Mode toggle — only shown when shared info is available
         if self.shared_info.is_some() {
+            let their_info_selected = self.view_mode == ContactViewMode::TheirInfo;
+            let my_info_selected = self.view_mode == ContactViewMode::MyInfoForThem;
             components.push(Component::ToggleList {
                 id: "view_mode".into(),
                 label: "Perspective".into(),
@@ -193,19 +195,45 @@ impl ContactDetailEngine {
                     ToggleItem {
                         id: "their_info".into(),
                         label: "Their Info".into(),
-                        selected: self.view_mode == ContactViewMode::TheirInfo,
+                        selected: their_info_selected,
                         subtitle: Some("What they share with me".into()),
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some(format!(
+                                "Their Info, {}",
+                                if their_info_selected {
+                                    "selected"
+                                } else {
+                                    "not selected"
+                                }
+                            )),
+                            hint: Some("Double tap to toggle".into()),
+                            role: Some(AccessibilityRole::Toggle),
+                        }),
                     },
                     ToggleItem {
                         id: "my_info_for_them".into(),
                         label: "My Info for Them".into(),
-                        selected: self.view_mode == ContactViewMode::MyInfoForThem,
+                        selected: my_info_selected,
                         subtitle: Some("What I share with them".into()),
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some(format!(
+                                "My Info for Them, {}",
+                                if my_info_selected {
+                                    "selected"
+                                } else {
+                                    "not selected"
+                                }
+                            )),
+                            hint: Some("Double tap to toggle".into()),
+                            role: Some(AccessibilityRole::Toggle),
+                        }),
                     },
                 ],
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Perspective options".into()),
+                    hint: Some("Select items to include".into()),
+                    role: None,
+                }),
             });
         }
 
@@ -236,7 +264,11 @@ impl ContactDetailEngine {
                     icon: None,
                     title: self.contact.name.clone(),
                     items: contact_info_items,
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some(self.contact.name.clone()),
+                        hint: None,
+                        role: Some(AccessibilityRole::Heading),
+                    }),
                 });
                 // Their fields — read-only, no visibility column.
                 // Each field is followed by an inline-editable private note.
@@ -246,7 +278,11 @@ impl ContactDetailEngine {
                         fields: vec![field.clone()],
                         visibility_mode: VisibilityMode::ReadOnly,
                         available_groups: vec![],
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some("Contact fields".into()),
+                            hint: None,
+                            role: None,
+                        }),
                     });
                     let note_value = self.field_notes.get(&field.id).cloned().unwrap_or_default();
                     components.push(Component::EditableText {
@@ -329,7 +365,11 @@ impl ContactDetailEngine {
                         icon: None,
                         title: "Update Delivery".into(),
                         items,
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some("Update Delivery".into()),
+                            hint: None,
+                            role: Some(AccessibilityRole::Heading),
+                        }),
                     });
                 }
             }
@@ -344,7 +384,11 @@ impl ContactDetailEngine {
                             title: "Display Name".into(),
                             detail: shared.shared_display_name.clone(),
                         }],
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some("They see me as".into()),
+                            hint: None,
+                            role: Some(AccessibilityRole::Heading),
+                        }),
                     });
                     // My fields — show which groups grant visibility
                     components.push(Component::FieldList {
@@ -352,7 +396,11 @@ impl ContactDetailEngine {
                         fields: shared.my_fields.clone(),
                         visibility_mode: VisibilityMode::PerGroup,
                         available_groups: shared.visible_groups.clone(),
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: Some("Contact fields".into()),
+                            hint: Some("Manage group visibility".into()),
+                            role: None,
+                        }),
                     });
                 }
             }
@@ -556,7 +604,11 @@ impl WorkflowEngine for ContactNotFoundEngine {
                     title: "Error".into(),
                     detail: format!("Contact '{}' was not found.", self.contact_id),
                 }],
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Not Found".into()),
+                    hint: None,
+                    role: Some(AccessibilityRole::Heading),
+                }),
             }],
             actions: vec![ScreenAction {
                 id: "back".into(),

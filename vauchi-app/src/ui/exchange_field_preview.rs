@@ -44,17 +44,28 @@ pub(super) fn build_field_preview_screen(
         .iter()
         .map(|f| {
             let visible = share_all || config.visible_field_ids.contains(f.id());
+            let visibility = if visible {
+                UiFieldVisibility::Shown
+            } else {
+                UiFieldVisibility::Hidden
+            };
             FieldDisplay {
                 id: f.id().to_string(),
                 label: f.label().to_string(),
                 value: f.value().to_string(),
                 field_type: format!("{:?}", f.field_type()),
-                visibility: if visible {
-                    UiFieldVisibility::Shown
-                } else {
-                    UiFieldVisibility::Hidden
-                },
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some(format!("{}: {}", f.label(), f.value())),
+                    hint: match visibility {
+                        UiFieldVisibility::Shown => None,
+                        UiFieldVisibility::Hidden => {
+                            Some("This field is hidden from contacts".into())
+                        }
+                        UiFieldVisibility::Groups(_) => Some("Visible to specific groups".into()),
+                    },
+                    role: None,
+                }),
+                visibility,
             }
         })
         .collect();
@@ -74,7 +85,11 @@ pub(super) fn build_field_preview_screen(
                 fields,
                 visibility_mode: VisibilityMode::ReadOnly,
                 available_groups: vec![],
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Contact fields".into()),
+                    hint: None,
+                    role: None,
+                }),
             },
         ],
         actions: vec![

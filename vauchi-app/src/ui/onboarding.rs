@@ -122,7 +122,11 @@ impl OnboardingEngine {
                         detail: "Use Vauchi on all your devices with seamless sync.".into(),
                     },
                 ],
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Welcome to Vauchi".into()),
+                    hint: None,
+                    role: Some(AccessibilityRole::Heading),
+                }),
             }],
             actions: vec![
                 ScreenAction {
@@ -164,7 +168,11 @@ impl OnboardingEngine {
                         detail: "Import your identity from a backup file.".into(),
                     },
                 ],
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Restore your identity".into()),
+                    hint: None,
+                    role: Some(AccessibilityRole::Heading),
+                }),
             }],
             actions: vec![
                 ScreenAction {
@@ -217,7 +225,11 @@ impl OnboardingEngine {
                         detail: "Share different info with different groups".into(),
                     },
                 ],
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Why Vauchi?".into()),
+                    hint: None,
+                    role: Some(AccessibilityRole::Heading),
+                }),
             }],
             actions: vec![ScreenAction {
                 id: "get_started".into(),
@@ -294,7 +306,11 @@ impl OnboardingEngine {
                         detail: "Choose what each group can see.".into(),
                     },
                 ],
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("What you'll set up next".into()),
+                    hint: None,
+                    role: Some(AccessibilityRole::Heading),
+                }),
             }],
             actions: vec![
                 ScreenAction {
@@ -325,7 +341,19 @@ impl OnboardingEngine {
                 label: g.name.clone(),
                 selected: g.selected,
                 subtitle: g.name_override.clone(),
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some(format!(
+                        "{}, {}",
+                        g.name,
+                        if g.selected {
+                            "selected"
+                        } else {
+                            "not selected"
+                        }
+                    )),
+                    hint: Some("Double tap to toggle".into()),
+                    role: Some(AccessibilityRole::Toggle),
+                }),
             })
             .collect();
 
@@ -349,7 +377,11 @@ impl OnboardingEngine {
                     id: "groups".into(),
                     label: "Suggested groups".into(),
                     items,
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some("Suggested groups options".into()),
+                        hint: Some("Select items to include".into()),
+                        role: None,
+                    }),
                 },
                 Component::TextInput {
                     id: "custom_group".into(),
@@ -398,17 +430,18 @@ impl OnboardingEngine {
         let selected = self.selected_group_names();
         let has_groups = !selected.is_empty();
 
+        let visibility_mode = if has_groups {
+            VisibilityMode::PerGroup
+        } else {
+            VisibilityMode::ShowHide
+        };
         let fields: Vec<FieldDisplay> = self
             .data
             .fields
             .iter()
             .enumerate()
-            .map(|(i, f)| FieldDisplay {
-                id: format!("field_{i}"),
-                field_type: f.field_type.clone(),
-                label: f.label.clone(),
-                value: f.value.clone(),
-                visibility: if f.shown {
+            .map(|(i, f)| {
+                let visibility = if f.shown {
                     if has_groups {
                         UiFieldVisibility::Groups(f.visible_to_groups.clone())
                     } else {
@@ -416,8 +449,27 @@ impl OnboardingEngine {
                     }
                 } else {
                     UiFieldVisibility::Hidden
-                },
-                a11y: None,
+                };
+                FieldDisplay {
+                    id: format!("field_{i}"),
+                    field_type: f.field_type.clone(),
+                    label: f.label.clone(),
+                    value: f.value.clone(),
+                    a11y: Some(A11y {
+                        label: Some(format!("{}: {}", f.label, f.value)),
+                        hint: match &visibility {
+                            UiFieldVisibility::Shown => None,
+                            UiFieldVisibility::Hidden => {
+                                Some("This field is hidden from contacts".into())
+                            }
+                            UiFieldVisibility::Groups(_) => {
+                                Some("Visible to specific groups".into())
+                            }
+                        },
+                        role: None,
+                    }),
+                    visibility,
+                }
             })
             .collect();
 
@@ -428,13 +480,17 @@ impl OnboardingEngine {
             components: vec![Component::FieldList {
                 id: "fields".into(),
                 fields,
-                visibility_mode: if has_groups {
-                    VisibilityMode::PerGroup
-                } else {
-                    VisibilityMode::ShowHide
-                },
+                visibility_mode: visibility_mode.clone(),
                 available_groups: selected,
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some("Contact fields".into()),
+                    hint: match visibility_mode {
+                        VisibilityMode::ShowHide => Some("Toggle field visibility".into()),
+                        VisibilityMode::PerGroup => Some("Manage group visibility".into()),
+                        VisibilityMode::ReadOnly => None,
+                    },
+                    role: None,
+                }),
             }],
             actions: vec![
                 ScreenAction {

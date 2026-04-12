@@ -81,8 +81,16 @@ impl ContactEditEngine {
             field_type: field.field_type.clone(),
             label: field.label.clone(),
             value: field.value.clone(),
+            a11y: Some(A11y {
+                label: Some(format!("{}: {}", field.label, field.value)),
+                hint: match visibility {
+                    UiFieldVisibility::Shown => None,
+                    UiFieldVisibility::Hidden => Some("This field is hidden from contacts".into()),
+                    UiFieldVisibility::Groups(_) => Some("Visible to specific groups".into()),
+                },
+                role: None,
+            }),
             visibility,
-            a11y: None,
         }
     }
 
@@ -138,7 +146,11 @@ impl ContactEditEngine {
                     fields,
                     visibility_mode: VisibilityMode::ShowHide,
                     available_groups: self.available_groups.clone(),
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some("Contact fields".into()),
+                        hint: Some("Toggle field visibility".into()),
+                        role: None,
+                    }),
                 },
             ],
             actions: vec![ScreenAction {
@@ -165,12 +177,23 @@ impl ContactEditEngine {
                 let items: Vec<ToggleItem> = self
                     .available_groups
                     .iter()
-                    .map(|group| ToggleItem {
-                        id: group.clone(),
-                        label: group.clone(),
-                        selected: field.visible_to_groups.contains(group),
-                        subtitle: None,
-                        a11y: None,
+                    .map(|group| {
+                        let selected = field.visible_to_groups.contains(group);
+                        ToggleItem {
+                            id: group.clone(),
+                            label: group.clone(),
+                            selected,
+                            subtitle: None,
+                            a11y: Some(A11y {
+                                label: Some(format!(
+                                    "{}, {}",
+                                    group,
+                                    if selected { "selected" } else { "not selected" }
+                                )),
+                                hint: Some("Double tap to toggle".into()),
+                                role: Some(AccessibilityRole::Toggle),
+                            }),
+                        }
                     })
                     .collect();
 
@@ -178,7 +201,11 @@ impl ContactEditEngine {
                     id: format!("vis_{}", field.id),
                     label: field.label.clone(),
                     items,
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some(format!("{} options", field.label)),
+                        hint: Some("Select items to include".into()),
+                        role: None,
+                    }),
                 }
             })
             .collect();
@@ -228,7 +255,11 @@ impl ContactEditEngine {
                 fields,
                 group_views: self.build_group_views(),
                 selected_group: self.selected_preview_group.clone(),
-                a11y: None,
+                a11y: Some(A11y {
+                    label: Some(format!("Card preview: {}", self.contact.display_name)),
+                    hint: Some("Shows how your card appears to others".into()),
+                    role: None,
+                }),
             }],
             actions: vec![
                 ScreenAction {

@@ -39,7 +39,11 @@ impl ContactVisibilityEngine {
                     id: "field_toggles".into(),
                     label: "Field Visibility".into(),
                     items: self.fields.clone(),
-                    a11y: None,
+                    a11y: Some(A11y {
+                        label: Some("Field Visibility options".into()),
+                        hint: Some("Select items to include".into()),
+                        role: None,
+                    }),
                 },
             ],
             actions: vec![ScreenAction {

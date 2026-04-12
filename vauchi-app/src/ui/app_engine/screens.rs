@@ -24,7 +24,7 @@ use crate::ui::contact_visibility::ContactVisibilityEngine;
 use crate::ui::delivery::{DeliveryItem, DeliveryStatusEngine};
 use crate::ui::device_linking::DeviceLinkingEngine;
 use crate::ui::device_management::{DeviceListItem, DeviceManagementEngine};
-use crate::ui::duplicate_detection::DuplicateDetectionEngine;
+use crate::ui::duplicate_detection::{DuplicateDetectionEngine, DuplicatePair};
 use crate::ui::duress_pin::{DuressConfig, DuressPinEngine};
 use crate::ui::emergency_shred::EmergencyShredEngine;
 use crate::ui::engine::WorkflowEngine;
@@ -614,7 +614,34 @@ impl AppEngine {
                 }
                 _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),
             },
-            AppScreen::ContactDuplicates => Box::new(DuplicateDetectionEngine::new(vec![])),
+            AppScreen::ContactDuplicates => {
+                let pairs = vauchi.find_duplicates().unwrap_or_default();
+                let ui_pairs: Vec<_> = pairs
+                    .iter()
+                    .map(|p| {
+                        let name1 = vauchi
+                            .get_contact(&p.id1)
+                            .ok()
+                            .flatten()
+                            .map(|c| c.display_name().to_string())
+                            .unwrap_or_else(|| p.id1.clone());
+                        let name2 = vauchi
+                            .get_contact(&p.id2)
+                            .ok()
+                            .flatten()
+                            .map(|c| c.display_name().to_string())
+                            .unwrap_or_else(|| p.id2.clone());
+                        DuplicatePair {
+                            id1: p.id1.clone(),
+                            name1,
+                            id2: p.id2.clone(),
+                            name2,
+                            similarity: p.similarity,
+                        }
+                    })
+                    .collect();
+                Box::new(DuplicateDetectionEngine::new(ui_pairs))
+            }
             AppScreen::ArchivedContacts => {
                 let archived = vauchi
                     .list_archived_contacts()

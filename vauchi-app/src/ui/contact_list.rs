@@ -142,6 +142,14 @@ impl WorkflowEngine for ContactListEngine {
             enabled: true,
         });
 
+        // Find duplicates action
+        actions.push(ScreenAction {
+            id: "find_duplicates".into(),
+            label: "Find Duplicates".into(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+        });
+
         // Add exchange shortcut when empty
         if self.all_contacts.is_empty() {
             actions.insert(

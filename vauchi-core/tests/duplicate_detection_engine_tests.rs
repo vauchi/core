@@ -4,6 +4,20 @@
 
 use vauchi_app::ui::*;
 
+// ── Tests: ContactListEngine has find_duplicates action ─────────────
+
+#[test]
+fn contacts_screen_has_find_duplicates_action() {
+    let engine = ContactListEngine::new(vec![]);
+    let screen = engine.current_screen();
+    let action = screen
+        .actions
+        .iter()
+        .find(|a| a.id == "find_duplicates")
+        .expect("Contacts screen should have find_duplicates action");
+    assert_eq!(action.label, "Find Duplicates");
+}
+
 // ── Test helpers ────────────────────────────────────────────────────
 
 fn sample_pairs() -> Vec<DuplicatePair> {

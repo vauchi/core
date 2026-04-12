@@ -43,6 +43,12 @@
       "label": "Archived Contacts",
       "style": "Secondary",
       "enabled": true
+    },
+    {
+      "id": "find_duplicates",
+      "label": "Find Duplicates",
+      "style": "Secondary",
+      "enabled": true
     }
   ],
   "progress": null,

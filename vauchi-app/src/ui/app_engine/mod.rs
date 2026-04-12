@@ -624,6 +624,16 @@ impl WorkflowEngine for AppEngine {
             return ActionResult::NavigateTo(screen);
         }
 
+        // "Find duplicates" from contacts → navigate to ContactDuplicates screen
+        if matches!(
+            &action,
+            UserAction::ActionPressed { action_id } if action_id == "find_duplicates"
+        ) && matches!(self.screen, AppScreen::Contacts)
+        {
+            let screen = self.navigate_to(AppScreen::ContactDuplicates);
+            return ActionResult::NavigateTo(screen);
+        }
+
         // Unarchive from ArchivedContacts screen
         if self.screen == AppScreen::ArchivedContacts
             && let UserAction::ActionPressed { ref action_id } = action

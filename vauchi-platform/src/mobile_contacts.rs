@@ -9,7 +9,8 @@ use vauchi_core::ContactField;
 use super::VauchiPlatform;
 use super::error::MobileError;
 use super::types::{
-    MobileContact, MobileContactCard, MobileFieldNote, MobileFieldType, MobileSocialNetwork,
+    MobileContact, MobileContactCard, MobileDuplicatePair, MobileFieldNote, MobileFieldType,
+    MobileSocialNetwork,
 };
 
 #[uniffi::export]
@@ -363,6 +364,43 @@ impl VauchiPlatform {
         let vauchi = self.open_vauchi()?;
         let contacts = vauchi.list_archived_contacts()?;
         Ok(contacts.iter().map(MobileContact::from).collect())
+    }
+
+    // === Duplicate Detection & Merge Operations ===
+
+    /// Find potential duplicate contacts based on name and field similarity.
+    pub fn find_duplicates(&self) -> Result<Vec<MobileDuplicatePair>, MobileError> {
+        let vauchi = self.open_vauchi()?;
+        let pairs = vauchi.find_duplicates()?;
+        Ok(pairs
+            .into_iter()
+            .map(|p| MobileDuplicatePair {
+                id1: p.id1,
+                id2: p.id2,
+                similarity: p.similarity,
+            })
+            .collect())
+    }
+
+    /// Dismiss a duplicate pair so it no longer appears in `find_duplicates` results.
+    pub fn dismiss_duplicate(&self, id1: String, id2: String) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi()?;
+        vauchi.dismiss_duplicate(&id1, &id2)?;
+        Ok(())
+    }
+
+    /// Merge two contacts, keeping the primary contact's identity.
+    ///
+    /// The secondary contact's unique fields are merged into the primary.
+    /// The secondary contact is removed from storage.
+    pub fn merge_contacts(
+        &self,
+        primary_id: String,
+        secondary_id: String,
+    ) -> Result<MobileContact, MobileError> {
+        let vauchi = self.open_vauchi()?;
+        let merged = vauchi.merge_contacts(&primary_id, &secondary_id)?;
+        Ok(MobileContact::from(&merged))
     }
 
     // === Hidden Contact Operations ===

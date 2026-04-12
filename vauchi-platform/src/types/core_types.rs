@@ -224,6 +224,14 @@ impl From<&Contact> for MobileContact {
     }
 }
 
+/// A pair of potentially duplicate contacts with similarity score.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileDuplicatePair {
+    pub id1: String,
+    pub id2: String,
+    pub similarity: f64,
+}
+
 /// A per-field private note entry (field_id + note text).
 ///
 /// Used as a Vec-based alternative to HashMap for UniFFI compatibility.

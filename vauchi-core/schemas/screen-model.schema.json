@@ -105,6 +105,51 @@
     }
   },
   "definitions": {
+    "A11y": {
+      "description": "Accessibility metadata for a UI component.\n\nPopulated by core engines so frontends can apply consistent a11y attributes without inventing their own labels.",
+      "type": "object",
+      "properties": {
+        "hint": {
+          "description": "Usage hint (maps to accessibilityHint/stateDescription).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label": {
+          "description": "Screen-reader label (maps to contentDescription/accessibilityLabel).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "description": "Semantic role for screen readers.",
+          "default": null,
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AccessibilityRole"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "AccessibilityRole": {
+      "description": "Semantic role hint for screen readers.",
+      "type": "string",
+      "enum": [
+        "Button",
+        "Link",
+        "Heading",
+        "Image",
+        "Toggle",
+        "TextField",
+        "Alert"
+      ]
+    },
     "ActionListItem": {
       "description": "An item in an action list.",
       "type": "object",
@@ -113,6 +158,17 @@
         "label"
       ],
       "properties": {
+        "a11y": {
+          "default": null,
+          "anyOf": [
+            {
+              "$ref": "#/definitions/A11y"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "detail": {
           "type": [
             "string",
@@ -226,6 +282,17 @@
                 "value"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "id": {
                   "type": "string"
                 },
@@ -512,6 +579,17 @@
                 "title"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "detail": {
                   "type": [
                     "string",
@@ -554,6 +632,17 @@
                 "masked"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "filled": {
                   "type": "integer",
                   "format": "uint",
@@ -598,6 +687,17 @@
                 "mode"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "data": {
                   "type": "string"
                 },
@@ -635,6 +735,17 @@
                 "warning"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "cancel_text": {
                   "type": "string"
                 },
@@ -672,6 +783,17 @@
                 "value"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "editing": {
                   "description": "When true, render as editable input. When false, render as static text with edit button.",
                   "type": "boolean"
@@ -740,6 +862,17 @@
                 "options"
               ],
               "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "id": {
                   "type": "string"
                 },
@@ -774,6 +907,17 @@
         "name"
       ],
       "properties": {
+        "a11y": {
+          "default": null,
+          "anyOf": [
+            {
+              "$ref": "#/definitions/A11y"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "avatar_initials": {
           "type": "string"
         },
@@ -1029,6 +1173,17 @@
         "label"
       ],
       "properties": {
+        "a11y": {
+          "default": null,
+          "anyOf": [
+            {
+              "$ref": "#/definitions/A11y"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "id": {
           "type": "string"
         },

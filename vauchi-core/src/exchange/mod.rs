@@ -116,7 +116,7 @@ pub use device_link::{
     DeviceLinkRequest, DeviceLinkResponder, DeviceLinkResponse, ProximityProof,
     compute_confirmation_mac, generate_numeric_code,
 };
-pub use direct_transport::ProximityLevel;
+pub use direct_transport::{ProximityLevel, UsbRole};
 pub use encrypted_message::{DecryptedExchangePayload, EncryptedExchangeMessage};
 pub use error::ExchangeError;
 pub use nfc_active::apdu as nfc_apdu;

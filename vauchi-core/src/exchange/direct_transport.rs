@@ -22,3 +22,15 @@ pub enum ProximityLevel {
     /// Wireless proximity (BLE, local Wi-Fi) — requires mutual code confirmation.
     Proximate,
 }
+
+/// Role in a USB/TCP direct exchange.
+///
+/// Determines send/recv ordering to avoid deadlock.
+/// Desktop (TCP client) is `Initiator`; phone (TCP server) is `Responder`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UsbRole {
+    /// Sends first, receives second (desktop / TCP client).
+    Initiator,
+    /// Receives first, sends second (phone / TCP server).
+    Responder,
+}

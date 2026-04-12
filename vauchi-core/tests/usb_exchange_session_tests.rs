@@ -12,7 +12,7 @@
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
 use vauchi_core::exchange::session::{ExchangeEvent, ExchangeSession, ExchangeState};
-use vauchi_core::exchange::{ManualConfirmationVerifier, ProximityConfidence};
+use vauchi_core::exchange::{ManualConfirmationVerifier, ProximityConfidence, UsbRole};
 use vauchi_core::identity::Identity;
 use vauchi_core::types::ExchangeTransport;
 
@@ -31,7 +31,12 @@ fn create_card(identity: &Identity) -> ContactCard {
 fn new_usb_session_starts_in_awaiting_direct_payload() {
     let identity = create_identity("Alice");
     let card = create_card(&identity);
-    let session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
+    let session = ExchangeSession::new_usb(
+        identity,
+        card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     assert!(matches!(
         session.state(),
@@ -45,7 +50,12 @@ fn new_usb_session_starts_in_awaiting_direct_payload() {
 fn new_usb_session_emits_direct_send_command() {
     let identity = create_identity("Alice");
     let card = create_card(&identity);
-    let mut session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
+    let mut session = ExchangeSession::new_usb(
+        identity,
+        card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     session.emit_initial_commands();
     let commands = session.drain_commands();
@@ -72,9 +82,14 @@ fn full_usb_exchange_ceremony_via_commands() {
         alice_id,
         alice_card.clone(),
         ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
     );
-    let mut bob_session =
-        ExchangeSession::new_usb(bob_id, bob_card.clone(), ManualConfirmationVerifier::new());
+    let mut bob_session = ExchangeSession::new_usb(
+        bob_id,
+        bob_card.clone(),
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     // Step 1: Both sessions emit DirectSend commands
     alice_session.emit_initial_commands();
@@ -168,9 +183,18 @@ fn usb_self_exchange_is_rejected() {
     let bytes = identity.to_storage_bytes();
     let identity2 = Identity::from_storage_bytes(&bytes).expect("roundtrip");
 
-    let mut session1 =
-        ExchangeSession::new_usb(identity, card.clone(), ManualConfirmationVerifier::new());
-    let mut session2 = ExchangeSession::new_usb(identity2, card, ManualConfirmationVerifier::new());
+    let mut session1 = ExchangeSession::new_usb(
+        identity,
+        card.clone(),
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
+    let mut session2 = ExchangeSession::new_usb(
+        identity2,
+        card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     session2.emit_initial_commands();
     let commands = session2.drain_commands();
@@ -190,7 +214,12 @@ fn usb_invalid_payload_is_rejected() {
     let identity = create_identity("Alice");
     let card = create_card(&identity);
 
-    let mut session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
+    let mut session = ExchangeSession::new_usb(
+        identity,
+        card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     let result = session.apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
         data: b"garbage-not-a-valid-qr-payload".to_vec(),
@@ -206,9 +235,18 @@ fn usb_direct_payload_in_wrong_state_is_rejected() {
     let bob_id = create_identity("Bob");
     let bob_card = create_card(&bob_id);
 
-    let mut session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
-    let mut bob_session =
-        ExchangeSession::new_usb(bob_id, bob_card, ManualConfirmationVerifier::new());
+    let mut session = ExchangeSession::new_usb(
+        identity,
+        card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
+    let mut bob_session = ExchangeSession::new_usb(
+        bob_id,
+        bob_card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     bob_session.emit_initial_commands();
     let bob_payload = match &bob_session.drain_commands()[0] {
@@ -232,6 +270,59 @@ fn usb_direct_payload_in_wrong_state_is_rejected() {
     );
 }
 
+// ── UsbRole: initiator/responder ───────────────────────────────
+
+// @internal
+#[test]
+fn usb_initiator_emits_is_initiator_true() {
+    let identity = create_identity("Alice");
+    let card = create_card(&identity);
+    let mut session = ExchangeSession::new_usb(
+        identity,
+        card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
+
+    session.emit_initial_commands();
+    let commands = session.drain_commands();
+
+    assert_eq!(commands.len(), 1, "should emit exactly one command");
+    match &commands[0] {
+        ExchangeCommand::DirectSend { is_initiator, .. } => {
+            assert!(*is_initiator, "Initiator role must set is_initiator: true");
+        }
+        other => panic!("expected DirectSend, got {:?}", other),
+    }
+}
+
+// @internal
+#[test]
+fn usb_responder_emits_is_initiator_false() {
+    let identity = create_identity("Bob");
+    let card = create_card(&identity);
+    let mut session = ExchangeSession::new_usb(
+        identity,
+        card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Responder,
+    );
+
+    session.emit_initial_commands();
+    let commands = session.drain_commands();
+
+    assert_eq!(commands.len(), 1, "should emit exactly one command");
+    match &commands[0] {
+        ExchangeCommand::DirectSend { is_initiator, .. } => {
+            assert!(
+                !*is_initiator,
+                "Responder role must set is_initiator: false"
+            );
+        }
+        other => panic!("expected DirectSend, got {:?}", other),
+    }
+}
+
 // @internal
 #[test]
 fn usb_direct_payload_on_qr_session_is_rejected() {
@@ -242,8 +333,12 @@ fn usb_direct_payload_on_qr_session_is_rejected() {
 
     // Create a QR session, not USB
     let mut session = ExchangeSession::new_qr(identity, card, ManualConfirmationVerifier::new());
-    let mut bob_session =
-        ExchangeSession::new_usb(bob_id, bob_card, ManualConfirmationVerifier::new());
+    let mut bob_session = ExchangeSession::new_usb(
+        bob_id,
+        bob_card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     bob_session.emit_initial_commands();
     let bob_payload = match &bob_session.drain_commands()[0] {

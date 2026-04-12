@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 use super::ble_handshake::BleHandshakeSession;
 use super::ble_payload::BleCardPayload;
 use super::command::{ExchangeCommand, ExchangeHardwareEvent};
+use super::direct_transport::UsbRole;
 use super::nfc_handshake::NfcHandshakeSession;
 use super::trust_metrics::TrustMetrics;
 use super::{ExchangeError, ExchangeQR, ProximityConfidence, ProximityVerifier, X3DHKeyPair};
@@ -150,6 +151,9 @@ pub struct ExchangeSession {
     ble_handshake: Option<BleHandshakeSession>,
     /// Device hardware capabilities for transport fallback decisions.
     device_capabilities: Option<super::capability::types::DeviceCapabilities>,
+    /// Role in a USB/TCP direct exchange (Initiator sends first, Responder receives first).
+    /// `None` for non-USB transports.
+    usb_role: Option<UsbRole>,
     /// Whether we initiated the BLE connection (scanner role).
     /// Set to `true` on `BleDeviceDiscovered`, determines who sends KeyOffer first.
     ble_is_initiator: bool,
@@ -227,6 +231,7 @@ impl ExchangeSession {
             nfc_handshake: None,
             ble_handshake: None,
             device_capabilities: None,
+            usb_role: None,
             ble_is_initiator: false,
             ble_pending_handshake: None,
             ble_pending_card: None,
@@ -269,6 +274,7 @@ impl ExchangeSession {
             nfc_handshake: None,
             ble_handshake: None,
             device_capabilities: None,
+            usb_role: None,
             ble_is_initiator: false,
             ble_pending_handshake: None,
             ble_pending_card: None,
@@ -316,6 +322,7 @@ impl ExchangeSession {
             nfc_handshake: Some(nfc_handshake),
             ble_handshake: None,
             device_capabilities: None,
+            usb_role: None,
             ble_is_initiator: false,
             ble_pending_handshake: None,
             ble_pending_card: None,
@@ -373,6 +380,7 @@ impl ExchangeSession {
             nfc_handshake: None,
             ble_handshake: Some(ble_handshake),
             device_capabilities: None,
+            usb_role: None,
             ble_is_initiator: false,
             ble_pending_handshake: None,
             ble_pending_card: None,
@@ -403,6 +411,7 @@ impl ExchangeSession {
         identity: Identity,
         our_card: ContactCard,
         proximity: impl ProximityVerifier + 'static,
+        role: UsbRole,
     ) -> Self {
         let our_x3dh = X3DHKeyPair::generate();
         let our_qr = ExchangeQR::generate(&identity, &our_x3dh);
@@ -425,6 +434,7 @@ impl ExchangeSession {
             nfc_handshake: None,
             ble_handshake: None,
             device_capabilities: None,
+            usb_role: Some(role),
             ble_is_initiator: false,
             ble_pending_handshake: None,
             ble_pending_card: None,
@@ -902,7 +912,7 @@ impl ExchangeSession {
             (ExchangeState::AwaitingDirectPayload { our_qr }, ExchangeTransport::Usb) => {
                 self.pending_commands.push(ExchangeCommand::DirectSend {
                     payload: our_qr.to_data_string().into_bytes(),
-                    is_initiator: true,
+                    is_initiator: self.usb_role == Some(UsbRole::Initiator),
                 });
             }
             _ => {}

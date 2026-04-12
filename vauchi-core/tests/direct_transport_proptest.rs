@@ -16,10 +16,10 @@ use std::thread;
 use proptest::prelude::*;
 
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::exchange::ManualConfirmationVerifier;
 use vauchi_core::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
 use vauchi_core::exchange::session::{ExchangeSession, ExchangeState};
 use vauchi_core::exchange::tcp_transport::TcpDirectTransport;
+use vauchi_core::exchange::{ManualConfirmationVerifier, UsbRole};
 use vauchi_core::identity::Identity;
 
 fn loopback_pair() -> (TcpStream, TcpStream) {
@@ -83,7 +83,12 @@ proptest! {
 fn adversarial_empty_direct_payload_rejected() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new(identity.display_name());
-    let mut session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
+    let mut session = ExchangeSession::new_usb(
+        identity,
+        card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     let result = session
         .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: Vec::new() });
@@ -95,7 +100,12 @@ fn adversarial_empty_direct_payload_rejected() {
 fn adversarial_null_bytes_in_payload_rejected() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new(identity.display_name());
-    let mut session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
+    let mut session = ExchangeSession::new_usb(
+        identity,
+        card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     let result = session.apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
         data: b"\0\0\0\0\0\0\0\0".to_vec(),
@@ -108,7 +118,12 @@ fn adversarial_null_bytes_in_payload_rejected() {
 fn adversarial_non_utf8_payload_rejected() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new(identity.display_name());
-    let mut session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
+    let mut session = ExchangeSession::new_usb(
+        identity,
+        card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     // Invalid UTF-8 sequence
     let result = session.apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
@@ -122,7 +137,12 @@ fn adversarial_non_utf8_payload_rejected() {
 fn adversarial_max_length_payload_rejected() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new(identity.display_name());
-    let mut session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
+    let mut session = ExchangeSession::new_usb(
+        identity,
+        card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     let result = session.apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
         data: b"A".repeat(100_000),
@@ -135,8 +155,12 @@ fn adversarial_max_length_payload_rejected() {
 fn adversarial_truncated_valid_payload() {
     let bob = Identity::create("Bob");
     let bob_card = ContactCard::new(bob.display_name());
-    let mut bob_session =
-        ExchangeSession::new_usb(bob, bob_card, ManualConfirmationVerifier::new());
+    let mut bob_session = ExchangeSession::new_usb(
+        bob,
+        bob_card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     bob_session.emit_initial_commands();
     let valid_payload = match &bob_session.drain_commands()[0] {
@@ -147,8 +171,12 @@ fn adversarial_truncated_valid_payload() {
     for truncate_at in [1, 10, 50, valid_payload.len() / 2, valid_payload.len() - 1] {
         let identity = Identity::create("Alice");
         let card = ContactCard::new(identity.display_name());
-        let mut session =
-            ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
+        let mut session = ExchangeSession::new_usb(
+            identity,
+            card,
+            ManualConfirmationVerifier::new(),
+            UsbRole::Initiator,
+        );
 
         let truncated = valid_payload[..truncate_at].to_vec();
         let result = session
@@ -166,8 +194,12 @@ fn adversarial_truncated_valid_payload() {
 fn adversarial_corrupted_valid_payload() {
     let bob = Identity::create("Bob");
     let bob_card = ContactCard::new(bob.display_name());
-    let mut bob_session =
-        ExchangeSession::new_usb(bob, bob_card, ManualConfirmationVerifier::new());
+    let mut bob_session = ExchangeSession::new_usb(
+        bob,
+        bob_card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     bob_session.emit_initial_commands();
     let valid_payload = match &bob_session.drain_commands()[0] {
@@ -184,7 +216,12 @@ fn adversarial_corrupted_valid_payload() {
 
     let identity = Identity::create("Alice");
     let card = ContactCard::new(identity.display_name());
-    let mut session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
+    let mut session = ExchangeSession::new_usb(
+        identity,
+        card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     let result = session
         .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: corrupted });
@@ -199,16 +236,24 @@ fn adversarial_replay_same_payload_twice() {
     let bob = Identity::create("Bob");
     let bob_card = ContactCard::new(bob.display_name());
 
-    let mut bob_session =
-        ExchangeSession::new_usb(bob, bob_card, ManualConfirmationVerifier::new());
+    let mut bob_session = ExchangeSession::new_usb(
+        bob,
+        bob_card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
     bob_session.emit_initial_commands();
     let bob_payload = match &bob_session.drain_commands()[0] {
         ExchangeCommand::DirectSend { payload, .. } => payload.clone(),
         other => panic!("expected DirectSend, got {:?}", other),
     };
 
-    let mut session =
-        ExchangeSession::new_usb(alice, alice_card, ManualConfirmationVerifier::new());
+    let mut session = ExchangeSession::new_usb(
+        alice,
+        alice_card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
 
     // First apply succeeds
     session

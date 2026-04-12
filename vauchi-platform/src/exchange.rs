@@ -527,6 +527,11 @@ pub enum MobileExchangeCommand {
     ShowShareSheet {
         url: String,
     },
+    // Direct transport (USB cable)
+    DirectSend {
+        payload: Vec<u8>,
+        is_initiator: bool,
+    },
 }
 
 impl From<ExchangeCommand> for MobileExchangeCommand {
@@ -586,6 +591,13 @@ impl From<ExchangeCommand> for MobileExchangeCommand {
                 slot_hash,
             },
             ExchangeCommand::ShowShareSheet { url } => Self::ShowShareSheet { url },
+            ExchangeCommand::DirectSend {
+                payload,
+                is_initiator,
+            } => Self::DirectSend {
+                payload,
+                is_initiator,
+            },
             _ => Self::QrRequestScan,
         }
     }
@@ -656,6 +668,10 @@ pub enum MobileExchangeHardwareEvent {
     LinkShared,
     LinkOpened {
         peer_public_key: Vec<u8>,
+    },
+    // Direct transport (USB cable)
+    DirectPayloadReceived {
+        data: Vec<u8>,
     },
     // Errors
     HardwareError {
@@ -732,6 +748,9 @@ impl From<MobileExchangeHardwareEvent> for ExchangeHardwareEvent {
             MobileExchangeHardwareEvent::LinkShared => Self::LinkShared,
             MobileExchangeHardwareEvent::LinkOpened { peer_public_key } => {
                 Self::LinkOpened { peer_public_key }
+            }
+            MobileExchangeHardwareEvent::DirectPayloadReceived { data } => {
+                Self::DirectPayloadReceived { data }
             }
         }
     }
@@ -904,4 +923,37 @@ mod tests {
 
     // Remaining session-level tests moved to tests/exchange_session_mobile_tests.rs
     // (they use only the public MobileExchangeSession API, not ProximityBridge internals)
+
+    #[test]
+    fn direct_send_roundtrips_through_mobile_enum() {
+        let cmd = ExchangeCommand::DirectSend {
+            payload: vec![1, 2, 3],
+            is_initiator: true,
+        };
+        let mobile: MobileExchangeCommand = cmd.into();
+        match mobile {
+            MobileExchangeCommand::DirectSend {
+                payload,
+                is_initiator,
+            } => {
+                assert_eq!(payload, vec![1, 2, 3]);
+                assert!(is_initiator);
+            }
+            other => panic!("expected DirectSend, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn direct_payload_received_roundtrips_through_mobile_enum() {
+        let evt = MobileExchangeHardwareEvent::DirectPayloadReceived {
+            data: vec![4, 5, 6],
+        };
+        let core: ExchangeHardwareEvent = evt.into();
+        match core {
+            ExchangeHardwareEvent::DirectPayloadReceived { data } => {
+                assert_eq!(data, vec![4, 5, 6]);
+            }
+            other => panic!("expected DirectPayloadReceived, got {other:?}"),
+        }
+    }
 }

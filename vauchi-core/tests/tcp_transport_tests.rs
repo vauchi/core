@@ -36,13 +36,12 @@ fn send_recv_roundtrip() {
 }
 
 #[test]
-fn send_recv_empty_payload_is_rejected() {
-    let (mut client, mut server) = loopback_pair();
+fn send_empty_payload_is_rejected() {
+    let (mut client, _server) = loopback_pair();
 
-    // Sending empty payload: length=0 is valid on send side
-    send_payload(&mut client, b"").expect("send empty");
-    // But recv treats length=0 as ConnectionClosed
-    let err = recv_payload(&mut server).expect_err("should fail");
+    // Empty payload is rejected on the send side to prevent
+    // asymmetric behavior (receiver would see ConnectionClosed).
+    let err = send_payload(&mut client, b"").expect_err("should fail");
     assert!(matches!(err, TcpTransportError::ConnectionClosed));
 }
 

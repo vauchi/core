@@ -99,6 +99,22 @@ pub enum ExchangeCommand {
     // Appended (not inserted) to preserve serde discriminant ordering.
     /// Stop BLE scanning (saves battery after discovery completes).
     BleStopScanning,
+
+    // ── Direct transport (USB/TCP) ─────────────────────────────────
+    // Appended to preserve serde discriminant ordering.
+    /// Send an exchange payload over a direct transport (USB cable / local TCP).
+    ///
+    /// The frontend should:
+    /// 1. Send `payload` to the peer over the established TCP connection
+    /// 2. Receive the peer's payload from the same connection
+    /// 3. Report the peer's data via [`ExchangeHardwareEvent::DirectPayloadReceived`]
+    ///
+    /// The `is_initiator` flag determines send/recv ordering to avoid deadlock
+    /// (initiator sends first, responder receives first).
+    DirectSend {
+        payload: Vec<u8>,
+        is_initiator: bool,
+    },
 }
 
 /// A hardware event reported by the frontend back to core.
@@ -181,6 +197,14 @@ pub enum ExchangeHardwareEvent {
     // ── Relay escrow (added after v0.13 — append-only to preserve discriminants) ──
     /// Blob retrieved from relay escrow gate (response to `RelayEscrowRetrieve`).
     RelayEscrowBlobReceived { gate_hash: Vec<u8>, blob: Vec<u8> },
+
+    // ── Direct transport (USB/TCP) ─────────────────────────────────
+    /// Peer's exchange payload received over a direct transport.
+    ///
+    /// Sent by the frontend after completing the TCP exchange requested
+    /// by [`ExchangeCommand::DirectSend`]. Contains the raw bytes of
+    /// the peer's exchange payload (QR data string format).
+    DirectPayloadReceived { data: Vec<u8> },
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

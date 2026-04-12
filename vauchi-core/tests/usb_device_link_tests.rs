@@ -2,19 +2,20 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Integration tests for device linking over direct transport (USB/TCP).
+//! Integration tests for device linking over TCP transport (USB cable).
 //!
-//! Verifies the full device linking protocol over `TcpDirectTransport`:
+//! Verifies the 3-round device link protocol over `TcpDirectTransport`:
 //! QR transfer → request → confirmation → response → master seed received.
+//! Frontends orchestrate the rounds using TcpDirectTransport directly
+//! (ADR-031: core emits no device-link transport commands).
 
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use vauchi_core::exchange::DirectTransport;
 use vauchi_core::exchange::device_link::{
-    DeviceLinkInitiator, DeviceLinkResponder, ProximityProof, recv_device_link_qr,
-    recv_encrypted_blob, send_device_link_qr, send_encrypted_blob,
+    DeviceLinkInitiator, DeviceLinkQR, DeviceLinkResponder, ProximityProof,
+    compute_confirmation_mac,
 };
 use vauchi_core::exchange::tcp_transport::TcpDirectTransport;
 use vauchi_core::identity::{DeviceRegistry, Identity};
@@ -45,10 +46,7 @@ fn create_manual_proof(initiator: &DeviceLinkInitiator, confirmation_code: &str)
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    let mac = vauchi_core::exchange::device_link::compute_confirmation_mac(
-        initiator.qr().link_key(),
-        confirmation_code,
-    );
+    let mac = compute_confirmation_mac(initiator.qr().link_key(), confirmation_code);
     ProximityProof::ManualConfirmation {
         confirmation_code_mac: mac,
         confirmed_at: now,
@@ -68,15 +66,16 @@ fn full_device_link_over_tcp_transport() {
 
     let (client, server) = loopback_pair();
 
-    // Initiator side (existing device): sends QR, receives request, sends response
+    // Initiator side: sends QR data, receives request, sends response
     let initiator_handle = thread::spawn(move || {
         let mut transport = TcpDirectTransport::physical(client);
 
-        // Round 1: Send DeviceLinkQR
-        send_device_link_qr(&mut transport, initiator.qr()).expect("send qr");
+        // Round 1: Send DeviceLinkQR as data string
+        let qr_data = initiator.qr().to_data_string();
+        transport.send(qr_data.as_bytes()).expect("send qr");
 
         // Round 2: Receive encrypted request
-        let encrypted_request = recv_encrypted_blob(&mut transport).expect("recv request");
+        let encrypted_request = transport.recv().expect("recv request");
 
         // Prepare confirmation and verify
         let (confirmation, request) = initiator
@@ -86,25 +85,25 @@ fn full_device_link_over_tcp_transport() {
         assert_eq!(confirmation.device_name, "New Desktop");
         assert!(!confirmation.confirmation_code.is_empty());
 
-        // Create proximity proof (manual confirmation for USB)
         let proof = create_manual_proof(&initiator, &confirmation.confirmation_code);
 
-        // Confirm link and get response
         let (encrypted_response, updated_registry, new_device) = initiator
             .confirm_link(&request, &proof)
             .expect("confirm link");
 
         // Round 3: Send encrypted response
-        send_encrypted_blob(&mut transport, &encrypted_response).expect("send response");
+        transport.send(&encrypted_response).expect("send response");
 
         (updated_registry, new_device)
     });
 
-    // Responder side (new device): receives QR, sends request, receives response
+    // Responder side: receives QR data, sends request, receives response
     let mut responder_transport = TcpDirectTransport::physical(server);
 
     // Round 1: Receive DeviceLinkQR
-    let qr = recv_device_link_qr(&mut responder_transport).expect("recv qr");
+    let qr_data = responder_transport.recv().expect("recv qr");
+    let qr_str = String::from_utf8(qr_data).expect("valid utf8");
+    let qr = DeviceLinkQR::from_data_string(&qr_str).expect("parse qr");
     assert!(!qr.is_expired());
     assert!(qr.verify_signature());
 
@@ -114,25 +113,24 @@ fn full_device_link_over_tcp_transport() {
 
     // Round 2: Create and send encrypted request
     let encrypted_request = responder.create_request().expect("create request");
-    send_encrypted_blob(&mut responder_transport, &encrypted_request).expect("send request");
+    responder_transport
+        .send(&encrypted_request)
+        .expect("send request");
 
-    // Verify confirmation code matches
     let responder_code = responder
         .compute_confirmation_code()
         .expect("confirmation code");
     assert!(!responder_code.is_empty());
 
     // Round 3: Receive encrypted response
-    let encrypted_response = recv_encrypted_blob(&mut responder_transport).expect("recv response");
+    let encrypted_response = responder_transport.recv().expect("recv response");
     let response = responder
         .process_response(&encrypted_response)
         .expect("process response");
 
-    // Verify the responder received a valid master seed
     assert_eq!(response.master_seed(), &[0x42u8; 32]);
     assert!(!response.display_name().is_empty());
 
-    // Verify initiator side completed successfully
     let (updated_registry, new_device) = initiator_handle.join().expect("initiator thread");
     assert_eq!(new_device.device_name(), "New Desktop");
     assert!(
@@ -145,7 +143,7 @@ fn full_device_link_over_tcp_transport() {
 
 // @internal
 #[test]
-fn recv_device_link_qr_rejects_invalid_data() {
+fn recv_invalid_qr_data_is_rejected() {
     let (client, server) = loopback_pair();
 
     thread::spawn(move || {
@@ -154,18 +152,20 @@ fn recv_device_link_qr_rejects_invalid_data() {
     });
 
     let mut transport = TcpDirectTransport::physical(server);
-    let result = recv_device_link_qr(&mut transport);
+    let data = transport.recv().expect("recv");
+    let qr_str = String::from_utf8(data).expect("utf8");
+    let result = DeviceLinkQR::from_data_string(&qr_str);
     assert!(result.is_err(), "Invalid QR data should be rejected");
 }
 
 // @internal
 #[test]
-fn recv_device_link_qr_rejects_after_disconnect() {
+fn recv_after_disconnect_fails() {
     let (client, server) = loopback_pair();
     drop(client);
 
     let mut transport = TcpDirectTransport::physical(server);
-    let result = recv_device_link_qr(&mut transport);
+    let result = transport.recv();
     assert!(result.is_err(), "Should fail on disconnected transport");
 }
 
@@ -178,11 +178,11 @@ fn send_recv_encrypted_blob_roundtrip() {
 
     let handle = thread::spawn(move || {
         let mut transport = TcpDirectTransport::physical(client);
-        send_encrypted_blob(&mut transport, &blob).expect("send");
+        transport.send(&blob).expect("send");
     });
 
     let mut transport = TcpDirectTransport::physical(server);
-    let received = recv_encrypted_blob(&mut transport).expect("recv");
+    let received = transport.recv().expect("recv");
 
     assert_eq!(received, expected);
     handle.join().expect("sender thread");

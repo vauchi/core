@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Property-based and adversarial tests for DirectTransport and USB exchange.
+//! Property-based and adversarial tests for TcpDirectTransport and USB exchange.
 //!
 //! CC-04: proptest for transport payload roundtrips.
 //! CC-14: adversarial payloads (truncated, corrupted, max-length, unicode, null bytes).
@@ -17,8 +17,8 @@ use proptest::prelude::*;
 
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::ManualConfirmationVerifier;
-use vauchi_core::exchange::direct_transport::DirectTransport;
-use vauchi_core::exchange::session::{ExchangeEvent, ExchangeSession, ExchangeState};
+use vauchi_core::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
+use vauchi_core::exchange::session::{ExchangeSession, ExchangeState};
 use vauchi_core::exchange::tcp_transport::TcpDirectTransport;
 use vauchi_core::identity::Identity;
 
@@ -85,9 +85,8 @@ fn adversarial_empty_direct_payload_rejected() {
     let card = ContactCard::new(identity.display_name());
     let mut session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
 
-    let result = session.apply(ExchangeEvent::DirectPayloadReceived {
-        their_payload: String::new(),
-    });
+    let result = session
+        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: Vec::new() });
     assert!(result.is_err(), "Empty payload should be rejected");
 }
 
@@ -98,23 +97,24 @@ fn adversarial_null_bytes_in_payload_rejected() {
     let card = ContactCard::new(identity.display_name());
     let mut session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
 
-    let result = session.apply(ExchangeEvent::DirectPayloadReceived {
-        their_payload: "\0\0\0\0\0\0\0\0".to_string(),
+    let result = session.apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
+        data: b"\0\0\0\0\0\0\0\0".to_vec(),
     });
     assert!(result.is_err(), "Null bytes payload should be rejected");
 }
 
 // @internal
 #[test]
-fn adversarial_unicode_payload_rejected() {
+fn adversarial_non_utf8_payload_rejected() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new(identity.display_name());
     let mut session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
 
-    let result = session.apply(ExchangeEvent::DirectPayloadReceived {
-        their_payload: "🔥💀🎃".repeat(100),
+    // Invalid UTF-8 sequence
+    let result = session.apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
+        data: vec![0xFF, 0xFE, 0x80, 0x81, 0xC0],
     });
-    assert!(result.is_err(), "Unicode garbage should be rejected");
+    assert!(result.is_err(), "Non-UTF-8 payload should be rejected");
 }
 
 // @internal
@@ -124,8 +124,8 @@ fn adversarial_max_length_payload_rejected() {
     let card = ContactCard::new(identity.display_name());
     let mut session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
 
-    let result = session.apply(ExchangeEvent::DirectPayloadReceived {
-        their_payload: "A".repeat(100_000),
+    let result = session.apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
+        data: b"A".repeat(100_000),
     });
     assert!(result.is_err(), "100KB garbage payload should be rejected");
 }
@@ -135,20 +135,24 @@ fn adversarial_max_length_payload_rejected() {
 fn adversarial_truncated_valid_payload() {
     let bob = Identity::create("Bob");
     let bob_card = ContactCard::new(bob.display_name());
-    let bob_session = ExchangeSession::new_usb(bob, bob_card, ManualConfirmationVerifier::new());
-    let valid_payload = bob_session.our_exchange_payload().unwrap();
+    let mut bob_session =
+        ExchangeSession::new_usb(bob, bob_card, ManualConfirmationVerifier::new());
 
-    // Truncate at various points
+    bob_session.emit_initial_commands();
+    let valid_payload = match &bob_session.drain_commands()[0] {
+        ExchangeCommand::DirectSend { payload, .. } => payload.clone(),
+        other => panic!("expected DirectSend, got {:?}", other),
+    };
+
     for truncate_at in [1, 10, 50, valid_payload.len() / 2, valid_payload.len() - 1] {
         let identity = Identity::create("Alice");
         let card = ContactCard::new(identity.display_name());
         let mut session =
             ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
 
-        let truncated = &valid_payload[..truncate_at];
-        let result = session.apply(ExchangeEvent::DirectPayloadReceived {
-            their_payload: truncated.to_string(),
-        });
+        let truncated = valid_payload[..truncate_at].to_vec();
+        let result = session
+            .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: truncated });
         assert!(
             result.is_err(),
             "Truncated payload at {} bytes should be rejected",
@@ -162,22 +166,28 @@ fn adversarial_truncated_valid_payload() {
 fn adversarial_corrupted_valid_payload() {
     let bob = Identity::create("Bob");
     let bob_card = ContactCard::new(bob.display_name());
-    let bob_session = ExchangeSession::new_usb(bob, bob_card, ManualConfirmationVerifier::new());
-    let valid_payload = bob_session.our_exchange_payload().unwrap();
+    let mut bob_session =
+        ExchangeSession::new_usb(bob, bob_card, ManualConfirmationVerifier::new());
 
-    // Flip bits at various positions
-    let mut corrupted = valid_payload.clone().into_bytes();
+    bob_session.emit_initial_commands();
+    let valid_payload = match &bob_session.drain_commands()[0] {
+        ExchangeCommand::DirectSend { payload, .. } => payload.clone(),
+        other => panic!("expected DirectSend, got {:?}", other),
+    };
+
+    // Corrupt specific base64 characters (stay in ASCII range for valid UTF-8)
+    let mut corrupted = valid_payload.clone();
     for pos in [0, 10, corrupted.len() / 2, corrupted.len() - 1] {
-        corrupted[pos] ^= 0xFF;
+        // XOR with 0x20 flips case for ASCII letters, stays valid UTF-8
+        corrupted[pos] ^= 0x20;
     }
 
     let identity = Identity::create("Alice");
     let card = ContactCard::new(identity.display_name());
     let mut session = ExchangeSession::new_usb(identity, card, ManualConfirmationVerifier::new());
 
-    let result = session.apply(ExchangeEvent::DirectPayloadReceived {
-        their_payload: String::from_utf8_lossy(&corrupted).to_string(),
-    });
+    let result = session
+        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: corrupted });
     assert!(result.is_err(), "Corrupted payload should be rejected");
 }
 
@@ -189,16 +199,21 @@ fn adversarial_replay_same_payload_twice() {
     let bob = Identity::create("Bob");
     let bob_card = ContactCard::new(bob.display_name());
 
-    let bob_session = ExchangeSession::new_usb(bob, bob_card, ManualConfirmationVerifier::new());
-    let bob_payload = bob_session.our_exchange_payload().unwrap();
+    let mut bob_session =
+        ExchangeSession::new_usb(bob, bob_card, ManualConfirmationVerifier::new());
+    bob_session.emit_initial_commands();
+    let bob_payload = match &bob_session.drain_commands()[0] {
+        ExchangeCommand::DirectSend { payload, .. } => payload.clone(),
+        other => panic!("expected DirectSend, got {:?}", other),
+    };
 
     let mut session =
         ExchangeSession::new_usb(alice, alice_card, ManualConfirmationVerifier::new());
 
     // First apply succeeds
     session
-        .apply(ExchangeEvent::DirectPayloadReceived {
-            their_payload: bob_payload.clone(),
+        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
+            data: bob_payload.clone(),
         })
         .expect("first should succeed");
 
@@ -208,9 +223,8 @@ fn adversarial_replay_same_payload_twice() {
     ));
 
     // Second apply fails (wrong state)
-    let result = session.apply(ExchangeEvent::DirectPayloadReceived {
-        their_payload: bob_payload,
-    });
+    let result = session
+        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: bob_payload });
     assert!(
         result.is_err(),
         "Replayed payload should be rejected (wrong state)"
@@ -219,10 +233,9 @@ fn adversarial_replay_same_payload_twice() {
 
 // @internal
 #[test]
-fn adversarial_tcp_invalid_magic_over_direct_transport() {
+fn adversarial_tcp_invalid_magic_over_transport() {
     let (mut client, server) = loopback_pair();
 
-    // Send garbage with wrong magic bytes
     client.write_all(b"XXXX").expect("write magic");
     client.write_all(&[1]).expect("write version");
     client.write_all(&4u32.to_be_bytes()).expect("write len");
@@ -231,15 +244,12 @@ fn adversarial_tcp_invalid_magic_over_direct_transport() {
 
     let mut transport = TcpDirectTransport::physical(server);
     let result = transport.recv();
-    assert!(
-        result.is_err(),
-        "Invalid magic should be rejected through DirectTransport"
-    );
+    assert!(result.is_err(), "Invalid magic should be rejected");
 }
 
 // @internal
 #[test]
-fn adversarial_tcp_wrong_version_over_direct_transport() {
+fn adversarial_tcp_wrong_version_over_transport() {
     let (mut client, server) = loopback_pair();
 
     client.write_all(b"VXCH").expect("magic");
@@ -250,8 +260,5 @@ fn adversarial_tcp_wrong_version_over_direct_transport() {
 
     let mut transport = TcpDirectTransport::physical(server);
     let result = transport.recv();
-    assert!(
-        result.is_err(),
-        "Wrong version should be rejected through DirectTransport"
-    );
+    assert!(result.is_err(), "Wrong version should be rejected");
 }

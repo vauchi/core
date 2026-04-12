@@ -54,9 +54,9 @@ pub enum ExchangeState {
         shared_key: crate::crypto::SymmetricKey,
     },
     /// Direct transport (USB/TCP): ready for payload exchange.
-    /// The caller retrieves our payload via `our_exchange_payload()`,
-    /// exchanges it over a `DirectTransport`, then feeds the peer's
-    /// payload back via `DirectPayloadReceived`.
+    /// `emit_initial_commands()` emits `DirectSend` with our payload.
+    /// Frontend executes TCP exchange and reports the peer's payload
+    /// via `ExchangeHardwareEvent::DirectPayloadReceived`.
     AwaitingDirectPayload { our_qr: ExchangeQR },
     /// NFC: waiting for both devices to tap.
     AwaitingNfcTap,
@@ -90,11 +90,6 @@ pub enum ExchangeEvent {
     CompleteExchange(ContactCard),
     /// Explicitly fail the session.
     Fail(ExchangeError),
-
-    // --- Direct transport events (USB/TCP) ---
-    /// Received the peer's exchange payload over a direct transport.
-    /// Contains the raw QR data string received from the peer.
-    DirectPayloadReceived { their_payload: String },
 
     // --- NFC events ---
     /// NFC tap completed; contains their payload bytes.
@@ -399,10 +394,10 @@ impl ExchangeSession {
     ///
     /// Used for desktop-to-phone exchange over a physical USB cable or
     /// local network TCP connection. The session starts in
-    /// `AwaitingDirectPayload` — the caller should:
-    /// 1. Call `our_exchange_payload()` to get the data string to send
-    /// 2. Exchange it over a `DirectTransport` (send ours, receive theirs)
-    /// 3. Feed the peer's payload via `apply(DirectPayloadReceived { .. })`
+    /// `AwaitingDirectPayload`. The ADR-031 command/event flow is:
+    /// 1. Call `emit_initial_commands()` → emits `DirectSend` with our payload
+    /// 2. Frontend executes TCP exchange, receives peer's payload
+    /// 3. Frontend reports `ExchangeHardwareEvent::DirectPayloadReceived`
     /// 4. Then `PerformKeyAgreement` → `CompleteExchange` as usual
     pub fn new_usb(
         identity: Identity,
@@ -700,10 +695,6 @@ impl ExchangeSession {
             ExchangeEvent::StartQR => self.handle_start_qr(),
             ExchangeEvent::ProcessQR(qr) => self.handle_process_qr(qr),
             ExchangeEvent::TheyScannedOurQR => self.handle_they_scanned_our_qr(),
-            // Direct transport events (USB/TCP)
-            ExchangeEvent::DirectPayloadReceived { their_payload } => {
-                self.handle_direct_payload_received(their_payload)
-            }
             // Shared events
             ExchangeEvent::PerformKeyAgreement => self.handle_perform_key_agreement(),
             ExchangeEvent::CompleteExchange(card) => {
@@ -851,6 +842,12 @@ impl ExchangeSession {
                 self.attempt_transport_fallback(&transport);
                 Ok(())
             }
+            // Direct transport (USB/TCP)
+            ExchangeHardwareEvent::DirectPayloadReceived { data } => {
+                let payload_str =
+                    String::from_utf8(data).map_err(|_| ExchangeError::InvalidQRFormat)?;
+                self.handle_direct_payload_received(payload_str)
+            }
             // New hardware event variants — not yet wired into the session state machine.
             // Frontends may send these; they are acknowledged without state change until
             // the corresponding session logic is implemented.
@@ -901,6 +898,12 @@ impl ExchangeSession {
                         service_uuid: super::VAUCHI_BLE_SERVICE_UUID.to_string(),
                         payload: Vec::new(),
                     });
+            }
+            (ExchangeState::AwaitingDirectPayload { our_qr }, ExchangeTransport::Usb) => {
+                self.pending_commands.push(ExchangeCommand::DirectSend {
+                    payload: our_qr.to_data_string().into_bytes(),
+                    is_initiator: true,
+                });
             }
             _ => {}
         }
@@ -1474,6 +1477,18 @@ impl ExchangeSession {
         if !qr.verify_signature() {
             return Err(ExchangeError::InvalidSignature);
         }
+
+        // Defense in depth: track consumed payload hashes to detect replays
+        let payload_hash = {
+            use sha2::{Digest, Sha256};
+            let mut h = Sha256::new();
+            h.update(their_payload.as_bytes());
+            let result = h.finalize();
+            let mut hash = [0u8; 32];
+            hash.copy_from_slice(&result);
+            hash
+        };
+        self.check_qr_reuse(&payload_hash)?;
 
         let their_public_key = *qr.public_key();
         let their_exchange_key = *qr.exchange_key();

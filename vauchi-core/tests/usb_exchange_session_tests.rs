@@ -9,9 +9,13 @@
 
 #![cfg(feature = "testing")]
 
+use std::net::{TcpListener, TcpStream};
+use std::thread;
+
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
 use vauchi_core::exchange::session::{ExchangeEvent, ExchangeSession, ExchangeState};
+use vauchi_core::exchange::tcp_transport::TcpDirectTransport;
 use vauchi_core::exchange::{ManualConfirmationVerifier, ProximityConfidence, UsbRole};
 use vauchi_core::identity::Identity;
 use vauchi_core::types::ExchangeTransport;
@@ -321,6 +325,122 @@ fn usb_responder_emits_is_initiator_false() {
         }
         other => panic!("expected DirectSend, got {:?}", other),
     }
+}
+
+// @internal
+#[test]
+fn full_usb_exchange_over_tcp_loopback() {
+    // Create two sessions — Alice is initiator (desktop), Bob is responder (phone)
+    let alice_id = create_identity("Alice");
+    let alice_card = create_card(&alice_id);
+    let bob_id = create_identity("Bob");
+    let bob_card = create_card(&bob_id);
+
+    let mut alice_session = ExchangeSession::new_usb(
+        alice_id,
+        alice_card.clone(),
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+    );
+    let mut bob_session = ExchangeSession::new_usb(
+        bob_id,
+        bob_card.clone(),
+        ManualConfirmationVerifier::new(),
+        UsbRole::Responder,
+    );
+
+    // Emit initial commands from both sessions
+    alice_session.emit_initial_commands();
+    bob_session.emit_initial_commands();
+    let alice_cmds = alice_session.drain_commands();
+    let bob_cmds = bob_session.drain_commands();
+
+    // Extract payloads and initiator flags
+    let (alice_payload, alice_init) = match &alice_cmds[0] {
+        ExchangeCommand::DirectSend {
+            payload,
+            is_initiator,
+        } => (payload.clone(), *is_initiator),
+        other => panic!("expected DirectSend from alice, got {:?}", other),
+    };
+    let (bob_payload, bob_init) = match &bob_cmds[0] {
+        ExchangeCommand::DirectSend {
+            payload,
+            is_initiator,
+        } => (payload.clone(), *is_initiator),
+        other => panic!("expected DirectSend from bob, got {:?}", other),
+    };
+
+    // Verify roles
+    assert!(alice_init, "alice should be initiator");
+    assert!(!bob_init, "bob should be responder");
+
+    // TCP loopback: Bob listens, Alice connects
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    // Bob runs in a thread (responder: recv first, then send)
+    let bob_handle = thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        let mut t = TcpDirectTransport::physical(stream);
+        t.exchange(&bob_payload, bob_init).unwrap()
+    });
+
+    // Alice connects and exchanges (initiator: send first, then recv)
+    let alice_stream = TcpStream::connect(addr).unwrap();
+    let mut alice_t = TcpDirectTransport::physical(alice_stream);
+    let bob_received = alice_t.exchange(&alice_payload, alice_init).unwrap();
+    let alice_received = bob_handle.join().unwrap();
+
+    // Feed received payloads back to sessions
+    alice_session
+        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: bob_received })
+        .expect("alice processes bob payload");
+    bob_session
+        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
+            data: alice_received,
+        })
+        .expect("bob processes alice payload");
+
+    // Both should be in AwaitingKeyAgreement
+    assert!(
+        matches!(
+            alice_session.state(),
+            ExchangeState::AwaitingKeyAgreement { .. }
+        ),
+        "alice should be in AwaitingKeyAgreement"
+    );
+    assert!(
+        matches!(
+            bob_session.state(),
+            ExchangeState::AwaitingKeyAgreement { .. }
+        ),
+        "bob should be in AwaitingKeyAgreement"
+    );
+
+    // Complete key agreement
+    alice_session
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .expect("alice key agreement");
+    bob_session
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .expect("bob key agreement");
+
+    // Both should now be in AwaitingCardExchange
+    assert!(
+        matches!(
+            alice_session.state(),
+            ExchangeState::AwaitingCardExchange { .. }
+        ),
+        "alice should be in AwaitingCardExchange"
+    );
+    assert!(
+        matches!(
+            bob_session.state(),
+            ExchangeState::AwaitingCardExchange { .. }
+        ),
+        "bob should be in AwaitingCardExchange"
+    );
 }
 
 // @internal

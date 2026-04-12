@@ -31,9 +31,9 @@ vauchi-core/src/storage/rekey.rs 1251
 vauchi-core/src/storage/mod.rs 1079
 
 # SPLIT DONE — Phase 3: app_engine.rs (1437) split into mod.rs + routing.rs + screens.rs
-vauchi-app/src/ui/app_engine/mod.rs 746
-vauchi-app/src/ui/app_engine/routing.rs 698
-vauchi-app/src/ui/app_engine/screens.rs 940
+vauchi-app/src/ui/app_engine/mod.rs 801
+vauchi-app/src/ui/app_engine/routing.rs 727
+vauchi-app/src/ui/app_engine/screens.rs 977
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

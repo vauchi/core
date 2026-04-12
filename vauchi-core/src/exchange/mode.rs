@@ -4,7 +4,7 @@
 
 //! Exchange mode catalog.
 //!
-//! Defines the [`ExchangeMode`] enum (all 10 supported modes) along with
+//! Defines the [`ExchangeMode`] enum (all 11 supported modes) along with
 //! supporting type enums and the static [`ModeConfig`] catalog that describes
 //! transport, bootstrap, proximity signals, timeouts, and device requirements
 //! for every mode.
@@ -40,10 +40,12 @@ pub enum ExchangeMode {
     Web,
     /// Async remote exchange via a shareable URL.
     Link,
+    /// USB cable exchange between a desktop and a phone.
+    Cable,
 }
 
 impl ExchangeMode {
-    /// Returns all ten variants in declaration order.
+    /// Returns all eleven variants in declaration order.
     pub fn all() -> &'static [Self] {
         &[
             Self::Glance,
@@ -56,6 +58,7 @@ impl ExchangeMode {
             Self::Broadcast,
             Self::Web,
             Self::Link,
+            Self::Cable,
         ]
     }
 
@@ -72,6 +75,7 @@ impl ExchangeMode {
             Self::Broadcast => "Broadcast",
             Self::Web => "Web",
             Self::Link => "Link",
+            Self::Cable => "Cable",
         }
     }
 
@@ -83,7 +87,19 @@ impl ExchangeMode {
             Self::TapTap | Self::TapHoverShake => ModeCategory::Fun,
             Self::Broadcast => ModeCategory::Group,
             Self::Web | Self::Link => ModeCategory::Remote,
+            Self::Cable => ModeCategory::Standard,
         }
+    }
+
+    /// Returns `true` if this mode requires a camera on at least one peer device.
+    pub fn requires_camera(self) -> bool {
+        self.config().requires.contains(&DeviceRequirement::Camera)
+    }
+
+    /// Returns `true` if this mode uses a physical proximity signal to verify
+    /// co-presence (i.e., the config's `proximity` slice is non-empty).
+    pub fn requires_proximity(self) -> bool {
+        !self.config().proximity.is_empty()
     }
 
     /// Static configuration for this mode.
@@ -99,6 +115,7 @@ impl ExchangeMode {
             Self::Broadcast => &MODE_BROADCAST,
             Self::Web => &MODE_WEB,
             Self::Link => &MODE_LINK,
+            Self::Cable => &MODE_CABLE,
         }
     }
 }
@@ -139,6 +156,8 @@ pub enum BootstrapMethod {
     NfcBootstrap,
     NfcAndBle,
     UrlShare,
+    /// USB cable connection — desktop initiates, phone responds.
+    UsbCable,
 }
 
 /// Physical proximity signal used to verify co-presence.
@@ -150,6 +169,8 @@ pub enum ProximityMethod {
     NfcRange,
     Accelerometer,
     Impact,
+    /// Physical wired connection (e.g. USB cable) guarantees co-presence.
+    WiredConnection,
 }
 
 /// Whether the exchange requires both parties to be physically present.
@@ -174,6 +195,8 @@ pub enum DeviceRequirement {
     Speaker,
     Accelerometer,
     Internet,
+    /// USB port capable of data transfer (not charge-only).
+    UsbPort,
 }
 
 // ── ModeConfig ──────────────────────────────────────────────────────────────
@@ -313,6 +336,16 @@ static MODE_LINK: ModeConfig = ModeConfig {
     requires: &[DeviceRequirement::Internet],
 };
 
+static MODE_CABLE: ModeConfig = ModeConfig {
+    data_transport: DataTransport::Ble,
+    bootstrap: BootstrapMethod::UsbCable,
+    proximity: &[ProximityMethod::WiredConnection],
+    fallback_transport: Some(DataTransport::Relay),
+    context: ExchangeContext::InPerson,
+    timeout: Duration::from_secs(60),
+    requires: &[DeviceRequirement::UsbPort],
+};
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 // INLINE_TEST_REQUIRED: static catalog constants (MODE_GLANCE…MODE_LINK) are not visible outside this module; tests verify exact field values against them
@@ -321,11 +354,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn exchange_mode_has_ten_variants() {
+    fn exchange_mode_has_eleven_variants() {
         let all = ExchangeMode::all();
-        assert_eq!(all.len(), 10);
+        assert_eq!(all.len(), 11);
         assert_eq!(all[0], ExchangeMode::Glance);
-        assert_eq!(all[9], ExchangeMode::Link);
+        assert_eq!(all[10], ExchangeMode::Cable);
     }
 
     #[test]
@@ -381,6 +414,7 @@ mod tests {
         assert_eq!(ExchangeMode::Broadcast.display_name(), "Broadcast");
         assert_eq!(ExchangeMode::Web.display_name(), "Web");
         assert_eq!(ExchangeMode::Link.display_name(), "Link");
+        assert_eq!(ExchangeMode::Cable.display_name(), "Cable");
     }
 
     #[test]
@@ -395,6 +429,7 @@ mod tests {
         assert_eq!(ExchangeMode::Broadcast.category(), ModeCategory::Group);
         assert_eq!(ExchangeMode::Web.category(), ModeCategory::Remote);
         assert_eq!(ExchangeMode::Link.category(), ModeCategory::Remote);
+        assert_eq!(ExchangeMode::Cable.category(), ModeCategory::Standard);
     }
 
     #[test]
@@ -476,7 +511,7 @@ mod tests {
     #[test]
     fn all_covers_every_variant() {
         let modes = ExchangeMode::all();
-        assert_eq!(modes.len(), 10, "update this count when adding variants");
+        assert_eq!(modes.len(), 11, "update this count when adding variants");
         for &mode in modes {
             match mode {
                 ExchangeMode::Glance
@@ -488,8 +523,29 @@ mod tests {
                 | ExchangeMode::TapHoverShake
                 | ExchangeMode::Broadcast
                 | ExchangeMode::Web
-                | ExchangeMode::Link => {}
+                | ExchangeMode::Link
+                | ExchangeMode::Cable => {}
             }
         }
+    }
+
+    #[test]
+    fn cable_mode_exists_and_is_categorized() {
+        let mode = ExchangeMode::Cable;
+        assert_eq!(mode.display_name(), "Cable");
+        assert_eq!(mode.category(), ModeCategory::Standard);
+        assert!(!mode.requires_camera());
+        assert!(mode.requires_proximity());
+    }
+
+    #[test]
+    fn cable_config_uses_usb_bootstrap_with_wired_proximity() {
+        let cfg = ExchangeMode::Cable.config();
+        assert_eq!(cfg.bootstrap, BootstrapMethod::UsbCable);
+        assert_eq!(cfg.proximity, &[ProximityMethod::WiredConnection]);
+        assert_eq!(cfg.context, ExchangeContext::InPerson);
+        assert_eq!(cfg.fallback_transport, Some(DataTransport::Relay));
+        assert!(cfg.requires.contains(&DeviceRequirement::UsbPort));
+        assert!(!cfg.requires.contains(&DeviceRequirement::Camera));
     }
 }

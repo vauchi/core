@@ -55,6 +55,10 @@ pub struct DeviceCapabilities {
     /// Device has internet connectivity (for relay/Link/Web modes).
     #[serde(default)]
     pub has_internet: bool,
+
+    /// Device has a USB port capable of data transfer (for Cable exchange).
+    #[serde(default)]
+    pub has_usb_port: bool,
 }
 
 /// Type of biometric hardware available on the device.

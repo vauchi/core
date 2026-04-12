@@ -16,7 +16,7 @@ use vauchi_core::exchange::mode_availability::{
 
 /// Engine that displays exchange mode selection.
 ///
-/// Shows all 10 modes grouped by `ModeCategory`, highlights the
+/// Shows all 11 modes grouped by `ModeCategory`, highlights the
 /// recommended mode, and grays out unavailable modes with a reason.
 /// When the user picks a mode, returns `ModeSelectionResult::Selected`.
 pub struct ModeSelectionEngine {
@@ -137,7 +137,10 @@ impl SerdeName for ExchangeMode {
             ExchangeMode::Broadcast => "broadcast",
             ExchangeMode::Web => "web",
             ExchangeMode::Link => "link",
-            _ => "unknown",
+            ExchangeMode::Cable => "cable",
+            // Safety: all known variants are listed above; new variants added to
+            // vauchi-core must also be added here before shipping.
+            _ => panic!("unknown ExchangeMode variant — update serde_name()"),
         }
     }
 }
@@ -155,6 +158,7 @@ fn parse_mode(name: &str) -> Option<ExchangeMode> {
         "broadcast" => Some(ExchangeMode::Broadcast),
         "web" => Some(ExchangeMode::Web),
         "link" => Some(ExchangeMode::Link),
+        "cable" => Some(ExchangeMode::Cable),
         _ => None,
     }
 }
@@ -172,6 +176,7 @@ mod tests {
             audio: vauchi_core::types::AudioCapability::Full,
             has_accelerometer: true,
             has_internet: true,
+            has_usb_port: true,
             ..Default::default()
         }
     }
@@ -189,7 +194,7 @@ mod tests {
     }
 
     #[test]
-    fn screen_shows_all_ten_modes() {
+    fn screen_shows_all_eleven_modes() {
         let engine = ModeSelectionEngine::new(full_caps());
         let screen = engine.screen();
         assert_eq!(screen.screen_id, "exchange_mode_selection");
@@ -203,7 +208,7 @@ mod tests {
                 _ => None,
             })
             .sum();
-        assert_eq!(mode_count, 10, "All 10 modes should be listed");
+        assert_eq!(mode_count, 11, "All 11 modes should be listed");
     }
 
     #[test]

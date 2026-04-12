@@ -52,6 +52,7 @@ pub fn check_mode_availability(mode: ExchangeMode, caps: &DeviceCapabilities) ->
             ),
             DeviceRequirement::Accelerometer => caps.has_accelerometer,
             DeviceRequirement::Internet => caps.has_internet,
+            DeviceRequirement::UsbPort => caps.has_usb_port,
         };
 
         if !satisfied {
@@ -112,6 +113,7 @@ fn requirement_name(req: &DeviceRequirement) -> &'static str {
         DeviceRequirement::Speaker => "speaker",
         DeviceRequirement::Accelerometer => "accelerometer",
         DeviceRequirement::Internet => "internet",
+        DeviceRequirement::UsbPort => "USB port",
     }
 }
 
@@ -134,6 +136,7 @@ mod tests {
             audio: AudioCapability::Full,
             has_accelerometer: true,
             has_internet: true,
+            has_usb_port: true,
             ..Default::default()
         }
     }

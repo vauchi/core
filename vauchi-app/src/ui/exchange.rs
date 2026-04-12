@@ -90,6 +90,28 @@ pub struct ExchangeEngine {
     reciprocity_confirmer: Option<ReciprocityConfirmer>,
 }
 
+/// Sub-steps for the USB cable / direct TCP exchange flow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DirectStep {
+    /// Waiting for USB connection (phone acts as server).
+    WaitingForConnection,
+    /// TCP exchange in progress.
+    Exchanging,
+}
+
+impl DirectStep {
+    /// Matches `QrStep::STEP_COUNT` / `BleStep::STEP_COUNT` for consistent
+    /// progress bar. Padded to 3 with a no-op mapping for the third slot.
+    pub(self) const STEP_COUNT: u8 = 3;
+
+    fn step_number(self, base: u8) -> u8 {
+        base + match self {
+            Self::WaitingForConnection => 0,
+            Self::Exchanging => 1,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum ExchangeStep {
     /// User picks an exchange mode (first step when mode is not pre-set).
@@ -105,7 +127,7 @@ enum ExchangeStep {
     /// Link exchange sub-flow (async relay-mediated).
     Link(LinkStep),
     /// USB cable / direct TCP exchange.
-    DirectTransport,
+    DirectTransport(DirectStep),
     Success,
     Failed,
 }
@@ -120,7 +142,7 @@ impl ExchangeStep {
             Self::Qr(qr) => qr.step_number(4),
             Self::Ble(ble) => ble.step_number(4),
             Self::Link(link) => link.step_number(4),
-            Self::DirectTransport => 4, // Same as QR/BLE/Link sub-flow start
+            Self::DirectTransport(direct) => direct.step_number(4),
             Self::Success => 4 + QrStep::STEP_COUNT,
             Self::Failed => 5 + QrStep::STEP_COUNT,
         }
@@ -131,6 +153,7 @@ impl ExchangeStep {
 // All sub-flows must have the same step count for consistent progress.
 const _: () = assert!(QrStep::STEP_COUNT == LinkStep::STEP_COUNT);
 const _: () = assert!(QrStep::STEP_COUNT == BleStep::STEP_COUNT);
+const _: () = assert!(DirectStep::STEP_COUNT == QrStep::STEP_COUNT);
 const TOTAL_STEPS: u8 = 3 + QrStep::STEP_COUNT + 2;
 
 impl ExchangeEngine {
@@ -147,7 +170,7 @@ impl ExchangeEngine {
                 return ExchangeStep::Link(LinkStep::ShareUrl);
             }
             if config.mode == Some(ExchangeMode::Cable) {
-                return ExchangeStep::DirectTransport;
+                return ExchangeStep::DirectTransport(DirectStep::WaitingForConnection);
             }
             if matches!(
                 config.mode,
@@ -224,7 +247,7 @@ impl ExchangeEngine {
 
         // If starting directly at DirectTransport, emit initial commands now.
         // USB sessions begin in AwaitingDirectPayload — no StartQR needed.
-        if step == ExchangeStep::DirectTransport {
+        if matches!(step, ExchangeStep::DirectTransport(_)) {
             session.emit_initial_commands();
         }
 
@@ -352,10 +375,11 @@ impl ExchangeEngine {
         if let Some(ref mut session) = self.session {
             // USB direct transport: session is already in AwaitingDirectPayload.
             // Just emit initial commands (DirectSend) without starting QR.
-            if self.step == ExchangeStep::DirectTransport {
+            if matches!(self.step, ExchangeStep::DirectTransport(_)) {
                 session.emit_initial_commands();
                 let commands = session.drain_commands();
                 if !commands.is_empty() {
+                    self.step = ExchangeStep::DirectTransport(DirectStep::Exchanging);
                     return ActionResult::ExchangeCommands { commands };
                 }
             }
@@ -651,13 +675,13 @@ impl ExchangeEngine {
             ExchangeStep::Link(LinkStep::Retrieving) => {
                 exchange_link::build_retrieving_screen(self.progress())
             }
-            ExchangeStep::DirectTransport => ScreenModel {
-                screen_id: "exchange_direct_transport".into(),
+            ExchangeStep::DirectTransport(DirectStep::WaitingForConnection) => ScreenModel {
+                screen_id: "exchange_direct_waiting".into(),
                 title: "USB Exchange".into(),
                 subtitle: Some("Connect your phone via USB cable".into()),
                 components: vec![Component::Text {
-                    id: "usb_status".into(),
-                    content: "Waiting for connection...".into(),
+                    id: "instructions".into(),
+                    content: "1. Connect your phone with a USB cable\n2. Enable USB tethering (Android) or trust this computer (iOS)\n3. Open Vauchi on your phone and start an exchange".into(),
                     style: TextStyle::Body,
                 }],
                 actions: vec![ScreenAction {
@@ -666,6 +690,19 @@ impl ExchangeEngine {
                     style: ActionStyle::Secondary,
                     enabled: true,
                 }],
+                progress: Some(self.progress()),
+                ..Default::default()
+            },
+            ExchangeStep::DirectTransport(DirectStep::Exchanging) => ScreenModel {
+                screen_id: "exchange_direct_exchanging".into(),
+                title: "USB Exchange".into(),
+                subtitle: Some("Exchanging contact cards...".into()),
+                components: vec![Component::Text {
+                    id: "status".into(),
+                    content: "Connected. Exchanging encrypted data...".into(),
+                    style: TextStyle::Body,
+                }],
+                actions: vec![],
                 progress: Some(self.progress()),
                 ..Default::default()
             },
@@ -2664,9 +2701,12 @@ mod tests {
             mode: Some(ExchangeMode::Cable),
             ..config_no_groups()
         });
-        assert_eq!(engine.step, ExchangeStep::DirectTransport);
+        assert_eq!(
+            engine.step,
+            ExchangeStep::DirectTransport(DirectStep::WaitingForConnection)
+        );
         let screen = engine.current_screen();
-        assert_eq!(screen.screen_id, "exchange_direct_transport");
+        assert_eq!(screen.screen_id, "exchange_direct_waiting");
     }
 
     // @internal
@@ -2699,11 +2739,14 @@ mod tests {
         let card = ContactCard::new("Test");
         let verifier = ManualConfirmationVerifier::new();
         let session = ExchangeSession::new_usb(identity, card, verifier, UsbRole::Initiator);
-        let mut engine = ExchangeEngine::with_session(config, session);
+        let engine = ExchangeEngine::with_session(config, session);
 
         // start_session_if_needed is called via handle_action in the USB path;
-        // after construction the step should be DirectTransport.
-        assert_eq!(engine.step, ExchangeStep::DirectTransport);
+        // after construction the step should be DirectTransport(WaitingForConnection).
+        assert_eq!(
+            engine.step,
+            ExchangeStep::DirectTransport(DirectStep::WaitingForConnection)
+        );
 
         // drain_commands calls session.drain_commands() which should contain DirectSend
         // emitted by emit_initial_commands during with_session construction.
@@ -2713,7 +2756,7 @@ mod tests {
         // forcing emit_initial_commands through a cancel + retry path. Instead,
         // directly test by checking that the session is set and the screen title matches.
         let screen = engine.current_screen();
-        assert_eq!(screen.screen_id, "exchange_direct_transport");
+        assert_eq!(screen.screen_id, "exchange_direct_waiting");
         assert!(
             engine.session().is_some(),
             "Session must be retained for DirectTransport"

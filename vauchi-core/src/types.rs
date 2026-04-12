@@ -8,6 +8,16 @@
 //! Placing them here avoids circular dependencies and prepares for future crate
 //! extraction (vauchi-types).
 
+/// Where an event originated — local device or synced from another.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+pub enum EventOrigin {
+    /// Event happened on this device.
+    Local,
+    /// Event arrived via sync from another device.
+    Synced,
+}
+
 /// Transport method used for contact exchange.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,

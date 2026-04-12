@@ -18,7 +18,7 @@ pub mod types;
 pub mod text;
 pub use types::{
     AhaMomentTracker, AhaMomentType, AudioCapability, DEFAULT_EMERGENCY_MESSAGE, DemoContactState,
-    DuressSettings, EmergencyBroadcastConfig, ExchangeTransport, OnboardingProgress,
+    DuressSettings, EmergencyBroadcastConfig, EventOrigin, ExchangeTransport, OnboardingProgress,
     OnboardingStep, ProximityConfidence,
 };
 pub mod contact;
@@ -76,8 +76,8 @@ pub mod api;
 #[cfg(feature = "network-rustls")]
 pub use api::{
     AppPasswordConfig, AuthMode, AuthResult, BroadcastResult, ConsentStatus, DuressAlert,
-    DuressAlertType, EmergencyWipeStatus, EventOrigin, HandlerId, RecoveryReadiness, SetupProgress,
-    Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult, VauchiSyncOutcome,
+    DuressAlertType, EmergencyWipeStatus, HandlerId, RecoveryReadiness, SetupProgress, Vauchi,
+    VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult, VauchiSyncOutcome,
 };
 pub mod aha_moments;
 pub use aha_moments::AhaMoment;

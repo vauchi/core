@@ -35,6 +35,7 @@ pub mod notification_types;
 
 pub mod notification_emitter;
 
+#[cfg(feature = "network-rustls")]
 pub mod activity_log_writer;
 
 pub mod ui;

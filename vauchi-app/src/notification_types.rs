@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-pub use vauchi_core::api::EventOrigin;
+pub use vauchi_core::EventOrigin;
 
 /// Notification categories that produce OS notifications.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

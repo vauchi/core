@@ -15,15 +15,7 @@ use crate::sync::SyncState;
 /// Unique identifier for a registered event handler.
 pub type HandlerId = u64;
 
-/// Where an event originated — local device or synced from another.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-pub enum EventOrigin {
-    /// Event happened on this device.
-    Local,
-    /// Event arrived via sync from another device.
-    Synced,
-}
+pub use crate::types::EventOrigin;
 
 /// Events emitted by Vauchi.
 #[derive(Debug, Clone)]

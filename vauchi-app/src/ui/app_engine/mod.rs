@@ -91,6 +91,7 @@ pub enum AppScreen {
     },
     More,
     ActivityLog,
+    ArchivedContacts,
 }
 
 impl AppScreen {
@@ -131,6 +132,7 @@ impl AppScreen {
             Self::VerifyFingerprint { .. } => "verify_fingerprint",
             Self::More => "more",
             Self::ActivityLog => "activity_log",
+            Self::ArchivedContacts => "archived_contacts",
         }
     }
 
@@ -161,6 +163,7 @@ impl AppScreen {
             "contact_limit" => Self::ContactLimit,
             "more" => Self::More,
             "activity_log" => Self::ActivityLog,
+            "archived_contacts" => Self::ArchivedContacts,
             _ => return None,
         })
     }
@@ -609,6 +612,37 @@ impl WorkflowEngine for AppEngine {
         {
             let screen = self.navigate_to(AppScreen::Exchange);
             return ActionResult::NavigateTo(screen);
+        }
+
+        // "View archived" from contacts → navigate to ArchivedContacts screen
+        if matches!(
+            &action,
+            UserAction::ActionPressed { action_id } if action_id == "view_archived"
+        ) && matches!(self.screen, AppScreen::Contacts)
+        {
+            let screen = self.navigate_to(AppScreen::ArchivedContacts);
+            return ActionResult::NavigateTo(screen);
+        }
+
+        // Unarchive from ArchivedContacts screen
+        if self.screen == AppScreen::ArchivedContacts
+            && let UserAction::ActionPressed { ref action_id } = action
+            && let Some(contact_id) = action_id.strip_prefix("unarchive_")
+        {
+            let _ = self.vauchi.unarchive_contact(contact_id);
+            self.engine_cache.remove(&AppScreen::Contacts);
+            self.engine_cache.remove(&AppScreen::ArchivedContacts);
+            let screen = self.screen.clone();
+            self.engine = Self::create_engine(
+                &self.vauchi,
+                &screen,
+                self.preview_as_contact.as_deref(),
+                &self.device_capabilities,
+            );
+            return ActionResult::ShowToast {
+                message: "Contact unarchived".into(),
+                undo_action_id: None,
+            };
         }
 
         if let Some(result) = self.handle_undo(&action) {

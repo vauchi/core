@@ -134,6 +134,14 @@ impl WorkflowEngine for ContactListEngine {
             }]
         };
 
+        // Archived contacts link
+        actions.push(ScreenAction {
+            id: "view_archived".into(),
+            label: "Archived Contacts".into(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+        });
+
         // Add exchange shortcut when empty
         if self.all_contacts.is_empty() {
             actions.insert(

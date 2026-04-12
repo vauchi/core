@@ -10,6 +10,7 @@ use super::AppEngine;
 use super::AppScreen;
 use super::initials;
 use crate::ui::activity_log::{ActivityLogEngine, ActivityLogItem};
+use crate::ui::archived_contacts::ArchivedContactsEngine;
 use crate::ui::backup_recovery::BackupRecoveryEngine;
 use crate::ui::component::{A11y, ContactItem, FieldDisplay, Status, UiFieldVisibility};
 use crate::ui::contact_detail::{
@@ -614,6 +615,15 @@ impl AppEngine {
                 _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),
             },
             AppScreen::ContactDuplicates => Box::new(DuplicateDetectionEngine::new(vec![])),
+            AppScreen::ArchivedContacts => {
+                let archived = vauchi
+                    .list_archived_contacts()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|c| (c.id().to_string(), c.display_name().to_string()))
+                    .collect();
+                Box::new(ArchivedContactsEngine::new(archived))
+            }
             AppScreen::ContactMerge {
                 primary_name,
                 primary_fields,

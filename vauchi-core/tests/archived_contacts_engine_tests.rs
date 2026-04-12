@@ -3,6 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Tests for ArchivedContactsEngine and AppEngine wiring.
+//!
+//! @feature: contacts_management
+//! @scenario: View and unarchive archived contacts
+//! @internal
 
 use vauchi_app::ui::{
     ActionResult, ActionStyle, AppEngine, AppScreen, ArchivedContactsEngine, Component,
@@ -12,18 +16,21 @@ use vauchi_core::api::Vauchi;
 
 // ── ArchivedContactsEngine unit tests ────────────────────────────────
 
+// @internal
 #[test]
 fn archived_contacts_screen_id_is_archived_contacts() {
     let engine = ArchivedContactsEngine::new(vec![]);
     assert_eq!(engine.current_screen().screen_id, "archived_contacts");
 }
 
+// @internal
 #[test]
 fn archived_contacts_title_is_archived_contacts() {
     let engine = ArchivedContactsEngine::new(vec![]);
     assert_eq!(engine.current_screen().title, "Archived Contacts");
 }
 
+// @internal
 #[test]
 fn archived_contacts_empty_state_shows_no_archived_text() {
     let engine = ArchivedContactsEngine::new(vec![]);
@@ -39,6 +46,7 @@ fn archived_contacts_empty_state_shows_no_archived_text() {
     );
 }
 
+// @internal
 #[test]
 fn archived_contacts_empty_state_has_no_actions() {
     let engine = ArchivedContactsEngine::new(vec![]);
@@ -49,6 +57,7 @@ fn archived_contacts_empty_state_has_no_actions() {
     );
 }
 
+// @internal
 #[test]
 fn archived_contacts_non_empty_shows_action_list() {
     let contacts = vec![
@@ -65,6 +74,7 @@ fn archived_contacts_non_empty_shows_action_list() {
     assert!(has_action_list, "non-empty state should show ActionList");
 }
 
+// @internal
 #[test]
 fn archived_contacts_items_have_unarchive_ids() {
     let contacts = vec![("abc123".to_string(), "Alice".to_string())];
@@ -84,6 +94,7 @@ fn archived_contacts_items_have_unarchive_ids() {
     );
 }
 
+// @internal
 #[test]
 fn archived_contacts_items_have_display_name_as_label() {
     let contacts = vec![("id1".to_string(), "Alice Smith".to_string())];
@@ -103,6 +114,7 @@ fn archived_contacts_items_have_display_name_as_label() {
     );
 }
 
+// @internal
 #[test]
 fn archived_contacts_items_have_tap_to_unarchive_detail() {
     let contacts = vec![("id1".to_string(), "Alice".to_string())];
@@ -124,6 +136,7 @@ fn archived_contacts_items_have_tap_to_unarchive_detail() {
     );
 }
 
+// @internal
 #[test]
 fn archived_contacts_unarchive_action_returns_complete() {
     let contacts = vec![("id1".to_string(), "Alice".to_string())];
@@ -137,6 +150,7 @@ fn archived_contacts_unarchive_action_returns_complete() {
     );
 }
 
+// @internal
 #[test]
 fn archived_contacts_unknown_action_returns_update_screen() {
     let mut engine = ArchivedContactsEngine::new(vec![]);
@@ -151,11 +165,13 @@ fn archived_contacts_unknown_action_returns_update_screen() {
 
 // ── AppScreen::ArchivedContacts tests ────────────────────────────────
 
+// @internal
 #[test]
 fn app_screen_archived_contacts_has_correct_screen_id() {
     assert_eq!(AppScreen::ArchivedContacts.screen_id(), "archived_contacts");
 }
 
+// @internal
 #[test]
 fn app_screen_archived_contacts_roundtrips_from_screen_id() {
     let parsed = AppScreen::from_screen_id("archived_contacts");
@@ -164,6 +180,8 @@ fn app_screen_archived_contacts_roundtrips_from_screen_id() {
 
 // ── ContactListEngine view_archived action ───────────────────────────
 
+// @scenario: contacts_management :: Contacts screen offers view archived action
+// @internal
 #[test]
 fn contacts_screen_has_view_archived_action() {
     let contact_engine = ContactListEngine::new(vec![]);
@@ -181,6 +199,8 @@ fn contacts_screen_has_view_archived_action() {
 
 // ── AppScreen::ArchivedContacts ──────────────────────────────────────
 
+// @scenario: contacts_management :: Navigate to archived contacts from contacts list
+// @internal
 #[test]
 fn app_engine_navigates_to_archived_contacts_from_contacts() {
     let mut vauchi = Vauchi::in_memory().unwrap();

@@ -2,10 +2,15 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//! @feature: contacts_management
+//! @scenario: Detect potential duplicate contacts
+//! @internal
+
 use vauchi_app::ui::*;
 
 // ── Tests: ContactListEngine has find_duplicates action ─────────────
 
+// @scenario: contacts_management :: Contacts screen offers find duplicates action
 #[test]
 fn contacts_screen_has_find_duplicates_action() {
     let engine = ContactListEngine::new(vec![]);

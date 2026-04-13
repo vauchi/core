@@ -213,6 +213,12 @@ user-id = 267 # Tony Arcieri (tarcieri)
 start = "2020-08-04"
 end = "2027-03-10"
 
+[[trusted.cookie]]
+criteria = "safe-to-deploy"
+user-id = 3864 # Sergio Benitez (SergioBenitez)
+start = "2019-05-02"
+end = "2027-04-13"
+
 [[trusted.cpufeatures]]
 criteria = "safe-to-deploy"
 user-id = 267 # Tony Arcieri (tarcieri)
@@ -369,6 +375,12 @@ user-id = 267 # Tony Arcieri (tarcieri)
 start = "2020-10-19"
 end = "2027-03-10"
 
+[[trusted.hpke]]
+criteria = "safe-to-deploy"
+user-id = 6979 # Michael Rosenberg (rozbb)
+start = "2020-05-12"
+end = "2027-04-13"
+
 [[trusted.http]]
 criteria = "safe-to-deploy"
 user-id = 359 # Sean McArthur (seanmonstar)
@@ -398,6 +410,48 @@ criteria = "safe-to-deploy"
 user-id = 359 # Sean McArthur (seanmonstar)
 start = "2022-01-15"
 end = "2027-03-10"
+
+[[trusted.icu_collections]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2022-09-27"
+end = "2027-04-13"
+
+[[trusted.icu_locale_core]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2025-02-26"
+end = "2027-04-13"
+
+[[trusted.icu_normalizer]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2021-04-29"
+end = "2027-04-13"
+
+[[trusted.icu_normalizer_data]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2023-10-03"
+end = "2027-04-13"
+
+[[trusted.icu_properties]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2022-01-31"
+end = "2027-04-13"
+
+[[trusted.icu_properties_data]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2023-10-03"
+end = "2027-04-13"
+
+[[trusted.icu_provider]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2022-01-31"
+end = "2027-04-13"
 
 [[trusted.id-arena]]
 criteria = "safe-to-deploy"
@@ -476,6 +530,12 @@ criteria = "safe-to-deploy"
 user-id = 6825 # Dan Gohman (sunfishcode)
 start = "2021-06-12"
 end = "2027-03-10"
+
+[[trusted.litemap]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2021-02-23"
+end = "2027-04-13"
 
 [[trusted.lock_api]]
 criteria = "safe-to-deploy"
@@ -651,6 +711,12 @@ user-id = 267 # Tony Arcieri (tarcieri)
 start = "2019-08-13"
 end = "2027-03-10"
 
+[[trusted.potential_utf]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2024-11-23"
+end = "2027-04-13"
+
 [[trusted.prettyplease]]
 criteria = "safe-to-deploy"
 user-id = 3618 # David Tolnay (dtolnay)
@@ -674,6 +740,12 @@ criteria = "safe-to-deploy"
 user-id = 3618 # David Tolnay (dtolnay)
 start = "2019-04-09"
 end = "2027-03-10"
+
+[[trusted.rand]]
+criteria = "safe-to-deploy"
+user-id = 1234 # Diggory Hardy (dhardy)
+start = "2019-06-06"
+end = "2027-04-13"
 
 [[trusted.rand_xorshift]]
 criteria = "safe-to-deploy"
@@ -1131,6 +1203,12 @@ user-id = 6743 # Ed Page (epage)
 start = "2023-02-22"
 end = "2027-03-10"
 
+[[trusted.writeable]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2021-11-01"
+end = "2027-04-13"
+
 [[trusted.x25519-dalek]]
 criteria = "safe-to-deploy"
 user-id = 6979 # Michael Rosenberg (rozbb)
@@ -1142,6 +1220,24 @@ criteria = "safe-to-deploy"
 user-id = 1139 # Manish Goregaokar (Manishearth)
 start = "2021-05-01"
 end = "2027-03-10"
+
+[[trusted.yoke-derive]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2021-07-02"
+end = "2027-04-13"
+
+[[trusted.zerofrom]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2022-04-06"
+end = "2027-04-13"
+
+[[trusted.zerofrom-derive]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2022-04-06"
+end = "2027-04-13"
 
 [[trusted.zeroize_derive]]
 criteria = "safe-to-deploy"
@@ -1160,6 +1256,12 @@ criteria = "safe-to-deploy"
 user-id = 1139 # Manish Goregaokar (Manishearth)
 start = "2021-04-19"
 end = "2027-03-10"
+
+[[trusted.zerovec-derive]]
+criteria = "safe-to-deploy"
+user-id = 1139 # Manish Goregaokar (Manishearth)
+start = "2021-12-11"
+end = "2027-04-13"
 
 [[trusted.zmij]]
 criteria = "safe-to-deploy"

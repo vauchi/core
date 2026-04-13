@@ -209,6 +209,13 @@ user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
+[[publisher.cookie]]
+version = "0.18.1"
+when = "2024-03-25"
+user-id = 3864
+user-login = "SergioBenitez"
+user-name = "Sergio Benitez"
+
 [[publisher.core-foundation]]
 version = "0.9.3"
 when = "2022-02-07"
@@ -312,6 +319,13 @@ when = "2026-04-09"
 user-id = 55123
 user-login = "rust-lang-owner"
 
+[[publisher.hpke]]
+version = "0.13.0"
+when = "2025-02-19"
+user-id = 6979
+user-login = "rozbb"
+user-name = "Michael Rosenberg"
+
 [[publisher.http]]
 version = "1.4.0"
 when = "2025-11-24"
@@ -346,6 +360,55 @@ when = "2026-02-02"
 user-id = 359
 user-login = "seanmonstar"
 user-name = "Sean McArthur"
+
+[[publisher.icu_collections]]
+version = "2.2.0"
+when = "2026-04-01"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
+
+[[publisher.icu_locale_core]]
+version = "2.2.0"
+when = "2026-04-01"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
+
+[[publisher.icu_normalizer]]
+version = "2.2.0"
+when = "2026-04-01"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
+
+[[publisher.icu_normalizer_data]]
+version = "2.2.0"
+when = "2026-04-01"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
+
+[[publisher.icu_properties]]
+version = "2.2.0"
+when = "2026-04-01"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
+
+[[publisher.icu_properties_data]]
+version = "2.2.0"
+when = "2026-04-01"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
+
+[[publisher.icu_provider]]
+version = "2.2.0"
+when = "2026-04-01"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
 
 [[publisher.id-arena]]
 version = "2.3.0"
@@ -421,6 +484,13 @@ when = "2025-12-23"
 user-id = 6825
 user-login = "sunfishcode"
 user-name = "Dan Gohman"
+
+[[publisher.litemap]]
+version = "0.8.2"
+when = "2026-04-01"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
 
 [[publisher.lock_api]]
 version = "0.4.14"
@@ -533,6 +603,13 @@ when = "2024-03-03"
 user-id = 267
 user-login = "tarcieri"
 user-name = "Tony Arcieri"
+
+[[publisher.potential_utf]]
+version = "0.1.5"
+when = "2026-04-01"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
 
 [[publisher.prettyplease]]
 version = "0.2.37"
@@ -1278,6 +1355,13 @@ version = "0.244.0"
 when = "2026-01-06"
 trusted-publisher = "github:bytecodealliance/wasm-tools"
 
+[[publisher.writeable]]
+version = "0.6.3"
+when = "2026-04-02"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
+
 [[publisher.x25519-dalek]]
 version = "2.0.1"
 when = "2024-02-07"
@@ -1287,6 +1371,27 @@ user-name = "Michael Rosenberg"
 
 [[publisher.yoke]]
 version = "0.8.2"
+when = "2026-04-01"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
+
+[[publisher.yoke-derive]]
+version = "0.8.2"
+when = "2026-04-01"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
+
+[[publisher.zerofrom]]
+version = "0.1.7"
+when = "2026-04-01"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
+
+[[publisher.zerofrom-derive]]
+version = "0.1.7"
 when = "2026-04-01"
 user-id = 1139
 user-login = "Manishearth"
@@ -1308,6 +1413,13 @@ user-name = "Manish Goregaokar"
 
 [[publisher.zerovec]]
 version = "0.11.6"
+when = "2026-04-01"
+user-id = 1139
+user-login = "Manishearth"
+user-name = "Manish Goregaokar"
+
+[[publisher.zerovec-derive]]
+version = "0.11.3"
 when = "2026-04-01"
 user-id = 1139
 user-login = "Manishearth"

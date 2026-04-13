@@ -123,10 +123,6 @@ criteria = "safe-to-run"
 version = "0.9.6"
 criteria = "safe-to-deploy"
 
-[[exemptions.cookie]]
-version = "0.18.1"
-criteria = "safe-to-deploy"
-
 [[exemptions.cookie_store]]
 version = "0.22.1"
 criteria = "safe-to-deploy"
@@ -371,10 +367,6 @@ criteria = "safe-to-run"
 version = "0.12.4"
 criteria = "safe-to-deploy"
 
-[[exemptions.hpke]]
-version = "0.13.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.humantime]]
 version = "2.3.0"
 criteria = "safe-to-run"
@@ -385,34 +377,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.iana-time-zone]]
 version = "0.1.65"
-criteria = "safe-to-deploy"
-
-[[exemptions.icu_collections]]
-version = "2.2.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.icu_locale_core]]
-version = "2.2.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.icu_normalizer]]
-version = "2.2.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.icu_normalizer_data]]
-version = "2.2.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.icu_properties]]
-version = "2.2.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.icu_properties_data]]
-version = "2.2.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.icu_provider]]
-version = "2.2.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.image]]
@@ -481,10 +445,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.linux-keyutils]]
 version = "0.2.5"
-criteria = "safe-to-deploy"
-
-[[exemptions.litemap]]
-version = "0.8.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.lru-slab]]
@@ -585,10 +545,6 @@ criteria = "safe-to-run"
 
 [[exemptions.png]]
 version = "0.18.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.potential_utf]]
-version = "0.1.5"
 criteria = "safe-to-deploy"
 
 [[exemptions.ppv-lite86]]
@@ -871,32 +827,12 @@ criteria = "safe-to-deploy"
 version = "1.0.6"
 criteria = "safe-to-deploy"
 
-[[exemptions.writeable]]
-version = "0.6.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.yoke-derive]]
-version = "0.8.2"
-criteria = "safe-to-deploy"
-
 [[exemptions.zerocopy]]
 version = "0.8.48"
 criteria = "safe-to-deploy"
 
 [[exemptions.zerocopy-derive]]
 version = "0.8.48"
-criteria = "safe-to-deploy"
-
-[[exemptions.zerofrom]]
-version = "0.1.7"
-criteria = "safe-to-deploy"
-
-[[exemptions.zerofrom-derive]]
-version = "0.1.7"
-criteria = "safe-to-deploy"
-
-[[exemptions.zerovec-derive]]
-version = "0.11.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.zune-core]]

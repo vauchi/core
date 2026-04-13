@@ -280,7 +280,7 @@ pub struct MobileContactDisplayOptions {
 pub struct MobileNameOption {
     pub source: String,
     pub name: String,
-    pub label: String,
+    pub is_primary: bool,
 }
 
 /// One avatar choice in the display options list.
@@ -288,7 +288,7 @@ pub struct MobileNameOption {
 pub struct MobileAvatarOption {
     pub source: String,
     pub has_data: bool,
-    pub label: String,
+    pub is_primary: bool,
 }
 
 /// Exchange result.

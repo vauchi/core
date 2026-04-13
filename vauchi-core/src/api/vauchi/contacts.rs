@@ -5,7 +5,7 @@
 //! Contact and double ratchet operations.
 
 use crate::contact::Contact;
-use crate::contact::display::{ContactDisplayOptions, DisplayPreference};
+use crate::contact::display::{AvatarPreference, ContactDisplayOptions, DisplayNamePreference};
 use crate::crypto::SymmetricKey;
 use crate::crypto::ratchet::DoubleRatchetState;
 
@@ -534,8 +534,15 @@ impl Vauchi {
     }
 
     /// Clears the local nickname for a contact.
+    ///
+    /// Resets display name preference to Primary if it was Custom.
     pub fn clear_contact_nickname(&self, contact_id: &str) -> VauchiResult<()> {
         self.storage.delete_contact_nickname(contact_id)?;
+        let (name_pref, _) = self.storage.load_display_preferences(contact_id)?;
+        if name_pref == DisplayNamePreference::Custom {
+            self.storage
+                .save_display_name_preference(contact_id, &DisplayNamePreference::Primary)?;
+        }
         Ok(())
     }
 
@@ -567,8 +574,15 @@ impl Vauchi {
     }
 
     /// Clears the custom avatar for a contact.
+    ///
+    /// Resets avatar preference to Primary if it was Custom.
     pub fn clear_contact_custom_avatar(&self, contact_id: &str) -> VauchiResult<()> {
         self.storage.delete_contact_custom_avatar(contact_id)?;
+        let (_, avatar_pref) = self.storage.load_display_preferences(contact_id)?;
+        if avatar_pref == AvatarPreference::Custom {
+            self.storage
+                .save_avatar_preference(contact_id, &AvatarPreference::Primary)?;
+        }
         Ok(())
     }
 
@@ -577,50 +591,130 @@ impl Vauchi {
         Ok(self.storage.load_contact_custom_avatar(contact_id)?)
     }
 
-    // === Name Variant Operations (internal, called by sync layer) ===
+    // === Shared Name Operations (internal, called by sync layer) ===
 
-    /// Upserts a name variant for a contact from an inbound card update.
-    pub fn upsert_contact_name_variant(
+    /// Adds a shared name for a contact from an inbound sync delta.
+    pub fn add_contact_shared_name(
         &self,
         contact_id: &str,
-        source_label: &str,
         name: &str,
-        avatar: Option<&[u8]>,
+        is_primary: bool,
     ) -> VauchiResult<()> {
-        self.storage
-            .upsert_name_variant(contact_id, source_label, name, avatar)?;
+        self.storage.add_shared_name(contact_id, name, is_primary)?;
         Ok(())
     }
 
-    /// Lists all name variants for a contact.
-    pub fn list_contact_name_variants(
+    /// Removes a shared name for a contact from an inbound sync delta.
+    pub fn remove_contact_shared_name(&self, contact_id: &str, name: &str) -> VauchiResult<()> {
+        self.storage.remove_shared_name(contact_id, name)?;
+        Ok(())
+    }
+
+    /// Lists all shared names for a contact.
+    pub fn list_contact_shared_names(
         &self,
         contact_id: &str,
-    ) -> VauchiResult<Vec<crate::contact::display::NameVariant>> {
-        Ok(self.storage.list_name_variants(contact_id)?)
+    ) -> VauchiResult<Vec<crate::contact::display::SharedName>> {
+        Ok(self.storage.list_shared_names(contact_id)?)
+    }
+
+    /// Adds a shared avatar for a contact from an inbound sync delta.
+    pub fn add_contact_shared_avatar(
+        &self,
+        contact_id: &str,
+        avatar_data: &[u8],
+        is_primary: bool,
+    ) -> VauchiResult<()> {
+        use sha2::{Digest, Sha256};
+        let hash = hex::encode(Sha256::digest(avatar_data));
+        self.storage
+            .add_shared_avatar(contact_id, &hash, avatar_data, is_primary)?;
+        Ok(())
+    }
+
+    /// Removes a shared avatar for a contact from an inbound sync delta.
+    pub fn remove_contact_shared_avatar(
+        &self,
+        contact_id: &str,
+        avatar_hash: &str,
+    ) -> VauchiResult<()> {
+        self.storage.remove_shared_avatar(contact_id, avatar_hash)?;
+        Ok(())
+    }
+
+    /// Lists all shared avatars for a contact.
+    pub fn list_contact_shared_avatars(
+        &self,
+        contact_id: &str,
+    ) -> VauchiResult<Vec<crate::contact::display::SharedAvatar>> {
+        Ok(self.storage.list_shared_avatars(contact_id)?)
     }
 
     // === Display Preference Operations ===
 
     /// Sets the display name preference for a contact.
+    ///
+    /// Setting `Custom` when no nickname is set returns `InvalidState`.
+    /// Setting `SharedName` when name not in shared set returns `InvalidState`.
     pub fn set_display_name_preference(
         &self,
         contact_id: &str,
-        pref: DisplayPreference,
+        pref: DisplayNamePreference,
     ) -> VauchiResult<()> {
-        self.validate_display_preference(contact_id, &pref, false)?;
+        match &pref {
+            DisplayNamePreference::Primary => {}
+            DisplayNamePreference::Custom => {
+                let nick = self.storage.load_contact_nickname(contact_id)?;
+                if nick.is_none() {
+                    return Err(VauchiError::InvalidState(
+                        "Cannot set Custom name preference without a nickname".into(),
+                    ));
+                }
+            }
+            DisplayNamePreference::SharedName { name } => {
+                let names = self.storage.list_shared_names(contact_id)?;
+                if !names.iter().any(|n| n.name == *name) {
+                    return Err(VauchiError::InvalidState(format!(
+                        "Shared name '{}' not found",
+                        name
+                    )));
+                }
+            }
+        }
         self.storage
             .save_display_name_preference(contact_id, &pref)?;
         Ok(())
     }
 
     /// Sets the avatar preference for a contact.
+    ///
+    /// Setting `Custom` when no custom avatar is set returns `InvalidState`.
+    /// Setting `SharedAvatar` when hash not in shared set returns `InvalidState`.
     pub fn set_avatar_preference(
         &self,
         contact_id: &str,
-        pref: DisplayPreference,
+        pref: AvatarPreference,
     ) -> VauchiResult<()> {
-        self.validate_display_preference(contact_id, &pref, true)?;
+        match &pref {
+            AvatarPreference::Primary => {}
+            AvatarPreference::Custom => {
+                let has = self.storage.has_contact_custom_avatar(contact_id)?;
+                if !has {
+                    return Err(VauchiError::InvalidState(
+                        "Cannot set Custom avatar preference without a custom avatar".into(),
+                    ));
+                }
+            }
+            AvatarPreference::SharedAvatar { hash } => {
+                let avatars = self.storage.list_shared_avatars(contact_id)?;
+                if !avatars.iter().any(|a| a.avatar_hash == *hash) {
+                    return Err(VauchiError::InvalidState(format!(
+                        "Shared avatar '{}' not found",
+                        hash
+                    )));
+                }
+            }
+        }
         self.storage.save_avatar_preference(contact_id, &pref)?;
         Ok(())
     }
@@ -632,66 +726,58 @@ impl Vauchi {
     ) -> VauchiResult<ContactDisplayOptions> {
         use crate::contact::display::*;
 
-        let contact = self
+        let _contact = self
             .storage
             .load_contact(contact_id)?
             .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
         let nickname = self.storage.load_contact_nickname(contact_id)?;
-        let variants = self.storage.list_name_variants(contact_id)?;
+        let shared_names = self.storage.list_shared_names(contact_id)?;
+        let shared_avatars = self.storage.list_shared_avatars(contact_id)?;
         let (name_pref, avatar_pref) = self.storage.load_display_preferences(contact_id)?;
-        let has_custom_avatar = self
-            .storage
-            .load_contact_custom_avatar(contact_id)?
-            .is_some();
+        let has_custom_avatar = self.storage.has_contact_custom_avatar(contact_id)?;
 
-        let mut names = vec![NameOption {
-            source: DisplayPreference::CardDefault,
-            name: contact.display_name().to_string(),
-            label: "Default".to_string(),
-        }];
-        for v in &variants {
-            names.push(NameOption {
-                source: DisplayPreference::CardVariant {
-                    source_label: v.source_label.clone(),
-                },
-                name: v.name.clone(),
-                label: if v.source_label.is_empty() {
-                    "Default".to_string()
+        // Build name options: shared names + custom nickname
+        let mut names: Vec<NameOption> = shared_names
+            .iter()
+            .map(|n| NameOption {
+                source: if n.is_primary {
+                    DisplayNamePreference::Primary
                 } else {
-                    v.source_label.clone()
+                    DisplayNamePreference::SharedName {
+                        name: n.name.clone(),
+                    }
                 },
-            });
-        }
+                name: n.name.clone(),
+                is_primary: n.is_primary,
+            })
+            .collect();
         if let Some(ref nick) = nickname {
             names.push(NameOption {
-                source: DisplayPreference::Custom,
+                source: DisplayNamePreference::Custom,
                 name: nick.clone(),
-                label: "Nickname".to_string(),
+                is_primary: false,
             });
         }
 
-        let mut avatars = vec![AvatarOption {
-            source: DisplayPreference::CardDefault,
-            has_data: contact.card().avatar().is_some(),
-            label: "Default".to_string(),
-        }];
-        for v in &variants {
-            avatars.push(AvatarOption {
-                source: DisplayPreference::CardVariant {
-                    source_label: v.source_label.clone(),
-                },
-                has_data: v.has_avatar,
-                label: if v.source_label.is_empty() {
-                    "Default".to_string()
+        // Build avatar options: shared avatars + custom avatar
+        let mut avatars: Vec<AvatarOption> = shared_avatars
+            .iter()
+            .map(|a| AvatarOption {
+                source: if a.is_primary {
+                    AvatarPreference::Primary
                 } else {
-                    v.source_label.clone()
+                    AvatarPreference::SharedAvatar {
+                        hash: a.avatar_hash.clone(),
+                    }
                 },
-            });
-        }
+                has_data: true,
+                is_primary: a.is_primary,
+            })
+            .collect();
         avatars.push(AvatarOption {
-            source: DisplayPreference::Custom,
+            source: AvatarPreference::Custom,
             has_data: has_custom_avatar,
-            label: "Custom".to_string(),
+            is_primary: false,
         });
 
         Ok(ContactDisplayOptions {
@@ -700,48 +786,6 @@ impl Vauchi {
             active_name_preference: name_pref,
             active_avatar_preference: avatar_pref,
         })
-    }
-
-    fn validate_display_preference(
-        &self,
-        contact_id: &str,
-        pref: &DisplayPreference,
-        is_avatar: bool,
-    ) -> VauchiResult<()> {
-        match pref {
-            DisplayPreference::CardDefault => Ok(()),
-            DisplayPreference::Custom => {
-                if is_avatar {
-                    let has = self
-                        .storage
-                        .load_contact_custom_avatar(contact_id)?
-                        .is_some();
-                    if !has {
-                        return Err(VauchiError::InvalidState(
-                            "Cannot set Custom avatar preference without a custom avatar".into(),
-                        ));
-                    }
-                } else {
-                    let nick = self.storage.load_contact_nickname(contact_id)?;
-                    if nick.is_none() {
-                        return Err(VauchiError::InvalidState(
-                            "Cannot set Custom name preference without a nickname".into(),
-                        ));
-                    }
-                }
-                Ok(())
-            }
-            DisplayPreference::CardVariant { source_label } => {
-                let variants = self.storage.list_name_variants(contact_id)?;
-                if !variants.iter().any(|v| v.source_label == *source_label) {
-                    return Err(VauchiError::InvalidState(format!(
-                        "No variant with source_label '{}'",
-                        source_label
-                    )));
-                }
-                Ok(())
-            }
-        }
     }
 
     // === Imported Contact Editing ===

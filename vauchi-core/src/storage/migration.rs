@@ -754,26 +754,35 @@ const MIGRATION_V42_PIN_CACHE: &str = "
     );
 ";
 
-/// Migration v43: Contact nickname, custom avatar, name variants, and display preferences.
+/// Migration v43: Contact nickname, custom avatar, shared names/avatars, and display preferences.
 ///
-/// Adds `contact_name_variants` table for per-group name/avatar tracking,
+/// Adds `contact_shared_names` and `contact_shared_avatars` tables for flat name/avatar sets,
 /// and 4 new columns on `contacts` for local nickname, custom avatar, and
 /// display preferences.
 const MIGRATION_V43_CONTACT_DISPLAY: &str = "
-    CREATE TABLE contact_name_variants (
-        contact_id   TEXT NOT NULL,
-        source_label TEXT NOT NULL,
-        name         TEXT NOT NULL,
-        avatar_encrypted BLOB,
-        updated_at   INTEGER NOT NULL,
-        PRIMARY KEY (contact_id, source_label),
+    CREATE TABLE contact_shared_names (
+        contact_id TEXT NOT NULL,
+        name       TEXT NOT NULL,
+        is_primary INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (contact_id, name),
+        FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE contact_shared_avatars (
+        contact_id       TEXT NOT NULL,
+        avatar_hash      TEXT NOT NULL,
+        avatar_encrypted BLOB NOT NULL,
+        is_primary       INTEGER NOT NULL DEFAULT 0,
+        updated_at       INTEGER NOT NULL,
+        PRIMARY KEY (contact_id, avatar_hash),
         FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
     );
 
     ALTER TABLE contacts ADD COLUMN nickname_encrypted BLOB;
     ALTER TABLE contacts ADD COLUMN custom_avatar_encrypted BLOB;
-    ALTER TABLE contacts ADD COLUMN display_name_preference TEXT NOT NULL DEFAULT '\"card_default\"';
-    ALTER TABLE contacts ADD COLUMN avatar_preference TEXT NOT NULL DEFAULT '\"card_default\"';
+    ALTER TABLE contacts ADD COLUMN display_name_preference TEXT NOT NULL DEFAULT '\"primary\"';
+    ALTER TABLE contacts ADD COLUMN avatar_preference TEXT NOT NULL DEFAULT '\"primary\"';
 ";
 
 const MIGRATION_V35_LOCAL_GROUPS: &str = "

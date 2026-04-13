@@ -25,7 +25,8 @@ pub mod contact;
 pub mod contact_card;
 pub mod identity;
 pub use contact::display::{
-    AvatarOption, ContactDisplayOptions, DisplayPreference, NameOption, NameVariant,
+    AvatarOption, AvatarPreference, ContactDisplayOptions, DisplayNamePreference, NameOption,
+    SharedAvatar, SharedName,
 };
 pub use contact::merge::DuplicatePair;
 pub use contact::{

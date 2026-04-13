@@ -13,6 +13,30 @@ use super::types::{
     MobileDuplicatePair, MobileFieldNote, MobileFieldType, MobileNameOption, MobileSocialNetwork,
 };
 
+impl VauchiPlatform {
+    /// Enriches a contact with display context (nickname, resolved name, custom avatar flag).
+    fn enrich_contact(
+        storage: &vauchi_core::Storage,
+        contact: &vauchi_core::Contact,
+    ) -> MobileContact {
+        let cid = contact.id();
+        let nickname = storage.load_contact_nickname(cid).ok().flatten();
+        let has_custom_avatar = storage.has_contact_custom_avatar(cid).unwrap_or(false);
+        let shared_names = storage.list_shared_names(cid).unwrap_or_default();
+        let (name_pref, _avatar_pref) = storage.load_display_preferences(cid).unwrap_or((
+            vauchi_core::DisplayNamePreference::Primary,
+            vauchi_core::AvatarPreference::Primary,
+        ));
+        let resolved = vauchi_core::contact::display::resolve_display_name(
+            contact.display_name(),
+            &name_pref,
+            &shared_names,
+            nickname.as_deref(),
+        );
+        MobileContact::with_display_context(contact, nickname, resolved, has_custom_avatar)
+    }
+}
+
 #[uniffi::export]
 impl VauchiPlatform {
     // === Contact Card Operations ===
@@ -111,21 +135,27 @@ impl VauchiPlatform {
     pub fn list_contacts(&self) -> Result<Vec<MobileContact>, MobileError> {
         let storage = self.open_storage()?;
         let contacts = storage.list_contacts()?;
-        Ok(contacts.iter().map(MobileContact::from).collect())
+        Ok(contacts
+            .iter()
+            .map(|c| Self::enrich_contact(&storage, c))
+            .collect())
     }
 
     /// Get single contact by ID.
     pub fn get_contact(&self, id: String) -> Result<Option<MobileContact>, MobileError> {
         let storage = self.open_storage()?;
         let contact = storage.load_contact(&id)?;
-        Ok(contact.as_ref().map(MobileContact::from))
+        Ok(contact.as_ref().map(|c| Self::enrich_contact(&storage, c)))
     }
 
     /// Search contacts using SQL-level search.
     pub fn search_contacts(&self, query: String) -> Result<Vec<MobileContact>, MobileError> {
         let storage = self.open_storage()?;
         let contacts = storage.search_contacts(&query)?;
-        Ok(contacts.iter().map(MobileContact::from).collect())
+        Ok(contacts
+            .iter()
+            .map(|c| Self::enrich_contact(&storage, c))
+            .collect())
     }
 
     /// Get contact count.
@@ -337,14 +367,14 @@ impl VauchiPlatform {
 
     /// Set the display name preference for a contact.
     ///
-    /// `pref_json` is a JSON-serialized `DisplayPreference`:
-    /// `"card_default"`, `{"card_variant":{"source_label":"Work"}}`, `"custom"`.
+    /// `pref_json` is a JSON-serialized `DisplayNamePreference`:
+    /// `"primary"`, `{"shared_name":{"name":"Alice"}}`, `"custom"`.
     pub fn set_display_name_preference(
         &self,
         contact_id: String,
         pref_json: String,
     ) -> Result<(), MobileError> {
-        let pref: vauchi_core::DisplayPreference = serde_json::from_str(&pref_json)
+        let pref: vauchi_core::DisplayNamePreference = serde_json::from_str(&pref_json)
             .map_err(|e| MobileError::InvalidInput(format!("Invalid preference JSON: {}", e)))?;
         let vauchi = self.open_vauchi()?;
         vauchi.set_display_name_preference(&contact_id, pref)?;
@@ -353,13 +383,14 @@ impl VauchiPlatform {
 
     /// Set the avatar preference for a contact.
     ///
-    /// `pref_json` is a JSON-serialized `DisplayPreference`.
+    /// `pref_json` is a JSON-serialized `AvatarPreference`:
+    /// `"primary"`, `{"shared_avatar":{"hash":"abc..."}}`, `"custom"`.
     pub fn set_avatar_preference(
         &self,
         contact_id: String,
         pref_json: String,
     ) -> Result<(), MobileError> {
-        let pref: vauchi_core::DisplayPreference = serde_json::from_str(&pref_json)
+        let pref: vauchi_core::AvatarPreference = serde_json::from_str(&pref_json)
             .map_err(|e| MobileError::InvalidInput(format!("Invalid preference JSON: {}", e)))?;
         let vauchi = self.open_vauchi()?;
         vauchi.set_avatar_preference(&contact_id, pref)?;
@@ -380,7 +411,7 @@ impl VauchiPlatform {
                 .map(|n| MobileNameOption {
                     source: serde_json::to_string(&n.source).unwrap_or_default(),
                     name: n.name,
-                    label: n.label,
+                    is_primary: n.is_primary,
                 })
                 .collect(),
             avatars: opts
@@ -389,7 +420,7 @@ impl VauchiPlatform {
                 .map(|a| MobileAvatarOption {
                     source: serde_json::to_string(&a.source).unwrap_or_default(),
                     has_data: a.has_data,
-                    label: a.label,
+                    is_primary: a.is_primary,
                 })
                 .collect(),
             active_name_preference: serde_json::to_string(&opts.active_name_preference)
@@ -473,8 +504,12 @@ impl VauchiPlatform {
     /// List all archived contacts.
     pub fn list_archived_contacts(&self) -> Result<Vec<MobileContact>, MobileError> {
         let vauchi = self.open_vauchi()?;
+        let storage = self.open_storage()?;
         let contacts = vauchi.list_archived_contacts()?;
-        Ok(contacts.iter().map(MobileContact::from).collect())
+        Ok(contacts
+            .iter()
+            .map(|c| Self::enrich_contact(&storage, c))
+            .collect())
     }
 
     // === Duplicate Detection & Merge Operations ===
@@ -510,8 +545,9 @@ impl VauchiPlatform {
         secondary_id: String,
     ) -> Result<MobileContact, MobileError> {
         let vauchi = self.open_vauchi()?;
+        let storage = self.open_storage()?;
         let merged = vauchi.merge_contacts(&primary_id, &secondary_id)?;
-        Ok(MobileContact::from(&merged))
+        Ok(Self::enrich_contact(&storage, &merged))
     }
 
     // === Hidden Contact Operations ===
@@ -539,8 +575,12 @@ impl VauchiPlatform {
     /// Routes through the Vauchi API for consistency with hide/unhide operations.
     pub fn list_hidden_contacts(&self) -> Result<Vec<MobileContact>, MobileError> {
         let vauchi = self.open_vauchi()?;
+        let storage = self.open_storage()?;
         let contacts = vauchi.list_hidden_contacts()?;
-        Ok(contacts.iter().map(MobileContact::from).collect())
+        Ok(contacts
+            .iter()
+            .map(|c| Self::enrich_contact(&storage, c))
+            .collect())
     }
 
     /// List contacts with pagination.

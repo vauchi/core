@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Storage operations for contact display: nickname, custom avatar,
-//! name variants, and display preferences (V43).
+//! shared names/avatars, and display preferences (V43).
 
 use rusqlite::params;
 
 use super::{Storage, StorageError};
-use crate::contact::display::{DisplayPreference, NameVariant};
+use crate::contact::display::{AvatarPreference, DisplayNamePreference, SharedAvatar, SharedName};
 
 impl Storage {
     /// Saves an encrypted nickname for a contact.
@@ -128,67 +128,144 @@ impl Storage {
         Ok(())
     }
 
-    // === Name Variant Operations ===
+    /// Checks if a contact has a custom avatar without loading/decrypting it.
+    pub fn has_contact_custom_avatar(&self, contact_id: &str) -> Result<bool, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT custom_avatar_encrypted IS NOT NULL FROM contacts WHERE id = ?1",
+            params![contact_id],
+            |row| row.get::<_, bool>(0),
+        );
+        match result {
+            Ok(has) => Ok(has),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
 
-    /// Upserts a name variant for a contact (called by sync layer on card updates).
-    pub fn upsert_name_variant(
+    // === Shared Name Operations ===
+    //
+    // Encrypted with the storage key (self.encryption_key), not the contact's shared key.
+    // Shared names are local-only data — the flat set received from the sender.
+
+    /// Adds or updates a shared name for a contact.
+    pub fn add_shared_name(
         &self,
         contact_id: &str,
-        source_label: &str,
         name: &str,
-        avatar: Option<&[u8]>,
+        is_primary: bool,
     ) -> Result<(), StorageError> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time before UNIX epoch")
             .as_secs();
-
-        let avatar_encrypted =
-            match avatar {
-                Some(data) => Some(crate::crypto::encrypt(&self.encryption_key, data).map_err(
-                    |e| StorageError::Encryption(format!("Encrypt variant avatar: {}", e)),
-                )?),
-                None => None,
-            };
-
         self.conn.execute(
-            "INSERT INTO contact_name_variants (contact_id, source_label, name, avatar_encrypted, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)
-             ON CONFLICT(contact_id, source_label)
-             DO UPDATE SET name = ?3, avatar_encrypted = ?4, updated_at = ?5",
-            params![contact_id, source_label, name, avatar_encrypted, now as i64],
+            "INSERT INTO contact_shared_names (contact_id, name, is_primary, updated_at)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(contact_id, name) DO UPDATE SET is_primary = ?3, updated_at = ?4",
+            params![contact_id, name, is_primary as i32, now as i64],
         )?;
         Ok(())
     }
 
-    /// Lists all name variants for a contact.
-    pub fn list_name_variants(&self, contact_id: &str) -> Result<Vec<NameVariant>, StorageError> {
+    /// Removes a shared name for a contact.
+    pub fn remove_shared_name(&self, contact_id: &str, name: &str) -> Result<(), StorageError> {
+        self.conn.execute(
+            "DELETE FROM contact_shared_names WHERE contact_id = ?1 AND name = ?2",
+            params![contact_id, name],
+        )?;
+        Ok(())
+    }
+
+    /// Lists all shared names for a contact (primary first).
+    pub fn list_shared_names(&self, contact_id: &str) -> Result<Vec<SharedName>, StorageError> {
         let mut stmt = self.conn.prepare(
-            "SELECT source_label, name, avatar_encrypted, updated_at
-             FROM contact_name_variants
+            "SELECT name, is_primary, updated_at
+             FROM contact_shared_names
              WHERE contact_id = ?1
-             ORDER BY source_label",
+             ORDER BY is_primary DESC, name",
         )?;
         let rows = stmt.query_map(params![contact_id], |row| {
             Ok((
                 row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, Option<Vec<u8>>>(2)?,
-                row.get::<_, i64>(3)?,
+                row.get::<_, i32>(1)?,
+                row.get::<_, i64>(2)?,
             ))
         })?;
-
-        let mut variants = Vec::new();
-        for row_result in rows {
-            let (source_label, name, avatar_enc, updated_at) = row_result?;
-            variants.push(NameVariant {
-                source_label,
+        let mut names = Vec::new();
+        for r in rows {
+            let (name, is_primary, updated_at) = r?;
+            names.push(SharedName {
                 name,
-                has_avatar: avatar_enc.is_some(),
+                is_primary: is_primary != 0,
                 updated_at: updated_at as u64,
             });
         }
-        Ok(variants)
+        Ok(names)
+    }
+
+    // === Shared Avatar Operations ===
+
+    /// Adds or updates a shared avatar for a contact.
+    pub fn add_shared_avatar(
+        &self,
+        contact_id: &str,
+        avatar_hash: &str,
+        avatar_data: &[u8],
+        is_primary: bool,
+    ) -> Result<(), StorageError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before UNIX epoch")
+            .as_secs();
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, avatar_data)
+            .map_err(|e| StorageError::Encryption(format!("Encrypt shared avatar: {}", e)))?;
+        self.conn.execute(
+            "INSERT INTO contact_shared_avatars (contact_id, avatar_hash, avatar_encrypted, is_primary, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(contact_id, avatar_hash) DO UPDATE SET avatar_encrypted = ?3, is_primary = ?4, updated_at = ?5",
+            params![contact_id, avatar_hash, encrypted, is_primary as i32, now as i64],
+        )?;
+        Ok(())
+    }
+
+    /// Removes a shared avatar for a contact.
+    pub fn remove_shared_avatar(
+        &self,
+        contact_id: &str,
+        avatar_hash: &str,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "DELETE FROM contact_shared_avatars WHERE contact_id = ?1 AND avatar_hash = ?2",
+            params![contact_id, avatar_hash],
+        )?;
+        Ok(())
+    }
+
+    /// Lists all shared avatars for a contact (primary first).
+    pub fn list_shared_avatars(&self, contact_id: &str) -> Result<Vec<SharedAvatar>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT avatar_hash, is_primary, updated_at
+             FROM contact_shared_avatars
+             WHERE contact_id = ?1
+             ORDER BY is_primary DESC",
+        )?;
+        let rows = stmt.query_map(params![contact_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i32>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
+        })?;
+        let mut avatars = Vec::new();
+        for r in rows {
+            let (hash, is_primary, updated_at) = r?;
+            avatars.push(SharedAvatar {
+                avatar_hash: hash,
+                is_primary: is_primary != 0,
+                updated_at: updated_at as u64,
+            });
+        }
+        Ok(avatars)
     }
 
     // === Display Preference Operations ===
@@ -197,7 +274,7 @@ impl Storage {
     pub fn save_display_name_preference(
         &self,
         contact_id: &str,
-        pref: &DisplayPreference,
+        pref: &DisplayNamePreference,
     ) -> Result<(), StorageError> {
         let json =
             serde_json::to_string(pref).map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -215,7 +292,7 @@ impl Storage {
     pub fn save_avatar_preference(
         &self,
         contact_id: &str,
-        pref: &DisplayPreference,
+        pref: &AvatarPreference,
     ) -> Result<(), StorageError> {
         let json =
             serde_json::to_string(pref).map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -233,7 +310,7 @@ impl Storage {
     pub fn load_display_preferences(
         &self,
         contact_id: &str,
-    ) -> Result<(DisplayPreference, DisplayPreference), StorageError> {
+    ) -> Result<(DisplayNamePreference, AvatarPreference), StorageError> {
         let result = self.conn.query_row(
             "SELECT display_name_preference, avatar_preference FROM contacts WHERE id = ?1",
             params![contact_id],
@@ -241,10 +318,10 @@ impl Storage {
         );
         match result {
             Ok((name_json, avatar_json)) => {
-                let name_pref: DisplayPreference = serde_json::from_str(&name_json)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                let avatar_pref: DisplayPreference = serde_json::from_str(&avatar_json)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let name_pref: DisplayNamePreference =
+                    serde_json::from_str(&name_json).unwrap_or_default();
+                let avatar_pref: AvatarPreference =
+                    serde_json::from_str(&avatar_json).unwrap_or_default();
                 Ok((name_pref, avatar_pref))
             }
             Err(rusqlite::Error::QueryReturnedNoRows) => {

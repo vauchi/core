@@ -4,30 +4,50 @@
 
 //! Display preference types for contact nickname and avatar resolution.
 //!
-//! Controls how a contact's name and avatar are displayed: from the default
-//! card, a specific group variant, or a local custom nickname/avatar.
+//! Names and avatars arrive as flat sets (no group metadata). The user
+//! picks one shared name/avatar or a local custom nickname/avatar.
 
 use serde::{Deserialize, Serialize};
 
-/// How the user wants a contact's name or avatar displayed.
+/// How the user wants a contact's display name resolved.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum DisplayPreference {
-    /// Use the contact's default card name/avatar — follows updates.
+pub enum DisplayNamePreference {
+    /// Use the contact's primary shared name — follows updates.
     #[default]
-    CardDefault,
-    /// Use the name/avatar from a specific group variant — follows updates.
-    CardVariant { source_label: String },
-    /// Use the local nickname / custom avatar — sticky.
+    Primary,
+    /// Use a specific shared name — follows updates, falls back to Primary if removed.
+    SharedName { name: String },
+    /// Use the local nickname — sticky.
     Custom,
 }
 
-/// A name+avatar variant from a specific visibility group.
+/// How the user wants a contact's avatar resolved.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AvatarPreference {
+    /// Use the contact's primary shared avatar — follows updates.
+    #[default]
+    Primary,
+    /// Use a specific shared avatar by hash — follows updates, falls back to Primary if removed.
+    SharedAvatar { hash: String },
+    /// Use the local custom avatar — sticky.
+    Custom,
+}
+
+/// A name from the flat set shared by a contact.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NameVariant {
-    pub source_label: String,
+pub struct SharedName {
     pub name: String,
-    pub has_avatar: bool,
+    pub is_primary: bool,
+    pub updated_at: u64,
+}
+
+/// A shared avatar reference (data fetched separately).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedAvatar {
+    pub avatar_hash: String,
+    pub is_primary: bool,
     pub updated_at: u64,
 }
 
@@ -36,42 +56,52 @@ pub struct NameVariant {
 pub struct ContactDisplayOptions {
     pub names: Vec<NameOption>,
     pub avatars: Vec<AvatarOption>,
-    pub active_name_preference: DisplayPreference,
-    pub active_avatar_preference: DisplayPreference,
+    pub active_name_preference: DisplayNamePreference,
+    pub active_avatar_preference: AvatarPreference,
 }
 
 /// One name choice in the display options list.
 #[derive(Debug, Clone)]
 pub struct NameOption {
-    pub source: DisplayPreference,
+    pub source: DisplayNamePreference,
     pub name: String,
-    pub label: String,
+    pub is_primary: bool,
 }
 
 /// One avatar choice in the display options list.
 #[derive(Debug, Clone)]
 pub struct AvatarOption {
-    pub source: DisplayPreference,
+    pub source: AvatarPreference,
     pub has_data: bool,
-    pub label: String,
+    pub is_primary: bool,
 }
 
-/// Resolves the display name given preferences, variants, and nickname.
+/// Resolves the display name given preferences, shared names, and nickname.
+///
+/// Fallback chain: selected → primary shared name → contact.display_name.
 pub fn resolve_display_name(
     default_name: &str,
-    preference: &DisplayPreference,
-    variants: &[NameVariant],
+    preference: &DisplayNamePreference,
+    shared_names: &[SharedName],
     nickname: Option<&str>,
 ) -> String {
-    match preference {
-        DisplayPreference::CardDefault => default_name.to_string(),
-        DisplayPreference::CardVariant { source_label } => variants
+    let primary = || {
+        shared_names
             .iter()
-            .find(|v| v.source_label == *source_label)
-            .map(|v| v.name.clone())
-            .unwrap_or_else(|| default_name.to_string()),
-        DisplayPreference::Custom => nickname
-            .map(|n| n.to_string())
-            .unwrap_or_else(|| default_name.to_string()),
+            .find(|n| n.is_primary)
+            .map(|n| n.name.clone())
+            .unwrap_or_else(|| default_name.to_string())
+    };
+
+    match preference {
+        DisplayNamePreference::Primary => primary(),
+        DisplayNamePreference::SharedName { name } => {
+            if shared_names.iter().any(|n| n.name == *name) {
+                name.clone()
+            } else {
+                primary()
+            }
+        }
+        DisplayNamePreference::Custom => nickname.map(|n| n.to_string()).unwrap_or_else(primary),
     }
 }

@@ -88,10 +88,10 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("visibility_labels", "display_name_override_encrypted"),
     // V38 exchange state crash recovery
     ("exchange_states", "encrypted_blob"),
-    // V43 contact display: nickname, custom avatar, name variants
+    // V43 contact display: nickname, custom avatar, shared avatars
     ("contacts", "nickname_encrypted"),
     ("contacts", "custom_avatar_encrypted"),
-    ("contact_name_variants", "avatar_encrypted"),
+    ("contact_shared_avatars", "avatar_encrypted"),
 ];
 
 /// Encrypted columns intentionally skipped by rekey, with documented reason.
@@ -1284,41 +1284,41 @@ impl Storage {
             }
             report(&mut completed, "contact_display");
 
-            // Re-encrypt contact_name_variants: avatar_encrypted (nullable, V43)
+            // Re-encrypt contact_shared_avatars: avatar_encrypted (V43)
             {
                 let mut stmt = self
                     .conn
-                    .prepare("SELECT contact_id, source_label, avatar_encrypted FROM contact_name_variants WHERE avatar_encrypted IS NOT NULL")
-                    .map_err(|e| StorageError::Migration(format!("Read name_variants: {}", e)))?;
+                    .prepare("SELECT contact_id, avatar_hash, avatar_encrypted FROM contact_shared_avatars")
+                    .map_err(|e| StorageError::Migration(format!("Read shared_avatars: {}", e)))?;
 
                 let rows: Vec<(String, String, Vec<u8>)> = stmt
                     .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
-                    .map_err(|e| StorageError::Migration(format!("Query name_variants: {}", e)))?
+                    .map_err(|e| StorageError::Migration(format!("Query shared_avatars: {}", e)))?
                     .collect::<Result<Vec<_>, _>>()
                     .map_err(|e| {
-                        StorageError::Migration(format!("Collect name_variants: {}", e))
+                        StorageError::Migration(format!("Collect shared_avatars: {}", e))
                     })?;
 
-                for (contact_id, source_label, enc) in &rows {
+                for (contact_id, avatar_hash, enc) in &rows {
                     let plain = decrypt(old_key, enc).map_err(|e| {
                         StorageError::Migration(format!(
-                            "Decrypt variant_avatar {}/{}: {}",
-                            contact_id, source_label, e
+                            "Decrypt shared_avatar {}/{}: {}",
+                            contact_id, avatar_hash, e
                         ))
                     })?;
                     let new_enc = encrypt(&new_key, &plain).map_err(|e| {
                         StorageError::Migration(format!(
-                            "Encrypt variant_avatar {}/{}: {}",
-                            contact_id, source_label, e
+                            "Encrypt shared_avatar {}/{}: {}",
+                            contact_id, avatar_hash, e
                         ))
                     })?;
                     self.conn.execute(
-                        "UPDATE contact_name_variants SET avatar_encrypted = ?1 WHERE contact_id = ?2 AND source_label = ?3",
-                        params![new_enc, contact_id, source_label],
-                    ).map_err(|e| StorageError::Migration(format!("Update variant_avatar {}/{}: {}", contact_id, source_label, e)))?;
+                        "UPDATE contact_shared_avatars SET avatar_encrypted = ?1 WHERE contact_id = ?2 AND avatar_hash = ?3",
+                        params![new_enc, contact_id, avatar_hash],
+                    ).map_err(|e| StorageError::Migration(format!("Update shared_avatar {}/{}: {}", contact_id, avatar_hash, e)))?;
                 }
             }
-            report(&mut completed, "contact_name_variants");
+            report(&mut completed, "shared_avatars");
 
             Ok(())
         })();

@@ -514,6 +514,14 @@ name = "exchange_reciprocity_integration_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "exchange_session_proptest"
+required-features = ["testing"]
+
+[[test]]
+name = "exchange_to_update_e2e_test"
+required-features = ["testing"]
+
+[[test]]
 name = "avatar_normalize_proptest"
 
 [[test]]

@@ -17,7 +17,7 @@
 mod common;
 
 use common::helpers::{create_vauchi_with_card, setup_ratchets};
-use vauchi_core::{Contact, ContactCard, ContactField, FieldType};
+use vauchi_core::{Contact, ContactField, FieldType};
 
 /// Full pipeline: exchange → ratchet → prepare_card_update → process_card_update → verify.
 ///

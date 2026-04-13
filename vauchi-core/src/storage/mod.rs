@@ -118,6 +118,7 @@ pub mod exchange_state;
 #[cfg(not(feature = "testing"))]
 mod exchange_state;
 
+mod contact_display_ops;
 pub mod local_keys;
 pub mod migration;
 mod ohttp_cache;

@@ -514,6 +514,35 @@ impl Vauchi {
         Ok(())
     }
 
+    // === Contact Nickname Operations ===
+
+    /// Sets a local nickname for a contact. Validates: non-empty after trim, <= 100 chars.
+    pub fn set_contact_nickname(&self, contact_id: &str, nickname: &str) -> VauchiResult<()> {
+        let trimmed = nickname.trim();
+        if trimmed.is_empty() {
+            return Err(VauchiError::InvalidState("Nickname cannot be empty".into()));
+        }
+        if trimmed.chars().count() > 100 {
+            return Err(VauchiError::InvalidState(
+                "Nickname exceeds 100 characters".into(),
+            ));
+        }
+        self.storage
+            .save_contact_nickname(contact_id, trimmed.as_bytes())?;
+        Ok(())
+    }
+
+    /// Clears the local nickname for a contact.
+    pub fn clear_contact_nickname(&self, contact_id: &str) -> VauchiResult<()> {
+        self.storage.delete_contact_nickname(contact_id)?;
+        Ok(())
+    }
+
+    /// Returns the local nickname for a contact, or None if unset.
+    pub fn get_contact_nickname(&self, contact_id: &str) -> VauchiResult<Option<String>> {
+        Ok(self.storage.load_contact_nickname(contact_id)?)
+    }
+
     // === Imported Contact Editing ===
 
     /// Update a field value on an imported contact.

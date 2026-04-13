@@ -48,6 +48,15 @@ pub enum UserAction {
     UndoPressed {
         action_id: String,
     },
+    /// User changed a slider value.
+    ///
+    /// `value_milli` is the new value scaled by 1000 (e.g., -300 for
+    /// -0.3). This avoids `f32` in the action enum so `Eq` is
+    /// preserved across FFI boundaries.
+    SliderChanged {
+        component_id: String,
+        value_milli: i32,
+    },
 }
 
 /// The result of handling a user action.

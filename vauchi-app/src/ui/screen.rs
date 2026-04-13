@@ -9,7 +9,7 @@ use crate::theme::DesignTokens;
 
 /// Current schema version. Increment when adding new Component types.
 /// Shells use this to detect unsupported components and degrade gracefully.
-pub const CURRENT_SCHEMA_VERSION: u16 = 2;
+pub const CURRENT_SCHEMA_VERSION: u16 = 3;
 
 /// Describes a full screen to render.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]

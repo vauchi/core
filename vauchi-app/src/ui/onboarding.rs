@@ -593,6 +593,7 @@ impl OnboardingEngine {
             subtitle: Some("This is how your card will look.".into()),
             components: vec![Component::CardPreview {
                 name: self.data.display_name.clone(),
+                avatar_data: None,
                 fields,
                 group_views,
                 selected_group: self.selected_preview_group.clone(),

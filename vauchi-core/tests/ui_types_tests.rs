@@ -348,6 +348,7 @@ fn test_component_field_list_roundtrip() {
 fn test_component_card_preview_roundtrip() {
     let component = Component::CardPreview {
         name: "Alice".into(),
+        avatar_data: None,
         fields: vec![FieldDisplay {
             id: "phone".into(),
             field_type: "phone".into(),

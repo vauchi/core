@@ -50,6 +50,10 @@ pub enum Component {
     },
     CardPreview {
         name: String,
+        /// Avatar image bytes (WebP). Frontends show this in the circular
+        /// header area. Falls back to initials from `name` when None.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        avatar_data: Option<Vec<u8>>,
         fields: Vec<FieldDisplay>,
         group_views: Vec<GroupCardView>,
         selected_group: Option<String>,
@@ -143,6 +147,56 @@ pub enum Component {
         label: String,
         selected: Option<String>,
         options: Vec<DropdownOption>,
+        #[serde(default)]
+        a11y: Option<A11y>,
+    },
+    /// Circular avatar preview with optional brightness adjustment.
+    ///
+    /// Used in the Avatar Editor screen and as a display component.
+    /// When `editable` is true, tapping emits
+    /// `UserAction::ActionPressed { action_id: "edit_avatar" }`.
+    AvatarPreview {
+        id: String,
+        /// Raw image bytes (WebP/PNG/JPEG) to display, or None for
+        /// initials-only fallback.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        image_data: Option<Vec<u8>>,
+        /// Fallback initials text when no image is available.
+        initials: String,
+        /// Background color for initials fallback `[r, g, b]`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        bg_color: Option<[u8; 3]>,
+        /// Brightness adjustment (-0.3 to 0.3). 0.0 = no change.
+        #[serde(default)]
+        brightness: f32,
+        /// Whether tapping opens the avatar editor (own card only).
+        #[serde(default)]
+        editable: bool,
+        #[serde(default)]
+        a11y: Option<A11y>,
+    },
+    /// A range slider for continuous value input.
+    ///
+    /// Emits `UserAction::SliderChanged { component_id, value }` on
+    /// value changes.
+    Slider {
+        id: String,
+        label: String,
+        /// Current value.
+        value: f32,
+        /// Minimum allowed value.
+        min: f32,
+        /// Maximum allowed value.
+        max: f32,
+        /// Step increment (0.0 = continuous).
+        #[serde(default)]
+        step: f32,
+        /// Optional icon name for the min end (e.g., "sun.min").
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        min_icon: Option<String>,
+        /// Optional icon name for the max end (e.g., "sun.max").
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        max_icon: Option<String>,
         #[serde(default)]
         a11y: Option<A11y>,
     },

@@ -252,6 +252,7 @@ impl ContactEditEngine {
             subtitle: None,
             components: vec![Component::CardPreview {
                 name: self.contact.display_name.clone(),
+                avatar_data: None,
                 fields,
                 group_views: self.build_group_views(),
                 selected_group: self.selected_preview_group.clone(),

@@ -237,7 +237,8 @@ rc:mutation:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\.\d+$/
   variables:
     MUTATION_PACKAGE: "vauchi-core"
-    MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs"
+    MUTATION_TIMEOUT_NIGHTLY: "240"
+    MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs --in-place"
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]

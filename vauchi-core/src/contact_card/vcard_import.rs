@@ -9,7 +9,7 @@
 
 use base64::prelude::*;
 
-use super::{ContactCard, ContactField, FieldType, MAX_AVATAR_SIZE, MAX_DISPLAY_NAME_LENGTH};
+use super::{ContactCard, ContactField, FieldType, MAX_DISPLAY_NAME_LENGTH};
 use crate::contact_card::field::MAX_VALUE_LENGTH;
 
 /// Maximum import file size: 10 MB.
@@ -311,9 +311,7 @@ fn parse_single_vcard(block: &str) -> Option<(ContactCard, Option<String>)> {
         card.set_nickname(&nick);
     }
 
-    if let Some(avatar) = avatar_data
-        && avatar.len() <= MAX_AVATAR_SIZE
-    {
+    if let Some(avatar) = avatar_data {
         let _ = card.set_avatar(avatar);
     }
 
@@ -670,10 +668,6 @@ fn decode_photo_base64(b64: &str) -> Option<Vec<u8>> {
     let clean: String = b64.chars().filter(|c| !c.is_whitespace()).collect();
 
     let decoded = BASE64_STANDARD.decode(clean.as_bytes()).ok()?;
-
-    if decoded.len() > MAX_AVATAR_SIZE {
-        return None;
-    }
 
     Some(decoded)
 }

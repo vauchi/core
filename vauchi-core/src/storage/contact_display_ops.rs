@@ -8,6 +8,7 @@
 use rusqlite::params;
 
 use super::{Storage, StorageError};
+use crate::contact::display::NameVariant;
 
 impl Storage {
     /// Saves an encrypted nickname for a contact.
@@ -125,5 +126,68 @@ impl Storage {
             return Err(StorageError::NotFound("Contact not found".to_string()));
         }
         Ok(())
+    }
+
+    // === Name Variant Operations ===
+
+    /// Upserts a name variant for a contact (called by sync layer on card updates).
+    pub fn upsert_name_variant(
+        &self,
+        contact_id: &str,
+        source_label: &str,
+        name: &str,
+        avatar: Option<&[u8]>,
+    ) -> Result<(), StorageError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before UNIX epoch")
+            .as_secs();
+
+        let avatar_encrypted =
+            match avatar {
+                Some(data) => Some(crate::crypto::encrypt(&self.encryption_key, data).map_err(
+                    |e| StorageError::Encryption(format!("Encrypt variant avatar: {}", e)),
+                )?),
+                None => None,
+            };
+
+        self.conn.execute(
+            "INSERT INTO contact_name_variants (contact_id, source_label, name, avatar_encrypted, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(contact_id, source_label)
+             DO UPDATE SET name = ?3, avatar_encrypted = ?4, updated_at = ?5",
+            params![contact_id, source_label, name, avatar_encrypted, now as i64],
+        )?;
+        Ok(())
+    }
+
+    /// Lists all name variants for a contact.
+    pub fn list_name_variants(&self, contact_id: &str) -> Result<Vec<NameVariant>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT source_label, name, avatar_encrypted, updated_at
+             FROM contact_name_variants
+             WHERE contact_id = ?1
+             ORDER BY source_label",
+        )?;
+        let rows = stmt.query_map(params![contact_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<Vec<u8>>>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        })?;
+
+        let mut variants = Vec::new();
+        for row_result in rows {
+            let (source_label, name, avatar_enc, updated_at) = row_result?;
+            variants.push(NameVariant {
+                source_label,
+                name,
+                has_avatar: avatar_enc.is_some(),
+                updated_at: updated_at as u64,
+            });
+        }
+        Ok(variants)
     }
 }

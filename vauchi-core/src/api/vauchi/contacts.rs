@@ -576,6 +576,29 @@ impl Vauchi {
         Ok(self.storage.load_contact_custom_avatar(contact_id)?)
     }
 
+    // === Name Variant Operations (internal, called by sync layer) ===
+
+    /// Upserts a name variant for a contact from an inbound card update.
+    pub fn upsert_contact_name_variant(
+        &self,
+        contact_id: &str,
+        source_label: &str,
+        name: &str,
+        avatar: Option<&[u8]>,
+    ) -> VauchiResult<()> {
+        self.storage
+            .upsert_name_variant(contact_id, source_label, name, avatar)?;
+        Ok(())
+    }
+
+    /// Lists all name variants for a contact.
+    pub fn list_contact_name_variants(
+        &self,
+        contact_id: &str,
+    ) -> VauchiResult<Vec<crate::contact::display::NameVariant>> {
+        Ok(self.storage.list_name_variants(contact_id)?)
+    }
+
     // === Imported Contact Editing ===
 
     /// Update a field value on an imported contact.

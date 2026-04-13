@@ -162,7 +162,7 @@ tokio = { version = "1.0", features = ["rt", "macros"] }
 # Property-based testing
 proptest = "1.4"
 # Parameterized tests
-rstest = "0.23"
+rstest = "0.26"
 # Benchmarking
 criterion = "0.5"
 # BDD testing (executable Gherkin)

@@ -84,6 +84,32 @@ pub struct FetchedBlob {
     pub created_at: u64,
 }
 
+/// V2 recovery proof store request body.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct V2RecoveryStoreRequest {
+    /// Hex-encoded hash of the old public key (32 bytes = 64 hex chars).
+    pub key_hash: String,
+    /// Base64-encoded recovery proof data (opaque to relay, max 4 KiB).
+    pub proof_data: String,
+}
+
+/// V2 recovery proof query request body.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct V2RecoveryQueryRequest {
+    /// Hex-encoded key hashes to look up (max 50).
+    pub key_hashes: Vec<String>,
+}
+
+/// A single recovery proof entry in a query response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct V2RecoveryProof {
+    pub key_hash: String,
+    /// Base64-encoded proof data.
+    pub proof_data: String,
+    pub created_at: u64,
+    pub expires_at: u64,
+}
+
 /// Standard V2 response envelope.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -106,6 +132,9 @@ pub struct V2Response {
     /// Number of blobs deleted by a purge request.
     #[serde(default)]
     pub blobs_deleted: Option<usize>,
+    /// Recovery proofs returned by a query.
+    #[serde(default)]
+    pub proofs: Option<Vec<V2RecoveryProof>>,
 }
 
 impl V2Response {
@@ -121,6 +150,7 @@ impl V2Response {
             payload: None,
             response: None,
             blobs_deleted: None,
+            proofs: None,
         }
     }
 }

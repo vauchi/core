@@ -349,15 +349,14 @@ impl IdentityRevoked {
     ) -> Self {
         let sender_id = identity.public_id();
 
-        // Decode hex IDs to raw bytes for canonical signature
+        // Decode hex IDs to raw bytes for canonical signature.
+        // Exchanged contacts have hex-encoded 32-byte public key IDs.
+        // Imported contacts have UUID IDs that aren't valid hex — for them
+        // the signature covers zeros, producing a message that `verify()`
+        // will reject. This is harmless: imported contacts don't participate
+        // in the relay protocol, so no one processes their revocations.
         let sender_bytes: [u8; 32] = *identity.signing_public_key();
-        let recipient_bytes: [u8; 32] = {
-            let decoded = hex::decode(recipient_id).unwrap_or_else(|_| vec![0u8; 32]);
-            let mut arr = [0u8; 32];
-            let len = decoded.len().min(32);
-            arr[..len].copy_from_slice(&decoded[..len]);
-            arr
-        };
+        let recipient_bytes: [u8; 32] = decode_hex_id(recipient_id).unwrap_or([0u8; 32]);
 
         let canonical = super::revocation::canonical_revocation_bytes(
             &sender_bytes,
@@ -376,12 +375,9 @@ impl IdentityRevoked {
 
     /// Verifies the revocation signature against the given public key.
     pub fn verify(&self, public_key: &[u8; 32]) -> bool {
-        let recipient_bytes: [u8; 32] = {
-            let decoded = hex::decode(&self.recipient_id).unwrap_or_else(|_| vec![0u8; 32]);
-            let mut arr = [0u8; 32];
-            let len = decoded.len().min(32);
-            arr[..len].copy_from_slice(&decoded[..len]);
-            arr
+        // Reject malformed recipient IDs instead of silently verifying against zeros.
+        let Some(recipient_bytes) = decode_hex_id(&self.recipient_id) else {
+            return false;
         };
 
         let canonical = super::revocation::canonical_revocation_bytes(
@@ -394,6 +390,13 @@ impl IdentityRevoked {
         let signature = crate::crypto::Signature::from_bytes(self.signature);
         pubkey.verify(&canonical, &signature)
     }
+}
+
+/// Decode a hex-encoded 32-byte public key fingerprint to raw bytes.
+/// Returns `None` if the hex is invalid or not exactly 32 bytes.
+fn decode_hex_id(hex_str: &str) -> Option<[u8; 32]> {
+    let decoded = hex::decode(hex_str).ok()?;
+    <[u8; 32]>::try_from(decoded.as_slice()).ok()
 }
 
 /// Serde helper for 32-byte arrays.

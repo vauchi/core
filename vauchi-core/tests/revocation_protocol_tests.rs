@@ -325,3 +325,24 @@ fn test_revocation_with_minimum_valid_timestamp() {
     // Alice contact should be deleted (timestamp equals exchange_timestamp, so >= condition is true)
     assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
 }
+
+// @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
+/// Imported contacts have UUID IDs (not hex-encoded public keys).
+/// `IdentityRevoked::create` must not panic for non-hex recipient IDs.
+/// The resulting message is meaningless (imported contacts don't participate
+/// in the relay protocol), but the deletion/shred flow must not crash.
+#[test]
+fn test_identity_revoked_handles_uuid_recipient_id() {
+    let identity = Identity::create("Alice");
+    let uuid_id = "550e8400-e29b-41d4-a716-446655440000";
+
+    // Must not panic — imported contacts reach this code path via
+    // execute_deletion() and ShredManager which iterate all contacts.
+    let revoked = IdentityRevoked::create(&identity, uuid_id, 1700000000);
+
+    // The message is created but verify() rejects it (non-hex recipient_id).
+    assert!(
+        !revoked.verify(identity.signing_public_key()),
+        "revocation for non-hex recipient_id must not verify"
+    );
+}

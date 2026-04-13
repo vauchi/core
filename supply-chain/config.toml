@@ -271,10 +271,6 @@ criteria = "safe-to-run"
 version = "2.4.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.fdeflate]]
-version = "0.3.7"
-criteria = "safe-to-deploy"
-
 [[exemptions.find-msvc-tools]]
 version = "0.1.9"
 criteria = "safe-to-deploy"

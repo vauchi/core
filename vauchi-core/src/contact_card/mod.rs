@@ -64,6 +64,8 @@ pub enum ContactCardError {
     FieldNotFound,
     #[error("Avatar too large (max {max} bytes, got {size} bytes)")]
     AvatarTooLarge { max: usize, size: usize },
+    #[error("Unsupported avatar image format (expected PNG, JPEG, BMP, or WebP)")]
+    AvatarInvalidFormat,
     #[error("Card too large (max {max} bytes, got {size} bytes)")]
     CardTooLarge { max: usize, size: usize },
     #[error("Serialization error: {0}")]

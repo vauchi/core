@@ -266,6 +266,20 @@
               "hint": "Opens the backup restore screen",
               "role": null
             }
+          },
+          {
+            "id": "setup_new_device",
+            "label": "Set Up New Device",
+            "kind": {
+              "Link": {
+                "detail": null
+              }
+            },
+            "a11y": {
+              "label": "Set Up New Device",
+              "hint": "Transfer your contacts to a new device via QR code",
+              "role": null
+            }
           }
         ]
       }

@@ -291,6 +291,16 @@ impl WorkflowEngine for SettingsEngine {
                             role: None,
                         }),
                     },
+                    SettingsItem {
+                        id: "setup_new_device".into(),
+                        label: "Set Up New Device".into(),
+                        kind: SettingsItemKind::Link { detail: None },
+                        a11y: Some(A11y {
+                            label: Some("Set Up New Device".into()),
+                            hint: Some("Transfer your contacts to a new device via QR code".into()),
+                            role: None,
+                        }),
+                    },
                 ],
             },
             Component::SettingsGroup {

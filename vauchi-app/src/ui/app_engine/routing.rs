@@ -640,6 +640,33 @@ impl AppEngine {
                     }
                 }
             }
+            AppScreen::DeviceReplacement => {
+                if self.engine.was_cancelled() {
+                    let screen = self.navigate_back();
+                    return ActionResult::NavigateTo(screen);
+                }
+                // Check if user chose to decommission old device
+                let outcome = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| {
+                        a.downcast_ref::<crate::ui::device_replacement::DeviceReplacementEngine>()
+                    })
+                    .map(|e| e.completion_outcome().clone());
+                if let Some(crate::ui::device_replacement::CompletionOutcome::RemoveOldDevice) =
+                    outcome
+                {
+                    // Delegate to existing device management unlink
+                    // (current device index = 0, handled by the platform layer)
+                    self.navigate_back();
+                    return ActionResult::ShowToast {
+                        message: "Device removal requested. Complete in Settings > Devices.".into(),
+                        undo_action_id: None,
+                    };
+                }
+                let screen = self.navigate_back();
+                ActionResult::NavigateTo(screen)
+            }
             _ => {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)

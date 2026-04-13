@@ -666,6 +666,13 @@ impl AppEngine {
                 let contact_count = vauchi.list_contacts().map(|c| c.len()).unwrap_or(0);
                 Box::new(ContactLimitEngine::new(contact_count, 0))
             }
+            AppScreen::DeviceReplacement => {
+                Box::new(crate::ui::device_replacement::DeviceReplacementEngine::new_source())
+                // Note: Settings "Set Up New Device" opens as Source (old device side).
+                // Onboarding "Transfer from another device" bypasses this engine entirely
+                // via ActionResult::StartDeviceLink. PostRestore is created by the backup
+                // restore completion handler (future wiring).
+            }
             AppScreen::VerifyFingerprint { contact_id } => {
                 let contact = vauchi.get_contact(contact_id).ok().flatten();
                 let their_fp = contact

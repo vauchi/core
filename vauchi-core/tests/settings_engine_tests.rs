@@ -328,9 +328,11 @@ fn settings_backup_section_has_links() {
     let engine = SettingsEngine::new(sample_config());
     let screen = engine.current_screen();
     let items = find_settings_group(&screen, "backup");
-    assert_eq!(items.len(), 2);
+    assert_eq!(items.len(), 3);
     assert!(matches!(items[0].kind, SettingsItemKind::Link { .. }));
     assert!(matches!(items[1].kind, SettingsItemKind::Link { .. }));
+    assert!(matches!(items[2].kind, SettingsItemKind::Link { .. }));
+    assert_eq!(items[2].id, "setup_new_device");
 }
 
 // @internal

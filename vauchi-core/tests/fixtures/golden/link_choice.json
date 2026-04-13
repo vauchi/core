@@ -11,6 +11,11 @@
         "title": "",
         "items": [
           {
+            "icon": "devices",
+            "title": "Transfer from another device",
+            "detail": "Move all contacts and data from your old device via QR code."
+          },
+          {
             "icon": "link",
             "title": "Link from another device",
             "detail": "Scan a QR code on your other device to link this one."
@@ -18,7 +23,7 @@
           {
             "icon": "backup",
             "title": "Restore from backup",
-            "detail": "Import your identity from a backup file."
+            "detail": "Import identity only. Contacts will need to be re-established."
           }
         ],
         "a11y": {
@@ -31,9 +36,15 @@
   ],
   "actions": [
     {
+      "id": "transfer_device",
+      "label": "Transfer from another device",
+      "style": "Primary",
+      "enabled": true
+    },
+    {
       "id": "link_device",
       "label": "Link from another device",
-      "style": "Primary",
+      "style": "Secondary",
       "enabled": true
     },
     {

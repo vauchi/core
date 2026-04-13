@@ -3300,9 +3300,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.37"
+version = "0.23.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "758025cb5fccfd3bc2fd74708fd4682be41d99e5dff73c377c0646c6012c73a4"
+checksum = "69f9466fb2c14ea04357e91413efb882e2a6d4a406e625449bc0a5d360d53a21"
 dependencies = [
  "aws-lc-rs",
  "log",
@@ -4398,7 +4398,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-app"
-version = "0.19.11"
+version = "0.19.12"
 dependencies = [
  "hex",
  "log",
@@ -4418,7 +4418,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-cabi"
-version = "0.19.11"
+version = "0.19.12"
 dependencies = [
  "base64",
  "cbindgen",
@@ -4433,7 +4433,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.19.11"
+version = "0.19.12"
 dependencies = [
  "argon2",
  "async-trait",
@@ -4484,7 +4484,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-platform"
-version = "0.19.11"
+version = "0.19.12"
 dependencies = [
  "base64",
  "crc32fast",
@@ -4504,7 +4504,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.19.11"
+version = "0.19.12"
 dependencies = [
  "serde",
  "serde_json",

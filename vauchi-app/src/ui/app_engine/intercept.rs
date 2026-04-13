@@ -88,6 +88,10 @@ impl AppEngine {
                     let screen = self.navigate_to(AppScreen::Backup);
                     return Some(ActionResult::NavigateTo(screen));
                 }
+                "setup_new_device" => {
+                    let screen = self.navigate_to(AppScreen::DeviceReplacement);
+                    return Some(ActionResult::NavigateTo(screen));
+                }
                 "sync" => {
                     let screen = self.navigate_to(AppScreen::Sync);
                     return Some(ActionResult::NavigateTo(screen));

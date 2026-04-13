@@ -158,6 +158,12 @@ impl OnboardingEngine {
                 title: "".into(),
                 items: vec![
                     InfoItem {
+                        icon: Some("devices".into()),
+                        title: "Transfer from another device".into(),
+                        detail: "Move all contacts and data from your old device via QR code."
+                            .into(),
+                    },
+                    InfoItem {
                         icon: Some("link".into()),
                         title: "Link from another device".into(),
                         detail: "Scan a QR code on your other device to link this one.".into(),
@@ -165,7 +171,8 @@ impl OnboardingEngine {
                     InfoItem {
                         icon: Some("backup".into()),
                         title: "Restore from backup".into(),
-                        detail: "Import your identity from a backup file.".into(),
+                        detail: "Import identity only. Contacts will need to be re-established."
+                            .into(),
                     },
                 ],
                 a11y: Some(A11y {
@@ -176,9 +183,15 @@ impl OnboardingEngine {
             }],
             actions: vec![
                 ScreenAction {
+                    id: "transfer_device".into(),
+                    label: "Transfer from another device".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                },
+                ScreenAction {
                     id: "link_device".into(),
                     label: "Link from another device".into(),
-                    style: ActionStyle::Primary,
+                    style: ActionStyle::Secondary,
                     enabled: true,
                 },
                 ScreenAction {
@@ -741,6 +754,9 @@ impl OnboardingEngine {
 
     fn handle_link_choice(&mut self, action: &UserAction) -> ActionResult {
         match action {
+            UserAction::ActionPressed { action_id } if action_id == "transfer_device" => {
+                ActionResult::StartDeviceLink
+            }
             UserAction::ActionPressed { action_id } if action_id == "link_device" => {
                 ActionResult::StartDeviceLink
             }

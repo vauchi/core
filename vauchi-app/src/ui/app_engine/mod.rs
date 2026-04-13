@@ -92,6 +92,7 @@ pub enum AppScreen {
     More,
     ActivityLog,
     ArchivedContacts,
+    DeviceReplacement,
 }
 
 impl AppScreen {
@@ -133,6 +134,7 @@ impl AppScreen {
             Self::More => "more",
             Self::ActivityLog => "activity_log",
             Self::ArchivedContacts => "archived_contacts",
+            Self::DeviceReplacement => "device_replacement",
         }
     }
 
@@ -164,6 +166,7 @@ impl AppScreen {
             "more" => Self::More,
             "activity_log" => Self::ActivityLog,
             "archived_contacts" => Self::ArchivedContacts,
+            "device_replacement" => Self::DeviceReplacement,
             _ => return None,
         })
     }

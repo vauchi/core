@@ -88,6 +88,10 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("visibility_labels", "display_name_override_encrypted"),
     // V38 exchange state crash recovery
     ("exchange_states", "encrypted_blob"),
+    // V43 contact display: nickname, custom avatar, name variants
+    ("contacts", "nickname_encrypted"),
+    ("contacts", "custom_avatar_encrypted"),
+    ("contact_name_variants", "avatar_encrypted"),
 ];
 
 /// Encrypted columns intentionally skipped by rekey, with documented reason.

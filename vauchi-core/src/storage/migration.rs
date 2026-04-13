@@ -474,6 +474,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "pin_cache",
             action: MigrationAction::Sql(MIGRATION_V42_PIN_CACHE),
         },
+        Migration {
+            version: 43,
+            name: "contact_display",
+            action: MigrationAction::Sql(MIGRATION_V43_CONTACT_DISPLAY),
+        },
     ]
 }
 
@@ -747,6 +752,28 @@ const MIGRATION_V42_PIN_CACHE: &str = "
         pin_bytes  BLOB NOT NULL,
         fetched_at INTEGER NOT NULL
     );
+";
+
+/// Migration v43: Contact nickname, custom avatar, name variants, and display preferences.
+///
+/// Adds `contact_name_variants` table for per-group name/avatar tracking,
+/// and 4 new columns on `contacts` for local nickname, custom avatar, and
+/// display preferences.
+const MIGRATION_V43_CONTACT_DISPLAY: &str = "
+    CREATE TABLE contact_name_variants (
+        contact_id   TEXT NOT NULL,
+        source_label TEXT NOT NULL,
+        name         TEXT NOT NULL,
+        avatar_encrypted BLOB,
+        updated_at   INTEGER NOT NULL,
+        PRIMARY KEY (contact_id, source_label),
+        FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+    );
+
+    ALTER TABLE contacts ADD COLUMN nickname_encrypted BLOB;
+    ALTER TABLE contacts ADD COLUMN custom_avatar_encrypted BLOB;
+    ALTER TABLE contacts ADD COLUMN display_name_preference TEXT NOT NULL DEFAULT '\"card_default\"';
+    ALTER TABLE contacts ADD COLUMN avatar_preference TEXT NOT NULL DEFAULT '\"card_default\"';
 ";
 
 const MIGRATION_V35_LOCAL_GROUPS: &str = "

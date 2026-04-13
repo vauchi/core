@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "screen_id": "link_show_qr",
   "title": "Link Device",
   "subtitle": null,

@@ -8,7 +8,7 @@
 use rusqlite::params;
 
 use super::{Storage, StorageError};
-use crate::contact::display::NameVariant;
+use crate::contact::display::{DisplayPreference, NameVariant};
 
 impl Storage {
     /// Saves an encrypted nickname for a contact.
@@ -189,5 +189,68 @@ impl Storage {
             });
         }
         Ok(variants)
+    }
+
+    // === Display Preference Operations ===
+
+    /// Saves the display name preference for a contact.
+    pub fn save_display_name_preference(
+        &self,
+        contact_id: &str,
+        pref: &DisplayPreference,
+    ) -> Result<(), StorageError> {
+        let json =
+            serde_json::to_string(pref).map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let rows = self.conn.execute(
+            "UPDATE contacts SET display_name_preference = ?1 WHERE id = ?2",
+            params![json, contact_id],
+        )?;
+        if rows == 0 {
+            return Err(StorageError::NotFound("Contact not found".to_string()));
+        }
+        Ok(())
+    }
+
+    /// Saves the avatar preference for a contact.
+    pub fn save_avatar_preference(
+        &self,
+        contact_id: &str,
+        pref: &DisplayPreference,
+    ) -> Result<(), StorageError> {
+        let json =
+            serde_json::to_string(pref).map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let rows = self.conn.execute(
+            "UPDATE contacts SET avatar_preference = ?1 WHERE id = ?2",
+            params![json, contact_id],
+        )?;
+        if rows == 0 {
+            return Err(StorageError::NotFound("Contact not found".to_string()));
+        }
+        Ok(())
+    }
+
+    /// Loads both display preferences for a contact.
+    pub fn load_display_preferences(
+        &self,
+        contact_id: &str,
+    ) -> Result<(DisplayPreference, DisplayPreference), StorageError> {
+        let result = self.conn.query_row(
+            "SELECT display_name_preference, avatar_preference FROM contacts WHERE id = ?1",
+            params![contact_id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        );
+        match result {
+            Ok((name_json, avatar_json)) => {
+                let name_pref: DisplayPreference = serde_json::from_str(&name_json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let avatar_pref: DisplayPreference = serde_json::from_str(&avatar_json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok((name_pref, avatar_pref))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                Err(StorageError::NotFound("Contact not found".to_string()))
+            }
+            Err(e) => Err(StorageError::Database(e)),
+        }
     }
 }

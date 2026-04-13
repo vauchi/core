@@ -5,6 +5,7 @@
 //! Contact and double ratchet operations.
 
 use crate::contact::Contact;
+use crate::contact::display::{ContactDisplayOptions, DisplayPreference};
 use crate::crypto::SymmetricKey;
 use crate::crypto::ratchet::DoubleRatchetState;
 
@@ -597,6 +598,150 @@ impl Vauchi {
         contact_id: &str,
     ) -> VauchiResult<Vec<crate::contact::display::NameVariant>> {
         Ok(self.storage.list_name_variants(contact_id)?)
+    }
+
+    // === Display Preference Operations ===
+
+    /// Sets the display name preference for a contact.
+    pub fn set_display_name_preference(
+        &self,
+        contact_id: &str,
+        pref: DisplayPreference,
+    ) -> VauchiResult<()> {
+        self.validate_display_preference(contact_id, &pref, false)?;
+        self.storage
+            .save_display_name_preference(contact_id, &pref)?;
+        Ok(())
+    }
+
+    /// Sets the avatar preference for a contact.
+    pub fn set_avatar_preference(
+        &self,
+        contact_id: &str,
+        pref: DisplayPreference,
+    ) -> VauchiResult<()> {
+        self.validate_display_preference(contact_id, &pref, true)?;
+        self.storage.save_avatar_preference(contact_id, &pref)?;
+        Ok(())
+    }
+
+    /// Returns all display options for a contact (for the chooser screen).
+    pub fn get_contact_display_options(
+        &self,
+        contact_id: &str,
+    ) -> VauchiResult<ContactDisplayOptions> {
+        use crate::contact::display::*;
+
+        let contact = self
+            .storage
+            .load_contact(contact_id)?
+            .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
+        let nickname = self.storage.load_contact_nickname(contact_id)?;
+        let variants = self.storage.list_name_variants(contact_id)?;
+        let (name_pref, avatar_pref) = self.storage.load_display_preferences(contact_id)?;
+        let has_custom_avatar = self
+            .storage
+            .load_contact_custom_avatar(contact_id)?
+            .is_some();
+
+        let mut names = vec![NameOption {
+            source: DisplayPreference::CardDefault,
+            name: contact.display_name().to_string(),
+            label: "Default".to_string(),
+        }];
+        for v in &variants {
+            names.push(NameOption {
+                source: DisplayPreference::CardVariant {
+                    source_label: v.source_label.clone(),
+                },
+                name: v.name.clone(),
+                label: if v.source_label.is_empty() {
+                    "Default".to_string()
+                } else {
+                    v.source_label.clone()
+                },
+            });
+        }
+        if let Some(ref nick) = nickname {
+            names.push(NameOption {
+                source: DisplayPreference::Custom,
+                name: nick.clone(),
+                label: "Nickname".to_string(),
+            });
+        }
+
+        let mut avatars = vec![AvatarOption {
+            source: DisplayPreference::CardDefault,
+            has_data: contact.card().avatar().is_some(),
+            label: "Default".to_string(),
+        }];
+        for v in &variants {
+            avatars.push(AvatarOption {
+                source: DisplayPreference::CardVariant {
+                    source_label: v.source_label.clone(),
+                },
+                has_data: v.has_avatar,
+                label: if v.source_label.is_empty() {
+                    "Default".to_string()
+                } else {
+                    v.source_label.clone()
+                },
+            });
+        }
+        avatars.push(AvatarOption {
+            source: DisplayPreference::Custom,
+            has_data: has_custom_avatar,
+            label: "Custom".to_string(),
+        });
+
+        Ok(ContactDisplayOptions {
+            names,
+            avatars,
+            active_name_preference: name_pref,
+            active_avatar_preference: avatar_pref,
+        })
+    }
+
+    fn validate_display_preference(
+        &self,
+        contact_id: &str,
+        pref: &DisplayPreference,
+        is_avatar: bool,
+    ) -> VauchiResult<()> {
+        match pref {
+            DisplayPreference::CardDefault => Ok(()),
+            DisplayPreference::Custom => {
+                if is_avatar {
+                    let has = self
+                        .storage
+                        .load_contact_custom_avatar(contact_id)?
+                        .is_some();
+                    if !has {
+                        return Err(VauchiError::InvalidState(
+                            "Cannot set Custom avatar preference without a custom avatar".into(),
+                        ));
+                    }
+                } else {
+                    let nick = self.storage.load_contact_nickname(contact_id)?;
+                    if nick.is_none() {
+                        return Err(VauchiError::InvalidState(
+                            "Cannot set Custom name preference without a nickname".into(),
+                        ));
+                    }
+                }
+                Ok(())
+            }
+            DisplayPreference::CardVariant { source_label } => {
+                let variants = self.storage.list_name_variants(contact_id)?;
+                if !variants.iter().any(|v| v.source_label == *source_label) {
+                    return Err(VauchiError::InvalidState(format!(
+                        "No variant with source_label '{}'",
+                        source_label
+                    )));
+                }
+                Ok(())
+            }
+        }
     }
 
     // === Imported Contact Editing ===

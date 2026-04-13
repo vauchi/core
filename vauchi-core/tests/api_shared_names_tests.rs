@@ -71,6 +71,10 @@ fn test_dedup_on_same_name() {
     let names = wb.list_contact_shared_names(&cid).unwrap();
     assert_eq!(names.len(), 1, "Duplicate names must be deduplicated");
     assert_eq!(names[0].name, "Bobby");
+    assert!(
+        !names[0].is_primary,
+        "Second insert (is_primary=false) must win on conflict"
+    );
 }
 
 #[test]

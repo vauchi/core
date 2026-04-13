@@ -404,29 +404,39 @@ impl VauchiPlatform {
     ) -> Result<MobileContactDisplayOptions, MobileError> {
         let vauchi = self.open_vauchi()?;
         let opts = vauchi.get_contact_display_options(&contact_id)?;
-        Ok(MobileContactDisplayOptions {
-            names: opts
-                .names
-                .into_iter()
-                .map(|n| MobileNameOption {
-                    source: serde_json::to_string(&n.source).unwrap_or_default(),
+        let names = opts
+            .names
+            .into_iter()
+            .map(|n| {
+                Ok(MobileNameOption {
+                    source: serde_json::to_string(&n.source).map_err(|e| {
+                        MobileError::Internal(format!("Serialize name source: {}", e))
+                    })?,
                     name: n.name,
                     is_primary: n.is_primary,
                 })
-                .collect(),
-            avatars: opts
-                .avatars
-                .into_iter()
-                .map(|a| MobileAvatarOption {
-                    source: serde_json::to_string(&a.source).unwrap_or_default(),
+            })
+            .collect::<Result<Vec<_>, MobileError>>()?;
+        let avatars = opts
+            .avatars
+            .into_iter()
+            .map(|a| {
+                Ok(MobileAvatarOption {
+                    source: serde_json::to_string(&a.source).map_err(|e| {
+                        MobileError::Internal(format!("Serialize avatar source: {}", e))
+                    })?,
                     has_data: a.has_data,
                     is_primary: a.is_primary,
                 })
-                .collect(),
+            })
+            .collect::<Result<Vec<_>, MobileError>>()?;
+        Ok(MobileContactDisplayOptions {
+            names,
+            avatars,
             active_name_preference: serde_json::to_string(&opts.active_name_preference)
-                .unwrap_or_default(),
+                .map_err(|e| MobileError::Internal(format!("Serialize name pref: {}", e)))?,
             active_avatar_preference: serde_json::to_string(&opts.active_avatar_preference)
-                .unwrap_or_default(),
+                .map_err(|e| MobileError::Internal(format!("Serialize avatar pref: {}", e)))?,
         })
     }
 
@@ -591,7 +601,10 @@ impl VauchiPlatform {
     ) -> Result<Vec<MobileContact>, MobileError> {
         let storage = self.open_storage()?;
         let contacts = storage.list_contacts_paginated(offset as usize, limit as usize)?;
-        Ok(contacts.iter().map(MobileContact::from).collect())
+        Ok(contacts
+            .iter()
+            .map(|c| Self::enrich_contact(&storage, c))
+            .collect())
     }
 
     // === Social Networks ===

@@ -137,7 +137,9 @@ impl Storage {
         );
         match result {
             Ok(has) => Ok(has),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                Err(StorageError::NotFound("Contact not found".to_string()))
+            }
             Err(e) => Err(StorageError::Database(e)),
         }
     }

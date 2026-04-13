@@ -5,7 +5,17 @@
 //! Additional ContactCard tests for coverage of set_display_name, update_field,
 //! remove_field, validate_size, reorder_fields, avatar methods.
 
+use image::{ImageBuffer, Rgba, RgbaImage};
+use std::io::Cursor;
 use vauchi_core::{ContactCard, ContactField, FieldType};
+
+/// Helper: create a small valid PNG for avatar tests.
+fn test_avatar_png() -> Vec<u8> {
+    let img: RgbaImage = ImageBuffer::from_pixel(1, 1, Rgba([255, 0, 0, 255]));
+    let mut buf = Cursor::new(Vec::new());
+    img.write_to(&mut buf, image::ImageFormat::Png).unwrap();
+    buf.into_inner()
+}
 
 // @scenario: contact_card_management :: Update display name
 #[test]
@@ -154,34 +164,45 @@ fn test_set_avatar() {
     let mut card = ContactCard::new("Test");
     assert!(card.avatar().is_none());
 
-    card.set_avatar(vec![0xFF, 0xD8, 0xFF]).unwrap();
-    card.avatar().expect("expected Some");
-    assert_eq!(card.avatar().unwrap(), &[0xFF, 0xD8, 0xFF]);
+    card.set_avatar(test_avatar_png()).unwrap();
+    let avatar = card.avatar().expect("expected Some");
+    // set_avatar normalizes to WebP (ADR-042)
+    assert_eq!(&avatar[0..4], b"RIFF");
+    assert_eq!(&avatar[8..12], b"WEBP");
 }
 
-// @scenario: contact_card_management :: Avatar image too large
+// @scenario: contact_card_management :: Avatar invalid format rejected
 #[test]
-fn test_set_avatar_too_large() {
+fn test_set_avatar_invalid_format() {
     let mut card = ContactCard::new("Test");
-    let large = vec![0u8; 262145]; // MAX_AVATAR_SIZE + 1
-    let result = card.set_avatar(large);
-    result.expect_err("expected error");
+    let garbage = vec![0x00, 0x01, 0x02];
+    let result = card.set_avatar(garbage);
+    result.expect_err("expected error for invalid image format");
 }
 
-// @scenario: contact_card_management :: Add avatar to contact card
+// @scenario: contact_card_management :: Large avatar image normalized
 #[test]
-fn test_set_avatar_at_max_size() {
+fn test_set_avatar_large_image_normalized() {
     let mut card = ContactCard::new("Test");
-    let max = vec![0u8; 262144]; // exactly MAX_AVATAR_SIZE
-    card.set_avatar(max).unwrap();
-    card.avatar().expect("expected Some");
+    let img: RgbaImage = ImageBuffer::from_fn(800, 800, |x, y| {
+        Rgba([(x % 256) as u8, (y % 256) as u8, 128, 255])
+    });
+    let mut buf = Cursor::new(Vec::new());
+    img.write_to(&mut buf, image::ImageFormat::Png).unwrap();
+    card.set_avatar(buf.into_inner()).unwrap();
+    let avatar = card.avatar().expect("expected Some");
+    assert!(
+        avatar.len() <= 32_768,
+        "avatar should be <= 32 KB after normalization"
+    );
+    assert_eq!(&avatar[0..4], b"RIFF");
 }
 
 // @scenario: contact_card_management :: Remove avatar from contact card
 #[test]
 fn test_clear_avatar() {
     let mut card = ContactCard::new("Test");
-    card.set_avatar(vec![1, 2, 3]).unwrap();
+    card.set_avatar(test_avatar_png()).unwrap();
     card.avatar().expect("expected Some");
 
     card.clear_avatar();

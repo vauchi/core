@@ -44,8 +44,8 @@ pub const MAX_DISPLAY_NAME_LENGTH: usize = 100;
 /// Maximum serialized card size in bytes (64 KB).
 pub const MAX_CARD_SIZE_BYTES: usize = 65536;
 
-/// Maximum avatar data size in bytes (256 KB).
-pub const MAX_AVATAR_SIZE: usize = 262144;
+/// Maximum avatar data size in bytes (32 KB, ADR-042).
+pub const MAX_AVATAR_SIZE: usize = 32_768;
 
 /// Maximum dimension (width or height) for avatar images.
 const MAX_AVATAR_DIMENSION: u32 = 512;
@@ -133,7 +133,7 @@ pub struct ContactCard {
     display_name: String,
     /// Contact information fields.
     fields: Vec<ContactField>,
-    /// Optional avatar image data (max 256 KB).
+    /// Optional avatar image data (WebP, max 32 KB per ADR-042).
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     avatar: Option<Vec<u8>>,
@@ -361,15 +361,11 @@ impl ContactCard {
 
     /// Sets the avatar image data.
     ///
-    /// Returns an error if the data exceeds the maximum avatar size (256 KB).
+    /// Accepts any supported image format (PNG, JPEG, BMP, WebP).
+    /// The image is normalized to WebP <= 32 KB (ADR-042).
     pub fn set_avatar(&mut self, data: Vec<u8>) -> Result<(), ContactCardError> {
-        if data.len() > MAX_AVATAR_SIZE {
-            return Err(ContactCardError::AvatarTooLarge {
-                max: MAX_AVATAR_SIZE,
-                size: data.len(),
-            });
-        }
-        self.avatar = Some(data);
+        let webp = normalize_avatar(&data)?;
+        self.avatar = Some(webp);
         Ok(())
     }
 

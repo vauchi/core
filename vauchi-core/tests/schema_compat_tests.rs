@@ -9,7 +9,17 @@
 //!
 //! Reference: _private/docs/problems/2026-02-22-content-schema-retro-compatibility/
 
+use image::{ImageBuffer, Rgba, RgbaImage};
+use std::io::Cursor;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
+
+/// Helper: create a small valid PNG for avatar tests.
+fn test_avatar_png() -> Vec<u8> {
+    let img: RgbaImage = ImageBuffer::from_pixel(1, 1, Rgba([255, 0, 0, 255]));
+    let mut buf = Cursor::new(Vec::new());
+    img.write_to(&mut buf, image::ImageFormat::Png).unwrap();
+    buf.into_inner()
+}
 
 // ============================================================
 // V0 Legacy Data (no schema_version field)
@@ -59,14 +69,19 @@ fn test_v1_roundtrip_preserves_all_fields() {
     ))
     .unwrap();
     card.set_nickname("Bobby");
-    card.set_avatar(vec![0xCA, 0xFE]).unwrap();
+    card.set_avatar(test_avatar_png()).unwrap();
 
     let json = serde_json::to_string(&card).expect("serialize should succeed");
     let loaded: ContactCard = serde_json::from_str(&json).expect("deserialize should succeed");
 
     assert_eq!(loaded.display_name(), "Bob Roundtrip");
     assert_eq!(loaded.nickname(), Some("Bobby"));
-    assert_eq!(loaded.avatar(), Some(&[0xCA, 0xFE][..]));
+    let avatar = loaded.avatar().expect("avatar should be present");
+    assert_eq!(
+        &avatar[0..4],
+        b"RIFF",
+        "avatar should be WebP after normalization"
+    );
     assert_eq!(loaded.fields().len(), 2);
     assert_eq!(loaded.schema_version(), 1, "new cards should be schema v1");
 }

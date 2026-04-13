@@ -6,6 +6,7 @@ use proptest::prelude::*;
 use vauchi_core::contact_card::{MAX_AVATAR_SIZE, normalize_avatar};
 
 proptest! {
+    // @internal
     // Random bytes should never panic — either Ok(webp) or Err(InvalidFormat)
     #[test]
     fn normalize_never_panics(data in proptest::collection::vec(any::<u8>(), 0..100_000)) {
@@ -13,6 +14,7 @@ proptest! {
         let _ = normalize_avatar(&data);
     }
 
+    // @internal
     // Any valid PNG input always produces valid WebP <= MAX_AVATAR_SIZE
     #[test]
     fn normalize_png_always_valid_webp(

@@ -147,12 +147,19 @@ impl ContactCard {
         Ok(())
     }
 
-    /// Returns the optional nickname annotation (local-only, never shared).
+    /// Returns the optional nickname annotation stored in the card blob.
+    ///
+    /// **Deprecated:** This field lives inside the serialized card and risks
+    /// overwrite on card updates. Use the contact-level nickname instead:
+    /// `Vauchi::get_contact_nickname()` / `Vauchi::set_contact_nickname()`.
     pub fn nickname(&self) -> Option<&str> {
         self.nickname.as_deref()
     }
 
-    /// Sets the local nickname annotation (max 100 chars). Empty string clears it.
+    /// Sets the local nickname annotation in the card blob (max 100 chars).
+    ///
+    /// **Deprecated:** Use `Vauchi::set_contact_nickname()` instead.
+    /// Card-level nickname risks overwrite on card updates.
     pub fn set_nickname(&mut self, nickname: &str) {
         let normalized = normalize_text(nickname);
         if normalized.is_empty() {

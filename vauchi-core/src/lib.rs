@@ -24,6 +24,9 @@ pub use types::{
 pub mod contact;
 pub mod contact_card;
 pub mod identity;
+pub use contact::display::{
+    AvatarOption, ContactDisplayOptions, DisplayPreference, NameOption, NameVariant,
+};
 pub use contact::merge::DuplicatePair;
 pub use contact::{
     Contact, ContactError, ContactKind, ExchangedData, FieldVisibility, Group, GroupError,

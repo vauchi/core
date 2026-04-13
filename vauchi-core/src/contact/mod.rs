@@ -7,6 +7,7 @@
 //! Represents contacts obtained through exchange or import, with shared encryption keys
 //! and visibility rules for exchanged contacts.
 
+pub mod display;
 pub mod kind;
 pub mod labels;
 pub mod local_group;

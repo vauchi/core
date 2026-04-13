@@ -34,6 +34,7 @@ fn setup_with_imported_contact() -> (Vauchi, String) {
     (wb, contact_id)
 }
 
+// @scenario: contacts_management.feature :: Set and display custom nickname
 #[test]
 fn test_set_and_get_nickname_roundtrip() {
     let (wb, cid) = setup_with_contact();
@@ -42,6 +43,7 @@ fn test_set_and_get_nickname_roundtrip() {
     assert_eq!(nick.as_deref(), Some("Bobby"));
 }
 
+// @internal
 #[test]
 fn test_get_nickname_returns_none_when_unset() {
     let (wb, cid) = setup_with_contact();
@@ -49,6 +51,7 @@ fn test_get_nickname_returns_none_when_unset() {
     assert!(nick.is_none(), "Unset nickname must return None");
 }
 
+// @internal
 #[test]
 fn test_clear_nickname() {
     let (wb, cid) = setup_with_contact();
@@ -58,6 +61,7 @@ fn test_clear_nickname() {
     assert!(nick.is_none(), "Cleared nickname must return None");
 }
 
+// @internal
 #[test]
 fn test_nickname_rejects_empty_after_trim() {
     let (wb, cid) = setup_with_contact();
@@ -65,6 +69,7 @@ fn test_nickname_rejects_empty_after_trim() {
     assert!(result.is_err(), "Whitespace-only nickname must be rejected");
 }
 
+// @internal
 #[test]
 fn test_nickname_rejects_too_long() {
     let (wb, cid) = setup_with_contact();
@@ -73,6 +78,7 @@ fn test_nickname_rejects_too_long() {
     assert!(result.is_err(), "Nickname >100 chars must be rejected");
 }
 
+// @internal
 #[test]
 fn test_nickname_trims_whitespace() {
     let (wb, cid) = setup_with_contact();
@@ -81,6 +87,7 @@ fn test_nickname_trims_whitespace() {
     assert_eq!(nick.as_deref(), Some("Bobby"));
 }
 
+// @internal
 #[test]
 fn test_nickname_for_missing_contact_fails() {
     let mut wb = Vauchi::in_memory().unwrap();
@@ -89,6 +96,7 @@ fn test_nickname_for_missing_contact_fails() {
     assert!(result.is_err(), "Nickname on nonexistent contact must fail");
 }
 
+// @scenario: contacts_management.feature :: Set and display custom nickname
 #[test]
 fn test_nickname_works_on_imported_contact() {
     let (wb, cid) = setup_with_imported_contact();
@@ -97,6 +105,7 @@ fn test_nickname_works_on_imported_contact() {
     assert_eq!(nick.as_deref(), Some("Chuck"));
 }
 
+// @internal
 #[test]
 fn test_nickname_overwrites_previous() {
     let (wb, cid) = setup_with_contact();

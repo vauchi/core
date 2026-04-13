@@ -34,6 +34,7 @@ fn minimal_webp() -> Vec<u8> {
     data
 }
 
+// @scenario: contacts_management.feature :: Upload custom avatar
 #[test]
 fn test_set_and_get_custom_avatar_roundtrip() {
     let (wb, cid) = setup_with_contact();
@@ -43,6 +44,7 @@ fn test_set_and_get_custom_avatar_roundtrip() {
     assert_eq!(avatar.as_deref(), Some(webp.as_slice()));
 }
 
+// @internal
 #[test]
 fn test_get_avatar_returns_none_when_unset() {
     let (wb, cid) = setup_with_contact();
@@ -50,6 +52,7 @@ fn test_get_avatar_returns_none_when_unset() {
     assert!(avatar.is_none(), "Unset avatar must return None");
 }
 
+// @internal
 #[test]
 fn test_clear_custom_avatar() {
     let (wb, cid) = setup_with_contact();
@@ -59,6 +62,7 @@ fn test_clear_custom_avatar() {
     assert!(avatar.is_none(), "Cleared avatar must return None");
 }
 
+// @internal
 #[test]
 fn test_avatar_rejects_non_webp() {
     let (wb, cid) = setup_with_contact();
@@ -69,6 +73,7 @@ fn test_avatar_rejects_non_webp() {
     assert!(result.is_err(), "Non-WebP data must be rejected");
 }
 
+// @internal
 #[test]
 fn test_avatar_rejects_too_large() {
     let (wb, cid) = setup_with_contact();
@@ -78,6 +83,7 @@ fn test_avatar_rejects_too_large() {
     assert!(result.is_err(), "Avatar >32 KB must be rejected");
 }
 
+// @internal
 #[test]
 fn test_avatar_rejects_empty() {
     let (wb, cid) = setup_with_contact();
@@ -85,6 +91,7 @@ fn test_avatar_rejects_empty() {
     assert!(result.is_err(), "Empty avatar must be rejected");
 }
 
+// @internal
 #[test]
 fn test_avatar_for_missing_contact_fails() {
     let mut wb = Vauchi::in_memory().unwrap();

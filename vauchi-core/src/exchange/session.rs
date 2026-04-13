@@ -1320,19 +1320,26 @@ impl ExchangeSession {
         &mut self,
         their_card: ContactCard,
     ) -> Result<Contact, ExchangeError> {
-        let (their_public_key, shared_key) =
-            match std::mem::replace(&mut self.state, ExchangeState::Idle) {
-                ExchangeState::AwaitingCardExchange {
-                    their_public_key,
-                    shared_key,
-                } => (their_public_key, shared_key),
-                other => {
-                    self.state = other;
-                    return Err(ExchangeError::InvalidState(
-                        "Not in card exchange state".into(),
-                    ));
-                }
-            };
+        // Use `Failed` as the placeholder instead of `Idle` so that if anything
+        // between here and the `Complete` assignment panics, the session lands in
+        // a terminal state rather than a misleadingly resumable one.
+        let (their_public_key, shared_key) = match std::mem::replace(
+            &mut self.state,
+            ExchangeState::Failed {
+                error: ExchangeError::Interrupted,
+            },
+        ) {
+            ExchangeState::AwaitingCardExchange {
+                their_public_key,
+                shared_key,
+            } => (their_public_key, shared_key),
+            other => {
+                self.state = other;
+                return Err(ExchangeError::InvalidState(
+                    "Not in card exchange state".into(),
+                ));
+            }
+        };
 
         let mut contact = Contact::from_exchange_full(
             their_public_key,

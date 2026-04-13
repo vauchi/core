@@ -84,6 +84,7 @@ pub use api::{
     VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult, VauchiSyncOutcome,
 };
 pub mod aha_moments;
+pub mod avatar;
 pub use aha_moments::AhaMoment;
 pub mod backup;
 pub use backup::{

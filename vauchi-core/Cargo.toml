@@ -528,5 +528,8 @@ name = "avatar_normalize_proptest"
 name = "avatar_normalize_tests"
 
 [[test]]
+name = "avatar_generate_tests"
+
+[[test]]
 name = "schema_gen"
 required-features = ["schema-gen"]

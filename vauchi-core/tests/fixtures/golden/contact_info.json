@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "screen_id": "contact_info",
   "title": "Add contact info",
   "subtitle": "Add phone, email, social profiles, and more to your card. You can always add or change entries later.",

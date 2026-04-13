@@ -9,8 +9,8 @@ use vauchi_core::ContactField;
 use super::VauchiPlatform;
 use super::error::MobileError;
 use super::types::{
-    MobileContact, MobileContactCard, MobileDuplicatePair, MobileFieldNote, MobileFieldType,
-    MobileSocialNetwork,
+    MobileAvatarOption, MobileContact, MobileContactCard, MobileContactDisplayOptions,
+    MobileDuplicatePair, MobileFieldNote, MobileFieldType, MobileNameOption, MobileSocialNetwork,
 };
 
 #[uniffi::export]
@@ -286,6 +286,117 @@ impl VauchiPlatform {
         let storage = self.open_storage()?;
         storage.delete_contact_field_note(&contact_id, &field_id)?;
         Ok(())
+    }
+
+    // === Contact Display Operations ===
+
+    /// Set a local nickname for a contact.
+    pub fn set_contact_nickname(
+        &self,
+        contact_id: String,
+        name: String,
+    ) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi()?;
+        vauchi.set_contact_nickname(&contact_id, &name)?;
+        Ok(())
+    }
+
+    /// Clear the local nickname for a contact.
+    pub fn clear_contact_nickname(&self, contact_id: String) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi()?;
+        vauchi.clear_contact_nickname(&contact_id)?;
+        Ok(())
+    }
+
+    /// Set a custom avatar for a contact (must be WebP, <= 32 KB).
+    pub fn set_contact_custom_avatar(
+        &self,
+        contact_id: String,
+        data: Vec<u8>,
+    ) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi()?;
+        vauchi.set_contact_custom_avatar(&contact_id, &data)?;
+        Ok(())
+    }
+
+    /// Clear the custom avatar for a contact.
+    pub fn clear_contact_custom_avatar(&self, contact_id: String) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi()?;
+        vauchi.clear_contact_custom_avatar(&contact_id)?;
+        Ok(())
+    }
+
+    /// Get the custom avatar for a contact, if set.
+    pub fn get_contact_custom_avatar(
+        &self,
+        contact_id: String,
+    ) -> Result<Option<Vec<u8>>, MobileError> {
+        let vauchi = self.open_vauchi()?;
+        Ok(vauchi.get_contact_custom_avatar(&contact_id)?)
+    }
+
+    /// Set the display name preference for a contact.
+    ///
+    /// `pref_json` is a JSON-serialized `DisplayPreference`:
+    /// `"card_default"`, `{"card_variant":{"source_label":"Work"}}`, `"custom"`.
+    pub fn set_display_name_preference(
+        &self,
+        contact_id: String,
+        pref_json: String,
+    ) -> Result<(), MobileError> {
+        let pref: vauchi_core::DisplayPreference = serde_json::from_str(&pref_json)
+            .map_err(|e| MobileError::InvalidInput(format!("Invalid preference JSON: {}", e)))?;
+        let vauchi = self.open_vauchi()?;
+        vauchi.set_display_name_preference(&contact_id, pref)?;
+        Ok(())
+    }
+
+    /// Set the avatar preference for a contact.
+    ///
+    /// `pref_json` is a JSON-serialized `DisplayPreference`.
+    pub fn set_avatar_preference(
+        &self,
+        contact_id: String,
+        pref_json: String,
+    ) -> Result<(), MobileError> {
+        let pref: vauchi_core::DisplayPreference = serde_json::from_str(&pref_json)
+            .map_err(|e| MobileError::InvalidInput(format!("Invalid preference JSON: {}", e)))?;
+        let vauchi = self.open_vauchi()?;
+        vauchi.set_avatar_preference(&contact_id, pref)?;
+        Ok(())
+    }
+
+    /// Get all display options for a contact (for the chooser screen).
+    pub fn get_contact_display_options(
+        &self,
+        contact_id: String,
+    ) -> Result<MobileContactDisplayOptions, MobileError> {
+        let vauchi = self.open_vauchi()?;
+        let opts = vauchi.get_contact_display_options(&contact_id)?;
+        Ok(MobileContactDisplayOptions {
+            names: opts
+                .names
+                .into_iter()
+                .map(|n| MobileNameOption {
+                    source: serde_json::to_string(&n.source).unwrap_or_default(),
+                    name: n.name,
+                    label: n.label,
+                })
+                .collect(),
+            avatars: opts
+                .avatars
+                .into_iter()
+                .map(|a| MobileAvatarOption {
+                    source: serde_json::to_string(&a.source).unwrap_or_default(),
+                    has_data: a.has_data,
+                    label: a.label,
+                })
+                .collect(),
+            active_name_preference: serde_json::to_string(&opts.active_name_preference)
+                .unwrap_or_default(),
+            active_avatar_preference: serde_json::to_string(&opts.active_avatar_preference)
+                .unwrap_or_default(),
+        })
     }
 
     // === Proposal Trust Operations ===

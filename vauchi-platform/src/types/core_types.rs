@@ -146,6 +146,12 @@ pub struct MobileContact {
     /// Whether this is an imported (non-exchanged) contact.
     /// Imported contacts use soft-delete; exchanged contacts use archive.
     pub is_imported: bool,
+    /// Custom local nickname, if set.
+    pub nickname: Option<String>,
+    /// The name to display, resolved from preferences (card default, variant, or nickname).
+    pub resolved_display_name: String,
+    /// Whether a custom avatar has been uploaded for this contact.
+    pub has_custom_avatar: bool,
 }
 
 /// Exchange reciprocity status — whether the other party also completed the exchange.
@@ -220,7 +226,26 @@ impl From<&Contact> for MobileContact {
                 }
             },
             is_imported: contact.is_imported(),
+            nickname: None,
+            resolved_display_name: contact.display_name().to_string(),
+            has_custom_avatar: false,
         }
+    }
+}
+
+impl MobileContact {
+    /// Constructs a MobileContact with display context.
+    pub fn with_display_context(
+        contact: &vauchi_core::Contact,
+        nickname: Option<String>,
+        resolved_display_name: String,
+        has_custom_avatar: bool,
+    ) -> Self {
+        let mut mc = MobileContact::from(contact);
+        mc.nickname = nickname;
+        mc.resolved_display_name = resolved_display_name;
+        mc.has_custom_avatar = has_custom_avatar;
+        mc
     }
 }
 
@@ -239,6 +264,31 @@ pub struct MobileDuplicatePair {
 pub struct MobileFieldNote {
     pub field_id: String,
     pub note: String,
+}
+
+/// Display options for a contact (name and avatar choices).
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileContactDisplayOptions {
+    pub names: Vec<MobileNameOption>,
+    pub avatars: Vec<MobileAvatarOption>,
+    pub active_name_preference: String,
+    pub active_avatar_preference: String,
+}
+
+/// One name choice in the display options list.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileNameOption {
+    pub source: String,
+    pub name: String,
+    pub label: String,
+}
+
+/// One avatar choice in the display options list.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileAvatarOption {
+    pub source: String,
+    pub has_data: bool,
+    pub label: String,
 }
 
 /// Exchange result.

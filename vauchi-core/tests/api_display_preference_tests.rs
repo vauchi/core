@@ -37,6 +37,7 @@ fn minimal_webp() -> Vec<u8> {
     data
 }
 
+// @internal
 #[test]
 fn test_default_preference_is_primary() {
     let (wb, cid) = setup_with_contact();
@@ -45,6 +46,7 @@ fn test_default_preference_is_primary() {
     assert_eq!(opts.active_avatar_preference, AvatarPreference::Primary);
 }
 
+// @scenario: contacts_management.feature :: Choose between shared names and nickname
 #[test]
 fn test_set_name_preference_to_custom() {
     let (wb, cid) = setup_with_contact();
@@ -55,6 +57,7 @@ fn test_set_name_preference_to_custom() {
     assert_eq!(opts.active_name_preference, DisplayNamePreference::Custom);
 }
 
+// @internal
 #[test]
 fn test_custom_name_preference_without_nickname_fails() {
     let (wb, cid) = setup_with_contact();
@@ -65,6 +68,7 @@ fn test_custom_name_preference_without_nickname_fails() {
     );
 }
 
+// @internal
 #[test]
 fn test_shared_name_preference_without_name_fails() {
     let (wb, cid) = setup_with_contact();
@@ -80,6 +84,7 @@ fn test_shared_name_preference_without_name_fails() {
     );
 }
 
+// @scenario: contacts_management.feature :: Select a shared name
 #[test]
 fn test_shared_name_preference_with_name_succeeds() {
     let (wb, cid) = setup_with_contact();
@@ -100,6 +105,7 @@ fn test_shared_name_preference_with_name_succeeds() {
     );
 }
 
+// @scenario: contacts_management.feature :: Choose between shared names and nickname
 #[test]
 fn test_display_options_includes_shared_names_and_nickname() {
     let (wb, cid) = setup_with_contact();
@@ -116,6 +122,7 @@ fn test_display_options_includes_shared_names_and_nickname() {
     );
 }
 
+// @internal
 #[test]
 fn test_avatar_preference_independent_from_name() {
     let (wb, cid) = setup_with_contact();
@@ -131,6 +138,7 @@ fn test_avatar_preference_independent_from_name() {
     );
 }
 
+// @internal
 #[test]
 fn test_custom_avatar_preference_without_avatar_fails() {
     let (wb, cid) = setup_with_contact();
@@ -141,6 +149,7 @@ fn test_custom_avatar_preference_without_avatar_fails() {
     );
 }
 
+// @scenario: contacts_management.feature :: Upload custom avatar
 #[test]
 fn test_custom_avatar_preference_with_avatar_succeeds() {
     let (wb, cid) = setup_with_contact();
@@ -151,6 +160,7 @@ fn test_custom_avatar_preference_with_avatar_succeeds() {
     assert_eq!(opts.active_avatar_preference, AvatarPreference::Custom);
 }
 
+// @internal
 #[test]
 fn test_clear_nickname_resets_custom_preference() {
     let (wb, cid) = setup_with_contact();
@@ -166,6 +176,7 @@ fn test_clear_nickname_resets_custom_preference() {
     );
 }
 
+// @internal
 #[test]
 fn test_clear_avatar_resets_custom_preference() {
     let (wb, cid) = setup_with_contact();
@@ -181,6 +192,7 @@ fn test_clear_avatar_resets_custom_preference() {
     );
 }
 
+// @internal
 #[test]
 fn test_display_options_always_shows_custom_avatar_option() {
     let (wb, cid) = setup_with_contact();
@@ -200,6 +212,7 @@ fn test_display_options_always_shows_custom_avatar_option() {
     );
 }
 
+// @internal
 #[test]
 fn test_serde_roundtrip_display_name_preference() {
     let variants = [
@@ -221,6 +234,7 @@ fn test_serde_roundtrip_display_name_preference() {
     }
 }
 
+// @internal
 #[test]
 fn test_serde_roundtrip_avatar_preference() {
     let variants = [

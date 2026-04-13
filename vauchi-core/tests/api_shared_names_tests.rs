@@ -22,6 +22,7 @@ fn setup_with_contact() -> (Vauchi, String) {
     (wb, contact_id)
 }
 
+// @scenario: contacts_management.feature :: Sync delta adds and removes shared names
 #[test]
 fn test_add_and_list_shared_name() {
     let (wb, cid) = setup_with_contact();
@@ -32,6 +33,7 @@ fn test_add_and_list_shared_name() {
     assert!(!names[0].is_primary);
 }
 
+// @scenario: contacts_management.feature :: Select a shared name
 #[test]
 fn test_add_primary_name() {
     let (wb, cid) = setup_with_contact();
@@ -42,6 +44,7 @@ fn test_add_primary_name() {
     assert!(names[0].is_primary);
 }
 
+// @scenario: contacts_management.feature :: Sync delta adds and removes shared names
 #[test]
 fn test_add_multiple_names() {
     let (wb, cid) = setup_with_contact();
@@ -52,6 +55,7 @@ fn test_add_multiple_names() {
     assert_eq!(names.len(), 3, "Expected 3 shared names");
 }
 
+// @scenario: contacts_management.feature :: Sync delta adds and removes shared names
 #[test]
 fn test_remove_shared_name() {
     let (wb, cid) = setup_with_contact();
@@ -63,6 +67,7 @@ fn test_remove_shared_name() {
     assert_eq!(names[0].name, "Bobby");
 }
 
+// @internal
 #[test]
 fn test_dedup_on_same_name() {
     let (wb, cid) = setup_with_contact();
@@ -77,6 +82,7 @@ fn test_dedup_on_same_name() {
     );
 }
 
+// @internal
 #[test]
 fn test_list_empty_when_none() {
     let (wb, cid) = setup_with_contact();
@@ -87,6 +93,7 @@ fn test_list_empty_when_none() {
     );
 }
 
+// @internal
 #[test]
 fn test_primary_name_listed_first() {
     let (wb, cid) = setup_with_contact();

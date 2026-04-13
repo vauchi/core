@@ -47,6 +47,7 @@ fn shared_names_with_primary() -> impl Strategy<Value = Vec<SharedName>> {
 
 proptest! {
     /// Resolved name is never empty — regardless of preference, shared names, or nickname.
+    // @internal
     #[test]
     fn resolved_name_never_empty(
         names in shared_names_with_primary(),
@@ -72,6 +73,7 @@ proptest! {
     }
 
     /// Primary preference always returns the is_primary=true shared name.
+    // @internal
     #[test]
     fn primary_returns_primary_name(
         names in shared_names_with_primary(),
@@ -97,6 +99,7 @@ proptest! {
     }
 
     /// Custom pref + nickname returns the nickname.
+    // @internal
     #[test]
     fn custom_with_nickname_returns_nickname(
         names in shared_names_with_primary(),
@@ -116,6 +119,7 @@ proptest! {
     }
 
     /// Custom pref without a nickname falls back to primary shared name.
+    // @internal
     #[test]
     fn custom_without_nickname_falls_back_to_primary(
         names in shared_names_with_primary(),
@@ -140,6 +144,7 @@ proptest! {
     }
 
     /// SharedName pref for a name not in the set falls back to primary.
+    // @internal
     #[test]
     fn shared_name_missing_falls_back_to_primary(
         names in shared_names_with_primary(),

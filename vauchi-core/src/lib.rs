@@ -37,7 +37,7 @@ pub use contact::{
 pub use contact_card::vcard_import::{VCardImportError, import_vcf};
 pub use contact_card::{
     ContactCard, ContactField, FieldType, ValidationError, is_allowed_scheme, is_blocked_scheme,
-    is_safe_url, is_valid_relay_url,
+    is_safe_url, is_valid_relay_url, normalize_avatar,
 };
 pub use identity::{Identity, IdentityBackup};
 

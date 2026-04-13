@@ -27,7 +27,9 @@ pub use uri::{
     is_valid_relay_url,
 };
 
+use image::ImageReader;
 use serde::{Deserialize, Serialize};
+use std::io::Cursor;
 
 use crate::text::normalize_text;
 use crate::types::VisibilityRules;
@@ -44,6 +46,50 @@ pub const MAX_CARD_SIZE_BYTES: usize = 65536;
 
 /// Maximum avatar data size in bytes (256 KB).
 pub const MAX_AVATAR_SIZE: usize = 262144;
+
+/// Maximum dimension (width or height) for avatar images.
+const MAX_AVATAR_DIMENSION: u32 = 512;
+
+/// Normalize any supported image (PNG, JPEG, BMP, WebP) to WebP <= `MAX_AVATAR_SIZE`.
+///
+/// Decodes the input, resizes if either dimension exceeds `MAX_AVATAR_DIMENSION`,
+/// and encodes as WebP. If the result still exceeds the size budget, the dimension
+/// is halved repeatedly until the output fits or the dimension reaches 32 px.
+pub fn normalize_avatar(data: &[u8]) -> Result<Vec<u8>, ContactCardError> {
+    if data.is_empty() {
+        return Err(ContactCardError::AvatarInvalidFormat);
+    }
+
+    let reader = ImageReader::new(Cursor::new(data))
+        .with_guessed_format()
+        .map_err(|_| ContactCardError::AvatarInvalidFormat)?;
+
+    let img = reader
+        .decode()
+        .map_err(|_| ContactCardError::AvatarInvalidFormat)?;
+
+    let mut dim = MAX_AVATAR_DIMENSION;
+
+    loop {
+        let resized = if img.width() > dim || img.height() > dim {
+            img.resize(dim, dim, image::imageops::FilterType::Lanczos3)
+        } else {
+            img.clone()
+        };
+
+        let mut buf = Cursor::new(Vec::new());
+        resized
+            .write_to(&mut buf, image::ImageFormat::WebP)
+            .map_err(|_| ContactCardError::AvatarInvalidFormat)?;
+
+        let output = buf.into_inner();
+        if output.len() <= MAX_AVATAR_SIZE || dim <= 32 {
+            return Ok(output);
+        }
+
+        dim /= 2;
+    }
+}
 
 /// Current ContactCard schema version.
 /// Incremented when the serialized format changes.

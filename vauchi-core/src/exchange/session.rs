@@ -867,7 +867,10 @@ impl ExchangeSession {
             | ExchangeHardwareEvent::RelayEscrowBlobReceived { .. }
             | ExchangeHardwareEvent::RelayEscrowFailed { .. }
             | ExchangeHardwareEvent::LinkShared
-            | ExchangeHardwareEvent::LinkOpened { .. } => Ok(()),
+            | ExchangeHardwareEvent::LinkOpened { .. }
+            // Image picking events are for the avatar editor, not exchanges.
+            | ExchangeHardwareEvent::ImageReceived { .. }
+            | ExchangeHardwareEvent::ImagePickCancelled => Ok(()),
         }
     }
 

@@ -115,6 +115,31 @@ pub enum ExchangeCommand {
         payload: Vec<u8>,
         is_initiator: bool,
     },
+
+    // ── Image picking (avatar editor, ADR-042) ─────────────────────
+    // Appended to preserve serde discriminant ordering.
+    /// Request the frontend to open the device photo library / gallery.
+    ///
+    /// Frontend should return [`ExchangeHardwareEvent::ImageReceived`]
+    /// with the selected image bytes, or
+    /// [`ExchangeHardwareEvent::ImagePickCancelled`] if the user
+    /// dismisses the picker.
+    ImagePickFromLibrary,
+    /// Request the frontend to capture an image from the device camera.
+    ///
+    /// Frontend should return [`ExchangeHardwareEvent::ImageReceived`]
+    /// with the captured image bytes, or
+    /// [`ExchangeHardwareEvent::ImagePickCancelled`] if the user
+    /// cancels.
+    ImageCaptureFromCamera,
+    /// Request the frontend to open a file picker for image files.
+    ///
+    /// Used on desktop platforms where a photo library may not exist.
+    /// Frontend should return [`ExchangeHardwareEvent::ImageReceived`]
+    /// with the selected image bytes, or
+    /// [`ExchangeHardwareEvent::ImagePickCancelled`] if the user
+    /// cancels.
+    ImagePickFromFile,
 }
 
 /// A hardware event reported by the frontend back to core.
@@ -205,6 +230,16 @@ pub enum ExchangeHardwareEvent {
     /// by [`ExchangeCommand::DirectSend`]. Contains the raw bytes of
     /// the peer's exchange payload (QR data string format).
     DirectPayloadReceived { data: Vec<u8> },
+
+    // ── Image picking (avatar editor, ADR-042) ─────────────────────
+    // Appended to preserve serde discriminant ordering.
+    /// Image data received from photo library, camera, or file picker.
+    ///
+    /// The frontend sends raw image bytes (PNG, JPEG, etc.) — core
+    /// handles format detection and normalization to WebP.
+    ImageReceived { data: Vec<u8> },
+    /// The user cancelled the image picker / camera without selecting.
+    ImagePickCancelled,
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access
@@ -354,6 +389,9 @@ mod tests {
             ExchangeCommand::ShowShareSheet {
                 url: "https://vauchi.app/link/abc123".into(),
             },
+            ExchangeCommand::ImagePickFromLibrary,
+            ExchangeCommand::ImageCaptureFromCamera,
+            ExchangeCommand::ImagePickFromFile,
         ];
         for cmd in &commands {
             let json = serde_json::to_string(cmd).expect("serialize");
@@ -416,6 +454,10 @@ mod tests {
             ExchangeHardwareEvent::LinkOpened {
                 peer_public_key: vec![0x04; 32],
             },
+            ExchangeHardwareEvent::ImageReceived {
+                data: vec![0xFF, 0xD8, 0xFF],
+            },
+            ExchangeHardwareEvent::ImagePickCancelled,
         ];
         for evt in &events {
             let json = serde_json::to_string(evt).expect("serialize");
@@ -491,9 +533,17 @@ mod tests {
                 slot_hash: vec![],
             },
             ExchangeCommand::ShowShareSheet { url: "".into() },
+            ExchangeCommand::BleStopScanning,
+            ExchangeCommand::DirectSend {
+                payload: vec![],
+                is_initiator: false,
+            },
+            ExchangeCommand::ImagePickFromLibrary,
+            ExchangeCommand::ImageCaptureFromCamera,
+            ExchangeCommand::ImagePickFromFile,
         ];
-        // 19 total command variants
-        assert_eq!(variants.len(), 19);
+        // 24 total command variants
+        assert_eq!(variants.len(), 24);
     }
 
     #[test]
@@ -548,8 +598,15 @@ mod tests {
             ExchangeHardwareEvent::LinkOpened {
                 peer_public_key: vec![],
             },
+            ExchangeHardwareEvent::RelayEscrowBlobReceived {
+                gate_hash: vec![],
+                blob: vec![],
+            },
+            ExchangeHardwareEvent::DirectPayloadReceived { data: vec![] },
+            ExchangeHardwareEvent::ImageReceived { data: vec![] },
+            ExchangeHardwareEvent::ImagePickCancelled,
         ];
-        // 17 total event variants (16 original + PermissionDenied)
-        assert_eq!(variants.len(), 17);
+        // 21 total event variants
+        assert_eq!(variants.len(), 21);
     }
 }

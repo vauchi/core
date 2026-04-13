@@ -5,6 +5,8 @@
 //! Storage operations for contact display: nickname, custom avatar,
 //! shared names/avatars, and display preferences (V43).
 
+use std::collections::{HashMap, HashSet};
+
 use rusqlite::params;
 
 use super::{Storage, StorageError};
@@ -349,5 +351,151 @@ impl Storage {
             }
             Err(e) => Err(StorageError::Database(e)),
         }
+    }
+
+    // === Batch Operations (N+1 prevention) ===
+
+    /// Batch-load shared names for multiple contacts in a single query.
+    ///
+    /// Returns a map of contact_id → Vec<SharedName>. Contacts with no shared
+    /// names are absent from the map (callers should use `.unwrap_or_default()`).
+    pub fn batch_shared_names(
+        &self,
+        contact_ids: &[&str],
+    ) -> Result<HashMap<String, Vec<SharedName>>, StorageError> {
+        if contact_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let placeholders: Vec<String> =
+            (1..=contact_ids.len()).map(|i| format!("?{}", i)).collect();
+        let sql = format!(
+            "SELECT contact_id, name, is_primary, updated_at
+             FROM contact_shared_names
+             WHERE contact_id IN ({})
+             ORDER BY contact_id, is_primary DESC, name",
+            placeholders.join(", ")
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(contact_ids.iter()), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i32>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        })?;
+        let mut map: HashMap<String, Vec<SharedName>> = HashMap::new();
+        for r in rows {
+            let (cid, name, is_primary, updated_at) = r?;
+            map.entry(cid).or_default().push(SharedName {
+                name,
+                is_primary: is_primary != 0,
+                updated_at: updated_at as u64,
+            });
+        }
+        Ok(map)
+    }
+
+    /// Batch-load nicknames for multiple contacts in a single query.
+    ///
+    /// Returns a map of contact_id → decrypted nickname string. Contacts with
+    /// no nickname (NULL) are absent from the map.
+    pub fn batch_nicknames(
+        &self,
+        contact_ids: &[&str],
+    ) -> Result<HashMap<String, String>, StorageError> {
+        if contact_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let placeholders: Vec<String> =
+            (1..=contact_ids.len()).map(|i| format!("?{}", i)).collect();
+        let sql = format!(
+            "SELECT id, nickname_encrypted
+             FROM contacts
+             WHERE id IN ({}) AND nickname_encrypted IS NOT NULL",
+            placeholders.join(", ")
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(contact_ids.iter()), |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+        })?;
+        let mut map = HashMap::new();
+        for r in rows {
+            let (cid, encrypted) = r?;
+            let plain = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                .map_err(|e| StorageError::Encryption(format!("Decrypt nickname: {}", e)))?;
+            let text = String::from_utf8(plain)
+                .map_err(|e| StorageError::Encryption(format!("Nickname not UTF-8: {}", e)))?;
+            map.insert(cid, text);
+        }
+        Ok(map)
+    }
+
+    /// Batch-load display preferences for multiple contacts in a single query.
+    ///
+    /// Returns a map of contact_id → (DisplayNamePreference, AvatarPreference).
+    /// Contacts absent from the result should fall back to their defaults.
+    pub fn batch_display_preferences(
+        &self,
+        contact_ids: &[&str],
+    ) -> Result<HashMap<String, (DisplayNamePreference, AvatarPreference)>, StorageError> {
+        if contact_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let placeholders: Vec<String> =
+            (1..=contact_ids.len()).map(|i| format!("?{}", i)).collect();
+        let sql = format!(
+            "SELECT id, display_name_preference, avatar_preference
+             FROM contacts
+             WHERE id IN ({})",
+            placeholders.join(", ")
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(contact_ids.iter()), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?;
+        let mut map = HashMap::new();
+        for r in rows {
+            let (cid, name_json, avatar_json) = r?;
+            let name_pref: DisplayNamePreference =
+                serde_json::from_str(&name_json).unwrap_or_default();
+            let avatar_pref: AvatarPreference =
+                serde_json::from_str(&avatar_json).unwrap_or_default();
+            map.insert(cid, (name_pref, avatar_pref));
+        }
+        Ok(map)
+    }
+
+    /// Batch-check which contacts have custom avatars.
+    ///
+    /// Returns the set of contact_ids that have a non-NULL custom avatar.
+    /// Absence from the set means no custom avatar.
+    pub fn batch_has_custom_avatar(
+        &self,
+        contact_ids: &[&str],
+    ) -> Result<HashSet<String>, StorageError> {
+        if contact_ids.is_empty() {
+            return Ok(HashSet::new());
+        }
+        let placeholders: Vec<String> =
+            (1..=contact_ids.len()).map(|i| format!("?{}", i)).collect();
+        let sql = format!(
+            "SELECT id FROM contacts
+             WHERE id IN ({}) AND custom_avatar_encrypted IS NOT NULL",
+            placeholders.join(", ")
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(contact_ids.iter()), |row| {
+            row.get::<_, String>(0)
+        })?;
+        let mut set = HashSet::new();
+        for r in rows {
+            set.insert(r?);
+        }
+        Ok(set)
     }
 }

@@ -13,6 +13,7 @@ mod activity_log;
 #[cfg(feature = "network-rustls")]
 mod app_engine;
 mod archived_contacts;
+pub mod avatar_editor;
 mod backup_recovery;
 mod component;
 mod contact_detail;
@@ -58,6 +59,7 @@ pub use activity_log::{ActivityLogEngine, ActivityLogItem};
 #[cfg(feature = "network-rustls")]
 pub use app_engine::{AppEngine, AppScreen};
 pub use archived_contacts::ArchivedContactsEngine;
+pub use avatar_editor::AvatarEditorEngine;
 pub use backup_recovery::{BackupMode, BackupRecoveryEngine};
 pub use component::{
     A11y, AccessibilityRole, ActionListItem, Component, ContactItem, DropdownOption, FieldDisplay,

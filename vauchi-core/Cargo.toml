@@ -514,6 +514,9 @@ name = "exchange_reciprocity_integration_tests"
 required-features = ["testing"]
 
 [[test]]
+name = "avatar_normalize_proptest"
+
+[[test]]
 name = "avatar_normalize_tests"
 
 [[test]]

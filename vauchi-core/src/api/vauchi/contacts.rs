@@ -543,6 +543,39 @@ impl Vauchi {
         Ok(self.storage.load_contact_nickname(contact_id)?)
     }
 
+    // === Contact Custom Avatar Operations ===
+
+    /// Sets a custom avatar for a contact. Validates: WebP format, <= 32 KB.
+    pub fn set_contact_custom_avatar(&self, contact_id: &str, data: &[u8]) -> VauchiResult<()> {
+        if data.len() < 12 {
+            return Err(VauchiError::InvalidState("Avatar data too small".into()));
+        }
+        if data.len() > 32 * 1024 {
+            return Err(VauchiError::InvalidState(
+                "Avatar exceeds 32768 bytes".into(),
+            ));
+        }
+        // Validate WebP magic: RIFF....WEBP
+        if &data[0..4] != b"RIFF" || &data[8..12] != b"WEBP" {
+            return Err(VauchiError::InvalidState(
+                "Avatar must be WebP format (RIFF....WEBP header)".into(),
+            ));
+        }
+        self.storage.save_contact_custom_avatar(contact_id, data)?;
+        Ok(())
+    }
+
+    /// Clears the custom avatar for a contact.
+    pub fn clear_contact_custom_avatar(&self, contact_id: &str) -> VauchiResult<()> {
+        self.storage.delete_contact_custom_avatar(contact_id)?;
+        Ok(())
+    }
+
+    /// Returns the custom avatar for a contact, or None if unset.
+    pub fn get_contact_custom_avatar(&self, contact_id: &str) -> VauchiResult<Option<Vec<u8>>> {
+        Ok(self.storage.load_contact_custom_avatar(contact_id)?)
+    }
+
     // === Imported Contact Editing ===
 
     /// Update a field value on an imported contact.

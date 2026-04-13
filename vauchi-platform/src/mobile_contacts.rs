@@ -129,6 +129,38 @@ impl VauchiPlatform {
         Ok(())
     }
 
+    /// Set own avatar image.
+    ///
+    /// Accepts any supported image format (PNG, JPEG, BMP, WebP).
+    /// The image is normalized to WebP <= 32 KB internally (ADR-042).
+    pub fn set_own_avatar(&self, avatar_bytes: Vec<u8>) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
+
+        card.set_avatar(avatar_bytes)
+            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+        storage.save_own_card(&card)?;
+
+        Ok(())
+    }
+
+    /// Clear own avatar image.
+    pub fn clear_own_avatar(&self) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+
+        let mut card = storage
+            .load_own_card()?
+            .ok_or(MobileError::IdentityNotFound)?;
+
+        card.clear_avatar();
+        storage.save_own_card(&card)?;
+
+        Ok(())
+    }
+
     // === Contact Operations ===
 
     /// List all contacts.

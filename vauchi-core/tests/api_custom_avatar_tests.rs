@@ -22,26 +22,26 @@ fn setup_with_contact() -> (Vauchi, String) {
     (wb, contact_id)
 }
 
-/// Minimal valid WebP file: RIFF header + WEBP signature + VP8 chunk.
-fn minimal_webp() -> Vec<u8> {
-    let mut data = Vec::new();
-    data.extend_from_slice(b"RIFF");
-    data.extend_from_slice(&18u32.to_le_bytes()); // file size - 8
-    data.extend_from_slice(b"WEBP");
-    data.extend_from_slice(b"VP8 ");
-    data.extend_from_slice(&6u32.to_le_bytes()); // chunk size
-    data.extend_from_slice(&[0x30, 0x01, 0x00, 0x9d, 0x01, 0x2a]); // minimal VP8 bitstream
-    data
+/// Create a tiny valid PNG for tests (1x1 red pixel).
+fn test_avatar_png() -> Vec<u8> {
+    let img = image::RgbaImage::from_pixel(1, 1, image::Rgba([255, 0, 0, 255]));
+    let mut buf = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut buf, image::ImageFormat::Png).unwrap();
+    buf.into_inner()
 }
 
 // @scenario: contacts_management.feature :: Upload custom avatar
 #[test]
 fn test_set_and_get_custom_avatar_roundtrip() {
     let (wb, cid) = setup_with_contact();
-    let webp = minimal_webp();
-    wb.set_contact_custom_avatar(&cid, &webp).unwrap();
+    let png = test_avatar_png();
+    wb.set_contact_custom_avatar(&cid, &png).unwrap();
     let avatar = wb.get_contact_custom_avatar(&cid).unwrap();
-    assert_eq!(avatar.as_deref(), Some(webp.as_slice()));
+    let avatar = avatar.expect("avatar should be set");
+    // Core normalizes to WebP (ADR-042)
+    assert_eq!(&avatar[0..4], b"RIFF");
+    assert_eq!(&avatar[8..12], b"WEBP");
+    assert!(avatar.len() <= 32_768);
 }
 
 // @internal
@@ -56,7 +56,8 @@ fn test_get_avatar_returns_none_when_unset() {
 #[test]
 fn test_clear_custom_avatar() {
     let (wb, cid) = setup_with_contact();
-    wb.set_contact_custom_avatar(&cid, &minimal_webp()).unwrap();
+    wb.set_contact_custom_avatar(&cid, &test_avatar_png())
+        .unwrap();
     wb.clear_contact_custom_avatar(&cid).unwrap();
     let avatar = wb.get_contact_custom_avatar(&cid).unwrap();
     assert!(avatar.is_none(), "Cleared avatar must return None");
@@ -64,23 +65,28 @@ fn test_clear_custom_avatar() {
 
 // @internal
 #[test]
-fn test_avatar_rejects_non_webp() {
+fn test_avatar_rejects_invalid_data() {
     let (wb, cid) = setup_with_contact();
-    let png_data = vec![
-        0x89, 0x50, 0x4E, 0x47, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    ];
-    let result = wb.set_contact_custom_avatar(&cid, &png_data);
-    assert!(result.is_err(), "Non-WebP data must be rejected");
+    let garbage = vec![0x00, 0x01, 0x02, 0x03, 0xFF];
+    let result = wb.set_contact_custom_avatar(&cid, &garbage);
+    assert!(result.is_err(), "Invalid image data must be rejected");
 }
 
 // @internal
 #[test]
-fn test_avatar_rejects_too_large() {
+fn test_avatar_accepts_jpeg() {
     let (wb, cid) = setup_with_contact();
-    let mut big = minimal_webp();
-    big.resize(32 * 1024 + 1, 0);
-    let result = wb.set_contact_custom_avatar(&cid, &big);
-    assert!(result.is_err(), "Avatar >32 KB must be rejected");
+    let img = image::RgbImage::from_pixel(1, 1, image::Rgb([0, 128, 255]));
+    let mut buf = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut buf, image::ImageFormat::Jpeg).unwrap();
+    let jpeg = buf.into_inner();
+    wb.set_contact_custom_avatar(&cid, &jpeg).unwrap();
+    let avatar = wb.get_contact_custom_avatar(&cid).unwrap().unwrap();
+    assert_eq!(
+        &avatar[0..4],
+        b"RIFF",
+        "JPEG input should be normalized to WebP"
+    );
 }
 
 // @internal
@@ -96,6 +102,6 @@ fn test_avatar_rejects_empty() {
 fn test_avatar_for_missing_contact_fails() {
     let mut wb = Vauchi::in_memory().unwrap();
     wb.create_identity("Alice").unwrap();
-    let result = wb.set_contact_custom_avatar("nonexistent", &minimal_webp());
+    let result = wb.set_contact_custom_avatar("nonexistent", &test_avatar_png());
     assert!(result.is_err(), "Avatar on nonexistent contact must fail");
 }

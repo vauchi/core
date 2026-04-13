@@ -150,6 +150,9 @@ impl Storage {
     // Shared names are local-only data — the flat set received from the sender.
 
     /// Adds or updates a shared name for a contact.
+    ///
+    /// When `is_primary` is true, clears the previous primary first
+    /// to maintain the exactly-one-primary invariant.
     pub fn add_shared_name(
         &self,
         contact_id: &str,
@@ -160,6 +163,12 @@ impl Storage {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time before UNIX epoch")
             .as_secs();
+        if is_primary {
+            self.conn.execute(
+                "UPDATE contact_shared_names SET is_primary = 0 WHERE contact_id = ?1 AND is_primary = 1",
+                params![contact_id],
+            )?;
+        }
         self.conn.execute(
             "INSERT INTO contact_shared_names (contact_id, name, is_primary, updated_at)
              VALUES (?1, ?2, ?3, ?4)
@@ -208,6 +217,9 @@ impl Storage {
     // === Shared Avatar Operations ===
 
     /// Adds or updates a shared avatar for a contact.
+    ///
+    /// When `is_primary` is true, clears the previous primary first
+    /// to maintain the exactly-one-primary invariant.
     pub fn add_shared_avatar(
         &self,
         contact_id: &str,
@@ -219,6 +231,12 @@ impl Storage {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time before UNIX epoch")
             .as_secs();
+        if is_primary {
+            self.conn.execute(
+                "UPDATE contact_shared_avatars SET is_primary = 0 WHERE contact_id = ?1 AND is_primary = 1",
+                params![contact_id],
+            )?;
+        }
         let encrypted = crate::crypto::encrypt(&self.encryption_key, avatar_data)
             .map_err(|e| StorageError::Encryption(format!("Encrypt shared avatar: {}", e)))?;
         self.conn.execute(

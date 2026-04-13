@@ -25,16 +25,13 @@ fn setup_with_contact() -> (Vauchi, String) {
     (wb, contact_id)
 }
 
-/// Minimal valid WebP file: RIFF header + WEBP signature + VP8 chunk.
-fn minimal_webp() -> Vec<u8> {
-    let mut data = Vec::new();
-    data.extend_from_slice(b"RIFF");
-    data.extend_from_slice(&18u32.to_le_bytes());
-    data.extend_from_slice(b"WEBP");
-    data.extend_from_slice(b"VP8 ");
-    data.extend_from_slice(&6u32.to_le_bytes());
-    data.extend_from_slice(&[0x30, 0x01, 0x00, 0x9d, 0x01, 0x2a]);
-    data
+/// Create a tiny valid PNG for tests (1x1 red pixel).
+/// Core normalizes to WebP internally (ADR-042).
+fn test_avatar_png() -> Vec<u8> {
+    let img = image::RgbaImage::from_pixel(1, 1, image::Rgba([255, 0, 0, 255]));
+    let mut buf = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut buf, image::ImageFormat::Png).unwrap();
+    buf.into_inner()
 }
 
 // @internal
@@ -153,7 +150,8 @@ fn test_custom_avatar_preference_without_avatar_fails() {
 #[test]
 fn test_custom_avatar_preference_with_avatar_succeeds() {
     let (wb, cid) = setup_with_contact();
-    wb.set_contact_custom_avatar(&cid, &minimal_webp()).unwrap();
+    wb.set_contact_custom_avatar(&cid, &test_avatar_png())
+        .unwrap();
     wb.set_avatar_preference(&cid, AvatarPreference::Custom)
         .unwrap();
     let opts = wb.get_contact_display_options(&cid).unwrap();
@@ -180,7 +178,8 @@ fn test_clear_nickname_resets_custom_preference() {
 #[test]
 fn test_clear_avatar_resets_custom_preference() {
     let (wb, cid) = setup_with_contact();
-    wb.set_contact_custom_avatar(&cid, &minimal_webp()).unwrap();
+    wb.set_contact_custom_avatar(&cid, &test_avatar_png())
+        .unwrap();
     wb.set_avatar_preference(&cid, AvatarPreference::Custom)
         .unwrap();
     wb.clear_contact_custom_avatar(&cid).unwrap();

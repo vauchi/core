@@ -6,6 +6,7 @@
 
 use crate::contact::Contact;
 use crate::contact::display::{AvatarPreference, ContactDisplayOptions, DisplayNamePreference};
+use crate::contact_card::normalize_avatar;
 use crate::crypto::SymmetricKey;
 use crate::crypto::ratchet::DoubleRatchetState;
 
@@ -553,23 +554,15 @@ impl Vauchi {
 
     // === Contact Custom Avatar Operations ===
 
-    /// Sets a custom avatar for a contact. Validates: WebP format, <= 32 KB.
+    /// Sets a custom avatar for a contact.
+    ///
+    /// Accepts any supported image format (PNG, JPEG, BMP, WebP).
+    /// Core normalizes to WebP <= 32 KB internally (ADR-042).
     pub fn set_contact_custom_avatar(&self, contact_id: &str, data: &[u8]) -> VauchiResult<()> {
-        if data.len() < 12 {
-            return Err(VauchiError::InvalidState("Avatar data too small".into()));
-        }
-        if data.len() > 32 * 1024 {
-            return Err(VauchiError::InvalidState(
-                "Avatar exceeds 32768 bytes".into(),
-            ));
-        }
-        // Validate WebP magic: RIFF....WEBP
-        if &data[0..4] != b"RIFF" || &data[8..12] != b"WEBP" {
-            return Err(VauchiError::InvalidState(
-                "Avatar must be WebP format (RIFF....WEBP header)".into(),
-            ));
-        }
-        self.storage.save_contact_custom_avatar(contact_id, data)?;
+        let webp = normalize_avatar(data).map_err(|e: crate::contact_card::ContactCardError| {
+            VauchiError::InvalidState(e.to_string())
+        })?;
+        self.storage.save_contact_custom_avatar(contact_id, &webp)?;
         Ok(())
     }
 

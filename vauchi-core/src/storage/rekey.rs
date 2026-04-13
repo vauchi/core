@@ -158,7 +158,7 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
-        const TOTAL_TABLES: u32 = 28;
+        const TOTAL_TABLES: u32 = 30;
         let mut completed: u32 = 0;
 
         let report = |completed: &mut u32, table: &str| {
@@ -1236,6 +1236,89 @@ impl Storage {
                 }
             }
             report(&mut completed, "exchange_states");
+
+            // Re-encrypt contacts: nickname_encrypted, custom_avatar_encrypted (nullable, V43)
+            {
+                let mut stmt = self
+                    .conn
+                    .prepare("SELECT id, nickname_encrypted, custom_avatar_encrypted FROM contacts WHERE nickname_encrypted IS NOT NULL OR custom_avatar_encrypted IS NOT NULL")
+                    .map_err(|e| StorageError::Migration(format!("Read contact_display: {}", e)))?;
+
+                type ContactDisplay = (String, Option<Vec<u8>>, Option<Vec<u8>>);
+                let rows: Vec<ContactDisplay> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query contact_display: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| {
+                        StorageError::Migration(format!("Collect contact_display: {}", e))
+                    })?;
+
+                for (id, nick_enc, avatar_enc) in &rows {
+                    let nick_new = if let Some(enc) = nick_enc {
+                        let plain = decrypt(old_key, enc).map_err(|e| {
+                            StorageError::Migration(format!("Decrypt nickname {}: {}", id, e))
+                        })?;
+                        Some(encrypt(&new_key, &plain).map_err(|e| {
+                            StorageError::Migration(format!("Encrypt nickname {}: {}", id, e))
+                        })?)
+                    } else {
+                        None
+                    };
+
+                    let avatar_new = if let Some(enc) = avatar_enc {
+                        let plain = decrypt(old_key, enc).map_err(|e| {
+                            StorageError::Migration(format!("Decrypt custom_avatar {}: {}", id, e))
+                        })?;
+                        Some(encrypt(&new_key, &plain).map_err(|e| {
+                            StorageError::Migration(format!("Encrypt custom_avatar {}: {}", id, e))
+                        })?)
+                    } else {
+                        None
+                    };
+
+                    self.conn.execute(
+                        "UPDATE contacts SET nickname_encrypted = ?1, custom_avatar_encrypted = ?2 WHERE id = ?3",
+                        params![nick_new, avatar_new, id],
+                    ).map_err(|e| StorageError::Migration(format!("Update contact_display {}: {}", id, e)))?;
+                }
+            }
+            report(&mut completed, "contact_display");
+
+            // Re-encrypt contact_name_variants: avatar_encrypted (nullable, V43)
+            {
+                let mut stmt = self
+                    .conn
+                    .prepare("SELECT contact_id, source_label, avatar_encrypted FROM contact_name_variants WHERE avatar_encrypted IS NOT NULL")
+                    .map_err(|e| StorageError::Migration(format!("Read name_variants: {}", e)))?;
+
+                let rows: Vec<(String, String, Vec<u8>)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+                    .map_err(|e| StorageError::Migration(format!("Query name_variants: {}", e)))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| {
+                        StorageError::Migration(format!("Collect name_variants: {}", e))
+                    })?;
+
+                for (contact_id, source_label, enc) in &rows {
+                    let plain = decrypt(old_key, enc).map_err(|e| {
+                        StorageError::Migration(format!(
+                            "Decrypt variant_avatar {}/{}: {}",
+                            contact_id, source_label, e
+                        ))
+                    })?;
+                    let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                        StorageError::Migration(format!(
+                            "Encrypt variant_avatar {}/{}: {}",
+                            contact_id, source_label, e
+                        ))
+                    })?;
+                    self.conn.execute(
+                        "UPDATE contact_name_variants SET avatar_encrypted = ?1 WHERE contact_id = ?2 AND source_label = ?3",
+                        params![new_enc, contact_id, source_label],
+                    ).map_err(|e| StorageError::Migration(format!("Update variant_avatar {}/{}: {}", contact_id, source_label, e)))?;
+                }
+            }
+            report(&mut completed, "contact_name_variants");
 
             Ok(())
         })();

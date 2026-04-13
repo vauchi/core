@@ -9,6 +9,7 @@ proptest! {
     // Random bytes should never panic — either Ok(webp) or Err(InvalidFormat)
     #[test]
     fn normalize_never_panics(data in proptest::collection::vec(any::<u8>(), 0..100_000)) {
+        // allow(zero_assertions) — intentional: verifies no-panic with random input
         let _ = normalize_avatar(&data);
     }
 

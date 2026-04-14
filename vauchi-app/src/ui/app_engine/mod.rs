@@ -153,6 +153,7 @@ impl AppScreen {
             "backup" => Self::Backup,
             "lock" => Self::Lock,
             "device_linking" => Self::DeviceLinking,
+            "device_management" => Self::DeviceManagement,
             "duress_pin" => Self::DuressPin,
             "emergency_shred" => Self::EmergencyShred,
             "delivery_status" => Self::DeliveryStatus,

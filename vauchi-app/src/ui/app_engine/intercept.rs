@@ -66,7 +66,7 @@ impl AppEngine {
                     return Some(ActionResult::NavigateTo(screen));
                 }
                 "devices" => {
-                    let screen = self.navigate_to(AppScreen::DeviceLinking);
+                    let screen = self.navigate_to(AppScreen::DeviceManagement);
                     return Some(ActionResult::NavigateTo(screen));
                 }
                 "duress_pin" => {

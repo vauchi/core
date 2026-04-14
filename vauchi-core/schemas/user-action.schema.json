@@ -213,6 +213,32 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "description": "User changed a slider value.\n\n`value_milli` is the new value scaled by 1000 (e.g., -300 for -0.3). This avoids `f32` in the action enum so `Eq` is preserved across FFI boundaries.",
+      "type": "object",
+      "required": [
+        "SliderChanged"
+      ],
+      "properties": {
+        "SliderChanged": {
+          "type": "object",
+          "required": [
+            "component_id",
+            "value_milli"
+          ],
+          "properties": {
+            "component_id": {
+              "type": "string"
+            },
+            "value_milli": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     }
   ]
 }

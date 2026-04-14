@@ -688,6 +688,18 @@
                     }
                   ]
                 },
+                "avatar_data": {
+                  "description": "Avatar image bytes (WebP). Frontends show this in the circular header area. Falls back to initials from `name` when None.",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
                 "fields": {
                   "type": "array",
                   "items": {
@@ -1187,6 +1199,154 @@
                     "string",
                     "null"
                   ]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Circular avatar preview with optional brightness adjustment.\n\nUsed in the Avatar Editor screen and as a display component. When `editable` is true, tapping emits `UserAction::ActionPressed { action_id: \"edit_avatar\" }`.",
+          "type": "object",
+          "required": [
+            "AvatarPreview"
+          ],
+          "properties": {
+            "AvatarPreview": {
+              "type": "object",
+              "required": [
+                "id",
+                "initials"
+              ],
+              "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "bg_color": {
+                  "description": "Background color for initials fallback `[r, g, b]`.",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  },
+                  "maxItems": 3,
+                  "minItems": 3
+                },
+                "brightness": {
+                  "description": "Brightness adjustment (-0.3 to 0.3). 0.0 = no change.",
+                  "default": 0.0,
+                  "type": "number",
+                  "format": "float"
+                },
+                "editable": {
+                  "description": "Whether tapping opens the avatar editor (own card only).",
+                  "default": false,
+                  "type": "boolean"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "image_data": {
+                  "description": "Raw image bytes (WebP/PNG/JPEG) to display, or None for initials-only fallback.",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "initials": {
+                  "description": "Fallback initials text when no image is available.",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "A range slider for continuous value input.\n\nEmits `UserAction::SliderChanged { component_id, value }` on value changes.",
+          "type": "object",
+          "required": [
+            "Slider"
+          ],
+          "properties": {
+            "Slider": {
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "max",
+                "min",
+                "value"
+              ],
+              "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "max": {
+                  "description": "Maximum allowed value.",
+                  "type": "number",
+                  "format": "float"
+                },
+                "max_icon": {
+                  "description": "Optional icon name for the max end (e.g., \"sun.max\").",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "min": {
+                  "description": "Minimum allowed value.",
+                  "type": "number",
+                  "format": "float"
+                },
+                "min_icon": {
+                  "description": "Optional icon name for the min end (e.g., \"sun.min\").",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "step": {
+                  "description": "Step increment (0.0 = continuous).",
+                  "default": 0.0,
+                  "type": "number",
+                  "format": "float"
+                },
+                "value": {
+                  "description": "Current value.",
+                  "type": "number",
+                  "format": "float"
                 }
               }
             }
@@ -1733,6 +1893,27 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "description": "Request the frontend to open the device photo library / gallery.\n\nFrontend should return [`ExchangeHardwareEvent::ImageReceived`] with the selected image bytes, or [`ExchangeHardwareEvent::ImagePickCancelled`] if the user dismisses the picker.",
+          "type": "string",
+          "enum": [
+            "ImagePickFromLibrary"
+          ]
+        },
+        {
+          "description": "Request the frontend to capture an image from the device camera.\n\nFrontend should return [`ExchangeHardwareEvent::ImageReceived`] with the captured image bytes, or [`ExchangeHardwareEvent::ImagePickCancelled`] if the user cancels.",
+          "type": "string",
+          "enum": [
+            "ImageCaptureFromCamera"
+          ]
+        },
+        {
+          "description": "Request the frontend to open a file picker for image files.\n\nUsed on desktop platforms where a photo library may not exist. Frontend should return [`ExchangeHardwareEvent::ImageReceived`] with the selected image bytes, or [`ExchangeHardwareEvent::ImagePickCancelled`] if the user cancels.",
+          "type": "string",
+          "enum": [
+            "ImagePickFromFile"
+          ]
         }
       ]
     },
@@ -2002,7 +2183,7 @@
         },
         "schema_version": {
           "description": "Schema version — shells ignore components from higher versions.",
-          "default": 2,
+          "default": 3,
           "type": "integer",
           "format": "uint16",
           "minimum": 0.0

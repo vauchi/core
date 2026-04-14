@@ -673,6 +673,11 @@ pub enum MobileExchangeHardwareEvent {
     DirectPayloadReceived {
         data: Vec<u8>,
     },
+    // Image (avatar picker / camera)
+    ImageReceived {
+        data: Vec<u8>,
+    },
+    ImagePickCancelled,
     // Errors
     HardwareError {
         transport: String,
@@ -752,6 +757,8 @@ impl From<MobileExchangeHardwareEvent> for ExchangeHardwareEvent {
             MobileExchangeHardwareEvent::DirectPayloadReceived { data } => {
                 Self::DirectPayloadReceived { data }
             }
+            MobileExchangeHardwareEvent::ImageReceived { data } => Self::ImageReceived { data },
+            MobileExchangeHardwareEvent::ImagePickCancelled => Self::ImagePickCancelled,
         }
     }
 }

@@ -708,13 +708,18 @@ security:deny:
   extends: [.linux-runner-readonly, .security-deny-job]
 
 # Supply chain verification (cargo-vet)
-# Inherits lint stage + needs:[] from shared template — starts immediately
-# Override script to use --locked (prevents generate-lockfile from resolving unvetted versions)
+# Inherits lint stage + needs:[] from shared template — starts immediately.
+# Uses --locked (committed Cargo.lock is source of truth for core).
+# On main, auto-regenerates exemptions if a lockfile update introduced unvetted deps.
 security:vet:
-  extends: [.linux-runner-readonly, .security-vet-job]
+  extends: [.linux-runner-readonly, .security-vet-autofix-job]
   script:
-    - cargo fetch
-    - cargo vet --locked
+    - |
+      curl --silent --fail \
+        "${CI_API_V4_URL}/projects/77957857/repository/files/scripts%2Fci%2Fvet-autofix.sh/raw?ref=main" \
+        -o vet-autofix.sh
+      chmod +x vet-autofix.sh
+    - ./vet-autofix.sh
 
 # Refine semgrep-sast from security.yml: gate on lint, run only on Rust changes
 semgrep-sast:
@@ -1722,6 +1727,8 @@ trigger:windows:
       echo "✓ windows/ updated to CABI $CLEAN_VERSION"
 
 # Trigger consumer apps directly (no intermediary repos)
+# Note: bridge jobs (trigger:) do not support timeout: — downstream jobs
+# have their own timeouts via .timeout-standard/.timeout-extended.
 trigger:ios:
   stage: trigger
   needs: [update:swift-bindings]

@@ -63,7 +63,7 @@ async-trait = "0.1"
 flate2 = "1.0"
 
 # QR code generation
-qrcode = "0.14"
+qrcode = { version = "0.14", default-features = false }
 
 # Image decoding/encoding for avatar normalization (ADR-042)
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "webp"] }
@@ -123,7 +123,7 @@ uuid = { version = "1.0", features = ["v4"] }
 
 # TLS for rustls feature (aws-lc-rs backend - works on Android/iOS)
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std", "tls12"], optional = true }
-webpki-roots = { version = "0.26", optional = true }
+webpki-roots = { version = "1.0", optional = true }
 
 # Platform keychain access (optional, for desktop apps)
 # Backend features are platform-specific — see [target] sections below.

@@ -354,6 +354,52 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
     }
 }
 
+/// Navigate to a parameterized screen (e.g. contact_detail with a contact_id).
+///
+/// # Safety
+/// `handle` must be a valid app handle or null.
+/// `screen_name` and `param` must be valid NUL-terminated UTF-8 strings or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_app_navigate_to_param(
+    handle: *mut VauchiApp,
+    screen_name: *const c_char,
+    param: *const c_char,
+) -> *mut c_char {
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return std::ptr::null_mut();
+            }
+            let name = match from_c_str(screen_name) {
+                Some(s) => s,
+                None => return to_c_string(r#"{"error":"null screen name"}"#),
+            };
+            let p = match from_c_str(param) {
+                Some(s) => s,
+                None => return to_c_string(r#"{"error":"null param"}"#),
+            };
+            let screen = match AppScreen::from_screen_id_with_param(&name, &p) {
+                Some(s) => s,
+                None => return to_c_string(&format!(r#"{{"error":"unknown screen: {}"}}"#, name)),
+            };
+            let app = &*handle;
+            match app.engine.lock() {
+                Ok(mut engine) => {
+                    let model = engine.navigate_to(screen);
+                    serde_json::to_string(&model).map_or_else(
+                        |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                        |j| to_c_string(&j),
+                    )
+                }
+                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            }
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
+        }
+    }
+}
+
 /// Get available screens as a JSON array of strings.
 ///
 /// # Safety

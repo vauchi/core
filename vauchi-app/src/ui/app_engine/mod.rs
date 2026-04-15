@@ -174,6 +174,23 @@ impl AppScreen {
             _ => return None,
         })
     }
+
+    /// Parse a screen name + parameter into a parameterized `AppScreen`.
+    ///
+    /// Used by CABI frontends that receive `OpenContact { contact_id }` etc.
+    /// and need to navigate to the target screen.
+    pub fn from_screen_id_with_param(id: &str, param: &str) -> Option<Self> {
+        let param = param.to_string();
+        Some(match id {
+            "contact_detail" => Self::ContactDetail { contact_id: param },
+            "contact_edit" => Self::ContactEdit { contact_id: param },
+            "contact_visibility" => Self::ContactVisibility { contact_id: param },
+            "entry_detail" => Self::MyInfoEntryDetail { field_id: param },
+            "group_detail" => Self::GroupDetail { group_id: param },
+            "verify_fingerprint" => Self::VerifyFingerprint { contact_id: param },
+            _ => return Self::from_screen_id(id),
+        })
+    }
 }
 
 /// Tracks which contact undo is pending (archive only — delete is now irrevocable).
@@ -486,7 +503,7 @@ fn initials(name: &str) -> String {
 // INLINE_TEST_REQUIRED: initials() is module-private, cannot be tested from external tests/
 #[cfg(test)]
 mod tests {
-    use super::initials;
+    use super::{AppScreen, initials};
 
     #[test]
     fn initials_single_word() {
@@ -516,6 +533,29 @@ mod tests {
     #[test]
     fn initials_extra_whitespace() {
         assert_eq!(initials("  Alice   Smith  "), "AS");
+    }
+
+    #[test]
+    fn from_screen_id_with_param_contact_detail() {
+        let screen = AppScreen::from_screen_id_with_param("contact_detail", "abc-123");
+        assert_eq!(
+            screen,
+            Some(AppScreen::ContactDetail {
+                contact_id: "abc-123".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn from_screen_id_with_param_falls_back() {
+        let screen = AppScreen::from_screen_id_with_param("contacts", "ignored");
+        assert_eq!(screen, Some(AppScreen::Contacts));
+    }
+
+    #[test]
+    fn from_screen_id_with_param_unknown() {
+        let screen = AppScreen::from_screen_id_with_param("nonexistent", "x");
+        assert_eq!(screen, None);
     }
 }
 

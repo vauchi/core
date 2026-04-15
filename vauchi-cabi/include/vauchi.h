@@ -230,6 +230,17 @@ char *vauchi_app_handle_action(struct VauchiApp *handle, const char *action_json
 char *vauchi_app_navigate_to(struct VauchiApp *handle, const char *screen_name);
 
 /**
+ * Navigate to a parameterized screen (e.g. contact_detail with a contact_id).
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null.
+ * `screen_name` and `param` must be valid NUL-terminated UTF-8 strings or null.
+ */
+char *vauchi_app_navigate_to_param(struct VauchiApp *handle,
+                                   const char *screen_name,
+                                   const char *param);
+
+/**
  * Get available screens as a JSON array of strings.
  *
  * # Safety

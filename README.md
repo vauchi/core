@@ -45,7 +45,7 @@ automatically receives the update - securely and privately.
 - **No Messages** - This is not a messenger; it only syncs contact information
 - **End-to-End Encrypted** - No server can read your data
 - **Decentralized** - Relay servers only pass encrypted
-  blobs; they have zero knowledge
+  blobs; the relay is oblivious to content and identities
 
 ## Development
 

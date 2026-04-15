@@ -40,7 +40,7 @@ for full specification.
 
 1. **Exchange** - Users scan QR codes to exchange X3DH keys
 2. **Encrypt** - Card updates are encrypted with Double Ratchet
-3. **Relay** - Encrypted blobs pass through relay servers (zero knowledge)
+3. **Relay** - Encrypted blobs pass through oblivious relay servers
 4. **Decrypt** - Only the intended recipient can decrypt
 
 ## Key Components

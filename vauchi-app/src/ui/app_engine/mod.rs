@@ -535,6 +535,7 @@ mod tests {
         assert_eq!(initials("  Alice   Smith  "), "AS");
     }
 
+    // @internal
     #[test]
     fn from_screen_id_with_param_contact_detail() {
         let screen = AppScreen::from_screen_id_with_param("contact_detail", "abc-123");
@@ -546,12 +547,14 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn from_screen_id_with_param_falls_back() {
         let screen = AppScreen::from_screen_id_with_param("contacts", "ignored");
         assert_eq!(screen, Some(AppScreen::Contacts));
     }
 
+    // @internal
     #[test]
     fn from_screen_id_with_param_unknown() {
         let screen = AppScreen::from_screen_id_with_param("nonexistent", "x");

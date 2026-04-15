@@ -4439,7 +4439,6 @@ dependencies = [
  "tokio",
  "unicode-normalization",
  "ureq",
- "url",
  "uuid",
  "vauchi-app",
  "vauchi-protocol",

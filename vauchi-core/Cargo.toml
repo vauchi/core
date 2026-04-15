@@ -107,9 +107,6 @@ unicode-normalization = "0.1.25"
 # Password strength estimation
 zxcvbn = "3"
 
-# URL parsing and validation (relay URL safety checks)
-url = "2.5"
-
 # Shared relay/client protocol types
 vauchi-protocol.workspace = true
 

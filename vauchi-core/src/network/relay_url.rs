@@ -11,7 +11,6 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use subtle::ConstantTimeEq;
 use thiserror::Error;
-use url::Url;
 
 /// Maximum allowed relay URL length in bytes.
 const MAX_URL_LENGTH: usize = 1024;
@@ -43,7 +42,7 @@ pub enum RelayUrlError {
 ///
 /// Checks:
 /// - Non-empty and within length limit
-/// - https:// scheme only (no http://, http://, etc.)
+/// - https:// scheme only (no http://, etc.)
 /// - No private/loopback/link-local hosts (SSRF prevention)
 /// - No userinfo (user:pass@)
 /// - No fragment (#)
@@ -60,39 +59,57 @@ pub fn validate_relay_url(url: &str) -> Result<(), RelayUrlError> {
         });
     }
 
-    // Null byte check (before URL parsing to prevent C-string truncation attacks)
+    // Null byte check (before parsing to prevent C-string truncation attacks)
     if url.contains('\0') {
         return Err(RelayUrlError::InvalidFormat(
             "URL contains null bytes".to_string(),
         ));
     }
 
-    // Parse URL
-    let parsed = Url::parse(url).map_err(|e| RelayUrlError::InvalidFormat(e.to_string()))?;
-
-    // Scheme must be https (or wss for legacy compat)
-    if parsed.scheme() != "https" {
+    // Scheme must be https://
+    let rest = if let Some(r) = url.strip_prefix("https://") {
+        r
+    } else if url.contains("://") {
+        // Has a scheme, but not https — insecure (http, ws, wss, ftp, etc.)
         return Err(RelayUrlError::InsecureScheme);
+    } else {
+        // No scheme at all — malformed
+        return Err(RelayUrlError::InvalidFormat(
+            "URL must start with https://".to_string(),
+        ));
+    };
+
+    if rest.is_empty() {
+        return Err(RelayUrlError::InvalidFormat("URL has no host".to_string()));
     }
 
-    // No userinfo (prevents credential leakage and request smuggling)
-    if !parsed.username().is_empty() || parsed.password().is_some() {
+    // No userinfo (user:pass@ before host)
+    // authority = [userinfo@]host[:port]
+    let authority = rest.split('/').next().unwrap_or(rest);
+    if authority.contains('@') {
         return Err(RelayUrlError::InvalidFormat(
             "URL must not contain userinfo".to_string(),
         ));
     }
 
     // No fragment
-    if parsed.fragment().is_some() {
+    if url.contains('#') {
         return Err(RelayUrlError::InvalidFormat(
             "URL must not contain a fragment".to_string(),
         ));
     }
 
-    // Must have a host
-    let host = parsed
-        .host_str()
-        .ok_or_else(|| RelayUrlError::InvalidFormat("URL has no host".to_string()))?;
+    // Extract host (strip port if present)
+    let host = if authority.starts_with('[') {
+        // IPv6: [::1]:port
+        let end = authority
+            .find(']')
+            .ok_or_else(|| RelayUrlError::InvalidFormat("Unclosed IPv6 bracket".to_string()))?;
+        &authority[1..end]
+    } else {
+        // hostname or IPv4: strip :port
+        authority.split(':').next().unwrap_or(authority)
+    };
 
     if host.is_empty() {
         return Err(RelayUrlError::InvalidFormat(

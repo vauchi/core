@@ -651,11 +651,10 @@ impl AppEngine {
                     .as_any()
                     .and_then(|a| a.downcast_ref::<crate::ui::avatar_editor::AvatarEditorEngine>())
                     .and_then(|e| e.result_avatar())
+                    && let Ok(Some(mut card)) = self.vauchi.own_card()
                 {
-                    if let Ok(Some(mut card)) = self.vauchi.own_card() {
-                        let _ = card.set_avatar(avatar.to_vec());
-                        let _ = self.vauchi.update_own_card(&card);
-                    }
+                    let _ = card.set_avatar(avatar.to_vec());
+                    let _ = self.vauchi.update_own_card(&card);
                 }
                 self.invalidate_screen(&AppScreen::MyInfo);
                 let screen = self.navigate_back();

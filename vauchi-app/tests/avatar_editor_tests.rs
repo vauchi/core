@@ -17,7 +17,7 @@ fn tiny_avatar() -> Vec<u8> {
 // @scenario: avatar_editor :: Initial screen shows source picker
 #[test]
 fn initial_screen_shows_source_picker() {
-    let engine = AvatarEditorEngine::new("Alice".into());
+    let engine = AvatarEditorEngine::new("Alice".into(), false);
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "avatar_editor");
     assert!(!screen.components.is_empty());
@@ -32,7 +32,7 @@ fn initial_screen_shows_source_picker() {
 // @scenario: avatar_editor :: Camera action emits image capture command
 #[test]
 fn camera_action_emits_capture_command() {
-    let mut engine = AvatarEditorEngine::new("Alice".into());
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "source_camera".into(),
     });
@@ -52,7 +52,7 @@ fn camera_action_emits_capture_command() {
 // @scenario: avatar_editor :: Photos action emits pick command
 #[test]
 fn photos_action_emits_pick_command() {
-    let mut engine = AvatarEditorEngine::new("Alice".into());
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "source_photos".into(),
     });
@@ -73,7 +73,7 @@ fn photos_action_emits_pick_command() {
 // @scenario: avatar_editor :: Generate action transitions to generator
 #[test]
 fn generate_action_transitions_to_generator() {
-    let mut engine = AvatarEditorEngine::new("Alice".into());
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "source_generate".into(),
     });
@@ -95,7 +95,7 @@ fn generate_action_transitions_to_generator() {
 // @scenario: avatar_editor :: Image received transitions to editing
 #[test]
 fn image_received_transitions_to_editing() {
-    let mut engine = AvatarEditorEngine::new("Alice".into());
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
     let result = engine
         .handle_hardware_event(ExchangeHardwareEvent::ImageReceived {
             data: tiny_avatar(),
@@ -121,7 +121,7 @@ fn image_received_transitions_to_editing() {
 // @scenario: avatar_editor :: Image pick cancelled stays on source picker
 #[test]
 fn image_pick_cancelled_stays_on_source_picker() {
-    let mut engine = AvatarEditorEngine::new("Alice".into());
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
     let result = engine
         .handle_hardware_event(ExchangeHardwareEvent::ImagePickCancelled)
         .expect("should handle cancel");
@@ -140,7 +140,7 @@ fn image_pick_cancelled_stays_on_source_picker() {
 // @scenario: avatar_editor :: Save in editing state completes
 #[test]
 fn save_in_editing_completes() {
-    let mut engine = AvatarEditorEngine::new("Alice".into());
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
     let _ = engine.handle_hardware_event(ExchangeHardwareEvent::ImageReceived {
         data: tiny_avatar(),
     });
@@ -161,7 +161,7 @@ fn save_in_editing_completes() {
 // @scenario: avatar_editor :: Cancel completes with cancelled flag
 #[test]
 fn cancel_completes_with_cancelled_flag() {
-    let mut engine = AvatarEditorEngine::new("Alice".into());
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });
@@ -175,7 +175,7 @@ fn cancel_completes_with_cancelled_flag() {
 // @scenario: avatar_editor :: Mandelbrot regenerate bumps seed
 #[test]
 fn mandelbrot_regenerate_updates_preview() {
-    let mut engine = AvatarEditorEngine::new("Alice".into());
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
     // Enter generator
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "source_generate".into(),
@@ -208,7 +208,7 @@ fn mandelbrot_regenerate_updates_preview() {
 // @scenario: avatar_editor :: Save in generator state completes with avatar
 #[test]
 fn save_in_generator_completes_with_avatar() {
-    let mut engine = AvatarEditorEngine::new("Alice".into());
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "source_generate".into(),
     });
@@ -224,7 +224,7 @@ fn save_in_generator_completes_with_avatar() {
 // @scenario: avatar_editor :: Brightness slider updates preview
 #[test]
 fn brightness_slider_updates_preview() {
-    let mut engine = AvatarEditorEngine::new("Alice".into());
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
     let _ = engine.handle_hardware_event(ExchangeHardwareEvent::ImageReceived {
         data: tiny_avatar(),
     });

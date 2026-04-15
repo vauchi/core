@@ -531,8 +531,11 @@ impl AppEngine {
                             }
                         });
 
+                    let avatar_data = contact.card().avatar().map(|a| a.to_vec());
+
                     let build_engine = |engine: ContactDetailEngine| {
                         let mut e = engine
+                            .with_avatar_data(avatar_data)
                             .with_field_notes(field_notes)
                             .with_trust(trust_level, proposal_trusted)
                             .with_reciprocity(reciprocity_status)
@@ -676,14 +679,15 @@ impl AppEngine {
                 // restore completion handler (future wiring).
             }
             AppScreen::AvatarEditor => {
-                let display_name = vauchi
-                    .own_card()
-                    .ok()
-                    .flatten()
+                let card = vauchi.own_card().ok().flatten();
+                let display_name = card
+                    .as_ref()
                     .map(|c| c.display_name().to_string())
                     .unwrap_or_default();
+                let has_existing_avatar = card.as_ref().is_some_and(|c| c.avatar().is_some());
                 Box::new(crate::ui::avatar_editor::AvatarEditorEngine::new(
                     display_name,
+                    has_existing_avatar,
                 ))
             }
             AppScreen::VerifyFingerprint { contact_id } => {

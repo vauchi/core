@@ -68,6 +68,8 @@ pub struct ContactDetailEngine {
     delivery_summary: Option<DeliverySummary>,
     /// Whether the user has pressed "Delete" and the InlineConfirm is showing.
     pending_delete: bool,
+    /// Avatar image bytes (WebP) for the AvatarPreview component.
+    avatar_data: Option<Vec<u8>>,
 }
 
 impl ContactDetailEngine {
@@ -87,6 +89,7 @@ impl ContactDetailEngine {
             is_imported: false,
             delivery_summary: None,
             pending_delete: false,
+            avatar_data: None,
         }
     }
 
@@ -111,6 +114,7 @@ impl ContactDetailEngine {
             is_imported: false,
             delivery_summary: None,
             pending_delete: false,
+            avatar_data: None,
         }
     }
 
@@ -148,6 +152,12 @@ impl ContactDetailEngine {
     /// Attach imported flag (true for imported contacts, false for exchanged).
     pub fn with_imported(mut self, is_imported: bool) -> Self {
         self.is_imported = is_imported;
+        self
+    }
+
+    /// Set the avatar image data for the AvatarPreview component.
+    pub fn with_avatar_data(mut self, data: Option<Vec<u8>>) -> Self {
+        self.avatar_data = data;
         self
     }
 
@@ -239,6 +249,21 @@ impl ContactDetailEngine {
 
         match self.view_mode {
             ContactViewMode::TheirInfo => {
+                // Avatar preview at top
+                components.push(Component::AvatarPreview {
+                    id: "avatar".into(),
+                    image_data: self.avatar_data.clone(),
+                    initials: self.contact.avatar_initials.clone(),
+                    bg_color: None,
+                    brightness: 0.0,
+                    editable: false,
+                    a11y: Some(A11y {
+                        label: Some(format!("{}'s avatar", self.contact.name)),
+                        hint: None,
+                        role: Some(AccessibilityRole::Image),
+                    }),
+                });
+
                 // Build contact_info items — always show initials, add trust level if set
                 let mut contact_info_items = vec![InfoItem {
                     icon: None,

@@ -187,3 +187,119 @@ fn my_info_avatar_preview_shows_saved_avatar() {
         "AvatarPreview should have image data after avatar was saved"
     );
 }
+
+// ── Gap 1: CardPreview avatar_data ─────────────────────────────
+
+// @scenario: avatar_editor_wiring :: ContactEdit CardPreview includes avatar data
+#[test]
+fn contact_edit_card_preview_includes_avatar_data() {
+    let mut engine = engine_with_identity();
+
+    // Set own avatar first
+    let avatar_data = vauchi_core::avatar::generate_initials_avatar([0, 128, 255], 32);
+    if let Ok(Some(mut card)) = engine.vauchi().own_card() {
+        card.set_avatar(avatar_data).unwrap();
+        engine.vauchi().update_own_card(&card).unwrap();
+    }
+
+    // Navigate to MyInfo, then trigger edit — the CardPreview in edit should have avatar
+    let _ = engine.navigate_to(AppScreen::MyInfo);
+
+    // Check that MyInfo's AvatarPreview has the avatar data
+    let screen = engine.current_screen();
+    let has_avatar_data = screen.components.iter().any(|c| {
+        matches!(
+            c,
+            Component::AvatarPreview {
+                image_data: Some(_),
+                ..
+            }
+        )
+    });
+    assert!(
+        has_avatar_data,
+        "MyInfo AvatarPreview should include avatar data from own card"
+    );
+}
+
+// ── Gap 2: ContactDetail avatar ────────────────────────────────
+
+// @scenario: avatar_editor_wiring :: ContactDetail shows AvatarPreview for contact
+#[test]
+fn contact_detail_shows_avatar_preview() {
+    let mut engine = engine_with_identity();
+
+    // Import a contact via vCard
+    let vcf = b"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Bob\r\nEND:VCARD\r\n";
+    engine.vauchi_mut().import_contacts_from_vcf(vcf).unwrap();
+    let contacts = engine.vauchi().list_contacts().unwrap();
+    let bob_id = contacts[0].id().to_string();
+
+    let screen = engine.navigate_to(AppScreen::ContactDetail { contact_id: bob_id });
+
+    let has_avatar = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::AvatarPreview { .. }));
+    assert!(
+        has_avatar,
+        "ContactDetail should show an AvatarPreview component"
+    );
+}
+
+// ── Gap 3: Clear avatar ────────────────────────────────────────
+
+// @scenario: avatar_editor_wiring :: AvatarEditor source picker has remove option when avatar exists
+#[test]
+fn avatar_editor_shows_remove_option_when_avatar_exists() {
+    let mut engine = engine_with_identity();
+
+    // Set an avatar
+    let avatar_data = vauchi_core::avatar::generate_initials_avatar([255, 0, 0], 32);
+    if let Ok(Some(mut card)) = engine.vauchi().own_card() {
+        card.set_avatar(avatar_data).unwrap();
+        engine.vauchi().update_own_card(&card).unwrap();
+    }
+
+    // Navigate to AvatarEditor — source picker should have "Remove" option
+    let screen = engine.navigate_to(AppScreen::AvatarEditor);
+    let has_remove = screen.components.iter().any(|c| match c {
+        Component::ActionList { items, .. } => items.iter().any(|i| i.id == "remove_avatar"),
+        _ => false,
+    });
+    assert!(
+        has_remove,
+        "AvatarEditor should show 'Remove' option when avatar exists"
+    );
+}
+
+// @scenario: avatar_editor_wiring :: Remove avatar action clears and completes
+#[test]
+fn remove_avatar_clears_and_completes() {
+    let mut engine = engine_with_identity();
+
+    // Set an avatar
+    let avatar_data = vauchi_core::avatar::generate_initials_avatar([255, 0, 0], 32);
+    if let Ok(Some(mut card)) = engine.vauchi().own_card() {
+        card.set_avatar(avatar_data).unwrap();
+        engine.vauchi().update_own_card(&card).unwrap();
+    }
+
+    let _ = engine.navigate_to(AppScreen::AvatarEditor);
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "remove_avatar".into(),
+    });
+
+    // Should navigate back
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "remove should navigate back, got {result:?}"
+    );
+
+    // Avatar should be cleared
+    let card = engine.vauchi().own_card().unwrap().unwrap();
+    assert!(
+        card.avatar().is_none(),
+        "avatar should be cleared after remove"
+    );
+}

@@ -645,16 +645,24 @@ impl AppEngine {
                     let screen = self.navigate_back();
                     return ActionResult::NavigateTo(screen);
                 }
-                // Persist the avatar to own card
-                if let Some(avatar) = self
+                let editor = self
                     .engine
                     .as_any()
-                    .and_then(|a| a.downcast_ref::<crate::ui::avatar_editor::AvatarEditorEngine>())
-                    .and_then(|e| e.result_avatar())
-                    && let Ok(Some(mut card)) = self.vauchi.own_card()
-                {
-                    let _ = card.set_avatar(avatar.to_vec());
-                    let _ = self.vauchi.update_own_card(&card);
+                    .and_then(|a| a.downcast_ref::<crate::ui::avatar_editor::AvatarEditorEngine>());
+                if let Some(editor) = editor {
+                    if editor.avatar_removed() {
+                        // Clear avatar from own card
+                        if let Ok(Some(mut card)) = self.vauchi.own_card() {
+                            card.clear_avatar();
+                            let _ = self.vauchi.update_own_card(&card);
+                        }
+                    } else if let Some(avatar) = editor.result_avatar() {
+                        // Persist the new avatar
+                        if let Ok(Some(mut card)) = self.vauchi.own_card() {
+                            let _ = card.set_avatar(avatar.to_vec());
+                            let _ = self.vauchi.update_own_card(&card);
+                        }
+                    }
                 }
                 self.invalidate_screen(&AppScreen::MyInfo);
                 let screen = self.navigate_back();

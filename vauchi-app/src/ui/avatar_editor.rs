@@ -62,16 +62,26 @@ pub struct AvatarEditorEngine {
     display_name: String,
     result: Option<Vec<u8>>,
     cancelled: bool,
+    has_existing_avatar: bool,
+    /// Set when user chose "Remove" — distinct from cancel (no avatar = intentional clear).
+    removed: bool,
 }
 
 impl AvatarEditorEngine {
-    pub fn new(display_name: String) -> Self {
+    pub fn new(display_name: String, has_existing_avatar: bool) -> Self {
         Self {
             state: State::SourcePicker,
             display_name,
+            has_existing_avatar,
             result: None,
             cancelled: false,
+            removed: false,
         }
+    }
+
+    /// Returns `true` if the user chose to remove the existing avatar.
+    pub fn avatar_removed(&self) -> bool {
+        self.removed
     }
 
     /// Read the resulting avatar after `Complete`. Returns `None` if
@@ -95,7 +105,7 @@ impl AvatarEditorEngine {
     }
 
     fn build_source_picker(&self) -> ScreenModel {
-        let items = vec![
+        let mut items = vec![
             ActionListItem {
                 id: "source_camera".into(),
                 label: "Camera".into(),
@@ -118,6 +128,15 @@ impl AvatarEditorEngine {
                 a11y: None,
             },
         ];
+        if self.has_existing_avatar {
+            items.push(ActionListItem {
+                id: "remove_avatar".into(),
+                label: "Remove".into(),
+                icon: Some("trash".into()),
+                detail: None,
+                a11y: None,
+            });
+        }
         ScreenModel::new(
             "avatar_editor",
             "Choose Avatar",
@@ -305,6 +324,12 @@ impl WorkflowEngine for AvatarEditorEngine {
             // ── Cancel (any state) ──────────────────────────────
             UserAction::ActionPressed { action_id } if action_id == "cancel" => {
                 self.cancelled = true;
+                ActionResult::Complete
+            }
+
+            // ── Remove avatar ───────────────────────────────────
+            UserAction::ActionPressed { action_id } if action_id == "remove_avatar" => {
+                self.removed = true;
                 ActionResult::Complete
             }
 

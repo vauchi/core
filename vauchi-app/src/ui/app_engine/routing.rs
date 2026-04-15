@@ -69,15 +69,15 @@ impl AppEngine {
         &self.field_catalog
     }
 
-    /// Handle a hardware event from the frontend during an exchange (ADR-031).
+    /// Handle a hardware event from the frontend (ADR-031).
     ///
     /// Frontends call this when hardware reports results (QR scanned, BLE data
-    /// received, etc.). Returns `ExchangeCommands` with response commands, or
-    /// a screen update if the exchange state changed (e.g., verification started).
+    /// received, image picked, etc.). Returns `ExchangeCommands` with response
+    /// commands, or a screen update if the engine state changed.
     ///
-    /// Returns `None` if the current screen is not an exchange screen.
+    /// Returns `None` if the current screen doesn't handle hardware events.
     pub fn handle_hardware_event(&mut self, event: ExchangeHardwareEvent) -> Option<ActionResult> {
-        if !matches!(self.screen, AppScreen::Exchange) {
+        if !matches!(self.screen, AppScreen::Exchange | AppScreen::AvatarEditor) {
             return None;
         }
 
@@ -639,6 +639,27 @@ impl AppEngine {
                         ActionResult::NavigateTo(screen)
                     }
                 }
+            }
+            AppScreen::AvatarEditor => {
+                if self.engine.was_cancelled() {
+                    let screen = self.navigate_back();
+                    return ActionResult::NavigateTo(screen);
+                }
+                // Persist the avatar to own card
+                if let Some(avatar) = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::avatar_editor::AvatarEditorEngine>())
+                    .and_then(|e| e.result_avatar())
+                {
+                    if let Ok(Some(mut card)) = self.vauchi.own_card() {
+                        let _ = card.set_avatar(avatar.to_vec());
+                        let _ = self.vauchi.update_own_card(&card);
+                    }
+                }
+                self.invalidate_screen(&AppScreen::MyInfo);
+                let screen = self.navigate_back();
+                ActionResult::NavigateTo(screen)
             }
             AppScreen::DeviceReplacement => {
                 if self.engine.was_cancelled() {

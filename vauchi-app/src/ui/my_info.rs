@@ -60,6 +60,8 @@ pub struct MyInfoEngine {
     preview_data: Option<SharedInfoView>,
     /// Show a first-exchange prompt (user has no contacts yet).
     show_exchange_prompt: bool,
+    /// Avatar image bytes (WebP) for the AvatarPreview component.
+    avatar_data: Option<Vec<u8>>,
 }
 
 impl MyInfoEngine {
@@ -71,6 +73,7 @@ impl MyInfoEngine {
             view_mode: MyInfoViewMode::EntryView,
             preview_data: None,
             show_exchange_prompt: false,
+            avatar_data: None,
         }
     }
 
@@ -96,6 +99,12 @@ impl MyInfoEngine {
     /// Show a first-exchange prompt when the user has no contacts.
     pub fn with_exchange_prompt(mut self, show: bool) -> Self {
         self.show_exchange_prompt = show;
+        self
+    }
+
+    /// Set the avatar image data for the AvatarPreview component.
+    pub fn with_avatar_data(mut self, data: Option<Vec<u8>>) -> Self {
+        self.avatar_data = data;
         self
     }
 
@@ -303,6 +312,28 @@ impl WorkflowEngine for MyInfoEngine {
         }
 
         let mut components = Vec::new();
+
+        // Avatar preview at top of MyInfo — editable (tap to open AvatarEditor)
+        let initials: String = self
+            .display_name
+            .split_whitespace()
+            .filter_map(|w| w.chars().next())
+            .take(2)
+            .collect::<String>()
+            .to_uppercase();
+        components.push(Component::AvatarPreview {
+            id: "avatar".into(),
+            image_data: self.avatar_data.clone(),
+            initials,
+            bg_color: None,
+            brightness: 0.0,
+            editable: true,
+            a11y: Some(A11y {
+                label: Some("Your avatar".into()),
+                hint: Some("Tap to edit avatar".into()),
+                role: Some(AccessibilityRole::Button),
+            }),
+        });
 
         // First-exchange prompt: shown when user has no contacts yet
         if self.show_exchange_prompt {

@@ -93,6 +93,7 @@ pub enum AppScreen {
     ActivityLog,
     ArchivedContacts,
     DeviceReplacement,
+    AvatarEditor,
 }
 
 impl AppScreen {
@@ -135,6 +136,7 @@ impl AppScreen {
             Self::ActivityLog => "activity_log",
             Self::ArchivedContacts => "archived_contacts",
             Self::DeviceReplacement => "device_replacement",
+            Self::AvatarEditor => "avatar_editor",
         }
     }
 
@@ -168,6 +170,7 @@ impl AppScreen {
             "activity_log" => Self::ActivityLog,
             "archived_contacts" => Self::ArchivedContacts,
             "device_replacement" => Self::DeviceReplacement,
+            "avatar_editor" => Self::AvatarEditor,
             _ => return None,
         })
     }
@@ -576,6 +579,10 @@ impl WorkflowEngine for AppEngine {
         self.persist_settings_toggle(&action);
 
         if let Some(result) = self.intercept_exit_preview(&action) {
+            return result;
+        }
+
+        if let Some(result) = self.intercept_edit_avatar(&action) {
             return result;
         }
 

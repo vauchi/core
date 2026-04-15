@@ -5,6 +5,19 @@
   "subtitle": null,
   "components": [
     {
+      "AvatarPreview": {
+        "id": "avatar",
+        "initials": "A",
+        "brightness": 0.0,
+        "editable": true,
+        "a11y": {
+          "label": "Your avatar",
+          "hint": "Tap to edit avatar",
+          "role": "Button"
+        }
+      }
+    },
+    {
       "ActionList": {
         "id": "own_entries",
         "items": [

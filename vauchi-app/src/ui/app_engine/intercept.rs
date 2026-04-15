@@ -118,6 +118,20 @@ impl AppEngine {
         None
     }
 
+    /// Intercept "edit_avatar" action on MyInfo to navigate to AvatarEditor.
+    pub(super) fn intercept_edit_avatar(&mut self, action: &UserAction) -> Option<ActionResult> {
+        if !matches!(self.screen, AppScreen::MyInfo) {
+            return None;
+        }
+        if let UserAction::ActionPressed { action_id } = action
+            && action_id == "edit_avatar"
+        {
+            let screen = self.navigate_to(AppScreen::AvatarEditor);
+            return Some(ActionResult::NavigateTo(screen));
+        }
+        None
+    }
+
     /// Intercept add-field actions on MyInfo and Onboarding to open FormDialog.
     pub(super) fn intercept_add_field(&mut self, action: &UserAction) -> Option<ActionResult> {
         let action_id = match action {

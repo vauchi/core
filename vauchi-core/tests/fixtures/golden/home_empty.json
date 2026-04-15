@@ -5,6 +5,19 @@
   "subtitle": null,
   "components": [
     {
+      "AvatarPreview": {
+        "id": "avatar",
+        "initials": "",
+        "brightness": 0.0,
+        "editable": true,
+        "a11y": {
+          "label": "Your avatar",
+          "hint": "Tap to edit avatar",
+          "role": "Button"
+        }
+      }
+    },
+    {
       "Text": {
         "id": "empty_hint",
         "content": "No entries yet. Add your first entry to share with contacts.\n\nYou can add phone numbers, email addresses, websites, social profiles, and more. Tap \"Add Entry\" to get started.",

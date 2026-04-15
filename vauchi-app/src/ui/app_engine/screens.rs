@@ -78,9 +78,10 @@ impl AppEngine {
                 let all_groups = vauchi.list_groups().unwrap_or_default();
 
                 // Build own card fields with visibility info
-                let (display_name, own_fields) = match vauchi.own_card() {
+                let (display_name, own_fields, avatar_data) = match vauchi.own_card() {
                     Ok(Some(card)) => {
                         let name = card.display_name().to_string();
+                        let avatar = card.avatar().map(|a| a.to_vec());
                         let fields: Vec<OwnFieldInfo> = card
                             .fields()
                             .iter()
@@ -111,9 +112,9 @@ impl AppEngine {
                                 }
                             })
                             .collect();
-                        (name, fields)
+                        (name, fields, avatar)
                     }
-                    _ => (String::new(), Vec::new()),
+                    _ => (String::new(), Vec::new(), None),
                 };
 
                 // Build group tabs
@@ -139,7 +140,8 @@ impl AppEngine {
                     MyInfoEngine::new(progress)
                         .with_own_card(display_name, own_fields)
                         .with_groups(group_tabs)
-                        .with_exchange_prompt(!has_contacts),
+                        .with_exchange_prompt(!has_contacts)
+                        .with_avatar_data(avatar_data),
                 )
             }
             AppScreen::MyInfoEntryDetail { field_id } => {
@@ -672,6 +674,17 @@ impl AppEngine {
                 // Onboarding "Transfer from another device" bypasses this engine entirely
                 // via ActionResult::StartDeviceLink. PostRestore is created by the backup
                 // restore completion handler (future wiring).
+            }
+            AppScreen::AvatarEditor => {
+                let display_name = vauchi
+                    .own_card()
+                    .ok()
+                    .flatten()
+                    .map(|c| c.display_name().to_string())
+                    .unwrap_or_default();
+                Box::new(crate::ui::avatar_editor::AvatarEditorEngine::new(
+                    display_name,
+                ))
             }
             AppScreen::VerifyFingerprint { contact_id } => {
                 let contact = vauchi.get_contact(contact_id).ok().flatten();

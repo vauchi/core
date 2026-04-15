@@ -26,7 +26,8 @@ zeroize = { version = "1.8", features = ["derive"] }
 schemars = { version = "0.8", optional = true }
 
 # Remote content (optional)
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "socks"], optional = true }
+# Use no-provider variant to avoid pulling in ring — aws-lc-rs comes from vauchi-core's rustls
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots-no-provider", "json", "socks"], optional = true }
 tokio = { version = "1.0", features = ["rt"], optional = true }
 
 [features]

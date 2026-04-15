@@ -134,7 +134,8 @@ keyring = { version = "3", optional = true }
 cpal = { version = "0.15", optional = true }
 
 # Sync HTTP client for v2 relay protocol (no async runtime needed)
-ureq = { version = "3", features = ["json"], optional = true }
+# Use rustls-no-provider + webpki-roots to avoid pulling in ring — aws-lc-rs is our TLS backend
+ureq = { version = "3", default-features = false, features = ["json", "rustls-no-provider", "rustls-webpki-roots", "gzip"], optional = true }
 
 # OHTTP client-side encryption (RFC 9458) for IP privacy
 ohttp = { version = "0.7", default-features = false, features = ["client", "rust-hpke"], optional = true }

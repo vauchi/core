@@ -40,6 +40,8 @@ pub struct ContactEditEngine {
     contact: EditableContact,
     available_groups: Vec<String>,
     selected_preview_group: Option<String>,
+    /// Avatar image bytes (WebP) for the CardPreview component.
+    avatar_data: Option<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -57,7 +59,14 @@ impl ContactEditEngine {
             contact,
             available_groups,
             selected_preview_group: None,
+            avatar_data: None,
         }
+    }
+
+    /// Set the avatar image data for the CardPreview component.
+    pub fn with_avatar_data(mut self, data: Option<Vec<u8>>) -> Self {
+        self.avatar_data = data;
+        self
     }
 
     /// Returns a reference to the edited contact data.
@@ -252,7 +261,7 @@ impl ContactEditEngine {
             subtitle: None,
             components: vec![Component::CardPreview {
                 name: self.contact.display_name.clone(),
-                avatar_data: None,
+                avatar_data: self.avatar_data.clone(),
                 fields,
                 group_views: self.build_group_views(),
                 selected_group: self.selected_preview_group.clone(),

@@ -615,7 +615,12 @@ impl AppEngine {
                         display_name: contact.display_name().to_string(),
                         fields,
                     };
-                    Box::new(ContactEditEngine::new(editable, vec![]))
+                    let avatar_data = vauchi
+                        .own_card()
+                        .ok()
+                        .flatten()
+                        .and_then(|c| c.avatar().map(|a| a.to_vec()));
+                    Box::new(ContactEditEngine::new(editable, vec![]).with_avatar_data(avatar_data))
                 }
                 _ => Box::new(ContactNotFoundEngine::new(contact_id.clone())),
             },

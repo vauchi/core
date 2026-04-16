@@ -379,12 +379,14 @@ fn processing_screen_shows_kdf_explanation_for_restore() {
     );
 }
 
+// @scenario: backup_format_versioning :: Full backup defaults to full level
 #[test]
 fn backup_defaults_to_full_level() {
     let engine = BackupRecoveryEngine::new(None, false);
     assert_eq!(*engine.level(), BackupLevel::Full);
 }
 
+// @scenario: backup_format_versioning :: Backup level toggle switches between full and identity-only
 #[test]
 fn backup_level_toggle_switches_to_identity_only_and_back() {
     let mut engine = BackupRecoveryEngine::new(None, false);
@@ -411,6 +413,7 @@ fn backup_level_toggle_switches_to_identity_only_and_back() {
     assert_eq!(*engine.level(), BackupLevel::Full);
 }
 
+// @internal
 #[test]
 fn backup_password_getter_returns_entered_password() {
     let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
@@ -423,6 +426,7 @@ fn backup_password_getter_returns_entered_password() {
     assert_eq!(engine.password(), "my-secret-pass");
 }
 
+// @internal
 #[test]
 fn backup_mode_getter() {
     let engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), false);

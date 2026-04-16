@@ -271,6 +271,7 @@ mod reciprocity_sync_tests;
 mod reciprocity_tests;
 mod recovery_comprehensive_tests;
 mod recovery_engine_tests;
+mod recovery_guardian_api_tests;
 mod recovery_readiness_tests;
 mod recovery_storage_tests;
 mod recovery_tests;

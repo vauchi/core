@@ -21,15 +21,10 @@ impl OnboardingStep {
         &[
             OnboardingStep::IdentityCheck,
             OnboardingStep::LinkChoice,
-            OnboardingStep::Welcome,
             OnboardingStep::DefaultName,
-            OnboardingStep::SkipGate,
             OnboardingStep::GroupsSetup,
             OnboardingStep::ContactInfo,
-            OnboardingStep::PreviewCard,
-            OnboardingStep::SecurityExplanation,
-            OnboardingStep::BackupPrompt,
-            OnboardingStep::Ready,
+            OnboardingStep::WhatNext,
         ]
     }
 
@@ -38,15 +33,10 @@ impl OnboardingStep {
         match self {
             OnboardingStep::IdentityCheck => 0,
             OnboardingStep::LinkChoice => 1,
-            OnboardingStep::Welcome => 2,
-            OnboardingStep::DefaultName => 3,
-            OnboardingStep::SkipGate => 4,
-            OnboardingStep::GroupsSetup => 5,
-            OnboardingStep::ContactInfo => 6,
-            OnboardingStep::PreviewCard => 7,
-            OnboardingStep::SecurityExplanation => 8,
-            OnboardingStep::BackupPrompt => 9,
-            OnboardingStep::Ready => 10,
+            OnboardingStep::DefaultName => 2,
+            OnboardingStep::GroupsSetup => 3,
+            OnboardingStep::ContactInfo => 4,
+            OnboardingStep::WhatNext => 5,
         }
     }
 
@@ -99,7 +89,7 @@ impl OnboardingProgress {
     /// Advances to the next step in the wizard.
     ///
     /// Marks the current step as completed and moves to the next one.
-    /// If already at the final step (`Ready`), this is idempotent and
+    /// If already at the final step (`WhatNext`), this is idempotent and
     /// marks the onboarding as complete.
     ///
     /// Returns the new current step.
@@ -125,19 +115,14 @@ impl OnboardingProgress {
 
     /// Skips the current step without marking it as completed.
     ///
-    /// If the current step is `BackupPrompt`, records that backup was skipped.
     /// Moves to the next step. If already at the final step, this is idempotent.
     ///
     /// Returns the new current step.
     pub fn skip_step(&mut self) -> OnboardingStep {
-        if self.current_step == OnboardingStep::BackupPrompt {
-            self.skipped_backup = true;
-        }
-
         if let Some(next) = self.current_step.next() {
             self.current_step = next;
         } else {
-            // Already at Ready — mark as complete
+            // Already at WhatNext — mark as complete
             if self.completed_at.is_none() {
                 self.completed_at = Some(
                     SystemTime::now()
@@ -149,16 +134,6 @@ impl OnboardingProgress {
         }
 
         self.current_step
-    }
-
-    /// Skips from SkipGate directly to SecurityExplanation.
-    /// Called when user chooses "Skip to finish" at the skip gate.
-    /// No-op if not currently at SkipGate (prevents state corruption).
-    pub fn skip_to_finish(&mut self) {
-        if self.current_step != OnboardingStep::SkipGate {
-            return;
-        }
-        self.current_step = OnboardingStep::SecurityExplanation;
     }
 
     /// Returns whether onboarding is complete (reached and passed `Ready`).

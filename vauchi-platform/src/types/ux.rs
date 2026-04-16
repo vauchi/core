@@ -139,24 +139,14 @@ pub enum MobileOnboardingStep {
     IdentityCheck,
     /// Link choice (device link or backup import)
     LinkChoice,
-    /// Welcome screen showing value proposition
-    Welcome,
     /// Default display name entry
     DefaultName,
-    /// Skip gate: user can skip to finish or continue setup
-    SkipGate,
     /// Groups setup: create contact groups
     GroupsSetup,
     /// Contact info fields (phone, email)
     ContactInfo,
-    /// Preview the contact card before continuing
-    PreviewCard,
-    /// Security explanation screen
-    SecurityExplanation,
-    /// Prompt to set up backup
-    BackupPrompt,
-    /// Onboarding complete, ready to use
-    Ready,
+    /// Choose what to do after onboarding
+    WhatNext,
 }
 
 impl From<vauchi_core::OnboardingStep> for MobileOnboardingStep {
@@ -164,17 +154,10 @@ impl From<vauchi_core::OnboardingStep> for MobileOnboardingStep {
         match step {
             vauchi_core::OnboardingStep::IdentityCheck => MobileOnboardingStep::IdentityCheck,
             vauchi_core::OnboardingStep::LinkChoice => MobileOnboardingStep::LinkChoice,
-            vauchi_core::OnboardingStep::Welcome => MobileOnboardingStep::Welcome,
             vauchi_core::OnboardingStep::DefaultName => MobileOnboardingStep::DefaultName,
-            vauchi_core::OnboardingStep::SkipGate => MobileOnboardingStep::SkipGate,
             vauchi_core::OnboardingStep::GroupsSetup => MobileOnboardingStep::GroupsSetup,
             vauchi_core::OnboardingStep::ContactInfo => MobileOnboardingStep::ContactInfo,
-            vauchi_core::OnboardingStep::PreviewCard => MobileOnboardingStep::PreviewCard,
-            vauchi_core::OnboardingStep::SecurityExplanation => {
-                MobileOnboardingStep::SecurityExplanation
-            }
-            vauchi_core::OnboardingStep::BackupPrompt => MobileOnboardingStep::BackupPrompt,
-            vauchi_core::OnboardingStep::Ready => MobileOnboardingStep::Ready,
+            vauchi_core::OnboardingStep::WhatNext => MobileOnboardingStep::WhatNext,
             _ => MobileOnboardingStep::IdentityCheck,
         }
     }
@@ -185,17 +168,10 @@ impl From<MobileOnboardingStep> for vauchi_core::OnboardingStep {
         match step {
             MobileOnboardingStep::IdentityCheck => vauchi_core::OnboardingStep::IdentityCheck,
             MobileOnboardingStep::LinkChoice => vauchi_core::OnboardingStep::LinkChoice,
-            MobileOnboardingStep::Welcome => vauchi_core::OnboardingStep::Welcome,
             MobileOnboardingStep::DefaultName => vauchi_core::OnboardingStep::DefaultName,
-            MobileOnboardingStep::SkipGate => vauchi_core::OnboardingStep::SkipGate,
             MobileOnboardingStep::GroupsSetup => vauchi_core::OnboardingStep::GroupsSetup,
             MobileOnboardingStep::ContactInfo => vauchi_core::OnboardingStep::ContactInfo,
-            MobileOnboardingStep::PreviewCard => vauchi_core::OnboardingStep::PreviewCard,
-            MobileOnboardingStep::SecurityExplanation => {
-                vauchi_core::OnboardingStep::SecurityExplanation
-            }
-            MobileOnboardingStep::BackupPrompt => vauchi_core::OnboardingStep::BackupPrompt,
-            MobileOnboardingStep::Ready => vauchi_core::OnboardingStep::Ready,
+            MobileOnboardingStep::WhatNext => vauchi_core::OnboardingStep::WhatNext,
         }
     }
 }

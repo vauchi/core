@@ -7,7 +7,7 @@
 
 use super::AppEngine;
 use super::AppScreen;
-use crate::ui::action::{ActionResult, UserAction};
+use crate::ui::action::{ActionResult, PostOnboardingDestination, UserAction};
 use crate::ui::form_dialog::FormDialogType;
 use vauchi_core::contact_card::FieldType;
 use vauchi_core::exchange::ExchangeHardwareEvent;
@@ -157,19 +157,13 @@ impl AppEngine {
                             .collect()
                     })
                     .unwrap_or_default();
-                let backup_requested = onboarding_engine.is_some_and(|ob| ob.backup_requested());
-
                 match self.vauchi.create_identity(&name) {
                     Ok(()) => {
                         // Persist onboarding groups
                         for group_name in &onboarding_groups {
                             let _ = self.vauchi.create_group(group_name);
                         }
-                        let target = if backup_requested {
-                            AppScreen::Backup
-                        } else {
-                            AppScreen::MyInfo
-                        };
+                        let target = AppScreen::MyInfo;
                         let screen = self.navigate_to_internal(target);
                         ActionResult::NavigateTo(screen)
                     }
@@ -706,6 +700,24 @@ impl AppEngine {
     pub(super) fn route_result(&mut self, result: ActionResult) -> ActionResult {
         match result {
             ActionResult::Complete => self.handle_completion(),
+            ActionResult::CompleteWith { destination } => {
+                let base_result = self.handle_completion();
+                if matches!(
+                    base_result,
+                    ActionResult::ValidationError { .. } | ActionResult::ShowAlert { .. }
+                ) {
+                    return base_result;
+                }
+                let target = match destination {
+                    PostOnboardingDestination::MainScreen => AppScreen::MyInfo,
+                    PostOnboardingDestination::Exchange => AppScreen::Exchange,
+                    PostOnboardingDestination::ImportContacts => AppScreen::Contacts,
+                    PostOnboardingDestination::SecurityInfo => AppScreen::Help,
+                    PostOnboardingDestination::BackupSetup => AppScreen::Backup,
+                };
+                let screen = self.navigate_to(target);
+                ActionResult::NavigateTo(screen)
+            }
             ActionResult::EditContact { contact_id } => {
                 let screen = self.navigate_to(AppScreen::ContactEdit { contact_id });
                 ActionResult::NavigateTo(screen)

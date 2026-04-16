@@ -59,6 +59,17 @@ pub enum UserAction {
     },
 }
 
+/// Where to navigate after onboarding completes.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PostOnboardingDestination {
+    MainScreen,
+    Exchange,
+    ImportContacts,
+    SecurityInfo,
+    BackupSetup,
+}
+
 /// The result of handling a user action.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -72,6 +83,10 @@ pub enum ActionResult {
         message: String,
     },
     Complete,
+    /// Onboarding complete — navigate to the chosen destination.
+    CompleteWith {
+        destination: PostOnboardingDestination,
+    },
     /// Frontend should switch to the device linking flow.
     StartDeviceLink,
     /// Frontend should switch to the backup import flow.

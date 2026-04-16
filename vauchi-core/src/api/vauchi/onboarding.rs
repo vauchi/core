@@ -39,25 +39,11 @@ impl Vauchi {
 
     /// Skips the current onboarding step without marking it completed.
     ///
-    /// If the current step is `BackupPrompt`, records that backup was skipped.
     /// Persists the updated progress to storage.
     /// Returns the updated progress.
     pub fn skip_onboarding_step(&self) -> VauchiResult<OnboardingProgress> {
         let mut progress = self.storage.load_or_create_onboarding_progress()?;
         progress.skip_step();
-        self.storage.save_onboarding_progress(&progress)?;
-        Ok(progress)
-    }
-
-    /// Skips from SkipGate directly to SecurityExplanation.
-    ///
-    /// Called when the user chooses "Skip to finish" at the skip gate,
-    /// bypassing GroupsSetup, ContactInfo, and PreviewCard.
-    /// Persists the updated progress to storage.
-    /// Returns the updated progress.
-    pub fn skip_onboarding_to_finish(&self) -> VauchiResult<OnboardingProgress> {
-        let mut progress = self.storage.load_or_create_onboarding_progress()?;
-        progress.skip_to_finish();
         self.storage.save_onboarding_progress(&progress)?;
         Ok(progress)
     }

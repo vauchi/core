@@ -131,26 +131,17 @@ pub enum OnboardingStep {
     IdentityCheck,
     /// Pre-gate: choose how to restore (link device or import backup)
     LinkChoice,
-    /// Welcome screen showing value proposition
-    Welcome,
     /// Default display name entry (renamed from CreateIdentity)
-    #[serde(alias = "CreateIdentity")]
+    #[serde(alias = "CreateIdentity", alias = "Welcome", alias = "SkipGate")]
     DefaultName,
-    /// Skip gate: user can skip to finish or continue setup
-    SkipGate,
     /// Groups setup: create contact groups
     GroupsSetup,
     /// Contact info fields (phone, email) (renamed from AddFields)
-    #[serde(alias = "AddFields")]
+    #[serde(alias = "AddFields", alias = "PreviewCard")]
     ContactInfo,
-    /// Preview the contact card before continuing
-    PreviewCard,
-    /// Security explanation screen
-    SecurityExplanation,
-    /// Prompt to set up backup
-    BackupPrompt,
-    /// Onboarding complete, ready to use
-    Ready,
+    /// Choose what to do after onboarding
+    #[serde(alias = "SecurityExplanation", alias = "BackupPrompt", alias = "Ready")]
+    WhatNext,
 }
 
 /// Tracks the user's progress through the onboarding wizard.

@@ -54,7 +54,7 @@ mod settings;
 mod support;
 #[cfg(feature = "network-rustls")]
 mod sync_status;
-pub use action::{ActionResult, UserAction};
+pub use action::{ActionResult, PostOnboardingDestination, UserAction};
 pub use activity_log::{ActivityLogEngine, ActivityLogItem};
 #[cfg(feature = "network-rustls")]
 pub use app_engine::{AppEngine, AppScreen};

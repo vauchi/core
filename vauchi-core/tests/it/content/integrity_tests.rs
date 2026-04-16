@@ -10,6 +10,7 @@
 
 use vauchi_app::content::{IntegrityError, compute_checksum, verify_checksum};
 
+// @internal
 #[test]
 fn test_compute_checksum() {
     let data = b"hello world";
@@ -23,6 +24,7 @@ fn test_compute_checksum() {
     );
 }
 
+// @internal
 #[test]
 fn test_compute_checksum_empty() {
     let data = b"";
@@ -35,6 +37,7 @@ fn test_compute_checksum_empty() {
     );
 }
 
+// @internal
 #[test]
 fn test_verify_checksum_valid() {
     let data = b"hello world";
@@ -43,6 +46,7 @@ fn test_verify_checksum_valid() {
     assert!(verify_checksum(data, checksum).is_ok(), "expected success");
 }
 
+// @internal
 #[test]
 fn test_verify_checksum_mismatch() {
     let data = b"hello world";
@@ -54,6 +58,7 @@ fn test_verify_checksum_mismatch() {
     assert!(matches!(result, Err(IntegrityError::ChecksumMismatch)));
 }
 
+// @internal
 #[test]
 fn test_verify_checksum_invalid_format() {
     let data = b"hello world";
@@ -64,6 +69,7 @@ fn test_verify_checksum_invalid_format() {
     assert!(matches!(result, Err(IntegrityError::InvalidFormat)));
 }
 
+// @internal
 #[test]
 fn test_verify_checksum_wrong_algorithm_prefix() {
     let data = b"hello world";
@@ -74,6 +80,7 @@ fn test_verify_checksum_wrong_algorithm_prefix() {
     assert!(matches!(result, Err(IntegrityError::InvalidFormat)));
 }
 
+// @internal
 #[test]
 fn test_checksum_roundtrip() {
     let data = b"test content for checksum verification";
@@ -81,6 +88,7 @@ fn test_checksum_roundtrip() {
     assert!(verify_checksum(data, &checksum).is_ok(), "expected success");
 }
 
+// @internal
 #[test]
 fn test_checksum_binary_data() {
     // Test with binary data including null bytes
@@ -92,6 +100,7 @@ fn test_checksum_binary_data() {
     );
 }
 
+// @internal
 #[test]
 fn test_checksum_large_data() {
     // Test with 1MB of data

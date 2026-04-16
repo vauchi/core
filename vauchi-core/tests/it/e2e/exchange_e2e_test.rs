@@ -20,6 +20,7 @@ use vauchi_core::{
 /// 3. Both parties perform X3DH key agreement
 /// 4. Contact cards are exchanged and verified
 /// 5. Double Ratchet is initialized for future communication
+// @internal
 #[test]
 fn test_contact_exchange_happy_path() {
     // Step 1: Create Vauchi instances for Alice and Bob

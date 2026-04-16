@@ -19,6 +19,7 @@ use vauchi_core::{
 ///
 /// Feature: sync_updates.feature
 /// Scenarios: Update propagates to contacts, Queued updates delivered
+// @internal
 #[test]
 fn test_sync_update_propagation_happy_path() {
     // Step 1: Set up Alice and Bob with existing exchange
@@ -124,6 +125,7 @@ fn test_sync_update_propagation_happy_path() {
 ///
 /// Feature: sync_updates.feature
 /// Scenarios: Queued updates delivered when contact comes online
+// @internal
 #[test]
 fn test_sync_manager_queue_happy_path() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -173,6 +175,7 @@ fn test_sync_manager_queue_happy_path() {
 /// Tests a complete workflow with three users demonstrating all main features.
 ///
 /// Combines: exchange, visibility, sync
+// @internal
 #[test]
 fn test_full_three_user_workflow() {
     let mut alice_wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -338,6 +341,7 @@ fn test_full_three_user_workflow() {
 /// Tests update delivery through relay when direct P2P fails.
 ///
 /// Feature: sync_updates.feature, relay_network.feature
+// @internal
 #[test]
 fn test_relay_update_delivery_happy_path() {
     let transport = MockTransport::new();

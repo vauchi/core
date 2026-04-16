@@ -24,6 +24,7 @@ fn test_config(temp: &TempDir) -> ContentConfig {
     }
 }
 
+// @internal
 #[test]
 fn test_manager_new_creates_cache() {
     let temp = TempDir::new().unwrap();
@@ -33,6 +34,7 @@ fn test_manager_new_creates_cache() {
     assert!(temp.path().join("content").exists());
 }
 
+// @internal
 #[test]
 fn test_manager_returns_bundled_networks_when_cache_empty() {
     let temp = TempDir::new().unwrap();
@@ -44,6 +46,7 @@ fn test_manager_returns_bundled_networks_when_cache_empty() {
     assert!(!networks.is_empty());
 }
 
+// @internal
 #[test]
 fn test_manager_returns_cached_networks_over_bundled() {
     let temp = TempDir::new().unwrap();
@@ -72,6 +75,7 @@ fn test_manager_returns_cached_networks_over_bundled() {
     assert_eq!(networks[0].id, "custom");
 }
 
+// @internal
 #[test]
 fn test_manager_update_check_disabled() {
     let temp = TempDir::new().unwrap();
@@ -86,6 +90,7 @@ fn test_manager_update_check_disabled() {
     assert!(matches!(status, UpdateStatus::Disabled));
 }
 
+// @internal
 #[test]
 fn test_manager_should_check_respects_interval() {
     let temp = TempDir::new().unwrap();
@@ -108,6 +113,7 @@ fn test_manager_should_check_respects_interval() {
     assert!(!manager.should_check_now());
 }
 
+// @internal
 #[test]
 fn test_manager_should_check_when_never_checked() {
     let temp = TempDir::new().unwrap();
@@ -123,6 +129,7 @@ fn test_manager_should_check_when_never_checked() {
     assert!(manager.should_check_now());
 }
 
+// @internal
 #[test]
 fn test_manager_should_check_when_interval_elapsed() {
     let temp = TempDir::new().unwrap();
@@ -144,6 +151,7 @@ fn test_manager_should_check_when_interval_elapsed() {
     assert!(manager.should_check_now());
 }
 
+// @internal
 #[test]
 fn test_manager_get_locale_returns_bundled_english() {
     let temp = TempDir::new().unwrap();
@@ -155,6 +163,7 @@ fn test_manager_get_locale_returns_bundled_english() {
     assert!(locale.is_some(), "expected Some value");
 }
 
+// @internal
 #[test]
 fn test_manager_get_locale_unknown_returns_none() {
     let temp = TempDir::new().unwrap();
@@ -165,6 +174,7 @@ fn test_manager_get_locale_unknown_returns_none() {
     assert!(locale.is_none());
 }
 
+// @internal
 #[test]
 fn test_manager_help_returns_none_when_cache_empty() {
     let temp = TempDir::new().unwrap();
@@ -176,6 +186,7 @@ fn test_manager_help_returns_none_when_cache_empty() {
     assert!(help.is_none());
 }
 
+// @internal
 #[test]
 fn test_manager_help_returns_cached_content() {
     let temp = TempDir::new().unwrap();
@@ -199,6 +210,7 @@ fn test_manager_help_returns_cached_content() {
     assert_eq!(strings.get("faq").unwrap(), "Frequently asked questions");
 }
 
+// @internal
 #[test]
 fn test_manager_help_unknown_language_returns_none() {
     let temp = TempDir::new().unwrap();
@@ -209,6 +221,7 @@ fn test_manager_help_unknown_language_returns_none() {
     assert!(help.is_none());
 }
 
+// @internal
 #[test]
 fn test_manager_themes_returns_default_when_cache_empty() {
     let temp = TempDir::new().unwrap();
@@ -220,6 +233,7 @@ fn test_manager_themes_returns_default_when_cache_empty() {
     assert_eq!(themes[0].id, "catppuccin-mocha");
 }
 
+// @internal
 #[test]
 fn test_manager_themes_returns_cached_themes() {
     let temp = TempDir::new().unwrap();
@@ -248,6 +262,7 @@ fn test_manager_themes_returns_cached_themes() {
     assert_eq!(themes[1].id, "test-b");
 }
 
+// @internal
 #[test]
 fn test_manager_record_check_time() {
     let temp = TempDir::new().unwrap();

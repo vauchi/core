@@ -9,6 +9,7 @@
 use vauchi_core::{Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi};
 
 /// Test: Contact management workflow
+// @internal
 #[test]
 fn test_contact_management_workflow() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -70,6 +71,7 @@ fn test_contact_management_workflow() {
 }
 
 /// Test: Contact card delta computation and application
+// @internal
 #[test]
 fn test_card_delta_workflow() {
     use vauchi_core::sync::{CardDelta, FieldChange};
@@ -155,6 +157,7 @@ fn test_card_delta_workflow() {
 }
 
 /// Test: Error handling for contacts
+// @internal
 #[test]
 fn test_contact_error_handling() {
     let mut wb: Vauchi = Vauchi::in_memory().unwrap();

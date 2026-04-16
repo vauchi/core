@@ -12,6 +12,7 @@ use vauchi_core::{Contact, ContactCard, ContactField, FieldType, SymmetricKey, V
 ///
 /// Feature: visibility_control.feature
 /// Scenarios: Hide field from specific contact, Visibility propagation
+// @internal
 #[test]
 fn test_visibility_control_happy_path() {
     // Step 1: Create Alice's Vauchi with contacts

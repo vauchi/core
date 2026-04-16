@@ -36,6 +36,7 @@ fn create_test_manifest() -> ContentManifest {
     }
 }
 
+// @internal
 #[test]
 fn test_cache_new_creates_directory() {
     let temp = TempDir::new().unwrap();
@@ -45,6 +46,7 @@ fn test_cache_new_creates_directory() {
     drop(cache);
 }
 
+// @internal
 #[test]
 fn test_cache_manifest_roundtrip() {
     let temp = TempDir::new().unwrap();
@@ -59,6 +61,7 @@ fn test_cache_manifest_roundtrip() {
     loaded.content.networks.expect("expected Some");
 }
 
+// @internal
 #[test]
 fn test_cache_manifest_not_found() {
     let temp = TempDir::new().unwrap();
@@ -67,6 +70,7 @@ fn test_cache_manifest_not_found() {
     assert!(cache.get_manifest().is_none());
 }
 
+// @internal
 #[test]
 fn test_cache_content_roundtrip() {
     let temp = TempDir::new().unwrap();
@@ -85,6 +89,7 @@ fn test_cache_content_roundtrip() {
     assert_eq!(loaded, data);
 }
 
+// @internal
 #[test]
 fn test_cache_content_creates_subdirectory() {
     let temp = TempDir::new().unwrap();
@@ -100,6 +105,7 @@ fn test_cache_content_creates_subdirectory() {
     assert!(temp.path().join("content/themes/dark.json").exists());
 }
 
+// @internal
 #[test]
 fn test_cache_content_not_found() {
     let temp = TempDir::new().unwrap();
@@ -112,6 +118,7 @@ fn test_cache_content_not_found() {
     );
 }
 
+// @internal
 #[test]
 fn test_cache_rejects_invalid_checksum() {
     let temp = TempDir::new().unwrap();
@@ -131,6 +138,7 @@ fn test_cache_rejects_invalid_checksum() {
     );
 }
 
+// @internal
 #[test]
 fn test_cache_atomic_write_no_partial_files() {
     let temp = TempDir::new().unwrap();
@@ -148,6 +156,7 @@ fn test_cache_atomic_write_no_partial_files() {
     assert!(!tmp_path.exists());
 }
 
+// @internal
 #[test]
 fn test_cache_overwrites_existing_content() {
     let temp = TempDir::new().unwrap();
@@ -171,6 +180,7 @@ fn test_cache_overwrites_existing_content() {
     assert_eq!(loaded, b"version 2");
 }
 
+// @internal
 #[test]
 fn test_cache_multiple_content_types() {
     let temp = TempDir::new().unwrap();
@@ -221,6 +231,7 @@ fn test_cache_multiple_content_types() {
     );
 }
 
+// @internal
 #[test]
 fn test_cache_clear_content_type() {
     let temp = TempDir::new().unwrap();
@@ -245,6 +256,7 @@ fn test_cache_clear_content_type() {
     );
 }
 
+// @internal
 #[test]
 fn test_cache_last_check_time() {
     let temp = TempDir::new().unwrap();
@@ -263,6 +275,7 @@ fn test_cache_last_check_time() {
     assert!(diff.as_secs() < 1);
 }
 
+// @internal
 #[test]
 fn test_cache_help_content_roundtrip() {
     let temp = TempDir::new().unwrap();

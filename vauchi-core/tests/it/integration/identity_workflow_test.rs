@@ -9,6 +9,7 @@
 use vauchi_core::{ContactField, FieldType, Vauchi};
 
 /// Test: Full identity and contact card workflow
+// @internal
 #[test]
 fn test_full_identity_workflow() {
     // Create Vauchi instance
@@ -67,6 +68,7 @@ fn test_full_identity_workflow() {
 /// Verifies that when a user exports their identity backup and imports it
 /// on another device, both devices share the same identity but have
 /// different device IDs and exchange keys.
+// @internal
 #[test]
 fn test_device_linking_via_backup() {
     use vauchi_core::identity::Identity;
@@ -116,6 +118,7 @@ fn test_device_linking_via_backup() {
 ///
 /// Tests adding multiple devices, revoking one, and verifying the registry
 /// state is correct throughout.
+// @internal
 #[test]
 fn test_device_registry_integration() {
     use vauchi_core::SigningKeyPair;
@@ -179,6 +182,7 @@ fn test_device_registry_integration() {
 ///
 /// Verifies that three devices derived from the same seed have unique
 /// device IDs and exchange keys.
+// @internal
 #[test]
 fn test_three_device_key_derivation() {
     use vauchi_core::identity::DeviceInfo;
@@ -209,6 +213,7 @@ fn test_three_device_key_derivation() {
 ///
 /// Tests that revocation certificates are properly created, signed,
 /// and can be verified.
+// @internal
 #[test]
 fn test_device_revocation_certificate_workflow() {
     use vauchi_core::SigningKeyPair;
@@ -263,6 +268,7 @@ fn test_device_revocation_certificate_workflow() {
 ///
 /// Tests that a registry broadcast correctly includes only active devices
 /// and can be verified by contacts.
+// @internal
 #[test]
 fn test_registry_broadcast_for_contacts() {
     use vauchi_core::SigningKeyPair;
@@ -314,6 +320,7 @@ fn test_registry_broadcast_for_contacts() {
 /// Test: Maximum devices limit enforced
 ///
 /// Verifies that the registry enforces the MAX_DEVICES limit.
+// @internal
 #[test]
 fn test_max_devices_limit_enforced() {
     use vauchi_core::SigningKeyPair;
@@ -346,6 +353,7 @@ fn test_max_devices_limit_enforced() {
 /// Test: Cannot revoke the last active device
 ///
 /// Verifies that the registry prevents revoking the last remaining device.
+// @internal
 #[test]
 fn test_cannot_revoke_last_device() {
     use vauchi_core::SigningKeyPair;

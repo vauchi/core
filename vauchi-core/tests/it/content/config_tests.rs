@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use vauchi_app::content::ContentConfig;
 
+// @internal
 #[test]
 fn test_config_default() {
     let config = ContentConfig::default();
@@ -24,6 +25,7 @@ fn test_config_default() {
     assert!(config.proxy_url.is_none());
 }
 
+// @internal
 #[test]
 fn test_config_with_storage_path() {
     let config = ContentConfig {
@@ -34,6 +36,7 @@ fn test_config_with_storage_path() {
     assert_eq!(config.storage_path, PathBuf::from("/tmp/vauchi"));
 }
 
+// @internal
 #[test]
 fn test_config_with_proxy() {
     let config = ContentConfig::default().with_proxy();
@@ -46,6 +49,7 @@ fn test_config_with_proxy() {
     assert_eq!(config.timeout, Duration::from_secs(60));
 }
 
+// @internal
 #[test]
 fn test_config_disable_remote_updates() {
     let config = ContentConfig {
@@ -56,6 +60,7 @@ fn test_config_disable_remote_updates() {
     assert!(!config.remote_updates_enabled);
 }
 
+// @internal
 #[test]
 fn test_config_custom_url() {
     let config = ContentConfig {
@@ -66,6 +71,7 @@ fn test_config_custom_url() {
     assert_eq!(config.content_url, "https://custom.example.com/content");
 }
 
+// @internal
 #[test]
 fn test_config_custom_interval() {
     let config = ContentConfig {
@@ -76,6 +82,7 @@ fn test_config_custom_interval() {
     assert_eq!(config.check_interval, Duration::from_secs(1800));
 }
 
+// @internal
 #[test]
 fn test_config_custom_timeout() {
     let config = ContentConfig {
@@ -86,6 +93,7 @@ fn test_config_custom_timeout() {
     assert_eq!(config.timeout, Duration::from_secs(15));
 }
 
+// @internal
 #[test]
 fn test_config_custom_max_size() {
     let config = ContentConfig {

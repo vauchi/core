@@ -11,6 +11,7 @@
 
 use vauchi_app::content::{ContentEntry, ContentManifest, ContentType, UpdateStatus};
 
+// @internal
 #[test]
 fn test_content_manifest_deserialize() {
     let json = r#"{
@@ -38,6 +39,7 @@ fn test_content_manifest_deserialize() {
     assert_eq!(networks.checksum, "sha256:abc123");
 }
 
+// @internal
 #[test]
 fn test_content_manifest_with_locales() {
     let json = r#"{
@@ -72,6 +74,7 @@ fn test_content_manifest_with_locales() {
     assert!(locales.files.contains_key("de"));
 }
 
+// @internal
 #[test]
 fn test_content_entry_max_version() {
     let json = r#"{
@@ -87,6 +90,7 @@ fn test_content_entry_max_version() {
     assert_eq!(entry.max_app_version, Some("2.0.0".to_string()));
 }
 
+// @internal
 #[test]
 fn test_content_type_dir_name() {
     assert_eq!(ContentType::Networks.dir_name(), "networks");
@@ -95,6 +99,7 @@ fn test_content_type_dir_name() {
     assert_eq!(ContentType::Themes.dir_name(), "themes");
 }
 
+// @internal
 #[test]
 fn test_update_status_variants() {
     let up_to_date = UpdateStatus::UpToDate;

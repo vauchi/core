@@ -15,6 +15,7 @@ use vauchi_core::{
 ///
 /// Feature: identity_management.feature
 /// Scenarios: Create encrypted identity backup, Restore identity from backup
+// @internal
 #[test]
 fn test_backup_recovery_happy_path() {
     // Step 1: Create identity and contact card
@@ -76,6 +77,7 @@ fn test_backup_recovery_happy_path() {
 ///
 /// Feature: device_management.feature
 /// Scenarios: Link new device via backup, Sync between devices
+// @internal
 #[test]
 fn test_multi_device_linking_happy_path() {
     // Step 1: Create identity on Device A

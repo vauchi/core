@@ -15,6 +15,7 @@ use vauchi_core::{
 };
 
 /// Test: Sync manager workflow
+// @internal
 #[test]
 fn test_sync_manager_workflow() {
     use vauchi_core::Storage;
@@ -68,6 +69,7 @@ fn test_sync_manager_workflow() {
 }
 
 /// Test: Relay client with mock transport
+// @internal
 #[test]
 fn test_relay_client_workflow() {
     let transport = MockTransport::new();
@@ -117,6 +119,7 @@ fn test_relay_client_workflow() {
 /// Test: Field modification and removal propagation
 ///
 /// Tests that add/modify/remove operations each produce the correct delta type.
+// @internal
 #[test]
 fn test_field_modification_and_removal_propagation() {
     use vauchi_core::sync::{CardDelta, FieldChange};

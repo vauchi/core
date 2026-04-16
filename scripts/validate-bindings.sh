@@ -31,7 +31,6 @@ EXPECTED_TYPES=(
     "MobileProximityHandler"
     "MobilePasswordCheck"
     "MobilePasswordStrength"
-    "MobileProximityResult"
     "MobileRecoveryClaim"
     "MobileRecoveryProgress"
     "MobileRecoveryVerification"
@@ -45,7 +44,6 @@ EXPECTED_TYPES=(
     "MobileError"
     "VauchiPlatform"
     "MobileProximityVerifier"
-    "PlatformAudioHandler"
 )
 
 # Minimum line counts (approximate, allows some variance)

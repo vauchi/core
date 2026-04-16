@@ -6,7 +6,7 @@
 //!
 //! These tests verify that `ExchangeSession` drives `BleHandshakeSession`
 //! through the full 4-phase handshake using only `ExchangeCommand`s and
-//! `ExchangeHardwareEvent`s — no hardware traits, no mock transports.
+//! `ExchangeHardwareEvent`s -- no hardware traits, no mock transports.
 
 use vauchi_core::ContactCard;
 use vauchi_core::exchange::{
@@ -24,7 +24,7 @@ fn ble_session(name: &str) -> ExchangeSession {
     ExchangeSession::new_ble(identity, card, proximity)
 }
 
-// −− Initial commands −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
+// -- Initial commands ------------------------------------------------
 
 // @internal
 #[test]
@@ -48,7 +48,7 @@ fn ble_session_emits_scan_and_advertise_on_start() {
     assert!(has_advertise, "missing BleStartAdvertising command");
 }
 
-// −− Discovery -> Connect −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
+// -- Discovery -> Connect ---------------------------------------------
 
 // @internal
 #[test]
@@ -77,7 +77,7 @@ fn ble_device_discovered_emits_connect_command() {
     );
 }
 
-// −− BleConnected (initiator) -> KeyOffer write −−−−−−−−−−−−−−−−−−−−−−−
+// -- BleConnected (initiator) -> KeyOffer write -----------------------
 
 // @internal
 #[test]
@@ -94,7 +94,7 @@ fn ble_connected_after_discovery_emits_key_offer_write() {
         .unwrap();
     let _ = session.drain_commands(); // drain BleConnect
 
-    // Connection established — should emit KeyOffer write
+    // Connection established -- should emit KeyOffer write
     session
         .apply_hardware_event(ExchangeHardwareEvent::BleConnected {
             device_id: "peer-1".into(),
@@ -118,7 +118,7 @@ fn ble_connected_after_discovery_emits_key_offer_write() {
     );
 }
 
-// −− Full 4-phase initiator flow −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
+// -- Full 4-phase initiator flow -------------------------------------
 
 // @internal
 #[test]
@@ -234,7 +234,7 @@ fn ble_full_initiator_flow_via_command_event() {
     );
 }
 
-// −− BLE disconnect during handshake -> fail −−−−−−−−−−−−−−−−−−−−−−−−−−
+// -- BLE disconnect during handshake -> fail --------------------------
 
 // @internal
 #[test]
@@ -253,7 +253,7 @@ fn ble_disconnect_during_connection_fails_session() {
     );
 }
 
-// −− BLE hardware error -> fail −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
+// -- BLE hardware error -> fail ---------------------------------------
 
 // @internal
 #[test]
@@ -273,7 +273,7 @@ fn ble_hardware_error_fails_session() {
     );
 }
 
-// −− Out-of-order BLE data buffering −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
+// -- Out-of-order BLE data buffering ---------------------------------
 
 // @internal
 #[test]
@@ -321,14 +321,14 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
         })
         .unwrap();
 
-    // No commands yet — waiting for key_ack
+    // No commands yet -- waiting for key_ack
     let cmds = initiator.drain_commands();
     assert!(
         cmds.is_empty(),
         "should not emit commands until both key_ack and card data arrive"
     );
 
-    // Now send key_ack — should trigger Phase 2 processing
+    // Now send key_ack -- should trigger Phase 2 processing
     initiator
         .apply_hardware_event(ExchangeHardwareEvent::BleCharacteristicNotified {
             uuid: CHAR_HANDSHAKE_NOTIFY.into(),

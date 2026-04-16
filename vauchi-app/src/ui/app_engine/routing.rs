@@ -786,49 +786,53 @@ impl AppEngine {
         }
     }
 
-    /// Execute backup export or import using captured password and level.
+    /// Execute backup export using captured password and level.
     ///
     /// Called when the BackupRecoveryEngine transitions to Processing.
     /// Runs the backup operation synchronously (Argon2id KDF is slow but
     /// the platform already calls handle_action on a background thread).
+    ///
+    /// Import (restore) is not handled here — it needs the raw backup file
+    /// from a platform file picker, so restore uses `StartBackupImport`.
     fn execute_backup(&mut self) -> ActionResult {
+        use crate::ui::backup_recovery::BackupRecoveryEngine;
+
+        // Read mode from the engine via downcast (avoids fragile string matching)
+        let is_restore = self
+            .engine
+            .as_any()
+            .and_then(|a| a.downcast_ref::<BackupRecoveryEngine>())
+            .is_some_and(|e| *e.mode() == crate::ui::backup_recovery::BackupMode::Restore);
+
+        if is_restore {
+            // Restore needs backup data from a file picker — not available here.
+            self.engine.processing_failed();
+            self.pending_backup_full = true;
+            return ActionResult::NavigateTo(self.engine.current_screen());
+        }
+
         let password = match self.pending_backup_password.take() {
             Some(p) => p,
             None => {
                 self.engine.processing_failed();
+                self.pending_backup_full = true;
                 return ActionResult::NavigateTo(self.engine.current_screen());
             }
         };
 
-        // Determine mode from the engine's current screen context.
-        // The engine just transitioned to Processing — check which mode.
-        let screen = self.engine.current_screen();
-        let is_restore = screen.title.contains("Restoring");
-
-        let result = if is_restore {
-            // Import: we don't have the backup data here — import needs
-            // the raw backup hex which comes from the frontend file picker.
-            // For now, signal failure; restore flow uses StartBackupImport.
-            Err("Restore via core-driven flow not yet supported".to_string())
-        } else if self.pending_backup_full {
-            self.vauchi
-                .export_full_backup(&password)
-                .map(|_| ())
-                .map_err(|e| e.to_string())
+        let result = if self.pending_backup_full {
+            self.vauchi.export_full_backup(&password)
         } else {
-            self.vauchi
-                .export_backup(&password)
-                .map(|_| ())
-                .map_err(|e| e.to_string())
+            self.vauchi.export_backup(&password)
         };
 
         // Reset captured state
         self.pending_backup_full = true;
 
         match result {
-            Ok(()) => {
+            Ok(data) => {
                 self.engine.processing_complete();
-                ActionResult::NavigateTo(self.engine.current_screen())
+                ActionResult::BackupExportComplete { data }
             }
             Err(_) => {
                 self.engine.processing_failed();

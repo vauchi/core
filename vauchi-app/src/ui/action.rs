@@ -108,6 +108,13 @@ pub enum ActionResult {
         message: String,
         undo_action_id: Option<String>,
     },
+    /// Backup export completed — frontend should save or share the data.
+    ///
+    /// The data is a hex-encoded encrypted backup blob. The frontend
+    /// presents a file-save dialog or share sheet.
+    BackupExportComplete {
+        data: String,
+    },
     /// All data has been wiped — frontend should reset to initial state.
     WipeComplete,
     /// Frontend should perform hardware actions for the exchange protocol (ADR-031).

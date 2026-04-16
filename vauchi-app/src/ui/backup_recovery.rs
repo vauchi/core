@@ -16,10 +16,25 @@ pub enum BackupMode {
     Restore,
 }
 
+/// What data the backup includes.
+///
+/// Option D decision: full is the default, identity-only is opt-in.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub enum BackupLevel {
+    /// Identity + contacts + own card + labels (v3 format).
+    #[default]
+    Full,
+    /// Identity only — master seed + device info (v2 format).
+    IdentityOnly,
+}
+
 /// Backup & recovery workflow engine.
 pub struct BackupRecoveryEngine {
     step: BackupStep,
     mode: BackupMode,
+    level: BackupLevel,
     password: String,
     confirm_password: String,
     has_identity: bool,
@@ -56,10 +71,31 @@ impl BackupRecoveryEngine {
         Self {
             step,
             mode,
+            level: BackupLevel::Full,
             password: String::new(),
             confirm_password: String::new(),
             has_identity,
         }
+    }
+
+    /// Returns the current backup level (full or identity-only).
+    ///
+    /// Callers check this when the engine reaches `Processing` to decide
+    /// whether to call `export_full_backup()` or `export_backup()`.
+    pub fn level(&self) -> &BackupLevel {
+        &self.level
+    }
+
+    /// Returns the current mode (create or restore).
+    pub fn mode(&self) -> &BackupMode {
+        &self.mode
+    }
+
+    /// Returns the password entered by the user.
+    ///
+    /// Only meaningful when the engine is in `Processing` state.
+    pub fn password(&self) -> &str {
+        &self.password
     }
 
     /// Signals that async processing completed successfully.
@@ -120,21 +156,54 @@ impl BackupRecoveryEngine {
     }
 
     fn choose_screen(&self) -> ScreenModel {
+        let detail = match self.level {
+            BackupLevel::Full => {
+                "Create an encrypted backup of your identity, contacts, and labels."
+            }
+            BackupLevel::IdentityOnly => {
+                "Create an encrypted backup of your identity only. Contacts and labels are not included."
+            }
+        };
+        let toggle_label = match self.level {
+            BackupLevel::Full => "Full backup (recommended)",
+            BackupLevel::IdentityOnly => "Identity only",
+        };
         ScreenModel {
             screen_id: "backup_choose".into(),
             title: "Backup & Recovery".into(),
             subtitle: None,
-            components: vec![Component::InfoPanel {
-                id: "backup_info".into(),
-                icon: Some("backup".into()),
-                title: "Protect your data".into(),
-                items: vec![InfoItem {
-                    icon: None,
-                    title: "Backup".into(),
-                    detail: "Create an encrypted backup of your identity. To preserve contacts, use device linking instead.".into(),
-                }],
-                a11y: None,
-            }],
+            components: vec![
+                Component::InfoPanel {
+                    id: "backup_info".into(),
+                    icon: Some("backup".into()),
+                    title: "Protect your data".into(),
+                    items: vec![InfoItem {
+                        icon: None,
+                        title: "Backup".into(),
+                        detail: detail.into(),
+                    }],
+                    a11y: None,
+                },
+                Component::ToggleList {
+                    id: "backup_level".into(),
+                    label: "Backup level".into(),
+                    items: vec![ToggleItem {
+                        id: "level_toggle".into(),
+                        label: toggle_label.into(),
+                        selected: self.level == BackupLevel::Full,
+                        subtitle: None,
+                        a11y: Some(A11y {
+                            label: Some("Backup level toggle".into()),
+                            hint: Some(
+                                "When on, backs up everything. When off, backs up identity only."
+                                    .into(),
+                            ),
+                            role: Some(AccessibilityRole::Toggle),
+                        }),
+                    }],
+                    a11y: None,
+                },
+            ],
             actions: vec![
                 ScreenAction {
                     id: "create".into(),
@@ -150,7 +219,7 @@ impl BackupRecoveryEngine {
                 },
             ],
             progress: None,
-        ..Default::default()
+            ..Default::default()
         }
     }
 
@@ -398,6 +467,19 @@ impl WorkflowEngine for BackupRecoveryEngine {
                 self.mode = BackupMode::Restore;
                 self.step = BackupStep::EnterPassword;
                 ActionResult::NavigateTo(self.current_screen())
+            }
+            (
+                BackupStep::ChooseMode,
+                UserAction::ItemToggled {
+                    component_id,
+                    item_id,
+                },
+            ) if component_id == "backup_level" && item_id == "level_toggle" => {
+                self.level = match self.level {
+                    BackupLevel::Full => BackupLevel::IdentityOnly,
+                    BackupLevel::IdentityOnly => BackupLevel::Full,
+                };
+                ActionResult::UpdateScreen(self.current_screen())
             }
 
             // EnterPassword

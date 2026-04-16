@@ -378,3 +378,56 @@ fn processing_screen_shows_kdf_explanation_for_restore() {
         "Restore processing screen should mention decryption: {detail:?}"
     );
 }
+
+#[test]
+fn backup_defaults_to_full_level() {
+    let engine = BackupRecoveryEngine::new(None, false);
+    assert_eq!(*engine.level(), BackupLevel::Full);
+}
+
+#[test]
+fn backup_level_toggle_switches_to_identity_only_and_back() {
+    let mut engine = BackupRecoveryEngine::new(None, false);
+    assert_eq!(*engine.level(), BackupLevel::Full);
+
+    // Toggle to identity-only
+    let result = engine.handle_action(UserAction::ItemToggled {
+        component_id: "backup_level".into(),
+        item_id: "level_toggle".into(),
+    });
+    assert_eq!(*engine.level(), BackupLevel::IdentityOnly);
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "backup_choose");
+        }
+        other => panic!("Expected UpdateScreen, got {:?}", other),
+    }
+
+    // Toggle back to full
+    let _ = engine.handle_action(UserAction::ItemToggled {
+        component_id: "backup_level".into(),
+        item_id: "level_toggle".into(),
+    });
+    assert_eq!(*engine.level(), BackupLevel::Full);
+}
+
+#[test]
+fn backup_password_getter_returns_entered_password() {
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
+    assert!(engine.password().is_empty());
+
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "my-secret-pass".into(),
+    });
+    assert_eq!(engine.password(), "my-secret-pass");
+}
+
+#[test]
+fn backup_mode_getter() {
+    let engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), false);
+    assert_eq!(*engine.mode(), BackupMode::Restore);
+
+    let engine2 = BackupRecoveryEngine::new(None, false);
+    assert_eq!(*engine2.mode(), BackupMode::Create);
+}

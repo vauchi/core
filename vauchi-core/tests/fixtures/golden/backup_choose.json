@@ -13,7 +13,27 @@
           {
             "icon": null,
             "title": "Backup",
-            "detail": "Create an encrypted backup of your identity. To preserve contacts, use device linking instead."
+            "detail": "Create an encrypted backup of your identity, contacts, and labels."
+          }
+        ],
+        "a11y": null
+      }
+    },
+    {
+      "ToggleList": {
+        "id": "backup_level",
+        "label": "Backup level",
+        "items": [
+          {
+            "id": "level_toggle",
+            "label": "Full backup (recommended)",
+            "selected": true,
+            "subtitle": null,
+            "a11y": {
+              "label": "Backup level toggle",
+              "hint": "When on, backs up everything. When off, backs up identity only.",
+              "role": "Toggle"
+            }
           }
         ],
         "a11y": null

@@ -10,6 +10,7 @@ impl Default for DesignTokens {
             spacing: SpacingTokens {
                 xs: 4,
                 sm: 8,
+                sm_md: 12,
                 md: 16,
                 lg: 24,
                 xl: 32,

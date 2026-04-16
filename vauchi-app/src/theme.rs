@@ -82,9 +82,15 @@ pub struct DesignTokens {
 pub struct SpacingTokens {
     pub xs: u16,
     pub sm: u16,
+    #[serde(default = "default_spacing_sm_md")]
+    pub sm_md: u16,
     pub md: u16,
     pub lg: u16,
     pub xl: u16,
+}
+
+fn default_spacing_sm_md() -> u16 {
+    12
 }
 
 /// Font size tokens for text hierarchy.
@@ -483,6 +489,7 @@ mod tests {
         let tokens = DesignTokens::default();
         assert_eq!(tokens.spacing.xs, 4);
         assert_eq!(tokens.spacing.sm, 8);
+        assert_eq!(tokens.spacing.sm_md, 12);
         assert_eq!(tokens.spacing.md, 16);
         assert_eq!(tokens.spacing.lg, 24);
         assert_eq!(tokens.spacing.xl, 32);

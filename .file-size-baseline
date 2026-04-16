@@ -32,7 +32,7 @@ vauchi-core/src/storage/mod.rs 1079
 
 # SPLIT DONE — Phase 3: app_engine.rs (1437) split into mod.rs + routing.rs + screens.rs
 vauchi-app/src/ui/app_engine/mod.rs 880
-vauchi-app/src/ui/app_engine/routing.rs 843
+vauchi-app/src/ui/app_engine/routing.rs 855
 vauchi-app/src/ui/app_engine/screens.rs 1074
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
@@ -53,7 +53,6 @@ vauchi-core/tests/it/migration_tests.rs 1224
 # vauchi-app — extracted from vauchi-core, inherits exemption
 vauchi-app/src/ui/exchange.rs 2770
 vauchi-app/src/ui/contact_detail.rs 1105
-vauchi-app/src/ui/onboarding.rs 1054
 
 # EXEMPT — BLE exchange sub-flow: inline tests access private state (proximity_runner, shake_envelope_sent)
 vauchi-app/src/ui/exchange_ble.rs 1050

@@ -402,49 +402,6 @@ char *vauchi_app_import_contacts_from_vcf(struct VauchiApp *handle,
 char *vauchi_app_drain_notifications(struct VauchiApp *handle);
 
 /**
- * Check if audio proximity verification is available on this platform.
- *
- * Returns 1 if cpal can enumerate at least one output and one input device,
- * 0 otherwise. Always safe to call (never panics).
- *
- * # Safety
- * No special requirements.
- */
-int32_t vauchi_audio_is_available(void);
-
-/**
- * Emit an ultrasonic challenge signal containing `data`.
- *
- * Blocks until the signal has been emitted. Returns 1 on success, 0 on failure.
- * `data` must point to at least `data_len` valid bytes.
- *
- * # Safety
- * `data` must be a valid pointer to `data_len` bytes, or null.
- */
-int32_t vauchi_audio_emit(const uint8_t *data, uintptr_t data_len);
-
-/**
- * Listen for an ultrasonic response within `timeout_ms` milliseconds.
- *
- * Blocks until a response is received or the timeout expires.
- * Returns a JSON string `{"data":[1,2,3,...]}` on success, or null on
- * failure/timeout. The caller must free the returned string with
- * `vauchi_string_free`.
- *
- * # Safety
- * No special requirements.
- */
-char *vauchi_audio_listen(uint64_t timeout_ms);
-
-/**
- * Stop all audio operations. Cancels any in-flight emit or listen.
- *
- * # Safety
- * No special requirements.
- */
-void vauchi_audio_stop(void);
-
-/**
  * Start a device link as the existing device (initiator).
  *
  * Creates an initiator from the app's identity and device registry.

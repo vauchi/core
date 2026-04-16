@@ -22,11 +22,42 @@
 //! - Some devices may not support 18+ kHz (speaker/mic limitations)
 //! - Background noise rejection via bandpass filtering
 
-use super::{AudioBackend, AudioCapability, AudioConfig, ProximityError};
+use super::proximity::ProximityError;
+use crate::types::AudioCapability;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+/// Configuration for ultrasonic audio verification.
+#[derive(Debug, Clone)]
+pub struct AudioConfig {
+    /// Base carrier frequency in Hz (default: 18500 Hz)
+    pub carrier_frequency: u32,
+    /// Frequency shift for FSK modulation in Hz (default: 1000 Hz)
+    pub frequency_shift: u32,
+    /// Sample rate in Hz (default: 44100 Hz)
+    pub sample_rate: u32,
+    /// Minimum signal-to-noise ratio for detection (default: 15.0 dB)
+    pub min_snr_db: f32,
+    /// Maximum detection distance in meters (default: 3.0)
+    pub max_distance_meters: f32,
+    /// Duration of each FSK symbol in milliseconds (default: 20)
+    pub symbol_duration_ms: u32,
+}
+
+impl Default for AudioConfig {
+    fn default() -> Self {
+        AudioConfig {
+            carrier_frequency: 18500,
+            frequency_shift: 1000,
+            sample_rate: 44100,
+            min_snr_db: 15.0,
+            max_distance_meters: 3.0,
+            symbol_duration_ms: 20,
+        }
+    }
+}
 
 /// CPAL-based audio backend for desktop platforms.
 pub struct CpalAudioBackend {
@@ -232,12 +263,14 @@ impl Default for CpalAudioBackend {
     }
 }
 
-impl AudioBackend for CpalAudioBackend {
-    fn check_capability(&self) -> AudioCapability {
+impl CpalAudioBackend {
+    /// Returns the device's audio capability.
+    pub fn check_capability(&self) -> AudioCapability {
         self.capability.clone()
     }
 
-    fn emit_signal(&self, data: &[u8], config: &AudioConfig) -> Result<(), ProximityError> {
+    /// Emits an ultrasonic signal encoding the given data.
+    pub fn emit_signal(&self, data: &[u8], config: &AudioConfig) -> Result<(), ProximityError> {
         if self.capability == AudioCapability::None
             || self.capability == AudioCapability::ReceiveOnly
         {
@@ -315,7 +348,8 @@ impl AudioBackend for CpalAudioBackend {
         Ok(())
     }
 
-    fn receive_signal(
+    /// Listens for an ultrasonic signal and returns decoded data.
+    pub fn receive_signal(
         &self,
         timeout: Duration,
         config: &AudioConfig,
@@ -390,11 +424,13 @@ impl AudioBackend for CpalAudioBackend {
         Self::decode_fsk_samples(&samples, config)
     }
 
-    fn is_active(&self) -> bool {
+    /// Returns true if currently emitting or receiving.
+    pub fn is_active(&self) -> bool {
         self.is_active.load(Ordering::SeqCst)
     }
 
-    fn stop(&self) {
+    /// Stops any ongoing audio operation.
+    pub fn stop(&self) {
         self.stop_signal.store(true, Ordering::SeqCst);
     }
 }

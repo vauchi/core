@@ -5,8 +5,8 @@
 //! Transport negotiation: select the highest-priority transport
 //! supported by both peers.
 
+use super::TransportType;
 use super::caps::TransportCaps;
-use super::channel::TransportType;
 
 /// Ordered from highest to lowest priority for negotiation.
 /// NFC sits above BLE: physical tap proves adjacency, RSSI does not.

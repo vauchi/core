@@ -14,7 +14,6 @@ crate-type = ["cdylib", "staticlib"]
 
 [features]
 default = []
-audio = ["vauchi-core/audio-cpal"]
 secure-storage = ["vauchi-core/secure-storage-linux"]
 
 [dependencies]

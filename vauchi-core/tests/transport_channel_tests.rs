@@ -4,7 +4,7 @@
 
 #![cfg(feature = "testing")]
 
-use vauchi_core::exchange::transport::{PeerInfo, TransportCaps, TransportError, TransportType};
+use vauchi_core::exchange::transport::{TransportCaps, TransportType};
 
 #[test]
 fn test_transport_type_as_str() {
@@ -82,67 +82,4 @@ fn test_transport_caps_unknown_bits_truncated() {
     let caps = TransportCaps::from_bytes(bytes);
     // Only known bits survive
     assert_eq!(caps, TransportCaps::all());
-}
-
-#[test]
-fn test_transport_error_display() {
-    let err = TransportError::Unavailable {
-        transport: TransportType::WifiAware,
-        reason: "not supported".into(),
-    };
-    let msg = format!("{}", err);
-    assert!(msg.contains("wifi_aware"));
-    assert!(msg.contains("not supported"));
-}
-
-#[test]
-fn test_transport_error_timeout() {
-    let err = TransportError::Timeout {
-        transport: TransportType::Ble,
-        timeout_ms: 5000,
-    };
-    let msg = format!("{}", err);
-    assert!(msg.contains("ble"));
-    assert!(msg.contains("5000"));
-}
-
-#[test]
-fn test_transport_error_no_common() {
-    let err = TransportError::NoCommonTransport;
-    let msg = format!("{}", err);
-    assert!(msg.contains("no common transport"));
-}
-
-#[test]
-fn test_transport_error_payload_too_large() {
-    let err = TransportError::PayloadTooLarge {
-        size: 10000,
-        max: 500,
-    };
-    let msg = format!("{}", err);
-    assert!(msg.contains("10000"));
-    assert!(msg.contains("500"));
-}
-
-#[test]
-fn test_peer_info_creation() {
-    let peer = PeerInfo {
-        peer_id: "test-peer-42".into(),
-        capabilities: TransportCaps::BLE | TransportCaps::WIFI_AWARE,
-        rssi: Some(-45),
-    };
-    assert_eq!(peer.peer_id, "test-peer-42");
-    assert!(peer.capabilities.contains(TransportCaps::WIFI_AWARE));
-    assert!(peer.capabilities.contains(TransportCaps::BLE));
-    assert_eq!(peer.rssi, Some(-45));
-}
-
-#[test]
-fn test_peer_info_no_rssi() {
-    let peer = PeerInfo {
-        peer_id: "remote".into(),
-        capabilities: TransportCaps::STATIC_QR,
-        rssi: None,
-    };
-    assert_eq!(peer.rssi, None);
 }

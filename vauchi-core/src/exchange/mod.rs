@@ -23,8 +23,6 @@ macro_rules! test_pub_mod {
 
 test_pub_mod!(
     accelerometer,
-    ambient_audio,
-    audio,
     ble_chunking,
     ble_handshake,
     ble_payload,
@@ -78,7 +76,6 @@ pub mod relay_exchange;
 pub mod shake_protocol;
 pub mod tcp_transport;
 
-#[allow(deprecated)]
 pub mod transport;
 
 #[cfg(any(test, feature = "testing"))]
@@ -88,13 +85,8 @@ pub use accelerometer::{
     AccelerometerBackend, AccelerometerConfig, AccelerometerSample, AccelerometerVerifier,
     MockAccelerometerBackend,
 };
-pub use ambient_audio::{
-    AmbientAudioBackend, AmbientAudioConfig, AmbientAudioVerifier, AudioFingerprint,
-    MockAmbientAudioBackend,
-};
-pub use audio::{AudioBackend, AudioCapability, AudioConfig, MockAudioBackend, UltrasonicVerifier};
 #[cfg(feature = "audio-cpal")]
-pub use audio_cpal::CpalAudioBackend;
+pub use audio_cpal::{AudioConfig, CpalAudioBackend};
 #[allow(deprecated)]
 pub use ble::{
     BLE_DEFAULT_USABLE, BLE_MIN_MTU, BLE_PAYLOAD_SIZE, BLEAdvertisement, BLEDevice, BLEError,

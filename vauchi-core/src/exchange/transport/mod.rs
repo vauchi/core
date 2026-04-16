@@ -2,27 +2,63 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Pluggable transport layer for exchange protocols.
+//! Transport types and utilities for exchange protocols.
 //!
-//! Provides a unified [`TransportChannel`] trait that all transports implement,
-//! with automatic negotiation, fallback chains, and diagnostic tooling.
-//!
-//! **Deprecated (ADR-031):** The blocking `TransportChannel` trait is superseded
-//! by `ExchangeCommand`/`ExchangeHardwareEvent`. See `exchange::command`.
+//! Transport negotiation, capabilities, animated QR, and tracing.
+//! Hardware I/O uses the `ExchangeCommand`/`ExchangeHardwareEvent` protocol (ADR-031).
 
 pub mod animated_qr;
 pub mod caps;
-pub mod channel;
-pub mod diagnostics;
-pub mod mock;
 pub mod negotiation;
-pub mod orchestrator;
 pub mod protocol;
 pub mod trace;
-pub mod wifi_aware;
+
+use serde::Serialize;
+use std::fmt;
 
 pub use caps::TransportCaps;
-pub use channel::{PeerInfo, TransportChannel, TransportError, TransportType};
-pub use mock::MockTransportChannel;
 pub use negotiation::negotiate_transport;
-pub use orchestrator::{FallbackPolicy, TransportChain};
+
+/// Identifies a transport mechanism.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum TransportType {
+    WifiAware,
+    Ble,
+    AnimatedQr,
+    StaticQr,
+    Nfc,
+    Tcp,
+}
+
+impl TransportType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::WifiAware => "wifi_aware",
+            Self::Ble => "ble",
+            Self::AnimatedQr => "animated_qr",
+            Self::StaticQr => "static_qr",
+            Self::Nfc => "nfc",
+            Self::Tcp => "tcp",
+        }
+    }
+
+    /// Priority for auto-negotiation. Higher = preferred.
+    pub fn priority(&self) -> u8 {
+        match self {
+            Self::WifiAware => 50,
+            Self::Tcp => 45,
+            Self::Nfc => 42,
+            Self::Ble => 40,
+            Self::AnimatedQr => 30,
+            Self::StaticQr => 20,
+        }
+    }
+}
+
+impl fmt::Display for TransportType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}

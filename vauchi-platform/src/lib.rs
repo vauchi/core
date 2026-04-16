@@ -20,8 +20,6 @@ use vauchi_core::{
 
 // === Modules ===
 
-mod audio;
-
 mod content;
 mod device_link_relay;
 mod diagnostic;
@@ -53,9 +51,6 @@ mod protocol;
 mod types;
 
 // Re-export public types
-pub use audio::{
-    MobileProximityResult, MobileProximityVerifier, PlatformAudioBackend, PlatformAudioHandler,
-};
 pub use content::{
     MobileApplyFailure, MobileApplyResult, MobileContentConfig, MobileContentType,
     MobileUpdateStatus,

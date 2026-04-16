@@ -8,7 +8,7 @@
 //! exchange session and can produce a [`TraceSummary`] or JSON export for
 //! post-session analysis.
 
-use super::channel::TransportType;
+use super::TransportType;
 use serde::Serialize;
 use std::time::Instant;
 

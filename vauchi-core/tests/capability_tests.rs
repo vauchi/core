@@ -11,8 +11,8 @@
 //! - available_exchanges() returns only supported transports
 //! - Serde roundtrip works for capability types
 
+use vauchi_core::AudioCapability;
 use vauchi_core::capability::*;
-use vauchi_core::exchange::AudioCapability;
 
 // ===== Mock RuntimeStateProvider for testing =====
 

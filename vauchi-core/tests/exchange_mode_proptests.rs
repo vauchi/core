@@ -3,10 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use proptest::prelude::*;
+use vauchi_core::AudioCapability;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::mode::{DataTransport, ExchangeContext, ProximityMethod};
 use vauchi_core::exchange::{
-    AudioCapability, ExchangeId, ExchangeMode, ExchangeRecord, ExchangeTrustLevel, ProximityResult,
+    ExchangeId, ExchangeMode, ExchangeRecord, ExchangeTrustLevel, ProximityResult,
     check_mode_availability, recommend_mode,
 };
 

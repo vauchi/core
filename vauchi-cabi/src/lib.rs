@@ -16,7 +16,6 @@ use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier};
 
 mod app;
-mod audio;
 mod config;
 mod device_link;
 mod exchange;
@@ -25,7 +24,6 @@ pub(crate) mod platform_event;
 mod workflow;
 
 pub use app::*;
-pub use audio::*;
 pub use device_link::*;
 pub use exchange::*;
 pub use i18n::*;
@@ -1279,44 +1277,6 @@ mod tests {
                 );
                 vauchi_app_destroy(handle2);
             }
-        }
-    }
-
-    // ── Audio backend tests ─────────────────────────────────────────
-
-    #[test]
-    fn audio_is_available_returns_valid_result() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let result = vauchi_audio_is_available();
-            assert!(result == 0 || result == 1);
-        }
-    }
-
-    #[test]
-    fn audio_emit_null_data_returns_zero() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let result = vauchi_audio_emit(std::ptr::null(), 0);
-            assert_eq!(result, 0, "null data should fail gracefully");
-        }
-    }
-
-    #[test]
-    fn audio_listen_zero_timeout_returns_null() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let result = vauchi_audio_listen(0);
-            assert!(result.is_null(), "zero timeout should return null");
-        }
-    }
-
-    #[test]
-    fn audio_stop_does_not_crash() {
-        // allow(zero_assertions) — no-panic boundary test
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            vauchi_audio_stop();
         }
     }
 

@@ -345,10 +345,6 @@ name = "diagnostic_log_event_tests"
 name = "diagnostic_report_tests"
 
 [[test]]
-name = "transport_orchestrator_tests"
-required-features = ["testing"]
-
-[[test]]
 name = "transport_trace_tests"
 required-features = ["testing"]
 
@@ -366,10 +362,6 @@ required-features = ["testing"]
 
 [[test]]
 name = "verifier_caps_tests"
-required-features = ["testing"]
-
-[[test]]
-name = "ambient_audio_verifier_tests"
 required-features = ["testing"]
 
 [[test]]

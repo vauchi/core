@@ -985,6 +985,58 @@ impl RecoveryConflict {
 }
 
 // =============================================================================
+// Recovery Progress
+// =============================================================================
+
+/// Progress of an in-flight recovery operation.
+///
+/// Tracks the accumulation of vouchers towards the recovery threshold.
+/// Persisted to storage so recovery survives app restarts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryProgress {
+    /// The recovery claim binding old_pk → new_pk.
+    pub claim: RecoveryClaim,
+    /// Vouchers collected so far.
+    pub vouchers: Vec<RecoveryVoucher>,
+    /// Required threshold (from settings when recovery started).
+    pub threshold: u32,
+    /// Unix timestamp when recovery started.
+    pub started_at: u64,
+}
+
+impl RecoveryProgress {
+    /// Creates a new recovery progress tracker.
+    pub fn new(claim: RecoveryClaim, threshold: u32) -> Self {
+        let started_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before UNIX epoch")
+            .as_secs();
+        Self {
+            claim,
+            vouchers: Vec::new(),
+            threshold,
+            started_at,
+        }
+    }
+
+    /// Returns the number of vouchers collected.
+    pub fn voucher_count(&self) -> usize {
+        self.vouchers.len()
+    }
+
+    /// Returns true if the threshold is met.
+    pub fn is_complete(&self) -> bool {
+        self.vouchers.len() >= self.threshold as usize
+    }
+
+    /// Adds a voucher. Returns the new count.
+    pub fn add_voucher(&mut self, voucher: RecoveryVoucher) -> usize {
+        self.vouchers.push(voucher);
+        self.vouchers.len()
+    }
+}
+
+// =============================================================================
 // Recovery Revocation
 // =============================================================================
 

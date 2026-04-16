@@ -484,6 +484,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "backup_reminder",
             action: MigrationAction::Sql(MIGRATION_V44_BACKUP_REMINDER),
         },
+        Migration {
+            version: 45,
+            name: "recovery_progress",
+            action: MigrationAction::Sql(MIGRATION_V45_RECOVERY_PROGRESS),
+        },
     ]
 }
 
@@ -800,6 +805,20 @@ const MIGRATION_V35_LOCAL_GROUPS: &str = "
         name TEXT NOT NULL,
         contact_ids_json TEXT NOT NULL DEFAULT '[]',
         created_at INTEGER NOT NULL
+    );
+";
+
+/// Migration v44: In-progress recovery state persistence.
+///
+/// Singleton table (id = 1) storing one in-flight recovery session at a time.
+/// `progress_encrypted` is the full `RecoveryProgress` struct serialized as JSON
+/// and encrypted with the storage key. Only one recovery can be active at a time —
+/// subsequent saves overwrite via INSERT OR REPLACE.
+const MIGRATION_V45_RECOVERY_PROGRESS: &str = "
+    CREATE TABLE IF NOT EXISTS recovery_progress (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        progress_encrypted BLOB NOT NULL,
+        updated_at INTEGER NOT NULL
     );
 ";
 

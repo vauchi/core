@@ -94,6 +94,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("contacts", "nickname_encrypted"),
     ("contacts", "custom_avatar_encrypted"),
     ("contact_shared_avatars", "avatar_encrypted"),
+    // V44 in-progress recovery state
+    ("recovery_progress", "progress_encrypted"),
 ];
 
 /// Encrypted columns intentionally skipped by rekey, with documented reason.
@@ -1223,6 +1225,35 @@ impl Storage {
                 }
             }
             report(&mut completed, "recovery_settings");
+
+            // Re-encrypt recovery_progress: progress_encrypted (singleton, V44)
+            {
+                let result: Result<(Option<Vec<u8>>,), _> = self.conn.query_row(
+                    "SELECT progress_encrypted FROM recovery_progress WHERE id = 1",
+                    [],
+                    |row| Ok((row.get(0)?,)),
+                );
+
+                if let Ok((Some(enc),)) = result
+                    && !enc.is_empty()
+                {
+                    let plain = decrypt(old_key, &enc).map_err(|e| {
+                        StorageError::Migration(format!("Decrypt recovery_progress: {}", e))
+                    })?;
+                    let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                        StorageError::Migration(format!("Encrypt recovery_progress: {}", e))
+                    })?;
+                    self.conn
+                        .execute(
+                            "UPDATE recovery_progress SET progress_encrypted = ?1 WHERE id = 1",
+                            params![new_enc],
+                        )
+                        .map_err(|e| {
+                            StorageError::Migration(format!("Update recovery_progress: {}", e))
+                        })?;
+                }
+            }
+            report(&mut completed, "recovery_progress");
 
             // Re-encrypt exchange_states: encrypted_blob (multi-row, crash recovery)
             {

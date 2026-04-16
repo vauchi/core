@@ -9,7 +9,7 @@
 use rusqlite::params;
 
 use super::{Storage, StorageError};
-use crate::recovery::RecoverySettings;
+use crate::recovery::{RecoveryProgress, RecoverySettings};
 
 impl Storage {
     // === Recovery Response Operations ===
@@ -188,5 +188,59 @@ impl Storage {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }
+    }
+
+    // === Recovery Progress Persistence ===
+
+    /// Saves in-progress recovery state (encrypted).
+    ///
+    /// Only one recovery can be in progress at a time. Subsequent calls
+    /// overwrite the previous state.
+    pub fn save_recovery_progress(&self, progress: &RecoveryProgress) -> Result<(), StorageError> {
+        let json =
+            serde_json::to_vec(progress).map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, &json)
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
+        self.conn.execute(
+            "INSERT OR REPLACE INTO recovery_progress (id, progress_encrypted, updated_at)
+             VALUES (1, ?1, ?2)",
+            params![
+                encrypted,
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs() as i64,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Loads in-progress recovery state, if any.
+    pub fn load_recovery_progress(&self) -> Result<Option<RecoveryProgress>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT progress_encrypted FROM recovery_progress WHERE id = 1",
+            [],
+            |row| row.get::<_, Vec<u8>>(0),
+        );
+
+        match result {
+            Ok(encrypted) => {
+                let json = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let progress: RecoveryProgress = serde_json::from_slice(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(progress))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    /// Deletes in-progress recovery state (recovery completed or abandoned).
+    pub fn clear_recovery_progress(&self) -> Result<(), StorageError> {
+        self.conn
+            .execute("DELETE FROM recovery_progress WHERE id = 1", [])?;
+        Ok(())
     }
 }

@@ -59,9 +59,9 @@ pub use exchange::{
 
 pub mod recovery;
 pub use recovery::{
-    ConflictingClaim, RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProof,
-    RecoveryRateLimiter, RecoveryReminder, RecoveryResponse, RecoveryRevocation, RecoverySettings,
-    RecoveryVoucher, VerificationResult,
+    ConflictingClaim, RecoveryClaim, RecoveryConflict, RecoveryError, RecoveryProgress,
+    RecoveryProof, RecoveryRateLimiter, RecoveryReminder, RecoveryResponse, RecoveryRevocation,
+    RecoverySettings, RecoveryVoucher, VerificationResult,
 };
 
 #[cfg(feature = "network-rustls")]

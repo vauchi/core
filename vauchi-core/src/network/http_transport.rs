@@ -15,7 +15,8 @@ use serde::Serialize;
 use vauchi_protocol::v2::{
     FetchedBlob, V2AckRequest, V2ExchangeClaimRequest, V2ExchangeCompleteRequest,
     V2ExchangeOfferRequest, V2FetchRequest, V2GuardianDeleteRequest, V2GuardianEntry,
-    V2GuardianQueryRequest, V2GuardianStoreRequest, V2PurgeRequest, V2Response, V2SendRequest,
+    V2GuardianQueryRequest, V2GuardianStoreRequest, V2PurgeRequest, V2RecoveryStoreRequest,
+    V2Response, V2SendRequest,
 };
 
 use super::error::NetworkError;
@@ -420,6 +421,26 @@ impl HttpTransport {
                 Ok(None)
             }
             Err(e) => Err(e),
+        }
+    }
+
+    /// Stores a recovery proof on the relay.
+    ///
+    /// The proof is opaque to the relay (encrypted). Keyed by a hash of
+    /// the old identity's public key.
+    pub fn recovery_store(&self, key_hash: &str, proof_data_b64: &str) -> Result<(), NetworkError> {
+        let req = V2RecoveryStoreRequest {
+            key_hash: key_hash.to_string(),
+            proof_data: proof_data_b64.to_string(),
+        };
+        let resp = self.post_action("recovery_store", &req)?;
+        if resp.status == "ok" {
+            Ok(())
+        } else {
+            Err(response_error(
+                "recovery_store",
+                &resp.error.unwrap_or_default(),
+            ))
         }
     }
 

@@ -133,11 +133,8 @@ impl Vauchi {
     /// Uploads the completed recovery proof to the relay.
     ///
     /// The proof contains the claim + all collected vouchers. It's stored
-    /// on the relay for the old identity's contacts to verify and accept.
-    ///
-    /// TODO: Requires a `recovery_store` method on `HttpTransport` — not
-    /// yet implemented. Will be wired in a later phase when the relay
-    /// recovery-store endpoint client method is added.
+    /// on the relay keyed by hash(old_pk) for the old identity's contacts
+    /// to verify and accept.
     pub fn upload_recovery_proof(&self) -> VauchiResult<()> {
         let progress = self
             .storage
@@ -152,10 +149,22 @@ impl Vauchi {
             )));
         }
 
-        // TODO: relay upload requires HttpTransport::recovery_store (not yet implemented)
-        Err(VauchiError::InvalidState(
-            "Not yet implemented: relay upload of recovery proof".into(),
-        ))
+        // Serialize progress as the proof payload
+        let proof_bytes =
+            serde_json::to_vec(&progress).map_err(|e| VauchiError::Serialization(e.to_string()))?;
+
+        // Key: hash(old_pk) — same key contacts will query
+        let key_hash = hex::encode(Sha256::digest(progress.claim.old_pk()));
+        let proof_b64 = base64::engine::general_purpose::STANDARD.encode(&proof_bytes);
+
+        // Upload to relay
+        let transport = self.create_guardian_transport();
+        transport.recovery_store(&key_hash, &proof_b64)?;
+
+        // Clear local progress — proof is now on the relay
+        self.storage.clear_recovery_progress()?;
+
+        Ok(())
     }
 
     // === Incoming Recovery (I'm helping / vouching) ===

@@ -26,6 +26,7 @@ use crate::contact::Contact;
 use crate::crypto::{PublicKey, Signature, SigningKeyPair};
 
 pub mod guardian;
+pub mod sealed_box;
 
 /// Recovery-related errors.
 #[derive(Error, Debug)]

@@ -24,6 +24,7 @@ fn small_blob_b64() -> String {
 // Serde roundtrip — EscrowMessage
 // ================================================================
 
+// @internal
 #[test]
 fn put_message_roundtrip() {
     let msg = EscrowMessage::Put {
@@ -37,6 +38,7 @@ fn put_message_roundtrip() {
     assert_eq!(parsed, msg);
 }
 
+// @internal
 #[test]
 fn get_message_roundtrip() {
     let msg = EscrowMessage::Get {
@@ -48,6 +50,7 @@ fn get_message_roundtrip() {
     assert_eq!(parsed, msg);
 }
 
+// @internal
 #[test]
 fn count_message_roundtrip() {
     let msg = EscrowMessage::Count {
@@ -62,6 +65,7 @@ fn count_message_roundtrip() {
 // Serde roundtrip — EscrowResponse
 // ================================================================
 
+// @internal
 #[test]
 fn stored_response_roundtrip() {
     let resp = EscrowResponse::Stored;
@@ -70,6 +74,7 @@ fn stored_response_roundtrip() {
     assert_eq!(parsed, resp);
 }
 
+// @internal
 #[test]
 fn already_exists_response_roundtrip() {
     let resp = EscrowResponse::AlreadyExists;
@@ -78,6 +83,7 @@ fn already_exists_response_roundtrip() {
     assert_eq!(parsed, resp);
 }
 
+// @internal
 #[test]
 fn gate_full_response_roundtrip() {
     let resp = EscrowResponse::GateFull;
@@ -86,6 +92,7 @@ fn gate_full_response_roundtrip() {
     assert_eq!(parsed, resp);
 }
 
+// @internal
 #[test]
 fn blob_too_large_response_roundtrip() {
     let resp = EscrowResponse::BlobTooLarge;
@@ -94,6 +101,7 @@ fn blob_too_large_response_roundtrip() {
     assert_eq!(parsed, resp);
 }
 
+// @internal
 #[test]
 fn blob_response_roundtrip() {
     let resp = EscrowResponse::Blob {
@@ -104,6 +112,7 @@ fn blob_response_roundtrip() {
     assert_eq!(parsed, resp);
 }
 
+// @internal
 #[test]
 fn not_ready_response_roundtrip() {
     let resp = EscrowResponse::NotReady { count: 1 };
@@ -112,6 +121,7 @@ fn not_ready_response_roundtrip() {
     assert_eq!(parsed, resp);
 }
 
+// @internal
 #[test]
 fn count_response_roundtrip() {
     let resp = EscrowResponse::Count { count: 2 };
@@ -120,6 +130,7 @@ fn count_response_roundtrip() {
     assert_eq!(parsed, resp);
 }
 
+// @internal
 #[test]
 fn not_found_response_roundtrip() {
     let resp = EscrowResponse::NotFound;
@@ -132,6 +143,7 @@ fn not_found_response_roundtrip() {
 // JSON wire format — tagged discriminator
 // ================================================================
 
+// @internal
 #[test]
 fn put_message_has_action_tag() {
     let msg = EscrowMessage::Put {
@@ -144,6 +156,7 @@ fn put_message_has_action_tag() {
     assert!(json.contains(r#""action":"Put"#));
 }
 
+// @internal
 #[test]
 fn stored_response_has_status_tag() {
     let resp = EscrowResponse::Stored;
@@ -151,6 +164,7 @@ fn stored_response_has_status_tag() {
     assert!(json.contains(r#""status":"Stored"#));
 }
 
+// @internal
 #[test]
 fn response_deserializes_from_minimal_json() {
     let json = r#"{"status":"NotFound"}"#;
@@ -162,6 +176,7 @@ fn response_deserializes_from_minimal_json() {
 // Validation — valid messages
 // ================================================================
 
+// @internal
 #[test]
 fn valid_put_passes_validation() {
     let msg = EscrowMessage::Put {
@@ -173,6 +188,7 @@ fn valid_put_passes_validation() {
     assert!(msg.validate().is_ok());
 }
 
+// @internal
 #[test]
 fn valid_get_passes_validation() {
     let msg = EscrowMessage::Get {
@@ -182,6 +198,7 @@ fn valid_get_passes_validation() {
     assert!(msg.validate().is_ok());
 }
 
+// @internal
 #[test]
 fn valid_count_passes_validation() {
     let msg = EscrowMessage::Count {
@@ -194,6 +211,7 @@ fn valid_count_passes_validation() {
 // Validation — invalid hashes
 // ================================================================
 
+// @internal
 #[test]
 fn put_rejects_short_gate_hash() {
     let msg = EscrowMessage::Put {
@@ -206,6 +224,7 @@ fn put_rejects_short_gate_hash() {
     assert!(errs.contains(&EscrowValidationError::InvalidGateHash));
 }
 
+// @internal
 #[test]
 fn put_rejects_non_hex_gate_hash() {
     let msg = EscrowMessage::Put {
@@ -218,6 +237,7 @@ fn put_rejects_non_hex_gate_hash() {
     assert!(errs.contains(&EscrowValidationError::InvalidGateHash));
 }
 
+// @internal
 #[test]
 fn get_rejects_invalid_slot_hash() {
     let msg = EscrowMessage::Get {
@@ -228,6 +248,7 @@ fn get_rejects_invalid_slot_hash() {
     assert!(errs.contains(&EscrowValidationError::InvalidSlotHash));
 }
 
+// @internal
 #[test]
 fn count_rejects_empty_gate_hash() {
     let msg = EscrowMessage::Count {
@@ -241,6 +262,7 @@ fn count_rejects_empty_gate_hash() {
 // Validation — blob size
 // ================================================================
 
+// @internal
 #[test]
 fn put_rejects_oversized_blob() {
     // base64 of 65537 bytes > MAX_BLOB_BYTES
@@ -258,6 +280,7 @@ fn put_rejects_oversized_blob() {
     );
 }
 
+// @internal
 #[test]
 fn put_accepts_max_size_blob() {
     // base64 of exactly MAX_BLOB_BYTES: ceil(65536 * 4/3) = 87382
@@ -276,6 +299,7 @@ fn put_accepts_max_size_blob() {
 // Validation — TTL
 // ================================================================
 
+// @internal
 #[test]
 fn put_rejects_excessive_ttl() {
     let msg = EscrowMessage::Put {
@@ -290,6 +314,7 @@ fn put_rejects_excessive_ttl() {
     }));
 }
 
+// @internal
 #[test]
 fn put_accepts_max_ttl() {
     let msg = EscrowMessage::Put {
@@ -305,6 +330,7 @@ fn put_accepts_max_ttl() {
 // Validation — multiple errors
 // ================================================================
 
+// @internal
 #[test]
 fn put_reports_all_errors_at_once() {
     let msg = EscrowMessage::Put {
@@ -321,21 +347,25 @@ fn put_reports_all_errors_at_once() {
 // Constants
 // ================================================================
 
+// @internal
 #[test]
 fn max_blob_bytes_is_64_kib() {
     assert_eq!(MAX_BLOB_BYTES, 65_536);
 }
 
+// @internal
 #[test]
 fn max_ttl_is_7_days() {
     assert_eq!(MAX_TTL_SECONDS, 7 * 24 * 60 * 60);
 }
 
+// @internal
 #[test]
 fn max_slots_per_gate_is_2() {
     assert_eq!(MAX_SLOTS_PER_GATE, 2);
 }
 
+// @internal
 #[test]
 fn hash_hex_length_is_64() {
     assert_eq!(HASH_HEX_LENGTH, 64);

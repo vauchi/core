@@ -18,16 +18,19 @@ use vauchi_protocol::*;
 // Wire format stability
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_protocol_version_is_1() {
     assert_eq!(PROTOCOL_VERSION, 1);
 }
 
+// @internal
 #[test]
 fn provider_contract_frame_header_size_is_4() {
     assert_eq!(FRAME_HEADER_SIZE, 4);
 }
 
+// @internal
 #[test]
 fn provider_contract_encode_decode_roundtrip() {
     let envelope = MessageEnvelope {
@@ -49,6 +52,7 @@ fn provider_contract_encode_decode_roundtrip() {
 // All payload variants required by relay
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_all_relay_payload_variants_constructable() {
     // Relay creates these payloads — they must be constructable and encode to JSON
@@ -81,6 +85,7 @@ fn provider_contract_all_relay_payload_variants_constructable() {
 // AckStatus variants
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_ack_status_all_variants() {
     let variants = [
@@ -96,6 +101,7 @@ fn provider_contract_ack_status_all_variants() {
 // Handshake struct shape
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_handshake_fields_accessible() {
     let h = Handshake {
@@ -119,6 +125,7 @@ fn provider_contract_handshake_fields_accessible() {
 // ForwardingHints canonical_data
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_forwarding_hints_canonical_data_exists() {
     let hints = ForwardingHints {
@@ -138,6 +145,7 @@ fn provider_contract_forwarding_hints_canonical_data_exists() {
 // Unknown payload backward compatibility
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_unknown_variant_for_forward_compat() {
     let json =
@@ -150,6 +158,7 @@ fn provider_contract_unknown_variant_for_forward_compat() {
 // V2 HTTP API type roundtrip tests (OHTTP-11)
 // ============================================================
 
+// @internal
 #[test]
 fn v2_send_request_roundtrip() {
     let req = V2SendRequest {
@@ -162,6 +171,7 @@ fn v2_send_request_roundtrip() {
     assert_eq!(parsed.ciphertext, "data");
 }
 
+// @internal
 #[test]
 fn v2_purge_request_roundtrip() {
     let req = V2PurgeRequest {
@@ -180,6 +190,7 @@ fn v2_purge_request_roundtrip() {
     assert_eq!(parsed.timestamp, 1700000000);
 }
 
+// @internal
 #[test]
 fn v2_response_roundtrip() {
     let mut resp = V2Response::new("ok");
@@ -191,6 +202,7 @@ fn v2_response_roundtrip() {
     assert!(parsed.error.is_none());
 }
 
+// @internal
 #[test]
 fn v2_response_with_blobs_roundtrip() {
     let mut resp = V2Response::new("ok");
@@ -209,6 +221,7 @@ fn v2_response_with_blobs_roundtrip() {
     assert_eq!(blobs[0].created_at, 12345);
 }
 
+// @internal
 #[test]
 fn fetched_blob_roundtrip() {
     let blob = FetchedBlob {
@@ -223,6 +236,7 @@ fn fetched_blob_roundtrip() {
     assert_eq!(parsed.created_at, 99999);
 }
 
+// @internal
 #[test]
 fn v2_response_defaults_for_missing_optional_fields() {
     let json = r#"{"status":"ok"}"#;
@@ -238,6 +252,7 @@ fn v2_response_defaults_for_missing_optional_fields() {
 // Escrow protocol types (relay consumer contract)
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_escrow_constants() {
     assert_eq!(MAX_BLOB_BYTES, 65_536);
@@ -246,6 +261,7 @@ fn provider_contract_escrow_constants() {
     assert_eq!(HASH_HEX_LENGTH, 64);
 }
 
+// @internal
 #[test]
 fn provider_contract_escrow_message_all_variants_constructable() {
     let hash = "ff".repeat(32);
@@ -267,6 +283,7 @@ fn provider_contract_escrow_message_all_variants_constructable() {
     assert_eq!(messages.len(), 3, "EscrowMessage must have 3 variants");
 }
 
+// @internal
 #[test]
 fn provider_contract_escrow_response_all_variants_constructable() {
     let responses = [
@@ -284,6 +301,7 @@ fn provider_contract_escrow_response_all_variants_constructable() {
     assert_eq!(responses.len(), 8, "EscrowResponse must have 8 variants");
 }
 
+// @internal
 #[test]
 fn provider_contract_escrow_put_roundtrip() {
     let msg = EscrowMessage::Put {
@@ -297,6 +315,7 @@ fn provider_contract_escrow_put_roundtrip() {
     assert_eq!(parsed, msg);
 }
 
+// @internal
 #[test]
 fn provider_contract_escrow_blob_response_roundtrip() {
     let resp = EscrowResponse::Blob {
@@ -307,6 +326,7 @@ fn provider_contract_escrow_blob_response_roundtrip() {
     assert_eq!(parsed, resp);
 }
 
+// @internal
 #[test]
 fn provider_contract_escrow_tagged_discriminator() {
     // Relay dispatches on "action" tag for messages
@@ -322,6 +342,7 @@ fn provider_contract_escrow_tagged_discriminator() {
     assert!(json.contains(r#""status":"Stored"#));
 }
 
+// @internal
 #[test]
 fn provider_contract_escrow_validation_rejects_bad_input() {
     let msg = EscrowMessage::Put {

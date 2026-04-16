@@ -50,6 +50,9 @@ pub enum RecoveryError {
     #[error("Invalid recovery data format")]
     InvalidFormat,
 
+    #[error("Decryption failed")]
+    DecryptionFailed,
+
     #[error("Serialization error: {0}")]
     SerializationError(String),
 

@@ -32,6 +32,7 @@ fn test_config(temp: &TempDir) -> ContentConfig {
     }
 }
 
+// @internal
 #[test]
 fn test_registry_from_content_manager_bundled() {
     let temp = TempDir::new().unwrap();
@@ -46,6 +47,7 @@ fn test_registry_from_content_manager_bundled() {
     assert!(registry.get("github").is_some(), "expected Some value");
 }
 
+// @internal
 #[test]
 fn test_registry_from_content_manager_cached() {
     let temp = TempDir::new().unwrap();
@@ -78,6 +80,7 @@ fn test_registry_from_content_manager_cached() {
     assert!(registry.get("twitter").is_none()); // Bundled networks not present
 }
 
+// @internal
 #[test]
 fn test_registry_generates_urls() {
     let temp = TempDir::new().unwrap();
@@ -92,6 +95,7 @@ fn test_registry_generates_urls() {
 }
 
 // @scenario: contact_card_management :: Update social network config on app launch
+// @internal
 #[test]
 fn test_new_network_after_cache_update() {
     let temp = TempDir::new().unwrap();
@@ -132,6 +136,7 @@ fn test_new_network_after_cache_update() {
     );
 }
 
+// @internal
 #[test]
 fn test_updated_url_template() {
     let temp = TempDir::new().unwrap();

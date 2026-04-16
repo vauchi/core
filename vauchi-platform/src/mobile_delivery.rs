@@ -413,6 +413,68 @@ impl VauchiPlatform {
 
         Ok(())
     }
+
+    /// Export full v3 backup (identity + contacts + own card + labels).
+    ///
+    /// Returns base64-encoded backup data.
+    pub fn export_full_backup(&self, password: String) -> Result<String, MobileError> {
+        let mut vauchi = self.open_vauchi()?;
+        let identity = self.get_identity()?;
+        vauchi
+            .set_identity(identity)
+            .map_err(|e| MobileError::Internal(e.to_string()))?;
+
+        let backup_hex = vauchi
+            .export_full_backup(&password)
+            .map_err(|e| MobileError::CryptoError(e.to_string()))?;
+
+        // Re-encode hex → bytes → base64 for mobile transport
+        let bytes = hex::decode(&backup_hex).map_err(|e| MobileError::Internal(e.to_string()))?;
+        use base64::Engine;
+        Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+    }
+
+    /// Import full v3 backup (identity + contacts + own card + labels).
+    ///
+    /// Accepts base64-encoded backup data from `export_full_backup`.
+    pub fn import_full_backup(
+        &self,
+        backup_data: String,
+        password: String,
+    ) -> Result<(), MobileError> {
+        {
+            let data = lock_or(&self.identity_data)?;
+            if data.is_some() {
+                return Err(MobileError::AlreadyInitialized);
+            }
+        }
+
+        // Decode base64 → bytes → hex for the Vauchi API
+        use base64::Engine;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(&backup_data)
+            .map_err(|_| MobileError::InvalidInput("Invalid base64".to_string()))?;
+        let backup_hex = hex::encode(&bytes);
+
+        let mut vauchi = self.open_vauchi()?;
+        vauchi
+            .import_full_backup(&backup_hex, &password)
+            .map_err(|e| MobileError::CryptoError(e.to_string()))?;
+
+        // Sync platform identity state from restored Vauchi
+        let identity = vauchi.identity().ok_or(MobileError::IdentityNotFound)?;
+        let internal_backup = identity
+            .export_backup("__internal_storage_key__")
+            .map_err(|e| MobileError::CryptoError(e.to_string()))?;
+
+        let identity_data_val = IdentityData {
+            backup_data: internal_backup.as_bytes().to_vec(),
+            display_name: identity.display_name().to_string(),
+        };
+        *lock_or(&self.identity_data)? = Some(identity_data_val);
+
+        Ok(())
+    }
 }
 
 // Async sync method — runs sync on a blocking thread to prevent UI freeze.

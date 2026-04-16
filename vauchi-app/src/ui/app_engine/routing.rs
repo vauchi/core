@@ -776,7 +776,64 @@ impl AppEngine {
                     ActionResult::UpdateScreen(self.engine.current_screen())
                 }
             }
+            // Intercept backup Processing: execute backup in core, return result screen
+            ActionResult::NavigateTo(ref screen)
+                if self.screen == AppScreen::Backup && screen.screen_id == "backup_processing" =>
+            {
+                self.execute_backup()
+            }
             other => other,
+        }
+    }
+
+    /// Execute backup export or import using captured password and level.
+    ///
+    /// Called when the BackupRecoveryEngine transitions to Processing.
+    /// Runs the backup operation synchronously (Argon2id KDF is slow but
+    /// the platform already calls handle_action on a background thread).
+    fn execute_backup(&mut self) -> ActionResult {
+        let password = match self.pending_backup_password.take() {
+            Some(p) => p,
+            None => {
+                self.engine.processing_failed();
+                return ActionResult::NavigateTo(self.engine.current_screen());
+            }
+        };
+
+        // Determine mode from the engine's current screen context.
+        // The engine just transitioned to Processing — check which mode.
+        let screen = self.engine.current_screen();
+        let is_restore = screen.title.contains("Restoring");
+
+        let result = if is_restore {
+            // Import: we don't have the backup data here — import needs
+            // the raw backup hex which comes from the frontend file picker.
+            // For now, signal failure; restore flow uses StartBackupImport.
+            Err("Restore via core-driven flow not yet supported".to_string())
+        } else if self.pending_backup_full {
+            self.vauchi
+                .export_full_backup(&password)
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        } else {
+            self.vauchi
+                .export_backup(&password)
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        };
+
+        // Reset captured state
+        self.pending_backup_full = true;
+
+        match result {
+            Ok(()) => {
+                self.engine.processing_complete();
+                ActionResult::NavigateTo(self.engine.current_screen())
+            }
+            Err(_) => {
+                self.engine.processing_failed();
+                ActionResult::NavigateTo(self.engine.current_screen())
+            }
         }
     }
 }

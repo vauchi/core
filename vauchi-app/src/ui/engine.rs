@@ -40,6 +40,15 @@ pub trait WorkflowEngine: Send {
         false
     }
 
+    /// Signal that async/background processing completed successfully.
+    ///
+    /// Used by backup and other engines that have an intermediate Processing
+    /// state. Default is a no-op for engines without a Processing step.
+    fn processing_complete(&mut self) {}
+
+    /// Signal that async/background processing failed.
+    fn processing_failed(&mut self) {}
+
     /// Handle a hardware event from the frontend (ADR-031).
     ///
     /// Engines that interact with platform hardware (camera, BLE, NFC,

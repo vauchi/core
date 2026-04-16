@@ -98,24 +98,6 @@ impl BackupRecoveryEngine {
         &self.password
     }
 
-    /// Signals that async processing completed successfully.
-    ///
-    /// Only transitions from `Processing` state; no-op otherwise.
-    pub fn processing_complete(&mut self) {
-        if self.step == BackupStep::Processing {
-            self.step = BackupStep::Complete;
-        }
-    }
-
-    /// Signals that async processing failed.
-    ///
-    /// Only transitions from `Processing` state; no-op otherwise.
-    pub fn processing_failed(&mut self) {
-        if self.step == BackupStep::Processing {
-            self.step = BackupStep::Failed;
-        }
-    }
-
     fn total_steps(&self) -> u8 {
         match self.mode {
             BackupMode::Create => 4,
@@ -591,6 +573,18 @@ impl WorkflowEngine for BackupRecoveryEngine {
 
             // Default: refresh current screen
             _ => ActionResult::UpdateScreen(self.current_screen()),
+        }
+    }
+
+    fn processing_complete(&mut self) {
+        if self.step == BackupStep::Processing {
+            self.step = BackupStep::Complete;
+        }
+    }
+
+    fn processing_failed(&mut self) {
+        if self.step == BackupStep::Processing {
+            self.step = BackupStep::Failed;
         }
     }
 }

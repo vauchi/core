@@ -213,6 +213,10 @@ pub struct AppEngine {
     engine_cache: HashMap<AppScreen, Box<dyn WorkflowEngine>>,
     /// Captured from onboarding TextChanged events for identity persistence.
     pending_display_name: Option<String>,
+    /// Captured from backup TextChanged events for backup execution.
+    pending_backup_password: Option<String>,
+    /// Captured from backup ItemToggled events (default: Full).
+    pending_backup_full: bool,
     /// Navigation history stack for back-button support.
     nav_history: Vec<AppScreen>,
     /// Field pending undo after delete from MyInfoEntryDetail.
@@ -298,6 +302,8 @@ impl AppEngine {
             engine,
             engine_cache: HashMap::new(),
             pending_display_name: None,
+            pending_backup_password: None,
+            pending_backup_full: true,
             nav_history: Vec::new(),
             pending_field_undo: None,
             pending_contact_undo: None,
@@ -617,6 +623,25 @@ impl WorkflowEngine for AppEngine {
             && component_id == "display_name"
         {
             self.pending_display_name = Some(value.clone());
+        }
+
+        // Capture backup password and level toggle during backup flow
+        if self.screen == AppScreen::Backup {
+            match &action {
+                UserAction::TextChanged {
+                    component_id,
+                    value,
+                } if component_id == "password" => {
+                    self.pending_backup_password = Some(value.clone());
+                }
+                UserAction::ItemToggled {
+                    component_id,
+                    item_id,
+                } if component_id == "backup_level" && item_id == "level_toggle" => {
+                    self.pending_backup_full = !self.pending_backup_full;
+                }
+                _ => {}
+            }
         }
 
         self.persist_settings_toggle(&action);

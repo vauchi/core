@@ -1,46 +1,44 @@
 {
   "schema_version": 3,
-  "screen_id": "security_explanation",
-  "title": "Your data is secure",
+  "screen_id": "what_next",
+  "title": "What would you like to do?",
   "subtitle": null,
-  "components": [
-    {
-      "InfoPanel": {
-        "id": "security_features",
-        "icon": "shield",
-        "title": "How Vauchi protects you",
-        "items": [
-          {
-            "icon": "lock",
-            "title": "End-to-end encryption",
-            "detail": "Only you and your contacts can read your data."
-          },
-          {
-            "icon": "server",
-            "title": "Decentralized",
-            "detail": "No central server stores your contacts."
-          },
-          {
-            "icon": "key",
-            "title": "You own your keys",
-            "detail": "Your cryptographic keys never leave your device."
-          }
-        ],
-        "a11y": null
-      }
-    }
-  ],
+  "components": [],
   "actions": [
     {
-      "id": "continue",
-      "label": "Continue",
+      "id": "exchange",
+      "label": "Exchange cards",
       "style": "Primary",
+      "enabled": true
+    },
+    {
+      "id": "import_contacts",
+      "label": "Import existing contacts",
+      "style": "Secondary",
+      "enabled": true
+    },
+    {
+      "id": "read_security",
+      "label": "Read about security",
+      "style": "Secondary",
+      "enabled": true
+    },
+    {
+      "id": "read_backup",
+      "label": "Read about backup",
+      "style": "Secondary",
+      "enabled": true
+    },
+    {
+      "id": "start_app",
+      "label": "Start using the app",
+      "style": "Secondary",
       "enabled": true
     }
   ],
   "progress": {
-    "current_step": 7,
-    "total_steps": 9,
+    "current_step": 4,
+    "total_steps": 4,
     "label": null
   },
   "tokens": {

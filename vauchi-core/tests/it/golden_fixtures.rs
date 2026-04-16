@@ -4,7 +4,7 @@
 
 //! Golden JSON fixtures for onboarding screens.
 //!
-//! Generates canonical JSON for each of the 11 onboarding screens, consumed
+//! Generates canonical JSON for each of the 6 onboarding screens, consumed
 //! by frontend contract tests.
 //!
 //! Verify freshness: `cargo test -p vauchi-core --test golden_fixtures`
@@ -47,7 +47,7 @@ fn assert_fixture_fresh(screen: &ScreenModel, filename: &str) {
     }
 }
 
-/// Walk through all 11 screens, collecting each ScreenModel.
+/// Walk through all 6 screens, collecting each ScreenModel.
 /// Returns `(screen_id, ScreenModel)` pairs in order.
 fn walk_all_screens() -> Vec<(String, ScreenModel)> {
     let mut engine = OnboardingEngine::new();
@@ -67,7 +67,7 @@ fn walk_all_screens() -> Vec<(String, ScreenModel)> {
     let screen = engine.current_screen();
     screens.push(("link_choice".to_string(), screen));
 
-    // Navigate: LinkChoice -> IdentityCheck (via "back"), then IdentityCheck -> Welcome (via "create_new")
+    // Navigate: LinkChoice -> IdentityCheck (via "back"), then IdentityCheck -> DefaultName (via "create_new")
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "back".into(),
     });
@@ -76,17 +76,7 @@ fn walk_all_screens() -> Vec<(String, ScreenModel)> {
     });
     assert!(matches!(result, ActionResult::NavigateTo(_)));
 
-    // 3. Welcome
-    let screen = engine.current_screen();
-    screens.push(("welcome".to_string(), screen));
-
-    // Advance: Welcome -> DefaultName
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
-    });
-    assert!(matches!(result, ActionResult::NavigateTo(_)));
-
-    // 4. DefaultName (empty — captures the initial state)
+    // 3. DefaultName (empty — captures the initial state)
     let screen = engine.current_screen();
     screens.push(("default_name".to_string(), screen));
 
@@ -100,17 +90,7 @@ fn walk_all_screens() -> Vec<(String, ScreenModel)> {
     });
     assert!(matches!(result, ActionResult::NavigateTo(_)));
 
-    // 5. SkipGate
-    let screen = engine.current_screen();
-    screens.push(("skip_gate".to_string(), screen));
-
-    // Advance: continue setup
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue_setup".into(),
-    });
-    assert!(matches!(result, ActionResult::NavigateTo(_)));
-
-    // 6. GroupsSetup
+    // 4. GroupsSetup
     let screen = engine.current_screen();
     screens.push(("groups_setup".to_string(), screen));
 
@@ -120,7 +100,7 @@ fn walk_all_screens() -> Vec<(String, ScreenModel)> {
     });
     assert!(matches!(result, ActionResult::NavigateTo(_)));
 
-    // 7. ContactInfo
+    // 5. ContactInfo
     let screen = engine.current_screen();
     screens.push(("contact_info".to_string(), screen));
 
@@ -130,41 +110,11 @@ fn walk_all_screens() -> Vec<(String, ScreenModel)> {
     });
     assert!(matches!(result, ActionResult::NavigateTo(_)));
 
-    // 8. PreviewCard
+    // 6. WhatNext
     let screen = engine.current_screen();
-    screens.push(("preview_card".to_string(), screen));
+    screens.push(("what_next".to_string(), screen));
 
-    // Advance: continue
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    assert!(matches!(result, ActionResult::NavigateTo(_)));
-
-    // 9. SecurityExplanation
-    let screen = engine.current_screen();
-    screens.push(("security_explanation".to_string(), screen));
-
-    // Advance: continue
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    assert!(matches!(result, ActionResult::NavigateTo(_)));
-
-    // 10. BackupPrompt
-    let screen = engine.current_screen();
-    screens.push(("backup_prompt".to_string(), screen));
-
-    // Advance: skip
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip".into(),
-    });
-    assert!(matches!(result, ActionResult::NavigateTo(_)));
-
-    // 11. Ready
-    let screen = engine.current_screen();
-    screens.push(("ready".to_string(), screen));
-
-    assert_eq!(screens.len(), 11, "expected exactly 11 onboarding screens");
+    assert_eq!(screens.len(), 6, "expected exactly 6 onboarding screens");
     screens
 }
 
@@ -188,33 +138,17 @@ fn link_choice_fixture_is_fresh() {
 
 // @internal
 #[test]
-fn welcome_fixture_is_fresh() {
-    let screens = walk_all_screens();
-    let (_, screen) = &screens[2];
-    assert_fixture_fresh(screen, "welcome.json");
-}
-
-// @internal
-#[test]
 fn default_name_fixture_is_fresh() {
     let screens = walk_all_screens();
-    let (_, screen) = &screens[3];
+    let (_, screen) = &screens[2];
     assert_fixture_fresh(screen, "default_name.json");
-}
-
-// @internal
-#[test]
-fn skip_gate_fixture_is_fresh() {
-    let screens = walk_all_screens();
-    let (_, screen) = &screens[4];
-    assert_fixture_fresh(screen, "skip_gate.json");
 }
 
 // @internal
 #[test]
 fn groups_setup_fixture_is_fresh() {
     let screens = walk_all_screens();
-    let (_, screen) = &screens[5];
+    let (_, screen) = &screens[3];
     assert_fixture_fresh(screen, "groups_setup.json");
 }
 
@@ -222,40 +156,16 @@ fn groups_setup_fixture_is_fresh() {
 #[test]
 fn contact_info_fixture_is_fresh() {
     let screens = walk_all_screens();
-    let (_, screen) = &screens[6];
+    let (_, screen) = &screens[4];
     assert_fixture_fresh(screen, "contact_info.json");
 }
 
 // @internal
 #[test]
-fn preview_card_fixture_is_fresh() {
+fn what_next_fixture_is_fresh() {
     let screens = walk_all_screens();
-    let (_, screen) = &screens[7];
-    assert_fixture_fresh(screen, "preview_card.json");
-}
-
-// @internal
-#[test]
-fn security_explanation_fixture_is_fresh() {
-    let screens = walk_all_screens();
-    let (_, screen) = &screens[8];
-    assert_fixture_fresh(screen, "security_explanation.json");
-}
-
-// @internal
-#[test]
-fn backup_prompt_fixture_is_fresh() {
-    let screens = walk_all_screens();
-    let (_, screen) = &screens[9];
-    assert_fixture_fresh(screen, "backup_prompt.json");
-}
-
-// @internal
-#[test]
-fn ready_fixture_is_fresh() {
-    let screens = walk_all_screens();
-    let (_, screen) = &screens[10];
-    assert_fixture_fresh(screen, "ready.json");
+    let (_, screen) = &screens[5];
+    assert_fixture_fresh(screen, "what_next.json");
 }
 
 // ── Version metadata ──────────────────────────────────────────────
@@ -317,8 +227,25 @@ fn regenerate_all_fixtures() {
     let dir = fixtures_dir();
     fs::create_dir_all(&dir).unwrap();
 
+    // Remove stale fixture files for removed screens
+    let stale_files = [
+        "welcome.json",
+        "skip_gate.json",
+        "preview_card.json",
+        "security_explanation.json",
+        "backup_prompt.json",
+        "ready.json",
+    ];
+    for stale in &stale_files {
+        let path = dir.join(stale);
+        if path.exists() {
+            fs::remove_file(&path).unwrap();
+            println!("Removed stale fixture: {stale}");
+        }
+    }
+
     let screens = walk_all_screens();
-    assert_eq!(screens.len(), 11, "expected 11 onboarding screens");
+    assert_eq!(screens.len(), 6, "expected 6 onboarding screens");
 
     for (name, screen) in &screens {
         let filename = format!("{name}.json");

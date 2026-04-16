@@ -12,15 +12,10 @@ use vauchi_app::ui::*;
 const ALL_SCREEN_IDS: &[&str] = &[
     "identity_check",
     "link_choice",
-    "welcome",
     "default_name",
-    "skip_gate",
     "groups_setup",
     "contact_info",
-    "preview_card",
-    "security_explanation",
-    "backup_prompt",
-    "ready",
+    "what_next",
 ];
 
 const GROUP_NAMES: &[&str] = &["Family", "Friends", "Coworkers", "Business"];
@@ -34,14 +29,13 @@ fn arb_action_id() -> impl Strategy<Value = String> {
         Just("link_device".to_string()),
         Just("restore_backup".to_string()),
         Just("back".to_string()),
-        Just("get_started".to_string()),
         Just("continue".to_string()),
-        Just("continue_setup".to_string()),
-        Just("skip_to_finish".to_string()),
         Just("skip".to_string()),
-        Just("edit".to_string()),
-        Just("setup_backup".to_string()),
-        Just("start".to_string()),
+        Just("exchange".to_string()),
+        Just("import_contacts".to_string()),
+        Just("read_security".to_string()),
+        Just("read_backup".to_string()),
+        Just("start_app".to_string()),
         Just("nonexistent_action".to_string()),
         "[a-z_]{1,20}",
     ]
@@ -111,15 +105,11 @@ fn arb_user_action() -> impl Strategy<Value = UserAction> {
 }
 
 /// Sequence of "continue/advance" actions that take the engine from
-/// IdentityCheck all the way to Ready (full path, no skipping).
-fn advance_to_ready(engine: &mut OnboardingEngine, name: &str) {
-    // IdentityCheck → Welcome
+/// IdentityCheck all the way to WhatNext (full path, no skipping).
+fn advance_to_what_next(engine: &mut OnboardingEngine, name: &str) {
+    // IdentityCheck -> DefaultName
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
-    });
-    // Welcome → DefaultName
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
@@ -129,22 +119,10 @@ fn advance_to_ready(engine: &mut OnboardingEngine, name: &str) {
         action_id: "continue".into(),
     });
     let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue_setup".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip".into(),
     });
 }
 
@@ -153,7 +131,7 @@ fn advance_to_ready(engine: &mut OnboardingEngine, name: &str) {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 
-    /// Any valid display name eventually reaches Complete via the full path.
+    /// Any valid display name eventually reaches CompleteWith via the full path.
 // @internal
     #[test]
     fn forward_progress_reaches_complete(name in "[A-Za-z ]{1,50}") {
@@ -161,15 +139,16 @@ proptest! {
         prop_assume!(!trimmed.is_empty());
 
         let mut engine = OnboardingEngine::new();
-        advance_to_ready(&mut engine, &name);
+        advance_to_what_next(&mut engine, &name);
 
         let screen = engine.current_screen();
-        prop_assert_eq!(screen.screen_id, "ready");
+        prop_assert_eq!(screen.screen_id, "what_next");
 
         let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "start".into(),
+            action_id: "start_app".into(),
         });
-        prop_assert!(matches!(result, ActionResult::Complete));
+        let is_complete_with = matches!(result, ActionResult::CompleteWith { .. });
+        prop_assert!(is_complete_with);
     }
 }
 
@@ -184,12 +163,9 @@ proptest! {
     fn screen_stability(actions in prop::collection::vec(arb_user_action(), 0..30)) {
         let mut engine = OnboardingEngine::new();
 
-        // Navigate past IdentityCheck to Welcome, then to DefaultName
+        // Navigate past IdentityCheck to DefaultName
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "create_new".into(),
-        });
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "get_started".into(),
         });
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "display_name".into(),
@@ -214,7 +190,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(128))]
 
     /// Pressing a non-existent action_id never panics and returns
-    /// UpdateScreen (not NavigateTo, not Complete).
+    /// UpdateScreen (not NavigateTo, not CompleteWith).
 // @internal
     #[test]
     fn unknown_action_returns_update_screen(
@@ -224,18 +200,17 @@ proptest! {
         // Filter out IDs that happen to be real action IDs
         let real_ids = [
             "have_identity", "create_new", "link_device", "restore_backup",
-            "back", "get_started", "continue", "continue_setup",
-            "skip_to_finish", "skip", "edit", "setup_backup", "start",
+            "back", "continue", "skip",
+            "exchange", "import_contacts", "read_security", "read_backup",
+            "start_app", "transfer_device", "submit_display_name",
+            "submit_custom_group", "add_entry",
         ];
         prop_assume!(!real_ids.contains(&bogus_id.as_str()));
 
         let mut engine = OnboardingEngine::new();
-        // Navigate past IdentityCheck to Welcome, then set name
+        // Navigate past IdentityCheck to DefaultName, then set name
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "create_new".into(),
-        });
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "get_started".into(),
         });
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "display_name".into(),
@@ -280,9 +255,6 @@ proptest! {
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "create_new".into(),
         });
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "get_started".into(),
-        });
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "display_name".into(),
             value: name,
@@ -313,9 +285,6 @@ proptest! {
         let mut engine = OnboardingEngine::new();
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "create_new".into(),
-        });
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "get_started".into(),
         });
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "display_name".into(),
@@ -349,18 +318,12 @@ proptest! {
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "create_new".into(),
         });
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "get_started".into(),
-        });
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "display_name".into(),
             value: "Test".into(),
         });
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
-        });
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue_setup".into(),
         });
 
         // Capture original state
@@ -411,18 +374,12 @@ proptest! {
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "create_new".into(),
         });
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "get_started".into(),
-        });
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "display_name".into(),
             value: "Test".into(),
         });
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
-        });
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue_setup".into(),
         });
 
         let original = engine.data()
@@ -460,7 +417,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(256))]
 
     /// No sequence of random UserActions causes a panic. The result is
-    /// always one of the four ActionResult variants, and the engine
+    /// always one of the ActionResult variants, and the engine
     /// always reports a valid screen_id.
 // @internal
     #[test]
@@ -490,6 +447,9 @@ proptest! {
                 }
                 ActionResult::Complete => {
                     // Complete is valid — engine reached the end
+                }
+                ActionResult::CompleteWith { .. } => {
+                    // CompleteWith is valid — onboarding finished with destination
                 }
                 ActionResult::StartDeviceLink | ActionResult::StartBackupImport => {
                     // External handoff — valid from LinkChoice step
@@ -527,8 +487,8 @@ proptest! {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(128))]
 
-    /// Every screen always has progress with total_steps == 9 and
-    /// current_step in 1..=9.
+    /// Every screen always has progress with total_steps == 4 and
+    /// current_step in 1..=4.
 // @internal
     #[test]
     fn progress_invariants(actions in prop::collection::vec(arb_user_action(), 0..30)) {
@@ -545,8 +505,8 @@ proptest! {
                 "Pre-gate screen {} should have no progress", screen.screen_id);
         } else {
             let progress = screen.progress.as_ref().expect("main screens must have progress");
-            prop_assert_eq!(progress.total_steps, 9);
-            prop_assert!(progress.current_step >= 1 && progress.current_step <= 9,
+            prop_assert_eq!(progress.total_steps, 4);
+            prop_assert!(progress.current_step >= 1 && progress.current_step <= 4,
                 "current_step {} out of range", progress.current_step);
         }
     }

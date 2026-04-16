@@ -23,74 +23,55 @@ fn create_engine() -> (std::sync::Arc<PlatformAppEngine>, tempfile::TempDir) {
 
 /// Drive through the full onboarding flow via JSON actions.
 ///
-/// Sequence mirrors `drive_onboarding` in `vauchi-core/tests/app_engine_tests.rs`:
-/// 1. create_new -> welcome
-/// 2. get_started -> default_name
-/// 3. TextChanged display_name "Alice" -> updates default_name
-/// 4. continue -> skip_gate
-/// 5. skip_to_finish -> security_explanation
-/// 6. continue -> backup_prompt
-/// 7. skip -> ready
-/// 8. start -> Complete (AppEngine routes to Home)
+/// Sequence mirrors the 6-step onboarding flow:
+/// 1. create_new -> default_name
+/// 2. TextChanged display_name "Alice" -> updates default_name
+/// 3. continue -> groups_setup
+/// 4. continue -> contact_info
+/// 5. continue -> what_next
+/// 6. start_app -> CompleteWith (AppEngine routes to Home)
 fn drive_onboarding(engine: &PlatformAppEngine) {
-    // Step 1: create_new -> welcome
+    // Step 1: create_new -> default_name
     let r = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "create_new"}}"#.into())
         .expect("step 1: create_new");
     let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 1");
-    assert_eq!(v["NavigateTo"]["screen_id"], "welcome", "step 1");
+    assert_eq!(v["NavigateTo"]["screen_id"], "default_name", "step 1");
 
-    // Step 2: get_started -> default_name
-    let r = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "get_started"}}"#.into())
-        .expect("step 2: get_started");
-    let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 2");
-    assert_eq!(v["NavigateTo"]["screen_id"], "default_name", "step 2");
-
-    // Step 3: enter display name
+    // Step 2: enter display name
     let r = engine
         .handle_action_json(
             r#"{"TextChanged": {"component_id": "display_name", "value": "Alice"}}"#.into(),
         )
-        .expect("step 3: text changed");
-    let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 3");
-    assert_eq!(v["UpdateScreen"]["screen_id"], "default_name", "step 3");
+        .expect("step 2: text changed");
+    let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 2");
+    assert_eq!(v["UpdateScreen"]["screen_id"], "default_name", "step 2");
 
-    // Step 4: continue -> skip_gate
+    // Step 3: continue -> groups_setup
+    let r = engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
+        .expect("step 3: continue");
+    let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 3");
+    assert_eq!(v["NavigateTo"]["screen_id"], "groups_setup", "step 3");
+
+    // Step 4: continue -> contact_info
     let r = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
         .expect("step 4: continue");
     let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 4");
-    assert_eq!(v["NavigateTo"]["screen_id"], "skip_gate", "step 4");
+    assert_eq!(v["NavigateTo"]["screen_id"], "contact_info", "step 4");
 
-    // Step 5: skip_to_finish -> security_explanation
-    let r = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "skip_to_finish"}}"#.into())
-        .expect("step 5: skip_to_finish");
-    let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 5");
-    assert_eq!(
-        v["NavigateTo"]["screen_id"], "security_explanation",
-        "step 5"
-    );
-
-    // Step 6: continue -> backup_prompt
+    // Step 5: continue -> what_next
     let r = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
-        .expect("step 6: continue");
-    let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 6");
-    assert_eq!(v["NavigateTo"]["screen_id"], "backup_prompt", "step 6");
+        .expect("step 5: continue");
+    let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 5");
+    assert_eq!(v["NavigateTo"]["screen_id"], "what_next", "step 5");
 
-    // Step 7: skip -> ready
-    let r = engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "skip"}}"#.into())
-        .expect("step 7: skip");
-    let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 7");
-    assert_eq!(v["NavigateTo"]["screen_id"], "ready", "step 7");
-
-    // Step 8: start -> Complete (AppEngine transitions to Home)
+    // Step 6: start_app -> CompleteWith (AppEngine transitions to Home)
     engine
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "start"}}"#.into())
-        .expect("step 8: start");
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "start_app"}}"#.into())
+        .expect("step 6: start_app");
 }
 
 // ============================================================================

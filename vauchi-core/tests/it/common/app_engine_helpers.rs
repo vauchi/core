@@ -10,7 +10,7 @@ use vauchi_core::api::Vauchi;
 /// Drive through the full onboarding flow, returning the final ActionResult.
 /// Each intermediate step is asserted to produce the expected ActionResult variant (T-12).
 pub fn drive_onboarding(engine: &mut AppEngine) -> ActionResult {
-    // Step 1: create_new -> navigates to welcome
+    // Step 1: create_new -> navigates to default_name
     let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
@@ -18,36 +18,36 @@ pub fn drive_onboarding(engine: &mut AppEngine) -> ActionResult {
         panic!("Step 1 (create_new) expected NavigateTo, got {r:?}");
     };
     assert_eq!(
-        screen.screen_id, "welcome",
-        "create_new should navigate to welcome"
-    );
-
-    // Step 2: get_started -> navigates to default_name
-    let r = engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
-    });
-    let ActionResult::NavigateTo(screen) = r else {
-        panic!("Step 2 (get_started) expected NavigateTo, got {r:?}");
-    };
-    assert_eq!(
         screen.screen_id, "default_name",
-        "get_started should navigate to default_name"
+        "create_new should navigate to default_name"
     );
 
-    // Step 3: enter display name -> updates screen
+    // Step 2: enter display name -> updates screen
     let r = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Alice".into(),
     });
     let ActionResult::UpdateScreen(screen) = r else {
-        panic!("Step 3 (TextChanged display_name) expected UpdateScreen, got {r:?}");
+        panic!("Step 2 (TextChanged display_name) expected UpdateScreen, got {r:?}");
     };
     assert_eq!(
         screen.screen_id, "default_name",
         "TextChanged should update the default_name screen"
     );
 
-    // Step 4: continue -> navigates to skip_gate
+    // Step 3: continue -> navigates to groups_setup
+    let r = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    let ActionResult::NavigateTo(screen) = r else {
+        panic!("Step 3 (continue) expected NavigateTo, got {r:?}");
+    };
+    assert_eq!(
+        screen.screen_id, "groups_setup",
+        "continue should navigate to groups_setup"
+    );
+
+    // Step 4: continue -> navigates to contact_info
     let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -55,58 +55,34 @@ pub fn drive_onboarding(engine: &mut AppEngine) -> ActionResult {
         panic!("Step 4 (continue) expected NavigateTo, got {r:?}");
     };
     assert_eq!(
-        screen.screen_id, "skip_gate",
-        "continue should navigate to skip_gate"
+        screen.screen_id, "contact_info",
+        "continue should navigate to contact_info"
     );
 
-    // Step 5: skip_to_finish -> navigates to security_explanation
-    let r = engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip_to_finish".into(),
-    });
-    let ActionResult::NavigateTo(screen) = r else {
-        panic!("Step 5 (skip_to_finish) expected NavigateTo, got {r:?}");
-    };
-    assert_eq!(
-        screen.screen_id, "security_explanation",
-        "skip_to_finish should navigate to security_explanation"
-    );
-
-    // Step 6: continue -> navigates to backup_prompt
+    // Step 5: continue -> navigates to what_next
     let r = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
     let ActionResult::NavigateTo(screen) = r else {
-        panic!("Step 6 (continue) expected NavigateTo, got {r:?}");
+        panic!("Step 5 (continue) expected NavigateTo, got {r:?}");
     };
     assert_eq!(
-        screen.screen_id, "backup_prompt",
-        "continue should navigate to backup_prompt"
+        screen.screen_id, "what_next",
+        "continue should navigate to what_next"
     );
 
-    // Step 7: skip -> navigates to ready
-    let r = engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip".into(),
-    });
-    let ActionResult::NavigateTo(screen) = r else {
-        panic!("Step 7 (skip) expected NavigateTo, got {r:?}");
-    };
-    assert_eq!(screen.screen_id, "ready", "skip should navigate to ready");
-
-    // Step 8: start -> Complete -> AppEngine routes to Home
+    // Step 6: start_app -> CompleteWith -> AppEngine routes to Home
     engine.handle_action(UserAction::ActionPressed {
-        action_id: "start".into(),
+        action_id: "start_app".into(),
     })
 }
 
-/// Drive onboarding with "setup_backup" pressed (instead of skip) at the backup prompt.
+/// Drive onboarding with "read_backup" pressed on the WhatNext screen.
 /// Returns the final ActionResult which should navigate to the backup screen.
 pub fn drive_onboarding_with_backup(engine: &mut AppEngine) -> ActionResult {
-    // Steps 1-6: same as drive_onboarding (through backup_prompt)
+    // Steps 1-5: same as drive_onboarding (through what_next)
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
@@ -116,20 +92,15 @@ pub fn drive_onboarding_with_backup(engine: &mut AppEngine) -> ActionResult {
         action_id: "continue".into(),
     });
     let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip_to_finish".into(),
+        action_id: "continue".into(),
     });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 
-    // Step 7: setup_backup (instead of skip) -> navigates to ready
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "setup_backup".into(),
-    });
-
-    // Step 8: start -> Complete -> AppEngine routes to backup
+    // Step 6: read_backup -> CompleteWith { BackupSetup } -> AppEngine routes to backup
     engine.handle_action(UserAction::ActionPressed {
-        action_id: "start".into(),
+        action_id: "read_backup".into(),
     })
 }
 
@@ -143,18 +114,8 @@ pub fn drive_onboarding_without_name(engine: &mut AppEngine) -> ActionResult {
         panic!("create_new should produce NavigateTo, got {r:?}");
     };
     assert_eq!(
-        screen.screen_id, "welcome",
-        "create_new should navigate to welcome"
-    );
-    let r = engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
-    });
-    let ActionResult::NavigateTo(screen) = r else {
-        panic!("get_started should produce NavigateTo, got {r:?}");
-    };
-    assert_eq!(
         screen.screen_id, "default_name",
-        "get_started should navigate to default_name"
+        "create_new should navigate to default_name"
     );
     // Attempt to continue without setting display_name
     engine.handle_action(UserAction::ActionPressed {

@@ -8,9 +8,9 @@ use vauchi_app::ui::{A11y, AccessibilityRole, SettingsItem, *};
 #[test]
 fn test_screen_model_serde_roundtrip() {
     let screen = ScreenModel {
-        screen_id: "welcome".to_string(),
-        title: "Welcome to Vauchi".to_string(),
-        subtitle: Some("Privacy-first contact cards".to_string()),
+        screen_id: "default_name".to_string(),
+        title: "What's your name?".to_string(),
+        subtitle: Some("This is how contacts will see you.".to_string()),
         components: vec![
             Component::InfoPanel {
                 id: "info".to_string(),
@@ -26,15 +26,15 @@ fn test_screen_model_serde_roundtrip() {
             Component::Divider,
         ],
         actions: vec![ScreenAction {
-            id: "get_started".to_string(),
-            label: "Get Started".to_string(),
+            id: "continue".to_string(),
+            label: "Continue".to_string(),
             style: ActionStyle::Primary,
             enabled: true,
         }],
         progress: Some(Progress {
             current_step: 1,
-            total_steps: 9,
-            label: Some("Welcome".to_string()),
+            total_steps: 4,
+            label: Some("DefaultName".to_string()),
         }),
         ..Default::default()
     };
@@ -42,15 +42,15 @@ fn test_screen_model_serde_roundtrip() {
     let json = serde_json::to_string(&screen).unwrap();
     let restored: ScreenModel = serde_json::from_str(&json).unwrap();
 
-    assert_eq!(restored.screen_id, "welcome");
-    assert_eq!(restored.title, "Welcome to Vauchi");
+    assert_eq!(restored.screen_id, "default_name");
+    assert_eq!(restored.title, "What's your name?");
     assert_eq!(restored.components.len(), 2);
     assert_eq!(restored.actions.len(), 1);
     assert!(restored.progress.is_some(), "expected Some value");
     let progress = restored.progress.unwrap();
     assert_eq!(progress.current_step, 1);
-    assert_eq!(progress.total_steps, 9);
-    assert_eq!(progress.label.as_deref(), Some("Welcome"));
+    assert_eq!(progress.total_steps, 4);
+    assert_eq!(progress.label.as_deref(), Some("DefaultName"));
 }
 
 // @internal

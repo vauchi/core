@@ -6,20 +6,13 @@ use vauchi_app::ui::*;
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-fn advance_to_welcome(engine: &mut OnboardingEngine) {
+fn advance_to_default_name(engine: &mut OnboardingEngine) {
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
 }
 
-fn advance_to_default_name(engine: &mut OnboardingEngine) {
-    advance_to_welcome(engine);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
-    });
-}
-
-fn advance_to_skip_gate(engine: &mut OnboardingEngine) {
+fn advance_to_groups_setup(engine: &mut OnboardingEngine) {
     advance_to_default_name(engine);
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
@@ -30,13 +23,6 @@ fn advance_to_skip_gate(engine: &mut OnboardingEngine) {
     });
 }
 
-fn advance_to_groups_setup(engine: &mut OnboardingEngine) {
-    advance_to_skip_gate(engine);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue_setup".into(),
-    });
-}
-
 fn advance_to_contact_info(engine: &mut OnboardingEngine) {
     advance_to_groups_setup(engine);
     let _ = engine.handle_action(UserAction::ActionPressed {
@@ -44,31 +30,10 @@ fn advance_to_contact_info(engine: &mut OnboardingEngine) {
     });
 }
 
-fn advance_to_preview_card(engine: &mut OnboardingEngine) {
+fn advance_to_what_next(engine: &mut OnboardingEngine) {
     advance_to_contact_info(engine);
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
-    });
-}
-
-fn advance_to_security_explanation(engine: &mut OnboardingEngine) {
-    advance_to_preview_card(engine);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-}
-
-fn advance_to_backup_prompt(engine: &mut OnboardingEngine) {
-    advance_to_security_explanation(engine);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-}
-
-fn advance_to_ready(engine: &mut OnboardingEngine) {
-    advance_to_backup_prompt(engine);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip".into(),
     });
 }
 
@@ -108,17 +73,17 @@ fn identity_check_has_info_panel_and_two_actions() {
 
 // @internal
 #[test]
-fn identity_check_create_new_goes_to_welcome() {
+fn identity_check_create_new_goes_to_default_name() {
     let mut engine = OnboardingEngine::new();
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
     match result {
         ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "welcome");
+            assert_eq!(screen.screen_id, "default_name");
             assert_eq!(screen.progress.as_ref().unwrap().current_step, 1);
         }
-        other => panic!("Expected NavigateTo welcome, got {other:?}"),
+        other => panic!("Expected NavigateTo default_name, got {other:?}"),
     }
 }
 
@@ -208,48 +173,7 @@ fn identity_check_unknown_action_returns_update_screen() {
     }
 }
 
-// ── Screen 1: Welcome ───────────────────────────────────────────────
-
-// @internal
-#[test]
-fn welcome_has_info_panel_and_one_action() {
-    let mut engine = OnboardingEngine::new();
-    advance_to_welcome(&mut engine);
-    let screen = engine.current_screen();
-
-    assert_eq!(screen.screen_id, "welcome");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 1);
-    assert_eq!(screen.progress.as_ref().unwrap().total_steps, 9);
-    assert!(
-        screen
-            .components
-            .iter()
-            .any(|c| matches!(c, Component::InfoPanel { .. })),
-        "Welcome screen should have an InfoPanel"
-    );
-    assert_eq!(screen.actions.len(), 1);
-    assert_eq!(screen.actions[0].id, "get_started");
-    assert!(matches!(screen.actions[0].style, ActionStyle::Primary));
-}
-
-// @internal
-#[test]
-fn welcome_to_default_name() {
-    let mut engine = OnboardingEngine::new();
-    advance_to_welcome(&mut engine);
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
-    });
-    match result {
-        ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "default_name");
-            assert_eq!(screen.progress.as_ref().unwrap().current_step, 2);
-        }
-        other => panic!("Expected NavigateTo, got {other:?}"),
-    }
-}
-
-// ── Screen 2: DefaultName ───────────────────────────────────────────
+// ── Screen 1: DefaultName ───────────────────────────────────────────
 
 // @internal
 #[test]
@@ -259,6 +183,8 @@ fn default_name_has_text_input() {
 
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "default_name");
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 1);
+    assert_eq!(screen.progress.as_ref().unwrap().total_steps, 4);
 
     let has_input = screen.components.iter().any(|c| {
         matches!(c, Component::TextInput { id, input_type, max_length, ..
@@ -336,7 +262,7 @@ fn default_name_text_changed_updates_screen() {
 
 // @internal
 #[test]
-fn default_name_continue_navigates_to_skip_gate() {
+fn default_name_continue_navigates_to_groups_setup() {
     let mut engine = OnboardingEngine::new();
     advance_to_default_name(&mut engine);
 
@@ -348,58 +274,12 @@ fn default_name_continue_navigates_to_skip_gate() {
         action_id: "continue".into(),
     });
     match result {
-        ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "skip_gate"),
-        other => panic!("Expected NavigateTo skip_gate, got {other:?}"),
-    }
-}
-
-// ── Screen 3: SkipGate ──────────────────────────────────────────────
-
-// @internal
-#[test]
-fn skip_gate_has_correct_actions() {
-    let mut engine = OnboardingEngine::new();
-    advance_to_skip_gate(&mut engine);
-
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "skip_gate");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 3);
-    assert_eq!(screen.actions.len(), 2);
-    assert_eq!(screen.actions[0].id, "continue_setup");
-    assert_eq!(screen.actions[1].id, "skip_to_finish");
-}
-
-// @internal
-#[test]
-fn skip_gate_continue_setup_goes_to_groups() {
-    let mut engine = OnboardingEngine::new();
-    advance_to_skip_gate(&mut engine);
-
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue_setup".into(),
-    });
-    match result {
         ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "groups_setup"),
         other => panic!("Expected NavigateTo groups_setup, got {other:?}"),
     }
 }
 
-// @internal
-#[test]
-fn skip_gate_skip_to_finish_goes_to_security() {
-    let mut engine = OnboardingEngine::new();
-    advance_to_skip_gate(&mut engine);
-
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip_to_finish".into(),
-    });
-    match result {
-        ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "security_explanation"),
-        other => panic!("Expected NavigateTo security_explanation, got {other:?}"),
-    }
-}
-
-// ── Screen 4: GroupsSetup ───────────────────────────────────────────
+// ── Screen 2: GroupsSetup ───────────────────────────────────────────
 
 // @internal
 #[test]
@@ -409,7 +289,7 @@ fn groups_setup_has_toggle_list_with_suggested_labels() {
 
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "groups_setup");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 4);
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 2);
 
     let toggle_list = screen.components.iter().find_map(|c| match c {
         Component::ToggleList { id, items, .. } if id == "groups" => Some(items),
@@ -502,7 +382,7 @@ fn groups_skip_goes_to_contact_info() {
     }
 }
 
-// ── Screen 5: ContactInfo ───────────────────────────────────────────
+// ── Screen 3: ContactInfo ───────────────────────────────────────────
 
 // @internal
 #[test]
@@ -512,7 +392,7 @@ fn contact_info_has_field_list() {
 
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "contact_info");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 5);
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 3);
 
     let has_field_list = screen.components.iter().any(|c| {
         matches!(c, Component::FieldList { id, ..
@@ -539,10 +419,7 @@ fn contact_info_visibility_mode_depends_on_groups() {
 
     // With groups selected
     let mut engine = OnboardingEngine::new();
-    advance_to_skip_gate(&mut engine);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue_setup".into(),
-    });
+    advance_to_groups_setup(&mut engine);
     // Select Family
     let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "groups".into(),
@@ -566,10 +443,7 @@ fn contact_info_visibility_mode_depends_on_groups() {
 #[test]
 fn contact_info_available_groups_from_selected() {
     let mut engine = OnboardingEngine::new();
-    advance_to_skip_gate(&mut engine);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue_setup".into(),
-    });
+    advance_to_groups_setup(&mut engine);
     let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "groups".into(),
         item_id: "Family".into(),
@@ -597,7 +471,7 @@ fn contact_info_available_groups_from_selected() {
 
 // @internal
 #[test]
-fn contact_info_continue_goes_to_preview() {
+fn contact_info_continue_goes_to_what_next() {
     let mut engine = OnboardingEngine::new();
     advance_to_contact_info(&mut engine);
 
@@ -605,196 +479,103 @@ fn contact_info_continue_goes_to_preview() {
         action_id: "continue".into(),
     });
     match result {
-        ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "preview_card"),
-        other => panic!("Expected NavigateTo preview_card, got {other:?}"),
+        ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "what_next"),
+        other => panic!("Expected NavigateTo what_next, got {other:?}"),
     }
 }
 
-// ── Screen 6: PreviewCard ───────────────────────────────────────────
+// ── Screen 4: WhatNext ─────────────────────────────────────────────
 
-// @internal
 #[test]
-fn preview_card_shows_display_name() {
+fn what_next_has_five_actions() {
     let mut engine = OnboardingEngine::new();
-    advance_to_preview_card(&mut engine);
-
+    advance_to_what_next(&mut engine);
     let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "preview_card");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 6);
-
-    let name = screen.components.iter().find_map(|c| match c {
-        Component::CardPreview { name, .. } => Some(name.clone()),
-        _ => None,
-    });
-    assert_eq!(name, Some("Alice".to_string()));
+    assert_eq!(screen.screen_id, "what_next");
+    assert_eq!(screen.progress.as_ref().unwrap().current_step, 4);
+    assert_eq!(screen.progress.as_ref().unwrap().total_steps, 4);
+    assert_eq!(screen.actions.len(), 5);
+    assert_eq!(screen.actions[0].id, "exchange");
+    assert!(matches!(screen.actions[0].style, ActionStyle::Primary));
+    assert_eq!(screen.actions[1].id, "import_contacts");
+    assert_eq!(screen.actions[2].id, "read_security");
+    assert_eq!(screen.actions[3].id, "read_backup");
+    assert_eq!(screen.actions[4].id, "start_app");
 }
 
-// @internal
 #[test]
-fn preview_card_edit_goes_back_to_contact_info() {
+fn what_next_exchange_completes_with_exchange() {
     let mut engine = OnboardingEngine::new();
-    advance_to_preview_card(&mut engine);
-
+    advance_to_what_next(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "edit".into(),
+        action_id: "exchange".into(),
     });
-    match result {
-        ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "contact_info"),
-        other => panic!("Expected NavigateTo contact_info, got {other:?}"),
-    }
+    assert!(matches!(
+        result,
+        ActionResult::CompleteWith {
+            destination: PostOnboardingDestination::Exchange
+        }
+    ));
 }
 
-// @internal
 #[test]
-fn preview_card_continue_goes_to_security() {
+fn what_next_start_app_completes_with_main_screen() {
     let mut engine = OnboardingEngine::new();
-    advance_to_preview_card(&mut engine);
-
+    advance_to_what_next(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
+        action_id: "start_app".into(),
     });
-    match result {
-        ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "security_explanation"),
-        other => panic!("Expected NavigateTo security_explanation, got {other:?}"),
-    }
+    assert!(matches!(
+        result,
+        ActionResult::CompleteWith {
+            destination: PostOnboardingDestination::MainScreen
+        }
+    ));
 }
 
-// ── Screen 7: SecurityExplanation ───────────────────────────────────
-
-// @internal
 #[test]
-fn security_explanation_has_info_panel() {
+fn what_next_import_contacts_completes_with_import() {
     let mut engine = OnboardingEngine::new();
-    advance_to_security_explanation(&mut engine);
-
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "security_explanation");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 7);
-    assert!(
-        screen
-            .components
-            .iter()
-            .any(|c| matches!(c, Component::InfoPanel { .. }))
-    );
-    assert_eq!(screen.actions.len(), 1);
-    assert_eq!(screen.actions[0].id, "continue");
-}
-
-// @internal
-#[test]
-fn security_explanation_continue_goes_to_backup() {
-    let mut engine = OnboardingEngine::new();
-    advance_to_security_explanation(&mut engine);
-
+    advance_to_what_next(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
+        action_id: "import_contacts".into(),
     });
-    match result {
-        ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "backup_prompt"),
-        other => panic!("Expected NavigateTo backup_prompt, got {other:?}"),
-    }
+    assert!(matches!(
+        result,
+        ActionResult::CompleteWith {
+            destination: PostOnboardingDestination::ImportContacts
+        }
+    ));
 }
 
-// ── Screen 8: BackupPrompt ──────────────────────────────────────────
-
-// @internal
 #[test]
-fn backup_prompt_has_two_actions() {
+fn what_next_read_security_completes_with_security() {
     let mut engine = OnboardingEngine::new();
-    advance_to_backup_prompt(&mut engine);
-
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "backup_prompt");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 8);
-    assert_eq!(screen.actions.len(), 2);
-    assert_eq!(screen.actions[0].id, "setup_backup");
-    assert_eq!(screen.actions[1].id, "skip");
-}
-
-// @internal
-#[test]
-fn backup_prompt_setup_goes_to_ready_and_sets_flag() {
-    let mut engine = OnboardingEngine::new();
-    advance_to_backup_prompt(&mut engine);
-
-    assert!(
-        !engine.backup_requested(),
-        "backup_requested should be false before pressing setup_backup"
-    );
-
+    advance_to_what_next(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "setup_backup".into(),
+        action_id: "read_security".into(),
     });
-    match result {
-        ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "ready"),
-        other => panic!("Expected NavigateTo ready, got {other:?}"),
-    }
-
-    assert!(
-        engine.backup_requested(),
-        "backup_requested should be true after pressing setup_backup"
-    );
+    assert!(matches!(
+        result,
+        ActionResult::CompleteWith {
+            destination: PostOnboardingDestination::SecurityInfo
+        }
+    ));
 }
 
-// @internal
 #[test]
-fn backup_prompt_skip_does_not_set_backup_flag() {
+fn what_next_read_backup_completes_with_backup() {
     let mut engine = OnboardingEngine::new();
-    advance_to_backup_prompt(&mut engine);
-
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip".into(),
-    });
-
-    assert!(
-        !engine.backup_requested(),
-        "backup_requested should be false after pressing skip"
-    );
-}
-
-// @internal
-#[test]
-fn backup_prompt_skip_navigates_to_ready() {
-    let mut engine = OnboardingEngine::new();
-    advance_to_backup_prompt(&mut engine);
-
+    advance_to_what_next(&mut engine);
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip".into(),
+        action_id: "read_backup".into(),
     });
-    match result {
-        ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "ready"),
-        other => panic!("Expected NavigateTo ready, got {other:?}"),
-    }
-}
-
-// ── Screen 9: Ready ─────────────────────────────────────────────────
-
-// @internal
-#[test]
-fn ready_screen_has_start_action() {
-    let mut engine = OnboardingEngine::new();
-    advance_to_ready(&mut engine);
-
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "ready");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 9);
-    assert_eq!(screen.actions.len(), 1);
-    assert_eq!(screen.actions[0].id, "start");
-}
-
-// @internal
-#[test]
-fn ready_start_completes() {
-    let mut engine = OnboardingEngine::new();
-    advance_to_ready(&mut engine);
-
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "start".into(),
-    });
-    assert!(
-        matches!(result, ActionResult::Complete),
-        "Expected Complete"
-    );
+    assert!(matches!(
+        result,
+        ActionResult::CompleteWith {
+            destination: PostOnboardingDestination::BackupSetup
+        }
+    ));
 }
 
 // ── Full flow ───────────────────────────────────────────────────────
@@ -804,97 +585,37 @@ fn ready_start_completes() {
 fn full_flow_to_completion() {
     let mut engine = OnboardingEngine::new();
 
-    // IdentityCheck -> Welcome
+    // IdentityCheck -> DefaultName
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
-    });
-    // Welcome -> DefaultName
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
     });
     // Enter name
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Alice".into(),
     });
-    // DefaultName -> SkipGate
+    // DefaultName -> GroupsSetup
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
-    });
-    // SkipGate -> GroupsSetup
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue_setup".into(),
     });
     // GroupsSetup -> ContactInfo
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    // ContactInfo -> PreviewCard
+    // ContactInfo -> WhatNext
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    // PreviewCard -> SecurityExplanation
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    // SecurityExplanation -> BackupPrompt
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    // BackupPrompt -> Ready
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip".into(),
-    });
-    // Ready -> Complete
+    // WhatNext -> CompleteWith
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "start".into(),
+        action_id: "start_app".into(),
     });
-    assert!(matches!(result, ActionResult::Complete));
-}
-
-// @internal
-#[test]
-fn skip_flow_bypasses_groups_and_fields() {
-    let mut engine = OnboardingEngine::new();
-
-    // IdentityCheck -> Welcome
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "create_new".into(),
-    });
-    // Welcome -> DefaultName
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
-    });
-    let _ = engine.handle_action(UserAction::TextChanged {
-        component_id: "display_name".into(),
-        value: "Bob".into(),
-    });
-    // DefaultName -> SkipGate
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    // SkipGate -> SecurityExplanation (skip)
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip_to_finish".into(),
-    });
-    match &result {
-        ActionResult::NavigateTo(screen) => assert_eq!(screen.screen_id, "security_explanation"),
-        other => panic!("Expected NavigateTo security_explanation, got {other:?}"),
-    }
-
-    // SecurityExplanation -> BackupPrompt
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    // BackupPrompt -> Ready
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip".into(),
-    });
-    // Ready -> Complete
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "start".into(),
-    });
-    assert!(matches!(result, ActionResult::Complete));
+    assert!(matches!(
+        result,
+        ActionResult::CompleteWith {
+            destination: PostOnboardingDestination::MainScreen
+        }
+    ));
 }
 
 // ── Data accessor ───────────────────────────────────────────────────
@@ -905,9 +626,6 @@ fn data_accessor_returns_collected_data() {
     let mut engine = OnboardingEngine::new();
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
@@ -987,45 +705,5 @@ fn onboarding_custom_group_text_input_has_a11y_label() {
             assert!(a11y.hint.is_some(), "hint should describe what to enter");
         }
         _ => unreachable!(),
-    }
-}
-
-// ── GroupViewSelected on PreviewCard ─────────────────────────────────
-
-// @internal
-#[test]
-fn preview_card_group_view_selected() {
-    let mut engine = OnboardingEngine::new();
-    advance_to_skip_gate(&mut engine);
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue_setup".into(),
-    });
-    let _ = engine.handle_action(UserAction::ItemToggled {
-        component_id: "groups".into(),
-        item_id: "Family".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-
-    // Now at PreviewCard
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "preview_card");
-
-    let result = engine.handle_action(UserAction::GroupViewSelected {
-        group_name: Some("Family".into()),
-    });
-    match result {
-        ActionResult::UpdateScreen(screen) => {
-            let selected = screen.components.iter().find_map(|c| match c {
-                Component::CardPreview { selected_group, .. } => Some(selected_group.clone()),
-                _ => None,
-            });
-            assert_eq!(selected, Some(Some("Family".to_string())));
-        }
-        other => panic!("Expected UpdateScreen, got {other:?}"),
     }
 }

@@ -35,8 +35,8 @@ fn workflow_new_returns_identity_check_screen() {
     );
 }
 
-/// Helper: navigate past IdentityCheck to Welcome.
-fn advance_to_welcome(workflow: &MobileOnboardingWorkflow) {
+/// Helper: navigate past IdentityCheck to DefaultName.
+fn advance_to_default_name(workflow: &MobileOnboardingWorkflow) {
     workflow
         .handle_action_json(r#"{"ActionPressed": {"action_id": "create_new"}}"#.into())
         .unwrap();
@@ -50,9 +50,8 @@ fn advance_to_welcome(workflow: &MobileOnboardingWorkflow) {
 #[test]
 fn workflow_handle_action_navigates_to_default_name() {
     let workflow = MobileOnboardingWorkflow::new();
-    advance_to_welcome(&workflow);
 
-    let action_json = r#"{"ActionPressed": {"action_id": "get_started"}}"#;
+    let action_json = r#"{"ActionPressed": {"action_id": "create_new"}}"#;
     let result_json = workflow
         .handle_action_json(action_json.to_string())
         .expect("should handle action");
@@ -70,11 +69,7 @@ fn workflow_handle_action_navigates_to_default_name() {
 #[test]
 fn workflow_text_changed_updates_screen() {
     let workflow = MobileOnboardingWorkflow::new();
-    advance_to_welcome(&workflow);
-
-    // Navigate to default_name
-    let nav = r#"{"ActionPressed": {"action_id": "get_started"}}"#;
-    workflow.handle_action_json(nav.to_string()).unwrap();
+    advance_to_default_name(&workflow);
 
     // Type a name
     let text_action = r#"{"TextChanged": {"component_id": "display_name", "value": "Alice"}}"#;
@@ -91,11 +86,7 @@ fn workflow_text_changed_updates_screen() {
 #[test]
 fn workflow_validation_error_on_empty_name() {
     let workflow = MobileOnboardingWorkflow::new();
-    advance_to_welcome(&workflow);
-
-    // Navigate to default_name
-    let nav = r#"{"ActionPressed": {"action_id": "get_started"}}"#;
-    workflow.handle_action_json(nav.to_string()).unwrap();
+    advance_to_default_name(&workflow);
 
     // Try to continue without entering a name
     let continue_action = r#"{"ActionPressed": {"action_id": "continue"}}"#;
@@ -117,14 +108,9 @@ fn workflow_validation_error_on_empty_name() {
 
 // @internal
 #[test]
-fn workflow_skip_flow_reaches_complete() {
+fn workflow_full_flow_reaches_complete_with() {
     let workflow = MobileOnboardingWorkflow::new();
-    advance_to_welcome(&workflow);
-
-    // Welcome -> DefaultName
-    workflow
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "get_started"}}"#.into())
-        .unwrap();
+    advance_to_default_name(&workflow);
 
     // Enter name
     workflow
@@ -133,32 +119,32 @@ fn workflow_skip_flow_reaches_complete() {
         )
         .unwrap();
 
-    // DefaultName -> SkipGate
+    // DefaultName -> GroupsSetup
     workflow
         .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
         .unwrap();
 
-    // SkipGate -> SecurityExplanation (skip)
-    workflow
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "skip_to_finish"}}"#.into())
-        .unwrap();
-
-    // SecurityExplanation -> BackupPrompt
+    // GroupsSetup -> ContactInfo
     workflow
         .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
         .unwrap();
 
-    // BackupPrompt -> Ready (skip)
+    // ContactInfo -> WhatNext
     workflow
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "skip"}}"#.into())
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
         .unwrap();
 
-    // Ready -> Complete
+    // WhatNext -> CompleteWith
     let result_json = workflow
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "start"}}"#.into())
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "start_app"}}"#.into())
         .unwrap();
+    let result: serde_json::Value = serde_json::from_str(&result_json).expect("should parse JSON");
 
-    assert_eq!(result_json.trim_matches('"'), "Complete");
+    assert!(
+        result["CompleteWith"].is_object(),
+        "expected CompleteWith, got: {result}"
+    );
+    assert_eq!(result["CompleteWith"]["destination"], "MainScreen");
 }
 
 // ============================================================================
@@ -169,12 +155,9 @@ fn workflow_skip_flow_reaches_complete() {
 #[test]
 fn workflow_onboarding_data_json_returns_valid_data() {
     let workflow = MobileOnboardingWorkflow::new();
-    advance_to_welcome(&workflow);
+    advance_to_default_name(&workflow);
 
-    // Navigate and set a name
-    workflow
-        .handle_action_json(r#"{"ActionPressed": {"action_id": "get_started"}}"#.into())
-        .unwrap();
+    // Set a name
     workflow
         .handle_action_json(
             r#"{"TextChanged": {"component_id": "display_name", "value": "Bob"}}"#.into(),

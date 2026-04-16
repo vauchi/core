@@ -28,18 +28,13 @@ use vauchi_core::types::{OnboardingProgress, OnboardingStep};
 #[test]
 fn test_step_ordering_matches_wizard_flow() {
     let all = OnboardingStep::all();
-    assert_eq!(all.len(), 11, "There should be 11 onboarding steps");
+    assert_eq!(all.len(), 6, "There should be 6 onboarding steps");
     assert_eq!(all[0], OnboardingStep::IdentityCheck);
     assert_eq!(all[1], OnboardingStep::LinkChoice);
-    assert_eq!(all[2], OnboardingStep::Welcome);
-    assert_eq!(all[3], OnboardingStep::DefaultName);
-    assert_eq!(all[4], OnboardingStep::SkipGate);
-    assert_eq!(all[5], OnboardingStep::GroupsSetup);
-    assert_eq!(all[6], OnboardingStep::ContactInfo);
-    assert_eq!(all[7], OnboardingStep::PreviewCard);
-    assert_eq!(all[8], OnboardingStep::SecurityExplanation);
-    assert_eq!(all[9], OnboardingStep::BackupPrompt);
-    assert_eq!(all[10], OnboardingStep::Ready);
+    assert_eq!(all[2], OnboardingStep::DefaultName);
+    assert_eq!(all[3], OnboardingStep::GroupsSetup);
+    assert_eq!(all[4], OnboardingStep::ContactInfo);
+    assert_eq!(all[5], OnboardingStep::WhatNext);
 }
 
 // @scenario: onboarding:step_index
@@ -47,15 +42,10 @@ fn test_step_ordering_matches_wizard_flow() {
 fn test_step_index_is_zero_based() {
     assert_eq!(OnboardingStep::IdentityCheck.index(), 0);
     assert_eq!(OnboardingStep::LinkChoice.index(), 1);
-    assert_eq!(OnboardingStep::Welcome.index(), 2);
-    assert_eq!(OnboardingStep::DefaultName.index(), 3);
-    assert_eq!(OnboardingStep::SkipGate.index(), 4);
-    assert_eq!(OnboardingStep::GroupsSetup.index(), 5);
-    assert_eq!(OnboardingStep::ContactInfo.index(), 6);
-    assert_eq!(OnboardingStep::PreviewCard.index(), 7);
-    assert_eq!(OnboardingStep::SecurityExplanation.index(), 8);
-    assert_eq!(OnboardingStep::BackupPrompt.index(), 9);
-    assert_eq!(OnboardingStep::Ready.index(), 10);
+    assert_eq!(OnboardingStep::DefaultName.index(), 2);
+    assert_eq!(OnboardingStep::GroupsSetup.index(), 3);
+    assert_eq!(OnboardingStep::ContactInfo.index(), 4);
+    assert_eq!(OnboardingStep::WhatNext.index(), 5);
 }
 
 // @scenario: onboarding:step_navigation
@@ -68,14 +58,14 @@ fn test_step_next_and_previous() {
         Some(OnboardingStep::LinkChoice)
     );
 
-    // Welcome.previous() = LinkChoice
+    // DefaultName.previous() = LinkChoice
     assert_eq!(
-        OnboardingStep::Welcome.previous(),
+        OnboardingStep::DefaultName.previous(),
         Some(OnboardingStep::LinkChoice)
     );
     assert_eq!(
-        OnboardingStep::Welcome.next(),
-        Some(OnboardingStep::DefaultName)
+        OnboardingStep::DefaultName.next(),
+        Some(OnboardingStep::GroupsSetup)
     );
 
     // Middle step has both
@@ -85,15 +75,15 @@ fn test_step_next_and_previous() {
     );
     assert_eq!(
         OnboardingStep::ContactInfo.next(),
-        Some(OnboardingStep::PreviewCard)
+        Some(OnboardingStep::WhatNext)
     );
 
-    // Ready has no next
+    // WhatNext has no next
     assert_eq!(
-        OnboardingStep::Ready.previous(),
-        Some(OnboardingStep::BackupPrompt)
+        OnboardingStep::WhatNext.previous(),
+        Some(OnboardingStep::ContactInfo)
     );
-    assert_eq!(OnboardingStep::Ready.next(), None);
+    assert_eq!(OnboardingStep::WhatNext.next(), None);
 }
 
 // @scenario: onboarding:step_index_consistency
@@ -159,56 +149,40 @@ fn test_advance_through_all_steps() {
             .contains(&OnboardingStep::IdentityCheck)
     );
 
-    // Advance from LinkChoice to Welcome
+    // Advance from LinkChoice to DefaultName
     let step = progress.advance();
-    assert_eq!(step, OnboardingStep::Welcome);
+    assert_eq!(step, OnboardingStep::DefaultName);
     assert!(
         progress
             .completed_steps
             .contains(&OnboardingStep::LinkChoice)
     );
 
-    // Advance from Welcome to DefaultName
+    // Advance from DefaultName to GroupsSetup
     let step = progress.advance();
-    assert_eq!(step, OnboardingStep::DefaultName);
-    assert!(progress.completed_steps.contains(&OnboardingStep::Welcome));
-
-    // Advance through remaining steps
-    let step = progress.advance();
-    assert_eq!(step, OnboardingStep::SkipGate);
+    assert_eq!(step, OnboardingStep::GroupsSetup);
     assert!(
         progress
             .completed_steps
             .contains(&OnboardingStep::DefaultName)
     );
 
-    let step = progress.advance();
-    assert_eq!(step, OnboardingStep::GroupsSetup);
-
+    // Advance through remaining steps
     let step = progress.advance();
     assert_eq!(step, OnboardingStep::ContactInfo);
 
     let step = progress.advance();
-    assert_eq!(step, OnboardingStep::PreviewCard);
-
-    let step = progress.advance();
-    assert_eq!(step, OnboardingStep::SecurityExplanation);
-
-    let step = progress.advance();
-    assert_eq!(step, OnboardingStep::BackupPrompt);
-
-    let step = progress.advance();
-    assert_eq!(step, OnboardingStep::Ready);
+    assert_eq!(step, OnboardingStep::WhatNext);
 
     // Verify state before final advance
     assert!(!progress.is_complete());
 
-    // Final advance at Ready marks completion
+    // Final advance at WhatNext marks completion
     let step = progress.advance();
-    assert_eq!(step, OnboardingStep::Ready, "Should stay at Ready");
+    assert_eq!(step, OnboardingStep::WhatNext, "Should stay at WhatNext");
     assert!(
         progress.is_complete(),
-        "Should be complete after advancing past Ready"
+        "Should be complete after advancing past WhatNext"
     );
     assert!(
         progress.completed_at.is_some(),
@@ -216,7 +190,7 @@ fn test_advance_through_all_steps() {
     );
 
     // Verify all steps are completed
-    assert_eq!(progress.completed_steps.len(), 11);
+    assert_eq!(progress.completed_steps.len(), 6);
 }
 
 // @scenario: onboarding:skip_step (#24)
@@ -239,67 +213,28 @@ fn test_skip_step_does_not_mark_completed() {
     );
 }
 
-// @scenario: onboarding:skip_backup (#12)
-#[test]
-fn test_skip_backup_records_flag() {
-    let mut progress = OnboardingProgress::new();
-
-    // Advance to BackupPrompt
-    progress.advance(); // IdentityCheck -> LinkChoice
-    progress.advance(); // LinkChoice -> Welcome
-    progress.advance(); // Welcome -> DefaultName
-    progress.advance(); // DefaultName -> SkipGate
-    progress.advance(); // SkipGate -> GroupsSetup
-    progress.advance(); // GroupsSetup -> ContactInfo
-    progress.advance(); // ContactInfo -> PreviewCard
-    progress.advance(); // PreviewCard -> SecurityExplanation
-    progress.advance(); // SecurityExplanation -> BackupPrompt
-
-    assert_eq!(progress.current_step(), OnboardingStep::BackupPrompt);
-    assert!(!progress.skipped_backup);
-
-    // Skip the backup step
-    let step = progress.skip_step();
-    assert_eq!(step, OnboardingStep::Ready);
-    assert!(
-        progress.skipped_backup,
-        "skipped_backup should be true after skipping BackupPrompt"
-    );
-    assert!(
-        !progress
-            .completed_steps
-            .contains(&OnboardingStep::BackupPrompt),
-        "BackupPrompt should not be in completed_steps when skipped"
-    );
-}
-
 // @scenario: onboarding:completion_percentage (#22)
 #[test]
 fn test_completion_percentage() {
     let mut progress = OnboardingProgress::new();
 
-    // 0 completed out of 11 total = 0%
+    // 0 completed out of 6 total = 0%
     assert_eq!(progress.completion_percentage(), 0);
 
-    // Complete 1 step: 1/11 = 9%
+    // Complete 1 step: 1/6 = 16%
     progress.advance(); // IdentityCheck -> LinkChoice, IdentityCheck completed
-    assert_eq!(progress.completion_percentage(), 9);
+    assert_eq!(progress.completion_percentage(), 16);
 
     // Complete all steps
-    progress.advance(); // LinkChoice -> Welcome
-    progress.advance(); // Welcome -> DefaultName
-    progress.advance(); // DefaultName -> SkipGate
-    progress.advance(); // SkipGate -> GroupsSetup
+    progress.advance(); // LinkChoice -> DefaultName
+    progress.advance(); // DefaultName -> GroupsSetup
     progress.advance(); // GroupsSetup -> ContactInfo
-    progress.advance(); // ContactInfo -> PreviewCard
-    progress.advance(); // PreviewCard -> SecurityExplanation
-    progress.advance(); // SecurityExplanation -> BackupPrompt
-    progress.advance(); // BackupPrompt -> Ready
-    assert_eq!(progress.completion_percentage(), 90); // 10/11
+    progress.advance(); // ContactInfo -> WhatNext
+    assert_eq!(progress.completion_percentage(), 83); // 5/6
 
-    // Final advance completes Ready
+    // Final advance completes WhatNext
     progress.advance();
-    assert_eq!(progress.completion_percentage(), 100); // 11/11
+    assert_eq!(progress.completion_percentage(), 100); // 6/6
 }
 
 // @scenario: onboarding:idempotent_advance_at_final (#26)
@@ -308,7 +243,7 @@ fn test_idempotent_advance_at_final_step() {
     let mut progress = OnboardingProgress::new();
 
     // Advance through all steps
-    for _ in 0..11 {
+    for _ in 0..6 {
         progress.advance();
     }
 
@@ -317,7 +252,7 @@ fn test_idempotent_advance_at_final_step() {
 
     // Advance again should be idempotent
     let step = progress.advance();
-    assert_eq!(step, OnboardingStep::Ready, "Should stay at Ready");
+    assert_eq!(step, OnboardingStep::WhatNext, "Should stay at WhatNext");
     assert!(progress.is_complete(), "Should still be complete");
     assert_eq!(
         progress.completed_at, completed_at,
@@ -349,54 +284,6 @@ fn test_reset_clears_all_progress() {
         "completed_at should be cleared"
     );
     assert!(!progress.is_complete());
-}
-
-// @scenario: onboarding:skip_to_finish (#skip_gate)
-#[test]
-fn test_skip_to_finish_jumps_to_security() {
-    let mut progress = OnboardingProgress::new();
-
-    // Advance to SkipGate
-    progress.advance(); // IdentityCheck -> LinkChoice
-    progress.advance(); // LinkChoice -> Welcome
-    progress.advance(); // Welcome -> DefaultName
-    progress.advance(); // DefaultName -> SkipGate
-
-    assert_eq!(progress.current_step(), OnboardingStep::SkipGate);
-
-    // Skip to finish jumps directly to SecurityExplanation
-    progress.skip_to_finish();
-    assert_eq!(progress.current_step(), OnboardingStep::SecurityExplanation);
-
-    // Intermediate steps (GroupsSetup, ContactInfo, PreviewCard) should NOT be completed
-    assert!(
-        !progress
-            .completed_steps
-            .contains(&OnboardingStep::GroupsSetup),
-        "GroupsSetup should not be completed after skip_to_finish"
-    );
-    assert!(
-        !progress
-            .completed_steps
-            .contains(&OnboardingStep::ContactInfo),
-        "ContactInfo should not be completed after skip_to_finish"
-    );
-    assert!(
-        !progress
-            .completed_steps
-            .contains(&OnboardingStep::PreviewCard),
-        "PreviewCard should not be completed after skip_to_finish"
-    );
-
-    // SkipGate itself should NOT be completed (skip_to_finish doesn't mark it)
-    assert!(
-        !progress.completed_steps.contains(&OnboardingStep::SkipGate),
-        "SkipGate should not be completed after skip_to_finish"
-    );
-
-    // Can continue from SecurityExplanation normally
-    let step = progress.advance();
-    assert_eq!(step, OnboardingStep::BackupPrompt);
 }
 
 // @scenario: onboarding:serde_backward_compat
@@ -436,13 +323,14 @@ fn test_serde_backward_compat_aliases() {
 #[test]
 fn test_serde_backward_compat_old_json_without_identity_check() {
     // Users who started onboarding before IdentityCheck was added have
-    // persisted JSON with "current_step": "Welcome". This must still work.
+    // persisted JSON with "current_step": "Welcome". This now maps to
+    // DefaultName after the 6-step flow change.
     let old_json = r#"{"current_step":"Welcome","completed_steps":[],"started_at":1000,"completed_at":null,"skipped_backup":false}"#;
     let progress = OnboardingProgress::from_json(old_json).expect("Old JSON should deserialize");
     assert_eq!(
         progress.current_step(),
-        OnboardingStep::Welcome,
-        "Old JSON starting at Welcome must still deserialize correctly"
+        OnboardingStep::DefaultName,
+        "Old JSON starting at Welcome must deserialize to DefaultName"
     );
     assert!(progress.completed_steps.is_empty());
 }
@@ -452,8 +340,8 @@ fn test_serde_backward_compat_old_json_without_identity_check() {
 fn test_json_serialization_roundtrip() {
     let mut progress = OnboardingProgress::new();
     progress.advance(); // IdentityCheck -> LinkChoice
-    progress.advance(); // LinkChoice -> Welcome
-    progress.skip_step(); // Skip Welcome -> DefaultName
+    progress.advance(); // LinkChoice -> DefaultName
+    progress.skip_step(); // Skip DefaultName -> GroupsSetup
 
     let json = progress.to_json().expect("Serialization should succeed");
     let restored = OnboardingProgress::from_json(&json).expect("Deserialization should succeed");
@@ -476,7 +364,7 @@ fn test_json_roundtrip_preserves_option_timestamps() {
     assert_eq!(restored.started_at, progress.started_at);
 
     // Complete and verify completed_at is preserved
-    for _ in 0..11 {
+    for _ in 0..6 {
         progress.advance();
     }
     progress.completed_at.expect("expected Some");
@@ -514,12 +402,12 @@ fn test_storage_save_load_roundtrip() {
 
     let mut progress = OnboardingProgress::new();
     progress.advance(); // IdentityCheck -> LinkChoice
-    progress.advance(); // LinkChoice -> Welcome
+    progress.advance(); // LinkChoice -> DefaultName
 
     storage.save_onboarding_progress(&progress).unwrap();
     let loaded = storage.load_onboarding_progress().unwrap().unwrap();
 
-    assert_eq!(loaded.current_step(), OnboardingStep::Welcome);
+    assert_eq!(loaded.current_step(), OnboardingStep::DefaultName);
     assert_eq!(loaded.completed_steps.len(), 2);
     assert!(
         loaded
@@ -574,7 +462,7 @@ fn test_storage_overwrite_replaces_previous() {
     let loaded = storage.load_onboarding_progress().unwrap().unwrap();
     assert_eq!(
         loaded.current_step(),
-        OnboardingStep::DefaultName,
+        OnboardingStep::GroupsSetup,
         "Should have the latest saved state"
     );
 }

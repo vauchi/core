@@ -4,7 +4,7 @@
 
 //! SP-21 Onboarding Scenario Tests (M14)
 //!
-//! Tests for the 11 remaining @planned onboarding scenarios.
+//! Tests for the 6-step onboarding flow scenarios.
 //! Core-verifiable scenarios get full tests; UI-only scenarios
 //! get guard-rail tests verifying the core API surface they need.
 //!
@@ -23,15 +23,14 @@ fn test_go_back_preserves_data() {
     let mut progress = OnboardingProgress::new();
     assert_eq!(progress.current_step(), OnboardingStep::IdentityCheck);
 
-    // Advance to step 3 (DefaultName)
+    // Advance to DefaultName
     progress.advance(); // → LinkChoice
-    progress.advance(); // → Welcome
     progress.advance(); // → DefaultName
     assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
 
-    // Go back to Welcome
+    // Go back to LinkChoice
     let prev = progress.current_step().previous();
-    assert_eq!(prev, Some(OnboardingStep::Welcome));
+    assert_eq!(prev, Some(OnboardingStep::LinkChoice));
 
     // Completed steps should be preserved (not lost on back)
     assert!(progress.completion_percentage() > 0);
@@ -72,8 +71,7 @@ fn test_every_step_except_first_has_previous() {
 fn test_onboarding_progress_survives_serialization() {
     let mut progress = OnboardingProgress::new();
     progress.advance(); // IdentityCheck → LinkChoice
-    progress.advance(); // LinkChoice → Welcome
-    progress.advance(); // Welcome → DefaultName
+    progress.advance(); // LinkChoice → DefaultName
     assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
 
     // Serialize (simulates app close)
@@ -94,23 +92,6 @@ fn test_onboarding_progress_survives_serialization() {
     );
 }
 
-// @scenario: onboarding :: Exit and resume onboarding
-// @internal
-#[test]
-fn test_onboarding_resume_after_skip_gate() {
-    let mut progress = OnboardingProgress::new();
-    // Advance to SkipGate
-    while progress.current_step() != OnboardingStep::SkipGate {
-        progress.advance();
-    }
-    assert_eq!(progress.current_step(), OnboardingStep::SkipGate);
-
-    // Serialize + restore
-    let json = progress.to_json().unwrap();
-    let restored = OnboardingProgress::from_json(&json).unwrap();
-    assert_eq!(restored.current_step(), OnboardingStep::SkipGate);
-}
-
 // ============================================================
 // Scenario: Replay onboarding from settings
 // @scenario: onboarding :: Replay onboarding from settings
@@ -121,7 +102,7 @@ fn test_onboarding_resume_after_skip_gate() {
 fn test_reset_clears_all_progress() {
     let mut progress = OnboardingProgress::new();
     // Complete most of onboarding
-    for _ in 0..8 {
+    for _ in 0..5 {
         progress.advance();
     }
     assert!(progress.completion_percentage() > 50);
@@ -179,7 +160,7 @@ fn test_onboarding_completion_unblocks_exchange() {
     }
 
     assert!(progress.is_complete());
-    assert_eq!(progress.current_step(), OnboardingStep::Ready);
+    assert_eq!(progress.current_step(), OnboardingStep::WhatNext);
     // After completion, exchange is available — verified at the API
     // layer in the app engine tests (exchange screen appears in
     // available_screens after onboarding).

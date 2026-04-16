@@ -134,9 +134,6 @@ fn onboarding_completion_with_empty_name_returns_update_screen_with_error() {
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
-    });
     // Intermediate step: set a whitespace-only name — validation asserted below
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
@@ -289,12 +286,14 @@ proptest! {
             prop_oneof![
                 Just(UserAction::ActionPressed { action_id: "create_new".into() }),
                 Just(UserAction::ActionPressed { action_id: "have_identity".into() }),
-                Just(UserAction::ActionPressed { action_id: "get_started".into() }),
                 Just(UserAction::ActionPressed { action_id: "continue".into() }),
                 Just(UserAction::ActionPressed { action_id: "skip".into() }),
                 Just(UserAction::ActionPressed { action_id: "back".into() }),
-                Just(UserAction::ActionPressed { action_id: "start".into() }),
-                Just(UserAction::ActionPressed { action_id: "skip_to_finish".into() }),
+                Just(UserAction::ActionPressed { action_id: "start_app".into() }),
+                Just(UserAction::ActionPressed { action_id: "exchange".into() }),
+                Just(UserAction::ActionPressed { action_id: "import_contacts".into() }),
+                Just(UserAction::ActionPressed { action_id: "read_security".into() }),
+                Just(UserAction::ActionPressed { action_id: "read_backup".into() }),
                 ".*".prop_map(|s| UserAction::TextChanged {
                     component_id: "display_name".into(),
                     value: s,

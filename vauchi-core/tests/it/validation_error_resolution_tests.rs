@@ -23,9 +23,6 @@ fn onboarding_empty_name_returns_update_screen_with_error() {
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
-    });
 
     // Now on DefaultName step. Submit with empty name.
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -76,9 +73,6 @@ fn onboarding_valid_name_after_error_navigates_forward() {
     // Navigate to name step
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "get_started".into(),
     });
 
     // Trigger validation error

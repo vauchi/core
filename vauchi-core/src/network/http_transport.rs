@@ -14,7 +14,8 @@ use std::time::Duration;
 use serde::Serialize;
 use vauchi_protocol::v2::{
     FetchedBlob, V2AckRequest, V2ExchangeClaimRequest, V2ExchangeCompleteRequest,
-    V2ExchangeOfferRequest, V2FetchRequest, V2PurgeRequest, V2Response, V2SendRequest,
+    V2ExchangeOfferRequest, V2FetchRequest, V2GuardianDeleteRequest, V2GuardianEntry,
+    V2GuardianQueryRequest, V2GuardianStoreRequest, V2PurgeRequest, V2Response, V2SendRequest,
 };
 
 use super::error::NetworkError;
@@ -419,6 +420,70 @@ impl HttpTransport {
                 Ok(None)
             }
             Err(e) => Err(e),
+        }
+    }
+
+    /// Stores (replaces) all guardian entries for a hash.
+    ///
+    /// Guardian queries go through OHTTP to prevent the relay from correlating
+    /// the uploading device with the guardian hash.
+    pub fn guardian_store(
+        &self,
+        guardian_hash: &str,
+        entries: Vec<V2GuardianEntry>,
+    ) -> Result<(), NetworkError> {
+        let req = V2GuardianStoreRequest {
+            guardian_hash: guardian_hash.to_string(),
+            entries,
+        };
+        let resp = self.post_action("guardian_store", &req)?;
+        if resp.status == "ok" {
+            Ok(())
+        } else {
+            Err(response_error(
+                "guardian_store",
+                &resp.error.unwrap_or_default(),
+            ))
+        }
+    }
+
+    /// Queries guardian entries by hash.
+    ///
+    /// Returns the encrypted entries (opaque blobs). The caller decrypts
+    /// using their X25519 secret key.
+    pub fn guardian_query(
+        &self,
+        guardian_hash: &str,
+    ) -> Result<Vec<V2GuardianEntry>, NetworkError> {
+        let req = V2GuardianQueryRequest {
+            guardian_hash: guardian_hash.to_string(),
+        };
+        let resp = self.post_action("guardian_query", &req)?;
+        if resp.status == "ok" {
+            Ok(resp.guardians.unwrap_or_default())
+        } else {
+            Err(response_error(
+                "guardian_query",
+                &resp.error.unwrap_or_default(),
+            ))
+        }
+    }
+
+    /// Deletes all guardian entries for a hash (identity purge).
+    pub fn guardian_delete(&self, guardian_hash: &str) -> Result<bool, NetworkError> {
+        let req = V2GuardianDeleteRequest {
+            guardian_hash: guardian_hash.to_string(),
+        };
+        let resp = self.post_action("guardian_delete", &req)?;
+        if resp.status == "ok" {
+            // The relay returns {"status": "ok", "deleted": true/false}
+            // but V2Response doesn't have a `deleted` field — just succeed.
+            Ok(true)
+        } else {
+            Err(response_error(
+                "guardian_delete",
+                &resp.error.unwrap_or_default(),
+            ))
         }
     }
 

@@ -172,6 +172,120 @@ impl Vauchi {
         Ok(())
     }
 
+    /// Exports a full v3 backup (identity + contacts + own card + labels).
+    ///
+    /// Returns the backup data as a hex-encoded string.
+    pub fn export_full_backup(&self, password: &str) -> VauchiResult<String> {
+        let identity = self
+            .identity
+            .as_ref()
+            .ok_or(VauchiError::IdentityNotInitialized)?;
+
+        let identity_data = crate::backup::FullBackupIdentityData {
+            display_name: identity.display_name().to_string(),
+            master_seed: *identity.master_seed(),
+            device_index: identity.device_index(),
+            device_name: identity.device_info().device_name().to_string(),
+        };
+
+        let contacts = self.storage.list_contacts()?;
+        let own_card = self.storage.load_own_card()?;
+        let groups = self.storage.load_all_groups()?;
+        let labels: Vec<(String, String, Vec<String>)> = groups
+            .iter()
+            .map(|g| {
+                (
+                    g.id().to_string(),
+                    g.name().to_string(),
+                    g.contacts().iter().cloned().collect(),
+                )
+            })
+            .collect();
+
+        let blob = crate::backup::export_full_backup(
+            &identity_data,
+            &contacts,
+            own_card.as_ref(),
+            &labels,
+            password,
+        )
+        .map_err(|e| VauchiError::Configuration(format!("Full backup export failed: {e}")))?;
+
+        Ok(hex::encode(blob))
+    }
+
+    /// Imports a full v3 backup, restoring identity, contacts, own card, and labels.
+    ///
+    /// The backup_data should be a hex-encoded string from `export_full_backup`.
+    /// Fails if an identity is already set (restore onto a fresh instance only).
+    pub fn import_full_backup(&mut self, backup_data: &str, password: &str) -> VauchiResult<()> {
+        if self.identity.is_some() {
+            return Err(VauchiError::AlreadyInitialized);
+        }
+
+        let bytes = hex::decode(backup_data.trim())
+            .map_err(|e| VauchiError::Configuration(format!("Invalid hex data: {e}")))?;
+
+        let envelope = crate::backup::import_full_backup(&bytes, password)
+            .map_err(|e| VauchiError::Configuration(format!("Full backup import failed: {e}")))?;
+
+        // Restore identity from envelope
+        let seed = crate::backup::extract_master_seed(&envelope.sections.identity)
+            .map_err(|e| VauchiError::Configuration(format!("Seed extraction failed: {e}")))?;
+
+        let identity = Identity::from_device_link(
+            *seed,
+            envelope.sections.identity.display_name.clone(),
+            envelope.sections.identity.device_index,
+            envelope.sections.identity.device_name.clone(),
+        );
+
+        // Persist identity (v2 format for storage compatibility)
+        let id_backup = identity
+            .export_backup(password)
+            .map_err(|e| VauchiError::Configuration(format!("Identity re-export failed: {e:?}")))?;
+        self.storage
+            .save_identity(id_backup.as_bytes(), identity.display_name())?;
+
+        // Restore own card
+        if let Some(card) = &envelope.sections.own_card {
+            self.storage.save_own_card(card)?;
+        } else {
+            let card = crate::contact_card::ContactCard::new(identity.display_name());
+            self.storage.save_own_card(&card)?;
+        }
+
+        // Restore contacts
+        let contacts = crate::backup::restore_contacts_from_envelope(&envelope)
+            .map_err(|e| VauchiError::Configuration(format!("Contact restore failed: {e}")))?;
+        for contact in &contacts {
+            self.storage.save_contact(contact)?;
+        }
+
+        // Restore labels
+        for label in &envelope.sections.labels {
+            let contacts: std::collections::HashSet<String> =
+                label.contacts.iter().cloned().collect();
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs();
+            let group = crate::contact::Group::from_storage(
+                label.label_id.clone(),
+                label.name.clone(),
+                contacts,
+                std::collections::HashSet::new(),
+                None,
+                now,
+                now,
+            );
+            self.storage.save_group(&group)?;
+        }
+
+        self.identity = Some(identity);
+        Ok(())
+    }
+
     /// Returns the current identity, if set.
     pub fn identity(&self) -> Option<&Identity> {
         self.identity.as_ref()

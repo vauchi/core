@@ -25,6 +25,8 @@ use thiserror::Error;
 use crate::contact::Contact;
 use crate::crypto::{PublicKey, Signature, SigningKeyPair};
 
+pub mod guardian;
+
 /// Recovery-related errors.
 #[derive(Error, Debug)]
 #[non_exhaustive]

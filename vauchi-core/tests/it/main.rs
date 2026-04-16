@@ -190,6 +190,7 @@ mod golden_fixtures;
 mod group_detail_engine_tests;
 mod group_transition_tests;
 mod groups_list_engine_tests;
+mod guardian_token_tests;
 mod help_engine_tests;
 mod hidden_contact_tests;
 mod http_transport_ohttp_key_tests;

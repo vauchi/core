@@ -142,8 +142,9 @@ pub struct MotionTokens {
 }
 
 // Generated from themes/tokens.json by themes/scripts/generate.py.
-// To update: edit tokens.json, run `python3 scripts/generate.py` in themes/.
-include!("../../../themes/generated/tokens_defaults.rs");
+// To update: edit tokens.json, run `generate.py`, copy tokens_defaults.rs here.
+// Contract check (check-core-contract.py) validates values match tokens.json.
+include!("tokens_defaults.rs");
 
 /// A complete theme definition
 #[derive(Debug, Clone, Serialize, Deserialize)]

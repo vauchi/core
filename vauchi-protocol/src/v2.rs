@@ -110,6 +110,46 @@ pub struct V2RecoveryProof {
     pub expires_at: u64,
 }
 
+// ── Guardian Storage ──────────────────────────────────────────────
+
+/// A single encrypted guardian entry (opaque to the relay).
+///
+/// Each entry is a sealed-box encrypted guardian token. The relay cannot
+/// read contents, identify guardians, or learn anything beyond the entry count.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct V2GuardianEntry {
+    /// Base64-encoded encrypted blob (sealed-box: ephemeral X25519 + XChaCha20-Poly1305).
+    pub data: String,
+}
+
+/// V2 guardian store request body.
+///
+/// Atomically replaces all guardian entries for a given hash.
+/// Removing a guardian = re-upload without their entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct V2GuardianStoreRequest {
+    /// Hex-encoded hash of `designator_pk || "guardians"` (64 hex chars = 32 bytes).
+    pub guardian_hash: String,
+    /// Encrypted entries (one per guardian, max 10).
+    pub entries: Vec<V2GuardianEntry>,
+}
+
+/// V2 guardian query request body.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct V2GuardianQueryRequest {
+    /// Hex-encoded guardian hash to look up (64 hex chars = 32 bytes).
+    pub guardian_hash: String,
+}
+
+/// V2 guardian delete request body.
+///
+/// Deletes all guardian entries for a hash (identity purge).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct V2GuardianDeleteRequest {
+    /// Hex-encoded guardian hash to delete (64 hex chars = 32 bytes).
+    pub guardian_hash: String,
+}
+
 /// Standard V2 response envelope.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -135,6 +175,9 @@ pub struct V2Response {
     /// Recovery proofs returned by a query.
     #[serde(default)]
     pub proofs: Option<Vec<V2RecoveryProof>>,
+    /// Guardian entries returned by a query.
+    #[serde(default)]
+    pub guardians: Option<Vec<V2GuardianEntry>>,
 }
 
 impl V2Response {
@@ -151,6 +194,7 @@ impl V2Response {
             response: None,
             blobs_deleted: None,
             proofs: None,
+            guardians: None,
         }
     }
 }

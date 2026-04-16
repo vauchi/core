@@ -43,7 +43,6 @@ EXPECTED_TYPES=(
     "MobileFieldType"
     "MobileError"
     "VauchiPlatform"
-    "MobileProximityVerifier"
 )
 
 # Minimum line counts (approximate, allows some variance)

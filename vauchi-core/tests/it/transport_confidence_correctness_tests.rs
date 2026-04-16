@@ -28,6 +28,7 @@ use vauchi_core::identity::Identity;
 /// BLE RSSI estimates distance but does not cryptographically prove proximity.
 /// RSSI can be amplified, relayed, or is inaccurate through walls.
 /// BLE verifiers must return Medium confidence, requiring manual confirmation.
+// @internal
 #[test]
 fn ble_verifier_confidence_is_medium_not_high() {
     let verifier = MockBLEVerifier::success_at_distance(1.0);
@@ -38,6 +39,7 @@ fn ble_verifier_confidence_is_medium_not_high() {
     );
 }
 
+// @internal
 #[test]
 fn ble_verifier_failure_still_reports_medium_confidence() {
     let verifier = MockBLEVerifier::failure();
@@ -52,6 +54,7 @@ fn ble_verifier_failure_still_reports_medium_confidence() {
 
 /// When both peers advertise NFC_TRIGGER, negotiate_transport() must select NFC.
 /// NFC was previously absent from TRANSPORT_MAP entirely.
+// @internal
 #[test]
 fn nfc_selected_when_both_peers_have_nfc_trigger() {
     let ours = TransportCaps::NFC_TRIGGER | TransportCaps::STATIC_QR;
@@ -65,6 +68,7 @@ fn nfc_selected_when_both_peers_have_nfc_trigger() {
 
 /// NFC must be preferred over BLE when both are available.
 /// Physical tap beats RSSI heuristic.
+// @internal
 #[test]
 fn nfc_preferred_over_ble_in_negotiation() {
     let ours = TransportCaps::NFC_TRIGGER | TransportCaps::BLE | TransportCaps::STATIC_QR;
@@ -77,6 +81,7 @@ fn nfc_preferred_over_ble_in_negotiation() {
 }
 
 /// TCP must still be preferred over NFC (TCP has higher throughput for data).
+// @internal
 #[test]
 fn tcp_still_preferred_over_nfc() {
     let ours = TransportCaps::TCP | TransportCaps::NFC_TRIGGER;
@@ -91,6 +96,7 @@ fn tcp_still_preferred_over_nfc() {
 // ===== B3: NFC priority must be above BLE =====
 
 /// NFC provides physical adjacency proof — it must have higher priority than BLE.
+// @internal
 #[test]
 fn nfc_priority_above_ble() {
     assert!(
@@ -102,6 +108,7 @@ fn nfc_priority_above_ble() {
 }
 
 /// NFC must sit between TCP and BLE in the priority chain.
+// @internal
 #[test]
 fn nfc_priority_between_tcp_and_ble() {
     let nfc = TransportType::Nfc.priority();
@@ -121,6 +128,7 @@ fn nfc_priority_between_tcp_and_ble() {
 /// NFC tap IS the proximity proof. The code must not run a separate
 /// ProximityVerifier on top of an NFC exchange. Even if the verifier
 /// would fail (e.g., no audio hardware), NFC should complete with High.
+// @internal
 #[test]
 fn nfc_exchange_sets_high_confidence_without_running_verifier() {
     let alice = Identity::create("Alice");

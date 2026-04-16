@@ -68,6 +68,7 @@ fn setup_shred_env() -> (tempfile::TempDir, Storage, MemoryKeyStorage, Identity)
 ///
 /// After `schedule_deletion()` is called, `execute_deletion()` must return an
 /// error and all local data (contacts, identity state) must survive intact.
+// @internal
 #[test]
 fn test_erasure_blocked_during_grace_period() {
     let storage = in_memory_storage();
@@ -115,6 +116,7 @@ fn test_erasure_blocked_during_grace_period() {
 /// wall-clock wait. Verifies that one `IdentityRevoked` message is generated per
 /// contact and that the deletion state transitions to `Executed`.
 // @scenario: privacy_compliance :: Full erasure after grace period
+// @internal
 #[test]
 fn test_full_erasure_after_grace_period() {
     let storage = in_memory_storage();
@@ -176,6 +178,7 @@ fn test_full_erasure_after_grace_period() {
 ///
 /// After cancellation: state is None, contacts are untouched, and the user
 /// can schedule again without error.
+// @internal
 #[test]
 fn test_cancellation_restores_full_access() {
     let storage = in_memory_storage();
@@ -236,6 +239,7 @@ fn test_cancellation_restores_full_access() {
 /// irrecoverable: two distinct seeds → two distinct SMKs → two distinct SEKs.
 /// Both the SMK and SEK bytes must differ.
 // @scenario: privacy_compliance :: Crypto-shredding key hierarchy is sound
+// @internal
 #[test]
 fn test_crypto_shredding_key_hierarchy_is_sound() {
     let seed_a: [u8; 32] = [0xAA; 32];
@@ -315,6 +319,7 @@ impl RevocationSender for MockRevocationSender {
 ///
 /// Sets up ShredManager with mock senders, adds contacts, bypasses the grace
 /// period, and verifies the report reflects exactly the expected notifications.
+// @internal
 #[test]
 fn test_hard_shred_sends_purge_and_revocations() {
     let (dir, storage, secure_storage, identity) = setup_shred_env();

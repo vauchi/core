@@ -4,6 +4,7 @@
 
 use vauchi_core::exchange::{MAX_APDU_DATA, reassemble_chain, split_into_chain};
 
+// @internal
 #[test]
 fn test_small_payload_single_chunk() {
     let data = vec![0xAA; 100];
@@ -16,6 +17,7 @@ fn test_small_payload_single_chunk() {
     assert_eq!(chunks[0][1], 0xE2, "INS should be preserved");
 }
 
+// @internal
 #[test]
 fn test_exact_boundary_single_chunk() {
     let data = vec![0xBB; MAX_APDU_DATA];
@@ -27,6 +29,7 @@ fn test_exact_boundary_single_chunk() {
     );
 }
 
+// @internal
 #[test]
 fn test_large_payload_multiple_chunks() {
     let data = vec![0xCC; MAX_APDU_DATA + 1];
@@ -39,6 +42,7 @@ fn test_large_payload_multiple_chunks() {
     assert_eq!(chunks[1][0], 0x00, "Final chunk CLA should be 0x00");
 }
 
+// @internal
 #[test]
 fn test_three_chunks() {
     let data = vec![0xDD; MAX_APDU_DATA * 2 + 50];
@@ -49,6 +53,7 @@ fn test_three_chunks() {
     assert_eq!(chunks[2][0], 0x00);
 }
 
+// @internal
 #[test]
 fn test_roundtrip_small() {
     let original = vec![0x42; 100];
@@ -57,6 +62,7 @@ fn test_roundtrip_small() {
     assert_eq!(original, reassembled);
 }
 
+// @internal
 #[test]
 fn test_roundtrip_large() {
     let original = vec![0x99; 600];
@@ -66,6 +72,7 @@ fn test_roundtrip_large() {
     assert_eq!(original, reassembled);
 }
 
+// @internal
 #[test]
 fn test_roundtrip_exact_boundary() {
     let original = vec![0xFF; MAX_APDU_DATA * 3];
@@ -75,6 +82,7 @@ fn test_roundtrip_exact_boundary() {
     assert_eq!(original, reassembled);
 }
 
+// @internal
 #[test]
 fn test_empty_payload() {
     let chunks = split_into_chain(0xE2, &[]);
@@ -83,12 +91,14 @@ fn test_empty_payload() {
     assert!(reassembled.is_empty());
 }
 
+// @internal
 #[test]
 fn test_reassemble_empty_chain_fails() {
     let result = reassemble_chain(&[]);
     result.expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_reassemble_missing_final_fails() {
     // A chain where the only command has chaining bit set — no final marker
@@ -97,6 +107,7 @@ fn test_reassemble_missing_final_fails() {
     result.expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_reassemble_truncated_command_fails() {
     let short = vec![0x00, 0xE2]; // Too short — no Lc
@@ -104,6 +115,7 @@ fn test_reassemble_truncated_command_fails() {
     result.expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_ins_byte_preserved() {
     let data = vec![0xAA; 10];

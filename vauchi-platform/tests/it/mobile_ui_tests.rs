@@ -18,6 +18,7 @@ use vauchi_platform::{
 // MobileOnboardingWorkflow — construction and initial screen
 // ============================================================================
 
+// @internal
 #[test]
 fn workflow_new_returns_identity_check_screen() {
     let workflow = MobileOnboardingWorkflow::new();
@@ -45,6 +46,7 @@ fn advance_to_welcome(workflow: &MobileOnboardingWorkflow) {
 // MobileOnboardingWorkflow — action handling round-trip
 // ============================================================================
 
+// @internal
 #[test]
 fn workflow_handle_action_navigates_to_default_name() {
     let workflow = MobileOnboardingWorkflow::new();
@@ -64,6 +66,7 @@ fn workflow_handle_action_navigates_to_default_name() {
     assert_eq!(result["NavigateTo"]["screen_id"], "default_name");
 }
 
+// @internal
 #[test]
 fn workflow_text_changed_updates_screen() {
     let workflow = MobileOnboardingWorkflow::new();
@@ -84,6 +87,7 @@ fn workflow_text_changed_updates_screen() {
     assert_eq!(result["UpdateScreen"]["screen_id"], "default_name");
 }
 
+// @internal
 #[test]
 fn workflow_validation_error_on_empty_name() {
     let workflow = MobileOnboardingWorkflow::new();
@@ -111,6 +115,7 @@ fn workflow_validation_error_on_empty_name() {
 // MobileOnboardingWorkflow — full flow to completion
 // ============================================================================
 
+// @internal
 #[test]
 fn workflow_skip_flow_reaches_complete() {
     let workflow = MobileOnboardingWorkflow::new();
@@ -160,6 +165,7 @@ fn workflow_skip_flow_reaches_complete() {
 // MobileOnboardingWorkflow — onboarding data
 // ============================================================================
 
+// @internal
 #[test]
 fn workflow_onboarding_data_json_returns_valid_data() {
     let workflow = MobileOnboardingWorkflow::new();
@@ -189,6 +195,7 @@ fn workflow_onboarding_data_json_returns_valid_data() {
 // MobileOnboardingWorkflow — invalid input handling
 // ============================================================================
 
+// @internal
 #[test]
 fn workflow_rejects_invalid_json() {
     let workflow = MobileOnboardingWorkflow::new();
@@ -204,6 +211,7 @@ fn workflow_rejects_invalid_json() {
     );
 }
 
+// @internal
 #[test]
 fn workflow_rejects_unknown_action_variant() {
     let workflow = MobileOnboardingWorkflow::new();
@@ -216,6 +224,7 @@ fn workflow_rejects_unknown_action_variant() {
 // MobileHomeWorkflow
 // ============================================================================
 
+// @internal
 #[test]
 fn home_workflow_returns_home_screen() {
     let workflow = MobileHomeWorkflow::new(r#"{"completed_steps":3,"total_steps":6}"#.into())
@@ -226,6 +235,7 @@ fn home_workflow_returns_home_screen() {
     assert_eq!(screen["screen_id"], "my_info");
 }
 
+// @internal
 #[test]
 fn home_workflow_handles_action() {
     let workflow = MobileHomeWorkflow::new(r#"{"completed_steps":6,"total_steps":6}"#.into())
@@ -245,6 +255,7 @@ fn home_workflow_handles_action() {
 // MobileContactListWorkflow
 // ============================================================================
 
+// @internal
 #[test]
 fn contact_list_workflow_returns_screen() {
     let workflow = MobileContactListWorkflow::new(
@@ -262,6 +273,7 @@ fn contact_list_workflow_returns_screen() {
 // MobileSettingsWorkflow
 // ============================================================================
 
+// @internal
 #[test]
 fn settings_workflow_returns_screen() {
     let config = r#"{
@@ -283,6 +295,7 @@ fn settings_workflow_returns_screen() {
 // MobileHelpWorkflow
 // ============================================================================
 
+// @internal
 #[test]
 fn help_workflow_returns_screen() {
     let items = r#"[{"id":"faq1","question":"How?","answer_url":"https://example.com","category":"General"}]"#;
@@ -297,6 +310,7 @@ fn help_workflow_returns_screen() {
 // MobileDeliveryStatusWorkflow
 // ============================================================================
 
+// @internal
 #[test]
 fn delivery_workflow_returns_screen() {
     let items = r#"[{"contact_id":"c1","contact_name":"Alice","status":"Success","detail":null,"retryable":false}]"#;
@@ -311,6 +325,7 @@ fn delivery_workflow_returns_screen() {
 // MobileLockScreenWorkflow
 // ============================================================================
 
+// @internal
 #[test]
 fn lock_screen_workflow_returns_screen() {
     let workflow = MobileLockScreenWorkflow::new(5).expect("should construct");
@@ -320,6 +335,7 @@ fn lock_screen_workflow_returns_screen() {
     assert_eq!(screen["screen_id"], "lock_screen");
 }
 
+// @internal
 #[test]
 fn lock_screen_workflow_unlock_flow() {
     let workflow = MobileLockScreenWorkflow::new(5).expect("should construct");
@@ -341,6 +357,7 @@ fn lock_screen_workflow_unlock_flow() {
 // MobileContactEditWorkflow
 // ============================================================================
 
+// @internal
 #[test]
 fn contact_edit_workflow_returns_screen() {
     let contact = r#"{"display_name":"Alice","fields":[{"id":"f1","field_type":"Phone","label":"Mobile","value":"+1-555-0100","visible_to_groups":["Family"],"shown":true}]}"#;
@@ -353,6 +370,7 @@ fn contact_edit_workflow_returns_screen() {
     assert_eq!(screen["screen_id"], "edit_fields");
 }
 
+// @internal
 #[test]
 fn contact_edit_workflow_full_flow() {
     let contact = r#"{"display_name":"Alice","fields":[]}"#;
@@ -385,6 +403,7 @@ fn contact_edit_workflow_full_flow() {
 // MobileExchangeWorkflow
 // ============================================================================
 
+// @internal
 #[test]
 fn exchange_workflow_returns_screen() {
     let config = r#"{"own_name":"Alice","own_qr_data":"vauchi://exchange?token=abc"}"#;
@@ -399,6 +418,7 @@ fn exchange_workflow_returns_screen() {
 // MobileDeviceLinkingWorkflow
 // ============================================================================
 
+// @internal
 #[test]
 fn device_linking_workflow_returns_screen() {
     let workflow = MobileDeviceLinkingWorkflow::new("vauchi://link?token=abc".into())
@@ -412,6 +432,7 @@ fn device_linking_workflow_returns_screen() {
 // MobileBackupRecoveryWorkflow
 // ============================================================================
 
+// @internal
 #[test]
 fn backup_workflow_returns_screen() {
     let workflow =
@@ -421,6 +442,7 @@ fn backup_workflow_returns_screen() {
     assert_eq!(screen["screen_id"], "backup_choose");
 }
 
+// @internal
 #[test]
 fn backup_workflow_create_mode() {
     let workflow =
@@ -434,6 +456,7 @@ fn backup_workflow_create_mode() {
 // MobileDuressPinWorkflow
 // ============================================================================
 
+// @internal
 #[test]
 fn duress_pin_workflow_returns_screen() {
     let config =
@@ -448,6 +471,7 @@ fn duress_pin_workflow_returns_screen() {
 // MobileEmergencyShredWorkflow
 // ============================================================================
 
+// @internal
 #[test]
 fn emergency_shred_workflow_returns_screen() {
     let workflow = MobileEmergencyShredWorkflow::new().expect("should construct");

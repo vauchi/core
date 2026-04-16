@@ -11,6 +11,7 @@ fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()
 }
 
+// @internal
 #[test]
 fn test_find_label_fuzzy_matches_case_insensitive_name() {
     let wb = create_test_vauchi();
@@ -28,6 +29,7 @@ fn test_find_label_fuzzy_matches_case_insensitive_name() {
     assert_eq!(found.name(), "Family");
 }
 
+// @internal
 #[test]
 fn test_find_label_fuzzy_matches_exact_name() {
     let wb = create_test_vauchi();
@@ -40,6 +42,7 @@ fn test_find_label_fuzzy_matches_exact_name() {
     assert_eq!(found.unwrap().id(), label.id());
 }
 
+// @internal
 #[test]
 fn test_find_label_fuzzy_matches_id_prefix() {
     let wb = create_test_vauchi();
@@ -59,6 +62,7 @@ fn test_find_label_fuzzy_matches_id_prefix() {
     assert_eq!(found.unwrap().id(), label_id);
 }
 
+// @internal
 #[test]
 fn test_find_label_fuzzy_returns_none_for_no_match() {
     let wb = create_test_vauchi();
@@ -71,6 +75,7 @@ fn test_find_label_fuzzy_returns_none_for_no_match() {
     assert!(found.is_none(), "should return None for non-matching query");
 }
 
+// @internal
 #[test]
 fn test_find_label_fuzzy_returns_none_when_no_labels_exist() {
     let wb = create_test_vauchi();
@@ -80,6 +85,7 @@ fn test_find_label_fuzzy_returns_none_when_no_labels_exist() {
     assert!(found.is_none(), "should return None when no labels exist");
 }
 
+// @internal
 #[test]
 fn test_find_label_fuzzy_prefers_name_match_over_id_prefix() {
     let wb = create_test_vauchi();
@@ -95,6 +101,7 @@ fn test_find_label_fuzzy_prefers_name_match_over_id_prefix() {
     assert_eq!(found.unwrap().id(), label1.id());
 }
 
+// @internal
 #[test]
 fn test_find_label_fuzzy_mixed_case_name() {
     let wb = create_test_vauchi();

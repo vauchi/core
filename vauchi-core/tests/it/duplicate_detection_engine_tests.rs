@@ -11,6 +11,7 @@ use vauchi_app::ui::*;
 // ── Tests: ContactListEngine has find_duplicates action ─────────────
 
 // @scenario: contacts_management :: Contacts screen offers find duplicates action
+// @internal
 #[test]
 fn contacts_screen_has_find_duplicates_action() {
     let engine = ContactListEngine::new(vec![]);
@@ -54,6 +55,7 @@ fn make_empty_engine() -> DuplicateDetectionEngine {
 
 // ── Tests ───────────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn duplicate_detection_screen_id() {
     let engine = make_engine_with_pairs();
@@ -61,6 +63,7 @@ fn duplicate_detection_screen_id() {
     assert_eq!(screen.screen_id, "duplicate_detection");
 }
 
+// @internal
 #[test]
 fn duplicate_detection_empty_shows_no_duplicates() {
     let engine = make_empty_engine();
@@ -78,6 +81,7 @@ fn duplicate_detection_empty_shows_no_duplicates() {
     }
 }
 
+// @internal
 #[test]
 fn duplicate_detection_empty_disables_actions() {
     let engine = make_empty_engine();
@@ -92,6 +96,7 @@ fn duplicate_detection_empty_disables_actions() {
     }
 }
 
+// @internal
 #[test]
 fn duplicate_detection_with_pairs_shows_count() {
     let engine = make_engine_with_pairs();
@@ -109,6 +114,7 @@ fn duplicate_detection_with_pairs_shows_count() {
     }
 }
 
+// @internal
 #[test]
 fn duplicate_detection_merge_completes() {
     let mut engine = make_engine_with_pairs();
@@ -119,6 +125,7 @@ fn duplicate_detection_merge_completes() {
     assert_eq!(result, ActionResult::Complete);
 }
 
+// @internal
 #[test]
 fn duplicate_detection_dismiss_stays_on_screen() {
     let mut engine = make_engine_with_pairs();
@@ -134,6 +141,7 @@ fn duplicate_detection_dismiss_stays_on_screen() {
     }
 }
 
+// @internal
 #[test]
 fn duplicate_detection_unknown_action_returns_update_screen() {
     let mut engine = make_engine_with_pairs();

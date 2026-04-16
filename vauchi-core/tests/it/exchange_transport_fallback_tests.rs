@@ -25,6 +25,7 @@ fn ble_session_with_caps(name: &str, caps: DeviceCapabilities) -> ExchangeSessio
 
 // −− Fallback from BLE -> QR −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn ble_unavailable_with_camera_falls_back_to_qr() {
     let caps = DeviceCapabilities {
@@ -57,6 +58,7 @@ fn ble_unavailable_with_camera_falls_back_to_qr() {
 
 // −− No fallback when no alternatives available −−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn ble_unavailable_without_camera_does_not_fall_back() {
     let caps = DeviceCapabilities {
@@ -86,6 +88,7 @@ fn ble_unavailable_without_camera_does_not_fall_back() {
 
 // −− DeviceCapabilities setter −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn set_device_capabilities_is_accessible() {
     let identity = Identity::create("Alice");

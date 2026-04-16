@@ -33,6 +33,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(1000))]
 
     /// Random bytes should not cause panics when deserializing ContactCard
+// @internal
     #[test]
     fn fuzz_contact_card_deserialize_no_panic(data in arbitrary_json_string()) {
         // allow(zero_assertions): No-panic fuzz test — validates input doesn't crash the parser
@@ -40,6 +41,7 @@ proptest! {
     }
 
     /// Valid ContactCard should round-trip correctly
+// @internal
     #[test]
     fn fuzz_contact_card_roundtrip(
         name in "[A-Za-z ]{1,50}",
@@ -83,6 +85,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(1000))]
 
     /// Random bytes should not cause panics when deserializing ContactField
+// @internal
     #[test]
     fn fuzz_contact_field_deserialize_no_panic(data in arbitrary_json_string()) {
         // allow(zero_assertions): No-panic fuzz test
@@ -90,6 +93,7 @@ proptest! {
     }
 
     /// Random bytes should not cause panics when deserializing FieldType
+// @internal
     #[test]
     fn fuzz_field_type_deserialize_no_panic(data in arbitrary_json_string()) {
         // allow(zero_assertions): No-panic fuzz test
@@ -105,6 +109,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(1000))]
 
     /// Random bytes should not cause panics when deserializing SyncItem
+// @internal
     #[test]
     fn fuzz_sync_item_deserialize_no_panic(data in arbitrary_json_string()) {
         // allow(zero_assertions): No-panic fuzz test
@@ -112,6 +117,7 @@ proptest! {
     }
 
     /// Random bytes should not cause panics when deserializing FieldChange
+// @internal
     #[test]
     fn fuzz_field_change_deserialize_no_panic(data in arbitrary_json_string()) {
         // allow(zero_assertions): No-panic fuzz test
@@ -127,6 +133,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(1000))]
 
     /// Random bytes should not cause panics when deserializing RatchetMessage
+// @internal
     #[test]
     fn fuzz_ratchet_message_deserialize_no_panic(data in arbitrary_json_string()) {
         // allow(zero_assertions): No-panic fuzz test
@@ -134,6 +141,7 @@ proptest! {
     }
 
     /// Valid RatchetMessage should round-trip correctly
+// @internal
     #[test]
     fn fuzz_ratchet_message_roundtrip(
         dh_public in arbitrary_bytes(32),
@@ -171,6 +179,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(1000))]
 
     /// Random bytes should not cause panics when deserializing FieldVisibility
+// @internal
     #[test]
     fn fuzz_field_visibility_deserialize_no_panic(data in arbitrary_json_string()) {
         // allow(zero_assertions): No-panic fuzz test
@@ -178,6 +187,7 @@ proptest! {
     }
 
     /// Random bytes should not cause panics when deserializing VisibilityRules
+// @internal
     #[test]
     fn fuzz_visibility_rules_deserialize_no_panic(data in arbitrary_json_string()) {
         // allow(zero_assertions): No-panic fuzz test
@@ -185,6 +195,7 @@ proptest! {
     }
 
     /// Valid VisibilityRules should round-trip correctly
+// @internal
     #[test]
     fn fuzz_visibility_rules_roundtrip(
         field_names in prop::collection::hash_set("[a-z]{1,20}", 1..10)
@@ -225,6 +236,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(1000))]
 
     /// Random bytes should not cause panics when deserializing RegisteredDevice
+// @internal
     #[test]
     fn fuzz_registered_device_deserialize_no_panic(data in arbitrary_json_string()) {
         // allow(zero_assertions): No-panic fuzz test
@@ -240,6 +252,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(1000))]
 
     /// Random bytes should not cause panics when deserializing SocialNetwork
+// @internal
     #[test]
     fn fuzz_social_network_deserialize_no_panic(data in arbitrary_json_string()) {
         // allow(zero_assertions): No-panic fuzz test
@@ -247,6 +260,7 @@ proptest! {
     }
 
     /// Valid SocialNetwork should round-trip correctly
+// @internal
     #[test]
     fn fuzz_social_network_roundtrip(
         id in "[a-z]{1,20}",
@@ -272,6 +286,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(500))]
 
     /// Encryption should handle arbitrary plaintext without panicking
+// @internal
     #[test]
     fn fuzz_encryption_arbitrary_plaintext(data in arbitrary_bytes(1000)) {
         use vauchi_core::crypto::{encrypt, decrypt, SymmetricKey};
@@ -289,6 +304,7 @@ proptest! {
     }
 
     /// Decryption of garbage should fail gracefully, not panic
+// @internal
     #[test]
     fn fuzz_decryption_garbage(data in arbitrary_bytes(100)) {
         // allow(zero_assertions): No-panic fuzz test — validates garbage input doesn't crash
@@ -302,6 +318,7 @@ proptest! {
     }
 
     /// Wrong key should fail decryption gracefully
+// @internal
     #[test]
     fn fuzz_decryption_wrong_key(data in arbitrary_bytes(100)) {
         use vauchi_core::crypto::{encrypt, decrypt, SymmetricKey};
@@ -325,6 +342,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(1000))]
 
     /// HKDF should handle arbitrary input key material
+// @internal
     #[test]
     fn fuzz_hkdf_arbitrary_ikm(ikm in arbitrary_bytes(100)) {
         use vauchi_core::crypto::HKDF;
@@ -339,6 +357,7 @@ proptest! {
     }
 
     /// HKDF should handle various output lengths
+// @internal
     #[test]
     fn fuzz_hkdf_output_lengths(len in 1usize..255) {
         use vauchi_core::crypto::HKDF;
@@ -361,6 +380,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
 
     /// Key generation should always produce valid keys
+// @internal
     #[test]
     fn fuzz_key_generation_consistency(_seed in any::<u64>()) {
         // allow(zero_assertions): No-panic fuzz test — validates key generation never crashes
@@ -381,6 +401,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(500))]
 
     /// Signing should handle arbitrary messages
+// @internal
     #[test]
     fn fuzz_signing_arbitrary_message(message in arbitrary_bytes(1000)) {
         use vauchi_core::crypto::SigningKeyPair;
@@ -396,6 +417,7 @@ proptest! {
     }
 
     /// Verification with wrong message should fail
+// @internal
     #[test]
     fn fuzz_signing_wrong_message(
         message1 in arbitrary_bytes(100),
@@ -415,6 +437,7 @@ proptest! {
     }
 
     /// Corrupted signature should fail verification
+// @internal
     #[test]
     fn fuzz_signing_corrupted_signature(
         message in arbitrary_bytes(100),

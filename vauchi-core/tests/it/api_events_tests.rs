@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use vauchi_core::api::*;
 use vauchi_core::*;
 
+// @internal
 #[test]
 fn test_vauchi_event_variants() {
     let event = VauchiEvent::contact_added("test-id".into(), EventOrigin::Local);
@@ -22,6 +23,7 @@ fn test_vauchi_event_variants() {
     assert!(matches!(event, VauchiEvent::ContactUpdated { .. }));
 }
 
+// @internal
 #[test]
 fn test_callback_handler() {
     let count = Arc::new(AtomicUsize::new(0));
@@ -40,6 +42,7 @@ fn test_callback_handler() {
     assert_eq!(count.load(Ordering::SeqCst), 1);
 }
 
+// @internal
 #[test]
 fn test_event_dispatcher_add_handler() {
     let dispatcher = EventDispatcher::new();
@@ -52,6 +55,7 @@ fn test_event_dispatcher_add_handler() {
     assert!(id > 0, "HandlerId should be positive");
 }
 
+// @internal
 #[test]
 fn test_event_dispatcher_dispatch() {
     let count = Arc::new(AtomicUsize::new(0));
@@ -71,6 +75,7 @@ fn test_event_dispatcher_dispatch() {
     assert_eq!(count.load(Ordering::SeqCst), 1);
 }
 
+// @internal
 #[test]
 fn test_event_dispatcher_multiple_handlers() {
     let count = Arc::new(AtomicUsize::new(0));
@@ -94,6 +99,7 @@ fn test_event_dispatcher_multiple_handlers() {
     assert_eq!(count.load(Ordering::SeqCst), 3);
 }
 
+// @internal
 #[test]
 fn test_event_dispatcher_clear_handlers() {
     let dispatcher = EventDispatcher::new();
@@ -108,6 +114,7 @@ fn test_event_dispatcher_clear_handlers() {
 }
 
 /// Test: remove_handler removes a specific handler by ID (#89).
+// @internal
 #[test]
 fn test_event_dispatcher_remove_handler() {
     let count_a = Arc::new(AtomicUsize::new(0));
@@ -163,6 +170,7 @@ fn test_event_dispatcher_remove_handler() {
     );
 }
 
+// @internal
 #[test]
 fn test_event_clone() {
     let event = VauchiEvent::ContactUpdated {
@@ -184,6 +192,7 @@ fn test_event_clone() {
     }
 }
 
+// @internal
 #[test]
 fn test_sync_state_event() {
     let event = VauchiEvent::SyncStateChanged {
@@ -199,6 +208,7 @@ fn test_sync_state_event() {
     }
 }
 
+// @internal
 #[test]
 fn test_connection_state_event() {
     let event = VauchiEvent::ConnectionStateChanged {

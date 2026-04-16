@@ -23,6 +23,7 @@ fn open_storage() -> (tempfile::TempDir, Storage) {
 // === Migration Tests ===
 
 // @scenario: security :: Local database encryption
+// @internal
 #[test]
 fn test_migration_v14_adds_encrypted_columns() {
     let (dir, _storage) = open_storage();
@@ -76,6 +77,7 @@ fn test_migration_v14_adds_encrypted_columns() {
         .expect("sync_checkpoints.state_json_encrypted column should exist");
 }
 
+// @internal
 #[test]
 fn test_migration_v14_schema_version() {
     let (dir, _storage) = open_storage();
@@ -97,6 +99,7 @@ fn test_migration_v14_schema_version() {
 
 // === Device Info Encryption ===
 
+// @internal
 #[test]
 fn test_device_info_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -114,6 +117,7 @@ fn test_device_info_encrypted_roundtrip() {
 }
 
 // @scenario: security :: Local database encryption
+// @internal
 #[test]
 fn test_device_info_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
@@ -149,6 +153,7 @@ fn test_device_info_stored_as_encrypted_blob() {
 
 // === Version Vector Encryption ===
 
+// @internal
 #[test]
 fn test_version_vector_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -168,6 +173,7 @@ fn test_version_vector_encrypted_roundtrip() {
 }
 
 // @scenario: security :: Local database encryption
+// @internal
 #[test]
 fn test_version_vector_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
@@ -203,6 +209,7 @@ fn test_version_vector_stored_as_encrypted_blob() {
 
 // === Contact Sync Timestamps Encryption ===
 
+// @internal
 #[test]
 fn test_contact_sync_timestamps_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -218,6 +225,7 @@ fn test_contact_sync_timestamps_encrypted_roundtrip() {
     assert_eq!(loaded, 1234567890);
 }
 
+// @internal
 #[test]
 fn test_contact_sync_timestamps_stored_encrypted() {
     let (dir, storage) = open_storage();
@@ -243,6 +251,7 @@ fn test_contact_sync_timestamps_stored_encrypted() {
 
 // === Pending Updates Encryption ===
 
+// @internal
 #[test]
 fn test_pending_update_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -270,6 +279,7 @@ fn test_pending_update_encrypted_roundtrip() {
 }
 
 // @scenario: security :: Local database encryption
+// @internal
 #[test]
 fn test_pending_update_payload_stored_encrypted() {
     let (dir, storage) = open_storage();
@@ -310,6 +320,7 @@ fn test_pending_update_payload_stored_encrypted() {
 
 // === Retry Entries Encryption ===
 
+// @internal
 #[test]
 fn test_retry_entry_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -335,6 +346,7 @@ fn test_retry_entry_encrypted_roundtrip() {
 }
 
 // @scenario: security :: Local database encryption
+// @internal
 #[test]
 fn test_retry_entry_payload_stored_encrypted() {
     let (dir, storage) = open_storage();
@@ -368,6 +380,7 @@ fn test_retry_entry_payload_stored_encrypted() {
 
 // === Device Sync Checkpoints Encryption ===
 
+// @internal
 #[test]
 fn test_device_sync_checkpoint_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -386,6 +399,7 @@ fn test_device_sync_checkpoint_encrypted_roundtrip() {
     assert_eq!(loaded.1, 0);
 }
 
+// @internal
 #[test]
 fn test_device_sync_checkpoint_stored_encrypted() {
     let (dir, storage) = open_storage();
@@ -422,6 +436,7 @@ fn test_device_sync_checkpoint_stored_encrypted() {
 
 // === Recovery Responses Encryption ===
 
+// @internal
 #[test]
 fn test_recovery_response_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -439,6 +454,7 @@ fn test_recovery_response_encrypted_roundtrip() {
     assert_eq!(loaded.2, Some(5000));
 }
 
+// @internal
 #[test]
 fn test_recovery_response_stored_encrypted() {
     let (dir, storage) = open_storage();
@@ -474,6 +490,7 @@ fn test_recovery_response_stored_encrypted() {
 
 // === Deletion State Encryption ===
 
+// @internal
 #[test]
 fn test_deletion_state_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -489,6 +506,7 @@ fn test_deletion_state_encrypted_roundtrip() {
 }
 
 // @scenario: security :: Local database encryption
+// @internal
 #[test]
 fn test_deletion_state_stored_encrypted() {
     let (dir, storage) = open_storage();
@@ -526,6 +544,7 @@ fn test_deletion_state_stored_encrypted() {
 
 // === Sync Checkpoints Encryption ===
 
+// @internal
 #[test]
 fn test_sync_checkpoint_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -543,6 +562,7 @@ fn test_sync_checkpoint_encrypted_roundtrip() {
     assert_eq!(loaded.2, r#"{"step":"half"}"#);
 }
 
+// @internal
 #[test]
 fn test_sync_checkpoint_stored_encrypted() {
     let (dir, storage) = open_storage();
@@ -579,6 +599,7 @@ fn test_sync_checkpoint_stored_encrypted() {
 
 // === Rekey Tests ===
 
+// @internal
 #[test]
 fn test_rekey_preserves_device_info() {
     let (_dir, mut storage) = open_storage();
@@ -595,6 +616,7 @@ fn test_rekey_preserves_device_info() {
     assert_eq!(loaded.2, "RekeyDevice");
 }
 
+// @internal
 #[test]
 fn test_rekey_preserves_version_vector() {
     let (_dir, mut storage) = open_storage();
@@ -613,6 +635,7 @@ fn test_rekey_preserves_version_vector() {
     assert_eq!(loaded.get(&[0x01; 32]), vector.get(&[0x01; 32]));
 }
 
+// @internal
 #[test]
 fn test_rekey_preserves_pending_updates() {
     let (_dir, mut storage) = open_storage();
@@ -639,6 +662,7 @@ fn test_rekey_preserves_pending_updates() {
     assert_eq!(loaded.payload, b"sensitive data");
 }
 
+// @internal
 #[test]
 fn test_rekey_preserves_retry_entries() {
     let (_dir, mut storage) = open_storage();
@@ -664,6 +688,7 @@ fn test_rekey_preserves_retry_entries() {
     assert_eq!(loaded.payload, b"retry data");
 }
 
+// @internal
 #[test]
 fn test_rekey_preserves_deletion_state() {
     let (_dir, mut storage) = open_storage();

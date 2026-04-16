@@ -37,6 +37,7 @@ fn ensure_init() {
 
 // @scenario: identity_management:Password strength validation
 /// Test: Short passwords are rejected
+// @internal
 #[test]
 fn test_password_too_short() {
     let result = check_password_strength("short".to_string());
@@ -47,6 +48,7 @@ fn test_password_too_short() {
 
 // @scenario: identity_management:Password strength validation
 /// Test: Common passwords are weak
+// @internal
 #[test]
 fn test_common_passwords_are_weak() {
     let common_passwords = ["password", "12345678", "qwertyui", "abcdefgh"];
@@ -64,6 +66,7 @@ fn test_common_passwords_are_weak() {
 
 // @scenario: identity_management:Password strength validation
 /// Test: Strong passwords are accepted
+// @internal
 #[test]
 fn test_strong_passwords() {
     let strong_passwords = [
@@ -84,6 +87,7 @@ fn test_strong_passwords() {
 
 // @scenario: identity_management:Password strength validation
 /// Test: Empty password is too weak
+// @internal
 #[test]
 fn test_empty_password() {
     let result = check_password_strength(String::new());
@@ -93,6 +97,7 @@ fn test_empty_password() {
 
 // @scenario: identity_management:Password strength validation
 /// Test: Exactly 8 character password
+// @internal
 #[test]
 fn test_minimum_length_password() {
     let result = check_password_strength("abcd1234".to_string());
@@ -107,6 +112,7 @@ fn test_minimum_length_password() {
 
 // @scenario: security:Sufficient key lengths
 /// Test: Storage key is 32 bytes
+// @internal
 #[test]
 fn test_storage_key_length() {
     let key = generate_storage_key();
@@ -115,6 +121,7 @@ fn test_storage_key_length() {
 
 // @scenario: security:Sufficient key lengths
 /// Test: Storage keys are unique
+// @internal
 #[test]
 fn test_storage_keys_are_unique() {
     let key1 = generate_storage_key();
@@ -128,6 +135,7 @@ fn test_storage_keys_are_unique() {
 
 // @scenario: security:Sufficient key lengths
 /// Test: Storage key is not all zeros
+// @internal
 #[test]
 fn test_storage_key_not_zeros() {
     let key = generate_storage_key();
@@ -142,6 +150,7 @@ fn test_storage_key_not_zeros() {
 
 // @scenario: security:No weak cryptography
 /// Test: HTTPS URLs are safe
+// @internal
 #[test]
 fn test_https_urls_safe() {
     assert!(is_safe_url("https://example.com".to_string()));
@@ -153,6 +162,7 @@ fn test_https_urls_safe() {
 
 // @scenario: security:No weak cryptography
 /// Test: HTTP URLs are safe (will be upgraded)
+// @internal
 #[test]
 fn test_http_urls_safe() {
     assert!(is_safe_url("http://example.com".to_string()));
@@ -160,6 +170,7 @@ fn test_http_urls_safe() {
 
 // @scenario: security:No weak cryptography
 /// Test: Tel URLs are safe
+// @internal
 #[test]
 fn test_tel_urls_safe() {
     assert!(is_safe_url("tel:+1234567890".to_string()));
@@ -168,6 +179,7 @@ fn test_tel_urls_safe() {
 
 // @scenario: security:No weak cryptography
 /// Test: Mailto URLs are safe
+// @internal
 #[test]
 fn test_mailto_urls_safe() {
     assert!(is_safe_url("mailto:user@example.com".to_string()));
@@ -178,6 +190,7 @@ fn test_mailto_urls_safe() {
 
 // @scenario: security:No weak cryptography
 /// Test: SMS URLs are safe
+// @internal
 #[test]
 fn test_sms_urls_safe() {
     assert!(is_safe_url("sms:+1234567890".to_string()));
@@ -185,6 +198,7 @@ fn test_sms_urls_safe() {
 
 // @scenario: security:No weak cryptography
 /// Test: Geo URLs are safe
+// @internal
 #[test]
 fn test_geo_urls_safe() {
     assert!(is_safe_url("geo:37.7749,-122.4194".to_string()));
@@ -192,6 +206,7 @@ fn test_geo_urls_safe() {
 
 // @scenario: security:No weak cryptography
 /// Test: JavaScript URLs are blocked
+// @internal
 #[test]
 fn test_javascript_urls_blocked() {
     assert!(!is_safe_url("javascript:alert(1)".to_string()));
@@ -200,6 +215,7 @@ fn test_javascript_urls_blocked() {
 
 // @scenario: security:No weak cryptography
 /// Test: Data URLs are blocked
+// @internal
 #[test]
 fn test_data_urls_blocked() {
     assert!(!is_safe_url(
@@ -209,6 +225,7 @@ fn test_data_urls_blocked() {
 
 // @scenario: security:No weak cryptography
 /// Test: File URLs are blocked
+// @internal
 #[test]
 fn test_file_urls_blocked() {
     assert!(!is_safe_url("file:///etc/passwd".to_string()));
@@ -220,6 +237,7 @@ fn test_file_urls_blocked() {
 
 // @scenario: security:No weak cryptography
 /// Test: Allowed schemes
+// @internal
 #[test]
 fn test_allowed_schemes() {
     assert!(is_allowed_scheme("https".to_string()));
@@ -232,6 +250,7 @@ fn test_allowed_schemes() {
 
 // @scenario: security:No weak cryptography
 /// Test: Blocked schemes
+// @internal
 #[test]
 fn test_blocked_schemes() {
     assert!(is_blocked_scheme("javascript".to_string()));
@@ -244,6 +263,7 @@ fn test_blocked_schemes() {
 
 // @scenario: security:No weak cryptography
 /// Test: Unknown schemes are not explicitly allowed or blocked
+// @internal
 #[test]
 fn test_unknown_schemes() {
     // Unknown schemes should not be in the allowed list
@@ -261,6 +281,7 @@ fn test_unknown_schemes() {
 
 // @scenario: security:No weak cryptography
 /// Test: Empty URL
+// @internal
 #[test]
 fn test_empty_url() {
     // Empty URL should not crash
@@ -271,6 +292,7 @@ fn test_empty_url() {
 
 // @scenario: security:No weak cryptography
 /// Test: Malformed URLs
+// @internal
 #[test]
 fn test_malformed_urls() {
     // These should not crash and should return false
@@ -280,6 +302,7 @@ fn test_malformed_urls() {
 
 // @scenario: security:No weak cryptography
 /// Test: Unicode in URLs
+// @internal
 #[test]
 fn test_unicode_urls() {
     // allow(zero_assertions): No-panic boundary test — validates exotic input doesn't crash
@@ -289,6 +312,7 @@ fn test_unicode_urls() {
 
 // @scenario: security:No weak cryptography
 /// Test: Very long URL
+// @internal
 #[test]
 fn test_long_url() {
     // allow(zero_assertions): No-panic boundary test — validates long input doesn't crash
@@ -302,6 +326,7 @@ fn test_long_url() {
 // ============================================================================
 
 // @scenario: security:Relay URL validation
+// @internal
 #[test]
 fn test_relay_url_wss_accepted() {
     assert!(is_valid_relay_url("https://relay.vauchi.app".to_string()));
@@ -312,6 +337,7 @@ fn test_relay_url_wss_accepted() {
 }
 
 // @scenario: security:Relay URL validation
+// @internal
 #[test]
 fn test_relay_url_ws_localhost_accepted() {
     assert!(is_valid_relay_url("http://localhost:9001".to_string()));
@@ -320,6 +346,7 @@ fn test_relay_url_ws_localhost_accepted() {
 }
 
 // @scenario: security:Relay URL validation
+// @internal
 #[test]
 fn test_relay_url_ws_remote_rejected() {
     assert!(!is_valid_relay_url("http://relay.example.com".to_string()));
@@ -327,6 +354,7 @@ fn test_relay_url_ws_remote_rejected() {
 }
 
 // @scenario: security:Relay URL validation
+// @internal
 #[test]
 fn test_relay_url_other_schemes_rejected() {
     assert!(!is_valid_relay_url("ftp://relay.example.com".to_string()));
@@ -341,6 +369,7 @@ fn test_relay_url_other_schemes_rejected() {
 
 // @scenario: help_faq:FAQ localization for supported languages
 /// Test: Get all FAQs in German returns same count as English
+// @internal
 #[test]
 fn test_get_faqs_localized_german_count() {
     ensure_init();
@@ -352,6 +381,7 @@ fn test_get_faqs_localized_german_count() {
 
 // @scenario: help_faq:FAQ localization for supported languages
 /// Test: German FAQs contain German text
+// @internal
 #[test]
 fn test_get_faqs_localized_german_content() {
     ensure_init();
@@ -366,6 +396,7 @@ fn test_get_faqs_localized_german_content() {
 
 // @scenario: help_faq:FAQ localization for supported languages
 /// Test: French FAQs contain French text
+// @internal
 #[test]
 fn test_get_faqs_localized_french_content() {
     ensure_init();
@@ -380,6 +411,7 @@ fn test_get_faqs_localized_french_content() {
 
 // @scenario: help_faq:FAQ localization for supported languages
 /// Test: Spanish FAQs contain Spanish text
+// @internal
 #[test]
 fn test_get_faqs_localized_spanish_content() {
     ensure_init();
@@ -394,6 +426,7 @@ fn test_get_faqs_localized_spanish_content() {
 
 // @scenario: help_faq:Browse FAQs in a category
 /// Test: Get FAQs by category in German
+// @internal
 #[test]
 fn test_get_faqs_by_category_localized() {
     ensure_init();
@@ -407,6 +440,7 @@ fn test_get_faqs_by_category_localized() {
 
 // @scenario: help_faq:View a specific FAQ
 /// Test: Get specific FAQ by ID in German
+// @internal
 #[test]
 fn test_get_faq_by_id_localized() {
     ensure_init();
@@ -417,6 +451,7 @@ fn test_get_faq_by_id_localized() {
 
 // @scenario: help_faq:View a specific FAQ
 /// Test: Get FAQ by ID that doesn't exist
+// @internal
 #[test]
 fn test_get_faq_by_id_localized_not_found() {
     ensure_init();
@@ -426,6 +461,7 @@ fn test_get_faq_by_id_localized_not_found() {
 
 // @scenario: help_faq:Search FAQs by keyword
 /// Test: Search FAQs in German
+// @internal
 #[test]
 fn test_search_faqs_localized_german() {
     ensure_init();
@@ -435,6 +471,7 @@ fn test_search_faqs_localized_german() {
 
 // @scenario: help_faq:Search FAQs by keyword
 /// Test: Search FAQs in English
+// @internal
 #[test]
 fn test_search_faqs_localized_english() {
     ensure_init();
@@ -444,6 +481,7 @@ fn test_search_faqs_localized_english() {
 
 // @scenario: help_faq:Search with no results
 /// Test: Search with no results
+// @internal
 #[test]
 fn test_search_faqs_localized_no_results() {
     ensure_init();
@@ -458,6 +496,7 @@ fn test_search_faqs_localized_no_results() {
 
 // @scenario: aha_moments:Card creation shows completion message
 /// Test: Get aha moment localized in German
+// @internal
 #[test]
 fn test_aha_moment_localized_german() {
     ensure_init();
@@ -476,6 +515,7 @@ fn test_aha_moment_localized_german() {
 
 // @scenario: aha_moments:Card creation shows completion message
 /// Test: Get aha moment localized in English
+// @internal
 #[test]
 fn test_aha_moment_localized_english() {
     ensure_init();
@@ -489,6 +529,7 @@ fn test_aha_moment_localized_english() {
 
 // @scenario: aha_moments:Aha moments are tracked per milestone
 /// Test: All moment types return localized content
+// @internal
 #[test]
 fn test_all_aha_moments_localized() {
     ensure_init();
@@ -516,6 +557,7 @@ fn test_all_aha_moments_localized() {
 
 // @scenario: aha_moments:First edit shows would-update feedback
 /// Test: French aha moment content
+// @internal
 #[test]
 fn test_aha_moment_localized_french() {
     ensure_init();
@@ -536,6 +578,7 @@ fn test_aha_moment_localized_french() {
 ///
 /// This is the contract test proving the mobile binding path (which calls
 /// compute_confirmation_mac internally) produces MACs that core validates correctly.
+// @internal
 #[test]
 fn test_confirmation_mac_contract_deterministic_and_accepted() {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -598,6 +641,7 @@ fn test_confirmation_mac_contract_deterministic_and_accepted() {
 // ── Design Tokens FFI Boundary ───────────────────────────────
 
 // @scenario: theming :: MobileTheme includes design tokens
+// @internal
 #[test]
 fn test_mobile_theme_includes_design_tokens() {
     let theme = vauchi_app::theme::default_theme();
@@ -613,6 +657,7 @@ fn test_mobile_theme_includes_design_tokens() {
 }
 
 // @scenario: theming :: MobileDesignTokens matches DesignTokens::default
+// @internal
 #[test]
 fn test_mobile_design_tokens_matches_core_defaults() {
     let core_tokens = vauchi_app::theme::DesignTokens::default();

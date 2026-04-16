@@ -15,6 +15,7 @@ fn make_engine() -> ExchangeEngine {
     })
 }
 
+// @internal
 #[test]
 fn exchange_starts_at_show_qr() {
     let engine = make_engine();
@@ -24,6 +25,7 @@ fn exchange_starts_at_show_qr() {
     assert_eq!(screen.progress.as_ref().unwrap().total_steps, 8);
 }
 
+// @internal
 #[test]
 fn exchange_shows_own_qr_data() {
     let engine = make_engine();
@@ -47,6 +49,7 @@ fn exchange_shows_own_qr_data() {
     }
 }
 
+// @internal
 #[test]
 fn exchange_continue_to_scan() {
     let mut engine = make_engine();
@@ -70,6 +73,7 @@ fn exchange_continue_to_scan() {
     }
 }
 
+// @internal
 #[test]
 fn exchange_scan_receives_data() {
     let mut engine = make_engine();
@@ -97,6 +101,7 @@ fn exchange_scan_receives_data() {
     assert!(screen.actions.is_empty());
 }
 
+// @internal
 #[test]
 fn exchange_mark_success() {
     let mut engine = make_engine();
@@ -124,6 +129,7 @@ fn exchange_mark_success() {
     }
 }
 
+// @internal
 #[test]
 fn exchange_mark_failed() {
     let mut engine = make_engine();
@@ -156,6 +162,7 @@ fn exchange_mark_failed() {
     assert_eq!(screen.actions[1].style, ActionStyle::Secondary);
 }
 
+// @internal
 #[test]
 fn exchange_success_done_completes() {
     let mut engine = make_engine();
@@ -175,6 +182,7 @@ fn exchange_success_done_completes() {
     assert_eq!(result, ActionResult::Complete);
 }
 
+// @internal
 #[test]
 fn exchange_failed_retry_restarts() {
     let mut engine = make_engine();
@@ -203,6 +211,7 @@ fn exchange_failed_retry_restarts() {
     assert_eq!(engine.current_screen().screen_id, "exchange_show_qr");
 }
 
+// @internal
 #[test]
 fn exchange_back_from_scan() {
     let mut engine = make_engine();
@@ -224,6 +233,7 @@ fn exchange_back_from_scan() {
     assert_eq!(engine.current_screen().screen_id, "exchange_show_qr");
 }
 
+// @internal
 #[test]
 fn exchange_failed_cancel_completes() {
     let mut engine = make_engine();
@@ -247,6 +257,7 @@ fn exchange_failed_cancel_completes() {
 //
 // Verifies that the success StatusIndicator carries a meaningful accessibility
 // label so screen readers can announce the outcome to users.
+// @internal
 #[test]
 fn exchange_success_status_indicator_has_a11y() {
     let mut engine = make_engine();
@@ -285,6 +296,7 @@ fn exchange_success_status_indicator_has_a11y() {
 //
 // Verifies that the own_qr QrCode component carries a meaningful accessibility
 // label and role so screen readers can identify it as an image.
+// @internal
 #[test]
 fn exchange_show_qr_has_a11y() {
     let engine = make_engine();

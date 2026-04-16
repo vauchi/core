@@ -27,6 +27,7 @@ fn sample_members() -> Vec<ContactItem> {
     ]
 }
 
+// @internal
 #[test]
 fn group_detail_screen_id() {
     let engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
@@ -34,6 +35,7 @@ fn group_detail_screen_id() {
     assert_eq!(screen.screen_id, "group_detail");
 }
 
+// @internal
 #[test]
 fn group_detail_title_is_group_name() {
     let engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
@@ -41,6 +43,7 @@ fn group_detail_title_is_group_name() {
     assert_eq!(screen.title, "Family");
 }
 
+// @internal
 #[test]
 fn group_detail_shows_member_count() {
     let engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
@@ -50,6 +53,7 @@ fn group_detail_shows_member_count() {
     assert_eq!(detail, "2");
 }
 
+// @internal
 // @internal
 #[test]
 fn group_detail_rename_opens_form_dialog() {
@@ -70,6 +74,7 @@ fn group_detail_rename_opens_form_dialog() {
 }
 
 // @internal — ADR-022: destructive actions use InlineConfirm, not ShowAlert
+// @internal
 #[test]
 fn group_detail_delete_shows_inline_confirm() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
@@ -90,6 +95,7 @@ fn group_detail_delete_shows_inline_confirm() {
 }
 
 // @internal
+// @internal
 #[test]
 fn group_detail_confirm_delete_completes() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
@@ -107,6 +113,7 @@ fn group_detail_confirm_delete_completes() {
     );
 }
 
+// @internal
 // @internal
 #[test]
 fn group_detail_cancel_delete_removes_inline_confirm() {
@@ -129,6 +136,7 @@ fn group_detail_cancel_delete_removes_inline_confirm() {
     assert!(!has_inline_confirm, "cancel should remove InlineConfirm");
 }
 
+// @internal
 #[test]
 fn group_detail_unknown_action_returns_update_screen() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
@@ -143,6 +151,7 @@ fn group_detail_unknown_action_returns_update_screen() {
     }
 }
 
+// @internal
 #[test]
 fn group_detail_has_preview_as_member_actions() {
     let engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
@@ -160,6 +169,7 @@ fn group_detail_has_preview_as_member_actions() {
     );
 }
 
+// @internal
 #[test]
 fn group_detail_preview_as_member_label_contains_name() {
     let engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
@@ -177,6 +187,7 @@ fn group_detail_preview_as_member_label_contains_name() {
     );
 }
 
+// @internal
 #[test]
 fn group_detail_preview_as_member_action_returns_preview_as() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
@@ -191,6 +202,7 @@ fn group_detail_preview_as_member_action_returns_preview_as() {
     }
 }
 
+// @internal
 #[test]
 fn group_detail_no_preview_as_actions_when_no_members() {
     let engine = GroupDetailEngine::new("g1".into(), "Empty Group".into(), vec![]);

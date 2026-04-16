@@ -29,6 +29,7 @@ fn setup() -> Vauchi {
 
 /// CLI calls create_identity(name) and then public_id() to display the user's ID.
 /// Changing the return type or removing public_id() would break CLI.
+// @internal
 #[test]
 fn contract_cli_create_identity_then_public_id() {
     let wb = setup();
@@ -40,6 +41,7 @@ fn contract_cli_create_identity_then_public_id() {
 }
 
 /// CLI accesses identity().display_name() to show the user's name.
+// @internal
 #[test]
 fn contract_cli_identity_display_name() {
     let wb = setup();
@@ -54,6 +56,7 @@ fn contract_cli_identity_display_name() {
 
 /// CLI calls list_contacts() and iterates over the result.
 /// Each Contact must have id(), display_name(), card(), public_key().
+// @internal
 #[test]
 fn contract_cli_list_contacts_shape() {
     let wb = setup();
@@ -66,6 +69,7 @@ fn contract_cli_list_contacts_shape() {
 }
 
 /// CLI uses paginated listing with offset/limit.
+// @internal
 #[test]
 fn contract_cli_list_contacts_paginated() {
     let wb = setup();
@@ -79,6 +83,7 @@ fn contract_cli_list_contacts_paginated() {
 
 /// Compile-time contract: Contact exposes these methods.
 /// If any are removed or renamed, this test fails to compile.
+// @internal
 #[test]
 fn contract_cli_contact_accessors_compile() {
     fn _check(c: &Contact) {
@@ -101,6 +106,7 @@ fn contract_cli_contact_accessors_compile() {
 // ============================================================
 
 /// All clients create cards and access their fields.
+// @internal
 #[test]
 fn contract_contact_card_shape() {
     let card = ContactCard::new("Shape");
@@ -110,6 +116,7 @@ fn contract_contact_card_shape() {
 }
 
 /// Cards must serialize/deserialize losslessly — sync depends on this.
+// @internal
 #[test]
 fn contract_contact_card_json_roundtrip() {
     let mut card = ContactCard::new("JSON");
@@ -135,6 +142,7 @@ fn contract_contact_card_json_roundtrip() {
 
 /// CLI's parse_field_type() maps strings to these variants.
 /// Removing a variant breaks CLI at compile time.
+// @internal
 #[test]
 fn contract_cli_field_type_variants() {
     let required_variants: Vec<FieldType> = vec![
@@ -155,6 +163,7 @@ fn contract_cli_field_type_variants() {
 // Contract: ContactField accessors (Consumer: CLI)
 // ============================================================
 
+// @internal
 #[test]
 fn contract_cli_contact_field_accessors() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+41791234567");
@@ -168,6 +177,7 @@ fn contract_cli_contact_field_accessors() {
 // ============================================================
 
 /// CLI exposes consent grant/check/revoke/export.
+// @internal
 #[test]
 fn contract_cli_consent_api() {
     let wb = setup();
@@ -193,6 +203,7 @@ fn contract_cli_consent_api() {
 // Contract: get_own_card / add_field_to_own_card (Consumer: CLI)
 // ============================================================
 
+// @internal
 #[test]
 fn contract_cli_card_field_management() {
     let wb = setup();

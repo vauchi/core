@@ -15,6 +15,7 @@
 // CONTACT CARD SNAPSHOTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_contact_card_serialization_snapshot() {
     use vauchi_core::ContactCard;
@@ -33,6 +34,7 @@ fn test_contact_card_serialization_snapshot() {
     assert_eq!(original, output, "ContactCard serialization changed");
 }
 
+// @internal
 #[test]
 fn test_field_type_serialization_snapshot() {
     use vauchi_core::FieldType;
@@ -64,6 +66,7 @@ fn test_field_type_serialization_snapshot() {
     );
 }
 
+// @internal
 #[test]
 fn test_contact_field_serialization_snapshot() {
     use vauchi_core::ContactField;
@@ -83,6 +86,7 @@ fn test_contact_field_serialization_snapshot() {
 // CARD DELTA SNAPSHOTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_field_change_added_serialization_snapshot() {
     use vauchi_core::ContactField;
@@ -101,6 +105,7 @@ fn test_field_change_added_serialization_snapshot() {
     assert!(serialized.contains("\"new-field\""));
 }
 
+// @internal
 #[test]
 fn test_field_change_modified_serialization_snapshot() {
     use vauchi_core::sync::FieldChange;
@@ -117,6 +122,7 @@ fn test_field_change_modified_serialization_snapshot() {
     assert_eq!(serialized, expected);
 }
 
+// @internal
 #[test]
 fn test_field_change_removed_serialization_snapshot() {
     use vauchi_core::sync::FieldChange;
@@ -131,6 +137,7 @@ fn test_field_change_removed_serialization_snapshot() {
     assert_eq!(serialized, expected);
 }
 
+// @internal
 #[test]
 fn test_field_change_display_name_changed_serialization_snapshot() {
     use vauchi_core::sync::FieldChange;
@@ -149,6 +156,7 @@ fn test_field_change_display_name_changed_serialization_snapshot() {
 // SYNC ITEM SNAPSHOTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_sync_item_card_updated_serialization_snapshot() {
     use vauchi_core::sync::SyncItem;
@@ -165,6 +173,7 @@ fn test_sync_item_card_updated_serialization_snapshot() {
     assert_eq!(serialized, expected);
 }
 
+// @internal
 #[test]
 fn test_sync_item_contact_removed_serialization_snapshot() {
     use vauchi_core::sync::SyncItem;
@@ -181,6 +190,7 @@ fn test_sync_item_contact_removed_serialization_snapshot() {
     assert_eq!(serialized, expected);
 }
 
+// @internal
 #[test]
 fn test_sync_item_visibility_changed_serialization_snapshot() {
     use vauchi_core::sync::SyncItem;
@@ -202,6 +212,7 @@ fn test_sync_item_visibility_changed_serialization_snapshot() {
 // DEVICE SNAPSHOTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_registered_device_serialization_snapshot() {
     use vauchi_core::identity::RegisteredDevice;
@@ -232,6 +243,7 @@ fn test_registered_device_serialization_snapshot() {
     assert_eq!(reparsed.created_at, 1700000000);
 }
 
+// @internal
 #[test]
 fn test_registered_device_revoked_serialization_snapshot() {
     use vauchi_core::identity::RegisteredDevice;
@@ -256,6 +268,7 @@ fn test_registered_device_revoked_serialization_snapshot() {
 // RATCHET MESSAGE SNAPSHOTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_ratchet_message_serialization_snapshot() {
     use vauchi_core::crypto::ratchet::RatchetMessage;
@@ -288,6 +301,7 @@ fn test_ratchet_message_serialization_snapshot() {
 // VISIBILITY RULES SNAPSHOTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_field_visibility_everyone_serialization_snapshot() {
     use vauchi_core::FieldVisibility;
@@ -298,6 +312,7 @@ fn test_field_visibility_everyone_serialization_snapshot() {
     assert_eq!(serialized, "\"Everyone\"");
 }
 
+// @internal
 #[test]
 fn test_field_visibility_nobody_serialization_snapshot() {
     use vauchi_core::FieldVisibility;
@@ -308,6 +323,7 @@ fn test_field_visibility_nobody_serialization_snapshot() {
     assert_eq!(serialized, "\"Nobody\"");
 }
 
+// @internal
 #[test]
 fn test_field_visibility_contacts_serialization_snapshot() {
     use std::collections::HashSet;
@@ -326,6 +342,7 @@ fn test_field_visibility_contacts_serialization_snapshot() {
     assert!(serialized.contains("contact-2"));
 }
 
+// @internal
 #[test]
 fn test_visibility_rules_serialization_snapshot() {
     use vauchi_core::VisibilityRules;
@@ -348,6 +365,7 @@ fn test_visibility_rules_serialization_snapshot() {
 // SOCIAL NETWORK SNAPSHOTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_social_network_serialization_snapshot() {
     use vauchi_core::SocialNetwork;
@@ -370,6 +388,7 @@ fn test_social_network_serialization_snapshot() {
 // ARRAY ENCODING SNAPSHOTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_byte_array_32_serialization_format() {
     use vauchi_core::crypto::ratchet::RatchetMessage;
@@ -394,6 +413,7 @@ fn test_byte_array_32_serialization_format() {
     );
 }
 
+// @internal
 #[test]
 fn test_byte_vec_serialization_format() {
     use vauchi_core::crypto::ratchet::RatchetMessage;

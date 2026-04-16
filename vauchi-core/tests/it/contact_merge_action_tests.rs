@@ -31,6 +31,7 @@ fn make_contact(name: &str, fields: &[(FieldType, &str, &str)]) -> Contact {
 // @scenario: contacts_management :: Merge duplicate contacts
 // ============================================================
 
+// @internal
 #[test]
 fn test_merge_contacts_preserves_primary_display_name() {
     let primary = make_contact("Bob Smith", &[]);
@@ -44,6 +45,7 @@ fn test_merge_contacts_preserves_primary_display_name() {
     );
 }
 
+// @internal
 #[test]
 fn test_merge_contacts_preserves_primary_id() {
     let primary = make_contact("Bob Smith", &[]);
@@ -57,6 +59,7 @@ fn test_merge_contacts_preserves_primary_id() {
     );
 }
 
+// @internal
 #[test]
 fn test_merge_contacts_adds_unique_fields_from_secondary() {
     let primary = make_contact("Bob Smith", &[(FieldType::Email, "work", "bob@work.com")]);
@@ -75,6 +78,7 @@ fn test_merge_contacts_adds_unique_fields_from_secondary() {
     assert!(has_phone, "Should have phone from secondary");
 }
 
+// @internal
 #[test]
 fn test_merge_contacts_does_not_duplicate_same_field() {
     let primary = make_contact("Bob Smith", &[(FieldType::Email, "work", "bob@work.com")]);
@@ -98,6 +102,7 @@ fn test_merge_contacts_does_not_duplicate_same_field() {
     );
 }
 
+// @internal
 #[test]
 fn test_merge_contacts_different_labels_both_kept() {
     let primary = make_contact("Bob Smith", &[(FieldType::Email, "work", "bob@work.com")]);
@@ -115,6 +120,7 @@ fn test_merge_contacts_different_labels_both_kept() {
     );
 }
 
+// @internal
 #[test]
 fn test_merge_contacts_preserves_all_info() {
     let primary = make_contact(
@@ -143,6 +149,7 @@ fn test_merge_contacts_preserves_all_info() {
     );
 }
 
+// @internal
 #[test]
 fn test_merge_contacts_preserves_favorite_from_primary() {
     let mut primary = make_contact("Bob Smith", &[]);
@@ -156,6 +163,7 @@ fn test_merge_contacts_preserves_favorite_from_primary() {
     );
 }
 
+// @internal
 #[test]
 fn test_merge_contacts_preserves_blocked_from_primary() {
     let mut primary = make_contact("Bob Smith", &[]);
@@ -174,6 +182,7 @@ fn test_merge_contacts_preserves_blocked_from_primary() {
 // @scenario: contacts_management :: Dismiss duplicate suggestion
 // ============================================================
 
+// @internal
 #[test]
 fn test_normalize_pair_key_sorts_lexicographically() {
     let (a, b) = normalize_pair_key("zzz", "aaa");
@@ -181,6 +190,7 @@ fn test_normalize_pair_key_sorts_lexicographically() {
     assert_eq!(b, "zzz");
 }
 
+// @internal
 #[test]
 fn test_normalize_pair_key_already_sorted() {
     let (a, b) = normalize_pair_key("aaa", "zzz");
@@ -188,6 +198,7 @@ fn test_normalize_pair_key_already_sorted() {
     assert_eq!(b, "zzz");
 }
 
+// @internal
 #[test]
 fn test_normalize_pair_key_equal_ids() {
     let (a, b) = normalize_pair_key("same", "same");
@@ -195,6 +206,7 @@ fn test_normalize_pair_key_equal_ids() {
     assert_eq!(b, "same");
 }
 
+// @internal
 #[test]
 fn test_filter_dismissed_removes_dismissed_pairs() {
     let c1 = make_contact("Alice", &[]);
@@ -227,6 +239,7 @@ fn test_filter_dismissed_removes_dismissed_pairs() {
     }
 }
 
+// @internal
 #[test]
 fn test_filter_dismissed_keeps_non_dismissed() {
     let c1 = make_contact("Alice", &[]);
@@ -241,6 +254,7 @@ fn test_filter_dismissed_keeps_non_dismissed() {
     assert_eq!(filtered.len(), 1, "No dismissals, all pairs should remain");
 }
 
+// @internal
 #[test]
 fn test_filter_dismissed_all_dismissed() {
     let c1 = make_contact("Alice", &[]);
@@ -261,6 +275,7 @@ fn test_filter_dismissed_all_dismissed() {
     );
 }
 
+// @internal
 #[test]
 fn test_filter_dismissed_order_independent() {
     // Dismissing (B, A) should also filter out (A, B) due to normalization

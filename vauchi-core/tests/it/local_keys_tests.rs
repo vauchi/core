@@ -9,6 +9,7 @@
 use tempfile::TempDir;
 use vauchi_core::storage::local_keys;
 
+// @internal
 #[test]
 fn test_load_or_generate_fallback_key_creates_new_key() {
     let dir = TempDir::new().unwrap();
@@ -20,6 +21,7 @@ fn test_load_or_generate_fallback_key_creates_new_key() {
     );
 }
 
+// @internal
 #[test]
 fn test_load_or_generate_fallback_key_persists_across_calls() {
     let dir = TempDir::new().unwrap();
@@ -32,6 +34,7 @@ fn test_load_or_generate_fallback_key_persists_across_calls() {
     );
 }
 
+// @internal
 #[test]
 fn test_load_or_generate_fallback_key_different_dirs_produce_different_keys() {
     let dir1 = TempDir::new().unwrap();
@@ -45,6 +48,7 @@ fn test_load_or_generate_fallback_key_different_dirs_produce_different_keys() {
     );
 }
 
+// @internal
 #[test]
 fn test_load_or_generate_fallback_key_rejects_wrong_length() {
     let dir = TempDir::new().unwrap();
@@ -60,6 +64,7 @@ fn test_load_or_generate_fallback_key_rejects_wrong_length() {
 }
 
 #[cfg(unix)]
+// @internal
 #[test]
 fn test_load_or_generate_fallback_key_sets_restrictive_permissions() {
     use std::os::unix::fs::PermissionsExt;
@@ -74,6 +79,7 @@ fn test_load_or_generate_fallback_key_sets_restrictive_permissions() {
     );
 }
 
+// @internal
 #[test]
 fn test_load_or_generate_backup_password_creates_new_password() {
     let dir = TempDir::new().unwrap();
@@ -85,6 +91,7 @@ fn test_load_or_generate_backup_password_creates_new_password() {
     );
 }
 
+// @internal
 #[test]
 fn test_load_or_generate_backup_password_persists_across_calls() {
     let dir = TempDir::new().unwrap();
@@ -96,6 +103,7 @@ fn test_load_or_generate_backup_password_persists_across_calls() {
     );
 }
 
+// @internal
 #[test]
 fn test_load_or_generate_backup_password_different_dirs() {
     let dir1 = TempDir::new().unwrap();
@@ -108,6 +116,7 @@ fn test_load_or_generate_backup_password_different_dirs() {
     );
 }
 
+// @internal
 #[test]
 fn test_load_or_generate_backup_password_not_legacy() {
     let dir = TempDir::new().unwrap();
@@ -119,6 +128,7 @@ fn test_load_or_generate_backup_password_not_legacy() {
     );
 }
 
+// @internal
 #[test]
 fn test_load_or_generate_backup_password_rejects_wrong_length() {
     let dir = TempDir::new().unwrap();
@@ -134,6 +144,7 @@ fn test_load_or_generate_backup_password_rejects_wrong_length() {
 }
 
 #[cfg(unix)]
+// @internal
 #[test]
 fn test_load_or_generate_backup_password_sets_restrictive_permissions() {
     use std::os::unix::fs::PermissionsExt;
@@ -148,6 +159,7 @@ fn test_load_or_generate_backup_password_sets_restrictive_permissions() {
     );
 }
 
+// @internal
 #[test]
 fn test_keychain_key_name_produces_deterministic_hash() {
     use std::path::Path;
@@ -156,6 +168,7 @@ fn test_keychain_key_name_produces_deterministic_hash() {
     assert_eq!(name1, name2, "Same path must produce same key name");
 }
 
+// @internal
 #[test]
 fn test_keychain_key_name_different_paths_produce_different_hashes() {
     use std::path::Path;
@@ -167,6 +180,7 @@ fn test_keychain_key_name_different_paths_produce_different_hashes() {
     );
 }
 
+// @internal
 #[test]
 fn test_keychain_key_name_starts_with_prefix() {
     use std::path::Path;
@@ -177,6 +191,7 @@ fn test_keychain_key_name_starts_with_prefix() {
     );
 }
 
+// @internal
 #[test]
 fn test_keychain_key_name_is_valid_hex_suffix() {
     use std::path::Path;
@@ -189,6 +204,7 @@ fn test_keychain_key_name_is_valid_hex_suffix() {
     );
 }
 
+// @internal
 #[test]
 fn test_legacy_backup_password_constant() {
     assert_eq!(

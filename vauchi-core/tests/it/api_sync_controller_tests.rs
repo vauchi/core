@@ -35,6 +35,7 @@ fn create_test_ratchet() -> DoubleRatchetState {
     DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap()
 }
 
+// @internal
 #[test]
 fn test_sync_controller_connect_disconnect() {
     let storage = create_test_storage();
@@ -53,6 +54,7 @@ fn test_sync_controller_connect_disconnect() {
     assert!(!controller.is_connected());
 }
 
+// @internal
 #[test]
 fn test_sync_controller_ratchet_management() {
     let storage = create_test_storage();
@@ -73,6 +75,7 @@ fn test_sync_controller_ratchet_management() {
     assert!(!controller.has_ratchet("contact-1"));
 }
 
+// @internal
 #[test]
 fn test_sync_controller_sync_not_connected() {
     let storage = create_test_storage();
@@ -87,6 +90,7 @@ fn test_sync_controller_sync_not_connected() {
     assert!(matches!(result, Err(VauchiError::Network(_))));
 }
 
+// @internal
 #[test]
 fn test_sync_controller_sync_empty() {
     let storage = create_test_storage();
@@ -104,6 +108,7 @@ fn test_sync_controller_sync_empty() {
     assert_eq!(result.failed, 0);
 }
 
+// @internal
 #[test]
 fn test_sync_controller_get_sync_state() {
     let storage = create_test_storage();
@@ -118,6 +123,7 @@ fn test_sync_controller_get_sync_state() {
     assert!(matches!(state, SyncState::Synced { .. }));
 }
 
+// @internal
 #[test]
 fn test_sync_controller_pending_count() {
     let storage = create_test_storage();
@@ -131,6 +137,7 @@ fn test_sync_controller_pending_count() {
     assert_eq!(controller.pending_count().unwrap(), 0);
 }
 
+// @internal
 #[test]
 fn test_sync_controller_in_flight_count() {
     let storage = create_test_storage();
@@ -144,6 +151,7 @@ fn test_sync_controller_in_flight_count() {
     assert_eq!(controller.in_flight_count(), 0);
 }
 
+// @internal
 #[test]
 fn test_sync_controller_auto_sync_config() {
     let storage = create_test_storage();
@@ -168,6 +176,7 @@ fn test_sync_controller_auto_sync_config() {
     assert!(!controller2.is_auto_sync_enabled());
 }
 
+// @internal
 #[test]
 fn test_sync_result_default() {
     let result = SyncResult::default();
@@ -179,6 +188,7 @@ fn test_sync_result_default() {
 }
 
 // @scenario: sync_updates :: Sync result tracks operation totals
+// @internal
 #[test]
 fn test_sync_result_total() {
     let result = SyncResult {
@@ -192,6 +202,7 @@ fn test_sync_result_total() {
 }
 
 // @scenario: sync_updates :: Sync result detects changes
+// @internal
 #[test]
 fn test_sync_result_has_changes() {
     let mut result = SyncResult::default();
@@ -213,6 +224,7 @@ fn test_sync_result_has_changes() {
 }
 
 // @scenario: sync_updates :: Sync result total with all zeros
+// @internal
 #[test]
 fn test_sync_result_total_empty() {
     let result = SyncResult::default();
@@ -221,6 +233,7 @@ fn test_sync_result_total_empty() {
 }
 
 // @scenario: sync_updates :: Batch size limiting
+// @internal
 #[test]
 fn test_sync_controller_batch_size_config() {
     let storage = create_test_storage();
@@ -242,6 +255,7 @@ fn test_sync_controller_batch_size_config() {
 }
 
 // @scenario: sync_updates :: Sync contact not connected
+// @internal
 #[test]
 fn test_sync_contact_not_connected() {
     let storage = create_test_storage();
@@ -257,6 +271,7 @@ fn test_sync_contact_not_connected() {
 }
 
 // @scenario: sync_updates :: Connection state tracking
+// @internal
 #[test]
 fn test_sync_controller_connection_state() {
     use vauchi_core::network::ConnectionState;
@@ -281,6 +296,7 @@ fn test_sync_controller_connection_state() {
 }
 
 // @scenario: sync_updates :: Sync status across contacts
+// @internal
 #[test]
 fn test_sync_controller_sync_status() {
     let storage = create_test_storage();
@@ -296,6 +312,7 @@ fn test_sync_controller_sync_status() {
 }
 
 // @scenario: sync_updates :: Relay accessor methods
+// @internal
 #[test]
 fn test_sync_controller_relay_accessors() {
     let storage = create_test_storage();
@@ -323,6 +340,7 @@ fn test_sync_controller_relay_accessors() {
 }
 
 // @scenario: sync_updates :: Ratchet removal for non-existent contact
+// @internal
 #[test]
 fn test_sync_controller_remove_nonexistent_ratchet() {
     let storage = create_test_storage();
@@ -339,6 +357,7 @@ fn test_sync_controller_remove_nonexistent_ratchet() {
     );
 }
 
+// @internal
 #[test]
 fn test_sync_controller_sync_contact_no_ratchet() {
     let storage = create_test_storage();
@@ -354,6 +373,7 @@ fn test_sync_controller_sync_contact_no_ratchet() {
     assert!(matches!(result, Err(VauchiError::InvalidState(_))));
 }
 
+// @internal
 #[test]
 fn test_sync_controller_sync_contact_with_ratchet() {
     let storage = create_test_storage();
@@ -393,6 +413,7 @@ fn create_test_registry(master_seed: &[u8; 32], device: &DeviceInfo) -> DeviceRe
 // test_sync_controller_send_device_sync removed (SP-33): send_device_sync
 // reimplemented via EncryptedUpdate + self-token (Task 4.3 done).
 
+// @internal
 #[test]
 fn test_sync_controller_process_device_sync() {
     let storage = create_test_storage();

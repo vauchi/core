@@ -16,6 +16,7 @@ use vauchi_core::{ContactCard, ContactField, FieldType, Identity, Storage, Symme
 // Contract: Storage::open() (Consumers: TUI, Desktop)
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_storage_open_returns_result() {
     let dir = tempfile::tempdir().unwrap();
@@ -29,6 +30,7 @@ fn provider_contract_storage_open_returns_result() {
 // Contract: Storage identity persistence (Consumers: TUI, Desktop)
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_storage_save_load_identity() {
     let dir = tempfile::tempdir().unwrap();
@@ -49,6 +51,7 @@ fn provider_contract_storage_save_load_identity() {
 // Contract: Storage card persistence (Consumers: TUI, Desktop)
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_storage_save_load_own_card_with_fields() {
     let dir = tempfile::tempdir().unwrap();
@@ -71,6 +74,7 @@ fn provider_contract_storage_save_load_own_card_with_fields() {
 // Contract: Storage contacts list (Consumers: TUI, Desktop)
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_storage_list_contacts_returns_vec() {
     let dir = tempfile::tempdir().unwrap();
@@ -80,6 +84,7 @@ fn provider_contract_storage_list_contacts_returns_vec() {
     assert!(contacts.is_empty());
 }
 
+// @internal
 #[test]
 fn provider_contract_storage_search_contacts_returns_vec() {
     let dir = tempfile::tempdir().unwrap();
@@ -93,6 +98,7 @@ fn provider_contract_storage_search_contacts_returns_vec() {
 // Contract: Identity creation and accessors (Consumers: TUI, Desktop)
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_identity_create_has_all_fields() {
     let identity = Identity::create("ProviderIdentity");
@@ -102,6 +108,7 @@ fn provider_contract_identity_create_has_all_fields() {
     assert!(!identity.signing_public_key().is_empty());
 }
 
+// @internal
 #[test]
 fn provider_contract_identity_set_display_name() {
     let mut identity = Identity::create("Before");
@@ -109,6 +116,7 @@ fn provider_contract_identity_set_display_name() {
     assert_eq!(identity.display_name(), "After");
 }
 
+// @internal
 #[test]
 fn provider_contract_identity_x3dh_keypair() {
     let identity = Identity::create("X3dhTest");
@@ -120,6 +128,7 @@ fn provider_contract_identity_x3dh_keypair() {
 // Contract: ContactCard mutations (Consumer: Desktop)
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_contact_card_remove_field() {
     let mut card = ContactCard::new("Mut");
@@ -130,6 +139,7 @@ fn provider_contract_contact_card_remove_field() {
     assert!(card.fields().is_empty());
 }
 
+// @internal
 #[test]
 fn provider_contract_contact_field_id_is_nonempty() {
     let mut card = ContactCard::new("Id");
@@ -142,12 +152,14 @@ fn provider_contract_contact_field_id_is_nonempty() {
 // Contract: SymmetricKey (Consumers: TUI, Desktop)
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_symmetric_key_generate_32_bytes() {
     let key = SymmetricKey::generate();
     assert_eq!(key.as_bytes().len(), 32);
 }
 
+// @internal
 #[test]
 fn provider_contract_symmetric_key_from_bytes() {
     let bytes = [0x55; 32];
@@ -159,6 +171,7 @@ fn provider_contract_symmetric_key_from_bytes() {
 // Contract: Exchange types exist (Consumer: Desktop)
 // ============================================================
 
+// @internal
 #[test]
 fn provider_contract_exchange_types_accessible() {
     use vauchi_core::exchange::{ExchangeEvent, ManualConfirmationVerifier};

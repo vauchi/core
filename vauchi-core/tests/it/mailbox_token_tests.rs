@@ -7,6 +7,7 @@ use vauchi_core::network::mailbox_token::{
     batch_register_tokens, compute_mailbox_token, compute_self_token, token_hex,
 };
 
+// @internal
 #[test]
 fn test_contact_mailbox_token_deterministic() {
     let shared_key = [0x42u8; 32];
@@ -17,6 +18,7 @@ fn test_contact_mailbox_token_deterministic() {
     assert_eq!(t1.len(), 32);
 }
 
+// @internal
 #[test]
 fn test_contact_mailbox_token_rotates_daily() {
     let shared_key = [0x42u8; 32];
@@ -25,6 +27,7 @@ fn test_contact_mailbox_token_rotates_daily() {
     assert_ne!(day1, day2);
 }
 
+// @internal
 #[test]
 fn test_different_contacts_produce_different_tokens() {
     let key_a = [0x42u8; 32];
@@ -35,6 +38,7 @@ fn test_different_contacts_produce_different_tokens() {
     assert_ne!(t_a, t_b);
 }
 
+// @internal
 #[test]
 fn test_self_token_deterministic_across_devices() {
     let master_seed = [0xAAu8; 32];
@@ -44,6 +48,7 @@ fn test_self_token_deterministic_across_devices() {
     assert_eq!(t1, t2);
 }
 
+// @internal
 #[test]
 fn test_self_token_differs_from_contact_token() {
     let key = [0x42u8; 32];
@@ -53,6 +58,7 @@ fn test_self_token_differs_from_contact_token() {
     assert_ne!(contact, self_tok);
 }
 
+// @internal
 #[test]
 fn test_token_hex_produces_64_char_hex() {
     let token = compute_mailbox_token(&[0x42u8; 32], 19804);
@@ -61,6 +67,7 @@ fn test_token_hex_produces_64_char_hex() {
     assert!(hex.chars().all(|c| c.is_ascii_hexdigit()));
 }
 
+// @internal
 #[test]
 fn test_batch_tokens_padded_to_256() {
     let contacts: Vec<[u8; 32]> = (0..5).map(|i| [i as u8; 32]).collect();
@@ -72,6 +79,7 @@ fn test_batch_tokens_padded_to_256() {
     }
 }
 
+// @internal
 #[test]
 fn test_batch_tokens_no_duplicates() {
     let contacts: Vec<[u8; 32]> = (0..5).map(|i| [i as u8; 32]).collect();
@@ -85,6 +93,7 @@ fn test_batch_tokens_no_duplicates() {
     assert!(sorted.len() >= 250);
 }
 
+// @internal
 #[test]
 fn test_batch_tokens_historical_catchup() {
     let contacts: Vec<[u8; 32]> = vec![[0x01; 32]];
@@ -96,6 +105,7 @@ fn test_batch_tokens_historical_catchup() {
     }
 }
 
+// @internal
 #[test]
 fn test_batch_tokens_many_contacts_splits() {
     // 200 contacts × 2 tokens/day (+ previous-day skew) + 2 self tokens = 402 real tokens
@@ -120,6 +130,7 @@ fn test_batch_tokens_many_contacts_splits() {
     }
 }
 
+// @internal
 #[test]
 fn test_batch_tokens_shuffled() {
     // Two calls with identical inputs should produce different orderings.
@@ -141,6 +152,7 @@ fn test_batch_tokens_shuffled() {
     );
 }
 
+// @internal
 #[test]
 fn test_batch_tokens_no_contacts_returns_one_batch() {
     let master_seed = [0xEEu8; 32];
@@ -150,6 +162,7 @@ fn test_batch_tokens_no_contacts_returns_one_batch() {
 }
 
 proptest! {
+// @internal
     #[test]
     fn prop_different_contacts_produce_unlinkable_tokens(
         key_a in prop::array::uniform32(any::<u8>()),

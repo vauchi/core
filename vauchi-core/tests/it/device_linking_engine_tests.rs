@@ -4,6 +4,7 @@
 
 use vauchi_app::ui::*;
 
+// @internal
 #[test]
 fn link_starts_at_show_qr() {
     let engine = DeviceLinkingEngine::new("vauchi://link?token=abc123".to_string());
@@ -20,6 +21,7 @@ fn link_starts_at_show_qr() {
     );
 }
 
+// @internal
 #[test]
 fn link_shows_qr_data() {
     let engine = DeviceLinkingEngine::new("vauchi://link?token=abc123".to_string());
@@ -43,6 +45,7 @@ fn link_shows_qr_data() {
     }
 }
 
+// @internal
 #[test]
 fn link_peer_connected_shows_verify() {
     let mut engine = DeviceLinkingEngine::new("data".to_string());
@@ -75,6 +78,7 @@ fn link_peer_connected_shows_verify() {
     }
 }
 
+// @internal
 #[test]
 fn link_confirm_starts_sync() {
     let mut engine = DeviceLinkingEngine::new("data".to_string());
@@ -100,6 +104,7 @@ fn link_confirm_starts_sync() {
     }
 }
 
+// @internal
 #[test]
 fn link_reject_restarts() {
     let mut engine = DeviceLinkingEngine::new("data".to_string());
@@ -117,6 +122,7 @@ fn link_reject_restarts() {
     }
 }
 
+// @internal
 #[test]
 fn link_sync_complete_shows_success() {
     let mut engine = DeviceLinkingEngine::new("data".to_string());
@@ -137,6 +143,7 @@ fn link_sync_complete_shows_success() {
     }
 }
 
+// @internal
 #[test]
 fn link_done_completes() {
     let mut engine = DeviceLinkingEngine::new("data".to_string());
@@ -157,6 +164,7 @@ fn link_done_completes() {
     );
 }
 
+// @internal
 #[test]
 fn peer_connected_is_noop_outside_show_qr() {
     let mut engine = DeviceLinkingEngine::new("data".to_string());
@@ -172,6 +180,7 @@ fn peer_connected_is_noop_outside_show_qr() {
     }
 }
 
+// @internal
 #[test]
 fn sync_complete_is_noop_outside_syncing() {
     let mut engine = DeviceLinkingEngine::new("data".to_string());
@@ -185,6 +194,7 @@ fn sync_complete_is_noop_outside_syncing() {
     assert_eq!(engine.current_screen().screen_id, "link_verify");
 }
 
+// @internal
 #[test]
 fn link_cancel_from_show_qr() {
     let mut engine = DeviceLinkingEngine::new("data".to_string());

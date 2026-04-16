@@ -13,6 +13,7 @@ fn create_test_vauchi() -> Vauchi {
     Vauchi::in_memory().unwrap()
 }
 
+// @internal
 #[test]
 fn test_vauchi_create_identity() {
     let mut wb = create_test_vauchi();
@@ -25,6 +26,7 @@ fn test_vauchi_create_identity() {
     assert_eq!(wb.identity().unwrap().display_name(), "Alice");
 }
 
+// @internal
 #[test]
 fn test_vauchi_create_identity_twice_fails() {
     let mut wb = create_test_vauchi();
@@ -35,6 +37,7 @@ fn test_vauchi_create_identity_twice_fails() {
     assert!(matches!(result, Err(VauchiError::AlreadyInitialized)));
 }
 
+// @internal
 #[test]
 fn test_vauchi_own_card() {
     let mut wb = create_test_vauchi();
@@ -44,6 +47,7 @@ fn test_vauchi_own_card() {
     assert_eq!(card.display_name(), "Alice");
 }
 
+// @internal
 #[test]
 fn test_vauchi_update_own_card() {
     let mut wb = create_test_vauchi();
@@ -63,6 +67,7 @@ fn test_vauchi_update_own_card() {
     assert!(loaded.fields().iter().any(|f| f.label() == "email"));
 }
 
+// @internal
 #[test]
 fn test_vauchi_add_own_field() {
     let mut wb = create_test_vauchi();
@@ -75,6 +80,7 @@ fn test_vauchi_add_own_field() {
     assert!(card.fields().iter().any(|f| f.label() == "phone"));
 }
 
+// @internal
 #[test]
 fn test_vauchi_remove_own_field() {
     let mut wb = create_test_vauchi();
@@ -92,6 +98,7 @@ fn test_vauchi_remove_own_field() {
     assert!(!card.fields().iter().any(|f| f.label() == "phone"));
 }
 
+// @internal
 #[test]
 fn test_vauchi_contact_operations() {
     let wb = create_test_vauchi();
@@ -120,6 +127,7 @@ fn test_vauchi_contact_operations() {
     assert_eq!(wb.contact_count().unwrap(), 0);
 }
 
+// @internal
 #[test]
 fn test_vauchi_verify_fingerprint() {
     let wb = create_test_vauchi();
@@ -140,6 +148,7 @@ fn test_vauchi_verify_fingerprint() {
     assert!(loaded.is_fingerprint_verified());
 }
 
+// @internal
 #[test]
 fn test_contact_fingerprint_format() {
     let contact = Contact::from_exchange(
@@ -175,6 +184,7 @@ fn test_contact_fingerprint_format() {
     );
 }
 
+// @internal
 #[test]
 fn test_vauchi_own_fingerprint() {
     let mut wb = create_test_vauchi();
@@ -201,6 +211,7 @@ fn test_vauchi_own_fingerprint() {
     }
 }
 
+// @internal
 #[test]
 fn test_vauchi_public_id() {
     let mut wb = create_test_vauchi();
@@ -216,6 +227,7 @@ fn test_vauchi_public_id() {
     assert!(!public_id.is_empty());
 }
 
+// @internal
 #[test]
 fn test_vauchi_builder() {
     let dir = tempfile::tempdir().unwrap();
@@ -229,6 +241,7 @@ fn test_vauchi_builder() {
     assert_eq!(wb.config().relay.server_url, "https://relay.example.com");
 }
 
+// @internal
 #[test]
 fn test_vauchi_builder_with_identity() {
     let dir = tempfile::tempdir().unwrap();
@@ -246,6 +259,7 @@ fn test_vauchi_builder_with_identity() {
     assert_eq!(wb.public_id().unwrap(), public_id);
 }
 
+// @internal
 #[test]
 fn test_propagate_card_update_to_contacts() {
     use vauchi_core::exchange::X3DHKeyPair;
@@ -285,6 +299,7 @@ fn test_propagate_card_update_to_contacts() {
     assert_eq!(pending[0].update_type, "card_delta");
 }
 
+// @internal
 #[test]
 fn test_propagate_skips_contacts_without_ratchet() {
     let mut wb = create_test_vauchi();
@@ -309,6 +324,7 @@ fn test_propagate_skips_contacts_without_ratchet() {
     assert_eq!(queued, 0);
 }
 
+// @internal
 #[test]
 fn test_propagate_empty_delta_not_queued() {
     use vauchi_core::exchange::X3DHKeyPair;
@@ -338,6 +354,7 @@ fn test_propagate_empty_delta_not_queued() {
     assert!(pending.is_empty());
 }
 
+// @internal
 #[test]
 fn test_propagate_respects_visibility_rules() {
     use vauchi_core::exchange::X3DHKeyPair;
@@ -382,6 +399,7 @@ fn test_propagate_respects_visibility_rules() {
     );
 }
 
+// @internal
 #[test]
 fn test_propagate_partial_visibility() {
     use vauchi_core::exchange::X3DHKeyPair;
@@ -428,6 +446,7 @@ fn test_propagate_partial_visibility() {
     assert_eq!(pending.len(), 1);
 }
 
+// @internal
 #[test]
 fn test_process_incoming_card_update() {
     use vauchi_core::Identity;
@@ -507,6 +526,7 @@ fn test_process_incoming_card_update() {
     assert!(bob_card.fields().iter().any(|f| f.label() == "work"));
 }
 
+// @internal
 #[test]
 fn test_update_display_name() {
     let mut wb = create_test_vauchi();
@@ -528,6 +548,7 @@ fn test_update_display_name() {
 }
 
 // @scenario: identity.feature - Display name change dispatches OwnCardUpdated event
+// @internal
 #[test]
 fn test_update_display_name_dispatches_event() {
     let mut wb = create_test_vauchi();
@@ -561,6 +582,7 @@ fn test_update_display_name_dispatches_event() {
 }
 
 // @scenario: identity.feature - Same display name does not dispatch event
+// @internal
 #[test]
 fn test_update_display_name_same_value_no_event() {
     let mut wb = create_test_vauchi();
@@ -587,6 +609,7 @@ fn test_update_display_name_same_value_no_event() {
     );
 }
 
+// @internal
 #[test]
 fn test_update_display_name_empty_fails() {
     let mut wb = create_test_vauchi();
@@ -601,6 +624,7 @@ fn test_update_display_name_empty_fails() {
     result.expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_update_display_name_too_long_fails() {
     let mut wb = create_test_vauchi();
@@ -612,6 +636,7 @@ fn test_update_display_name_too_long_fails() {
     result.expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_update_display_name_no_identity_fails() {
     let mut wb = create_test_vauchi();
@@ -621,6 +646,7 @@ fn test_update_display_name_no_identity_fails() {
     assert!(matches!(result, Err(VauchiError::IdentityNotInitialized)));
 }
 
+// @internal
 #[test]
 fn test_process_update_rejects_invalid_signature() {
     use vauchi_core::Identity;
@@ -692,6 +718,7 @@ fn test_process_update_rejects_invalid_signature() {
 
 // === Malformed data tests for process_card_update (#195) ===
 
+// @internal
 #[test]
 fn test_process_card_update_truncated_message() {
     // Truncated ratchet message should fail deserialization
@@ -722,6 +749,7 @@ fn test_process_card_update_truncated_message() {
     assert!(result.is_err(), "Truncated message should be rejected");
 }
 
+// @internal
 #[test]
 fn test_process_card_update_empty_payload() {
     let mut alice_wb = create_test_vauchi();
@@ -751,6 +779,7 @@ fn test_process_card_update_empty_payload() {
     assert!(result.is_err(), "Empty payload should be rejected");
 }
 
+// @internal
 #[test]
 fn test_process_card_update_malformed_json_in_ratchet() {
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
@@ -789,6 +818,7 @@ fn test_process_card_update_malformed_json_in_ratchet() {
     assert!(result.is_err(), "Malformed delta JSON should be rejected");
 }
 
+// @internal
 #[test]
 fn test_process_card_update_unknown_contact() {
     let mut alice_wb = create_test_vauchi();

@@ -8,6 +8,7 @@
 use vauchi_core::crypto::*;
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_basic_roundtrip() {
     let key = SymmetricKey::generate();
@@ -18,6 +19,7 @@ fn test_basic_roundtrip() {
 }
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_empty_data() {
     let key = SymmetricKey::generate();
@@ -30,6 +32,7 @@ fn test_empty_data() {
 // --- SP-9 #227: SymmetricKey::from_bytes validation ---
 
 // @scenario: security :: Sufficient key lengths
+// @internal
 #[test]
 #[should_panic(expected = "all-zeros key is degenerate")]
 fn test_symmetric_key_rejects_all_zeros() {
@@ -37,6 +40,7 @@ fn test_symmetric_key_rejects_all_zeros() {
 }
 
 // @scenario: security :: Sufficient key lengths
+// @internal
 #[test]
 fn test_symmetric_key_accepts_nonzero() {
     let mut bytes = [0u8; 32];
@@ -47,6 +51,7 @@ fn test_symmetric_key_accepts_nonzero() {
 
 // --- K-L1: try_from_bytes returns Result instead of panicking ---
 
+// @internal
 #[test]
 fn test_try_from_bytes_rejects_all_zeros() {
     let result = SymmetricKey::try_from_bytes([0u8; 32]);
@@ -59,6 +64,7 @@ fn test_try_from_bytes_rejects_all_zeros() {
     );
 }
 
+// @internal
 #[test]
 fn test_try_from_bytes_accepts_nonzero() {
     let mut bytes = [0u8; 32];
@@ -70,6 +76,7 @@ fn test_try_from_bytes_accepts_nonzero() {
 // --- SP-9 #231: Unknown algorithm tags are rejected ---
 
 // @scenario: security :: Correct algorithms used
+// @internal
 #[test]
 fn test_unknown_algorithm_tag_rejected() {
     let key = SymmetricKey::generate();
@@ -97,6 +104,7 @@ fn test_unknown_algorithm_tag_rejected() {
 }
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_encrypt_with_ad_prevents_ad_mismatch() {
     let key = SymmetricKey::generate();
@@ -115,6 +123,7 @@ fn test_encrypt_with_ad_prevents_ad_mismatch() {
 }
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_ad_bound_ciphertext_cannot_use_plain_decrypt() {
     let key = SymmetricKey::generate();
@@ -135,12 +144,14 @@ fn test_ad_bound_ciphertext_cannot_use_plain_decrypt() {
 // --- SP-9 #234: HKDF derive_key vs derive flexibility ---
 
 // @scenario: security :: Correct algorithms used
+// @internal
 #[test]
 fn test_hkdf_derive_key_produces_32_bytes() {
     let key = HKDF::derive_key(Some(b"salt"), b"ikm", b"info");
     assert_eq!(key.len(), 32);
 }
 
+// @internal
 #[test]
 fn test_hkdf_derive_variable_length() {
     let result16 = HKDF::derive(Some(b"salt"), b"ikm", b"info", 16).unwrap();
@@ -155,6 +166,7 @@ fn test_hkdf_derive_variable_length() {
     assert_eq!(result32, key32.to_vec());
 }
 
+// @internal
 #[test]
 fn test_hkdf_different_info_different_keys() {
     let key_a = HKDF::derive_key(Some(b"salt"), b"ikm", b"domain A");
@@ -162,6 +174,7 @@ fn test_hkdf_different_info_different_keys() {
     assert_ne!(key_a, key_b, "Different info must produce different keys");
 }
 
+// @internal
 #[test]
 fn test_hkdf_different_salt_different_keys() {
     let key_a = HKDF::derive_key(Some(b"salt1"), b"ikm", b"info");
@@ -175,6 +188,7 @@ fn test_hkdf_different_salt_different_keys() {
 //  Public key comparisons correctly use standard == since they are non-secret.)
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_wrong_key_cannot_decrypt() {
     let key1 = SymmetricKey::generate();

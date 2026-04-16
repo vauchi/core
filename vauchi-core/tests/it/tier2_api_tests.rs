@@ -26,6 +26,7 @@ fn now() -> u64 {
 // API 1: find_device_by_prefix (facade)
 // ============================================================
 
+// @internal
 #[test]
 fn test_vauchi_find_device_by_prefix_with_registry() {
     let mut wb = create_test_vauchi();
@@ -51,6 +52,7 @@ fn test_vauchi_find_device_by_prefix_with_registry() {
     assert_eq!(found.unwrap().device_id_hex(), hex_id);
 }
 
+// @internal
 #[test]
 fn test_vauchi_find_device_by_prefix_no_registry() {
     let mut wb = create_test_vauchi();
@@ -68,6 +70,7 @@ fn test_vauchi_find_device_by_prefix_no_registry() {
 // API 2: get_delivery_status_for_contact / get_failed_deliveries
 // ============================================================
 
+// @internal
 #[test]
 fn test_get_delivery_status_for_contact_returns_matching_records() {
     let mut wb = create_test_vauchi();
@@ -124,6 +127,7 @@ fn test_get_delivery_status_for_contact_returns_matching_records() {
     assert!(message_ids.contains(&"msg-003"), "Should contain msg-003");
 }
 
+// @internal
 #[test]
 fn test_get_delivery_status_for_contact_returns_empty_for_unknown() {
     let mut wb = create_test_vauchi();
@@ -136,6 +140,7 @@ fn test_get_delivery_status_for_contact_returns_empty_for_unknown() {
     );
 }
 
+// @internal
 #[test]
 fn test_get_failed_deliveries_returns_only_failed() {
     let mut wb = create_test_vauchi();
@@ -235,6 +240,7 @@ fn contact_id_for_seed(seed_byte: u8) -> String {
     hex::encode([seed_byte; 32])
 }
 
+// @internal
 #[test]
 fn test_apply_sync_items_processes_contact_added() {
     let mut wb = create_test_vauchi();
@@ -259,6 +265,7 @@ fn test_apply_sync_items_processes_contact_added() {
     assert_eq!(contact.unwrap().display_name(), "Bob");
 }
 
+// @internal
 #[test]
 fn test_apply_sync_items_processes_contact_removed() {
     let mut wb = create_test_vauchi();
@@ -287,6 +294,7 @@ fn test_apply_sync_items_processes_contact_removed() {
     assert!(contact.is_none(), "Contact should be removed after sync");
 }
 
+// @internal
 #[test]
 fn test_apply_sync_items_processes_visibility_changed() {
     let mut wb = create_test_vauchi();
@@ -321,6 +329,7 @@ fn test_apply_sync_items_processes_visibility_changed() {
     );
 }
 
+// @internal
 #[test]
 fn test_apply_sync_items_empty_list_returns_zero() {
     let mut wb = create_test_vauchi();
@@ -334,6 +343,7 @@ fn test_apply_sync_items_empty_list_returns_zero() {
 // SyncResult convenience methods (V13)
 // ============================================================
 
+// @internal
 #[test]
 fn test_sync_result_total_sums_all_operations() {
     let result = SyncResult {
@@ -350,6 +360,7 @@ fn test_sync_result_total_sums_all_operations() {
     );
 }
 
+// @internal
 #[test]
 fn test_sync_result_total_zero_for_default() {
     let result = SyncResult::default();
@@ -360,6 +371,7 @@ fn test_sync_result_total_zero_for_default() {
     );
 }
 
+// @internal
 #[test]
 fn test_sync_result_has_changes_true_when_sent() {
     let result = SyncResult {
@@ -372,6 +384,7 @@ fn test_sync_result_has_changes_true_when_sent() {
     );
 }
 
+// @internal
 #[test]
 fn test_sync_result_has_changes_true_when_acknowledged() {
     let result = SyncResult {
@@ -384,6 +397,7 @@ fn test_sync_result_has_changes_true_when_acknowledged() {
     );
 }
 
+// @internal
 #[test]
 fn test_sync_result_has_changes_false_for_default() {
     let result = SyncResult::default();

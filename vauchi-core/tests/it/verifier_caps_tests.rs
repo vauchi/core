@@ -14,11 +14,13 @@ use vauchi_core::exchange::transport::TransportCaps;
 
 // ===== Bit values =====
 
+// @internal
 #[test]
 fn ambient_audio_bit_is_0x40() {
     assert_eq!(TransportCaps::AMBIENT_AUDIO.bits(), 0x0040);
 }
 
+// @internal
 #[test]
 fn accelerometer_bit_is_0x80() {
     assert_eq!(TransportCaps::ACCELEROMETER.bits(), 0x0080);
@@ -26,6 +28,7 @@ fn accelerometer_bit_is_0x80() {
 
 // ===== No overlap with existing transport bits =====
 
+// @internal
 #[test]
 fn verifier_bits_do_not_overlap_transport_bits() {
     let transport_bits = TransportCaps::STATIC_QR
@@ -43,6 +46,7 @@ fn verifier_bits_do_not_overlap_transport_bits() {
 
 // ===== Wire-format roundtrip =====
 
+// @internal
 #[test]
 fn ambient_audio_roundtrip() {
     let caps = TransportCaps::STATIC_QR | TransportCaps::AMBIENT_AUDIO;
@@ -53,6 +57,7 @@ fn ambient_audio_roundtrip() {
     assert!(restored.contains(TransportCaps::STATIC_QR));
 }
 
+// @internal
 #[test]
 fn accelerometer_roundtrip() {
     let caps = TransportCaps::BLE | TransportCaps::ACCELEROMETER;
@@ -63,6 +68,7 @@ fn accelerometer_roundtrip() {
     assert!(restored.contains(TransportCaps::BLE));
 }
 
+// @internal
 #[test]
 fn both_verifier_caps_roundtrip() {
     let caps = TransportCaps::STATIC_QR
@@ -76,6 +82,7 @@ fn both_verifier_caps_roundtrip() {
 
 // ===== Backward compatibility =====
 
+// @internal
 #[test]
 fn v2_peer_without_verifier_caps_still_works() {
     // v2 peer only advertises transports, no verifier bits
@@ -84,6 +91,7 @@ fn v2_peer_without_verifier_caps_still_works() {
     assert!(!v2_caps.contains(TransportCaps::ACCELEROMETER));
 }
 
+// @internal
 #[test]
 fn verifier_caps_do_not_affect_transport_negotiation() {
     // Adding verifier caps should not change which transport is selected
@@ -102,6 +110,7 @@ fn verifier_caps_do_not_affect_transport_negotiation() {
 
 // ===== Intersection for verifier negotiation =====
 
+// @internal
 #[test]
 fn both_peers_have_ambient_audio() {
     let ours = TransportCaps::STATIC_QR | TransportCaps::AMBIENT_AUDIO;
@@ -110,6 +119,7 @@ fn both_peers_have_ambient_audio() {
     assert!(common.contains(TransportCaps::AMBIENT_AUDIO));
 }
 
+// @internal
 #[test]
 fn only_one_peer_has_accelerometer() {
     let ours = TransportCaps::STATIC_QR | TransportCaps::ACCELEROMETER;

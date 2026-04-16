@@ -10,6 +10,7 @@ use vauchi_core::api::SyncConfig;
 
 // --- C1: Post-Exchange Sync Delay ---
 
+// @internal
 #[test]
 fn test_post_exchange_delay_in_range() {
     let config = SyncConfig {
@@ -30,6 +31,7 @@ fn test_post_exchange_delay_in_range() {
     }
 }
 
+// @internal
 #[test]
 fn test_post_exchange_delay_min_equals_max() {
     let config = SyncConfig {
@@ -41,6 +43,7 @@ fn test_post_exchange_delay_min_equals_max() {
     assert_eq!(delay, Duration::from_secs(60));
 }
 
+// @internal
 #[test]
 fn test_post_exchange_delay_min_greater_than_max() {
     let config = SyncConfig {
@@ -58,6 +61,7 @@ fn test_post_exchange_delay_min_greater_than_max() {
 
 // --- C2: Sync Interval Jitter ---
 
+// @internal
 #[test]
 fn test_jittered_sync_interval_in_range() {
     let config = SyncConfig {
@@ -78,6 +82,7 @@ fn test_jittered_sync_interval_in_range() {
     }
 }
 
+// @internal
 #[test]
 fn test_zero_jitter_returns_exact_interval() {
     let config = SyncConfig {
@@ -89,6 +94,7 @@ fn test_zero_jitter_returns_exact_interval() {
     assert_eq!(interval, Duration::from_secs(60));
 }
 
+// @internal
 #[test]
 fn test_jitter_capped_at_50_percent() {
     let config = SyncConfig {
@@ -111,6 +117,7 @@ fn test_jitter_capped_at_50_percent() {
 
 // --- C3: Padding Config ---
 
+// @internal
 #[test]
 fn test_padding_config_defaults_to_enabled() {
     let config = SyncConfig::default();
@@ -119,6 +126,7 @@ fn test_padding_config_defaults_to_enabled() {
 
 // --- Default values ---
 
+// @internal
 #[test]
 fn test_sync_config_timing_defaults() {
     let config = SyncConfig::default();

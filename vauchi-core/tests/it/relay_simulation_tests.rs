@@ -21,6 +21,7 @@ use vauchi_core::{
 // =============================================================================
 
 /// Test: Relay client connects and disconnects cleanly
+// @internal
 #[test]
 fn test_relay_connect_disconnect() {
     let transport = MockTransport::new();
@@ -47,6 +48,7 @@ fn test_relay_connect_disconnect() {
 }
 
 /// Test: Reconnection after disconnect
+// @internal
 #[test]
 fn test_relay_reconnection() {
     let transport = MockTransport::new();
@@ -78,6 +80,7 @@ fn test_relay_reconnection() {
 /// Test: Sending update through relay
 // @scenario: relay_network :: Automatic fallback to relay
 // @scenario: sync_updates :: Sync via WebSocket relay
+// @internal
 #[test]
 fn test_relay_send_update() {
     let transport = MockTransport::new();
@@ -115,6 +118,7 @@ fn test_relay_send_update() {
 
 /// Test: Multiple messages tracked in-flight
 // @scenario: relay_network :: Relay stores messages for offline contacts
+// @internal
 #[test]
 fn test_relay_multiple_in_flight() {
     let transport = MockTransport::new();
@@ -159,6 +163,7 @@ fn test_relay_multiple_in_flight() {
 
 /// Test: Sync manager queues updates for delivery
 // @scenario: relay_network :: Relay stores messages for offline contacts
+// @internal
 #[test]
 fn test_sync_manager_queue_for_relay() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -194,6 +199,7 @@ fn test_sync_manager_queue_for_relay() {
 }
 
 /// Test: Marking updates as delivered clears pending
+// @internal
 #[test]
 fn test_sync_manager_mark_delivered() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -223,6 +229,7 @@ fn test_sync_manager_mark_delivered() {
 }
 
 /// Test: Sync state reflects pending count
+// @internal
 #[test]
 fn test_sync_state_pending_count() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -257,6 +264,7 @@ fn test_sync_state_pending_count() {
 // @scenario: relay_network :: Relay only sees encrypted blobs
 // @scenario: sync_updates :: Sync via WebSocket relay
 // @scenario: sync_updates :: All sync traffic is encrypted
+// @internal
 #[test]
 fn test_full_update_propagation() {
     // Set up Alice and Bob
@@ -359,6 +367,7 @@ fn test_full_update_propagation() {
 
 /// Test: Relay client config values are respected
 // @scenario: relay_network :: Relay node configuration
+// @internal
 #[test]
 fn test_relay_config() {
     let transport = MockTransport::new();
@@ -381,6 +390,7 @@ fn test_relay_config() {
 
 /// Test: Default transport config
 // @scenario: relay_network :: Relay node configuration
+// @internal
 #[test]
 fn test_default_transport_config() {
     let config = TransportConfig::default();
@@ -394,6 +404,7 @@ fn test_default_transport_config() {
 // =============================================================================
 
 /// Test: Empty payload handling
+// @internal
 #[test]
 fn test_relay_empty_payload() {
     let transport = MockTransport::new();
@@ -420,6 +431,7 @@ fn test_relay_empty_payload() {
 
 /// Test: Large payload handling
 // @scenario: relay_network :: Storage limits per blob
+// @internal
 #[test]
 fn test_relay_large_payload() {
     let transport = MockTransport::new();

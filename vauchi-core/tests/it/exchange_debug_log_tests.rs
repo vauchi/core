@@ -10,6 +10,7 @@ use vauchi_core::diagnostic::exchange_debug::{ExchangeDebugEvent, ExchangeDebugL
 
 // ===== Basic event collection =====
 
+// @internal
 #[test]
 fn empty_log_has_no_events() {
     let log = ExchangeDebugLog::new();
@@ -17,6 +18,7 @@ fn empty_log_has_no_events() {
     assert!(log.to_jsonl().is_empty());
 }
 
+// @internal
 #[test]
 fn push_event_records_with_timestamp() {
     let mut log = ExchangeDebugLog::new();
@@ -34,6 +36,7 @@ fn push_event_records_with_timestamp() {
     }
 }
 
+// @internal
 #[test]
 fn multiple_events_have_increasing_timestamps() {
     let mut log = ExchangeDebugLog::new();
@@ -52,6 +55,7 @@ fn multiple_events_have_increasing_timestamps() {
 
 // ===== Event variant coverage =====
 
+// @internal
 #[test]
 fn all_event_variants_are_serializable() {
     let mut log = ExchangeDebugLog::new();
@@ -97,6 +101,7 @@ fn all_event_variants_are_serializable() {
 
 // ===== JSONL export =====
 
+// @internal
 #[test]
 fn jsonl_contains_event_type_tags() {
     let mut log = ExchangeDebugLog::new();
@@ -116,6 +121,7 @@ fn jsonl_contains_event_type_tags() {
 
 // ===== Markdown export =====
 
+// @internal
 #[test]
 fn to_markdown_empty_log() {
     let log = ExchangeDebugLog::new();
@@ -125,6 +131,7 @@ fn to_markdown_empty_log() {
     assert!(!md.contains("|---:|---|"));
 }
 
+// @internal
 #[test]
 fn to_markdown_with_events() {
     let mut log = ExchangeDebugLog::new();
@@ -147,6 +154,7 @@ fn to_markdown_with_events() {
     assert!(md.contains("| 0 |") || md.contains("| 1 |"));
 }
 
+// @internal
 #[test]
 fn to_markdown_includes_event_details() {
     let mut log = ExchangeDebugLog::new();
@@ -158,6 +166,7 @@ fn to_markdown_includes_event_details() {
     assert!(md.contains("timeout"));
 }
 
+// @internal
 #[test]
 fn to_markdown_shows_transport_and_confidence_values() {
     let mut log = ExchangeDebugLog::new();

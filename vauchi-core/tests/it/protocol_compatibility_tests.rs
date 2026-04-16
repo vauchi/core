@@ -212,6 +212,7 @@ const SERIALIZED_RATCHET_STATE_V1: &str = r#"{
 // TESTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_ratchet_message_compatibility_v1() {
     use vauchi_core::crypto::ratchet::RatchetMessage;
@@ -236,6 +237,7 @@ fn test_ratchet_message_compatibility_v1() {
     assert_eq!(msg.ciphertext, reparsed.ciphertext);
 }
 
+// @internal
 #[test]
 fn test_contact_card_compatibility_v1() {
     use vauchi_core::ContactCard;
@@ -268,6 +270,7 @@ fn test_contact_card_compatibility_v1() {
     assert_eq!(card.fields().len(), reparsed.fields().len());
 }
 
+// @internal
 #[test]
 fn test_field_type_variants_compatibility_v1() {
     use vauchi_core::ContactField;
@@ -292,6 +295,7 @@ fn test_field_type_variants_compatibility_v1() {
     assert_eq!(custom.label(), "Notes");
 }
 
+// @internal
 #[test]
 fn test_card_delta_added_compatibility_v1() {
     use vauchi_core::sync::CardDelta;
@@ -313,6 +317,7 @@ fn test_card_delta_added_compatibility_v1() {
     }
 }
 
+// @internal
 #[test]
 fn test_card_delta_modified_compatibility_v1() {
     use vauchi_core::sync::CardDelta;
@@ -335,6 +340,7 @@ fn test_card_delta_modified_compatibility_v1() {
     }
 }
 
+// @internal
 #[test]
 fn test_card_delta_removed_compatibility_v1() {
     use vauchi_core::sync::CardDelta;
@@ -352,6 +358,7 @@ fn test_card_delta_removed_compatibility_v1() {
     }
 }
 
+// @internal
 #[test]
 fn test_card_delta_display_name_changed_compatibility_v1() {
     use vauchi_core::sync::CardDelta;
@@ -369,6 +376,7 @@ fn test_card_delta_display_name_changed_compatibility_v1() {
     }
 }
 
+// @internal
 #[test]
 fn test_device_registry_compatibility_v1() {
     use vauchi_core::identity::DeviceRegistry;
@@ -397,6 +405,7 @@ fn test_device_registry_compatibility_v1() {
     assert_eq!(registry.all_devices().len(), reparsed.all_devices().len());
 }
 
+// @internal
 #[test]
 fn test_registered_device_revoked_compatibility_v1() {
     use vauchi_core::identity::RegisteredDevice;
@@ -410,6 +419,7 @@ fn test_registered_device_revoked_compatibility_v1() {
     assert!(!device.is_active());
 }
 
+// @internal
 #[test]
 fn test_sync_item_card_updated_compatibility_v1() {
     use vauchi_core::sync::SyncItem;
@@ -434,6 +444,7 @@ fn test_sync_item_card_updated_compatibility_v1() {
     }
 }
 
+// @internal
 #[test]
 fn test_sync_item_contact_removed_compatibility_v1() {
     use vauchi_core::sync::SyncItem;
@@ -453,6 +464,7 @@ fn test_sync_item_contact_removed_compatibility_v1() {
     }
 }
 
+// @internal
 #[test]
 fn test_sync_item_visibility_changed_compatibility_v1() {
     use vauchi_core::sync::SyncItem;
@@ -476,6 +488,7 @@ fn test_sync_item_visibility_changed_compatibility_v1() {
     }
 }
 
+// @internal
 #[test]
 fn test_serialized_ratchet_state_compatibility_v1() {
     use vauchi_core::crypto::ratchet::SerializedRatchetState;
@@ -526,6 +539,7 @@ fn test_serialized_ratchet_state_compatibility_v1() {
 // =============================================================================
 
 /// Verifies that enum variant names haven't changed (which would break JSON).
+// @internal
 #[test]
 fn test_field_change_enum_variant_names() {
     // These strings represent the JSON enum tag names
@@ -544,6 +558,7 @@ fn test_field_change_enum_variant_names() {
         .expect("DisplayNameChanged variant name changed");
 }
 
+// @internal
 #[test]
 fn test_field_type_enum_variant_names() {
     use vauchi_core::FieldType;
@@ -565,6 +580,7 @@ fn test_field_type_enum_variant_names() {
     }
 }
 
+// @internal
 #[test]
 fn test_sync_item_enum_variant_names() {
     // Verify all SyncItem variant names are stable

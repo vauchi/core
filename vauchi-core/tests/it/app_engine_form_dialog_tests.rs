@@ -13,6 +13,7 @@ use vauchi_core::contact_card::FieldType;
 
 // ── FormDialogEngine tests ────────────────────────────────────────────
 
+// @internal
 #[test]
 fn form_dialog_add_field_shows_type_list() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -34,6 +35,7 @@ fn form_dialog_add_field_shows_type_list() {
     );
 }
 
+// @internal
 #[test]
 fn form_dialog_add_field_type_selection_shows_value_inputs() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -68,6 +70,7 @@ fn form_dialog_add_field_type_selection_shows_value_inputs() {
     }
 }
 
+// @internal
 #[test]
 fn form_dialog_edit_name_tracks_text_changes() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -97,6 +100,7 @@ fn form_dialog_edit_name_tracks_text_changes() {
     }
 }
 
+// @internal
 #[test]
 fn form_dialog_submit_navigates_back() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -123,6 +127,7 @@ fn form_dialog_submit_navigates_back() {
 
 // ── FormDialog completion tests ──────────────────────────────────────
 
+// @internal
 #[test]
 fn form_dialog_edit_name_saves_display_name() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -153,6 +158,7 @@ fn form_dialog_edit_name_saves_display_name() {
     );
 }
 
+// @internal
 #[test]
 fn form_dialog_edit_name_empty_returns_validation_error() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -198,6 +204,7 @@ fn form_dialog_edit_name_empty_returns_validation_error() {
     }
 }
 
+// @internal
 #[test]
 fn form_dialog_add_field_saves_to_own_card() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -230,6 +237,7 @@ fn form_dialog_add_field_saves_to_own_card() {
     );
 }
 
+// @internal
 #[test]
 fn form_dialog_add_field_empty_value_returns_validation_error() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -276,6 +284,7 @@ fn form_dialog_add_field_empty_value_returns_validation_error() {
     }
 }
 
+// @internal
 #[test]
 fn form_dialog_edit_field_saves_value() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -317,6 +326,7 @@ fn form_dialog_edit_field_saves_value() {
     );
 }
 
+// @internal
 #[test]
 fn form_dialog_cancel_navigates_back() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -344,6 +354,7 @@ fn form_dialog_cancel_navigates_back() {
     }
 }
 
+// @internal
 #[test]
 fn form_dialog_cancel_does_not_save_modified_name() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -383,6 +394,7 @@ fn form_dialog_cancel_does_not_save_modified_name() {
     assert_eq!(identity.display_name(), "Alice");
 }
 
+// @internal
 #[test]
 fn form_dialog_edit_relay_url_navigates_back() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -411,6 +423,7 @@ fn form_dialog_edit_relay_url_navigates_back() {
     );
 }
 
+// @internal
 #[test]
 fn form_dialog_cancel_add_field_does_not_save() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -467,6 +480,7 @@ fn form_dialog_cancel_add_field_does_not_save() {
 // ── Social network field routing tests ──────────────────────────────
 
 /// @scenario: contact_card_management :: Add social network field from catalog
+// @internal
 #[test]
 fn form_dialog_add_social_field_stores_as_social_type() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -518,6 +532,7 @@ fn form_dialog_add_social_field_stores_as_social_type() {
 }
 
 /// @scenario: contact_card_management :: Social field label uses display name
+// @internal
 #[test]
 fn form_dialog_add_social_field_uses_display_name_as_label() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -562,6 +577,7 @@ fn form_dialog_add_social_field_uses_display_name_as_label() {
 // ── field_note persistence tests ──────────────────────────────────────
 
 /// AddField: a note entered in field_note is persisted on the ContactField.
+// @internal
 #[test]
 fn form_dialog_add_field_with_note_persists_note() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -611,6 +627,7 @@ fn form_dialog_add_field_with_note_persists_note() {
 }
 
 /// AddField: an empty note leaves the field note as None.
+// @internal
 #[test]
 fn form_dialog_add_field_without_note_leaves_note_none() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -653,6 +670,7 @@ fn form_dialog_add_field_without_note_leaves_note_none() {
 }
 
 /// EditField: a note entered in field_note is persisted on the existing ContactField.
+// @internal
 #[test]
 fn form_dialog_edit_field_with_note_persists_note() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -711,6 +729,7 @@ fn form_dialog_edit_field_with_note_persists_note() {
 }
 
 /// EditField: an existing note is pre-populated in the form's field_note input.
+// @internal
 #[test]
 fn form_dialog_edit_field_prefills_current_note() {
     let engine = vauchi_app::ui::FormDialogEngine::new(FormDialogType::EditField {

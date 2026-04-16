@@ -13,6 +13,7 @@ fn default_config() -> AnimatedQrConfig {
 }
 
 // --- Test 1: Encode payload into frames, verify frame_count > 1 for large payloads ---
+// @internal
 #[test]
 fn large_payload_produces_multiple_frames() {
     let payload = vec![0xAB; 2000]; // 2000 bytes > default 400 chunk_size
@@ -28,6 +29,7 @@ fn large_payload_produces_multiple_frames() {
 }
 
 // --- Test 2: next_frame cycles (wraps around after last frame) ---
+// @internal
 #[test]
 fn next_frame_cycles_around() {
     let payload = vec![0x42; 800]; // 2 frames
@@ -48,6 +50,7 @@ fn next_frame_cycles_around() {
 }
 
 // --- Test 3: Receive frames out of order — reassemble correctly ---
+// @internal
 #[test]
 fn receive_out_of_order_reassembles_correctly() {
     let payload = vec![0xCD; 1200]; // 3 frames
@@ -88,6 +91,7 @@ fn receive_out_of_order_reassembles_correctly() {
 }
 
 // --- Test 4: Duplicate frames ignored ---
+// @internal
 #[test]
 fn duplicate_frames_ignored() {
     let payload = vec![0xEF; 800]; // 2 frames
@@ -124,6 +128,7 @@ fn duplicate_frames_ignored() {
 }
 
 // --- Test 5: Invalid frame rejected ---
+// @internal
 #[test]
 fn invalid_frame_rejected() {
     let mut receiver = AnimatedQrSession::new_receiver(default_config());
@@ -145,6 +150,7 @@ fn invalid_frame_rejected() {
 }
 
 // --- Test 6: Small payload → single frame ---
+// @internal
 #[test]
 fn small_payload_single_frame() {
     let payload = b"hello".to_vec();
@@ -158,6 +164,7 @@ fn small_payload_single_frame() {
 }
 
 // --- Test 7: Frame format matches {index}/{total}/{crc32_hex}/{base64url} ---
+// @internal
 #[test]
 fn frame_format_matches_spec() {
     let payload = b"test data".to_vec();
@@ -192,6 +199,7 @@ fn frame_format_matches_spec() {
 }
 
 // --- Test 8: Empty receiver cannot reassemble (missing chunks error) ---
+// @internal
 #[test]
 fn empty_receiver_cannot_reassemble() {
     let receiver = AnimatedQrSession::new_receiver(default_config());
@@ -201,6 +209,7 @@ fn empty_receiver_cannot_reassemble() {
 }
 
 // --- Test 9: CRC mismatch detected ---
+// @internal
 #[test]
 fn crc_mismatch_detected() {
     let payload = b"some data".to_vec();

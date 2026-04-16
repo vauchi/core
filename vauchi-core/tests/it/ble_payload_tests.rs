@@ -4,6 +4,7 @@
 
 use vauchi_core::exchange::BleCardPayload;
 
+// @internal
 #[test]
 fn test_ble_card_payload_roundtrip() {
     let fields = vec![
@@ -32,6 +33,7 @@ fn test_ble_card_payload_roundtrip() {
     assert!(restored.verify_crc16(), "CRC16 must verify after roundtrip");
 }
 
+// @internal
 #[test]
 fn test_ble_card_payload_crc16_detects_corruption() {
     let fields = vec![("email".to_string(), "bob@example.com".to_string())];
@@ -53,6 +55,7 @@ fn test_ble_card_payload_crc16_detects_corruption() {
     );
 }
 
+// @internal
 #[test]
 fn test_ble_card_payload_empty_fields_and_no_avatar() {
     let original = BleCardPayload::new([0x00; 32], "Empty".to_string(), [0x00; 32], vec![], None);
@@ -70,6 +73,7 @@ fn test_ble_card_payload_empty_fields_and_no_avatar() {
     );
 }
 
+// @internal
 #[test]
 fn test_ble_card_payload_large_avatar() {
     let large_avatar = vec![0x42; 10 * 1024]; // 10KB

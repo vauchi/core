@@ -170,6 +170,7 @@ fn walk_all_screens() -> Vec<(String, ScreenModel)> {
 
 // ── Per-screen freshness tests ─────────────────────────────────────
 
+// @internal
 #[test]
 fn identity_check_fixture_is_fresh() {
     let screens = walk_all_screens();
@@ -177,6 +178,7 @@ fn identity_check_fixture_is_fresh() {
     assert_fixture_fresh(screen, "identity_check.json");
 }
 
+// @internal
 #[test]
 fn link_choice_fixture_is_fresh() {
     let screens = walk_all_screens();
@@ -184,6 +186,7 @@ fn link_choice_fixture_is_fresh() {
     assert_fixture_fresh(screen, "link_choice.json");
 }
 
+// @internal
 #[test]
 fn welcome_fixture_is_fresh() {
     let screens = walk_all_screens();
@@ -191,6 +194,7 @@ fn welcome_fixture_is_fresh() {
     assert_fixture_fresh(screen, "welcome.json");
 }
 
+// @internal
 #[test]
 fn default_name_fixture_is_fresh() {
     let screens = walk_all_screens();
@@ -198,6 +202,7 @@ fn default_name_fixture_is_fresh() {
     assert_fixture_fresh(screen, "default_name.json");
 }
 
+// @internal
 #[test]
 fn skip_gate_fixture_is_fresh() {
     let screens = walk_all_screens();
@@ -205,6 +210,7 @@ fn skip_gate_fixture_is_fresh() {
     assert_fixture_fresh(screen, "skip_gate.json");
 }
 
+// @internal
 #[test]
 fn groups_setup_fixture_is_fresh() {
     let screens = walk_all_screens();
@@ -212,6 +218,7 @@ fn groups_setup_fixture_is_fresh() {
     assert_fixture_fresh(screen, "groups_setup.json");
 }
 
+// @internal
 #[test]
 fn contact_info_fixture_is_fresh() {
     let screens = walk_all_screens();
@@ -219,6 +226,7 @@ fn contact_info_fixture_is_fresh() {
     assert_fixture_fresh(screen, "contact_info.json");
 }
 
+// @internal
 #[test]
 fn preview_card_fixture_is_fresh() {
     let screens = walk_all_screens();
@@ -226,6 +234,7 @@ fn preview_card_fixture_is_fresh() {
     assert_fixture_fresh(screen, "preview_card.json");
 }
 
+// @internal
 #[test]
 fn security_explanation_fixture_is_fresh() {
     let screens = walk_all_screens();
@@ -233,6 +242,7 @@ fn security_explanation_fixture_is_fresh() {
     assert_fixture_fresh(screen, "security_explanation.json");
 }
 
+// @internal
 #[test]
 fn backup_prompt_fixture_is_fresh() {
     let screens = walk_all_screens();
@@ -240,6 +250,7 @@ fn backup_prompt_fixture_is_fresh() {
     assert_fixture_fresh(screen, "backup_prompt.json");
 }
 
+// @internal
 #[test]
 fn ready_fixture_is_fresh() {
     let screens = walk_all_screens();
@@ -261,6 +272,7 @@ fn write_version_file(fixture_count: usize) {
     fs::write(fixtures_dir().join(".version"), content).unwrap();
 }
 
+// @internal
 #[test]
 fn version_metadata_file_exists_and_is_valid() {
     let path = fixtures_dir().join(".version");
@@ -298,6 +310,7 @@ fn version_metadata_file_exists_and_is_valid() {
 
 /// Regenerate all golden fixtures and the `.version` metadata file.
 /// Run with: `cargo test -p vauchi-core --test golden_fixtures -- --ignored`
+// @internal
 #[test]
 #[ignore]
 fn regenerate_all_fixtures() {

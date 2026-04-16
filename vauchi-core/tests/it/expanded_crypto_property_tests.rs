@@ -103,6 +103,7 @@ proptest! {
     ///
     /// Tests that the backup pipeline handles unicode, combining characters,
     /// null bytes, RTL text, emoji, and max-length passwords correctly.
+// @internal
     #[test]
     fn prop_backup_roundtrip_adversarial_passwords(
         password in adversarial_password_strategy()
@@ -133,6 +134,7 @@ proptest! {
     }
 
     /// Property: Backup/restore roundtrip preserves identity for randomly-generated strong passwords.
+// @internal
     #[test]
     fn prop_backup_roundtrip_random_strong_passwords(
         password in strong_password_strategy()
@@ -157,6 +159,7 @@ proptest! {
     }
 
     /// Property: Wrong password always fails backup restore.
+// @internal
     #[test]
     fn prop_backup_wrong_password_fails(
         password1 in adversarial_password_strategy(),
@@ -175,6 +178,7 @@ proptest! {
     }
 
     /// Property: Tampered backup data fails restore.
+// @internal
     #[test]
     fn prop_backup_tampered_data_fails(
         password in adversarial_password_strategy(),
@@ -210,6 +214,7 @@ proptest! {
     /// Property: Argon2id key derivation is deterministic.
     ///
     /// The same (password, salt) pair must always produce the same derived key.
+// @internal
     #[test]
     fn prop_argon2id_deterministic(
         password in prop::collection::vec(any::<u8>(), 8..64),
@@ -228,6 +233,7 @@ proptest! {
     }
 
     /// Property: Different salts produce different Argon2id keys.
+// @internal
     #[test]
     fn prop_argon2id_different_salts_different_keys(
         password in prop::collection::vec(any::<u8>(), 8..64),
@@ -255,6 +261,7 @@ proptest! {
     /// Property: HKDF derivation is deterministic.
     ///
     /// The same (salt, ikm, info) must always produce the same output.
+// @internal
     #[test]
     fn prop_hkdf_deterministic(
         salt in prop::collection::vec(any::<u8>(), 16..64),
@@ -274,6 +281,7 @@ proptest! {
     }
 
     /// Property: HKDF derive_key is deterministic and produces 32 bytes.
+// @internal
     #[test]
     fn prop_hkdf_derive_key_deterministic(
         salt in prop::collection::vec(any::<u8>(), 16..64),
@@ -287,6 +295,7 @@ proptest! {
     }
 
     /// Property: HKDF derive_key_pair is deterministic and produces two distinct keys.
+// @internal
     #[test]
     fn prop_hkdf_derive_key_pair_deterministic(
         salt in prop::collection::vec(any::<u8>(), 16..64),
@@ -303,6 +312,7 @@ proptest! {
     }
 
     /// Property: Different IKM produces different HKDF output.
+// @internal
     #[test]
     fn prop_hkdf_different_ikm_different_output(
         ikm1 in prop::collection::vec(any::<u8>(), 16..64),
@@ -332,6 +342,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(50))]
 
     /// Property: EncryptedUpdate payload roundtrips through JSON serialization.
+// @internal
     #[test]
     fn prop_encrypted_update_roundtrip(
         recipient_id in hex_id_strategy(),
@@ -383,6 +394,7 @@ proptest! {
     }
 
     /// Property: Acknowledgment payload roundtrips through JSON serialization.
+// @internal
     #[test]
     fn prop_acknowledgment_roundtrip(
         ack_msg_id in message_id_strategy(),
@@ -422,6 +434,7 @@ proptest! {
     }
 
     /// Property: Handshake payload roundtrips through JSON serialization.
+// @internal
     #[test]
     fn prop_handshake_roundtrip(
         identity_key in bytes32_strategy(),
@@ -462,6 +475,7 @@ proptest! {
     }
 
     /// Property: Presence payload roundtrips through JSON serialization.
+// @internal
     #[test]
     fn prop_presence_roundtrip(
         status in prop_oneof![
@@ -498,6 +512,7 @@ proptest! {
     // DeviceSync roundtrip property test removed (SP-33): wire type removed.
 
     /// Property: IdentityRevoked payload roundtrips through JSON serialization.
+// @internal
     #[test]
     fn prop_identity_revoked_roundtrip(
         sender_id in hex_id_strategy(),
@@ -541,6 +556,7 @@ proptest! {
     }
 
     /// Property: IdentityDeletionNotice payload roundtrips through JSON serialization.
+// @internal
     #[test]
     fn prop_identity_deletion_notice_roundtrip(
         stage in prop_oneof![
@@ -588,6 +604,7 @@ proptest! {
     }
 
     /// Property: PurgeRequest payload roundtrips through JSON serialization.
+// @internal
     #[test]
     fn prop_purge_request_roundtrip(
         public_key in bytes32_strategy(),
@@ -624,6 +641,7 @@ proptest! {
     }
 
     /// Property: ForwardingHints payload roundtrips through JSON serialization.
+// @internal
     #[test]
     fn prop_forwarding_hints_roundtrip(
         blob_id in "[a-f0-9]{16}",
@@ -662,6 +680,7 @@ proptest! {
     }
 
     /// Property: VersionNegotiation roundtrips through JSON serialization.
+// @internal
     #[test]
     fn prop_version_negotiation_roundtrip(
         versions in prop::collection::vec(1u32..100, 1..10),
@@ -692,6 +711,7 @@ proptest! {
     ///
     /// The Double Ratchet stores skipped message keys, allowing messages
     /// received out of order to be decrypted correctly.
+// @internal
     #[test]
     fn prop_ratchet_out_of_order_delivery(
         seed in bytes32_strategy(),
@@ -739,6 +759,7 @@ proptest! {
     ///
     /// Tests that when Alice sends N messages but Bob receives them with gaps,
     /// the skipped messages can still be decrypted later.
+// @internal
     #[test]
     fn prop_ratchet_skip_then_catch_up(
         seed in bytes32_strategy(),
@@ -792,6 +813,7 @@ proptest! {
     ///
     /// Once a message has been decrypted, attempting to decrypt it again must fail
     /// (replay protection via consumed skipped keys).
+// @internal
     #[test]
     fn prop_ratchet_duplicate_message_rejected(
         seed in bytes32_strategy()

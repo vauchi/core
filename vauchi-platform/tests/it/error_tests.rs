@@ -7,6 +7,7 @@
 use vauchi_core::{StorageError, VauchiError};
 use vauchi_platform::MobileError;
 
+// @internal
 #[test]
 fn test_storage_error_conversion() {
     let storage_err = StorageError::NotFound("test record".to_string());
@@ -24,6 +25,7 @@ fn test_storage_error_conversion() {
     );
 }
 
+// @internal
 #[test]
 fn test_vauchi_error_contact_not_found() {
     let err = VauchiError::ContactNotFound("abc123".to_string());
@@ -40,6 +42,7 @@ fn test_vauchi_error_contact_not_found() {
     );
 }
 
+// @internal
 #[test]
 fn test_vauchi_error_storage_maps_to_storage_error() {
     let storage_err = StorageError::Encryption("key error".to_string());
@@ -53,6 +56,7 @@ fn test_vauchi_error_storage_maps_to_storage_error() {
     );
 }
 
+// @internal
 #[test]
 fn test_vauchi_error_other_maps_to_internal() {
     let err = VauchiError::IdentityNotInitialized;
@@ -65,6 +69,7 @@ fn test_vauchi_error_other_maps_to_internal() {
     );
 }
 
+// @internal
 #[test]
 fn test_error_display_not_initialized() {
     let err = MobileError::NotInitialized;
@@ -75,6 +80,7 @@ fn test_error_display_not_initialized() {
     );
 }
 
+// @internal
 #[test]
 fn test_error_display_already_initialized() {
     let err = MobileError::AlreadyInitialized;
@@ -85,6 +91,7 @@ fn test_error_display_already_initialized() {
     );
 }
 
+// @internal
 #[test]
 fn test_error_display_identity_not_found() {
     let err = MobileError::IdentityNotFound;
@@ -95,6 +102,7 @@ fn test_error_display_identity_not_found() {
     );
 }
 
+// @internal
 #[test]
 fn test_error_display_invalid_qr() {
     let err = MobileError::InvalidQrCode;
@@ -105,6 +113,7 @@ fn test_error_display_invalid_qr() {
     );
 }
 
+// @internal
 #[test]
 fn test_error_display_exchange_failed() {
     let err = MobileError::ExchangeFailed("timeout".to_string());
@@ -115,6 +124,7 @@ fn test_error_display_exchange_failed() {
     );
 }
 
+// @internal
 #[test]
 fn test_error_display_crypto_error() {
     let err = MobileError::CryptoError("bad key".to_string());

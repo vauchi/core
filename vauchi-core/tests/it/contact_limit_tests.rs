@@ -20,6 +20,7 @@ fn make_contact(name: &str) -> Contact {
 }
 
 // @scenario: contacts_management :: Maximum contacts reached
+// @internal
 #[test]
 fn test_add_contact_at_limit_minus_one_succeeds() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -38,6 +39,7 @@ fn test_add_contact_at_limit_minus_one_succeeds() {
 }
 
 // @scenario: contacts_management :: Maximum contacts reached
+// @internal
 #[test]
 fn test_add_contact_reaches_exact_limit() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -55,6 +57,7 @@ fn test_add_contact_reaches_exact_limit() {
 }
 
 // @scenario: contacts_management :: Exceed maximum contacts
+// @internal
 #[test]
 fn test_add_contact_exceeds_limit_returns_error() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -75,6 +78,7 @@ fn test_add_contact_exceeds_limit_returns_error() {
 }
 
 // @scenario: contacts_management :: Exceed maximum contacts
+// @internal
 #[test]
 fn test_exceed_limit_error_message_includes_limit() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -97,6 +101,7 @@ fn test_exceed_limit_error_message_includes_limit() {
 }
 
 // @scenario: contacts_management :: Exceed maximum contacts
+// @internal
 #[test]
 fn test_exceed_limit_contact_not_persisted() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -113,6 +118,7 @@ fn test_exceed_limit_contact_not_persisted() {
 }
 
 // @scenario: contacts_management :: Maximum contacts reached
+// @internal
 #[test]
 fn test_add_contact_after_removal_succeeds() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -133,6 +139,7 @@ fn test_add_contact_after_removal_succeeds() {
 }
 
 // @scenario: contacts_management :: Maximum contacts reached
+// @internal
 #[test]
 fn test_default_limit_is_10000() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
@@ -141,6 +148,7 @@ fn test_default_limit_is_10000() {
 }
 
 // Negative path: limit of 0 means no contacts allowed
+// @internal
 #[test]
 fn test_zero_limit_rejects_all_contacts() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");

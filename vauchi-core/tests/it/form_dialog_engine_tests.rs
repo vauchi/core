@@ -6,6 +6,7 @@ use vauchi_app::ui::*;
 
 // --- AddField tests ---
 
+// @internal
 #[test]
 fn form_dialog_add_field_shows_type_list_and_inputs() {
     let engine = FormDialogEngine::new(FormDialogType::AddField {
@@ -49,6 +50,7 @@ fn form_dialog_add_field_shows_type_list_and_inputs() {
     assert!(has_note, "Should show Comment input");
 }
 
+// @internal
 #[test]
 fn form_dialog_add_field_select_type_updates_title() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField {
@@ -72,6 +74,7 @@ fn form_dialog_add_field_select_type_updates_title() {
     }
 }
 
+// @internal
 #[test]
 fn form_dialog_add_field_submit_completes() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField {
@@ -93,6 +96,7 @@ fn form_dialog_add_field_submit_completes() {
     assert_eq!(result, ActionResult::Complete);
 }
 
+// @internal
 #[test]
 fn form_dialog_add_field_cancel_clean_completes() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField {
@@ -113,6 +117,7 @@ fn form_dialog_add_field_cancel_clean_completes() {
     );
 }
 
+// @internal
 #[test]
 fn form_dialog_add_field_collected_input_format() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField {
@@ -152,6 +157,7 @@ fn form_dialog_add_field_collected_input_format() {
     assert_eq!(parts[4], "", "No groups selected");
 }
 
+// @internal
 #[test]
 fn form_dialog_add_field_group_toggle() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField {
@@ -193,6 +199,7 @@ fn form_dialog_add_field_group_toggle() {
 
 // --- EditField tests ---
 
+// @internal
 #[test]
 fn form_dialog_edit_field_screen_id() {
     let engine = FormDialogEngine::new(FormDialogType::EditField {
@@ -205,6 +212,7 @@ fn form_dialog_edit_field_screen_id() {
     assert_eq!(screen.screen_id, "form_edit_field");
 }
 
+// @internal
 #[test]
 fn form_dialog_edit_field_prefills_current_value() {
     let engine = FormDialogEngine::new(FormDialogType::EditField {
@@ -227,6 +235,7 @@ fn form_dialog_edit_field_prefills_current_value() {
     );
 }
 
+// @internal
 #[test]
 fn form_dialog_edit_field_submit_completes() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditField {
@@ -245,6 +254,7 @@ fn form_dialog_edit_field_submit_completes() {
     assert_eq!(result, ActionResult::Complete);
 }
 
+// @internal
 #[test]
 fn form_dialog_edit_field_collected_input() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditField {
@@ -267,6 +277,7 @@ fn form_dialog_edit_field_collected_input() {
 
 // --- EditName tests ---
 
+// @internal
 #[test]
 fn form_dialog_edit_name_screen_id() {
     let engine = FormDialogEngine::new(FormDialogType::EditName {
@@ -276,6 +287,7 @@ fn form_dialog_edit_name_screen_id() {
     assert_eq!(screen.screen_id, "form_edit_name");
 }
 
+// @internal
 #[test]
 fn form_dialog_edit_name_prefills_current_name() {
     let engine = FormDialogEngine::new(FormDialogType::EditName {
@@ -295,6 +307,7 @@ fn form_dialog_edit_name_prefills_current_name() {
     );
 }
 
+// @internal
 #[test]
 fn form_dialog_edit_name_collected_input() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditName {
@@ -312,6 +325,7 @@ fn form_dialog_edit_name_collected_input() {
 
 // --- EditRelayUrl tests ---
 
+// @internal
 #[test]
 fn form_dialog_edit_relay_url_screen_id() {
     let engine = FormDialogEngine::new(FormDialogType::EditRelayUrl {
@@ -321,6 +335,7 @@ fn form_dialog_edit_relay_url_screen_id() {
     assert_eq!(screen.screen_id, "form_edit_relay_url");
 }
 
+// @internal
 #[test]
 fn form_dialog_edit_relay_url_collected_input() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditRelayUrl {
@@ -338,6 +353,7 @@ fn form_dialog_edit_relay_url_collected_input() {
 
 // --- TextChanged test ---
 
+// @internal
 #[test]
 fn form_dialog_text_changed_updates_value() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditField {
@@ -372,6 +388,7 @@ fn form_dialog_text_changed_updates_value() {
 // --- Dirty-cancel → InlineConfirm tests (ADR-022) ---
 
 // @internal
+// @internal
 #[test]
 fn form_dialog_cancel_dirty_edit_shows_inline_confirm() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditName {
@@ -400,6 +417,7 @@ fn form_dialog_cancel_dirty_edit_shows_inline_confirm() {
 }
 
 // @internal
+// @internal
 #[test]
 fn form_dialog_confirm_discard_completes() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditName {
@@ -426,6 +444,7 @@ fn form_dialog_confirm_discard_completes() {
     assert!(engine.was_cancelled(), "should be marked cancelled");
 }
 
+// @internal
 // @internal
 #[test]
 fn form_dialog_cancel_discard_removes_inline_confirm() {
@@ -459,6 +478,7 @@ fn form_dialog_cancel_discard_removes_inline_confirm() {
 }
 
 // @internal
+// @internal
 #[test]
 fn form_dialog_cancel_dirty_add_field_shows_inline_confirm() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField {
@@ -487,6 +507,7 @@ fn form_dialog_cancel_dirty_add_field_shows_inline_confirm() {
 }
 
 // @internal — second cancel while InlineConfirm shown removes it
+// @internal
 #[test]
 fn form_dialog_second_cancel_removes_inline_confirm() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditName {

@@ -25,6 +25,7 @@ fn nfc_session(name: &str) -> ExchangeSession {
 
 // −− Initial commands −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn nfc_session_emits_activate_with_payload() {
     let mut session = nfc_session("Alice");
@@ -46,6 +47,7 @@ fn nfc_session_emits_activate_with_payload() {
 
 // −− NFC tap completes exchange −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn nfc_data_received_with_valid_payload_completes_exchange() {
     let mut alice = nfc_session("Alice");
@@ -79,6 +81,7 @@ fn nfc_data_received_with_valid_payload_completes_exchange() {
 
 // −− NFC hardware unavailable −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn nfc_hardware_unavailable_does_not_crash() {
     let mut session = nfc_session("Alice");
@@ -99,6 +102,7 @@ fn nfc_hardware_unavailable_does_not_crash() {
 
 // −− NFC deactivate on completion −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn nfc_tap_emits_deactivate_after_processing() {
     let mut alice = nfc_session("Alice");

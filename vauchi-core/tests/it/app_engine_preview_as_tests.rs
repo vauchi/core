@@ -27,6 +27,7 @@ fn vauchi_with_contact() -> (Vauchi, String) {
 
 // ── preview_as() ──────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn test_preview_as_navigates_to_my_info() {
     let (vauchi, contact_id) = vauchi_with_contact();
@@ -36,6 +37,7 @@ fn test_preview_as_navigates_to_my_info() {
     assert_eq!(screen.screen_id, "my_info");
 }
 
+// @internal
 #[test]
 fn test_preview_as_shows_preview_mode_title() {
     let (vauchi, contact_id) = vauchi_with_contact();
@@ -50,6 +52,7 @@ fn test_preview_as_shows_preview_mode_title() {
     );
 }
 
+// @internal
 #[test]
 fn test_preview_as_shows_banner_component() {
     let (vauchi, contact_id) = vauchi_with_contact();
@@ -68,6 +71,7 @@ fn test_preview_as_shows_banner_component() {
     );
 }
 
+// @internal
 #[test]
 fn test_preview_as_banner_has_exit_preview_action_id() {
     let (vauchi, contact_id) = vauchi_with_contact();
@@ -88,6 +92,7 @@ fn test_preview_as_banner_has_exit_preview_action_id() {
     );
 }
 
+// @internal
 #[test]
 fn test_preview_as_screen_has_exit_preview_action() {
     let (vauchi, contact_id) = vauchi_with_contact();
@@ -103,6 +108,7 @@ fn test_preview_as_screen_has_exit_preview_action() {
     );
 }
 
+// @internal
 #[test]
 fn test_preview_as_shows_contact_name_in_banner() {
     let (vauchi, contact_id) = vauchi_with_contact();
@@ -127,6 +133,7 @@ fn test_preview_as_shows_contact_name_in_banner() {
 
 // ── exit-preview action ───────────────────────────────────────────────
 
+// @internal
 #[test]
 fn test_exit_preview_returns_to_edit_mode() {
     let (vauchi, contact_id) = vauchi_with_contact();
@@ -149,6 +156,7 @@ fn test_exit_preview_returns_to_edit_mode() {
     assert_eq!(screen.screen_id, "my_info");
 }
 
+// @internal
 #[test]
 fn test_exit_preview_removes_banner() {
     let (vauchi, contact_id) = vauchi_with_contact();
@@ -177,6 +185,7 @@ fn test_exit_preview_removes_banner() {
     );
 }
 
+// @internal
 #[test]
 fn test_exit_preview_screen_has_normal_my_info_actions() {
     let (vauchi, contact_id) = vauchi_with_contact();
@@ -209,6 +218,7 @@ fn test_exit_preview_screen_has_normal_my_info_actions() {
 
 // ── transient state (not serialized, machine-local) ──────────────────
 
+// @internal
 #[test]
 fn test_preview_as_state_cleared_by_exit_preview_not_left_over() {
     // After exit-preview, a subsequent navigate to MyInfo must not re-enter preview mode.

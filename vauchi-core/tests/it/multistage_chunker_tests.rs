@@ -4,6 +4,7 @@
 
 use vauchi_core::exchange::multistage::chunker::Chunker;
 
+// @internal
 #[test]
 fn test_chunk_small_payload() {
     let data = vec![42u8; 100];
@@ -12,6 +13,7 @@ fn test_chunk_small_payload() {
     assert_eq!(chunker.chunk(0).unwrap(), &data[..]);
 }
 
+// @internal
 #[test]
 fn test_chunk_exact_boundary() {
     let data = vec![0u8; 1600];
@@ -21,6 +23,7 @@ fn test_chunk_exact_boundary() {
     assert_eq!(chunker.chunk(1).unwrap().len(), 800);
 }
 
+// @internal
 #[test]
 fn test_chunk_with_remainder() {
     let data = vec![0u8; 2100];
@@ -31,6 +34,7 @@ fn test_chunk_with_remainder() {
     assert_eq!(chunker.chunk(2).unwrap().len(), 500);
 }
 
+// @internal
 #[test]
 fn test_chunk_out_of_bounds() {
     let data = vec![0u8; 100];
@@ -38,6 +42,7 @@ fn test_chunk_out_of_bounds() {
     assert!(chunker.chunk(1).is_none());
 }
 
+// @internal
 #[test]
 fn test_reassemble_from_chunks() {
     let original = (0..=255).cycle().take(2500).collect::<Vec<u8>>();
@@ -50,6 +55,7 @@ fn test_reassemble_from_chunks() {
     assert_eq!(reassembled, original);
 }
 
+// @internal
 #[test]
 fn test_reassembly_buffer() {
     use vauchi_core::exchange::multistage::chunker::ReassemblyBuffer;
@@ -71,6 +77,7 @@ fn test_reassembly_buffer() {
     assert_eq!(reassembled, original);
 }
 
+// @internal
 #[test]
 fn test_reassembly_buffer_duplicate_insert_ok() {
     use vauchi_core::exchange::multistage::chunker::ReassemblyBuffer;

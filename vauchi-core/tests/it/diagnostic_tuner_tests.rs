@@ -29,6 +29,7 @@ fn make_result(
     }
 }
 
+// @internal
 #[test]
 fn score_config_perfect_decode_rate_dominates() {
     let good = make_result(1, 1.0, 5.0, 2.0, 0);
@@ -36,6 +37,7 @@ fn score_config_perfect_decode_rate_dominates() {
     assert!(score_config(&good) > score_config(&bad));
 }
 
+// @internal
 #[test]
 fn score_config_lower_latency_scores_higher() {
     let fast = make_result(1, 0.9, 2.0, 2.0, 0);
@@ -43,6 +45,7 @@ fn score_config_lower_latency_scores_higher() {
     assert!(score_config(&fast) > score_config(&slow));
 }
 
+// @internal
 #[test]
 fn score_config_lower_jitter_scores_higher() {
     let stable = make_result(1, 0.9, 5.0, 1.0, 0);
@@ -50,6 +53,7 @@ fn score_config_lower_jitter_scores_higher() {
     assert!(score_config(&stable) > score_config(&jittery));
 }
 
+// @internal
 #[test]
 fn score_config_thermal_events_penalise() {
     let cool = make_result(1, 0.9, 5.0, 2.0, 0);
@@ -57,6 +61,7 @@ fn score_config_thermal_events_penalise() {
     assert!(score_config(&cool) > score_config(&hot));
 }
 
+// @internal
 #[test]
 fn score_config_deterministic_with_known_inputs() {
     let result = make_result(1, 1.0, 10.0, 5.0, 0);
@@ -72,6 +77,7 @@ fn score_config_deterministic_with_known_inputs() {
     );
 }
 
+// @internal
 #[test]
 fn score_config_zero_latency_clamped_to_one() {
     let result = make_result(1, 1.0, 0.0, 1.0, 0);
@@ -80,6 +86,7 @@ fn score_config_zero_latency_clamped_to_one() {
     assert!(score > 0.0);
 }
 
+// @internal
 #[test]
 fn rank_configs_returns_sorted_descending() {
     let results = vec![
@@ -94,12 +101,14 @@ fn rank_configs_returns_sorted_descending() {
     assert!(ranked[1].1 >= ranked[2].1);
 }
 
+// @internal
 #[test]
 fn rank_configs_empty_input() {
     let ranked = rank_configs(&[]);
     assert!(ranked.is_empty());
 }
 
+// @internal
 #[test]
 fn generate_sweep_matrix_respects_iso_range() {
     let profile = DeviceCapabilityProfile {
@@ -122,6 +131,7 @@ fn generate_sweep_matrix_respects_iso_range() {
     assert!(!matrix.camera_configs.is_empty());
 }
 
+// @internal
 #[test]
 fn generate_sweep_matrix_skips_unsupported_iso() {
     let profile = DeviceCapabilityProfile {
@@ -142,6 +152,7 @@ fn generate_sweep_matrix_skips_unsupported_iso() {
     assert!(!matrix.camera_configs.is_empty());
 }
 
+// @internal
 #[test]
 fn generate_sweep_matrix_includes_qr_configs() {
     let profile = DeviceCapabilityProfile {
@@ -171,6 +182,7 @@ fn generate_sweep_matrix_includes_qr_configs() {
     assert!(has_all_ec, "should cover all EC levels");
 }
 
+// @internal
 #[test]
 fn generate_sweep_matrix_legacy_android_minimal() {
     let profile = DeviceCapabilityProfile {

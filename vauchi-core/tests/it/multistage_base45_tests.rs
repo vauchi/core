@@ -4,16 +4,19 @@
 
 use vauchi_core::exchange::multistage::base45;
 
+// @internal
 #[test]
 fn test_encode_empty() {
     assert_eq!(base45::encode(&[]), "");
 }
 
+// @internal
 #[test]
 fn test_decode_empty() {
     assert_eq!(base45::decode("").unwrap(), Vec::<u8>::new());
 }
 
+// @internal
 #[test]
 fn test_roundtrip_hello() {
     let input = b"Hello!!";
@@ -22,6 +25,7 @@ fn test_roundtrip_hello() {
     assert_eq!(decoded, input);
 }
 
+// @internal
 #[test]
 fn test_roundtrip_binary() {
     let input: Vec<u8> = (0..=255).collect();
@@ -30,6 +34,7 @@ fn test_roundtrip_binary() {
     assert_eq!(decoded, input);
 }
 
+// @internal
 #[test]
 fn test_encode_uses_alphanumeric_charset() {
     let input = b"test data for QR";
@@ -40,11 +45,13 @@ fn test_encode_uses_alphanumeric_charset() {
     }
 }
 
+// @internal
 #[test]
 fn test_decode_invalid_char() {
     base45::decode("abc").expect_err("expected error"); // lowercase not in charset
 }
 
+// @internal
 #[test]
 fn test_rfc9285_vector() {
     // RFC 9285 test vector: "AB" encodes to "BB8"

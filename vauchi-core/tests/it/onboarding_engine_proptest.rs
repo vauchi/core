@@ -154,6 +154,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 
     /// Any valid display name eventually reaches Complete via the full path.
+// @internal
     #[test]
     fn forward_progress_reaches_complete(name in "[A-Za-z ]{1,50}") {
         let trimmed = name.trim().to_string();
@@ -178,6 +179,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(128))]
 
     /// Calling `current_screen()` twice yields the same screen_id.
+// @internal
     #[test]
     fn screen_stability(actions in prop::collection::vec(arb_user_action(), 0..30)) {
         let mut engine = OnboardingEngine::new();
@@ -213,6 +215,7 @@ proptest! {
 
     /// Pressing a non-existent action_id never panics and returns
     /// UpdateScreen (not NavigateTo, not Complete).
+// @internal
     #[test]
     fn unknown_action_returns_update_screen(
         bogus_id in "[a-z]{5,15}",
@@ -268,6 +271,7 @@ proptest! {
 
     /// Empty or whitespace-only display names are rejected with
     /// ValidationError when pressing continue on DefaultName.
+// @internal
     #[test]
     fn empty_name_rejected(name in "([ \\t]*){0,20}") {
         prop_assume!(name.trim().is_empty());
@@ -301,6 +305,7 @@ proptest! {
     }
 
     /// Non-empty, non-whitespace names pass validation.
+// @internal
     #[test]
     fn non_empty_name_accepted(name in "[A-Za-z][A-Za-z ]{0,49}") {
         prop_assume!(!name.trim().is_empty());
@@ -334,6 +339,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 
     /// Toggling a group twice returns it to its original selected state.
+// @internal
     #[test]
     fn toggle_twice_returns_to_original(group_idx in 0..4usize) {
         let group_name = GROUP_NAMES[group_idx];
@@ -393,6 +399,7 @@ proptest! {
     }
 
     /// Toggling a group N times: even N → original, odd N → flipped.
+// @internal
     #[test]
     fn toggle_n_times_parity(
         group_idx in 0..4usize,
@@ -455,6 +462,7 @@ proptest! {
     /// No sequence of random UserActions causes a panic. The result is
     /// always one of the four ActionResult variants, and the engine
     /// always reports a valid screen_id.
+// @internal
     #[test]
     fn random_actions_never_panic(actions in prop::collection::vec(arb_user_action(), 0..50)) {
         let mut engine = OnboardingEngine::new();
@@ -521,6 +529,7 @@ proptest! {
 
     /// Every screen always has progress with total_steps == 9 and
     /// current_step in 1..=9.
+// @internal
     #[test]
     fn progress_invariants(actions in prop::collection::vec(arb_user_action(), 0..30)) {
         let mut engine = OnboardingEngine::new();

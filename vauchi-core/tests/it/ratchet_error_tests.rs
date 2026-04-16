@@ -14,6 +14,7 @@ use vauchi_core::{SymmetricKey, crypto::ratchet::DoubleRatchetState, exchange::X
 // =============================================================================
 
 /// Test: Messages can be decrypted in order
+// @internal
 #[test]
 fn test_ratchet_messages_in_order() {
     let shared_secret = SymmetricKey::generate();
@@ -43,6 +44,7 @@ fn test_ratchet_messages_in_order() {
 }
 
 /// Test: Out-of-order messages can be handled (with message skipping)
+// @internal
 #[test]
 fn test_ratchet_handles_message_skip() {
     let shared_secret = SymmetricKey::generate();
@@ -78,6 +80,7 @@ fn test_ratchet_handles_message_skip() {
 
 /// Test: Duplicate message detection
 // @scenario: security :: Replay attack prevention
+// @internal
 #[test]
 fn test_ratchet_rejects_duplicate_message() {
     let shared_secret = SymmetricKey::generate();
@@ -110,6 +113,7 @@ fn test_ratchet_rejects_duplicate_message() {
 // =============================================================================
 
 /// Test: Ratchet detects corrupted DH public key
+// @internal
 #[test]
 fn test_ratchet_fails_on_corrupted_dh_key() {
     let shared_secret = SymmetricKey::generate();
@@ -130,6 +134,7 @@ fn test_ratchet_fails_on_corrupted_dh_key() {
 }
 
 /// Test: Ratchet handles empty plaintext
+// @internal
 #[test]
 fn test_ratchet_handles_empty_plaintext() {
     let shared_secret = SymmetricKey::generate();
@@ -148,6 +153,7 @@ fn test_ratchet_handles_empty_plaintext() {
 }
 
 /// Test: Ratchet handles large plaintext
+// @internal
 #[test]
 fn test_ratchet_handles_large_plaintext() {
     let shared_secret = SymmetricKey::generate();
@@ -171,6 +177,7 @@ fn test_ratchet_handles_large_plaintext() {
 
 /// Test: Different shared secrets produce different ratchets
 // @scenario: security :: Forward secrecy via Double Ratchet
+// @internal
 #[test]
 fn test_different_secrets_produce_different_ratchets() {
     let secret1 = SymmetricKey::generate();
@@ -195,6 +202,7 @@ fn test_different_secrets_produce_different_ratchets() {
 
 /// Test: Same plaintext encrypts differently each time (nonce)
 // @scenario: security :: Forward secrecy via Double Ratchet
+// @internal
 #[test]
 fn test_same_plaintext_different_ciphertext() {
     let shared_secret = SymmetricKey::generate();
@@ -220,6 +228,7 @@ fn test_same_plaintext_different_ciphertext() {
 
 /// Test: Bidirectional ratchet conversation
 // @scenario: security :: Forward secrecy via Double Ratchet
+// @internal
 #[test]
 fn test_bidirectional_conversation() {
     let shared_secret = SymmetricKey::generate();
@@ -255,6 +264,7 @@ fn test_bidirectional_conversation() {
 }
 
 /// Test: Multiple consecutive messages from same party
+// @internal
 #[test]
 fn test_consecutive_messages_same_party() {
     let shared_secret = SymmetricKey::generate();
@@ -290,6 +300,7 @@ fn test_consecutive_messages_same_party() {
 // =============================================================================
 
 /// Test: Ratchet state can be serialized and restored
+// @internal
 #[test]
 fn test_ratchet_state_serialization() {
     use vauchi_core::{Contact, ContactCard, Vauchi};
@@ -359,6 +370,7 @@ fn test_ratchet_state_serialization() {
 }
 
 /// Test: Ratchet message serialization roundtrip
+// @internal
 #[test]
 fn test_ratchet_message_serialization() {
     let shared_secret = SymmetricKey::generate();

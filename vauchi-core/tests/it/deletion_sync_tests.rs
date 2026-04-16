@@ -10,6 +10,7 @@
 use vauchi_core::sync::device_sync::SyncItem;
 
 // @scenario: privacy_compliance :: Identity deletion propagates across all user devices
+// @internal
 #[test]
 fn test_deletion_scheduled_sync_item() {
     let item = SyncItem::DeletionScheduled {
@@ -39,6 +40,7 @@ fn test_deletion_scheduled_sync_item() {
 }
 
 // @scenario: privacy_compliance :: Cancel deletion during grace period
+// @internal
 #[test]
 fn test_deletion_cancelled_sync_item() {
     let item = SyncItem::DeletionCancelled {
@@ -60,6 +62,7 @@ fn test_deletion_cancelled_sync_item() {
     }
 }
 
+// @internal
 #[test]
 fn test_existing_sync_items_still_deserialize() {
     // Ensure backward compat: existing SyncItem variants still work

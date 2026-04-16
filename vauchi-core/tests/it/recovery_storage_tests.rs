@@ -11,6 +11,7 @@ fn test_storage() -> Storage {
 }
 
 // @scenario: contact_recovery :: Accept recovery and reconnect
+// @internal
 #[test]
 fn test_save_and_get_recovery_response() {
     let storage = test_storage();
@@ -27,6 +28,7 @@ fn test_save_and_get_recovery_response() {
     assert!(remind_at.is_none());
 }
 
+// @internal
 #[test]
 fn test_recovery_response_with_remind_at() {
     let storage = test_storage();
@@ -40,6 +42,7 @@ fn test_recovery_response_with_remind_at() {
     assert_eq!(remind_at, Some(9999));
 }
 
+// @internal
 #[test]
 fn test_recovery_response_overwrite() {
     let storage = test_storage();
@@ -55,6 +58,7 @@ fn test_recovery_response_overwrite() {
     assert_eq!(response, "accept");
 }
 
+// @internal
 #[test]
 fn test_recovery_response_not_found() {
     let storage = test_storage();
@@ -63,6 +67,7 @@ fn test_recovery_response_not_found() {
 }
 
 // @scenario: contact_recovery :: Relay rate limits recovery queries
+// @internal
 #[test]
 fn test_check_recovery_rate_limit_empty() {
     let storage = test_storage();
@@ -72,6 +77,7 @@ fn test_check_recovery_rate_limit_empty() {
 }
 
 // @scenario: contact_recovery :: Relay rate limits recovery queries
+// @internal
 #[test]
 fn test_update_and_check_recovery_rate_limit() {
     let storage = test_storage();
@@ -87,6 +93,7 @@ fn test_update_and_check_recovery_rate_limit() {
 }
 
 // @scenario: contact_recovery :: Relay rate limits recovery queries
+// @internal
 #[test]
 fn test_recovery_rate_limit_overwrite() {
     let storage = test_storage();
@@ -100,6 +107,7 @@ fn test_recovery_rate_limit_overwrite() {
     assert_eq!(window_start, 2000);
 }
 
+// @internal
 #[test]
 fn test_multiple_recovery_responses() {
     let storage = test_storage();
@@ -135,6 +143,7 @@ use vauchi_core::recovery::RecoverySettings;
 
 /// Test load_recovery_settings returns None when not saved
 // @scenario: contact_recovery :: Recovery settings persistence
+// @internal
 #[test]
 fn test_load_recovery_settings_none() {
     let storage = test_storage();
@@ -144,6 +153,7 @@ fn test_load_recovery_settings_none() {
 
 /// Test save and load recovery settings roundtrip
 // @scenario: contact_recovery :: Recovery settings persistence
+// @internal
 #[test]
 fn test_save_load_recovery_settings() {
     let storage = test_storage();
@@ -162,6 +172,7 @@ fn test_save_load_recovery_settings() {
 
 /// Test recovery settings overwrite
 // @scenario: contact_recovery :: Recovery settings persistence
+// @internal
 #[test]
 fn test_recovery_settings_overwrite() {
     let storage = test_storage();
@@ -179,6 +190,7 @@ fn test_recovery_settings_overwrite() {
 
 /// Test recovery settings default roundtrip
 // @scenario: contact_recovery :: Recovery settings persistence
+// @internal
 #[test]
 fn test_recovery_settings_default_roundtrip() {
     let storage = test_storage();
@@ -196,6 +208,7 @@ fn test_recovery_settings_default_roundtrip() {
 
 /// Test rate limits are independent per identity PK
 // @scenario: contact_recovery :: Relay rate limits recovery queries
+// @internal
 #[test]
 fn test_recovery_rate_limit_independent_per_pk() {
     let storage = test_storage();

@@ -7,6 +7,7 @@
 use vauchi_core::exchange::transport::TransportType;
 use vauchi_core::exchange::transport::trace::{TraceEventKind, TraceLog};
 
+// @internal
 #[test]
 fn records_events_and_returns_them() {
     let mut log = TraceLog::new();
@@ -27,6 +28,7 @@ fn records_events_and_returns_them() {
     assert!(matches!(events[2].event, TraceEventKind::ExchangeComplete));
 }
 
+// @internal
 #[test]
 fn timestamps_are_monotonically_increasing() {
     let mut log = TraceLog::new();
@@ -45,6 +47,7 @@ fn timestamps_are_monotonically_increasing() {
     }
 }
 
+// @internal
 #[test]
 fn export_json_contains_expected_strings() {
     let mut log = TraceLog::new();
@@ -68,6 +71,7 @@ fn export_json_contains_expected_strings() {
     );
 }
 
+// @internal
 #[test]
 fn summary_extracts_transport_used_from_transport_selected() {
     let mut log = TraceLog::new();
@@ -80,6 +84,7 @@ fn summary_extracts_transport_used_from_transport_selected() {
     assert_eq!(summary.transport_used, Some(TransportType::Ble));
 }
 
+// @internal
 #[test]
 fn summary_counts_fallbacks() {
     let mut log = TraceLog::new();
@@ -107,6 +112,7 @@ fn summary_counts_fallbacks() {
     );
 }
 
+// @internal
 #[test]
 fn summary_totals_bytes_transferred() {
     let mut log = TraceLog::new();
@@ -119,6 +125,7 @@ fn summary_totals_bytes_transferred() {
     assert_eq!(summary.bytes_transferred, 100 + 120 + 500 + 480);
 }
 
+// @internal
 #[test]
 fn empty_log_produces_empty_summary() {
     let log = TraceLog::new();

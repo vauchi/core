@@ -20,6 +20,7 @@ fn alt_shared_secret() -> Vec<u8> {
 // Deterministic derivation
 // ================================================================
 
+// @internal
 #[test]
 fn derive_produces_64_char_hex_hashes() {
     let keys = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -31,6 +32,7 @@ fn derive_produces_64_char_hex_hashes() {
     assert!(keys.their_slot.chars().all(|c| c.is_ascii_hexdigit()));
 }
 
+// @internal
 #[test]
 fn same_secret_produces_same_gate_hash() {
     let init = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -41,6 +43,7 @@ fn same_secret_produces_same_gate_hash() {
     );
 }
 
+// @internal
 #[test]
 fn roles_swap_slot_assignment() {
     let init = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -56,6 +59,7 @@ fn roles_swap_slot_assignment() {
     );
 }
 
+// @internal
 #[test]
 fn derivation_is_deterministic() {
     let a = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -69,6 +73,7 @@ fn derivation_is_deterministic() {
 // Domain separation — security critical
 // ================================================================
 
+// @internal
 #[test]
 fn gate_slot_init_slot_resp_are_all_distinct() {
     let keys = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -77,6 +82,7 @@ fn gate_slot_init_slot_resp_are_all_distinct() {
     assert_ne!(keys.our_slot, keys.their_slot, "our_slot ≠ their_slot");
 }
 
+// @internal
 #[test]
 fn different_secrets_produce_different_values() {
     let a = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -90,6 +96,7 @@ fn different_secrets_produce_different_values() {
 // Card encryption roundtrip
 // ================================================================
 
+// @internal
 #[test]
 fn encrypt_decrypt_roundtrip() {
     let keys = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -105,6 +112,7 @@ fn encrypt_decrypt_roundtrip() {
     assert_eq!(decrypted, plaintext);
 }
 
+// @internal
 #[test]
 fn both_roles_can_decrypt_each_others_cards() {
     let init = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -125,6 +133,7 @@ fn both_roles_can_decrypt_each_others_cards() {
     assert_eq!(decrypted_bob, bob_card);
 }
 
+// @internal
 #[test]
 fn wrong_key_fails_decryption() {
     let keys_a = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -137,6 +146,7 @@ fn wrong_key_fails_decryption() {
     );
 }
 
+// @internal
 #[test]
 fn tampered_ciphertext_fails() {
     let keys = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -156,6 +166,7 @@ fn tampered_ciphertext_fails() {
 // Adversarial inputs
 // ================================================================
 
+// @internal
 #[test]
 fn empty_plaintext_roundtrips() {
     let keys = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -164,6 +175,7 @@ fn empty_plaintext_roundtrips() {
     assert!(pt.is_empty());
 }
 
+// @internal
 #[test]
 fn large_plaintext_roundtrips() {
     let keys = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -173,6 +185,7 @@ fn large_plaintext_roundtrips() {
     assert_eq!(pt, big);
 }
 
+// @internal
 #[test]
 fn truncated_ciphertext_fails() {
     let keys = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -182,6 +195,7 @@ fn truncated_ciphertext_fails() {
     assert!(keys.decrypt_card(&ct[..5]).is_err());
 }
 
+// @internal
 #[test]
 fn flipped_nonce_byte_fails() {
     let keys = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);
@@ -196,6 +210,7 @@ fn flipped_nonce_byte_fails() {
     );
 }
 
+// @internal
 #[test]
 fn each_encryption_produces_different_ciphertext() {
     let keys = EscrowKeys::derive(&test_shared_secret(), EscrowRole::Initiator);

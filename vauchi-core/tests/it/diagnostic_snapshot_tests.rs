@@ -5,6 +5,7 @@
 use vauchi_core::diagnostic::snapshot::{BoundingBox, SnapshotMetadata};
 use vauchi_core::diagnostic::tuner::{ErrorCorrectionLevel, QrConfig};
 
+// @internal
 #[test]
 fn snapshot_metadata_roundtrips_json() {
     let meta = SnapshotMetadata {
@@ -38,6 +39,7 @@ fn snapshot_metadata_roundtrips_json() {
     assert!(!back.redacted);
 }
 
+// @internal
 #[test]
 fn snapshot_metadata_handles_none_fields() {
     let meta = SnapshotMetadata {

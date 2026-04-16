@@ -15,6 +15,7 @@ fn offline_engine() -> SyncStatusEngine {
         .with_connection_state(ConnectionState::Disconnected)
 }
 
+// @internal
 #[test]
 fn sync_status_screen_id() {
     let engine = connected_engine();
@@ -22,6 +23,7 @@ fn sync_status_screen_id() {
     assert_eq!(screen.screen_id, "sync_status");
 }
 
+// @internal
 #[test]
 fn sync_status_title() {
     let engine = connected_engine();
@@ -29,6 +31,7 @@ fn sync_status_title() {
     assert_eq!(screen.title, "Sync");
 }
 
+// @internal
 #[test]
 fn sync_status_shows_relay_url() {
     let engine = connected_engine();
@@ -43,6 +46,7 @@ fn sync_status_shows_relay_url() {
     assert!(has_relay_url, "Screen should display the relay URL");
 }
 
+// @internal
 #[test]
 fn connected_shows_success_status() {
     let engine = connected_engine();
@@ -60,6 +64,7 @@ fn connected_shows_success_status() {
     assert_eq!(st, Status::Success);
 }
 
+// @internal
 #[test]
 fn offline_shows_failed_status_with_guidance() {
     let engine = offline_engine();
@@ -86,6 +91,7 @@ fn offline_shows_failed_status_with_guidance() {
     );
 }
 
+// @internal
 #[test]
 fn offline_disables_sync_now_button() {
     let engine = offline_engine();
@@ -98,6 +104,7 @@ fn offline_disables_sync_now_button() {
     );
 }
 
+// @internal
 #[test]
 fn offline_shows_retry_connection_label() {
     let engine = offline_engine();
@@ -114,6 +121,7 @@ fn offline_shows_retry_connection_label() {
     );
 }
 
+// @internal
 #[test]
 fn connected_shows_test_connection_label() {
     let engine = connected_engine();
@@ -130,6 +138,7 @@ fn connected_shows_test_connection_label() {
     );
 }
 
+// @internal
 #[test]
 fn sync_now_returns_complete() {
     let mut engine = connected_engine();
@@ -143,6 +152,7 @@ fn sync_now_returns_complete() {
     assert_eq!(engine.collected_input().as_deref(), Some("sync_now"));
 }
 
+// @internal
 #[test]
 fn test_connection_returns_complete() {
     let mut engine = offline_engine();
@@ -156,6 +166,7 @@ fn test_connection_returns_complete() {
     assert_eq!(engine.collected_input().as_deref(), Some("test_connection"));
 }
 
+// @internal
 #[test]
 fn reconnecting_shows_in_progress() {
     let engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 5, 0)
@@ -171,6 +182,7 @@ fn reconnecting_shows_in_progress() {
     assert_eq!(st, Status::InProgress);
 }
 
+// @internal
 #[test]
 fn zero_pending_shows_all_up_to_date() {
     let engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 3, 0)
@@ -191,6 +203,7 @@ fn zero_pending_shows_all_up_to_date() {
     );
 }
 
+// @internal
 #[test]
 fn nonzero_pending_shows_count() {
     let engine = SyncStatusEngine::new("https://relay.vauchi.app".into(), 3, 7)
@@ -210,6 +223,7 @@ fn nonzero_pending_shows_count() {
     );
 }
 
+// @internal
 #[test]
 fn unknown_action_returns_update_screen() {
     let mut engine = connected_engine();

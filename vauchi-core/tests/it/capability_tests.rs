@@ -116,6 +116,7 @@ fn make_gate(
 // ===== Platform tests =====
 
 // @scenario: device_capabilities :: Platform detection
+// @internal
 #[test]
 fn test_platform_default_is_unknown() {
     let platform = Platform::default();
@@ -123,6 +124,7 @@ fn test_platform_default_is_unknown() {
 }
 
 // @scenario: device_capabilities :: Platform detection
+// @internal
 #[test]
 fn test_platform_variants_distinct() {
     assert_ne!(Platform::Android, Platform::Ios);
@@ -132,6 +134,7 @@ fn test_platform_variants_distinct() {
 }
 
 // @scenario: device_capabilities :: Platform serialization
+// @internal
 #[test]
 fn test_platform_serde_roundtrip() {
     let platforms = vec![
@@ -152,6 +155,7 @@ fn test_platform_serde_roundtrip() {
 // ===== DeviceCapabilities tests =====
 
 // @scenario: device_capabilities :: Capabilities serialization
+// @internal
 #[test]
 fn test_device_capabilities_serde_roundtrip() {
     let caps = DeviceCapabilities {
@@ -178,6 +182,7 @@ fn test_device_capabilities_serde_roundtrip() {
 // ===== FeatureGate feature availability tests =====
 
 // @scenario: device_capabilities :: QR display always available
+// @internal
 #[test]
 fn test_qr_display_always_available() {
     let caps = make_caps(false, false, false);
@@ -189,6 +194,7 @@ fn test_qr_display_always_available() {
 }
 
 // @scenario: device_capabilities :: QR scan requires camera
+// @internal
 #[test]
 fn test_qr_scan_requires_camera() {
     let no_camera = make_caps(false, false, false);
@@ -204,6 +210,7 @@ fn test_qr_scan_requires_camera() {
 }
 
 // @scenario: device_capabilities :: NFC exchange requires NFC hardware
+// @internal
 #[test]
 fn test_nfc_exchange_requires_nfc() {
     let no_nfc = make_caps(false, false, false);
@@ -222,6 +229,7 @@ fn test_nfc_exchange_requires_nfc() {
 }
 
 // @scenario: device_capabilities :: BLE exchange requires BLE hardware
+// @internal
 #[test]
 fn test_ble_exchange_requires_ble() {
     let no_ble = make_caps(false, false, false);
@@ -240,6 +248,7 @@ fn test_ble_exchange_requires_ble() {
 }
 
 // @scenario: device_capabilities :: Mesh mode requires BLE
+// @internal
 #[test]
 fn test_mesh_mode_requires_ble() {
     let no_ble = make_caps(false, false, false);
@@ -258,6 +267,7 @@ fn test_mesh_mode_requires_ble() {
 }
 
 // @scenario: device_capabilities :: Biometric unlock requires biometric hardware
+// @internal
 #[test]
 fn test_biometric_unlock_requires_biometrics() {
     let no_bio = make_caps(false, false, false);
@@ -280,6 +290,7 @@ fn test_biometric_unlock_requires_biometrics() {
 // ===== FeatureGate action gating tests =====
 
 // @scenario: device_capabilities :: Exchange blocked at critical battery
+// @internal
 #[test]
 fn test_exchange_blocked_at_critical_battery() {
     let caps = make_caps(false, false, false);
@@ -289,6 +300,7 @@ fn test_exchange_blocked_at_critical_battery() {
 }
 
 // @scenario: device_capabilities :: Exchange allowed at normal battery
+// @internal
 #[test]
 fn test_exchange_allowed_at_normal_battery() {
     let caps = make_caps(false, false, false);
@@ -298,6 +310,7 @@ fn test_exchange_allowed_at_normal_battery() {
 }
 
 // @scenario: device_capabilities :: Relay sync blocked when offline
+// @internal
 #[test]
 fn test_relay_sync_blocked_when_offline() {
     let caps = make_caps(false, false, false);
@@ -307,6 +320,7 @@ fn test_relay_sync_blocked_when_offline() {
 }
 
 // @scenario: device_capabilities :: Relay sync allowed when online
+// @internal
 #[test]
 fn test_relay_sync_allowed_when_online() {
     let caps = make_caps(false, false, false);
@@ -316,6 +330,7 @@ fn test_relay_sync_allowed_when_online() {
 }
 
 // @scenario: device_capabilities :: Sync blocked at low storage
+// @internal
 #[test]
 fn test_sync_blocked_at_low_storage() {
     let caps = make_caps(false, false, false);
@@ -325,6 +340,7 @@ fn test_sync_blocked_at_low_storage() {
 }
 
 // @scenario: device_capabilities :: Mesh relay blocked at critical battery
+// @internal
 #[test]
 fn test_mesh_relay_blocked_at_critical_battery() {
     let caps = make_caps(false, false, false);
@@ -334,6 +350,7 @@ fn test_mesh_relay_blocked_at_critical_battery() {
 }
 
 // @scenario: device_capabilities :: Mesh relay warning at low battery
+// @internal
 #[test]
 fn test_mesh_relay_warning_at_low_battery() {
     let caps = make_caps(false, false, false);
@@ -345,6 +362,7 @@ fn test_mesh_relay_warning_at_low_battery() {
 // ===== available_exchanges tests =====
 
 // @scenario: device_capabilities :: Available exchanges for minimal device
+// @internal
 #[test]
 fn test_available_exchanges_minimal_device() {
     let caps = make_caps(false, false, false);
@@ -356,6 +374,7 @@ fn test_available_exchanges_minimal_device() {
 }
 
 // @scenario: device_capabilities :: Available exchanges for full device
+// @internal
 #[test]
 fn test_available_exchanges_full_device() {
     let caps = make_caps(true, true, true);
@@ -369,6 +388,7 @@ fn test_available_exchanges_full_device() {
 }
 
 // @scenario: device_capabilities :: Available exchanges for iOS without NFC
+// @internal
 #[test]
 fn test_available_exchanges_ios_no_nfc() {
     let mut caps = make_caps(false, true, true);
@@ -385,6 +405,7 @@ fn test_available_exchanges_ios_no_nfc() {
 // ===== AudioCapability serde tests =====
 
 // @scenario: device_capabilities :: Audio capability serialization
+// @internal
 #[test]
 fn test_audio_capability_serde_roundtrip() {
     let variants = vec![
@@ -404,6 +425,7 @@ fn test_audio_capability_serde_roundtrip() {
 // ===== BiometricType tests =====
 
 // @scenario: device_capabilities :: Biometric type serialization
+// @internal
 #[test]
 fn test_biometric_type_serde_roundtrip() {
     let types = vec![
@@ -422,6 +444,7 @@ fn test_biometric_type_serde_roundtrip() {
 // ===== ConnectionType tests =====
 
 // @scenario: device_capabilities :: Connection type variants
+// @internal
 #[test]
 fn test_connection_type_variants() {
     let variants = [
@@ -519,72 +542,76 @@ mod proptest_capability {
     }
 
     proptest! {
-        /// QR display must always be available regardless of device capabilities.
-        #[test]
-        fn prop_qr_display_always_available(caps in arb_device_capabilities()) {
-            let runtime = MockRuntimeState::healthy();
-            let gate = FeatureGate::new(caps, Box::new(runtime));
+            /// QR display must always be available regardless of device capabilities.
+    // @internal
+            #[test]
+            fn prop_qr_display_always_available(caps in arb_device_capabilities()) {
+                let runtime = MockRuntimeState::healthy();
+                let gate = FeatureGate::new(caps, Box::new(runtime));
 
-            prop_assert_eq!(
-                gate.is_available(Feature::QrDisplay),
-                FeatureStatus::Available,
-                "QR display must be available for any capability combination"
-            );
-        }
-
-        /// available_exchanges() must always return at least one feature (QR display).
-        #[test]
-        fn prop_at_least_one_exchange_method(caps in arb_device_capabilities()) {
-            let runtime = MockRuntimeState::healthy();
-            let gate = FeatureGate::new(caps, Box::new(runtime));
-
-            let exchanges = gate.available_exchanges();
-            prop_assert!(
-                !exchanges.is_empty(),
-                "There must always be at least one available exchange method"
-            );
-            prop_assert!(
-                exchanges.contains(&Feature::QrDisplay),
-                "QR display must always be in available exchanges"
-            );
-        }
-
-        /// NFC exchange availability should match has_nfc capability.
-        #[test]
-        fn prop_nfc_matches_capability(caps in arb_device_capabilities()) {
-            let runtime = MockRuntimeState::healthy();
-            let gate = FeatureGate::new(caps.clone(), Box::new(runtime));
-
-            if caps.has_nfc {
                 prop_assert_eq!(
-                    gate.is_available(Feature::NfcExchange),
-                    FeatureStatus::Available
-                );
-            } else {
-                prop_assert_eq!(
-                    gate.is_available(Feature::NfcExchange),
-                    FeatureStatus::Unavailable
+                    gate.is_available(Feature::QrDisplay),
+                    FeatureStatus::Available,
+                    "QR display must be available for any capability combination"
                 );
             }
-        }
 
-        /// BLE exchange availability should match has_ble capability.
-        #[test]
-        fn prop_ble_matches_capability(caps in arb_device_capabilities()) {
-            let runtime = MockRuntimeState::healthy();
-            let gate = FeatureGate::new(caps.clone(), Box::new(runtime));
+            /// available_exchanges() must always return at least one feature (QR display).
+    // @internal
+            #[test]
+            fn prop_at_least_one_exchange_method(caps in arb_device_capabilities()) {
+                let runtime = MockRuntimeState::healthy();
+                let gate = FeatureGate::new(caps, Box::new(runtime));
 
-            if caps.has_ble {
-                prop_assert_eq!(
-                    gate.is_available(Feature::BleExchange),
-                    FeatureStatus::Available
+                let exchanges = gate.available_exchanges();
+                prop_assert!(
+                    !exchanges.is_empty(),
+                    "There must always be at least one available exchange method"
                 );
-            } else {
-                prop_assert_eq!(
-                    gate.is_available(Feature::BleExchange),
-                    FeatureStatus::Unavailable
+                prop_assert!(
+                    exchanges.contains(&Feature::QrDisplay),
+                    "QR display must always be in available exchanges"
                 );
             }
+
+            /// NFC exchange availability should match has_nfc capability.
+    // @internal
+            #[test]
+            fn prop_nfc_matches_capability(caps in arb_device_capabilities()) {
+                let runtime = MockRuntimeState::healthy();
+                let gate = FeatureGate::new(caps.clone(), Box::new(runtime));
+
+                if caps.has_nfc {
+                    prop_assert_eq!(
+                        gate.is_available(Feature::NfcExchange),
+                        FeatureStatus::Available
+                    );
+                } else {
+                    prop_assert_eq!(
+                        gate.is_available(Feature::NfcExchange),
+                        FeatureStatus::Unavailable
+                    );
+                }
+            }
+
+            /// BLE exchange availability should match has_ble capability.
+    // @internal
+            #[test]
+            fn prop_ble_matches_capability(caps in arb_device_capabilities()) {
+                let runtime = MockRuntimeState::healthy();
+                let gate = FeatureGate::new(caps.clone(), Box::new(runtime));
+
+                if caps.has_ble {
+                    prop_assert_eq!(
+                        gate.is_available(Feature::BleExchange),
+                        FeatureStatus::Available
+                    );
+                } else {
+                    prop_assert_eq!(
+                        gate.is_available(Feature::BleExchange),
+                        FeatureStatus::Unavailable
+                    );
+                }
+            }
         }
-    }
 }

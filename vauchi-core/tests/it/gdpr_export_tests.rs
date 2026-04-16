@@ -41,6 +41,7 @@ fn setup_storage_with_contacts() -> Storage {
 }
 
 // @scenario: privacy_compliance :: Export includes all data types
+// @internal
 #[test]
 fn test_export_includes_contacts() {
     let storage = setup_storage_with_contacts();
@@ -53,6 +54,7 @@ fn test_export_includes_contacts() {
 }
 
 // @scenario: privacy_compliance :: Export includes all data types
+// @internal
 #[test]
 fn test_export_includes_own_card() {
     let storage = setup_storage_with_contacts();
@@ -63,6 +65,7 @@ fn test_export_includes_own_card() {
 }
 
 // @scenario: privacy_compliance :: Export all my data
+// @internal
 #[test]
 fn test_export_excludes_private_keys() {
     let storage = setup_storage_with_contacts();
@@ -101,6 +104,7 @@ fn test_export_excludes_private_keys() {
 }
 
 // @scenario: privacy_compliance :: Export includes all data types
+// @internal
 #[test]
 fn test_export_includes_consent_records() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -122,6 +126,7 @@ fn test_export_includes_consent_records() {
 }
 
 // @scenario: privacy_compliance :: Export includes device list and recovery config
+// @internal
 #[test]
 fn test_export_includes_devices() {
     let storage = setup_storage_with_contacts();
@@ -136,6 +141,7 @@ fn test_export_includes_devices() {
 }
 
 // @scenario: privacy_compliance :: Export includes device list and recovery config
+// @internal
 #[test]
 fn test_export_includes_recovery_config() {
     let storage = setup_storage_with_contacts();
@@ -150,6 +156,7 @@ fn test_export_includes_recovery_config() {
 }
 
 // @scenario: privacy_compliance :: Export all my data
+// @internal
 #[test]
 fn test_export_version_bumped_to_3() {
     let storage = setup_storage_with_contacts();
@@ -160,6 +167,7 @@ fn test_export_version_bumped_to_3() {
     assert!(export.exported_at > 0, "Export timestamp should be set");
 }
 
+// @internal
 #[test]
 fn test_list_audit_log_empty() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -168,6 +176,7 @@ fn test_list_audit_log_empty() {
     assert!(log.is_empty(), "Empty DB should return empty audit log");
 }
 
+// @internal
 #[test]
 fn test_list_audit_log_roundtrip() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -189,6 +198,7 @@ fn test_list_audit_log_roundtrip() {
     assert!(log[1].2 > 0);
 }
 
+// @internal
 #[test]
 fn test_list_audit_log_decrypts_details() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -207,6 +217,7 @@ fn test_list_audit_log_decrypts_details() {
 }
 
 // @scenario: privacy_compliance :: Export includes all data types
+// @internal
 #[test]
 fn test_export_includes_audit_log() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -235,6 +246,7 @@ fn test_export_includes_audit_log() {
 }
 
 // @scenario: privacy_compliance :: Encrypted GDPR export roundtrip
+// @internal
 #[test]
 fn test_encrypted_export_roundtrip() {
     use vauchi_core::api::{export_encrypted, import_encrypted};
@@ -255,6 +267,7 @@ fn test_encrypted_export_roundtrip() {
 }
 
 // @scenario: privacy_compliance :: Wrong password fails decryption
+// @internal
 #[test]
 fn test_encrypted_export_wrong_password_fails() {
     use vauchi_core::api::{export_encrypted, import_encrypted};

@@ -18,6 +18,7 @@ fn fields_of_type(card: &ContactCard, ft: FieldType) -> Vec<(&str, &str)> {
 
 // ── Basic parsing ───────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn test_split_multi_contact_vcf() {
     let vcf = b"BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Alice\r\nEND:VCARD\r\n\
@@ -29,6 +30,7 @@ fn test_split_multi_contact_vcf() {
     assert_eq!(results[1].0.display_name(), "Bob");
 }
 
+// @internal
 #[test]
 fn test_import_vcard_40_basic() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -56,6 +58,7 @@ fn test_import_vcard_40_basic() {
     assert_eq!(emails[0].1, "john@example.com");
 }
 
+// @internal
 #[test]
 fn test_import_vcard_30_google() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -88,6 +91,7 @@ fn test_import_vcard_30_google() {
     assert_eq!(title.unwrap().1, "Engineer");
 }
 
+// @internal
 #[test]
 fn test_import_vcard_21_outlook() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -115,6 +119,7 @@ fn test_import_vcard_21_outlook() {
 
 // ── QUOTED-PRINTABLE ────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn test_vcard_21_quoted_printable_utf8() {
     // Simulate a v2.1 card with QP-encoded UTF-8 name
@@ -131,6 +136,7 @@ fn test_vcard_21_quoted_printable_utf8() {
 
 // ── Properties ──────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn test_parse_tel_with_types() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -149,6 +155,7 @@ fn test_parse_tel_with_types() {
     assert_eq!(phones[2].0, "Mobile");
 }
 
+// @internal
 #[test]
 fn test_parse_email_with_types() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -165,6 +172,7 @@ fn test_parse_email_with_types() {
     assert_eq!(emails[1].0, "Work");
 }
 
+// @internal
 #[test]
 fn test_parse_adr_structured() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -182,6 +190,7 @@ fn test_parse_adr_structured() {
     assert!(addrs[0].1.contains("USA"));
 }
 
+// @internal
 #[test]
 fn test_parse_org_title_nickname() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -207,6 +216,7 @@ fn test_parse_org_title_nickname() {
     assert_eq!(title.unwrap().1, "Senior Dev");
 }
 
+// @internal
 #[test]
 fn test_parse_bday() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -221,6 +231,7 @@ fn test_parse_bday() {
     assert_eq!(bdays[0].1, "1990-05-15");
 }
 
+// @internal
 #[test]
 fn test_parse_uid_returned() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -235,6 +246,7 @@ fn test_parse_uid_returned() {
 
 // ── N fallback ──────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn test_fn_fallback_to_n() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -249,6 +261,7 @@ fn test_fn_fallback_to_n() {
 
 // ── Group prefixes ──────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn test_apple_group_prefix_with_ablabel() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -274,6 +287,7 @@ fn test_apple_group_prefix_with_ablabel() {
 
 // ── Limits ──────────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn test_oversized_file_rejected() {
     let big = vec![b'x'; 10 * 1024 * 1024 + 1];
@@ -285,6 +299,7 @@ fn test_oversized_file_rejected() {
     assert_eq!(max, 10 * 1024 * 1024);
 }
 
+// @internal
 #[test]
 fn test_oversized_field_truncated() {
     let long_name = "A".repeat(200);
@@ -296,6 +311,7 @@ fn test_oversized_field_truncated() {
     assert_eq!(results[0].0.display_name().len(), 100);
 }
 
+// @internal
 #[test]
 fn test_malformed_contact_skipped() {
     // First contact has no FN or N → skipped. Second is valid.
@@ -309,12 +325,14 @@ fn test_malformed_contact_skipped() {
 
 // ── Edge cases ──────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn test_empty_file_returns_empty() {
     let results = import_vcf(b"").unwrap();
     assert!(results.is_empty());
 }
 
+// @internal
 #[test]
 fn test_missing_version_defaults_to_30() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -327,6 +345,7 @@ fn test_missing_version_defaults_to_30() {
     assert_eq!(results[0].0.display_name(), "No Version");
 }
 
+// @internal
 #[test]
 fn test_bare_params_vcard_21() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -349,6 +368,7 @@ fn test_bare_params_vcard_21() {
 
 // ── Line unfolding ──────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn test_line_unfolding() {
     // NOTE value split across two lines with space continuation
@@ -367,6 +387,7 @@ fn test_line_unfolding() {
 
 // ── Social profiles ─────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn test_social_profile() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -383,6 +404,7 @@ fn test_social_profile() {
 
 // ── Unescape / date / address via public API ───────────────────────
 
+// @internal
 #[test]
 fn test_unescape_backslash_sequences_via_note() {
     // Verify unescaping of \n, \,, \;, \:, \\ through a NOTE field
@@ -400,6 +422,7 @@ fn test_unescape_backslash_sequences_via_note() {
     assert!(notes[0].1.contains(';'), "semicolon not unescaped");
 }
 
+// @internal
 #[test]
 fn test_compact_bday_format() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -414,6 +437,7 @@ fn test_compact_bday_format() {
     assert_eq!(bdays[0].1, "1990-05-15");
 }
 
+// @internal
 #[test]
 fn test_n_only_family_name() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -425,6 +449,7 @@ fn test_n_only_family_name() {
     assert_eq!(results[0].0.display_name(), "Smith");
 }
 
+// @internal
 #[test]
 fn test_n_only_given_name() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -436,6 +461,7 @@ fn test_n_only_given_name() {
     assert_eq!(results[0].0.display_name(), "Jane");
 }
 
+// @internal
 #[test]
 fn test_adr_full_structured() {
     let vcf = b"BEGIN:VCARD\r\n\
@@ -456,42 +482,45 @@ mod proptests {
     use vauchi_core::contact_card::vcard_import::import_vcf;
 
     proptest! {
-        #[test]
-        fn vcard_parser_never_panics(data in proptest::collection::vec(any::<u8>(), 0..4096)) {
-            // The parser must never panic, regardless of input.
-            // It may return Ok or Err, but must not panic.
-            let result = import_vcf(&data);
-            // Every successful parse must return valid ContactCards
-            if let Ok(cards) = result {
-                for (card, _uid) in &cards {
-                    prop_assert!(!card.display_name().is_empty());
+    // @internal
+            #[test]
+            fn vcard_parser_never_panics(data in proptest::collection::vec(any::<u8>(), 0..4096)) {
+                // The parser must never panic, regardless of input.
+                // It may return Ok or Err, but must not panic.
+                let result = import_vcf(&data);
+                // Every successful parse must return valid ContactCards
+                if let Ok(cards) = result {
+                    for (card, _uid) in &cards {
+                        prop_assert!(!card.display_name().is_empty());
+                    }
                 }
             }
-        }
 
-        #[test]
-        fn vcard_parser_respects_field_limits(
-            name in "[a-zA-Z ]{1,200}",
-            value in "[a-zA-Z0-9 ]{0,2000}",
-        ) {
-            let vcf = format!(
-                "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:{name}\r\nNOTE:{value}\r\nEND:VCARD\r\n"
-            );
-            let results = import_vcf(vcf.as_bytes()).unwrap();
-            if let Some((card, _)) = results.first() {
-                // Display name max 100 chars
-                assert!(card.display_name().chars().count() <= 100);
-                // Field values max 1000 chars
-                for field in card.fields() {
-                    assert!(field.value().chars().count() <= 1000);
+    // @internal
+            #[test]
+            fn vcard_parser_respects_field_limits(
+                name in "[a-zA-Z ]{1,200}",
+                value in "[a-zA-Z0-9 ]{0,2000}",
+            ) {
+                let vcf = format!(
+                    "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:{name}\r\nNOTE:{value}\r\nEND:VCARD\r\n"
+                );
+                let results = import_vcf(vcf.as_bytes()).unwrap();
+                if let Some((card, _)) = results.first() {
+                    // Display name max 100 chars
+                    assert!(card.display_name().chars().count() <= 100);
+                    // Field values max 1000 chars
+                    for field in card.fields() {
+                        assert!(field.value().chars().count() <= 1000);
+                    }
                 }
             }
         }
-    }
 }
 
 // ── Non-UTF-8 encoding support ──────────────────────────────────────
 
+// @internal
 #[test]
 fn import_latin1_contact() {
     // "José" in Latin-1: J(4A) o(6F) s(73) é(E9)
@@ -504,6 +533,7 @@ fn import_latin1_contact() {
     assert_eq!(cards[0].0.display_name(), "Jos\u{e9}"); // "José"
 }
 
+// @internal
 #[test]
 fn import_utf8_bom_stripped() {
     let mut raw = vec![0xEF, 0xBB, 0xBF]; // UTF-8 BOM
@@ -513,6 +543,7 @@ fn import_utf8_bom_stripped() {
     assert_eq!(cards[0].0.display_name(), "Alice");
 }
 
+// @internal
 #[test]
 fn import_plain_utf8_still_works() {
     // "José" in UTF-8: J(4A) o(6F) s(73) é(C3 A9)

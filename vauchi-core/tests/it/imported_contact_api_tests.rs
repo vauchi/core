@@ -40,6 +40,7 @@ fn add_exchanged(wb: &Vauchi, name: &str) -> String {
 
 // ── Trust guard: imported contacts cannot be trusted for recovery ──────────
 
+// @internal
 #[test]
 fn trust_for_recovery_fails_for_imported_contact() {
     let wb = new_vauchi();
@@ -63,6 +64,7 @@ fn trust_for_recovery_fails_for_imported_contact() {
 
 // ── Trust guard: imported contacts cannot have fingerprint verified ─────────
 
+// @internal
 #[test]
 fn verify_fingerprint_fails_for_imported_contact() {
     let wb = new_vauchi();
@@ -77,6 +79,7 @@ fn verify_fingerprint_fails_for_imported_contact() {
 
 // ── Editing: update a field on an imported contact succeeds ────────────────
 
+// @internal
 #[test]
 fn update_imported_contact_field_succeeds() {
     let wb = new_vauchi();
@@ -118,6 +121,7 @@ fn update_imported_contact_field_succeeds() {
 
 // ── Editing: update a field on an exchanged contact is rejected ────────────
 
+// @internal
 #[test]
 fn update_imported_contact_field_rejects_exchanged() {
     let wb = new_vauchi();
@@ -142,6 +146,7 @@ fn update_imported_contact_field_rejects_exchanged() {
 
 // ── Editing: add a field to an imported contact succeeds ───────────────────
 
+// @internal
 #[test]
 fn add_imported_contact_field_succeeds() {
     let wb = new_vauchi();
@@ -162,6 +167,7 @@ fn add_imported_contact_field_succeeds() {
 
 // ── Editing: add a field to an exchanged contact is rejected ───────────────
 
+// @internal
 #[test]
 fn add_imported_contact_field_rejects_exchanged() {
     let wb = new_vauchi();
@@ -186,6 +192,7 @@ fn add_imported_contact_field_rejects_exchanged() {
 
 // ── Editing: remove a field from an imported contact succeeds ──────────────
 
+// @internal
 #[test]
 fn remove_imported_contact_field_succeeds() {
     let wb = new_vauchi();
@@ -218,6 +225,7 @@ fn remove_imported_contact_field_succeeds() {
 
 // ── Editing: remove a field from an exchanged contact is rejected ──────────
 
+// @internal
 #[test]
 fn remove_imported_contact_field_rejects_exchanged() {
     let wb = new_vauchi();
@@ -242,6 +250,7 @@ fn remove_imported_contact_field_rejects_exchanged() {
 
 // ── Editing: operations on unknown contacts return ContactNotFound ──────────
 
+// @internal
 #[test]
 fn update_imported_contact_field_unknown_contact_returns_not_found() {
     let wb = new_vauchi();
@@ -254,6 +263,7 @@ fn update_imported_contact_field_unknown_contact_returns_not_found() {
     );
 }
 
+// @internal
 #[test]
 fn add_imported_contact_field_unknown_contact_returns_not_found() {
     let wb = new_vauchi();
@@ -267,6 +277,7 @@ fn add_imported_contact_field_unknown_contact_returns_not_found() {
     );
 }
 
+// @internal
 #[test]
 fn remove_imported_contact_field_unknown_contact_returns_not_found() {
     let wb = new_vauchi();
@@ -281,6 +292,7 @@ fn remove_imported_contact_field_unknown_contact_returns_not_found() {
 
 // ── Editing: update non-existent field returns an error ───────────────────
 
+// @internal
 #[test]
 fn update_imported_contact_field_missing_field_returns_error() {
     let wb = new_vauchi();
@@ -295,6 +307,7 @@ fn update_imported_contact_field_missing_field_returns_error() {
 
 // ── Editing: remove non-existent field returns an error ───────────────────
 
+// @internal
 #[test]
 fn remove_imported_contact_field_missing_field_returns_error() {
     let wb = new_vauchi();
@@ -309,6 +322,7 @@ fn remove_imported_contact_field_missing_field_returns_error() {
 
 // ── Import API: import_contacts_from_vcf ──────────────────────────────────
 
+// @internal
 #[test]
 fn import_vcf_creates_contacts() {
     let wb = new_vauchi();
@@ -330,6 +344,7 @@ fn import_vcf_creates_contacts() {
     assert!(names.contains(&"Bob VCF"), "Bob VCF must be in contacts");
 }
 
+// @internal
 #[test]
 fn import_vcf_returns_count() {
     let wb = new_vauchi();
@@ -346,6 +361,7 @@ fn import_vcf_returns_count() {
     assert!(result.warnings.is_empty());
 }
 
+// @internal
 #[test]
 fn import_empty_vcf_returns_zero() {
     let wb = new_vauchi();
@@ -359,6 +375,7 @@ fn import_empty_vcf_returns_zero() {
 
 // ── Editing: multiple fields can be added and individually removed ─────────
 
+// @internal
 #[test]
 fn imported_contact_multiple_field_add_and_remove() {
     let wb = new_vauchi();
@@ -391,6 +408,7 @@ fn imported_contact_multiple_field_add_and_remove() {
 
 // ── C3: Import respects contact limit ──────────────────────────────────────
 
+// @internal
 #[test]
 fn import_vcf_respects_contact_limit() {
     let wb = new_vauchi();
@@ -415,6 +433,7 @@ fn import_vcf_respects_contact_limit() {
 
 // ── W5: Cross-kind merge returns error ─────────────────────────────────────
 
+// @internal
 #[test]
 fn test_merge_cross_kind_returns_error() {
     let wb = new_vauchi();
@@ -444,6 +463,7 @@ fn test_merge_cross_kind_returns_error() {
 
 // ── W7: Re-import same VCF produces no duplicates ──────────────────────────
 
+// @internal
 #[test]
 fn test_reimport_same_vcf_no_duplicates() {
     let wb = new_vauchi();

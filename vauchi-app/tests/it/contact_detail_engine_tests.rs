@@ -44,6 +44,7 @@ fn exchanged_engine() -> ContactDetailEngine {
 }
 
 // @scenario: contact_detail.feature - Delete imported contact shows InlineConfirm
+// @internal
 #[test]
 fn delete_contact_shows_inline_confirm() {
     let mut engine = imported_engine();
@@ -71,6 +72,7 @@ fn delete_contact_shows_inline_confirm() {
 }
 
 // @scenario: contact_detail.feature - Confirm delete completes engine
+// @internal
 #[test]
 fn confirm_delete_contact_completes() {
     let mut engine = imported_engine();
@@ -93,6 +95,7 @@ fn confirm_delete_contact_completes() {
 }
 
 // @scenario: contact_detail.feature - Cancel delete removes InlineConfirm
+// @internal
 #[test]
 fn cancel_delete_contact_removes_inline_confirm() {
     let mut engine = imported_engine();
@@ -128,6 +131,7 @@ fn cancel_delete_contact_removes_inline_confirm() {
 //
 // Verifies that the personal_note EditableText component carries a meaningful
 // accessibility label and TextField role so screen readers can announce it.
+// @internal
 #[test]
 fn contact_detail_personal_note_has_a11y() {
     let engine = exchanged_engine();
@@ -170,6 +174,7 @@ fn contact_detail_personal_note_has_a11y() {
 //
 // Verifies that the delete confirmation InlineConfirm carries an Alert role
 // and descriptive label so screen readers announce it as a destructive action.
+// @internal
 #[test]
 fn contact_detail_delete_inline_confirm_has_a11y() {
     let mut engine = imported_engine();
@@ -207,6 +212,7 @@ fn contact_detail_delete_inline_confirm_has_a11y() {
 }
 
 // @scenario: contact_detail.feature - Archive exchanged contact still uses ShowToast
+// @internal
 #[test]
 fn archive_contact_still_uses_show_toast() {
     let mut engine = exchanged_engine();

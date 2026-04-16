@@ -16,6 +16,7 @@ fn make_test_identity() -> Identity {
 // Phase 1: Key Offer
 // ============================================================
 
+// @internal
 #[test]
 fn test_initiator_creates_key_offer() {
     let identity = make_test_identity();
@@ -38,6 +39,7 @@ fn test_initiator_creates_key_offer() {
     assert!(!parsed.is_expired());
 }
 
+// @internal
 #[test]
 fn test_double_key_offer_rejected() {
     let identity = make_test_identity();
@@ -52,6 +54,7 @@ fn test_double_key_offer_rejected() {
 // Full Handshake
 // ============================================================
 
+// @internal
 #[test]
 fn test_full_handshake_happy_path() {
     let alice_id = make_test_identity();
@@ -104,6 +107,7 @@ fn test_full_handshake_happy_path() {
 // Failure Cases
 // ============================================================
 
+// @internal
 #[test]
 fn test_expired_key_offer_rejected() {
     let alice_id = make_test_identity();
@@ -120,6 +124,7 @@ fn test_expired_key_offer_rejected() {
     assert!(matches!(result, Err(ExchangeError::NfcExpired)));
 }
 
+// @internal
 #[test]
 fn test_tampered_ciphertext_rejected() {
     let alice_id = make_test_identity();
@@ -141,6 +146,7 @@ fn test_tampered_ciphertext_rejected() {
     assert!(matches!(result, Err(ExchangeError::NfcDecryptionFailed)));
 }
 
+// @internal
 #[test]
 fn test_tampered_phase3_ciphertext_rejected() {
     let alice_id = make_test_identity();
@@ -164,6 +170,7 @@ fn test_tampered_phase3_ciphertext_rejected() {
     assert!(matches!(result, Err(ExchangeError::NfcDecryptionFailed)));
 }
 
+// @internal
 #[test]
 fn test_invalid_state_transitions() {
     let identity = make_test_identity();
@@ -186,6 +193,7 @@ fn test_invalid_state_transitions() {
 // Relay Fallback
 // ============================================================
 
+// @internal
 #[test]
 fn test_relay_fallback_from_key_ack_received() {
     let alice_id = make_test_identity();
@@ -207,6 +215,7 @@ fn test_relay_fallback_from_key_ack_received() {
     ));
 }
 
+// @internal
 #[test]
 fn test_relay_fallback_from_idle_fails() {
     let identity = make_test_identity();
@@ -216,6 +225,7 @@ fn test_relay_fallback_from_idle_fails() {
     assert!(matches!(result, Err(ExchangeError::InvalidState(_))));
 }
 
+// @internal
 #[test]
 fn test_relay_fallback_without_shared_key_fails() {
     let identity = make_test_identity();
@@ -232,6 +242,7 @@ fn test_relay_fallback_without_shared_key_fails() {
 // Identity Key Verification
 // ============================================================
 
+// @internal
 #[test]
 fn test_exchange_preserves_identity_keys() {
     let alice_id = make_test_identity();
@@ -266,6 +277,7 @@ fn test_exchange_preserves_identity_keys() {
 // ============================================================
 
 proptest! {
+// @internal
     #[test]
     fn prop_handshake_succeeds_with_any_display_names(
         alice_name in "[a-zA-Z0-9 ]{1,100}",
@@ -289,6 +301,7 @@ proptest! {
         prop_assert!(bob_result.remote_card.verify_crc16());
     }
 
+// @internal
     #[test]
     fn prop_card_payload_roundtrip(
         name in "[\\w]{0,200}",

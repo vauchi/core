@@ -20,6 +20,7 @@ use vauchi_core::{
 // =============================================================================
 
 /// Test: Sync state remains pending when delivery fails
+// @internal
 #[test]
 fn test_sync_state_pending_on_undelivered() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -49,6 +50,7 @@ fn test_sync_state_pending_on_undelivered() {
 }
 
 /// Test: Relay client handles disconnect gracefully
+// @internal
 #[test]
 fn test_relay_disconnect_clears_state() {
     let transport = MockTransport::new();
@@ -91,6 +93,7 @@ fn test_relay_disconnect_clears_state() {
 }
 
 /// Test: Multiple pending updates for same contact
+// @internal
 #[test]
 fn test_multiple_pending_updates_queued() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -125,6 +128,7 @@ fn test_multiple_pending_updates_queued() {
 // =============================================================================
 
 /// Test: Decrypt fails with wrong ratchet state
+// @internal
 #[test]
 fn test_decrypt_fails_with_wrong_ratchet() {
     let shared_secret1 = SymmetricKey::generate();
@@ -147,6 +151,7 @@ fn test_decrypt_fails_with_wrong_ratchet() {
 }
 
 /// Test: Decrypt fails with corrupted ciphertext
+// @internal
 #[test]
 fn test_decrypt_fails_with_corrupted_ciphertext() {
     let shared_secret = SymmetricKey::generate();
@@ -174,6 +179,7 @@ fn test_decrypt_fails_with_corrupted_ciphertext() {
 }
 
 /// Test: Delta signature verification rejects wrong signer
+// @internal
 #[test]
 fn test_delta_signature_rejects_wrong_signer() {
     use vauchi_core::identity::Identity;
@@ -211,6 +217,7 @@ fn test_delta_signature_rejects_wrong_signer() {
 }
 
 /// Test: Delta signature verification rejects tampered delta
+// @internal
 #[test]
 fn test_delta_signature_rejects_tampered_delta() {
     use vauchi_core::identity::Identity;
@@ -254,6 +261,7 @@ fn test_delta_signature_rejects_tampered_delta() {
 // =============================================================================
 
 /// Test: Loading non-existent contact returns None
+// @internal
 #[test]
 fn test_load_nonexistent_contact_returns_none() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -263,6 +271,7 @@ fn test_load_nonexistent_contact_returns_none() {
 }
 
 /// Test: Loading non-existent ratchet state returns None
+// @internal
 #[test]
 fn test_load_nonexistent_ratchet_returns_none() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -272,6 +281,7 @@ fn test_load_nonexistent_ratchet_returns_none() {
 }
 
 /// Test: Saving and loading contact preserves data
+// @internal
 #[test]
 fn test_contact_roundtrip_preserves_data() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -305,6 +315,7 @@ fn test_contact_roundtrip_preserves_data() {
 // =============================================================================
 
 /// Test: Delta with no changes is empty
+// @internal
 #[test]
 fn test_empty_delta_when_cards_identical() {
     let card = ContactCard::new("Test");
@@ -318,6 +329,7 @@ fn test_empty_delta_when_cards_identical() {
 }
 
 /// Test: Cannot create identity twice
+// @internal
 #[test]
 fn test_cannot_create_identity_twice() {
     let mut wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -329,6 +341,7 @@ fn test_cannot_create_identity_twice() {
 }
 
 /// Test: Cannot add duplicate contact
+// @internal
 #[test]
 fn test_cannot_add_duplicate_contact() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -356,6 +369,7 @@ fn test_cannot_add_duplicate_contact() {
 }
 
 /// Test: Mark non-existent update as delivered fails gracefully
+// @internal
 #[test]
 fn test_mark_nonexistent_update_delivered() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -374,6 +388,7 @@ fn test_mark_nonexistent_update_delivered() {
 // =============================================================================
 
 /// Test: Wrong password fails backup import
+// @internal
 #[test]
 fn test_wrong_password_fails_backup_import() {
     use vauchi_core::identity::Identity;
@@ -386,6 +401,7 @@ fn test_wrong_password_fails_backup_import() {
 }
 
 /// Test: Corrupted backup fails import
+// @internal
 #[test]
 fn test_corrupted_backup_fails_import() {
     use vauchi_core::identity::Identity;
@@ -405,6 +421,7 @@ fn test_corrupted_backup_fails_import() {
 }
 
 /// Test: Empty password is rejected
+// @internal
 #[test]
 fn test_empty_password_rejected_for_backup() {
     use vauchi_core::identity::Identity;
@@ -420,6 +437,7 @@ fn test_empty_password_rejected_for_backup() {
 // =============================================================================
 
 /// Test: Setting visibility on non-existent field is handled
+// @internal
 #[test]
 fn test_visibility_on_nonexistent_field() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();

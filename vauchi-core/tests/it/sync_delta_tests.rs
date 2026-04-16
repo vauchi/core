@@ -10,6 +10,7 @@ use vauchi_core::sync::*;
 use vauchi_core::*;
 
 // @scenario: sync_updates :: Only changed fields transmitted
+// @internal
 #[test]
 fn test_delta_compute_no_changes() {
     let card = ContactCard::new("Alice");
@@ -19,6 +20,7 @@ fn test_delta_compute_no_changes() {
 }
 
 // @scenario: sync_updates :: Only changed fields transmitted
+// @internal
 #[test]
 fn test_delta_compute_display_name_change() {
     let old = ContactCard::new("Alice");
@@ -34,6 +36,7 @@ fn test_delta_compute_display_name_change() {
 }
 
 // @scenario: sync_updates :: Only changed fields transmitted
+// @internal
 #[test]
 fn test_delta_compute_field_added() {
     let old = ContactCard::new("Alice");
@@ -51,6 +54,7 @@ fn test_delta_compute_field_added() {
     assert!(matches!(&delta.changes[0], FieldChange::Added { .. }));
 }
 
+// @internal
 #[test]
 fn test_delta_compute_field_modified() {
     let mut old = ContactCard::new("Alice");
@@ -76,6 +80,7 @@ fn test_delta_compute_field_modified() {
 }
 
 // @scenario: sync_updates :: Only changed fields transmitted
+// @internal
 #[test]
 fn test_delta_compute_field_removed() {
     let mut old = ContactCard::new("Alice");
@@ -95,6 +100,7 @@ fn test_delta_compute_field_removed() {
 }
 
 // @scenario: sync_updates :: Receive contact card update
+// @internal
 #[test]
 fn test_delta_apply_display_name() {
     let mut card = ContactCard::new("Alice");
@@ -116,6 +122,7 @@ fn test_delta_apply_display_name() {
 }
 
 // @scenario: sync_updates :: Receive contact card update
+// @internal
 #[test]
 fn test_delta_apply_add_field() {
     let mut card = ContactCard::new("Alice");
@@ -137,6 +144,7 @@ fn test_delta_apply_add_field() {
 }
 
 // @scenario: sync_updates :: Receive contact card update
+// @internal
 #[test]
 fn test_delta_apply_remove_field() {
     let mut card = ContactCard::new("Alice");
@@ -158,6 +166,7 @@ fn test_delta_apply_remove_field() {
     assert!(card.fields().is_empty());
 }
 
+// @internal
 #[test]
 fn test_delta_roundtrip() {
     let mut old = ContactCard::new("Alice");
@@ -182,6 +191,7 @@ fn test_delta_roundtrip() {
 }
 
 // @scenario: sync_updates :: Verify update signatures
+// @internal
 #[test]
 fn test_delta_sign_and_verify() {
     let identity = Identity::create("Test User");
@@ -209,6 +219,7 @@ fn test_delta_sign_and_verify() {
 }
 
 // @scenario: sync_updates :: Verify update signatures
+// @internal
 #[test]
 fn test_delta_signature_binds_sender_and_recipient() {
     let alice = Identity::create("Alice");
@@ -235,6 +246,7 @@ fn test_delta_signature_binds_sender_and_recipient() {
     assert!(!delta.verify(bob.signing_public_key(), bob.signing_public_key()));
 }
 
+// @internal
 #[test]
 fn test_delta_serialization_roundtrip() {
     let mut old = ContactCard::new("Alice");
@@ -261,6 +273,7 @@ fn test_delta_serialization_roundtrip() {
     assert_eq!(delta.changes.len(), restored.changes.len());
 }
 
+// @internal
 #[test]
 fn test_delta_multiple_changes() {
     let mut old = ContactCard::new("Alice");
@@ -296,6 +309,7 @@ fn test_delta_multiple_changes() {
 }
 
 // @scenario: sync_updates :: Update only visible fields
+// @internal
 #[test]
 fn test_delta_filter_for_contact_all_visible() {
     use vauchi_core::contact::VisibilityRules;
@@ -319,6 +333,7 @@ fn test_delta_filter_for_contact_all_visible() {
 }
 
 // @scenario: sync_updates :: Update only visible fields
+// @internal
 #[test]
 fn test_delta_filter_for_contact_some_hidden() {
     use vauchi_core::contact::VisibilityRules;
@@ -346,6 +361,7 @@ fn test_delta_filter_for_contact_some_hidden() {
 }
 
 // @scenario: sync_updates :: Update only visible fields
+// @internal
 #[test]
 fn test_delta_filter_for_contact_restricted_access() {
     use std::collections::HashSet;
@@ -375,6 +391,7 @@ fn test_delta_filter_for_contact_restricted_access() {
 }
 
 // @scenario: sync_updates :: Update only visible fields
+// @internal
 #[test]
 fn test_delta_filter_display_name_always_visible() {
     use vauchi_core::contact::VisibilityRules;
@@ -399,6 +416,7 @@ fn test_delta_filter_display_name_always_visible() {
 // filter_with() tests
 // ============================================================
 
+// @internal
 #[test]
 fn test_filter_with_allows_matching_fields() {
     // Create old card with two fields
@@ -458,6 +476,7 @@ fn test_filter_with_allows_matching_fields() {
     );
 }
 
+// @internal
 #[test]
 fn test_filter_with_always_includes_display_name() {
     let old = ContactCard::new("Alice");
@@ -475,6 +494,7 @@ fn test_filter_with_always_includes_display_name() {
     ));
 }
 
+// @internal
 #[test]
 fn test_filter_with_handles_added_and_removed() {
     // Start with a card containing work+mobile
@@ -527,6 +547,7 @@ fn test_filter_with_handles_added_and_removed() {
 // === Zero Signature Rejection Tests (Item 102) ===
 
 // @scenario: sync_updates :: Verify update signatures
+// @internal
 #[test]
 fn test_unsigned_delta_rejected_by_verify() {
     let identity = Identity::create("Alice");
@@ -551,6 +572,7 @@ fn test_unsigned_delta_rejected_by_verify() {
 // === ValidationSummary in CardDelta Tests (Task 7 — G3) ===
 
 // @scenario: field_validation :: Validation counts in card updates
+// @internal
 #[test]
 fn test_card_delta_with_validation_summary_roundtrip() {
     use std::collections::HashMap;
@@ -596,6 +618,7 @@ fn test_card_delta_with_validation_summary_roundtrip() {
 }
 
 // @scenario: field_validation :: Backward compatible card updates
+// @internal
 #[test]
 fn test_card_delta_without_summary_backward_compat() {
     // Simulate a JSON payload from an older client that has no validation_summary field
@@ -616,6 +639,7 @@ fn test_card_delta_without_summary_backward_compat() {
 }
 
 // @scenario: field_validation :: Validation summary not serialized when empty
+// @internal
 #[test]
 fn test_card_delta_none_summary_not_serialized() {
     let old = ContactCard::new("Alice");
@@ -638,6 +662,7 @@ fn test_card_delta_none_summary_not_serialized() {
 }
 
 // @scenario: field_validation :: Validation summary in filtered deltas
+// @internal
 #[test]
 fn test_card_delta_filter_preserves_validation_summary() {
     use std::collections::HashMap;
@@ -677,6 +702,7 @@ fn test_card_delta_filter_preserves_validation_summary() {
 }
 
 // @scenario: field_validation :: Validation summary with multiple fields
+// @internal
 #[test]
 fn test_card_delta_validation_summary_multiple_fields() {
     use std::collections::HashMap;

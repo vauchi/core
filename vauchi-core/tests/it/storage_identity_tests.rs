@@ -14,6 +14,7 @@ fn create_test_storage() -> Storage {
     Storage::in_memory(key).unwrap()
 }
 
+// @internal
 #[test]
 fn test_save_and_load_identity() {
     let storage = create_test_storage();
@@ -42,6 +43,7 @@ fn test_save_and_load_identity() {
     assert_eq!(loaded_name, display_name);
 }
 
+// @internal
 #[test]
 fn test_identity_replace_on_save() {
     let storage = create_test_storage();
@@ -66,6 +68,7 @@ fn test_identity_replace_on_save() {
     assert_eq!(loaded_name, "Second Name");
 }
 
+// @internal
 #[test]
 fn test_has_identity() {
     let storage = create_test_storage();
@@ -77,6 +80,7 @@ fn test_has_identity() {
     assert!(storage.has_identity().unwrap());
 }
 
+// @internal
 #[test]
 fn test_identity_encryption() {
     let storage = create_test_storage();
@@ -96,6 +100,7 @@ fn test_identity_encryption() {
 
 /// Test load_password_config returns None when no identity exists
 // @scenario: identity_management :: App password setup
+// @internal
 #[test]
 fn test_load_password_config_no_identity() {
     let storage = create_test_storage();
@@ -107,6 +112,7 @@ fn test_load_password_config_no_identity() {
 
 /// Test load_password_config returns None when identity exists but no password set
 // @scenario: identity_management :: App password setup
+// @internal
 #[test]
 fn test_load_password_config_no_password_set() {
     let storage = create_test_storage();
@@ -119,6 +125,7 @@ fn test_load_password_config_no_password_set() {
 
 /// Test save_app_password + load_password_config roundtrip
 // @scenario: identity_management :: App password setup
+// @internal
 #[test]
 fn test_save_load_app_password() {
     let storage = create_test_storage();
@@ -142,6 +149,7 @@ fn test_save_load_app_password() {
 
 /// Test save_duress_password enables duress mode
 // @scenario: identity_management :: Duress PIN
+// @internal
 #[test]
 fn test_save_duress_password() {
     let storage = create_test_storage();
@@ -172,6 +180,7 @@ fn test_save_duress_password() {
 
 /// Test disable_duress clears duress hash/salt and disables flag
 // @scenario: identity_management :: Duress PIN
+// @internal
 #[test]
 fn test_disable_duress() {
     let storage = create_test_storage();
@@ -201,6 +210,7 @@ fn test_disable_duress() {
 
 /// Test app password can be updated (replaced)
 // @scenario: identity_management :: App password setup
+// @internal
 #[test]
 fn test_update_app_password() {
     let storage = create_test_storage();

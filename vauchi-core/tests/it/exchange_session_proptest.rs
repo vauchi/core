@@ -78,8 +78,10 @@ proptest! {
     /// The `prop_assert!` below is a secondary sanity check — no event
     /// transitions back to `Idle` once the session has started, so this
     /// assertion is structurally always true. Its purpose is CC-17
+// @internal
     /// compliance (every `#[test]` must contain an assertion).
     // @scenario: contact_exchange :: Exchange handles invalid state transitions
+// @internal
     #[test]
     fn no_event_sequence_panics(
         event_indices in proptest::collection::vec(0..8u8, 1..20),
@@ -106,6 +108,7 @@ proptest! {
     /// After an explicit Fail event, the session must be in Failed state
     /// and reject all subsequent events except another Fail.
     // @scenario: contact_exchange :: Exchange handles invalid state transitions
+// @internal
     #[test]
     fn fail_event_is_terminal(
         pre_events in proptest::collection::vec(0..5u8, 0..5),
@@ -149,6 +152,7 @@ proptest! {
 /// this fails immediately.
 // @scenario: contact_exchange :: Successful QR code exchange with proximity
 // @scenario: contact_exchange :: Exchange creates mutual keys
+// @internal
 #[test]
 fn happy_path_qr_exchange_always_completes() {
     let alice_identity = Identity::create("Alice");

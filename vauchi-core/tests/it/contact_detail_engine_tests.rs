@@ -44,6 +44,7 @@ fn make_detail_engine() -> ContactDetailEngine {
 /// Verifies that a saved personal note is surfaced as an editable text
 /// component on the ContactDetail screen when it is loaded.
 #[cfg(feature = "network-rustls")]
+// @internal
 #[test]
 fn contact_detail_shows_personal_note() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -102,6 +103,7 @@ fn contact_detail_shows_personal_note() {
 
 /// @scenario: contacts_management :: ContactDetail shows empty note when none saved
 #[cfg(feature = "network-rustls")]
+// @internal
 #[test]
 fn contact_detail_shows_empty_note_when_no_note_saved() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -138,6 +140,7 @@ fn contact_detail_shows_empty_note_when_no_note_saved() {
 
 /// @scenario: contacts_management :: Edit personal note persists via AppEngine
 #[cfg(feature = "network-rustls")]
+// @internal
 #[test]
 fn contact_detail_text_changed_saves_personal_note() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -193,6 +196,7 @@ fn contact_detail_text_changed_saves_personal_note() {
 /// Verifies that a saved field note is surfaced as an editable text
 /// component (id `field_note:{field_id}`) on the ContactDetail screen.
 #[cfg(feature = "network-rustls")]
+// @internal
 #[test]
 fn contact_detail_shows_field_notes() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -261,6 +265,7 @@ fn contact_detail_shows_field_notes() {
 
 /// @scenario: contacts_management :: ContactDetail shows empty field note when none saved
 #[cfg(feature = "network-rustls")]
+// @internal
 #[test]
 fn contact_detail_shows_empty_field_note_when_none_saved() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -302,6 +307,7 @@ fn contact_detail_shows_empty_field_note_when_none_saved() {
 
 /// @scenario: contacts_management :: Editing a field note via TextChanged persists it
 #[cfg(feature = "network-rustls")]
+// @internal
 #[test]
 fn contact_detail_text_changed_saves_field_note() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -361,6 +367,7 @@ fn contact_detail_text_changed_saves_field_note() {
 
 // ── ContactDetailEngine tests ───────────────────────────────────────
 
+// @internal
 #[test]
 fn contact_detail_screen_id() {
     let engine = make_detail_engine();
@@ -368,6 +375,7 @@ fn contact_detail_screen_id() {
     assert_eq!(screen.screen_id, "contact_detail");
 }
 
+// @internal
 #[test]
 fn contact_detail_shows_contact_name_as_title() {
     let engine = make_detail_engine();
@@ -375,6 +383,7 @@ fn contact_detail_shows_contact_name_as_title() {
     assert_eq!(screen.title, "Alice");
 }
 
+// @internal
 #[test]
 fn contact_detail_edit_returns_edit_contact() {
     let mut engine = make_detail_engine();
@@ -390,6 +399,7 @@ fn contact_detail_edit_returns_edit_contact() {
     }
 }
 
+// @internal
 #[test]
 fn contact_detail_back_completes() {
     let mut engine = make_detail_engine();
@@ -400,6 +410,7 @@ fn contact_detail_back_completes() {
     assert_eq!(result, ActionResult::Complete);
 }
 
+// @internal
 #[test]
 fn contact_detail_unknown_action_returns_update_screen() {
     let mut engine = make_detail_engine();
@@ -417,6 +428,7 @@ fn contact_detail_unknown_action_returns_update_screen() {
 
 // ── ContactNotFoundEngine tests ─────────────────────────────────────
 
+// @internal
 #[test]
 fn contact_not_found_screen_id() {
     let engine = ContactNotFoundEngine::new("missing_id".into());
@@ -424,6 +436,7 @@ fn contact_not_found_screen_id() {
     assert_eq!(screen.screen_id, "contact_not_found");
 }
 
+// @internal
 #[test]
 fn contact_not_found_shows_contact_id_in_error() {
     let engine = ContactNotFoundEngine::new("xyz_123".into());
@@ -442,6 +455,7 @@ fn contact_not_found_shows_contact_id_in_error() {
     }
 }
 
+// @internal
 #[test]
 fn contact_not_found_back_completes() {
     let mut engine = ContactNotFoundEngine::new("missing".into());

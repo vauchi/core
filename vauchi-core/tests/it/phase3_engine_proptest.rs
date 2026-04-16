@@ -201,6 +201,7 @@ fn make_shred() -> EmergencyShredEngine {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(128))]
 
+// @internal
     #[test]
     fn exchange_random_actions_never_panic(
         actions in prop::collection::vec(arb_phase3_action(), 0..50),
@@ -221,6 +222,7 @@ proptest! {
         assert_screen_in(&screen.screen_id, EXCHANGE_SCREENS, "ExchangeEngine")?;
     }
 
+// @internal
     #[test]
     fn device_linking_random_actions_never_panic(
         actions in prop::collection::vec(arb_phase3_action(), 0..50),
@@ -240,6 +242,7 @@ proptest! {
         assert_screen_in(&screen.screen_id, DEVICE_LINK_SCREENS, "DeviceLinkingEngine")?;
     }
 
+// @internal
     #[test]
     fn backup_random_actions_never_panic(
         actions in prop::collection::vec(arb_phase3_action(), 0..50),
@@ -259,6 +262,7 @@ proptest! {
         assert_screen_in(&screen.screen_id, BACKUP_SCREENS, "BackupRecoveryEngine")?;
     }
 
+// @internal
     #[test]
     fn duress_random_actions_never_panic(
         actions in prop::collection::vec(arb_phase3_action(), 0..50),
@@ -272,6 +276,7 @@ proptest! {
         assert_screen_in(&screen.screen_id, DURESS_SCREENS, "DuressPinEngine")?;
     }
 
+// @internal
     #[test]
     fn shred_random_actions_never_panic(
         actions in prop::collection::vec(arb_phase3_action(), 0..50),
@@ -295,6 +300,7 @@ proptest! {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(128))]
 
+// @internal
     #[test]
     fn exchange_screen_stability(actions in prop::collection::vec(arb_phase3_action(), 0..30)) {
         let mut engine = make_exchange();
@@ -310,6 +316,7 @@ proptest! {
         );
     }
 
+// @internal
     #[test]
     fn device_linking_screen_stability(actions in prop::collection::vec(arb_phase3_action(), 0..30)) {
         let mut engine = make_device_linking();
@@ -325,6 +332,7 @@ proptest! {
         );
     }
 
+// @internal
     #[test]
     fn backup_screen_stability(actions in prop::collection::vec(arb_phase3_action(), 0..30)) {
         let mut engine = make_backup(None);
@@ -340,6 +348,7 @@ proptest! {
         );
     }
 
+// @internal
     #[test]
     fn duress_screen_stability(actions in prop::collection::vec(arb_phase3_action(), 0..30)) {
         let mut engine = make_duress();
@@ -355,6 +364,7 @@ proptest! {
         );
     }
 
+// @internal
     #[test]
     fn shred_screen_stability(actions in prop::collection::vec(arb_phase3_action(), 0..30)) {
         let mut engine = make_shred();
@@ -376,6 +386,7 @@ proptest! {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(128))]
 
+// @internal
     #[test]
     fn exchange_progress_invariants(actions in prop::collection::vec(arb_phase3_action(), 0..30)) {
         let mut engine = make_exchange();
@@ -393,6 +404,7 @@ proptest! {
         );
     }
 
+// @internal
     #[test]
     fn device_linking_progress_invariants(actions in prop::collection::vec(arb_phase3_action(), 0..30)) {
         let mut engine = make_device_linking();
@@ -410,6 +422,7 @@ proptest! {
         );
     }
 
+// @internal
     #[test]
     fn backup_progress_invariants(actions in prop::collection::vec(arb_phase3_action(), 0..30)) {
         let mut engine = make_backup(None);
@@ -432,6 +445,7 @@ proptest! {
         }
     }
 
+// @internal
     #[test]
     fn duress_progress_invariants(actions in prop::collection::vec(arb_phase3_action(), 0..30)) {
         let mut engine = make_duress();
@@ -449,6 +463,7 @@ proptest! {
         );
     }
 
+// @internal
     #[test]
     fn shred_progress_invariants(actions in prop::collection::vec(arb_phase3_action(), 0..30)) {
         let mut engine = make_shred();
@@ -473,6 +488,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 
     /// Exchange: ShowQr → scan data → mark_success → done = Complete.
+// @internal
     #[test]
     fn exchange_forward_progress(
         qr_data in "[a-z0-9]{5,30}",
@@ -513,6 +529,7 @@ proptest! {
     }
 
     /// DeviceLinking: ShowQr → peer_connected → confirm → sync_complete → done = Complete.
+// @internal
     #[test]
     fn device_linking_forward_progress(code in "[A-Z0-9]{6}") {
         let mut engine = make_device_linking();
@@ -539,6 +556,7 @@ proptest! {
     }
 
     /// BackupRecovery (Create): choose → password → confirm → processing_complete → done.
+// @internal
     #[test]
     fn backup_create_forward_progress(password in "[a-zA-Z0-9]{4,20}") {
         let mut engine = make_backup(None);
@@ -580,6 +598,7 @@ proptest! {
     }
 
     /// BackupRecovery (Restore): choose → password → processing_complete → done.
+// @internal
     #[test]
     fn backup_restore_forward_progress(password in "[a-zA-Z0-9]{4,20}") {
         let mut engine = make_backup(None);
@@ -611,6 +630,7 @@ proptest! {
     }
 
     /// DuressPin: overview → configure → enter pin → confirm pin → alerts → save = Complete.
+// @internal
     #[test]
     fn duress_forward_progress(pin in "[0-9]{4,8}") {
         let mut engine = make_duress();
@@ -649,6 +669,7 @@ proptest! {
     }
 
     /// EmergencyShred: warning → confirm → type DELETE → wipe → wipe_complete → done = WipeComplete.
+// @internal
     #[test]
     fn shred_forward_progress(_dummy in 0..1u8) {
         let mut engine = make_shred();

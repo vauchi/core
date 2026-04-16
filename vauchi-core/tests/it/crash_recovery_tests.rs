@@ -29,6 +29,7 @@ fn create_batch_items(count: usize) -> Vec<SyncItem> {
 // ============================================================
 
 // @scenario: platform_edge_cases :: Sync state persisted atomically
+// @internal
 #[test]
 fn test_checkpoint_save_and_load() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -50,6 +51,7 @@ fn test_checkpoint_save_and_load() {
 }
 
 // @scenario: sync_updates :: Sync survives device reboot
+// @internal
 #[test]
 fn test_checkpoint_resume_from_correct_position() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -81,6 +83,7 @@ fn test_checkpoint_resume_from_correct_position() {
     }
 }
 
+// @internal
 #[test]
 fn test_checkpoint_update_progress() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -104,6 +107,7 @@ fn test_checkpoint_update_progress() {
     assert_eq!(sent_count, 30, "Checkpoint should reflect updated progress");
 }
 
+// @internal
 #[test]
 fn test_checkpoint_clear_after_completion() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -121,6 +125,7 @@ fn test_checkpoint_clear_after_completion() {
     assert!(loaded.is_none(), "Checkpoint should be cleared");
 }
 
+// @internal
 #[test]
 fn test_no_checkpoint_returns_none() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -133,6 +138,7 @@ fn test_no_checkpoint_returns_none() {
     );
 }
 
+// @internal
 #[test]
 fn test_multiple_device_checkpoints_independent() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -170,6 +176,7 @@ fn test_multiple_device_checkpoints_independent() {
 // Batch Checkpoint Tests (V12 table)
 // ============================================================
 
+// @internal
 #[test]
 fn test_batch_checkpoint_save_and_load() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -188,6 +195,7 @@ fn test_batch_checkpoint_save_and_load() {
     assert_eq!(state, "{\"state\":\"mid\"}");
 }
 
+// @internal
 #[test]
 fn test_batch_checkpoint_update_progress() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -208,6 +216,7 @@ fn test_batch_checkpoint_update_progress() {
     assert_eq!(state, "{\"step\":5}", "State should be updated");
 }
 
+// @internal
 #[test]
 fn test_batch_checkpoint_clear() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -223,6 +232,7 @@ fn test_batch_checkpoint_clear() {
     assert!(loaded.is_none(), "Checkpoint should be cleared");
 }
 
+// @internal
 #[test]
 fn test_batch_checkpoint_crash_resume_scenario() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -259,6 +269,7 @@ fn test_batch_checkpoint_crash_resume_scenario() {
     assert!(storage.load_batch_checkpoint(batch_id).unwrap().is_none());
 }
 
+// @internal
 #[test]
 fn test_batch_checkpoint_no_orphans() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

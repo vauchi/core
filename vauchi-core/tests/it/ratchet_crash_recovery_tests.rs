@@ -17,6 +17,7 @@ use vauchi_core::exchange::X3DHKeyPair;
 
 /// Scenario: Ratchet state survives serialization roundtrip
 // @scenario: security :: Forward secrecy via Double Ratchet
+// @internal
 #[test]
 fn test_ratchet_state_serialization_roundtrip() {
     let x3dh_secret = SymmetricKey::generate();
@@ -45,6 +46,7 @@ fn test_ratchet_state_serialization_roundtrip() {
 
 /// Scenario: Both parties can restore state and continue
 // @scenario: security :: Forward secrecy via Double Ratchet
+// @internal
 #[test]
 fn test_both_parties_restore_state() {
     let x3dh_secret = SymmetricKey::generate();
@@ -85,6 +87,7 @@ fn test_both_parties_restore_state() {
 
 /// Scenario: State can be restored at any point during conversation
 // @scenario: security :: Forward secrecy via Double Ratchet
+// @internal
 #[test]
 fn test_restore_mid_conversation() {
     let x3dh_secret = SymmetricKey::generate();
@@ -117,6 +120,7 @@ fn test_restore_mid_conversation() {
 }
 
 /// Scenario: DH ratchet state survives serialization
+// @internal
 #[test]
 fn test_dh_ratchet_state_survives() {
     let x3dh_secret = SymmetricKey::generate();
@@ -157,6 +161,7 @@ fn test_dh_ratchet_state_survives() {
 
 /// Scenario: Skipped message keys survive serialization
 // @scenario: security :: Forward secrecy via Double Ratchet
+// @internal
 #[test]
 fn test_skipped_keys_survive_serialization() {
     let x3dh_secret = SymmetricKey::generate();
@@ -196,6 +201,7 @@ fn test_skipped_keys_survive_serialization() {
 // =============================================================================
 
 /// Scenario: Responder can restore before receiving first message
+// @internal
 #[test]
 fn test_responder_restore_before_first_message() {
     let x3dh_secret = SymmetricKey::generate();
@@ -225,6 +231,7 @@ fn test_responder_restore_before_first_message() {
 // =============================================================================
 
 /// Scenario: Invalid serialized state is rejected
+// @internal
 #[test]
 fn test_invalid_send_chain_rejected() {
     let x3dh_secret = SymmetricKey::generate();
@@ -250,6 +257,7 @@ fn test_invalid_send_chain_rejected() {
 // =============================================================================
 
 /// Scenario: Many serialization cycles don't corrupt state
+// @internal
 #[test]
 fn test_many_serialization_cycles() {
     let x3dh_secret = SymmetricKey::generate();

@@ -20,6 +20,7 @@ use vauchi_core::*;
 /// QR exchange: both sides display and scan — implicit proximity.
 /// Key agreement after scanning and confirming should succeed.
 // @scenario: contact_exchange :: Successful QR code exchange with proximity
+// @internal
 #[test]
 fn test_qr_exchange_key_agreement_succeeds() {
     let alice = Identity::create("Alice");
@@ -79,6 +80,7 @@ fn test_qr_exchange_key_agreement_succeeds() {
 
 /// QR exchange: attempting key agreement from wrong state should fail.
 // @scenario: contact_exchange :: QR code exchange blocked without proximity
+// @internal
 #[test]
 fn test_qr_key_agreement_from_wrong_state_fails() {
     let alice = Identity::create("Alice");
@@ -102,6 +104,7 @@ fn test_qr_key_agreement_from_wrong_state_fails() {
 
 /// NFC: does not require proximity verification step (physical tap IS proximity).
 // @scenario: contact_exchange :: NFC active exchange between two phones
+// @internal
 #[test]
 fn test_nfc_skips_proximity() {
     let alice = Identity::create("Alice");
@@ -130,6 +133,7 @@ fn test_nfc_skips_proximity() {
 
 /// ManualConfirmationVerifier::pre_confirmed is available in testing mode.
 /// This test just verifies the cfg gate works.
+// @internal
 #[test]
 fn test_pre_confirmed_available_in_testing() {
     let verifier = ManualConfirmationVerifier::pre_confirmed();

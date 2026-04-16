@@ -12,6 +12,7 @@ use vauchi_core::identity::Identity;
 
 // ── Roundtrip without relay metadata ───────────────────────────────
 
+// @internal
 #[test]
 fn v3_roundtrip_no_relay_metadata() {
     let identity = Identity::create("Alice");
@@ -31,6 +32,7 @@ fn v3_roundtrip_no_relay_metadata() {
 
 // ── Roundtrip with relay metadata ──────────────────────────────────
 
+// @internal
 #[test]
 fn v3_roundtrip_with_relay_url_and_noise_pubkey() {
     let identity = Identity::create("Bob");
@@ -54,6 +56,7 @@ fn v3_roundtrip_with_relay_url_and_noise_pubkey() {
     assert!(parsed.verify_signature());
 }
 
+// @internal
 #[test]
 fn v3_relay_url_without_noise_pubkey_rejected() {
     // TOFU fail-closed: relay URL without Noise pubkey allows MITM
@@ -75,6 +78,7 @@ fn v3_relay_url_without_noise_pubkey_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn v3_roundtrip_unicode_name_with_relay() {
     let identity = Identity::create("Müller 日本語");
@@ -97,6 +101,7 @@ fn v3_roundtrip_unicode_name_with_relay() {
 
 // ── Signature integrity ────────────────────────────────────────────
 
+// @internal
 #[test]
 fn v3_signature_covers_relay_fields() {
     let identity = Identity::create("Dave");
@@ -115,6 +120,7 @@ fn v3_signature_covers_relay_fields() {
 
 // ── Adversarial relay URLs (CC-14) ─────────────────────────────────
 
+// @internal
 #[test]
 fn v3_empty_relay_url_rejected_on_parse() {
     let identity = Identity::create("Eve");
@@ -132,6 +138,7 @@ fn v3_empty_relay_url_rejected_on_parse() {
     );
 }
 
+// @internal
 #[test]
 fn v3_private_host_relay_url_rejected_on_parse() {
     let identity = Identity::create("Mallory");
@@ -154,6 +161,7 @@ fn v3_private_host_relay_url_rejected_on_parse() {
     );
 }
 
+// @internal
 #[test]
 fn v3_insecure_scheme_relay_url_rejected_on_parse() {
     let identity = Identity::create("Oscar");
@@ -176,6 +184,7 @@ fn v3_insecure_scheme_relay_url_rejected_on_parse() {
     );
 }
 
+// @internal
 #[test]
 fn v3_roundtrip_long_relay_url() {
     let identity = Identity::create("Frank");
@@ -200,6 +209,7 @@ fn v3_roundtrip_long_relay_url() {
 
 // ── QR image still generates ───────────────────────────────────────
 
+// @internal
 #[test]
 fn v3_qr_image_generation_with_relay() {
     let identity = Identity::create("Grace");

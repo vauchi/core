@@ -4,6 +4,7 @@
 
 use vauchi_core::diagnostic::tuner::*;
 
+// @internal
 #[test]
 fn generate_qr_test_patterns_covers_all_ec_levels() {
     let patterns = generate_qr_test_patterns();
@@ -22,6 +23,7 @@ fn generate_qr_test_patterns_covers_all_ec_levels() {
     }
 }
 
+// @internal
 #[test]
 fn generate_qr_test_patterns_payload_matches_config_size() {
     let patterns = generate_qr_test_patterns();
@@ -36,6 +38,7 @@ fn generate_qr_test_patterns_payload_matches_config_size() {
     }
 }
 
+// @internal
 #[test]
 fn generate_qr_test_patterns_deterministic() {
     let a = generate_qr_test_patterns();
@@ -47,6 +50,7 @@ fn generate_qr_test_patterns_deterministic() {
     }
 }
 
+// @internal
 #[test]
 fn generate_qr_test_patterns_valid_ascii() {
     let patterns = generate_qr_test_patterns();

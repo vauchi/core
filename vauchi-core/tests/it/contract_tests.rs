@@ -30,6 +30,7 @@ fn load_schema(name: &str) -> serde_json::Value {
         .unwrap_or_else(|e| panic!("Failed to parse schema {}: {}", path.display(), e))
 }
 
+// @internal
 #[test]
 fn golden_fixtures_validate_against_screen_model_schema() {
     let schema_value = load_schema("screen-model.schema.json");
@@ -71,6 +72,7 @@ fn golden_fixtures_validate_against_screen_model_schema() {
     }
 }
 
+// @internal
 #[test]
 fn user_action_variants_validate_against_schema() {
     let schema_value = load_schema("user-action.schema.json");
@@ -156,6 +158,7 @@ fn user_action_variants_validate_against_schema() {
     }
 }
 
+// @internal
 #[test]
 fn action_result_variants_validate_against_schema() {
     let schema_value = load_schema("action-result.schema.json");
@@ -230,6 +233,7 @@ fn action_result_variants_validate_against_schema() {
 /// Contract: deserializing an unknown UserAction variant returns a serde error,
 /// not a panic. Frontends may send actions from a newer version; core must
 /// handle this gracefully at the deserialization boundary.
+// @internal
 #[test]
 fn unknown_user_action_variant_returns_error_not_panic() {
     let unknown_json = r#"{"FutureAction": {"widget_id": "x"}}"#;
@@ -248,6 +252,7 @@ fn unknown_user_action_variant_returns_error_not_panic() {
 }
 
 /// Contract: deserializing malformed JSON for UserAction returns an error.
+// @internal
 #[test]
 fn malformed_user_action_json_returns_error_not_panic() {
     let cases = [r#""JustAString""#, r#"null"#, r#"42"#, r#"[]"#, r#"{}"#];
@@ -274,6 +279,7 @@ fn malformed_user_action_json_returns_error_not_panic() {
 /// Catches the silent fallback in get_available_themes() where a parsing
 /// failure returns only the default theme instead of failing visibly.
 // @scenario: schema_compat :: Core parser accepts themes.json from sibling repo
+// @internal
 #[test]
 fn embedded_themes_json_parses_successfully() {
     let themes_json = include_bytes!("../../../../themes/generated/themes.json");
@@ -288,6 +294,7 @@ fn embedded_themes_json_parses_successfully() {
 
 /// Contract: embedded networks.json parses into a populated registry.
 // @scenario: schema_compat :: Core parser accepts networks.json
+// @internal
 #[test]
 fn embedded_networks_json_parses_successfully() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -300,6 +307,7 @@ fn embedded_networks_json_parses_successfully() {
 
 /// Contract: all locale files in the sibling repo are valid JSON with string values.
 // @scenario: schema_compat :: Core parser accepts locale files from sibling repo
+// @internal
 #[test]
 fn locale_files_are_valid_json() {
     let locales_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../locales");

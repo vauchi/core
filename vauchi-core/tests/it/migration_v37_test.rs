@@ -12,6 +12,7 @@ use vauchi_core::storage::Storage;
 
 /// Opens a fresh in-memory Storage (runs all migrations) and verifies
 /// that the three new columns exist with correct defaults.
+// @internal
 #[test]
 fn migration_v37_adds_delete_archive_columns() {
     let key = SymmetricKey::generate();
@@ -71,6 +72,7 @@ fn migration_v37_adds_delete_archive_columns() {
 }
 
 /// Verifies that the schema version is at least 37 after opening storage.
+// @internal
 #[test]
 fn migration_v37_schema_version_is_at_least_37() {
     let key = SymmetricKey::generate();

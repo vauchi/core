@@ -9,6 +9,7 @@ use vauchi_core::identity::password::{PasswordStrength, password_feedback, valid
 use zxcvbn::Score;
 
 // @scenario: identity_management :: Password strength validation
+// @internal
 #[test]
 fn test_validate_strong_password() {
     let result = validate_password("correct-horse-battery-staple");
@@ -16,6 +17,7 @@ fn test_validate_strong_password() {
 }
 
 // @scenario: identity_management :: Password strength validation
+// @internal
 #[test]
 fn test_validate_very_strong_password() {
     let result = validate_password("Zq!9xK#mP$2vL&nW@4rT^8jYf");
@@ -29,6 +31,7 @@ fn test_validate_very_strong_password() {
 
 // @scenario: identity_management :: Backup password requirements
 // @scenario: identity_management :: Password strength validation
+// @internal
 #[test]
 fn test_validate_weak_password() {
     let result = validate_password("password");
@@ -37,6 +40,7 @@ fn test_validate_weak_password() {
 
 // @scenario: identity_management :: Backup password requirements
 // @scenario: identity_management :: Password strength validation
+// @internal
 #[test]
 fn test_validate_too_short() {
     let result = validate_password("Ab1!x");
@@ -45,6 +49,7 @@ fn test_validate_too_short() {
 
 // @scenario: identity_management :: Backup password requirements
 // @scenario: identity_management :: Password strength validation
+// @internal
 #[test]
 fn test_validate_common_password() {
     let result = validate_password("12345678");
@@ -53,6 +58,7 @@ fn test_validate_common_password() {
 
 // @scenario: identity_management :: Backup password requirements
 // @scenario: identity_management :: Password strength validation
+// @internal
 #[test]
 fn test_validate_exactly_min_length_but_weak() {
     let result = validate_password("aaaaaaaa");
@@ -60,6 +66,7 @@ fn test_validate_exactly_min_length_but_weak() {
 }
 
 // @scenario: identity_management :: Password strength validation
+// @internal
 #[test]
 fn test_password_strength_from_score() {
     assert_eq!(
@@ -78,6 +85,7 @@ fn test_password_strength_from_score() {
     );
 }
 
+// @internal
 #[test]
 fn test_password_feedback_weak_password() {
     let feedback = password_feedback("password123");
@@ -86,6 +94,7 @@ fn test_password_feedback_weak_password() {
     assert!(!feedback.is_empty() || feedback.is_empty()); // Just ensure no panic
 }
 
+// @internal
 #[test]
 fn test_password_feedback_strong_password() {
     // allow(zero_assertions): No-panic coverage test — strong passwords may have empty feedback
@@ -93,6 +102,7 @@ fn test_password_feedback_strong_password() {
     let _ = feedback;
 }
 
+// @internal
 #[test]
 fn test_password_feedback_very_weak() {
     // allow(zero_assertions): No-panic coverage test

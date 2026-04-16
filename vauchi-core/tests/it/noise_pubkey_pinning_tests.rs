@@ -12,6 +12,7 @@ use vauchi_core::network::relay_url::verify_relay_noise_pubkey;
 // ── Matching pubkey ────────────────────────────────────────────────
 
 // @scenario: noise_protocol :: Noise NK handshake with relay
+// @internal
 #[test]
 fn matching_pubkey_accepted() {
     let expected = [42u8; 32];
@@ -19,6 +20,7 @@ fn matching_pubkey_accepted() {
     verify_relay_noise_pubkey(Some(&expected), &actual).expect("expected success");
 }
 
+// @internal
 #[test]
 fn no_pinned_pubkey_accepted() {
     // When no pubkey is pinned (TOFU), any relay pubkey is accepted
@@ -29,6 +31,7 @@ fn no_pinned_pubkey_accepted() {
 // ── Mismatched pubkey ──────────────────────────────────────────────
 
 // @scenario: noise_protocol :: Handshake fails with wrong relay key
+// @internal
 #[test]
 fn mismatched_pubkey_rejected() {
     let expected = [42u8; 32];
@@ -43,6 +46,7 @@ fn mismatched_pubkey_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn single_byte_difference_rejected() {
     let expected = [42u8; 32];
@@ -55,6 +59,7 @@ fn single_byte_difference_rejected() {
     ));
 }
 
+// @internal
 #[test]
 fn all_zeros_vs_all_ones_rejected() {
     let expected = [0u8; 32];

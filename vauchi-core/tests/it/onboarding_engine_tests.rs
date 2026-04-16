@@ -74,6 +74,7 @@ fn advance_to_ready(engine: &mut OnboardingEngine) {
 
 // ── Pre-gate: IdentityCheck ─────────────────────────────────────────
 
+// @internal
 #[test]
 fn starts_at_identity_check() {
     let engine = OnboardingEngine::new();
@@ -85,6 +86,7 @@ fn starts_at_identity_check() {
     );
 }
 
+// @internal
 #[test]
 fn identity_check_has_info_panel_and_two_actions() {
     let engine = OnboardingEngine::new();
@@ -104,6 +106,7 @@ fn identity_check_has_info_panel_and_two_actions() {
     assert!(matches!(screen.actions[1].style, ActionStyle::Secondary));
 }
 
+// @internal
 #[test]
 fn identity_check_create_new_goes_to_welcome() {
     let mut engine = OnboardingEngine::new();
@@ -119,6 +122,7 @@ fn identity_check_create_new_goes_to_welcome() {
     }
 }
 
+// @internal
 #[test]
 fn identity_check_have_identity_goes_to_link_choice() {
     let mut engine = OnboardingEngine::new();
@@ -139,6 +143,7 @@ fn identity_check_have_identity_goes_to_link_choice() {
 
 // ── Pre-gate: LinkChoice ────────────────────────────────────────────
 
+// @internal
 #[test]
 fn link_choice_link_device_returns_start_device_link() {
     let mut engine = OnboardingEngine::new();
@@ -154,6 +159,7 @@ fn link_choice_link_device_returns_start_device_link() {
     );
 }
 
+// @internal
 #[test]
 fn link_choice_restore_backup_returns_start_backup_import() {
     let mut engine = OnboardingEngine::new();
@@ -169,6 +175,7 @@ fn link_choice_restore_backup_returns_start_backup_import() {
     );
 }
 
+// @internal
 #[test]
 fn link_choice_back_returns_to_identity_check() {
     let mut engine = OnboardingEngine::new();
@@ -186,6 +193,7 @@ fn link_choice_back_returns_to_identity_check() {
     }
 }
 
+// @internal
 #[test]
 fn identity_check_unknown_action_returns_update_screen() {
     let mut engine = OnboardingEngine::new();
@@ -202,6 +210,7 @@ fn identity_check_unknown_action_returns_update_screen() {
 
 // ── Screen 1: Welcome ───────────────────────────────────────────────
 
+// @internal
 #[test]
 fn welcome_has_info_panel_and_one_action() {
     let mut engine = OnboardingEngine::new();
@@ -223,6 +232,7 @@ fn welcome_has_info_panel_and_one_action() {
     assert!(matches!(screen.actions[0].style, ActionStyle::Primary));
 }
 
+// @internal
 #[test]
 fn welcome_to_default_name() {
     let mut engine = OnboardingEngine::new();
@@ -241,6 +251,7 @@ fn welcome_to_default_name() {
 
 // ── Screen 2: DefaultName ───────────────────────────────────────────
 
+// @internal
 #[test]
 fn default_name_has_text_input() {
     let mut engine = OnboardingEngine::new();
@@ -262,6 +273,7 @@ fn default_name_has_text_input() {
     );
 }
 
+// @internal
 #[test]
 fn default_name_validation_rejects_empty() {
     let mut engine = OnboardingEngine::new();
@@ -282,6 +294,7 @@ fn default_name_validation_rejects_empty() {
     }
 }
 
+// @internal
 #[test]
 fn default_name_validation_rejects_whitespace_only() {
     let mut engine = OnboardingEngine::new();
@@ -300,6 +313,7 @@ fn default_name_validation_rejects_whitespace_only() {
     );
 }
 
+// @internal
 #[test]
 fn default_name_text_changed_updates_screen() {
     let mut engine = OnboardingEngine::new();
@@ -320,6 +334,7 @@ fn default_name_text_changed_updates_screen() {
     }
 }
 
+// @internal
 #[test]
 fn default_name_continue_navigates_to_skip_gate() {
     let mut engine = OnboardingEngine::new();
@@ -340,6 +355,7 @@ fn default_name_continue_navigates_to_skip_gate() {
 
 // ── Screen 3: SkipGate ──────────────────────────────────────────────
 
+// @internal
 #[test]
 fn skip_gate_has_correct_actions() {
     let mut engine = OnboardingEngine::new();
@@ -353,6 +369,7 @@ fn skip_gate_has_correct_actions() {
     assert_eq!(screen.actions[1].id, "skip_to_finish");
 }
 
+// @internal
 #[test]
 fn skip_gate_continue_setup_goes_to_groups() {
     let mut engine = OnboardingEngine::new();
@@ -367,6 +384,7 @@ fn skip_gate_continue_setup_goes_to_groups() {
     }
 }
 
+// @internal
 #[test]
 fn skip_gate_skip_to_finish_goes_to_security() {
     let mut engine = OnboardingEngine::new();
@@ -383,6 +401,7 @@ fn skip_gate_skip_to_finish_goes_to_security() {
 
 // ── Screen 4: GroupsSetup ───────────────────────────────────────────
 
+// @internal
 #[test]
 fn groups_setup_has_toggle_list_with_suggested_labels() {
     let mut engine = OnboardingEngine::new();
@@ -409,6 +428,7 @@ fn groups_setup_has_toggle_list_with_suggested_labels() {
     );
 }
 
+// @internal
 #[test]
 fn groups_toggle_selects_and_deselects() {
     let mut engine = OnboardingEngine::new();
@@ -452,6 +472,7 @@ fn groups_toggle_selects_and_deselects() {
     }
 }
 
+// @internal
 #[test]
 fn groups_continue_goes_to_contact_info() {
     let mut engine = OnboardingEngine::new();
@@ -466,6 +487,7 @@ fn groups_continue_goes_to_contact_info() {
     }
 }
 
+// @internal
 #[test]
 fn groups_skip_goes_to_contact_info() {
     let mut engine = OnboardingEngine::new();
@@ -482,6 +504,7 @@ fn groups_skip_goes_to_contact_info() {
 
 // ── Screen 5: ContactInfo ───────────────────────────────────────────
 
+// @internal
 #[test]
 fn contact_info_has_field_list() {
     let mut engine = OnboardingEngine::new();
@@ -498,6 +521,7 @@ fn contact_info_has_field_list() {
     assert!(has_field_list, "ContactInfo should have a FieldList");
 }
 
+// @internal
 #[test]
 fn contact_info_visibility_mode_depends_on_groups() {
     // Without groups selected
@@ -538,6 +562,7 @@ fn contact_info_visibility_mode_depends_on_groups() {
     assert_eq!(mode, Some(VisibilityMode::PerGroup));
 }
 
+// @internal
 #[test]
 fn contact_info_available_groups_from_selected() {
     let mut engine = OnboardingEngine::new();
@@ -570,6 +595,7 @@ fn contact_info_available_groups_from_selected() {
     );
 }
 
+// @internal
 #[test]
 fn contact_info_continue_goes_to_preview() {
     let mut engine = OnboardingEngine::new();
@@ -586,6 +612,7 @@ fn contact_info_continue_goes_to_preview() {
 
 // ── Screen 6: PreviewCard ───────────────────────────────────────────
 
+// @internal
 #[test]
 fn preview_card_shows_display_name() {
     let mut engine = OnboardingEngine::new();
@@ -602,6 +629,7 @@ fn preview_card_shows_display_name() {
     assert_eq!(name, Some("Alice".to_string()));
 }
 
+// @internal
 #[test]
 fn preview_card_edit_goes_back_to_contact_info() {
     let mut engine = OnboardingEngine::new();
@@ -616,6 +644,7 @@ fn preview_card_edit_goes_back_to_contact_info() {
     }
 }
 
+// @internal
 #[test]
 fn preview_card_continue_goes_to_security() {
     let mut engine = OnboardingEngine::new();
@@ -632,6 +661,7 @@ fn preview_card_continue_goes_to_security() {
 
 // ── Screen 7: SecurityExplanation ───────────────────────────────────
 
+// @internal
 #[test]
 fn security_explanation_has_info_panel() {
     let mut engine = OnboardingEngine::new();
@@ -650,6 +680,7 @@ fn security_explanation_has_info_panel() {
     assert_eq!(screen.actions[0].id, "continue");
 }
 
+// @internal
 #[test]
 fn security_explanation_continue_goes_to_backup() {
     let mut engine = OnboardingEngine::new();
@@ -666,6 +697,7 @@ fn security_explanation_continue_goes_to_backup() {
 
 // ── Screen 8: BackupPrompt ──────────────────────────────────────────
 
+// @internal
 #[test]
 fn backup_prompt_has_two_actions() {
     let mut engine = OnboardingEngine::new();
@@ -679,6 +711,7 @@ fn backup_prompt_has_two_actions() {
     assert_eq!(screen.actions[1].id, "skip");
 }
 
+// @internal
 #[test]
 fn backup_prompt_setup_goes_to_ready_and_sets_flag() {
     let mut engine = OnboardingEngine::new();
@@ -703,6 +736,7 @@ fn backup_prompt_setup_goes_to_ready_and_sets_flag() {
     );
 }
 
+// @internal
 #[test]
 fn backup_prompt_skip_does_not_set_backup_flag() {
     let mut engine = OnboardingEngine::new();
@@ -718,6 +752,7 @@ fn backup_prompt_skip_does_not_set_backup_flag() {
     );
 }
 
+// @internal
 #[test]
 fn backup_prompt_skip_navigates_to_ready() {
     let mut engine = OnboardingEngine::new();
@@ -734,6 +769,7 @@ fn backup_prompt_skip_navigates_to_ready() {
 
 // ── Screen 9: Ready ─────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn ready_screen_has_start_action() {
     let mut engine = OnboardingEngine::new();
@@ -746,6 +782,7 @@ fn ready_screen_has_start_action() {
     assert_eq!(screen.actions[0].id, "start");
 }
 
+// @internal
 #[test]
 fn ready_start_completes() {
     let mut engine = OnboardingEngine::new();
@@ -762,6 +799,7 @@ fn ready_start_completes() {
 
 // ── Full flow ───────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn full_flow_to_completion() {
     let mut engine = OnboardingEngine::new();
@@ -814,6 +852,7 @@ fn full_flow_to_completion() {
     assert!(matches!(result, ActionResult::Complete));
 }
 
+// @internal
 #[test]
 fn skip_flow_bypasses_groups_and_fields() {
     let mut engine = OnboardingEngine::new();
@@ -860,6 +899,7 @@ fn skip_flow_bypasses_groups_and_fields() {
 
 // ── Data accessor ───────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn data_accessor_returns_collected_data() {
     let mut engine = OnboardingEngine::new();
@@ -877,6 +917,7 @@ fn data_accessor_returns_collected_data() {
     assert_eq!(engine.data().display_name, "Alice");
 }
 
+// @internal
 #[test]
 fn data_reflects_selected_groups() {
     let mut engine = OnboardingEngine::new();
@@ -904,6 +945,7 @@ fn data_reflects_selected_groups() {
 // ── A11y labels ────────────────────────────────────────────────────
 
 // @scenario: accessibility :: onboarding text inputs have a11y labels
+// @internal
 #[test]
 fn onboarding_text_input_has_a11y_label() {
     let mut engine = OnboardingEngine::new();
@@ -926,6 +968,7 @@ fn onboarding_text_input_has_a11y_label() {
 }
 
 // @scenario: accessibility :: onboarding custom group input has a11y label
+// @internal
 #[test]
 fn onboarding_custom_group_text_input_has_a11y_label() {
     let mut engine = OnboardingEngine::new();
@@ -949,6 +992,7 @@ fn onboarding_custom_group_text_input_has_a11y_label() {
 
 // ── GroupViewSelected on PreviewCard ─────────────────────────────────
 
+// @internal
 #[test]
 fn preview_card_group_view_selected() {
     let mut engine = OnboardingEngine::new();

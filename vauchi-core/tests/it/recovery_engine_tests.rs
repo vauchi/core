@@ -33,6 +33,7 @@ fn quorum_met() -> RecoveryEngine {
     )
 }
 
+// @internal
 #[test]
 fn recovery_screen_id() {
     let engine = quorum_not_met();
@@ -40,6 +41,7 @@ fn recovery_screen_id() {
     assert_eq!(screen.screen_id, "recovery_status");
 }
 
+// @internal
 #[test]
 fn recovery_title() {
     let engine = quorum_not_met();
@@ -47,6 +49,7 @@ fn recovery_title() {
     assert_eq!(screen.title, "Social Recovery");
 }
 
+// @internal
 #[test]
 fn recovery_quorum_not_met_disables_claim() {
     let engine = quorum_not_met();
@@ -70,6 +73,7 @@ fn recovery_quorum_not_met_disables_claim() {
     assert_eq!(quorum_met_detail, "No");
 }
 
+// @internal
 #[test]
 fn recovery_quorum_met_enables_claim() {
     let engine = quorum_met();
@@ -93,6 +97,7 @@ fn recovery_quorum_met_enables_claim() {
     assert_eq!(quorum_met_detail, "Yes");
 }
 
+// @internal
 #[test]
 fn recovery_claim_shows_alert() {
     let mut engine = quorum_met();
@@ -111,6 +116,7 @@ fn recovery_claim_shows_alert() {
     }
 }
 
+// @internal
 #[test]
 fn recovery_status_shows_alert() {
     let mut engine = quorum_not_met();
@@ -126,6 +132,7 @@ fn recovery_status_shows_alert() {
     }
 }
 
+// @internal
 #[test]
 fn recovery_unknown_action_returns_update_screen() {
     let mut engine = quorum_not_met();

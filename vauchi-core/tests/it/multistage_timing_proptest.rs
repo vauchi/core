@@ -136,6 +136,7 @@ proptest! {
     ///
     /// Deterministic: proptest can shrink scan_every_n to find minimal
     /// failing pattern.
+// @internal
     #[test]
     fn test_exchange_completes_with_asymmetric_scan_loss(
         alice_n in 1u8..6,
@@ -178,6 +179,7 @@ proptest! {
     /// FINALIZED_GRACE_DURATION are reduced, this test will catch it.
     ///
     /// Runs via `just test-slow` or nightly CI. ~10-60s per case.
+// @internal
     #[test]
     #[ignore]
     fn test_exchange_completes_with_asymmetric_delays(

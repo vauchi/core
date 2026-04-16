@@ -11,12 +11,14 @@ use vauchi_core::diagnostic::log_event::LogEventKind;
 
 // ===== Inactive session (no-op) =====
 
+// @internal
 #[test]
 fn inactive_session_is_default() {
     let session = DebugSession::new();
     assert!(!session.is_active());
 }
 
+// @internal
 #[test]
 fn inactive_session_ignores_events() {
     let mut session = DebugSession::new();
@@ -30,6 +32,7 @@ fn inactive_session_ignores_events() {
 
 // ===== Active session =====
 
+// @internal
 #[test]
 fn activate_enables_event_collection() {
     let mut session = DebugSession::new();
@@ -41,6 +44,7 @@ fn activate_enables_event_collection() {
     assert_eq!(session.events().len(), 2);
 }
 
+// @internal
 #[test]
 fn activation_logs_debug_mode_activated_event() {
     let mut session = DebugSession::new();
@@ -51,6 +55,7 @@ fn activation_logs_debug_mode_activated_event() {
     assert!(matches!(&events[0].kind, LogEventKind::DebugModeActivated));
 }
 
+// @internal
 #[test]
 fn deactivate_stops_collection() {
     let mut session = DebugSession::new();
@@ -65,6 +70,7 @@ fn deactivate_stops_collection() {
 
 // ===== UX event logging =====
 
+// @internal
 #[test]
 fn log_screen_appeared() {
     let mut session = DebugSession::new();
@@ -80,6 +86,7 @@ fn log_screen_appeared() {
     ));
 }
 
+// @internal
 #[test]
 fn log_screen_dismissed() {
     let mut session = DebugSession::new();
@@ -93,6 +100,7 @@ fn log_screen_dismissed() {
     ));
 }
 
+// @internal
 #[test]
 fn log_user_action() {
     let mut session = DebugSession::new();
@@ -106,6 +114,7 @@ fn log_user_action() {
     ));
 }
 
+// @internal
 #[test]
 fn log_flow_abandoned() {
     let mut session = DebugSession::new();
@@ -119,6 +128,7 @@ fn log_flow_abandoned() {
     ));
 }
 
+// @internal
 #[test]
 fn log_error_presented() {
     let mut session = DebugSession::new();
@@ -132,6 +142,7 @@ fn log_error_presented() {
     ));
 }
 
+// @internal
 #[test]
 fn log_tester_note() {
     let mut session = DebugSession::new();
@@ -145,6 +156,7 @@ fn log_tester_note() {
     ));
 }
 
+// @internal
 #[test]
 fn log_retry_attempted() {
     let mut session = DebugSession::new();
@@ -160,6 +172,7 @@ fn log_retry_attempted() {
 
 // ===== ScreenId coverage =====
 
+// @internal
 #[test]
 fn screen_id_serde_roundtrip() {
     let screens = vec![
@@ -194,6 +207,7 @@ fn screen_id_serde_roundtrip() {
 
 // ===== JSONL export =====
 
+// @internal
 #[test]
 fn to_jsonl_exports_all_events() {
     let mut session = DebugSession::new();
@@ -213,6 +227,7 @@ fn to_jsonl_exports_all_events() {
     }
 }
 
+// @internal
 #[test]
 fn inactive_session_jsonl_is_empty() {
     let session = DebugSession::new();
@@ -221,6 +236,7 @@ fn inactive_session_jsonl_is_empty() {
 
 // ===== Session marker =====
 
+// @internal
 #[test]
 fn log_session_marker() {
     let mut session = DebugSession::new();
@@ -236,6 +252,7 @@ fn log_session_marker() {
 
 // ===== Re-activation semantics =====
 
+// @internal
 #[test]
 fn activate_twice_is_idempotent_when_already_active() {
     let mut session = DebugSession::new();
@@ -252,6 +269,7 @@ fn activate_twice_is_idempotent_when_already_active() {
 
 // ===== Markdown export =====
 
+// @internal
 #[test]
 fn to_markdown_empty_session() {
     let session = DebugSession::new();
@@ -263,6 +281,7 @@ fn to_markdown_empty_session() {
     assert!(!md.contains("|---:|---|"));
 }
 
+// @internal
 #[test]
 fn to_markdown_active_with_events() {
     let mut session = DebugSession::new();
@@ -283,6 +302,7 @@ fn to_markdown_active_with_events() {
     assert!(md.contains("| 0 |") || md.contains("| 1 |"));
 }
 
+// @internal
 #[test]
 fn to_markdown_contains_screen_details() {
     let mut session = DebugSession::new();
@@ -294,6 +314,7 @@ fn to_markdown_contains_screen_details() {
     assert!(md.contains("timeout"));
 }
 
+// @internal
 #[test]
 fn to_markdown_deactivated_session_shows_inactive_with_events() {
     let mut session = DebugSession::new();

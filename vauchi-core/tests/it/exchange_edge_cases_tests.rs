@@ -73,6 +73,7 @@ fn advance_to_card_exchange() -> (ExchangeSession, ExchangeSession) {
 /// user somehow scans their own QR the session must reject it because
 /// the QR's signing public key matches the session's identity.
 // @scenario: contact_exchange :: Cannot exchange with yourself
+// @internal
 #[test]
 fn test_self_exchange_rejected() {
     let alice = Identity::create("Alice");
@@ -93,6 +94,7 @@ fn test_self_exchange_rejected() {
 
 /// Scenario: Different identity scanning QR succeeds normally.
 // @scenario: contact_exchange :: Successful QR code exchange with proximity
+// @internal
 #[test]
 fn test_different_identity_exchange_succeeds() {
     let alice = Identity::create("Alice");
@@ -122,6 +124,7 @@ fn test_different_identity_exchange_succeeds() {
 
 /// Scenario: QR code expiration (5 minutes)
 // @scenario: contact_exchange :: Mutual QR rejects expired peer QR code
+// @internal
 #[test]
 fn test_qr_expiration() {
     let alice = Identity::create("Alice");
@@ -134,6 +137,7 @@ fn test_qr_expiration() {
 
 /// Scenario: Expired QR is rejected during ProcessQR
 // @scenario: contact_exchange :: Mutual QR rejects expired peer QR code
+// @internal
 #[test]
 fn test_expired_qr_rejected_on_process() {
     let alice = Identity::create("Alice");
@@ -169,6 +173,7 @@ fn test_expired_qr_rejected_on_process() {
 // @scenario: contact_exchange :: Exchange with existing contact shows update option
 // @scenario: contact_exchange :: Update existing contact via exchange
 // @scenario: contact_exchange :: Keep existing contact without update
+// @internal
 #[test]
 fn test_duplicate_contact_detection() {
     let alice = Identity::create("Alice");
@@ -203,6 +208,7 @@ fn test_duplicate_contact_detection() {
 
 /// Scenario: No duplicate detected for new contact
 // @scenario: contact_exchange :: Exchange with existing contact shows update option
+// @internal
 #[test]
 fn test_no_duplicate_for_new_contact() {
     let alice = Identity::create("Alice");
@@ -243,6 +249,7 @@ fn test_no_duplicate_for_new_contact() {
 
 /// Scenario: Session timeout detection
 // @scenario: contact_exchange :: Exchange session timeout
+// @internal
 #[test]
 fn test_session_timeout_detection() {
     let alice = Identity::create("Alice");
@@ -255,6 +262,7 @@ fn test_session_timeout_detection() {
 /// Scenario: Interrupted session can be resumed within window
 // @scenario: contact_exchange :: Exchange session timeout
 // @scenario: contact_exchange :: Resume interrupted exchange
+// @internal
 #[test]
 fn test_interrupted_session_resumable() {
     let alice = Identity::create("Alice");
@@ -275,6 +283,7 @@ fn test_interrupted_session_resumable() {
 // =============================================================================
 
 /// Scenario: Cannot ProcessQR from Idle state (must call StartQR first)
+// @internal
 #[test]
 fn test_cannot_process_qr_from_idle() {
     let alice = Identity::create("Alice");
@@ -296,6 +305,7 @@ fn test_cannot_process_qr_from_idle() {
 }
 
 /// Scenario: Cannot call StartQR twice (already in DisplayingQr)
+// @internal
 #[test]
 fn test_cannot_start_qr_twice() {
     let alice = Identity::create("Alice");
@@ -312,6 +322,7 @@ fn test_cannot_start_qr_twice() {
 }
 
 /// Scenario: Cannot perform key agreement from Idle
+// @internal
 #[test]
 fn test_cannot_key_agreement_from_idle() {
     let alice = Identity::create("Alice");
@@ -325,6 +336,7 @@ fn test_cannot_key_agreement_from_idle() {
 }
 
 /// Scenario: Cannot complete exchange from Idle
+// @internal
 #[test]
 fn test_cannot_complete_exchange_from_idle() {
     let alice = Identity::create("Alice");
@@ -338,6 +350,7 @@ fn test_cannot_complete_exchange_from_idle() {
 }
 
 /// Scenario: Cannot TheyScannedOurQR from DisplayingQr (must be in PeerScanned)
+// @internal
 #[test]
 fn test_cannot_they_scanned_from_displaying_qr() {
     let alice = Identity::create("Alice");
@@ -352,6 +365,7 @@ fn test_cannot_they_scanned_from_displaying_qr() {
 }
 
 /// Scenario: Cannot ProcessQR from PeerScanned (already scanned one)
+// @internal
 #[test]
 fn test_cannot_process_qr_from_peer_scanned() {
     let alice = Identity::create("Alice");
@@ -387,6 +401,7 @@ fn test_cannot_process_qr_from_peer_scanned() {
 // =============================================================================
 
 /// Scenario: Our card is accessible during exchange
+// @internal
 #[test]
 fn test_our_card_accessible() {
     let alice = Identity::create("Alice");
@@ -401,6 +416,7 @@ fn test_our_card_accessible() {
 // =============================================================================
 
 /// Scenario: Generated QR has valid signature
+// @internal
 #[test]
 fn test_qr_signature_valid() {
     let alice = Identity::create("Alice");
@@ -421,6 +437,7 @@ fn test_qr_signature_valid() {
 /// passes, while a maliciously-constructed QR would fail. Here we
 /// verify the positive path since we cannot easily tamper with signature
 /// bytes through the public API (the QR struct fields are private).
+// @internal
 #[test]
 fn test_valid_signature_accepted() {
     let alice = Identity::create("Alice");
@@ -451,6 +468,7 @@ fn test_valid_signature_accepted() {
 
 /// Scenario: QR reuse is detected by check_qr_reuse
 // @scenario: contact_exchange :: Same QR scanned twice by same person
+// @internal
 #[test]
 fn test_qr_reuse_detected() {
     let alice = Identity::create("Alice");
@@ -470,6 +488,7 @@ fn test_qr_reuse_detected() {
 }
 
 /// Scenario: Different QR hashes are independent
+// @internal
 #[test]
 fn test_different_qr_hashes_independent() {
     let alice = Identity::create("Alice");
@@ -489,6 +508,7 @@ fn test_different_qr_hashes_independent() {
 /// Scenario: Complete exchange flow produces Complete state
 // @scenario: contact_exchange :: Successful QR code exchange with proximity
 // @scenario: contact_exchange :: Exchange creates mutual keys
+// @internal
 #[test]
 fn test_complete_exchange_flow() {
     let (mut alice_session, mut bob_session) = advance_to_card_exchange();
@@ -526,6 +546,7 @@ fn test_complete_exchange_flow() {
 // =============================================================================
 
 /// Scenario: Session can be explicitly failed from any state
+// @internal
 #[test]
 fn test_explicit_fail_from_idle() {
     let alice = Identity::create("Alice");
@@ -539,6 +560,7 @@ fn test_explicit_fail_from_idle() {
 }
 
 /// Scenario: Session can be explicitly failed from DisplayingQr
+// @internal
 #[test]
 fn test_explicit_fail_from_displaying_qr() {
     let alice = Identity::create("Alice");
@@ -557,6 +579,7 @@ fn test_explicit_fail_from_displaying_qr() {
 // =============================================================================
 
 /// Scenario: QR events are rejected on NFC transport sessions
+// @internal
 #[test]
 fn test_qr_events_rejected_on_nfc_transport() {
     let alice = Identity::create("Alice");
@@ -572,6 +595,7 @@ fn test_qr_events_rejected_on_nfc_transport() {
 }
 
 /// Scenario: QR events are rejected on BLE transport sessions
+// @internal
 #[test]
 fn test_qr_events_rejected_on_ble_transport() {
     let alice = Identity::create("Alice");
@@ -591,6 +615,7 @@ fn test_qr_events_rejected_on_ble_transport() {
 // =============================================================================
 
 /// Scenario: Our exchange public key is accessible
+// @internal
 #[test]
 fn test_our_exchange_public_key_accessible() {
     let alice = Identity::create("Alice");

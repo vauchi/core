@@ -75,6 +75,7 @@ fn setup_alice_as_sender_to_bob() -> (Vauchi, String) {
 // propagate_card_update: CEK wrapping
 // =============================================================================
 
+// @internal
 #[test]
 fn test_propagate_with_cek_rotates_cek() {
     let (alice, bob_id) = setup_alice_as_sender_to_bob();
@@ -122,6 +123,7 @@ fn test_propagate_with_cek_rotates_cek() {
     );
 }
 
+// @internal
 #[test]
 fn test_propagate_without_cek_generates_one() {
     // Contact without CEK gets a generated CEK — all updates use
@@ -150,6 +152,7 @@ fn test_propagate_without_cek_generates_one() {
 // process_card_update: CEK handling
 // =============================================================================
 
+// @internal
 #[test]
 fn test_process_cek_wrapped_update_saves_cek() {
     let (alice, bob_id, bob_identity, bob_dh, shared_secret) = setup_alice_with_bob_ratchet();
@@ -201,6 +204,7 @@ fn test_process_cek_wrapped_update_saves_cek() {
     );
 }
 
+// @internal
 #[test]
 fn test_process_cek_wrapped_update() {
     let (alice, bob_id, bob_identity, bob_dh, shared_secret) = setup_alice_with_bob_ratchet();
@@ -240,6 +244,7 @@ fn test_process_cek_wrapped_update() {
     assert!(changed.iter().any(|f| f == "work"));
 }
 
+// @internal
 #[test]
 fn test_process_update_from_revoked_sender_rejected() {
     let (alice, bob_id, bob_identity, bob_dh, shared_secret) = setup_alice_with_bob_ratchet();
@@ -282,6 +287,7 @@ fn test_process_update_from_revoked_sender_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn test_process_cek_wrapped_update_applies_delta() {
     let (alice, bob_id, bob_identity, bob_dh, shared_secret) = setup_alice_with_bob_ratchet();
@@ -336,6 +342,7 @@ fn test_process_cek_wrapped_update_applies_delta() {
 // CRIT-06: Forged signature must be rejected
 // =============================================================================
 
+// @internal
 #[test]
 fn test_cek_wrapped_forged_signature_rejected() {
     let (alice, bob_id, bob_identity, bob_dh, shared_secret) = setup_alice_with_bob_ratchet();
@@ -382,6 +389,7 @@ fn test_cek_wrapped_forged_signature_rejected() {
 // migrate_contacts_to_cek
 // =============================================================================
 
+// @internal
 #[test]
 fn test_migrate_contacts_generates_cek() {
     let (alice, bob_id) = setup_alice_as_sender_to_bob();
@@ -401,6 +409,7 @@ fn test_migrate_contacts_generates_cek() {
         .expect("expected Some");
 }
 
+// @internal
 #[test]
 fn test_migrate_contacts_queues_updates() {
     let (alice, bob_id) = setup_alice_as_sender_to_bob();
@@ -419,6 +428,7 @@ fn test_migrate_contacts_queues_updates() {
     assert_eq!(pending[0].update_type, "cek_migration");
 }
 
+// @internal
 #[test]
 fn test_migrate_skips_contacts_with_existing_cek() {
     let (alice, bob_id) = setup_alice_as_sender_to_bob();
@@ -439,6 +449,7 @@ fn test_migrate_skips_contacts_with_existing_cek() {
     assert_eq!(stored.to_bytes(), cek_bytes);
 }
 
+// @internal
 #[test]
 fn test_migrate_contacts_skips_no_ratchet() {
     let mut alice = create_test_vauchi();
@@ -458,6 +469,7 @@ fn test_migrate_contacts_skips_no_ratchet() {
 // End-to-end: CEK-wrapped propagation + processing
 // =============================================================================
 
+// @internal
 #[test]
 fn test_cek_wrapped_end_to_end_flow() {
     // Setup: Alice and Bob with mutual ratchets

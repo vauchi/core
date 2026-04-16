@@ -24,6 +24,7 @@ fn add_named_contact(wb: &Vauchi, name: &str, pk: [u8; 32]) -> String {
 }
 
 // @scenario: contacts_management :: Search contacts by name
+// @internal
 #[test]
 fn test_find_contact_fuzzy_matches_name_case_insensitive() {
     let wb = create_test_vauchi();
@@ -42,6 +43,7 @@ fn test_find_contact_fuzzy_matches_name_case_insensitive() {
 }
 
 // @scenario: contacts_management :: Search contacts by name
+// @internal
 #[test]
 fn test_find_contact_fuzzy_matches_name_substring() {
     let wb = create_test_vauchi();
@@ -55,6 +57,7 @@ fn test_find_contact_fuzzy_matches_name_substring() {
     assert_eq!(results.len(), 2, "should find two Alices");
 }
 
+// @internal
 #[test]
 fn test_find_contact_fuzzy_matches_id_prefix() {
     let wb = create_test_vauchi();
@@ -73,6 +76,7 @@ fn test_find_contact_fuzzy_matches_id_prefix() {
     );
 }
 
+// @internal
 #[test]
 fn test_find_contact_fuzzy_deduplicates_name_and_id_matches() {
     let wb = create_test_vauchi();
@@ -95,6 +99,7 @@ fn test_find_contact_fuzzy_deduplicates_name_and_id_matches() {
 }
 
 // @scenario: contacts_management :: Search contacts by name
+// @internal
 #[test]
 fn test_find_contact_fuzzy_returns_empty_for_no_match() {
     let wb = create_test_vauchi();
@@ -110,6 +115,7 @@ fn test_find_contact_fuzzy_returns_empty_for_no_match() {
     );
 }
 
+// @internal
 #[test]
 fn test_find_contact_fuzzy_returns_empty_for_empty_query() {
     let wb = create_test_vauchi();
@@ -128,6 +134,7 @@ fn test_find_contact_fuzzy_returns_empty_for_empty_query() {
     );
 }
 
+// @internal
 #[test]
 fn test_find_contact_fuzzy_union_of_name_and_id_without_duplicates() {
     let wb = create_test_vauchi();

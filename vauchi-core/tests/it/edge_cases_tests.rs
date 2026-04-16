@@ -22,6 +22,7 @@ use vauchi_core::{
 use vauchi_core::contact_card::MAX_FIELDS;
 
 /// Test: Card at max fields rejects addition
+// @internal
 #[test]
 fn test_card_at_max_fields_rejects_addition() {
     let mut card = ContactCard::new("Test");
@@ -44,6 +45,7 @@ fn test_card_at_max_fields_rejects_addition() {
 }
 
 /// Test: Card at max fields allows modification
+// @internal
 #[test]
 fn test_card_at_max_fields_allows_modification() {
     let mut card = ContactCard::new("Test");
@@ -65,6 +67,7 @@ fn test_card_at_max_fields_allows_modification() {
 }
 
 /// Test: Card at max fields allows removal
+// @internal
 #[test]
 fn test_card_at_max_fields_allows_removal() {
     let mut card = ContactCard::new("Test");
@@ -91,6 +94,7 @@ fn test_card_at_max_fields_allows_removal() {
 }
 
 /// Test: Empty card delta computation
+// @internal
 #[test]
 fn test_empty_card_delta_computation() {
     let old = ContactCard::new("Empty");
@@ -108,6 +112,7 @@ fn test_empty_card_delta_computation() {
 // =============================================================================
 
 /// Test: Field with emoji roundtrip
+// @internal
 #[test]
 fn test_field_with_emoji_roundtrip() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -137,6 +142,7 @@ fn test_field_with_emoji_roundtrip() {
 }
 
 /// Test: Field with RTL text
+// @internal
 #[test]
 fn test_field_with_rtl_text() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -166,6 +172,7 @@ fn test_field_with_rtl_text() {
 }
 
 /// Test: Field with various Unicode categories
+// @internal
 #[test]
 fn test_field_with_various_unicode() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -199,6 +206,7 @@ fn test_field_with_various_unicode() {
 }
 
 /// Test: Empty string handling
+// @internal
 #[test]
 fn test_empty_string_field_value() {
     // allow(zero_assertions): Both Ok and Err are valid — testing no-panic only
@@ -212,6 +220,7 @@ fn test_empty_string_field_value() {
 // =============================================================================
 
 /// Test: Delta with only display name change
+// @internal
 #[test]
 fn test_delta_only_display_name_change() {
     let old = ContactCard::new("Old Name");
@@ -223,6 +232,7 @@ fn test_delta_only_display_name_change() {
 }
 
 /// Test: Delta computation with many fields
+// @internal
 #[test]
 fn test_delta_with_many_fields() {
     let mut old = ContactCard::new("Test");
@@ -251,6 +261,7 @@ fn test_delta_with_many_fields() {
 }
 
 /// Test: Delta apply preserves display name when unchanged
+// @internal
 #[test]
 fn test_delta_apply_preserves_display_name() {
     let mut old = ContactCard::new("Preserved Name");
@@ -275,6 +286,7 @@ fn test_delta_apply_preserves_display_name() {
 // =============================================================================
 
 /// Test: Device registry at max devices
+// @internal
 #[test]
 fn test_device_registry_at_max_devices() {
     let master_seed = [0x42u8; 32];
@@ -295,6 +307,7 @@ fn test_device_registry_at_max_devices() {
 }
 
 /// Test: Device revocation at limit
+// @internal
 #[test]
 fn test_device_revocation_when_at_two() {
     let master_seed = [0x42u8; 32];
@@ -323,6 +336,7 @@ fn test_device_revocation_when_at_two() {
 // =============================================================================
 
 /// Test: Visibility with all fields hidden
+// @internal
 #[test]
 fn test_visibility_all_fields_hidden() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -362,6 +376,7 @@ fn test_visibility_all_fields_hidden() {
 }
 
 /// Test: Visibility default is Everyone
+// @internal
 #[test]
 fn test_visibility_default_is_everyone() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -389,6 +404,7 @@ fn test_visibility_default_is_everyone() {
 // =============================================================================
 
 /// Test: Identity with very long display name
+// @internal
 #[test]
 fn test_identity_long_display_name() {
     let long_name = "A".repeat(100);
@@ -397,6 +413,7 @@ fn test_identity_long_display_name() {
 }
 
 /// Test: Identity with special characters in name
+// @internal
 #[test]
 fn test_identity_special_chars_in_name() {
     let special_name = "O'Brien-Smith (Jr.) & Co.";
@@ -405,6 +422,7 @@ fn test_identity_special_chars_in_name() {
 }
 
 /// Test: Backup with maximum complexity password
+// @internal
 #[test]
 fn test_backup_with_complex_password() {
     let identity = Identity::create("Test");
@@ -421,6 +439,7 @@ fn test_backup_with_complex_password() {
 // =============================================================================
 
 /// Test: Contact with very long display name
+// @internal
 #[test]
 fn test_contact_long_display_name() {
     let long_name = "X".repeat(200);
@@ -430,6 +449,7 @@ fn test_contact_long_display_name() {
 }
 
 /// Test: Contact search is case insensitive
+// @internal
 #[test]
 fn test_contact_search_case_insensitive() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -463,6 +483,7 @@ fn test_contact_search_case_insensitive() {
 }
 
 /// Test: Contact search with partial match
+// @internal
 #[test]
 fn test_contact_search_partial_match() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -493,6 +514,7 @@ fn test_contact_search_partial_match() {
 // =============================================================================
 
 /// Test: Saving same contact twice updates
+// @internal
 #[test]
 fn test_saving_contact_twice_updates() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
@@ -531,6 +553,7 @@ fn test_saving_contact_twice_updates() {
 }
 
 /// Test: Contact count remains accurate after operations
+// @internal
 #[test]
 fn test_contact_count_accuracy() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();

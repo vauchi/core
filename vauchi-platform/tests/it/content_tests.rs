@@ -6,6 +6,7 @@
 
 use vauchi_platform::{MobileContentConfig, MobileContentType};
 
+// @internal
 #[test]
 fn test_content_type_networks_roundtrip() {
     let mobile = MobileContentType::Networks;
@@ -17,6 +18,7 @@ fn test_content_type_networks_roundtrip() {
     );
 }
 
+// @internal
 #[test]
 fn test_content_type_locales_roundtrip() {
     let mobile = MobileContentType::Locales;
@@ -28,6 +30,7 @@ fn test_content_type_locales_roundtrip() {
     );
 }
 
+// @internal
 #[test]
 fn test_content_type_themes_roundtrip() {
     let mobile = MobileContentType::Themes;
@@ -39,6 +42,7 @@ fn test_content_type_themes_roundtrip() {
     );
 }
 
+// @internal
 #[test]
 fn test_content_type_help_roundtrip() {
     let mobile = MobileContentType::Help;
@@ -50,6 +54,7 @@ fn test_content_type_help_roundtrip() {
     );
 }
 
+// @internal
 #[test]
 fn test_default_config() {
     let config = MobileContentConfig::default();

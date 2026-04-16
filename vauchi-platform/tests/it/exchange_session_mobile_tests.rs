@@ -27,6 +27,7 @@ impl MobileProximityHandler for SuccessHandler {
 }
 
 // @scenario: contact_exchange:Generate exchange QR code
+// @internal
 #[test]
 fn test_session_generates_qr() {
     let identity = Identity::create("Alice");
@@ -46,6 +47,7 @@ fn test_session_generates_qr() {
 }
 
 // @scenario: contact_exchange:Mutual QR exchange with bidirectional scanning
+// @internal
 #[test]
 fn test_session_mutual_qr_flow() {
     let alice = Identity::create("Alice");
@@ -105,6 +107,7 @@ fn test_session_mutual_qr_flow() {
 }
 
 // @scenario: contact_exchange:Incomplete exchange recovery
+// @internal
 #[test]
 fn test_finalize_requires_complete_state() {
     let identity = Identity::create("Alice");
@@ -116,6 +119,7 @@ fn test_finalize_requires_complete_state() {
 }
 
 // @scenario: contact_exchange:Successful QR code exchange with proximity
+// @internal
 #[test]
 fn test_confirm_proximity_manual_session() {
     let identity = Identity::create("Alice");
@@ -128,6 +132,7 @@ fn test_confirm_proximity_manual_session() {
 }
 
 // @scenario: contact_exchange:Successful QR code exchange with proximity
+// @internal
 #[test]
 fn test_confirm_proximity_proximity_session() {
     let identity = Identity::create("Alice");
@@ -140,6 +145,7 @@ fn test_confirm_proximity_proximity_session() {
 }
 
 // @scenario: contact_exchange:Exchange timeout after interruption
+// @internal
 #[test]
 fn test_session_not_timed_out_initially() {
     let identity = Identity::create("Alice");
@@ -151,6 +157,7 @@ fn test_session_not_timed_out_initially() {
 
 // === Phase B: Event wiring tests ===
 
+// @internal
 #[test]
 fn test_verification_confidence_defaults_to_unknown() {
     use vauchi_platform::MobileProximityConfidence;
@@ -165,6 +172,7 @@ fn test_verification_confidence_defaults_to_unknown() {
     );
 }
 
+// @internal
 #[test]
 fn test_get_verification_events_empty_before_verification() {
     let identity = Identity::create("Alice");
@@ -174,6 +182,7 @@ fn test_get_verification_events_empty_before_verification() {
     assert!(session.get_verification_events().is_empty());
 }
 
+// @internal
 #[test]
 fn test_verification_events_populated_after_key_agreement() {
     use vauchi_platform::{MobileProximityConfidence, MobileProximityVerifierEvent};
@@ -231,6 +240,7 @@ fn test_verification_events_populated_after_key_agreement() {
     );
 }
 
+// @internal
 #[test]
 fn test_proximity_factory_wraps_in_chain() {
     let identity = Identity::create("Alice");
@@ -239,6 +249,7 @@ fn test_proximity_factory_wraps_in_chain() {
     assert!(session.get_verification_events().is_empty());
 }
 
+// @internal
 #[test]
 fn test_manual_factory_wraps_in_chain() {
     let identity = Identity::create("Alice");
@@ -249,6 +260,7 @@ fn test_manual_factory_wraps_in_chain() {
 
 // === Debug log wiring tests ===
 
+// @internal
 #[test]
 fn test_debug_log_disabled_by_default() {
     let identity = Identity::create("Alice");
@@ -259,6 +271,7 @@ fn test_debug_log_disabled_by_default() {
     assert!(session.get_exchange_debug_markdown().is_none());
 }
 
+// @internal
 #[test]
 fn test_enable_debug_log_captures_events() {
     let identity = Identity::create("Alice");
@@ -277,6 +290,7 @@ fn test_enable_debug_log_captures_events() {
     assert!(jsonl.contains("qr_generated"));
 }
 
+// @internal
 #[test]
 fn test_debug_log_markdown_output() {
     let identity = Identity::create("Alice");

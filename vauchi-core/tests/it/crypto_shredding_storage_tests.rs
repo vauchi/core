@@ -36,6 +36,7 @@ fn test_contact(id: &str) -> Contact {
 
 // === Migration V13 ===
 
+// @internal
 #[test]
 fn test_schema_version_is_13() {
     let storage = test_storage();
@@ -47,6 +48,7 @@ fn test_schema_version_is_13() {
 
 // === CEK Storage ===
 
+// @internal
 #[test]
 fn test_save_and_load_cek() {
     let storage = test_storage();
@@ -66,6 +68,7 @@ fn test_save_and_load_cek() {
     assert_eq!(decrypted, plaintext);
 }
 
+// @internal
 #[test]
 fn test_load_cek_returns_none_for_legacy_contact() {
     let storage = test_storage();
@@ -77,6 +80,7 @@ fn test_load_cek_returns_none_for_legacy_contact() {
     assert!(loaded.is_none(), "Legacy contact should have no CEK");
 }
 
+// @internal
 #[test]
 fn test_delete_cek_crypto_shreds() {
     let storage = test_storage();
@@ -99,6 +103,7 @@ fn test_delete_cek_crypto_shreds() {
     assert!(storage.load_contact_cek(contact.id()).unwrap().is_none());
 }
 
+// @internal
 #[test]
 fn test_cek_stored_encrypted_with_storage_key() {
     let storage = test_storage();
@@ -124,6 +129,7 @@ fn test_cek_stored_encrypted_with_storage_key() {
     assert!(raw.len() > 32);
 }
 
+// @internal
 #[test]
 fn test_save_cek_nonexistent_contact_fails() {
     let storage = test_storage();
@@ -133,6 +139,7 @@ fn test_save_cek_nonexistent_contact_fails() {
     result.expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_cek_rotation_replaces_old() {
     let storage = test_storage();
@@ -159,6 +166,7 @@ fn test_cek_rotation_replaces_old() {
 
 // === Crypto-Shredding Integration ===
 
+// @internal
 #[test]
 fn test_deleted_cek_renders_encrypted_data_unreadable() {
     let storage = test_storage();
@@ -194,6 +202,7 @@ fn test_deleted_cek_renders_encrypted_data_unreadable() {
     );
 }
 
+// @internal
 #[test]
 fn test_cek_rotation_old_cek_cannot_decrypt_new_data() {
     let storage = test_storage();
@@ -223,6 +232,7 @@ fn test_cek_rotation_old_cek_cannot_decrypt_new_data() {
     );
 }
 
+// @internal
 #[test]
 fn test_multi_contact_cek_isolation() {
     let storage = test_storage();
@@ -271,6 +281,7 @@ fn test_multi_contact_cek_isolation() {
     loaded_bob.decrypt(&ct_alice).expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_cek_deletion_is_idempotent() {
     let storage = test_storage();
@@ -291,6 +302,7 @@ fn test_cek_deletion_is_idempotent() {
 
 // === Revoked Senders ===
 
+// @internal
 #[test]
 fn test_record_and_check_revoked_sender() {
     let storage = test_storage();
@@ -305,6 +317,7 @@ fn test_record_and_check_revoked_sender() {
     assert!(!storage.is_sender_revoked("bob_pk").unwrap());
 }
 
+// @internal
 #[test]
 fn test_revoked_sender_persists_after_contact_deletion() {
     let storage = test_storage();
@@ -321,6 +334,7 @@ fn test_revoked_sender_persists_after_contact_deletion() {
     assert!(storage.is_sender_revoked(contact.id()).unwrap());
 }
 
+// @internal
 #[test]
 fn test_revoked_sender_idempotent() {
     let storage = test_storage();

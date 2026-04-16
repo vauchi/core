@@ -36,6 +36,7 @@ fn make_imported(name: &str, source: ImportSource) -> Contact {
 
 // ── Save and load roundtrip ──────────────────────────────────────
 
+// @internal
 #[test]
 fn save_and_load_imported_contact() {
     let storage = open_storage();
@@ -53,6 +54,7 @@ fn save_and_load_imported_contact() {
 
 // ── List contacts includes both kinds ────────────────────────────
 
+// @internal
 #[test]
 fn list_contacts_includes_both_kinds() {
     let storage = open_storage();
@@ -81,6 +83,7 @@ fn list_contacts_includes_both_kinds() {
 
 // ── Search contacts finds imported ───────────────────────────────
 
+// @internal
 #[test]
 fn search_contacts_finds_imported() {
     let storage = open_storage();
@@ -96,6 +99,7 @@ fn search_contacts_finds_imported() {
 
 // ── Delete imported contact ──────────────────────────────────────
 
+// @internal
 #[test]
 fn delete_imported_contact() {
     let storage = open_storage();
@@ -120,6 +124,7 @@ fn delete_imported_contact() {
 
 // ── Imported contact roundtrip preserves metadata ────────────────
 
+// @internal
 #[test]
 fn imported_contact_roundtrip_preserves_metadata() {
     let storage = open_storage();
@@ -155,6 +160,7 @@ fn imported_contact_roundtrip_preserves_metadata() {
 
 // ── Existing exchanged contacts unaffected ───────────────────────
 
+// @internal
 #[test]
 fn existing_exchanged_contacts_unaffected() {
     let storage = open_storage();
@@ -182,6 +188,7 @@ fn existing_exchanged_contacts_unaffected() {
 
 // ── Imported contacts have no crypto fields ──────────────────────
 
+// @internal
 #[test]
 fn imported_contact_has_no_crypto_fields() {
     let storage = open_storage();
@@ -205,6 +212,7 @@ fn imported_contact_has_no_crypto_fields() {
 
 // ── Pagination includes imported contacts ────────────────────────
 
+// @internal
 #[test]
 fn list_contacts_paginated_includes_imported() {
     let storage = open_storage();
@@ -229,6 +237,7 @@ fn list_contacts_paginated_includes_imported() {
 
 // ── Imported contact local flags survive roundtrip ───────────────
 
+// @internal
 #[test]
 fn imported_contact_flags_survive_roundtrip() {
     let storage = open_storage();

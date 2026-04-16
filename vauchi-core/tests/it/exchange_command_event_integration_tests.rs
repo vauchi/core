@@ -41,6 +41,7 @@ fn ble_session(name: &str) -> ExchangeSession {
 
 // −− QR full round-trip −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn qr_full_round_trip_via_commands_and_events() {
     let mut alice = qr_session("Alice");
@@ -98,6 +99,7 @@ fn qr_full_round_trip_via_commands_and_events() {
 
 // −− NFC full round-trip −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn nfc_full_round_trip_via_commands_and_events() {
     let mut alice = nfc_session("Alice");
@@ -174,6 +176,7 @@ fn nfc_full_round_trip_via_commands_and_events() {
 
 // −− BLE -> QR fallback −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn ble_to_qr_fallback_produces_working_qr_session() {
     let mut session = ble_session("Alice");
@@ -219,6 +222,7 @@ fn ble_to_qr_fallback_produces_working_qr_session() {
 
 // −− Mixed transport: command/event isolation −−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn qr_session_ignores_ble_events() {
     let mut session = qr_session("Alice");
@@ -240,6 +244,7 @@ fn qr_session_ignores_ble_events() {
     );
 }
 
+// @internal
 #[test]
 fn nfc_session_ignores_ble_events() {
     let mut session = nfc_session("Alice");

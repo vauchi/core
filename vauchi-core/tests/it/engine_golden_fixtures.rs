@@ -132,6 +132,7 @@ fn sample_delivery_items() -> Vec<DeliveryItem> {
 
 // ── Per-engine freshness tests ───────────────────────────────────
 
+// @internal
 #[test]
 fn home_fixture_is_fresh() {
     let engine = MyInfoEngine::new(MyInfoProgress {
@@ -152,6 +153,7 @@ fn home_fixture_is_fresh() {
     assert_fixture_fresh(&engine.current_screen(), "home.json");
 }
 
+// @internal
 #[test]
 fn home_empty_fixture_is_fresh() {
     let engine = MyInfoEngine::new(MyInfoProgress {
@@ -161,36 +163,42 @@ fn home_empty_fixture_is_fresh() {
     assert_fixture_fresh(&engine.current_screen(), "home_empty.json");
 }
 
+// @internal
 #[test]
 fn contact_list_fixture_is_fresh() {
     let engine = ContactListEngine::new(sample_contacts());
     assert_fixture_fresh(&engine.current_screen(), "contact_list.json");
 }
 
+// @internal
 #[test]
 fn settings_fixture_is_fresh() {
     let engine = SettingsEngine::new(sample_settings_config());
     assert_fixture_fresh(&engine.current_screen(), "settings.json");
 }
 
+// @internal
 #[test]
 fn help_fixture_is_fresh() {
     let engine = HelpEngine::new(sample_help_items());
     assert_fixture_fresh(&engine.current_screen(), "help.json");
 }
 
+// @internal
 #[test]
 fn delivery_status_fixture_is_fresh() {
     let engine = DeliveryStatusEngine::new(sample_delivery_items());
     assert_fixture_fresh(&engine.current_screen(), "delivery_status.json");
 }
 
+// @internal
 #[test]
 fn delivery_empty_fixture_is_fresh() {
     let engine = DeliveryStatusEngine::new(vec![]);
     assert_fixture_fresh(&engine.current_screen(), "delivery_empty.json");
 }
 
+// @internal
 #[test]
 fn lock_screen_fixture_is_fresh() {
     let engine = LockScreenEngine::new(5);
@@ -227,12 +235,14 @@ fn sample_edit_groups() -> Vec<String> {
     vec!["Family".into(), "Friends".into(), "Work".into()]
 }
 
+// @internal
 #[test]
 fn contact_edit_fields_fixture_is_fresh() {
     let engine = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
     assert_fixture_fresh(&engine.current_screen(), "contact_edit_fields.json");
 }
 
+// @internal
 #[test]
 fn contact_edit_visibility_fixture_is_fresh() {
     let mut engine = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
@@ -242,6 +252,7 @@ fn contact_edit_visibility_fixture_is_fresh() {
     assert_fixture_fresh(&engine.current_screen(), "contact_edit_visibility.json");
 }
 
+// @internal
 #[test]
 fn contact_edit_preview_fixture_is_fresh() {
     let mut engine = ContactEditEngine::new(sample_editable_contact(), sample_edit_groups());
@@ -286,30 +297,35 @@ fn sample_duress_config() -> DuressConfig {
 
 // ── Phase 3 per-engine freshness tests ──────────────────────────
 
+// @internal
 #[test]
 fn exchange_show_qr_fixture_is_fresh() {
     let engine = ExchangeEngine::new(sample_exchange_config());
     assert_fixture_fresh(&engine.current_screen(), "exchange_show_qr.json");
 }
 
+// @internal
 #[test]
 fn device_linking_fixture_is_fresh() {
     let engine = DeviceLinkingEngine::new("vauchi://link?token=abc123".to_string());
     assert_fixture_fresh(&engine.current_screen(), "device_linking.json");
 }
 
+// @internal
 #[test]
 fn backup_choose_fixture_is_fresh() {
     let engine = BackupRecoveryEngine::new(None, false);
     assert_fixture_fresh(&engine.current_screen(), "backup_choose.json");
 }
 
+// @internal
 #[test]
 fn duress_overview_fixture_is_fresh() {
     let engine = DuressPinEngine::new(sample_duress_config());
     assert_fixture_fresh(&engine.current_screen(), "duress_overview.json");
 }
 
+// @internal
 #[test]
 fn emergency_shred_fixture_is_fresh() {
     let engine = EmergencyShredEngine::new();
@@ -318,6 +334,7 @@ fn emergency_shred_fixture_is_fresh() {
 
 // ── Regenerate all fixtures (run with --ignored) ─────────────────
 
+// @internal
 #[test]
 #[ignore]
 fn regenerate_all_engine_fixtures() {

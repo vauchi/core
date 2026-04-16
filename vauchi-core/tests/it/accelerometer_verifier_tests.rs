@@ -18,12 +18,14 @@ use vauchi_core::exchange::{ProximityConfidence, ProximityError, ProximityVerifi
 
 // ===== AccelerometerSample =====
 
+// @internal
 #[test]
 fn sample_magnitude_for_unit_vector() {
     let s = AccelerometerSample::new(1.0, 0.0, 0.0);
     assert!((s.magnitude() - 1.0).abs() < 0.001);
 }
 
+// @internal
 #[test]
 fn sample_magnitude_for_3d_vector() {
     let s = AccelerometerSample::new(3.0, 4.0, 0.0);
@@ -32,6 +34,7 @@ fn sample_magnitude_for_3d_vector() {
 
 // ===== AccelerometerConfig defaults =====
 
+// @internal
 #[test]
 fn default_config_has_sane_values() {
     let config = AccelerometerConfig::default();
@@ -46,6 +49,7 @@ fn default_config_has_sane_values() {
 
 // ===== Verifier trait compliance =====
 
+// @internal
 #[test]
 fn accelerometer_confidence_is_high() {
     let backend = MockAccelerometerBackend::co_located();
@@ -53,6 +57,7 @@ fn accelerometer_confidence_is_high() {
     assert_eq!(verifier.confidence_level(), ProximityConfidence::High);
 }
 
+// @internal
 #[test]
 fn accelerometer_emit_records_and_stores() {
     let backend = MockAccelerometerBackend::co_located();
@@ -63,6 +68,7 @@ fn accelerometer_emit_records_and_stores() {
     result.expect("expected success");
 }
 
+// @internal
 #[test]
 fn accelerometer_listen_returns_envelope() {
     let backend = MockAccelerometerBackend::co_located();
@@ -79,6 +85,7 @@ fn accelerometer_listen_returns_envelope() {
     );
 }
 
+// @internal
 #[test]
 fn accelerometer_listen_fails_without_prior_emit() {
     let backend = MockAccelerometerBackend::co_located();
@@ -90,6 +97,7 @@ fn accelerometer_listen_fails_without_prior_emit() {
 
 // ===== Co-location verification =====
 
+// @internal
 #[test]
 fn co_located_tap_passes_verification() {
     let backend = MockAccelerometerBackend::co_located();
@@ -108,6 +116,7 @@ fn co_located_tap_passes_verification() {
     );
 }
 
+// @internal
 #[test]
 fn remote_device_fails_verification() {
     let backend = MockAccelerometerBackend::remote();
@@ -131,6 +140,7 @@ fn remote_device_fails_verification() {
 
 // ===== Backend unavailability =====
 
+// @internal
 #[test]
 fn unavailable_backend_returns_not_supported() {
     let backend = MockAccelerometerBackend::unavailable();
@@ -143,6 +153,7 @@ fn unavailable_backend_returns_not_supported() {
 
 // ===== Edge cases =====
 
+// @internal
 #[test]
 fn verify_response_rejects_wrong_length() {
     let backend = MockAccelerometerBackend::co_located();
@@ -161,6 +172,7 @@ fn verify_response_rejects_wrong_length() {
     );
 }
 
+// @internal
 #[test]
 fn verify_response_rejects_without_local_data() {
     let backend = MockAccelerometerBackend::co_located();
@@ -172,6 +184,7 @@ fn verify_response_rejects_without_local_data() {
 
 // ===== Cross-correlation math =====
 
+// @internal
 #[test]
 fn identical_envelopes_have_correlation_one() {
     use vauchi_core::exchange::accelerometer::cross_correlate;
@@ -185,6 +198,7 @@ fn identical_envelopes_have_correlation_one() {
     );
 }
 
+// @internal
 #[test]
 fn opposite_envelopes_have_negative_correlation() {
     use vauchi_core::exchange::accelerometer::cross_correlate;
@@ -199,6 +213,7 @@ fn opposite_envelopes_have_negative_correlation() {
     );
 }
 
+// @internal
 #[test]
 fn uncorrelated_signals_near_zero() {
     use vauchi_core::exchange::accelerometer::cross_correlate;

@@ -4,12 +4,14 @@
 
 use vauchi_core::exchange::multistage::types::*;
 
+// @internal
 #[test]
 fn test_protocol_state_default_is_idle() {
     let state = ProtocolState::default();
     assert!(matches!(state, ProtocolState::Idle));
 }
 
+// @internal
 #[test]
 fn test_chunk_bitmap_new_empty() {
     let bm = ChunkBitmap::new(10);
@@ -18,6 +20,7 @@ fn test_chunk_bitmap_new_empty() {
     assert!(!bm.is_complete());
 }
 
+// @internal
 #[test]
 fn test_chunk_bitmap_mark_and_check() {
     let mut bm = ChunkBitmap::new(4);
@@ -30,6 +33,7 @@ fn test_chunk_bitmap_mark_and_check() {
     assert_eq!(bm.received_count(), 2);
 }
 
+// @internal
 #[test]
 fn test_chunk_bitmap_complete() {
     let mut bm = ChunkBitmap::new(3);
@@ -39,6 +43,7 @@ fn test_chunk_bitmap_complete() {
     assert!(bm.is_complete());
 }
 
+// @internal
 #[test]
 fn test_chunk_bitmap_to_bytes_roundtrip() {
     let mut bm = ChunkBitmap::new(16);
@@ -53,6 +58,7 @@ fn test_chunk_bitmap_to_bytes_roundtrip() {
     assert!(!bm2.has(1));
 }
 
+// @internal
 #[test]
 fn test_qr_payload_has_error_correction() {
     let payload = QrPayload {

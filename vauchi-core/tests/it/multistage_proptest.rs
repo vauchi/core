@@ -50,6 +50,7 @@ proptest! {
 
     /// Full exchange roundtrip with random payloads from 1 to 20000 bytes.
     /// Exercises INIT -> DATA -> VRFY -> CONF -> COMPLETE with asymmetric sizes.
+// @internal
     #[test]
     fn test_exchange_roundtrip_any_payload(
         alice_data in prop::collection::vec(any::<u8>(), 1..20000),
@@ -73,6 +74,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(256))]
 
     /// Base45 encode/decode roundtrip for arbitrary byte sequences.
+// @internal
     #[test]
     fn test_base45_roundtrip(data in prop::collection::vec(any::<u8>(), 0..1000)) {
         let encoded = base45::encode(&data);
@@ -89,6 +91,7 @@ proptest! {
 /// Transferring forever.
 ///
 /// Counterexample: alice=500 bytes (2 chunks), bob=19000 bytes (41 chunks).
+// @internal
 #[test]
 fn regression_asymmetric_payload_deadlock() {
     let alice_data = vec![0xAA; 500];
@@ -111,6 +114,7 @@ fn regression_asymmetric_payload_deadlock() {
 }
 
 /// Regression: extreme asymmetry — 1-byte vs maximum payload.
+// @internal
 #[test]
 fn regression_extreme_asymmetry() {
     let alice_data = vec![0x42; 1];

@@ -30,18 +30,21 @@ fn make_guardian(name: &str, transport: ExchangeTransport) -> Contact {
     contact
 }
 
+// @internal
 #[test]
 fn test_guardian_diversity_no_guardians_returns_none() {
     let contacts: Vec<Contact> = vec![];
     assert!(check_guardian_diversity(&contacts).is_none());
 }
 
+// @internal
 #[test]
 fn test_guardian_diversity_single_guardian_returns_none() {
     let contacts = vec![make_guardian("Alice", ExchangeTransport::Qr)];
     assert!(check_guardian_diversity(&contacts).is_none());
 }
 
+// @internal
 #[test]
 fn test_guardian_diversity_all_same_transport_warns() {
     let contacts = vec![
@@ -59,6 +62,7 @@ fn test_guardian_diversity_all_same_transport_warns() {
     assert_eq!(w.guardian_count, 3);
 }
 
+// @internal
 #[test]
 fn test_guardian_diversity_mixed_transport_no_warning() {
     let contacts = vec![
@@ -69,6 +73,7 @@ fn test_guardian_diversity_mixed_transport_no_warning() {
     assert!(check_guardian_diversity(&contacts).is_none());
 }
 
+// @internal
 #[test]
 fn test_revocation_reminder_no_recovered_contacts() {
     let contacts = vec![Contact::from_exchange_full(
@@ -82,6 +87,7 @@ fn test_revocation_reminder_no_recovered_contacts() {
     assert!(reminders.is_empty());
 }
 
+// @internal
 #[test]
 fn test_revocation_reminder_recovered_unverified() {
     let mut contact = Contact::from_exchange_full(
@@ -98,6 +104,7 @@ fn test_revocation_reminder_recovered_unverified() {
     assert_eq!(reminders[0].contact_id, hex::encode([99u8; 32]));
 }
 
+// @internal
 #[test]
 fn test_revocation_reminder_recovered_but_verified_is_ok() {
     let mut contact = Contact::from_exchange_full(

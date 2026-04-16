@@ -29,12 +29,14 @@ fn make_contact(mutate: impl FnOnce(&mut Contact)) -> Contact {
 // Cautious: has_recovered overrides everything
 // ============================================================
 
+// @internal
 #[test]
 fn test_recovered_contact_is_cautious() {
     let contact = make_contact(|c| c.set_has_recovered(true));
     assert_eq!(contact.trust_level(), TrustLevel::Cautious);
 }
 
+// @internal
 #[test]
 fn test_recovered_then_verified_restores_trust() {
     // Fingerprint re-verification is an in-person act that
@@ -46,6 +48,7 @@ fn test_recovered_then_verified_restores_trust() {
     assert_eq!(contact.trust_level(), TrustLevel::Verified);
 }
 
+// @internal
 #[test]
 fn test_recovered_without_reverification_stays_cautious() {
     // Without re-verification, recovered stays Cautious.
@@ -58,6 +61,7 @@ fn test_recovered_without_reverification_stays_cautious() {
     assert_eq!(contact.trust_level(), TrustLevel::Cautious);
 }
 
+// @internal
 #[test]
 fn test_recovered_overrides_high_proximity_nfc() {
     let contact = make_contact(|c| {
@@ -72,6 +76,7 @@ fn test_recovered_overrides_high_proximity_nfc() {
 // Verified: fingerprint manually confirmed
 // ============================================================
 
+// @internal
 #[test]
 fn test_fingerprint_verified_is_verified() {
     let contact = make_contact(|c| {
@@ -84,6 +89,7 @@ fn test_fingerprint_verified_is_verified() {
 // High: close-range transport with high proximity confidence
 // ============================================================
 
+// @internal
 #[test]
 fn test_high_proximity_nfc_is_high() {
     let contact = make_contact(|c| {
@@ -93,6 +99,7 @@ fn test_high_proximity_nfc_is_high() {
     assert_eq!(contact.trust_level(), TrustLevel::High);
 }
 
+// @internal
 #[test]
 fn test_high_proximity_ble_is_high() {
     let contact = make_contact(|c| {
@@ -106,6 +113,7 @@ fn test_high_proximity_ble_is_high() {
 // Standard: high proximity but QR (no close-range channel)
 // ============================================================
 
+// @internal
 #[test]
 fn test_high_proximity_qr_is_standard() {
     let contact = make_contact(|c| {
@@ -119,12 +127,14 @@ fn test_high_proximity_qr_is_standard() {
 // Standard: fallback for all other cases
 // ============================================================
 
+// @internal
 #[test]
 fn test_default_contact_is_standard() {
     let contact = make_contact(|_| {});
     assert_eq!(contact.trust_level(), TrustLevel::Standard);
 }
 
+// @internal
 #[test]
 fn test_medium_proximity_nfc_is_standard() {
     let contact = make_contact(|c| {
@@ -134,6 +144,7 @@ fn test_medium_proximity_nfc_is_standard() {
     assert_eq!(contact.trust_level(), TrustLevel::Standard);
 }
 
+// @internal
 #[test]
 fn test_unknown_proximity_ble_is_standard() {
     let contact = make_contact(|c| {
@@ -143,6 +154,7 @@ fn test_unknown_proximity_ble_is_standard() {
     assert_eq!(contact.trust_level(), TrustLevel::Standard);
 }
 
+// @internal
 #[test]
 fn test_low_proximity_nfc_is_standard() {
     let contact = make_contact(|c| {
@@ -157,6 +169,7 @@ fn test_low_proximity_nfc_is_standard() {
 // proximity and verifier confidence for trust derivation
 // ============================================================
 
+// @internal
 #[test]
 fn usb_transport_with_metrics_is_high_trust() {
     use vauchi_core::exchange::{TrustMetrics, VerifierEventLog};
@@ -173,6 +186,7 @@ fn usb_transport_with_metrics_is_high_trust() {
     assert_eq!(contact.trust_level(), TrustLevel::High);
 }
 
+// @internal
 #[test]
 fn qr_with_ultrasonic_verifier_is_high_trust() {
     use vauchi_core::exchange::{TrustMetrics, VerifierEventLog, VerifierMethod};
@@ -189,6 +203,7 @@ fn qr_with_ultrasonic_verifier_is_high_trust() {
     assert_eq!(contact.trust_level(), TrustLevel::High);
 }
 
+// @internal
 #[test]
 fn ble_with_manual_confirm_is_standard_trust() {
     use vauchi_core::exchange::{TrustMetrics, VerifierEventLog, VerifierMethod};
@@ -205,6 +220,7 @@ fn ble_with_manual_confirm_is_standard_trust() {
     assert_eq!(contact.trust_level(), TrustLevel::Standard);
 }
 
+// @internal
 #[test]
 fn recovered_overrides_usb_physical() {
     use vauchi_core::exchange::{TrustMetrics, VerifierEventLog};
@@ -222,6 +238,7 @@ fn recovered_overrides_usb_physical() {
     assert_eq!(contact.trust_level(), TrustLevel::Cautious);
 }
 
+// @internal
 #[test]
 fn trust_metrics_present_no_signal_gives_standard() {
     use vauchi_core::exchange::{TrustMetrics, VerifierEventLog};
@@ -238,6 +255,7 @@ fn trust_metrics_present_no_signal_gives_standard() {
     assert_eq!(contact.trust_level(), TrustLevel::Standard);
 }
 
+// @internal
 #[test]
 fn legacy_contact_without_metrics_uses_old_logic() {
     let mut contact = make_contact(|_| {});

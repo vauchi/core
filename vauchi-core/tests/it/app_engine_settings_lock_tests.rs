@@ -12,6 +12,7 @@ use vauchi_core::api::Vauchi;
 
 // ── settings toggle persistence tests (HIGH-4) ──────────────────────
 
+// @internal
 #[test]
 fn settings_toggle_persists_after_navigate_away_and_back() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -54,6 +55,7 @@ fn settings_toggle_persists_after_navigate_away_and_back() {
     );
 }
 
+// @internal
 #[test]
 fn settings_toggle_suppress_presence_persists() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -85,6 +87,7 @@ fn settings_toggle_suppress_presence_persists() {
     );
 }
 
+// @internal
 #[test]
 fn settings_emergency_wipe_navigates_to_shred() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -110,6 +113,7 @@ fn settings_emergency_wipe_navigates_to_shred() {
     }
 }
 
+// @internal
 #[test]
 fn duress_pin_screen_renders_with_defaults() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -121,6 +125,7 @@ fn duress_pin_screen_renders_with_defaults() {
 }
 
 // @scenario: duress_password :: Duress PIN setup persists through AppEngine
+// @internal
 #[test]
 fn duress_pin_setup_persists_via_handle_completion() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -175,6 +180,7 @@ fn duress_pin_setup_persists_via_handle_completion() {
 }
 
 // @scenario: duress_password :: Disabling duress PIN persists
+// @internal
 #[test]
 fn duress_pin_disable_persists_via_handle_completion() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -210,6 +216,7 @@ fn duress_pin_disable_persists_via_handle_completion() {
 
 // ── lock screen password verification tests (CRIT-3) ─────────────────
 
+// @internal
 #[test]
 fn lock_screen_wrong_pin_stays_locked() {
     let mut engine = engine_with_password("123456");
@@ -234,6 +241,7 @@ fn lock_screen_wrong_pin_stays_locked() {
     );
 }
 
+// @internal
 #[test]
 fn lock_screen_correct_pin_unlocks() {
     let mut engine = engine_with_password("123456");
@@ -260,6 +268,7 @@ fn lock_screen_correct_pin_unlocks() {
     );
 }
 
+// @internal
 #[test]
 fn lock_screen_empty_pin_does_not_unlock() {
     let mut engine = engine_with_password("123456");
@@ -282,6 +291,7 @@ fn lock_screen_empty_pin_does_not_unlock() {
     );
 }
 
+// @internal
 #[test]
 fn lock_screen_tracks_failed_attempts() {
     let mut engine = engine_with_password("123456");
@@ -323,6 +333,7 @@ fn lock_screen_tracks_failed_attempts() {
     );
 }
 
+// @internal
 #[test]
 fn lock_screen_correct_pin_after_failed_attempt_unlocks() {
     let mut engine = engine_with_password("123456");

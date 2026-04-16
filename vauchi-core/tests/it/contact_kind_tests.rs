@@ -41,6 +41,7 @@ fn test_imported_data() -> ImportedData {
 // is_exchanged / is_imported
 // ========================================
 
+// @internal
 #[test]
 fn exchanged_kind_reports_is_exchanged_true() {
     let kind = ContactKind::Exchanged(test_exchanged_data());
@@ -48,6 +49,7 @@ fn exchanged_kind_reports_is_exchanged_true() {
     assert!(!kind.is_imported());
 }
 
+// @internal
 #[test]
 fn imported_kind_reports_is_imported_true() {
     let kind = ContactKind::Imported(test_imported_data());
@@ -59,6 +61,7 @@ fn imported_kind_reports_is_imported_true() {
 // Accessor methods
 // ========================================
 
+// @internal
 #[test]
 fn exchanged_data_accessor_returns_some_for_exchanged() {
     let kind = ContactKind::Exchanged(test_exchanged_data());
@@ -67,12 +70,14 @@ fn exchanged_data_accessor_returns_some_for_exchanged() {
     assert_eq!(*data.unwrap().public_key(), [0xAB; 32]);
 }
 
+// @internal
 #[test]
 fn exchanged_data_accessor_returns_none_for_imported() {
     let kind = ContactKind::Imported(test_imported_data());
     assert!(kind.exchanged_data().is_none());
 }
 
+// @internal
 #[test]
 fn exchanged_data_mut_accessor_returns_some_for_exchanged() {
     let mut kind = ContactKind::Exchanged(test_exchanged_data());
@@ -84,12 +89,14 @@ fn exchanged_data_mut_accessor_returns_some_for_exchanged() {
     assert!(kind.exchanged_data().unwrap().fingerprint_verified());
 }
 
+// @internal
 #[test]
 fn exchanged_data_mut_accessor_returns_none_for_imported() {
     let mut kind = ContactKind::Imported(test_imported_data());
     assert!(kind.exchanged_data_mut().is_none());
 }
 
+// @internal
 #[test]
 fn imported_data_accessor_returns_some_for_imported() {
     let kind = ContactKind::Imported(test_imported_data());
@@ -98,6 +105,7 @@ fn imported_data_accessor_returns_some_for_imported() {
     assert_eq!(data.unwrap().source, ImportSource::VcardFile);
 }
 
+// @internal
 #[test]
 fn imported_data_accessor_returns_none_for_exchanged() {
     let kind = ContactKind::Exchanged(test_exchanged_data());
@@ -108,6 +116,7 @@ fn imported_data_accessor_returns_none_for_exchanged() {
 // ImportSource serde roundtrip
 // ========================================
 
+// @internal
 #[test]
 fn import_source_serde_roundtrip() {
     let sources = [
@@ -129,6 +138,7 @@ fn import_source_serde_roundtrip() {
 // ImportedData with original_uid
 // ========================================
 
+// @internal
 #[test]
 fn imported_data_preserves_original_uid() {
     let data = ImportedData {

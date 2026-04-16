@@ -4,6 +4,7 @@
 
 use vauchi_core::exchange::multistage::qr_codec::*;
 
+// @internal
 #[test]
 fn test_parse_init_qr() {
     let pubkey = [1u8; 32];
@@ -42,6 +43,7 @@ fn test_parse_init_qr() {
     }
 }
 
+// @internal
 #[test]
 fn test_parse_data_qr() {
     let session_id = [5u8; 16];
@@ -68,6 +70,7 @@ fn test_parse_data_qr() {
     }
 }
 
+// @internal
 #[test]
 fn test_parse_verify_qr() {
     let session_id = [6u8; 16];
@@ -86,6 +89,7 @@ fn test_parse_verify_qr() {
     }
 }
 
+// @internal
 #[test]
 fn test_parse_confirm_qr() {
     let session_id = [8u8; 16];
@@ -104,12 +108,14 @@ fn test_parse_confirm_qr() {
     }
 }
 
+// @internal
 #[test]
 fn test_parse_unknown_prefix() {
     let result = parse_qr("UNKNOWN:data");
     result.expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_data_qr_crc_integrity() {
     let session_id = [0u8; 16];
@@ -128,6 +134,7 @@ fn test_data_qr_crc_integrity() {
 
 // === Relay URL in INIT QR ===
 
+// @internal
 #[test]
 fn test_init_qr_with_relay_url_but_no_noise_pubkey_is_rejected() {
     let session_id = [10u8; 16];
@@ -155,6 +162,7 @@ fn test_init_qr_with_relay_url_but_no_noise_pubkey_is_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn test_init_qr_with_relay_url_and_noise_pubkey() {
     let session_id = [14u8; 16];
@@ -188,6 +196,7 @@ fn test_init_qr_with_relay_url_and_noise_pubkey() {
     }
 }
 
+// @internal
 #[test]
 fn test_init_qr_without_relay_backward_compat() {
     // format_init_qr (no relay) should still parse correctly
@@ -221,6 +230,7 @@ fn test_init_qr_without_relay_backward_compat() {
     }
 }
 
+// @internal
 #[test]
 fn test_init_qr_rejects_private_host_relay_url() {
     let session_id = [30u8; 16];
@@ -243,6 +253,7 @@ fn test_init_qr_rejects_private_host_relay_url() {
     assert!(result.is_err(), "private host relay URL should be rejected");
 }
 
+// @internal
 #[test]
 fn test_init_qr_rejects_insecure_scheme() {
     let session_id = [34u8; 16];
@@ -267,6 +278,7 @@ fn test_init_qr_rejects_insecure_scheme() {
     );
 }
 
+// @internal
 #[test]
 fn test_init_qr_truncated_before_flags() {
     // Build a valid prefix but truncate before flags byte
@@ -291,6 +303,7 @@ fn test_init_qr_truncated_before_flags() {
     assert!(result.is_err(), "truncated INIT QR should fail");
 }
 
+// @internal
 #[test]
 fn test_init_qr_with_only_noise_pubkey() {
     let session_id = [23u8; 16];
@@ -323,6 +336,7 @@ fn test_init_qr_with_only_noise_pubkey() {
     }
 }
 
+// @internal
 #[test]
 fn test_relay_url_without_noise_pubkey_rejected_tofu() {
     // TOFU fail-closed: relay URL present but Noise pubkey missing → reject

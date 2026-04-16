@@ -8,6 +8,7 @@
 use vauchi_core::network::delivery::failure_to_user_message;
 
 // @scenario: message_delivery :: User sees meaningful error for failed delivery
+// @internal
 #[test]
 fn test_connection_timeout_error_message() {
     let msg = failure_to_user_message("connection_timeout");
@@ -18,6 +19,7 @@ fn test_connection_timeout_error_message() {
     );
 }
 
+// @internal
 #[test]
 fn test_recipient_not_found_error_message() {
     let msg = failure_to_user_message("recipient_not_found");
@@ -28,6 +30,7 @@ fn test_recipient_not_found_error_message() {
     );
 }
 
+// @internal
 #[test]
 fn test_key_mismatch_error_message() {
     let msg = failure_to_user_message("key_mismatch");
@@ -38,6 +41,7 @@ fn test_key_mismatch_error_message() {
     );
 }
 
+// @internal
 #[test]
 fn test_quota_exceeded_error_message() {
     let msg = failure_to_user_message("quota_exceeded");
@@ -48,6 +52,7 @@ fn test_quota_exceeded_error_message() {
     );
 }
 
+// @internal
 #[test]
 fn test_expired_message_error_message() {
     let msg = failure_to_user_message("expired");
@@ -59,6 +64,7 @@ fn test_expired_message_error_message() {
 }
 
 // @scenario: message_delivery :: Unknown failure reasons produce generic message
+// @internal
 #[test]
 fn test_unknown_failure_reason_returns_generic_message() {
     let msg = failure_to_user_message("something_unexpected");

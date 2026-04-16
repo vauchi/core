@@ -50,6 +50,7 @@ fn create_test_contact_with_fields(
 // Duplicate Detection API Tests
 // ================================================================
 
+// @internal
 #[test]
 fn test_find_duplicates_empty_contacts() {
     let wb = create_vauchi_with_identity("Alice");
@@ -57,6 +58,7 @@ fn test_find_duplicates_empty_contacts() {
     assert_eq!(duplicates.len(), 0);
 }
 
+// @internal
 #[test]
 fn test_find_duplicates_no_duplicates() {
     let wb = create_vauchi_with_identity("Alice");
@@ -69,6 +71,7 @@ fn test_find_duplicates_no_duplicates() {
     assert_eq!(duplicates.len(), 0);
 }
 
+// @internal
 #[test]
 fn test_find_duplicates_detects_similar_names() {
     let wb = create_vauchi_with_identity("Alice");
@@ -89,6 +92,7 @@ fn test_find_duplicates_detects_similar_names() {
     );
 }
 
+// @internal
 #[test]
 fn test_get_duplicate_score_returns_similarity() {
     let wb = create_vauchi_with_identity("Alice");
@@ -108,6 +112,7 @@ fn test_get_duplicate_score_returns_similarity() {
     );
 }
 
+// @internal
 #[test]
 fn test_get_duplicate_score_contact_not_found() {
     let wb = create_vauchi_with_identity("Alice");
@@ -115,6 +120,7 @@ fn test_get_duplicate_score_contact_not_found() {
     assert!(result.is_err(), "expected error");
 }
 
+// @internal
 #[test]
 fn test_dismiss_duplicate_removes_from_results() {
     let wb = create_vauchi_with_identity("Alice");
@@ -145,6 +151,7 @@ fn test_dismiss_duplicate_removes_from_results() {
     );
 }
 
+// @internal
 #[test]
 fn test_dismiss_duplicate_order_independent() {
     let wb = create_vauchi_with_identity("Alice");
@@ -167,6 +174,7 @@ fn test_dismiss_duplicate_order_independent() {
     );
 }
 
+// @internal
 #[test]
 fn test_merge_contacts_combines_fields() {
     let wb = create_vauchi_with_identity("Alice");
@@ -203,6 +211,7 @@ fn test_merge_contacts_combines_fields() {
     assert!(wb.get_contact(&secondary_id).unwrap().is_none());
 }
 
+// @internal
 #[test]
 fn test_merge_contacts_preserves_primary_name() {
     let wb = create_vauchi_with_identity("Alice");
@@ -218,6 +227,7 @@ fn test_merge_contacts_preserves_primary_name() {
     assert_eq!(merged.display_name(), "Bob Primary");
 }
 
+// @internal
 #[test]
 fn test_merge_contacts_not_found_error() {
     let wb = create_vauchi_with_identity("Alice");
@@ -233,6 +243,7 @@ fn test_merge_contacts_not_found_error() {
 // Setup Progress / Onboarding API Tests
 // ================================================================
 
+// @internal
 #[test]
 fn test_setup_progress_fresh_instance() {
     let wb = create_test_vauchi();
@@ -250,6 +261,7 @@ fn test_setup_progress_fresh_instance() {
     assert_eq!(progress.completion_fraction(), 0.0);
 }
 
+// @internal
 #[test]
 fn test_setup_progress_after_identity() {
     let wb = create_vauchi_with_identity("Alice");
@@ -261,6 +273,7 @@ fn test_setup_progress_after_identity() {
     assert_eq!(progress.completed_steps, 1);
 }
 
+// @internal
 #[test]
 fn test_setup_progress_after_adding_field() {
     let wb = create_vauchi_with_identity("Alice");
@@ -278,6 +291,7 @@ fn test_setup_progress_after_adding_field() {
     assert_eq!(progress.completed_steps, 2);
 }
 
+// @internal
 #[test]
 fn test_setup_progress_after_adding_contacts() {
     let wb = create_vauchi_with_identity("Alice");
@@ -297,6 +311,7 @@ fn test_setup_progress_after_adding_contacts() {
     assert!(progress.has_three_contacts);
 }
 
+// @internal
 #[test]
 fn test_setup_progress_completion_fraction() {
     let wb = create_vauchi_with_identity("Alice");
@@ -318,12 +333,14 @@ fn test_setup_progress_completion_fraction() {
     );
 }
 
+// @internal
 #[test]
 fn test_is_first_launch_true_for_fresh_instance() {
     let wb = create_test_vauchi();
     assert!(wb.is_first_launch().unwrap());
 }
 
+// @internal
 #[test]
 fn test_is_first_launch_false_after_identity() {
     let wb = create_vauchi_with_identity("Alice");
@@ -334,6 +351,7 @@ fn test_is_first_launch_false_after_identity() {
 // Emergency Wipe Status API Tests
 // ================================================================
 
+// @internal
 #[test]
 fn test_emergency_wipe_status_unconfigured() {
     let wb = create_vauchi_with_identity("Alice");
@@ -348,6 +366,7 @@ fn test_emergency_wipe_status_unconfigured() {
     assert!(!status.password_enabled);
 }
 
+// @internal
 #[test]
 fn test_emergency_wipe_status_with_emergency_config() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -363,6 +382,7 @@ fn test_emergency_wipe_status_with_emergency_config() {
     assert!(status.broadcast_configured);
 }
 
+// @internal
 #[test]
 fn test_emergency_wipe_status_with_trusted_contacts() {
     let wb = create_vauchi_with_identity("Alice");
@@ -381,6 +401,7 @@ fn test_emergency_wipe_status_with_trusted_contacts() {
     assert_eq!(status.trusted_contact_count, 1);
 }
 
+// @internal
 #[test]
 fn test_perform_emergency_wipe_requires_confirmation() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -395,6 +416,7 @@ fn test_perform_emergency_wipe_requires_confirmation() {
     );
 }
 
+// @internal
 #[test]
 fn test_perform_emergency_wipe_clears_contacts() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -411,6 +433,7 @@ fn test_perform_emergency_wipe_clears_contacts() {
     assert!(!wb.has_identity());
 }
 
+// @internal
 #[test]
 fn test_perform_emergency_wipe_clears_own_card() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -431,6 +454,7 @@ fn test_perform_emergency_wipe_clears_own_card() {
 // New Aha Moment Types Tests
 // ================================================================
 
+// @internal
 #[test]
 fn test_new_aha_moments_exist() {
     let all = AhaMomentType::all();
@@ -442,6 +466,7 @@ fn test_new_aha_moments_exist() {
     assert!(all.contains(&AhaMomentType::DeviceLinked));
 }
 
+// @internal
 #[test]
 fn test_first_field_edit_moment_has_content() {
     assert!(!AhaMomentType::FirstFieldEdit.title().is_empty());
@@ -449,6 +474,7 @@ fn test_first_field_edit_moment_has_content() {
     assert_eq!(AhaMomentType::FirstFieldEdit.title(), "Field updated!");
 }
 
+// @internal
 #[test]
 fn test_three_contacts_reached_moment_has_content() {
     assert!(!AhaMomentType::ThreeContactsReached.title().is_empty());
@@ -459,6 +485,7 @@ fn test_three_contacts_reached_moment_has_content() {
     );
 }
 
+// @internal
 #[test]
 fn test_device_linked_moment_has_content() {
     assert!(!AhaMomentType::DeviceLinked.title().is_empty());
@@ -466,6 +493,7 @@ fn test_device_linked_moment_has_content() {
     assert_eq!(AhaMomentType::DeviceLinked.title(), "Device linked!");
 }
 
+// @internal
 #[test]
 fn test_new_aha_moments_trigger_via_api() {
     let wb = create_vauchi_with_identity("Alice");
@@ -484,6 +512,7 @@ fn test_new_aha_moments_trigger_via_api() {
     assert!(moment.is_none());
 }
 
+// @internal
 #[test]
 fn test_new_aha_moments_animations() {
     assert!(AhaMomentType::FirstFieldEdit.has_animation());
@@ -495,6 +524,7 @@ fn test_new_aha_moments_animations() {
 // Label Members (get_group_members) API Tests
 // ================================================================
 
+// @internal
 #[test]
 fn test_get_label_members_empty_label() {
     let wb = create_vauchi_with_identity("Alice");
@@ -504,6 +534,7 @@ fn test_get_label_members_empty_label() {
     assert_eq!(members.len(), 0);
 }
 
+// @internal
 #[test]
 fn test_get_label_members_returns_contacts() {
     let wb = create_vauchi_with_identity("Alice");
@@ -530,6 +561,7 @@ fn test_get_label_members_returns_contacts() {
     assert!(member_names.contains(&"Charlie"));
 }
 
+// @internal
 #[test]
 fn test_get_label_members_skips_deleted_contacts() {
     let wb = create_vauchi_with_identity("Alice");
@@ -560,6 +592,7 @@ fn test_get_label_members_skips_deleted_contacts() {
 // Label Display Name Override API Tests
 // ================================================================
 
+// @internal
 #[test]
 fn test_set_label_display_name_override_api() {
     let wb = create_vauchi_with_identity("Matthew Egloff");
@@ -573,6 +606,7 @@ fn test_set_label_display_name_override_api() {
     assert_eq!(loaded.resolve_display_name("Matthew Egloff"), "Matt");
 }
 
+// @internal
 #[test]
 fn test_clear_label_display_name_override_api() {
     let wb = create_vauchi_with_identity("Matthew Egloff");
@@ -591,6 +625,7 @@ fn test_clear_label_display_name_override_api() {
     );
 }
 
+// @internal
 #[test]
 fn test_set_label_display_name_override_empty_rejected() {
     let wb = create_vauchi_with_identity("Alice");
@@ -600,6 +635,7 @@ fn test_set_label_display_name_override_empty_rejected() {
     assert!(result.is_err(), "empty override should be rejected");
 }
 
+// @internal
 #[test]
 fn test_set_label_display_name_override_whitespace_rejected() {
     let wb = create_vauchi_with_identity("Alice");
@@ -612,6 +648,7 @@ fn test_set_label_display_name_override_whitespace_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn test_set_label_display_name_override_nonexistent_label() {
     let wb = create_vauchi_with_identity("Alice");

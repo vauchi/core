@@ -38,6 +38,7 @@ fn make_test_registry() -> DeviceRegistry {
 // === Own Card Encryption ===
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_own_card_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -57,6 +58,7 @@ fn test_own_card_encrypted_roundtrip() {
 }
 
 // @scenario: security :: Local database encryption
+// @internal
 #[test]
 fn test_own_card_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
@@ -92,6 +94,7 @@ fn test_own_card_stored_as_encrypted_blob() {
 
 // === Device Registry Encryption ===
 
+// @internal
 #[test]
 fn test_device_registry_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -106,6 +109,7 @@ fn test_device_registry_encrypted_roundtrip() {
     assert_eq!(loaded.version(), registry.version());
 }
 
+// @internal
 #[test]
 fn test_device_registry_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
@@ -131,6 +135,7 @@ fn test_device_registry_stored_as_encrypted_blob() {
 // === Device Sync State Encryption ===
 
 // @scenario: sync_updates :: All sync traffic is encrypted
+// @internal
 #[test]
 fn test_device_sync_state_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -146,6 +151,7 @@ fn test_device_sync_state_encrypted_roundtrip() {
 }
 
 // @scenario: sync_updates :: All sync traffic is encrypted
+// @internal
 #[test]
 fn test_device_sync_state_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
@@ -169,6 +175,7 @@ fn test_device_sync_state_stored_as_encrypted_blob() {
     assert!(!blob.is_empty());
 }
 
+// @internal
 #[test]
 fn test_list_device_sync_states_encrypted() {
     let (_dir, storage) = open_storage();
@@ -185,6 +192,7 @@ fn test_list_device_sync_states_encrypted() {
 
 // === Visibility Labels Encryption ===
 
+// @internal
 #[test]
 fn test_visibility_label_encrypted_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -197,6 +205,7 @@ fn test_visibility_label_encrypted_roundtrip() {
     assert_eq!(loaded.contacts(), label.contacts());
 }
 
+// @internal
 #[test]
 fn test_visibility_label_stored_as_encrypted_blob() {
     let (dir, storage) = open_storage();
@@ -230,6 +239,7 @@ fn test_visibility_label_stored_as_encrypted_blob() {
     assert!(!blob2.is_empty());
 }
 
+// @internal
 #[test]
 fn test_load_all_labels_encrypted() {
     let (_dir, storage) = open_storage();
@@ -246,6 +256,7 @@ fn test_load_all_labels_encrypted() {
 
 // === Migration Tests ===
 
+// @internal
 #[test]
 fn test_migration_v13_adds_encrypted_columns() {
     let (dir, _storage) = open_storage();
@@ -275,6 +286,7 @@ fn test_migration_v13_adds_encrypted_columns() {
         .expect("visibility_labels encrypted columns should exist");
 }
 
+// @internal
 #[test]
 fn test_migration_v13_schema_version() {
     let (dir, _storage) = open_storage();
@@ -294,6 +306,7 @@ fn test_migration_v13_schema_version() {
     );
 }
 
+// @internal
 #[test]
 fn test_migration_v13_fallback_reads_plaintext() {
     let dir = tempfile::tempdir().unwrap();
@@ -332,6 +345,7 @@ fn test_migration_v13_fallback_reads_plaintext() {
     }
 }
 
+// @internal
 #[test]
 fn test_device_registry_json_export_with_encrypted_storage() {
     let (_dir, storage) = open_storage();
@@ -352,6 +366,7 @@ fn test_device_registry_json_export_with_encrypted_storage() {
 
 // === Rekey Tests ===
 
+// @internal
 #[test]
 fn test_rekey_preserves_own_card() {
     let (_dir, mut storage) = open_storage();
@@ -368,6 +383,7 @@ fn test_rekey_preserves_own_card() {
     assert_eq!(loaded.display_name(), "ReKeyTest");
 }
 
+// @internal
 #[test]
 fn test_rekey_preserves_device_registry() {
     let (_dir, mut storage) = open_storage();
@@ -385,6 +401,7 @@ fn test_rekey_preserves_device_registry() {
     assert_eq!(loaded.version(), registry.version());
 }
 
+// @internal
 #[test]
 fn test_rekey_preserves_device_sync_state() {
     let (_dir, mut storage) = open_storage();
@@ -402,6 +419,7 @@ fn test_rekey_preserves_device_sync_state() {
     assert_eq!(loaded.device_id(), &[0xCC; 32]);
 }
 
+// @internal
 #[test]
 fn test_rekey_preserves_visibility_labels() {
     let (_dir, mut storage) = open_storage();
@@ -417,6 +435,7 @@ fn test_rekey_preserves_visibility_labels() {
 }
 
 // @scenario: security :: Local database encryption
+// @internal
 #[test]
 fn test_rekey_old_key_cannot_decrypt() {
     let (dir, mut storage) = open_storage();
@@ -447,6 +466,7 @@ fn test_rekey_old_key_cannot_decrypt() {
     assert_eq!(loaded.display_name(), "OldKeyTest");
 }
 
+// @internal
 #[test]
 fn test_rekey_with_smk_derived_sek() {
     use vauchi_core::crypto::ShreddingMasterKey;

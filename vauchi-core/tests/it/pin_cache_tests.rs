@@ -13,6 +13,7 @@ fn open_storage() -> Storage {
 }
 
 // @scenario: pinning:pin cache persistence
+// @internal
 #[test]
 fn save_and_load_pin_cache() {
     let storage = open_storage();
@@ -34,6 +35,7 @@ fn save_and_load_pin_cache() {
 }
 
 // @scenario: pinning:pin cache persistence
+// @internal
 #[test]
 fn load_pin_cache_returns_none_when_empty() {
     let storage = open_storage();
@@ -42,6 +44,7 @@ fn load_pin_cache_returns_none_when_empty() {
 }
 
 // @scenario: pinning:pin cache persistence
+// @internal
 #[test]
 fn clear_pin_cache_removes_entry() {
     let storage = open_storage();
@@ -57,6 +60,7 @@ fn clear_pin_cache_removes_entry() {
 }
 
 // @scenario: pinning:pin cache persistence
+// @internal
 #[test]
 fn save_pin_cache_upserts() {
     let storage = open_storage();
@@ -78,6 +82,7 @@ fn save_pin_cache_upserts() {
 }
 
 // @scenario: pinning:pin cache persistence
+// @internal
 #[test]
 fn clear_pin_cache_does_not_affect_other_relays() {
     let storage = open_storage();
@@ -114,6 +119,7 @@ fn clear_pin_cache_does_not_affect_other_relays() {
 // Note: the transport layer (fetch_pin_config) rejects empty responses,
 // but the storage layer must handle empty lists gracefully in case
 // a future caller has a legitimate reason to clear cached pins.
+// @internal
 #[test]
 fn save_empty_pin_list_roundtrips() {
     let storage = open_storage();

@@ -97,6 +97,7 @@ fn drive_onboarding(engine: &PlatformAppEngine) {
 // Construction and initial screen
 // ============================================================================
 
+// @internal
 #[test]
 fn new_engine_starts_on_onboarding() {
     let (engine, _dir) = create_engine();
@@ -105,6 +106,7 @@ fn new_engine_starts_on_onboarding() {
     assert_eq!(screen["screen_id"], "identity_check");
 }
 
+// @internal
 #[test]
 fn current_screen_id_returns_lightweight_id() {
     let (engine, _dir) = create_engine();
@@ -116,6 +118,7 @@ fn current_screen_id_returns_lightweight_id() {
 // Onboarding flow
 // ============================================================================
 
+// @internal
 #[test]
 fn onboarding_flow_completes_and_transitions_to_my_info() {
     let (engine, _dir) = create_engine();
@@ -128,6 +131,7 @@ fn onboarding_flow_completes_and_transitions_to_my_info() {
 // Navigation (require completed onboarding)
 // ============================================================================
 
+// @internal
 #[test]
 fn navigate_to_json_simple_variant() {
     let (engine, _dir) = create_engine();
@@ -139,6 +143,7 @@ fn navigate_to_json_simple_variant() {
     assert_eq!(screen["screen_id"], "exchange_mode_selection");
 }
 
+// @internal
 #[test]
 fn navigate_back_returns_previous_screen() {
     let (engine, _dir) = create_engine();
@@ -151,6 +156,7 @@ fn navigate_back_returns_previous_screen() {
     assert_eq!(screen["screen_id"], "my_info");
 }
 
+// @internal
 #[test]
 fn available_screens_returns_nav_bar_items() {
     let (engine, _dir) = create_engine();
@@ -169,6 +175,7 @@ fn available_screens_returns_nav_bar_items() {
 
 // @scenario: notification.feature - Poll notifications returns empty before events
 // @internal
+// @internal
 #[test]
 fn poll_notifications_returns_empty_before_events() {
     let (engine, _dir) = create_engine();
@@ -181,6 +188,7 @@ fn poll_notifications_returns_empty_before_events() {
 }
 
 // @scenario: notification.feature - Drain notifications returns empty before events
+// @internal
 // @internal
 #[test]
 fn drain_pending_notifications_returns_empty_before_events() {
@@ -196,6 +204,7 @@ fn drain_pending_notifications_returns_empty_before_events() {
 }
 
 // @scenario: notification.feature - Card update produces no OS notification
+// @internal
 // @internal
 #[test]
 fn poll_notifications_after_card_update_returns_no_notification() {
@@ -232,6 +241,7 @@ fn poll_notifications_after_card_update_returns_no_notification() {
 
 // @scenario: notification.feature - Poll and drain are independently callable
 // @internal
+// @internal
 #[test]
 fn poll_and_drain_are_independently_callable() {
     let (engine, _dir) = create_engine();
@@ -251,6 +261,7 @@ fn poll_and_drain_are_independently_callable() {
 // Error handling
 // ============================================================================
 
+// @internal
 #[test]
 fn handle_action_invalid_json_returns_error() {
     let (engine, _dir) = create_engine();
@@ -258,6 +269,7 @@ fn handle_action_invalid_json_returns_error() {
     assert!(result.is_err(), "should return error for invalid JSON");
 }
 
+// @internal
 #[test]
 fn navigate_to_invalid_json_returns_error() {
     let (engine, _dir) = create_engine();
@@ -269,6 +281,7 @@ fn navigate_to_invalid_json_returns_error() {
 // Invalidation
 // ============================================================================
 
+// @internal
 #[test]
 fn invalidate_all_succeeds() {
     let (engine, _dir) = create_engine();
@@ -278,6 +291,7 @@ fn invalidate_all_succeeds() {
     assert_eq!(id, "my_info");
 }
 
+// @internal
 #[test]
 fn invalidate_screen_json_succeeds() {
     let (engine, _dir) = create_engine();
@@ -291,12 +305,14 @@ fn invalidate_screen_json_succeeds() {
 // Identity and form state queries
 // ============================================================================
 
+// @internal
 #[test]
 fn has_identity_returns_false_before_onboarding() {
     let (engine, _dir) = create_engine();
     assert!(!engine.has_identity().expect("has_identity"));
 }
 
+// @internal
 #[test]
 fn has_identity_returns_true_after_onboarding() {
     let (engine, _dir) = create_engine();
@@ -304,6 +320,7 @@ fn has_identity_returns_true_after_onboarding() {
     assert!(engine.has_identity().expect("has_identity"));
 }
 
+// @internal
 #[test]
 fn form_has_data_returns_false_on_non_form_screen() {
     let (engine, _dir) = create_engine();
@@ -326,6 +343,7 @@ impl PlatformEventListener for RecordingListener {
 }
 
 // @scenario: event-listener.feature - Event listener receives screen invalidation on card update
+// @internal
 #[test]
 fn event_listener_receives_invalidation_on_card_update() {
     let (engine, _dir) = create_engine();
@@ -385,6 +403,7 @@ fn event_listener_receives_invalidation_on_card_update() {
 }
 
 // @scenario: event-listener.feature - Replacing event listener unregisters previous one
+// @internal
 #[test]
 fn replacing_event_listener_unregisters_previous() {
     let (engine, _dir) = create_engine();

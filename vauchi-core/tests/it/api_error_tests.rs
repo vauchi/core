@@ -8,6 +8,7 @@
 use vauchi_core::api::*;
 use vauchi_core::*;
 
+// @internal
 #[test]
 fn test_error_display() {
     let err = VauchiError::ContactNotFound("test-id".into());
@@ -15,6 +16,7 @@ fn test_error_display() {
     assert!(err.to_string().contains("test-id"));
 }
 
+// @internal
 #[test]
 fn test_error_from_validation() {
     let validation_err = ValidationError::InvalidEmail;
@@ -22,6 +24,7 @@ fn test_error_from_validation() {
     assert!(matches!(err, VauchiError::Validation(_)));
 }
 
+// @internal
 #[test]
 fn test_error_from_storage() {
     let storage_err = StorageError::NotFound("key".into());
@@ -29,6 +32,7 @@ fn test_error_from_storage() {
     assert!(matches!(err, VauchiError::Storage(_)));
 }
 
+// @internal
 #[test]
 fn test_error_from_network() {
     let network_err = NetworkError::NotConnected;
@@ -36,6 +40,7 @@ fn test_error_from_network() {
     assert!(matches!(err, VauchiError::Network(_)));
 }
 
+// @internal
 #[test]
 fn test_error_from_sync() {
     let sync_err = SyncError::NoChanges;

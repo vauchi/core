@@ -13,6 +13,7 @@ use vauchi_core::crypto::cek::ContentEncryptionKey;
 
 // @scenario: security :: Contact cards are encrypted at rest
 // @scenario: privacy_compliance :: Card updates use per-contact content encryption key
+// @internal
 #[test]
 fn test_cek_generate_encrypt_decrypt() {
     let cek = ContentEncryptionKey::generate();
@@ -26,6 +27,7 @@ fn test_cek_generate_encrypt_decrypt() {
 }
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_cek_different_keys_cannot_decrypt() {
     let cek1 = ContentEncryptionKey::generate();
@@ -38,6 +40,7 @@ fn test_cek_different_keys_cannot_decrypt() {
 }
 
 // @scenario: security :: Forward secrecy via Double Ratchet
+// @internal
 #[test]
 fn test_cek_rotation_invalidates_old() {
     let old_cek = ContentEncryptionKey::generate();
@@ -61,6 +64,7 @@ fn test_cek_rotation_invalidates_old() {
 }
 
 // @scenario: security :: Secure deletion of data
+// @internal
 #[test]
 fn test_cek_destroy_renders_card_unreadable() {
     let cek = ContentEncryptionKey::generate();
@@ -81,6 +85,7 @@ fn test_cek_destroy_renders_card_unreadable() {
     wrong_key.decrypt(&ciphertext).expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_cek_serialization_roundtrip() {
     let cek = ContentEncryptionKey::generate();
@@ -95,6 +100,7 @@ fn test_cek_serialization_roundtrip() {
     assert_eq!(restored.decrypt(&ciphertext).unwrap(), plaintext);
 }
 
+// @internal
 #[test]
 fn test_cek_encrypt_empty_plaintext() {
     let cek = ContentEncryptionKey::generate();
@@ -105,6 +111,7 @@ fn test_cek_encrypt_empty_plaintext() {
     assert_eq!(decrypted, plaintext);
 }
 
+// @internal
 #[test]
 fn test_cek_encrypt_large_payload() {
     let cek = ContentEncryptionKey::generate();
@@ -117,6 +124,7 @@ fn test_cek_encrypt_large_payload() {
 }
 
 // @scenario: security :: Correct algorithms used
+// @internal
 #[test]
 fn test_cek_ciphertext_is_tagged_xchacha20() {
     let cek = ContentEncryptionKey::generate();
@@ -126,6 +134,7 @@ fn test_cek_ciphertext_is_tagged_xchacha20() {
     assert_eq!(ciphertext[0], 0x02, "CEK should use XChaCha20-Poly1305");
 }
 
+// @internal
 #[test]
 fn test_cek_each_encryption_produces_unique_ciphertext() {
     let cek = ContentEncryptionKey::generate();
@@ -144,6 +153,7 @@ fn test_cek_each_encryption_produces_unique_ciphertext() {
 // --- Additional CEK coverage tests ---
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_cek_clone_preserves_functionality() {
     let cek_original = ContentEncryptionKey::generate();
@@ -158,6 +168,7 @@ fn test_cek_clone_preserves_functionality() {
 }
 
 // @scenario: security :: Memory dump protection
+// @internal
 #[test]
 fn test_cek_debug_redacted() {
     let cek = ContentEncryptionKey::generate();
@@ -171,6 +182,7 @@ fn test_cek_debug_redacted() {
 }
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_cek_from_bytes_reject_all_zeros() {
     // from_bytes delegates to SymmetricKey::from_bytes which rejects all-zeros
@@ -181,6 +193,7 @@ fn test_cek_from_bytes_reject_all_zeros() {
 }
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_cek_decrypt_corrupted_payload() {
     let cek = ContentEncryptionKey::generate();
@@ -196,6 +209,7 @@ fn test_cek_decrypt_corrupted_payload() {
 }
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_cek_decrypt_truncated_ciphertext() {
     let cek = ContentEncryptionKey::generate();
@@ -210,6 +224,7 @@ fn test_cek_decrypt_truncated_ciphertext() {
 }
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_cek_multiple_clones_independent() {
     let cek1 = ContentEncryptionKey::generate();
@@ -231,6 +246,7 @@ fn test_cek_multiple_clones_independent() {
 }
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_cek_to_bytes_from_bytes_consistency() {
     let cek1 = ContentEncryptionKey::generate();
@@ -249,6 +265,7 @@ fn test_cek_to_bytes_from_bytes_consistency() {
 }
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_cek_single_byte_plaintext() {
     let cek = ContentEncryptionKey::generate();
@@ -261,6 +278,7 @@ fn test_cek_single_byte_plaintext() {
 }
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_cek_binary_plaintext_with_nulls() {
     let cek = ContentEncryptionKey::generate();
@@ -273,6 +291,7 @@ fn test_cek_binary_plaintext_with_nulls() {
 }
 
 // @scenario: security :: Contact cards are encrypted at rest
+// @internal
 #[test]
 fn test_cek_decrypt_empty_ciphertext() {
     let cek = ContentEncryptionKey::generate();

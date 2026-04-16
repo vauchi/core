@@ -21,6 +21,7 @@ fn open_storage() -> Storage {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 /// Creating a group persists it and round-trips through get_local_group.
+// @internal
 #[test]
 fn create_local_group() {
     let storage = open_storage();
@@ -47,6 +48,7 @@ fn create_local_group() {
 }
 
 /// Adding a contact to a group persists the membership.
+// @internal
 #[test]
 fn add_contact_to_group() {
     let storage = open_storage();
@@ -64,6 +66,7 @@ fn add_contact_to_group() {
 }
 
 /// Adding the same contact twice is idempotent (no error, still 1 member).
+// @internal
 #[test]
 fn add_contact_to_group_idempotent() {
     let storage = open_storage();
@@ -82,6 +85,7 @@ fn add_contact_to_group_idempotent() {
 }
 
 /// Removing a contact from a group removes only that contact.
+// @internal
 #[test]
 fn remove_contact_from_group() {
     let storage = open_storage();
@@ -105,6 +109,7 @@ fn remove_contact_from_group() {
 }
 
 /// Removing a contact that is not in the group is a no-op (no error).
+// @internal
 #[test]
 fn remove_nonmember_contact_is_noop() {
     let storage = open_storage();
@@ -120,6 +125,7 @@ fn remove_nonmember_contact_is_noop() {
 }
 
 /// list_local_groups returns all created groups.
+// @internal
 #[test]
 fn list_groups() {
     let storage = open_storage();
@@ -138,6 +144,7 @@ fn list_groups() {
 }
 
 /// Deleting a group removes it from storage.
+// @internal
 #[test]
 fn delete_group() {
     let storage = open_storage();
@@ -162,6 +169,7 @@ fn delete_group() {
 /// This test is deliberately trivial: if someone adds `visible_fields` to
 /// `LocalGroup`, this test would need to be updated, drawing attention to the
 /// privacy boundary violation.
+// @internal
 #[test]
 fn group_has_no_visibility_fields() {
     // LocalGroup must only have organizational fields (id, name, contact_ids,
@@ -183,6 +191,7 @@ fn group_has_no_visibility_fields() {
 }
 
 /// `add_to_local_group` on a non-existent group returns NotFound.
+// @internal
 #[test]
 fn add_to_nonexistent_group_returns_not_found() {
     let storage = open_storage();

@@ -4,6 +4,7 @@
 
 use vauchi_core::diagnostic::log_event::{LogEvent, LogEventKind};
 
+// @internal
 #[test]
 fn log_event_serializes_to_json() {
     let event = LogEvent {
@@ -20,6 +21,7 @@ fn log_event_serializes_to_json() {
     assert!(json.contains("\"frame_index\":42"));
 }
 
+// @internal
 #[test]
 fn log_event_roundtrips_all_variants() {
     let events = vec![
@@ -73,6 +75,7 @@ fn log_event_roundtrips_all_variants() {
     }
 }
 
+// @internal
 #[test]
 fn log_event_parses_jsonl_stream() {
     // With #[serde(tag = "kind")] on LogEventKind, the kind field in LogEvent
@@ -87,6 +90,7 @@ fn log_event_parses_jsonl_stream() {
     }
 }
 
+// @internal
 #[test]
 fn log_event_decode_success_has_expected_fields() {
     let event = LogEvent {
@@ -107,6 +111,7 @@ fn log_event_decode_success_has_expected_fields() {
     assert_eq!(parsed["kind"]["frame_index"], 0);
 }
 
+// @internal
 #[test]
 fn log_event_sweep_phase_complete_preserves_vec() {
     let event = LogEvent {
@@ -129,6 +134,7 @@ fn log_event_sweep_phase_complete_preserves_vec() {
     }
 }
 
+// @internal
 #[test]
 fn log_event_rejects_invalid_json() {
     let bad_inputs = vec![

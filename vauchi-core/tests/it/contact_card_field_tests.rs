@@ -8,6 +8,7 @@
 use vauchi_core::contact_card::*;
 
 // @scenario: contact_card_management :: Add field to contact card
+// @internal
 #[test]
 fn test_create_field() {
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-1234");
@@ -17,6 +18,7 @@ fn test_create_field() {
 }
 
 // @scenario: field_validation :: Valid phone number formats
+// @internal
 #[test]
 fn test_validate_valid_phone() {
     let field = ContactField::new(FieldType::Phone, "Test", "+1-555-123-4567");
@@ -24,6 +26,7 @@ fn test_validate_valid_phone() {
 }
 
 // @scenario: field_validation :: Valid email address formats
+// @internal
 #[test]
 fn test_validate_valid_email() {
     let field = ContactField::new(FieldType::Email, "Test", "test@example.com");
@@ -31,6 +34,7 @@ fn test_validate_valid_email() {
 }
 
 // @scenario: unicode_normalization :: Field label NFC normalization
+// @internal
 #[test]
 fn test_field_label_normalized_nfc() {
     let field = ContactField::new(FieldType::Phone, "Te\u{0301}le\u{0301}phone", "+41");
@@ -38,6 +42,7 @@ fn test_field_label_normalized_nfc() {
 }
 
 // @scenario: unicode_normalization :: Field value NFC normalization
+// @internal
 #[test]
 fn test_field_value_normalized_nfc() {
     let mut field = ContactField::new(FieldType::Custom, "Note", "cafe\u{0301}");
@@ -48,12 +53,14 @@ fn test_field_value_normalized_nfc() {
 
 // --- note field tests ---
 
+// @internal
 #[test]
 fn test_field_note_default_none() {
     let f = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67");
     assert_eq!(f.note(), None);
 }
 
+// @internal
 #[test]
 fn test_field_with_note() {
     let f = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67")
@@ -61,6 +68,7 @@ fn test_field_with_note() {
     assert_eq!(f.note(), Some("check spam"));
 }
 
+// @internal
 #[test]
 fn test_field_note_truncated_at_500_chars() {
     let long_note = "x".repeat(600);
@@ -68,12 +76,14 @@ fn test_field_note_truncated_at_500_chars() {
     assert_eq!(f.note().unwrap().chars().count(), 500);
 }
 
+// @internal
 #[test]
 fn test_field_empty_note_is_none() {
     let f = ContactField::new(FieldType::Phone, "Work", "+41...").with_note("".to_string());
     assert_eq!(f.note(), None);
 }
 
+// @internal
 #[test]
 fn test_strip_private_removes_note() {
     let f = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67")
@@ -85,6 +95,7 @@ fn test_strip_private_removes_note() {
     assert_eq!(stripped.id(), f.id());
 }
 
+// @internal
 #[test]
 fn test_strip_private_on_field_without_note() {
     let f = ContactField::new(FieldType::Phone, "Work", "+41...");
@@ -93,6 +104,7 @@ fn test_strip_private_on_field_without_note() {
     assert_eq!(stripped.value(), f.value());
 }
 
+// @internal
 #[test]
 fn test_note_serde_roundtrip() {
     let f = ContactField::new(FieldType::Phone, "Work", "+41...").with_note("my note".to_string());
@@ -101,6 +113,7 @@ fn test_note_serde_roundtrip() {
     assert_eq!(restored.note(), Some("my note"));
 }
 
+// @internal
 #[test]
 fn test_note_backward_compat_deserialize() {
     // Old JSON without note field should deserialize fine
@@ -110,6 +123,7 @@ fn test_note_backward_compat_deserialize() {
     assert_eq!(f.note(), None);
 }
 
+// @internal
 #[test]
 fn test_field_note_truncated_multibyte_utf8() {
     // 600 CJK characters (3 bytes each = 1800 bytes) should truncate to 500 characters
@@ -123,6 +137,7 @@ fn test_field_note_truncated_multibyte_utf8() {
 }
 
 // @scenario: contact_card_management :: Field type alias resolution
+// @internal
 #[test]
 fn test_field_type_from_alias_phone() {
     for alias in &["phone", "Phone", "tel", "TEL", "telephone"] {
@@ -133,6 +148,7 @@ fn test_field_type_from_alias_phone() {
 }
 
 // @scenario: contact_card_management :: Field type alias resolution
+// @internal
 #[test]
 fn test_field_type_from_alias_email() {
     for alias in &["email", "mail", "EMAIL"] {
@@ -143,6 +159,7 @@ fn test_field_type_from_alias_email() {
 }
 
 // @scenario: contact_card_management :: Field type alias resolution
+// @internal
 #[test]
 fn test_field_type_from_alias_social_with_label() {
     let (ft, label) = FieldType::from_alias("twitter").unwrap();
@@ -163,6 +180,7 @@ fn test_field_type_from_alias_social_with_label() {
 }
 
 // @scenario: contact_card_management :: Field type alias resolution
+// @internal
 #[test]
 fn test_field_type_from_alias_generic_social() {
     let (ft, label) = FieldType::from_alias("social").unwrap();
@@ -171,6 +189,7 @@ fn test_field_type_from_alias_generic_social() {
 }
 
 // @scenario: contact_card_management :: Field type alias resolution
+// @internal
 #[test]
 fn test_field_type_from_alias_unknown_returns_none() {
     assert!(FieldType::from_alias("fax").is_none());
@@ -179,6 +198,7 @@ fn test_field_type_from_alias_unknown_returns_none() {
 }
 
 // @scenario: contact_card_management :: Field type categorization
+// @internal
 #[test]
 fn test_field_type_is_social() {
     assert!(FieldType::Social.is_social());

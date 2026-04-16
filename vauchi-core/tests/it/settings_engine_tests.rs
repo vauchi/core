@@ -30,12 +30,14 @@ fn sample_config() -> SettingsConfig {
 }
 
 // @internal
+// @internal
 #[test]
 fn settings_screen_id() {
     let engine = SettingsEngine::new(sample_config());
     assert_eq!(engine.current_screen().screen_id, "settings");
 }
 
+// @internal
 // @internal
 #[test]
 fn settings_shows_all_groups() {
@@ -69,6 +71,7 @@ fn settings_shows_all_groups() {
 }
 
 // @internal
+// @internal
 #[test]
 fn settings_toggle_delivery_receipts() {
     let mut engine = SettingsEngine::new(sample_config());
@@ -96,6 +99,7 @@ fn settings_toggle_delivery_receipts() {
 }
 
 // @internal
+// @internal
 #[test]
 fn settings_toggle_suppress_presence() {
     let mut engine = SettingsEngine::new(sample_config());
@@ -120,6 +124,7 @@ fn settings_toggle_suppress_presence() {
 }
 
 // @internal
+// @internal
 #[test]
 fn settings_reflects_config_values() {
     let engine = SettingsEngine::new(sample_config());
@@ -133,6 +138,7 @@ fn settings_reflects_config_values() {
 }
 
 // ADR-022: irrevocable actions use InlineConfirm, not ShowAlert
+// @internal
 // @internal
 #[test]
 fn settings_emergency_wipe_shows_inline_confirm() {
@@ -154,6 +160,7 @@ fn settings_emergency_wipe_shows_inline_confirm() {
     );
 }
 
+// @internal
 // @internal
 #[test]
 fn settings_confirm_emergency_wipe_completes() {
@@ -177,6 +184,7 @@ fn settings_confirm_emergency_wipe_completes() {
     );
 }
 
+// @internal
 // @internal
 #[test]
 fn settings_cancel_emergency_wipe_removes_inline_confirm() {
@@ -204,6 +212,7 @@ fn settings_cancel_emergency_wipe_removes_inline_confirm() {
     assert!(!has_inline_confirm, "cancel should remove InlineConfirm");
 }
 
+// @internal
 #[test]
 fn settings_device_count_in_detail() {
     let engine = SettingsEngine::new(sample_config());
@@ -213,6 +222,7 @@ fn settings_device_count_in_detail() {
     assert_eq!(detail.as_deref(), Some("3 devices"));
 }
 
+// @internal
 // @internal
 #[test]
 fn settings_single_device_no_plural() {
@@ -224,6 +234,7 @@ fn settings_single_device_no_plural() {
     assert_eq!(detail.as_deref(), Some("1 device"));
 }
 
+// @internal
 // @internal
 #[test]
 fn settings_appearance_section_has_theme_and_language() {
@@ -238,6 +249,7 @@ fn settings_appearance_section_has_theme_and_language() {
     assert_eq!(lang, "English");
 }
 
+// @internal
 // @internal
 #[test]
 fn settings_accessibility_toggles() {
@@ -261,6 +273,7 @@ fn settings_accessibility_toggles() {
 }
 
 // @internal
+// @internal
 #[test]
 fn settings_about_shows_version() {
     let mut config = sample_config();
@@ -273,6 +286,7 @@ fn settings_about_shows_version() {
 }
 
 // @internal
+// @internal
 #[test]
 fn settings_about_version_without_build() {
     let mut config = sample_config();
@@ -284,6 +298,7 @@ fn settings_about_version_without_build() {
     assert_eq!(version, "0.19.0");
 }
 
+// @internal
 // @internal
 #[test]
 fn settings_debug_mode_toggle() {
@@ -305,6 +320,7 @@ fn settings_debug_mode_toggle() {
 }
 
 // @internal
+// @internal
 #[test]
 fn settings_delivery_section() {
     let mut config = sample_config();
@@ -323,6 +339,7 @@ fn settings_delivery_section() {
 }
 
 // @internal
+// @internal
 #[test]
 fn settings_backup_section_has_links() {
     let engine = SettingsEngine::new(sample_config());
@@ -335,6 +352,7 @@ fn settings_backup_section_has_links() {
     assert_eq!(items[2].id, "setup_new_device");
 }
 
+// @internal
 // @internal
 #[test]
 fn settings_items_have_a11y_labels() {

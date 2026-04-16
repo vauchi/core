@@ -41,6 +41,7 @@ fn now() -> u64 {
 /// - Labels are not shared with contacts
 // @scenario: visibility_labels :: Labels sync across my own devices only
 // @scenario: visibility_labels :: Labels are not shared with contacts
+// @internal
 #[test]
 fn test_label_sync_across_devices() {
     // =========================================================================
@@ -273,6 +274,7 @@ fn test_label_sync_across_devices() {
 /// Feature: visibility_labels.feature
 /// Scenario: Delete contact removes from all labels
 // @scenario: visibility_labels :: Delete contact removes from all labels
+// @internal
 #[test]
 fn test_delete_contact_clears_overrides() {
     let mut manager = GroupManager::new();
@@ -314,6 +316,7 @@ fn test_delete_contact_clears_overrides() {
 /// Feature: visibility_labels.feature
 /// Scenario: Configure default fields for a label
 // @scenario: visibility_labels :: Configure default fields for a label
+// @internal
 #[test]
 fn test_set_visible_fields_bulk() {
     let mut manager = GroupManager::new();
@@ -363,6 +366,7 @@ fn test_set_visible_fields_bulk() {
 ///
 /// Feature: visibility_labels.feature
 /// Scenario: Labels track creation and modification times
+// @internal
 #[test]
 fn test_label_timestamps() {
     let mut manager = GroupManager::new();
@@ -405,6 +409,7 @@ fn test_label_timestamps() {
 }
 
 /// Tests serialization and deserialization of GroupManager.
+// @internal
 #[test]
 fn test_label_manager_serialization() {
     let mut manager = GroupManager::new();

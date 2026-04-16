@@ -24,6 +24,7 @@ fn now() -> u64 {
 
 // === Exponential Backoff Tests ===
 
+// @internal
 #[test]
 fn test_exponential_backoff_calculation() {
     // Backoff: 1s, 2s, 4s, 8s, 16s, 32s, 64s, 128s, 256s, 512s... max 3600s (1h)
@@ -38,6 +39,7 @@ fn test_exponential_backoff_calculation() {
     assert_eq!(queue.backoff_seconds(20), 3600); // Always capped at 1 hour
 }
 
+// @internal
 #[test]
 fn test_calculate_next_retry_time() {
     let queue = RetryQueue::new();
@@ -55,6 +57,7 @@ fn test_calculate_next_retry_time() {
 
 // === Retry Entry Storage Tests ===
 
+// @internal
 #[test]
 fn test_create_and_retrieve_retry_entry() {
     let storage = test_storage();
@@ -83,6 +86,7 @@ fn test_create_and_retrieve_retry_entry() {
     assert_eq!(retrieved.max_attempts, 10);
 }
 
+// @internal
 #[test]
 fn test_get_due_retries() {
     let storage = test_storage();
@@ -116,6 +120,7 @@ fn test_get_due_retries() {
     assert!(due_ids.contains(&"msg-2"));
 }
 
+// @internal
 #[test]
 fn test_increment_retry_attempt() {
     let storage = test_storage();
@@ -143,6 +148,7 @@ fn test_increment_retry_attempt() {
     assert_eq!(retrieved.next_retry, new_next_retry);
 }
 
+// @internal
 #[test]
 fn test_delete_retry_entry() {
     let storage = test_storage();
@@ -170,6 +176,7 @@ fn test_delete_retry_entry() {
     assert!(storage.get_retry_entry("to-delete").unwrap().is_none());
 }
 
+// @internal
 #[test]
 fn test_max_attempts_exceeded() {
     let storage = test_storage();
@@ -198,6 +205,7 @@ fn test_max_attempts_exceeded() {
     assert!(retrieved.is_max_attempts_exceeded()); // 10 >= 10
 }
 
+// @internal
 #[test]
 fn test_get_all_retry_entries() {
     let storage = test_storage();
@@ -220,6 +228,7 @@ fn test_get_all_retry_entries() {
     assert_eq!(all.len(), 5);
 }
 
+// @internal
 #[test]
 fn test_count_retry_entries() {
     let storage = test_storage();
@@ -243,6 +252,7 @@ fn test_count_retry_entries() {
     assert_eq!(storage.count_retry_entries().unwrap(), 3);
 }
 
+// @internal
 #[test]
 fn test_retry_entry_for_recipient() {
     let storage = test_storage();
@@ -284,6 +294,7 @@ fn test_retry_entry_for_recipient() {
 
 // === Jitter Tests ===
 
+// @internal
 #[test]
 fn test_retry_backoff_with_jitter_varies() {
     // Scenario: Exponential backoff with jitter prevents thundering herd (@retry)
@@ -304,6 +315,7 @@ fn test_retry_backoff_with_jitter_varies() {
     );
 }
 
+// @internal
 #[test]
 fn test_retry_backoff_with_jitter_stays_within_bounds() {
     // Jitter should add 0-25% of base delay, never exceed max_backoff
@@ -319,6 +331,7 @@ fn test_retry_backoff_with_jitter_stays_within_bounds() {
     }
 }
 
+// @internal
 #[test]
 fn test_retry_backoff_with_jitter_respects_max_backoff() {
     // At high attempt counts, jitter must not exceed max_backoff_secs
@@ -334,6 +347,7 @@ fn test_retry_backoff_with_jitter_respects_max_backoff() {
     }
 }
 
+// @internal
 #[test]
 fn test_next_retry_time_with_jitter_varies() {
     // next_retry_time_with_jitter should produce varying timestamps
@@ -355,6 +369,7 @@ fn test_next_retry_time_with_jitter_varies() {
 
 // === Integration Tests ===
 
+// @internal
 #[test]
 fn test_retry_lifecycle() {
     let storage = test_storage();

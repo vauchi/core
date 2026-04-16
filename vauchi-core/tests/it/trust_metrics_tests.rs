@@ -38,6 +38,7 @@ fn test_public_key() -> [u8; 32] {
 // Task 1: ExchangeTransport serde
 // ============================================================
 
+// @internal
 #[test]
 fn test_exchange_transport_serde_roundtrip_qr() {
     let transport = ExchangeTransport::Qr;
@@ -47,6 +48,7 @@ fn test_exchange_transport_serde_roundtrip_qr() {
     assert_eq!(deserialized, ExchangeTransport::Qr);
 }
 
+// @internal
 #[test]
 fn test_exchange_transport_serde_roundtrip_nfc() {
     let transport = ExchangeTransport::Nfc;
@@ -56,6 +58,7 @@ fn test_exchange_transport_serde_roundtrip_nfc() {
     assert_eq!(deserialized, ExchangeTransport::Nfc);
 }
 
+// @internal
 #[test]
 fn test_exchange_transport_serde_roundtrip_ble() {
     let transport = ExchangeTransport::Ble;
@@ -69,6 +72,7 @@ fn test_exchange_transport_serde_roundtrip_ble() {
 // Task 4: Usb and Audio variants + serde backward compat
 // ============================================================
 
+// @internal
 #[test]
 fn exchange_transport_usb_serde_roundtrip() {
     let transport = ExchangeTransport::Usb;
@@ -78,6 +82,7 @@ fn exchange_transport_usb_serde_roundtrip() {
     assert_eq!(deserialized, ExchangeTransport::Usb);
 }
 
+// @internal
 #[test]
 fn exchange_transport_audio_serde_roundtrip() {
     let transport = ExchangeTransport::Audio;
@@ -87,6 +92,7 @@ fn exchange_transport_audio_serde_roundtrip() {
     assert_eq!(deserialized, ExchangeTransport::Audio);
 }
 
+// @internal
 #[test]
 fn exchange_transport_legacy_pascal_case_deserializes() {
     let qr: ExchangeTransport = serde_json::from_str(r#""Qr""#).expect("legacy Qr");
@@ -101,6 +107,7 @@ fn exchange_transport_legacy_pascal_case_deserializes() {
 // Task 2: Trust fields on Contact
 // ============================================================
 
+// @internal
 #[test]
 fn test_contact_from_exchange_full_preserves_transport() {
     let contact = Contact::from_exchange_full(
@@ -113,6 +120,7 @@ fn test_contact_from_exchange_full_preserves_transport() {
     assert_eq!(contact.exchange_transport(), Some(ExchangeTransport::Nfc));
 }
 
+// @internal
 #[test]
 fn test_contact_from_exchange_full_preserves_proximity() {
     let contact = Contact::from_exchange_full(
@@ -125,6 +133,7 @@ fn test_contact_from_exchange_full_preserves_proximity() {
     assert_eq!(*contact.proximity_confidence(), ProximityConfidence::High);
 }
 
+// @internal
 #[test]
 fn test_contact_default_has_recovered_is_false() {
     let contact = Contact::from_exchange_full(
@@ -137,6 +146,7 @@ fn test_contact_default_has_recovered_is_false() {
     assert!(!contact.has_recovered());
 }
 
+// @internal
 #[test]
 fn test_contact_default_card_updated_at_is_none() {
     let contact = Contact::from_exchange_full(
@@ -149,6 +159,7 @@ fn test_contact_default_card_updated_at_is_none() {
     assert_eq!(contact.card_updated_at(), None);
 }
 
+// @internal
 #[test]
 fn test_contact_from_exchange_defaults_to_qr_transport() {
     let contact = Contact::from_exchange(test_public_key(), test_card(), test_key());
@@ -159,6 +170,7 @@ fn test_contact_from_exchange_defaults_to_qr_transport() {
 // Task 4: accept_recovery sets has_recovered
 // ============================================================
 
+// @internal
 #[test]
 fn test_accept_recovery_sets_has_recovered_flag() {
     let mut contact = Contact::from_exchange_full(
@@ -183,6 +195,7 @@ fn test_accept_recovery_sets_has_recovered_flag() {
     );
 }
 
+// @internal
 #[test]
 fn test_has_recovered_is_permanent() {
     let mut contact = Contact::from_exchange_full(
@@ -210,6 +223,7 @@ fn test_has_recovered_is_permanent() {
 // Task 5: update_card sets card_updated_at
 // ============================================================
 
+// @internal
 #[test]
 fn test_update_card_sets_card_updated_at() {
     let mut contact = Contact::from_exchange_full(
@@ -231,6 +245,7 @@ fn test_update_card_sets_card_updated_at() {
     assert_eq!(contact.display_name(), "Updated Name");
 }
 
+// @internal
 #[test]
 fn test_update_card_timestamp_increases() {
     let mut contact = Contact::from_exchange_full(
@@ -290,6 +305,7 @@ fn run_full_qr_exchange() -> Contact {
     }
 }
 
+// @internal
 #[test]
 fn test_qr_exchange_session_sets_qr_transport_on_contact() {
     let contact = run_full_qr_exchange();
@@ -300,6 +316,7 @@ fn test_qr_exchange_session_sets_qr_transport_on_contact() {
     );
 }
 
+// @internal
 #[test]
 fn test_qr_exchange_contact_has_recovered_is_false() {
     let contact = run_full_qr_exchange();
@@ -309,6 +326,7 @@ fn test_qr_exchange_contact_has_recovered_is_false() {
     );
 }
 
+// @internal
 #[test]
 fn test_qr_exchange_contact_card_updated_at_is_none() {
     let contact = run_full_qr_exchange();
@@ -323,6 +341,7 @@ fn test_qr_exchange_contact_card_updated_at_is_none() {
 // Task 6-7: Storage roundtrip for trust metric fields
 // ============================================================
 
+// @internal
 #[test]
 fn test_storage_roundtrip_preserves_exchange_transport() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -345,6 +364,7 @@ fn test_storage_roundtrip_preserves_exchange_transport() {
     );
 }
 
+// @internal
 #[test]
 fn test_storage_roundtrip_preserves_has_recovered() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -367,6 +387,7 @@ fn test_storage_roundtrip_preserves_has_recovered() {
     );
 }
 
+// @internal
 #[test]
 fn test_storage_roundtrip_preserves_card_updated_at() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -391,6 +412,7 @@ fn test_storage_roundtrip_preserves_card_updated_at() {
     );
 }
 
+// @internal
 #[test]
 fn test_storage_roundtrip_default_trust_fields() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -420,6 +442,7 @@ fn test_storage_roundtrip_default_trust_fields() {
 // Task 3 (tidy): VerifierChain winning_method accessor
 // ============================================================
 
+// @internal
 #[test]
 fn verifier_chain_reports_winning_method() {
     use vauchi_core::exchange::ProximityVerifier;
@@ -444,6 +467,7 @@ fn verifier_chain_reports_winning_method() {
 // Task 1 (tidy): VerifierEventLog serde roundtrip
 // ============================================================
 
+// @internal
 #[test]
 fn verifier_event_log_serde_roundtrip() {
     use vauchi_core::ProximityConfidence;
@@ -488,12 +512,14 @@ fn make_contact(mutate: impl FnOnce(&mut Contact)) -> Contact {
     c
 }
 
+// @internal
 #[test]
 fn contact_trust_metrics_defaults_to_none() {
     let contact = make_contact(|_| {});
     assert!(contact.trust_metrics().is_none());
 }
 
+// @internal
 #[test]
 fn contact_stores_trust_metrics() {
     let mut contact = make_contact(|_| {});
@@ -511,6 +537,7 @@ fn contact_stores_trust_metrics() {
     assert_eq!(m.transport_proximity, TransportProximity::Proximate);
 }
 
+// @internal
 #[test]
 fn contact_trust_metrics_can_be_cleared() {
     let mut contact = make_contact(|_| {});
@@ -528,6 +555,7 @@ fn contact_trust_metrics_can_be_cleared() {
     assert!(contact.trust_metrics().is_none());
 }
 
+// @internal
 #[test]
 fn storage_roundtrip_preserves_trust_metrics() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -553,6 +581,7 @@ fn storage_roundtrip_preserves_trust_metrics() {
     assert_eq!(m.timestamp, 1_711_324_800);
 }
 
+// @internal
 #[test]
 fn storage_roundtrip_preserves_none_trust_metrics() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -568,6 +597,7 @@ fn storage_roundtrip_preserves_none_trust_metrics() {
     );
 }
 
+// @internal
 #[test]
 fn list_contacts_preserves_trust_metrics() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

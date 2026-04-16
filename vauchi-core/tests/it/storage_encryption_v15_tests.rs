@@ -31,6 +31,7 @@ fn make_contact(name: &str) -> Contact {
 
 // === Migration Tests ===
 
+// @internal
 #[test]
 fn test_migration_v15_adds_encrypted_columns() {
     let (dir, _storage) = open_storage();
@@ -102,6 +103,7 @@ fn test_migration_v15_adds_encrypted_columns() {
     );
 }
 
+// @internal
 #[test]
 fn test_schema_version_at_least_16() {
     let (_dir, storage) = open_storage();
@@ -115,6 +117,7 @@ fn test_schema_version_at_least_16() {
 
 // === ux_state roundtrip tests ===
 
+// @internal
 #[test]
 fn test_aha_tracker_roundtrip_encrypted() {
     let (_dir, storage) = open_storage();
@@ -131,6 +134,7 @@ fn test_aha_tracker_roundtrip_encrypted() {
     assert!(!loaded.has_seen(AhaMomentType::FirstContactAdded));
 }
 
+// @internal
 #[test]
 fn test_demo_contact_state_roundtrip_encrypted() {
     let (_dir, storage) = open_storage();
@@ -146,6 +150,7 @@ fn test_demo_contact_state_roundtrip_encrypted() {
     assert_eq!(loaded.update_count, 2);
 }
 
+// @internal
 #[test]
 fn test_ux_state_combined_roundtrip_encrypted() {
     let (_dir, storage) = open_storage();
@@ -164,6 +169,7 @@ fn test_ux_state_combined_roundtrip_encrypted() {
     assert_eq!(loaded_demo.update_count, 1);
 }
 
+// @internal
 #[test]
 fn test_ux_state_encrypted_in_db() {
     let (dir, storage) = open_storage();
@@ -214,6 +220,7 @@ fn test_ux_state_encrypted_in_db() {
 
 // === audit_log roundtrip tests ===
 
+// @internal
 #[test]
 fn test_audit_log_roundtrip() {
     // allow(zero_assertions): Write-only interface — no read-back API to assert against
@@ -225,6 +232,7 @@ fn test_audit_log_roundtrip() {
     storage.log_audit_event("another_event", None).unwrap();
 }
 
+// @internal
 #[test]
 fn test_audit_log_encrypted_in_db() {
     let (dir, storage) = open_storage();
@@ -257,6 +265,7 @@ fn test_audit_log_encrypted_in_db() {
     );
 }
 
+// @internal
 #[test]
 fn test_audit_log_null_details_no_encryption() {
     let (dir, storage) = open_storage();
@@ -282,6 +291,7 @@ fn test_audit_log_null_details_no_encryption() {
 
 // === Rekey tests ===
 
+// @internal
 #[test]
 fn test_rekey_preserves_ux_state() {
     let (_dir, mut storage) = open_storage();
@@ -300,6 +310,7 @@ fn test_rekey_preserves_ux_state() {
     assert!(loaded_demo.is_active);
 }
 
+// @internal
 #[test]
 fn test_rekey_preserves_audit_log() {
     let (dir, mut storage) = open_storage();
@@ -325,6 +336,7 @@ fn test_rekey_preserves_audit_log() {
 // === Rekey: personal notes and field notes self-healing ===
 
 // @scenario: security :: Rekey heals plaintext personal notes
+// @internal
 #[test]
 fn test_rekey_heals_plaintext_personal_notes() {
     let (dir, mut storage) = open_storage();
@@ -376,6 +388,7 @@ fn test_rekey_heals_plaintext_personal_notes() {
 }
 
 // @scenario: security :: Rekey preserves encrypted personal notes
+// @internal
 #[test]
 fn test_rekey_preserves_encrypted_personal_notes() {
     let (_dir, mut storage) = open_storage();
@@ -403,6 +416,7 @@ fn test_rekey_preserves_encrypted_personal_notes() {
 }
 
 // @scenario: security :: Rekey heals plaintext contact field notes
+// @internal
 #[test]
 fn test_rekey_heals_plaintext_field_notes() {
     let (dir, mut storage) = open_storage();
@@ -455,6 +469,7 @@ fn test_rekey_heals_plaintext_field_notes() {
 }
 
 // @scenario: security :: Rekey preserves encrypted contact field notes
+// @internal
 #[test]
 fn test_rekey_preserves_encrypted_field_notes() {
     let (_dir, mut storage) = open_storage();
@@ -482,6 +497,7 @@ fn test_rekey_preserves_encrypted_field_notes() {
 }
 
 // @scenario: security :: Notes stored at rest are encrypted
+// @internal
 #[test]
 fn test_notes_stored_encrypted_at_rest() {
     let (dir, storage) = open_storage();

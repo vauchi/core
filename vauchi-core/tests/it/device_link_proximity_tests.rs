@@ -26,6 +26,7 @@ fn create_test_registry(identity: &Identity) -> DeviceRegistry {
 
 // @scenario: device_management :: Linking requires proximity verification
 // @scenario: device_management :: Prevent unauthorized device linking
+// @internal
 #[test]
 fn test_build_response_rejected_without_proximity() {
     let master_seed = [0x42u8; 32];
@@ -57,6 +58,7 @@ fn test_build_response_rejected_without_proximity() {
 }
 
 // @scenario: device_management :: Linking requires proximity verification
+// @internal
 #[test]
 fn test_build_response_succeeds_after_proximity_verified() {
     let master_seed = [0x42u8; 32];
@@ -89,6 +91,7 @@ fn test_build_response_succeeds_after_proximity_verified() {
     assert_eq!(updated_registry.device_count(), 2);
 }
 
+// @internal
 #[test]
 fn test_proximity_challenge_deterministic() {
     let master_seed = [0x42u8; 32];
@@ -104,6 +107,7 @@ fn test_proximity_challenge_deterministic() {
     assert_eq!(challenge1.len(), 16);
 }
 
+// @internal
 #[test]
 fn test_proximity_challenge_differs_per_session() {
     let master_seed = [0x42u8; 32];
@@ -122,6 +126,7 @@ fn test_proximity_challenge_differs_per_session() {
 }
 
 // @scenario: device_management :: Verify device during linking
+// @internal
 #[test]
 fn test_both_sides_derive_same_challenge() {
     let master_seed = [0x42u8; 32];
@@ -143,6 +148,7 @@ fn test_both_sides_derive_same_challenge() {
 }
 
 // @scenario: device_management :: Linking requires proximity verification
+// @internal
 #[test]
 fn test_restored_initiator_requires_proximity() {
     let master_seed = [0x42u8; 32];
@@ -179,6 +185,7 @@ fn test_restored_initiator_requires_proximity() {
     );
 }
 
+// @internal
 #[test]
 #[allow(deprecated)]
 fn test_deprecated_process_request_requires_proximity() {
@@ -223,6 +230,7 @@ fn now_unix_secs() -> u64 {
 }
 
 // @scenario: device_management :: Linking with ultrasonic proximity proof succeeds
+// @internal
 #[test]
 fn test_confirm_link_with_ultrasonic_proof_succeeds() {
     let master_seed = [0x42u8; 32];
@@ -257,6 +265,7 @@ fn test_confirm_link_with_ultrasonic_proof_succeeds() {
 }
 
 // @scenario: device_management :: Linking with manual confirmation proof succeeds
+// @internal
 #[test]
 fn test_confirm_link_with_manual_proof_succeeds() {
     let master_seed = [0x42u8; 32];
@@ -292,6 +301,7 @@ fn test_confirm_link_with_manual_proof_succeeds() {
 }
 
 // @scenario: device_management :: Expired ultrasonic proof is rejected
+// @internal
 #[test]
 fn test_confirm_link_with_expired_ultrasonic_rejected() {
     let master_seed = [0x42u8; 32];
@@ -324,6 +334,7 @@ fn test_confirm_link_with_expired_ultrasonic_rejected() {
 }
 
 // @scenario: device_management :: Expired manual confirmation is rejected
+// @internal
 #[test]
 fn test_confirm_link_with_expired_manual_rejected() {
     let master_seed = [0x42u8; 32];
@@ -357,6 +368,7 @@ fn test_confirm_link_with_expired_manual_rejected() {
 }
 
 // @scenario: device_management :: Wrong ultrasonic challenge is rejected
+// @internal
 #[test]
 fn test_confirm_link_with_wrong_challenge_rejected() {
     let master_seed = [0x42u8; 32];
@@ -387,6 +399,7 @@ fn test_confirm_link_with_wrong_challenge_rejected() {
 }
 
 // @scenario: device_management :: Wrong manual confirmation MAC is rejected
+// @internal
 #[test]
 fn test_confirm_link_with_wrong_mac_rejected() {
     let master_seed = [0x42u8; 32];
@@ -421,6 +434,7 @@ fn test_confirm_link_with_wrong_mac_rejected() {
 // ---------------------------------------------------------------------------
 
 // @scenario: device_management :: Cross-session replay attack prevented
+// @internal
 #[test]
 fn test_cross_session_replay_rejected() {
     let master_seed = [0x42u8; 32];
@@ -457,6 +471,7 @@ fn test_cross_session_replay_rejected() {
 }
 
 // @scenario: device_management :: Cross-session replay attack prevented
+// @internal
 #[test]
 fn test_cross_session_manual_mac_replay_rejected() {
     let master_seed = [0x42u8; 32];
@@ -506,6 +521,7 @@ fn test_cross_session_manual_mac_replay_rejected() {
 // ---------------------------------------------------------------------------
 
 // @scenario: device_management :: Proximity proof boundary timing
+// @internal
 #[test]
 fn test_ultrasonic_proof_at_exactly_60_seconds_accepted() {
     let master_seed = [0x42u8; 32];
@@ -536,6 +552,7 @@ fn test_ultrasonic_proof_at_exactly_60_seconds_accepted() {
 }
 
 // @scenario: device_management :: Proximity proof boundary timing
+// @internal
 #[test]
 fn test_ultrasonic_proof_at_61_seconds_rejected() {
     let master_seed = [0x42u8; 32];
@@ -566,6 +583,7 @@ fn test_ultrasonic_proof_at_61_seconds_rejected() {
 }
 
 // @scenario: device_management :: Proximity proof boundary timing
+// @internal
 #[test]
 fn test_manual_proof_at_exactly_60_seconds_accepted() {
     let master_seed = [0x42u8; 32];
@@ -597,6 +615,7 @@ fn test_manual_proof_at_exactly_60_seconds_accepted() {
 }
 
 // @scenario: device_management :: Proximity proof boundary timing
+// @internal
 #[test]
 fn test_manual_proof_at_61_seconds_rejected() {
     let master_seed = [0x42u8; 32];
@@ -632,6 +651,7 @@ fn test_manual_proof_at_61_seconds_rejected() {
 // ---------------------------------------------------------------------------
 
 // @scenario: device_management :: Self-linking prevention
+// @internal
 #[test]
 fn test_self_linking_same_device_name_rejected() {
     let master_seed = [0x42u8; 32];
@@ -664,6 +684,7 @@ fn test_self_linking_same_device_name_rejected() {
 }
 
 // @scenario: device_management :: Self-linking prevention
+// @internal
 #[test]
 fn test_self_linking_restored_initiator_rejected() {
     let master_seed = [0x42u8; 32];
@@ -702,6 +723,7 @@ fn test_self_linking_restored_initiator_rejected() {
 }
 
 // @scenario: device_management :: Self-linking prevention
+// @internal
 #[test]
 fn test_different_device_name_allowed() {
     // Sanity check: a different device name should succeed
@@ -743,90 +765,93 @@ mod proximity_proof_proptests {
     use proptest::prelude::*;
 
     proptest! {
-        /// Any timestamp older than 60 seconds must be rejected as expired.
-        #[test]
-        fn test_expired_ultrasonic_timestamp_always_rejected(age in 61u64..=86400u64) {
-            let master_seed = [0x42u8; 32];
-            let identity = Identity::create("Alice");
-            let registry = create_test_registry(&identity);
-            let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+            /// Any timestamp older than 60 seconds must be rejected as expired.
+    // @internal
+            #[test]
+            fn test_expired_ultrasonic_timestamp_always_rejected(age in 61u64..=86400u64) {
+                let master_seed = [0x42u8; 32];
+                let identity = Identity::create("Alice");
+                let registry = create_test_registry(&identity);
+                let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
 
-            let qr_string = initiator.qr().to_data_string();
-            let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-            let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
-            let encrypted_request = responder.create_request().unwrap();
-            let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+                let qr_string = initiator.qr().to_data_string();
+                let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+                let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
+                let encrypted_request = responder.create_request().unwrap();
+                let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
-            let proof = ProximityProof::Ultrasonic {
-                challenge_response: initiator.proximity_challenge(),
-                verified_at: now_unix_secs().saturating_sub(age),
-            };
+                let proof = ProximityProof::Ultrasonic {
+                    challenge_response: initiator.proximity_challenge(),
+                    verified_at: now_unix_secs().saturating_sub(age),
+                };
 
-            let result = initiator.confirm_link(&request, &proof);
-            prop_assert!(
-                matches!(result, Err(ExchangeError::ProximityExpired)),
-                "Expected ProximityExpired for age={}, got err: {:?}", age, result.err()
-            );
+                let result = initiator.confirm_link(&request, &proof);
+                prop_assert!(
+                    matches!(result, Err(ExchangeError::ProximityExpired)),
+                    "Expected ProximityExpired for age={}, got err: {:?}", age, result.err()
+                );
+            }
+
+            /// Any tampered challenge response (different from the real challenge) must be rejected.
+    // @internal
+            #[test]
+            fn test_tampered_challenge_response_always_rejected(tampered in prop::array::uniform16(any::<u8>())) {
+                let master_seed = [0x42u8; 32];
+                let identity = Identity::create("Alice");
+                let registry = create_test_registry(&identity);
+                let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+
+                // Skip if tampered happens to equal the real challenge (astronomically unlikely)
+                let real_challenge = initiator.proximity_challenge();
+                prop_assume!(tampered != real_challenge);
+
+                let qr_string = initiator.qr().to_data_string();
+                let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+                let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
+                let encrypted_request = responder.create_request().unwrap();
+                let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+
+                let proof = ProximityProof::Ultrasonic {
+                    challenge_response: tampered,
+                    verified_at: now_unix_secs(),
+                };
+
+                let result = initiator.confirm_link(&request, &proof);
+                prop_assert!(
+                    matches!(result, Err(ExchangeError::ProximityNotVerified)),
+                    "Expected ProximityNotVerified for tampered challenge, got err: {:?}", result.err()
+                );
+            }
+
+            /// Any tampered MAC (different from the real one) must be rejected.
+    // @internal
+            #[test]
+            fn test_tampered_confirmation_mac_always_rejected(tampered_mac in prop::array::uniform32(any::<u8>())) {
+                let master_seed = [0x42u8; 32];
+                let identity = Identity::create("Alice");
+                let registry = create_test_registry(&identity);
+                let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+
+                let qr_string = initiator.qr().to_data_string();
+                let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
+                let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
+                let encrypted_request = responder.create_request().unwrap();
+                let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
+
+                // Skip if tampered MAC happens to equal the real MAC
+                let real_mac = compute_confirmation_mac(initiator.qr().link_key(), &confirmation.confirmation_code);
+                prop_assume!(tampered_mac != real_mac);
+
+                let proof = ProximityProof::ManualConfirmation {
+                    confirmation_code_mac: tampered_mac,
+                    confirmed_at: now_unix_secs(),
+                };
+
+                let result = initiator.confirm_link(&request, &proof);
+                prop_assert!(
+                    matches!(result, Err(ExchangeError::ProximityNotVerified)),
+                    "Expected ProximityNotVerified for tampered MAC, got err: {:?}", result.err()
+                );
+            }
         }
-
-        /// Any tampered challenge response (different from the real challenge) must be rejected.
-        #[test]
-        fn test_tampered_challenge_response_always_rejected(tampered in prop::array::uniform16(any::<u8>())) {
-            let master_seed = [0x42u8; 32];
-            let identity = Identity::create("Alice");
-            let registry = create_test_registry(&identity);
-            let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
-
-            // Skip if tampered happens to equal the real challenge (astronomically unlikely)
-            let real_challenge = initiator.proximity_challenge();
-            prop_assume!(tampered != real_challenge);
-
-            let qr_string = initiator.qr().to_data_string();
-            let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-            let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
-            let encrypted_request = responder.create_request().unwrap();
-            let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
-
-            let proof = ProximityProof::Ultrasonic {
-                challenge_response: tampered,
-                verified_at: now_unix_secs(),
-            };
-
-            let result = initiator.confirm_link(&request, &proof);
-            prop_assert!(
-                matches!(result, Err(ExchangeError::ProximityNotVerified)),
-                "Expected ProximityNotVerified for tampered challenge, got err: {:?}", result.err()
-            );
-        }
-
-        /// Any tampered MAC (different from the real one) must be rejected.
-        #[test]
-        fn test_tampered_confirmation_mac_always_rejected(tampered_mac in prop::array::uniform32(any::<u8>())) {
-            let master_seed = [0x42u8; 32];
-            let identity = Identity::create("Alice");
-            let registry = create_test_registry(&identity);
-            let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
-
-            let qr_string = initiator.qr().to_data_string();
-            let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-            let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
-            let encrypted_request = responder.create_request().unwrap();
-            let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
-
-            // Skip if tampered MAC happens to equal the real MAC
-            let real_mac = compute_confirmation_mac(initiator.qr().link_key(), &confirmation.confirmation_code);
-            prop_assume!(tampered_mac != real_mac);
-
-            let proof = ProximityProof::ManualConfirmation {
-                confirmation_code_mac: tampered_mac,
-                confirmed_at: now_unix_secs(),
-            };
-
-            let result = initiator.confirm_link(&request, &proof);
-            prop_assert!(
-                matches!(result, Err(ExchangeError::ProximityNotVerified)),
-                "Expected ProximityNotVerified for tampered MAC, got err: {:?}", result.err()
-            );
-        }
-    }
 }

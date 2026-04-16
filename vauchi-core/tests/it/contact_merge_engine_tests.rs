@@ -21,6 +21,7 @@ fn make_engine() -> ContactMergeEngine {
 
 // ── Tests ───────────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn contact_merge_screen_id() {
     let engine = make_engine();
@@ -28,6 +29,7 @@ fn contact_merge_screen_id() {
     assert_eq!(screen.screen_id, "contact_merge");
 }
 
+// @internal
 #[test]
 fn contact_merge_title_is_merge_contacts() {
     let engine = make_engine();
@@ -35,6 +37,7 @@ fn contact_merge_title_is_merge_contacts() {
     assert_eq!(screen.title, "Merge Contacts");
 }
 
+// @internal
 #[test]
 fn contact_merge_shows_both_contact_names() {
     let engine = make_engine();
@@ -58,6 +61,7 @@ fn contact_merge_shows_both_contact_names() {
     }
 }
 
+// @internal
 #[test]
 fn contact_merge_confirm_completes() {
     let mut engine = make_engine();
@@ -68,6 +72,7 @@ fn contact_merge_confirm_completes() {
     assert_eq!(result, ActionResult::Complete);
 }
 
+// @internal
 #[test]
 fn contact_merge_cancel_stays_on_screen() {
     let mut engine = make_engine();
@@ -83,6 +88,7 @@ fn contact_merge_cancel_stays_on_screen() {
     }
 }
 
+// @internal
 #[test]
 fn contact_merge_unknown_action_returns_update_screen() {
     let mut engine = make_engine();

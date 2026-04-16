@@ -26,6 +26,7 @@ fn open_storage() -> (tempfile::TempDir, Storage) {
 
 // === Migration Tests ===
 
+// @internal
 #[test]
 fn test_migration_v18_adds_encrypted_column() {
     let (dir, _storage) = open_storage();
@@ -39,6 +40,7 @@ fn test_migration_v18_adds_encrypted_column() {
         .expect("contacts.visibility_rules_encrypted column should exist");
 }
 
+// @internal
 #[test]
 fn test_migration_v18_schema_version_at_least_18() {
     let (dir, _storage) = open_storage();
@@ -61,6 +63,7 @@ fn test_migration_v18_schema_version_at_least_18() {
 // === Save/Load Roundtrip Tests ===
 
 // @scenario: visibility_control :: Visibility settings persist after app restart
+// @internal
 #[test]
 fn test_contact_with_visibility_rules_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -121,6 +124,7 @@ fn test_contact_with_visibility_rules_roundtrip() {
 }
 
 // @scenario: visibility_control :: New fields default to visible to all contacts
+// @internal
 #[test]
 fn test_contact_with_empty_visibility_rules_roundtrip() {
     let (_dir, storage) = open_storage();
@@ -144,6 +148,7 @@ fn test_contact_with_empty_visibility_rules_roundtrip() {
 // === Encryption Verification Tests ===
 
 // @scenario: visibility_control :: Encrypted updates reveal nothing about hidden fields
+// @internal
 #[test]
 fn test_visibility_rules_stored_encrypted_not_plaintext() {
     let (dir, storage) = open_storage();
@@ -205,6 +210,7 @@ fn test_visibility_rules_stored_encrypted_not_plaintext() {
 // === List/Search Tests ===
 
 // @scenario: visibility_control :: Visibility settings persist after app restart
+// @internal
 #[test]
 fn test_list_contacts_with_encrypted_visibility_rules() {
     let (_dir, storage) = open_storage();

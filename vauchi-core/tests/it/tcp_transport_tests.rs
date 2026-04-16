@@ -24,6 +24,7 @@ fn loopback_pair() -> (TcpStream, TcpStream) {
 
 // ── send/recv roundtrip ─────────────────────────────────────
 
+// @internal
 #[test]
 fn send_recv_roundtrip() {
     let (mut client, mut server) = loopback_pair();
@@ -35,6 +36,7 @@ fn send_recv_roundtrip() {
     assert_eq!(received, payload);
 }
 
+// @internal
 #[test]
 fn send_empty_payload_is_rejected() {
     let (mut client, _server) = loopback_pair();
@@ -45,6 +47,7 @@ fn send_empty_payload_is_rejected() {
     assert!(matches!(err, TcpTransportError::ConnectionClosed));
 }
 
+// @internal
 #[test]
 fn send_recv_large_payload() {
     let (mut client, mut server) = loopback_pair();
@@ -59,6 +62,7 @@ fn send_recv_large_payload() {
 
 // ── bidirectional exchange ──────────────────────────────────
 
+// @internal
 #[test]
 fn exchange_payloads_bidirectional() {
     let (mut client, mut server) = loopback_pair();
@@ -81,6 +85,7 @@ fn exchange_payloads_bidirectional() {
     assert_eq!(received_by_bob, alice_payload);
 }
 
+// @internal
 #[test]
 fn exchange_with_realistic_qr_payload() {
     let (mut client, mut server) = loopback_pair();
@@ -102,6 +107,7 @@ fn exchange_with_realistic_qr_payload() {
 
 // ── error handling ──────────────────────────────────────────
 
+// @internal
 #[test]
 fn recv_invalid_magic_is_rejected() {
     let (mut client, mut server) = loopback_pair();
@@ -117,6 +123,7 @@ fn recv_invalid_magic_is_rejected() {
     assert!(matches!(err, TcpTransportError::InvalidMagic));
 }
 
+// @internal
 #[test]
 fn recv_wrong_version_is_rejected() {
     let (mut client, mut server) = loopback_pair();
@@ -131,6 +138,7 @@ fn recv_wrong_version_is_rejected() {
     assert!(matches!(err, TcpTransportError::UnsupportedVersion(99)));
 }
 
+// @internal
 #[test]
 fn recv_oversized_length_is_rejected() {
     let (mut client, mut server) = loopback_pair();
@@ -147,6 +155,7 @@ fn recv_oversized_length_is_rejected() {
     assert!(matches!(err, TcpTransportError::PayloadTooLarge(100_000)));
 }
 
+// @internal
 #[test]
 fn send_oversized_payload_is_rejected() {
     let (mut client, _server) = loopback_pair();
@@ -156,6 +165,7 @@ fn send_oversized_payload_is_rejected() {
     assert!(matches!(err, TcpTransportError::PayloadTooLarge(100_000)));
 }
 
+// @internal
 #[test]
 fn recv_connection_closed_mid_payload() {
     let (mut client, mut server) = loopback_pair();

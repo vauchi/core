@@ -65,6 +65,7 @@ proptest! {
 
     /// A hide override must make a group-visible field invisible.
     /// Priority rule 1 must beat priority rule 2.
+// @internal
     #[test]
     fn override_hides_group_visible_field(
         field_count in 1..8usize,
@@ -125,6 +126,7 @@ proptest! {
 
     /// A show override must make a group-hidden field visible.
     /// Priority rule 1 must grant visibility even without a group grant.
+// @internal
     #[test]
     fn override_shows_group_hidden_field(
         field_count in 2..8usize,
@@ -172,6 +174,7 @@ proptest! {
     /// To test this cleanly we need to isolate from the VisibilityRules fallback.
     /// We do that by creating a group with explicit field grants — the union of
     /// those grants is what the contact should see.
+// @internal
     #[test]
     fn group_member_sees_group_visible_fields(
         field_count in 2..8usize,
@@ -223,6 +226,7 @@ proptest! {
 
     /// After removing a hide-override, the field returns to its group-based
     /// visibility (visible if in the group's visible_fields, hidden otherwise).
+// @internal
     #[test]
     fn override_removal_restores_group_visibility(
         field_count in 1..6usize,
@@ -284,6 +288,7 @@ proptest! {
     /// A contact in multiple groups sees the union of all fields visible
     /// across those groups. Each group contributes its visible_fields set,
     /// and a field visible in ANY group must be visible to the contact.
+// @internal
     #[test]
     fn multi_group_union_is_preserved(
         field_count in 3..8usize,
@@ -334,6 +339,7 @@ proptest! {
 
     /// Calling `get_effective_field_visibility` twice on identical state
     /// must return the same result (no side effects, pure read).
+// @internal
     #[test]
     fn visibility_query_is_deterministic(
         field_count in 1..6usize,
@@ -386,6 +392,7 @@ proptest! {
     /// that calling it once per field vs. collecting all results in a loop
     /// produces consistent outcomes — a regression guard against any
     /// stateful side-effects in the visibility engine.
+// @internal
     #[test]
     fn bulk_iteration_agrees_with_individual_queries(
         field_count in 1..8usize,

@@ -13,6 +13,7 @@ use vauchi_core::sync::delta::{CekWrappedPayload, PAYLOAD_VERSION_CEK, Versioned
 
 // === Serialization Round-trips ===
 
+// @internal
 #[test]
 fn test_cek_wrapped_payload_roundtrip() {
     let cek = ContentEncryptionKey::generate();
@@ -35,6 +36,7 @@ fn test_cek_wrapped_payload_roundtrip() {
     assert_eq!(decoded.nonce, [0xABu8; 32]);
 }
 
+// @internal
 #[test]
 fn test_cek_wrapped_payload_decrypt_roundtrip() {
     let cek = ContentEncryptionKey::generate();
@@ -56,6 +58,7 @@ fn test_cek_wrapped_payload_decrypt_roundtrip() {
 
 // === Version-Tagged Encoding ===
 
+// @internal
 #[test]
 fn test_versioned_payload_cek_roundtrip() {
     let cek = ContentEncryptionKey::generate();
@@ -83,6 +86,7 @@ fn test_versioned_payload_cek_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_versioned_payload_unknown_version_returns_error() {
     let data = vec![0xFF, 0x01, 0x02, 0x03];
@@ -90,12 +94,14 @@ fn test_versioned_payload_unknown_version_returns_error() {
     result.expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_versioned_payload_empty_returns_error() {
     let result = VersionedPayload::decode(&[]);
     result.expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_cek_wrapped_with_real_encryption() {
     // Full flow: create delta bytes → CEK encrypt → wrap → version tag → decode → CEK decrypt
@@ -126,6 +132,7 @@ fn test_cek_wrapped_with_real_encryption() {
     }
 }
 
+// @internal
 #[test]
 fn test_cek_rotation_in_wrapped_payload() {
     let delta = b"card delta data";
@@ -167,6 +174,7 @@ fn test_cek_rotation_in_wrapped_payload() {
 
 // === Version Byte Constants ===
 
+// @internal
 #[test]
 fn test_version_constants() {
     assert_eq!(PAYLOAD_VERSION_CEK, 0x02);

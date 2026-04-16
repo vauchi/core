@@ -5,6 +5,7 @@
 use vauchi_core::exchange::{TransportProximity, TrustMetrics, VerifierEventLog, VerifierMethod};
 use vauchi_core::{ExchangeTransport, ProximityConfidence};
 
+// @internal
 #[test]
 fn transport_proximity_for_usb_is_physical() {
     assert_eq!(
@@ -13,6 +14,7 @@ fn transport_proximity_for_usb_is_physical() {
     );
 }
 
+// @internal
 #[test]
 fn transport_proximity_for_nfc_is_contact_range() {
     assert_eq!(
@@ -21,6 +23,7 @@ fn transport_proximity_for_nfc_is_contact_range() {
     );
 }
 
+// @internal
 #[test]
 fn transport_proximity_for_ble_is_proximate() {
     assert_eq!(
@@ -29,6 +32,7 @@ fn transport_proximity_for_ble_is_proximate() {
     );
 }
 
+// @internal
 #[test]
 fn transport_proximity_for_qr_is_none() {
     assert_eq!(
@@ -37,6 +41,7 @@ fn transport_proximity_for_qr_is_none() {
     );
 }
 
+// @internal
 #[test]
 fn transport_proximity_for_audio_is_none() {
     assert_eq!(
@@ -45,6 +50,7 @@ fn transport_proximity_for_audio_is_none() {
     );
 }
 
+// @internal
 #[test]
 fn trust_metrics_serde_roundtrip() {
     let metrics = TrustMetrics {
@@ -72,6 +78,7 @@ fn trust_metrics_serde_roundtrip() {
     assert_eq!(deserialized.timestamp, 1711324800);
 }
 
+// @internal
 #[test]
 fn trust_metrics_strong_transport_is_strong() {
     assert!(TransportProximity::Physical.is_strong());

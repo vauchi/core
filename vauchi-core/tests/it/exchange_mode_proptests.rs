@@ -56,6 +56,7 @@ fn arb_capabilities() -> impl Strategy<Value = DeviceCapabilities> {
 }
 
 proptest! {
+// @internal
     #[test]
     fn trust_score_always_in_zero_one(
         confidence in 0.0f64..=1.0,
@@ -79,6 +80,7 @@ proptest! {
         prop_assert!(score <= 1.0);
     }
 
+// @internal
     #[test]
     fn trust_level_covers_all_scores(score in 0.0f64..=1.0) {
         let level = ExchangeTrustLevel::from_score(score);
@@ -86,6 +88,7 @@ proptest! {
         prop_assert!(!level.display_text().is_empty());
     }
 
+// @internal
     #[test]
     fn recommend_always_returns_a_mode(caps in arb_capabilities()) {
         let mode = recommend_mode(&caps);
@@ -93,6 +96,7 @@ proptest! {
         prop_assert!(mode.config().timeout.as_secs() > 0);
     }
 
+// @internal
     #[test]
     fn exchange_id_roundtrip(bytes in any::<[u8; 32]>()) {
         let id = ExchangeId::from_bytes(bytes);
@@ -100,12 +104,14 @@ proptest! {
         prop_assert_eq!(id, restored);
     }
 
+// @internal
     #[test]
     fn mode_config_timeout_positive(mode in arb_exchange_mode()) {
         let config = mode.config();
         prop_assert!(config.timeout.as_secs() > 0);
     }
 
+// @internal
     #[test]
     fn check_availability_never_panics(
         mode in arb_exchange_mode(),

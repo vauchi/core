@@ -130,6 +130,7 @@ fn get_index_names(conn: &Connection) -> Vec<String> {
 // SCHEMA STRUCTURE TESTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_schema_has_all_expected_tables() {
     let key = SymmetricKey::generate();
@@ -163,6 +164,7 @@ fn test_schema_has_all_expected_tables() {
     drop(conn);
 }
 
+// @internal
 #[test]
 fn test_schema_tables_via_raw_connection() {
     // Create a raw SQLite connection and initialize schema manually
@@ -365,6 +367,7 @@ fn test_schema_tables_via_raw_connection() {
 // DATA PERSISTENCE TESTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_own_card_persistence() {
     use vauchi_core::ContactCard;
@@ -393,6 +396,7 @@ fn test_own_card_persistence() {
     assert_eq!(loaded.fields()[0].value(), "test@example.com");
 }
 
+// @internal
 #[test]
 fn test_pending_updates_persistence() {
     use vauchi_core::storage::{PendingUpdate, UpdateStatus};
@@ -429,6 +433,7 @@ fn test_pending_updates_persistence() {
     assert!(storage.get_all_pending_updates().unwrap().is_empty());
 }
 
+// @internal
 #[test]
 fn test_contact_persistence_roundtrip() {
     use vauchi_core::contact::Contact;
@@ -464,6 +469,7 @@ fn test_contact_persistence_roundtrip() {
 // SCHEMA EVOLUTION TESTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_create_table_if_not_exists_is_idempotent() {
     // Running schema creation twice should not fail
@@ -482,6 +488,7 @@ fn test_create_table_if_not_exists_is_idempotent() {
     assert!(storage2.load_own_card().unwrap().is_none()); // Different instance, no data
 }
 
+// @internal
 #[test]
 fn test_nullable_columns_work() {
     use vauchi_core::contact::Contact;
@@ -503,6 +510,7 @@ fn test_nullable_columns_work() {
     assert_eq!(loaded.card().display_name(), "Bob");
 }
 
+// @internal
 #[test]
 fn test_default_column_values() {
     use vauchi_core::storage::{PendingUpdate, UpdateStatus};
@@ -543,6 +551,7 @@ fn run_migrations_up_to(conn: &Connection, key: &SymmetricKey, up_to_version: u3
     MigrationRunner::run(conn, key, &subset, None).unwrap();
 }
 
+// @internal
 #[test]
 fn test_migration_v19_adds_password_columns() {
     let conn = Connection::open_in_memory().unwrap();
@@ -595,6 +604,7 @@ fn test_migration_v19_adds_password_columns() {
     assert_eq!(duress_enabled, 0, "duress_enabled should default to 0");
 }
 
+// @internal
 #[test]
 fn test_migration_v20_creates_duress_settings_table() {
     let conn = Connection::open_in_memory().unwrap();
@@ -665,6 +675,7 @@ fn test_migration_v20_creates_duress_settings_table() {
     assert_eq!(include_location, 0, "include_location should default to 0");
 }
 
+// @internal
 #[test]
 fn test_migration_v21_creates_decoy_contacts_table() {
     let conn = Connection::open_in_memory().unwrap();
@@ -724,6 +735,7 @@ fn test_migration_v21_creates_decoy_contacts_table() {
     assert_eq!(name, "Decoy Alice");
 }
 
+// @internal
 #[test]
 fn test_schema_version_after_all_migrations() {
     let conn = Connection::open_in_memory().unwrap();
@@ -742,6 +754,7 @@ fn test_schema_version_after_all_migrations() {
     );
 }
 
+// @internal
 #[test]
 fn test_migration_v19_is_safe_on_fresh_identity_table() {
     // V19 uses ALTER TABLE which should work even if the identity table has no rows
@@ -812,6 +825,7 @@ fn test_migration_v19_is_safe_on_fresh_identity_table() {
 // EMERGENCY BROADCAST MIGRATION TEST (V22)
 // =============================================================================
 
+// @internal
 #[test]
 fn test_migration_v22_creates_emergency_config_table() {
     let conn = Connection::open_in_memory().unwrap();
@@ -892,6 +906,7 @@ fn test_migration_v22_creates_emergency_config_table() {
 /// If the process crashes after ALTER TABLE but before COMMIT, the migration
 /// runner will re-run the callback — the column already exists but must not
 /// cause an error.
+// @internal
 #[test]
 fn test_add_column_idempotent_via_double_migration() {
     let conn = Connection::open_in_memory().unwrap();
@@ -935,6 +950,7 @@ fn test_add_column_idempotent_via_double_migration() {
 
 /// Tests that re_encrypt_all_tables (rekey) is atomic — either all tables
 /// are re-encrypted or none are.
+// @internal
 #[test]
 fn test_rekey_is_atomic() {
     let key = SymmetricKey::generate();
@@ -958,6 +974,7 @@ fn test_rekey_is_atomic() {
 // DOWNGRADE PREVENTION
 // =============================================================================
 
+// @internal
 #[test]
 fn test_migration_rejects_newer_schema_version() {
     let conn = Connection::open_in_memory().unwrap();
@@ -997,6 +1014,7 @@ fn test_migration_rejects_newer_schema_version() {
 use vauchi_core::storage::migration::{Migration, MigrationAction};
 
 /// current_version returns 0 on a fresh database with no schema_version table.
+// @internal
 #[test]
 fn test_current_version_fresh_db_returns_zero() {
     let conn = Connection::open_in_memory().unwrap();
@@ -1005,6 +1023,7 @@ fn test_current_version_fresh_db_returns_zero() {
 }
 
 /// Running with an empty migrations list is a no-op (returns Ok).
+// @internal
 #[test]
 fn test_migration_empty_list_is_noop() {
     let conn = Connection::open_in_memory().unwrap();
@@ -1022,6 +1041,7 @@ fn test_migration_empty_list_is_noop() {
 }
 
 /// Out-of-order migrations are rejected before any SQL runs.
+// @internal
 #[test]
 fn test_migration_out_of_order_rejected() {
     let conn = Connection::open_in_memory().unwrap();
@@ -1055,6 +1075,7 @@ fn test_migration_out_of_order_rejected() {
 }
 
 /// Duplicate version numbers are rejected (ordering check catches v==v).
+// @internal
 #[test]
 fn test_migration_duplicate_version_rejected() {
     let conn = Connection::open_in_memory().unwrap();
@@ -1081,6 +1102,7 @@ fn test_migration_duplicate_version_rejected() {
 }
 
 /// A failed SQL migration rolls back the entire transaction.
+// @internal
 #[test]
 fn test_migration_sql_failure_rolls_back() {
     let conn = Connection::open_in_memory().unwrap();
@@ -1125,6 +1147,7 @@ fn test_migration_sql_failure_rolls_back() {
 }
 
 /// A failed callback migration rolls back the entire transaction.
+// @internal
 #[test]
 fn test_migration_callback_failure_rolls_back() {
     let conn = Connection::open_in_memory().unwrap();
@@ -1179,6 +1202,7 @@ fn test_migration_callback_failure_rolls_back() {
     assert_eq!(version, 0, "Version should be 0 after callback rollback");
 }
 
+// @internal
 // @internal
 #[test]
 fn test_migration_v40_adds_reciprocity_columns() {

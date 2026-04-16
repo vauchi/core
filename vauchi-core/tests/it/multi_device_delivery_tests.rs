@@ -25,6 +25,7 @@ fn now() -> u64 {
 // === Device Delivery Record Tests ===
 
 // @scenario: message_delivery :: Update delivered to all linked devices
+// @internal
 #[test]
 fn test_create_device_delivery_record() {
     let storage = test_storage();
@@ -50,6 +51,7 @@ fn test_create_device_delivery_record() {
 }
 
 // @scenario: message_delivery :: Update delivered to all linked devices
+// @internal
 #[test]
 fn test_track_multiple_devices_for_message() {
     let storage = test_storage();
@@ -77,6 +79,7 @@ fn test_track_multiple_devices_for_message() {
 }
 
 // @scenario: message_delivery :: Delivery status updates in real-time
+// @internal
 #[test]
 fn test_update_device_delivery_status() {
     let storage = test_storage();
@@ -110,6 +113,7 @@ fn test_update_device_delivery_status() {
 }
 
 // @scenario: message_delivery :: Partial delivery to devices
+// @internal
 #[test]
 fn test_get_delivery_summary() {
     let storage = test_storage();
@@ -141,6 +145,7 @@ fn test_get_delivery_summary() {
 }
 
 // @scenario: message_delivery :: Update delivered to all linked devices
+// @internal
 #[test]
 fn test_is_fully_delivered() {
     let storage = test_storage();
@@ -162,6 +167,7 @@ fn test_is_fully_delivered() {
     assert!(summary.is_fully_delivered());
 }
 
+// @internal
 #[test]
 fn test_delete_device_deliveries_for_message() {
     let storage = test_storage();
@@ -206,6 +212,7 @@ fn test_delete_device_deliveries_for_message() {
 // @scenario: message_delivery :: Device comes online later
 // @scenario: message_delivery :: Manual retry option
 // @scenario: message_delivery :: Receive pending updates when coming online
+// @internal
 #[test]
 fn test_get_pending_device_deliveries() {
     let storage = test_storage();
@@ -237,6 +244,7 @@ fn test_get_pending_device_deliveries() {
 
 // @scenario: message_delivery :: Device comes online later
 // @scenario: message_delivery :: Expired messages can be resent
+// @internal
 #[test]
 fn test_device_delivery_status_transitions() {
     let storage = test_storage();
@@ -285,6 +293,7 @@ fn test_device_delivery_status_transitions() {
 }
 
 // @scenario: message_delivery :: Partial delivery to devices
+// @internal
 #[test]
 fn test_count_device_deliveries_by_status() {
     let storage = test_storage();

@@ -25,6 +25,7 @@ fn create_test_pair() -> (DoubleRatchetState, DoubleRatchetState) {
 }
 
 // @scenario: security :: Forward secrecy via Double Ratchet
+// @internal
 #[test]
 fn test_dr_encrypt_decrypt_roundtrip() {
     let (mut alice, mut bob) = create_test_pair();
@@ -38,6 +39,7 @@ fn test_dr_encrypt_decrypt_roundtrip() {
 }
 
 // @scenario: security :: Forward secrecy via Double Ratchet
+// @internal
 #[test]
 fn test_dr_bidirectional_communication() {
     let (mut alice, mut bob) = create_test_pair();
@@ -59,6 +61,7 @@ fn test_dr_bidirectional_communication() {
 }
 
 // @scenario: security :: Forward secrecy via Double Ratchet
+// @internal
 #[test]
 fn test_dr_forward_secrecy() {
     let (mut alice, mut bob) = create_test_pair();
@@ -87,6 +90,7 @@ fn test_dr_forward_secrecy() {
 }
 
 // @scenario: security :: Forward secrecy via Double Ratchet
+// @internal
 #[test]
 fn test_forward_secrecy_compromised_state() {
     // CRIT-04: Serialize ratchet state, advance it, then attempt to decrypt
@@ -117,6 +121,7 @@ fn test_forward_secrecy_compromised_state() {
     );
 }
 
+// @internal
 #[test]
 fn test_dr_out_of_order_messages() {
     let (mut alice, mut bob) = create_test_pair();
@@ -137,6 +142,7 @@ fn test_dr_out_of_order_messages() {
     assert_eq!(b"Second".as_slice(), dec2.as_slice());
 }
 
+// @internal
 #[test]
 fn test_dr_dh_ratchet_on_reply() {
     let (mut alice, mut bob) = create_test_pair();
@@ -158,6 +164,7 @@ fn test_dr_dh_ratchet_on_reply() {
     assert_ne!(initial_alice_dh, alice.our_public_key());
 }
 
+// @internal
 #[test]
 fn test_dr_multiple_ratchets() {
     let (mut alice, mut bob) = create_test_pair();
@@ -176,6 +183,7 @@ fn test_dr_multiple_ratchets() {
     assert!(bob.dh_generation() > 0);
 }
 
+// @internal
 #[test]
 fn test_dr_responder_cannot_send_first() {
     let shared_secret = SymmetricKey::from_bytes([42u8; 32]);
@@ -187,6 +195,7 @@ fn test_dr_responder_cannot_send_first() {
     result.expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_dr_different_keys_per_message() {
     let (mut alice, _bob) = create_test_pair();
@@ -202,6 +211,7 @@ fn test_dr_different_keys_per_message() {
     assert_eq!(msg2.message_index, 1);
 }
 
+// @internal
 #[test]
 fn test_dr_skipped_message_limit() {
     let (mut alice, mut bob) = create_test_pair();
@@ -228,6 +238,7 @@ fn test_dr_skipped_message_limit() {
     assert_eq!(bob.skipped_keys_count(), 0);
 }
 
+// @internal
 #[test]
 fn test_dr_empty_message() {
     let (mut alice, mut bob) = create_test_pair();
@@ -238,6 +249,7 @@ fn test_dr_empty_message() {
     assert!(dec.is_empty());
 }
 
+// @internal
 #[test]
 fn test_dr_large_message() {
     let (mut alice, mut bob) = create_test_pair();
@@ -249,6 +261,7 @@ fn test_dr_large_message() {
     assert_eq!(large_data, dec);
 }
 
+// @internal
 #[test]
 fn test_ratchet_serialize_roundtrip() {
     let (alice, mut bob) = create_test_pair();
@@ -272,6 +285,7 @@ fn test_ratchet_serialize_roundtrip() {
     );
 }
 
+// @internal
 #[test]
 fn test_ratchet_serialize_after_messages() {
     let (mut alice, mut bob) = create_test_pair();
@@ -293,6 +307,7 @@ fn test_ratchet_serialize_after_messages() {
     assert_eq!(b"Continued".as_slice(), decrypted.as_slice());
 }
 
+// @internal
 #[test]
 fn test_ratchet_serialize_with_skipped_keys() {
     let (mut alice, mut bob) = create_test_pair();
@@ -320,6 +335,7 @@ fn test_ratchet_serialize_with_skipped_keys() {
 }
 
 /// SP-9 #236: Serialized ratchet state includes version field.
+// @internal
 #[test]
 fn test_ratchet_serialize_includes_version() {
     let (alice, _bob) = create_test_pair();
@@ -332,6 +348,7 @@ fn test_ratchet_serialize_includes_version() {
 }
 
 /// SP-9 #236: Deserialize rejects future versions.
+// @internal
 #[test]
 fn test_ratchet_deserialize_rejects_future_version() {
     let (alice, _bob) = create_test_pair();
@@ -342,6 +359,7 @@ fn test_ratchet_deserialize_rejects_future_version() {
 }
 
 /// SP-9 #236: Deserialize accepts version 1 (current) and version 0 (legacy default).
+// @internal
 #[test]
 fn test_ratchet_deserialize_accepts_current_and_legacy_version() {
     let (alice, _bob) = create_test_pair();

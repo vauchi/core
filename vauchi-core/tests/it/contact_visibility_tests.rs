@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use vauchi_core::contact::{FieldVisibility, VisibilityRules};
 
 // @scenario: visibility_control :: New fields default to visible to all contacts
+// @internal
 #[test]
 fn test_default_is_everyone() {
     let rules = VisibilityRules::new();
@@ -16,6 +17,7 @@ fn test_default_is_everyone() {
 }
 
 // @scenario: visibility_control :: Show a field only to specific contacts
+// @internal
 #[test]
 fn test_set_contacts_only() {
     let mut rules = VisibilityRules::new();
@@ -31,6 +33,7 @@ fn test_set_contacts_only() {
 }
 
 // @scenario: visibility_control :: Make a field private (visible to none)
+// @internal
 #[test]
 fn test_set_nobody() {
     let mut rules = VisibilityRules::new();
@@ -44,6 +47,7 @@ fn test_set_nobody() {
 // @scenario: visibility_control :: Make a field private (visible to none)
 // @scenario: contacts_management :: Contact shows only fields I can see
 // @scenario: visibility_control :: View what a specific contact can see
+// @internal
 #[test]
 fn test_visible_fields() {
     let mut rules = VisibilityRules::new();
@@ -71,6 +75,7 @@ fn test_visible_fields() {
 // ============================================================
 
 // @scenario: visibility_control :: New fields default to visible to all contacts
+// @internal
 #[test]
 fn test_set_everyone_explicit() {
     let mut rules = VisibilityRules::new();
@@ -86,6 +91,7 @@ fn test_set_everyone_explicit() {
 }
 
 // @scenario: visibility_control :: Reset all visibility to default
+// @internal
 #[test]
 fn test_remove_reverts_to_default() {
     let mut rules = VisibilityRules::new();
@@ -100,6 +106,7 @@ fn test_remove_reverts_to_default() {
     assert_eq!(*rules.get("secret"), FieldVisibility::Everyone);
 }
 
+// @internal
 #[test]
 fn test_field_visibility_equality() {
     let v1 = FieldVisibility::Everyone;
@@ -120,6 +127,7 @@ fn test_field_visibility_equality() {
 }
 
 // @scenario: visibility_control :: Visibility settings persist after app restart
+// @internal
 #[test]
 fn test_visibility_rules_serialization() {
     let mut rules = VisibilityRules::new();
@@ -141,6 +149,7 @@ fn test_visibility_rules_serialization() {
 }
 
 // @scenario: visibility_control :: Show a field only to specific contacts
+// @internal
 #[test]
 fn test_empty_contacts_set() {
     let mut rules = VisibilityRules::new();
@@ -154,6 +163,7 @@ fn test_empty_contacts_set() {
 
 // @scenario: visibility_control :: Show a field only to specific contacts
 // @scenario: visibility_control :: Make a field private (visible to none)
+// @internal
 #[test]
 fn test_multiple_rules() {
     let mut rules = VisibilityRules::new();

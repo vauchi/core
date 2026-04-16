@@ -24,6 +24,7 @@ fn make_contact(name: &str, relay_url: Option<&str>, noise_pubkey: Option<[u8; 3
 
 // ── relay_for_contact ──────────────────────────────────────────────
 
+// @internal
 #[test]
 fn relay_for_contact_returns_contact_relay_when_set() {
     let config = MultiRelayConfig::builder()
@@ -38,6 +39,7 @@ fn relay_for_contact_returns_contact_relay_when_set() {
     assert_eq!(relay, "https://alice.relay");
 }
 
+// @internal
 #[test]
 fn relay_for_contact_returns_home_relay_when_no_contact_relay() {
     let config = MultiRelayConfig::builder()
@@ -52,6 +54,7 @@ fn relay_for_contact_returns_home_relay_when_no_contact_relay() {
     assert_eq!(relay, "https://home.relay");
 }
 
+// @internal
 #[test]
 fn relay_for_contact_falls_back_when_contact_relay_unhealthy() {
     let config = MultiRelayConfig::builder()
@@ -73,6 +76,7 @@ fn relay_for_contact_falls_back_when_contact_relay_unhealthy() {
 
 // ── add_contact_relay ──────────────────────────────────────────────
 
+// @internal
 #[test]
 fn add_contact_relay_tracked_for_health() {
     let config = MultiRelayConfig::builder()
@@ -91,6 +95,7 @@ fn add_contact_relay_tracked_for_health() {
     );
 }
 
+// @internal
 #[test]
 fn add_contact_relay_deduplication() {
     let config = MultiRelayConfig::builder()
@@ -112,6 +117,7 @@ fn add_contact_relay_deduplication() {
 
 // ── all_relay_urls ─────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn all_relay_urls_includes_home_and_contact_relays() {
     let config = MultiRelayConfig::builder()
@@ -131,6 +137,7 @@ fn all_relay_urls_includes_home_and_contact_relays() {
 
 // ── fallback and recovery ─────────────────────────────────────────
 
+// @internal
 #[test]
 fn unhealthy_contact_relay_falls_back_then_recovers() {
     let config = MultiRelayConfig::builder()
@@ -162,6 +169,7 @@ fn unhealthy_contact_relay_falls_back_then_recovers() {
     );
 }
 
+// @internal
 #[test]
 fn contacts_without_relay_always_use_home_regardless_of_health() {
     let config = MultiRelayConfig::builder()
@@ -178,6 +186,7 @@ fn contacts_without_relay_always_use_home_regardless_of_health() {
     assert_eq!(relay, "https://home.relay");
 }
 
+// @internal
 #[test]
 fn empty_relay_url_treated_as_no_relay() {
     let config = MultiRelayConfig::builder()
@@ -194,6 +203,7 @@ fn empty_relay_url_treated_as_no_relay() {
     );
 }
 
+// @internal
 #[test]
 fn mixed_relay_contacts_route_independently() {
     let config = MultiRelayConfig::builder()
@@ -221,6 +231,7 @@ fn mixed_relay_contacts_route_independently() {
 
 // ── group_by_relay ─────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn group_contacts_by_relay() {
     let config = MultiRelayConfig::builder()

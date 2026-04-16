@@ -18,6 +18,7 @@ fn create_test_contact() -> Contact {
 
 // @scenario: device_management :: New device receives full state
 // @scenario: sync_updates :: New device receives full state
+// @internal
 #[test]
 fn test_contact_sync_data_roundtrip() {
     let contact = create_test_contact();
@@ -30,6 +31,7 @@ fn test_contact_sync_data_roundtrip() {
 }
 
 // @scenario: device_management :: New device receives full state
+// @internal
 #[test]
 fn test_contact_sync_data_serialization() {
     let contact = create_test_contact();
@@ -44,6 +46,7 @@ fn test_contact_sync_data_serialization() {
 
 // @scenario: device_management :: New device receives full state
 // @scenario: sync_updates :: New device receives full state
+// @internal
 #[test]
 fn test_device_sync_payload_roundtrip() {
     let contact1 = create_test_contact();
@@ -58,6 +61,7 @@ fn test_device_sync_payload_roundtrip() {
     assert_eq!(restored.version, 1);
 }
 
+// @internal
 #[test]
 fn test_device_sync_payload_empty() {
     let payload = DeviceSyncPayload::empty();
@@ -74,6 +78,7 @@ fn test_device_sync_payload_empty() {
 /// "When I update my phone number on Device A
 ///  Then Device B should receive the update"
 // @scenario: device_management :: Changes sync between devices
+// @internal
 #[test]
 fn test_sync_item_card_updated() {
     use vauchi_core::contact_card::{ContactField, FieldType};
@@ -99,6 +104,7 @@ fn test_sync_item_card_updated() {
 ///  And I add a different field on Device B
 ///  Then both fields should appear on both devices"
 // @scenario: device_management :: Bidirectional sync
+// @internal
 #[test]
 fn test_sync_item_contact_added() {
     let contact = create_test_contact();
@@ -119,6 +125,7 @@ fn test_sync_item_contact_added() {
 ///  And both come online
 ///  Then the later change should win"
 // @scenario: device_management :: Conflict resolution between devices
+// @internal
 #[test]
 fn test_conflict_resolution_last_write_wins() {
     // Device A update at timestamp 1000
@@ -150,6 +157,7 @@ fn test_conflict_resolution_last_write_wins() {
 
 /// Test SyncItem visibility change
 // @scenario: device_management :: Some settings sync across devices
+// @internal
 #[test]
 fn test_sync_item_visibility_changed() {
     let item = SyncItem::VisibilityChanged {
@@ -164,6 +172,7 @@ fn test_sync_item_visibility_changed() {
 }
 
 /// Test SyncItem contact removed
+// @internal
 #[test]
 fn test_sync_item_contact_removed() {
     let item = SyncItem::ContactRemoved {
@@ -177,6 +186,7 @@ fn test_sync_item_contact_removed() {
 
 /// Test InterDeviceSyncState for tracking sync with other own devices
 // @scenario: device_management :: Changes sync between devices
+// @internal
 #[test]
 fn test_inter_device_sync_state_creation() {
     let device_id = [0x42u8; 32];
@@ -190,6 +200,7 @@ fn test_inter_device_sync_state_creation() {
 
 /// Test adding items to sync queue
 // @scenario: device_management :: Offline changes sync when reconnected
+// @internal
 #[test]
 fn test_inter_device_sync_state_queue_item() {
     let device_id = [0x42u8; 32];
@@ -207,6 +218,7 @@ fn test_inter_device_sync_state_queue_item() {
 }
 
 /// Test serialization of SyncItem for transmission
+// @internal
 #[test]
 fn test_sync_item_serialization() {
     let item = SyncItem::CardUpdated {
@@ -223,6 +235,7 @@ fn test_sync_item_serialization() {
 
 /// Test version vector for causality tracking
 // @scenario: device_management :: Device registry version tracking
+// @internal
 #[test]
 fn test_version_vector_increment() {
     let device_id = [0x42u8; 32];
@@ -237,6 +250,7 @@ fn test_version_vector_increment() {
 
 /// Test version vector merge for conflict detection
 // @scenario: device_management :: Conflict resolution between devices
+// @internal
 #[test]
 fn test_version_vector_merge() {
     let device_a = [0x41u8; 32];
@@ -259,6 +273,7 @@ fn test_version_vector_merge() {
 
 /// Test version vector comparison for conflict detection
 // @scenario: device_management :: Conflict resolution between devices
+// @internal
 #[test]
 fn test_version_vector_concurrent_detection() {
     let device_a = [0x41u8; 32];
@@ -280,6 +295,7 @@ fn test_version_vector_concurrent_detection() {
 
 /// Verify PersonalNoteChanged serialises and deserialises correctly.
 // @scenario: device_management :: Personal note syncs to linked devices
+// @internal
 #[test]
 fn test_personal_note_sync_item_roundtrip() {
     let item = SyncItem::PersonalNoteChanged {
@@ -294,6 +310,7 @@ fn test_personal_note_sync_item_roundtrip() {
 
 /// Verify ContactFieldNoteChanged serialises and deserialises correctly.
 // @scenario: device_management :: Contact field note syncs to linked devices
+// @internal
 #[test]
 fn test_contact_field_note_sync_item_roundtrip() {
     let item = SyncItem::ContactFieldNoteChanged {
@@ -309,6 +326,7 @@ fn test_contact_field_note_sync_item_roundtrip() {
 
 /// Verify ProposalTrustChanged serialises and deserialises correctly.
 // @scenario: device_management :: Proposal trust syncs to linked devices
+// @internal
 #[test]
 fn test_proposal_trust_sync_item_roundtrip() {
     let item = SyncItem::ProposalTrustChanged {
@@ -322,6 +340,7 @@ fn test_proposal_trust_sync_item_roundtrip() {
 }
 
 /// timestamp() accessor works for all three new variants.
+// @internal
 #[test]
 fn test_new_sync_item_timestamps() {
     let personal = SyncItem::PersonalNoteChanged {
@@ -356,6 +375,7 @@ fn create_imported_test_contact() -> Contact {
 
 /// DeviceSyncPayload::new() with a mix of exchanged and imported contacts
 /// must not panic and must separate them into the correct fields.
+// @internal
 #[test]
 fn test_device_sync_payload_new_mixed_contacts_no_panic() {
     let exchanged = create_test_contact();
@@ -372,6 +392,7 @@ fn test_device_sync_payload_new_mixed_contacts_no_panic() {
 
 /// DeviceSyncPayload with imported_contacts serializes and deserializes
 /// correctly, including backward-compat (missing field defaults to empty vec).
+// @internal
 #[test]
 fn test_device_sync_payload_imported_contacts_roundtrip() {
     let exchanged = create_test_contact();
@@ -388,6 +409,7 @@ fn test_device_sync_payload_imported_contacts_roundtrip() {
 }
 
 /// Old payloads without imported_contacts field deserialize with empty vec.
+// @internal
 #[test]
 fn test_device_sync_payload_backward_compat_no_imported_field() {
     // Simulate a payload from before the imported_contacts field was added

@@ -4,6 +4,7 @@
 
 use vauchi_app::ui::*;
 
+// @internal
 #[test]
 fn lock_screen_id() {
     let engine = LockScreenEngine::new(3);
@@ -11,6 +12,7 @@ fn lock_screen_id() {
     assert_eq!(screen.screen_id, "lock_screen");
 }
 
+// @internal
 #[test]
 fn lock_screen_has_pin_input() {
     let engine = LockScreenEngine::new(3);
@@ -31,6 +33,7 @@ fn lock_screen_has_pin_input() {
     }
 }
 
+// @internal
 #[test]
 fn lock_screen_unlock_disabled_when_empty() {
     let engine = LockScreenEngine::new(3);
@@ -46,6 +49,7 @@ fn lock_screen_unlock_disabled_when_empty() {
     );
 }
 
+// @internal
 #[test]
 fn lock_screen_text_input_enables_unlock() {
     let mut engine = LockScreenEngine::new(3);
@@ -68,6 +72,7 @@ fn lock_screen_text_input_enables_unlock() {
     );
 }
 
+// @internal
 #[test]
 fn lock_screen_submit_returns_complete() {
     let mut engine = LockScreenEngine::new(3);
@@ -81,6 +86,7 @@ fn lock_screen_submit_returns_complete() {
     assert_eq!(result, ActionResult::Complete);
 }
 
+// @internal
 #[test]
 fn lock_screen_empty_submit_shows_validation() {
     let mut engine = LockScreenEngine::new(3);
@@ -99,6 +105,7 @@ fn lock_screen_empty_submit_shows_validation() {
     }
 }
 
+// @internal
 #[test]
 fn lock_screen_failed_attempt_shows_remaining() {
     let mut engine = LockScreenEngine::new(3);
@@ -136,6 +143,7 @@ fn lock_screen_failed_attempt_shows_remaining() {
     }
 }
 
+// @internal
 #[test]
 fn lock_screen_max_attempts_lockout() {
     let mut engine = LockScreenEngine::new(3);
@@ -147,6 +155,7 @@ fn lock_screen_max_attempts_lockout() {
     ); // 3 of 3
 }
 
+// @internal
 #[test]
 fn lock_screen_pin_accumulates_single_chars() {
     let mut engine = LockScreenEngine::new(3);
@@ -191,6 +200,7 @@ fn lock_screen_pin_accumulates_single_chars() {
     }
 }
 
+// @internal
 #[test]
 fn lock_screen_pin_backspace_removes_last_char() {
     let mut engine = LockScreenEngine::new(3);
@@ -229,6 +239,7 @@ fn lock_screen_pin_backspace_removes_last_char() {
     }
 }
 
+// @internal
 #[test]
 fn lock_screen_pin_backspace_on_empty_is_noop() {
     let mut engine = LockScreenEngine::new(3);
@@ -269,6 +280,7 @@ fn lock_screen_pin_backspace_on_empty_is_noop() {
     );
 }
 
+// @internal
 #[test]
 fn lock_screen_pin_does_not_exceed_length() {
     let mut engine = LockScreenEngine::new(3);

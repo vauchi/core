@@ -55,6 +55,7 @@ fn timestamp_strategy() -> impl Strategy<Value = u64> {
 
 proptest! {
     /// Property: ContactCard JSON roundtrip preserves all data
+// @internal
     #[test]
     fn prop_contact_card_json_roundtrip(name in display_name_strategy()) {
         let card = ContactCard::new(&name);
@@ -65,6 +66,7 @@ proptest! {
     }
 
     /// Property: ContactCard with fields JSON roundtrip
+// @internal
     #[test]
     fn prop_contact_card_with_fields_roundtrip(
         name in display_name_strategy(),
@@ -83,6 +85,7 @@ proptest! {
     }
 
     /// Property: VisibilityRules JSON roundtrip
+// @internal
     #[test]
     fn prop_visibility_rules_roundtrip(
         field_id in field_label_strategy(),
@@ -101,6 +104,7 @@ proptest! {
     }
 
     /// Property: SyncItem JSON roundtrip preserves timestamp
+// @internal
     #[test]
     fn prop_sync_item_roundtrip(
         label in field_label_strategy(),
@@ -121,6 +125,7 @@ proptest! {
 
     /// Property: VersionVector increment preserves count
     /// (JSON roundtrip is problematic for HashMap<[u8;32],_>, so test behavior instead)
+// @internal
     #[test]
     fn prop_version_vector_increment_preserves(
         device_id in bytes32_strategy(),
@@ -142,6 +147,7 @@ proptest! {
 
 proptest! {
     /// Property: Encryption/decryption is a perfect roundtrip
+// @internal
     #[test]
     fn prop_encryption_roundtrip(
         key_bytes in bytes32_strategy(),
@@ -156,6 +162,7 @@ proptest! {
     }
 
     /// Property: Ciphertext is different from plaintext (for non-trivial input)
+// @internal
     #[test]
     fn prop_encryption_transforms_data(
         key_bytes in bytes32_strategy(),
@@ -171,6 +178,7 @@ proptest! {
     }
 
     /// Property: Different keys produce different ciphertexts
+// @internal
     #[test]
     fn prop_different_keys_different_ciphertext(
         key1_bytes in bytes32_strategy(),
@@ -191,6 +199,7 @@ proptest! {
     }
 
     /// Property: Decryption with wrong key fails
+// @internal
     #[test]
     fn prop_wrong_key_fails_decryption(
         key1_bytes in bytes32_strategy(),
@@ -209,6 +218,7 @@ proptest! {
     }
 
     /// Property: Signing and verification roundtrip
+// @internal
     #[test]
     fn prop_signing_roundtrip(
         seed in bytes32_strategy(),
@@ -221,6 +231,7 @@ proptest! {
     }
 
     /// Property: Tampered message fails verification
+// @internal
     #[test]
     fn prop_tampered_message_fails_verification(
         seed in bytes32_strategy(),
@@ -245,6 +256,7 @@ proptest! {
 
 proptest! {
     /// Property: VersionVector increment always increases version
+// @internal
     #[test]
     fn prop_version_vector_increment_increases(
         device_id in bytes32_strategy(),
@@ -265,6 +277,7 @@ proptest! {
     }
 
     /// Property: VersionVector merge is commutative
+// @internal
     #[test]
     fn prop_version_vector_merge_commutative(
         device_a in bytes32_strategy(),
@@ -290,6 +303,7 @@ proptest! {
     }
 
     /// Property: VersionVector merge takes maximum
+// @internal
     #[test]
     fn prop_version_vector_merge_takes_max(
         device_id in bytes32_strategy(),
@@ -312,6 +326,7 @@ proptest! {
     }
 
     /// Property: SyncItem conflict resolution - later timestamp wins
+// @internal
     #[test]
     fn prop_sync_item_later_wins(
         label in field_label_strategy(),
@@ -347,6 +362,7 @@ proptest! {
     }
 
     /// Property: Device key derivation is deterministic
+// @internal
     #[test]
     fn prop_device_derivation_deterministic(
         seed in bytes32_strategy(),
@@ -361,6 +377,7 @@ proptest! {
     }
 
     /// Property: Different device indices produce different keys
+// @internal
     #[test]
     fn prop_different_indices_different_keys(
         seed in bytes32_strategy(),
@@ -384,6 +401,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(5))]
 
     /// Property: Identity backup/restore preserves public keys
+// @internal
     #[test]
     fn prop_identity_backup_restore(
         name in display_name_strategy()
@@ -405,6 +423,7 @@ proptest! {
 
 proptest! {
     /// Property: Everyone visibility allows all contacts
+// @internal
     #[test]
     fn prop_everyone_allows_all(
         field_id in field_label_strategy(),
@@ -417,6 +436,7 @@ proptest! {
     }
 
     /// Property: Nobody visibility blocks all contacts
+// @internal
     #[test]
     fn prop_nobody_blocks_all(
         field_id in field_label_strategy(),
@@ -429,6 +449,7 @@ proptest! {
     }
 
     /// Property: Contacts visibility is precise
+// @internal
     #[test]
     fn prop_contacts_visibility_precise(
         field_id in field_label_strategy(),
@@ -447,6 +468,7 @@ proptest! {
     }
 
     /// Property: Default visibility is Everyone
+// @internal
     #[test]
     fn prop_default_is_everyone(
         field_id in field_label_strategy(),
@@ -480,194 +502,201 @@ mod extended_property_tests {
     }
 
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(10))]
+            #![proptest_config(ProptestConfig::with_cases(10))]
 
-        /// Property: Ratchet handles many consecutive messages correctly.
-        /// This is a slow test - run with: cargo test -- --ignored
-        #[test]
-        #[ignore]
-        fn prop_ratchet_many_messages_roundtrip(
-            seed in bytes32_strategy(),
-            message_count in message_count_strategy()
-        ) {
-            let shared_secret = SymmetricKey::from_bytes(seed);
-            let bob_dh = X3DHKeyPair::generate();
+            /// Property: Ratchet handles many consecutive messages correctly.
+            /// This is a slow test - run with: cargo test -- --ignored
+    // @internal
+            #[test]
+            #[ignore]
+            fn prop_ratchet_many_messages_roundtrip(
+                seed in bytes32_strategy(),
+                message_count in message_count_strategy()
+            ) {
+                let shared_secret = SymmetricKey::from_bytes(seed);
+                let bob_dh = X3DHKeyPair::generate();
 
-            let mut alice_ratchet =
-                DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
-            let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
+                let mut alice_ratchet =
+                    DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
+                let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
-            for i in 0..message_count {
-                let plaintext = format!("Message number {}", i);
-                let encrypted = alice_ratchet.encrypt(plaintext.as_bytes()).unwrap();
-                let decrypted = bob_ratchet.decrypt(&encrypted).unwrap();
-                prop_assert_eq!(decrypted, plaintext.as_bytes());
-            }
-        }
-
-        /// Property: Many deltas applied in sequence produce consistent result.
-        /// This is a slow test - run with: cargo test -- --ignored
-        #[test]
-        #[ignore]
-        fn prop_sync_many_deltas_converge(
-            name in display_name_strategy(),
-            delta_count in delta_count_strategy()
-        ) {
-            let mut card = ContactCard::new(&name);
-
-            for i in 0..delta_count {
-                let old_card = card.clone();
-
-                // Add a field
-                let field = ContactField::new(
-                    FieldType::Custom,
-                    &format!("field_{}", i),
-                    &format!("value_{}", i),
-                );
-
-                // Only add if under limit
-                if card.fields().len() < 25 {
-                    let _ = card.add_field(field);
+                for i in 0..message_count {
+                    let plaintext = format!("Message number {}", i);
+                    let encrypted = alice_ratchet.encrypt(plaintext.as_bytes()).unwrap();
+                    let decrypted = bob_ratchet.decrypt(&encrypted).unwrap();
+                    prop_assert_eq!(decrypted, plaintext.as_bytes());
                 }
-
-                let delta = CardDelta::compute(&old_card, &card);
-
-                // Apply delta to a fresh copy
-                let mut verification_card = old_card.clone();
-                if !delta.is_empty() {
-                    delta.apply(&mut verification_card).unwrap();
-                }
-
-                // Cards should match after applying delta
-                prop_assert_eq!(card.display_name(), verification_card.display_name());
-                prop_assert_eq!(card.fields().len(), verification_card.fields().len());
             }
-        }
 
-        /// Property: Field values at maximum length are handled correctly.
-        #[test]
-        fn prop_field_value_max_length(
-            name in display_name_strategy(),
-            label in field_label_strategy()
-        ) {
-            let mut card = ContactCard::new(&name);
+            /// Property: Many deltas applied in sequence produce consistent result.
+            /// This is a slow test - run with: cargo test -- --ignored
+    // @internal
+            #[test]
+            #[ignore]
+            fn prop_sync_many_deltas_converge(
+                name in display_name_strategy(),
+                delta_count in delta_count_strategy()
+            ) {
+                let mut card = ContactCard::new(&name);
 
-            // Create a field with a very long value (1000 chars)
-            let long_value: String = (0..1000).map(|i| char::from(b'A' + (i % 26) as u8)).collect();
-            let field = ContactField::new(FieldType::Custom, &label, &long_value);
+                for i in 0..delta_count {
+                    let old_card = card.clone();
 
-            let result = card.add_field(field);
-            prop_assert!(result.is_ok(), "add_field failed: {:?}", result);
+                    // Add a field
+                    let field = ContactField::new(
+                        FieldType::Custom,
+                        &format!("field_{}", i),
+                        &format!("value_{}", i),
+                    );
 
-            // Verify roundtrip
-            let json = serde_json::to_string(&card).unwrap();
-            let restored: ContactCard = serde_json::from_str(&json).unwrap();
+                    // Only add if under limit
+                    if card.fields().len() < 25 {
+                        let _ = card.add_field(field);
+                    }
 
-            let restored_field = restored.fields().iter().find(|f| f.label() == label);
-            prop_assert!(restored_field.is_some(), "field '{}' not found after roundtrip", label);
-            prop_assert_eq!(restored_field.unwrap().value(), long_value);
-        }
+                    let delta = CardDelta::compute(&old_card, &card);
 
-        /// Property: Cards with maximum fields are handled correctly.
-        #[test]
-        fn prop_card_max_fields(
-            name in display_name_strategy()
-        ) {
-            let mut card = ContactCard::new(&name);
+                    // Apply delta to a fresh copy
+                    let mut verification_card = old_card.clone();
+                    if !delta.is_empty() {
+                        delta.apply(&mut verification_card).unwrap();
+                    }
 
-            // Add maximum number of fields
-            let max = vauchi_core::contact_card::MAX_FIELDS;
-            for i in 0..max {
-                let field = ContactField::new(
-                    FieldType::Custom,
-                    &format!("field_{}", i),
-                    &format!("value_{}", i),
-                );
+                    // Cards should match after applying delta
+                    prop_assert_eq!(card.display_name(), verification_card.display_name());
+                    prop_assert_eq!(card.fields().len(), verification_card.fields().len());
+                }
+            }
+
+            /// Property: Field values at maximum length are handled correctly.
+    // @internal
+            #[test]
+            fn prop_field_value_max_length(
+                name in display_name_strategy(),
+                label in field_label_strategy()
+            ) {
+                let mut card = ContactCard::new(&name);
+
+                // Create a field with a very long value (1000 chars)
+                let long_value: String = (0..1000).map(|i| char::from(b'A' + (i % 26) as u8)).collect();
+                let field = ContactField::new(FieldType::Custom, &label, &long_value);
+
                 let result = card.add_field(field);
-                prop_assert!(result.is_ok(), "Should allow field {} of {}", i + 1, max);
+                prop_assert!(result.is_ok(), "add_field failed: {:?}", result);
+
+                // Verify roundtrip
+                let json = serde_json::to_string(&card).unwrap();
+                let restored: ContactCard = serde_json::from_str(&json).unwrap();
+
+                let restored_field = restored.fields().iter().find(|f| f.label() == label);
+                prop_assert!(restored_field.is_some(), "field '{}' not found after roundtrip", label);
+                prop_assert_eq!(restored_field.unwrap().value(), long_value);
             }
 
-            prop_assert_eq!(card.fields().len(), max);
+            /// Property: Cards with maximum fields are handled correctly.
+    // @internal
+            #[test]
+            fn prop_card_max_fields(
+                name in display_name_strategy()
+            ) {
+                let mut card = ContactCard::new(&name);
 
-            // 26th field should fail
-            let extra_field = ContactField::new(FieldType::Custom, "extra", "value");
-            let result = card.add_field(extra_field);
-            prop_assert!(result.is_err(), "Should reject field 26");
-        }
+                // Add maximum number of fields
+                let max = vauchi_core::contact_card::MAX_FIELDS;
+                for i in 0..max {
+                    let field = ContactField::new(
+                        FieldType::Custom,
+                        &format!("field_{}", i),
+                        &format!("value_{}", i),
+                    );
+                    let result = card.add_field(field);
+                    prop_assert!(result.is_ok(), "Should allow field {} of {}", i + 1, max);
+                }
 
-        /// Property: Bidirectional ratchet conversation maintains correctness.
-        #[test]
-        fn prop_ratchet_bidirectional(
-            seed in bytes32_strategy(),
-            exchanges in 1usize..20usize
-        ) {
-            let shared_secret = SymmetricKey::from_bytes(seed);
-            let bob_dh = X3DHKeyPair::generate();
+                prop_assert_eq!(card.fields().len(), max);
 
-            let mut alice_ratchet =
-                DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
-            let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
-
-            for i in 0..exchanges {
-                // Alice -> Bob
-                let alice_msg = format!("Alice message {}", i);
-                let enc_a = alice_ratchet.encrypt(alice_msg.as_bytes()).unwrap();
-                let dec_a = bob_ratchet.decrypt(&enc_a).unwrap();
-                prop_assert_eq!(dec_a, alice_msg.as_bytes());
-
-                // Bob -> Alice
-                let bob_msg = format!("Bob message {}", i);
-                let enc_b = bob_ratchet.encrypt(bob_msg.as_bytes()).unwrap();
-                let dec_b = alice_ratchet.decrypt(&enc_b).unwrap();
-                prop_assert_eq!(dec_b, bob_msg.as_bytes());
+                // 26th field should fail
+                let extra_field = ContactField::new(FieldType::Custom, "extra", "value");
+                let result = card.add_field(extra_field);
+                prop_assert!(result.is_err(), "Should reject field 26");
             }
-        }
 
-        /// Property: Version vector with many devices maintains consistency.
-        #[test]
-        fn prop_version_vector_many_devices(
-            device_count in 5usize..20usize,
-            ops_per_device in 1usize..10usize
-        ) {
-            let mut vv = VersionVector::new();
-            let mut expected: std::collections::HashMap<[u8; 32], u64> = std::collections::HashMap::new();
+            /// Property: Bidirectional ratchet conversation maintains correctness.
+    // @internal
+            #[test]
+            fn prop_ratchet_bidirectional(
+                seed in bytes32_strategy(),
+                exchanges in 1usize..20usize
+            ) {
+                let shared_secret = SymmetricKey::from_bytes(seed);
+                let bob_dh = X3DHKeyPair::generate();
 
-            for d in 0..device_count {
-                let mut device_id = [0u8; 32];
-                device_id[0] = d as u8;
+                let mut alice_ratchet =
+                    DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
+                let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
-                for _ in 0..ops_per_device {
-                    vv.increment(&device_id);
-                    *expected.entry(device_id).or_insert(0) += 1;
+                for i in 0..exchanges {
+                    // Alice -> Bob
+                    let alice_msg = format!("Alice message {}", i);
+                    let enc_a = alice_ratchet.encrypt(alice_msg.as_bytes()).unwrap();
+                    let dec_a = bob_ratchet.decrypt(&enc_a).unwrap();
+                    prop_assert_eq!(dec_a, alice_msg.as_bytes());
+
+                    // Bob -> Alice
+                    let bob_msg = format!("Bob message {}", i);
+                    let enc_b = bob_ratchet.encrypt(bob_msg.as_bytes()).unwrap();
+                    let dec_b = alice_ratchet.decrypt(&enc_b).unwrap();
+                    prop_assert_eq!(dec_b, bob_msg.as_bytes());
                 }
             }
 
-            // Verify all devices have correct counts
-            for (device_id, expected_count) in expected {
-                prop_assert_eq!(vv.get(&device_id), expected_count);
+            /// Property: Version vector with many devices maintains consistency.
+    // @internal
+            #[test]
+            fn prop_version_vector_many_devices(
+                device_count in 5usize..20usize,
+                ops_per_device in 1usize..10usize
+            ) {
+                let mut vv = VersionVector::new();
+                let mut expected: std::collections::HashMap<[u8; 32], u64> = std::collections::HashMap::new();
+
+                for d in 0..device_count {
+                    let mut device_id = [0u8; 32];
+                    device_id[0] = d as u8;
+
+                    for _ in 0..ops_per_device {
+                        vv.increment(&device_id);
+                        *expected.entry(device_id).or_insert(0) += 1;
+                    }
+                }
+
+                // Verify all devices have correct counts
+                for (device_id, expected_count) in expected {
+                    prop_assert_eq!(vv.get(&device_id), expected_count);
+                }
+            }
+
+            /// Property: Delta computation is deterministic.
+    // @internal
+            #[test]
+            fn prop_delta_deterministic(
+                name in display_name_strategy(),
+                label in field_label_strategy(),
+                value1 in "[a-zA-Z0-9]{1,20}",
+                value2 in "[a-zA-Z0-9]{1,20}"
+            ) {
+                let mut card1 = ContactCard::new(&name);
+                card1.add_field(ContactField::new(FieldType::Custom, &label, &value1)).unwrap();
+
+                let mut card2 = ContactCard::new(&name);
+                card2.add_field(ContactField::new(FieldType::Custom, &label, &value2)).unwrap();
+
+                // Compute delta twice
+                let delta1 = CardDelta::compute(&card1, &card2);
+                let delta2 = CardDelta::compute(&card1, &card2);
+
+                // Should be identical
+                prop_assert_eq!(delta1.changes.len(), delta2.changes.len());
             }
         }
-
-        /// Property: Delta computation is deterministic.
-        #[test]
-        fn prop_delta_deterministic(
-            name in display_name_strategy(),
-            label in field_label_strategy(),
-            value1 in "[a-zA-Z0-9]{1,20}",
-            value2 in "[a-zA-Z0-9]{1,20}"
-        ) {
-            let mut card1 = ContactCard::new(&name);
-            card1.add_field(ContactField::new(FieldType::Custom, &label, &value1)).unwrap();
-
-            let mut card2 = ContactCard::new(&name);
-            card2.add_field(ContactField::new(FieldType::Custom, &label, &value2)).unwrap();
-
-            // Compute delta twice
-            let delta1 = CardDelta::compute(&card1, &card2);
-            let delta2 = CardDelta::compute(&card1, &card2);
-
-            // Should be identical
-            prop_assert_eq!(delta1.changes.len(), delta2.changes.len());
-        }
-    }
 }

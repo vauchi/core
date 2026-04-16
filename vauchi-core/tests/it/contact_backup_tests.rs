@@ -37,6 +37,7 @@ fn make_imported(name: &str, source: ImportSource) -> Contact {
 
 /// Export and import round-trip for a mixed list (exchanged + imported).
 /// Both kinds must survive with their IDs and display names intact.
+// @internal
 #[test]
 fn contact_backup_roundtrip() {
     let alice = make_exchanged("Alice");
@@ -63,6 +64,7 @@ fn contact_backup_roundtrip() {
 }
 
 /// Wrong password must return an error (authentication tag mismatch).
+// @internal
 #[test]
 fn contact_backup_wrong_password_fails() {
     let contact = make_exchanged("Charlie");
@@ -77,6 +79,7 @@ fn contact_backup_wrong_password_fails() {
 }
 
 /// An empty contact list exports and imports without error.
+// @internal
 #[test]
 fn contact_backup_empty_list() {
     let blob = export_contact_backup(&[], "password").unwrap();
@@ -88,6 +91,7 @@ fn contact_backup_empty_list() {
 }
 
 /// Imported contact metadata (source, imported_at, original_uid) is preserved.
+// @internal
 #[test]
 fn contact_backup_preserves_imported_metadata() {
     let contact = make_imported("Dave", ImportSource::Manual);
@@ -121,6 +125,7 @@ fn contact_backup_preserves_imported_metadata() {
 }
 
 /// Tampered ciphertext must fail with DecryptionFailed.
+// @internal
 #[test]
 fn contact_backup_tampered_ciphertext_fails() {
     let contact = make_exchanged("Eve");
@@ -143,6 +148,7 @@ fn contact_backup_tampered_ciphertext_fails() {
 }
 
 /// Truncated data returns TooShort error.
+// @internal
 #[test]
 fn contact_backup_truncated_data_fails() {
     let result = import_contact_backup(&[0x01, 0x02], "password");
@@ -154,6 +160,7 @@ fn contact_backup_truncated_data_fails() {
 }
 
 /// Unknown version byte returns UnsupportedVersion error.
+// @internal
 #[test]
 fn contact_backup_unknown_version_fails() {
     // Build a blob with an invalid version byte but enough salt+data

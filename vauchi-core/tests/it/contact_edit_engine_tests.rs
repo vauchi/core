@@ -40,6 +40,7 @@ fn make_engine() -> ContactEditEngine {
 
 // ── Tests ───────────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn edit_starts_at_fields() {
     let engine = make_engine();
@@ -50,6 +51,7 @@ fn edit_starts_at_fields() {
     assert_eq!(progress.total_steps, 3);
 }
 
+// @internal
 #[test]
 fn edit_fields_has_name_input_and_field_list() {
     let engine = make_engine();
@@ -88,6 +90,7 @@ fn edit_fields_has_name_input_and_field_list() {
     }
 }
 
+// @internal
 #[test]
 fn edit_change_name_updates_screen() {
     let mut engine = make_engine();
@@ -107,6 +110,7 @@ fn edit_change_name_updates_screen() {
     assert_eq!(engine.edited_contact().display_name, "Bob");
 }
 
+// @internal
 #[test]
 fn edit_empty_name_shows_validation_error() {
     let mut engine = make_engine();
@@ -131,6 +135,7 @@ fn edit_empty_name_shows_validation_error() {
     }
 }
 
+// @internal
 #[test]
 fn edit_continue_to_visibility() {
     let mut engine = make_engine();
@@ -148,6 +153,7 @@ fn edit_continue_to_visibility() {
     }
 }
 
+// @internal
 #[test]
 fn edit_visibility_shows_toggle_lists() {
     let mut engine = make_engine();
@@ -200,6 +206,7 @@ fn edit_visibility_shows_toggle_lists() {
     }
 }
 
+// @internal
 #[test]
 fn edit_toggle_group_visibility() {
     let mut engine = make_engine();
@@ -236,6 +243,7 @@ fn edit_toggle_group_visibility() {
     assert!(phone_field.visible_to_groups.contains(&"Family".into()));
 }
 
+// @internal
 #[test]
 fn edit_continue_to_preview() {
     let mut engine = make_engine();
@@ -258,6 +266,7 @@ fn edit_continue_to_preview() {
     }
 }
 
+// @internal
 #[test]
 fn edit_preview_shows_card() {
     let mut engine = make_engine();
@@ -289,6 +298,7 @@ fn edit_preview_shows_card() {
     }
 }
 
+// @internal
 #[test]
 fn edit_preview_group_selection() {
     let mut engine = make_engine();
@@ -314,6 +324,7 @@ fn edit_preview_group_selection() {
     }
 }
 
+// @internal
 #[test]
 fn edit_save_returns_complete() {
     let mut engine = make_engine();
@@ -331,6 +342,7 @@ fn edit_save_returns_complete() {
     assert_eq!(result, ActionResult::Complete);
 }
 
+// @internal
 #[test]
 fn edit_back_from_visibility_to_fields() {
     let mut engine = make_engine();
@@ -352,6 +364,7 @@ fn edit_back_from_visibility_to_fields() {
     }
 }
 
+// @internal
 #[test]
 fn edit_back_from_preview_to_visibility() {
     let mut engine = make_engine();
@@ -376,6 +389,7 @@ fn edit_back_from_preview_to_visibility() {
     }
 }
 
+// @internal
 #[test]
 fn edit_data_persists_across_steps() {
     let mut engine = make_engine();

@@ -21,6 +21,7 @@ use vauchi_core::{ContactCard, Identity};
 
 // @scenario: contact_exchange :: Mutual QR uses fresh ephemeral keys for forward secrecy
 // @scenario: contact_exchange :: Generate exchange QR code
+// @internal
 #[test]
 fn test_qr_generate_with_ephemeral() {
     let identity = Identity::create("Alice");
@@ -45,6 +46,7 @@ fn test_qr_generate_with_ephemeral() {
 }
 
 // @scenario: contact_exchange :: Mutual QR uses fresh ephemeral keys for forward secrecy
+// @internal
 #[test]
 fn test_qr_ephemeral_changes_each_call() {
     let identity = Identity::create("Alice");
@@ -71,6 +73,7 @@ fn test_qr_ephemeral_changes_each_call() {
 }
 
 // @scenario: contact_exchange :: Generate exchange QR code
+// @internal
 #[test]
 fn test_qr_ephemeral_roundtrip_via_data_string() {
     let identity = Identity::create("Alice");
@@ -91,6 +94,7 @@ fn test_qr_ephemeral_roundtrip_via_data_string() {
 // ============================================================
 
 // @scenario: contact_exchange :: Default QR exchange uses mutual flow
+// @internal
 #[test]
 fn test_start_qr_generates_qr() {
     let identity = Identity::create("Alice");
@@ -114,6 +118,7 @@ fn test_start_qr_generates_qr() {
     assert!(!qr.is_expired());
 }
 
+// @internal
 #[test]
 fn test_start_qr_rejects_wrong_transport() {
     let identity = Identity::create("Alice");
@@ -127,6 +132,7 @@ fn test_start_qr_rejects_wrong_transport() {
     assert!(result.is_err(), "Should reject StartQR on NFC transport");
 }
 
+// @internal
 #[test]
 fn test_scan_their_qr_transitions() {
     let alice_identity = Identity::create("Alice");
@@ -159,6 +165,7 @@ fn test_scan_their_qr_transitions() {
 }
 
 // @scenario: contact_exchange :: Mutual QR rejects expired peer QR code
+// @internal
 #[test]
 fn test_scan_rejects_expired() {
     let alice_identity = Identity::create("Alice");
@@ -187,6 +194,7 @@ fn test_scan_rejects_expired() {
 
 // @scenario: contact_exchange :: Mutual QR prevents self-exchange
 // @scenario: contact_exchange :: Cannot exchange with yourself
+// @internal
 #[test]
 fn test_scan_rejects_self_exchange() {
     let alice_identity = Identity::create("Alice");
@@ -217,6 +225,7 @@ fn test_scan_rejects_self_exchange() {
 
 // @scenario: contact_exchange :: Successful QR code exchange with proximity
 // @scenario: contact_exchange :: X3DH key agreement during exchange
+// @internal
 #[test]
 fn test_key_agreement_symmetric() {
     // Both sides use fresh ephemerals, so DH should be symmetric:
@@ -240,6 +249,7 @@ fn test_key_agreement_symmetric() {
 // @scenario: contact_exchange :: Successful QR code exchange with proximity
 // @scenario: contact_exchange :: Mutual QR exchange with bidirectional scanning
 // @scenario: contact_exchange :: Exchange creates mutual keys
+// @internal
 #[test]
 fn test_full_qr_exchange() {
     use vauchi_core::crypto::{decrypt, encrypt};
@@ -362,6 +372,7 @@ fn test_full_qr_exchange() {
 }
 
 // @scenario: contact_exchange :: Mutual QR uses fresh ephemeral keys for forward secrecy
+// @internal
 #[test]
 fn test_qr_uses_fresh_ephemeral_not_identity() {
     let alice_identity = Identity::create("Alice");
@@ -386,6 +397,7 @@ fn test_qr_uses_fresh_ephemeral_not_identity() {
     );
 }
 
+// @internal
 #[test]
 fn test_they_scanned_requires_peer_scanned_state() {
     let identity = Identity::create("Alice");
@@ -400,6 +412,7 @@ fn test_they_scanned_requires_peer_scanned_state() {
     assert!(result.is_err(), "Should fail when not in PeerScanned state");
 }
 
+// @internal
 #[test]
 fn test_qr_contact_names_correct() {
     let alice_identity = Identity::create("Alice");

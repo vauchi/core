@@ -89,6 +89,7 @@ fn run_qr_exchange(
 
 // ── Relay metadata flows through exchange ──────────────────────────
 
+// @internal
 #[test]
 fn exchange_with_relay_metadata_populates_contact() {
     let (alice_contact, bob_contact) = run_qr_exchange(
@@ -123,6 +124,7 @@ fn exchange_with_relay_metadata_populates_contact() {
     );
 }
 
+// @internal
 #[test]
 fn exchange_without_relay_metadata_leaves_contact_fields_empty() {
     let (alice_contact, bob_contact) = run_qr_exchange(None, None, None, None);
@@ -133,6 +135,7 @@ fn exchange_without_relay_metadata_leaves_contact_fields_empty() {
     assert!(bob_contact.relay_noise_pubkey().is_none());
 }
 
+// @internal
 #[test]
 fn exchange_with_partial_relay_metadata() {
     // Alice has relay, Bob doesn't

@@ -8,6 +8,7 @@
 use vauchi_core::identity::password::{PasswordStrength, validate_password};
 use zxcvbn::Score;
 
+// @internal
 #[test]
 fn test_password_strength_from_score() {
     assert_eq!(
@@ -27,6 +28,7 @@ fn test_password_strength_from_score() {
 }
 
 // @scenario: identity_management :: Backup password requirements
+// @internal
 #[test]
 fn test_short_password() {
     validate_password("short").expect_err("expected error");
@@ -35,6 +37,7 @@ fn test_short_password() {
 }
 
 // @scenario: identity_management :: Backup password requirements
+// @internal
 #[test]
 fn test_common_passwords() {
     validate_password("password").expect_err("expected error");
@@ -43,6 +46,7 @@ fn test_common_passwords() {
 }
 
 // @scenario: identity_management :: Backup password requirements
+// @internal
 #[test]
 fn test_strong_passphrase() {
     let result = validate_password("correct-horse-battery-staple");

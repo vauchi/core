@@ -4,6 +4,7 @@
 
 use vauchi_app::ui::*;
 
+// @internal
 #[test]
 fn support_screen_id() {
     let engine = SupportEngine::new();
@@ -11,6 +12,7 @@ fn support_screen_id() {
     assert_eq!(screen.screen_id, "support");
 }
 
+// @internal
 #[test]
 fn support_title() {
     let engine = SupportEngine::new();
@@ -18,6 +20,7 @@ fn support_title() {
     assert_eq!(screen.title, "Support Vauchi");
 }
 
+// @internal
 #[test]
 fn support_open_github_sponsors_opens_url() {
     let mut engine = SupportEngine::new();
@@ -32,6 +35,7 @@ fn support_open_github_sponsors_opens_url() {
     }
 }
 
+// @internal
 #[test]
 fn support_open_liberapay_opens_url() {
     let mut engine = SupportEngine::new();
@@ -46,6 +50,7 @@ fn support_open_liberapay_opens_url() {
     }
 }
 
+// @internal
 #[test]
 fn support_unknown_action_returns_update_screen() {
     let mut engine = SupportEngine::new();
@@ -60,6 +65,7 @@ fn support_unknown_action_returns_update_screen() {
     }
 }
 
+// @internal
 #[test]
 fn support_default_creates_engine() {
     let engine = SupportEngine;

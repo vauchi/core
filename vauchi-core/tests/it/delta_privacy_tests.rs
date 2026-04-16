@@ -14,6 +14,7 @@ const SECRET_NOTE: &str = "SECRET NOTE DO NOT LEAK 7f3a9b2c";
 
 /// SECURITY: Proves that `CardDelta::compute()` strips private annotations
 /// from ContactField before placing them in `FieldChange::Added`.
+// @internal
 #[test]
 fn test_card_delta_never_contains_field_notes() {
     let old_card = ContactCard::new("Alice");
@@ -51,6 +52,7 @@ fn test_card_delta_never_contains_field_notes() {
 /// SECURITY: Filtered deltas (via `filter_with`) must also be free of notes.
 /// Since stripping happens at compute time, the clones in filter paths inherit
 /// the clean fields — this test locks that invariant.
+// @internal
 #[test]
 fn test_filtered_delta_preserves_privacy() {
     let old_card = ContactCard::new("Alice");

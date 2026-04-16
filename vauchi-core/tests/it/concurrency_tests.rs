@@ -63,6 +63,7 @@ fn create_test_contact(name: &str) -> Contact {
 // SEQUENTIAL OPERATION TESTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_sequential_contact_operations() {
     let key = SymmetricKey::generate();
@@ -97,6 +98,7 @@ fn test_sequential_contact_operations() {
     assert_eq!(remaining.len(), 50);
 }
 
+// @internal
 #[test]
 fn test_sequential_pending_update_operations() {
     use vauchi_core::storage::{PendingUpdate, UpdateStatus};
@@ -136,6 +138,7 @@ fn test_sequential_pending_update_operations() {
 // FILE-BASED CONCURRENT ACCESS TESTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_multiple_connections_same_file() {
     let dir = tempdir().unwrap();
@@ -173,6 +176,7 @@ fn test_multiple_connections_same_file() {
     }
 }
 
+// @internal
 #[test]
 fn test_concurrent_readers_file_based() {
     let dir = tempdir().unwrap();
@@ -226,6 +230,7 @@ fn test_concurrent_readers_file_based() {
     }
 }
 
+// @internal
 #[test]
 fn test_sequential_writers_file_based() {
     let dir = tempdir().unwrap();
@@ -276,6 +281,7 @@ fn test_sequential_writers_file_based() {
 // READ-AFTER-WRITE CONSISTENCY TESTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_read_after_write_consistency() {
     let dir = tempdir().unwrap();
@@ -300,6 +306,7 @@ fn test_read_after_write_consistency() {
     }
 }
 
+// @internal
 #[test]
 fn test_update_visibility_consistency() {
     let dir = tempdir().unwrap();
@@ -343,6 +350,7 @@ fn test_update_visibility_consistency() {
 // STRESS TESTS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_rapid_open_close_cycles() {
     let dir = tempdir().unwrap();
@@ -365,6 +373,7 @@ fn test_rapid_open_close_cycles() {
     }
 }
 
+// @internal
 #[test]
 fn test_interleaved_reads_writes() {
     let dir = tempdir().unwrap();
@@ -399,6 +408,7 @@ fn test_interleaved_reads_writes() {
 // ERROR HANDLING UNDER CONCURRENT ACCESS
 // =============================================================================
 
+// @internal
 #[test]
 fn test_delete_nonexistent_is_idempotent() {
     let key = SymmetricKey::generate();
@@ -415,6 +425,7 @@ fn test_delete_nonexistent_is_idempotent() {
     }
 }
 
+// @internal
 #[test]
 fn test_double_save_overwrites() {
     let key = SymmetricKey::generate();

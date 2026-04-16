@@ -7,6 +7,7 @@
 
 use vauchi_core::network::*;
 
+// @internal
 #[test]
 fn test_error_display_messages() {
     let errors = vec![
@@ -25,6 +26,7 @@ fn test_error_display_messages() {
     }
 }
 
+// @internal
 #[test]
 fn test_error_clone() {
     let error = NetworkError::ConnectionFailed("test".into());

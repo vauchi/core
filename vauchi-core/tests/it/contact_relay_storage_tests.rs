@@ -25,6 +25,7 @@ fn open_storage() -> Storage {
 
 // ── Save/load roundtrip ──────────────────────────────────────────
 
+// @internal
 #[test]
 fn contact_relay_url_survives_storage_roundtrip() {
     let storage = open_storage();
@@ -41,6 +42,7 @@ fn contact_relay_url_survives_storage_roundtrip() {
     );
 }
 
+// @internal
 #[test]
 fn contact_relay_noise_pubkey_survives_storage_roundtrip() {
     let storage = open_storage();
@@ -58,6 +60,7 @@ fn contact_relay_noise_pubkey_survives_storage_roundtrip() {
     );
 }
 
+// @internal
 #[test]
 fn contact_with_both_relay_fields_roundtrips() {
     let storage = open_storage();
@@ -75,6 +78,7 @@ fn contact_with_both_relay_fields_roundtrips() {
     assert_eq!(loaded.relay_noise_pubkey().unwrap(), &[99u8; 32]);
 }
 
+// @internal
 #[test]
 fn contact_without_relay_fields_loads_as_none() {
     let storage = open_storage();
@@ -89,6 +93,7 @@ fn contact_without_relay_fields_loads_as_none() {
 
 // ── Existing contacts preserved after migration ──────────────────
 
+// @internal
 #[test]
 fn existing_contact_without_relay_loads_after_migration() {
     // This tests that contacts saved before the relay migration
@@ -108,6 +113,7 @@ fn existing_contact_without_relay_loads_after_migration() {
 
 // ── list_contacts includes relay fields ──────────────────────────
 
+// @internal
 #[test]
 fn list_contacts_includes_relay_metadata() {
     let storage = open_storage();
@@ -138,6 +144,7 @@ fn list_contacts_includes_relay_metadata() {
 
 // ── Update relay fields ──────────────────────────────────────────
 
+// @internal
 #[test]
 fn update_contact_relay_url_persists() {
     let storage = open_storage();
@@ -154,6 +161,7 @@ fn update_contact_relay_url_persists() {
     assert_eq!(loaded.relay_url().unwrap(), "https://new-relay.example.com");
 }
 
+// @internal
 #[test]
 fn clear_contact_relay_url_persists() {
     let storage = open_storage();

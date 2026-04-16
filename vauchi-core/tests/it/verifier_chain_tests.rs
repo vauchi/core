@@ -19,6 +19,7 @@ use vauchi_core::exchange::{
 
 // ===== Basic chain behavior =====
 
+// @internal
 #[test]
 fn single_successful_verifier_completes() {
     let verifier = MockProximityVerifier::success();
@@ -36,6 +37,7 @@ fn single_successful_verifier_completes() {
     assert_eq!(log.final_confidence(), Some(ProximityConfidence::High));
 }
 
+// @internal
 #[test]
 fn single_failing_verifier_exhausts() {
     let verifier = MockProximityVerifier::failure();
@@ -54,6 +56,7 @@ fn single_failing_verifier_exhausts() {
 
 // ===== Fallback behavior =====
 
+// @internal
 #[test]
 fn falls_back_to_second_verifier_when_first_fails() {
     let failing = MockProximityVerifier::failure();
@@ -90,6 +93,7 @@ fn falls_back_to_second_verifier_when_first_fails() {
     assert_eq!(completed_method, Some(VerifierMethod::AmbientAudio));
 }
 
+// @internal
 #[test]
 fn all_verifiers_fail_produces_exhausted() {
     let fail1 = MockProximityVerifier::failure();
@@ -117,6 +121,7 @@ fn all_verifiers_fail_produces_exhausted() {
 
 // ===== Event ordering =====
 
+// @internal
 #[test]
 fn events_in_correct_order_for_fallback() {
     let failing = MockProximityVerifier::failure();
@@ -165,6 +170,7 @@ fn events_in_correct_order_for_fallback() {
     ));
 }
 
+// @internal
 #[test]
 fn first_success_stops_chain() {
     let success1 = MockProximityVerifier::success();
@@ -201,6 +207,7 @@ fn first_success_stops_chain() {
 
 // ===== Empty chain =====
 
+// @internal
 #[test]
 fn empty_chain_produces_exhausted() {
     let chain = VerifierChain::new();
@@ -215,6 +222,7 @@ fn empty_chain_produces_exhausted() {
 
 // ===== Timeout verifier =====
 
+// @internal
 #[test]
 fn timeout_verifier_falls_back() {
     let timeout_verifier = MockProximityVerifier::timeout();
@@ -250,6 +258,7 @@ fn timeout_verifier_falls_back() {
 
 // ===== ProximityVerifier trait impl (W4) =====
 
+// @internal
 #[test]
 fn trait_impl_populates_last_event_log() {
     let mut chain = VerifierChain::new();
@@ -276,6 +285,7 @@ fn trait_impl_populates_last_event_log() {
     assert_eq!(log.final_confidence(), Some(ProximityConfidence::High));
 }
 
+// @internal
 #[test]
 fn trait_impl_populates_last_event_log_on_failure() {
     let mut chain = VerifierChain::new();
@@ -298,6 +308,7 @@ fn trait_impl_populates_last_event_log_on_failure() {
     assert!(!log.is_completed());
 }
 
+// @internal
 #[test]
 fn confidence_level_reflects_winner_not_maximum() {
     // Chain: High-confidence (fails) → Medium-confidence (succeeds)
@@ -323,12 +334,14 @@ fn confidence_level_reflects_winner_not_maximum() {
     assert_eq!(chain.confidence_level(), ProximityConfidence::Medium);
 }
 
+// @internal
 #[test]
 fn confidence_level_returns_unknown_before_any_verification() {
     let chain = VerifierChain::new();
     assert_eq!(chain.confidence_level(), ProximityConfidence::Unknown);
 }
 
+// @internal
 #[test]
 fn confidence_level_returns_unknown_after_all_fail() {
     let mut chain = VerifierChain::new();
@@ -347,6 +360,7 @@ fn confidence_level_returns_unknown_after_all_fail() {
     assert_eq!(chain.confidence_level(), ProximityConfidence::Unknown);
 }
 
+// @internal
 #[test]
 fn individual_methods_return_not_supported() {
     let chain = VerifierChain::new();
@@ -362,6 +376,7 @@ fn individual_methods_return_not_supported() {
     assert!(!chain.verify_response(&[0u8; 16], &[0x01]));
 }
 
+// @internal
 #[test]
 fn trait_impl_verification_event_log_delegates_to_last_event_log() {
     let mut chain = VerifierChain::new();
@@ -393,6 +408,7 @@ fn trait_impl_verification_event_log_delegates_to_last_event_log() {
 
 // ===== Atomicity consistency tests =====
 
+// @internal
 #[test]
 fn log_and_confidence_are_consistent_after_fallback() {
     // Fail → Succeed chain: confidence must match the winning verifier's
@@ -429,6 +445,7 @@ fn log_and_confidence_are_consistent_after_fallback() {
 
 // ===== Event callback tests =====
 
+// @internal
 #[test]
 fn callback_receives_events_during_verification() {
     let received: Arc<Mutex<Vec<ProximityVerifierEvent>>> = Arc::new(Mutex::new(Vec::new()));
@@ -470,6 +487,7 @@ fn callback_receives_events_during_verification() {
     );
 }
 
+// @internal
 #[test]
 fn callback_receives_fallback_events() {
     let received: Arc<Mutex<Vec<ProximityVerifierEvent>>> = Arc::new(Mutex::new(Vec::new()));
@@ -513,6 +531,7 @@ fn callback_receives_fallback_events() {
     );
 }
 
+// @internal
 #[test]
 fn no_callback_does_not_panic() {
     // Chain without callback should work fine (no-op)

@@ -15,6 +15,7 @@ use vauchi_core::crypto::SymmetricKey;
 
 // ── my_info field tests ──────────────────────────────────────────────
 
+// @internal
 #[test]
 fn my_info_shows_own_fields_via_app_engine() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -45,6 +46,7 @@ fn my_info_shows_own_fields_via_app_engine() {
     assert!(!has_contact_list, "MyInfo should not show a ContactList");
 }
 
+// @internal
 #[test]
 fn my_info_renders_safely_with_no_fields() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -60,6 +62,7 @@ fn my_info_renders_safely_with_no_fields() {
 
 // ── contact detail / edit wiring tests ──────────────────────────────
 
+// @internal
 #[test]
 fn contact_detail_nonexistent_shows_not_found() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -72,6 +75,7 @@ fn contact_detail_nonexistent_shows_not_found() {
     assert_eq!(screen.screen_id, "contact_not_found");
 }
 
+// @internal
 #[test]
 fn contact_edit_nonexistent_shows_not_found() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -86,6 +90,7 @@ fn contact_edit_nonexistent_shows_not_found() {
     assert_eq!(screen.screen_id, "contact_not_found");
 }
 
+// @internal
 #[test]
 fn contact_detail_edit_navigates_to_edit_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -131,6 +136,7 @@ fn contact_detail_edit_navigates_to_edit_screen() {
 
 // ── contact visibility tests ─────────────────────────────────────────
 
+// @internal
 #[test]
 fn navigate_to_contact_visibility_shows_toggles() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -147,6 +153,7 @@ fn navigate_to_contact_visibility_shows_toggles() {
     );
 }
 
+// @internal
 #[test]
 fn contact_visibility_toggle_updates_field() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -170,6 +177,7 @@ fn contact_visibility_toggle_updates_field() {
 
 // ── groups routing tests ─────────────────────────────────────────────
 
+// @internal
 #[test]
 fn navigate_to_group_detail_shows_group() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -189,6 +197,7 @@ fn navigate_to_group_detail_shows_group() {
 }
 
 /// @scenario: visibility_labels :: Group detail shows real name and members
+// @internal
 #[test]
 fn group_detail_shows_real_name_and_members() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -212,6 +221,7 @@ fn group_detail_shows_real_name_and_members() {
     assert!(has_member_list, "Should have an empty members ContactList");
 }
 
+// @internal
 #[test]
 fn groups_list_item_selected_routes_to_group_detail() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -245,6 +255,7 @@ fn groups_list_item_selected_routes_to_group_detail() {
 // SP-12a: Duplicate Detection, Merge Preview, Contact Limit
 // =============================================================================
 
+// @internal
 #[test]
 fn duplicate_detection_navigate_shows_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -255,6 +266,7 @@ fn duplicate_detection_navigate_shows_screen() {
     assert_eq!(screen.title, "Duplicate Detection");
 }
 
+// @internal
 #[test]
 fn duplicate_detection_empty_shows_no_duplicates() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -272,6 +284,7 @@ fn duplicate_detection_empty_shows_no_duplicates() {
     );
 }
 
+// @internal
 #[test]
 fn duplicate_detection_merge_navigates_back() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -288,6 +301,7 @@ fn duplicate_detection_merge_navigates_back() {
     );
 }
 
+// @internal
 #[test]
 fn duplicate_detection_dismiss_stays_on_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -304,6 +318,7 @@ fn duplicate_detection_dismiss_stays_on_screen() {
     );
 }
 
+// @internal
 #[test]
 fn contact_merge_navigate_shows_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -319,6 +334,7 @@ fn contact_merge_navigate_shows_screen() {
     assert_eq!(screen.title, "Merge Contacts");
 }
 
+// @internal
 #[test]
 fn contact_merge_shows_both_contacts() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -340,6 +356,7 @@ fn contact_merge_shows_both_contacts() {
     );
 }
 
+// @internal
 #[test]
 fn contact_merge_confirm_navigates_back() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -360,6 +377,7 @@ fn contact_merge_confirm_navigates_back() {
     );
 }
 
+// @internal
 #[test]
 fn contact_merge_cancel_stays_on_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -381,6 +399,7 @@ fn contact_merge_cancel_stays_on_screen() {
     );
 }
 
+// @internal
 #[test]
 fn contact_limit_navigate_shows_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -391,6 +410,7 @@ fn contact_limit_navigate_shows_screen() {
     assert_eq!(screen.title, "Contact Limit");
 }
 
+// @internal
 #[test]
 fn contact_limit_shows_text_input() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -407,6 +427,7 @@ fn contact_limit_shows_text_input() {
     );
 }
 
+// @internal
 #[test]
 fn contact_limit_edit_then_save() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -439,6 +460,7 @@ fn contact_limit_edit_then_save() {
     );
 }
 
+// @internal
 #[test]
 fn contact_limit_save_invalid_returns_update_screen_with_validation_error() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -485,6 +507,7 @@ fn contact_limit_save_invalid_returns_update_screen_with_validation_error() {
     }
 }
 
+// @internal
 #[test]
 fn contact_limit_cancel_edit_restores_value() {
     let mut vauchi = Vauchi::in_memory().unwrap();

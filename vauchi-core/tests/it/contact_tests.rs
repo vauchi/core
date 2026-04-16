@@ -19,6 +19,7 @@ fn create_test_contact() -> Contact {
 }
 
 // @scenario: contacts_management :: View contact details
+// @internal
 #[test]
 fn test_create_contact() {
     let contact = create_test_contact();
@@ -29,6 +30,7 @@ fn test_create_contact() {
 }
 
 // @scenario: security :: Fingerprint verification
+// @internal
 #[test]
 fn test_fingerprint_verification() {
     let mut contact = create_test_contact();
@@ -39,6 +41,7 @@ fn test_fingerprint_verification() {
 }
 
 // @scenario: security :: Fingerprint verification
+// @internal
 #[test]
 fn test_fingerprint_format() {
     let contact = create_test_contact();
@@ -52,6 +55,7 @@ fn test_fingerprint_format() {
 
 // @scenario: visibility_control :: Default visibility is public
 // @scenario: visibility_control :: Set field visibility to private
+// @internal
 #[test]
 fn test_visibility_rules() {
     let mut contact = create_test_contact();
@@ -82,6 +86,7 @@ fn test_visibility_rules() {
 // ============================================================
 
 // @scenario: sync_updates :: Receive contact update from relay
+// @internal
 #[test]
 fn test_contact_from_sync_data() {
     let public_key = [0x42u8; 32];
@@ -111,6 +116,7 @@ fn test_contact_from_sync_data() {
 }
 
 // @scenario: sync_updates :: Receive contact update from relay
+// @internal
 #[test]
 fn test_contact_update_card() {
     let mut contact = create_test_contact();
@@ -125,6 +131,7 @@ fn test_contact_update_card() {
 }
 
 // @scenario: contact_card_management :: Update display name
+// @internal
 #[test]
 fn test_contact_set_display_name() {
     let mut contact = create_test_contact();
@@ -135,6 +142,7 @@ fn test_contact_set_display_name() {
 }
 
 // @scenario: contact_card_management :: Display name must not be empty
+// @internal
 #[test]
 fn test_contact_set_display_name_empty_error() {
     let mut contact = create_test_contact();
@@ -144,6 +152,7 @@ fn test_contact_set_display_name_empty_error() {
 }
 
 // @scenario: contacts_management :: View contact details
+// @internal
 #[test]
 fn test_contact_accessors() {
     let public_key = [0x42u8; 32];
@@ -167,6 +176,7 @@ fn test_contact_accessors() {
 }
 
 // @scenario: contacts_management :: View contact details
+// @internal
 #[test]
 fn test_contact_id_is_hex_encoded_public_key() {
     let public_key = [0xABu8; 32];
@@ -180,6 +190,7 @@ fn test_contact_id_is_hex_encoded_public_key() {
 }
 
 // @scenario: security :: Fingerprint verification
+// @internal
 #[test]
 fn test_fingerprint_readability() {
     let mut public_key = [0u8; 32];
@@ -207,6 +218,7 @@ fn test_fingerprint_readability() {
 // ============================================================
 
 // @scenario: contacts_management :: Hide contact from main list
+// @internal
 #[test]
 fn test_contact_hidden_default_false() {
     let contact = create_test_contact();
@@ -215,6 +227,7 @@ fn test_contact_hidden_default_false() {
 }
 
 // @scenario: contacts_management :: Hide contact from main list
+// @internal
 #[test]
 fn test_contact_hide_and_unhide() {
     let mut contact = create_test_contact();
@@ -231,6 +244,7 @@ fn test_contact_hide_and_unhide() {
 }
 
 // @scenario: contacts_management :: Hide contact from main list
+// @internal
 #[test]
 fn test_contact_set_hidden() {
     let mut contact = create_test_contact();
@@ -247,6 +261,7 @@ fn test_contact_set_hidden() {
 // ============================================================
 
 // @scenario: contacts_management :: Block a contact
+// @internal
 #[test]
 fn test_contact_blocked_default_false() {
     let contact = create_test_contact();
@@ -257,6 +272,7 @@ fn test_contact_blocked_default_false() {
 
 // @scenario: contacts_management :: Block a contact
 // @scenario: contacts_management :: Unblock a contact
+// @internal
 #[test]
 fn test_contact_block_and_unblock() {
     let mut contact = create_test_contact();
@@ -275,6 +291,7 @@ fn test_contact_block_and_unblock() {
 }
 
 // @scenario: contacts_management :: Block a contact
+// @internal
 #[test]
 fn test_contact_set_blocked() {
     let mut contact = create_test_contact();
@@ -287,6 +304,7 @@ fn test_contact_set_blocked() {
 }
 
 // @scenario: contacts_management :: Block a contact
+// @internal
 #[test]
 fn test_contact_hidden_and_blocked_independent() {
     let mut contact = create_test_contact();
@@ -313,6 +331,7 @@ fn test_contact_hidden_and_blocked_independent() {
 }
 
 // @scenario: sync_updates :: Receive contact update from relay
+// @internal
 #[test]
 fn test_contact_from_sync_data_full() {
     let public_key = [0x42u8; 32];
@@ -343,6 +362,7 @@ fn test_contact_from_sync_data_full() {
 // ========================================
 
 // @scenario: identity_management :: Social recovery setup
+// @internal
 #[test]
 fn test_contact_default_not_recovery_trusted() {
     let contact = create_test_contact();
@@ -350,6 +370,7 @@ fn test_contact_default_not_recovery_trusted() {
 }
 
 // @scenario: identity_management :: Social recovery setup
+// @internal
 #[test]
 fn test_contact_trust_for_recovery() {
     let mut contact = create_test_contact();
@@ -362,6 +383,7 @@ fn test_contact_trust_for_recovery() {
 }
 
 // @scenario: identity_management :: Social recovery setup
+// @internal
 #[test]
 fn test_contact_trust_for_recovery_rejects_standard_trust() {
     let mut contact = create_test_contact();
@@ -374,6 +396,7 @@ fn test_contact_trust_for_recovery_rejects_standard_trust() {
 }
 
 // @scenario: identity_management :: Social recovery setup
+// @internal
 #[test]
 fn test_contact_trust_for_recovery_rejects_blocked() {
     let mut contact = create_test_contact();
@@ -398,6 +421,7 @@ fn test_contact_trust_for_recovery_rejects_blocked() {
 // trust is blocked until the user re-verifies the fingerprint
 // in person, which clears the recovered flag and restores
 // Verified trust.
+// @internal
 #[test]
 fn test_recovered_contact_trust_lifecycle() {
     let mut contact = create_test_contact();
@@ -429,6 +453,7 @@ fn test_recovered_contact_trust_lifecycle() {
 
 // @scenario: identity_management :: Social recovery setup
 // @scenario: contact_recovery :: Remove recovery trust from contact
+// @internal
 #[test]
 fn test_contact_untrust_for_recovery() {
     let mut contact = create_test_contact();
@@ -441,6 +466,7 @@ fn test_contact_untrust_for_recovery() {
 }
 
 // @scenario: identity_management :: Social recovery setup
+// @internal
 #[test]
 fn test_contact_set_recovery_trusted() {
     let mut contact = create_test_contact();
@@ -455,6 +481,7 @@ fn test_contact_set_recovery_trusted() {
 // @scenario: identity_management :: Social recovery setup
 // @scenario: sync_updates :: Receive contact update from relay
 // @scenario: contact_recovery :: Trust state syncs across linked devices
+// @internal
 #[test]
 fn test_contact_from_sync_data_full_with_recovery_trusted() {
     let public_key = [0x42u8; 32];
@@ -481,6 +508,7 @@ fn test_contact_from_sync_data_full_with_recovery_trusted() {
 
 // @scenario: identity_management :: Social recovery setup
 // @scenario: contact_recovery :: Removing trust does not affect other contact properties
+// @internal
 #[test]
 fn test_recovery_trust_independent_of_blocked_hidden() {
     let mut contact = create_test_contact();

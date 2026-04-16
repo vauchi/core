@@ -11,6 +11,7 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 
+// @internal
 #[test]
 fn navigate_to_home_shows_home_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -20,6 +21,7 @@ fn navigate_to_home_shows_home_screen() {
     assert_eq!(screen.screen_id, "my_info");
 }
 
+// @internal
 #[test]
 fn navigate_to_contacts_shows_contact_list() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -29,6 +31,7 @@ fn navigate_to_contacts_shows_contact_list() {
     assert_eq!(screen.screen_id, "contact_list");
 }
 
+// @internal
 #[test]
 fn navigate_to_settings_shows_settings() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -38,6 +41,7 @@ fn navigate_to_settings_shows_settings() {
     assert_eq!(screen.screen_id, "settings");
 }
 
+// @internal
 #[test]
 fn navigate_to_exchange_shows_mode_selection() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -48,6 +52,7 @@ fn navigate_to_exchange_shows_mode_selection() {
     assert_eq!(screen.screen_id, "exchange_mode_selection");
 }
 
+// @internal
 #[test]
 fn navigate_to_help_shows_help() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -57,6 +62,7 @@ fn navigate_to_help_shows_help() {
     assert_eq!(screen.screen_id, "help");
 }
 
+// @internal
 #[test]
 fn navigate_to_lock_shows_lock() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -66,6 +72,7 @@ fn navigate_to_lock_shows_lock() {
     assert_eq!(screen.screen_id, "lock_screen");
 }
 
+// @internal
 #[test]
 fn navigate_to_emergency_shred_shows_warning() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -75,6 +82,7 @@ fn navigate_to_emergency_shred_shows_warning() {
     assert_eq!(screen.screen_id, "shred_warning");
 }
 
+// @internal
 #[test]
 fn navigate_to_backup_shows_backup() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -86,6 +94,7 @@ fn navigate_to_backup_shows_backup() {
 
 // ── persistence tests ───────────────────────────────────────────────
 
+// @internal
 #[test]
 fn app_engine_detects_persisted_identity() {
     let dir = tempfile::tempdir().unwrap();
@@ -119,6 +128,7 @@ fn app_engine_detects_persisted_identity() {
 
 // ── available_screens tests ─────────────────────────────────────────
 
+// @internal
 #[test]
 fn available_screens_without_identity_is_onboarding_only() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -127,6 +137,7 @@ fn available_screens_without_identity_is_onboarding_only() {
     assert_eq!(screens, vec![AppScreen::Onboarding]);
 }
 
+// @internal
 #[test]
 fn available_screens_with_identity_has_five_tab_nav() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -151,6 +162,7 @@ fn available_screens_with_identity_has_five_tab_nav() {
 
 // ── failure-path tests for create_engine edge cases ─────────────────
 
+// @internal
 #[test]
 fn navigate_to_exchange_without_identity_card() {
     // Create Vauchi but don't create identity — own_card() returns None
@@ -162,6 +174,7 @@ fn navigate_to_exchange_without_identity_card() {
     assert!(!screen.screen_id.is_empty());
 }
 
+// @internal
 #[test]
 fn navigate_to_settings_without_identity() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -173,6 +186,7 @@ fn navigate_to_settings_without_identity() {
 
 // ── engine cache tests ──────────────────────────────────────────────
 
+// @internal
 #[test]
 fn navigate_away_and_back_preserves_engine_state() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -216,6 +230,7 @@ fn navigate_away_and_back_preserves_engine_state() {
     );
 }
 
+// @internal
 #[test]
 fn onboarding_engine_not_cached() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -233,6 +248,7 @@ fn onboarding_engine_not_cached() {
     );
 }
 
+// @internal
 #[test]
 fn lock_screen_engine_not_cached() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -253,6 +269,7 @@ fn lock_screen_engine_not_cached() {
     );
 }
 
+// @internal
 #[test]
 fn navigate_creates_fresh_engine_first_time() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -272,6 +289,7 @@ fn navigate_creates_fresh_engine_first_time() {
 
 // ── cache invalidation tests ─────────────────────────────────────────
 
+// @internal
 #[test]
 fn invalidate_screen_removes_cached_engine() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -290,6 +308,7 @@ fn invalidate_screen_removes_cached_engine() {
     assert_eq!(screen.screen_id, "contact_list");
 }
 
+// @internal
 #[test]
 fn invalidate_all_clears_entire_cache() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -313,6 +332,7 @@ fn invalidate_all_clears_entire_cache() {
 
 // ── navigation history tests (HIGH-5) ────────────────────────────────
 
+// @internal
 #[test]
 fn back_from_contact_detail_returns_to_contacts() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -349,6 +369,7 @@ fn back_from_contact_detail_returns_to_contacts() {
     );
 }
 
+// @internal
 #[test]
 fn navigate_back_from_duress_pin_returns_to_settings() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -369,6 +390,7 @@ fn navigate_back_from_duress_pin_returns_to_settings() {
     );
 }
 
+// @internal
 #[test]
 fn navigate_back_from_settings_returns_to_home() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -388,6 +410,7 @@ fn navigate_back_from_settings_returns_to_home() {
     );
 }
 
+// @internal
 #[test]
 fn back_with_empty_history_returns_to_home() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -400,6 +423,7 @@ fn back_with_empty_history_returns_to_home() {
     assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
 }
 
+// @internal
 #[test]
 fn navigate_back_does_not_create_circular_history() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -425,6 +449,7 @@ fn navigate_back_does_not_create_circular_history() {
 
 // ── Wave 6 Phase A: new engine navigation tests ──────────────────────
 
+// @internal
 #[test]
 fn navigate_to_sync_shows_sync_status() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -439,6 +464,7 @@ fn navigate_to_sync_shows_sync_status() {
     );
 }
 
+// @internal
 #[test]
 fn navigate_to_recovery_shows_recovery_status() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -454,6 +480,7 @@ fn navigate_to_recovery_shows_recovery_status() {
     );
 }
 
+// @internal
 #[test]
 fn navigate_to_privacy_shows_privacy_settings() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -472,6 +499,7 @@ fn navigate_to_privacy_shows_privacy_settings() {
     );
 }
 
+// @internal
 #[test]
 fn navigate_to_support_shows_support() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -488,6 +516,7 @@ fn navigate_to_support_shows_support() {
 
 // ── Wave 6 failure-path tests (CC-11) ────────────────────────────────
 
+// @internal
 #[test]
 fn sync_engine_unknown_action_returns_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -505,6 +534,7 @@ fn sync_engine_unknown_action_returns_screen() {
     }
 }
 
+// @internal
 #[test]
 fn privacy_engine_text_changed_is_noop() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -525,6 +555,7 @@ fn privacy_engine_text_changed_is_noop() {
 
 // ── default_screen tests (Phase 1: Navigation IA) ──────────────────
 
+// @internal
 #[test]
 fn default_screen_is_my_info_when_no_contacts() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -533,6 +564,7 @@ fn default_screen_is_my_info_when_no_contacts() {
     assert_eq!(engine.default_screen(), AppScreen::MyInfo);
 }
 
+// @internal
 #[test]
 fn default_screen_is_contacts_when_has_contacts() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -546,6 +578,7 @@ fn default_screen_is_contacts_when_has_contacts() {
     assert_eq!(engine.default_screen(), AppScreen::Contacts);
 }
 
+// @internal
 #[test]
 fn default_screen_is_onboarding_without_identity() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -563,6 +596,7 @@ fn default_screen_is_onboarding_without_identity() {
 /// to it. This prevents the "missing 6 screens" problem from recurring.
 ///
 /// See: Gate 6 of frontend architecture audit (2026-03-18)
+// @internal
 #[test]
 fn cabi_completeness_all_simple_screens_roundtrip_via_screen_id() {
     // All non-parameterized AppScreen variants that CABI must support.
@@ -610,6 +644,7 @@ fn cabi_completeness_all_simple_screens_roundtrip_via_screen_id() {
 
 // ── L2b MoreEngine tests ─────────────────────────────────────────────
 
+// @internal
 #[test]
 fn navigate_to_more_shows_more_menu() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -624,6 +659,7 @@ fn navigate_to_more_shows_more_menu() {
     );
 }
 
+// @internal
 #[test]
 fn more_engine_has_expected_navigation_targets() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -674,6 +710,7 @@ fn more_engine_has_expected_navigation_targets() {
     assert_eq!(action_ids.len(), 7, "More menu should have exactly 7 items");
 }
 
+// @internal
 #[test]
 fn more_engine_routes_to_settings() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -693,6 +730,7 @@ fn more_engine_routes_to_settings() {
     assert_eq!(engine.current_app_screen(), &AppScreen::Settings);
 }
 
+// @internal
 #[test]
 fn more_engine_routes_to_help() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -713,6 +751,7 @@ fn more_engine_routes_to_help() {
 }
 
 // @internal
+// @internal
 #[test]
 fn more_engine_routes_to_activity_log() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -732,6 +771,7 @@ fn more_engine_routes_to_activity_log() {
     assert_eq!(engine.current_app_screen(), &AppScreen::ActivityLog);
 }
 
+// @internal
 #[test]
 fn more_engine_unknown_action_returns_update_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -750,6 +790,7 @@ fn more_engine_unknown_action_returns_update_screen() {
     }
 }
 
+// @internal
 #[test]
 fn from_screen_id_more_roundtrips() {
     let screen = AppScreen::More;
@@ -764,6 +805,7 @@ fn from_screen_id_more_roundtrips() {
 // ============================================================================
 
 // @scenario: onboarding.feature - Empty state with guidance
+// @internal
 #[test]
 fn go_exchange_from_contacts_navigates_to_exchange() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -787,6 +829,7 @@ fn go_exchange_from_contacts_navigates_to_exchange() {
 }
 
 // @scenario: onboarding.feature - Prompt for first exchange
+// @internal
 #[test]
 fn go_exchange_from_my_info_navigates_to_exchange() {
     let mut vauchi = Vauchi::in_memory().unwrap();

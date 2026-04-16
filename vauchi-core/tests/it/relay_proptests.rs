@@ -34,6 +34,7 @@ fn noise_pubkey_strategy() -> impl Strategy<Value = [u8; 32]> {
 // ── QR v3 roundtrip properties ───────────────────────────────────
 
 proptest! {
+// @internal
     #[test]
     fn qr_v3_roundtrip_preserves_relay_url(
         relay_url in valid_relay_url_strategy(),
@@ -58,6 +59,7 @@ proptest! {
         prop_assert!(parsed.verify_signature());
     }
 
+// @internal
     #[test]
     fn qr_v3_roundtrip_preserves_noise_pubkey(
         pubkey in noise_pubkey_strategy()
@@ -78,6 +80,7 @@ proptest! {
         prop_assert_eq!(parsed.relay_noise_pubkey().unwrap(), &pubkey);
     }
 
+// @internal
     #[test]
     fn qr_v3_roundtrip_both_relay_fields(
         relay_url in valid_relay_url_strategy(),
@@ -107,6 +110,7 @@ proptest! {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(20))]
 
+// @internal
     #[test]
     fn contact_relay_url_roundtrips_through_storage(
         relay_url in valid_relay_url_strategy()
@@ -125,6 +129,7 @@ proptest! {
         prop_assert_eq!(loaded.relay_url().unwrap(), &relay_url);
     }
 
+// @internal
     #[test]
     fn contact_relay_pubkey_roundtrips_through_storage(
         pubkey in noise_pubkey_strategy()
@@ -147,6 +152,7 @@ proptest! {
 // ── Multi-stage INIT QR roundtrip properties ────────────────────
 
 proptest! {
+// @internal
     #[test]
     fn multistage_init_qr_roundtrip_with_relay(
         relay_url in valid_relay_url_strategy(),
@@ -188,6 +194,7 @@ proptest! {
         }
     }
 
+// @internal
     #[test]
     fn multistage_init_qr_roundtrip_without_relay(
         display_name in "[A-Za-z0-9 ]{1,20}"
@@ -218,6 +225,7 @@ proptest! {
 // ── Relay URL validation properties ──────────────────────────────
 
 proptest! {
+// @internal
     #[test]
     fn valid_wss_urls_pass_validation(
         relay_url in valid_relay_url_strategy()
@@ -225,6 +233,7 @@ proptest! {
         prop_assert!(validate_relay_url(&relay_url).is_ok(), "valid URL rejected: {}", relay_url);
     }
 
+// @internal
     #[test]
     fn non_https_schemes_fail_validation(
         scheme in "(http|ws|wss|ftp|file)",

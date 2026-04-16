@@ -4,6 +4,7 @@
 
 use vauchi_core::exchange::NfcCardPayload;
 
+// @internal
 #[test]
 fn test_crc16_deterministic() {
     let payload = NfcCardPayload::new([0xAA; 32], "Alice".to_string(), [0xBB; 32]);
@@ -13,6 +14,7 @@ fn test_crc16_deterministic() {
     assert_ne!(crc1, 0, "CRC16 should not be zero for non-empty data");
 }
 
+// @internal
 #[test]
 fn test_crc16_changes_with_data() {
     let p1 = NfcCardPayload::new([0xAA; 32], "Alice".to_string(), [0xBB; 32]);
@@ -24,6 +26,7 @@ fn test_crc16_changes_with_data() {
     );
 }
 
+// @internal
 #[test]
 fn test_crc16_changes_with_name() {
     let p1 = NfcCardPayload::new([0xAA; 32], "Alice".to_string(), [0xBB; 32]);
@@ -35,6 +38,7 @@ fn test_crc16_changes_with_name() {
     );
 }
 
+// @internal
 #[test]
 fn test_serialization_roundtrip() {
     let original = NfcCardPayload::new([0x11; 32], "Charlie".to_string(), [0x22; 32]);
@@ -47,6 +51,7 @@ fn test_serialization_roundtrip() {
     assert!(restored.verify_crc16());
 }
 
+// @internal
 #[test]
 fn test_crc16_verification_detects_corruption() {
     let mut payload = NfcCardPayload::new([0x11; 32], "Charlie".to_string(), [0x22; 32]);
@@ -58,6 +63,7 @@ fn test_crc16_verification_detects_corruption() {
     );
 }
 
+// @internal
 #[test]
 fn test_empty_display_name() {
     let payload = NfcCardPayload::new([0x00; 32], String::new(), [0x00; 32]);
@@ -67,6 +73,7 @@ fn test_empty_display_name() {
     assert_eq!(restored.display_name, "");
 }
 
+// @internal
 #[test]
 fn test_unicode_display_name() {
     let payload = NfcCardPayload::new(
@@ -80,6 +87,7 @@ fn test_unicode_display_name() {
     assert_eq!(restored.display_name, "Mattia Egloff \u{1F44B}");
 }
 
+// @internal
 #[test]
 fn test_adversarial_max_length_name() {
     let long_name = "A".repeat(500);
@@ -90,6 +98,7 @@ fn test_adversarial_max_length_name() {
     assert_eq!(restored.display_name, long_name);
 }
 
+// @internal
 #[test]
 fn test_deserialization_rejects_truncated_bytes() {
     let payload = NfcCardPayload::new([0x11; 32], "Test".to_string(), [0x22; 32]);

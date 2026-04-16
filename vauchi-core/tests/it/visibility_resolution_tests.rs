@@ -17,6 +17,7 @@ use vauchi_core::contact::GroupManager;
 use vauchi_core::contact::labels::resolve_visible_fields;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 
+// @internal
 #[test]
 fn test_visible_fields_no_groups_mode() {
     let mut card = ContactCard::new("Alice");
@@ -38,6 +39,7 @@ fn test_visible_fields_no_groups_mode() {
     assert_eq!(visible.len(), 1);
 }
 
+// @internal
 #[test]
 fn test_visible_fields_no_groups_mode_empty() {
     let mut card = ContactCard::new("Alice");
@@ -51,6 +53,7 @@ fn test_visible_fields_no_groups_mode_empty() {
     assert!(visible.is_empty(), "No shown fields means no visibility");
 }
 
+// @internal
 #[test]
 fn test_visible_fields_groups_mode() {
     let mut card = ContactCard::new("Alice");
@@ -74,6 +77,7 @@ fn test_visible_fields_groups_mode() {
     assert!(visible.contains(&field1_id));
 }
 
+// @internal
 #[test]
 fn test_visible_fields_ungrouped_contact_in_groups_mode() {
     let mut card = ContactCard::new("Alice");
@@ -93,6 +97,7 @@ fn test_visible_fields_ungrouped_contact_in_groups_mode() {
     );
 }
 
+// @internal
 #[test]
 fn test_visible_fields_groups_mode_ignores_field_visibility() {
     let mut card = ContactCard::new("Alice");
@@ -128,6 +133,7 @@ fn test_visible_fields_groups_mode_ignores_field_visibility() {
     assert_eq!(visible.len(), 1);
 }
 
+// @internal
 #[test]
 fn test_visible_fields_groups_mode_with_per_contact_override() {
     let mut card = ContactCard::new("Alice");
@@ -163,6 +169,7 @@ fn test_visible_fields_groups_mode_with_per_contact_override() {
     );
 }
 
+// @internal
 #[test]
 fn test_is_empty_label_manager() {
     let mut manager = GroupManager::new();

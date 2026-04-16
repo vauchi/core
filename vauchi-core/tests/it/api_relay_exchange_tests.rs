@@ -20,6 +20,7 @@ fn setup_vauchi(name: &str) -> Vauchi {
 }
 
 // @scenario: field_validation.feature - Accept relay exchange creates contact
+// @internal
 #[test]
 fn test_accept_relay_exchange_creates_contact() {
     let wb = setup_vauchi("Alice");
@@ -50,6 +51,7 @@ fn test_accept_relay_exchange_creates_contact() {
 }
 
 // @scenario: field_validation.feature - Accept relay exchange initializes ratchet
+// @internal
 #[test]
 fn test_accept_relay_exchange_initializes_ratchet() {
     let wb = setup_vauchi("Alice");
@@ -75,6 +77,7 @@ fn test_accept_relay_exchange_initializes_ratchet() {
 }
 
 // @scenario: field_validation.feature - Accept duplicate exchange fails
+// @internal
 #[test]
 fn test_accept_relay_exchange_rejects_duplicate() {
     let wb = setup_vauchi("Alice");
@@ -97,6 +100,7 @@ fn test_accept_relay_exchange_rejects_duplicate() {
 }
 
 // @scenario: field_validation.feature - Accept exchange without identity fails
+// @internal
 #[test]
 fn test_accept_relay_exchange_requires_identity() {
     let wb = Vauchi::in_memory().unwrap();
@@ -116,6 +120,7 @@ fn test_accept_relay_exchange_requires_identity() {
 // A contact created via relay exchange has Standard trust (no proximity
 // verification). Granting recovery trust to such a contact would allow
 // an unverified remote party to vouch for identity restoration.
+// @internal
 #[test]
 fn test_relay_contact_cannot_be_recovery_trusted() {
     let wb = setup_vauchi("Alice");

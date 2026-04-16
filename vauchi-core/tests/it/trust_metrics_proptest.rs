@@ -51,6 +51,7 @@ fn arb_verifier_method() -> impl Strategy<Value = Option<VerifierMethod>> {
 }
 
 proptest! {
+// @internal
     #[test]
     fn trust_metrics_serde_roundtrip(
         transport in arb_exchange_transport(),
@@ -74,6 +75,7 @@ proptest! {
         );
     }
 
+// @internal
     #[test]
     fn transport_proximity_derivation_is_deterministic(
         transport in arb_exchange_transport(),
@@ -83,6 +85,7 @@ proptest! {
         prop_assert_eq!(a, b);
     }
 
+// @internal
     #[test]
     fn strong_transport_always_gives_high_trust_without_recovery(
         transport in prop_oneof![Just(ExchangeTransport::Usb), Just(ExchangeTransport::Nfc)],
@@ -104,18 +107,21 @@ proptest! {
 
 // --- CC-14: Adversarial deserialization tests for TrustMetrics ---
 
+// @internal
 #[test]
 fn trust_metrics_rejects_empty_json() {
     let result = serde_json::from_str::<TrustMetrics>("");
     assert!(result.is_err());
 }
 
+// @internal
 #[test]
 fn trust_metrics_rejects_null() {
     let result = serde_json::from_str::<TrustMetrics>("null");
     assert!(result.is_err());
 }
 
+// @internal
 #[test]
 fn trust_metrics_rejects_truncated_json() {
     let metrics = TrustMetrics::new(
@@ -131,6 +137,7 @@ fn trust_metrics_rejects_truncated_json() {
     assert!(result.is_err());
 }
 
+// @internal
 #[test]
 fn trust_metrics_unknown_transport_variant() {
     let json = r#"{"transport":"quantum","proximity":"high","verifier_method":null,"verifier_log":{"events":[]},"transport_proximity":"none","timestamp":0}"#;

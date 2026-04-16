@@ -26,6 +26,7 @@ fn ble_session(name: &str) -> ExchangeSession {
 
 // −− Initial commands −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn ble_session_emits_scan_and_advertise_on_start() {
     let mut session = ble_session("Alice");
@@ -49,6 +50,7 @@ fn ble_session_emits_scan_and_advertise_on_start() {
 
 // −− Discovery -> Connect −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn ble_device_discovered_emits_connect_command() {
     let mut session = ble_session("Alice");
@@ -77,6 +79,7 @@ fn ble_device_discovered_emits_connect_command() {
 
 // −− BleConnected (initiator) -> KeyOffer write −−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn ble_connected_after_discovery_emits_key_offer_write() {
     let mut session = ble_session("Alice");
@@ -117,6 +120,7 @@ fn ble_connected_after_discovery_emits_key_offer_write() {
 
 // −− Full 4-phase initiator flow −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn ble_full_initiator_flow_via_command_event() {
     let mut initiator = ble_session("Alice");
@@ -232,6 +236,7 @@ fn ble_full_initiator_flow_via_command_event() {
 
 // −− BLE disconnect during handshake -> fail −−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn ble_disconnect_during_connection_fails_session() {
     let mut session = ble_session("Alice");
@@ -250,6 +255,7 @@ fn ble_disconnect_during_connection_fails_session() {
 
 // −− BLE hardware error -> fail −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn ble_hardware_error_fails_session() {
     let mut session = ble_session("Alice");
@@ -269,6 +275,7 @@ fn ble_hardware_error_fails_session() {
 
 // −− Out-of-order BLE data buffering −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn ble_card_before_key_ack_is_buffered_and_processed() {
     let mut initiator = ble_session("Alice");

@@ -4,6 +4,7 @@
 
 use vauchi_core::exchange::multistage::commitment::Commitment;
 
+// @internal
 #[test]
 fn test_commitment_create_and_verify() {
     let plaintext = b"secret contact card data";
@@ -18,6 +19,7 @@ fn test_commitment_create_and_verify() {
     assert_eq!(decrypted, plaintext);
 }
 
+// @internal
 #[test]
 fn test_commitment_hash_is_deterministic() {
     let plaintext = b"test data";
@@ -28,6 +30,7 @@ fn test_commitment_hash_is_deterministic() {
     assert_ne!(c1.hash(), c2.hash()); // different reveal keys
 }
 
+// @internal
 #[test]
 fn test_commitment_verify_from_parts() {
     let plaintext = b"alice's contact card";
@@ -45,6 +48,7 @@ fn test_commitment_verify_from_parts() {
     assert!(Commitment::verify_hash(&reveal_key, &ciphertext, hash));
 }
 
+// @internal
 #[test]
 fn test_commitment_wrong_key_fails() {
     let plaintext = b"secret";
@@ -56,6 +60,7 @@ fn test_commitment_wrong_key_fails() {
     result.expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_commitment_tampered_ciphertext_fails() {
     let plaintext = b"data";
@@ -68,6 +73,7 @@ fn test_commitment_tampered_ciphertext_fails() {
     result.expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_commitment_hash_mismatch_detected() {
     let plaintext = b"data";
@@ -85,6 +91,7 @@ fn test_commitment_hash_mismatch_detected() {
 
 // === T1.7: Commitment binds relay metadata (context) ===
 
+// @internal
 #[test]
 fn test_commitment_with_context_binds_relay_url() {
     let plaintext = b"contact card data";
@@ -110,6 +117,7 @@ fn test_commitment_with_context_binds_relay_url() {
     ));
 }
 
+// @internal
 #[test]
 fn test_commitment_with_context_empty_context_differs_from_no_context() {
     let plaintext = b"card data";
@@ -127,6 +135,7 @@ fn test_commitment_with_context_empty_context_differs_from_no_context() {
     ));
 }
 
+// @internal
 #[test]
 fn test_commitment_context_includes_relay_and_pubkey() {
     let plaintext = b"card";
@@ -153,6 +162,7 @@ fn test_commitment_context_includes_relay_and_pubkey() {
     ));
 }
 
+// @internal
 #[test]
 fn test_commitment_with_context_decryption_unchanged() {
     // Context affects the hash only, not the encryption.

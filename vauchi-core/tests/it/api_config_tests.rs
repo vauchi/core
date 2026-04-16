@@ -8,6 +8,7 @@
 use std::path::PathBuf;
 use vauchi_core::api::*;
 
+// @internal
 #[test]
 fn test_vauchi_config_default() {
     let config = VauchiConfig::default();
@@ -20,6 +21,7 @@ fn test_vauchi_config_default() {
     );
 }
 
+// @internal
 #[test]
 fn test_default_relay_url_is_valid_https() {
     let config = VauchiConfig::default();
@@ -33,6 +35,7 @@ fn test_default_relay_url_is_valid_https() {
     );
 }
 
+// @internal
 #[test]
 fn test_vauchi_config_builder() {
     let config = VauchiConfig::with_storage_path("/tmp/test")
@@ -44,6 +47,7 @@ fn test_vauchi_config_builder() {
     assert!(!config.auto_save);
 }
 
+// @internal
 #[test]
 fn test_relay_config_default() {
     let config = RelayConfig::default();
@@ -56,6 +60,7 @@ fn test_relay_config_default() {
     assert_eq!(config.ack_timeout_ms, 30_000);
 }
 
+// @internal
 #[test]
 fn test_relay_config_to_transport_config() {
     let relay = RelayConfig {
@@ -76,6 +81,7 @@ fn test_relay_config_to_transport_config() {
     assert_eq!(transport.reconnect_base_delay_ms, 500);
 }
 
+// @internal
 #[test]
 fn test_relay_config_to_relay_client_config() {
     let relay = RelayConfig {
@@ -94,6 +100,7 @@ fn test_relay_config_to_relay_client_config() {
     assert_eq!(client_config.max_retries, 3);
 }
 
+// @internal
 #[test]
 fn test_sync_config_default() {
     let config = SyncConfig::default();
@@ -106,6 +113,7 @@ fn test_sync_config_default() {
 // ─── Certificate pinning defaults ───────────────────────────────────
 
 /// @internal C7
+// @internal
 #[test]
 fn default_relay_config_has_production_pin() {
     let config = RelayConfig::default();
@@ -123,6 +131,7 @@ fn default_relay_config_has_production_pin() {
 }
 
 /// @internal C7
+// @internal
 #[test]
 fn relay_config_pin_propagates_to_transport_config() {
     let relay = RelayConfig::default();
@@ -140,6 +149,7 @@ fn relay_config_pin_propagates_to_transport_config() {
 }
 
 /// @internal C7
+// @internal
 #[test]
 fn default_relay_config_has_no_pin_rotation_key() {
     let config = RelayConfig::default();
@@ -150,6 +160,7 @@ fn default_relay_config_has_no_pin_rotation_key() {
 }
 
 /// @internal C7
+// @internal
 #[test]
 fn default_relay_config_has_24h_pin_ttl() {
     let config = RelayConfig::default();

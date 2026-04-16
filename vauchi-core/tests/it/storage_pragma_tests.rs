@@ -14,6 +14,7 @@ use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::Storage;
 
 /// WAL mode should be enabled for file-based storage.
+// @internal
 #[test]
 fn test_wal_mode_enabled() {
     let tmp = NamedTempFile::new().unwrap();
@@ -28,6 +29,7 @@ fn test_wal_mode_enabled() {
 }
 
 /// synchronous should be set to NORMAL (1) for better write performance.
+// @internal
 #[test]
 fn test_synchronous_normal() {
     let tmp = NamedTempFile::new().unwrap();
@@ -42,6 +44,7 @@ fn test_synchronous_normal() {
 }
 
 /// cache_size should be configured for performance.
+// @internal
 #[test]
 fn test_cache_size_configured() {
     let tmp = NamedTempFile::new().unwrap();
@@ -59,6 +62,7 @@ fn test_cache_size_configured() {
 
 /// In-memory storage should not crash when PRAGMAs are applied.
 /// WAL is not supported for :memory: — SQLite silently falls back to "memory" journal mode.
+// @internal
 #[test]
 fn test_in_memory_does_not_crash() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -73,6 +77,7 @@ fn test_in_memory_does_not_crash() {
 // ============================================================================
 
 /// secure_delete should be ON to overwrite deleted content with zeros.
+// @internal
 #[test]
 fn test_secure_delete_enabled() {
     let tmp = NamedTempFile::new().unwrap();
@@ -91,6 +96,7 @@ fn test_secure_delete_enabled() {
 }
 
 /// temp_store should be MEMORY (2) to keep temporary tables in RAM.
+// @internal
 #[test]
 fn test_temp_store_memory() {
     let tmp = NamedTempFile::new().unwrap();
@@ -109,6 +115,7 @@ fn test_temp_store_memory() {
 }
 
 /// auto_vacuum should be FULL (1) for new databases.
+// @internal
 #[test]
 fn test_auto_vacuum_full() {
     let tmp = NamedTempFile::new().unwrap();
@@ -132,6 +139,7 @@ fn test_auto_vacuum_full() {
 
 /// Database file should be created with 0600 permissions (owner-only).
 #[cfg(unix)]
+// @internal
 #[test]
 fn test_database_file_permissions_0600() {
     use std::os::unix::fs::PermissionsExt;
@@ -155,6 +163,7 @@ fn test_database_file_permissions_0600() {
 
 /// Existing database files should not have their permissions changed on reopen.
 #[cfg(unix)]
+// @internal
 #[test]
 fn test_existing_database_permissions_preserved() {
     use std::os::unix::fs::PermissionsExt;
@@ -187,6 +196,7 @@ fn test_existing_database_permissions_preserved() {
 // ============================================================================
 
 /// The contacts display_name index should exist after migrations.
+// @internal
 #[test]
 fn test_display_name_index_exists() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -207,6 +217,7 @@ fn test_display_name_index_exists() {
 }
 
 /// Searching 1000 contacts by display_name should complete in under 200ms.
+// @internal
 #[test]
 fn test_search_1000_contacts_under_200ms() {
     use std::time::Instant;

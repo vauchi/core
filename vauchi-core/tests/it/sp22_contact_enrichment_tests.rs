@@ -10,6 +10,7 @@
 
 use vauchi_core::contact_card::{ContactCard, FieldType};
 
+// @internal
 #[test]
 fn test_contact_card_nickname_field_add_and_retrieve() {
     // RED: ContactCard doesn't have nickname() method yet
@@ -22,6 +23,7 @@ fn test_contact_card_nickname_field_add_and_retrieve() {
     assert_eq!(card.nickname(), Some("Al"));
 }
 
+// @internal
 #[test]
 fn test_contact_card_nickname_field_empty_clears() {
     // RED: ContactCard doesn't support clearing nickname
@@ -34,6 +36,7 @@ fn test_contact_card_nickname_field_empty_clears() {
     assert_eq!(card.nickname(), None);
 }
 
+// @internal
 #[test]
 fn test_contact_card_nickname_field_max_length() {
     // RED: Nickname should respect max length constraint
@@ -48,12 +51,14 @@ fn test_contact_card_nickname_field_max_length() {
     assert!(nickname.len() <= 100);
 }
 
+// @internal
 #[test]
 fn test_birthday_field_type_exists() {
     let field_type = FieldType::Birthday;
     assert_eq!(format!("{field_type:?}"), "Birthday");
 }
 
+// @internal
 #[test]
 fn test_birthday_field_iso8601_valid_date() {
     // RED: Can't create Birthday field with ISO 8601 date yet
@@ -63,6 +68,7 @@ fn test_birthday_field_iso8601_valid_date() {
     field.validate().expect("Valid ISO 8601 date should pass");
 }
 
+// @internal
 #[test]
 fn test_birthday_field_iso8601_invalid_date_format() {
     // RED: Birthday validation should reject non-ISO 8601 formats
@@ -74,6 +80,7 @@ fn test_birthday_field_iso8601_invalid_date_format() {
     field.validate().expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_birthday_field_iso8601_invalid_date_value() {
     // RED: Birthday validation should reject impossible dates
@@ -85,6 +92,7 @@ fn test_birthday_field_iso8601_invalid_date_value() {
     field.validate().expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_contact_card_single_birthday_constraint() {
     // RED: ContactCard should enforce single birthday
@@ -105,6 +113,7 @@ fn test_contact_card_single_birthday_constraint() {
     assert_eq!(card.fields().len(), 1);
 }
 
+// @internal
 #[test]
 fn test_birthday_field_leap_year_valid() {
     // RED: Birthday should validate leap year dates
@@ -114,6 +123,7 @@ fn test_birthday_field_leap_year_valid() {
     field.validate().expect("Leap year date should be valid");
 }
 
+// @internal
 #[test]
 fn test_birthday_field_leap_year_invalid() {
     // RED: Birthday should reject invalid leap year dates

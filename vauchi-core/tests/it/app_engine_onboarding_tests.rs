@@ -16,6 +16,7 @@ use vauchi_core::api::Vauchi;
 
 use proptest::prelude::*;
 
+// @internal
 #[test]
 fn app_engine_starts_on_onboarding_without_identity() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -23,6 +24,7 @@ fn app_engine_starts_on_onboarding_without_identity() {
     assert_eq!(engine.current_app_screen(), &AppScreen::Onboarding);
 }
 
+// @internal
 #[test]
 fn app_engine_shows_onboarding_screen() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -32,6 +34,7 @@ fn app_engine_shows_onboarding_screen() {
     assert!(!screen.title.is_empty());
 }
 
+// @internal
 #[test]
 fn onboarding_complete_navigates_to_home() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -50,6 +53,7 @@ fn onboarding_complete_navigates_to_home() {
     assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
 }
 
+// @internal
 #[test]
 fn onboarding_with_backup_navigates_to_backup_screen() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -67,6 +71,7 @@ fn onboarding_with_backup_navigates_to_backup_screen() {
     assert_eq!(engine.current_app_screen(), &AppScreen::Backup);
 }
 
+// @internal
 #[test]
 fn app_engine_starts_on_home_with_identity() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -75,6 +80,7 @@ fn app_engine_starts_on_home_with_identity() {
     assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
 }
 
+// @internal
 #[test]
 fn onboarding_completion_without_name_returns_update_screen_with_error() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -118,6 +124,7 @@ fn onboarding_completion_without_name_returns_update_screen_with_error() {
 }
 
 /// Verify that a whitespace-only name is also rejected.
+// @internal
 #[test]
 fn onboarding_completion_with_empty_name_returns_update_screen_with_error() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -170,6 +177,7 @@ fn onboarding_completion_with_empty_name_returns_update_screen_with_error() {
     );
 }
 
+// @internal
 #[test]
 fn onboarding_complete_creates_identity_in_vauchi() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -190,6 +198,7 @@ fn onboarding_complete_creates_identity_in_vauchi() {
     );
 }
 
+// @internal
 #[test]
 fn home_screen_no_setup_progress() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -210,6 +219,7 @@ fn home_screen_no_setup_progress() {
 /// Reproduce the "identity not initialized" bug:
 /// After onboarding creates identity via vauchi.create_identity(),
 /// navigating to AddField form and completing it should succeed.
+// @internal
 #[test]
 fn add_field_after_onboarding_identity_creation() {
     // Create Vauchi (no identity) + AppEngine — same as TUI startup
@@ -272,6 +282,7 @@ proptest! {
     /// Random sequences of UserActions fired at a fresh AppEngine never
     /// panic and always produce a non-empty screen_id. This satisfies
     /// CC-13 (stateful property tests for state machines).
+// @internal
     #[test]
     fn onboarding_random_actions_never_panic(
         actions in prop::collection::vec(

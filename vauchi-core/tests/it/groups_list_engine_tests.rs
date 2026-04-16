@@ -21,6 +21,7 @@ fn sample_groups() -> Vec<GroupInfo> {
     ]
 }
 
+// @internal
 #[test]
 fn groups_list_screen_id() {
     let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
@@ -28,6 +29,7 @@ fn groups_list_screen_id() {
     assert_eq!(screen.screen_id, "groups_list");
 }
 
+// @internal
 #[test]
 fn groups_list_title() {
     let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
@@ -35,6 +37,7 @@ fn groups_list_title() {
     assert_eq!(screen.title, "Groups");
 }
 
+// @internal
 #[test]
 fn groups_list_shows_groups_with_member_counts() {
     let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
@@ -65,6 +68,7 @@ fn groups_list_shows_groups_with_member_counts() {
 }
 
 // @internal
+// @internal
 #[test]
 fn groups_list_new_group_opens_form_dialog() {
     let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
@@ -79,6 +83,7 @@ fn groups_list_new_group_opens_form_dialog() {
     }
 }
 
+// @internal
 #[test]
 fn groups_list_unknown_action_returns_update_screen() {
     let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);

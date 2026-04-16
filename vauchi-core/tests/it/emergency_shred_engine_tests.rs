@@ -4,6 +4,7 @@
 
 use vauchi_app::ui::*;
 
+// @internal
 #[test]
 fn shred_starts_at_warning() {
     let engine = EmergencyShredEngine::new();
@@ -13,6 +14,7 @@ fn shred_starts_at_warning() {
     assert_eq!(screen.progress.as_ref().unwrap().total_steps, 3);
 }
 
+// @internal
 #[test]
 fn shred_warning_has_info_panel() {
     let engine = EmergencyShredEngine::new();
@@ -38,6 +40,7 @@ fn shred_warning_has_info_panel() {
     assert_eq!(screen.actions[1].style, ActionStyle::Secondary);
 }
 
+// @internal
 #[test]
 fn shred_continue_to_confirm() {
     let mut engine = EmergencyShredEngine::new();
@@ -55,6 +58,7 @@ fn shred_continue_to_confirm() {
 }
 
 // @scenario: emergency_shred :: Hard shred requires valid shred token
+// @internal
 #[test]
 fn shred_confirm_requires_delete_text() {
     let mut engine = EmergencyShredEngine::new();
@@ -90,6 +94,7 @@ fn shred_confirm_requires_delete_text() {
     );
 }
 
+// @internal
 #[test]
 fn shred_confirm_wrong_text_validation_error() {
     let mut engine = EmergencyShredEngine::new();
@@ -119,6 +124,7 @@ fn shred_confirm_wrong_text_validation_error() {
 }
 
 // @scenario: emergency_shred :: Panic shred destroys everything immediately
+// @internal
 #[test]
 fn shred_confirm_delete_starts_wipe() {
     let mut engine = EmergencyShredEngine::new();
@@ -158,6 +164,7 @@ fn shred_confirm_delete_starts_wipe() {
 }
 
 // @scenario: emergency_shred :: Shred report tracks what was destroyed
+// @internal
 #[test]
 fn shred_wipe_complete() {
     let mut engine = EmergencyShredEngine::new();
@@ -198,6 +205,7 @@ fn shred_wipe_complete() {
 }
 
 // @scenario: emergency_shred :: Cancel soft shred during grace period
+// @internal
 #[test]
 fn shred_cancel_returns_complete() {
     // Cancel from warning

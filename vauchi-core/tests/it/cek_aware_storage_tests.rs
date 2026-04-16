@@ -41,12 +41,14 @@ fn make_contact_with_cek(name: &str) -> Contact {
 
 // === Contact Struct CEK Field ===
 
+// @internal
 #[test]
 fn test_contact_cek_none_by_default() {
     let contact = make_contact("Alice");
     assert!(contact.cek().is_none());
 }
 
+// @internal
 #[test]
 fn test_contact_set_and_get_cek() {
     let mut contact = make_contact("Alice");
@@ -59,6 +61,7 @@ fn test_contact_set_and_get_cek() {
     assert_eq!(contact.cek().unwrap().to_bytes(), cek_bytes);
 }
 
+// @internal
 #[test]
 fn test_contact_clear_cek() {
     let mut contact = make_contact_with_cek("Alice");
@@ -70,6 +73,7 @@ fn test_contact_clear_cek() {
 
 // === CEK-Aware Save/Load Round-trip ===
 
+// @internal
 #[test]
 fn test_save_load_contact_with_cek_roundtrip() {
     let storage = test_storage();
@@ -82,6 +86,7 @@ fn test_save_load_contact_with_cek_roundtrip() {
     assert!(loaded.cek().is_some(), "CEK should be loaded with contact");
 }
 
+// @internal
 #[test]
 fn test_legacy_contact_still_loads_without_cek() {
     let storage = test_storage();
@@ -95,6 +100,7 @@ fn test_legacy_contact_still_loads_without_cek() {
     assert!(loaded.cek().is_none(), "Legacy contact should have no CEK");
 }
 
+// @internal
 #[test]
 fn test_list_contacts_includes_cek_contacts() {
     let storage = test_storage();
@@ -109,6 +115,7 @@ fn test_list_contacts_includes_cek_contacts() {
 
 // === CEK-Protected Display Name ===
 
+// @internal
 #[test]
 fn test_cek_contact_display_name_empty_in_db() {
     let storage = test_storage();
@@ -133,6 +140,7 @@ fn test_cek_contact_display_name_empty_in_db() {
     );
 }
 
+// @internal
 #[test]
 fn test_legacy_contact_has_plaintext_display_name() {
     let storage = test_storage();
@@ -153,6 +161,7 @@ fn test_legacy_contact_has_plaintext_display_name() {
 
 // === Card Encrypted With CEK (not storage key) ===
 
+// @internal
 #[test]
 fn test_cek_contact_card_not_decryptable_with_storage_key_alone() {
     let storage = test_storage();
@@ -179,6 +188,7 @@ fn test_cek_contact_card_not_decryptable_with_storage_key_alone() {
 
 // === Crypto-Shredding: CEK Deletion Makes Card Unreadable ===
 
+// @internal
 #[test]
 fn test_crypto_shred_makes_card_unreadable() {
     let storage = test_storage();
@@ -202,6 +212,7 @@ fn test_crypto_shred_makes_card_unreadable() {
 
 // === Search Works With CEK Contacts ===
 
+// @internal
 #[test]
 fn test_search_contacts_finds_cek_protected_name() {
     let storage = test_storage();
@@ -233,6 +244,7 @@ fn test_search_contacts_finds_cek_protected_name() {
 
 // === CEK Rotation Replaces At-Rest Encryption ===
 
+// @internal
 #[test]
 fn test_save_contact_with_rotated_cek() {
     let storage = test_storage();

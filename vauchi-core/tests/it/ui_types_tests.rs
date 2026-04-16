@@ -4,6 +4,7 @@
 
 use vauchi_app::ui::{A11y, AccessibilityRole, SettingsItem, *};
 
+// @internal
 #[test]
 fn test_screen_model_serde_roundtrip() {
     let screen = ScreenModel {
@@ -52,6 +53,7 @@ fn test_screen_model_serde_roundtrip() {
     assert_eq!(progress.label.as_deref(), Some("Welcome"));
 }
 
+// @internal
 #[test]
 fn test_user_action_text_changed_roundtrip() {
     let action = UserAction::TextChanged {
@@ -72,6 +74,7 @@ fn test_user_action_text_changed_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_user_action_item_toggled_roundtrip() {
     let action = UserAction::ItemToggled {
@@ -92,6 +95,7 @@ fn test_user_action_item_toggled_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_user_action_action_pressed_roundtrip() {
     let action = UserAction::ActionPressed {
@@ -107,6 +111,7 @@ fn test_user_action_action_pressed_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_user_action_field_visibility_changed_roundtrip() {
     let action = UserAction::FieldVisibilityChanged {
@@ -130,6 +135,7 @@ fn test_user_action_field_visibility_changed_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_user_action_group_view_selected_roundtrip() {
     let action = UserAction::GroupViewSelected {
@@ -145,6 +151,7 @@ fn test_user_action_group_view_selected_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_action_result_update_screen_roundtrip() {
     let screen = ScreenModel {
@@ -171,6 +178,7 @@ fn test_action_result_update_screen_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_action_result_navigate_to_roundtrip() {
     let screen = ScreenModel {
@@ -192,6 +200,7 @@ fn test_action_result_navigate_to_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_action_result_validation_error_roundtrip() {
     let result = ActionResult::ValidationError {
@@ -212,6 +221,7 @@ fn test_action_result_validation_error_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_action_result_complete_roundtrip() {
     let result = ActionResult::Complete;
@@ -220,6 +230,7 @@ fn test_action_result_complete_roundtrip() {
     assert!(matches!(restored, ActionResult::Complete));
 }
 
+// @internal
 #[test]
 fn test_component_text_input_roundtrip() {
     let component = Component::TextInput {
@@ -258,6 +269,7 @@ fn test_component_text_input_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_component_toggle_list_roundtrip() {
     let component = Component::ToggleList {
@@ -302,6 +314,7 @@ fn test_component_toggle_list_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_component_field_list_roundtrip() {
     let component = Component::FieldList {
@@ -344,6 +357,7 @@ fn test_component_field_list_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_component_card_preview_roundtrip() {
     let component = Component::CardPreview {
@@ -394,6 +408,7 @@ fn test_component_card_preview_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_screen_action_styles() {
     let styles = vec![
@@ -416,6 +431,7 @@ fn test_screen_action_styles() {
     }
 }
 
+// @internal
 #[test]
 fn test_text_style_variants() {
     let styles = vec![
@@ -443,6 +459,7 @@ fn test_text_style_variants() {
     }
 }
 
+// @internal
 #[test]
 fn test_input_type_variants() {
     let types = vec![InputType::Text, InputType::Phone, InputType::Email];
@@ -454,6 +471,7 @@ fn test_input_type_variants() {
     }
 }
 
+// @internal
 #[test]
 fn test_field_visibility_variants() {
     let variants = vec![
@@ -469,6 +487,7 @@ fn test_field_visibility_variants() {
     }
 }
 
+// @internal
 #[test]
 fn test_divider_component_roundtrip() {
     let component = Component::Divider;
@@ -477,6 +496,7 @@ fn test_divider_component_roundtrip() {
     assert!(matches!(restored, Component::Divider));
 }
 
+// @internal
 #[test]
 fn test_screen_model_empty_components() {
     let screen = ScreenModel {
@@ -498,6 +518,7 @@ fn test_screen_model_empty_components() {
     assert!(restored.subtitle.is_none());
 }
 
+// @internal
 #[test]
 fn test_screen_action_disabled() {
     let action = ScreenAction {
@@ -514,6 +535,7 @@ fn test_screen_action_disabled() {
 
 // === InlineConfirm component ===
 
+// @internal
 #[test]
 fn test_component_inline_confirm_roundtrip() {
     let component = Component::InlineConfirm {
@@ -546,6 +568,7 @@ fn test_component_inline_confirm_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_component_inline_confirm_non_destructive_roundtrip() {
     let component = Component::InlineConfirm {
@@ -580,6 +603,7 @@ fn test_component_inline_confirm_non_destructive_roundtrip() {
 
 // === EditableText component ===
 
+// @internal
 #[test]
 fn test_component_editable_text_display_mode_roundtrip() {
     let component = Component::EditableText {
@@ -612,6 +636,7 @@ fn test_component_editable_text_display_mode_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_component_editable_text_editing_with_error_roundtrip() {
     let component = Component::EditableText {
@@ -646,6 +671,7 @@ fn test_component_editable_text_editing_with_error_roundtrip() {
 
 // === ShowToast ActionResult ===
 
+// @internal
 #[test]
 fn test_action_result_show_toast_roundtrip() {
     let result = ActionResult::ShowToast {
@@ -666,6 +692,7 @@ fn test_action_result_show_toast_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn test_action_result_show_toast_without_undo_roundtrip() {
     let result = ActionResult::ShowToast {
@@ -688,6 +715,7 @@ fn test_action_result_show_toast_without_undo_roundtrip() {
 
 // === UndoPressed UserAction ===
 
+// @internal
 #[test]
 fn test_user_action_undo_pressed_roundtrip() {
     let action = UserAction::UndoPressed {
@@ -705,6 +733,7 @@ fn test_user_action_undo_pressed_roundtrip() {
 
 // === A11y struct ===
 
+// @internal
 // @internal
 #[test]
 fn test_a11y_struct_roundtrip() {
@@ -724,6 +753,7 @@ fn test_a11y_struct_roundtrip() {
 }
 
 // @internal
+// @internal
 #[test]
 fn test_a11y_default_is_none() {
     let a11y = A11y::default();
@@ -732,6 +762,7 @@ fn test_a11y_default_is_none() {
     assert_eq!(a11y.role, None);
 }
 
+// @internal
 // @internal
 #[test]
 fn test_a11y_with_role_roundtrip() {
@@ -746,6 +777,7 @@ fn test_a11y_with_role_roundtrip() {
 }
 
 // @internal
+// @internal
 #[test]
 fn test_a11y_without_role_deserializes() {
     let json = r#"{"label":"test"}"#;
@@ -758,6 +790,7 @@ fn test_a11y_without_role_deserializes() {
 // === Sub-type struct a11y field backward-compat ===
 
 // @internal
+// @internal
 #[test]
 fn test_settings_item_without_a11y_deserializes() {
     let json = r#"{"id":"theme","label":"Theme","kind":{"Link":{"detail":"Catppuccin"}}}"#;
@@ -766,6 +799,7 @@ fn test_settings_item_without_a11y_deserializes() {
     assert_eq!(item.a11y, None);
 }
 
+// @internal
 // @internal
 #[test]
 fn test_component_text_input_without_a11y_deserializes() {
@@ -777,6 +811,7 @@ fn test_component_text_input_without_a11y_deserializes() {
     }
 }
 
+// @internal
 // @internal
 #[test]
 fn test_component_text_input_with_a11y_roundtrip() {

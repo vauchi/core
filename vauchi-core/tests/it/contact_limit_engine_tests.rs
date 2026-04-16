@@ -12,6 +12,7 @@ fn make_engine() -> ContactLimitEngine {
 
 // ── Tests ───────────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn contact_limit_screen_id() {
     let engine = make_engine();
@@ -19,6 +20,7 @@ fn contact_limit_screen_id() {
     assert_eq!(screen.screen_id, "contact_limit");
 }
 
+// @internal
 #[test]
 fn contact_limit_initial_shows_edit_action() {
     let engine = make_engine();
@@ -27,6 +29,7 @@ fn contact_limit_initial_shows_edit_action() {
     assert_eq!(screen.actions[0].id, "edit");
 }
 
+// @internal
 #[test]
 fn contact_limit_edit_shows_save_and_cancel() {
     let mut engine = make_engine();
@@ -44,6 +47,7 @@ fn contact_limit_edit_shows_save_and_cancel() {
     }
 }
 
+// @internal
 #[test]
 fn contact_limit_save_valid_number_completes() {
     let mut engine = make_engine();
@@ -64,6 +68,7 @@ fn contact_limit_save_valid_number_completes() {
     assert_eq!(result, ActionResult::Complete);
 }
 
+// @internal
 #[test]
 fn contact_limit_save_invalid_number_returns_validation_error() {
     let mut engine = make_engine();
@@ -93,6 +98,7 @@ fn contact_limit_save_invalid_number_returns_validation_error() {
     }
 }
 
+// @internal
 #[test]
 fn contact_limit_cancel_edit_returns_to_view_mode() {
     let mut engine = make_engine();
@@ -115,6 +121,7 @@ fn contact_limit_cancel_edit_returns_to_view_mode() {
     }
 }
 
+// @internal
 #[test]
 fn contact_limit_text_changed_updates_value() {
     let mut engine = make_engine();
@@ -145,6 +152,7 @@ fn contact_limit_text_changed_updates_value() {
     }
 }
 
+// @internal
 #[test]
 fn contact_limit_usage_percentage_display() {
     let engine = ContactLimitEngine::new(25, 50);

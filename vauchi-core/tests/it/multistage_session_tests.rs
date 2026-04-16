@@ -5,6 +5,7 @@
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::ProtocolState;
 
+// @internal
 #[test]
 fn test_new_session_is_idle() {
     let card = b"Alice's contact card".to_vec();
@@ -12,6 +13,7 @@ fn test_new_session_is_idle() {
     assert!(matches!(session.get_state(), ProtocolState::Idle));
 }
 
+// @internal
 #[test]
 fn test_get_display_qr_starts_advertising() {
     let card = b"Alice's card".to_vec();
@@ -22,6 +24,7 @@ fn test_get_display_qr_starts_advertising() {
     assert!(matches!(session.get_state(), ProtocolState::Advertising));
 }
 
+// @internal
 #[test]
 fn test_full_exchange_two_sessions() {
     let alice_card = b"Alice's full contact card with avatar data".to_vec();
@@ -76,6 +79,7 @@ fn test_full_exchange_two_sessions() {
     assert_eq!(bob_received, alice_card);
 }
 
+// @internal
 #[test]
 fn test_full_exchange_with_relay_metadata() {
     let alice_card = b"Alice's card for relay test".to_vec();
@@ -138,6 +142,7 @@ fn test_full_exchange_with_relay_metadata() {
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
 
+// @internal
 #[test]
 fn test_exchange_without_relay_metadata() {
     let alice_card = b"Alice no relay".to_vec();
@@ -174,6 +179,7 @@ fn test_exchange_without_relay_metadata() {
     assert!(bob.peer_relay_noise_pubkey().is_none());
 }
 
+// @internal
 #[test]
 fn test_cancel_session_clears_state() {
     let mut session = MultiStageSession::new(b"data".to_vec());
@@ -183,6 +189,7 @@ fn test_cancel_session_clears_state() {
     assert!(session.get_received_data().is_none());
 }
 
+// @internal
 #[test]
 fn test_exchange_with_large_payload() {
     let alice_card = vec![0xAA; 15_000];

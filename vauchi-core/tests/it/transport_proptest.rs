@@ -11,6 +11,7 @@ use vauchi_core::exchange::transport::negotiation::negotiate_transport;
 use vauchi_core::exchange::transport::protocol::ExchangeProtocol;
 
 proptest! {
+// @internal
     #[test]
     fn caps_roundtrip(bits in 0u16..=0b1111_1111u16) {
         let caps = TransportCaps::from_bits_truncate(bits);
@@ -19,6 +20,7 @@ proptest! {
         prop_assert_eq!(caps, restored);
     }
 
+// @internal
     #[test]
     fn negotiation_always_returns_valid_type(
         ours_bits in 0u16..=0b1111_1111u16,
@@ -34,6 +36,7 @@ proptest! {
         ));
     }
 
+// @internal
     #[test]
     fn negotiation_symmetric(
         ours_bits in 0u16..=0b1111_1111u16,
@@ -46,6 +49,7 @@ proptest! {
         prop_assert_eq!(result_ab, result_ba, "negotiation must be symmetric");
     }
 
+// @internal
     #[test]
     fn encrypt_decrypt_roundtrip(data in proptest::collection::vec(any::<u8>(), 1..4096)) {
         let alice = ExchangeProtocol::new_random();

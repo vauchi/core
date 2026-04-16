@@ -110,6 +110,7 @@ fn sample_session_data() -> (
     (results, events, snapshots, profile)
 }
 
+// @internal
 #[test]
 fn generate_html_report_produces_valid_html() {
     let (results, events, snapshots, profile) = sample_session_data();
@@ -119,6 +120,7 @@ fn generate_html_report_produces_valid_html() {
     assert!(html.contains("</html>"));
 }
 
+// @internal
 #[test]
 fn generate_html_report_contains_device_info() {
     let (results, events, snapshots, profile) = sample_session_data();
@@ -127,6 +129,7 @@ fn generate_html_report_contains_device_info() {
     assert!(html.contains("Android"));
 }
 
+// @internal
 #[test]
 fn generate_html_report_contains_svg_chart() {
     let (results, events, snapshots, profile) = sample_session_data();
@@ -135,6 +138,7 @@ fn generate_html_report_contains_svg_chart() {
     assert!(html.contains("</svg>"));
 }
 
+// @internal
 #[test]
 fn generate_html_report_contains_style_tag() {
     let (results, events, snapshots, profile) = sample_session_data();
@@ -143,6 +147,7 @@ fn generate_html_report_contains_style_tag() {
     assert!(html.contains("</style>"));
 }
 
+// @internal
 #[test]
 fn generate_html_report_no_external_dependencies() {
     let (results, events, snapshots, profile) = sample_session_data();
@@ -153,6 +158,7 @@ fn generate_html_report_no_external_dependencies() {
     assert!(!html.contains("<link rel=\"stylesheet\""));
 }
 
+// @internal
 #[test]
 fn generate_html_report_empty_results() {
     let profile = DeviceCapabilityProfile {

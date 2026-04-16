@@ -14,6 +14,7 @@ use vauchi_core::contact_card::{ContactField, FieldType};
 
 // ── AppScreen / FormDialogType serde roundtrip tests ─────────────────
 
+// @internal
 #[test]
 fn app_screen_serde_roundtrip_simple_variants() {
     let screens = vec![
@@ -44,6 +45,7 @@ fn app_screen_serde_roundtrip_simple_variants() {
     }
 }
 
+// @internal
 #[test]
 fn app_screen_serde_roundtrip_parameterized_variants() {
     let screens = vec![
@@ -81,6 +83,7 @@ fn app_screen_serde_roundtrip_parameterized_variants() {
     }
 }
 
+// @internal
 #[test]
 fn form_dialog_type_serde_roundtrip() {
     let variants = vec![
@@ -107,6 +110,7 @@ fn form_dialog_type_serde_roundtrip() {
     }
 }
 
+// @internal
 #[test]
 fn app_screen_form_dialog_serde_roundtrip() {
     let screen = AppScreen::FormDialog {
@@ -121,6 +125,7 @@ fn app_screen_form_dialog_serde_roundtrip() {
 
 // ── entry detail delete / undo tests ─────────────────────────────────
 
+// @internal
 #[test]
 fn entry_detail_delete_returns_show_toast_with_undo() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -161,6 +166,7 @@ fn entry_detail_delete_returns_show_toast_with_undo() {
     assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
 }
 
+// @internal
 #[test]
 fn entry_detail_delete_undo_restores_field() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -211,6 +217,7 @@ fn entry_detail_delete_undo_restores_field() {
 
 // ── ADR-031: AppEngine exchange round-trip tests ──────────────────
 
+// @internal
 #[test]
 fn exchange_screen_with_identity_has_session() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -246,6 +253,7 @@ fn exchange_screen_with_identity_has_session() {
     assert!(!qr_data.is_empty(), "session QR data should not be empty");
 }
 
+// @internal
 #[test]
 fn exchange_hardware_event_delegated_to_session() {
     use vauchi_core::exchange::ExchangeHardwareEvent;
@@ -269,6 +277,7 @@ fn exchange_hardware_event_delegated_to_session() {
     );
 }
 
+// @internal
 #[test]
 fn exchange_hardware_unavailable_shows_toast() {
     use vauchi_core::exchange::ExchangeHardwareEvent;
@@ -298,6 +307,7 @@ proptest! {
     /// Random sequences of UserActions fired at a fresh AppEngine never
     /// panic and always produce a non-empty screen_id. This satisfies
     /// CC-13 (stateful property tests for state machines).
+// @internal
     #[test]
     fn onboarding_random_actions_never_panic(
         actions in prop::collection::vec(

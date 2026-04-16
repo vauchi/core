@@ -11,6 +11,7 @@ use vauchi_core::exchange::transport::protocol::ExchangeProtocol;
 
 /// Offer must be exactly 90 bytes:
 /// identity_pub(32) + ephemeral_pub(32) + nonce(16) + timestamp(8) + caps(2)
+// @internal
 #[test]
 fn create_offer_returns_90_bytes() {
     let protocol = ExchangeProtocol::new_random();
@@ -21,6 +22,7 @@ fn create_offer_returns_90_bytes() {
 }
 
 /// Two parties performing mutual key agreement must derive identical shared keys.
+// @internal
 #[test]
 fn mutual_key_agreement_produces_identical_shared_keys() {
     let alice = ExchangeProtocol::new_random();
@@ -42,6 +44,7 @@ fn mutual_key_agreement_produces_identical_shared_keys() {
 }
 
 /// Encrypt-then-decrypt roundtrip must recover the original plaintext.
+// @internal
 #[test]
 fn encrypt_then_decrypt_roundtrip() {
     let alice = ExchangeProtocol::new_random();
@@ -70,6 +73,7 @@ fn encrypt_then_decrypt_roundtrip() {
 }
 
 /// Decryption with a wrong key must fail.
+// @internal
 #[test]
 fn wrong_key_cannot_decrypt() {
     let alice = ExchangeProtocol::new_random();
@@ -105,6 +109,7 @@ fn wrong_key_cannot_decrypt() {
 
 /// Tampering with the offer (flipping a byte in ephemeral pub) must produce
 /// a different shared secret than the untampered offer.
+// @internal
 #[test]
 fn tampered_offer_produces_different_shared_secret() {
     let alice = ExchangeProtocol::new_random();
@@ -128,6 +133,7 @@ fn tampered_offer_produces_different_shared_secret() {
 }
 
 /// An offer shorter than 90 bytes must be rejected.
+// @internal
 #[test]
 fn short_offer_rejected() {
     let alice = ExchangeProtocol::new_random();
@@ -145,6 +151,7 @@ fn short_offer_rejected() {
 }
 
 /// Capabilities bitfield must appear at bytes 88..90 of the offer.
+// @internal
 #[test]
 fn capabilities_embedded_in_offer_bytes_88_90() {
     let caps = TransportCaps::BLE | TransportCaps::WIFI_AWARE;

@@ -15,6 +15,7 @@ use vauchi_core::*;
 
 // ===== Debug log activation =====
 
+// @internal
 #[test]
 fn debug_log_disabled_by_default() {
     let identity = Identity::create("Alice");
@@ -24,6 +25,7 @@ fn debug_log_disabled_by_default() {
     assert!(session.exchange_debug_log().is_none());
 }
 
+// @internal
 #[test]
 fn enable_debug_log_creates_log_with_session_started() {
     let identity = Identity::create("Alice");
@@ -40,6 +42,7 @@ fn enable_debug_log_creates_log_with_session_started() {
     ));
 }
 
+// @internal
 #[test]
 fn enable_debug_log_nfc_records_transport() {
     let identity = Identity::create("Alice");
@@ -55,6 +58,7 @@ fn enable_debug_log_nfc_records_transport() {
     ));
 }
 
+// @internal
 #[test]
 fn enable_debug_log_ble_records_transport() {
     let identity = Identity::create("Alice");
@@ -72,6 +76,7 @@ fn enable_debug_log_ble_records_transport() {
 
 // ===== QR flow events =====
 
+// @internal
 #[test]
 fn start_qr_logs_qr_generated() {
     let identity = Identity::create("Alice");
@@ -90,6 +95,7 @@ fn start_qr_logs_qr_generated() {
     ));
 }
 
+// @internal
 #[test]
 fn process_qr_logs_qr_scanned() {
     let alice_identity = Identity::create("Alice");
@@ -118,6 +124,7 @@ fn process_qr_logs_qr_scanned() {
 
 // ===== Key agreement + proximity =====
 
+// @internal
 #[test]
 fn key_agreement_logs_completion_and_proximity() {
     let alice_identity = Identity::create("Alice");
@@ -168,6 +175,7 @@ fn key_agreement_logs_completion_and_proximity() {
 
 // ===== Exchange completion =====
 
+// @internal
 #[test]
 fn complete_exchange_logs_completed() {
     let alice_identity = Identity::create("Alice");
@@ -207,6 +215,7 @@ fn complete_exchange_logs_completed() {
 
 // ===== Failure logging =====
 
+// @internal
 #[test]
 fn fail_event_logs_exchange_failed() {
     let identity = Identity::create("Alice");
@@ -227,6 +236,7 @@ fn fail_event_logs_exchange_failed() {
 
 // ===== Idempotency =====
 
+// @internal
 #[test]
 fn enable_debug_log_twice_is_idempotent() {
     let identity = Identity::create("Alice");
@@ -246,6 +256,7 @@ fn enable_debug_log_twice_is_idempotent() {
 
 // ===== No events when disabled =====
 
+// @internal
 #[test]
 fn no_debug_events_when_log_disabled() {
     let identity = Identity::create("Alice");
@@ -260,6 +271,7 @@ fn no_debug_events_when_log_disabled() {
 
 // ===== JSONL export =====
 
+// @internal
 #[test]
 fn debug_log_exports_to_jsonl() {
     let identity = Identity::create("Alice");

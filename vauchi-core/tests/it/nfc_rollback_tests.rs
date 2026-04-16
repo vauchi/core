@@ -5,6 +5,7 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use vauchi_core::exchange::{ExchangeError, NfcRollback, NoopNfcRollback};
 
+// @internal
 #[test]
 fn test_noop_rollback_succeeds() {
     let rollback = NoopNfcRollback;
@@ -46,6 +47,7 @@ impl NfcRollback for CountingRollback {
     }
 }
 
+// @internal
 #[test]
 fn test_rollback_all_calls_both() {
     let rollback = CountingRollback::new();
@@ -64,6 +66,7 @@ fn test_rollback_all_calls_both() {
     );
 }
 
+// @internal
 #[test]
 fn test_rollback_trait_is_object_safe() {
     // Verify NfcRollback can be used as a trait object
@@ -86,6 +89,7 @@ impl NfcRollback for FailingRatchetRollback {
     }
 }
 
+// @internal
 #[test]
 fn test_rollback_all_propagates_ratchet_error() {
     let rollback = FailingRatchetRollback;

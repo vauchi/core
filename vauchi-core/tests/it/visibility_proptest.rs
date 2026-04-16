@@ -55,6 +55,7 @@ fn card_with_fields(num_fields: usize) -> (ContactCard, Vec<String>) {
 proptest! {
     /// No field leaks in no-group mode: only shown fields are visible,
     /// and every shown field is visible.
+// @internal
     #[test]
     fn no_field_leak_no_groups(
         num_fields in 1..10usize,
@@ -96,6 +97,7 @@ proptest! {
     }
 
     /// Fields not marked shown are never visible in no-group mode.
+// @internal
     #[test]
     fn hidden_fields_never_visible_no_groups(
         num_fields in 1..10usize,
@@ -129,6 +131,7 @@ proptest! {
 
 proptest! {
     /// Ungrouped contacts see nothing in groups mode.
+// @internal
     #[test]
     fn ungrouped_contacts_see_nothing(
         num_groups in 1..5usize,
@@ -161,6 +164,7 @@ proptest! {
 
     /// A contact in a label sees exactly the fields visible in that label
     /// (when in a single label with no overrides).
+// @internal
     #[test]
     fn single_label_visibility(
         num_fields in 2..8usize,
@@ -195,6 +199,7 @@ proptest! {
 
     /// Multi-label union: a contact in multiple labels sees the union of
     /// all fields visible across those labels.
+// @internal
     #[test]
     fn multi_label_union(
         num_fields in 3..8usize,
@@ -248,6 +253,7 @@ proptest! {
 
 proptest! {
     /// Per-contact override can hide a field that is visible via labels.
+// @internal
     #[test]
     fn override_hides_label_visible_field(
         num_fields in 1..8usize,
@@ -294,6 +300,7 @@ proptest! {
     }
 
     /// Per-contact override can grant visibility to a field not in any label.
+// @internal
     #[test]
     fn override_grants_visibility(
         num_fields in 2..8usize,
@@ -338,6 +345,7 @@ proptest! {
 
 proptest! {
     /// Visibility resolution is deterministic: same inputs always yield same outputs.
+// @internal
     #[test]
     fn visibility_is_deterministic(
         num_fields in 1..8usize,
@@ -359,6 +367,7 @@ proptest! {
     }
 
     /// Determinism in groups mode with labels.
+// @internal
     #[test]
     fn visibility_deterministic_groups_mode(
         num_fields in 1..5usize,
@@ -390,6 +399,7 @@ proptest! {
 proptest! {
     /// When switching from no-group to groups mode (by creating a label),
     /// contacts not in any label lose all visibility (default-closed).
+// @internal
     #[test]
     fn mode_switch_default_closed(
         num_fields in 1..8usize,

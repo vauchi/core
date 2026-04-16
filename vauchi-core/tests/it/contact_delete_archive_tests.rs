@@ -49,6 +49,7 @@ fn create_imported_contact(name: &str) -> Contact {
 // Contact struct: Soft-delete tests
 // ============================================================
 
+// @internal
 #[test]
 fn new_contact_is_not_soft_deleted() {
     let contact = create_test_contact("Alice", 0x01);
@@ -63,6 +64,7 @@ fn new_contact_is_not_soft_deleted() {
     );
 }
 
+// @internal
 #[test]
 fn soft_delete_sets_timestamp() {
     let mut contact = create_test_contact("Bob", 0x02);
@@ -79,6 +81,7 @@ fn soft_delete_sets_timestamp() {
     );
 }
 
+// @internal
 #[test]
 fn undo_soft_delete_clears_timestamp() {
     let mut contact = create_test_contact("Charlie", 0x03);
@@ -101,6 +104,7 @@ fn undo_soft_delete_clears_timestamp() {
 // Contact struct: Archive tests
 // ============================================================
 
+// @internal
 #[test]
 fn new_contact_is_not_archived() {
     let contact = create_test_contact("Dave", 0x04);
@@ -112,6 +116,7 @@ fn new_contact_is_not_archived() {
     );
 }
 
+// @internal
 #[test]
 fn archive_sets_flag_and_timestamp() {
     let mut contact = create_test_contact("Eve", 0x05);
@@ -128,6 +133,7 @@ fn archive_sets_flag_and_timestamp() {
     );
 }
 
+// @internal
 #[test]
 fn unarchive_clears_flag_and_timestamp() {
     let mut contact = create_test_contact("Frank", 0x06);
@@ -146,6 +152,7 @@ fn unarchive_clears_flag_and_timestamp() {
     );
 }
 
+// @internal
 #[test]
 fn imported_contact_defaults_not_deleted_not_archived() {
     let card = ContactCard::new("Grace");
@@ -160,6 +167,7 @@ fn imported_contact_defaults_not_deleted_not_archived() {
 // Storage layer tests
 // ============================================================
 
+// @internal
 #[test]
 fn storage_persists_deleted_at() {
     let storage = create_test_storage();
@@ -177,6 +185,7 @@ fn storage_persists_deleted_at() {
     assert!(loaded.is_soft_deleted());
 }
 
+// @internal
 #[test]
 fn storage_persists_archived_flag() {
     let storage = create_test_storage();
@@ -194,6 +203,7 @@ fn storage_persists_archived_flag() {
     );
 }
 
+// @internal
 #[test]
 fn list_contacts_excludes_soft_deleted() {
     let storage = create_test_storage();
@@ -210,6 +220,7 @@ fn list_contacts_excludes_soft_deleted() {
     assert_eq!(list[0].id(), contact_a.id());
 }
 
+// @internal
 #[test]
 fn list_contacts_excludes_archived() {
     let storage = create_test_storage();
@@ -226,6 +237,7 @@ fn list_contacts_excludes_archived() {
     assert_eq!(list[0].id(), contact_a.id());
 }
 
+// @internal
 #[test]
 fn list_archived_contacts_returns_only_archived() {
     let storage = create_test_storage();
@@ -242,6 +254,7 @@ fn list_archived_contacts_returns_only_archived() {
     assert_eq!(archived[0].id(), contact_arch.id());
 }
 
+// @internal
 #[test]
 fn find_stale_soft_deletes_returns_old_deletions() {
     let storage = create_test_storage();
@@ -270,6 +283,7 @@ fn find_stale_soft_deletes_returns_old_deletions() {
 // Task 4: ContactManager API via Vauchi facade
 // ============================================================
 
+// @internal
 #[test]
 fn soft_delete_imported_contact_sets_deleted_at() {
     let mut wb = create_test_vauchi();
@@ -286,6 +300,7 @@ fn soft_delete_imported_contact_sets_deleted_at() {
     assert!(loaded.deleted_at().is_some(), "deleted_at should be set");
 }
 
+// @internal
 #[test]
 fn undo_delete_imported_contact_clears_deleted_at() {
     let mut wb = create_test_vauchi();
@@ -306,6 +321,7 @@ fn undo_delete_imported_contact_clears_deleted_at() {
     assert_eq!(loaded.deleted_at(), None, "deleted_at should be None");
 }
 
+// @internal
 #[test]
 fn hard_delete_imported_contact_removes_from_storage() {
     let mut wb = create_test_vauchi();
@@ -321,6 +337,7 @@ fn hard_delete_imported_contact_removes_from_storage() {
     assert!(loaded.is_none(), "Contact should be removed from storage");
 }
 
+// @internal
 #[test]
 fn archive_exchanged_contact_sets_archived() {
     let mut wb = create_test_vauchi();
@@ -337,6 +354,7 @@ fn archive_exchanged_contact_sets_archived() {
     assert!(loaded.archived_at().is_some(), "archived_at should be set");
 }
 
+// @internal
 #[test]
 fn unarchive_contact_clears_archived() {
     let mut wb = create_test_vauchi();
@@ -354,6 +372,7 @@ fn unarchive_contact_clears_archived() {
     assert_eq!(loaded.archived_at(), None, "archived_at should be None");
 }
 
+// @internal
 #[test]
 fn vauchi_list_archived_contacts_excludes_from_active() {
     let mut wb = create_test_vauchi();
@@ -386,6 +405,7 @@ fn vauchi_list_archived_contacts_excludes_from_active() {
 // Task 6: Adversarial tests
 // ============================================================
 
+// @internal
 #[test]
 fn delete_nonexistent_contact_returns_error() {
     let mut wb = create_test_vauchi();
@@ -399,6 +419,7 @@ fn delete_nonexistent_contact_returns_error() {
     );
 }
 
+// @internal
 #[test]
 fn delete_already_deleted_contact_is_idempotent() {
     let mut wb = create_test_vauchi();
@@ -425,6 +446,7 @@ fn delete_already_deleted_contact_is_idempotent() {
     );
 }
 
+// @internal
 #[test]
 fn archive_imported_contact_returns_error() {
     let mut wb = create_test_vauchi();
@@ -442,6 +464,7 @@ fn archive_imported_contact_returns_error() {
     );
 }
 
+// @internal
 #[test]
 fn delete_exchanged_contact_returns_error() {
     let mut wb = create_test_vauchi();
@@ -459,6 +482,7 @@ fn delete_exchanged_contact_returns_error() {
     );
 }
 
+// @internal
 #[test]
 fn unarchive_non_archived_contact_is_idempotent() {
     let mut wb = create_test_vauchi();
@@ -476,6 +500,7 @@ fn unarchive_non_archived_contact_is_idempotent() {
     assert_eq!(loaded.archived_at(), None);
 }
 
+// @internal
 #[test]
 fn undo_delete_after_hard_delete_returns_error() {
     let mut wb = create_test_vauchi();
@@ -502,6 +527,7 @@ fn undo_delete_after_hard_delete_returns_error() {
 // Task 5: SyncItem roundtrip serialization tests
 // ============================================================
 
+// @internal
 #[test]
 fn sync_item_contact_archived_roundtrip() {
     let item = SyncItem::ContactArchived {
@@ -526,6 +552,7 @@ fn sync_item_contact_archived_roundtrip() {
     );
 }
 
+// @internal
 #[test]
 fn sync_item_contact_unarchived_roundtrip() {
     let item = SyncItem::ContactUnarchived {
@@ -549,6 +576,7 @@ fn sync_item_contact_unarchived_roundtrip() {
     );
 }
 
+// @internal
 #[test]
 fn apply_sync_contact_archived_sets_flag() {
     let mut wb = create_test_vauchi();
@@ -578,6 +606,7 @@ fn apply_sync_contact_archived_sets_flag() {
     );
 }
 
+// @internal
 #[test]
 fn apply_sync_contact_unarchived_clears_flag() {
     let mut wb = create_test_vauchi();
@@ -607,6 +636,7 @@ fn apply_sync_contact_unarchived_clears_flag() {
     assert_eq!(loaded.archived_at(), None);
 }
 
+// @internal
 #[test]
 fn apply_sync_archive_nonexistent_contact_skips() {
     let mut wb = create_test_vauchi();

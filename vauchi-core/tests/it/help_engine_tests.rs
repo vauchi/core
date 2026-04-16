@@ -31,6 +31,7 @@ fn sample_items() -> Vec<HelpItem> {
 }
 
 // @scenario: help_faq :: View FAQ categories
+// @internal
 #[test]
 fn help_screen_id() {
     let engine = HelpEngine::new(sample_items());
@@ -41,6 +42,7 @@ fn help_screen_id() {
 }
 
 // @scenario: help_faq :: Browse FAQs in a category
+// @internal
 #[test]
 fn help_groups_by_category() {
     let engine = HelpEngine::new(sample_items());
@@ -70,6 +72,7 @@ fn help_groups_by_category() {
 }
 
 // @scenario: help_faq :: View a specific FAQ
+// @internal
 #[test]
 fn help_select_item_with_answer_shows_inline_alert() {
     let mut engine = HelpEngine::new(sample_items());
@@ -88,6 +91,7 @@ fn help_select_item_with_answer_shows_inline_alert() {
 }
 
 // @scenario: help_faq :: Related FAQs are linked
+// @internal
 #[test]
 fn help_select_item_without_answer_falls_back_to_url() {
     let mut engine = HelpEngine::new(sample_items());
@@ -104,6 +108,7 @@ fn help_select_item_without_answer_falls_back_to_url() {
     }
 }
 
+// @internal
 #[test]
 fn help_select_item_without_url_returns_update() {
     let mut engine = HelpEngine::new(sample_items());
@@ -121,6 +126,7 @@ fn help_select_item_without_url_returns_update() {
 }
 
 // @scenario: help_faq :: All categories have at least one FAQ
+// @internal
 #[test]
 fn help_empty_items_shows_empty() {
     let engine = HelpEngine::new(vec![]);

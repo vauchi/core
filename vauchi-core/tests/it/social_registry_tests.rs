@@ -7,6 +7,7 @@
 
 use vauchi_core::social::*;
 
+// @internal
 #[test]
 fn test_social_network_creation() {
     let network = SocialNetwork::new("twitter", "Twitter", "https://twitter.com/{username}");
@@ -20,6 +21,7 @@ fn test_social_network_creation() {
     assert!(network.icon().is_none());
 }
 
+// @internal
 #[test]
 fn test_social_network_with_icon() {
     let network = SocialNetwork::new("github", "GitHub", "https://github.com/{username}")
@@ -29,6 +31,7 @@ fn test_social_network_with_icon() {
 }
 
 // @scenario: contact_card_management :: Generate profile URL from social field
+// @internal
 #[test]
 fn test_profile_url_generation() {
     let twitter = SocialNetwork::new("twitter", "Twitter", "https://twitter.com/{username}");
@@ -37,6 +40,7 @@ fn test_profile_url_generation() {
 }
 
 // @scenario: contact_card_management :: Generate profile URL from social field
+// @internal
 #[test]
 fn test_profile_url_strips_at_symbol() {
     let twitter = SocialNetwork::new("twitter", "Twitter", "https://twitter.com/{username}");
@@ -44,6 +48,7 @@ fn test_profile_url_strips_at_symbol() {
     assert_eq!(twitter.profile_url("@alice"), "https://twitter.com/alice");
 }
 
+// @internal
 #[test]
 fn test_profile_url_preserves_full_url() {
     let twitter = SocialNetwork::new("twitter", "Twitter", "https://twitter.com/{username}");
@@ -52,6 +57,7 @@ fn test_profile_url_preserves_full_url() {
     assert_eq!(twitter.profile_url(full_url), full_url);
 }
 
+// @internal
 #[test]
 fn test_profile_url_trims_whitespace() {
     let github = SocialNetwork::new("github", "GitHub", "https://github.com/{username}");
@@ -60,6 +66,7 @@ fn test_profile_url_trims_whitespace() {
 }
 
 // @scenario: contact_card_management :: Load social network configurations from remote repository
+// @internal
 #[test]
 fn test_registry_with_defaults() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -71,6 +78,7 @@ fn test_registry_with_defaults() {
 }
 
 // @scenario: contact_card_management :: Load social network configurations from remote repository
+// @internal
 #[test]
 fn test_registry_get_case_insensitive() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -81,6 +89,7 @@ fn test_registry_get_case_insensitive() {
 }
 
 // @scenario: contact_card_management :: Generate profile URL from social field
+// @internal
 #[test]
 fn test_registry_profile_url() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -94,6 +103,7 @@ fn test_registry_profile_url() {
 }
 
 // @scenario: contact_card_management :: Load social network configurations from remote repository
+// @internal
 #[test]
 fn test_registry_search() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -103,6 +113,7 @@ fn test_registry_search() {
     assert!(results.iter().any(|n| n.id() == "gitlab"));
 }
 
+// @internal
 #[test]
 fn test_registry_add_and_remove() {
     let mut registry = SocialNetworkRegistry::new();
@@ -119,6 +130,7 @@ fn test_registry_add_and_remove() {
 }
 
 // @scenario: contact_card_management :: Use cached social network config when offline
+// @internal
 #[test]
 fn test_registry_json_serialization() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -131,6 +143,7 @@ fn test_registry_json_serialization() {
 }
 
 // @scenario: contact_card_management :: Load social network configurations from remote repository
+// @internal
 #[test]
 fn test_registry_all_sorted() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -143,6 +156,7 @@ fn test_registry_all_sorted() {
 }
 
 // @scenario: contact_card_management :: Generate profile URL from social field
+// @internal
 #[test]
 fn test_specific_url_formats() {
     let registry = SocialNetworkRegistry::with_defaults();
@@ -168,6 +182,7 @@ fn test_specific_url_formats() {
 
 // @scenario: contact_card_management :: Generate profile URL from social field
 // @scenario: contact_card_management :: View help text for finding social network ID
+// @internal
 #[test]
 fn test_mastodon_handles() {
     let mastodon = SocialNetwork::new(

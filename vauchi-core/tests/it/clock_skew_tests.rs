@@ -14,6 +14,7 @@ use vauchi_core::sync::{SyncItem, VersionVector};
 // =============================================================================
 
 /// Scenario: Version vector tracks device versions
+// @internal
 #[test]
 fn test_version_vector_tracks_versions() {
     let device_a = [0x01u8; 32];
@@ -37,6 +38,7 @@ fn test_version_vector_tracks_versions() {
 }
 
 /// Scenario: Version vector merge takes maximum
+// @internal
 #[test]
 fn test_version_vector_merge() {
     let device_a = [0x01u8; 32];
@@ -68,6 +70,7 @@ fn test_version_vector_merge() {
 
 /// Scenario: Detect concurrent updates (neither dominates)
 // @scenario: sync_updates :: Detect truly concurrent updates
+// @internal
 #[test]
 fn test_detect_concurrent_updates() {
     let device_a = [0x01u8; 32];
@@ -91,6 +94,7 @@ fn test_detect_concurrent_updates() {
 }
 
 /// Scenario: Detect happens-before relationship
+// @internal
 #[test]
 fn test_detect_happens_before() {
     let device_a = [0x01u8; 32];
@@ -116,6 +120,7 @@ fn test_detect_happens_before() {
 /// Scenario: Identical vectors behavior
 /// Note: Two identical non-empty vectors are considered "concurrent"
 /// because neither dominates the other (no device has MORE in either)
+// @internal
 #[test]
 fn test_identical_vectors_behavior() {
     let device_a = [0x01u8; 32];
@@ -139,6 +144,7 @@ fn test_identical_vectors_behavior() {
 
 /// Scenario: Conflict resolution works regardless of wall clock time
 // @scenario: sync_updates :: Sync handles clock skew between devices
+// @internal
 #[test]
 fn test_conflict_resolution_clock_independent() {
     let device_a = [0x01u8; 32];
@@ -186,6 +192,7 @@ fn test_conflict_resolution_clock_independent() {
 /// Scenario: Version vectors handle extreme clock skew
 // @scenario: sync_updates :: Extreme clock skew detection
 // @scenario: device_management :: Backward clock jump (Clock Skew)
+// @internal
 #[test]
 fn test_extreme_clock_skew() {
     let device_a = [0x01u8; 32];
@@ -224,6 +231,7 @@ fn test_extreme_clock_skew() {
 // =============================================================================
 
 /// Scenario: Version vector survives serialization roundtrip
+// @internal
 #[test]
 fn test_version_vector_roundtrip() {
     let device_a = [0xABu8; 32];
@@ -246,6 +254,7 @@ fn test_version_vector_roundtrip() {
 // =============================================================================
 
 /// Scenario: Three-way merge with concurrent updates
+// @internal
 #[test]
 fn test_three_way_merge() {
     let device_a = [0x01u8; 32];
@@ -288,6 +297,7 @@ fn test_three_way_merge() {
 }
 
 /// Scenario: Detect if local state is behind
+// @internal
 #[test]
 fn test_detect_local_state_behind() {
     let device_a = [0x01u8; 32];
@@ -319,6 +329,7 @@ fn test_detect_local_state_behind() {
 
 /// Scenario: Last-write-wins for non-concurrent updates
 // @scenario: sync_updates :: Last-write-wins for single field
+// @internal
 #[test]
 fn test_last_write_wins_sequential() {
     // When updates are sequential (not concurrent), last-write-wins is correct
@@ -347,6 +358,7 @@ fn test_last_write_wins_sequential() {
 
 /// Scenario: Timestamps tie - deterministic resolution needed
 // @scenario: sync_updates :: LWW merge for complex changes
+// @internal
 #[test]
 fn test_timestamp_tie_resolution() {
     let item1 = SyncItem::CardUpdated {

@@ -17,6 +17,7 @@ use vauchi_core::sync::ReplayDetector;
 // Configurable Clock Skew Tolerance Tests
 // ============================================================
 
+// @internal
 #[test]
 fn test_default_tolerance_rejects_large_skew() {
     let mut detector = ReplayDetector::default_tolerance(); // 60s
@@ -39,6 +40,7 @@ fn test_default_tolerance_rejects_large_skew() {
     );
 }
 
+// @internal
 #[test]
 fn test_high_tolerance_accepts_moderate_skew() {
     let mut detector = ReplayDetector::new(3600); // 1 hour tolerance
@@ -57,6 +59,7 @@ fn test_high_tolerance_accepts_moderate_skew() {
     );
 }
 
+// @internal
 #[test]
 fn test_high_tolerance_rejects_beyond_window() {
     let mut detector = ReplayDetector::new(3600); // 1 hour tolerance
@@ -75,6 +78,7 @@ fn test_high_tolerance_rejects_beyond_window() {
     );
 }
 
+// @internal
 #[test]
 fn test_duplicate_nonce_always_rejected() {
     let mut detector = ReplayDetector::new(3600);
@@ -88,6 +92,7 @@ fn test_duplicate_nonce_always_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn test_same_nonce_different_contacts_accepted() {
     let mut detector = ReplayDetector::new(60);
@@ -101,6 +106,7 @@ fn test_same_nonce_different_contacts_accepted() {
     );
 }
 
+// @internal
 #[test]
 fn test_prune_removes_old_nonces() {
     let mut detector = ReplayDetector::new(60);
@@ -136,6 +142,7 @@ fn test_prune_removes_old_nonces() {
 // ReplayDetector Persistence Tests
 // ============================================================
 
+// @internal
 #[test]
 fn test_replay_nonce_persisted_to_storage() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -153,6 +160,7 @@ fn test_replay_nonce_persisted_to_storage() {
     assert_eq!(nonces[0].1, 1000);
 }
 
+// @internal
 #[test]
 fn test_replay_nonces_multiple_contacts() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -173,6 +181,7 @@ fn test_replay_nonces_multiple_contacts() {
     assert_eq!(nonces_b.len(), 1);
 }
 
+// @internal
 #[test]
 fn test_replay_nonces_cleanup_old() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -196,6 +205,7 @@ fn test_replay_nonces_cleanup_old() {
     assert_eq!(remaining[0].0, recent_nonce);
 }
 
+// @internal
 #[test]
 fn test_replay_detector_roundtrip_via_storage() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
@@ -227,6 +237,7 @@ fn test_replay_detector_roundtrip_via_storage() {
     );
 }
 
+// @internal
 #[test]
 fn test_duplicate_nonce_insert_is_idempotent() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();

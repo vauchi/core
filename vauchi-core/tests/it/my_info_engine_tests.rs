@@ -25,12 +25,14 @@ fn sample_own_fields() -> Vec<OwnFieldInfo> {
     ]
 }
 
+// @internal
 #[test]
 fn my_info_screen_id() {
     let engine = MyInfoEngine::new(MyInfoProgress::default());
     assert_eq!(engine.current_screen().screen_id, "my_info");
 }
 
+// @internal
 #[test]
 fn my_info_shows_own_fields_in_action_list() {
     let engine = MyInfoEngine::new(MyInfoProgress::default())
@@ -57,6 +59,7 @@ fn my_info_shows_own_fields_in_action_list() {
     }
 }
 
+// @internal
 #[test]
 fn my_info_title_is_display_name() {
     let engine = MyInfoEngine::new(MyInfoProgress::default())
@@ -66,6 +69,7 @@ fn my_info_title_is_display_name() {
     assert_eq!(screen.title, "Demo User");
 }
 
+// @internal
 #[test]
 fn my_info_has_add_entry_and_toggle_view_actions() {
     let engine = MyInfoEngine::new(MyInfoProgress::default());
@@ -76,6 +80,7 @@ fn my_info_has_add_entry_and_toggle_view_actions() {
     assert_eq!(screen.actions[2].id, "preview-as-picker");
 }
 
+// @internal
 #[test]
 fn my_info_no_setup_progress() {
     let engine = MyInfoEngine::new(MyInfoProgress {
@@ -90,6 +95,7 @@ fn my_info_no_setup_progress() {
     assert!(!has_progress, "MyInfo should not show setup progress");
 }
 
+// @internal
 #[test]
 fn my_info_empty_fields_shows_hint() {
     let engine = MyInfoEngine::new(MyInfoProgress::default());
@@ -101,6 +107,7 @@ fn my_info_empty_fields_shows_hint() {
     assert!(has_hint, "MyInfo without entries should show hint text");
 }
 
+// @internal
 #[test]
 fn my_info_toggle_view_switches_mode() {
     let mut engine = MyInfoEngine::new(MyInfoProgress::default())
@@ -130,6 +137,7 @@ fn my_info_toggle_view_switches_mode() {
     );
 }
 
+// @internal
 #[test]
 fn my_info_entry_selection_opens_detail() {
     let mut engine = MyInfoEngine::new(MyInfoProgress::default())
@@ -170,6 +178,7 @@ fn sample_shared_info_view() -> SharedInfoView {
     }
 }
 
+// @internal
 #[test]
 fn test_preview_view_shows_banner_and_fields() {
     let engine = MyInfoEngine::new(MyInfoProgress::default())
@@ -230,6 +239,7 @@ fn test_preview_view_shows_banner_and_fields() {
 // ============================================================================
 
 // @scenario: onboarding.feature - Prompt for first exchange
+// @internal
 #[test]
 fn my_info_shows_exchange_prompt_when_no_contacts() {
     let engine = MyInfoEngine::new(MyInfoProgress::default())
@@ -267,6 +277,7 @@ fn my_info_shows_exchange_prompt_when_no_contacts() {
 }
 
 // @scenario: onboarding.feature - Exchange prompt hidden when contacts exist
+// @internal
 #[test]
 fn my_info_hides_exchange_prompt_when_has_contacts() {
     let engine = MyInfoEngine::new(MyInfoProgress::default())

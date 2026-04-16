@@ -29,6 +29,7 @@ fn make_contact(name: &str, transport: ExchangeTransport) -> Contact {
     )
 }
 
+// @internal
 #[test]
 fn test_statistics_empty_contacts() {
     let stats = compute_statistics(&[]);
@@ -37,6 +38,7 @@ fn test_statistics_empty_contacts() {
     assert!(stats.exchange_method_breakdown.is_empty());
 }
 
+// @internal
 #[test]
 fn test_statistics_total_contacts() {
     let contacts = vec![
@@ -48,6 +50,7 @@ fn test_statistics_total_contacts() {
     assert_eq!(stats.total_contacts, 3);
 }
 
+// @internal
 #[test]
 fn test_statistics_exchange_method_breakdown() {
     let contacts = vec![
@@ -79,6 +82,7 @@ fn test_statistics_exchange_method_breakdown() {
     );
 }
 
+// @internal
 #[test]
 fn test_statistics_recovery_count() {
     let mut alice = make_contact("Alice", ExchangeTransport::Qr);
@@ -89,6 +93,7 @@ fn test_statistics_recovery_count() {
     assert_eq!(stats.recovery_count, 1);
 }
 
+// @internal
 #[test]
 fn test_statistics_card_freshness_unknown_when_no_updates() {
     let contacts = vec![make_contact("Alice", ExchangeTransport::Qr)];

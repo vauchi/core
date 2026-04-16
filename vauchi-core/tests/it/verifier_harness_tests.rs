@@ -15,6 +15,7 @@ use vauchi_core::exchange::verifier_harness::{PeerCapabilities, Scenario, Simula
 
 // ===== SimulatedPeer construction =====
 
+// @internal
 #[test]
 fn peer_with_all_capabilities() {
     let peer = SimulatedPeer::new(PeerCapabilities {
@@ -26,6 +27,7 @@ fn peer_with_all_capabilities() {
     assert_eq!(peer.capabilities().available_methods().len(), 4);
 }
 
+// @internal
 #[test]
 fn peer_with_no_capabilities() {
     let peer = SimulatedPeer::new(PeerCapabilities {
@@ -37,6 +39,7 @@ fn peer_with_no_capabilities() {
     assert!(peer.capabilities().available_methods().is_empty());
 }
 
+// @internal
 #[test]
 fn peer_with_mobile_capabilities() {
     let peer = SimulatedPeer::mobile();
@@ -47,6 +50,7 @@ fn peer_with_mobile_capabilities() {
     assert!(methods.contains(&VerifierMethod::ManualConfirmation));
 }
 
+// @internal
 #[test]
 fn peer_with_desktop_capabilities() {
     let peer = SimulatedPeer::desktop();
@@ -61,6 +65,7 @@ fn peer_with_desktop_capabilities() {
 
 /// Scenario A: Both mobile, co-located, all verifiers succeed.
 /// Expected: First verifier succeeds (ultrasonic), High confidence.
+// @internal
 #[test]
 fn scenario_a_both_mobile_co_located_all_succeed() {
     let scenario = Scenario::new(
@@ -77,6 +82,7 @@ fn scenario_a_both_mobile_co_located_all_succeed() {
 }
 
 /// Scenario B: Both mobile, co-located, ultrasonic fails, ambient audio succeeds.
+// @internal
 #[test]
 fn scenario_b_ultrasonic_fails_ambient_succeeds() {
     let scenario = Scenario::new(SimulatedPeer::mobile(), SimulatedPeer::mobile(), true)
@@ -89,6 +95,7 @@ fn scenario_b_ultrasonic_fails_ambient_succeeds() {
 
 /// Scenario C: Mobile + Desktop, co-located.
 /// Common methods: ambient_audio, manual_confirmation.
+// @internal
 #[test]
 fn scenario_c_mobile_desktop_co_located() {
     let scenario = Scenario::new(SimulatedPeer::mobile(), SimulatedPeer::desktop(), true)
@@ -107,6 +114,7 @@ fn scenario_c_mobile_desktop_co_located() {
 
 /// Scenario D: Both mobile, NOT co-located.
 /// All proximity verifiers should fail, leaving only manual confirmation.
+// @internal
 #[test]
 fn scenario_d_both_mobile_remote() {
     let scenario = Scenario::new(
@@ -126,6 +134,7 @@ fn scenario_d_both_mobile_remote() {
 }
 
 /// Scenario E: Both desktop, co-located.
+// @internal
 #[test]
 fn scenario_e_both_desktop_co_located() {
     let scenario = Scenario::new(SimulatedPeer::desktop(), SimulatedPeer::desktop(), true)
@@ -136,6 +145,7 @@ fn scenario_e_both_desktop_co_located() {
 }
 
 /// Scenario F: No common methods (one peer has nothing).
+// @internal
 #[test]
 fn scenario_f_no_common_methods() {
     let empty_peer = SimulatedPeer::new(PeerCapabilities {
@@ -152,6 +162,7 @@ fn scenario_f_no_common_methods() {
 }
 
 /// Scenario G: All methods timeout.
+// @internal
 #[test]
 fn scenario_g_all_methods_timeout() {
     let scenario = Scenario::new(SimulatedPeer::mobile(), SimulatedPeer::mobile(), true)
@@ -162,6 +173,7 @@ fn scenario_g_all_methods_timeout() {
 }
 
 /// Scenario H: Accelerometer-only devices (e.g., watches).
+// @internal
 #[test]
 fn scenario_h_accelerometer_only() {
     let watch = SimulatedPeer::new(PeerCapabilities {
@@ -178,6 +190,7 @@ fn scenario_h_accelerometer_only() {
 }
 
 /// Scenario I: Manual-only fallback.
+// @internal
 #[test]
 fn scenario_i_manual_only() {
     let manual_only = SimulatedPeer::new(PeerCapabilities {
@@ -199,6 +212,7 @@ fn scenario_i_manual_only() {
 
 // ===== VerificationOutcome =====
 
+// @internal
 #[test]
 fn outcome_has_event_log() {
     let scenario = Scenario::new(SimulatedPeer::mobile(), SimulatedPeer::mobile(), true)

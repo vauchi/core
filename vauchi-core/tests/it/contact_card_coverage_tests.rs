@@ -18,6 +18,7 @@ fn test_avatar_png() -> Vec<u8> {
 }
 
 // @scenario: contact_card_management :: Update display name
+// @internal
 #[test]
 fn test_set_display_name() {
     let mut card = ContactCard::new("Original");
@@ -26,6 +27,7 @@ fn test_set_display_name() {
 }
 
 // @scenario: contact_card_management :: Display name cannot be empty
+// @internal
 #[test]
 fn test_set_display_name_empty_fails() {
     let mut card = ContactCard::new("Original");
@@ -34,6 +36,7 @@ fn test_set_display_name_empty_fails() {
 }
 
 // @scenario: contact_card_management :: Display name length limit
+// @internal
 #[test]
 fn test_set_display_name_too_long_fails() {
     let mut card = ContactCard::new("Original");
@@ -43,6 +46,7 @@ fn test_set_display_name_too_long_fails() {
 }
 
 // @scenario: contact_card_management :: Display name length limit
+// @internal
 #[test]
 fn test_set_display_name_max_length() {
     let mut card = ContactCard::new("Original");
@@ -52,6 +56,7 @@ fn test_set_display_name_max_length() {
 }
 
 // @scenario: contact_card_management :: Edit an existing field value
+// @internal
 #[test]
 fn test_update_field_value() {
     let mut card = ContactCard::new("Test");
@@ -63,6 +68,7 @@ fn test_update_field_value() {
     assert_eq!(card.fields()[0].value(), "new@test.com");
 }
 
+// @internal
 #[test]
 fn test_update_field_value_not_found() {
     let mut card = ContactCard::new("Test");
@@ -71,6 +77,7 @@ fn test_update_field_value_not_found() {
 }
 
 // @scenario: contact_card_management :: Edit a field label
+// @internal
 #[test]
 fn test_update_field_label() {
     let mut card = ContactCard::new("Test");
@@ -82,6 +89,7 @@ fn test_update_field_label() {
     assert_eq!(card.fields()[0].label(), "personal");
 }
 
+// @internal
 #[test]
 fn test_update_field_label_not_found() {
     let mut card = ContactCard::new("Test");
@@ -89,6 +97,7 @@ fn test_update_field_label_not_found() {
     result.expect_err("expected error");
 }
 
+// @internal
 #[test]
 fn test_remove_field_not_found() {
     let mut card = ContactCard::new("Test");
@@ -98,6 +107,7 @@ fn test_remove_field_not_found() {
 
 // @scenario: contact_card_management :: Exceed maximum fields
 // @scenario: contact_card_management :: Maximum number of fields
+// @internal
 #[test]
 fn test_max_fields_reached() {
     let mut card = ContactCard::new("Test");
@@ -114,6 +124,7 @@ fn test_max_fields_reached() {
 }
 
 // @scenario: contact_card_management :: Contact card size limit
+// @internal
 #[test]
 fn test_validate_size_ok() {
     let card = ContactCard::new("Test");
@@ -124,6 +135,7 @@ fn test_validate_size_ok() {
 }
 
 // @scenario: contact_card_management :: Reorder contact fields
+// @internal
 #[test]
 fn test_reorder_fields() {
     let mut card = ContactCard::new("Test");
@@ -149,6 +161,7 @@ fn test_reorder_fields() {
     assert_eq!(card.fields()[2].id(), id1);
 }
 
+// @internal
 #[test]
 fn test_reorder_fields_invalid_id() {
     let mut card = ContactCard::new("Test");
@@ -159,6 +172,7 @@ fn test_reorder_fields_invalid_id() {
 }
 
 // @scenario: contact_card_management :: Add avatar to contact card
+// @internal
 #[test]
 fn test_set_avatar() {
     let mut card = ContactCard::new("Test");
@@ -172,6 +186,7 @@ fn test_set_avatar() {
 }
 
 // @scenario: contact_card_management :: Avatar invalid format rejected
+// @internal
 #[test]
 fn test_set_avatar_invalid_format() {
     let mut card = ContactCard::new("Test");
@@ -181,6 +196,7 @@ fn test_set_avatar_invalid_format() {
 }
 
 // @scenario: contact_card_management :: Large avatar image normalized
+// @internal
 #[test]
 fn test_set_avatar_large_image_normalized() {
     let mut card = ContactCard::new("Test");
@@ -199,6 +215,7 @@ fn test_set_avatar_large_image_normalized() {
 }
 
 // @scenario: contact_card_management :: Remove avatar from contact card
+// @internal
 #[test]
 fn test_clear_avatar() {
     let mut card = ContactCard::new("Test");
@@ -209,6 +226,7 @@ fn test_clear_avatar() {
     assert!(card.avatar().is_none());
 }
 
+// @internal
 #[test]
 fn test_fields_mut() {
     let mut card = ContactCard::new("Test");
@@ -219,6 +237,7 @@ fn test_fields_mut() {
     assert_eq!(fields.len(), 1);
 }
 
+// @internal
 #[test]
 fn test_card_id_unique() {
     let card1 = ContactCard::new("Test");

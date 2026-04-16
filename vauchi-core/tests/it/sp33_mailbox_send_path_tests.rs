@@ -44,6 +44,7 @@ fn create_test_ratchet() -> (DoubleRatchetState, DoubleRatchetState) {
 
 /// When send_update is called with a mailbox-token-derived recipient_id,
 /// the EncryptedUpdate on the wire must carry that token (64-char hex).
+// @internal
 #[test]
 fn test_send_update_recipient_id_is_64_char_hex_token() {
     let shared_key = [0x42u8; 32];
@@ -91,6 +92,7 @@ fn test_send_update_recipient_id_is_64_char_hex_token() {
 }
 
 /// Negative case: if no shared key, send_update uses the provided recipient_id as-is.
+// @internal
 #[test]
 fn test_send_update_without_shared_key_uses_provided_recipient() {
     let transport = MockTransport::new();
@@ -114,6 +116,7 @@ fn test_send_update_without_shared_key_uses_provided_recipient() {
 // Task 4.2: Client sends RegisterMailbox on connect
 // ============================================================
 
+// @internal
 #[test]
 fn test_register_mailbox_tokens_sends_256_tokens() {
     let transport = MockTransport::new();
@@ -155,6 +158,7 @@ fn test_register_mailbox_tokens_sends_256_tokens() {
     }
 }
 
+// @internal
 #[test]
 fn test_register_mailbox_tokens_with_no_contacts() {
     let transport = MockTransport::new();
@@ -183,6 +187,7 @@ fn test_register_mailbox_tokens_with_no_contacts() {
 // Task 4.3: Device sync via self-token EncryptedUpdate
 // ============================================================
 
+// @internal
 #[test]
 fn test_device_sync_uses_self_token_as_recipient_id() {
     let transport = MockTransport::new();
@@ -223,6 +228,7 @@ fn test_device_sync_uses_self_token_as_recipient_id() {
 // ============================================================
 
 /// Valid IdentityRevoked signature is accepted.
+// @internal
 #[test]
 fn test_identity_revoked_valid_signature_accepted() {
     let identity = Identity::create("Alice");
@@ -237,6 +243,7 @@ fn test_identity_revoked_valid_signature_accepted() {
 }
 
 /// Forged signature is rejected (CC-14 adversarial).
+// @internal
 #[test]
 fn test_identity_revoked_forged_signature_rejected() {
     let identity = Identity::create("Alice");
@@ -255,6 +262,7 @@ fn test_identity_revoked_forged_signature_rejected() {
 }
 
 /// Unknown sender's public key fails verification (CC-14 adversarial).
+// @internal
 #[test]
 fn test_identity_revoked_unknown_sender_rejected() {
     let alice = Identity::create("Alice");
@@ -271,6 +279,7 @@ fn test_identity_revoked_unknown_sender_rejected() {
 }
 
 /// Tampered timestamp makes signature invalid (CC-14 adversarial).
+// @internal
 #[test]
 fn test_identity_revoked_tampered_timestamp_rejected() {
     let identity = Identity::create("Alice");
@@ -288,6 +297,7 @@ fn test_identity_revoked_tampered_timestamp_rejected() {
 }
 
 /// Tampered recipient_id makes signature invalid (CC-14 adversarial).
+// @internal
 #[test]
 fn test_identity_revoked_tampered_recipient_rejected() {
     let identity = Identity::create("Alice");
@@ -305,6 +315,7 @@ fn test_identity_revoked_tampered_recipient_rejected() {
 }
 
 /// Empty/zero public key fails verification.
+// @internal
 #[test]
 fn test_identity_revoked_zero_pubkey_rejected() {
     let identity = Identity::create("Alice");

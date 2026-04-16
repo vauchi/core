@@ -47,6 +47,7 @@ fn run_full_exchange(
     (alice, bob)
 }
 
+// @internal
 #[test]
 fn test_e2e_text_only_card() {
     let alice_card = b"name:Alice\nemail:alice@example.com\nphone:+1234567890".to_vec();
@@ -59,6 +60,7 @@ fn test_e2e_text_only_card() {
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
 
+// @internal
 #[test]
 fn test_e2e_card_with_avatar() {
     // Simulate card with 128x128 JPEG avatar (~12KB)
@@ -74,6 +76,7 @@ fn test_e2e_card_with_avatar() {
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
 
+// @internal
 #[test]
 fn test_e2e_max_payload_32kb() {
     // 32KB is the max card size per design
@@ -87,6 +90,7 @@ fn test_e2e_max_payload_32kb() {
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
 
+// @internal
 #[test]
 fn test_e2e_minimum_payload_1_byte() {
     let (alice, bob) = run_full_exchange(vec![0x01], vec![0x02]);
@@ -97,6 +101,7 @@ fn test_e2e_minimum_payload_1_byte() {
     assert_eq!(bob.get_received_data().unwrap(), vec![0x01]);
 }
 
+// @internal
 #[test]
 fn test_e2e_asymmetric_payload_sizes() {
     // One side has a tiny card, the other has a large card.
@@ -111,6 +116,7 @@ fn test_e2e_asymmetric_payload_sizes() {
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
 
+// @internal
 #[test]
 fn test_e2e_abort_mid_transfer() {
     let alice_card = vec![0xAA; 15_000];
@@ -148,6 +154,7 @@ fn test_e2e_abort_mid_transfer() {
     assert!(bob.get_received_data().is_none());
 }
 
+// @internal
 #[test]
 fn test_e2e_one_side_cancel_other_unaffected() {
     let alice_card = vec![0xAA; 5_000];
@@ -172,6 +179,7 @@ fn test_e2e_one_side_cancel_other_unaffected() {
     assert!(!matches!(bob.get_state(), ProtocolState::Failed(_)));
 }
 
+// @internal
 #[test]
 fn test_e2e_duplicate_init_scans_idempotent() {
     let alice_card = b"Alice".to_vec();
@@ -213,6 +221,7 @@ fn test_e2e_duplicate_init_scans_idempotent() {
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
 
+// @internal
 #[test]
 fn test_e2e_duplicate_data_scans_idempotent() {
     let alice_card = b"Alice card data".to_vec();
@@ -251,6 +260,7 @@ fn test_e2e_duplicate_data_scans_idempotent() {
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
 
+// @internal
 #[test]
 fn test_e2e_invalid_qr_rejected_gracefully() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());
@@ -273,6 +283,7 @@ fn test_e2e_invalid_qr_rejected_gracefully() {
     assert_eq!(alice.get_state(), ProtocolState::Advertising);
 }
 
+// @internal
 #[test]
 fn test_e2e_invalid_qr_during_transfer_ignored() {
     let alice_card = b"Alice".to_vec();
@@ -313,6 +324,7 @@ fn test_e2e_invalid_qr_during_transfer_ignored() {
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
 
+// @internal
 #[test]
 fn test_e2e_grace_period_broadcasts_combo() {
     let (mut alice, mut bob) = run_full_exchange(b"Alice".to_vec(), b"Bob".to_vec());
@@ -338,6 +350,7 @@ fn test_e2e_grace_period_broadcasts_combo() {
     );
 }
 
+// @internal
 #[test]
 #[ignore] // Wall-clock test: takes 61s. Run with `cargo test -- --ignored`.
 fn test_e2e_grace_period_expires() {
@@ -357,6 +370,7 @@ fn test_e2e_grace_period_expires() {
     );
 }
 
+// @internal
 #[test]
 fn test_e2e_no_qr_after_cancel() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());
@@ -367,6 +381,7 @@ fn test_e2e_no_qr_after_cancel() {
     assert!(alice.get_display_qr().is_none());
 }
 
+// @internal
 #[test]
 fn test_e2e_received_data_none_before_complete() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());
@@ -379,6 +394,7 @@ fn test_e2e_received_data_none_before_complete() {
     assert!(alice.get_received_data().is_none());
 }
 
+// @internal
 #[test]
 fn test_e2e_binary_payload_all_byte_values() {
     // Card containing every possible byte value (0x00..0xFF)
@@ -392,6 +408,7 @@ fn test_e2e_binary_payload_all_byte_values() {
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
 
+// @internal
 #[test]
 fn test_e2e_identical_cards() {
     // Both sides exchange the exact same data
@@ -408,6 +425,7 @@ fn test_e2e_identical_cards() {
 
 /// Feature: contact_exchange.feature @atomicity
 /// Data must not be available until both sides reach Finalized.
+// @internal
 #[test]
 fn test_atomicity_data_not_available_in_complete() {
     let alice_card = b"Alice".to_vec();
@@ -456,6 +474,7 @@ fn test_atomicity_data_not_available_in_complete() {
 
 /// Feature: contact_exchange.feature @atomicity
 /// Both sides must exchange READY QRs to reach Finalized.
+// @internal
 #[test]
 fn test_atomicity_ready_exchange_reaches_finalized() {
     let alice_card = b"Alice atomicity test".to_vec();
@@ -471,6 +490,7 @@ fn test_atomicity_ready_exchange_reaches_finalized() {
 /// Feature: contact_exchange.feature @atomicity
 /// If one side stops scanning after Complete (never scans READY),
 /// the other side must NOT reach Finalized.
+// @internal
 #[test]
 fn test_atomicity_one_side_stops_scanning_no_finalize() {
     let alice_card = b"Alice".to_vec();
@@ -538,6 +558,7 @@ fn test_atomicity_one_side_stops_scanning_no_finalize() {
 /// broadcasting its own RDYY so the peer can also finalize. Without this,
 /// the first-to-finalize side stops displaying QRs and the peer times out
 /// with "peer did not confirm readiness".
+// @internal
 #[test]
 fn test_asymmetric_finalization_both_must_complete() {
     let alice_card = b"Alice (iPhone)".to_vec();
@@ -627,6 +648,7 @@ fn test_asymmetric_finalization_both_must_complete() {
 // ── Resilience tests (Solutions S1–S6) ──────────────────────────────────
 
 /// S4: Verify data is NOT available in Complete state (only in Finalized).
+// @internal
 #[test]
 fn test_data_not_available_in_complete() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());
@@ -659,6 +681,7 @@ fn test_data_not_available_in_complete() {
 }
 
 /// S5: FAIL QR type — when one side fails, peer can detect it.
+// @internal
 #[test]
 fn test_fail_qr_roundtrip() {
     use vauchi_core::exchange::multistage::qr_codec;
@@ -677,6 +700,7 @@ fn test_fail_qr_roundtrip() {
 }
 
 /// S5: FAIL QR causes peer to abort when not yet Finalized.
+// @internal
 #[test]
 fn test_fail_qr_aborts_peer() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());
@@ -696,6 +720,7 @@ fn test_fail_qr_aborts_peer() {
 }
 
 /// S5: FAIL QR does NOT override Finalized state.
+// @internal
 #[test]
 fn test_fail_qr_ignored_when_finalized() {
     let (mut alice, _bob) = run_full_exchange(b"Alice".to_vec(), b"Bob".to_vec());
@@ -709,6 +734,7 @@ fn test_fail_qr_ignored_when_finalized() {
 }
 
 /// S3: Adaptive display durations — each stage has appropriate timing with jitter.
+// @internal
 #[test]
 fn test_adaptive_display_durations() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());
@@ -766,6 +792,7 @@ fn test_adaptive_display_durations() {
 /// Guards against incomplete zeroization when new fields are added to
 /// MultiStageSession. If this test fails after adding a field, update
 /// clear_sensitive() to cover it.
+// @internal
 #[test]
 fn test_clear_sensitive_covers_all_security_fields() {
     // Run a full exchange to populate all fields
@@ -798,6 +825,7 @@ fn test_clear_sensitive_covers_all_security_fields() {
 }
 
 /// S2: Complete state shows ONLY COMBO QRs (no VRFY/CONF interleave).
+// @internal
 #[test]
 fn test_complete_shows_only_combo() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());

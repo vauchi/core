@@ -31,6 +31,7 @@ fn make_engine() -> ContactVisibilityEngine {
 
 // ── Tests ───────────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn contact_visibility_screen_id() {
     let engine = make_engine();
@@ -38,6 +39,7 @@ fn contact_visibility_screen_id() {
     assert_eq!(screen.screen_id, "contact_visibility");
 }
 
+// @internal
 #[test]
 fn contact_visibility_title_includes_contact_name() {
     let engine = make_engine();
@@ -49,6 +51,7 @@ fn contact_visibility_title_includes_contact_name() {
     );
 }
 
+// @internal
 #[test]
 fn contact_visibility_toggle_flips_field_state() {
     let mut engine = make_engine();
@@ -70,6 +73,7 @@ fn contact_visibility_toggle_flips_field_state() {
     }
 }
 
+// @internal
 #[test]
 fn contact_visibility_save_completes() {
     let mut engine = make_engine();
@@ -80,6 +84,7 @@ fn contact_visibility_save_completes() {
     assert_eq!(result, ActionResult::Complete);
 }
 
+// @internal
 #[test]
 fn contact_visibility_collected_input_format() {
     let engine = make_engine();
@@ -89,6 +94,7 @@ fn contact_visibility_collected_input_format() {
     assert_eq!(input, "email:visible,phone:hidden");
 }
 
+// @internal
 #[test]
 fn contact_visibility_toggle_then_collected_input_reflects_change() {
     let mut engine = make_engine();
@@ -104,6 +110,7 @@ fn contact_visibility_toggle_then_collected_input_reflects_change() {
     assert_eq!(input, "email:visible,phone:visible");
 }
 
+// @internal
 #[test]
 fn contact_visibility_unknown_action_returns_update_screen() {
     let mut engine = make_engine();

@@ -26,6 +26,7 @@ fn create_test_contact(name: &str) -> Contact {
     Contact::from_exchange(public_key, card, shared_key)
 }
 
+// @internal
 #[test]
 fn test_storage_save_load_contact() {
     let storage = create_test_storage();
@@ -43,6 +44,7 @@ fn test_storage_save_load_contact() {
     assert_eq!(loaded.card().fields().len(), 1);
 }
 
+// @internal
 #[test]
 fn test_storage_list_contacts() {
     let storage = create_test_storage();
@@ -64,6 +66,7 @@ fn test_storage_list_contacts() {
     assert_eq!(contacts.len(), 2);
 }
 
+// @internal
 #[test]
 fn test_storage_delete_contact() {
     let storage = create_test_storage();
@@ -82,6 +85,7 @@ fn test_storage_delete_contact() {
     assert!(storage.load_contact(&contact_id).unwrap().is_none());
 }
 
+// @internal
 #[test]
 fn test_storage_contact_not_found() {
     let storage = create_test_storage();
@@ -89,6 +93,7 @@ fn test_storage_contact_not_found() {
     assert!(result.is_none());
 }
 
+// @internal
 #[test]
 fn test_storage_save_load_own_card() {
     let storage = create_test_storage();
@@ -103,6 +108,7 @@ fn test_storage_save_load_own_card() {
     assert_eq!(loaded.fields().len(), 1);
 }
 
+// @internal
 #[test]
 fn test_storage_own_card_not_found() {
     let storage = create_test_storage();
@@ -110,6 +116,7 @@ fn test_storage_own_card_not_found() {
     assert!(result.is_none());
 }
 
+// @internal
 #[test]
 fn test_storage_pending_updates() {
     let storage = create_test_storage();
@@ -135,6 +142,7 @@ fn test_storage_pending_updates() {
     assert_eq!(pending[0].payload, vec![1, 2, 3, 4]);
 }
 
+// @internal
 #[test]
 fn test_storage_mark_update_sent() {
     let storage = create_test_storage();
@@ -159,6 +167,7 @@ fn test_storage_mark_update_sent() {
     assert_eq!(storage.count_pending_updates(contact.id()).unwrap(), 0);
 }
 
+// @internal
 #[test]
 fn test_storage_update_status() {
     let storage = create_test_storage();
@@ -195,6 +204,7 @@ fn test_storage_update_status() {
     assert!(matches!(pending[0].status, UpdateStatus::Failed { .. }));
 }
 
+// @internal
 #[test]
 fn test_storage_save_load_ratchet_state() {
     use vauchi_core::crypto::SymmetricKey;
@@ -224,6 +234,7 @@ fn test_storage_save_load_ratchet_state() {
     assert_eq!(loaded.our_public_key(), ratchet.our_public_key());
 }
 
+// @internal
 #[test]
 fn test_storage_ratchet_state_encryption() {
     use vauchi_core::crypto::SymmetricKey;
@@ -253,6 +264,7 @@ fn test_storage_ratchet_state_encryption() {
     assert!(!msg2.ciphertext.is_empty());
 }
 
+// @internal
 #[test]
 fn test_storage_ratchet_deleted_with_contact() {
     use vauchi_core::crypto::SymmetricKey;
@@ -286,6 +298,7 @@ fn test_storage_ratchet_deleted_with_contact() {
     assert!(storage.load_ratchet_state(&contact_id).unwrap().is_none());
 }
 
+// @internal
 #[test]
 fn test_storage_ratchet_not_found() {
     let storage = create_test_storage();
@@ -296,6 +309,7 @@ fn test_storage_ratchet_not_found() {
 /// SP-9 #126: Ratchet states use per-contact derived encryption keys.
 /// Verifies that two contacts' ratchet states are independently encrypted
 /// and can be loaded back correctly.
+// @internal
 #[test]
 fn test_storage_ratchet_per_contact_key_isolation() {
     use vauchi_core::crypto::SymmetricKey;
@@ -345,6 +359,7 @@ fn test_storage_ratchet_per_contact_key_isolation() {
     assert_eq!(loaded_b.our_public_key(), ratchet_b.our_public_key());
 }
 
+// @internal
 #[test]
 fn test_storage_save_load_device_info() {
     let storage = create_test_storage();
@@ -375,6 +390,7 @@ fn test_storage_save_load_device_info() {
     assert_eq!(loaded_created, created_at);
 }
 
+// @internal
 #[test]
 fn test_storage_device_info_update() {
     let storage = create_test_storage();
@@ -392,6 +408,7 @@ fn test_storage_device_info_update() {
     assert_eq!(name, "New Name");
 }
 
+// @internal
 #[test]
 fn test_storage_save_load_device_registry() {
     use vauchi_core::crypto::SigningKeyPair;
@@ -420,6 +437,7 @@ fn test_storage_save_load_device_registry() {
     assert!(loaded.verify(&signing_key.public_key()));
 }
 
+// @internal
 #[test]
 fn test_storage_device_registry_roundtrip() {
     use vauchi_core::crypto::SigningKeyPair;
@@ -451,6 +469,7 @@ fn test_storage_device_registry_roundtrip() {
 
 /// Scenario: Offline changes sync when reconnected
 /// Need to persist pending sync items between app restarts
+// @internal
 #[test]
 fn test_storage_save_load_device_sync_state() {
     use vauchi_core::sync::device_sync::{InterDeviceSyncState, SyncItem};
@@ -484,6 +503,7 @@ fn test_storage_save_load_device_sync_state() {
 }
 
 /// Test that we can list all device sync states
+// @internal
 #[test]
 fn test_storage_list_device_sync_states() {
     use vauchi_core::sync::device_sync::{InterDeviceSyncState, SyncItem};
@@ -515,6 +535,7 @@ fn test_storage_list_device_sync_states() {
 }
 
 /// Test version vector persistence for conflict detection
+// @internal
 #[test]
 fn test_storage_save_load_version_vector() {
     use vauchi_core::sync::device_sync::VersionVector;
@@ -540,6 +561,7 @@ fn test_storage_save_load_version_vector() {
 }
 
 /// Test that version vector updates correctly
+// @internal
 #[test]
 fn test_storage_version_vector_update() {
     use vauchi_core::sync::device_sync::VersionVector;
@@ -564,6 +586,7 @@ fn test_storage_version_vector_update() {
 }
 
 /// Test that recovery_trusted flag persists through save/load
+// @internal
 #[test]
 fn test_storage_recovery_trusted_persistence() {
     let storage = create_test_storage();
@@ -605,6 +628,7 @@ fn test_storage_recovery_trusted_persistence() {
 
 /// Test get_contact_limit returns default 10_000
 // @scenario: contacts_management :: Contact limits
+// @internal
 #[test]
 fn test_get_contact_limit_default() {
     let storage = create_test_storage();
@@ -614,6 +638,7 @@ fn test_get_contact_limit_default() {
 
 /// Test last_delta_version defaults to 0 for new contact
 // @scenario: sync_updates :: Delta sync versioning
+// @internal
 #[test]
 fn test_last_delta_version_default() {
     let storage = create_test_storage();
@@ -627,6 +652,7 @@ fn test_last_delta_version_default() {
 
 /// Test record_delta_version and last_delta_version roundtrip
 // @scenario: sync_updates :: Delta sync versioning
+// @internal
 #[test]
 fn test_record_and_load_delta_version() {
     let storage = create_test_storage();
@@ -646,6 +672,7 @@ fn test_record_and_load_delta_version() {
 
 /// Test last_delta_version fails for nonexistent contact
 // @scenario: sync_updates :: Delta sync versioning
+// @internal
 #[test]
 fn test_last_delta_version_nonexistent_contact() {
     let storage = create_test_storage();
@@ -655,6 +682,7 @@ fn test_last_delta_version_nonexistent_contact() {
 
 /// Test wipe_device_data clears device_info and sync state
 // @scenario: identity_management :: Identity deletion
+// @internal
 #[test]
 fn test_wipe_device_data() {
     let storage = create_test_storage();
@@ -675,6 +703,7 @@ fn test_wipe_device_data() {
 
 /// Test is_replay_nonce detects duplicates
 // @scenario: security :: Replay attack prevention
+// @internal
 #[test]
 fn test_is_replay_nonce() {
     let storage = create_test_storage();
@@ -698,6 +727,7 @@ fn test_is_replay_nonce() {
 
 /// Test cleanup_replay_nonces removes old entries
 // @scenario: security :: Replay attack prevention
+// @internal
 #[test]
 fn test_cleanup_replay_nonces() {
     let storage = create_test_storage();
@@ -720,6 +750,7 @@ fn test_cleanup_replay_nonces() {
 
 /// Test load_device_registry_json returns structured JSON
 // @scenario: identity_management :: GDPR data export
+// @internal
 #[test]
 fn test_load_device_registry_json() {
     use vauchi_core::crypto::SigningKeyPair;
@@ -751,6 +782,7 @@ fn test_load_device_registry_json() {
 
 /// Test that proposal_trusted defaults to false on a new contact.
 // @scenario: contacts_management :: Contact trust management
+// @internal
 #[test]
 fn test_proposal_trusted_defaults_false() {
     let contact = create_test_contact("Default User");
@@ -762,6 +794,7 @@ fn test_proposal_trusted_defaults_false() {
 
 /// Test that proposal_trusted = true survives a save/load roundtrip.
 // @scenario: contacts_management :: Contact trust management
+// @internal
 #[test]
 fn test_proposal_trusted_storage_roundtrip() {
     let storage = create_test_storage();
@@ -796,6 +829,7 @@ fn test_proposal_trusted_storage_roundtrip() {
 
 /// Test that proposal_trusted = false is correctly persisted and reloaded.
 // @scenario: contacts_management :: Contact trust management
+// @internal
 #[test]
 fn test_proposal_trusted_false_persists() {
     let storage = create_test_storage();

@@ -20,6 +20,7 @@ fn make_test_contact() -> Contact {
 
 // ── Default state ──────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn new_contact_has_no_relay_metadata() {
     let contact = make_test_contact();
@@ -35,6 +36,7 @@ fn new_contact_has_no_relay_metadata() {
 
 // ── Setting relay metadata ─────────────────────────────────────────
 
+// @internal
 #[test]
 fn set_relay_url() {
     let mut contact = make_test_contact();
@@ -45,6 +47,7 @@ fn set_relay_url() {
     );
 }
 
+// @internal
 #[test]
 fn set_relay_noise_pubkey() {
     let mut contact = make_test_contact();
@@ -53,6 +56,7 @@ fn set_relay_noise_pubkey() {
     assert_eq!(contact.relay_noise_pubkey().unwrap(), &pubkey);
 }
 
+// @internal
 #[test]
 fn clear_relay_metadata() {
     let mut contact = make_test_contact();
@@ -68,6 +72,7 @@ fn clear_relay_metadata() {
 
 // ── Constructors preserve relay fields ─────────────────────────────
 
+// @internal
 #[test]
 fn from_exchange_has_no_relay_fields() {
     let contact = Contact::from_exchange(
@@ -79,6 +84,7 @@ fn from_exchange_has_no_relay_fields() {
     assert!(contact.relay_noise_pubkey().is_none());
 }
 
+// @internal
 #[test]
 fn from_sync_data_has_no_relay_fields() {
     let contact = Contact::from_sync_data(
@@ -95,6 +101,7 @@ fn from_sync_data_has_no_relay_fields() {
 
 // ── Relay metadata survives card update ────────────────────────────
 
+// @internal
 #[test]
 fn relay_metadata_preserved_after_card_update() {
     let mut contact = make_test_contact();
@@ -110,6 +117,7 @@ fn relay_metadata_preserved_after_card_update() {
 
 // ── Relay metadata survives recovery ───────────────────────────────
 
+// @internal
 #[test]
 fn relay_metadata_preserved_after_recovery() {
     let mut contact = make_test_contact();

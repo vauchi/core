@@ -50,6 +50,7 @@ fn make_test_card(identity: &Identity, name: &str) -> BleCardPayload {
 // @scenario: ble_exchange :: Any single byte flip in ciphertext fails decryption
 // @scenario: ble_exchange :: Chunking and reassembly preserves data
 proptest! {
+// @internal
     #[test]
     fn prop_encrypt_decrypt_roundtrip(plaintext in prop::collection::vec(any::<u8>(), 0..10_000)) {
         let key = make_test_key();
@@ -63,6 +64,7 @@ proptest! {
         prop_assert_eq!(&decrypted, &plaintext, "roundtrip must preserve plaintext");
     }
 
+// @internal
     #[test]
     fn prop_tampered_ciphertext_always_fails(
         plaintext in prop::collection::vec(any::<u8>(), 1..1000),
@@ -88,6 +90,7 @@ proptest! {
         );
     }
 
+// @internal
     #[test]
     fn prop_chunking_roundtrip(
         mtu in 20usize..512,
@@ -113,6 +116,7 @@ proptest! {
 // ============================================================
 
 // @scenario: ble_exchange :: Empty display name roundtrips correctly
+// @internal
 #[test]
 fn test_adversarial_empty_display_name() {
     let identity_key = [1u8; 32];
@@ -134,6 +138,7 @@ fn test_adversarial_empty_display_name() {
 }
 
 // @scenario: ble_exchange :: Unicode display name roundtrips correctly
+// @internal
 #[test]
 fn test_adversarial_unicode_display_name() {
     let identity_key = [3u8; 32];
@@ -158,6 +163,7 @@ fn test_adversarial_unicode_display_name() {
 }
 
 // @scenario: ble_exchange :: Null bytes in fields roundtrip correctly
+// @internal
 #[test]
 fn test_adversarial_null_bytes_in_fields() {
     let identity_key = [5u8; 32];
@@ -193,6 +199,7 @@ fn test_adversarial_null_bytes_in_fields() {
 }
 
 // @scenario: ble_exchange :: Maximum size avatar roundtrips correctly
+// @internal
 #[test]
 fn test_adversarial_max_size_avatar() {
     let identity_key = [7u8; 32];
@@ -224,6 +231,7 @@ fn test_adversarial_max_size_avatar() {
 }
 
 // @scenario: ble_exchange :: Truncated handshake packet is rejected
+// @internal
 #[test]
 fn test_adversarial_truncated_handshake_packet() {
     let identity = make_test_identity();

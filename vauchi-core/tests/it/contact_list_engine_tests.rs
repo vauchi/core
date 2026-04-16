@@ -47,6 +47,7 @@ fn extract_contacts(screen: &ScreenModel) -> &Vec<ContactItem> {
     }
 }
 
+// @internal
 #[test]
 fn contact_list_shows_all_contacts() {
     let engine = ContactListEngine::new(sample_contacts());
@@ -63,6 +64,7 @@ fn contact_list_shows_all_contacts() {
     assert_eq!(contacts[2].name, "Charlie");
 }
 
+// @internal
 #[test]
 fn contact_list_search_filters_by_name() {
     let mut engine = ContactListEngine::new(sample_contacts());
@@ -82,6 +84,7 @@ fn contact_list_search_filters_by_name() {
     }
 }
 
+// @internal
 #[test]
 fn contact_list_search_case_insensitive() {
     let mut engine = ContactListEngine::new(sample_contacts());
@@ -100,6 +103,7 @@ fn contact_list_search_case_insensitive() {
     }
 }
 
+// @internal
 #[test]
 fn contact_list_search_empty_restores_all() {
     let mut engine = ContactListEngine::new(sample_contacts());
@@ -125,6 +129,7 @@ fn contact_list_search_empty_restores_all() {
     }
 }
 
+// @internal
 #[test]
 fn contact_list_select_opens_contact() {
     let mut engine = ContactListEngine::new(sample_contacts());
@@ -140,6 +145,7 @@ fn contact_list_select_opens_contact() {
 }
 
 // @scenario: onboarding.feature - Empty state with guidance
+// @internal
 #[test]
 fn contact_list_empty_shows_guidance() {
     let engine = ContactListEngine::new(vec![]);
@@ -175,6 +181,7 @@ fn contact_list_empty_shows_guidance() {
 }
 
 // @scenario: onboarding.feature - Search with no results still shows ContactList
+// @internal
 #[test]
 fn contact_list_search_no_results_shows_empty_list_not_guidance() {
     let mut engine = ContactListEngine::new(sample_contacts());
@@ -230,6 +237,7 @@ fn contacts_with_fields() -> Vec<ContactItem> {
     ]
 }
 
+// @internal
 #[test]
 fn search_matches_field_values() {
     let mut engine = ContactListEngine::new(contacts_with_fields());
@@ -248,6 +256,7 @@ fn search_matches_field_values() {
     }
 }
 
+// @internal
 #[test]
 fn search_matches_phone_number() {
     let mut engine = ContactListEngine::new(contacts_with_fields());
@@ -266,6 +275,7 @@ fn search_matches_phone_number() {
     }
 }
 
+// @internal
 #[test]
 fn search_matches_name_or_field() {
     let mut engine = ContactListEngine::new(contacts_with_fields());
@@ -286,6 +296,7 @@ fn search_matches_name_or_field() {
     }
 }
 
+// @internal
 #[test]
 fn search_no_match_returns_empty() {
     let mut engine = ContactListEngine::new(contacts_with_fields());
@@ -348,6 +359,7 @@ fn group_memberships() -> std::collections::HashMap<String, Vec<String>> {
     m
 }
 
+// @internal
 #[test]
 fn group_filter_shows_only_group_members() {
     let (contacts, groups) = contacts_with_groups();
@@ -369,6 +381,7 @@ fn group_filter_shows_only_group_members() {
     }
 }
 
+// @internal
 #[test]
 fn group_filter_clear_shows_all() {
     let (contacts, groups) = contacts_with_groups();
@@ -393,6 +406,7 @@ fn group_filter_clear_shows_all() {
     }
 }
 
+// @internal
 #[test]
 fn group_filter_combines_with_search() {
     let (mut contacts, groups) = contacts_with_groups();
@@ -421,6 +435,7 @@ fn group_filter_combines_with_search() {
     }
 }
 
+// @internal
 #[test]
 fn available_groups_shown_in_screen() {
     let (contacts, groups) = contacts_with_groups();
@@ -440,6 +455,7 @@ fn available_groups_shown_in_screen() {
 }
 
 // @scenario: accessibility :: contact items preserve a11y through engine
+// @internal
 #[test]
 fn contact_item_a11y_is_preserved_through_engine() {
     let contacts = vec![ContactItem {

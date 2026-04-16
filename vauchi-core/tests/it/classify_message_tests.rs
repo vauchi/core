@@ -8,6 +8,7 @@
 use vauchi_core::network::MessageType;
 use vauchi_core::network::simple_message::*;
 
+// @internal
 #[test]
 fn test_classify_message_returns_encrypted_update_for_encrypted_update_payload() {
     let envelope = create_simple_envelope(SimplePayload::EncryptedUpdate(SimpleEncryptedUpdate {
@@ -22,6 +23,7 @@ fn test_classify_message_returns_encrypted_update_for_encrypted_update_payload()
     assert_eq!(result, MessageType::EncryptedUpdate);
 }
 
+// @internal
 #[test]
 fn test_classify_message_returns_acknowledgment_for_ack_payload() {
     let envelope = create_simple_envelope(SimplePayload::Acknowledgment(SimpleAcknowledgment {
@@ -35,6 +37,7 @@ fn test_classify_message_returns_acknowledgment_for_ack_payload() {
     assert_eq!(result, MessageType::Acknowledgment);
 }
 
+// @internal
 #[test]
 fn test_classify_message_returns_handshake_for_handshake_payload() {
     let envelope = create_simple_envelope(SimplePayload::Handshake(SimpleHandshake {
@@ -54,6 +57,7 @@ fn test_classify_message_returns_handshake_for_handshake_payload() {
 
 // DeviceSync classify test removed (SP-33): wire type removed.
 
+// @internal
 #[test]
 fn test_classify_message_returns_identity_revoked_for_revoked_payload() {
     let envelope = create_simple_envelope(SimplePayload::IdentityRevoked(SimpleIdentityRevoked {
@@ -69,6 +73,7 @@ fn test_classify_message_returns_identity_revoked_for_revoked_payload() {
     assert_eq!(result, MessageType::IdentityRevoked);
 }
 
+// @internal
 #[test]
 fn test_classify_message_returns_unknown_for_empty_input() {
     let result = vauchi_core::network::classify_message(&[]);
@@ -76,6 +81,7 @@ fn test_classify_message_returns_unknown_for_empty_input() {
     assert_eq!(result, MessageType::Unknown);
 }
 
+// @internal
 #[test]
 fn test_classify_message_returns_unknown_for_garbage_bytes() {
     let result = vauchi_core::network::classify_message(&[0xFF, 0xFE, 0xFD, 0xFC, 0xFB]);
@@ -83,6 +89,7 @@ fn test_classify_message_returns_unknown_for_garbage_bytes() {
     assert_eq!(result, MessageType::Unknown);
 }
 
+// @internal
 #[test]
 fn test_classify_message_returns_unknown_for_short_frame() {
     // Only 3 bytes - not enough for even the frame header
@@ -91,6 +98,7 @@ fn test_classify_message_returns_unknown_for_short_frame() {
     assert_eq!(result, MessageType::Unknown);
 }
 
+// @internal
 #[test]
 fn test_classify_message_returns_unknown_for_truncated_json() {
     // Valid frame header claiming 100 bytes but only 10 bytes of data
@@ -108,19 +116,20 @@ mod proptest_classify {
     use vauchi_core::network::MessageType;
 
     proptest! {
-        #[test]
-        fn classify_message_never_panics_on_arbitrary_bytes(data in proptest::collection::vec(any::<u8>(), 0..1024)) {
-            // Must never panic, always returns a valid MessageType
-            let result = vauchi_core::network::classify_message(&data);
-            // Must always return a valid variant without panicking
-            prop_assert!(matches!(
-                result,
-                MessageType::EncryptedUpdate
-                    | MessageType::Acknowledgment
-                    | MessageType::Handshake
-                    | MessageType::IdentityRevoked
-                    | MessageType::Unknown
-            ));
+    // @internal
+            #[test]
+            fn classify_message_never_panics_on_arbitrary_bytes(data in proptest::collection::vec(any::<u8>(), 0..1024)) {
+                // Must never panic, always returns a valid MessageType
+                let result = vauchi_core::network::classify_message(&data);
+                // Must always return a valid variant without panicking
+                prop_assert!(matches!(
+                    result,
+                    MessageType::EncryptedUpdate
+                        | MessageType::Acknowledgment
+                        | MessageType::Handshake
+                        | MessageType::IdentityRevoked
+                        | MessageType::Unknown
+                ));
+            }
         }
-    }
 }

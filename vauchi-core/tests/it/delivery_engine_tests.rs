@@ -14,6 +14,7 @@ fn make_item(id: &str, name: &str, status: Status, retryable: bool) -> DeliveryI
     }
 }
 
+// @internal
 #[test]
 fn delivery_screen_id() {
     let engine = DeliveryStatusEngine::new(vec![]);
@@ -21,6 +22,7 @@ fn delivery_screen_id() {
     assert_eq!(screen.screen_id, "delivery_status");
 }
 
+// @internal
 #[test]
 fn delivery_empty_shows_all_delivered() {
     let engine = DeliveryStatusEngine::new(vec![]);
@@ -44,6 +46,7 @@ fn delivery_empty_shows_all_delivered() {
     }
 }
 
+// @internal
 #[test]
 fn delivery_shows_status_per_item() {
     let items = vec![
@@ -70,6 +73,7 @@ fn delivery_shows_status_per_item() {
     }
 }
 
+// @internal
 #[test]
 fn delivery_select_contact_opens_it() {
     let items = vec![make_item("c1", "Alice", Status::Success, false)];
@@ -86,6 +90,7 @@ fn delivery_select_contact_opens_it() {
     }
 }
 
+// @internal
 #[test]
 fn delivery_retry_button_when_retryable() {
     let items = vec![
@@ -102,6 +107,7 @@ fn delivery_retry_button_when_retryable() {
     assert!(screen.actions[0].enabled);
 }
 
+// @internal
 #[test]
 fn delivery_no_retry_when_all_success() {
     let items = vec![
@@ -114,6 +120,7 @@ fn delivery_no_retry_when_all_success() {
     assert!(screen.actions.is_empty());
 }
 
+// @internal
 #[test]
 fn delivery_mixed_statuses() {
     let items = vec![

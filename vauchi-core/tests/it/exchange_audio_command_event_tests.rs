@@ -46,6 +46,7 @@ fn create_peer_scanned_sessions() -> (ExchangeSession, ExchangeSession) {
 
 // −− Audio commands emitted after key agreement −−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn qr_key_agreement_emits_audio_commands() {
     let (mut alice, _bob) = create_peer_scanned_sessions();
@@ -75,6 +76,7 @@ fn qr_key_agreement_emits_audio_commands() {
 
 // −− AudioResponseReceived sets proximity confidence −−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn audio_response_received_advances_state() {
     let (mut alice, _bob) = create_peer_scanned_sessions();
@@ -100,6 +102,7 @@ fn audio_response_received_advances_state() {
 
 // −− Audio unavailable doesn't block exchange −−−−−−−−−−−−−−−−−−−−−−−−
 
+// @internal
 #[test]
 fn audio_hardware_unavailable_does_not_block_key_agreement() {
     let (mut alice, _bob) = create_peer_scanned_sessions();

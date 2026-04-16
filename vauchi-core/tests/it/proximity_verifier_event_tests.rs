@@ -18,6 +18,7 @@ use vauchi_core::exchange::verifier_event::{
 
 // ===== VerifierMethod =====
 
+// @internal
 #[test]
 fn verifier_method_display() {
     assert_eq!(VerifierMethod::Ultrasonic.as_str(), "ultrasonic");
@@ -33,6 +34,7 @@ fn verifier_method_display() {
 
 // ===== ProximityVerifierEvent variants =====
 
+// @internal
 #[test]
 fn waiting_for_action_event() {
     let event = ProximityVerifierEvent::WaitingForAction {
@@ -48,6 +50,7 @@ fn waiting_for_action_event() {
     ));
 }
 
+// @internal
 #[test]
 fn in_progress_event() {
     let event = ProximityVerifierEvent::InProgress {
@@ -61,6 +64,7 @@ fn in_progress_event() {
     }
 }
 
+// @internal
 #[test]
 fn method_failed_event() {
     let event = ProximityVerifierEvent::MethodFailed {
@@ -75,6 +79,7 @@ fn method_failed_event() {
     }
 }
 
+// @internal
 #[test]
 fn falling_back_event() {
     let event = ProximityVerifierEvent::FallingBack {
@@ -93,6 +98,7 @@ fn falling_back_event() {
     }
 }
 
+// @internal
 #[test]
 fn completed_event() {
     let event = ProximityVerifierEvent::Completed {
@@ -107,6 +113,7 @@ fn completed_event() {
     }
 }
 
+// @internal
 #[test]
 fn all_methods_exhausted_event() {
     let event = ProximityVerifierEvent::AllMethodsExhausted;
@@ -115,12 +122,14 @@ fn all_methods_exhausted_event() {
 
 // ===== VerifierEventLog =====
 
+// @internal
 #[test]
 fn event_log_starts_empty() {
     let log = VerifierEventLog::new();
     assert!(log.events().is_empty());
 }
 
+// @internal
 #[test]
 fn event_log_records_events() {
     let mut log = VerifierEventLog::new();
@@ -135,6 +144,7 @@ fn event_log_records_events() {
     assert_eq!(log.events().len(), 2);
 }
 
+// @internal
 #[test]
 fn event_log_last_event() {
     let mut log = VerifierEventLog::new();
@@ -151,6 +161,7 @@ fn event_log_last_event() {
     assert!(matches!(last, ProximityVerifierEvent::Completed { .. }));
 }
 
+// @internal
 #[test]
 fn event_log_is_completed() {
     let mut log = VerifierEventLog::new();
@@ -163,6 +174,7 @@ fn event_log_is_completed() {
     assert!(log.is_completed());
 }
 
+// @internal
 #[test]
 fn event_log_is_exhausted() {
     let mut log = VerifierEventLog::new();
@@ -172,6 +184,7 @@ fn event_log_is_exhausted() {
     assert!(log.is_exhausted());
 }
 
+// @internal
 #[test]
 fn event_log_final_confidence() {
     let mut log = VerifierEventLog::new();
@@ -184,6 +197,7 @@ fn event_log_final_confidence() {
     assert_eq!(log.final_confidence(), Some(ProximityConfidence::High));
 }
 
+// @internal
 #[test]
 fn event_log_final_confidence_none_when_exhausted() {
     let mut log = VerifierEventLog::new();

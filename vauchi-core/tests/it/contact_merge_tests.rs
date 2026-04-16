@@ -28,6 +28,7 @@ fn make_imported_contact(name: &str, fields: &[(FieldType, &str, &str)]) -> Cont
     Contact::from_import(card, ImportSource::VcardFile, None)
 }
 
+// @internal
 #[test]
 fn test_no_duplicates_in_empty_list() {
     let contacts: Vec<Contact> = vec![];
@@ -35,6 +36,7 @@ fn test_no_duplicates_in_empty_list() {
     assert!(dups.is_empty());
 }
 
+// @internal
 #[test]
 fn test_no_duplicates_single_contact() {
     let contacts = vec![make_contact("Alice", &[])];
@@ -43,6 +45,7 @@ fn test_no_duplicates_single_contact() {
 }
 
 // @scenario: contacts_management :: Detect potential duplicate contacts
+// @internal
 #[test]
 fn test_exact_name_duplicate() {
     let contacts = vec![
@@ -55,6 +58,7 @@ fn test_exact_name_duplicate() {
 }
 
 // @scenario: contacts_management :: Detect potential duplicate contacts
+// @internal
 #[test]
 fn test_case_insensitive_name_match() {
     let contacts = vec![
@@ -66,6 +70,7 @@ fn test_case_insensitive_name_match() {
 }
 
 // @scenario: contacts_management :: Detect potential duplicate contacts
+// @internal
 #[test]
 fn test_different_names_no_duplicate() {
     let contacts = vec![make_contact("Alice", &[]), make_contact("Bob", &[])];
@@ -74,6 +79,7 @@ fn test_different_names_no_duplicate() {
 }
 
 // @scenario: contacts_management :: Detect potential duplicate contacts
+// @internal
 #[test]
 fn test_similar_names_with_shared_fields() {
     let contacts = vec![
@@ -92,6 +98,7 @@ fn test_similar_names_with_shared_fields() {
 }
 
 // @scenario: contacts_management :: Detect potential duplicate contacts
+// @internal
 #[test]
 fn test_partial_name_match() {
     // "Alice" is contained in "Alice Smith" → similarity ~0.8
@@ -102,6 +109,7 @@ fn test_partial_name_match() {
 }
 
 // @scenario: contacts_management :: Detect potential duplicate contacts
+// @internal
 #[test]
 fn test_duplicates_sorted_by_similarity() {
     let contacts = vec![
@@ -122,6 +130,7 @@ fn test_duplicates_sorted_by_similarity() {
 }
 
 // @scenario: contacts_management :: Detect potential duplicate contacts
+// @internal
 #[test]
 fn test_three_contacts_detects_all_pairs() {
     let contacts = vec![
@@ -135,6 +144,7 @@ fn test_three_contacts_detects_all_pairs() {
 }
 
 // @scenario: contacts_management :: Detect potential duplicate contacts
+// @internal
 #[test]
 fn test_duplicate_pair_has_correct_ids() {
     let contacts = vec![make_contact("Alice", &[]), make_contact("Alice", &[])];
@@ -144,6 +154,7 @@ fn test_duplicate_pair_has_correct_ids() {
     assert_eq!(dups[0].id2, contacts[1].id());
 }
 
+// @internal
 #[test]
 fn test_empty_name_contacts() {
     // Empty names won't match well with real names
@@ -152,6 +163,7 @@ fn test_empty_name_contacts() {
     assert!(dups.is_empty());
 }
 
+// @internal
 #[test]
 fn test_duplicate_detection_nfc_vs_nfd() {
     // NFC (precomposed) and NFD (decomposed) versions of "José" should
@@ -170,6 +182,7 @@ fn test_duplicate_detection_nfc_vs_nfd() {
 
 // ── Phone normalization (Task 8: Dedup extension) ─────────────────────────
 
+// @internal
 #[test]
 fn phone_normalization_strips_formatting() {
     assert_eq!(normalize_phone("+1 (555) 123-4567"), "15551234567");
@@ -179,6 +192,7 @@ fn phone_normalization_strips_formatting() {
     assert_eq!(normalize_phone(""), "");
 }
 
+// @internal
 #[test]
 fn phone_normalization_retains_only_digits() {
     // Letters, spaces, parens, dashes, plus all stripped
@@ -187,6 +201,7 @@ fn phone_normalization_retains_only_digits() {
 }
 
 // @scenario: contacts_management :: Detect duplicate contacts across import sources
+// @internal
 #[test]
 fn cross_kind_dedup_finds_phone_match() {
     // An exchanged contact and an imported contact with the same phone number
@@ -208,6 +223,7 @@ fn cross_kind_dedup_finds_phone_match() {
     );
 }
 
+// @internal
 #[test]
 fn different_phones_stay_below_threshold() {
     // Contacts with different phone numbers should not be flagged as duplicates
@@ -227,6 +243,7 @@ fn different_phones_stay_below_threshold() {
 }
 
 // @scenario: contact_management :: Preview merge shows unique fields
+// @internal
 #[test]
 fn test_preview_merge_additions() {
     use vauchi_core::contact::merge::preview_merge_additions;

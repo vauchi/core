@@ -39,6 +39,7 @@ fn make_contact_with_pk(pk: [u8; 32], name: &str) -> Contact {
 
 // === Domain Separator ===
 
+// @internal
 #[test]
 fn test_domain_separator_is_25_bytes() {
     assert_eq!(REVOCATION_DOMAIN_SEPARATOR.len(), 25);
@@ -47,6 +48,7 @@ fn test_domain_separator_is_25_bytes() {
 
 // === Canonical Signature ===
 
+// @internal
 #[test]
 fn test_canonical_bytes_length() {
     let sender_id = [0x01u8; 32];
@@ -57,6 +59,7 @@ fn test_canonical_bytes_length() {
     assert_eq!(bytes.len(), 97); // 25 + 32 + 32 + 8
 }
 
+// @internal
 #[test]
 fn test_canonical_bytes_deterministic() {
     let sender_id = [0xAAu8; 32];
@@ -68,6 +71,7 @@ fn test_canonical_bytes_deterministic() {
     assert_eq!(a, b);
 }
 
+// @internal
 #[test]
 fn test_canonical_bytes_different_for_different_inputs() {
     let sender = [0xAAu8; 32];
@@ -81,6 +85,7 @@ fn test_canonical_bytes_different_for_different_inputs() {
     assert_ne!(a, c);
 }
 
+// @internal
 #[test]
 fn test_canonical_bytes_starts_with_domain_separator() {
     let bytes = canonical_revocation_bytes(&[0u8; 32], &[0u8; 32], 0);
@@ -90,6 +95,7 @@ fn test_canonical_bytes_starts_with_domain_separator() {
 // === IdentityRevoked Message ===
 
 // @scenario: privacy_compliance :: Revocation signal is cryptographically authenticated
+// @internal
 #[test]
 fn test_identity_revoked_sign_and_verify() {
     let identity = Identity::create("Alice Test");
@@ -104,6 +110,7 @@ fn test_identity_revoked_sign_and_verify() {
 }
 
 // @scenario: privacy_compliance :: Spoofed revocation signal is rejected
+// @internal
 #[test]
 fn test_identity_revoked_rejects_tampered_timestamp() {
     let identity = Identity::create("Alice Test");
@@ -119,6 +126,7 @@ fn test_identity_revoked_rejects_tampered_timestamp() {
 }
 
 // @scenario: privacy_compliance :: Spoofed revocation signal is rejected
+// @internal
 #[test]
 fn test_identity_revoked_rejects_wrong_key() {
     let identity = Identity::create("Alice");
@@ -131,6 +139,7 @@ fn test_identity_revoked_rejects_wrong_key() {
     assert!(!revoked.verify(other_identity.signing_public_key()));
 }
 
+// @internal
 #[test]
 fn test_identity_revoked_serialization_roundtrip() {
     let identity = Identity::create("Alice");
@@ -150,6 +159,7 @@ fn test_identity_revoked_serialization_roundtrip() {
 // === Revocation Processing ===
 
 // @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
+// @internal
 #[test]
 fn test_process_revocation_deletes_contact_and_records_tombstone() {
     let storage = test_storage();
@@ -176,6 +186,7 @@ fn test_process_revocation_deletes_contact_and_records_tombstone() {
 }
 
 // @scenario: privacy_compliance :: Spoofed revocation signal is rejected
+// @internal
 #[test]
 fn test_process_revocation_rejects_invalid_signature() {
     let storage = test_storage();
@@ -204,6 +215,7 @@ fn test_process_revocation_rejects_invalid_signature() {
 }
 
 // @scenario: privacy_compliance :: Replayed revocation for re-established contact is rejected
+// @internal
 #[test]
 fn test_process_revocation_stale_rejected() {
     let storage = test_storage();
@@ -227,6 +239,7 @@ fn test_process_revocation_stale_rejected() {
         .expect("expected Some");
 }
 
+// @internal
 #[test]
 fn test_process_revocation_unknown_sender_noop() {
     let storage = test_storage();
@@ -241,6 +254,7 @@ fn test_process_revocation_unknown_sender_noop() {
 }
 
 // @scenario: privacy_compliance :: Card update arriving after revocation is discarded
+// @internal
 #[test]
 fn test_update_after_revocation_discarded_via_tombstone() {
     let storage = test_storage();
@@ -255,6 +269,7 @@ fn test_update_after_revocation_discarded_via_tombstone() {
 }
 
 // @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
+// @internal
 #[test]
 fn test_revocation_only_deletes_matching_sender() {
     let storage = test_storage();
@@ -281,6 +296,7 @@ fn test_revocation_only_deletes_matching_sender() {
 }
 
 // @scenario: security :: Tampered exchange data is rejected
+// @internal
 #[test]
 fn test_revocation_with_future_timestamp() {
     let storage = test_storage();
@@ -304,6 +320,7 @@ fn test_revocation_with_future_timestamp() {
 }
 
 // @scenario: privacy_compliance :: Identity deletion sends revocation signal to all contacts
+// @internal
 #[test]
 fn test_revocation_with_minimum_valid_timestamp() {
     let storage = test_storage();
@@ -331,6 +348,7 @@ fn test_revocation_with_minimum_valid_timestamp() {
 /// `IdentityRevoked::create` must not panic for non-hex recipient IDs.
 /// The resulting message is meaningless (imported contacts don't participate
 /// in the relay protocol), but the deletion/shred flow must not crash.
+// @internal
 #[test]
 fn test_identity_revoked_handles_uuid_recipient_id() {
     let identity = Identity::create("Alice");

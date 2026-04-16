@@ -6,6 +6,7 @@
 
 use vauchi_core::storage::StorageError;
 
+// @internal
 #[test]
 fn sqlite_full_error_code_13_converts_to_disk_full() {
     // SQLITE_FULL has extended_code = 13
@@ -18,6 +19,7 @@ fn sqlite_full_error_code_13_converts_to_disk_full() {
     );
 }
 
+// @internal
 #[test]
 fn other_sqlite_errors_remain_database() {
     // SQLITE_BUSY has extended_code = 5
@@ -30,6 +32,7 @@ fn other_sqlite_errors_remain_database() {
     );
 }
 
+// @internal
 #[test]
 fn disk_full_user_message_is_actionable() {
     let err = StorageError::DiskFull;
@@ -38,6 +41,7 @@ fn disk_full_user_message_is_actionable() {
     assert!(msg.contains("Free up space"), "Message: {msg}");
 }
 
+// @internal
 #[test]
 fn queue_full_user_message_mentions_sync() {
     let err = StorageError::QueueFull("test".into());
@@ -45,6 +49,7 @@ fn queue_full_user_message_mentions_sync() {
     assert!(msg.contains("sync"), "Message: {msg}");
 }
 
+// @internal
 #[test]
 fn generic_error_user_message_is_safe() {
     let err = StorageError::Encryption("internal detail".into());

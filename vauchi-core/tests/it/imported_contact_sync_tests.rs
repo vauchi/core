@@ -35,6 +35,7 @@ fn make_exchanged(name: &str) -> Contact {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 /// Serialize then deserialize `ImportedContactSyncData` — all fields survive.
+// @internal
 #[test]
 fn imported_sync_data_roundtrip() {
     let contact = make_imported("Alice");
@@ -52,6 +53,7 @@ fn imported_sync_data_roundtrip() {
 }
 
 /// `from_contact` populates all fields from an imported `Contact`.
+// @internal
 #[test]
 fn imported_sync_data_from_contact() {
     let contact = make_imported("Bob");
@@ -74,6 +76,7 @@ fn imported_sync_data_from_contact() {
 }
 
 /// `to_contact` reconstructs an imported `Contact` with the same id and name.
+// @internal
 #[test]
 fn imported_sync_data_to_contact() {
     let original = make_imported("Carol");
@@ -105,6 +108,7 @@ fn imported_sync_data_to_contact() {
 }
 
 /// `SyncItem::ImportedContactAdded` serializes and deserializes correctly.
+// @internal
 #[test]
 fn sync_item_imported_added_roundtrip() {
     let contact = make_imported("Dave");
@@ -131,6 +135,7 @@ fn sync_item_imported_added_roundtrip() {
 }
 
 /// `SyncItem::ImportedContactRemoved` serializes and deserializes correctly.
+// @internal
 #[test]
 fn sync_item_imported_removed_roundtrip() {
     let item = SyncItem::ImportedContactRemoved {
@@ -154,6 +159,7 @@ fn sync_item_imported_removed_roundtrip() {
 }
 
 /// `from_contact` returns `None` for an exchanged contact — no imported data.
+// @internal
 #[test]
 fn imported_sync_data_returns_none_for_exchanged() {
     let contact = make_exchanged("Eve");
@@ -165,6 +171,7 @@ fn imported_sync_data_returns_none_for_exchanged() {
 }
 
 /// `timestamp()` method works for all three new SyncItem variants.
+// @internal
 #[test]
 fn sync_item_timestamp_for_imported_variants() {
     let contact = make_imported("Frank");

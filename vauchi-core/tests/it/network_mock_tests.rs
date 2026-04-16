@@ -19,6 +19,7 @@ fn create_test_message() -> MessageEnvelope {
     }
 }
 
+// @internal
 #[test]
 fn test_mock_transport_connect_disconnect() {
     let mut transport = MockTransport::new();
@@ -32,6 +33,7 @@ fn test_mock_transport_connect_disconnect() {
     assert_eq!(transport.state(), ConnectionState::Disconnected);
 }
 
+// @internal
 #[test]
 fn test_mock_transport_send_receive() {
     let mut transport = MockTransport::new();
@@ -49,6 +51,7 @@ fn test_mock_transport_send_receive() {
     assert!(transport.receive().unwrap().is_none());
 }
 
+// @internal
 #[test]
 fn test_mock_transport_send_tracks_messages() {
     let mut transport = MockTransport::new();
@@ -62,6 +65,7 @@ fn test_mock_transport_send_tracks_messages() {
 }
 
 // @scenario: message_delivery :: Handle relay unavailable gracefully
+// @internal
 #[test]
 fn test_mock_transport_error_injection() {
     let mut transport = MockTransport::new();
@@ -72,6 +76,7 @@ fn test_mock_transport_error_injection() {
     assert!(result.unwrap_err().to_string().contains("test error"));
 }
 
+// @internal
 #[test]
 fn test_mock_transport_auto_ack() {
     let mut transport = MockTransport::new();
@@ -94,6 +99,7 @@ fn test_mock_transport_auto_ack() {
 }
 
 // @scenario: message_delivery :: Handle relay unavailable gracefully
+// @internal
 #[test]
 fn test_mock_transport_not_connected_error() {
     let mut transport = MockTransport::new();
@@ -106,6 +112,7 @@ fn test_mock_transport_not_connected_error() {
     assert!(matches!(result.unwrap_err(), NetworkError::NotConnected));
 }
 
+// @internal
 #[test]
 fn test_mock_transport_clear_sent() {
     let mut transport = MockTransport::new();
@@ -118,6 +125,7 @@ fn test_mock_transport_clear_sent() {
     assert!(transport.sent_messages().is_empty());
 }
 
+// @internal
 #[test]
 fn test_mock_transport_set_state() {
     let mut transport = MockTransport::new();
@@ -129,6 +137,7 @@ fn test_mock_transport_set_state() {
     );
 }
 
+// @internal
 #[test]
 fn test_mock_transport_has_pending() {
     let mut transport = MockTransport::new();

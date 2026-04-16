@@ -49,6 +49,7 @@ fn make_legacy_contact(pk: [u8; 32], name: &str) -> Contact {
 
 // === Revocation Generation ===
 
+// @internal
 #[test]
 fn test_execute_deletion_returns_revocations_for_all_contacts() {
     let storage = test_storage();
@@ -67,6 +68,7 @@ fn test_execute_deletion_returns_revocations_for_all_contacts() {
     assert_eq!(result.revocations.len(), 2);
 }
 
+// @internal
 #[test]
 fn test_execute_deletion_revocations_have_correct_sender_id() {
     let storage = test_storage();
@@ -86,6 +88,7 @@ fn test_execute_deletion_revocations_have_correct_sender_id() {
     }
 }
 
+// @internal
 #[test]
 fn test_execute_deletion_revocations_have_correct_recipient_ids() {
     let storage = test_storage();
@@ -112,6 +115,7 @@ fn test_execute_deletion_revocations_have_correct_recipient_ids() {
     assert!(recipient_ids.contains(&carol_id.as_str()));
 }
 
+// @internal
 #[test]
 fn test_execute_deletion_revocations_verify_with_identity() {
     let storage = test_storage();
@@ -135,6 +139,7 @@ fn test_execute_deletion_revocations_verify_with_identity() {
 
 // === CEK Crypto-Shredding ===
 
+// @internal
 #[test]
 fn test_execute_deletion_shreds_all_ceks() {
     let storage = test_storage();
@@ -172,6 +177,7 @@ fn test_execute_deletion_shreds_all_ceks() {
     );
 }
 
+// @internal
 #[test]
 fn test_execute_deletion_contacts_still_exist_after_shredding() {
     // Contacts remain in DB (DB deletion is a separate step)
@@ -200,6 +206,7 @@ fn test_execute_deletion_contacts_still_exist_after_shredding() {
 
 // === Grace Period and State ===
 
+// @internal
 #[test]
 fn test_execute_deletion_still_requires_grace_period() {
     let storage = test_storage();
@@ -214,6 +221,7 @@ fn test_execute_deletion_still_requires_grace_period() {
     assert!(matches!(result, Err(DeletionError::GracePeriodNotElapsed)));
 }
 
+// @internal
 #[test]
 fn test_execute_deletion_marks_state_as_executed() {
     let storage = test_storage();
@@ -227,6 +235,7 @@ fn test_execute_deletion_marks_state_as_executed() {
     assert!(matches!(state, DeletionState::Executed { .. }));
 }
 
+// @internal
 #[test]
 fn test_execute_deletion_requires_scheduled_state() {
     let storage = test_storage();
@@ -242,6 +251,7 @@ fn test_execute_deletion_requires_scheduled_state() {
 // === Edge Cases ===
 
 // @scenario: emergency_shred :: Shred with no contacts
+// @internal
 #[test]
 fn test_execute_deletion_no_contacts_returns_empty_revocations() {
     let storage = test_storage();
@@ -254,6 +264,7 @@ fn test_execute_deletion_no_contacts_returns_empty_revocations() {
     assert!(result.revocations.is_empty());
 }
 
+// @internal
 #[test]
 fn test_execute_deletion_legacy_contacts_get_revocations() {
     // Legacy contacts (no CEK) should still get revocation messages
@@ -270,6 +281,7 @@ fn test_execute_deletion_legacy_contacts_get_revocations() {
     assert_eq!(result.revocations.len(), 1);
 }
 
+// @internal
 #[test]
 fn test_execute_deletion_mixed_cek_and_legacy_contacts() {
     let storage = test_storage();

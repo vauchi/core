@@ -35,6 +35,7 @@ fn make_test_ohttp_client() -> OhttpClient {
 
 // @scenario: sync_privacy:OHTTP sync gate checks
 /// connect() requires an identity — must return IdentityNotInitialized.
+// @internal
 #[test]
 fn test_connect_without_identity_returns_error() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -49,6 +50,7 @@ fn test_connect_without_identity_returns_error() {
 
 // @scenario: sync_privacy:OHTTP sync gate checks
 /// sync() without an identity returns NoIdentity.
+// @internal
 #[test]
 fn test_sync_no_identity_returns_no_identity() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -61,6 +63,7 @@ fn test_sync_no_identity_returns_no_identity() {
 
 // @scenario: sync_privacy:OHTTP sync gate checks
 /// sync() without calling connect() first returns NotConnected.
+// @internal
 #[test]
 fn test_sync_not_connected_returns_not_connected() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -78,6 +81,7 @@ fn test_sync_not_connected_returns_not_connected() {
 ///
 /// Requires a valid OHTTP key to be injected so the NotConnected gate is bypassed
 /// and the timing check is actually reached.
+// @internal
 #[test]
 #[cfg(feature = "testing")]
 fn test_sync_too_soon_returns_too_soon() {
@@ -97,6 +101,7 @@ fn test_sync_too_soon_returns_too_soon() {
 
 // @scenario: sync_privacy:OHTTP key bootstrap on connect
 /// disconnect() clears the OHTTP key so sync() returns NotConnected.
+// @internal
 #[test]
 fn test_disconnect_clears_ohttp_state() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -113,6 +118,7 @@ fn test_disconnect_clears_ohttp_state() {
 /// set_post_exchange_delay() sets a timing deadline that causes sync() to return TooSoon.
 ///
 /// Requires a valid OHTTP key to be injected so the NotConnected gate is bypassed.
+// @internal
 #[test]
 #[cfg(feature = "testing")]
 fn test_set_post_exchange_delay_blocks_sync() {
@@ -135,6 +141,7 @@ fn test_set_post_exchange_delay_blocks_sync() {
 
 // @scenario: sync_privacy:OHTTP key bootstrap on connect
 /// After connect() fails (no real relay), disconnect() still leaves sync() returning NotConnected.
+// @internal
 #[test]
 fn test_sync_outcome_not_connected_after_disconnect() {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -155,6 +162,7 @@ fn test_sync_outcome_not_connected_after_disconnect() {
 
 // @scenario: sync_privacy:OHTTP key bootstrap on connect
 /// OhttpConfig::default() has the correct production defaults.
+// @internal
 #[test]
 fn test_ohttp_config_defaults() {
     use vauchi_core::api::OhttpConfig;
@@ -172,6 +180,7 @@ fn test_ohttp_config_defaults() {
 
 // @scenario: sync_privacy:OHTTP key cache persistence
 /// Storage roundtrip: save an OHTTP key via storage, load it back, verify bytes match.
+// @internal
 #[test]
 fn test_ohttp_cache_roundtrip_via_storage() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -196,6 +205,7 @@ fn test_ohttp_cache_roundtrip_via_storage() {
 // @scenario: sync_privacy:OHTTP sync gate checks
 /// Sync gate ordering: NoIdentity is checked before NotConnected,
 /// and NotConnected is checked before TooSoon.
+// @internal
 #[test]
 #[cfg(feature = "testing")]
 fn test_sync_gate_ordering() {

@@ -23,6 +23,7 @@ fn enabled_config() -> DuressConfig {
 }
 
 // @scenario: duress_mode :: Duress mode is opt-in and disabled by default
+// @internal
 #[test]
 fn duress_starts_at_overview() {
     let engine = DuressPinEngine::new(default_config());
@@ -46,6 +47,7 @@ fn duress_starts_at_overview() {
     );
 }
 
+// @internal
 #[test]
 fn duress_overview_shows_enable_toggle() {
     let engine = DuressPinEngine::new(default_config());
@@ -103,6 +105,7 @@ fn duress_overview_shows_enable_toggle() {
     assert_eq!(disable.style, ActionStyle::Destructive);
 }
 
+// @internal
 #[test]
 fn duress_configure_goes_to_pin() {
     let mut engine = DuressPinEngine::new(default_config());
@@ -118,6 +121,7 @@ fn duress_configure_goes_to_pin() {
     }
 }
 
+// @internal
 #[test]
 fn duress_enter_pin_validation() {
     let mut engine = DuressPinEngine::new(default_config());
@@ -164,6 +168,7 @@ fn duress_enter_pin_validation() {
 }
 
 // @scenario: duress_mode :: Duress PIN must differ from normal PIN
+// @internal
 #[test]
 fn duress_pin_mismatch_error() {
     let mut engine = DuressPinEngine::new(default_config());
@@ -199,6 +204,7 @@ fn duress_pin_mismatch_error() {
     }
 }
 
+// @internal
 #[test]
 fn duress_pin_match_to_alerts() {
     let mut engine = DuressPinEngine::new(default_config());
@@ -231,6 +237,7 @@ fn duress_pin_match_to_alerts() {
 
 // @scenario: duress_mode :: Enable duress PIN in settings
 // @scenario: duress_mode :: Configure trusted contacts for duress alerts
+// @internal
 #[test]
 fn duress_alerts_save_enables() {
     let mut engine = DuressPinEngine::new(default_config());
@@ -283,6 +290,7 @@ fn duress_alerts_save_enables() {
     );
 }
 
+// @internal
 #[test]
 fn duress_disable_shows_inline_confirm() {
     let mut engine = DuressPinEngine::new(enabled_config());
@@ -311,6 +319,7 @@ fn duress_disable_shows_inline_confirm() {
 }
 
 // @scenario: duress_mode :: Disable duress mode from settings
+// @internal
 #[test]
 fn duress_confirm_disable_completes() {
     let mut engine = DuressPinEngine::new(enabled_config());
@@ -333,6 +342,7 @@ fn duress_confirm_disable_completes() {
     );
 }
 
+// @internal
 #[test]
 fn duress_cancel_disable_keeps_enabled() {
     let mut engine = DuressPinEngine::new(enabled_config());
@@ -357,6 +367,7 @@ fn duress_cancel_disable_keeps_enabled() {
     );
 }
 
+// @internal
 #[test]
 fn duress_back_navigation() {
     let mut engine = DuressPinEngine::new(default_config());
@@ -431,6 +442,7 @@ fn duress_back_navigation() {
     }
 }
 
+// @internal
 #[test]
 fn duress_pin_accumulates_single_chars() {
     let mut engine = DuressPinEngine::new(default_config());
@@ -484,6 +496,7 @@ fn duress_pin_accumulates_single_chars() {
     }
 }
 
+// @internal
 #[test]
 fn duress_pin_backspace_removes_last_char() {
     let mut engine = DuressPinEngine::new(default_config());

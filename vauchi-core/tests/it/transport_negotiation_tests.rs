@@ -7,6 +7,7 @@
 use vauchi_core::exchange::transport::negotiation::negotiate_transport;
 use vauchi_core::exchange::transport::{TransportCaps, TransportType};
 
+// @internal
 #[test]
 fn both_have_wifi_aware_selects_wifi_aware() {
     let ours = TransportCaps::WIFI_AWARE | TransportCaps::BLE | TransportCaps::STATIC_QR;
@@ -17,6 +18,7 @@ fn both_have_wifi_aware_selects_wifi_aware() {
     );
 }
 
+// @internal
 #[test]
 fn no_wifi_aware_both_have_ble_selects_ble() {
     let ours = TransportCaps::BLE | TransportCaps::STATIC_QR;
@@ -24,6 +26,7 @@ fn no_wifi_aware_both_have_ble_selects_ble() {
     assert_eq!(negotiate_transport(&ours, &theirs), TransportType::Ble);
 }
 
+// @internal
 #[test]
 fn both_have_animated_qr_only_selects_animated_qr() {
     let ours = TransportCaps::ANIMATED_QR;
@@ -34,6 +37,7 @@ fn both_have_animated_qr_only_selects_animated_qr() {
     );
 }
 
+// @internal
 #[test]
 fn both_have_static_qr_only_selects_static_qr() {
     let ours = TransportCaps::STATIC_QR;
@@ -41,6 +45,7 @@ fn both_have_static_qr_only_selects_static_qr() {
     assert_eq!(negotiate_transport(&ours, &theirs), TransportType::StaticQr);
 }
 
+// @internal
 #[test]
 fn no_overlap_falls_back_to_static_qr() {
     let ours = TransportCaps::BLE;
@@ -48,6 +53,7 @@ fn no_overlap_falls_back_to_static_qr() {
     assert_eq!(negotiate_transport(&ours, &theirs), TransportType::StaticQr);
 }
 
+// @internal
 #[test]
 fn all_flags_selects_wifi_aware_highest_priority() {
     let all = TransportCaps::STATIC_QR
@@ -59,6 +65,7 @@ fn all_flags_selects_wifi_aware_highest_priority() {
     assert_eq!(negotiate_transport(&all, &all), TransportType::WifiAware);
 }
 
+// @internal
 #[test]
 fn v2_peer_with_empty_caps_falls_back_to_static_qr() {
     let ours = TransportCaps::WIFI_AWARE | TransportCaps::BLE | TransportCaps::STATIC_QR;
@@ -66,6 +73,7 @@ fn v2_peer_with_empty_caps_falls_back_to_static_qr() {
     assert_eq!(negotiate_transport(&ours, &theirs), TransportType::StaticQr);
 }
 
+// @internal
 #[test]
 fn negotiation_is_symmetric() {
     let a = TransportCaps::TCP | TransportCaps::BLE | TransportCaps::STATIC_QR;
@@ -73,6 +81,7 @@ fn negotiation_is_symmetric() {
     assert_eq!(negotiate_transport(&a, &b), negotiate_transport(&b, &a));
 }
 
+// @internal
 #[test]
 fn tcp_preferred_over_ble() {
     let ours = TransportCaps::TCP | TransportCaps::BLE;

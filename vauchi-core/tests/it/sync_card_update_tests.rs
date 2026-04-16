@@ -125,6 +125,7 @@ fn create_valid_update(
 
 // --- Tests ---
 
+// @internal
 #[test]
 fn test_process_empty_batch() {
     let alice_wb = create_vauchi_with_identity("Alice");
@@ -136,6 +137,7 @@ fn test_process_empty_batch() {
     assert_eq!(result.skipped, 0, "No updates skipped");
 }
 
+// @internal
 #[test]
 fn test_process_single_valid_update() {
     let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
@@ -179,6 +181,7 @@ fn test_process_single_valid_update() {
     assert!(has_email, "Card should have the new email field");
 }
 
+// @internal
 #[test]
 fn test_sender_revoked_rejected() {
     let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
@@ -217,6 +220,7 @@ fn test_sender_revoked_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn test_contact_not_found_rejected() {
     let alice_wb = create_vauchi_with_identity("Alice");
@@ -236,6 +240,7 @@ fn test_contact_not_found_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn test_contact_blocked_rejected() {
     let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
@@ -271,6 +276,7 @@ fn test_contact_blocked_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn test_no_ratchet_state_rejected() {
     let alice_wb = create_vauchi_with_identity("Alice");
@@ -299,6 +305,7 @@ fn test_no_ratchet_state_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn test_invalid_ratchet_message_rejected() {
     let (alice_wb, _bob_wb, _shared_secret, bob_contact_id, _alice_contact_id) =
@@ -323,6 +330,7 @@ fn test_invalid_ratchet_message_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn test_decryption_failed_rejected() {
     let (alice_wb, _bob_wb, _shared_secret, bob_contact_id, _alice_contact_id) =
@@ -352,6 +360,7 @@ fn test_decryption_failed_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn test_signature_invalid_rejected() {
     let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
@@ -410,6 +419,7 @@ fn test_signature_invalid_rejected() {
     );
 }
 
+// @internal
 #[test]
 fn test_replay_detected() {
     let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
@@ -504,6 +514,7 @@ fn test_replay_detected() {
     );
 }
 
+// @internal
 #[test]
 fn test_batch_partial_failure() {
     let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
@@ -542,6 +553,7 @@ fn test_batch_partial_failure() {
     assert_eq!(result.processed, 1, "One valid update should be processed");
 }
 
+// @internal
 #[test]
 fn test_decode_versioned_payload_via_helper() {
     // Test via a full pipeline: create a CEK-wrapped update and verify it processes
@@ -574,6 +586,7 @@ fn test_decode_versioned_payload_via_helper() {
     );
 }
 
+// @internal
 #[test]
 fn test_decode_versioned_payload_cek_wrapped() {
     let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =
@@ -638,6 +651,7 @@ fn test_decode_versioned_payload_cek_wrapped() {
 // ============================================================
 
 // @scenario: anonymous_sender :: Incoming messages with anonymous sender ID are resolved
+// @internal
 #[test]
 fn test_process_card_update_resolves_anonymous_sender_id() {
     use vauchi_core::network::anonymous::AnonymousSender;
@@ -689,6 +703,7 @@ fn test_process_card_update_resolves_anonymous_sender_id() {
 }
 
 // @scenario: anonymous_sender :: Unknown anonymous sender ID is handled gracefully
+// @internal
 #[test]
 fn test_process_card_update_skips_unresolvable_anonymous_id() {
     let alice_wb = create_vauchi_with_identity("Alice");
@@ -718,6 +733,7 @@ fn test_process_card_update_skips_unresolvable_anonymous_id() {
 
 // @scenario: contact_field_notes :: per-field note is deleted when contact removes that field
 // @scenario: contact_field_notes :: notes on retained fields survive when another field is removed
+// @internal
 #[test]
 fn test_field_note_cleaned_on_inbound_field_removed() {
     let (alice_wb, bob_wb, _shared_secret, bob_contact_id, alice_contact_id) =

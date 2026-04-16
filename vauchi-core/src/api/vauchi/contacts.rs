@@ -316,6 +316,18 @@ impl Vauchi {
         }
 
         self.storage.save_contact(&contact)?;
+
+        // Upload updated guardian entries to relay after trust change
+        #[cfg(feature = "network-http")]
+        {
+            // Best-effort: log but don't fail the local toggle on relay errors
+            if let Err(_e) = self.upload_guardian_entries() {
+                // Relay upload failed — local state is correct, relay will be
+                // updated on next sync or manual retry. Silent for now;
+                // future: emit an event for the UI to show a warning.
+            }
+        }
+
         Ok(new_state)
     }
 

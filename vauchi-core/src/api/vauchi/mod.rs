@@ -19,6 +19,8 @@ mod import;
 mod merge;
 mod onboarding;
 mod propagation;
+#[cfg(feature = "network-http")]
+mod recovery;
 mod security;
 mod setup;
 #[cfg(feature = "network-http")]

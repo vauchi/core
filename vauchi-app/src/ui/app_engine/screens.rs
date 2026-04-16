@@ -1001,6 +1001,33 @@ impl AppEngine {
                 answer_url: Some("https://docs.vauchi.app/faq/privacy".into()),
                 category: "Privacy".into(),
             },
+            HelpItem {
+                id: "report-issue".into(),
+                question: "Report Issue".into(),
+                answer: None,
+                answer_url: Some("https://gitlab.com/vauchi/vauchi/-/issues/new".into()),
+                category: "Support".into(),
+            },
+            HelpItem {
+                id: "contact-support".into(),
+                question: "Contact Support".into(),
+                answer: Some(
+                    "Email support@vauchi.app for help. For security issues, \
+                     contact security@vauchi.app. Vauchi never collects telemetry \
+                     or crash reports — your privacy is preserved even when \
+                     reporting problems."
+                        .into(),
+                ),
+                answer_url: Some("mailto:support@vauchi.app".into()),
+                category: "Support".into(),
+            },
+            HelpItem {
+                id: "known-issues".into(),
+                question: "Known Issues".into(),
+                answer: None,
+                answer_url: Some("https://docs.vauchi.app/users/known-issues/".into()),
+                category: "Support".into(),
+            },
         ]
     }
 }

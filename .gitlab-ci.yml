@@ -1018,8 +1018,7 @@ build:cabi-windows:
       # Build CABI DLL via cross-compilation
       echo "Cross-compiling vauchi-cabi for x86_64-pc-windows-msvc..."
       cargo xwin build -p vauchi-cabi --release \
-        --target x86_64-pc-windows-msvc \
-        --features audio
+        --target x86_64-pc-windows-msvc
       echo "Cross-compilation complete"
 
       # Prepare dist

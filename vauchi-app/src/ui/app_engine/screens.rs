@@ -1003,22 +1003,16 @@ impl AppEngine {
             },
             HelpItem {
                 id: "report-issue".into(),
-                question: "Report Issue".into(),
+                question: "Report a Bug".into(),
                 answer: None,
-                answer_url: Some("https://gitlab.com/vauchi/vauchi/-/issues/new".into()),
+                answer_url: Some(Self::bug_report_mailto()),
                 category: "Support".into(),
             },
             HelpItem {
-                id: "contact-support".into(),
-                question: "Contact Support".into(),
-                answer: Some(
-                    "Email support@vauchi.app for help. For security issues, \
-                     contact security@vauchi.app. Vauchi never collects telemetry \
-                     or crash reports — your privacy is preserved even when \
-                     reporting problems."
-                        .into(),
-                ),
-                answer_url: Some("mailto:support@vauchi.app".into()),
+                id: "feature-idea".into(),
+                question: "Suggest an Idea".into(),
+                answer: None,
+                answer_url: Some(Self::idea_mailto()),
                 category: "Support".into(),
             },
             HelpItem {
@@ -1029,5 +1023,52 @@ impl AppEngine {
                 category: "Support".into(),
             },
         ]
+    }
+
+    fn bug_report_mailto() -> String {
+        let version = env!("CARGO_PKG_VERSION");
+        let os = std::env::consts::OS;
+        let arch = std::env::consts::ARCH;
+        let subject = Self::percent_encode(&format!("Bug Report — Vauchi v{version}"));
+        let body = Self::percent_encode(&format!(
+            "--- Device Info (auto-filled) ---\n\
+             App: Vauchi v{version}\n\
+             Platform: {os} ({arch})\n\
+             ---\n\n\
+             What happened:\n\n\n\
+             Steps to reproduce:\n\
+             1. \n\
+             2. \n\
+             3. \n\n\
+             What I expected:\n\n"
+        ));
+        format!("mailto:support@vauchi.app?subject={subject}&body={body}")
+    }
+
+    fn idea_mailto() -> String {
+        let version = env!("CARGO_PKG_VERSION");
+        let subject = Self::percent_encode(&format!("Idea — Vauchi v{version}"));
+        let body = Self::percent_encode(
+            "What would you like to see in Vauchi?\n\n\n\
+             Why would this be useful?\n\n",
+        );
+        format!("mailto:support@vauchi.app?subject={subject}&body={body}")
+    }
+
+    fn percent_encode(s: &str) -> String {
+        let mut out = String::with_capacity(s.len() * 2);
+        for b in s.bytes() {
+            match b {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                    out.push(b as char);
+                }
+                _ => {
+                    out.push('%');
+                    out.push(char::from(b"0123456789ABCDEF"[(b >> 4) as usize]));
+                    out.push(char::from(b"0123456789ABCDEF"[(b & 0x0F) as usize]));
+                }
+            }
+        }
+        out
     }
 }

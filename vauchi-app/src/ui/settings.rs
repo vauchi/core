@@ -33,6 +33,8 @@ pub struct SettingsConfig {
     pub high_contrast: bool,
     #[serde(default)]
     pub large_touch: bool,
+    #[serde(default = "default_true")]
+    pub show_help_icons: bool,
     #[serde(default)]
     pub version: String,
     #[serde(default)]
@@ -49,6 +51,10 @@ pub struct SettingsConfig {
     pub backup_reminder_frequency: String,
     #[serde(default)]
     pub last_backup_display: String,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Settings screen engine.
@@ -175,6 +181,18 @@ impl WorkflowEngine for SettingsEngine {
                         a11y: Some(A11y {
                             label: Some("Language".into()),
                             hint: Some("The current display language of the app".into()),
+                            role: None,
+                        }),
+                    },
+                    SettingsItem {
+                        id: "show_help_icons".into(),
+                        label: "Show help icons".into(),
+                        kind: SettingsItemKind::Toggle {
+                            enabled: self.config.show_help_icons,
+                        },
+                        a11y: Some(A11y {
+                            label: None,
+                            hint: Some("Toggle contextual help icons on form fields".into()),
                             role: None,
                         }),
                     },
@@ -541,6 +559,13 @@ impl WorkflowEngine for SettingsEngine {
                     "large_touch" => self.config.large_touch = !self.config.large_touch,
                     _ => {}
                 }
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::SettingsToggled {
+                ref component_id,
+                ref item_id,
+            } if component_id == "appearance" && item_id == "show_help_icons" => {
+                self.config.show_help_icons = !self.config.show_help_icons;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::SettingsToggled {

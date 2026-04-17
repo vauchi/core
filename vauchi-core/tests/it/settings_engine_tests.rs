@@ -20,6 +20,7 @@ fn sample_config() -> SettingsConfig {
         reduce_motion: false,
         high_contrast: false,
         large_touch: false,
+        show_help_icons: true,
         version: String::new(),
         build: String::new(),
         sync_status: String::new(),
@@ -390,6 +391,55 @@ fn settings_items_have_a11y_labels() {
             assert!(a11y.is_some(), "InlineConfirm '{}' missing a11y label", id);
         }
     }
+}
+
+// @internal
+#[test]
+fn settings_show_help_icons_appears_in_appearance_group() {
+    let engine = SettingsEngine::new(sample_config());
+    let screen = engine.current_screen();
+    // Verify the toggle is present and defaults to true
+    let enabled = find_toggle(&screen, "appearance", "show_help_icons");
+    assert!(enabled, "show_help_icons should default to true");
+}
+
+// @internal
+#[test]
+fn settings_show_help_icons_toggle_flips_config() {
+    let mut engine = SettingsEngine::new(sample_config());
+
+    // Initially enabled
+    let screen = engine.current_screen();
+    assert!(
+        find_toggle(&screen, "appearance", "show_help_icons"),
+        "show_help_icons should start enabled"
+    );
+
+    // Toggle off
+    let result = engine.handle_action(UserAction::SettingsToggled {
+        component_id: "appearance".into(),
+        item_id: "show_help_icons".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("Expected UpdateScreen, got {result:?}");
+    };
+    assert!(
+        !find_toggle(&screen, "appearance", "show_help_icons"),
+        "show_help_icons should be disabled after toggle"
+    );
+
+    // Toggle on again
+    let result = engine.handle_action(UserAction::SettingsToggled {
+        component_id: "appearance".into(),
+        item_id: "show_help_icons".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("Expected UpdateScreen, got {result:?}");
+    };
+    assert!(
+        find_toggle(&screen, "appearance", "show_help_icons"),
+        "show_help_icons should be re-enabled after second toggle"
+    );
 }
 
 // --- helpers ---

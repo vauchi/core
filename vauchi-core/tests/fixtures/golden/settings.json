@@ -130,6 +130,20 @@
               "hint": "The current display language of the app",
               "role": null
             }
+          },
+          {
+            "id": "show_help_icons",
+            "label": "Show help icons",
+            "kind": {
+              "Toggle": {
+                "enabled": true
+              }
+            },
+            "a11y": {
+              "label": null,
+              "hint": "Toggle contextual help icons on form fields",
+              "role": null
+            }
           }
         ]
       }

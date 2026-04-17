@@ -193,6 +193,7 @@ impl AppEngine {
                     reduce_motion: false,
                     high_contrast: false,
                     large_touch: false,
+                    show_help_icons: true,
                     version: String::new(),
                     build: String::new(),
                     sync_status: String::new(),

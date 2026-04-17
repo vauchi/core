@@ -9,7 +9,8 @@
 
 use vauchi_core::diagnostic::{
     DeviceCapabilityProfile, ErrorCorrectionLevel, Platform, QrConfig, TuningResult,
-    generate_qr_test_patterns, generate_sweep_matrix, rank_configs, score_config,
+    generate_extended_qr_test_patterns, generate_qr_test_patterns, generate_sweep_matrix,
+    generate_throughput_sequence, rank_configs, score_config,
 };
 
 // === Mobile Wrapper Types ===
@@ -249,4 +250,139 @@ pub fn diagnostic_generate_qr_test_patterns() -> Vec<MobileQrTestPattern> {
             data,
         })
         .collect()
+}
+
+#[uniffi::export]
+pub fn diagnostic_generate_extended_qr_test_patterns() -> Vec<MobileQrTestPattern> {
+    generate_extended_qr_test_patterns()
+        .into_iter()
+        .map(|(config, data)| MobileQrTestPattern {
+            config: qr_config_to_mobile(&config),
+            data,
+        })
+        .collect()
+}
+
+// === Throughput Sequence ===
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileThroughputFrame {
+    pub frame_index: u32,
+    pub total_frames: u32,
+    pub data: String,
+}
+
+#[uniffi::export]
+pub fn diagnostic_generate_throughput_sequence(
+    total_bytes: u32,
+    frame_capacity: u32,
+) -> Vec<MobileThroughputFrame> {
+    generate_throughput_sequence(total_bytes as usize, frame_capacity as usize)
+        .into_iter()
+        .map(|f| MobileThroughputFrame {
+            frame_index: f.frame_index,
+            total_frames: f.total_frames,
+            data: f.data,
+        })
+        .collect()
+}
+
+// === Scanner Backend (gated behind diagnostic-scanner feature) ===
+
+#[cfg(feature = "diagnostic-scanner")]
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum MobileScannerBackend {
+    RqrrRaw,
+    RqrrPreprocessed,
+}
+
+#[cfg(feature = "diagnostic-scanner")]
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileScanResult {
+    pub decoded: Option<String>,
+    pub total_us: u64,
+    pub preprocessing_us: u64,
+    pub decode_us: u64,
+    pub frame_skipped: bool,
+    pub laplacian_variance: f32,
+}
+
+#[cfg(feature = "diagnostic-scanner")]
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobilePreprocessConfig {
+    pub target_width: u32,
+    pub clahe_clip_limit: f32,
+    pub clahe_tile_size: u32,
+    pub threshold_window: u32,
+    pub unsharp_sigma: f32,
+    pub unsharp_amount: f32,
+    pub sharpness_threshold: f32,
+    pub apply_clahe: bool,
+    pub apply_unsharp: bool,
+    pub apply_threshold: bool,
+}
+
+#[cfg(feature = "diagnostic-scanner")]
+#[uniffi::export]
+pub fn diagnostic_scan_qr(
+    backend: MobileScannerBackend,
+    luma_data: Vec<u8>,
+    width: u32,
+    height: u32,
+) -> MobileScanResult {
+    use vauchi_core::diagnostic::scanner::{ScannerBackend, scan_qr_from_luma};
+
+    let rust_backend = match backend {
+        MobileScannerBackend::RqrrRaw => ScannerBackend::RqrrRaw,
+        MobileScannerBackend::RqrrPreprocessed => ScannerBackend::RqrrPreprocessed,
+    };
+    let result = scan_qr_from_luma(rust_backend, &luma_data, width, height);
+    MobileScanResult {
+        decoded: result.decoded,
+        total_us: result.total_us,
+        preprocessing_us: result.preprocessing_us,
+        decode_us: result.decode_us,
+        frame_skipped: result.frame_skipped,
+        laplacian_variance: result.laplacian_variance,
+    }
+}
+
+#[cfg(feature = "diagnostic-scanner")]
+#[uniffi::export]
+pub fn diagnostic_scan_qr_with_config(
+    backend: MobileScannerBackend,
+    luma_data: Vec<u8>,
+    width: u32,
+    height: u32,
+    config: MobilePreprocessConfig,
+) -> MobileScanResult {
+    use vauchi_core::diagnostic::preprocess::PreprocessConfig;
+    use vauchi_core::diagnostic::scanner::{ScannerBackend, scan_qr_from_luma_with_config};
+
+    let rust_backend = match backend {
+        MobileScannerBackend::RqrrRaw => ScannerBackend::RqrrRaw,
+        MobileScannerBackend::RqrrPreprocessed => ScannerBackend::RqrrPreprocessed,
+    };
+    let rust_config = PreprocessConfig {
+        target_width: config.target_width,
+        clahe_clip_limit: config.clahe_clip_limit,
+        clahe_tile_size: config.clahe_tile_size,
+        threshold_window: config.threshold_window,
+        unsharp_sigma: config.unsharp_sigma,
+        unsharp_amount: config.unsharp_amount,
+        sharpness_threshold: config.sharpness_threshold,
+        apply_clahe: config.apply_clahe,
+        apply_unsharp: config.apply_unsharp,
+        apply_threshold: config.apply_threshold,
+    };
+    let result =
+        scan_qr_from_luma_with_config(rust_backend, &luma_data, width, height, &rust_config);
+    MobileScanResult {
+        decoded: result.decoded,
+        total_us: result.total_us,
+        preprocessing_us: result.preprocessing_us,
+        decode_us: result.decode_us,
+        frame_skipped: result.frame_skipped,
+        laplacian_variance: result.laplacian_variance,
+    }
 }

@@ -21,6 +21,8 @@ async-sync = ["tokio"]
 # Default-on so mobile bindings expose check_content_updates() / apply_content_updates()
 # instead of silently returning Disabled. Gate 2 of frontend architecture audit (2026-03-18).
 content-updates = ["vauchi-app/content-updates", "tokio"]
+# Diagnostic QR scanner benchmarking (forwards to vauchi-core)
+diagnostic-scanner = ["vauchi-core/diagnostic-scanner"]
 
 [dependencies]
 # Core Vauchi library (with rustls for Android/iOS - no OpenSSL dependency)

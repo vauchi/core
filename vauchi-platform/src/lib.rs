@@ -62,8 +62,14 @@ pub use content::{
 pub use diagnostic::{
     MobileCameraConfig, MobileDeviceCapabilityProfile, MobileErrorCorrectionLevel, MobileFpsRange,
     MobilePlatform, MobileQrConfig, MobileQrTestPattern, MobileScoredConfig, MobileSweepMatrix,
-    MobileTuningResult, diagnostic_generate_qr_test_patterns, diagnostic_generate_sweep_matrix,
-    diagnostic_rank_configs, diagnostic_score_config,
+    MobileThroughputFrame, MobileTuningResult, diagnostic_generate_extended_qr_test_patterns,
+    diagnostic_generate_qr_test_patterns, diagnostic_generate_sweep_matrix,
+    diagnostic_generate_throughput_sequence, diagnostic_rank_configs, diagnostic_score_config,
+};
+#[cfg(feature = "diagnostic-scanner")]
+pub use diagnostic::{
+    MobilePreprocessConfig, MobileScanResult, MobileScannerBackend, diagnostic_scan_qr,
+    diagnostic_scan_qr_with_config,
 };
 use error::lock_or;
 pub use error::{KeychainError, MobileError};

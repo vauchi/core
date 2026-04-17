@@ -12,7 +12,7 @@ use super::types::{
     MobileGdprExport, MobileShredReport, MobileShredStatus, MobileShredToken,
     MobileShredVerification,
 };
-use super::{MobilePlatformKeychain, MobileRelaySender, VauchiPlatform};
+use super::{MobilePlatformKeychain, VauchiPlatform};
 
 #[uniffi::export]
 impl VauchiPlatform {
@@ -149,23 +149,16 @@ impl VauchiPlatform {
 
         let core_token = vauchi_core::api::ShredToken::from_created_at(token.created_at);
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+        let _ = lock_or(&self.pinned_cert_pem)?.clone();
 
-        let (mut purge_sender, purge_error) = match MobileRelaySender::new(
-            &self.relay_url,
-            &identity.public_id(),
-            lock_or(&self.pinned_cert_pem)?.clone(),
-        ) {
+        let (purge_res, rev_res) = self.build_shred_senders(&identity.public_id());
+        let (mut purge_sender, purge_error) = match purge_res {
             Ok(sender) => (Some(sender), None),
-            Err(e) => (None, Some(e.to_string())),
+            Err(e) => (None, Some(e)),
         };
-
-        let (mut revocation_sender, rev_error) = match MobileRelaySender::new(
-            &self.relay_url,
-            &identity.public_id(),
-            lock_or(&self.pinned_cert_pem)?.clone(),
-        ) {
+        let (mut revocation_sender, rev_error) = match rev_res {
             Ok(sender) => (Some(sender), None),
-            Err(e) => (None, Some(e.to_string())),
+            Err(e) => (None, Some(e)),
         };
 
         let report = manager
@@ -204,23 +197,16 @@ impl VauchiPlatform {
         let data_dir = self.data_dir();
 
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
+        let _ = lock_or(&self.pinned_cert_pem)?.clone();
 
-        let (mut purge_sender, purge_error) = match MobileRelaySender::new(
-            &self.relay_url,
-            &identity.public_id(),
-            lock_or(&self.pinned_cert_pem)?.clone(),
-        ) {
+        let (purge_res, rev_res) = self.build_shred_senders(&identity.public_id());
+        let (mut purge_sender, purge_error) = match purge_res {
             Ok(sender) => (Some(sender), None),
-            Err(e) => (None, Some(e.to_string())),
+            Err(e) => (None, Some(e)),
         };
-
-        let (mut revocation_sender, rev_error) = match MobileRelaySender::new(
-            &self.relay_url,
-            &identity.public_id(),
-            lock_or(&self.pinned_cert_pem)?.clone(),
-        ) {
+        let (mut revocation_sender, rev_error) = match rev_res {
             Ok(sender) => (Some(sender), None),
-            Err(e) => (None, Some(e.to_string())),
+            Err(e) => (None, Some(e)),
         };
 
         let report = manager

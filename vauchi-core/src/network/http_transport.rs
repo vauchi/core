@@ -134,8 +134,12 @@ impl HttpTransportConfig {
     /// Production callers must never use this — `allow_direct: true` leaks
     /// the client's source IP to the relay, defeating ADR-037. The CI
     /// `check-no-allow-direct` lint treats every non-test `allow_direct: true`
-    /// as a hard failure; this helper exists so tests do not trip it.
-    #[cfg(any(test, feature = "testing"))]
+    /// as a hard failure; this helper exists so tests do not trip it, and
+    /// the lint's allow-list explicitly names `for_testing`.
+    ///
+    /// Not feature-gated because downstream test binaries (vauchi-platform,
+    /// e2e) consume vauchi-core as a regular dependency where `cfg(test)`
+    /// is not active; the lint guard is the real enforcement mechanism.
     pub fn for_testing(relay_url: impl Into<String>, timeout_ms: u64) -> Self {
         Self {
             relay_url: relay_url.into(),

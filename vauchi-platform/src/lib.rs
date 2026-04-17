@@ -773,53 +773,41 @@ pub fn widget_panic_shred(
 
 // === Shred Network Senders ===
 
-/// Creates a `RelayClient<HttpTransportAdapter>` for shred operations.
-fn create_shred_relay_client(
-    relay_url: &str,
-    sender_id: &str,
-    _pinned_cert: Option<String>,
-) -> Result<
-    vauchi_core::network::RelayClient<vauchi_core::network::HttpTransportAdapter>,
-    vauchi_core::api::ShredError,
-> {
-    use vauchi_core::network::{
-        HttpTransport, HttpTransportAdapter, HttpTransportConfig, ProxyConfig, RelayClient,
-        RelayClientConfig, TransportConfig,
-    };
-
-    let http_url = relay_url.to_string();
-    let transport = HttpTransport::new(HttpTransportConfig {
-        relay_url: http_url.clone(),
-        timeout_ms: 10_000,
-        proxy: ProxyConfig::None,
-        allow_direct: true,
-        pinned_certs: vauchi_core::api::RelayConfig::default_pins(),
-    });
-    let adapter = HttpTransportAdapter::new(transport);
-    let config = RelayClientConfig {
-        transport: TransportConfig {
-            server_url: http_url,
-            ..TransportConfig::default()
-        },
-        ..RelayClientConfig::default()
-    };
-    let client = RelayClient::new(adapter, config, sender_id.to_string());
-    Ok(client)
-}
-
 /// Sends relay purge and revocation messages via HTTP transport during shred.
 struct MobileRelaySender {
     client: vauchi_core::network::RelayClient<vauchi_core::network::HttpTransportAdapter>,
 }
 
 impl MobileRelaySender {
-    fn new(
-        relay_url: &str,
+    /// Wrap an already-built `HttpTransport` into a relay sender.
+    ///
+    /// The transport should be constructed via `Vauchi::build_relay_transport`
+    /// so that shred requests flow through OHTTP when a gateway key is
+    /// cached (ADR-037). A panic-wipe triggered before the first
+    /// successful `connect()` falls back to direct HTTP — this is the
+    /// narrow availability trade-off tracked by problem record
+    /// `_private/docs/problems/2026-04-17-ohttp-allow-direct-fallback/`:
+    /// the shred must complete even when OHTTP is unreachable, but once
+    /// a key is cached the transport fails closed.
+    fn from_transport(
+        transport: vauchi_core::network::HttpTransport,
+        relay_url: String,
         sender_id: &str,
-        pinned_cert: Option<String>,
-    ) -> Result<Self, vauchi_core::api::ShredError> {
-        let client = create_shred_relay_client(relay_url, sender_id, pinned_cert)?;
-        Ok(Self { client })
+    ) -> Self {
+        use vauchi_core::network::{
+            HttpTransportAdapter, RelayClient, RelayClientConfig, TransportConfig,
+        };
+        let adapter = HttpTransportAdapter::new(transport);
+        let config = RelayClientConfig {
+            transport: TransportConfig {
+                server_url: relay_url,
+                ..TransportConfig::default()
+            },
+            ..RelayClientConfig::default()
+        };
+        Self {
+            client: RelayClient::new(adapter, config, sender_id.to_string()),
+        }
     }
 }
 
@@ -886,6 +874,35 @@ impl VauchiPlatform {
             .with_relay_url(&self.relay_url)
             .with_storage_key(self.storage_key.clone());
         Vauchi::new(config).map_err(|e| MobileError::Internal(e.to_string()))
+    }
+
+    /// Build the pair of `MobileRelaySender`s used by shred/purge flows.
+    ///
+    /// Both senders share one fresh `Vauchi` instance so the OHTTP key
+    /// cache (if any) is reused. If `open_vauchi` fails, both results
+    /// carry the same error string — shred itself proceeds best-effort
+    /// without relay-side purge/revocation.
+    pub(crate) fn build_shred_senders(
+        &self,
+        sender_id: &str,
+    ) -> (
+        Result<MobileRelaySender, String>,
+        Result<MobileRelaySender, String>,
+    ) {
+        let vauchi = match self.open_vauchi() {
+            Ok(v) => v,
+            Err(e) => {
+                let msg = e.to_string();
+                return (Err(msg.clone()), Err(msg));
+            }
+        };
+        let purge_transport = vauchi.build_relay_transport(self.relay_url.clone(), 10_000);
+        let rev_transport = vauchi.build_relay_transport(self.relay_url.clone(), 10_000);
+        let purge =
+            MobileRelaySender::from_transport(purge_transport, self.relay_url.clone(), sender_id);
+        let rev =
+            MobileRelaySender::from_transport(rev_transport, self.relay_url.clone(), sender_id);
+        (Ok(purge), Ok(rev))
     }
 
     /// Save a contact directly to storage.
@@ -1554,12 +1571,24 @@ mod tests {
         assert!(partial.has_changes);
     }
 
+    fn test_shred_sender() -> MobileRelaySender {
+        use vauchi_core::network::{HttpTransport, HttpTransportConfig};
+        let transport = HttpTransport::new(HttpTransportConfig::for_testing(
+            "http://localhost:8080",
+            1000,
+        ));
+        MobileRelaySender::from_transport(
+            transport,
+            "http://localhost:8080".to_string(),
+            "abcd1234",
+        )
+    }
+
     // @scenario: privacy_compliance:Identity purge sends relay purge and revocations
     #[test]
     fn test_mobile_relay_sender_implements_revocation_trait() {
         fn accepts_sender(_: &mut dyn vauchi_core::api::RevocationSender) {}
-        let mut sender = MobileRelaySender::new("http://localhost:8080", "abcd1234", None)
-            .expect("MobileRelaySender should construct successfully");
+        let mut sender = test_shred_sender();
         accepts_sender(&mut sender);
     }
 
@@ -1567,8 +1596,7 @@ mod tests {
     #[test]
     fn test_mobile_relay_sender_implements_purge_trait() {
         fn accepts_sender(_: &mut dyn vauchi_core::api::PurgeSender) {}
-        let mut sender = MobileRelaySender::new("http://localhost:8080", "abcd1234", None)
-            .expect("MobileRelaySender should construct successfully");
+        let mut sender = test_shred_sender();
         accepts_sender(&mut sender);
     }
 

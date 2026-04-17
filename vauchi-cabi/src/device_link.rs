@@ -15,12 +15,10 @@ use std::time::{Duration, Instant};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 
+use super::{VauchiApp, from_c_str, to_c_string};
 use vauchi_core::exchange::{
     DeviceLinkInitiator, DeviceLinkRequest, ProximityProof, compute_confirmation_mac,
 };
-use vauchi_core::network::{HttpTransport, HttpTransportConfig, ProxyConfig};
-
-use super::{VauchiApp, from_c_str, to_c_string};
 
 /// Opaque handle to a device link initiator.
 pub struct VauchiDeviceLinkInitiator {
@@ -273,17 +271,11 @@ pub unsafe extern "C" fn vauchi_device_link_confirm_manual(
 }
 
 // ── Relay transport ───────────────────────────────────────────────────
-
-fn create_transport(relay_url: &str) -> HttpTransport {
-    let http_url = relay_url.to_string();
-    HttpTransport::new(HttpTransportConfig {
-        relay_url: http_url,
-        timeout_ms: 10_000,
-        proxy: ProxyConfig::None,
-        allow_direct: true,
-        pinned_certs: vauchi_core::api::RelayConfig::default_pins(),
-    })
-}
+//
+// Transports are now built via `Vauchi::build_relay_transport` so that
+// device-link requests flow through OHTTP when the calling app has
+// already bootstrapped a gateway key. See problem record
+// `_private/docs/problems/2026-04-17-ohttp-allow-direct-fallback/`.
 
 /// Claim payload sent by the new device.
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -313,8 +305,10 @@ pub unsafe extern "C" fn vauchi_device_link_listen(
         }
         let app = unsafe { &*handle };
 
-        // Extract identity_id and relay_url under lock, then release
-        let (identity_id, relay_url) = {
+        // Extract identity_id and build the (OHTTP-aware) transport under
+        // lock. `build_relay_transport` wires OHTTP from the cached
+        // gateway key if the caller has already connected.
+        let (identity_id, transport) = {
             let engine = match app.engine.lock() {
                 Ok(e) => e,
                 Err(_) => return to_c_string(r#"{"error":"lock poisoned"}"#),
@@ -324,13 +318,11 @@ pub unsafe extern "C" fn vauchi_device_link_listen(
                 Some(id) => id,
                 None => return to_c_string(r#"{"error":"no identity"}"#),
             };
-            (
-                hex::encode(identity.signing_public_key()),
-                vauchi.config().relay.server_url.clone(),
-            )
+            let identity_id = hex::encode(identity.signing_public_key());
+            let relay_url = vauchi.config().relay.server_url.clone();
+            let transport = vauchi.build_relay_transport(relay_url, 10_000);
+            (identity_id, transport)
         };
-
-        let transport = create_transport(&relay_url);
 
         // 1. Create offer with identity info
         let code = match transport
@@ -409,15 +401,15 @@ pub unsafe extern "C" fn vauchi_device_link_send_response(
         };
 
         let app = unsafe { &*handle };
-        let relay_url = {
+        let transport = {
             let engine = match app.engine.lock() {
                 Ok(e) => e,
                 Err(_) => return -1,
             };
-            engine.vauchi().config().relay.server_url.clone()
+            let vauchi = engine.vauchi();
+            let relay_url = vauchi.config().relay.server_url.clone();
+            vauchi.build_relay_transport(relay_url, 10_000)
         };
-
-        let transport = create_transport(&relay_url);
         match transport.exchange_claim(&token, &BASE64.encode(&response_bytes)) {
             Ok(_) => 0,
             Err(_) => -1,

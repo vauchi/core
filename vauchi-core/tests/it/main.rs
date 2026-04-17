@@ -131,6 +131,8 @@ mod diagnostic_extended_pattern_tests;
 mod diagnostic_log_event_tests;
 mod diagnostic_qr_pattern_tests;
 mod diagnostic_report_tests;
+#[cfg(feature = "diagnostic-scanner")]
+mod diagnostic_scanner_tests;
 mod diagnostic_snapshot_tests;
 mod diagnostic_tuner_tests;
 mod direct_transport_proptest;

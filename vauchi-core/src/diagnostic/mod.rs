@@ -9,6 +9,8 @@ pub mod exchange_debug;
 pub(crate) mod exchange_debug;
 pub mod log_event;
 pub mod report;
+#[cfg(feature = "diagnostic-scanner")]
+pub mod scanner;
 pub mod snapshot;
 pub mod tuner;
 

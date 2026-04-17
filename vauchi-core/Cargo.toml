@@ -41,6 +41,8 @@ test-timings = []
 test-kdf = []
 # JSON Schema generation for UI types (dev tooling only)
 schema-gen = ["schemars", "vauchi-app/schema-gen"]
+# Diagnostic QR scanner benchmarking (rqrr decoder + image preprocessing)
+diagnostic-scanner = ["rqrr"]
 
 [dependencies]
 # Cryptography (audited libraries)
@@ -136,6 +138,9 @@ ureq = { version = "3", default-features = false, features = ["json", "rustls-no
 
 # OHTTP client-side encryption (RFC 9458) for IP privacy
 ohttp = { version = "0.7", default-features = false, features = ["client", "rust-hpke"], optional = true }
+
+# QR code decoding for diagnostic scanner benchmarking (optional)
+rqrr = { version = "0.10", optional = true }
 
 # Remote content updates — module moved to vauchi-app.
 # Feature retained as empty for backward compatibility (consumers may reference it).

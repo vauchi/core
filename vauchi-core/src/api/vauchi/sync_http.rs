@@ -587,6 +587,33 @@ impl Vauchi {
         })
     }
 
+    /// Build an `HttpTransport` to the given relay URL with OHTTP wired
+    /// from the cached gateway key, if one is available.
+    ///
+    /// Used by call sites outside the sync path (device link, exchange,
+    /// guardian, shred) that need a transport to a relay endpoint while
+    /// still honoring ADR-037's IP-privacy guarantee. `allow_direct` is
+    /// true only when `connect()` has not yet succeeded — once a key is
+    /// cached, the transport fails closed on OHTTP failure instead of
+    /// silently leaking the client's source IP.
+    pub fn build_relay_transport(&self, relay_url: String, timeout_ms: u64) -> HttpTransport {
+        let mut transport = HttpTransport::new(HttpTransportConfig {
+            relay_url,
+            timeout_ms,
+            proxy: self.config.relay.proxy.clone(),
+            allow_direct: self.ohttp_key.is_none(),
+            pinned_certs: self.config.relay.pinned_certs.clone(),
+        });
+
+        if let Some(ref cached) = self.ohttp_key
+            && let Ok(client) = OhttpClient::new(cached.encoded_config().to_vec())
+        {
+            transport.set_ohttp(client);
+        }
+
+        transport
+    }
+
     /// Returns the relay URL for HTTP requests.
     pub(crate) fn http_relay_url(&self) -> String {
         self.config.relay.server_url.clone()

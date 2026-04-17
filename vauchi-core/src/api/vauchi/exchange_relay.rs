@@ -47,7 +47,7 @@ use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::exchange::relay_exchange::derive_sas;
 use crate::exchange::{X3DH, X3DHKeyPair};
-use crate::network::{HttpTransport, HttpTransportConfig};
+use crate::network::HttpTransport;
 
 /// Result of `start_relay_exchange`: the code to display and secret
 /// material needed to complete the exchange later.
@@ -380,25 +380,8 @@ impl Vauchi {
     /// display names — the same data shared in a QR exchange), but the
     /// caller's source IP is still sensitive: a relay that sees two IPs
     /// coordinating an exchange learns who met whom. ADR-037 therefore
-    /// requires OHTTP here as well. Direct mode is permitted only before
-    /// OHTTP has been wired (pre-`connect()`); once `ohttp_key` is set the
-    /// transport fails closed on OHTTP failure rather than silently leaking.
+    /// requires OHTTP here as well.
     fn create_relay_transport(&self) -> HttpTransport {
-        let mut transport = HttpTransport::new(HttpTransportConfig {
-            relay_url: self.http_relay_url(),
-            timeout_ms: self.config.relay.connect_timeout_ms,
-            proxy: self.config.relay.proxy.clone(),
-            allow_direct: self.ohttp_key.is_none(),
-            pinned_certs: self.config.relay.pinned_certs.clone(),
-        });
-
-        if let Some(ref ohttp_client) = self.ohttp_key
-            && let Ok(client) =
-                crate::network::OhttpClient::new(ohttp_client.encoded_config().to_vec())
-        {
-            transport.set_ohttp(client);
-        }
-
-        transport
+        self.build_relay_transport(self.http_relay_url(), self.config.relay.connect_timeout_ms)
     }
 }

@@ -228,15 +228,19 @@ impl Vauchi {
             // Entry not for us — try next
         }
 
-        let _token = found_token.ok_or_else(|| {
+        let token = found_token.ok_or_else(|| {
             VauchiError::InvalidState(
                 "No guardian entry found for our key — we may not be a designated guardian".into(),
             )
         })?;
 
-        // Create voucher: signs (old_pk, new_pk) with our keypair
-        let voucher =
-            RecoveryVoucher::create(claim.old_pk(), claim.new_pk(), identity.signing_keypair());
+        // Create voucher: signs (old_pk, new_pk) with our keypair, attaching the guardian token
+        let voucher = RecoveryVoucher::create(
+            claim.old_pk(),
+            claim.new_pk(),
+            identity.signing_keypair(),
+            Some(token),
+        );
 
         Ok(voucher)
     }

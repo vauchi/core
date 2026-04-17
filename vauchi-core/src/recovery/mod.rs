@@ -297,6 +297,9 @@ impl RecoveryClaim {
     }
 }
 
+/// Domain separator for recovery voucher signatures (ADR-007).
+const VOUCHER_DOMAIN: &[u8] = b"vauchi-recovery-voucher-v1";
+
 /// Voucher created by a contact confirming the recovery claim.
 #[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -307,6 +310,9 @@ pub struct RecoveryVoucher {
     timestamp: u64,
     #[serde_as(as = "[_; 64]")]
     signature: [u8; 64],
+    /// Optional guardian token proving the voucher is from a designated guardian.
+    /// Present in v2 vouchers; absent in v1 (legacy).
+    guardian_token: Option<guardian::GuardianToken>,
 }
 
 impl RecoveryVoucher {
@@ -322,6 +328,7 @@ impl RecoveryVoucher {
     pub fn create_from_claim(
         claim: &RecoveryClaim,
         voucher_keypair: &SigningKeyPair,
+        guardian_token: Option<guardian::GuardianToken>,
     ) -> Result<Self, RecoveryError> {
         if claim.is_expired() {
             return Err(RecoveryError::ClaimExpired);
@@ -336,11 +343,17 @@ impl RecoveryVoucher {
             claim.old_pk(),
             claim.new_pk(),
             voucher_keypair,
+            guardian_token,
         ))
     }
 
     /// Creates a signed voucher.
-    pub fn create(old_pk: &[u8; 32], new_pk: &[u8; 32], voucher_keypair: &SigningKeyPair) -> Self {
+    pub fn create(
+        old_pk: &[u8; 32],
+        new_pk: &[u8; 32],
+        voucher_keypair: &SigningKeyPair,
+        guardian_token: Option<guardian::GuardianToken>,
+    ) -> Self {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
@@ -358,6 +371,7 @@ impl RecoveryVoucher {
             voucher_pk,
             timestamp,
             signature: *signature.as_bytes(),
+            guardian_token,
         }
     }
 
@@ -368,7 +382,8 @@ impl RecoveryVoucher {
         voucher_pk: &[u8; 32],
         timestamp: u64,
     ) -> Vec<u8> {
-        let mut data = Vec::with_capacity(32 + 32 + 32 + 8);
+        let mut data = Vec::with_capacity(VOUCHER_DOMAIN.len() + 32 + 32 + 32 + 8);
+        data.extend_from_slice(VOUCHER_DOMAIN);
         data.extend_from_slice(old_pk);
         data.extend_from_slice(new_pk);
         data.extend_from_slice(voucher_pk);
@@ -396,6 +411,11 @@ impl RecoveryVoucher {
         self.timestamp
     }
 
+    /// Returns the guardian token, if present (v2 vouchers).
+    pub fn guardian_token(&self) -> Option<&guardian::GuardianToken> {
+        self.guardian_token.as_ref()
+    }
+
     /// Verifies the voucher signature.
     pub fn verify(&self) -> bool {
         let data =
@@ -406,19 +426,30 @@ impl RecoveryVoucher {
     }
 
     /// Serializes the voucher to bytes.
+    ///
+    /// Version 1: legacy layout (no guardian token).
+    /// Version 2: includes guardian token after the v1 fields.
     pub fn to_bytes(&self) -> Vec<u8> {
+        let version: u8 = if self.guardian_token.is_some() { 2 } else { 1 };
         // Version + old_pk + new_pk + voucher_pk + timestamp + signature
         let mut bytes = Vec::with_capacity(1 + 32 + 32 + 32 + 8 + 64);
-        bytes.push(1); // Version 1
+        bytes.push(version);
         bytes.extend_from_slice(&self.old_pk);
         bytes.extend_from_slice(&self.new_pk);
         bytes.extend_from_slice(&self.voucher_pk);
         bytes.extend_from_slice(&self.timestamp.to_le_bytes());
         bytes.extend_from_slice(&self.signature);
+        if let Some(ref token) = self.guardian_token {
+            let token_bytes = token.to_bytes();
+            bytes.extend_from_slice(&(token_bytes.len() as u32).to_le_bytes());
+            bytes.extend_from_slice(&token_bytes);
+        }
         bytes
     }
 
     /// Deserializes a voucher from bytes.
+    ///
+    /// Supports both v1 (legacy, no guardian token) and v2 (with guardian token).
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, RecoveryError> {
         // Version (1) + old_pk (32) + new_pk (32) + voucher_pk (32) + timestamp (8) + signature (64) = 169
         if bytes.len() < 169 {
@@ -426,7 +457,7 @@ impl RecoveryVoucher {
         }
 
         let version = bytes[0];
-        if version != 1 {
+        if version != 1 && version != 2 {
             return Err(RecoveryError::InvalidFormat);
         }
 
@@ -448,12 +479,33 @@ impl RecoveryVoucher {
             .try_into()
             .map_err(|_| RecoveryError::InvalidFormat)?;
 
+        // Parse v2 guardian token
+        let guardian_token = if version >= 2 && bytes.len() > 169 {
+            if bytes.len() < 173 {
+                // Need at least 4 bytes for length prefix
+                return Err(RecoveryError::InvalidFormat);
+            }
+            let token_len = u32::from_le_bytes(
+                bytes[169..173]
+                    .try_into()
+                    .map_err(|_| RecoveryError::InvalidFormat)?,
+            ) as usize;
+            if bytes.len() < 173 + token_len {
+                return Err(RecoveryError::InvalidFormat);
+            }
+            let token = guardian::GuardianToken::from_bytes(&bytes[173..173 + token_len])?;
+            Some(token)
+        } else {
+            None
+        };
+
         Ok(Self {
             old_pk,
             new_pk,
             voucher_pk,
             timestamp,
             signature,
+            guardian_token,
         })
     }
 
@@ -465,7 +517,7 @@ impl RecoveryVoucher {
 }
 
 /// Current serialization format version for recovery proofs (#72).
-pub const RECOVERY_PROOF_VERSION: u8 = 1;
+pub const RECOVERY_PROOF_VERSION: u8 = 2;
 
 /// Complete recovery proof with multiple vouchers.
 ///
@@ -595,6 +647,21 @@ impl RecoveryProof {
         // Verify signature
         if !voucher.verify() {
             return Err(RecoveryError::InvalidSignature);
+        }
+
+        // Validate guardian token if present
+        if let Some(ref token) = voucher.guardian_token {
+            if !token.verify() {
+                return Err(RecoveryError::InvalidSignature);
+            }
+            // Token's designator_pk must match the proof's old_pk (the recovering identity)
+            if token.designator_pk() != &self.old_pk {
+                return Err(RecoveryError::MismatchedKeys);
+            }
+            // Token's guardian_pk must match the voucher's signer
+            if token.guardian_pk() != voucher.voucher_pk() {
+                return Err(RecoveryError::MismatchedKeys);
+            }
         }
 
         // Check for duplicate

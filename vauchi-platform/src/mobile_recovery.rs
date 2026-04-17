@@ -105,7 +105,7 @@ impl VauchiPlatform {
             return Err(MobileError::InvalidInput("Claim has expired".to_string()));
         }
 
-        let voucher = RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair())
+        let voucher = RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair(), None)
             .map_err(|e| MobileError::CryptoError(e.to_string()))?;
 
         let voucher_data = base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes());

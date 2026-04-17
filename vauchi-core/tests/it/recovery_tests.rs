@@ -28,7 +28,7 @@ fn test_recovery_voucher_roundtrip() {
     let new_pk = [0x02u8; 32];
     let keypair = SigningKeyPair::generate();
 
-    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &keypair);
+    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &keypair, None);
     let bytes = voucher.to_bytes();
     let restored = RecoveryVoucher::from_bytes(&bytes).unwrap();
 

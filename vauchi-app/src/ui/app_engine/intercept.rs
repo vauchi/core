@@ -36,11 +36,12 @@ impl AppEngine {
                     _ => {}
                 }
             }
-            if component_id == "backup" && item_id == "backup_reminders" {
-                if let Ok(mut state) = self.vauchi.load_backup_reminder_state() {
-                    state.reminders_enabled = !state.reminders_enabled;
-                    let _ = self.vauchi.save_backup_reminder_state(&state);
-                }
+            if component_id == "backup"
+                && item_id == "backup_reminders"
+                && let Ok(mut state) = self.vauchi.load_backup_reminder_state()
+            {
+                state.reminders_enabled = !state.reminders_enabled;
+                let _ = self.vauchi.save_backup_reminder_state(&state);
             }
         }
     }

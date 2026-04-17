@@ -2,7 +2,7 @@
   "schema_version": 3,
   "screen_id": "groups_setup",
   "title": "Choose your groups",
-  "subtitle": "Groups let you share different info with different people. Use [Space] to select.",
+  "subtitle": "Organize who sees what",
   "components": [
     {
       "Text": {

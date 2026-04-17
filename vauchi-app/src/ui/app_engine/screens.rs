@@ -54,7 +54,7 @@ impl AppEngine {
         device_capabilities: &vauchi_core::exchange::capability::types::DeviceCapabilities,
     ) -> Box<dyn WorkflowEngine> {
         match screen {
-            AppScreen::Onboarding => Box::new(OnboardingEngine::new()),
+            AppScreen::Onboarding => Box::new(OnboardingEngine::new().with_help_icons(true)),
             AppScreen::MyInfo => {
                 // If a preview-as contact is active, build in PreviewAs view mode.
                 if let Some(contact_id) = preview_as {

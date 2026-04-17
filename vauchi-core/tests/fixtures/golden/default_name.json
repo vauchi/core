@@ -2,7 +2,7 @@
   "schema_version": 3,
   "screen_id": "default_name",
   "title": "What's your name?",
-  "subtitle": "This is how contacts will see you.",
+  "subtitle": "How you appear to contacts",
   "components": [
     {
       "Text": {

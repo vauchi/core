@@ -809,3 +809,216 @@ fn onboarding_custom_group_text_input_has_a11y_label() {
         _ => unreachable!(),
     }
 }
+
+// ── Subtitles ──────────────────────────────────────────────────────
+
+// @internal
+#[test]
+fn default_name_step_has_expected_subtitle() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_default_name(&mut engine);
+
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "default_name");
+    assert_eq!(
+        screen.subtitle.as_deref(),
+        Some("How you appear to contacts")
+    );
+}
+
+// @internal
+#[test]
+fn groups_step_has_expected_subtitle() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_groups_setup(&mut engine);
+
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "groups_setup");
+    assert_eq!(screen.subtitle.as_deref(), Some("Organize who sees what"));
+}
+
+// @internal
+#[test]
+fn contact_info_step_has_subtitle() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_contact_info(&mut engine);
+
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "contact_info");
+    assert!(
+        screen.subtitle.is_some(),
+        "contact_info step must have a subtitle"
+    );
+}
+
+// @internal
+#[test]
+fn what_next_step_has_expected_subtitle() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_what_next(&mut engine);
+
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "what_next");
+    assert_eq!(
+        screen.subtitle.as_deref(),
+        Some("This is what contacts will see")
+    );
+}
+
+// ── info_key / help icons ──────────────────────────────────────────
+
+// @internal
+#[test]
+fn groups_toggle_items_have_info_key_when_help_enabled() {
+    let mut engine = OnboardingEngine::new().with_help_icons(true);
+    advance_to_groups_setup(&mut engine);
+
+    let screen = engine.current_screen();
+    let items = screen.components.iter().find_map(|c| match c {
+        Component::ToggleList { id, items, .. } if id == "groups" => Some(items),
+        _ => None,
+    });
+    let items = items.expect("groups ToggleList not found");
+    assert!(!items.is_empty(), "must have at least one toggle item");
+    for item in items {
+        assert_eq!(
+            item.info_key.as_deref(),
+            Some("groups_purpose"),
+            "item '{}' should have info_key when help is enabled",
+            item.id
+        );
+    }
+}
+
+// @internal
+#[test]
+fn groups_toggle_items_have_no_info_key_when_help_disabled() {
+    let mut engine = OnboardingEngine::new(); // help off by default
+    advance_to_groups_setup(&mut engine);
+
+    let screen = engine.current_screen();
+    let items = screen.components.iter().find_map(|c| match c {
+        Component::ToggleList { id, items, .. } if id == "groups" => Some(items),
+        _ => None,
+    });
+    let items = items.expect("groups ToggleList not found");
+    assert!(!items.is_empty(), "must have at least one toggle item");
+    for item in items {
+        assert_eq!(
+            item.info_key, None,
+            "item '{}' should have no info_key when help is disabled",
+            item.id
+        );
+    }
+}
+
+// @internal
+#[test]
+fn contact_info_phone_input_has_info_key_when_help_enabled() {
+    let mut engine = OnboardingEngine::new().with_help_icons(true);
+    advance_to_contact_info(&mut engine);
+
+    // Reveal the phone input first
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_phone".into(),
+    });
+
+    let screen = engine.current_screen();
+    let phone_input = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::TextInput { id, .. } if id == "phone_input"));
+    assert!(phone_input.is_some(), "phone_input not found");
+    match phone_input.unwrap() {
+        Component::TextInput { info_key, .. } => {
+            assert_eq!(
+                info_key.as_deref(),
+                Some("contact_info_optional"),
+                "phone_input should have info_key when help is enabled"
+            );
+        }
+        _ => unreachable!(),
+    }
+}
+
+// @internal
+#[test]
+fn contact_info_phone_input_has_no_info_key_when_help_disabled() {
+    let mut engine = OnboardingEngine::new(); // help off by default
+    advance_to_contact_info(&mut engine);
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_phone".into(),
+    });
+
+    let screen = engine.current_screen();
+    let phone_input = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::TextInput { id, .. } if id == "phone_input"));
+    assert!(phone_input.is_some(), "phone_input not found");
+    match phone_input.unwrap() {
+        Component::TextInput { info_key, .. } => {
+            assert_eq!(
+                info_key, &None,
+                "phone_input should have no info_key when help is disabled"
+            );
+        }
+        _ => unreachable!(),
+    }
+}
+
+// @internal
+#[test]
+fn contact_info_email_input_has_info_key_when_help_enabled() {
+    let mut engine = OnboardingEngine::new().with_help_icons(true);
+    advance_to_contact_info(&mut engine);
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_email".into(),
+    });
+
+    let screen = engine.current_screen();
+    let email_input = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::TextInput { id, .. } if id == "email_input"));
+    assert!(email_input.is_some(), "email_input not found");
+    match email_input.unwrap() {
+        Component::TextInput { info_key, .. } => {
+            assert_eq!(
+                info_key.as_deref(),
+                Some("contact_info_optional"),
+                "email_input should have info_key when help is enabled"
+            );
+        }
+        _ => unreachable!(),
+    }
+}
+
+// @internal
+#[test]
+fn contact_info_email_input_has_no_info_key_when_help_disabled() {
+    let mut engine = OnboardingEngine::new(); // help off by default
+    advance_to_contact_info(&mut engine);
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_email".into(),
+    });
+
+    let screen = engine.current_screen();
+    let email_input = screen
+        .components
+        .iter()
+        .find(|c| matches!(c, Component::TextInput { id, .. } if id == "email_input"));
+    assert!(email_input.is_some(), "email_input not found");
+    match email_input.unwrap() {
+        Component::TextInput { info_key, .. } => {
+            assert_eq!(
+                info_key, &None,
+                "email_input should have no info_key when help is disabled"
+            );
+        }
+        _ => unreachable!(),
+    }
+}

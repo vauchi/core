@@ -2,7 +2,7 @@
   "schema_version": 3,
   "screen_id": "what_next",
   "title": "What would you like to do?",
-  "subtitle": null,
+  "subtitle": "This is what contacts will see",
   "components": [],
   "actions": [
     {

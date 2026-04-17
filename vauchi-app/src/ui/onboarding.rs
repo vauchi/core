@@ -54,6 +54,8 @@ pub struct OnboardingEngine {
     email_input_visible: bool,
     phone_value: String,
     email_value: String,
+    /// When true, info icon keys are set on components that have help content.
+    show_help_icons: bool,
 }
 
 impl Default for OnboardingEngine {
@@ -64,6 +66,9 @@ impl Default for OnboardingEngine {
 
 impl OnboardingEngine {
     /// Creates a new engine starting at the IdentityCheck screen.
+    ///
+    /// Help icons are disabled by default. Use [`with_help_icons`](Self::with_help_icons)
+    /// to enable them.
     pub fn new() -> Self {
         let groups = SUGGESTED_LABELS
             .iter()
@@ -86,7 +91,18 @@ impl OnboardingEngine {
             email_input_visible: false,
             phone_value: String::new(),
             email_value: String::new(),
+            show_help_icons: false,
         }
+    }
+
+    /// Enable or disable help icons on onboarding components.
+    ///
+    /// When `true`, components that have associated help content will have
+    /// `info_key` set so the frontend can render an info icon that opens a
+    /// help overlay.
+    pub fn with_help_icons(mut self, enabled: bool) -> Self {
+        self.show_help_icons = enabled;
+        self
     }
 
     /// Returns a reference to the collected onboarding data.
@@ -221,7 +237,7 @@ impl OnboardingEngine {
         ScreenModel {
             screen_id: "default_name".into(),
             title: "What's your name?".into(),
-            subtitle: Some("This is how contacts will see you.".into()),
+            subtitle: Some("How you appear to contacts".into()),
             components: vec![
                 Component::Text {
                     id: "name_instruction".into(),
@@ -256,6 +272,11 @@ impl OnboardingEngine {
     }
 
     fn build_groups_setup(&self) -> ScreenModel {
+        let groups_info_key = if self.show_help_icons {
+            Some("groups_purpose".into())
+        } else {
+            None
+        };
         let items = self
             .data
             .selected_groups
@@ -278,18 +299,14 @@ impl OnboardingEngine {
                     hint: Some("Double tap to toggle".into()),
                     role: Some(AccessibilityRole::Toggle),
                 }),
-                info_key: None,
+                info_key: groups_info_key.clone(),
             })
             .collect();
 
         ScreenModel {
             screen_id: "groups_setup".into(),
             title: "Choose your groups".into(),
-            subtitle: Some(
-                "Groups let you share different info with different people. \
-                 Use [Space] to select."
-                    .into(),
-            ),
+            subtitle: Some("Organize who sees what".into()),
             components: vec![
                 Component::Text {
                     id: "groups_recommendation".into(),
@@ -344,6 +361,11 @@ impl OnboardingEngine {
     }
 
     fn build_contact_info(&self) -> ScreenModel {
+        let contact_info_key = if self.show_help_icons {
+            Some("contact_info_optional".into())
+        } else {
+            None
+        };
         let mut components: Vec<Component> = Vec::new();
 
         if self.phone_input_visible {
@@ -360,7 +382,7 @@ impl OnboardingEngine {
                     hint: Some("Enter your phone number".into()),
                     role: None,
                 }),
-                info_key: None,
+                info_key: contact_info_key.clone(),
             });
         }
 
@@ -378,7 +400,7 @@ impl OnboardingEngine {
                     hint: Some("Enter your email address".into()),
                     role: None,
                 }),
-                info_key: None,
+                info_key: contact_info_key,
             });
         }
 
@@ -441,7 +463,7 @@ impl OnboardingEngine {
         ScreenModel {
             screen_id: "what_next".into(),
             title: "What would you like to do?".into(),
-            subtitle: None,
+            subtitle: Some("This is what contacts will see".into()),
             components: vec![],
             actions: vec![
                 ScreenAction {

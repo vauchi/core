@@ -276,6 +276,7 @@ mod recovery_guardian_api_tests;
 mod recovery_readiness_tests;
 mod recovery_storage_tests;
 mod recovery_tests;
+mod recovery_voucher_v2_tests;
 mod rekey_coverage_tests;
 mod relay_exchange_tests;
 mod relay_proptests;

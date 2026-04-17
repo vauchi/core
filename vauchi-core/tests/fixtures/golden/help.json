@@ -5,6 +5,18 @@
   "subtitle": null,
   "components": [
     {
+      "TextInput": {
+        "id": "help_search",
+        "label": "Search",
+        "value": "",
+        "placeholder": "Search help topics…",
+        "max_length": null,
+        "validation_error": null,
+        "input_type": "Text",
+        "a11y": null
+      }
+    },
+    {
       "ActionList": {
         "id": "Getting Started",
         "items": [

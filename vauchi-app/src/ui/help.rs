@@ -23,17 +23,39 @@ pub struct HelpItem {
 #[derive(Clone, Debug)]
 pub struct HelpEngine {
     items: Vec<HelpItem>,
+    search_query: String,
 }
 
 impl HelpEngine {
     pub fn new(items: Vec<HelpItem>) -> Self {
-        Self { items }
+        Self {
+            items,
+            search_query: String::new(),
+        }
     }
 
-    /// Returns the unique categories in the order they first appear.
-    fn categories(&self) -> Vec<String> {
+    /// Returns items filtered by the current search query.
+    fn filtered_items(&self) -> Vec<&HelpItem> {
+        if self.search_query.is_empty() {
+            return self.items.iter().collect();
+        }
+        let query = self.search_query.to_lowercase();
+        self.items
+            .iter()
+            .filter(|item| {
+                item.question.to_lowercase().contains(&query)
+                    || item
+                        .answer
+                        .as_deref()
+                        .is_some_and(|a| a.to_lowercase().contains(&query))
+            })
+            .collect()
+    }
+
+    /// Returns the unique categories from filtered items in first-appearance order.
+    fn categories(&self, filtered: &[&HelpItem]) -> Vec<String> {
         let mut seen = Vec::new();
-        for item in &self.items {
+        for item in filtered {
             if !seen.contains(&item.category) {
                 seen.push(item.category.clone());
             }
@@ -44,30 +66,39 @@ impl HelpEngine {
 
 impl WorkflowEngine for HelpEngine {
     fn current_screen(&self) -> ScreenModel {
-        let components: Vec<Component> = self
-            .categories()
-            .into_iter()
-            .map(|category| {
-                let items = self
-                    .items
-                    .iter()
-                    .filter(|item| item.category == category)
-                    .map(|item| ActionListItem {
-                        id: item.id.clone(),
-                        label: item.question.clone(),
-                        icon: None,
-                        detail: None,
-                        a11y: None,
-                        info_key: None,
-                    })
-                    .collect();
+        let filtered = self.filtered_items();
 
-                Component::ActionList {
-                    id: category,
-                    items,
-                }
-            })
-            .collect();
+        let mut components: Vec<Component> = vec![Component::TextInput {
+            id: "help_search".into(),
+            label: "Search".into(),
+            value: self.search_query.clone(),
+            placeholder: Some("Search help topics…".into()),
+            max_length: None,
+            validation_error: None,
+            input_type: InputType::Text,
+            a11y: None,
+            info_key: None,
+        }];
+
+        for category in self.categories(&filtered) {
+            let items = filtered
+                .iter()
+                .filter(|item| item.category == category)
+                .map(|item| ActionListItem {
+                    id: item.id.clone(),
+                    label: item.question.clone(),
+                    icon: None,
+                    detail: None,
+                    a11y: None,
+                    info_key: None,
+                })
+                .collect();
+
+            components.push(Component::ActionList {
+                id: category,
+                items,
+            });
+        }
 
         ScreenModel {
             screen_id: "help".into(),
@@ -82,13 +113,20 @@ impl WorkflowEngine for HelpEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if component_id == "help_search" => {
+                self.search_query = value;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
             UserAction::ListItemSelected { item_id, .. } => {
                 if let Some(item) = self.items.iter().find(|i| i.id == item_id) {
                     // Prefer inline answer (works in TUI and offline)
                     if let Some(ref answer) = item.answer {
-                        return ActionResult::ShowAlert {
+                        return ActionResult::ShowInfoOverlay {
                             title: item.question.clone(),
-                            message: answer.clone(),
+                            body: answer.clone(),
                         };
                     }
                     // Fall back to URL for items without inline text

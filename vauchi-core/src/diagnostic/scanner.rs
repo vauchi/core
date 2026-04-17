@@ -189,17 +189,43 @@ pub fn scan_qr_yolo(
         };
     }
 
-    // Step 2: For each detection, crop and try rqrr decode
+    // Step 2: For each detection, crop → preprocess → rqrr decode
     let decode_start = std::time::Instant::now();
+    // Preprocessing config tuned for cropped QR patches (already localized
+    // by YOLO, so skip downscale and sharpness gating — focus on contrast)
+    let patch_config = super::preprocess::PreprocessConfig {
+        target_width: 0, // no downscale — patch is already small
+        clahe_clip_limit: 3.0,
+        clahe_tile_size: 16, // larger tiles for small patches
+        threshold_window: 25,
+        unsharp_sigma: 1.5,
+        unsharp_amount: 0.8,
+        sharpness_threshold: 0.0, // don't skip — YOLO already filtered
+        apply_clahe: true,
+        apply_unsharp: true,
+        apply_threshold: false, // let rqrr do its own binarization
+    };
     for det in &detections {
         let patch = super::yolo_detector::crop_detection(&img, det, 0.15);
-        let result = decode_rqrr(patch);
-        if result.decoded.is_some() {
+        // Try raw decode first (fast path)
+        let raw_result = decode_rqrr(patch.clone());
+        if raw_result.decoded.is_some() {
             return ScanResult {
                 total_us: total_start.elapsed().as_micros() as u64,
                 preprocessing_us: detection_us,
                 decode_us: decode_start.elapsed().as_micros() as u64,
-                ..result
+                ..raw_result
+            };
+        }
+        // Raw failed — apply Tier 1 preprocessing and retry
+        let pre = super::preprocess::preprocess_frame(patch, &patch_config);
+        let pre_result = decode_rqrr(pre.image);
+        if pre_result.decoded.is_some() {
+            return ScanResult {
+                total_us: total_start.elapsed().as_micros() as u64,
+                preprocessing_us: detection_us + pre.preprocess_time_us,
+                decode_us: decode_start.elapsed().as_micros() as u64,
+                ..pre_result
             };
         }
     }

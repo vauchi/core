@@ -1049,8 +1049,11 @@ impl VauchiPlatform {
             MobileError::StorageError("Degenerate storage key rejected".to_string())
         })?;
 
-        let _storage = Storage::open(&storage_path, storage_key.clone())
-            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        // Storage handle is opened lazily on first use; the constructor does not
+        // pre-open it. Pre-opening would run schema migrations and startup
+        // maintenance during cold start (audit finding F4, 2026-04-17) for a
+        // handle that is immediately dropped — Storage is not retained on
+        // VauchiPlatform; every operation re-opens via storage_path + storage_key.
 
         Ok(Arc::new(VauchiPlatform {
             storage_path,
@@ -1096,8 +1099,7 @@ impl VauchiPlatform {
             key
         };
 
-        let _storage = Storage::open(&storage_path, storage_key.clone())
-            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        // Storage handle opened lazily — see new_with_secure_key for rationale.
 
         Ok(Arc::new(VauchiPlatform {
             storage_path,

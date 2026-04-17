@@ -243,7 +243,8 @@
               "label": "Duress PIN",
               "hint": "Opens the duress PIN configuration screen",
               "role": null
-            }
+            },
+            "info_key": "duress_pin"
           }
         ]
       }

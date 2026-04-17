@@ -357,6 +357,7 @@ impl ContactDetailEngine {
                             ),
                             role: None,
                         }),
+                        info_key: None,
                     }],
                 });
                 // Delivery status summary (J1: update propagation)

@@ -355,6 +355,8 @@ pub struct SettingsItem {
     pub kind: SettingsItemKind,
     #[serde(default)]
     pub a11y: Option<A11y>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub info_key: Option<String>,
 }
 
 /// The kind of a settings item.

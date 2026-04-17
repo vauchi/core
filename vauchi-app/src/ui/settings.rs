@@ -74,6 +74,8 @@ impl SettingsEngine {
 
 impl WorkflowEngine for SettingsEngine {
     fn current_screen(&self) -> ScreenModel {
+        let show_help = self.config.show_help_icons;
+
         let mut components = vec![
             Component::SettingsGroup {
                 id: "profile".into(),
@@ -90,6 +92,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Your visible name shown to contacts".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "edit_profile".into(),
@@ -100,6 +103,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Opens the profile editor".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                 ],
             },
@@ -121,6 +125,7 @@ impl WorkflowEngine for SettingsEngine {
                             ),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "suppress_presence".into(),
@@ -135,6 +140,7 @@ impl WorkflowEngine for SettingsEngine {
                             ),
                             role: None,
                         }),
+                        info_key: None,
                     },
                 ],
             },
@@ -154,6 +160,7 @@ impl WorkflowEngine for SettingsEngine {
                         ),
                         role: None,
                     }),
+                    info_key: None,
                 }],
             },
             Component::SettingsGroup {
@@ -171,6 +178,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("The current color theme of the app".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "language".into(),
@@ -183,6 +191,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("The current display language of the app".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "show_help_icons".into(),
@@ -195,6 +204,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Toggle contextual help icons on form fields".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                 ],
             },
@@ -215,6 +225,7 @@ impl WorkflowEngine for SettingsEngine {
                             ),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "high_contrast".into(),
@@ -230,6 +241,7 @@ impl WorkflowEngine for SettingsEngine {
                             ),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "large_touch".into(),
@@ -244,6 +256,7 @@ impl WorkflowEngine for SettingsEngine {
                             ),
                             role: None,
                         }),
+                        info_key: None,
                     },
                 ],
             },
@@ -260,6 +273,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Opens the password change screen".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "devices".into(),
@@ -276,6 +290,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Opens the list of linked devices".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "duress_pin".into(),
@@ -286,6 +301,11 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Opens the duress PIN configuration screen".into()),
                             role: None,
                         }),
+                        info_key: if show_help {
+                            Some("duress_pin".into())
+                        } else {
+                            None
+                        },
                     },
                 ],
             },
@@ -302,6 +322,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Opens the backup export screen".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "backup_import".into(),
@@ -312,6 +333,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Opens the backup restore screen".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "setup_new_device".into(),
@@ -322,6 +344,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Transfer your contacts to a new device via QR code".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "last_backup".into(),
@@ -334,6 +357,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: None,
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "backup_reminders".into(),
@@ -346,6 +370,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Tap to change frequency".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                 ],
             },
@@ -363,6 +388,7 @@ impl WorkflowEngine for SettingsEngine {
                         hint: Some("The relay server used for message delivery".into()),
                         role: None,
                     }),
+                    info_key: None,
                 }],
             },
             Component::SettingsGroup {
@@ -380,6 +406,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Opens the sync status detail screen".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "pending_updates".into(),
@@ -392,6 +419,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Number of contact updates waiting to be delivered".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "failed_deliveries".into(),
@@ -404,6 +432,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Number of updates that failed to deliver".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                 ],
             },
@@ -420,6 +449,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Opens the help center".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "funding".into(),
@@ -430,6 +460,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Opens the funding and support page".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "privacy_policy".into(),
@@ -440,6 +471,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("Opens the privacy policy".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                 ],
             },
@@ -462,6 +494,7 @@ impl WorkflowEngine for SettingsEngine {
                             hint: Some("The current app version and build number".into()),
                             role: None,
                         }),
+                        info_key: None,
                     },
                     SettingsItem {
                         id: "debug_mode".into(),
@@ -476,6 +509,7 @@ impl WorkflowEngine for SettingsEngine {
                             ),
                             role: None,
                         }),
+                        info_key: None,
                     },
                 ],
             },
@@ -495,6 +529,7 @@ impl WorkflowEngine for SettingsEngine {
                         ),
                         role: None,
                     }),
+                    info_key: None,
                 }],
             },
         ];

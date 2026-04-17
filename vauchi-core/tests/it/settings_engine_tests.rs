@@ -442,6 +442,64 @@ fn settings_show_help_icons_toggle_flips_config() {
     );
 }
 
+// @internal
+#[test]
+fn settings_duress_pin_has_info_key_when_help_icons_enabled() {
+    let mut config = sample_config();
+    config.show_help_icons = true;
+    let engine = SettingsEngine::new(config);
+    let screen = engine.current_screen();
+    let items = find_settings_group(&screen, "security");
+    let duress = items
+        .iter()
+        .find(|i| i.id == "duress_pin")
+        .expect("duress_pin not found");
+    assert_eq!(
+        duress.info_key.as_deref(),
+        Some("duress_pin"),
+        "duress_pin should have info_key when show_help_icons is true"
+    );
+}
+
+// @internal
+#[test]
+fn settings_duress_pin_has_no_info_key_when_help_icons_disabled() {
+    let mut config = sample_config();
+    config.show_help_icons = false;
+    let engine = SettingsEngine::new(config);
+    let screen = engine.current_screen();
+    let items = find_settings_group(&screen, "security");
+    let duress = items
+        .iter()
+        .find(|i| i.id == "duress_pin")
+        .expect("duress_pin not found");
+    assert_eq!(
+        duress.info_key, None,
+        "duress_pin should have no info_key when show_help_icons is false"
+    );
+}
+
+// @internal
+#[test]
+fn settings_other_items_have_no_info_key() {
+    let engine = SettingsEngine::new(sample_config());
+    let screen = engine.current_screen();
+    // Items other than duress_pin should not have info_key regardless of show_help_icons
+    for component in &screen.components {
+        if let Component::SettingsGroup { id, items, .. } = component {
+            for item in items {
+                if item.id != "duress_pin" {
+                    assert_eq!(
+                        item.info_key, None,
+                        "item '{}' in group '{}' should have no info_key",
+                        item.id, id
+                    );
+                }
+            }
+        }
+    }
+}
+
 // --- helpers ---
 
 fn find_settings_group<'a>(screen: &'a ScreenModel, group_id: &str) -> &'a [SettingsItem] {

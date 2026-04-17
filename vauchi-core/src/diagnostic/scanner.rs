@@ -147,7 +147,9 @@ pub fn scan_qr_yolo(
 ) -> ScanResult {
     let total_start = std::time::Instant::now();
 
-    let Some(img) = GrayImage::from_raw(width, height, luma_data.to_vec()) else {
+    // Build GrayImage — use from_raw with the owned vec only once
+    let expected = (width as usize) * (height as usize);
+    if luma_data.len() != expected {
         return ScanResult {
             decoded: None,
             total_us: total_start.elapsed().as_micros() as u64,
@@ -156,9 +158,10 @@ pub fn scan_qr_yolo(
             frame_skipped: false,
             laplacian_variance: 0.0,
         };
-    };
+    }
+    let img = GrayImage::from_raw(width, height, luma_data.to_vec()).expect("dims verified above");
 
-    // Step 1: YOLO detection
+    // Step 1: YOLO detection (uses pre-allocated buffer internally)
     let detect_start = std::time::Instant::now();
     let detections = match detector.detect(&img, confidence_threshold) {
         Ok(d) => d,

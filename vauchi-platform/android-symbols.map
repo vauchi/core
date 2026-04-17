@@ -15,7 +15,6 @@
   global:
     Java_*;
     uniffi_*;
-    JNI_OnLoad;
   local:
     *;
 };

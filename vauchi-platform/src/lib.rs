@@ -1587,6 +1587,7 @@ mod tests {
     // @scenario: privacy_compliance:Identity purge sends relay purge and revocations
     #[test]
     fn test_mobile_relay_sender_implements_revocation_trait() {
+        // allow(zero_assertions): compile-time trait-impl check via dyn coercion.
         fn accepts_sender(_: &mut dyn vauchi_core::api::RevocationSender) {}
         let mut sender = test_shred_sender();
         accepts_sender(&mut sender);
@@ -1595,6 +1596,7 @@ mod tests {
     // @scenario: privacy_compliance:Identity purge sends relay purge request
     #[test]
     fn test_mobile_relay_sender_implements_purge_trait() {
+        // allow(zero_assertions): compile-time trait-impl check via dyn coercion.
         fn accepts_sender(_: &mut dyn vauchi_core::api::PurgeSender) {}
         let mut sender = test_shred_sender();
         accepts_sender(&mut sender);

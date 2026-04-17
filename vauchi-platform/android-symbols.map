@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Version script for Android .so — limit exported symbols to reduce
+# relocation count and speed up linker load time (D5 cold start).
+#
+# UniFFI generates uniffi_* scaffolding functions and Java_* JNI
+# entry points. Everything else is internal and should not be
+# exported. Reducing exports cuts GLOB_DAT relocations by ~10-30x,
+# which is the dominant linker cost on eMMC devices (Pixel 3a).
+#
+# See: chromium.googlesource.com/chromium/src.git/+/master/docs/native_relocations.md
+{
+  global:
+    Java_*;
+    uniffi_*;
+    JNI_OnLoad;
+  local:
+    *;
+};

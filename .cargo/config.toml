@@ -14,12 +14,14 @@ linker = "clang"
 rustflags = ["-C", "link-arg=-fuse-ld=mold", "--cfg", "rust_analyzer"]
 
 # Android NDK configuration for cross-compilation
-# NOTE: Linker paths are set via environment variables in build-android.sh
+# NOTE: Linker paths are set via environment variables in build-bindings.sh
 # to support different NDK locations (Android Studio SDK vs standalone NDK)
 
-# If you have a standalone NDK, you can hardcode paths here.
-# Otherwise, the build script will set the linker via CARGO_TARGET_*_LINKER env vars.
+# Limit exported symbols to uniffi_*/Java_*/JNI_OnLoad via version script.
+# Reduces GLOB_DAT relocations and speeds up linker load on eMMC devices
+# (Pixel 3a cold start: ~10-30x fewer relocations to process).
+[target.aarch64-linux-android]
+rustflags = ["-C", "link-arg=-Wl,--version-script=vauchi-platform/android-symbols.map"]
 
-# Example for standalone NDK at /opt/android-ndk:
-# [target.aarch64-linux-android]
-# linker = "/opt/android-ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
+[target.x86_64-linux-android]
+rustflags = ["-C", "link-arg=-Wl,--version-script=vauchi-platform/android-symbols.map"]

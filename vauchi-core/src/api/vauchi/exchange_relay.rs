@@ -374,17 +374,31 @@ impl Vauchi {
         }))
     }
 
-    /// Create a bare `HttpTransport` for relay exchange operations.
+    /// Create an `HttpTransport` for relay-mediated exchange operations.
     ///
-    /// Uses direct mode (no OHTTP) — exchange payloads contain only
-    /// public keys and display names, matching the QR exchange threat model.
+    /// Exchange payloads are non-secret (they contain only public keys and
+    /// display names — the same data shared in a QR exchange), but the
+    /// caller's source IP is still sensitive: a relay that sees two IPs
+    /// coordinating an exchange learns who met whom. ADR-037 therefore
+    /// requires OHTTP here as well. Direct mode is permitted only before
+    /// OHTTP has been wired (pre-`connect()`); once `ohttp_key` is set the
+    /// transport fails closed on OHTTP failure rather than silently leaking.
     fn create_relay_transport(&self) -> HttpTransport {
-        HttpTransport::new(HttpTransportConfig {
+        let mut transport = HttpTransport::new(HttpTransportConfig {
             relay_url: self.http_relay_url(),
             timeout_ms: self.config.relay.connect_timeout_ms,
             proxy: self.config.relay.proxy.clone(),
-            allow_direct: true,
+            allow_direct: self.ohttp_key.is_none(),
             pinned_certs: self.config.relay.pinned_certs.clone(),
-        })
+        });
+
+        if let Some(ref ohttp_client) = self.ohttp_key
+            && let Ok(client) =
+                crate::network::OhttpClient::new(ohttp_client.encoded_config().to_vec())
+        {
+            transport.set_ohttp(client);
+        }
+
+        transport
     }
 }

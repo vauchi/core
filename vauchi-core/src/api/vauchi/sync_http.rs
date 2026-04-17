@@ -204,6 +204,16 @@ impl Vauchi {
         Ok(())
     }
 
+    /// Whether an OHTTP gateway key is currently cached on this instance.
+    ///
+    /// Used by platform wrappers and tests to verify that
+    /// `connect()` populated the key — a prerequisite for
+    /// `build_relay_transport` to wire OHTTP into downstream calls
+    /// (device link, shred, exchange).
+    pub fn has_ohttp_key(&self) -> bool {
+        self.ohttp_key.is_some()
+    }
+
     // =====================================================================
     // Receive phase
     // =====================================================================

@@ -141,6 +141,7 @@ mod tests {
         1_776_960_000
     }
 
+    // @internal
     #[test]
     fn decoy_timestamps_are_deterministic() {
         let now = fixed_now();
@@ -150,6 +151,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn decoy_timestamps_differ_per_id() {
         let now = fixed_now();
@@ -159,6 +161,7 @@ mod tests {
         assert_ne!(a.0, b.0, "created_at collision between distinct decoys");
     }
 
+    // @internal
     #[test]
     fn decoy_created_at_is_inside_the_documented_window() {
         let now = fixed_now();
@@ -178,6 +181,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn decoy_updated_at_is_at_least_a_week_old_and_after_created() {
         let now = fixed_now();

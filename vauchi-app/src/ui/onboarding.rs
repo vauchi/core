@@ -46,7 +46,6 @@ pub struct FieldSetup {
 
 /// Pure state-machine driving the 6-step onboarding flow.
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
 pub struct OnboardingEngine {
     step: Step,
     data: OnboardingData,
@@ -341,103 +340,95 @@ impl OnboardingEngine {
         }
     }
 
-    fn selected_group_names(&self) -> Vec<String> {
-        self.data
-            .selected_groups
-            .iter()
-            .filter(|g| g.selected)
-            .map(|g| g.name.clone())
-            .collect()
-    }
-
     fn build_contact_info(&self) -> ScreenModel {
-        let selected = self.selected_group_names();
-        let has_groups = !selected.is_empty();
+        let mut components: Vec<Component> = Vec::new();
 
-        let visibility_mode = if has_groups {
-            VisibilityMode::PerGroup
-        } else {
-            VisibilityMode::ShowHide
-        };
-        let fields: Vec<FieldDisplay> = self
-            .data
-            .fields
-            .iter()
-            .enumerate()
-            .map(|(i, f)| {
-                let visibility = if f.shown {
-                    if has_groups {
-                        UiFieldVisibility::Groups(f.visible_to_groups.clone())
-                    } else {
-                        UiFieldVisibility::Shown
-                    }
-                } else {
-                    UiFieldVisibility::Hidden
-                };
-                FieldDisplay {
-                    id: format!("field_{i}"),
-                    field_type: f.field_type.clone(),
-                    label: f.label.clone(),
-                    value: f.value.clone(),
-                    a11y: Some(A11y {
-                        label: Some(format!("{}: {}", f.label, f.value)),
-                        hint: match &visibility {
-                            UiFieldVisibility::Shown => None,
-                            UiFieldVisibility::Hidden => {
-                                Some("This field is hidden from contacts".into())
-                            }
-                            UiFieldVisibility::Groups(_) => {
-                                Some("Visible to specific groups".into())
-                            }
-                        },
-                        role: None,
-                    }),
-                    visibility,
-                }
-            })
-            .collect();
+        if self.phone_input_visible {
+            components.push(Component::TextInput {
+                id: "phone_input".into(),
+                label: "Phone number".into(),
+                value: self.phone_value.clone(),
+                placeholder: Some("+1 555 123 4567".into()),
+                max_length: Some(30),
+                validation_error: None,
+                input_type: InputType::Phone,
+                a11y: Some(A11y {
+                    label: Some("Phone number input".into()),
+                    hint: Some("Enter your phone number".into()),
+                    role: None,
+                }),
+            });
+        }
+
+        if self.email_input_visible {
+            components.push(Component::TextInput {
+                id: "email_input".into(),
+                label: "Email address".into(),
+                value: self.email_value.clone(),
+                placeholder: Some("you@example.com".into()),
+                max_length: Some(254),
+                validation_error: None,
+                input_type: InputType::Email,
+                a11y: Some(A11y {
+                    label: Some("Email address input".into()),
+                    hint: Some("Enter your email address".into()),
+                    role: None,
+                }),
+            });
+        }
+
+        for field in &self.data.fields {
+            components.push(Component::Text {
+                id: format!("social_{}", field.label.to_lowercase()),
+                content: format!("{}: {}", field.label, field.value),
+                style: TextStyle::Body,
+            });
+        }
+
+        let mut actions = Vec::new();
+        if !self.phone_input_visible {
+            actions.push(ScreenAction {
+                id: "show_phone".into(),
+                label: "Add phone number".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+            });
+        }
+        if !self.email_input_visible {
+            actions.push(ScreenAction {
+                id: "show_email".into(),
+                label: "Add email address".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+            });
+        }
+        actions.push(ScreenAction {
+            id: "add_social".into(),
+            label: "Add social profile".into(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+        });
+        actions.push(ScreenAction {
+            id: "continue".into(),
+            label: "Continue".into(),
+            style: ActionStyle::Primary,
+            enabled: true,
+        });
+        actions.push(ScreenAction {
+            id: "skip".into(),
+            label: "Skip".into(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+        });
 
         ScreenModel {
             screen_id: "contact_info".into(),
             title: "Add contact info".into(),
-            subtitle: Some("Add phone, email, social profiles, and more to your card. You can always add or change entries later.".into()),
-            components: vec![Component::FieldList {
-                id: "fields".into(),
-                fields,
-                visibility_mode: visibility_mode.clone(),
-                available_groups: selected,
-                a11y: Some(A11y {
-                    label: Some("Contact fields".into()),
-                    hint: match visibility_mode {
-                        VisibilityMode::ShowHide => Some("Toggle field visibility".into()),
-                        VisibilityMode::PerGroup => Some("Manage group visibility".into()),
-                        VisibilityMode::ReadOnly => None,
-                    },
-                    role: None,
-                }),
-            }],
-            actions: vec![
-                ScreenAction {
-                    id: "add_entry".into(),
-                    label: "Add Entry".into(),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                },
-                ScreenAction {
-                    id: "continue".into(),
-                    label: "Continue".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                },
-                ScreenAction {
-                    id: "skip".into(),
-                    label: "Skip".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                },
-            ],
+            subtitle: Some("Optional \u{2014} you can add more later.".into()),
+            components,
+            actions,
             progress: self.progress(3),
-        ..Default::default()
+            ..Default::default()
         }
     }
 
@@ -630,45 +621,58 @@ impl OnboardingEngine {
 
     fn handle_contact_info(&mut self, action: &UserAction) -> ActionResult {
         match action {
-            UserAction::FieldVisibilityChanged {
-                field_id,
-                group_id,
-                visible,
-            } => {
-                let idx = field_id
-                    .strip_prefix("field_")
-                    .and_then(|s| s.parse::<usize>().ok());
-
-                match idx.and_then(|i| self.data.fields.get_mut(i)) {
-                    Some(field) => {
-                        match group_id {
-                            Some(group) => {
-                                if *visible {
-                                    if !field.visible_to_groups.contains(group) {
-                                        field.visible_to_groups.push(group.clone());
-                                    }
-                                } else {
-                                    field.visible_to_groups.retain(|g| g != group);
-                                }
-                            }
-                            None => {
-                                field.shown = *visible;
-                            }
-                        }
-                        ActionResult::UpdateScreen(self.current_screen())
-                    }
-                    None => ActionResult::ValidationError {
-                        component_id: field_id.clone(),
-                        message: "Unknown field".into(),
-                    },
-                }
+            UserAction::ActionPressed { action_id } if action_id == "show_phone" => {
+                self.phone_input_visible = true;
+                ActionResult::UpdateScreen(self.current_screen())
             }
-            UserAction::ActionPressed { action_id }
-                if action_id == "continue" || action_id == "skip" =>
-            {
+            UserAction::ActionPressed { action_id } if action_id == "show_email" => {
+                self.email_input_visible = true;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if component_id == "phone_input" => {
+                self.phone_value = value.clone();
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if component_id == "email_input" => {
+                self.email_value = value.clone();
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::ActionPressed { action_id } if action_id == "continue" => {
+                self.sync_quick_add_fields();
+                self.navigate_to(Step::WhatNext)
+            }
+            UserAction::ActionPressed { action_id } if action_id == "skip" => {
                 self.navigate_to(Step::WhatNext)
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
+        }
+    }
+
+    /// Sync non-empty phone/email values to OnboardingData.fields.
+    fn sync_quick_add_fields(&mut self) {
+        if !self.phone_value.trim().is_empty() {
+            self.data.fields.push(FieldSetup {
+                field_type: "phone".into(),
+                label: "Phone".into(),
+                value: self.phone_value.trim().to_string(),
+                visible_to_groups: Vec::new(),
+                shown: true,
+            });
+        }
+        if !self.email_value.trim().is_empty() {
+            self.data.fields.push(FieldSetup {
+                field_type: "email".into(),
+                label: "Email".into(),
+                value: self.email_value.trim().to_string(),
+                visible_to_groups: Vec::new(),
+                shown: true,
+            });
         }
     }
 

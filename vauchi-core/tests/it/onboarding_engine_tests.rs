@@ -384,9 +384,10 @@ fn groups_skip_goes_to_contact_info() {
 
 // ── Screen 3: ContactInfo ───────────────────────────────────────────
 
+// @scenario: onboarding :: Quick add phone and email
 // @internal
 #[test]
-fn contact_info_has_field_list() {
+fn contact_info_has_quick_add_buttons() {
     let mut engine = OnboardingEngine::new();
     advance_to_contact_info(&mut engine);
 
@@ -394,78 +395,179 @@ fn contact_info_has_field_list() {
     assert_eq!(screen.screen_id, "contact_info");
     assert_eq!(screen.progress.as_ref().unwrap().current_step, 3);
 
-    let has_field_list = screen.components.iter().any(|c| {
-        matches!(c, Component::FieldList { id, ..
-        } if id == "fields")
-    });
-    assert!(has_field_list, "ContactInfo should have a FieldList");
+    // Should have quick-add action buttons, not a FieldList
+    let has_field_list = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::FieldList { .. }));
+    assert!(!has_field_list, "Quick-add should NOT have FieldList");
+
+    let action_ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+    assert!(
+        action_ids.contains(&"show_phone"),
+        "Should have show_phone action"
+    );
+    assert!(
+        action_ids.contains(&"show_email"),
+        "Should have show_email action"
+    );
+    assert!(
+        action_ids.contains(&"add_social"),
+        "Should have add_social action"
+    );
+    assert!(
+        action_ids.contains(&"continue"),
+        "Should have continue action"
+    );
+    assert!(action_ids.contains(&"skip"), "Should have skip action");
 }
 
+// @scenario: onboarding :: Quick add phone and email
 // @internal
 #[test]
-fn contact_info_visibility_mode_depends_on_groups() {
-    // Without groups selected
+fn contact_info_show_phone_reveals_input() {
     let mut engine = OnboardingEngine::new();
     advance_to_contact_info(&mut engine);
 
-    let screen = engine.current_screen();
-    let mode = screen.components.iter().find_map(|c| match c {
-        Component::FieldList {
-            visibility_mode, ..
-        } => Some(visibility_mode.clone()),
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_phone".into(),
+    });
+    let screen = match result {
+        ActionResult::UpdateScreen(s) => s,
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    };
+
+    let has_phone_input = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::TextInput { id, .. } if id == "phone_input"));
+    assert!(has_phone_input, "Phone input should be visible");
+
+    let has_show_phone = screen.actions.iter().any(|a| a.id == "show_phone");
+    assert!(!has_show_phone, "show_phone button should be hidden");
+}
+
+// @scenario: onboarding :: Quick add phone and email
+// @internal
+#[test]
+fn contact_info_show_email_reveals_input() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_contact_info(&mut engine);
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_email".into(),
+    });
+    let screen = match result {
+        ActionResult::UpdateScreen(s) => s,
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    };
+
+    let has_email_input = screen
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::TextInput { id, .. } if id == "email_input"));
+    assert!(has_email_input, "Email input should be visible");
+}
+
+// @scenario: onboarding :: Quick add phone and email
+// @internal
+#[test]
+fn contact_info_typing_phone_updates_value() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_contact_info(&mut engine);
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_phone".into(),
+    });
+
+    let result = engine.handle_action(UserAction::TextChanged {
+        component_id: "phone_input".into(),
+        value: "+41 79 123 4567".into(),
+    });
+    let screen = match result {
+        ActionResult::UpdateScreen(s) => s,
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    };
+
+    let phone_value = screen.components.iter().find_map(|c| match c {
+        Component::TextInput { id, value, .. } if id == "phone_input" => Some(value.clone()),
         _ => None,
     });
-    assert_eq!(mode, Some(VisibilityMode::ShowHide));
+    assert_eq!(phone_value, Some("+41 79 123 4567".into()));
+}
 
-    // With groups selected
+// @scenario: onboarding :: Quick add phone and email
+// @internal
+#[test]
+fn contact_info_continue_syncs_fields_to_data() {
     let mut engine = OnboardingEngine::new();
-    advance_to_groups_setup(&mut engine);
-    // Select Family
-    let _ = engine.handle_action(UserAction::ItemToggled {
-        component_id: "groups".into(),
-        item_id: "Family".into(),
+    advance_to_contact_info(&mut engine);
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_phone".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "phone_input".into(),
+        value: "+41 79 000 0000".into(),
     });
     let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
+        action_id: "show_email".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "email_input".into(),
+        value: "alice@example.com".into(),
     });
 
-    let screen = engine.current_screen();
-    let mode = screen.components.iter().find_map(|c| match c {
-        Component::FieldList {
-            visibility_mode, ..
-        } => Some(visibility_mode.clone()),
-        _ => None,
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
     });
-    assert_eq!(mode, Some(VisibilityMode::PerGroup));
+    assert!(
+        matches!(result, ActionResult::NavigateTo(ref s) if s.screen_id == "what_next"),
+        "Should navigate to what_next"
+    );
+
+    let data = engine.data();
+    let phone = data.fields.iter().find(|f| f.field_type == "phone");
+    let email = data.fields.iter().find(|f| f.field_type == "email");
+    assert_eq!(phone.map(|f| f.value.as_str()), Some("+41 79 000 0000"));
+    assert_eq!(email.map(|f| f.value.as_str()), Some("alice@example.com"));
+    assert!(phone.unwrap().shown);
+    assert!(email.unwrap().shown);
+}
+
+// @scenario: onboarding :: Quick add phone and email
+// @internal
+#[test]
+fn contact_info_skip_does_not_sync_empty_fields() {
+    let mut engine = OnboardingEngine::new();
+    advance_to_contact_info(&mut engine);
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "show_phone".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "skip".into(),
+    });
+    assert!(matches!(result, ActionResult::NavigateTo(ref s) if s.screen_id == "what_next"));
+    assert!(
+        engine.data().fields.is_empty(),
+        "Skip should not add empty fields"
+    );
 }
 
 // @internal
 #[test]
-fn contact_info_available_groups_from_selected() {
+fn contact_info_add_social_falls_through() {
     let mut engine = OnboardingEngine::new();
-    advance_to_groups_setup(&mut engine);
-    let _ = engine.handle_action(UserAction::ItemToggled {
-        component_id: "groups".into(),
-        item_id: "Family".into(),
-    });
-    let _ = engine.handle_action(UserAction::ItemToggled {
-        component_id: "groups".into(),
-        item_id: "Friends".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
+    advance_to_contact_info(&mut engine);
 
-    let screen = engine.current_screen();
-    let groups = screen.components.iter().find_map(|c| match c {
-        Component::FieldList {
-            available_groups, ..
-        } => Some(available_groups.clone()),
-        _ => None,
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "add_social".into(),
     });
-    assert_eq!(
-        groups,
-        Some(vec!["Family".to_string(), "Friends".to_string()])
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "Engine returns UpdateScreen; AppEngine intercepts add_social"
     );
 }
 

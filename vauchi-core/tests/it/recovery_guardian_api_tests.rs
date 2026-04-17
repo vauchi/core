@@ -26,6 +26,7 @@ fn compute_guardian_hash_for_test(designator_pk: &[u8; 32]) -> String {
 
 /// Tests the full guardian token lifecycle:
 /// designator creates token → encrypts to guardian → guardian decrypts → verifies.
+// @scenario: contact_recovery :: Full lifecycle of guardian token creation, encryption, decryption, and verification
 #[test]
 fn test_guardian_token_seal_unseal_verify_lifecycle() {
     // Designator (Alice) creates her identity
@@ -67,6 +68,7 @@ fn test_guardian_token_seal_unseal_verify_lifecycle() {
 }
 
 /// Tests that a non-guardian cannot decrypt any entry.
+// @scenario: contact_recovery :: Non-guardian cannot decrypt sealed guardian entry
 #[test]
 fn test_non_guardian_cannot_decrypt_sealed_entry() {
     let alice_signing = SigningKeyPair::generate();
@@ -89,6 +91,7 @@ fn test_non_guardian_cannot_decrypt_sealed_entry() {
 }
 
 /// Tests deterministic guardian hash computation.
+// @scenario: contact_recovery :: Guardian hash computation is deterministic for the same key
 #[test]
 fn test_guardian_hash_is_deterministic() {
     let pk = [0xABu8; 32];
@@ -99,6 +102,7 @@ fn test_guardian_hash_is_deterministic() {
 }
 
 /// Tests that different designator keys produce different hashes.
+// @scenario: contact_recovery :: Different designator keys produce different guardian hashes
 #[test]
 fn test_guardian_hash_differs_per_designator() {
     let pk1 = [0x01u8; 32];
@@ -109,6 +113,7 @@ fn test_guardian_hash_differs_per_designator() {
 }
 
 /// Tests Ed25519 to X25519 key conversion consistency.
+// @scenario: contact_recovery :: Ed25519 to X25519 key conversion is deterministic
 #[test]
 fn test_ed25519_to_x25519_conversion_is_deterministic() {
     // Create an Ed25519 keypair
@@ -132,6 +137,7 @@ fn test_ed25519_to_x25519_conversion_is_deterministic() {
 }
 
 /// Tests multiple guardians: each can only decrypt their own entry.
+// @scenario: contact_recovery :: Each guardian can only decrypt their own sealed entry
 #[test]
 fn test_multiple_guardians_isolation() {
     let alice = SigningKeyPair::generate();

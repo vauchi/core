@@ -17,6 +17,7 @@ use vauchi_core::{RecoveryClaim, RecoveryError, RecoveryProof, RecoveryVoucher};
 // Voucher v2 serialization roundtrip
 // =============================================================================
 
+// @scenario: contact_recovery :: Serialize and deserialize v2 recovery voucher with guardian token
 #[test]
 fn test_voucher_v2_with_guardian_token_roundtrip() {
     let old_keypair = SigningKeyPair::generate();
@@ -58,6 +59,7 @@ fn test_voucher_v2_with_guardian_token_roundtrip() {
     );
 }
 
+// @scenario: contact_recovery :: Serialize and deserialize v1 recovery voucher without guardian token
 #[test]
 fn test_voucher_v1_without_token_roundtrip() {
     let old_pk = [0x01u8; 32];
@@ -78,6 +80,7 @@ fn test_voucher_v1_without_token_roundtrip() {
     );
 }
 
+// @scenario: contact_recovery :: Deserializing v2 voucher preserves guardian token fields exactly
 #[test]
 fn test_voucher_v2_from_bytes_preserves_token() {
     let old_keypair = SigningKeyPair::generate();
@@ -116,6 +119,7 @@ fn test_voucher_v2_from_bytes_preserves_token() {
 // Voucher version byte
 // =============================================================================
 
+// @scenario: contact_recovery :: Version byte is 2 for voucher with token and 1 without
 #[test]
 fn test_voucher_v2_version_byte() {
     let old_keypair = SigningKeyPair::generate();
@@ -147,6 +151,7 @@ fn test_voucher_v2_version_byte() {
 // create_from_claim with token
 // =============================================================================
 
+// @scenario: contact_recovery :: Create recovery voucher from claim with guardian token
 #[test]
 fn test_create_from_claim_with_token() {
     let old_keypair = SigningKeyPair::generate();
@@ -182,6 +187,7 @@ fn test_create_from_claim_with_token() {
 // RecoveryProof::add_voucher guardian token validation
 // =============================================================================
 
+// @scenario: contact_recovery :: Add voucher with valid guardian token to recovery proof
 #[test]
 fn test_proof_add_voucher_with_valid_token() {
     let old_keypair = SigningKeyPair::generate();
@@ -211,6 +217,7 @@ fn test_proof_add_voucher_with_valid_token() {
     );
 }
 
+// @scenario: contact_recovery :: Reject recovery proof voucher with invalid guardian token signature
 #[test]
 fn test_proof_rejects_voucher_with_invalid_token_signature() {
     let old_keypair = SigningKeyPair::generate();
@@ -243,6 +250,7 @@ fn test_proof_rejects_voucher_with_invalid_token_signature() {
     );
 }
 
+// @scenario: contact_recovery :: Reject recovery proof voucher whose token designator does not match proof identity
 #[test]
 fn test_proof_rejects_voucher_with_wrong_designator_pk() {
     let old_keypair = SigningKeyPair::generate();
@@ -274,6 +282,7 @@ fn test_proof_rejects_voucher_with_wrong_designator_pk() {
     );
 }
 
+// @scenario: contact_recovery :: Reject recovery proof voucher where token guardian key does not match voucher signer
 #[test]
 fn test_proof_rejects_voucher_with_wrong_guardian_pk() {
     let old_keypair = SigningKeyPair::generate();
@@ -305,6 +314,7 @@ fn test_proof_rejects_voucher_with_wrong_guardian_pk() {
     );
 }
 
+// @scenario: contact_recovery :: Accept v1 backward-compatible voucher without guardian token
 #[test]
 fn test_proof_accepts_voucher_without_token() {
     let old_pk = [0x01u8; 32];

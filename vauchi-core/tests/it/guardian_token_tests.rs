@@ -11,6 +11,7 @@
 use vauchi_core::crypto::{PublicKey, Signature, SigningKeyPair};
 use vauchi_core::recovery::guardian::GuardianToken;
 
+// @scenario: contact_recovery :: Create a guardian token with correct designator and guardian keys
 #[test]
 fn test_create_guardian_token() {
     let designator = SigningKeyPair::generate();
@@ -26,6 +27,7 @@ fn test_create_guardian_token() {
     );
 }
 
+// @scenario: contact_recovery :: Verify a freshly created guardian token
 #[test]
 fn test_verify_guardian_token() {
     let designator = SigningKeyPair::generate();
@@ -39,6 +41,7 @@ fn test_verify_guardian_token() {
     );
 }
 
+// @scenario: contact_recovery :: Reject guardian token with tampered guardian key
 #[test]
 fn test_tampered_guardian_token_fails_verification() {
     let designator = SigningKeyPair::generate();
@@ -54,6 +57,7 @@ fn test_tampered_guardian_token_fails_verification() {
     );
 }
 
+// @scenario: contact_recovery :: Serialize and deserialize a guardian token preserving all fields
 #[test]
 fn test_guardian_token_serialization_roundtrip() {
     let designator = SigningKeyPair::generate();
@@ -69,6 +73,7 @@ fn test_guardian_token_serialization_roundtrip() {
     assert!(restored.verify(), "restored token must still verify");
 }
 
+// @scenario: contact_recovery :: Reject forged guardian token signed by wrong designator key
 #[test]
 fn test_wrong_designator_cannot_forge_token() {
     let real_designator = SigningKeyPair::generate();
@@ -88,6 +93,7 @@ fn test_wrong_designator_cannot_forge_token() {
     );
 }
 
+// @scenario: contact_recovery :: Enforce domain separation in guardian token signature
 #[test]
 fn test_domain_separation() {
     let designator = SigningKeyPair::generate();

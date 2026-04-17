@@ -23,6 +23,7 @@ fn generate_keypair() -> (StaticSecret, PublicKey) {
 // Tests
 // ---------------------------------------------------------------------------
 
+// @scenario: contact_recovery :: Seal and unseal a payload with the correct recipient key
 #[test]
 fn test_seal_unseal_roundtrip() {
     let (secret, public) = generate_keypair();
@@ -37,6 +38,7 @@ fn test_seal_unseal_roundtrip() {
     );
 }
 
+// @scenario: contact_recovery :: Wrong recipient key cannot decrypt sealed payload
 #[test]
 fn test_wrong_key_cannot_decrypt() {
     let (_secret_a, public_a) = generate_keypair();
@@ -52,6 +54,7 @@ fn test_wrong_key_cannot_decrypt() {
     );
 }
 
+// @scenario: contact_recovery :: Tampered sealed-box ciphertext fails authentication
 #[test]
 fn test_tampered_ciphertext_fails() {
     let (secret, public) = generate_keypair();
@@ -69,6 +72,7 @@ fn test_tampered_ciphertext_fails() {
     );
 }
 
+// @scenario: contact_recovery :: Sealed-box output size is ephemeral-pk plus nonce plus ciphertext plus tag
 #[test]
 fn test_sealed_box_output_size() {
     let (_secret, public) = generate_keypair();

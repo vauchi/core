@@ -36,6 +36,7 @@ fn valid_sealed_blob(recipient_pk: &X25519PublicKey) -> Vec<u8> {
 // GuardianToken::from_bytes — adversarial inputs
 // ---------------------------------------------------------------------------
 
+// @scenario: contact_recovery :: Reject empty input for GuardianToken deserialization
 #[test]
 fn test_guardian_token_from_bytes_empty() {
     let result = GuardianToken::from_bytes(&[]);
@@ -48,6 +49,7 @@ fn test_guardian_token_from_bytes_empty() {
     );
 }
 
+// @scenario: contact_recovery :: Reject single zero byte for GuardianToken deserialization
 #[test]
 fn test_guardian_token_from_bytes_single_zero_byte() {
     let result = GuardianToken::from_bytes(&[0x00]);
@@ -60,6 +62,7 @@ fn test_guardian_token_from_bytes_single_zero_byte() {
     );
 }
 
+// @scenario: contact_recovery :: Reject plausible-length zero buffer for GuardianToken deserialization
 #[test]
 fn test_guardian_token_from_bytes_127_zero_bytes() {
     let input = vec![0u8; 127];
@@ -76,6 +79,7 @@ fn test_guardian_token_from_bytes_127_zero_bytes() {
     );
 }
 
+// @scenario: contact_recovery :: Reject or invalidate one-megabyte zero buffer for GuardianToken
 #[test]
 fn test_guardian_token_from_bytes_one_megabyte_zeros() {
     // postcard may successfully decode a 1 MB zero buffer into a GuardianToken
@@ -100,6 +104,7 @@ fn test_guardian_token_from_bytes_one_megabyte_zeros() {
     }
 }
 
+// @scenario: contact_recovery :: Reject or fail verification when last byte is flipped in GuardianToken
 #[test]
 fn test_guardian_token_from_bytes_last_byte_flipped_fails_verification() {
     let designator = SigningKeyPair::generate();
@@ -130,6 +135,7 @@ fn test_guardian_token_from_bytes_last_byte_flipped_fails_verification() {
     }
 }
 
+// @scenario: contact_recovery :: Reject 200 bytes of 0xFF as garbage for GuardianToken deserialization
 #[test]
 fn test_guardian_token_from_bytes_all_0xff_200_bytes() {
     let input = vec![0xFFu8; 200];
@@ -146,6 +152,7 @@ fn test_guardian_token_from_bytes_all_0xff_200_bytes() {
     );
 }
 
+// @scenario: contact_recovery :: Reject truncated GuardianToken bytes
 #[test]
 fn test_guardian_token_from_bytes_half_length_truncated() {
     let designator = SigningKeyPair::generate();
@@ -171,6 +178,7 @@ fn test_guardian_token_from_bytes_half_length_truncated() {
 // sealed_box::open — adversarial inputs
 // ---------------------------------------------------------------------------
 
+// @scenario: contact_recovery :: Reject empty input for sealed-box decryption
 #[test]
 fn test_sealed_box_open_empty_slice() {
     let (secret, _) = generate_x25519_keypair();
@@ -184,6 +192,7 @@ fn test_sealed_box_open_empty_slice() {
     );
 }
 
+// @scenario: contact_recovery :: Reject sub-minimum-length input for sealed-box decryption
 #[test]
 fn test_sealed_box_open_71_bytes_too_short() {
     let (secret, _) = generate_x25519_keypair();
@@ -202,6 +211,7 @@ fn test_sealed_box_open_71_bytes_too_short() {
     );
 }
 
+// @scenario: contact_recovery :: Reject all-zero minimum-size blob in sealed-box decryption
 #[test]
 fn test_sealed_box_open_72_zero_bytes_decryption_fails() {
     let (secret, _) = generate_x25519_keypair();
@@ -217,6 +227,7 @@ fn test_sealed_box_open_72_zero_bytes_decryption_fails() {
     );
 }
 
+// @scenario: contact_recovery :: Reject oversized junk blob in sealed-box decryption
 #[test]
 fn test_sealed_box_open_one_megabyte_random_looking() {
     let (secret, _) = generate_x25519_keypair();
@@ -232,6 +243,7 @@ fn test_sealed_box_open_one_megabyte_random_looking() {
     );
 }
 
+// @scenario: contact_recovery :: Reject sealed-box blob with zeroed nonce
 #[test]
 fn test_sealed_box_open_nonce_zeroed_fails() {
     let (secret, public) = generate_x25519_keypair();
@@ -255,6 +267,7 @@ fn test_sealed_box_open_nonce_zeroed_fails() {
     );
 }
 
+// @scenario: contact_recovery :: Reject sealed-box blob with zeroed ephemeral public key
 #[test]
 fn test_sealed_box_open_ephemeral_pk_zeroed_fails() {
     let (secret, public) = generate_x25519_keypair();
@@ -278,6 +291,7 @@ fn test_sealed_box_open_ephemeral_pk_zeroed_fails() {
     );
 }
 
+// @scenario: contact_recovery :: Reject sealed-box blob with flipped authentication tag
 #[test]
 fn test_sealed_box_open_tag_bytes_flipped_fails() {
     let (secret, public) = generate_x25519_keypair();
@@ -306,6 +320,7 @@ fn test_sealed_box_open_tag_bytes_flipped_fails() {
 // GuardianToken::verify — adversarial scenarios
 // ---------------------------------------------------------------------------
 
+// @scenario: contact_recovery :: Reject token with all-zero designator key
 #[test]
 fn test_guardian_token_verify_all_zero_designator_pk_returns_false() {
     let guardian = SigningKeyPair::generate();
@@ -322,6 +337,7 @@ fn test_guardian_token_verify_all_zero_designator_pk_returns_false() {
     );
 }
 
+// @scenario: contact_recovery :: Reject token with all-zero guardian key tampered after signing
 #[test]
 fn test_guardian_token_verify_all_zero_guardian_pk_returns_false() {
     let designator = SigningKeyPair::generate();
@@ -336,6 +352,7 @@ fn test_guardian_token_verify_all_zero_guardian_pk_returns_false() {
     );
 }
 
+// @scenario: contact_recovery :: Reject token with zeroed signature bytes
 #[test]
 fn test_guardian_token_verify_all_zero_signature_returns_false() {
     let designator = SigningKeyPair::generate();

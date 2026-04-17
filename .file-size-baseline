@@ -61,4 +61,4 @@ vauchi-app/src/ui/contact_detail.rs 1105
 vauchi-app/src/ui/exchange_ble.rs 1050
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
-vauchi-core/src/network/http_transport.rs 1035
+# (moved up — guardian CRUD methods added for social recovery)

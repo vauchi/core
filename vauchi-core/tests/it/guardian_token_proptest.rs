@@ -15,6 +15,7 @@ use vauchi_core::recovery::sealed_box;
 use x25519_dalek::{PublicKey, StaticSecret};
 
 proptest! {
+    // @internal
     #[test]
     fn valid_tokens_always_verify(seed1 in any::<[u8; 32]>(), seed2 in any::<[u8; 32]>()) {
         let designator = SigningKeyPair::from_seed(&seed1);
@@ -25,6 +26,7 @@ proptest! {
         prop_assert!(token.verify());
     }
 
+    // @internal
     #[test]
     fn wrong_signer_never_verifies(
         seed1 in any::<[u8; 32]>(),
@@ -46,6 +48,7 @@ proptest! {
         prop_assert!(!token.verify());
     }
 
+    // @internal
     #[test]
     fn sealed_box_roundtrip(plaintext in prop::collection::vec(any::<u8>(), 0..512)) {
         let recipient_secret = StaticSecret::random_from_rng(rand::rngs::OsRng);

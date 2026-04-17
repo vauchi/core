@@ -21,6 +21,9 @@ pub enum ScannerBackend {
     RqrrRaw,
     /// rqrr with Tier 1 preprocessing pipeline.
     RqrrPreprocessed,
+    /// YOLO detector → crop → rqrr decode.
+    #[cfg(feature = "diagnostic-yolo")]
+    YoloRqrr,
 }
 
 /// Result of a single QR scan attempt with timing breakdown.
@@ -112,6 +115,100 @@ pub fn scan_qr_from_luma_with_config(
                 ..result
             }
         }
+        #[cfg(feature = "diagnostic-yolo")]
+        ScannerBackend::YoloRqrr => {
+            // YOLO detection requires a pre-loaded detector session.
+            // For the scan_qr_from_luma API, use the standalone function below.
+            // This arm returns a stub — callers should use scan_qr_yolo() instead.
+            ScanResult {
+                decoded: None,
+                total_us: total_start.elapsed().as_micros() as u64,
+                preprocessing_us: 0,
+                decode_us: 0,
+                frame_skipped: false,
+                laplacian_variance: 0.0,
+            }
+        }
+    }
+}
+
+/// Scan a QR code using YOLO detection → crop → rqrr decode pipeline.
+///
+/// The detector locates QR code regions in the frame, crops each one with
+/// padding, and feeds the cropped patch to rqrr for decoding. Returns the
+/// first successfully decoded QR content.
+#[cfg(feature = "diagnostic-yolo")]
+pub fn scan_qr_yolo(
+    detector: &mut super::yolo_detector::YoloDetector,
+    luma_data: &[u8],
+    width: u32,
+    height: u32,
+    confidence_threshold: f32,
+) -> ScanResult {
+    let total_start = std::time::Instant::now();
+
+    let Some(img) = GrayImage::from_raw(width, height, luma_data.to_vec()) else {
+        return ScanResult {
+            decoded: None,
+            total_us: total_start.elapsed().as_micros() as u64,
+            preprocessing_us: 0,
+            decode_us: 0,
+            frame_skipped: false,
+            laplacian_variance: 0.0,
+        };
+    };
+
+    // Step 1: YOLO detection
+    let detect_start = std::time::Instant::now();
+    let detections = match detector.detect(&img, confidence_threshold) {
+        Ok(d) => d,
+        Err(_) => {
+            return ScanResult {
+                decoded: None,
+                total_us: total_start.elapsed().as_micros() as u64,
+                preprocessing_us: detect_start.elapsed().as_micros() as u64,
+                decode_us: 0,
+                frame_skipped: false,
+                laplacian_variance: 0.0,
+            };
+        }
+    };
+    let detection_us = detect_start.elapsed().as_micros() as u64;
+
+    if detections.is_empty() {
+        return ScanResult {
+            decoded: None,
+            total_us: total_start.elapsed().as_micros() as u64,
+            preprocessing_us: detection_us,
+            decode_us: 0,
+            frame_skipped: false,
+            laplacian_variance: 0.0,
+        };
+    }
+
+    // Step 2: For each detection, crop and try rqrr decode
+    let decode_start = std::time::Instant::now();
+    for det in &detections {
+        let patch = super::yolo_detector::crop_detection(&img, det, 0.15);
+        let result = decode_rqrr(patch);
+        if result.decoded.is_some() {
+            return ScanResult {
+                total_us: total_start.elapsed().as_micros() as u64,
+                preprocessing_us: detection_us,
+                decode_us: decode_start.elapsed().as_micros() as u64,
+                ..result
+            };
+        }
+    }
+
+    // No detection decoded successfully
+    ScanResult {
+        decoded: None,
+        total_us: total_start.elapsed().as_micros() as u64,
+        preprocessing_us: detection_us,
+        decode_us: decode_start.elapsed().as_micros() as u64,
+        frame_skipped: false,
+        laplacian_variance: 0.0,
     }
 }
 

@@ -251,6 +251,10 @@ criteria = "safe-to-deploy"
 version = "4.1.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.der]]
+version = "0.8.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.derive_builder]]
 version = "0.20.2"
 criteria = "safe-to-deploy"
@@ -407,6 +411,10 @@ criteria = "safe-to-run"
 version = "0.12.4"
 criteria = "safe-to-deploy"
 
+[[exemptions.hmac-sha256]]
+version = "1.1.14"
+criteria = "safe-to-deploy"
+
 [[exemptions.humantime]]
 version = "2.3.0"
 criteria = "safe-to-run"
@@ -499,6 +507,10 @@ criteria = "safe-to-deploy"
 version = "0.16.4"
 criteria = "safe-to-deploy"
 
+[[exemptions.lzma-rust2]]
+version = "0.15.7"
+criteria = "safe-to-deploy"
+
 [[exemptions.matrixmultiply]]
 version = "0.3.10"
 criteria = "safe-to-deploy"
@@ -517,6 +529,18 @@ criteria = "safe-to-deploy"
 
 [[exemptions.nalgebra]]
 version = "0.32.6"
+criteria = "safe-to-deploy"
+
+[[exemptions.native-tls]]
+version = "0.2.18"
+criteria = "safe-to-deploy"
+
+[[exemptions.ndarray]]
+version = "0.16.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.ndarray]]
+version = "0.17.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.ndk]]
@@ -551,6 +575,26 @@ criteria = "safe-to-deploy"
 version = "1.21.3"
 criteria = "safe-to-deploy"
 
+[[exemptions.openssl]]
+version = "0.10.77"
+criteria = "safe-to-deploy"
+
+[[exemptions.openssl-probe]]
+version = "0.2.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.openssl-sys]]
+version = "0.9.113"
+criteria = "safe-to-deploy"
+
+[[exemptions.ort]]
+version = "2.0.0-rc.12"
+criteria = "safe-to-deploy"
+
+[[exemptions.ort-sys]]
+version = "2.0.0-rc.12"
+criteria = "safe-to-deploy"
+
 [[exemptions.outref]]
 version = "0.5.2"
 criteria = "safe-to-run"
@@ -570,6 +614,10 @@ criteria = "safe-to-run"
 [[exemptions.peg-runtime]]
 version = "0.6.3"
 criteria = "safe-to-run"
+
+[[exemptions.pem-rfc7468]]
+version = "1.0.0"
+criteria = "safe-to-deploy"
 
 [[exemptions.pin-project]]
 version = "1.1.11"
@@ -605,6 +653,14 @@ criteria = "safe-to-run"
 
 [[exemptions.png]]
 version = "0.18.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.portable-atomic]]
+version = "1.13.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.portable-atomic-util]]
+version = "0.2.7"
 criteria = "safe-to-deploy"
 
 [[exemptions.ppv-lite86]]
@@ -705,6 +761,10 @@ criteria = "safe-to-run"
 
 [[exemptions.safe_arch]]
 version = "0.7.4"
+criteria = "safe-to-deploy"
+
+[[exemptions.schannel]]
+version = "0.1.29"
 criteria = "safe-to-deploy"
 
 [[exemptions.schemars]]
@@ -911,6 +971,10 @@ criteria = "safe-to-deploy"
 version = "0.3.95"
 criteria = "safe-to-deploy"
 
+[[exemptions.webpki-root-certs]]
+version = "1.0.6"
+criteria = "safe-to-deploy"
+
 [[exemptions.webpki-roots]]
 version = "1.0.6"
 criteria = "safe-to-deploy"
@@ -921,6 +985,18 @@ criteria = "safe-to-deploy"
 
 [[exemptions.wide]]
 version = "0.7.33"
+criteria = "safe-to-deploy"
+
+[[exemptions.winapi]]
+version = "0.3.9"
+criteria = "safe-to-deploy"
+
+[[exemptions.winapi-i686-pc-windows-gnu]]
+version = "0.4.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.winapi-x86_64-pc-windows-gnu]]
+version = "0.4.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.zerocopy]]

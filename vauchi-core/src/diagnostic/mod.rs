@@ -15,6 +15,8 @@ pub mod report;
 pub mod scanner;
 pub mod snapshot;
 pub mod tuner;
+#[cfg(feature = "diagnostic-yolo")]
+pub mod yolo_detector;
 
 pub use debug_session::DebugSession;
 pub use log_event::{LogEvent, LogEventKind, ScreenId};

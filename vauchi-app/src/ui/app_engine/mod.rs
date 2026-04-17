@@ -709,6 +709,10 @@ impl WorkflowEngine for AppEngine {
             return result;
         }
 
+        if let Some(result) = self.intercept_info_requested(&action) {
+            return result;
+        }
+
         if let AppScreen::MyInfoEntryDetail { ref field_id } = self.screen {
             let field_id = field_id.clone();
             if let Some(result) = self.intercept_entry_detail_action(&field_id, &action) {

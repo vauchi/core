@@ -7,10 +7,12 @@
 
 use super::AppEngine;
 use super::AppScreen;
+use crate::i18n::Locale;
 use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::contact_detail::ContactDetailEngine;
 use crate::ui::engine::WorkflowEngine;
 use crate::ui::form_dialog::FormDialogType;
+use crate::ui::info_content;
 use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 
 impl AppEngine {
@@ -515,6 +517,23 @@ impl AppEngine {
             secondary_fields,
         });
         Some(ActionResult::NavigateTo(screen))
+    }
+
+    /// Intercept `InfoRequested` and resolve the key to localized help content.
+    ///
+    /// Returns `ShowInfoOverlay` when the key is known, or `UpdateScreen`
+    /// with the current screen when the key is unknown. This intercept runs
+    /// before delegation to child engines so every screen in the app gets
+    /// (i) icon support without each engine needing to handle it.
+    pub(super) fn intercept_info_requested(&mut self, action: &UserAction) -> Option<ActionResult> {
+        let UserAction::InfoRequested { key } = action else {
+            return None;
+        };
+        if let Some((title, body)) = info_content::resolve_info_key(key, Locale::English) {
+            return Some(ActionResult::ShowInfoOverlay { title, body });
+        }
+        // Unknown key: refresh the current screen rather than silently swallowing the tap.
+        Some(ActionResult::UpdateScreen(self.engine.current_screen()))
     }
 
     /// Handle undo actions (field delete restoration, contact delete/archive undo).

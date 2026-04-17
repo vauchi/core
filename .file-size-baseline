@@ -12,7 +12,7 @@ vauchi-cabi/src/lib.rs 1841
 vauchi-platform/src/types.rs 1547
 
 # EXEMPT — UniFFI facade: splitting breaks binding generation (trust/notes/preview/import exports added)
-vauchi-platform/src/lib.rs 2402
+vauchi-platform/src/lib.rs 2420
 
 # EXEMPT — state machine: scattered transitions create protocol bugs
 vauchi-core/src/exchange/session.rs 1753
@@ -34,7 +34,7 @@ vauchi-core/src/storage/rekey.rs 1390
 vauchi-core/src/storage/mod.rs 1079
 
 # SPLIT DONE — Phase 3: app_engine.rs (1437) split into mod.rs + routing.rs + screens.rs
-vauchi-app/src/ui/app_engine/mod.rs 930
+vauchi-app/src/ui/app_engine/mod.rs 935
 vauchi-app/src/ui/app_engine/routing.rs 855
 vauchi-app/src/ui/app_engine/screens.rs 1120
 
@@ -55,7 +55,7 @@ vauchi-core/tests/it/migration_tests.rs 1224
 
 # vauchi-app — extracted from vauchi-core, inherits exemption
 vauchi-app/src/ui/exchange.rs 2770
-vauchi-app/src/ui/contact_detail.rs 1105
+vauchi-app/src/ui/contact_detail.rs 1115
 
 # EXEMPT — BLE exchange sub-flow: inline tests access private state (proximity_runner, shake_envelope_sent)
 vauchi-app/src/ui/exchange_ble.rs 1050

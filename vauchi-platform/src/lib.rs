@@ -2,6 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Deprecated direct help FFI functions are kept for backward compatibility
+// with iOS/Android until Tasks 13-14 migrate them to ScreenModel routing.
+#![allow(deprecated)]
+
 //! Vauchi Mobile Bindings
 //!
 //! UniFFI bindings for Android and iOS platforms.
@@ -621,6 +625,7 @@ pub fn parse_locale_code(code: String) -> Option<MobileLocale> {
 // ============================================================
 
 /// Get all help categories with their display names.
+#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
 #[uniffi::export]
 pub fn get_help_categories() -> Vec<MobileHelpCategoryInfo> {
     vauchi_app::help::HelpCategory::all()
@@ -633,6 +638,7 @@ pub fn get_help_categories() -> Vec<MobileHelpCategoryInfo> {
 }
 
 /// Get all FAQ items.
+#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
 #[uniffi::export]
 pub fn get_faqs() -> Vec<MobileFaqItem> {
     vauchi_app::help::get_faqs()
@@ -642,6 +648,7 @@ pub fn get_faqs() -> Vec<MobileFaqItem> {
 }
 
 /// Get FAQ items for a specific category.
+#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
 #[uniffi::export]
 pub fn get_faqs_by_category(category: MobileHelpCategory) -> Vec<MobileFaqItem> {
     vauchi_app::help::get_faqs_by_category(category.into())
@@ -653,6 +660,7 @@ pub fn get_faqs_by_category(category: MobileHelpCategory) -> Vec<MobileFaqItem> 
 /// Get a specific FAQ item by ID.
 ///
 /// Returns None if the FAQ is not found.
+#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
 #[uniffi::export]
 pub fn get_faq_by_id(id: String) -> Option<MobileFaqItem> {
     vauchi_app::help::get_faq_by_id(&id).map(|f| MobileFaqItem::from(&f))
@@ -661,6 +669,7 @@ pub fn get_faq_by_id(id: String) -> Option<MobileFaqItem> {
 /// Search FAQs by query text.
 ///
 /// Searches in both questions and answers (case-insensitive).
+#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
 #[uniffi::export]
 pub fn search_faqs(query: String) -> Vec<MobileFaqItem> {
     vauchi_app::help::search_faqs(&query)
@@ -670,6 +679,7 @@ pub fn search_faqs(query: String) -> Vec<MobileFaqItem> {
 }
 
 /// Get all FAQ items in the specified locale.
+#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
 #[uniffi::export]
 pub fn get_faqs_localized(locale: MobileLocale) -> Vec<MobileFaqItem> {
     vauchi_app::help::get_faqs_localized(locale.into())
@@ -679,6 +689,7 @@ pub fn get_faqs_localized(locale: MobileLocale) -> Vec<MobileFaqItem> {
 }
 
 /// Get FAQ items for a specific category in the specified locale.
+#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
 #[uniffi::export]
 pub fn get_faqs_by_category_localized(
     category: MobileHelpCategory,
@@ -693,6 +704,7 @@ pub fn get_faqs_by_category_localized(
 /// Get a specific FAQ item by ID in the specified locale.
 ///
 /// Returns None if the FAQ is not found.
+#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
 #[uniffi::export]
 pub fn get_faq_by_id_localized(id: String, locale: MobileLocale) -> Option<MobileFaqItem> {
     vauchi_app::help::get_faq_by_id_localized(&id, locale.into()).map(|f| MobileFaqItem::from(&f))
@@ -701,6 +713,7 @@ pub fn get_faq_by_id_localized(id: String, locale: MobileLocale) -> Option<Mobil
 /// Search FAQs by query text in the specified locale.
 ///
 /// Searches in both questions and answers (case-insensitive).
+#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
 #[uniffi::export]
 pub fn search_faqs_localized(query: String, locale: MobileLocale) -> Vec<MobileFaqItem> {
     vauchi_app::help::search_faqs_localized(&query, locale.into())

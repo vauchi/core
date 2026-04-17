@@ -244,6 +244,8 @@ pub struct AppEngine {
     /// Set when the user confirms a merge from DuplicateDetection; consumed by
     /// handle_completion for ContactMerge.
     pub(super) pending_merge: Option<(String, String)>,
+    /// Whether a backup reminder toast should be shown on next main-screen render.
+    pending_backup_reminder: bool,
 }
 
 impl AppEngine {
@@ -296,6 +298,19 @@ impl AppEngine {
             }
         }));
 
+        // Check if a backup reminder is due (only if identity exists and not on lock/onboarding).
+        let pending_backup_reminder = matches!(screen, AppScreen::MyInfo | AppScreen::Contacts)
+            && vauchi
+                .identity()
+                .and_then(|id| {
+                    let fallback = id.device_info().created_at();
+                    vauchi
+                        .load_backup_reminder_state()
+                        .ok()
+                        .map(|state| state.is_reminder_due(now, fallback))
+                })
+                .unwrap_or(false);
+
         Self {
             vauchi,
             screen,
@@ -316,6 +331,30 @@ impl AppEngine {
             event_rx,
             _event_handler_id: event_handler_id,
             pending_merge: None,
+            pending_backup_reminder,
+        }
+    }
+
+    /// Check and drain a pending backup reminder.
+    ///
+    /// Returns `Some(ShowToast { .. })` if a backup reminder is due, `None` otherwise.
+    /// Frontends should call this after initialization or after unlocking.
+    /// The toast `undo_action_id` is `"backup_now"` — pressing it navigates to Backup.
+    pub fn drain_backup_reminder(&mut self) -> Option<ActionResult> {
+        if self.pending_backup_reminder {
+            self.pending_backup_reminder = false;
+            // Record that we showed a reminder
+            if let Ok(mut state) = self.vauchi.load_backup_reminder_state() {
+                state.record_reminder_shown();
+                let _ = self.vauchi.save_backup_reminder_state(&state);
+            }
+            Some(ActionResult::ShowToast {
+                message: "You haven't backed up in a while. Back up now to protect your identity."
+                    .into(),
+                undo_action_id: Some("backup_now".into()),
+            })
+        } else {
+            None
         }
     }
 
@@ -600,6 +639,14 @@ impl WorkflowEngine for AppEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         self.drain_events_to_log();
+
+        // Handle backup reminder toast action
+        if matches!(
+            &action,
+            UserAction::ActionPressed { action_id } if action_id == "backup_now"
+        ) {
+            return ActionResult::NavigateTo(self.navigate_to(AppScreen::Backup));
+        }
 
         // Handle update link action from banner/button presses
         if matches!(

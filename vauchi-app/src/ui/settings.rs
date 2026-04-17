@@ -45,6 +45,12 @@ pub struct SettingsConfig {
     pub failed_deliveries: u32,
     #[serde(default)]
     pub debug_mode: bool,
+    #[serde(default = "default_true")]
+    pub backup_reminders_enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Settings screen engine.
@@ -301,6 +307,20 @@ impl WorkflowEngine for SettingsEngine {
                             role: None,
                         }),
                     },
+                    SettingsItem {
+                        id: "backup_reminders".into(),
+                        label: "Backup reminders".into(),
+                        kind: SettingsItemKind::Toggle {
+                            enabled: self.config.backup_reminders_enabled,
+                        },
+                        a11y: Some(A11y {
+                            label: Some("Backup reminders".into()),
+                            hint: Some(
+                                "Receive periodic reminders to back up your identity".into(),
+                            ),
+                            role: None,
+                        }),
+                    },
                 ],
             },
             Component::SettingsGroup {
@@ -520,6 +540,13 @@ impl WorkflowEngine for SettingsEngine {
                 ref item_id,
             } if component_id == "about" && item_id == "debug_mode" => {
                 self.config.debug_mode = !self.config.debug_mode;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::SettingsToggled {
+                ref component_id,
+                ref item_id,
+            } if component_id == "backup" && item_id == "backup_reminders" => {
+                self.config.backup_reminders_enabled = !self.config.backup_reminders_enabled;
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected { ref item_id, .. } if item_id == "emergency_wipe" => {

@@ -280,6 +280,20 @@
               "hint": "Transfer your contacts to a new device via QR code",
               "role": null
             }
+          },
+          {
+            "id": "backup_reminders",
+            "label": "Backup reminders",
+            "kind": {
+              "Toggle": {
+                "enabled": true
+              }
+            },
+            "a11y": {
+              "label": "Backup reminders",
+              "hint": "Receive periodic reminders to back up your identity",
+              "role": null
+            }
           }
         ]
       }

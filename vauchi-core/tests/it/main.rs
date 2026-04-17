@@ -50,6 +50,7 @@ mod avatar_normalize_proptest;
 mod avatar_normalize_tests;
 mod backup_format_versioning_tests;
 mod backup_recovery_engine_tests;
+mod backup_reminder_tests;
 mod ble_chunking_tests;
 mod ble_exchange_tests;
 mod ble_handshake_tests;

@@ -89,6 +89,7 @@ fn sample_settings_config() -> SettingsConfig {
         pending_updates: 0,
         failed_deliveries: 0,
         debug_mode: false,
+        backup_reminders_enabled: true,
     }
 }
 

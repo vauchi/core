@@ -479,6 +479,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "contact_display",
             action: MigrationAction::Sql(MIGRATION_V43_CONTACT_DISPLAY),
         },
+        Migration {
+            version: 44,
+            name: "backup_reminder",
+            action: MigrationAction::Sql(MIGRATION_V44_BACKUP_REMINDER),
+        },
     ]
 }
 
@@ -784,6 +789,10 @@ const MIGRATION_V43_CONTACT_DISPLAY: &str = "
     ALTER TABLE contacts ADD COLUMN display_name_preference TEXT NOT NULL DEFAULT '\"primary\"';
     ALTER TABLE contacts ADD COLUMN avatar_preference TEXT NOT NULL DEFAULT '\"primary\"';
 ";
+
+/// Migration v44: Add backup_reminder column to ux_state.
+const MIGRATION_V44_BACKUP_REMINDER: &str =
+    "ALTER TABLE ux_state ADD COLUMN backup_reminder_encrypted BLOB;";
 
 const MIGRATION_V35_LOCAL_GROUPS: &str = "
     CREATE TABLE IF NOT EXISTS local_groups (

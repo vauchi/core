@@ -84,6 +84,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("recovery_settings", "settings_encrypted"),
     // V29 onboarding progress
     ("ux_state", "onboarding_progress_encrypted"),
+    // V44 backup reminder
+    ("ux_state", "backup_reminder_encrypted"),
     // V30 label display name override
     ("visibility_labels", "display_name_override_encrypted"),
     // V38 exchange state crash recovery
@@ -861,21 +863,22 @@ impl Storage {
             }
             report(&mut completed, "field_validations");
 
-            // Re-encrypt ux_state: aha_tracker, demo_contact, onboarding_progress
+            // Re-encrypt ux_state: aha_tracker, demo_contact, onboarding_progress, backup_reminder
             {
                 let result = self.conn.query_row(
-                    "SELECT id, aha_tracker_json_encrypted, demo_contact_json_encrypted, onboarding_progress_encrypted FROM ux_state WHERE id = 1",
+                    "SELECT id, aha_tracker_json_encrypted, demo_contact_json_encrypted, onboarding_progress_encrypted, backup_reminder_encrypted FROM ux_state WHERE id = 1",
                     [],
                     |row| {
                         let id: i64 = row.get(0)?;
                         let aha: Option<Vec<u8>> = row.get(1)?;
                         let demo: Option<Vec<u8>> = row.get(2)?;
                         let onboarding: Option<Vec<u8>> = row.get(3)?;
-                        Ok((id, aha, demo, onboarding))
+                        let backup_reminder: Option<Vec<u8>> = row.get(4)?;
+                        Ok((id, aha, demo, onboarding, backup_reminder))
                     },
                 );
 
-                if let Ok((id, aha_enc, demo_enc, onboarding_enc)) = result {
+                if let Ok((id, aha_enc, demo_enc, onboarding_enc, backup_reminder_enc)) = result {
                     if let Some(enc) = aha_enc
                         && !enc.is_empty()
                     {
@@ -921,6 +924,24 @@ impl Storage {
                                 "UPDATE ux_state SET onboarding_progress_encrypted = ?1 WHERE id = ?2",
                                 params![new_enc, id],
                             ).map_err(|e| StorageError::Migration(format!("Update onboarding: {}", e)))?;
+                    }
+                    if let Some(enc) = backup_reminder_enc
+                        && !enc.is_empty()
+                    {
+                        let plain = decrypt(old_key, &enc).map_err(|e| {
+                            StorageError::Migration(format!("Decrypt backup_reminder: {}", e))
+                        })?;
+                        let new_enc = encrypt(&new_key, &plain).map_err(|e| {
+                            StorageError::Migration(format!("Encrypt backup_reminder: {}", e))
+                        })?;
+                        self.conn
+                            .execute(
+                                "UPDATE ux_state SET backup_reminder_encrypted = ?1 WHERE id = ?2",
+                                params![new_enc, id],
+                            )
+                            .map_err(|e| {
+                                StorageError::Migration(format!("Update backup_reminder: {}", e))
+                            })?;
                     }
                 }
             }

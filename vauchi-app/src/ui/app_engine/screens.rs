@@ -199,6 +199,10 @@ impl AppEngine {
                     pending_updates: 0,
                     failed_deliveries: 0,
                     debug_mode: false,
+                    backup_reminders_enabled: vauchi
+                        .load_backup_reminder_state()
+                        .map(|s| s.reminders_enabled)
+                        .unwrap_or(true),
                 };
                 Box::new(SettingsEngine::new(config))
             }

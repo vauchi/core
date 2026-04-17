@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use crate::contact_card::{ContactCard, ContactField};
 use crate::identity::Identity;
+use crate::types::BackupReminderState;
 
 use crate::storage::SecureStorage;
 
@@ -144,6 +145,7 @@ impl Vauchi {
         let backup = identity
             .export_backup(password)
             .map_err(|e| VauchiError::Configuration(format!("Export failed: {:?}", e)))?;
+        let _ = self.record_backup_completed();
         Ok(hex::encode(backup.as_bytes()))
     }
 
@@ -211,6 +213,7 @@ impl Vauchi {
         )
         .map_err(|e| VauchiError::Configuration(format!("Full backup export failed: {e}")))?;
 
+        let _ = self.record_backup_completed();
         Ok(hex::encode(blob))
     }
 
@@ -460,5 +463,29 @@ impl Vauchi {
         card.set_field_shown(field_id, shown);
         self.storage.save_own_card(&card)?;
         Ok(())
+    }
+
+    // === Backup Reminder Operations ===
+
+    /// Loads backup reminder state, returning defaults if none persisted.
+    pub fn load_backup_reminder_state(&self) -> VauchiResult<BackupReminderState> {
+        self.storage
+            .load_backup_reminder_state()
+            .map(|opt| opt.unwrap_or_default())
+            .map_err(Into::into)
+    }
+
+    /// Saves backup reminder state to encrypted storage.
+    pub fn save_backup_reminder_state(&self, state: &BackupReminderState) -> VauchiResult<()> {
+        self.storage
+            .save_backup_reminder_state(state)
+            .map_err(Into::into)
+    }
+
+    /// Records that a backup completed successfully (resets reminder count).
+    pub fn record_backup_completed(&self) -> VauchiResult<()> {
+        let mut state = self.load_backup_reminder_state()?;
+        state.record_backup();
+        self.save_backup_reminder_state(&state)
     }
 }

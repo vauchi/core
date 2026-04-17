@@ -182,6 +182,72 @@ pub struct DemoContactState {
     pub update_count: u32,
 }
 
+/// Tracks backup reminder state for progressive nudges.
+///
+/// Persisted encrypted in the `ux_state` table.
+/// Schedule: first reminder at 7 days, then every 30 days.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BackupReminderState {
+    /// Unix epoch seconds of last successful backup.
+    pub last_backup_timestamp: Option<u64>,
+    /// Whether backup reminders are enabled.
+    pub reminders_enabled: bool,
+    /// Reminders shown since last backup (drives schedule).
+    pub reminder_count: u32,
+}
+
+impl Default for BackupReminderState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BackupReminderState {
+    pub fn new() -> Self {
+        Self {
+            last_backup_timestamp: None,
+            reminders_enabled: true,
+            reminder_count: 0,
+        }
+    }
+
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// Record that a backup completed successfully.
+    pub fn record_backup(&mut self) {
+        self.last_backup_timestamp = Some(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+        );
+        self.reminder_count = 0;
+    }
+
+    /// Record that a reminder was shown (dismissed or acted on).
+    pub fn record_reminder_shown(&mut self) {
+        self.reminder_count += 1;
+    }
+
+    /// Check if a reminder is due.
+    /// `fallback_timestamp` is identity creation time (used when no backup exists).
+    pub fn is_reminder_due(&self, now: u64, fallback_timestamp: u64) -> bool {
+        if !self.reminders_enabled {
+            return false;
+        }
+        let reference = self.last_backup_timestamp.unwrap_or(fallback_timestamp);
+        let threshold_days: u64 = if self.reminder_count == 0 { 7 } else { 30 };
+        let threshold_secs = threshold_days * 24 * 60 * 60;
+        now.saturating_sub(reference) >= threshold_secs
+    }
+}
+
 // --- Visibility types (breaks contact ↔ contact_card circular dep) ---
 
 /// Visibility setting for a single field.

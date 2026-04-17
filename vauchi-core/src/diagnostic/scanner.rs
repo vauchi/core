@@ -189,43 +189,32 @@ pub fn scan_qr_yolo(
         };
     }
 
-    // Step 2: For each detection, crop → preprocess → rqrr decode
+    // Step 2: For each detection, crop → multi-decoder attempt
+    // Strategy per vendor findings: no CLAHE, no unsharp (both hurt QR).
+    // Try rqrr first (fast), then rxing with tryHarder (handles V20+).
     let decode_start = std::time::Instant::now();
-    // Preprocessing config tuned for cropped QR patches (already localized
-    // by YOLO, so skip downscale and sharpness gating — focus on contrast)
-    let patch_config = super::preprocess::PreprocessConfig {
-        target_width: 0, // no downscale — patch is already small
-        clahe_clip_limit: 3.0,
-        clahe_tile_size: 16, // larger tiles for small patches
-        threshold_window: 25,
-        unsharp_sigma: 1.5,
-        unsharp_amount: 0.8,
-        sharpness_threshold: 0.0, // don't skip — YOLO already filtered
-        apply_clahe: true,
-        apply_unsharp: true,
-        apply_threshold: false, // let rqrr do its own binarization
-    };
     for det in &detections {
         let patch = super::yolo_detector::crop_detection(&img, det, 0.15);
-        // Try raw decode first (fast path)
-        let raw_result = decode_rqrr(patch.clone());
-        if raw_result.decoded.is_some() {
+
+        // Fast path: rqrr raw decode
+        let rqrr_result = decode_rqrr(patch.clone());
+        if rqrr_result.decoded.is_some() {
             return ScanResult {
                 total_us: total_start.elapsed().as_micros() as u64,
                 preprocessing_us: detection_us,
                 decode_us: decode_start.elapsed().as_micros() as u64,
-                ..raw_result
+                ..rqrr_result
             };
         }
-        // Raw failed — apply Tier 1 preprocessing and retry
-        let pre = super::preprocess::preprocess_frame(patch, &patch_config);
-        let pre_result = decode_rqrr(pre.image);
-        if pre_result.decoded.is_some() {
+
+        // Fallback: rxing with tryHarder (handles V20+, perspective)
+        let rxing_result = decode_rxing_try_harder(&patch);
+        if rxing_result.decoded.is_some() {
             return ScanResult {
                 total_us: total_start.elapsed().as_micros() as u64,
-                preprocessing_us: detection_us + pre.preprocess_time_us,
+                preprocessing_us: detection_us,
                 decode_us: decode_start.elapsed().as_micros() as u64,
-                ..pre_result
+                ..rxing_result
             };
         }
     }
@@ -241,7 +230,7 @@ pub fn scan_qr_yolo(
     }
 }
 
-/// Decode a QR code from a grayscale image using rqrr.
+/// Decode a QR code from a grayscale image using rqrr (fast, simple).
 fn decode_rqrr(img: GrayImage) -> ScanResult {
     let decode_start = std::time::Instant::now();
     let mut prepared = rqrr::PreparedImage::prepare(img);
@@ -255,6 +244,41 @@ fn decode_rqrr(img: GrayImage) -> ScanResult {
     ScanResult {
         decoded,
         total_us: 0, // set by caller
+        preprocessing_us: 0,
+        decode_us,
+        frame_skipped: false,
+        laplacian_variance: 0.0,
+    }
+}
+
+/// Decode a QR code using rxing with tryHarder hints.
+///
+/// rxing is a Rust port of ZXing with better Version 20+ support and
+/// multi-path decoding. tryHarder enables sub-pixel refinement and
+/// additional finder-pattern search strategies.
+fn decode_rxing_try_harder(img: &GrayImage) -> ScanResult {
+    let decode_start = std::time::Instant::now();
+    let (w, h) = img.dimensions();
+    let luma = img.as_raw().clone();
+
+    let mut hints = rxing::DecodeHints::default();
+    hints.TryHarder = Some(true);
+
+    let decoded = rxing::helpers::detect_in_luma_with_hints(
+        luma,
+        w,
+        h,
+        Some(rxing::BarcodeFormat::QR_CODE),
+        &mut hints,
+    )
+    .ok()
+    .map(|r| r.getText().to_string());
+
+    let decode_us = decode_start.elapsed().as_micros() as u64;
+
+    ScanResult {
+        decoded,
+        total_us: 0,
         preprocessing_us: 0,
         decode_us,
         frame_skipped: false,

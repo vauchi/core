@@ -87,18 +87,6 @@ fn arb_user_action() -> impl Strategy<Value = UserAction> {
                 item_id,
             }
         }),
-        (
-            "field_[0-9]{1,2}".prop_map(Some),
-            prop::option::of(arb_group_name()),
-            any::<bool>(),
-        )
-            .prop_map(|(field_id, group_id, visible)| {
-                UserAction::FieldVisibilityChanged {
-                    field_id: field_id.unwrap(),
-                    group_id,
-                    visible,
-                }
-            }),
         prop::option::of(arb_group_name())
             .prop_map(|group_name| UserAction::GroupViewSelected { group_name }),
     ]
@@ -203,7 +191,7 @@ proptest! {
             "back", "continue", "skip",
             "exchange", "import_contacts", "read_security", "read_backup",
             "start_app", "transfer_device", "submit_display_name",
-            "submit_custom_group", "add_entry",
+            "submit_custom_group", "show_phone", "show_email", "add_social",
         ];
         prop_assume!(!real_ids.contains(&bogus_id.as_str()));
 

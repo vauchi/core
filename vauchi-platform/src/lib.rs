@@ -876,12 +876,44 @@ impl VauchiPlatform {
         Vauchi::new(config).map_err(|e| MobileError::Internal(e.to_string()))
     }
 
+    /// Opens a Vauchi instance with identity loaded **and** the OHTTP
+    /// gateway key resolved (cache → bundled).
+    ///
+    /// Use for flows that immediately issue a relay request (device
+    /// link, shred, exchange). Resolving OHTTP here lets the call
+    /// chain's `build_relay_transport` wire encryption on the first
+    /// request — without this, `ohttp_key.is_none()` flips
+    /// `allow_direct = true` and the first request leaks the client
+    /// IP to the relay (ADR-037 §Bootstrap Exceptions).
+    ///
+    /// Neither step hits the network in production:
+    /// `OhttpConfig::bundled_gateway_key` is always set by default, so
+    /// key resolution is in-process.
+    ///
+    /// Returns `Err(IdentityNotInitialized)` if no identity exists —
+    /// relay-bound flows require one. If `connect()` fails (corrupt
+    /// bundled key, storage error), the returned `Vauchi` still has
+    /// the identity set and `build_relay_transport` falls back to the
+    /// `allow_direct` path — functionality preserved, privacy degraded.
+    pub(crate) fn open_vauchi_for_relay(&self) -> Result<Vauchi, MobileError> {
+        let mut vauchi = self.open_vauchi()?;
+        let identity = self.get_identity()?;
+        vauchi
+            .set_identity(identity)
+            .map_err(|e| MobileError::Internal(e.to_string()))?;
+        let _ = vauchi.connect();
+        Ok(vauchi)
+    }
+
     /// Build the pair of `MobileRelaySender`s used by shred/purge flows.
     ///
     /// Both senders share one fresh `Vauchi` instance so the OHTTP key
-    /// cache (if any) is reused. If `open_vauchi` fails, both results
-    /// carry the same error string — shred itself proceeds best-effort
-    /// without relay-side purge/revocation.
+    /// cache is reused. `open_vauchi_for_relay` resolves the bundled
+    /// OHTTP key eagerly so the first shred request goes through OHTTP
+    /// instead of leaking the client IP via the `allow_direct` fallback.
+    /// If the instance cannot be opened (no identity, storage error),
+    /// both results carry the same error string — shred itself proceeds
+    /// best-effort without relay-side purge/revocation.
     pub(crate) fn build_shred_senders(
         &self,
         sender_id: &str,
@@ -889,7 +921,7 @@ impl VauchiPlatform {
         Result<MobileRelaySender, String>,
         Result<MobileRelaySender, String>,
     ) {
-        let vauchi = match self.open_vauchi() {
+        let vauchi = match self.open_vauchi_for_relay() {
             Ok(v) => v,
             Err(e) => {
                 let msg = e.to_string();
@@ -2322,5 +2354,49 @@ mod tests {
         if let Ok(r) = result {
             assert_eq!(r.imported, 0);
         }
+    }
+
+    // @internal
+    #[test]
+    fn test_open_vauchi_for_relay_without_identity_errors() {
+        let (wb, _dir) = create_test_instance();
+        let result = wb.open_vauchi_for_relay();
+        assert!(result.is_err(), "expected IdentityNotFound error");
+        assert!(
+            matches!(result, Err(MobileError::IdentityNotFound)),
+            "open_vauchi_for_relay should fail with IdentityNotFound when no identity exists"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn test_open_vauchi_for_relay_with_identity_populates_ohttp_key() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let vauchi = wb.open_vauchi_for_relay().unwrap();
+        assert!(vauchi.identity().is_some());
+        assert!(
+            vauchi.has_ohttp_key(),
+            "open_vauchi_for_relay should eagerly resolve the bundled \
+             OHTTP key so device-link/shred flows route through OHTTP \
+             on first use (ADR-037)"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn test_open_vauchi_for_relay_transport_has_ohttp_wired() {
+        let (wb, _dir) = create_test_instance();
+        wb.create_identity("Alice".to_string()).unwrap();
+
+        let vauchi = wb.open_vauchi_for_relay().unwrap();
+        let transport = vauchi.build_relay_transport("http://localhost:8080".to_string(), 1_000);
+        assert!(
+            transport.has_ohttp(),
+            "transport built after open_vauchi_for_relay must have OHTTP wired — \
+             without this, device-link and shred leak the client IP to the relay \
+             (problem record 2026-04-17-ohttp-allow-direct-fallback)"
+        );
     }
 }

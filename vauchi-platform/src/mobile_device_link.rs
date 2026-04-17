@@ -163,7 +163,7 @@ impl VauchiPlatform {
         };
 
         let transport = self
-            .open_vauchi()?
+            .open_vauchi_for_relay()?
             .build_relay_transport(self.relay_url.clone(), 10_000);
         device_link_relay::send_and_receive(&transport, &msg, timeout_secs)
             .map_err(|e| MobileError::NetworkError(e.to_string()))
@@ -181,7 +181,7 @@ impl VauchiPlatform {
         let identity_id = hex::encode(identity.signing_public_key());
 
         let transport = self
-            .open_vauchi()?
+            .open_vauchi_for_relay()?
             .build_relay_transport(self.relay_url.clone(), 10_000);
         let (payload, sender_token) =
             device_link_relay::listen_for_request(&transport, &identity_id, timeout_secs)
@@ -203,7 +203,7 @@ impl VauchiPlatform {
         encrypted_response: Vec<u8>,
     ) -> Result<(), MobileError> {
         let transport = self
-            .open_vauchi()?
+            .open_vauchi_for_relay()?
             .build_relay_transport(self.relay_url.clone(), 10_000);
         device_link_relay::send_response(&transport, &sender_token, encrypted_response)
             .map_err(|e| MobileError::NetworkError(e.to_string()))

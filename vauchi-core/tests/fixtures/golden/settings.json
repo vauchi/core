@@ -455,6 +455,20 @@
         "label": "About",
         "items": [
           {
+            "id": "what_is_vauchi",
+            "label": "What is Vauchi?",
+            "kind": {
+              "Link": {
+                "detail": null
+              }
+            },
+            "a11y": {
+              "label": "What is Vauchi?",
+              "hint": "Learn what Vauchi is and how it works",
+              "role": null
+            }
+          },
+          {
             "id": "version",
             "label": "Version",
             "kind": {

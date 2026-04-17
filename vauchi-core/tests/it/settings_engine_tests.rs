@@ -500,6 +500,43 @@ fn settings_other_items_have_no_info_key() {
     }
 }
 
+// @internal
+#[test]
+fn settings_about_has_what_is_vauchi_item() {
+    let engine = SettingsEngine::new(sample_config());
+    let screen = engine.current_screen();
+    let items = find_settings_group(&screen, "about");
+    let item = items.iter().find(|i| i.id == "what_is_vauchi");
+    assert!(
+        item.is_some(),
+        "about group should contain what_is_vauchi item"
+    );
+    let item = item.unwrap();
+    assert_eq!(item.label, "What is Vauchi?");
+    assert!(matches!(item.kind, SettingsItemKind::Link { .. }));
+}
+
+// @internal
+#[test]
+fn settings_select_what_is_vauchi_returns_show_info_overlay() {
+    let mut engine = SettingsEngine::new(sample_config());
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "about".into(),
+        item_id: "what_is_vauchi".into(),
+    });
+    match result {
+        ActionResult::ShowInfoOverlay { title, body } => {
+            assert_eq!(title, "What is Vauchi?");
+            assert!(!body.is_empty(), "body should not be empty");
+            assert!(
+                !body.starts_with("Missing:"),
+                "body should not be a missing-key placeholder"
+            );
+        }
+        other => panic!("Expected ShowInfoOverlay, got {other:?}"),
+    }
+}
+
 // --- helpers ---
 
 fn find_settings_group<'a>(screen: &'a ScreenModel, group_id: &str) -> &'a [SettingsItem] {

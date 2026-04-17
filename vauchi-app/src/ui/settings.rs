@@ -4,6 +4,7 @@
 
 //! Settings screen engine — displays app settings grouped by category.
 
+use crate::i18n::{Locale, get_string};
 use crate::ui::*;
 use serde::{Deserialize, Serialize};
 
@@ -480,6 +481,17 @@ impl WorkflowEngine for SettingsEngine {
                 label: "About".into(),
                 items: vec![
                     SettingsItem {
+                        id: "what_is_vauchi".into(),
+                        label: "What is Vauchi?".into(),
+                        kind: SettingsItemKind::Link { detail: None },
+                        a11y: Some(A11y {
+                            label: Some("What is Vauchi?".into()),
+                            hint: Some("Learn what Vauchi is and how it works".into()),
+                            role: None,
+                        }),
+                        info_key: None,
+                    },
+                    SettingsItem {
                         id: "version".into(),
                         label: "Version".into(),
                         kind: SettingsItemKind::Value {
@@ -620,6 +632,14 @@ impl WorkflowEngine for SettingsEngine {
                 let next = current.next();
                 self.config.backup_reminder_frequency = next.label().to_string();
                 ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::ListItemSelected {
+                ref component_id,
+                ref item_id,
+            } if component_id == "about" && item_id == "what_is_vauchi" => {
+                let title = get_string(Locale::English, "about.what_is_vauchi.title");
+                let body = get_string(Locale::English, "about.what_is_vauchi.body");
+                ActionResult::ShowInfoOverlay { title, body }
             }
             UserAction::ListItemSelected { ref item_id, .. } if item_id == "emergency_wipe" => {
                 self.pending_wipe = true;

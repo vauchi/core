@@ -46,10 +46,15 @@ pub struct FieldSetup {
 
 /// Pure state-machine driving the 6-step onboarding flow.
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct OnboardingEngine {
     step: Step,
     data: OnboardingData,
     custom_group_input: String,
+    phone_input_visible: bool,
+    email_input_visible: bool,
+    phone_value: String,
+    email_value: String,
 }
 
 impl Default for OnboardingEngine {
@@ -78,6 +83,10 @@ impl OnboardingEngine {
                 fields: Vec::new(),
             },
             custom_group_input: String::new(),
+            phone_input_visible: false,
+            email_input_visible: false,
+            phone_value: String::new(),
+            email_value: String::new(),
         }
     }
 

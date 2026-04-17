@@ -238,6 +238,10 @@ impl ExchangeEngine {
     /// (StartQR applied). Use `drain_commands()` to get the initial
     /// `QrDisplay` command after construction.
     pub fn with_session(config: ExchangeConfig, mut session: ExchangeSession) -> Self {
+        // Always enable debug logging — negligible overhead, data only
+        // consumed when explicitly requested via exchange_debug_log().
+        session.enable_debug_log();
+
         let step = Self::initial_step(&config);
         let mode_selection = if step == ExchangeStep::ModeSelection {
             Some(ModeSelectionEngine::new(config.device_capabilities.clone()))

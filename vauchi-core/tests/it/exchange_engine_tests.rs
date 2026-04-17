@@ -292,6 +292,43 @@ fn exchange_success_status_indicator_has_a11y() {
     }
 }
 
+// ===== Debug log auto-enabled =====
+
+// @internal
+#[test]
+fn with_session_auto_enables_debug_log() {
+    let identity = vauchi_core::identity::Identity::create("Alice");
+    let card = vauchi_core::contact_card::ContactCard::new("Alice");
+    let proximity = vauchi_core::exchange::MockProximityVerifier::success();
+    let session = vauchi_core::exchange::ExchangeSession::new_qr(identity, card, proximity);
+
+    let config = ExchangeConfig {
+        own_name: "Alice".to_string(),
+        own_qr_data: "alice-payload".to_string(),
+        available_groups: vec![],
+        device_capabilities: Default::default(),
+        mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
+        card_snapshot: None,
+    };
+
+    let engine = ExchangeEngine::with_session(config, session);
+
+    // Debug log should be auto-enabled with at least SessionStarted
+    let log = engine
+        .session()
+        .unwrap()
+        .exchange_debug_log()
+        .expect("debug log should be auto-enabled by with_session");
+    assert!(
+        !log.events().is_empty(),
+        "auto-enabled log should have events"
+    );
+    assert!(matches!(
+        &log.events()[0].event,
+        vauchi_core::diagnostic::exchange_debug::ExchangeDebugEvent::SessionStarted { .. }
+    ));
+}
+
 // @scenario: accessibility :: Exchange QR display screen has populated a11y
 //
 // Verifies that the own_qr QrCode component carries a meaningful accessibility

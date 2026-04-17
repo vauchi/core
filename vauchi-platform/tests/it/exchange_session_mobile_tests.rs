@@ -308,3 +308,27 @@ fn test_debug_log_markdown_output() {
     assert!(md.contains("SessionStarted"));
     assert!(md.contains("QrGenerated"));
 }
+
+// @internal
+#[test]
+fn test_latency_summary_json_after_generate_qr() {
+    let identity = Identity::create("Alice");
+    let card = ContactCard::new("Alice");
+    let session = create_qr_exchange_manual(identity, card);
+
+    session.enable_debug_log();
+    session.generate_qr().unwrap();
+
+    let json = session
+        .get_latency_summary_json()
+        .expect("summary should exist after QR generation");
+    assert!(json.contains("session_to_qr_generated_ms"));
+    // Only session→QR generated segment should be present
+    assert!(json.contains("qr_generated_to_scanned_ms"));
+
+    let parsed: serde_json::Value = serde_json::from_str(&json).expect("should be valid JSON");
+    assert!(parsed["session_to_qr_generated_ms"].is_number());
+    // QR not scanned yet, so this should be null
+    assert!(parsed["qr_generated_to_scanned_ms"].is_null());
+    assert!(parsed["total_ms"].is_null());
+}

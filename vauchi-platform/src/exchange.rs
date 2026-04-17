@@ -405,6 +405,21 @@ impl MobileExchangeSession {
         inner.exchange_debug_log().map(|log| log.to_markdown())
     }
 
+    /// Returns the exchange latency summary as JSON, if debug logging is enabled.
+    ///
+    /// Computes deltas between milestone events (session start → QR generated
+    /// → QR scanned → key agreement → exchange completed). Each segment is
+    /// null when the corresponding milestone was not recorded.
+    pub fn get_latency_summary_json(&self) -> Option<String> {
+        let Ok(inner) = self.inner.lock() else {
+            return None;
+        };
+        inner
+            .exchange_debug_log()
+            .and_then(|log| log.latency_summary())
+            .and_then(|s| serde_json::to_string_pretty(&s).ok())
+    }
+
     // ── ADR-031: Command/Event API ──────────────────────────────────
 
     /// Drain all pending commands from the session (ADR-031).

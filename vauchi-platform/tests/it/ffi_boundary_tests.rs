@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! FFI Boundary Tests
+#![allow(deprecated)] // Help FFI functions deprecated pending iOS/Android refactor
 //!
 //! Tests the FFI boundary between Rust and mobile platforms.
 //! Focuses on type conversions, error handling, and standalone functions

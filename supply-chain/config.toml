@@ -571,6 +571,10 @@ criteria = "safe-to-run"
 version = "0.1.28"
 criteria = "safe-to-deploy"
 
+[[exemptions.pxfm]]
+version = "0.1.29"
+criteria = "safe-to-deploy"
+
 [[exemptions.qrcode]]
 version = "0.14.1"
 criteria = "safe-to-deploy"
@@ -585,6 +589,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.r-efi]]
 version = "6.0.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.rand]]
+version = "0.8.6"
 criteria = "safe-to-deploy"
 
 [[exemptions.rand]]
@@ -737,6 +745,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.tokio]]
 version = "1.52.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.tokio]]
+version = "1.52.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.tokio-rustls]]

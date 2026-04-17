@@ -770,6 +770,9 @@ impl ExchangeSession {
 
     /// Queues a command for the frontend.
     fn emit_command(&mut self, cmd: ExchangeCommand) {
+        self.debug_event(ExchangeDebugEvent::CommandDispatched {
+            command_name: cmd.variant_name().to_string(),
+        });
         self.pending_commands.push(cmd);
     }
 
@@ -880,11 +883,12 @@ impl ExchangeSession {
     /// hardware commands (e.g., `QrDisplay` for QR sessions, `BleStartScanning`
     /// for BLE sessions). Use `drain_commands()` to retrieve them.
     pub fn emit_initial_commands(&mut self) {
-        match (&self.state, self.transport) {
+        // Build commands first to avoid borrowing conflicts with emit_command().
+        let cmds: Vec<ExchangeCommand> = match (&self.state, self.transport) {
             (ExchangeState::DisplayingQr { our_qr }, ExchangeTransport::Qr) => {
-                self.pending_commands.push(ExchangeCommand::QrDisplay {
+                vec![ExchangeCommand::QrDisplay {
                     data: our_qr.to_data_string(),
-                });
+                }]
             }
             (ExchangeState::AwaitingNfcTap, ExchangeTransport::Nfc) => {
                 // Generate our NFC key offer payload for the frontend to present.
@@ -898,27 +902,29 @@ impl ExchangeSession {
                         super::nfc_active::ExchangeNfc::generate(&self.identity, &self.our_x3dh);
                     nfc.to_bytes().to_vec()
                 };
-                self.pending_commands
-                    .push(ExchangeCommand::NfcActivate { payload });
+                vec![ExchangeCommand::NfcActivate { payload }]
             }
             (ExchangeState::AwaitingBleConnection, ExchangeTransport::Ble) => {
-                self.pending_commands
-                    .push(ExchangeCommand::BleStartScanning {
+                vec![
+                    ExchangeCommand::BleStartScanning {
                         service_uuid: super::VAUCHI_BLE_SERVICE_UUID.to_string(),
-                    });
-                self.pending_commands
-                    .push(ExchangeCommand::BleStartAdvertising {
+                    },
+                    ExchangeCommand::BleStartAdvertising {
                         service_uuid: super::VAUCHI_BLE_SERVICE_UUID.to_string(),
                         payload: Vec::new(),
-                    });
+                    },
+                ]
             }
             (ExchangeState::AwaitingDirectPayload { our_qr }, ExchangeTransport::Usb) => {
-                self.pending_commands.push(ExchangeCommand::DirectSend {
+                vec![ExchangeCommand::DirectSend {
                     payload: our_qr.to_data_string().into_bytes(),
                     is_initiator: self.usb_role == Some(UsbRole::Initiator),
-                });
+                }]
             }
-            _ => {}
+            _ => vec![],
+        };
+        for cmd in cmds {
+            self.emit_command(cmd);
         }
     }
 

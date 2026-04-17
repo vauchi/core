@@ -142,6 +142,38 @@ pub enum ExchangeCommand {
     ImagePickFromFile,
 }
 
+impl ExchangeCommand {
+    /// Returns the variant name without payload data (safe for diagnostics).
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::QrDisplay { .. } => "QrDisplay",
+            Self::QrRequestScan => "QrRequestScan",
+            Self::BleStartAdvertising { .. } => "BleStartAdvertising",
+            Self::BleStartScanning { .. } => "BleStartScanning",
+            Self::BleConnect { .. } => "BleConnect",
+            Self::BleWriteCharacteristic { .. } => "BleWriteCharacteristic",
+            Self::BleReadCharacteristic { .. } => "BleReadCharacteristic",
+            Self::BleDisconnect => "BleDisconnect",
+            Self::NfcActivate { .. } => "NfcActivate",
+            Self::NfcDeactivate => "NfcDeactivate",
+            Self::AudioEmitChallenge { .. } => "AudioEmitChallenge",
+            Self::AudioListenForResponse { .. } => "AudioListenForResponse",
+            Self::AudioStop => "AudioStop",
+            Self::AccelerometerStart => "AccelerometerStart",
+            Self::AccelerometerStop => "AccelerometerStop",
+            Self::RelayEscrowDeposit { .. } => "RelayEscrowDeposit",
+            Self::RelayEscrowCheck { .. } => "RelayEscrowCheck",
+            Self::RelayEscrowRetrieve { .. } => "RelayEscrowRetrieve",
+            Self::ShowShareSheet { .. } => "ShowShareSheet",
+            Self::BleStopScanning => "BleStopScanning",
+            Self::DirectSend { .. } => "DirectSend",
+            Self::ImagePickFromLibrary => "ImagePickFromLibrary",
+            Self::ImageCaptureFromCamera => "ImageCaptureFromCamera",
+            Self::ImagePickFromFile => "ImagePickFromFile",
+        }
+    }
+}
+
 /// A hardware event reported by the frontend back to core.
 ///
 /// These are the results of previously issued [`ExchangeCommand`]s or

@@ -33,6 +33,8 @@ pub enum ExchangeDebugEvent {
     ExchangeCompleted,
     /// Exchange failed.
     ExchangeFailed { error: String },
+    /// A command was dispatched to the frontend.
+    CommandDispatched { command_name: String },
 }
 
 /// A timestamped exchange event entry.
@@ -118,7 +120,50 @@ impl ExchangeDebugLog {
             ExchangeDebugEvent::ExchangeFailed { error } => {
                 format!("ExchangeFailed: {error}")
             }
+            ExchangeDebugEvent::CommandDispatched { command_name } => {
+                format!("CommandDispatched ({command_name})")
+            }
         }
+    }
+
+    /// Compute a latency summary with deltas between milestone events.
+    ///
+    /// Returns `None` if the log has no events. Each segment is `None` if
+    /// the corresponding milestone event was not recorded (e.g., partial or
+    /// failed exchange). `total_ms` is only present when both
+    /// `SessionStarted` and `ExchangeCompleted` exist.
+    pub fn latency_summary(&self) -> Option<LatencySummary> {
+        if self.events.is_empty() {
+            return None;
+        }
+
+        let find = |pred: fn(&ExchangeDebugEvent) -> bool| -> Option<u64> {
+            self.events
+                .iter()
+                .find(|e| pred(&e.event))
+                .map(|e| e.elapsed_ms)
+        };
+
+        let session_ms = find(|e| matches!(e, ExchangeDebugEvent::SessionStarted { .. }));
+        let qr_gen_ms = find(|e| matches!(e, ExchangeDebugEvent::QrGenerated));
+        let qr_scan_ms = find(|e| matches!(e, ExchangeDebugEvent::QrScanned));
+        let key_ms = find(|e| matches!(e, ExchangeDebugEvent::KeyAgreementCompleted));
+        let done_ms = find(|e| matches!(e, ExchangeDebugEvent::ExchangeCompleted));
+
+        let delta = |a: Option<u64>, b: Option<u64>| -> Option<i64> {
+            match (a, b) {
+                (Some(a), Some(b)) => Some(b as i64 - a as i64),
+                _ => None,
+            }
+        };
+
+        Some(LatencySummary {
+            session_to_qr_generated_ms: delta(session_ms, qr_gen_ms),
+            qr_generated_to_scanned_ms: delta(qr_gen_ms, qr_scan_ms),
+            qr_scanned_to_key_agreement_ms: delta(qr_scan_ms, key_ms),
+            key_agreement_to_completed_ms: delta(key_ms, done_ms),
+            total_ms: delta(session_ms, done_ms),
+        })
     }
 
     /// Export the log as JSONL (one JSON object per line).
@@ -129,6 +174,24 @@ impl ExchangeDebugLog {
             .collect::<Vec<_>>()
             .join("\n")
     }
+}
+
+/// Latency deltas between milestone exchange events.
+///
+/// Each field is the delta in milliseconds between two consecutive milestones.
+/// Fields are `None` when the corresponding milestone was not recorded.
+#[derive(Debug, Clone, Serialize)]
+pub struct LatencySummary {
+    /// SessionStarted → QrGenerated (session setup + key generation).
+    pub session_to_qr_generated_ms: Option<i64>,
+    /// QrGenerated → QrScanned (camera focus + QR decode + signature verify).
+    pub qr_generated_to_scanned_ms: Option<i64>,
+    /// QrScanned → KeyAgreementCompleted (X3DH / HKDF derivation).
+    pub qr_scanned_to_key_agreement_ms: Option<i64>,
+    /// KeyAgreementCompleted → ExchangeCompleted (card exchange + relay).
+    pub key_agreement_to_completed_ms: Option<i64>,
+    /// SessionStarted → ExchangeCompleted (end-to-end).
+    pub total_ms: Option<i64>,
 }
 
 impl Default for ExchangeDebugLog {

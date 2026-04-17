@@ -76,14 +76,17 @@ fn all_event_variants_are_serializable() {
     log.push(ExchangeDebugEvent::ExchangeFailed {
         error: "timeout".to_string(),
     });
+    log.push(ExchangeDebugEvent::CommandDispatched {
+        command_name: "QrDisplay".to_string(),
+    });
 
-    assert_eq!(log.events().len(), 8);
+    assert_eq!(log.events().len(), 9);
 
     let jsonl = log.to_jsonl();
     assert!(!jsonl.is_empty());
     // Each event should be on its own line
     let lines: Vec<&str> = jsonl.lines().collect();
-    assert_eq!(lines.len(), 8);
+    assert_eq!(lines.len(), 9);
 
     // Each line should be valid JSON
     for line in &lines {

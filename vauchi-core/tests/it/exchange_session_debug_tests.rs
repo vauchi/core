@@ -150,8 +150,9 @@ fn key_agreement_logs_completion_and_proximity() {
     let log = bob_session.exchange_debug_log().unwrap();
 
     // SessionStarted, QrGenerated, QrScanned,
-    // KeyAgreementCompleted, ProximityCheckStarted, ProximityCheckCompleted
-    assert_eq!(log.events().len(), 6);
+    // KeyAgreementCompleted, ProximityCheckStarted, ProximityCheckCompleted,
+    // CommandDispatched(AudioEmitChallenge), CommandDispatched(AudioListenForResponse)
+    assert_eq!(log.events().len(), 8);
 
     // Verify key agreement event exists
     assert!(

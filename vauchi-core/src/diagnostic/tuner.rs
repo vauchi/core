@@ -77,6 +77,9 @@ const DESIRED_BRIGHTNESS: &[f32] = &[0.5, 0.75, 1.0];
 const DESIRED_PAYLOAD_SIZES: &[usize] = &[100, 250, 472];
 const DESIRED_MODULE_SIZES: &[u32] = &[6, 10, 14];
 
+/// Extended payload sizes for Version 10–40 QR code benchmarking.
+const EXTENDED_PAYLOAD_SIZES: &[usize] = &[100, 250, 472, 600, 1200, 1400, 2400, 3300];
+
 fn filter_range(desired: &[i32], range: Option<(i32, i32)>) -> Vec<Option<i32>> {
     match range {
         Some((min, max)) => desired
@@ -186,18 +189,7 @@ pub fn generate_qr_test_patterns() -> Vec<(QrConfig, String)> {
                     payload_size_bytes: size,
                     module_size_px: module,
                 };
-                let pattern: String = (0..size)
-                    .map(|i| {
-                        let byte = ((i * 7 + 13) % 62) as u8;
-                        match byte {
-                            0..=9 => (b'0' + byte) as char,
-                            10..=35 => (b'A' + byte - 10) as char,
-                            36..=61 => (b'a' + byte - 36) as char,
-                            _ => unreachable!(),
-                        }
-                    })
-                    .collect();
-                patterns.push((config, pattern));
+                patterns.push((config, deterministic_payload(size)));
             }
         }
     }
@@ -228,4 +220,94 @@ pub fn rank_configs(results: &[TuningResult]) -> Vec<(u32, f32)> {
         .collect();
     scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     scored
+}
+
+/// Generate deterministic ASCII payload of the given size.
+fn deterministic_payload(size: usize) -> String {
+    (0..size)
+        .map(|i| {
+            let byte = ((i * 7 + 13) % 62) as u8;
+            match byte {
+                0..=9 => (b'0' + byte) as char,
+                10..=35 => (b'A' + byte - 10) as char,
+                36..=61 => (b'a' + byte - 36) as char,
+                _ => unreachable!(),
+            }
+        })
+        .collect()
+}
+
+/// Generate extended QR test patterns for Version 10–40 benchmarking.
+///
+/// Includes both the original small payload sizes (100/250/472) and
+/// extended sizes (600/1200/1400/2400/3300) that exercise QR Versions
+/// 10, 15, 20, 30, and 40.
+pub fn generate_extended_qr_test_patterns() -> Vec<(QrConfig, String)> {
+    let mut patterns = Vec::new();
+    for &ec in &[
+        ErrorCorrectionLevel::L,
+        ErrorCorrectionLevel::M,
+        ErrorCorrectionLevel::Q,
+        ErrorCorrectionLevel::H,
+    ] {
+        for &size in EXTENDED_PAYLOAD_SIZES {
+            for &module in DESIRED_MODULE_SIZES {
+                let config = QrConfig {
+                    error_correction: ec,
+                    payload_size_bytes: size,
+                    module_size_px: module,
+                };
+                patterns.push((config, deterministic_payload(size)));
+            }
+        }
+    }
+    patterns
+}
+
+/// A single frame in a throughput test sequence.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThroughputFrame {
+    /// Zero-based frame index.
+    pub frame_index: u32,
+    /// Total number of frames in the sequence.
+    pub total_frames: u32,
+    /// The frame payload including sequence header.
+    pub data: String,
+}
+
+/// Split a large payload into numbered frames for animated QR throughput testing.
+///
+/// Each frame payload is formatted as `SEQ:{index}:{total}:{data_chunk}` so the
+/// scanner can track frame ordering and detect losses. The `frame_capacity` is
+/// the max bytes per QR code (after the header overhead).
+pub fn generate_throughput_sequence(
+    total_bytes: usize,
+    frame_capacity: usize,
+) -> Vec<ThroughputFrame> {
+    let source = deterministic_payload(total_bytes);
+
+    // Estimate header overhead: "SEQ:999:999:" = ~13 bytes max
+    let header_budget = 16;
+    let chunk_size = frame_capacity.saturating_sub(header_budget);
+    assert!(chunk_size > 0, "frame_capacity too small for header");
+
+    let chunks: Vec<&str> = source
+        .as_bytes()
+        .chunks(chunk_size)
+        .map(|c| std::str::from_utf8(c).expect("ASCII"))
+        .collect();
+
+    let total_frames = chunks.len() as u32;
+    chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, chunk)| {
+            let idx = i as u32;
+            ThroughputFrame {
+                frame_index: idx,
+                total_frames,
+                data: format!("SEQ:{idx}:{total_frames}:{chunk}"),
+            }
+        })
+        .collect()
 }

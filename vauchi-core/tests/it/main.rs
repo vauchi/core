@@ -127,6 +127,7 @@ mod demo_contact_integration_tests;
 mod device_link_proximity_tests;
 mod device_linking_engine_tests;
 mod device_race_condition_tests;
+mod diagnostic_extended_pattern_tests;
 mod diagnostic_log_event_tests;
 mod diagnostic_qr_pattern_tests;
 mod diagnostic_report_tests;

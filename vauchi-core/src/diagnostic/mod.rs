@@ -18,5 +18,6 @@ pub use report::generate_html_report;
 pub use snapshot::{BoundingBox, SnapshotMetadata};
 pub use tuner::{
     CameraConfig, DeviceCapabilityProfile, ErrorCorrectionLevel, Platform, QrConfig, SweepMatrix,
-    TuningResult, generate_qr_test_patterns, generate_sweep_matrix, rank_configs, score_config,
+    ThroughputFrame, TuningResult, generate_extended_qr_test_patterns, generate_qr_test_patterns,
+    generate_sweep_matrix, generate_throughput_sequence, rank_configs, score_config,
 };

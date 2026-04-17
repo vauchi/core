@@ -102,6 +102,7 @@ impl DuressPinEngine {
                     selected: self.config.enabled,
                     subtitle: None,
                     a11y: None,
+                    info_key: None,
                 }],
                 a11y: None,
             },
@@ -249,6 +250,7 @@ impl DuressPinEngine {
                         hint: Some("Message to send when duress PIN is used".into()),
                         role: Some(AccessibilityRole::TextField),
                     }),
+                    info_key: None,
                 },
                 Component::ToggleList {
                     id: "alerts".into(),
@@ -259,6 +261,7 @@ impl DuressPinEngine {
                         selected: self.config.include_location,
                         subtitle: Some("Share your location in the alert".into()),
                         a11y: None,
+                        info_key: None,
                     }],
                     a11y: None,
                 },

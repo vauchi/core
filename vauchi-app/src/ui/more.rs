@@ -49,6 +49,7 @@ impl WorkflowEngine for MoreEngine {
                 icon: None,
                 detail: None,
                 a11y: None,
+                info_key: None,
             })
             .collect();
 

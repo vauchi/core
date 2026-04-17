@@ -32,6 +32,8 @@ pub enum Component {
         input_type: InputType,
         #[serde(default)]
         a11y: Option<A11y>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        info_key: Option<String>,
     },
     ToggleList {
         id: String,
@@ -130,6 +132,8 @@ pub enum Component {
         validation_error: Option<String>,
         #[serde(default)]
         a11y: Option<A11y>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        info_key: Option<String>,
     },
     Divider,
     /// Informational banner with an optional action button (e.g. preview mode indicator).
@@ -277,6 +281,8 @@ pub struct ToggleItem {
     pub subtitle: Option<String>,
     #[serde(default)]
     pub a11y: Option<A11y>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub info_key: Option<String>,
 }
 
 /// A contact field as displayed in the UI.
@@ -372,6 +378,8 @@ pub struct ActionListItem {
     pub detail: Option<String>,
     #[serde(default)]
     pub a11y: Option<A11y>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub info_key: Option<String>,
 }
 
 /// Status for a status indicator component.

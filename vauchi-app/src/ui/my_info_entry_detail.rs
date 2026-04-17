@@ -90,6 +90,7 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                     selected: *visible,
                     subtitle: None,
                     a11y: None,
+                    info_key: None,
                 })
                 .collect();
 
@@ -126,6 +127,7 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                     icon: None,
                     detail: Some(format!("via {}", c.via_group)),
                     a11y: None,
+                    info_key: None,
                 })
                 .collect();
 

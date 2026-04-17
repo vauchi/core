@@ -148,6 +148,7 @@ impl ContactEditEngine {
                     validation_error: None,
                     input_type: InputType::Text,
                     a11y: None,
+                    info_key: None,
                 },
                 Component::Divider,
                 Component::FieldList {
@@ -202,6 +203,7 @@ impl ContactEditEngine {
                                 hint: Some("Double tap to toggle".into()),
                                 role: Some(AccessibilityRole::Toggle),
                             }),
+                            info_key: None,
                         }
                     })
                     .collect();

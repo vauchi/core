@@ -62,6 +62,7 @@ impl ContactLimitEngine {
                 validation_error: None,
                 input_type: InputType::Text,
                 a11y: None,
+                info_key: None,
             },
         ];
 

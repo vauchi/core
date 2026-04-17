@@ -241,6 +241,7 @@ impl OnboardingEngine {
                         hint: Some("Enter the name others will see on your contact card".into()),
                         role: None,
                     }),
+                    info_key: None,
                 },
             ],
             actions: vec![ScreenAction {
@@ -277,6 +278,7 @@ impl OnboardingEngine {
                     hint: Some("Double tap to toggle".into()),
                     role: Some(AccessibilityRole::Toggle),
                 }),
+                info_key: None,
             })
             .collect();
 
@@ -319,6 +321,7 @@ impl OnboardingEngine {
                         hint: Some("Enter a name for a custom contact group".into()),
                         role: None,
                     }),
+                    info_key: None,
                 },
             ],
             actions: vec![
@@ -357,6 +360,7 @@ impl OnboardingEngine {
                     hint: Some("Enter your phone number".into()),
                     role: None,
                 }),
+                info_key: None,
             });
         }
 
@@ -374,6 +378,7 @@ impl OnboardingEngine {
                     hint: Some("Enter your email address".into()),
                     role: None,
                 }),
+                info_key: None,
             });
         }
 

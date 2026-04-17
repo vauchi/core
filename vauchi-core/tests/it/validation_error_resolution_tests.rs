@@ -118,6 +118,7 @@ fn screen_model_with_validation_error_injects_into_text_input() {
                 validation_error: None,
                 input_type: InputType::Text,
                 a11y: None,
+                info_key: None,
             },
             Component::TextInput {
                 id: "field_b".into(),
@@ -128,6 +129,7 @@ fn screen_model_with_validation_error_injects_into_text_input() {
                 validation_error: None,
                 input_type: InputType::Text,
                 a11y: None,
+                info_key: None,
             },
         ],
         ..Default::default()

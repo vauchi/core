@@ -242,6 +242,7 @@ fn test_component_text_input_roundtrip() {
         validation_error: None,
         input_type: InputType::Text,
         a11y: None,
+        info_key: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -282,6 +283,7 @@ fn test_component_toggle_list_roundtrip() {
                 selected: true,
                 subtitle: Some("Close family members".into()),
                 a11y: None,
+                info_key: None,
             },
             ToggleItem {
                 id: "work".into(),
@@ -289,6 +291,7 @@ fn test_component_toggle_list_roundtrip() {
                 selected: false,
                 subtitle: None,
                 a11y: None,
+                info_key: None,
             },
         ],
         a11y: None,
@@ -613,6 +616,7 @@ fn test_component_editable_text_display_mode_roundtrip() {
         editing: false,
         validation_error: None,
         a11y: None,
+        info_key: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -646,6 +650,7 @@ fn test_component_editable_text_editing_with_error_roundtrip() {
         editing: true,
         validation_error: Some("Name cannot be empty".into()),
         a11y: None,
+        info_key: None,
     };
 
     let json = serde_json::to_string(&component).unwrap();
@@ -828,9 +833,52 @@ fn test_component_text_input_with_a11y_roundtrip() {
             hint: Some("Enter your display name".into()),
             role: None,
         }),
+        info_key: None,
     };
     let json = serde_json::to_string(&component).unwrap();
     let parsed: Component = serde_json::from_str(&json).unwrap();
     assert_eq!(component, parsed);
     assert!(json.contains("\"a11y\""));
+}
+
+// @internal
+#[test]
+fn text_input_info_key_serializes() {
+    let component = Component::TextInput {
+        id: "test".into(),
+        label: "Test".into(),
+        value: "".into(),
+        placeholder: None,
+        max_length: None,
+        validation_error: None,
+        input_type: InputType::Text,
+        a11y: None,
+        info_key: Some("x".into()),
+    };
+    let json = serde_json::to_string(&component).unwrap();
+    assert!(
+        json.contains("\"info_key\":\"x\""),
+        "Expected info_key in JSON, got: {json}"
+    );
+}
+
+// @internal
+#[test]
+fn text_input_without_info_key_omits_field() {
+    let component = Component::TextInput {
+        id: "test".into(),
+        label: "Test".into(),
+        value: "".into(),
+        placeholder: None,
+        max_length: None,
+        validation_error: None,
+        input_type: InputType::Text,
+        a11y: None,
+        info_key: None,
+    };
+    let json = serde_json::to_string(&component).unwrap();
+    assert!(
+        !json.contains("info_key"),
+        "Expected info_key to be omitted from JSON, got: {json}"
+    );
 }

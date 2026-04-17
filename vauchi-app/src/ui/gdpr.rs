@@ -89,6 +89,7 @@ impl GdprEngine {
                             icon: Some("data".into()),
                             detail: Some("See what data is stored locally".into()),
                             a11y: None,
+                            info_key: None,
                         },
                         ActionListItem {
                             id: "manage_consent".into(),
@@ -96,6 +97,7 @@ impl GdprEngine {
                             icon: Some("consent".into()),
                             detail: Some("Review and update data consent".into()),
                             a11y: None,
+                            info_key: None,
                         },
                     ],
                 },

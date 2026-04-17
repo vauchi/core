@@ -76,6 +76,7 @@ impl DeviceManagementEngine {
                         },
                         role: None,
                     }),
+                    info_key: None,
                 }
             })
             .collect();

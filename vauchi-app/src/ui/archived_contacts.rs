@@ -37,6 +37,7 @@ impl ArchivedContactsEngine {
                         icon: None,
                         detail: Some("Tap to unarchive".into()),
                         a11y: None,
+                        info_key: None,
                     })
                     .collect(),
             }]

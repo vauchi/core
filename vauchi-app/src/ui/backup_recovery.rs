@@ -182,6 +182,7 @@ impl BackupRecoveryEngine {
                             ),
                             role: Some(AccessibilityRole::Toggle),
                         }),
+                        info_key: None,
                     }],
                     a11y: None,
                 },
@@ -227,6 +228,7 @@ impl BackupRecoveryEngine {
                     hint: None,
                     role: Some(AccessibilityRole::TextField),
                 }),
+                info_key: None,
             }],
             actions: vec![
                 ScreenAction {
@@ -292,6 +294,7 @@ impl BackupRecoveryEngine {
                     hint: None,
                     role: Some(AccessibilityRole::TextField),
                 }),
+                info_key: None,
             }],
             actions: vec![
                 ScreenAction {

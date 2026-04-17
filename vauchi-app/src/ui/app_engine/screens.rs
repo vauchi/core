@@ -591,6 +591,7 @@ impl AppEngine {
                                 selected: true,
                                 subtitle: None,
                                 a11y: None,
+                                info_key: None,
                             })
                             .collect();
                         (name, items)

@@ -55,6 +55,7 @@ impl DuplicateDetectionEngine {
                                 icon: None,
                                 detail: Some(format!("{pct}% similar")),
                                 a11y: None,
+                                info_key: None,
                             }
                         })
                         .collect(),

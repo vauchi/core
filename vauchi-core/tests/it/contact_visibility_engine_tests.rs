@@ -14,6 +14,7 @@ fn sample_fields() -> Vec<ToggleItem> {
             selected: true,
             subtitle: None,
             a11y: None,
+            info_key: None,
         },
         ToggleItem {
             id: "phone".into(),
@@ -21,6 +22,7 @@ fn sample_fields() -> Vec<ToggleItem> {
             selected: false,
             subtitle: None,
             a11y: None,
+            info_key: None,
         },
     ]
 }

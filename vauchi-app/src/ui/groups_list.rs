@@ -80,6 +80,7 @@ impl GroupsEngine {
                         hint: Some("Double tap to toggle".into()),
                         role: Some(AccessibilityRole::Toggle),
                     }),
+                    info_key: None,
                 },
                 ToggleItem {
                     id: "visibility".into(),
@@ -98,6 +99,7 @@ impl GroupsEngine {
                         hint: Some("Double tap to toggle".into()),
                         role: Some(AccessibilityRole::Toggle),
                     }),
+                    info_key: None,
                 },
             ],
             a11y: Some(A11y {
@@ -136,6 +138,7 @@ impl GroupsEngine {
                     icon: Some("group".into()),
                     detail: Some(detail),
                     a11y: None,
+                    info_key: None,
                 }
             })
             .collect();

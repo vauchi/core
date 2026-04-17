@@ -123,6 +123,7 @@ pub(super) fn build_manual_entry_screen(progress: Progress) -> ScreenModel {
                 hint: Some("Enter the exchange code shown on the other person's screen".into()),
                 role: Some(AccessibilityRole::TextField),
             }),
+            info_key: None,
         }],
         actions: vec![
             ScreenAction {

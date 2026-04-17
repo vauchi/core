@@ -807,6 +807,7 @@ fn build_group_selection_screen(
             selected: selected_groups.contains(id),
             subtitle: None,
             a11y: None,
+            info_key: None,
         })
         .collect();
     ScreenModel {

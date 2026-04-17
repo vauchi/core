@@ -153,6 +153,7 @@ impl MyInfoEngine {
                     icon: Some(f.field_type.clone()),
                     detail,
                     a11y: None,
+                    info_key: None,
                 }
             })
             .collect();
@@ -192,6 +193,7 @@ impl MyInfoEngine {
                     None
                 },
                 a11y: None,
+                info_key: None,
             })
             .collect();
 
@@ -222,6 +224,7 @@ impl MyInfoEngine {
                         icon: Some(f.field_type.clone()),
                         detail: None,
                         a11y: None,
+                        info_key: None,
                     })
                     .collect();
 

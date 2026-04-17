@@ -112,6 +112,7 @@ impl AvatarEditorEngine {
                 icon: Some("camera".into()),
                 detail: None,
                 a11y: None,
+                info_key: None,
             },
             ActionListItem {
                 id: "source_photos".into(),
@@ -119,6 +120,7 @@ impl AvatarEditorEngine {
                 icon: Some("photo".into()),
                 detail: None,
                 a11y: None,
+                info_key: None,
             },
             ActionListItem {
                 id: "source_generate".into(),
@@ -126,6 +128,7 @@ impl AvatarEditorEngine {
                 icon: Some("sparkles".into()),
                 detail: None,
                 a11y: None,
+                info_key: None,
             },
         ];
         if self.has_existing_avatar {
@@ -135,6 +138,7 @@ impl AvatarEditorEngine {
                 icon: Some("trash".into()),
                 detail: None,
                 a11y: None,
+                info_key: None,
             });
         }
         ScreenModel::new(
@@ -230,6 +234,7 @@ impl AvatarEditorEngine {
                     icon: Some("textformat".into()),
                     detail: None,
                     a11y: None,
+                    info_key: None,
                 },
                 ActionListItem {
                     id: "mandelbrot".into(),
@@ -237,6 +242,7 @@ impl AvatarEditorEngine {
                     icon: Some("sparkles".into()),
                     detail: None,
                     a11y: None,
+                    info_key: None,
                 },
             ],
         });
@@ -252,6 +258,7 @@ impl AvatarEditorEngine {
                     icon: None,
                     detail: Some(format!("#{:02x}{:02x}{:02x}", c[0], c[1], c[2])),
                     a11y: None,
+                    info_key: None,
                 })
                 .collect();
             components.push(Component::ActionList {

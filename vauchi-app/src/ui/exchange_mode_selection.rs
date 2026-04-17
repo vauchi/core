@@ -78,6 +78,7 @@ impl ModeSelectionEngine {
                             icon,
                             detail,
                             a11y: None,
+                            info_key: None,
                         }
                     })
                     .collect();

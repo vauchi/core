@@ -219,6 +219,7 @@ impl ContactDetailEngine {
                             hint: Some("Double tap to toggle".into()),
                             role: Some(AccessibilityRole::Toggle),
                         }),
+                        info_key: None,
                     },
                     ToggleItem {
                         id: "my_info_for_them".into(),
@@ -237,6 +238,7 @@ impl ContactDetailEngine {
                             hint: Some("Double tap to toggle".into()),
                             role: Some(AccessibilityRole::Toggle),
                         }),
+                        info_key: None,
                     },
                 ],
                 a11y: Some(A11y {
@@ -321,6 +323,7 @@ impl ContactDetailEngine {
                             hint: Some("Double tap to edit".into()),
                             role: Some(AccessibilityRole::TextField),
                         }),
+                        info_key: None,
                     });
                 }
                 // Private note about the contact — only visible to me, never shared
@@ -335,6 +338,7 @@ impl ContactDetailEngine {
                         hint: Some("Double tap to edit".into()),
                         role: Some(AccessibilityRole::TextField),
                     }),
+                    info_key: None,
                 });
                 // Trust & permissions group (local-only, never shared with the contact)
                 components.push(Component::SettingsGroup {

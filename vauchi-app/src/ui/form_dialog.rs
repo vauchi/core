@@ -200,6 +200,7 @@ impl FormDialogEngine {
                     hint: Some(format!("Select {} as the field type.", e.display_name)),
                     role: None,
                 }),
+                info_key: None,
             })
             .collect();
 
@@ -232,6 +233,7 @@ impl FormDialogEngine {
                 hint: Some(placeholder.into()),
                 role: Some(AccessibilityRole::TextField),
             }),
+            info_key: None,
         });
 
         // Display Name (optional) — the label shown next to the value
@@ -248,6 +250,7 @@ impl FormDialogEngine {
                 hint: Some("e.g. Work, Personal, Mobile".into()),
                 role: Some(AccessibilityRole::TextField),
             }),
+            info_key: None,
         });
 
         // Comment (your eyes only, optional) — private note
@@ -264,6 +267,7 @@ impl FormDialogEngine {
                 hint: Some("Only visible to you".into()),
                 role: Some(AccessibilityRole::TextField),
             }),
+            info_key: None,
         });
 
         // Group visibility toggles
@@ -277,6 +281,7 @@ impl FormDialogEngine {
                     selected: self.selected_groups.contains(gid),
                     subtitle: None,
                     a11y: None,
+                    info_key: None,
                 })
                 .collect();
 
@@ -348,6 +353,7 @@ impl FormDialogEngine {
                             hint: Some("Enter new value".into()),
                             role: Some(AccessibilityRole::TextField),
                         }),
+                        info_key: None,
                     },
                     Component::TextInput {
                         id: "field_note".into(),
@@ -362,6 +368,7 @@ impl FormDialogEngine {
                             hint: Some("Only visible to you".into()),
                             role: Some(AccessibilityRole::TextField),
                         }),
+                        info_key: None,
                     },
                 ],
                 actions: vec![
@@ -398,6 +405,7 @@ impl FormDialogEngine {
                         hint: Some("Your name".into()),
                         role: Some(AccessibilityRole::TextField),
                     }),
+                    info_key: None,
                 }],
                 actions: vec![
                     ScreenAction {
@@ -433,6 +441,7 @@ impl FormDialogEngine {
                         hint: Some("https://relay.example.com".into()),
                         role: Some(AccessibilityRole::TextField),
                     }),
+                    info_key: None,
                 }],
                 actions: vec![
                     ScreenAction {
@@ -484,6 +493,7 @@ impl FormDialogEngine {
                     hint: Some("e.g. Family, Work, Friends".into()),
                     role: Some(AccessibilityRole::TextField),
                 }),
+                info_key: None,
             }],
             actions: vec![
                 ScreenAction {

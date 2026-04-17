@@ -58,6 +58,7 @@ impl WorkflowEngine for HelpEngine {
                         icon: None,
                         detail: None,
                         a11y: None,
+                        info_key: None,
                     })
                     .collect();
 

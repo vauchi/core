@@ -17,16 +17,16 @@
 //!
 //! # Key derivation
 //!
-//! SHA-256("vauchi-sealed-box-v1" || shared_secret) → 32-byte symmetric key.
+//! HKDF-SHA256(salt=None, ikm=shared_secret, info="vauchi-sealed-box-v1") → 32-byte symmetric key.
 
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
 use rand::RngCore;
 use rand::rngs::OsRng;
-use sha2::{Digest, Sha256};
 use x25519_dalek::{PublicKey, StaticSecret};
 
 use super::RecoveryError;
+use crate::crypto::HKDF;
 
 /// Domain separation string for key derivation.
 const DOMAIN: &[u8] = b"vauchi-sealed-box-v1";
@@ -53,8 +53,8 @@ pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Vec<u8> {
     // 2. DH: ephemeral_secret × recipient_pk → shared secret.
     let shared = ephemeral_secret.diffie_hellman(recipient_pk);
 
-    // 3. Derive symmetric key: SHA-256(domain || shared_secret).
-    let key_bytes = derive_key(shared.as_bytes());
+    // 3. Derive symmetric key via HKDF-SHA256 (ADR-007).
+    let key = HKDF::derive_key(None, shared.as_bytes(), DOMAIN);
 
     // 4. Generate a random 192-bit nonce.
     let mut nonce_bytes = [0u8; 24];
@@ -62,7 +62,7 @@ pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Vec<u8> {
     let nonce = XNonce::from(nonce_bytes);
 
     // 5. Encrypt.
-    let cipher = XChaCha20Poly1305::new_from_slice(&key_bytes)
+    let cipher = XChaCha20Poly1305::new_from_slice(key.as_ref())
         .expect("32-byte key is always valid for XChaCha20Poly1305");
     let ciphertext = cipher
         .encrypt(&nonce, plaintext)
@@ -102,25 +102,13 @@ pub fn open(sealed: &[u8], recipient_secret: &StaticSecret) -> Result<Vec<u8>, R
     // 2. DH: recipient_secret × ephemeral_pk → shared secret.
     let shared = recipient_secret.diffie_hellman(&ephemeral_pk);
 
-    // 3. Derive symmetric key.
-    let key_bytes = derive_key(shared.as_bytes());
+    // 3. Derive symmetric key via HKDF-SHA256 (ADR-007).
+    let key = HKDF::derive_key(None, shared.as_bytes(), DOMAIN);
 
     // 4. Decrypt + authenticate.
-    let cipher = XChaCha20Poly1305::new_from_slice(&key_bytes)
+    let cipher = XChaCha20Poly1305::new_from_slice(key.as_ref())
         .expect("32-byte key is always valid for XChaCha20Poly1305");
     cipher
         .decrypt(&nonce, ciphertext)
         .map_err(|_| RecoveryError::DecryptionFailed)
-}
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-/// Derives a 32-byte symmetric key: SHA-256(DOMAIN || shared_secret_bytes).
-fn derive_key(shared_secret: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(DOMAIN);
-    hasher.update(shared_secret);
-    hasher.finalize().into()
 }

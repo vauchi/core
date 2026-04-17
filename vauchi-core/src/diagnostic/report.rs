@@ -4,9 +4,49 @@
 
 use std::fmt::Write;
 
+use serde::{Deserialize, Serialize};
+
 use super::log_event::LogEvent;
 use super::snapshot::SnapshotMetadata;
 use super::tuner::{DeviceCapabilityProfile, Platform, TuningResult, rank_configs};
+
+/// Results from a single scanner backend in the multi-backend comparison.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackendBenchmark {
+    /// Scanner backend name (e.g. "ML Kit", "ZXing", "rqrr (raw)", "rqrr (preprocessed)").
+    pub backend_name: String,
+    /// QR version tested (0 = mixed).
+    pub qr_version: u32,
+    /// Total frames processed.
+    pub frames_total: u32,
+    /// Frames successfully decoded.
+    pub frames_decoded: u32,
+    /// Decode rate (0.0–1.0).
+    pub decode_rate: f32,
+    /// Average decode latency in milliseconds.
+    pub avg_latency_ms: f32,
+    /// Average preprocessing time in microseconds (0 for platform-native).
+    pub avg_preprocessing_us: u64,
+    /// Frames skipped by sharpness gating (rqrr only).
+    pub frames_skipped: u32,
+}
+
+/// Throughput test results for one scanner backend.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThroughputBenchmark {
+    /// Scanner backend name.
+    pub backend_name: String,
+    /// Beacon fps setting.
+    pub beacon_fps: u32,
+    /// Effective bytes per second successfully decoded.
+    pub bytes_per_sec: f64,
+    /// Frame loss rate (0.0–1.0).
+    pub frame_loss_rate: f32,
+    /// Total frames in sequence.
+    pub total_frames: u32,
+    /// Frames successfully decoded.
+    pub decoded_frames: u32,
+}
 
 #[derive(Debug)]
 #[non_exhaustive]
@@ -315,6 +355,255 @@ fn write_event_log(html: &mut String, events: &[LogEvent]) -> Result<(), ReportE
 
     writeln!(html, "</pre>")?;
     writeln!(html, "</details>")?;
+    writeln!(html, "</section>")?;
+    Ok(())
+}
+
+/// Generate a multi-backend comparison report for the QR scanner benchmark.
+///
+/// Compares decode rate, latency, and throughput across scanner backends
+/// at each QR version tested. Produces side-by-side charts and tables.
+pub fn generate_comparison_report(
+    profile: &DeviceCapabilityProfile,
+    benchmarks: &[BackendBenchmark],
+    throughput: &[ThroughputBenchmark],
+) -> Result<String, ReportError> {
+    let mut html = String::with_capacity(16384);
+
+    write_header(&mut html)?;
+    // Override title
+    html = html.replace(
+        "<h1>QR Camera Tuner Report</h1>",
+        "<h1>QR Scanner Backend Comparison</h1>",
+    );
+    write_device_section(&mut html, profile)?;
+
+    if !benchmarks.is_empty() {
+        write_comparison_chart(&mut html, benchmarks)?;
+        write_comparison_table(&mut html, benchmarks)?;
+    }
+
+    if !throughput.is_empty() {
+        write_throughput_section(&mut html, throughput)?;
+    }
+
+    write_footer(&mut html)?;
+    Ok(html)
+}
+
+fn write_comparison_chart(
+    html: &mut String,
+    benchmarks: &[BackendBenchmark],
+) -> Result<(), ReportError> {
+    // Group by QR version
+    let mut versions: Vec<u32> = benchmarks.iter().map(|b| b.qr_version).collect();
+    versions.sort_unstable();
+    versions.dedup();
+
+    let backends: Vec<&str> = {
+        let mut names: Vec<&str> = benchmarks.iter().map(|b| b.backend_name.as_str()).collect();
+        names.sort_unstable();
+        names.dedup();
+        names
+    };
+
+    let colors = ["#00d4aa", "#e94560", "#0f3460", "#f5a623", "#9b59b6"];
+
+    for &version in &versions {
+        let version_data: Vec<&BackendBenchmark> = benchmarks
+            .iter()
+            .filter(|b| b.qr_version == version)
+            .collect();
+
+        if version_data.is_empty() {
+            continue;
+        }
+
+        let version_label = if version == 0 {
+            "Mixed".to_string()
+        } else {
+            format!("Version {version}")
+        };
+
+        writeln!(html, "<section>")?;
+        writeln!(html, "<h2>Decode Rate — {version_label}</h2>")?;
+
+        let bar_height = 32u32;
+        let gap = 8u32;
+        let chart_width = 400u32;
+        let label_width = 160u32;
+        let total_height = version_data.len() as u32 * (bar_height + gap) + gap;
+
+        writeln!(
+            html,
+            "<svg width=\"{}\" height=\"{}\" role=\"img\" aria-label=\"Decode rate comparison for {}\">",
+            chart_width + label_width + 80,
+            total_height,
+            version_label,
+        )?;
+
+        for (i, bench) in version_data.iter().enumerate() {
+            let y = i as u32 * (bar_height + gap) + gap;
+            let bar_w = (bench.decode_rate * chart_width as f32).max(1.0) as u32;
+            let color_idx = backends
+                .iter()
+                .position(|&n| n == bench.backend_name)
+                .unwrap_or(0);
+            let fill = colors[color_idx % colors.len()];
+
+            writeln!(
+                html,
+                "<text x=\"0\" y=\"{}\" fill=\"#e0e0e0\" font-size=\"13\" \
+                 dominant-baseline=\"middle\">{}</text>",
+                y + bar_height / 2,
+                html_escape(&bench.backend_name),
+            )?;
+            writeln!(
+                html,
+                "<rect x=\"{label_width}\" y=\"{y}\" width=\"{bar_w}\" \
+                 height=\"{bar_height}\" fill=\"{fill}\" rx=\"4\"/>",
+            )?;
+            writeln!(
+                html,
+                "<text x=\"{}\" y=\"{}\" fill=\"#e0e0e0\" font-size=\"12\" \
+                 dominant-baseline=\"middle\">{:.0}% ({:.1}ms)</text>",
+                label_width + bar_w + 6,
+                y + bar_height / 2,
+                bench.decode_rate * 100.0,
+                bench.avg_latency_ms,
+            )?;
+        }
+
+        writeln!(html, "</svg>")?;
+        writeln!(html, "</section>")?;
+    }
+
+    Ok(())
+}
+
+fn write_comparison_table(
+    html: &mut String,
+    benchmarks: &[BackendBenchmark],
+) -> Result<(), ReportError> {
+    writeln!(html, "<section>")?;
+    writeln!(html, "<h2>Backend Details</h2>")?;
+    writeln!(html, "<table>")?;
+    writeln!(
+        html,
+        "<tr><th>Backend</th><th>QR&nbsp;Ver</th><th>Decode&nbsp;%</th>\
+         <th>Latency&nbsp;ms</th><th>Preproc&nbsp;&micro;s</th>\
+         <th>Frames</th><th>Decoded</th><th>Skipped</th></tr>"
+    )?;
+
+    for b in benchmarks {
+        let ver = if b.qr_version == 0 {
+            "mixed".to_string()
+        } else {
+            b.qr_version.to_string()
+        };
+        writeln!(
+            html,
+            "<tr><td>{}</td><td>{}</td><td>{:.1}</td><td>{:.1}</td>\
+             <td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+            html_escape(&b.backend_name),
+            ver,
+            b.decode_rate * 100.0,
+            b.avg_latency_ms,
+            b.avg_preprocessing_us,
+            b.frames_total,
+            b.frames_decoded,
+            b.frames_skipped,
+        )?;
+    }
+
+    writeln!(html, "</table>")?;
+    writeln!(html, "</section>")?;
+    Ok(())
+}
+
+fn write_throughput_section(
+    html: &mut String,
+    throughput: &[ThroughputBenchmark],
+) -> Result<(), ReportError> {
+    writeln!(html, "<section>")?;
+    writeln!(html, "<h2>Throughput Comparison</h2>")?;
+    writeln!(html, "<table>")?;
+    writeln!(
+        html,
+        "<tr><th>Backend</th><th>Beacon&nbsp;FPS</th>\
+         <th>Bytes/s</th><th>Frame&nbsp;Loss</th>\
+         <th>Decoded</th><th>Total</th></tr>"
+    )?;
+
+    for t in throughput {
+        writeln!(
+            html,
+            "<tr><td>{}</td><td>{}</td><td>{:.0}</td><td>{:.1}%</td>\
+             <td>{}</td><td>{}</td></tr>",
+            html_escape(&t.backend_name),
+            t.beacon_fps,
+            t.bytes_per_sec,
+            t.frame_loss_rate * 100.0,
+            t.decoded_frames,
+            t.total_frames,
+        )?;
+    }
+
+    writeln!(html, "</table>")?;
+
+    // SVG bar chart for throughput
+    if !throughput.is_empty() {
+        let max_bps = throughput
+            .iter()
+            .map(|t| t.bytes_per_sec)
+            .fold(f64::NEG_INFINITY, f64::max)
+            .max(1.0);
+
+        let bar_height = 32u32;
+        let gap = 8u32;
+        let chart_width = 400u32;
+        let label_width = 160u32;
+        let total_height = throughput.len() as u32 * (bar_height + gap) + gap;
+
+        writeln!(
+            html,
+            "<svg width=\"{}\" height=\"{total_height}\" role=\"img\" \
+             aria-label=\"Throughput comparison\">",
+            chart_width + label_width + 100,
+        )?;
+
+        let colors = ["#00d4aa", "#e94560", "#0f3460", "#f5a623"];
+        for (i, t) in throughput.iter().enumerate() {
+            let y = i as u32 * (bar_height + gap) + gap;
+            let bar_w = ((t.bytes_per_sec / max_bps) * chart_width as f64).max(1.0) as u32;
+            let fill = colors[i % colors.len()];
+            let label = format!("{} @{}fps", t.backend_name, t.beacon_fps);
+
+            writeln!(
+                html,
+                "<text x=\"0\" y=\"{}\" fill=\"#e0e0e0\" font-size=\"13\" \
+                 dominant-baseline=\"middle\">{}</text>",
+                y + bar_height / 2,
+                html_escape(&label),
+            )?;
+            writeln!(
+                html,
+                "<rect x=\"{label_width}\" y=\"{y}\" width=\"{bar_w}\" \
+                 height=\"{bar_height}\" fill=\"{fill}\" rx=\"4\"/>",
+            )?;
+            writeln!(
+                html,
+                "<text x=\"{}\" y=\"{}\" fill=\"#e0e0e0\" font-size=\"12\" \
+                 dominant-baseline=\"middle\">{:.0} B/s</text>",
+                label_width + bar_w + 6,
+                y + bar_height / 2,
+                t.bytes_per_sec,
+            )?;
+        }
+
+        writeln!(html, "</svg>")?;
+    }
+
     writeln!(html, "</section>")?;
     Ok(())
 }

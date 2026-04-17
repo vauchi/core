@@ -18,7 +18,9 @@ pub mod tuner;
 
 pub use debug_session::DebugSession;
 pub use log_event::{LogEvent, LogEventKind, ScreenId};
-pub use report::generate_html_report;
+pub use report::{
+    BackendBenchmark, ThroughputBenchmark, generate_comparison_report, generate_html_report,
+};
 pub use snapshot::{BoundingBox, SnapshotMetadata};
 pub use tuner::{
     CameraConfig, DeviceCapabilityProfile, ErrorCorrectionLevel, Platform, QrConfig, SweepMatrix,

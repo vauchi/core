@@ -114,9 +114,8 @@ impl AppEngine {
                     return Some(ActionResult::NavigateTo(screen));
                 }
                 "help_center" => {
-                    return Some(ActionResult::OpenUrl {
-                        url: "https://docs.vauchi.app".into(),
-                    });
+                    let screen = self.navigate_to(AppScreen::Help);
+                    return Some(ActionResult::NavigateTo(screen));
                 }
                 "funding" => {
                     return Some(ActionResult::OpenUrl {

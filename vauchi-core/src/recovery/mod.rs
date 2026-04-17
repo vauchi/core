@@ -1029,10 +1029,37 @@ impl RecoveryProgress {
         self.vouchers.len() >= self.threshold as usize
     }
 
-    /// Adds a voucher. Returns the new count.
-    pub fn add_voucher(&mut self, voucher: RecoveryVoucher) -> usize {
+    /// Adds a voucher after validating it against the claim.
+    ///
+    /// Checks: key binding (old_pk/new_pk match claim), signature validity,
+    /// no self-vouching, no duplicates. Mirrors `RecoveryProof::add_voucher`.
+    pub fn add_voucher(&mut self, voucher: RecoveryVoucher) -> Result<usize, RecoveryError> {
+        // Verify keys match the claim
+        if voucher.old_pk() != self.claim.old_pk() || voucher.new_pk() != self.claim.new_pk() {
+            return Err(RecoveryError::MismatchedKeys);
+        }
+
+        // Prevent self-vouching (voucher_pk == new_pk)
+        if voucher.voucher_pk() == self.claim.new_pk() {
+            return Err(RecoveryError::SelfVouching);
+        }
+
+        // Verify signature
+        if !voucher.verify() {
+            return Err(RecoveryError::InvalidSignature);
+        }
+
+        // Check for duplicate
+        if self
+            .vouchers
+            .iter()
+            .any(|v| v.voucher_pk() == voucher.voucher_pk())
+        {
+            return Err(RecoveryError::DuplicateVoucher);
+        }
+
         self.vouchers.push(voucher);
-        self.vouchers.len()
+        Ok(self.vouchers.len())
     }
 }
 

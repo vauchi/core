@@ -119,7 +119,9 @@ impl Vauchi {
             .load_recovery_progress()?
             .ok_or_else(|| VauchiError::InvalidState("No recovery in progress".into()))?;
 
-        progress.add_voucher(voucher);
+        progress
+            .add_voucher(voucher)
+            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         self.storage.save_recovery_progress(&progress)?;
 
         Ok(progress)
@@ -256,16 +258,27 @@ impl Vauchi {
 
     /// Creates an `HttpTransport` for guardian relay operations.
     ///
-    /// Uses direct mode (no OHTTP) for upload operations. Query operations
-    /// should use OHTTP for privacy, but that's wired in a later phase.
+    /// Uses OHTTP when available (ADR-037) to prevent the relay from
+    /// correlating the client's IP with the guardian hash. Falls back
+    /// to direct mode when OHTTP is not yet configured (pre-connect).
     fn create_guardian_transport(&self) -> HttpTransport {
-        HttpTransport::new(HttpTransportConfig {
+        let mut transport = HttpTransport::new(HttpTransportConfig {
             relay_url: self.http_relay_url(),
             timeout_ms: self.config.relay.connect_timeout_ms,
             proxy: self.config.relay.proxy.clone(),
             allow_direct: true,
             pinned_certs: self.config.relay.pinned_certs.clone(),
-        })
+        });
+
+        // Wire OHTTP if a key is cached from a previous connect()
+        if let Some(ref ohttp_client) = self.ohttp_key
+            && let Ok(client) =
+                crate::network::OhttpClient::new(ohttp_client.encoded_config().to_vec())
+        {
+            transport.set_ohttp(client);
+        }
+
+        transport
     }
 }
 

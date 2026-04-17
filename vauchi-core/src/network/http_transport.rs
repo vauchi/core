@@ -491,15 +491,13 @@ impl HttpTransport {
     }
 
     /// Deletes all guardian entries for a hash (identity purge).
-    pub fn guardian_delete(&self, guardian_hash: &str) -> Result<bool, NetworkError> {
+    pub fn guardian_delete(&self, guardian_hash: &str) -> Result<(), NetworkError> {
         let req = V2GuardianDeleteRequest {
             guardian_hash: guardian_hash.to_string(),
         };
         let resp = self.post_action("guardian_delete", &req)?;
         if resp.status == "ok" {
-            // The relay returns {"status": "ok", "deleted": true/false}
-            // but V2Response doesn't have a `deleted` field — just succeed.
-            Ok(true)
+            Ok(())
         } else {
             Err(response_error(
                 "guardian_delete",

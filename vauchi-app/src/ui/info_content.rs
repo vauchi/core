@@ -27,6 +27,7 @@ pub fn resolve_info_key(key: &str, locale: Locale) -> Option<(String, String)> {
 mod tests {
     use super::*;
 
+    // @internal
     #[test]
     fn resolve_known_key_returns_content() {
         let result = resolve_info_key("auto_lock", Locale::English);
@@ -36,12 +37,14 @@ mod tests {
         assert!(!body.is_empty(), "body must not be empty");
     }
 
+    // @internal
     #[test]
     fn resolve_unknown_key_returns_none() {
         let result = resolve_info_key("nonexistent_key_xyz", Locale::English);
         assert!(result.is_none(), "expected None for unknown key");
     }
 
+    // @internal
     #[test]
     fn resolve_known_key_has_non_missing_content() {
         let (title, body) = resolve_info_key("auto_lock", Locale::English).unwrap();

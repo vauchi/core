@@ -4,6 +4,7 @@
 
 //! Verifies that every info_key used in the codebase resolves to non-empty locale content.
 
+// @scenario: help_faq :: all info keys resolve to locale content
 #[test]
 fn all_info_keys_resolve_to_content() {
     let known_keys = [

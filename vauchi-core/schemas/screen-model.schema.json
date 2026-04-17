@@ -185,6 +185,12 @@
         "id": {
           "type": "string"
         },
+        "info_key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "label": {
           "type": "string"
         }
@@ -296,6 +302,12 @@
                 },
                 "id": {
                   "type": "string"
+                },
+                "info_key": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "input_type": {
                   "$ref": "#/definitions/InputType"
@@ -858,6 +870,12 @@
                 "id": {
                   "type": "string"
                 },
+                "info_key": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "label": {
                   "type": "string"
                 },
@@ -1414,6 +1432,12 @@
         "id": {
           "type": "string"
         },
+        "info_key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "kind": {
           "$ref": "#/definitions/SettingsItemKind"
         },
@@ -1638,6 +1662,12 @@
         },
         "id": {
           "type": "string"
+        },
+        "info_key": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "label": {
           "type": "string"

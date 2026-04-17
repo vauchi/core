@@ -239,6 +239,27 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "description": "User tapped the (i) info icon on a component. Core resolves the key to localized help content.",
+      "type": "object",
+      "required": [
+        "InfoRequested"
+      ],
+      "properties": {
+        "InfoRequested": {
+          "type": "object",
+          "required": [
+            "key"
+          ],
+          "properties": {
+            "key": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     }
   ]
 }

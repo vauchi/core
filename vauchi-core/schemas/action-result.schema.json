@@ -58,6 +58,27 @@
       "additionalProperties": false
     },
     {
+      "description": "Onboarding complete — navigate to the chosen destination.",
+      "type": "object",
+      "required": [
+        "CompleteWith"
+      ],
+      "properties": {
+        "CompleteWith": {
+          "type": "object",
+          "required": [
+            "destination"
+          ],
+          "properties": {
+            "destination": {
+              "$ref": "#/definitions/PostOnboardingDestination"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "description": "Frontend should switch to the device linking flow.",
       "type": "string",
       "enum": [
@@ -365,6 +386,31 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "description": "Frontend should display a help info overlay. Rendered as bottom sheet (mobile), popover (desktop), or inline text (TUI/CLI).",
+      "type": "object",
+      "required": [
+        "ShowInfoOverlay"
+      ],
+      "properties": {
+        "ShowInfoOverlay": {
+          "type": "object",
+          "required": [
+            "body",
+            "title"
+          ],
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
@@ -446,6 +492,12 @@
         },
         "id": {
           "type": "string"
+        },
+        "info_key": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "label": {
           "type": "string"
@@ -558,6 +610,12 @@
                 },
                 "id": {
                   "type": "string"
+                },
+                "info_key": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "input_type": {
                   "$ref": "#/definitions/InputType"
@@ -1119,6 +1177,12 @@
                 },
                 "id": {
                   "type": "string"
+                },
+                "info_key": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "label": {
                   "type": "string"
@@ -2105,6 +2169,17 @@
         }
       }
     },
+    "PostOnboardingDestination": {
+      "description": "Where to navigate after onboarding completes.",
+      "type": "string",
+      "enum": [
+        "MainScreen",
+        "Exchange",
+        "ImportContacts",
+        "SecurityInfo",
+        "BackupSetup"
+      ]
+    },
     "Progress": {
       "description": "Step progress indicator.",
       "type": "object",
@@ -2291,6 +2366,12 @@
         },
         "id": {
           "type": "string"
+        },
+        "info_key": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "kind": {
           "$ref": "#/definitions/SettingsItemKind"
@@ -2516,6 +2597,12 @@
         },
         "id": {
           "type": "string"
+        },
+        "info_key": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "label": {
           "type": "string"

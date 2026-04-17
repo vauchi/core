@@ -18,14 +18,17 @@ vauchi-platform/src/lib.rs 2315
 vauchi-core/src/exchange/session.rs 1747
 vauchi-core/src/exchange/multistage/session.rs 1178
 
+# EXEMPT — transport layer: all relay methods must be co-located for protocol coherence
+vauchi-core/src/network/http_transport.rs 1119
+
 # EXEMPT — security-critical: crypto + verification belong together
-vauchi-core/src/recovery/mod.rs 1084
+vauchi-core/src/recovery/mod.rs 1236
 
 # EXEMPT — migration ledger: coherence over size, version history must be co-located
-vauchi-core/src/storage/migration.rs 1795
+vauchi-core/src/storage/migration.rs 1811
 
 # EXEMPT — rekey ledger: all encrypted columns must be co-located for correctness (audit C1)
-vauchi-core/src/storage/rekey.rs 1360
+vauchi-core/src/storage/rekey.rs 1390
 
 # SPLIT — Phase 3: extract connection management
 vauchi-core/src/storage/mod.rs 1079

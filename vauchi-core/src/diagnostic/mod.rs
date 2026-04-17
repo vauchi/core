@@ -8,6 +8,8 @@ pub mod exchange_debug;
 #[cfg(not(feature = "testing"))]
 pub(crate) mod exchange_debug;
 pub mod log_event;
+#[cfg(feature = "diagnostic-scanner")]
+pub mod preprocess;
 pub mod report;
 #[cfg(feature = "diagnostic-scanner")]
 pub mod scanner;

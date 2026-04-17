@@ -38,7 +38,7 @@ pub struct ScanResult {
     pub laplacian_variance: f32,
 }
 
-/// Decode a QR code from a grayscale (Y-plane) image.
+/// Decode a QR code from a grayscale (Y-plane) image using default config.
 ///
 /// The `luma_data` must contain exactly `width * height` bytes of 8-bit
 /// grayscale pixel data (e.g., the Y-plane from a YUV camera frame).
@@ -47,6 +47,24 @@ pub fn scan_qr_from_luma(
     luma_data: &[u8],
     width: u32,
     height: u32,
+) -> ScanResult {
+    use super::preprocess::PreprocessConfig;
+    scan_qr_from_luma_with_config(
+        backend,
+        luma_data,
+        width,
+        height,
+        &PreprocessConfig::default(),
+    )
+}
+
+/// Decode a QR code from a grayscale (Y-plane) image with custom preprocessing config.
+pub fn scan_qr_from_luma_with_config(
+    backend: ScannerBackend,
+    luma_data: &[u8],
+    width: u32,
+    height: u32,
+    preprocess_config: &super::preprocess::PreprocessConfig,
 ) -> ScanResult {
     let total_start = std::time::Instant::now();
 
@@ -71,12 +89,24 @@ pub fn scan_qr_from_luma(
             }
         }
         ScannerBackend::RqrrPreprocessed => {
-            // Phase 3 will add preprocessing here.
-            // For now, fall through to raw decode.
-            let result = decode_rqrr(img);
+            use super::preprocess::preprocess_frame;
+
+            let pre = preprocess_frame(img, preprocess_config);
+            if pre.skipped {
+                return ScanResult {
+                    decoded: None,
+                    total_us: total_start.elapsed().as_micros() as u64,
+                    preprocessing_us: pre.preprocess_time_us,
+                    decode_us: 0,
+                    frame_skipped: true,
+                    laplacian_variance: pre.laplacian_variance,
+                };
+            }
+            let result = decode_rqrr(pre.image);
             ScanResult {
                 total_us: total_start.elapsed().as_micros() as u64,
-                preprocessing_us: 0,
+                preprocessing_us: pre.preprocess_time_us,
+                laplacian_variance: pre.laplacian_variance,
                 ..result
             }
         }

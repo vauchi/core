@@ -42,7 +42,7 @@ test-kdf = []
 # JSON Schema generation for UI types (dev tooling only)
 schema-gen = ["schemars", "vauchi-app/schema-gen"]
 # Diagnostic QR scanner benchmarking (rqrr decoder + image preprocessing)
-diagnostic-scanner = ["rqrr"]
+diagnostic-scanner = ["rqrr", "imageproc", "fast_image_resize"]
 
 [dependencies]
 # Cryptography (audited libraries)
@@ -141,6 +141,10 @@ ohttp = { version = "0.7", default-features = false, features = ["client", "rust
 
 # QR code decoding for diagnostic scanner benchmarking (optional)
 rqrr = { version = "0.10", optional = true }
+
+# Image preprocessing for diagnostic scanner benchmarking (optional)
+imageproc = { version = "0.25", optional = true }
+fast_image_resize = { version = "5", optional = true, default-features = false }
 
 # Remote content updates — module moved to vauchi-app.
 # Feature retained as empty for backward compatibility (consumers may reference it).

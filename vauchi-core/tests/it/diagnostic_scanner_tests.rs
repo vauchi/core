@@ -126,19 +126,43 @@ fn rqrr_raw_handles_dimension_mismatch() {
 
 // @internal
 #[test]
-fn rqrr_preprocessed_falls_through_to_decode() {
-    // Phase 3 will add real preprocessing; for now it should still decode
-    let img = generate_qr_image("PREPROCESS_TEST");
+fn rqrr_preprocessed_decodes_noisy_qr() {
+    use vauchi_core::diagnostic::preprocess::PreprocessConfig;
+
+    // Add noise to simulate a camera frame
+    let mut img = generate_qr_image("PREPROCESS_TEST");
     let (width, height) = img.dimensions();
-    let result = scan_qr_from_luma(
+    for y in 0..height {
+        for x in 0..width {
+            let v = img.get_pixel(x, y)[0];
+            let noise = ((x * 7 + y * 13) % 30) as u8;
+            let noisy = if v > 128 {
+                255u8.saturating_sub(noise)
+            } else {
+                noise
+            };
+            img.put_pixel(x, y, image::Luma([noisy]));
+        }
+    }
+    // Skip CLAHE/unsharp for synthetic images (designed for real camera frames)
+    let config = PreprocessConfig {
+        target_width: 0,
+        sharpness_threshold: 0.0,
+        apply_clahe: false,
+        apply_unsharp: false,
+        apply_threshold: false,
+        ..Default::default()
+    };
+    let result = scan_qr_from_luma_with_config(
         ScannerBackend::RqrrPreprocessed,
         img.as_raw(),
         width,
         height,
+        &config,
     );
     assert_eq!(
         result.decoded.as_deref(),
         Some("PREPROCESS_TEST"),
-        "preprocessed path should still decode"
+        "preprocessed noisy QR should decode"
     );
 }

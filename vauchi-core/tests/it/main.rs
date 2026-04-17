@@ -129,6 +129,8 @@ mod device_linking_engine_tests;
 mod device_race_condition_tests;
 mod diagnostic_extended_pattern_tests;
 mod diagnostic_log_event_tests;
+#[cfg(feature = "diagnostic-scanner")]
+mod diagnostic_preprocess_tests;
 mod diagnostic_qr_pattern_tests;
 mod diagnostic_report_tests;
 #[cfg(feature = "diagnostic-scanner")]

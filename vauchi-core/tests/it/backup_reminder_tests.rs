@@ -12,6 +12,7 @@ const BACKUP_PASSWORD: &str = "correct-horse-battery-staple";
 
 // ── Serde ────────────────────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn backup_reminder_state_serde_roundtrip() {
     let state = BackupReminderState::new();
@@ -29,6 +30,7 @@ fn backup_reminder_state_serde_roundtrip() {
 
 // ── State mutations ──────────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn backup_reminder_state_record_backup_resets() {
     let mut state = BackupReminderState::new();
@@ -51,6 +53,7 @@ fn backup_reminder_state_record_backup_resets() {
     );
 }
 
+// @internal
 #[test]
 fn backup_reminder_state_record_reminder_increments() {
     let mut state = BackupReminderState::new();
@@ -65,6 +68,8 @@ fn backup_reminder_state_record_reminder_increments() {
 
 // ── Reminder scheduling logic ────────────────────────────────────────────────
 
+// @scenario: backup_reminder :: reminders disabled
+// @internal
 #[test]
 fn is_reminder_due_false_when_disabled() {
     let mut state = BackupReminderState::new();
@@ -75,6 +80,8 @@ fn is_reminder_due_false_when_disabled() {
     assert!(!state.is_reminder_due(now, identity_created));
 }
 
+// @scenario: backup_reminder :: first reminder after 7 days
+// @internal
 #[test]
 fn is_reminder_due_after_7_days_first_time() {
     let state = BackupReminderState::new(); // no backup, reminder_count=0
@@ -83,6 +90,8 @@ fn is_reminder_due_after_7_days_first_time() {
     assert!(state.is_reminder_due(now, identity_created));
 }
 
+// @scenario: backup_reminder :: no reminder before 7 days
+// @internal
 #[test]
 fn is_reminder_not_due_before_7_days() {
     let state = BackupReminderState::new();
@@ -91,6 +100,8 @@ fn is_reminder_not_due_before_7_days() {
     assert!(!state.is_reminder_due(now, identity_created));
 }
 
+// @scenario: backup_reminder :: progressive 30-day schedule
+// @internal
 #[test]
 fn is_reminder_due_after_30_days_second_time() {
     let mut state = BackupReminderState::new();
@@ -108,6 +119,7 @@ fn is_reminder_due_after_30_days_second_time() {
 
 // ── Storage persistence ──────────────────────────────────────────────────────
 
+// @internal
 #[test]
 fn backup_reminder_storage_roundtrip() {
     let vauchi = Vauchi::in_memory().unwrap();
@@ -134,6 +146,8 @@ fn backup_reminder_storage_roundtrip() {
 
 // ── Export integration ───────────────────────────────────────────────────────
 
+// @scenario: backup_reminder :: export updates reminder state
+// @internal
 #[test]
 fn export_backup_updates_reminder_state() {
     let mut vauchi = Vauchi::in_memory().unwrap();

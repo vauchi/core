@@ -862,6 +862,33 @@ fn text_input_info_key_serializes() {
     );
 }
 
+// === InfoRequested UserAction ===
+
+// @internal
+#[test]
+fn info_requested_action_roundtrips() {
+    let action = UserAction::InfoRequested {
+        key: "auto_lock".into(),
+    };
+    let json = serde_json::to_string(&action).unwrap();
+    let back: UserAction = serde_json::from_str(&json).unwrap();
+    assert_eq!(action, back);
+}
+
+// === ShowInfoOverlay ActionResult ===
+
+// @internal
+#[test]
+fn show_info_overlay_result_roundtrips() {
+    let result = ActionResult::ShowInfoOverlay {
+        title: "Auto-lock".into(),
+        body: "Locks vauchi after inactivity.".into(),
+    };
+    let json = serde_json::to_string(&result).unwrap();
+    assert!(json.contains("ShowInfoOverlay"));
+    assert!(json.contains("Auto-lock"));
+}
+
 // @internal
 #[test]
 fn text_input_without_info_key_omits_field() {

@@ -57,6 +57,11 @@ pub enum UserAction {
         component_id: String,
         value_milli: i32,
     },
+    /// User tapped the (i) info icon on a component.
+    /// Core resolves the key to localized help content.
+    InfoRequested {
+        key: String,
+    },
 }
 
 /// Where to navigate after onboarding completes.
@@ -157,5 +162,12 @@ pub enum ActionResult {
     /// These are non-blocking and do not change the current screen.
     Notify {
         notifications: Vec<PendingNotification>,
+    },
+    /// Frontend should display a help info overlay.
+    /// Rendered as bottom sheet (mobile), popover (desktop),
+    /// or inline text (TUI/CLI).
+    ShowInfoOverlay {
+        title: String,
+        body: String,
     },
 }

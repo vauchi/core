@@ -9,6 +9,7 @@
 //! suited for contact card sync (not real-time chat).
 
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use serde::Serialize;
@@ -159,6 +160,14 @@ pub struct HttpTransport {
     agent: Result<ureq::Agent, NetworkError>,
     ohttp: Option<OhttpClient>,
     last_version_policy: Mutex<Option<VersionPolicy>>,
+    /// Count of `post_action` calls that took the direct-HTTP branch
+    /// because OHTTP was not configured. Every tick represents one
+    /// request where the relay saw the client's source IP — a privacy
+    /// degradation. Frontends and diagnostics should surface this
+    /// counter; the 2026-04-17 audit remediation (problem record
+    /// `2026-04-17-ohttp-allow-direct-fallback`) defines the expected
+    /// steady-state value as zero.
+    direct_fallback_count: AtomicU64,
 }
 
 impl HttpTransport {
@@ -173,7 +182,15 @@ impl HttpTransport {
             agent,
             ohttp: None,
             last_version_policy: Mutex::new(None),
+            direct_fallback_count: AtomicU64::new(0),
         }
+    }
+
+    /// Number of requests that have fallen back to direct HTTP because
+    /// OHTTP was not configured. See the `direct_fallback_count` field
+    /// docstring for the privacy interpretation.
+    pub fn direct_fallback_count(&self) -> u64 {
+        self.direct_fallback_count.load(Ordering::Relaxed)
     }
 
     /// Set the OHTTP client for encrypted requests.
@@ -543,6 +560,10 @@ impl HttpTransport {
         if let Some(ohttp) = &self.ohttp {
             self.post_via_ohttp(ohttp, action, body)
         } else if self.config.allow_direct {
+            // Direct-HTTP fallback exposes the caller's source IP to the
+            // relay. Count every occurrence so diagnostics can detect
+            // the privacy regression (see `direct_fallback_count`).
+            self.direct_fallback_count.fetch_add(1, Ordering::Relaxed);
             let url = format!("{}/v2/{action}", self.config.relay_url);
             self.post_json(&url, body)
         } else {
@@ -898,6 +919,37 @@ mod tests {
             HttpTransport::new(HttpTransportConfig::for_testing("http://127.0.0.1:1", 1000));
         let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
         assert!(result.is_err());
+    }
+
+    // @internal
+    #[test]
+    fn test_direct_fallback_count_starts_zero() {
+        let transport =
+            HttpTransport::new(HttpTransportConfig::for_testing("http://127.0.0.1:1", 1000));
+        assert_eq!(transport.direct_fallback_count(), 0);
+    }
+
+    // @internal
+    #[test]
+    fn test_direct_fallback_count_increments_on_each_direct_post() {
+        let transport =
+            HttpTransport::new(HttpTransportConfig::for_testing("http://127.0.0.1:1", 1000));
+        // Fails at network layer (connection refused), but the counter
+        // must have ticked because post_action took the direct branch.
+        let _ = transport.send_update(&"a".repeat(64), "dGVzdA==");
+        assert_eq!(transport.direct_fallback_count(), 1);
+        let _ = transport.send_update(&"b".repeat(64), "dGVzdA==");
+        assert_eq!(transport.direct_fallback_count(), 2);
+    }
+
+    // @internal
+    #[test]
+    fn test_direct_fallback_count_stays_zero_when_blocked() {
+        // allow_direct = false → post_action returns the fail-closed error
+        // before reaching the direct branch. The counter must stay at zero.
+        let transport = HttpTransport::new(HttpTransportConfig::default());
+        let _ = transport.send_update(&"a".repeat(64), "dGVzdA==");
+        assert_eq!(transport.direct_fallback_count(), 0);
     }
 
     #[test]

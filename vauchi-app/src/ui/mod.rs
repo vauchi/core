@@ -42,6 +42,7 @@ mod gdpr;
 mod group_detail;
 mod groups_list;
 mod help;
+pub mod info_content;
 mod lock_screen;
 mod more;
 mod my_info;

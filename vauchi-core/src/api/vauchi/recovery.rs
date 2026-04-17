@@ -263,14 +263,16 @@ impl Vauchi {
     /// Creates an `HttpTransport` for guardian relay operations.
     ///
     /// Uses OHTTP when available (ADR-037) to prevent the relay from
-    /// correlating the client's IP with the guardian hash. Falls back
-    /// to direct mode when OHTTP is not yet configured (pre-connect).
+    /// correlating the client's IP with the guardian hash. Direct mode
+    /// is allowed only when OHTTP has not been wired yet (pre-connect);
+    /// once `ohttp_key` is set, `allow_direct` is false so a subsequent
+    /// OHTTP failure fails closed instead of silently leaking the IP.
     fn create_guardian_transport(&self) -> HttpTransport {
         let mut transport = HttpTransport::new(HttpTransportConfig {
             relay_url: self.http_relay_url(),
             timeout_ms: self.config.relay.connect_timeout_ms,
             proxy: self.config.relay.proxy.clone(),
-            allow_direct: true,
+            allow_direct: self.ohttp_key.is_none(),
             pinned_certs: self.config.relay.pinned_certs.clone(),
         });
 

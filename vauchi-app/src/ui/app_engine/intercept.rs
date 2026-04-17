@@ -155,7 +155,7 @@ impl AppEngine {
             _ => return None,
         };
 
-        if action_id != "add_field" && action_id != "add_entry" {
+        if action_id != "add_field" && action_id != "add_entry" && action_id != "add_social" {
             return None;
         }
 

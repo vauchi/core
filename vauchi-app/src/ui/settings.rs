@@ -45,12 +45,10 @@ pub struct SettingsConfig {
     pub failed_deliveries: u32,
     #[serde(default)]
     pub debug_mode: bool,
-    #[serde(default = "default_true")]
-    pub backup_reminders_enabled: bool,
-}
-
-fn default_true() -> bool {
-    true
+    #[serde(default)]
+    pub backup_reminder_frequency: String,
+    #[serde(default)]
+    pub last_backup_display: String,
 }
 
 /// Settings screen engine.
@@ -308,16 +306,26 @@ impl WorkflowEngine for SettingsEngine {
                         }),
                     },
                     SettingsItem {
-                        id: "backup_reminders".into(),
-                        label: "Backup reminders".into(),
-                        kind: SettingsItemKind::Toggle {
-                            enabled: self.config.backup_reminders_enabled,
+                        id: "last_backup".into(),
+                        label: "Last backup".into(),
+                        kind: SettingsItemKind::Value {
+                            value: self.config.last_backup_display.clone(),
                         },
                         a11y: Some(A11y {
-                            label: Some("Backup reminders".into()),
-                            hint: Some(
-                                "Receive periodic reminders to back up your identity".into(),
-                            ),
+                            label: Some("Last backup date".into()),
+                            hint: None,
+                            role: None,
+                        }),
+                    },
+                    SettingsItem {
+                        id: "backup_reminders".into(),
+                        label: "Backup reminders".into(),
+                        kind: SettingsItemKind::Value {
+                            value: self.config.backup_reminder_frequency.clone(),
+                        },
+                        a11y: Some(A11y {
+                            label: Some("Backup reminder frequency".into()),
+                            hint: Some("Tap to change frequency".into()),
                             role: None,
                         }),
                     },
@@ -542,11 +550,15 @@ impl WorkflowEngine for SettingsEngine {
                 self.config.debug_mode = !self.config.debug_mode;
                 ActionResult::UpdateScreen(self.current_screen())
             }
-            UserAction::SettingsToggled {
+            UserAction::ListItemSelected {
                 ref component_id,
                 ref item_id,
             } if component_id == "backup" && item_id == "backup_reminders" => {
-                self.config.backup_reminders_enabled = !self.config.backup_reminders_enabled;
+                let current = vauchi_core::types::ReminderFrequency::from_label(
+                    &self.config.backup_reminder_frequency,
+                );
+                let next = current.next();
+                self.config.backup_reminder_frequency = next.label().to_string();
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected { ref item_id, .. } if item_id == "emergency_wipe" => {

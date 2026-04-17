@@ -26,7 +26,8 @@ fn sample_config() -> SettingsConfig {
         pending_updates: 0,
         failed_deliveries: 0,
         debug_mode: false,
-        backup_reminders_enabled: true,
+        backup_reminder_frequency: "Weekly".into(),
+        last_backup_display: "Never".into(),
     }
 }
 
@@ -346,13 +347,15 @@ fn settings_backup_section_has_links() {
     let engine = SettingsEngine::new(sample_config());
     let screen = engine.current_screen();
     let items = find_settings_group(&screen, "backup");
-    assert_eq!(items.len(), 4);
+    assert_eq!(items.len(), 5);
     assert!(matches!(items[0].kind, SettingsItemKind::Link { .. }));
     assert!(matches!(items[1].kind, SettingsItemKind::Link { .. }));
     assert!(matches!(items[2].kind, SettingsItemKind::Link { .. }));
     assert_eq!(items[2].id, "setup_new_device");
-    assert!(matches!(items[3].kind, SettingsItemKind::Toggle { .. }));
-    assert_eq!(items[3].id, "backup_reminders");
+    assert!(matches!(items[3].kind, SettingsItemKind::Value { .. }));
+    assert_eq!(items[3].id, "last_backup");
+    assert!(matches!(items[4].kind, SettingsItemKind::Value { .. }));
+    assert_eq!(items[4].id, "backup_reminders");
 }
 
 // @internal

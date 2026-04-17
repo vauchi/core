@@ -5,7 +5,7 @@
 //! Integration tests for backup reminder state.
 
 use vauchi_core::Vauchi;
-use vauchi_core::types::BackupReminderState;
+use vauchi_core::types::{BackupReminderState, ReminderFrequency};
 
 const SECS_PER_DAY: u64 = 24 * 60 * 60;
 const BACKUP_PASSWORD: &str = "correct-horse-battery-staple";
@@ -19,6 +19,7 @@ fn backup_reminder_state_serde_roundtrip() {
     assert!(state.reminders_enabled);
     assert_eq!(state.reminder_count, 0);
     assert_eq!(state.last_backup_timestamp, None);
+    assert_eq!(state.frequency, ReminderFrequency::Weekly);
 
     let json = state.to_json().unwrap();
     let restored = BackupReminderState::from_json(&json).unwrap();
@@ -26,6 +27,17 @@ fn backup_reminder_state_serde_roundtrip() {
     assert_eq!(restored.reminders_enabled, state.reminders_enabled);
     assert_eq!(restored.reminder_count, state.reminder_count);
     assert_eq!(restored.last_backup_timestamp, state.last_backup_timestamp);
+    assert_eq!(restored.frequency, state.frequency);
+}
+
+// @internal
+#[test]
+fn backup_reminder_state_serde_backward_compat() {
+    // Legacy JSON without frequency field should deserialize with default Weekly
+    let json = r#"{"last_backup_timestamp":null,"reminders_enabled":true,"reminder_count":0}"#;
+    let state = BackupReminderState::from_json(json).unwrap();
+    assert_eq!(state.frequency, ReminderFrequency::Weekly);
+    assert!(state.reminders_enabled);
 }
 
 // ── State mutations ──────────────────────────────────────────────────────────
@@ -78,6 +90,11 @@ fn is_reminder_due_false_when_disabled() {
     let identity_created = 1_000_000;
     let now = identity_created + 30 * SECS_PER_DAY; // well past any threshold
     assert!(!state.is_reminder_due(now, identity_created));
+
+    // Also test frequency=Never disables reminders
+    let mut state2 = BackupReminderState::new();
+    state2.frequency = ReminderFrequency::Never;
+    assert!(!state2.is_reminder_due(now, identity_created));
 }
 
 // @scenario: backup_reminder :: first reminder after 7 days
@@ -100,14 +117,14 @@ fn is_reminder_not_due_before_7_days() {
     assert!(!state.is_reminder_due(now, identity_created));
 }
 
-// @scenario: backup_reminder :: progressive 30-day schedule
+// @scenario: backup_reminder :: monthly frequency at 30-day threshold
 // @internal
 #[test]
-fn is_reminder_due_after_30_days_second_time() {
+fn is_reminder_due_after_30_days_monthly() {
     let mut state = BackupReminderState::new();
+    state.frequency = ReminderFrequency::Monthly;
     let last_backup = 1_000_000;
     state.last_backup_timestamp = Some(last_backup);
-    state.reminder_count = 1; // already shown once
 
     let now = last_backup + 31 * SECS_PER_DAY;
     assert!(state.is_reminder_due(now, 0));
@@ -115,6 +132,49 @@ fn is_reminder_due_after_30_days_second_time() {
     // Not due at 29 days
     let now_early = last_backup + 29 * SECS_PER_DAY;
     assert!(!state.is_reminder_due(now_early, 0));
+}
+
+// @scenario: backup_reminder :: monthly frequency triggers at 30 days
+// @internal
+#[test]
+fn is_reminder_due_monthly_frequency() {
+    let mut state = BackupReminderState::new();
+    state.frequency = ReminderFrequency::Monthly;
+    let identity_created = 1_000_000;
+
+    // Not due at 7 days (weekly threshold)
+    let now_7d = identity_created + 8 * SECS_PER_DAY;
+    assert!(!state.is_reminder_due(now_7d, identity_created));
+
+    // Due at 31 days (monthly threshold)
+    let now_31d = identity_created + 31 * SECS_PER_DAY;
+    assert!(state.is_reminder_due(now_31d, identity_created));
+}
+
+// @scenario: backup_reminder :: frequency cycling
+// @internal
+#[test]
+fn reminder_frequency_cycles() {
+    assert_eq!(ReminderFrequency::Weekly.next(), ReminderFrequency::Monthly);
+    assert_eq!(ReminderFrequency::Monthly.next(), ReminderFrequency::Never);
+    assert_eq!(ReminderFrequency::Never.next(), ReminderFrequency::Weekly);
+}
+
+// @internal
+#[test]
+fn reminder_frequency_label_roundtrip() {
+    for freq in [
+        ReminderFrequency::Weekly,
+        ReminderFrequency::Monthly,
+        ReminderFrequency::Never,
+    ] {
+        assert_eq!(ReminderFrequency::from_label(freq.label()), freq);
+    }
+    // Unknown label defaults to Weekly
+    assert_eq!(
+        ReminderFrequency::from_label("bogus"),
+        ReminderFrequency::Weekly
+    );
 }
 
 // ── Storage persistence ──────────────────────────────────────────────────────

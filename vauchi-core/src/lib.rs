@@ -20,6 +20,7 @@ pub use types::{
     AhaMomentTracker, AhaMomentType, AudioCapability, BackupReminderState,
     DEFAULT_EMERGENCY_MESSAGE, DemoContactState, DuressSettings, EmergencyBroadcastConfig,
     EventOrigin, ExchangeTransport, OnboardingProgress, OnboardingStep, ProximityConfidence,
+    ReminderFrequency,
 };
 pub mod contact;
 pub mod contact_card;

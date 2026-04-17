@@ -36,11 +36,21 @@ impl AppEngine {
                     _ => {}
                 }
             }
+        }
+
+        // Handle backup_reminders frequency cycling (ListItemSelected, not SettingsToggled)
+        if let UserAction::ListItemSelected {
+            component_id,
+            item_id,
+        } = action
+        {
             if component_id == "backup"
                 && item_id == "backup_reminders"
                 && let Ok(mut state) = self.vauchi.load_backup_reminder_state()
             {
-                state.reminders_enabled = !state.reminders_enabled;
+                let next = state.frequency.next();
+                state.frequency = next;
+                state.reminders_enabled = next != vauchi_core::types::ReminderFrequency::Never;
                 let _ = self.vauchi.save_backup_reminder_state(&state);
             }
         }

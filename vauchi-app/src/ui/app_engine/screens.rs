@@ -199,10 +199,16 @@ impl AppEngine {
                     pending_updates: 0,
                     failed_deliveries: 0,
                     debug_mode: false,
-                    backup_reminders_enabled: vauchi
+                    backup_reminder_frequency: vauchi
                         .load_backup_reminder_state()
-                        .map(|s| s.reminders_enabled)
-                        .unwrap_or(true),
+                        .map(|s| s.frequency.label().to_string())
+                        .unwrap_or_else(|_| "Weekly".to_string()),
+                    last_backup_display: vauchi
+                        .load_backup_reminder_state()
+                        .ok()
+                        .and_then(|s| s.last_backup_timestamp)
+                        .map(|ts| format_relative_time(ts))
+                        .unwrap_or_else(|| "Never".to_string()),
                 };
                 Box::new(SettingsEngine::new(config))
             }
@@ -1074,5 +1080,36 @@ impl AppEngine {
             }
         }
         out
+    }
+}
+
+/// Format a Unix timestamp as a human-readable relative time string.
+fn format_relative_time(timestamp: u64) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let delta = now.saturating_sub(timestamp);
+    let days = delta / (24 * 60 * 60);
+    if days == 0 {
+        "Today".to_string()
+    } else if days == 1 {
+        "Yesterday".to_string()
+    } else if days < 7 {
+        format!("{days} days ago")
+    } else if days < 30 {
+        let weeks = days / 7;
+        if weeks == 1 {
+            "1 week ago".to_string()
+        } else {
+            format!("{weeks} weeks ago")
+        }
+    } else {
+        let months = days / 30;
+        if months == 1 {
+            "1 month ago".to_string()
+        } else {
+            format!("{months} months ago")
+        }
     }
 }

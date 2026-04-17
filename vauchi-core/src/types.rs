@@ -182,18 +182,76 @@ pub struct DemoContactState {
     pub update_count: u32,
 }
 
+/// How often to remind about backups.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ReminderFrequency {
+    Weekly,
+    Monthly,
+    Never,
+}
+
+impl ReminderFrequency {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Weekly => "Weekly",
+            Self::Monthly => "Monthly",
+            Self::Never => "Never",
+        }
+    }
+
+    pub fn from_label(s: &str) -> Self {
+        match s {
+            "Monthly" => Self::Monthly,
+            "Never" => Self::Never,
+            _ => Self::Weekly,
+        }
+    }
+
+    /// Cycle to the next frequency option.
+    pub fn next(self) -> Self {
+        match self {
+            Self::Weekly => Self::Monthly,
+            Self::Monthly => Self::Never,
+            Self::Never => Self::Weekly,
+        }
+    }
+
+    /// Threshold in seconds, or None if disabled.
+    pub fn threshold_secs(self) -> Option<u64> {
+        match self {
+            Self::Weekly => Some(7 * 24 * 60 * 60),
+            Self::Monthly => Some(30 * 24 * 60 * 60),
+            Self::Never => None,
+        }
+    }
+}
+
+impl Default for ReminderFrequency {
+    fn default() -> Self {
+        Self::Weekly
+    }
+}
+
 /// Tracks backup reminder state for progressive nudges.
 ///
 /// Persisted encrypted in the `ux_state` table.
-/// Schedule: first reminder at 7 days, then every 30 days.
+/// Schedule: configurable via `frequency` (Weekly, Monthly, or Never).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BackupReminderState {
     /// Unix epoch seconds of last successful backup.
     pub last_backup_timestamp: Option<u64>,
-    /// Whether backup reminders are enabled.
+    /// Legacy field — use `frequency` instead. Kept for backward compat.
+    #[serde(default = "default_true")]
     pub reminders_enabled: bool,
     /// Reminders shown since last backup (drives schedule).
     pub reminder_count: u32,
+    /// How often to remind. Defaults to Weekly.
+    #[serde(default)]
+    pub frequency: ReminderFrequency,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for BackupReminderState {
@@ -208,6 +266,7 @@ impl BackupReminderState {
             last_backup_timestamp: None,
             reminders_enabled: true,
             reminder_count: 0,
+            frequency: ReminderFrequency::Weekly,
         }
     }
 
@@ -238,13 +297,17 @@ impl BackupReminderState {
     /// Check if a reminder is due.
     /// `fallback_timestamp` is identity creation time (used when no backup exists).
     pub fn is_reminder_due(&self, now: u64, fallback_timestamp: u64) -> bool {
+        // Respect frequency setting
+        let threshold = match self.frequency.threshold_secs() {
+            Some(t) => t,
+            None => return false,
+        };
+        // Also respect legacy field
         if !self.reminders_enabled {
             return false;
         }
         let reference = self.last_backup_timestamp.unwrap_or(fallback_timestamp);
-        let threshold_days: u64 = if self.reminder_count == 0 { 7 } else { 30 };
-        let threshold_secs = threshold_days * 24 * 60 * 60;
-        now.saturating_sub(reference) >= threshold_secs
+        now.saturating_sub(reference) >= threshold
     }
 }
 

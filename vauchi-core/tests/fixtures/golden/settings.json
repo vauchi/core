@@ -282,16 +282,30 @@
             }
           },
           {
-            "id": "backup_reminders",
-            "label": "Backup reminders",
+            "id": "last_backup",
+            "label": "Last backup",
             "kind": {
-              "Toggle": {
-                "enabled": true
+              "Value": {
+                "value": "Never"
               }
             },
             "a11y": {
-              "label": "Backup reminders",
-              "hint": "Receive periodic reminders to back up your identity",
+              "label": "Last backup date",
+              "hint": null,
+              "role": null
+            }
+          },
+          {
+            "id": "backup_reminders",
+            "label": "Backup reminders",
+            "kind": {
+              "Value": {
+                "value": "Weekly"
+              }
+            },
+            "a11y": {
+              "label": "Backup reminder frequency",
+              "hint": "Tap to change frequency",
               "role": null
             }
           }

@@ -89,7 +89,8 @@ fn sample_settings_config() -> SettingsConfig {
         pending_updates: 0,
         failed_deliveries: 0,
         debug_mode: false,
-        backup_reminders_enabled: true,
+        backup_reminder_frequency: "Weekly".into(),
+        last_backup_display: "Never".into(),
     }
 }
 

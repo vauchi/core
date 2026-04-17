@@ -622,22 +622,18 @@ mod tests {
             assert!(!handle.is_null());
 
             let steps: &[&str] = &[
-                // 1: identity_check → welcome
+                // identity_check → default_name
                 r#"{"ActionPressed":{"action_id":"create_new"}}"#,
-                // 2: welcome → default_name
-                r#"{"ActionPressed":{"action_id":"get_started"}}"#,
-                // 3: set display name (on default_name screen)
+                // default_name: set display name (also stored as pending_display_name)
                 r#"{"TextChanged":{"component_id":"display_name","value":"TestUser"}}"#,
-                // 4: default_name → skip_gate
+                // default_name → groups_setup
                 r#"{"ActionPressed":{"action_id":"continue"}}"#,
-                // 5: skip_gate → security_explanation (fast path)
-                r#"{"ActionPressed":{"action_id":"skip_to_finish"}}"#,
-                // 6: security_explanation → backup_prompt
-                r#"{"ActionPressed":{"action_id":"continue"}}"#,
-                // 7: backup_prompt → ready
+                // groups_setup → contact_info
                 r#"{"ActionPressed":{"action_id":"skip"}}"#,
-                // 8: ready → Complete (creates identity)
-                r#"{"ActionPressed":{"action_id":"start"}}"#,
+                // contact_info → what_next
+                r#"{"ActionPressed":{"action_id":"skip"}}"#,
+                // what_next → CompleteWith(MainScreen) → create_identity
+                r#"{"ActionPressed":{"action_id":"start_app"}}"#,
             ];
 
             for step in steps {
@@ -1186,13 +1182,11 @@ mod tests {
 
             let steps: &[&str] = &[
                 r#"{"ActionPressed":{"action_id":"create_new"}}"#,
-                r#"{"ActionPressed":{"action_id":"get_started"}}"#,
                 r#"{"TextChanged":{"component_id":"display_name","value":"PersistTest"}}"#,
                 r#"{"ActionPressed":{"action_id":"continue"}}"#,
-                r#"{"ActionPressed":{"action_id":"skip_to_finish"}}"#,
-                r#"{"ActionPressed":{"action_id":"continue"}}"#,
                 r#"{"ActionPressed":{"action_id":"skip"}}"#,
-                r#"{"ActionPressed":{"action_id":"start"}}"#,
+                r#"{"ActionPressed":{"action_id":"skip"}}"#,
+                r#"{"ActionPressed":{"action_id":"start_app"}}"#,
             ];
             for step in steps {
                 let action = CString::new(*step).unwrap();
@@ -1245,13 +1239,11 @@ mod tests {
 
             let steps: &[&str] = &[
                 r#"{"ActionPressed":{"action_id":"create_new"}}"#,
-                r#"{"ActionPressed":{"action_id":"get_started"}}"#,
                 r#"{"TextChanged":{"component_id":"display_name","value":"KeyTest"}}"#,
                 r#"{"ActionPressed":{"action_id":"continue"}}"#,
-                r#"{"ActionPressed":{"action_id":"skip_to_finish"}}"#,
-                r#"{"ActionPressed":{"action_id":"continue"}}"#,
                 r#"{"ActionPressed":{"action_id":"skip"}}"#,
-                r#"{"ActionPressed":{"action_id":"start"}}"#,
+                r#"{"ActionPressed":{"action_id":"skip"}}"#,
+                r#"{"ActionPressed":{"action_id":"start_app"}}"#,
             ];
             for step in steps {
                 let action = CString::new(*step).unwrap();

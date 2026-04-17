@@ -386,3 +386,61 @@ pub fn diagnostic_scan_qr_with_config(
         laplacian_variance: result.laplacian_variance,
     }
 }
+
+// === YOLO Scanner (gated behind diagnostic-yolo) ===
+
+#[cfg(feature = "diagnostic-yolo")]
+use std::sync::Mutex;
+
+#[cfg(feature = "diagnostic-yolo")]
+static YOLO_DETECTOR: Mutex<Option<vauchi_core::diagnostic::yolo_detector::YoloDetector>> =
+    Mutex::new(None);
+
+/// Load the YOLO QR detector model from a file path.
+/// Must be called once before `diagnostic_scan_qr_yolo`.
+#[cfg(feature = "diagnostic-yolo")]
+#[uniffi::export]
+pub fn diagnostic_load_yolo_model(model_path: String) -> bool {
+    use vauchi_core::diagnostic::yolo_detector::YoloDetector;
+    match YoloDetector::load(std::path::Path::new(&model_path)) {
+        Ok(det) => {
+            *YOLO_DETECTOR.lock().unwrap() = Some(det);
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+/// Scan a QR code using YOLO detection → crop → rqrr decode.
+#[cfg(feature = "diagnostic-yolo")]
+#[uniffi::export]
+pub fn diagnostic_scan_qr_yolo(
+    luma_data: Vec<u8>,
+    width: u32,
+    height: u32,
+    confidence_threshold: f32,
+) -> MobileScanResult {
+    use vauchi_core::diagnostic::scanner::scan_qr_yolo;
+    let mut guard = YOLO_DETECTOR.lock().unwrap();
+    match guard.as_mut() {
+        Some(detector) => {
+            let result = scan_qr_yolo(detector, &luma_data, width, height, confidence_threshold);
+            MobileScanResult {
+                decoded: result.decoded,
+                total_us: result.total_us,
+                preprocessing_us: result.preprocessing_us,
+                decode_us: result.decode_us,
+                frame_skipped: result.frame_skipped,
+                laplacian_variance: result.laplacian_variance,
+            }
+        }
+        None => MobileScanResult {
+            decoded: None,
+            total_us: 0,
+            preprocessing_us: 0,
+            decode_us: 0,
+            frame_skipped: false,
+            laplacian_variance: 0.0,
+        },
+    }
+}

@@ -23,6 +23,8 @@ async-sync = ["tokio"]
 content-updates = ["vauchi-app/content-updates", "tokio"]
 # Diagnostic QR scanner benchmarking (forwards to vauchi-core)
 diagnostic-scanner = ["vauchi-core/diagnostic-scanner"]
+# YOLO-based QR detector (adds ort ONNX runtime)
+diagnostic-yolo = ["diagnostic-scanner", "vauchi-core/diagnostic-yolo"]
 
 [dependencies]
 # Core Vauchi library (with rustls for Android/iOS - no OpenSSL dependency)

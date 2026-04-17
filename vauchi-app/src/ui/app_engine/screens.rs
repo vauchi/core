@@ -207,7 +207,7 @@ impl AppEngine {
                         .load_backup_reminder_state()
                         .ok()
                         .and_then(|s| s.last_backup_timestamp)
-                        .map(|ts| format_relative_time(ts))
+                        .map(format_relative_time)
                         .unwrap_or_else(|| "Never".to_string()),
                 };
                 Box::new(SettingsEngine::new(config))

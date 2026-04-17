@@ -23,18 +23,17 @@ impl AppEngine {
             component_id,
             item_id,
         } = action
+            && component_id == "privacy"
         {
-            if component_id == "privacy" {
-                let config = self.vauchi.config_mut();
-                match item_id.as_str() {
-                    "delivery_receipts" => {
-                        config.delivery_receipts_enabled = !config.delivery_receipts_enabled;
-                    }
-                    "suppress_presence" => {
-                        config.suppress_presence = !config.suppress_presence;
-                    }
-                    _ => {}
+            let config = self.vauchi.config_mut();
+            match item_id.as_str() {
+                "delivery_receipts" => {
+                    config.delivery_receipts_enabled = !config.delivery_receipts_enabled;
                 }
+                "suppress_presence" => {
+                    config.suppress_presence = !config.suppress_presence;
+                }
+                _ => {}
             }
         }
 
@@ -43,16 +42,14 @@ impl AppEngine {
             component_id,
             item_id,
         } = action
+            && component_id == "backup"
+            && item_id == "backup_reminders"
+            && let Ok(mut state) = self.vauchi.load_backup_reminder_state()
         {
-            if component_id == "backup"
-                && item_id == "backup_reminders"
-                && let Ok(mut state) = self.vauchi.load_backup_reminder_state()
-            {
-                let next = state.frequency.next();
-                state.frequency = next;
-                state.reminders_enabled = next != vauchi_core::types::ReminderFrequency::Never;
-                let _ = self.vauchi.save_backup_reminder_state(&state);
-            }
+            let next = state.frequency.next();
+            state.frequency = next;
+            state.reminders_enabled = next != vauchi_core::types::ReminderFrequency::Never;
+            let _ = self.vauchi.save_backup_reminder_state(&state);
         }
     }
 

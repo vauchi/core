@@ -183,8 +183,9 @@ pub struct DemoContactState {
 }
 
 /// How often to remind about backups.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ReminderFrequency {
+    #[default]
     Weekly,
     Monthly,
     Never,
@@ -223,12 +224,6 @@ impl ReminderFrequency {
             Self::Monthly => Some(30 * 24 * 60 * 60),
             Self::Never => None,
         }
-    }
-}
-
-impl Default for ReminderFrequency {
-    fn default() -> Self {
-        Self::Weekly
     }
 }
 

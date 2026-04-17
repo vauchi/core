@@ -497,7 +497,7 @@ impl Vauchi {
 
     /// Fetch a fresh OHTTP key from the relay and cache it in storage.
     fn fetch_and_cache_ohttp_key(&self, relay_url: &str) -> VauchiResult<Vec<u8>> {
-        let transport = self.create_bare_transport();
+        let transport = self.create_bootstrap_transport_direct();
         let key_bytes = transport.fetch_ohttp_key().map_err(VauchiError::Network)?;
         self.storage.save_ohttp_key(relay_url, &key_bytes)?;
         Ok(key_bytes)
@@ -555,7 +555,7 @@ impl Vauchi {
         relay_url: &str,
         verify_key: &[u8; 32],
     ) -> VauchiResult<Vec<PinnedCertificate>> {
-        let transport = self.create_bare_transport();
+        let transport = self.create_bootstrap_transport_direct();
         let pins = transport
             .fetch_pin_config(verify_key)
             .map_err(VauchiError::Network)?;
@@ -563,14 +563,21 @@ impl Vauchi {
         Ok(pins)
     }
 
-    /// Create a bare `HttpTransport` (no OHTTP, direct allowed) for
-    /// bootstrap operations: fetching the OHTTP key, health checks,
-    /// and pin-config refresh.
+    /// Create an `HttpTransport` in direct (non-OHTTP) mode for the
+    /// bootstrap operations that cannot themselves go through OHTTP:
+    /// fetching the gateway key, health checks, and pin-config refresh.
+    ///
+    /// This is the documented exception to the "all relay traffic flows
+    /// through OHTTP" rule — see the §Bootstrap Exceptions section of
+    /// `docs/docs/developers/threat-model.md`. The caller's IP is visible
+    /// to the relay for these requests. In production, bundled keys
+    /// (`OhttpConfig::bundled_gateway_key`) eliminate the OHTTP-key fetch
+    /// entirely; pin-config refresh remains the infrequent exception.
     ///
     /// Uses only bundled pins (not `resolve_pins`) to avoid circular
     /// dependency: pin-config fetch must not depend on cached pins
     /// from a previous pin-config fetch.
-    fn create_bare_transport(&self) -> HttpTransport {
+    fn create_bootstrap_transport_direct(&self) -> HttpTransport {
         HttpTransport::new(HttpTransportConfig {
             relay_url: self.http_relay_url(),
             timeout_ms: self.config.relay.connect_timeout_ms,

@@ -126,6 +126,26 @@ impl Default for HttpTransportConfig {
     }
 }
 
+impl HttpTransportConfig {
+    /// Test-only constructor that sets `allow_direct: true` with no pins
+    /// or proxy, so tests can hit a local relay over plain HTTP.
+    ///
+    /// Production callers must never use this — `allow_direct: true` leaks
+    /// the client's source IP to the relay, defeating ADR-037. The CI
+    /// `check-no-allow-direct` lint treats every non-test `allow_direct: true`
+    /// as a hard failure; this helper exists so tests do not trip it.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn for_testing(relay_url: impl Into<String>, timeout_ms: u64) -> Self {
+        Self {
+            relay_url: relay_url.into(),
+            timeout_ms,
+            proxy: ProxyConfig::None,
+            allow_direct: true,
+            pinned_certs: Vec::new(),
+        }
+    }
+}
+
 /// HTTP transport for relay v2 protocol.
 ///
 /// Uses `ureq` (sync HTTP) — no async runtime required. Each method
@@ -803,13 +823,10 @@ mod tests {
 
     #[test]
     fn test_http_transport_creation() {
-        let transport = HttpTransport::new(HttpTransportConfig {
-            relay_url: "http://localhost:8080".into(),
-            timeout_ms: 5000,
-            proxy: ProxyConfig::None,
-            allow_direct: true,
-            pinned_certs: vec![],
-        });
+        let transport = HttpTransport::new(HttpTransportConfig::for_testing(
+            "http://localhost:8080",
+            5000,
+        ));
         assert_eq!(transport.relay_url(), "http://localhost:8080");
         assert_eq!(transport.proxy(), &ProxyConfig::None);
     }
@@ -877,13 +894,8 @@ mod tests {
 
     #[test]
     fn test_send_update_direct_connection_refused() {
-        let transport = HttpTransport::new(HttpTransportConfig {
-            relay_url: "http://127.0.0.1:1".into(),
-            timeout_ms: 1000,
-            proxy: ProxyConfig::None,
-            allow_direct: true,
-            pinned_certs: vec![],
-        });
+        let transport =
+            HttpTransport::new(HttpTransportConfig::for_testing("http://127.0.0.1:1", 1000));
         let result = transport.send_update(&"a".repeat(64), "dGVzdA==");
         assert!(result.is_err());
     }

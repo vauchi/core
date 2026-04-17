@@ -6,17 +6,10 @@
 
 #![cfg(feature = "network-http")]
 
-use vauchi_core::network::ProxyConfig;
 use vauchi_core::network::http_transport::{HttpTransport, HttpTransportConfig};
 
 fn test_transport() -> HttpTransport {
-    HttpTransport::new(HttpTransportConfig {
-        relay_url: "http://localhost:1".to_string(),
-        timeout_ms: 100,
-        proxy: ProxyConfig::None,
-        allow_direct: true,
-        pinned_certs: vec![],
-    })
+    HttpTransport::new(HttpTransportConfig::for_testing("http://localhost:1", 100))
 }
 
 // @scenario: relay_exchange :: offer endpoint exists on HttpTransport

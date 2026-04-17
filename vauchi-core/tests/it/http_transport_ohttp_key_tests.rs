@@ -10,20 +10,13 @@
 
 #![cfg(feature = "network-http")]
 
-use vauchi_core::network::ProxyConfig;
 use vauchi_core::network::http_transport::{HttpTransport, HttpTransportConfig};
 
 // @scenario: sync:OHTTP key fetch
 #[test]
 fn test_fetch_ohttp_key_builds_correct_url() {
-    let config = HttpTransportConfig {
-        relay_url: "http://localhost:1".to_string(),
-        timeout_ms: 1000,
-        proxy: ProxyConfig::None,
-        allow_direct: true,
-        pinned_certs: vec![],
-    };
-    let transport = HttpTransport::new(config);
+    let transport =
+        HttpTransport::new(HttpTransportConfig::for_testing("http://localhost:1", 1000));
     // Will fail with connection refused — but proves
     // the method exists and builds the right URL
     let err = transport.fetch_ohttp_key().unwrap_err();
@@ -41,13 +34,6 @@ fn test_fetch_ohttp_key_builds_correct_url() {
 fn test_fetch_ohttp_key_empty_response_is_error() {
     // This test verifies the method exists and returns
     // the right error type. Can't test with real relay.
-    let config = HttpTransportConfig {
-        relay_url: "http://localhost:1".to_string(),
-        timeout_ms: 100,
-        proxy: ProxyConfig::None,
-        allow_direct: true,
-        pinned_certs: vec![],
-    };
-    let transport = HttpTransport::new(config);
+    let transport = HttpTransport::new(HttpTransportConfig::for_testing("http://localhost:1", 100));
     assert!(transport.fetch_ohttp_key().is_err());
 }

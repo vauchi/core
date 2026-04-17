@@ -286,10 +286,13 @@ pub fn generate_throughput_sequence(
 ) -> Vec<ThroughputFrame> {
     let source = deterministic_payload(total_bytes);
 
-    // Estimate header overhead: "SEQ:999:999:" = ~13 bytes max
-    let header_budget = 16;
+    // Header overhead: "SEQ:{idx}:{total}:" — up to ~17 bytes for large sequences.
+    // Budget 20 bytes to cover sequences up to 99999 frames.
+    let header_budget = 20;
     let chunk_size = frame_capacity.saturating_sub(header_budget);
-    assert!(chunk_size > 0, "frame_capacity too small for header");
+    if chunk_size == 0 {
+        return Vec::new();
+    }
 
     let chunks: Vec<&str> = source
         .as_bytes()

@@ -6,8 +6,10 @@
 //!
 //! Provides rqrr-based QR decoding from raw grayscale (Y-plane) camera
 //! frames, with optional Tier 1 preprocessing (CLAHE, adaptive threshold,
-//! sharpness gating). Exposed via UniFFI for on-device A/B testing against
-//! platform-native scanners (ML Kit, AVFoundation).
+//! sharpness gating). Intended for future UniFFI export via vauchi-platform
+//! for on-device A/B testing against platform-native scanners.
+//!
+//! Only the first detected QR grid per frame is decoded.
 
 use image::GrayImage;
 use serde::{Deserialize, Serialize};

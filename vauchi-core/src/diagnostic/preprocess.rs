@@ -162,6 +162,11 @@ fn downscale_luma(img: GrayImage, target_width: u32) -> GrayImage {
     let dst_h = (src_h as f64 * scale).round() as u32;
     let dst_w = target_width;
 
+    // Guard against pathological aspect ratios (e.g. 4000x2 → dst_h=0)
+    if dst_w == 0 || dst_h == 0 {
+        return img;
+    }
+
     let src_image = Image::from_vec_u8(src_w, src_h, img.into_raw(), PixelType::U8)
         .expect("source image creation");
 

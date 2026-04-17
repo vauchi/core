@@ -143,7 +143,7 @@ ohttp = { version = "0.7", default-features = false, features = ["client", "rust
 rqrr = { version = "0.10", optional = true }
 
 # Image preprocessing for diagnostic scanner benchmarking (optional)
-imageproc = { version = "0.25", optional = true }
+imageproc = { version = "0.25", optional = true, default-features = false }
 fast_image_resize = { version = "5", optional = true, default-features = false }
 
 # Remote content updates — module moved to vauchi-app.

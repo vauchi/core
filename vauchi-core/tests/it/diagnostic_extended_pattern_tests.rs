@@ -8,6 +8,8 @@ use vauchi_core::diagnostic::tuner::*;
 #[test]
 fn extended_patterns_cover_all_ec_levels() {
     let patterns = generate_extended_qr_test_patterns();
+    // 4 EC levels × 8 payload sizes × 3 module sizes = 96
+    assert_eq!(patterns.len(), 96, "4 EC × 8 sizes × 3 modules");
     for ec in [
         ErrorCorrectionLevel::L,
         ErrorCorrectionLevel::M,
@@ -90,14 +92,9 @@ fn throughput_sequence_splits_correctly() {
     let capacity = 1400;
     let frames = generate_throughput_sequence(total, capacity);
 
-    assert!(!frames.is_empty());
-    // With 16-byte header budget, chunk_size = 1384
-    // 50000 / 1384 = ~36.1, so 37 frames
-    assert!(
-        frames.len() >= 36 && frames.len() <= 38,
-        "expected ~36-37 frames, got {}",
-        frames.len()
-    );
+    // chunk_size = 1400 - 20 (header budget) = 1380
+    // ceil(50000 / 1380) = 37 frames
+    assert_eq!(frames.len(), 37, "50000 bytes / 1380 chunk = 37 frames");
 }
 
 // @internal

@@ -55,7 +55,10 @@ fn rqrr_raw_decodes_simple_qr() {
         Some("HELLO12345"),
         "should decode simple QR"
     );
-    assert!(!result.frame_skipped);
+    assert!(
+        !result.frame_skipped,
+        "valid QR frame should not be skipped"
+    );
 }
 
 // @internal
@@ -90,7 +93,10 @@ fn rqrr_raw_returns_none_on_garbage() {
     let garbage: Vec<u8> = (0..100 * 100).map(|i| ((i * 37 + 7) % 256) as u8).collect();
     let result = scan_qr_from_luma(ScannerBackend::RqrrRaw, &garbage, 100, 100);
     assert!(result.decoded.is_none(), "should not decode garbage data");
-    assert!(!result.frame_skipped);
+    assert!(
+        !result.frame_skipped,
+        "valid QR frame should not be skipped"
+    );
 }
 
 // @internal

@@ -35,7 +35,7 @@ pub struct GuardianToken {
     guardian_pk: [u8; 32],
     /// Unix timestamp (seconds) when the token was created.
     created_at: u64,
-    /// Ed25519 signature over `guardian_pk || GUARDIAN_DOMAIN`.
+    /// Ed25519 signature over `GUARDIAN_DOMAIN || designator_pk || guardian_pk || created_at (LE)`.
     #[serde_as(as = "[_; 64]")]
     signature: [u8; 64],
 }
@@ -53,6 +53,7 @@ impl GuardianToken {
     ///
     /// This constructor exists for adversarial testing (forgery tests). In
     /// production use `create` instead.
+    #[doc(hidden)]
     pub fn create_with_claimed_pk(
         signer: &SigningKeyPair,
         claimed_designator_pk: PublicKey,
@@ -63,7 +64,11 @@ impl GuardianToken {
             .expect("system time must be after UNIX_EPOCH")
             .as_secs();
 
-        let msg = build_signed_message(guardian_pk.as_bytes());
+        let msg = build_signed_message(
+            claimed_designator_pk.as_bytes(),
+            guardian_pk.as_bytes(),
+            created_at,
+        );
         let signature = signer.sign(&msg);
 
         Self {
@@ -80,7 +85,7 @@ impl GuardianToken {
     pub fn verify(&self) -> bool {
         let pk = PublicKey::from_bytes(self.designator_pk);
         let sig = Signature::from_bytes(self.signature);
-        let msg = build_signed_message(&self.guardian_pk);
+        let msg = build_signed_message(&self.designator_pk, &self.guardian_pk, self.created_at);
         pk.verify(&msg, &sig)
     }
 
@@ -124,10 +129,18 @@ impl GuardianToken {
     }
 }
 
-/// Builds the message that is signed: `guardian_pk_bytes || GUARDIAN_DOMAIN`.
-fn build_signed_message(guardian_pk: &[u8; 32]) -> Vec<u8> {
-    let mut msg = Vec::with_capacity(guardian_pk.len() + GUARDIAN_DOMAIN.len());
-    msg.extend_from_slice(guardian_pk);
+/// Builds the message that is signed:
+/// `GUARDIAN_DOMAIN || designator_pk || guardian_pk || created_at (8 bytes LE)`.
+fn build_signed_message(
+    designator_pk: &[u8; 32],
+    guardian_pk: &[u8; 32],
+    created_at: u64,
+) -> Vec<u8> {
+    let mut msg =
+        Vec::with_capacity(GUARDIAN_DOMAIN.len() + designator_pk.len() + guardian_pk.len() + 8);
     msg.extend_from_slice(GUARDIAN_DOMAIN);
+    msg.extend_from_slice(designator_pk);
+    msg.extend_from_slice(guardian_pk);
+    msg.extend_from_slice(&created_at.to_le_bytes());
     msg
 }

@@ -677,40 +677,47 @@ fn test_mobile_design_tokens_matches_core_defaults() {
     );
 }
 
-// === QR Matrix Generation ===
+// === QR Bitmap Generation ===
 
 // @internal
 #[test]
-fn generate_qr_matrix_produces_valid_square_matrix() {
-    use vauchi_platform::{MobileQrEccLevel, generate_qr_matrix};
+fn generate_qr_bitmap_produces_valid_square_image() {
+    use vauchi_platform::{MobileQrEccLevel, generate_qr_bitmap};
 
-    let result = generate_qr_matrix("hello world".to_string(), MobileQrEccLevel::Medium).unwrap();
-    assert!(result.width > 0, "width must be positive");
+    let result = generate_qr_bitmap(
+        "hello world".into(),
+        512,
+        MobileQrEccLevel::Medium,
+        0,
+        255,
+        4,
+    )
+    .unwrap();
+    assert_eq!(result.size, 512, "size must match requested");
     assert_eq!(
-        result.modules.len(),
-        (result.width * result.width) as usize,
-        "modules length must equal width²"
+        result.pixels.len(),
+        (512 * 512) as usize,
+        "pixels length must equal size²"
     );
-    // QR Version 1 is 21x21 + 8 quiet zone = 29x29
-    assert!(result.width >= 29, "minimum QR + quiet zone is 29");
 }
 
 // @internal
 #[test]
-fn generate_qr_matrix_has_dark_modules() {
-    use vauchi_platform::{MobileQrEccLevel, generate_qr_matrix};
+fn generate_qr_bitmap_has_dark_and_light_pixels() {
+    use vauchi_platform::{MobileQrEccLevel, generate_qr_bitmap};
 
-    let result = generate_qr_matrix("test data".to_string(), MobileQrEccLevel::Low).unwrap();
-    let dark_count = result.modules.iter().filter(|&&m| m).count();
-    let light_count = result.modules.iter().filter(|&&m| !m).count();
-    assert!(dark_count > 0, "QR code must have dark modules");
-    assert!(light_count > 0, "QR code must have light modules");
+    let result =
+        generate_qr_bitmap("test data".into(), 256, MobileQrEccLevel::Low, 0, 255, 4).unwrap();
+    let dark_count = result.pixels.iter().filter(|&&p| p == 0).count();
+    let light_count = result.pixels.iter().filter(|&&p| p == 255).count();
+    assert!(dark_count > 0, "bitmap must have dark pixels");
+    assert!(light_count > 0, "bitmap must have light pixels");
 }
 
 // @internal
 #[test]
-fn generate_qr_matrix_ecc_levels_all_work() {
-    use vauchi_platform::{MobileQrEccLevel, generate_qr_matrix};
+fn generate_qr_bitmap_ecc_levels_all_work() {
+    use vauchi_platform::{MobileQrEccLevel, generate_qr_bitmap};
 
     for ecc in [
         MobileQrEccLevel::Low,
@@ -718,74 +725,58 @@ fn generate_qr_matrix_ecc_levels_all_work() {
         MobileQrEccLevel::Quartile,
         MobileQrEccLevel::High,
     ] {
-        let result = generate_qr_matrix("ecc test".to_string(), ecc).unwrap();
-        assert!(result.width > 0);
-        assert_eq!(result.modules.len(), (result.width * result.width) as usize);
+        let result = generate_qr_bitmap("ecc test".into(), 256, ecc, 0, 255, 4).unwrap();
+        assert_eq!(result.size, 256);
+        assert_eq!(result.pixels.len(), 256 * 256);
     }
 }
 
 // @internal
 #[test]
-fn generate_qr_matrix_higher_ecc_produces_larger_or_equal_qr() {
-    use vauchi_platform::{MobileQrEccLevel, generate_qr_matrix};
+fn generate_qr_bitmap_custom_colors() {
+    use vauchi_platform::{MobileQrEccLevel, generate_qr_bitmap};
 
-    let low = generate_qr_matrix(
-        "same data for comparison".to_string(),
-        MobileQrEccLevel::Low,
+    // Gray QR: dark=64, light=224
+    let result = generate_qr_bitmap(
+        "gray test".into(),
+        256,
+        MobileQrEccLevel::Medium,
+        64,
+        224,
+        4,
     )
     .unwrap();
-    let high = generate_qr_matrix(
-        "same data for comparison".to_string(),
-        MobileQrEccLevel::High,
-    )
-    .unwrap();
+    let has_dark = result.pixels.iter().any(|&p| p == 64);
+    let has_light = result.pixels.iter().any(|&p| p == 224);
+    assert!(has_dark, "bitmap must contain dark color (64)");
+    assert!(has_light, "bitmap must contain light color (224)");
+    // No other pixel values should exist
     assert!(
-        high.width >= low.width,
-        "higher ECC should produce equal or larger QR: low={}, high={}",
-        low.width,
-        high.width
+        result.pixels.iter().all(|&p| p == 64 || p == 224),
+        "bitmap should only contain dark and light values"
     );
 }
 
 // @internal
 #[test]
-fn generate_qr_matrix_roundtrips_with_scanner() {
+fn generate_qr_bitmap_roundtrips_with_scanner() {
     use vauchi_platform::{
-        MobileQrEccLevel, MobileScannerBackend, diagnostic_scan_qr, generate_qr_matrix,
+        MobileQrEccLevel, MobileScannerBackend, diagnostic_scan_qr, generate_qr_bitmap,
     };
 
     let data = "wb://roundtrip-test-data-12345";
-    let matrix = generate_qr_matrix(data.to_string(), MobileQrEccLevel::Medium).unwrap();
-
-    // Render matrix as grayscale image (8 pixels per module)
-    let module_px = 8u32;
-    let img_size = matrix.width * module_px;
-    let mut luma = vec![255u8; (img_size * img_size) as usize]; // white background
-
-    for y in 0..matrix.width {
-        for x in 0..matrix.width {
-            if matrix.modules[(y * matrix.width + x) as usize] {
-                // Dark module — fill with black pixels
-                for dy in 0..module_px {
-                    for dx in 0..module_px {
-                        let px = (x * module_px + dx) as usize;
-                        let py = (y * module_px + dy) as usize;
-                        luma[py * img_size as usize + px] = 0;
-                    }
-                }
-            }
-        }
-    }
+    // Render at 512px with default black/white — the bitmap IS the luma image
+    let bitmap = generate_qr_bitmap(data.into(), 512, MobileQrEccLevel::Medium, 0, 255, 4).unwrap();
 
     let result = diagnostic_scan_qr(
         MobileScannerBackend::RqrrPreprocessed,
-        luma,
-        img_size,
-        img_size,
+        bitmap.pixels,
+        bitmap.size,
+        bitmap.size,
     );
     assert_eq!(
         result.decoded.as_deref(),
         Some(data),
-        "scanner should decode what generate_qr_matrix produced"
+        "scanner should decode what generate_qr_bitmap produced"
     );
 }

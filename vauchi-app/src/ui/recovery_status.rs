@@ -177,6 +177,7 @@ impl RecoveryEngine {
                     data: qr_data,
                     mode: QrMode::Display,
                     label: Some("Recovery claim — scan to vouch".into()),
+                    scan_quality: None,
                     a11y: Some(A11y {
                         label: Some("Recovery claim QR code".into()),
                         hint: Some("Show this to trusted contacts so they can vouch for you".into()),

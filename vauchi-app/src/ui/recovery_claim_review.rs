@@ -343,6 +343,7 @@ impl RecoveryClaimReviewEngine {
                     data: "voucher-placeholder".into(),
                     mode: QrMode::Display,
                     label: Some("Recovery voucher".into()),
+                    scan_quality: None,
                     a11y: Some(A11y {
                         label: Some("Recovery voucher QR code".into()),
                         hint: Some("The recovering contact scans this to add your voucher".into()),

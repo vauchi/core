@@ -127,6 +127,10 @@ criteria = "safe-to-deploy"
 version = "0.4.44"
 criteria = "safe-to-deploy"
 
+[[exemptions.chrono-tz]]
+version = "0.10.4"
+criteria = "safe-to-deploy"
+
 [[exemptions.clang-sys]]
 version = "1.8.1"
 criteria = "safe-to-deploy"
@@ -137,6 +141,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.clap_derive]]
 version = "4.6.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.codepage-437]]
+version = "0.1.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.combine]]
@@ -197,6 +205,14 @@ criteria = "safe-to-run"
 
 [[exemptions.crypto-common]]
 version = "0.1.7"
+criteria = "safe-to-deploy"
+
+[[exemptions.csv]]
+version = "1.4.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.csv-core]]
+version = "0.1.13"
 criteria = "safe-to-deploy"
 
 [[exemptions.ctr]]
@@ -294,6 +310,10 @@ criteria = "safe-to-deploy"
 [[exemptions.fancy-regex]]
 version = "0.14.0"
 criteria = "safe-to-run"
+
+[[exemptions.fancy-regex]]
+version = "0.17.0"
+criteria = "safe-to-deploy"
 
 [[exemptions.fast_image_resize]]
 version = "5.5.0"
@@ -525,6 +545,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.moxcms]]
 version = "0.8.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.multimap]]
+version = "0.10.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.nalgebra]]
@@ -759,6 +783,14 @@ criteria = "safe-to-deploy"
 version = "0.3.1"
 criteria = "safe-to-run"
 
+[[exemptions.rxing]]
+version = "0.8.5"
+criteria = "safe-to-deploy"
+
+[[exemptions.rxing-one-d-proc-derive]]
+version = "0.8.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.safe_arch]]
 version = "0.7.4"
 criteria = "safe-to-deploy"
@@ -825,6 +857,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.siphasher]]
 version = "0.3.11"
+criteria = "safe-to-deploy"
+
+[[exemptions.siphasher]]
+version = "1.0.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.spin]]
@@ -919,6 +955,10 @@ criteria = "safe-to-deploy"
 version = "0.1.4"
 criteria = "safe-to-run"
 
+[[exemptions.unicode-segmentation]]
+version = "1.13.2"
+criteria = "safe-to-deploy"
+
 [[exemptions.untrusted]]
 version = "0.9.0"
 criteria = "safe-to-deploy"
@@ -929,6 +969,14 @@ criteria = "safe-to-deploy"
 
 [[exemptions.ureq-proto]]
 version = "0.6.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.uriparse]]
+version = "0.6.4"
+criteria = "safe-to-deploy"
+
+[[exemptions.urlencoding]]
+version = "2.1.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.utf8-zero]]

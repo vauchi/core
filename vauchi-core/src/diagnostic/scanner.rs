@@ -94,24 +94,12 @@ pub fn scan_qr_from_luma_with_config(
             }
         }
         ScannerBackend::RqrrPreprocessed => {
-            use super::preprocess::preprocess_frame;
-
-            let pre = preprocess_frame(img, preprocess_config);
-            if pre.skipped {
-                return ScanResult {
-                    decoded: None,
-                    total_us: total_start.elapsed().as_micros() as u64,
-                    preprocessing_us: pre.preprocess_time_us,
-                    decode_us: 0,
-                    frame_skipped: true,
-                    laplacian_variance: pre.laplacian_variance,
-                };
-            }
-            let result = decode_rqrr(pre.image);
+            // Use rxing tryHarder directly on the frame (no YOLO needed).
+            // rxing's built-in finder-pattern search handles perspective.
+            let result = decode_rxing_try_harder(&img);
             ScanResult {
                 total_us: total_start.elapsed().as_micros() as u64,
-                preprocessing_us: pre.preprocess_time_us,
-                laplacian_variance: pre.laplacian_variance,
+                preprocessing_us: 0,
                 ..result
             }
         }

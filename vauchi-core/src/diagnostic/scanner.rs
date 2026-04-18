@@ -94,13 +94,31 @@ pub fn scan_qr_from_luma_with_config(
             }
         }
         ScannerBackend::RqrrPreprocessed => {
-            // Use rxing tryHarder directly on the frame (no YOLO needed).
-            // rxing's built-in finder-pattern search handles perspective.
-            let result = decode_rxing_try_harder(&img);
+            // Multi-decoder pipeline optimized for animated V4 QR:
+            // 1. rxing fast (no tryHarder) — handles simple codes in ~10ms
+            // 2. rqrr fallback — different finder-pattern algorithm
+            // 3. rxing tryHarder — last resort, sub-pixel refinement
+            let fast = decode_rxing_fast(&img);
+            if fast.decoded.is_some() {
+                return ScanResult {
+                    total_us: total_start.elapsed().as_micros() as u64,
+                    preprocessing_us: 0,
+                    ..fast
+                };
+            }
+            let rqrr = decode_rqrr(img.clone());
+            if rqrr.decoded.is_some() {
+                return ScanResult {
+                    total_us: total_start.elapsed().as_micros() as u64,
+                    preprocessing_us: 0,
+                    ..rqrr
+                };
+            }
+            let hard = decode_rxing_try_harder(&img);
             ScanResult {
                 total_us: total_start.elapsed().as_micros() as u64,
                 preprocessing_us: 0,
-                ..result
+                ..hard
             }
         }
         #[cfg(feature = "diagnostic-yolo")]
@@ -232,6 +250,37 @@ fn decode_rqrr(img: GrayImage) -> ScanResult {
     ScanResult {
         decoded,
         total_us: 0, // set by caller
+        preprocessing_us: 0,
+        decode_us,
+        frame_skipped: false,
+        laplacian_variance: 0.0,
+    }
+}
+
+/// Fast rxing decode without tryHarder — optimized for clean, simple QR
+/// codes like animated V4 frames. ~10ms on 480p.
+fn decode_rxing_fast(img: &GrayImage) -> ScanResult {
+    let decode_start = std::time::Instant::now();
+    let (w, h) = img.dimensions();
+    let luma = img.as_raw().clone();
+
+    let mut hints = rxing::DecodeHints::default();
+    hints.TryHarder = Some(false);
+
+    let decoded = rxing::helpers::detect_in_luma_with_hints(
+        luma,
+        w,
+        h,
+        Some(rxing::BarcodeFormat::QR_CODE),
+        &mut hints,
+    )
+    .ok()
+    .map(|r| r.getText().to_string());
+
+    let decode_us = decode_start.elapsed().as_micros() as u64;
+    ScanResult {
+        decoded,
+        total_us: 0,
         preprocessing_us: 0,
         decode_us,
         frame_skipped: false,

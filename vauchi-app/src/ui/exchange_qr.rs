@@ -114,16 +114,15 @@ impl QrStep {
 }
 
 /// Builds the "Share Your Code" screen.
+///
+/// `qr_data` is the current animated frame string (or full payload for
+/// static QR). The engine handles frame cycling via `advance_qr_frame()`.
 pub(super) fn build_show_qr_screen(
-    session: Option<&ExchangeSession>,
+    qr_data: &str,
     config_name: &str,
-    config_qr_data: &str,
     progress: Progress,
 ) -> ScreenModel {
-    let qr_data = session
-        .and_then(|s| s.qr())
-        .map(|qr| qr.to_data_string())
-        .unwrap_or_else(|| config_qr_data.to_owned());
+    let qr_data = qr_data.to_owned();
 
     ScreenModel {
         screen_id: "exchange_show_qr".into(),
@@ -485,7 +484,7 @@ mod tests {
             total_steps: 5,
             label: None,
         };
-        let screen = build_show_qr_screen(None, "Alice", "qr-data", progress);
+        let screen = build_show_qr_screen("qr-data", "Alice", progress);
         let qr = &screen.components[0];
         match qr {
             Component::QrCode { scan_quality, .. } => {

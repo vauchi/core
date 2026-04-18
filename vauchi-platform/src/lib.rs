@@ -61,10 +61,11 @@ pub use content::{
 };
 pub use diagnostic::{
     MobileCameraConfig, MobileDeviceCapabilityProfile, MobileErrorCorrectionLevel, MobileFpsRange,
-    MobilePlatform, MobileQrConfig, MobileQrTestPattern, MobileScoredConfig, MobileSweepMatrix,
-    MobileThroughputFrame, MobileTuningResult, diagnostic_generate_extended_qr_test_patterns,
-    diagnostic_generate_qr_test_patterns, diagnostic_generate_sweep_matrix,
-    diagnostic_generate_throughput_sequence, diagnostic_rank_configs, diagnostic_score_config,
+    MobilePlatform, MobileQrConfig, MobileQrEccLevel, MobileQrMatrix, MobileQrTestPattern,
+    MobileScoredConfig, MobileSweepMatrix, MobileThroughputFrame, MobileTuningResult,
+    diagnostic_generate_extended_qr_test_patterns, diagnostic_generate_qr_test_patterns,
+    diagnostic_generate_sweep_matrix, diagnostic_generate_throughput_sequence,
+    diagnostic_rank_configs, diagnostic_score_config, generate_qr_matrix,
 };
 #[cfg(feature = "diagnostic-scanner")]
 pub use diagnostic::{

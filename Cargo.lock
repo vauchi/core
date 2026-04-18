@@ -5013,6 +5013,7 @@ dependencies = [
  "criterion",
  "hex",
  "proptest",
+ "qrcode",
  "serde",
  "serde_json",
  "tempfile",

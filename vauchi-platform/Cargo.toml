@@ -57,6 +57,9 @@ zxcvbn = "3.0"
 # CRC32 checksums for multipart QR codec
 crc32fast = "1.4"
 
+# QR code generation (replaces ZXing on Android, used for all platforms)
+qrcode = { version = "0.14", default-features = false }
+
 [[bin]]
 name = "uniffi-bindgen"
 path = "uniffi-bindgen.rs"

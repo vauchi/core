@@ -287,6 +287,68 @@ pub fn diagnostic_generate_throughput_sequence(
         .collect()
 }
 
+// === QR Code Generation — replaces ZXing/ML Kit on mobile ===
+
+/// Error correction level for QR generation.
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum MobileQrEccLevel {
+    Low,
+    Medium,
+    Quartile,
+    High,
+}
+
+/// QR code as a flat boolean matrix (row-major).
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileQrMatrix {
+    /// Module grid width (= height, QR codes are square).
+    pub width: u32,
+    /// Row-major module data: `true` = dark module, `false` = light module.
+    /// Length = width * width.
+    pub modules: Vec<bool>,
+}
+
+/// Generate a QR code matrix from a data string.
+///
+/// Returns the raw module grid with quiet zone included.
+/// Frontends render each module as pixels at their chosen scale.
+#[uniffi::export]
+pub fn generate_qr_matrix(data: String, ecc: MobileQrEccLevel) -> Result<MobileQrMatrix, String> {
+    use qrcode::{EcLevel, QrCode};
+
+    let ec = match ecc {
+        MobileQrEccLevel::Low => EcLevel::L,
+        MobileQrEccLevel::Medium => EcLevel::M,
+        MobileQrEccLevel::Quartile => EcLevel::Q,
+        MobileQrEccLevel::High => EcLevel::H,
+    };
+
+    let code = QrCode::with_error_correction_level(data.as_bytes(), ec)
+        .map_err(|e| format!("QR generation failed: {e}"))?;
+
+    let colors = code.to_colors();
+    let qr_width = code.width() as u32;
+    // Add standard quiet zone (4 modules each side)
+    let quiet = 4u32;
+    let total_width = qr_width + 2 * quiet;
+    let mut modules = vec![false; (total_width * total_width) as usize];
+
+    for (i, color) in colors.iter().enumerate() {
+        let qx = (i as u32) % qr_width;
+        let qy = (i as u32) / qr_width;
+        if *color == qrcode::Color::Dark {
+            let px = qx + quiet;
+            let py = qy + quiet;
+            modules[(py * total_width + px) as usize] = true;
+        }
+    }
+
+    Ok(MobileQrMatrix {
+        width: total_width,
+        modules,
+    })
+}
+
 // === Scanner Backend — always available (rxing/rqrr are non-optional) ===
 
 #[derive(Debug, Clone, uniffi::Enum)]

@@ -9,7 +9,6 @@
 //! and make room for Link and BLE sub-flows in later tiers.
 
 use crate::ui::*;
-use vauchi_core::exchange::ExchangeSession;
 
 // ── Scan quality tracking ──────────────────────────────────────────
 

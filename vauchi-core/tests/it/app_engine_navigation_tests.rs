@@ -485,6 +485,20 @@ fn navigate_to_recovery_shows_recovery_status() {
 
 // @internal
 #[test]
+fn navigate_to_recovery_claim_review_shows_review() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    let screen = engine.navigate_to(AppScreen::RecoveryClaimReview);
+    assert_eq!(screen.screen_id, "recovery_claim_review");
+    assert!(
+        screen.actions.iter().any(|a| a.id == "reject"),
+        "Recovery claim review must have reject action"
+    );
+}
+
+// @internal
+#[test]
 fn navigate_to_privacy_shows_privacy_settings() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();

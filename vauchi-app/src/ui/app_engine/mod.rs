@@ -94,6 +94,7 @@ pub enum AppScreen {
     ArchivedContacts,
     DeviceReplacement,
     AvatarEditor,
+    RecoveryClaimReview,
 }
 
 impl AppScreen {
@@ -137,6 +138,7 @@ impl AppScreen {
             Self::ArchivedContacts => "archived_contacts",
             Self::DeviceReplacement => "device_replacement",
             Self::AvatarEditor => "avatar_editor",
+            Self::RecoveryClaimReview => "recovery_claim_review",
         }
     }
 
@@ -171,6 +173,7 @@ impl AppScreen {
             "archived_contacts" => Self::ArchivedContacts,
             "device_replacement" => Self::DeviceReplacement,
             "avatar_editor" => Self::AvatarEditor,
+            "recovery_claim_review" => Self::RecoveryClaimReview,
             _ => return None,
         })
     }

@@ -40,6 +40,9 @@ use crate::ui::more::MoreEngine;
 use crate::ui::my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, OwnFieldInfo};
 use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 use crate::ui::onboarding::OnboardingEngine;
+use crate::ui::recovery_claim_review::{
+    ClaimContext, Confidence, RecoveryClaimReviewEngine, ReviewMode,
+};
 use crate::ui::recovery_status::RecoveryEngine;
 use crate::ui::settings::{SettingsConfig, SettingsEngine};
 use crate::ui::support::SupportEngine;
@@ -705,6 +708,21 @@ impl AppEngine {
                 Box::new(crate::ui::avatar_editor::AvatarEditorEngine::new(
                     display_name,
                     has_existing_avatar,
+                ))
+            }
+            AppScreen::RecoveryClaimReview => {
+                // Default: vouching mode with low confidence placeholder.
+                // In production, AppEngine populates context from the scanned
+                // claim data before navigating here.
+                Box::new(RecoveryClaimReviewEngine::new(
+                    ReviewMode::Vouching,
+                    ClaimContext {
+                        contact_name: "Unknown".into(),
+                        old_pk_fingerprint: String::new(),
+                        mutual_voucher_count: 0,
+                        threshold: 3,
+                        confidence: Confidence::Low,
+                    },
                 ))
             }
             AppScreen::VerifyFingerprint { contact_id } => {

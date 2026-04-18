@@ -45,9 +45,17 @@ pub struct ScanResult {
 }
 
 /// Minimum Laplacian variance for Tier 2+3 fallback decoders.
-/// Below this, the frame is too blurry for any decoder to succeed — skip
-/// the expensive fallback tiers and save ~20-30ms per frame.
-const SHARPNESS_GATE_THRESHOLD: f32 = 50.0;
+///
+/// Conservative threshold: only gates extremely blurry frames (rapid motion
+/// blur, lens transition). Values below ~15 produce images where no decoder
+/// can find finder patterns. Values above ~50 risk gating frames that rxing
+/// tryHarder could decode with sub-pixel refinement.
+///
+/// **Not yet validated on device.** Adjust based on diagnostic tuner data
+/// from `_private/docs/investigations/` benchmark runs. The threshold is
+/// intentionally low to avoid false gating — a missed optimization is
+/// cheaper than a missed QR decode.
+const SHARPNESS_GATE_THRESHOLD: f32 = 15.0;
 
 /// Decode a QR code from a grayscale (Y-plane) image.
 ///

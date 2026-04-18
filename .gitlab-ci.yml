@@ -633,10 +633,14 @@ fuzz:nightly:
       TARGET_COUNT=$(echo $TARGETS | wc -w | tr -d ' ')
       echo "=== Fuzzing ${TARGET_COUNT} targets, ${FUZZ_JOBS} parallel, ${FUZZ_DURATION}s each ==="
 
+      # Run fuzz targets in parallel; capture exit code separately to avoid
+      # pipefail killing the script before the CRASH/PASS count check runs.
+      set +o pipefail
       echo "$TARGETS" | tr ' ' '\n' | grep -v '^$' | \
         xargs -P "$FUZZ_JOBS" -I{} sh -c \
           'echo "START: {}"; cargo +nightly fuzz run {} -- -max_total_time='"$FUZZ_DURATION"' 2>&1 && echo "PASS:{}" || echo "CRASH:{}"' \
           | tee /tmp/fuzz-output.log
+      set -o pipefail
 
       FAILED=$(grep -c '^CRASH:' /tmp/fuzz-output.log || true)
       PASSED=$(grep -c '^PASS:' /tmp/fuzz-output.log || true)

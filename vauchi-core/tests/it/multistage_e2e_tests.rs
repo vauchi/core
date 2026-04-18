@@ -28,7 +28,8 @@ fn run_full_exchange(
     bob.process_scanned_qr(&ai.data);
 
     // Stages 2-6: cycle through DATA, VERIFY, CONFIRM, READY
-    for _ in 0..500 {
+    // With 80-byte chunks, 32KB payloads need ~500+ rounds per side
+    for _ in 0..2000 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
         if let Some(aq) = &aq {
@@ -740,11 +741,11 @@ fn test_adaptive_display_durations() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());
     let mut bob = MultiStageSession::new(b"Bob".to_vec());
 
-    // INIT should be ~600ms (±20% jitter: 480–720ms)
+    // INIT should be ~400ms (±20% jitter: 320–480ms)
     let init_qr = alice.get_display_qr().unwrap();
     assert!(
-        (480..=720).contains(&init_qr.display_duration_ms),
-        "INIT display should be ~600ms, got {}",
+        (320..=480).contains(&init_qr.display_duration_ms),
+        "INIT display should be ~400ms, got {}",
         init_qr.display_duration_ms
     );
 
@@ -753,11 +754,11 @@ fn test_adaptive_display_durations() {
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&init_qr.data);
 
-    // DATA should be ~250ms (±20%: 200–300ms)
+    // DATA should be ~100ms (±20%: 80–120ms) — animated V4 QR at 10fps
     let data_qr = alice.get_display_qr().unwrap();
     assert!(
-        (200..=300).contains(&data_qr.display_duration_ms),
-        "DATA display should be ~250ms, got {}",
+        (80..=120).contains(&data_qr.display_duration_ms),
+        "DATA display should be ~100ms, got {}",
         data_qr.display_duration_ms
     );
 
@@ -776,12 +777,12 @@ fn test_adaptive_display_durations() {
         }
     }
 
-    // COMBO/RDYY should be ~500ms (±20%: 400–600ms)
+    // RDYY should be ~400ms (±20%: 320–480ms)
     if matches!(alice.get_state(), ProtocolState::Complete) {
         let combo_qr = alice.get_display_qr().unwrap();
         assert!(
-            (400..=600).contains(&combo_qr.display_duration_ms),
-            "COMBO display should be ~500ms, got {}",
+            (320..=480).contains(&combo_qr.display_duration_ms),
+            "RDYY display should be ~400ms, got {}",
             combo_qr.display_duration_ms
         );
     }

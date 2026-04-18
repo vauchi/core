@@ -59,7 +59,7 @@ proptest! {
         let alice_data_clone = alice_data.clone();
         let bob_data_clone = bob_data.clone();
 
-        let (alice, bob) = run_exchange(alice_data, bob_data, 500);
+        let (alice, bob) = run_exchange(alice_data, bob_data, 1500);
 
         prop_assert!(matches!(alice.get_state(), ProtocolState::Finalized),
             "Alice did not reach Complete, got: {:?}", alice.get_state());
@@ -97,7 +97,7 @@ fn regression_asymmetric_payload_deadlock() {
     let alice_data = vec![0xAA; 500];
     let bob_data = vec![0xBB; 19_000];
 
-    let (alice, bob) = run_exchange(alice_data.clone(), bob_data.clone(), 200);
+    let (alice, bob) = run_exchange(alice_data.clone(), bob_data.clone(), 1000);
 
     assert!(
         matches!(alice.get_state(), ProtocolState::Finalized),
@@ -120,7 +120,7 @@ fn regression_extreme_asymmetry() {
     let alice_data = vec![0x42; 1];
     let bob_data = vec![0xFF; 19_999];
 
-    let (alice, bob) = run_exchange(alice_data.clone(), bob_data.clone(), 500);
+    let (alice, bob) = run_exchange(alice_data.clone(), bob_data.clone(), 1000);
 
     assert!(
         matches!(alice.get_state(), ProtocolState::Finalized),

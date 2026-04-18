@@ -203,7 +203,7 @@ fn test_exchange_with_large_payload() {
     alice.process_scanned_qr(&bob_init.data);
     bob.process_scanned_qr(&alice_init.data);
 
-    for _ in 0..200 {
+    for _ in 0..1000 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
         if let Some(aq) = &aq {

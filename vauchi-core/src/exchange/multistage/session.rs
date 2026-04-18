@@ -35,9 +35,12 @@ use super::qr_codec::{self, StageQr};
 use super::types::{ChunkBitmap, ProtocolState, QrPayload};
 
 /// Maximum raw payload bytes per chunk (before transport encryption overhead).
-/// Transport encryption adds 12 (nonce) + 16 (Poly1305 tag) = 28 bytes overhead,
-/// so with 500-byte QR chunk budget the usable payload is 472 bytes.
-const CHUNK_PAYLOAD_SIZE: usize = 472;
+/// Transport encryption adds 12 (nonce) + 16 (Poly1305 tag) = 28 bytes overhead.
+///
+/// V4-optimized: 80 bytes → ~108 bytes encrypted → ~162 base45 chars.
+/// With ~44 chars DATA header → ~206 total chars → fits V10 QR at ECC-M (213 chars).
+/// Produces small, trivially decodable QR codes at 240p in ~9ms.
+const CHUNK_PAYLOAD_SIZE: usize = 80;
 
 /// HKDF info string for transport key derivation.
 const HKDF_INFO: &[u8] = b"vauchi-multistage-v1";
@@ -65,11 +68,11 @@ const FINALIZED_GRACE_DURATION: Duration = Duration::from_secs(60);
 /// Base display durations per QR type (jitter added at runtime).
 /// Tuned for <5s total exchange on typical hardware.
 /// Shorter = more scan opportunities per second = faster convergence.
-const DISPLAY_MS_INIT: u32 = 600;
-const DISPLAY_MS_DATA: u32 = 250;
-const DISPLAY_MS_VRFY: u32 = 400;
-const DISPLAY_MS_CONF: u32 = 400;
-const DISPLAY_MS_RDYY: u32 = 500;
+const DISPLAY_MS_INIT: u32 = 400;
+const DISPLAY_MS_DATA: u32 = 100; // 10fps animated — rxing decodes in ~10ms at 240p
+const DISPLAY_MS_VRFY: u32 = 300;
+const DISPLAY_MS_CONF: u32 = 300;
+const DISPLAY_MS_RDYY: u32 = 400;
 const DISPLAY_MS_FAIL: u32 = 400;
 
 /// Add ±20% jitter to prevent synchronization lock between two devices.

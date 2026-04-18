@@ -313,7 +313,10 @@ pub struct MobileQrMatrix {
 /// Returns the raw module grid with quiet zone included.
 /// Frontends render each module as pixels at their chosen scale.
 #[uniffi::export]
-pub fn generate_qr_matrix(data: String, ecc: MobileQrEccLevel) -> Result<MobileQrMatrix, String> {
+pub fn generate_qr_matrix(
+    data: String,
+    ecc: MobileQrEccLevel,
+) -> Result<MobileQrMatrix, crate::error::MobileError> {
     use qrcode::{EcLevel, QrCode};
 
     let ec = match ecc {
@@ -323,8 +326,9 @@ pub fn generate_qr_matrix(data: String, ecc: MobileQrEccLevel) -> Result<MobileQ
         MobileQrEccLevel::High => EcLevel::H,
     };
 
-    let code = QrCode::with_error_correction_level(data.as_bytes(), ec)
-        .map_err(|e| format!("QR generation failed: {e}"))?;
+    let code = QrCode::with_error_correction_level(data.as_bytes(), ec).map_err(|e| {
+        crate::error::MobileError::ExchangeFailed(format!("QR generation failed: {e}"))
+    })?;
 
     let colors = code.to_colors();
     let qr_width = code.width() as u32;

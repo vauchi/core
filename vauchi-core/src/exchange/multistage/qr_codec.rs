@@ -57,8 +57,8 @@ pub enum StageQr {
     },
     Data {
         session_id: [u8; 16],
-        chunk_idx: u8,
-        chunk_total: u8,
+        chunk_idx: u16,
+        chunk_total: u16,
         ack_bitmap: Vec<u8>,
         crc: u16,
         payload: Vec<u8>,
@@ -105,7 +105,7 @@ pub enum StageQr {
 const SID_LEN: usize = 24; // base45(16 bytes) = 8 pairs × 3
 const F32_LEN: usize = 48; // base45(32 bytes) = 16 pairs × 3
 const CRC_LEN: usize = 3; // base45(2 bytes) = 1 pair × 3
-const IDX_LEN: usize = 3; // zero-padded decimal "000"–"255"
+const IDX_LEN: usize = 4; // zero-padded decimal "0000"–"9999"
 const ACK_LEN_LEN: usize = 2; // zero-padded decimal length of ack field "00"–"99"
 
 /// Name length field width (zero-padded decimal "00"–"99").
@@ -276,18 +276,18 @@ pub fn format_inid_qr(
 
 /// Format a DATA stage QR string with CRC-16 integrity check.
 ///
-/// Layout: `DATA<sid:24><idx:3>/<total:3><ack_len:2><ack:variable><crc:3><payload>`
+/// Layout: `DATA<sid:24><idx:4>/<total:4><ack_len:02><ack:variable><crc:3><payload>`
 pub fn format_data_qr(
     session_id: &[u8; 16],
-    chunk_idx: u8,
-    chunk_total: u8,
+    chunk_idx: u16,
+    chunk_total: u16,
     ack_bitmap: &[u8],
     payload: &[u8],
 ) -> String {
     let crc = crc16::compute(payload);
     let ack_encoded = base45::encode(ack_bitmap);
     format!(
-        "DATA{sid}{idx:03}/{total:03}{ack_len:02}{ack}{crc}{data}",
+        "DATA{sid}{idx:04}/{total:04}{ack_len:02}{ack}{crc}{data}",
         sid = base45::encode(session_id),
         idx = chunk_idx,
         total = chunk_total,
@@ -507,10 +507,10 @@ fn parse_data(body: &str) -> Result<StageQr, QrCodecError> {
     }
     let total_str = take(body, &mut pos, IDX_LEN)?;
 
-    let chunk_idx: u8 = idx_str
+    let chunk_idx: u16 = idx_str
         .parse()
         .map_err(|_| QrCodecError::InvalidFieldCount)?;
-    let chunk_total: u8 = total_str
+    let chunk_total: u16 = total_str
         .parse()
         .map_err(|_| QrCodecError::InvalidFieldCount)?;
 

@@ -29,10 +29,10 @@ pub enum ProtocolState {
     Advertising,
     Discovered,
     Transferring {
-        chunks_sent: u8,
-        chunks_total: u8,
-        chunks_received: u8,
-        peer_chunks_total: u8,
+        chunks_sent: u16,
+        chunks_total: u16,
+        chunks_received: u16,
+        peer_chunks_total: u16,
     },
     Verifying,
     Confirming,
@@ -48,11 +48,11 @@ pub enum ProtocolState {
 #[derive(Debug, Clone)]
 pub struct ChunkBitmap {
     bits: Vec<u8>,
-    total: u8,
+    total: u16,
 }
 
 impl ChunkBitmap {
-    pub fn new(total: u8) -> Self {
+    pub fn new(total: u16) -> Self {
         let byte_count = (total as usize).div_ceil(8);
         ChunkBitmap {
             bits: vec![0u8; byte_count],
@@ -61,25 +61,25 @@ impl ChunkBitmap {
     }
 
     #[allow(dead_code)]
-    pub fn total(&self) -> u8 {
+    pub fn total(&self) -> u16 {
         self.total
     }
 
-    pub fn mark_received(&mut self, index: u8) {
+    pub fn mark_received(&mut self, index: u16) {
         if index < self.total {
             self.bits[index as usize / 8] |= 1 << (index % 8);
         }
     }
 
-    pub fn has(&self, index: u8) -> bool {
+    pub fn has(&self, index: u16) -> bool {
         if index >= self.total {
             return false;
         }
         self.bits[index as usize / 8] & (1 << (index % 8)) != 0
     }
 
-    pub fn received_count(&self) -> u8 {
-        (0..self.total).filter(|&i| self.has(i)).count() as u8
+    pub fn received_count(&self) -> u16 {
+        (0..self.total).filter(|&i| self.has(i)).count() as u16
     }
 
     pub fn is_complete(&self) -> bool {
@@ -88,7 +88,7 @@ impl ChunkBitmap {
 
     /// Next un-received chunk index, or `None` if all received.
     #[allow(dead_code)]
-    pub fn next_missing(&self) -> Option<u8> {
+    pub fn next_missing(&self) -> Option<u16> {
         (0..self.total).find(|&i| !self.has(i))
     }
 
@@ -96,7 +96,7 @@ impl ChunkBitmap {
         self.bits.clone()
     }
 
-    pub fn from_bytes(bytes: &[u8], total: u8) -> Self {
+    pub fn from_bytes(bytes: &[u8], total: u16) -> Self {
         let byte_count = (total as usize).div_ceil(8);
         let mut bits = vec![0u8; byte_count];
         let copy_len = bits.len().min(bytes.len());

@@ -121,13 +121,13 @@ pub struct MultiStageSession {
 
     // Outbound chunks (transport-encrypted commitment ciphertext)
     outbound_chunks: Vec<Vec<u8>>,
-    outbound_total: u8,
+    outbound_total: u16,
 
     // Inbound tracking
     inbound_buffer: Option<ReassemblyBuffer>,
     inbound_bitmap: Option<ChunkBitmap>,
     peer_ack_bitmap: Option<ChunkBitmap>,
-    peer_chunks_total: Option<u8>,
+    peer_chunks_total: Option<u16>,
 
     // Reveal key received from peer
     peer_reveal_key: Option<[u8; 32]>,
@@ -142,7 +142,7 @@ pub struct MultiStageSession {
     init_qr_cache: Option<String>,
 
     // Current outbound chunk index for round-robin display
-    current_chunk_idx: u8,
+    current_chunk_idx: u16,
 
     // Display cycle counter — every Nth cycle, re-show INIT so a slower
     // peer still in Advertising can discover us.
@@ -354,9 +354,12 @@ impl MultiStageSession {
             }
             ProtocolState::Confirming => {
                 self.display_cycle += 1;
-                // Every 3rd cycle, re-show VRFY so a slower peer still in
-                // Verifying can process our reveal key before seeing CONF.
-                if self.display_cycle.is_multiple_of(3) {
+                // Interleave VRFY and CONF using cycle mod 7: show VRFY on
+                // phases 0,1,2 and CONF on phases 3,4,5,6. Using prime 7
+                // ensures coprimality with scan_every_n 2..6, so the scanner
+                // cycles through all phases and sees both frame types.
+                let phase = self.display_cycle % 7;
+                if phase < 3 {
                     let qr_data =
                         qr_codec::format_verify_qr(&self.session_id, self.commitment.reveal_key());
                     Some(QrPayload {
@@ -418,7 +421,9 @@ impl MultiStageSession {
                     .as_ref()
                     .map(|b| b.is_complete())
                     .unwrap_or(false);
-                if !all_acked && self.display_cycle.is_multiple_of(3) {
+                // Interleave DATA (3 per 7 cycles) when peer hasn't ACK'd.
+                let phase = self.display_cycle % 7;
+                if !all_acked && phase < 3 {
                     self.get_data_chunk_qr().or_else(|| self.get_combo_qr())
                 } else {
                     self.get_combo_qr()
@@ -438,7 +443,8 @@ impl MultiStageSession {
                     .as_ref()
                     .map(|b| b.is_complete())
                     .unwrap_or(false);
-                if !all_acked && self.display_cycle.is_multiple_of(3) {
+                let phase = self.display_cycle % 7;
+                if !all_acked && phase < 3 {
                     self.display_cycle += 1;
                     self.get_data_chunk_qr().or_else(|| self.get_combo_qr())
                 } else {
@@ -648,8 +654,8 @@ impl MultiStageSession {
 
     fn handle_data(
         &mut self,
-        chunk_idx: u8,
-        chunk_total: u8,
+        chunk_idx: u16,
+        chunk_total: u16,
         ack_bitmap_bytes: Vec<u8>,
         encrypted_payload: Vec<u8>,
     ) -> ProtocolState {
@@ -946,15 +952,16 @@ impl MultiStageSession {
         key
     }
 
-    fn transport_encrypt(&self, key: &[u8; 32], chunk_idx: u8, plaintext: &[u8]) -> Vec<u8> {
+    fn transport_encrypt(&self, key: &[u8; 32], chunk_idx: u16, plaintext: &[u8]) -> Vec<u8> {
         let nonce_bytes: [u8; 12] = crate::crypto::random_bytes();
+        let idx_aad = chunk_idx.to_le_bytes();
 
         let cipher = ChaCha20Poly1305::new(key.into());
         let nonce = chacha20poly1305::Nonce::from_slice(&nonce_bytes);
 
         let payload = Payload {
             msg: plaintext,
-            aad: &[chunk_idx],
+            aad: &idx_aad,
         };
         let ciphertext = cipher.encrypt(nonce, payload).expect("encryption failed");
 
@@ -968,20 +975,21 @@ impl MultiStageSession {
     fn transport_decrypt(
         &self,
         key: &[u8; 32],
-        chunk_idx: u8,
+        chunk_idx: u16,
         ciphertext: &[u8],
     ) -> Option<Vec<u8>> {
         if ciphertext.len() < 12 + 16 {
             return None;
         }
         let (nonce_bytes, encrypted) = ciphertext.split_at(12);
+        let idx_aad = chunk_idx.to_le_bytes();
 
         let cipher = ChaCha20Poly1305::new(key.into());
         let nonce = chacha20poly1305::Nonce::from_slice(nonce_bytes);
 
         let payload = Payload {
             msg: encrypted,
-            aad: &[chunk_idx],
+            aad: &idx_aad,
         };
         cipher.decrypt(nonce, payload).ok()
     }

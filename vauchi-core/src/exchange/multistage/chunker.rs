@@ -21,14 +21,14 @@ impl<'a> Chunker<'a> {
         }
     }
 
-    pub fn total_chunks(&self) -> u8 {
+    pub fn total_chunks(&self) -> u16 {
         if self.data.is_empty() {
             return 1;
         }
-        self.data.len().div_ceil(self.chunk_size) as u8
+        self.data.len().div_ceil(self.chunk_size) as u16
     }
 
-    pub fn chunk(&self, index: u8) -> Option<&[u8]> {
+    pub fn chunk(&self, index: u16) -> Option<&[u8]> {
         let start = index as usize * self.chunk_size;
         if start >= self.data.len() && index > 0 {
             return None;
@@ -41,12 +41,12 @@ impl<'a> Chunker<'a> {
 /// Reassembles chunks received out of order.
 pub struct ReassemblyBuffer {
     chunks: Vec<Option<Vec<u8>>>,
-    received: u8,
-    total: u8,
+    received: u16,
+    total: u16,
 }
 
 impl ReassemblyBuffer {
-    pub fn new(total: u8) -> Self {
+    pub fn new(total: u16) -> Self {
         ReassemblyBuffer {
             chunks: vec![None; total as usize],
             received: 0,
@@ -64,7 +64,7 @@ impl ReassemblyBuffer {
         }
     }
 
-    pub fn insert(&mut self, index: u8, data: Vec<u8>) {
+    pub fn insert(&mut self, index: u16, data: Vec<u8>) {
         if index < self.total && self.chunks[index as usize].is_none() {
             self.chunks[index as usize] = Some(data);
             self.received += 1;
@@ -72,7 +72,7 @@ impl ReassemblyBuffer {
     }
 
     #[allow(dead_code)]
-    pub fn has(&self, index: u8) -> bool {
+    pub fn has(&self, index: u16) -> bool {
         index < self.total && self.chunks[index as usize].is_some()
     }
 
@@ -80,7 +80,7 @@ impl ReassemblyBuffer {
         self.received == self.total
     }
 
-    pub fn received_count(&self) -> u8 {
+    pub fn received_count(&self) -> u16 {
         self.received
     }
 

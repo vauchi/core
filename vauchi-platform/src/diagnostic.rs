@@ -353,6 +353,87 @@ pub fn generate_qr_matrix(
     })
 }
 
+/// Pre-rendered QR code bitmap (grayscale, 8-bit).
+///
+/// Frontends wrap this directly into a native image (UIImage, NSImage,
+/// Bitmap) — no pixel loops needed on the frontend side.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileQrBitmap {
+    /// Bitmap width in pixels (= height, always square).
+    pub size: u32,
+    /// Row-major grayscale pixels, length = `size × size`.
+    /// 0 = dark (black), 255 = light (white), or custom values.
+    pub pixels: Vec<u8>,
+}
+
+/// Generate a ready-to-display QR code bitmap with quiet zone and scaling.
+///
+/// Renders the QR modules into a grayscale pixel buffer at the requested
+/// size. Frontends wrap the result into a native image with zero pixel
+/// arithmetic — all rendering happens in Rust.
+///
+/// - `data`: the string to encode
+/// - `size`: output bitmap width/height in pixels
+/// - `ecc`: error correction level
+/// - `dark`: grayscale value for dark modules (0 = black)
+/// - `light`: grayscale value for light modules (255 = white)
+/// - `margin`: quiet zone in modules (standard: 4)
+#[uniffi::export]
+pub fn generate_qr_bitmap(
+    data: String,
+    size: u32,
+    ecc: MobileQrEccLevel,
+    dark: u8,
+    light: u8,
+    margin: u32,
+) -> Result<MobileQrBitmap, crate::error::MobileError> {
+    use qrcode::{EcLevel, QrCode};
+
+    let ec = match ecc {
+        MobileQrEccLevel::Low => EcLevel::L,
+        MobileQrEccLevel::Medium => EcLevel::M,
+        MobileQrEccLevel::Quartile => EcLevel::Q,
+        MobileQrEccLevel::High => EcLevel::H,
+    };
+
+    let code = QrCode::with_error_correction_level(data.as_bytes(), ec).map_err(|e| {
+        crate::error::MobileError::ExchangeFailed(format!("QR generation failed: {e}"))
+    })?;
+
+    let qr_width = code.width() as u32;
+    let total_modules = qr_width + 2 * margin;
+    let size_px = size;
+    let scale = size_px as f32 / total_modules as f32;
+
+    // Pre-fill with light background
+    let mut pixels = vec![light; (size_px * size_px) as usize];
+
+    // Paint dark modules
+    let colors = code.to_colors();
+    for (i, color) in colors.iter().enumerate() {
+        if *color == qrcode::Color::Dark {
+            let qx = (i as u32) % qr_width;
+            let qy = (i as u32) / qr_width;
+
+            let px0 = ((qx + margin) as f32 * scale) as u32;
+            let py0 = ((qy + margin) as f32 * scale) as u32;
+            let px1 = (((qx + margin + 1) as f32 * scale) as u32).min(size_px);
+            let py1 = (((qy + margin + 1) as f32 * scale) as u32).min(size_px);
+
+            for py in py0..py1 {
+                let row_start = (py * size_px + px0) as usize;
+                let row_end = (py * size_px + px1) as usize;
+                pixels[row_start..row_end].fill(dark);
+            }
+        }
+    }
+
+    Ok(MobileQrBitmap {
+        size: size_px,
+        pixels,
+    })
+}
+
 // === Scanner Backend — always available (rxing/rqrr are non-optional) ===
 
 #[derive(Debug, Clone, uniffi::Enum)]

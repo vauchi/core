@@ -676,3 +676,116 @@ fn test_mobile_design_tokens_matches_core_defaults() {
         core_tokens.motion.emphasis_duration_ms
     );
 }
+
+// === QR Matrix Generation ===
+
+// @internal
+#[test]
+fn generate_qr_matrix_produces_valid_square_matrix() {
+    use vauchi_platform::{MobileQrEccLevel, generate_qr_matrix};
+
+    let result = generate_qr_matrix("hello world".to_string(), MobileQrEccLevel::Medium).unwrap();
+    assert!(result.width > 0, "width must be positive");
+    assert_eq!(
+        result.modules.len(),
+        (result.width * result.width) as usize,
+        "modules length must equal width²"
+    );
+    // QR Version 1 is 21x21 + 8 quiet zone = 29x29
+    assert!(result.width >= 29, "minimum QR + quiet zone is 29");
+}
+
+// @internal
+#[test]
+fn generate_qr_matrix_has_dark_modules() {
+    use vauchi_platform::{MobileQrEccLevel, generate_qr_matrix};
+
+    let result = generate_qr_matrix("test data".to_string(), MobileQrEccLevel::Low).unwrap();
+    let dark_count = result.modules.iter().filter(|&&m| m).count();
+    let light_count = result.modules.iter().filter(|&&m| !m).count();
+    assert!(dark_count > 0, "QR code must have dark modules");
+    assert!(light_count > 0, "QR code must have light modules");
+}
+
+// @internal
+#[test]
+fn generate_qr_matrix_ecc_levels_all_work() {
+    use vauchi_platform::{MobileQrEccLevel, generate_qr_matrix};
+
+    for ecc in [
+        MobileQrEccLevel::Low,
+        MobileQrEccLevel::Medium,
+        MobileQrEccLevel::Quartile,
+        MobileQrEccLevel::High,
+    ] {
+        let result = generate_qr_matrix("ecc test".to_string(), ecc).unwrap();
+        assert!(result.width > 0);
+        assert_eq!(result.modules.len(), (result.width * result.width) as usize);
+    }
+}
+
+// @internal
+#[test]
+fn generate_qr_matrix_higher_ecc_produces_larger_or_equal_qr() {
+    use vauchi_platform::{MobileQrEccLevel, generate_qr_matrix};
+
+    let low = generate_qr_matrix(
+        "same data for comparison".to_string(),
+        MobileQrEccLevel::Low,
+    )
+    .unwrap();
+    let high = generate_qr_matrix(
+        "same data for comparison".to_string(),
+        MobileQrEccLevel::High,
+    )
+    .unwrap();
+    assert!(
+        high.width >= low.width,
+        "higher ECC should produce equal or larger QR: low={}, high={}",
+        low.width,
+        high.width
+    );
+}
+
+// @internal
+#[test]
+fn generate_qr_matrix_roundtrips_with_scanner() {
+    use vauchi_platform::{
+        MobileQrEccLevel, MobileScannerBackend, diagnostic_scan_qr, generate_qr_matrix,
+    };
+
+    let data = "wb://roundtrip-test-data-12345";
+    let matrix = generate_qr_matrix(data.to_string(), MobileQrEccLevel::Medium).unwrap();
+
+    // Render matrix as grayscale image (8 pixels per module)
+    let module_px = 8u32;
+    let img_size = matrix.width * module_px;
+    let mut luma = vec![255u8; (img_size * img_size) as usize]; // white background
+
+    for y in 0..matrix.width {
+        for x in 0..matrix.width {
+            if matrix.modules[(y * matrix.width + x) as usize] {
+                // Dark module — fill with black pixels
+                for dy in 0..module_px {
+                    for dx in 0..module_px {
+                        let px = (x * module_px + dx) as usize;
+                        let py = (y * module_px + dy) as usize;
+                        luma[py * img_size as usize + px] = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    let result = diagnostic_scan_qr(
+        MobileScannerBackend::RqrrPreprocessed,
+        luma,
+        img_size,
+        img_size,
+    );
+    assert_eq!(
+        result.decoded.as_deref(),
+        Some(data),
+        "scanner should decode what generate_qr_matrix produced"
+    );
+}

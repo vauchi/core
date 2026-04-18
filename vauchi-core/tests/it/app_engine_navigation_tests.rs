@@ -475,8 +475,11 @@ fn navigate_to_recovery_shows_recovery_status() {
     assert_eq!(screen.title, "Social Recovery");
     // Fresh identity has 0 contacts, quorum not met — Start Recovery disabled
     assert!(
-        screen.actions.iter().any(|a| a.id == "claim" && !a.enabled),
-        "Recovery claim action must be disabled when quorum not met"
+        screen
+            .actions
+            .iter()
+            .any(|a| a.id == "start_recovery" && !a.enabled),
+        "Recovery start_recovery action must be disabled when quorum not met"
     );
 }
 

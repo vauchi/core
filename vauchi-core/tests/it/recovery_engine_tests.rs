@@ -2,6 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//! Tests for RecoveryEngine — the outgoing social recovery flow.
+//!
+//! Traces to: features/contact_recovery.feature
+//! - @recovery @trust: quorum status
+//! - @recovery @vouching: voucher collection
+//! - @recovery @proof: proof submission
+
 use vauchi_app::ui::*;
 
 fn make_contact(id: &str, name: &str, initials: &str) -> ContactItem {
@@ -33,6 +40,8 @@ fn quorum_met() -> RecoveryEngine {
     )
 }
 
+// ── Status screen ────────────────────────────────────────────────
+
 // @internal
 #[test]
 fn recovery_screen_id() {
@@ -51,21 +60,20 @@ fn recovery_title() {
 
 // @internal
 #[test]
-fn recovery_quorum_not_met_disables_claim() {
+fn recovery_quorum_not_met_disables_start() {
     let engine = quorum_not_met();
     let screen = engine.current_screen();
 
-    let claim_action = screen
+    let start_action = screen
         .actions
         .iter()
-        .find(|a| a.id == "claim")
-        .expect("claim action should exist");
+        .find(|a| a.id == "start_recovery")
+        .expect("start_recovery action should exist");
     assert!(
-        !claim_action.enabled,
-        "claim should be disabled when quorum not met"
+        !start_action.enabled,
+        "start_recovery should be disabled when quorum not met"
     );
 
-    // Verify quorum info shows "1 of 3"
     let detail = find_info_detail(&screen, "quorum_info", "Trusted Contacts");
     assert_eq!(detail, "1 of 3");
 
@@ -75,21 +83,20 @@ fn recovery_quorum_not_met_disables_claim() {
 
 // @internal
 #[test]
-fn recovery_quorum_met_enables_claim() {
+fn recovery_quorum_met_enables_start() {
     let engine = quorum_met();
     let screen = engine.current_screen();
 
-    let claim_action = screen
+    let start_action = screen
         .actions
         .iter()
-        .find(|a| a.id == "claim")
-        .expect("claim action should exist");
+        .find(|a| a.id == "start_recovery")
+        .expect("start_recovery action should exist");
     assert!(
-        claim_action.enabled,
-        "claim should be enabled when quorum met"
+        start_action.enabled,
+        "start_recovery should be enabled when quorum met"
     );
 
-    // Verify quorum info shows "3 of 3"
     let detail = find_info_detail(&screen, "quorum_info", "Trusted Contacts");
     assert_eq!(detail, "3 of 3");
 
@@ -99,29 +106,10 @@ fn recovery_quorum_met_enables_claim() {
 
 // @internal
 #[test]
-fn recovery_claim_shows_alert() {
-    let mut engine = quorum_met();
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "claim".into(),
-    });
-    match result {
-        ActionResult::ShowAlert { title, message } => {
-            assert_eq!(title, "Coming Soon");
-            assert_eq!(
-                message,
-                "Social recovery will be available in a future update."
-            );
-        }
-        other => panic!("Expected ShowAlert, got {other:?}"),
-    }
-}
-
-// @internal
-#[test]
-fn recovery_status_shows_alert() {
+fn status_check_shows_no_active_claims() {
     let mut engine = quorum_not_met();
     let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "status".into(),
+        action_id: "check_status".into(),
     });
     match result {
         ActionResult::ShowAlert { title, message } => {
@@ -130,6 +118,193 @@ fn recovery_status_shows_alert() {
         }
         other => panic!("Expected ShowAlert, got {other:?}"),
     }
+}
+
+// ── State transitions ────────────────────────────────────────────
+
+// @scenario: contact_recovery :: Start recovery shows claim QR
+#[test]
+fn start_recovery_transitions_to_show_claim_qr() {
+    let mut engine = quorum_met();
+    engine.set_claim_data([0xAB; 32]);
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "start_recovery".into(),
+    });
+
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "recovery_status");
+            let has_qr = screen
+                .components
+                .iter()
+                .any(|c| matches!(c, Component::QrCode { mode, .. } if *mode == QrMode::Display));
+            assert!(has_qr, "should show QR code with claim data");
+            let has_cancel = screen.actions.iter().any(|a| a.id == "cancel");
+            assert!(has_cancel, "should have cancel action");
+        }
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    }
+}
+
+// @scenario: contact_recovery :: Cancel recovery returns to status
+#[test]
+fn cancel_from_claim_qr_returns_to_status() {
+    let mut engine = quorum_met();
+    engine.set_claim_data([0xAB; 32]);
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "start_recovery".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            let has_start = screen.actions.iter().any(|a| a.id == "start_recovery");
+            assert!(
+                has_start,
+                "should be back at status with start_recovery action"
+            );
+        }
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    }
+}
+
+// @scenario: contact_recovery :: Wait for voucher shows scanner
+#[test]
+fn wait_for_voucher_shows_collection_screen() {
+    let mut engine = quorum_met();
+    engine.set_claim_data([0xAB; 32]);
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "start_recovery".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "wait_for_voucher".into(),
+    });
+
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            let has_status = screen
+                .components
+                .iter()
+                .any(|c| matches!(c, Component::StatusIndicator { .. }));
+            assert!(has_status, "should show voucher collection status");
+        }
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    }
+}
+
+// @scenario: contact_recovery :: Voucher added updates progress
+#[test]
+fn add_voucher_updates_progress_count() {
+    let mut engine = quorum_met();
+    engine.set_claim_data([0xAB; 32]);
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "start_recovery".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "wait_for_voucher".into(),
+    });
+
+    engine.add_voucher_for_testing("Alice");
+    let screen = engine.current_screen();
+
+    let status_detail = screen.components.iter().find_map(|c| match c {
+        Component::StatusIndicator { detail, .. } => detail.clone(),
+        _ => None,
+    });
+    assert_eq!(status_detail.as_deref(), Some("1 of 3 vouchers collected"),);
+}
+
+// @scenario: contact_recovery :: Threshold met enables submit
+#[test]
+fn threshold_met_enables_submit() {
+    let mut engine = quorum_met();
+    engine.set_claim_data([0xAB; 32]);
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "start_recovery".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "wait_for_voucher".into(),
+    });
+
+    engine.add_voucher_for_testing("Alice");
+    engine.add_voucher_for_testing("Bob");
+    engine.add_voucher_for_testing("Carol");
+
+    let screen = engine.current_screen();
+    let submit = screen
+        .actions
+        .iter()
+        .find(|a| a.id == "submit_proof")
+        .expect("submit_proof action should exist");
+    assert!(submit.enabled, "submit should be enabled at threshold");
+}
+
+// @scenario: contact_recovery :: Submit proof transitions to complete
+#[test]
+fn submit_proof_transitions_to_complete() {
+    let mut engine = quorum_met();
+    engine.set_claim_data([0xAB; 32]);
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "start_recovery".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "wait_for_voucher".into(),
+    });
+    engine.add_voucher_for_testing("Alice");
+    engine.add_voucher_for_testing("Bob");
+    engine.add_voucher_for_testing("Carol");
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit_proof".into(),
+    });
+
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            let has_success = screen.components.iter().any(|c| {
+                matches!(
+                    c,
+                    Component::StatusIndicator { status, .. }
+                        if *status == Status::Success
+                )
+            });
+            assert!(has_success, "should show success status");
+            let has_done = screen.actions.iter().any(|a| a.id == "done");
+            assert!(has_done, "should have done action");
+        }
+        other => panic!("Expected UpdateScreen, got {other:?}"),
+    }
+}
+
+// @scenario: contact_recovery :: Done from complete returns Complete
+#[test]
+fn done_from_complete_returns_complete() {
+    let mut engine = quorum_met();
+    engine.set_claim_data([0xAB; 32]);
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "start_recovery".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "wait_for_voucher".into(),
+    });
+    engine.add_voucher_for_testing("Alice");
+    engine.add_voucher_for_testing("Bob");
+    engine.add_voucher_for_testing("Carol");
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit_proof".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "done".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::Complete),
+        "done should return Complete"
+    );
 }
 
 // @internal
@@ -145,6 +320,29 @@ fn recovery_unknown_action_returns_update_screen() {
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
     }
+}
+
+// @internal
+#[test]
+fn submit_before_threshold_not_enabled() {
+    let mut engine = quorum_met();
+    engine.set_claim_data([0xAB; 32]);
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "start_recovery".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "wait_for_voucher".into(),
+    });
+    engine.add_voucher_for_testing("Alice");
+    // Only 1 of 3
+
+    let screen = engine.current_screen();
+    let submit = screen.actions.iter().find(|a| a.id == "submit_proof");
+    assert!(submit.is_some(), "submit_proof should exist");
+    assert!(
+        !submit.unwrap().enabled,
+        "submit should be disabled below threshold"
+    );
 }
 
 // --- helpers ---

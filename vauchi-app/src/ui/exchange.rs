@@ -2788,6 +2788,7 @@ mod tests {
 
     // ── Scan quality tracking ──────────────────────────────────────
 
+    // @internal
     #[test]
     fn scan_quality_starts_as_no_signal() {
         let mut engine = ExchangeEngine::new(config_no_groups());
@@ -2806,6 +2807,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn scan_progress_updates_quality_to_good() {
         let mut engine = ExchangeEngine::new(config_no_groups());
@@ -2836,6 +2838,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn scan_progress_degrades_to_poor_on_low_detection() {
         let mut engine = ExchangeEngine::new(config_no_groups());
@@ -2862,6 +2865,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn scan_quality_resets_on_back_and_re_enter() {
         let mut engine = ExchangeEngine::new(config_no_groups());
@@ -2901,6 +2905,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn scan_progress_ignored_outside_scan_step() {
         let mut engine = ExchangeEngine::new(config_no_groups());

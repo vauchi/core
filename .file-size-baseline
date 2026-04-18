@@ -15,7 +15,7 @@ vauchi-platform/src/types.rs 1547
 vauchi-platform/src/lib.rs 2425
 
 # EXEMPT — state machine: scattered transitions create protocol bugs
-vauchi-core/src/exchange/session.rs 1753
+vauchi-core/src/exchange/session.rs 1756
 vauchi-core/src/exchange/multistage/session.rs 1189
 
 # EXEMPT — transport layer: all relay methods must be co-located for protocol coherence
@@ -54,7 +54,7 @@ vauchi-core/tests/it/visibility_label_tests.rs 1220
 vauchi-core/tests/it/migration_tests.rs 1224
 
 # vauchi-app — extracted from vauchi-core, inherits exemption
-vauchi-app/src/ui/exchange.rs 2770
+vauchi-app/src/ui/exchange.rs 2928
 vauchi-app/src/ui/contact_detail.rs 1115
 
 # EXEMPT — BLE exchange sub-flow: inline tests access private state (proximity_runner, shake_envelope_sent)

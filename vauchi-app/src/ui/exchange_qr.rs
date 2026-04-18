@@ -314,12 +314,14 @@ mod tests {
 
     // ── ScanQualityTracker ──────────────────────────────────────────
 
+    // @internal
     #[test]
     fn empty_tracker_returns_no_signal() {
         let tracker = ScanQualityTracker::new();
         assert_eq!(tracker.quality(), ScanQuality::NoSignal);
     }
 
+    // @internal
     #[test]
     fn all_detected_returns_good() {
         let mut tracker = ScanQualityTracker::new();
@@ -329,6 +331,7 @@ mod tests {
         assert_eq!(tracker.quality(), ScanQuality::Good);
     }
 
+    // @internal
     #[test]
     fn all_missed_returns_no_signal() {
         let mut tracker = ScanQualityTracker::new();
@@ -338,6 +341,7 @@ mod tests {
         assert_eq!(tracker.quality(), ScanQuality::NoSignal);
     }
 
+    // @internal
     #[test]
     fn seventy_percent_detection_is_good() {
         let mut tracker = ScanQualityTracker::new();
@@ -348,6 +352,7 @@ mod tests {
         assert_eq!(tracker.quality(), ScanQuality::Good);
     }
 
+    // @internal
     #[test]
     fn sixty_percent_detection_is_weak() {
         let mut tracker = ScanQualityTracker::new();
@@ -358,6 +363,7 @@ mod tests {
         assert_eq!(tracker.quality(), ScanQuality::Weak);
     }
 
+    // @internal
     #[test]
     fn forty_percent_detection_is_weak() {
         let mut tracker = ScanQualityTracker::new();
@@ -368,6 +374,7 @@ mod tests {
         assert_eq!(tracker.quality(), ScanQuality::Weak);
     }
 
+    // @internal
     #[test]
     fn twenty_percent_detection_is_poor() {
         let mut tracker = ScanQualityTracker::new();
@@ -378,6 +385,7 @@ mod tests {
         assert_eq!(tracker.quality(), ScanQuality::Poor);
     }
 
+    // @internal
     #[test]
     fn single_detection_with_partial_window() {
         let mut tracker = ScanQualityTracker::new();
@@ -386,6 +394,7 @@ mod tests {
         assert_eq!(tracker.quality(), ScanQuality::Good);
     }
 
+    // @internal
     #[test]
     fn rolling_window_drops_old_frames() {
         let mut tracker = ScanQualityTracker::new();
@@ -402,6 +411,7 @@ mod tests {
         assert_eq!(tracker.quality(), ScanQuality::NoSignal);
     }
 
+    // @internal
     #[test]
     fn reset_clears_state() {
         let mut tracker = ScanQualityTracker::new();
@@ -414,6 +424,7 @@ mod tests {
         assert_eq!(tracker.quality(), ScanQuality::NoSignal);
     }
 
+    // @internal
     #[test]
     fn partial_window_boundary_at_nine_percent() {
         let mut tracker = ScanQualityTracker::new();
@@ -430,6 +441,7 @@ mod tests {
 
     // ── build_scan_qr_screen ────────────────────────────────────────
 
+    // @internal
     #[test]
     fn scan_screen_includes_quality_when_provided() {
         let progress = Progress {
@@ -447,6 +459,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn scan_screen_quality_is_none_when_not_provided() {
         let progress = Progress {
@@ -464,6 +477,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn show_qr_screen_has_no_scan_quality() {
         let progress = Progress {

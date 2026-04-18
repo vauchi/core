@@ -965,13 +965,17 @@ impl WorkflowEngine for ExchangeEngine {
             commands.extend(session.drain_commands());
         }
 
-        // Route escrow events to reciprocity confirmer if active
+        // Route escrow events to reciprocity confirmer if active.
+        // Check reciprocity result before clearing — the step sync below
+        // uses it to decide Success vs Failed.
+        let mut reciprocity_result = None;
         if let Some(ref mut confirmer) = self.reciprocity_confirmer {
             if let Some(ref evt) = event_for_confirmer {
                 let cmds = confirmer.handle_event(evt);
                 commands.extend(cmds);
             }
             if confirmer.is_done() {
+                reciprocity_result = Some(confirmer.reciprocity());
                 self.reciprocity_confirmer = None;
             }
         }
@@ -979,8 +983,10 @@ impl WorkflowEngine for ExchangeEngine {
         // Sync engine step from session state
         match session.state() {
             vauchi_core::exchange::ExchangeState::Complete { .. } => {
-                self.step = ExchangeStep::Success;
-                // Create reciprocity confirmer from session tokens
+                // Create reciprocity confirmer from session tokens.
+                // Don't transition to Success until reciprocity is confirmed —
+                // this prevents asymmetric exchanges where one side saves a
+                // contact but the other never received the data.
                 if self.reciprocity_confirmer.is_none()
                     && let (Some(our_token), Some(their_token)) = (
                         session.our_confirmation_token().copied(),
@@ -1002,6 +1008,30 @@ impl WorkflowEngine for ExchangeEngine {
                     );
                     commands.extend(confirmer.start());
                     self.reciprocity_confirmer = Some(confirmer);
+                    // Stay on Verifying while waiting for peer confirmation
+                    self.step = ExchangeStep::Qr(QrStep::Verifying);
+                } else if let Some(result) = reciprocity_result {
+                    // Confirmer just finished — check result
+                    match result {
+                        vauchi_core::exchange::reciprocity::Reciprocity::Confirmed => {
+                            self.step = ExchangeStep::Success;
+                        }
+                        _ => {
+                            // Escrow exhausted without confirmation — peer
+                            // didn't deposit their token. Exchange failed.
+                            self.failure_detail =
+                                Some("Exchange not confirmed by the other device".into());
+                            self.step = ExchangeStep::Failed;
+                        }
+                    }
+                } else if self.reciprocity_confirmer.is_some() {
+                    // Confirmer still running — stay on Verifying
+                    self.step = ExchangeStep::Qr(QrStep::Verifying);
+                } else {
+                    // No confirmation tokens available (e.g., no relay configured).
+                    // Fall through to Success for backward compat — but log a warning.
+                    // This path should be eliminated once relay is always available.
+                    self.step = ExchangeStep::Success;
                 }
             }
             vauchi_core::exchange::ExchangeState::Failed { error } => {

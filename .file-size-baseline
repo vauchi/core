@@ -16,7 +16,7 @@ vauchi-platform/src/lib.rs 2425
 
 # EXEMPT — state machine: scattered transitions create protocol bugs
 vauchi-core/src/exchange/session.rs 1753
-vauchi-core/src/exchange/multistage/session.rs 1178
+vauchi-core/src/exchange/multistage/session.rs 1189
 
 # EXEMPT — transport layer: all relay methods must be co-located for protocol coherence
 vauchi-core/src/network/http_transport.rs 1187

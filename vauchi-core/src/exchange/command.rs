@@ -194,9 +194,14 @@ pub enum ExchangeHardwareEvent {
     ///
     /// - `detected`: whether a QR code was found in this frame
     /// - `confidence`: optional platform-specific confidence score (0-100)
+    /// - `frame_skipped`: true if the scanner skipped this frame (e.g.,
+    ///   sharpness gating). Skipped frames are excluded from the quality
+    ///   calculation — they indicate camera settling, not wrong pointing.
     QrScanProgress {
         detected: bool,
         confidence: Option<u8>,
+        #[serde(default)]
+        frame_skipped: bool,
     },
 
     // ── BLE ──────────────────────────────────────────────────────────
@@ -506,10 +511,12 @@ mod tests {
             ExchangeHardwareEvent::QrScanProgress {
                 detected: true,
                 confidence: Some(85),
+                frame_skipped: false,
             },
             ExchangeHardwareEvent::QrScanProgress {
                 detected: false,
                 confidence: None,
+                frame_skipped: true,
             },
         ];
         for evt in &events {
@@ -661,6 +668,7 @@ mod tests {
             ExchangeHardwareEvent::QrScanProgress {
                 detected: false,
                 confidence: None,
+                frame_skipped: false,
             },
         ];
         // 22 total event variants

@@ -866,12 +866,19 @@ impl WorkflowEngine for ExchangeEngine {
             return self.handle_link_hardware_event(event);
         }
 
-        // QR scan progress → update quality tracker, refresh screen
+        // QR scan progress → update quality tracker, refresh screen.
+        // Skipped frames (sharpness gating) are excluded — they indicate
+        // camera settling, not wrong pointing.
         if matches!(self.step, ExchangeStep::Qr(QrStep::ScanQr))
-            && let vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress { detected, .. } =
-                &event
+            && let vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
+                detected,
+                frame_skipped,
+                ..
+            } = &event
         {
-            self.scan_quality_tracker.record_frame(*detected);
+            if !frame_skipped {
+                self.scan_quality_tracker.record_frame(*detected);
+            }
             return Some(ActionResult::UpdateScreen(self.build_screen()));
         }
 
@@ -2821,6 +2828,7 @@ mod tests {
                 vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
                     detected: true,
                     confidence: Some(90),
+                    frame_skipped: false,
                 },
             );
             assert!(
@@ -2852,6 +2860,7 @@ mod tests {
                 vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
                     detected: i < 2,
                     confidence: None,
+                    frame_skipped: false,
                 },
             );
         }
@@ -2879,6 +2888,7 @@ mod tests {
                 vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
                     detected: true,
                     confidence: None,
+                    frame_skipped: false,
                 },
             );
         }
@@ -2916,6 +2926,7 @@ mod tests {
             vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
                 detected: true,
                 confidence: Some(100),
+                frame_skipped: false,
             },
         );
 
@@ -2924,5 +2935,45 @@ mod tests {
             result.is_none(),
             "QrScanProgress on ShowQr step should be ignored"
         );
+    }
+
+    // @internal
+    #[test]
+    fn skipped_frames_do_not_degrade_quality() {
+        let mut engine = ExchangeEngine::new(config_no_groups());
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+
+        // Send 5 detected frames → Good quality
+        for _ in 0..5 {
+            engine.handle_hardware_event(
+                vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
+                    detected: true,
+                    confidence: None,
+                    frame_skipped: false,
+                },
+            );
+        }
+
+        // Send 20 skipped frames — these should NOT count as misses
+        for _ in 0..20 {
+            engine.handle_hardware_event(
+                vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
+                    detected: false,
+                    confidence: None,
+                    frame_skipped: true,
+                },
+            );
+        }
+
+        // Quality should still be Good (5/5 = 100%, skipped frames excluded)
+        let screen = engine.current_screen();
+        match &screen.components[0] {
+            Component::QrCode { scan_quality, .. } => {
+                assert_eq!(*scan_quality, Some(ScanQuality::Good));
+            }
+            other => panic!("expected QrCode, got {:?}", other),
+        }
     }
 }

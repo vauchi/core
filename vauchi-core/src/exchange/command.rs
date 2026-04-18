@@ -186,6 +186,19 @@ pub enum ExchangeHardwareEvent {
     /// The user scanned a QR code containing `data`.
     QrScanned { data: String },
 
+    /// Per-frame scan progress from the camera viewfinder.
+    ///
+    /// Frontends send this periodically (e.g., every 200-500 ms) while the
+    /// QR scanner is active. Core uses the rolling detection rate to compute
+    /// a [`ScanQuality`] indicator for the viewfinder frame color.
+    ///
+    /// - `detected`: whether a QR code was found in this frame
+    /// - `confidence`: optional platform-specific confidence score (0-100)
+    QrScanProgress {
+        detected: bool,
+        confidence: Option<u8>,
+    },
+
     // ── BLE ──────────────────────────────────────────────────────────
     /// A BLE peripheral was discovered during scanning.
     BleDeviceDiscovered {
@@ -490,6 +503,14 @@ mod tests {
                 data: vec![0xFF, 0xD8, 0xFF],
             },
             ExchangeHardwareEvent::ImagePickCancelled,
+            ExchangeHardwareEvent::QrScanProgress {
+                detected: true,
+                confidence: Some(85),
+            },
+            ExchangeHardwareEvent::QrScanProgress {
+                detected: false,
+                confidence: None,
+            },
         ];
         for evt in &events {
             let json = serde_json::to_string(evt).expect("serialize");
@@ -637,8 +658,12 @@ mod tests {
             ExchangeHardwareEvent::DirectPayloadReceived { data: vec![] },
             ExchangeHardwareEvent::ImageReceived { data: vec![] },
             ExchangeHardwareEvent::ImagePickCancelled,
+            ExchangeHardwareEvent::QrScanProgress {
+                detected: false,
+                confidence: None,
+            },
         ];
-        // 21 total event variants
-        assert_eq!(variants.len(), 21);
+        // 22 total event variants
+        assert_eq!(variants.len(), 22);
     }
 }

@@ -873,7 +873,10 @@ impl ExchangeSession {
             | ExchangeHardwareEvent::LinkOpened { .. }
             // Image picking events are for the avatar editor, not exchanges.
             | ExchangeHardwareEvent::ImageReceived { .. }
-            | ExchangeHardwareEvent::ImagePickCancelled => Ok(()),
+            | ExchangeHardwareEvent::ImagePickCancelled
+            // QrScanProgress is a UI-only signal handled by ExchangeEngine's
+            // ScanQualityTracker — the session state machine ignores it.
+            | ExchangeHardwareEvent::QrScanProgress { .. } => Ok(()),
         }
     }
 

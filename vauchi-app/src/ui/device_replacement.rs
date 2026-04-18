@@ -241,6 +241,7 @@ impl DeviceReplacementEngine {
                     data: qr_data,
                     mode: QrMode::Display,
                     label: Some("Scan on new device".into()),
+                    scan_quality: None,
                     a11y: Some(A11y {
                         label: Some("Device transfer QR code".into()),
                         hint: Some("Scan this code on your new device to begin transfer.".into()),

@@ -15,7 +15,7 @@ use crate::ui::exchange_ble::{
 use crate::ui::exchange_field_preview::{self, FieldPreviewConfig, FieldPreviewResult};
 use crate::ui::exchange_link::{self, LinkActionOutcome, LinkHardwareOutcome, LinkStep};
 use crate::ui::exchange_mode_selection::{ModeSelectionEngine, ModeSelectionResult};
-use crate::ui::exchange_qr::{self, QrActionOutcome, QrStep};
+use crate::ui::exchange_qr::{self, QrActionOutcome, QrStep, ScanQualityTracker};
 use crate::ui::*;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::command::ExchangeCommand;
@@ -88,6 +88,8 @@ pub struct ExchangeEngine {
     ble_flow: Option<BleExchangeFlow>,
     /// Reciprocity confirmation cascade driver (created on exchange completion).
     reciprocity_confirmer: Option<ReciprocityConfirmer>,
+    /// Rolling window tracker for QR scan quality (viewfinder frame color).
+    scan_quality_tracker: ScanQualityTracker,
 }
 
 /// Sub-steps for the USB cable / direct TCP exchange flow.
@@ -225,6 +227,7 @@ impl ExchangeEngine {
             link_received_card: None,
             ble_flow,
             reciprocity_confirmer: None,
+            scan_quality_tracker: ScanQualityTracker::new(),
         }
     }
 
@@ -276,6 +279,7 @@ impl ExchangeEngine {
                     link_received_card: None,
                     ble_flow: None,
                     reciprocity_confirmer: None,
+                    scan_quality_tracker: ScanQualityTracker::new(),
                 };
             }
             session.emit_initial_commands();
@@ -298,6 +302,7 @@ impl ExchangeEngine {
             link_received_card: None,
             ble_flow: None,
             reciprocity_confirmer: None,
+            scan_quality_tracker: ScanQualityTracker::new(),
         }
     }
 
@@ -642,7 +647,10 @@ impl ExchangeEngine {
                 &self.config.own_qr_data,
                 self.progress(),
             ),
-            ExchangeStep::Qr(QrStep::ScanQr) => exchange_qr::build_scan_qr_screen(self.progress()),
+            ExchangeStep::Qr(QrStep::ScanQr) => exchange_qr::build_scan_qr_screen(
+                self.progress(),
+                Some(self.scan_quality_tracker.quality()),
+            ),
             ExchangeStep::Qr(QrStep::ManualEntry) => {
                 exchange_qr::build_manual_entry_screen(self.progress())
             }
@@ -856,6 +864,17 @@ impl WorkflowEngine for ExchangeEngine {
         // Link mode events — handled without ExchangeSession
         if matches!(self.step, ExchangeStep::Link(_)) {
             return self.handle_link_hardware_event(event);
+        }
+
+        // QR scan progress → update quality tracker, refresh screen
+        if matches!(self.step, ExchangeStep::Qr(QrStep::ScanQr)) {
+            if let vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
+                detected, ..
+            } = &event
+            {
+                self.scan_quality_tracker.record_frame(*detected);
+                return Some(ActionResult::UpdateScreen(self.build_screen()));
+            }
         }
 
         // Camera unavailable/denied during QR scan → switch to manual entry
@@ -1116,6 +1135,7 @@ impl WorkflowEngine for ExchangeEngine {
                     match outcome {
                         QrActionOutcome::AdvanceToScan { session_active } => {
                             self.step = ExchangeStep::Qr(QrStep::ScanQr);
+                            self.scan_quality_tracker.reset();
                             if session_active {
                                 ActionResult::ExchangeCommands {
                                     commands: vec![ExchangeCommand::QrRequestScan],
@@ -2765,6 +2785,141 @@ mod tests {
         assert!(
             engine.session().is_some(),
             "Session must be retained for DirectTransport"
+        );
+    }
+
+    // ── Scan quality tracking ──────────────────────────────────────
+
+    #[test]
+    fn scan_quality_starts_as_no_signal() {
+        let mut engine = ExchangeEngine::new(config_no_groups());
+        // Advance to ScanQr
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
+
+        let screen = engine.current_screen();
+        match &screen.components[0] {
+            Component::QrCode { scan_quality, .. } => {
+                assert_eq!(*scan_quality, Some(ScanQuality::NoSignal));
+            }
+            other => panic!("expected QrCode, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn scan_progress_updates_quality_to_good() {
+        let mut engine = ExchangeEngine::new(config_no_groups());
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+
+        // Send 10 detected frames
+        for _ in 0..10 {
+            let result = engine.handle_hardware_event(
+                vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
+                    detected: true,
+                    confidence: Some(90),
+                },
+            );
+            assert!(
+                matches!(result, Some(ActionResult::UpdateScreen(_))),
+                "QrScanProgress must trigger screen update"
+            );
+        }
+
+        let screen = engine.current_screen();
+        match &screen.components[0] {
+            Component::QrCode { scan_quality, .. } => {
+                assert_eq!(*scan_quality, Some(ScanQuality::Good));
+            }
+            other => panic!("expected QrCode, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn scan_progress_degrades_to_poor_on_low_detection() {
+        let mut engine = ExchangeEngine::new(config_no_groups());
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+
+        // 2 detected, 8 missed → 20% → Poor
+        for i in 0..10 {
+            engine.handle_hardware_event(
+                vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
+                    detected: i < 2,
+                    confidence: None,
+                },
+            );
+        }
+
+        let screen = engine.current_screen();
+        match &screen.components[0] {
+            Component::QrCode { scan_quality, .. } => {
+                assert_eq!(*scan_quality, Some(ScanQuality::Poor));
+            }
+            other => panic!("expected QrCode, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn scan_quality_resets_on_back_and_re_enter() {
+        let mut engine = ExchangeEngine::new(config_no_groups());
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+
+        // Build up quality
+        for _ in 0..10 {
+            engine.handle_hardware_event(
+                vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
+                    detected: true,
+                    confidence: None,
+                },
+            );
+        }
+
+        // Go back
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "back".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
+
+        // Re-enter scan
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
+
+        // Quality should be reset to NoSignal
+        let screen = engine.current_screen();
+        match &screen.components[0] {
+            Component::QrCode { scan_quality, .. } => {
+                assert_eq!(*scan_quality, Some(ScanQuality::NoSignal));
+            }
+            other => panic!("expected QrCode, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn scan_progress_ignored_outside_scan_step() {
+        let mut engine = ExchangeEngine::new(config_no_groups());
+        // Still on ShowQr step
+        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
+
+        let result = engine.handle_hardware_event(
+            vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
+                detected: true,
+                confidence: Some(100),
+            },
+        );
+
+        // Should not be handled (no session, not in scan step)
+        assert!(
+            result.is_none(),
+            "QrScanProgress on ShowQr step should be ignored"
         );
     }
 }

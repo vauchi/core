@@ -108,6 +108,10 @@ pub enum Component {
         data: String,
         mode: QrMode,
         label: Option<String>,
+        /// Real-time scan quality for the viewfinder frame indicator.
+        /// Only meaningful when `mode` is `Scan`; `None` when `Display`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        scan_quality: Option<ScanQuality>,
         #[serde(default)]
         a11y: Option<A11y>,
     },
@@ -403,4 +407,22 @@ pub enum Status {
 pub enum QrMode {
     Display,
     Scan,
+}
+
+/// Real-time scan quality indicator for QR camera viewfinder.
+///
+/// Frontends render this as a colored border/frame around the camera
+/// preview to guide the user's device positioning:
+/// - `Good` → green frame (QR reliably detected)
+/// - `Weak` → yellow frame (QR detected but low confidence)
+/// - `Poor` → orange frame (intermittent detection)
+/// - `NoSignal` → red frame (nothing detected / wrong pointing)
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum ScanQuality {
+    Good,
+    Weak,
+    Poor,
+    NoSignal,
 }

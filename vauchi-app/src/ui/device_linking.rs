@@ -79,6 +79,7 @@ impl DeviceLinkingEngine {
                         data: self.qr_data.clone(),
                         mode: QrMode::Display,
                         label: Some("Scan on new device".into()),
+                        scan_quality: None,
                         a11y: Some(A11y {
                             label: Some("Device link QR code".into()),
                             hint: Some(

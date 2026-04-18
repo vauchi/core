@@ -610,6 +610,7 @@ fuzz:nightly:
   extends: [.linux-runner]
   timeout: 12h
   stage: mutation
+  resource_group: fuzz-nightly
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $FUZZ_ENABLED == "true"
   allow_failure: true

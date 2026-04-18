@@ -44,7 +44,7 @@ schema-gen = ["schemars", "vauchi-app/schema-gen"]
 # Diagnostic QR scanner benchmarking (rqrr decoder + image preprocessing)
 diagnostic-scanner = ["imageproc", "fast_image_resize"]
 # YOLO-based QR detector for diagnostic scanner (adds ~15MB ONNX runtime)
-diagnostic-yolo = ["diagnostic-scanner", "ort", "ndarray"]
+diagnostic-yolo = ["diagnostic-scanner", "ort"]
 
 [dependencies]
 # Cryptography (audited libraries)
@@ -151,7 +151,6 @@ fast_image_resize = { version = "5", optional = true, default-features = false }
 
 # ONNX Runtime for YOLO QR detector (optional, adds ~15MB)
 ort = { version = "2.0.0-rc.9", optional = true }
-ndarray = { version = "0.16", optional = true }
 
 # Remote content updates — module moved to vauchi-app.
 # Feature retained as empty for backward compatibility (consumers may reference it).

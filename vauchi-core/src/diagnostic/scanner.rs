@@ -43,7 +43,7 @@ pub struct ScanResult {
     pub laplacian_variance: f32,
 }
 
-/// Decode a QR code from a grayscale (Y-plane) image using default config.
+/// Decode a QR code from a grayscale (Y-plane) image.
 ///
 /// The `luma_data` must contain exactly `width * height` bytes of 8-bit
 /// grayscale pixel data (e.g., the Y-plane from a YUV camera frame).
@@ -52,25 +52,6 @@ pub fn scan_qr_from_luma(
     luma_data: &[u8],
     width: u32,
     height: u32,
-) -> ScanResult {
-    use super::preprocess::PreprocessConfig;
-    scan_qr_from_luma_with_config(
-        backend,
-        luma_data,
-        width,
-        height,
-        &PreprocessConfig::default(),
-    )
-}
-
-/// Decode a QR code from a grayscale (Y-plane) image with custom preprocessing config.
-#[cfg(feature = "diagnostic-scanner")]
-pub fn scan_qr_from_luma_with_config(
-    backend: ScannerBackend,
-    luma_data: &[u8],
-    width: u32,
-    height: u32,
-    _preprocess_config: &super::preprocess::PreprocessConfig,
 ) -> ScanResult {
     let total_start = std::time::Instant::now();
 
@@ -137,6 +118,22 @@ pub fn scan_qr_from_luma_with_config(
             }
         }
     }
+}
+
+/// Decode a QR code from a grayscale (Y-plane) image with custom preprocessing config.
+///
+/// The preprocess config is accepted for API compatibility with the diagnostic
+/// benchmark harness, but is unused by the current rxing/rqrr multi-decoder
+/// pipeline (preprocessing hurts decode rate per vendor findings).
+#[cfg(feature = "diagnostic-scanner")]
+pub fn scan_qr_from_luma_with_config(
+    backend: ScannerBackend,
+    luma_data: &[u8],
+    width: u32,
+    height: u32,
+    _preprocess_config: &super::preprocess::PreprocessConfig,
+) -> ScanResult {
+    scan_qr_from_luma(backend, luma_data, width, height)
 }
 
 /// Scan a QR code using YOLO detection → crop → rqrr decode pipeline.

@@ -345,6 +345,80 @@ fn submit_before_threshold_not_enabled() {
     );
 }
 
+// ── Multi-device awareness ───────────────────────────────────────
+
+// @scenario: contact_recovery :: Linked devices show hint
+#[test]
+fn linked_devices_show_multi_device_hint() {
+    let mut engine = quorum_met();
+    engine.set_linked_device_count(1);
+    let screen = engine.current_screen();
+
+    let has_hint = screen.components.iter().any(|c| {
+        matches!(
+            c,
+            Component::StatusIndicator { id, .. } if id == "multi_device_hint"
+        )
+    });
+    assert!(
+        has_hint,
+        "should show multi-device hint when devices linked"
+    );
+}
+
+// @scenario: contact_recovery :: No linked devices hides hint
+#[test]
+fn no_linked_devices_hides_hint() {
+    let engine = quorum_met();
+    let screen = engine.current_screen();
+
+    let has_hint = screen.components.iter().any(|c| {
+        matches!(
+            c,
+            Component::StatusIndicator { id, .. } if id == "multi_device_hint"
+        )
+    });
+    assert!(
+        !has_hint,
+        "should not show multi-device hint when no other devices"
+    );
+}
+
+// ── Completion UX ────────────────────────────────────────────────
+
+// @scenario: contact_recovery :: Complete screen shows what is recovered
+#[test]
+fn complete_screen_explains_what_is_recovered() {
+    let mut engine = quorum_met();
+    engine.set_claim_data([0xAB; 32]);
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "start_recovery".into(),
+    });
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "wait_for_voucher".into(),
+    });
+    engine.add_voucher_for_testing("Alice");
+    engine.add_voucher_for_testing("Bob");
+    engine.add_voucher_for_testing("Carol");
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit_proof".into(),
+    });
+
+    let screen = engine.current_screen();
+
+    // Should have info about what is/isn't recovered
+    let has_recovery_info = screen.components.iter().any(|c| match c {
+        Component::Text { content, .. } => {
+            content.contains("contact relationships") || content.contains("NOT recovered")
+        }
+        _ => false,
+    });
+    assert!(
+        has_recovery_info,
+        "complete screen should explain what is/isn't recovered"
+    );
+}
+
 // --- helpers ---
 
 fn find_info_detail(screen: &ScreenModel, panel_id: &str, item_title: &str) -> String {

@@ -38,6 +38,8 @@ pub struct RecoveryEngine {
     step: RecoveryStep,
     trusted_contacts: Vec<ContactItem>,
     quorum_threshold: usize,
+    /// Number of linked devices (0 = this is the only device).
+    linked_device_count: usize,
     /// Claim data (old_pk) set before starting recovery.
     claim_data: Option<[u8; 32]>,
     /// Vouchers collected so far (display records).
@@ -50,9 +52,15 @@ impl RecoveryEngine {
             step: RecoveryStep::Status,
             trusted_contacts,
             quorum_threshold,
+            linked_device_count: 0,
             claim_data: None,
             collected_vouchers: Vec::new(),
         }
+    }
+
+    /// Sets the number of linked devices (other than the current one).
+    pub fn set_linked_device_count(&mut self, count: usize) {
+        self.linked_device_count = count;
     }
 
     /// Sets the old_pk claim data. Called by AppEngine before the user
@@ -87,35 +95,56 @@ impl RecoveryEngine {
         let current = self.trusted_contacts.len();
         let quorum_met = current >= self.quorum_threshold;
 
+        let mut components = Vec::new();
+
+        // Multi-device awareness: if user has other devices, suggest
+        // revoking from a surviving device instead of full recovery.
+        if self.linked_device_count > 0 {
+            components.push(Component::StatusIndicator {
+                id: "multi_device_hint".into(),
+                icon: Some("link".into()),
+                title: "Linked Devices Available".into(),
+                detail: Some(format!(
+                    "You have {} other linked device(s). If you lost one device \
+                     but still have another, revoke the lost device from \
+                     Device Management instead of using recovery.",
+                    self.linked_device_count
+                )),
+                status: Status::Success,
+                a11y: None,
+            });
+        }
+
+        components.push(Component::InfoPanel {
+            id: "quorum_info".into(),
+            icon: Some("recovery".into()),
+            title: "Quorum Status".into(),
+            items: vec![
+                InfoItem {
+                    icon: None,
+                    title: "Trusted Contacts".into(),
+                    detail: format!("{current} of {}", self.quorum_threshold),
+                },
+                InfoItem {
+                    icon: None,
+                    title: "Quorum Met".into(),
+                    detail: if quorum_met { "Yes" } else { "No" }.into(),
+                },
+            ],
+            a11y: None,
+        });
+
+        components.push(Component::ContactList {
+            id: "trusted_contacts".into(),
+            contacts: self.trusted_contacts.clone(),
+            searchable: false,
+        });
+
         ScreenModel {
             screen_id: "recovery_status".into(),
             title: "Social Recovery".into(),
             subtitle: None,
-            components: vec![
-                Component::InfoPanel {
-                    id: "quorum_info".into(),
-                    icon: Some("recovery".into()),
-                    title: "Quorum Status".into(),
-                    items: vec![
-                        InfoItem {
-                            icon: None,
-                            title: "Trusted Contacts".into(),
-                            detail: format!("{current} of {}", self.quorum_threshold),
-                        },
-                        InfoItem {
-                            icon: None,
-                            title: "Quorum Met".into(),
-                            detail: if quorum_met { "Yes" } else { "No" }.into(),
-                        },
-                    ],
-                    a11y: None,
-                },
-                Component::ContactList {
-                    id: "trusted_contacts".into(),
-                    contacts: self.trusted_contacts.clone(),
-                    searchable: false,
-                },
-            ],
+            components,
             actions: vec![
                 ScreenAction {
                     id: "start_recovery".into(),
@@ -253,18 +282,35 @@ impl RecoveryEngine {
             screen_id: "recovery_status".into(),
             title: "Recovery Complete".into(),
             subtitle: None,
-            components: vec![Component::StatusIndicator {
-                id: "recovery_complete".into(),
-                icon: Some("checkmark.circle.fill".into()),
-                title: "Recovery Proof Submitted".into(),
-                detail: Some(
-                    "Your contacts will be notified. They can accept \
+            components: vec![
+                Component::StatusIndicator {
+                    id: "recovery_complete".into(),
+                    icon: Some("checkmark.circle.fill".into()),
+                    title: "Recovery Proof Submitted".into(),
+                    detail: Some(
+                        "Your contacts will be notified. They can accept \
                          your new identity to restore your contact relationships."
+                            .into(),
+                    ),
+                    status: Status::Success,
+                    a11y: None,
+                },
+                Component::Text {
+                    id: "what_is_recovered".into(),
+                    content: "What is recovered: contact relationships \
+                              and the ability to communicate with your contacts."
                         .into(),
-                ),
-                status: Status::Success,
-                a11y: None,
-            }],
+                    style: TextStyle::Body,
+                },
+                Component::Text {
+                    id: "what_is_not_recovered".into(),
+                    content: "NOT recovered: message history, device-specific \
+                              settings, and trust levels. Your contacts will \
+                              re-send their cards once they accept your recovery."
+                        .into(),
+                    style: TextStyle::Caption,
+                },
+            ],
             actions: vec![ScreenAction {
                 id: "done".into(),
                 label: "Done".into(),

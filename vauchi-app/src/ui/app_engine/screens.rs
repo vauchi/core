@@ -336,7 +336,13 @@ impl AppEngine {
             }
             AppScreen::Recovery => {
                 let contacts = Self::load_contact_items(vauchi);
-                Box::new(RecoveryEngine::new(contacts, 3))
+                let device_count = vauchi
+                    .list_devices()
+                    .map(|d| d.len().saturating_sub(1))
+                    .unwrap_or(0);
+                let mut engine = RecoveryEngine::new(contacts, 3);
+                engine.set_linked_device_count(device_count);
+                Box::new(engine)
             }
             AppScreen::Groups => {
                 let all_groups = vauchi.list_groups().unwrap_or_default();

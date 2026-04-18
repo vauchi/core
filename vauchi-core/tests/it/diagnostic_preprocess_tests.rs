@@ -215,7 +215,7 @@ fn preprocessed_qr_still_decodable() {
         Some("PREPROCESS_DECODE_TEST"),
         "preprocessed noisy QR should still decode"
     );
-    assert!(result.preprocessing_us > 0);
+    // preprocessing_us is 0 since CLAHE/unsharp were removed per vendor findings
     assert!(!result.frame_skipped);
 }
 

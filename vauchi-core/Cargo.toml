@@ -42,7 +42,7 @@ test-kdf = []
 # JSON Schema generation for UI types (dev tooling only)
 schema-gen = ["schemars", "vauchi-app/schema-gen"]
 # Diagnostic QR scanner benchmarking (rqrr decoder + image preprocessing)
-diagnostic-scanner = ["rqrr", "rxing", "imageproc", "fast_image_resize"]
+diagnostic-scanner = ["imageproc", "fast_image_resize"]
 # YOLO-based QR detector for diagnostic scanner (adds ~15MB ONNX runtime)
 diagnostic-yolo = ["diagnostic-scanner", "ort", "ndarray"]
 
@@ -141,9 +141,9 @@ ureq = { version = "3", default-features = false, features = ["json", "rustls-no
 # OHTTP client-side encryption (RFC 9458) for IP privacy
 ohttp = { version = "0.7", default-features = false, features = ["client", "rust-hpke"], optional = true }
 
-# QR code decoding for diagnostic scanner benchmarking (optional)
-rqrr = { version = "0.10", optional = true }
-rxing = { version = "0.8", optional = true, default-features = false, features = ["encoding_rs"] }
+# QR code decoding — used by production mobile scanner (rxing tryHarder pipeline)
+rqrr = "0.10"
+rxing = { version = "0.8", default-features = false, features = ["encoding_rs"] }
 
 # Image preprocessing for diagnostic scanner benchmarking (optional)
 imageproc = { version = "0.25", optional = true, default-features = false }

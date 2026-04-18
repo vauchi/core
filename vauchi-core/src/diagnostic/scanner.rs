@@ -64,12 +64,13 @@ pub fn scan_qr_from_luma(
 }
 
 /// Decode a QR code from a grayscale (Y-plane) image with custom preprocessing config.
+#[cfg(feature = "diagnostic-scanner")]
 pub fn scan_qr_from_luma_with_config(
     backend: ScannerBackend,
     luma_data: &[u8],
     width: u32,
     height: u32,
-    preprocess_config: &super::preprocess::PreprocessConfig,
+    _preprocess_config: &super::preprocess::PreprocessConfig,
 ) -> ScanResult {
     let total_start = std::time::Instant::now();
 
@@ -264,8 +265,10 @@ fn decode_rxing_fast(img: &GrayImage) -> ScanResult {
     let (w, h) = img.dimensions();
     let luma = img.as_raw().clone();
 
-    let mut hints = rxing::DecodeHints::default();
-    hints.TryHarder = Some(false);
+    let mut hints = rxing::DecodeHints {
+        TryHarder: Some(false),
+        ..Default::default()
+    };
 
     let decoded = rxing::helpers::detect_in_luma_with_hints(
         luma,
@@ -298,8 +301,10 @@ fn decode_rxing_try_harder(img: &GrayImage) -> ScanResult {
     let (w, h) = img.dimensions();
     let luma = img.as_raw().clone();
 
-    let mut hints = rxing::DecodeHints::default();
-    hints.TryHarder = Some(true);
+    let mut hints = rxing::DecodeHints {
+        TryHarder: Some(true),
+        ..Default::default()
+    };
 
     let decoded = rxing::helpers::detect_in_luma_with_hints(
         luma,

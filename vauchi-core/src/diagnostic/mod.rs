@@ -11,7 +11,6 @@ pub mod log_event;
 #[cfg(feature = "diagnostic-scanner")]
 pub mod preprocess;
 pub mod report;
-#[cfg(feature = "diagnostic-scanner")]
 pub mod scanner;
 pub mod snapshot;
 pub mod tuner;

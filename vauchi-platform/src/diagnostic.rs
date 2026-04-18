@@ -287,16 +287,14 @@ pub fn diagnostic_generate_throughput_sequence(
         .collect()
 }
 
-// === Scanner Backend (gated behind diagnostic-scanner feature) ===
+// === Scanner Backend — always available (rxing/rqrr are non-optional) ===
 
-#[cfg(feature = "diagnostic-scanner")]
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum MobileScannerBackend {
     RqrrRaw,
     RqrrPreprocessed,
 }
 
-#[cfg(feature = "diagnostic-scanner")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileScanResult {
     pub decoded: Option<String>,
@@ -322,7 +320,6 @@ pub struct MobilePreprocessConfig {
     pub apply_threshold: bool,
 }
 
-#[cfg(feature = "diagnostic-scanner")]
 #[uniffi::export]
 pub fn diagnostic_scan_qr(
     backend: MobileScannerBackend,

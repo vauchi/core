@@ -191,8 +191,8 @@ fn apply_clahe(img: GrayImage, clip_limit: f32, tile_size: u32) -> GrayImage {
     let (w, h) = img.dimensions();
     let tw = tile_size.max(1);
     let th = tile_size.max(1);
-    let nx = (w + tw - 1) / tw;
-    let ny = (h + th - 1) / th;
+    let nx = w.div_ceil(tw);
+    let ny = h.div_ceil(th);
 
     // Compute clipped + redistributed CDF per tile
     let mut tile_cdfs: Vec<[f32; 256]> = Vec::with_capacity((nx * ny) as usize);

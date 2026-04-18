@@ -21,9 +21,9 @@ const SCAN_QUALITY_WINDOW: usize = 10;
 ///
 /// Uses a fixed-size circular buffer of the last [`SCAN_QUALITY_WINDOW`]
 /// frames. Detection rate thresholds:
-/// - `Good`     (green):  ≥ 70% detected
-/// - `Weak`     (yellow): ≥ 40% detected
-/// - `Poor`     (orange): ≥ 10% detected
+/// - `Good`     (green):  >= 70% detected
+/// - `Weak`     (yellow): >= 40% detected
+/// - `Poor`     (orange): >= 10% detected
 /// - `NoSignal` (red):    < 10% detected
 #[derive(Debug, Clone)]
 pub(super) struct ScanQualityTracker {
@@ -295,6 +295,18 @@ pub(super) fn handle_qr_action(
     }
 }
 
+/// Outcome of a QR sub-flow action, interpreted by the parent engine.
+pub(super) enum QrActionOutcome {
+    /// User pressed "Scan Their Code" — advance to ScanQr step.
+    AdvanceToScan { session_active: bool },
+    /// User pressed "Back" on scan/manual screen — return to ShowQr.
+    BackToShowQr,
+    /// User scanned a QR code — store data and move to Verifying.
+    QrScanned { data: String },
+    /// User submitted a code via manual entry (camera permission denied fallback).
+    ManualCodeEntered { data: String },
+}
+
 // INLINE_TEST_REQUIRED: tests need pub(super) ScanQualityTracker and screen builder access
 #[cfg(test)]
 mod tests {
@@ -370,20 +382,20 @@ mod tests {
     fn single_detection_with_partial_window() {
         let mut tracker = ScanQualityTracker::new();
         tracker.record_frame(true);
-        // 1/1 = 100% → Good
+        // 1/1 = 100% -> Good
         assert_eq!(tracker.quality(), ScanQuality::Good);
     }
 
     #[test]
     fn rolling_window_drops_old_frames() {
         let mut tracker = ScanQualityTracker::new();
-        // Fill with 10 detected frames → Good
+        // Fill with 10 detected frames -> Good
         for _ in 0..10 {
             tracker.record_frame(true);
         }
         assert_eq!(tracker.quality(), ScanQuality::Good);
 
-        // Now push 10 missed frames → overwrite the window
+        // Now push 10 missed frames -> overwrite the window
         for _ in 0..10 {
             tracker.record_frame(false);
         }
@@ -405,13 +417,13 @@ mod tests {
     #[test]
     fn partial_window_boundary_at_nine_percent() {
         let mut tracker = ScanQualityTracker::new();
-        // 9 missed, 0 detected out of 9 frames → 0% → NoSignal
+        // 9 missed, 0 detected out of 9 frames -> 0% -> NoSignal
         for _ in 0..9 {
             tracker.record_frame(false);
         }
         assert_eq!(tracker.quality(), ScanQuality::NoSignal);
 
-        // 1 detected → 1/10 = 10% → Poor
+        // 1 detected -> 1/10 = 10% -> Poor
         tracker.record_frame(true);
         assert_eq!(tracker.quality(), ScanQuality::Poor);
     }
@@ -468,16 +480,4 @@ mod tests {
             other => panic!("expected QrCode, got {:?}", other),
         }
     }
-}
-
-/// Outcome of a QR sub-flow action, interpreted by the parent engine.
-pub(super) enum QrActionOutcome {
-    /// User pressed "Scan Their Code" — advance to ScanQr step.
-    AdvanceToScan { session_active: bool },
-    /// User pressed "Back" on scan/manual screen — return to ShowQr.
-    BackToShowQr,
-    /// User scanned a QR code — store data and move to Verifying.
-    QrScanned { data: String },
-    /// User submitted a code via manual entry (camera permission denied fallback).
-    ManualCodeEntered { data: String },
 }

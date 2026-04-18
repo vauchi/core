@@ -867,14 +867,12 @@ impl WorkflowEngine for ExchangeEngine {
         }
 
         // QR scan progress → update quality tracker, refresh screen
-        if matches!(self.step, ExchangeStep::Qr(QrStep::ScanQr)) {
-            if let vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
-                detected, ..
-            } = &event
-            {
-                self.scan_quality_tracker.record_frame(*detected);
-                return Some(ActionResult::UpdateScreen(self.build_screen()));
-            }
+        if matches!(self.step, ExchangeStep::Qr(QrStep::ScanQr))
+            && let vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress { detected, .. } =
+                &event
+        {
+            self.scan_quality_tracker.record_frame(*detected);
+            return Some(ActionResult::UpdateScreen(self.build_screen()));
         }
 
         // Camera unavailable/denied during QR scan → switch to manual entry

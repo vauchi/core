@@ -746,8 +746,8 @@ fn generate_qr_bitmap_custom_colors() {
         4,
     )
     .unwrap();
-    let has_dark = result.pixels.iter().any(|&p| p == 64);
-    let has_light = result.pixels.iter().any(|&p| p == 224);
+    let has_dark = result.pixels.contains(&64);
+    let has_light = result.pixels.contains(&224);
     assert!(has_dark, "bitmap must contain dark color (64)");
     assert!(has_light, "bitmap must contain light color (224)");
     // No other pixel values should exist

@@ -21,14 +21,6 @@ pub enum MobilePlatform {
     Ios,
 }
 
-#[derive(Debug, Clone, uniffi::Enum)]
-pub enum MobileErrorCorrectionLevel {
-    L,
-    M,
-    Q,
-    H,
-}
-
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileFpsRange {
     pub min: i32,
@@ -67,7 +59,7 @@ pub struct MobileCameraConfig {
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileQrConfig {
-    pub error_correction: MobileErrorCorrectionLevel,
+    pub error_correction: MobileQrEccLevel,
     pub payload_size_bytes: u32,
     pub module_size_px: u32,
 }
@@ -75,7 +67,7 @@ pub struct MobileQrConfig {
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileTuningResult {
     pub camera_config_id: u32,
-    pub qr_error_correction: MobileErrorCorrectionLevel,
+    pub qr_error_correction: MobileQrEccLevel,
     pub qr_payload_size_bytes: u32,
     pub qr_module_size_px: u32,
     pub decode_rate: f32,
@@ -117,13 +109,13 @@ impl From<&MobilePlatform> for Platform {
     }
 }
 
-impl From<&MobileErrorCorrectionLevel> for ErrorCorrectionLevel {
-    fn from(ec: &MobileErrorCorrectionLevel) -> Self {
+impl From<&MobileQrEccLevel> for ErrorCorrectionLevel {
+    fn from(ec: &MobileQrEccLevel) -> Self {
         match ec {
-            MobileErrorCorrectionLevel::L => ErrorCorrectionLevel::L,
-            MobileErrorCorrectionLevel::M => ErrorCorrectionLevel::M,
-            MobileErrorCorrectionLevel::Q => ErrorCorrectionLevel::Q,
-            MobileErrorCorrectionLevel::H => ErrorCorrectionLevel::H,
+            MobileQrEccLevel::Low => ErrorCorrectionLevel::L,
+            MobileQrEccLevel::Medium => ErrorCorrectionLevel::M,
+            MobileQrEccLevel::Quartile => ErrorCorrectionLevel::Q,
+            MobileQrEccLevel::High => ErrorCorrectionLevel::H,
         }
     }
 }
@@ -175,13 +167,13 @@ impl From<&MobileTuningResult> for TuningResult {
 
 // === Conversions: Core -> Mobile ===
 
-fn ec_to_mobile(ec: &ErrorCorrectionLevel) -> MobileErrorCorrectionLevel {
+fn ec_to_mobile(ec: &ErrorCorrectionLevel) -> MobileQrEccLevel {
     match ec {
-        ErrorCorrectionLevel::L => MobileErrorCorrectionLevel::L,
-        ErrorCorrectionLevel::M => MobileErrorCorrectionLevel::M,
-        ErrorCorrectionLevel::Q => MobileErrorCorrectionLevel::Q,
-        ErrorCorrectionLevel::H => MobileErrorCorrectionLevel::H,
-        _ => MobileErrorCorrectionLevel::M,
+        ErrorCorrectionLevel::L => MobileQrEccLevel::Low,
+        ErrorCorrectionLevel::M => MobileQrEccLevel::Medium,
+        ErrorCorrectionLevel::Q => MobileQrEccLevel::Quartile,
+        ErrorCorrectionLevel::H => MobileQrEccLevel::High,
+        _ => MobileQrEccLevel::Medium,
     }
 }
 

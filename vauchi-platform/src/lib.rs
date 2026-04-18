@@ -60,9 +60,9 @@ pub use content::{
     MobileUpdateStatus,
 };
 pub use diagnostic::{
-    MobileCameraConfig, MobileDeviceCapabilityProfile, MobileErrorCorrectionLevel, MobileFpsRange,
-    MobilePlatform, MobileQrBitmap, MobileQrConfig, MobileQrEccLevel, MobileQrTestPattern,
-    MobileScoredConfig, MobileSweepMatrix, MobileThroughputFrame, MobileTuningResult,
+    MobileCameraConfig, MobileDeviceCapabilityProfile, MobileFpsRange, MobilePlatform,
+    MobileQrBitmap, MobileQrConfig, MobileQrEccLevel, MobileQrTestPattern, MobileScoredConfig,
+    MobileSweepMatrix, MobileThroughputFrame, MobileTuningResult,
     diagnostic_generate_extended_qr_test_patterns, diagnostic_generate_qr_test_patterns,
     diagnostic_generate_sweep_matrix, diagnostic_generate_throughput_sequence,
     diagnostic_rank_configs, diagnostic_score_config, generate_qr_bitmap,

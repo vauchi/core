@@ -317,4 +317,32 @@ impl VauchiPlatform {
             recommendation,
         })
     }
+
+    /// Upload encrypted guardian entries to the relay.
+    ///
+    /// Creates guardian tokens for each recovery-trusted contact and uploads
+    /// them encrypted (sealed-box) to the relay. Called after toggling
+    /// recovery trust on a contact.
+    pub fn upload_guardian_entries(&self) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi_for_relay()?;
+        vauchi
+            .upload_guardian_entries()
+            .map_err(|e| MobileError::NetworkError(e.to_string()))
+    }
+
+    /// Save a recovery response (accept, reject, or remind_me_later).
+    ///
+    /// Used by the RecoveryClaimReviewEngine to persist the user's decision.
+    pub fn save_recovery_response(
+        &self,
+        claim_id: String,
+        contact_id: String,
+        response: String,
+        remind_at: Option<u64>,
+    ) -> Result<(), MobileError> {
+        let vauchi = self.open_vauchi()?;
+        vauchi
+            .save_recovery_response_action(&claim_id, &contact_id, &response, remind_at)
+            .map_err(|e| MobileError::StorageError(e.to_string()))
+    }
 }

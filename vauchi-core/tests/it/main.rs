@@ -278,6 +278,7 @@ mod ratchet_error_tests;
 mod rate_limit_handling;
 mod reciprocity_sync_tests;
 mod reciprocity_tests;
+mod recovery_claim_review_tests;
 mod recovery_comprehensive_tests;
 mod recovery_engine_tests;
 mod recovery_guardian_api_tests;

@@ -31,9 +31,9 @@ NC='\033[0m'
 
 # Transition allowlist — remove entries when the referenced deprecation
 # is retired. Each line is an exact function name (no wildcards).
-ALLOWLIST=(
-  "diagnostic_scan_qr"
-)
+# Empty after Phase 9 of 2026-04-19-diagnostics-out-of-production-plan.md
+# removed the last deprecated alias (diagnostic_scan_qr).
+ALLOWLIST=()
 
 # Regenerate Kotlin bindings with default features (no diagnostic-scanner).
 # We use Kotlin as the reference because it's the most compact surface

@@ -463,22 +463,6 @@ pub fn scan_qr(
     }
 }
 
-/// Deprecated alias for [`scan_qr`] — kept to let Android/iOS consumers
-/// migrate from `diagnosticScanQr` → `scanQr` without a binding break.
-///
-/// Scheduled for removal in 0.20.0 once consumers update (Phase 9 of
-/// `2026-04-19-diagnostics-out-of-production-plan.md`).
-#[deprecated(since = "0.19.35", note = "use `scan_qr` — alias removed in 0.20")]
-#[uniffi::export]
-pub fn diagnostic_scan_qr(
-    backend: MobileScannerBackend,
-    luma_data: Vec<u8>,
-    width: u32,
-    height: u32,
-) -> MobileScanResult {
-    scan_qr(backend, luma_data, width, height)
-}
-
 #[cfg(feature = "diagnostic-scanner")]
 #[uniffi::export]
 pub fn diagnostic_scan_qr_with_config(

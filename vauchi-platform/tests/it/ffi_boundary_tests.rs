@@ -760,15 +760,13 @@ fn generate_qr_bitmap_custom_colors() {
 // @internal
 #[test]
 fn generate_qr_bitmap_roundtrips_with_scanner() {
-    use vauchi_platform::{
-        MobileQrEccLevel, MobileScannerBackend, diagnostic_scan_qr, generate_qr_bitmap,
-    };
+    use vauchi_platform::{MobileQrEccLevel, MobileScannerBackend, generate_qr_bitmap, scan_qr};
 
     let data = "wb://roundtrip-test-data-12345";
     // Render at 512px with default black/white — the bitmap IS the luma image
     let bitmap = generate_qr_bitmap(data.into(), 512, MobileQrEccLevel::Medium, 0, 255, 4).unwrap();
 
-    let result = diagnostic_scan_qr(
+    let result = scan_qr(
         MobileScannerBackend::RqrrPreprocessed,
         bitmap.pixels,
         bitmap.size,

@@ -64,9 +64,6 @@ pub use content::{
 // - MobileQrBitmap, MobileQrEccLevel: params/return types for generation
 // - MobileScannerBackend, MobileScanResult, scan_qr: production scanner
 //   (rxing/rqrr pipeline from `vauchi_core::qr::scanner`)
-// - diagnostic_scan_qr: deprecated alias (to be removed 0.20.0 — Phase 9)
-#[allow(deprecated)]
-pub use diagnostic::diagnostic_scan_qr;
 pub use diagnostic::{
     MobileQrBitmap, MobileQrEccLevel, MobileScanResult, MobileScannerBackend, generate_qr_bitmap,
     scan_qr,

@@ -14,14 +14,17 @@ crate-type = ["cdylib", "staticlib", "lib"]
 name = "vauchi_platform"
 
 [features]
-default = ["async-sync", "content-updates", "diagnostic-scanner"]
+default = ["async-sync", "content-updates"]
 # Async sync — runs sync in background thread via tokio::spawn_blocking
 async-sync = ["tokio"]
 # Enable remote content updates (networks, locales, themes).
 # Default-on so mobile bindings expose check_content_updates() / apply_content_updates()
 # instead of silently returning Disabled. Gate 2 of frontend architecture audit (2026-03-18).
 content-updates = ["vauchi-app/content-updates", "tokio"]
-# Diagnostic QR scanner preprocessing (imageproc, fast_image_resize)
+# Diagnostic QR preprocessing pipeline (imageproc, fast_image_resize, CLAHE,
+# adaptive threshold, unsharp mask). Gates the `diagnostic_scan_qr_with_config`
+# UniFFI export. NOT in defaults — production mobile scanner uses rxing/rqrr
+# directly via `diagnostic_scan_qr` (always available).
 diagnostic-scanner = ["vauchi-core/diagnostic-scanner"]
 # YOLO-based QR detector (adds ort ONNX runtime)
 diagnostic-yolo = ["diagnostic-scanner", "vauchi-core/diagnostic-yolo"]

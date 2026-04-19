@@ -67,11 +67,12 @@ pub use diagnostic::{
     diagnostic_generate_sweep_matrix, diagnostic_generate_throughput_sequence,
     diagnostic_rank_configs, diagnostic_score_config, generate_qr_bitmap,
 };
+// Production QR scanner — rxing/rqrr are non-optional, always available.
+pub use diagnostic::{MobileScanResult, MobileScannerBackend, diagnostic_scan_qr};
+// Preprocessing config API — only built with diagnostic-scanner feature
+// (pulls imageproc + fast_image_resize).
 #[cfg(feature = "diagnostic-scanner")]
-pub use diagnostic::{
-    MobilePreprocessConfig, MobileScanResult, MobileScannerBackend, diagnostic_scan_qr,
-    diagnostic_scan_qr_with_config,
-};
+pub use diagnostic::{MobilePreprocessConfig, diagnostic_scan_qr_with_config};
 use error::lock_or;
 pub use error::{KeychainError, MobileError};
 pub use exchange::{

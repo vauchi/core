@@ -59,20 +59,28 @@ pub use content::{
     MobileApplyFailure, MobileApplyResult, MobileContentConfig, MobileContentType,
     MobileUpdateStatus,
 };
+// Production QR surface — always available.
+// - generate_qr_bitmap: own-card QR display on Android/iOS
+// - MobileQrBitmap, MobileQrEccLevel: params/return types for generation
+// - MobileScannerBackend, MobileScanResult, diagnostic_scan_qr:
+//   production scanner (rxing/rqrr). Rename pending in Phase 3 follow-up.
+pub use diagnostic::{
+    MobileQrBitmap, MobileQrEccLevel, MobileScanResult, MobileScannerBackend, diagnostic_scan_qr,
+    generate_qr_bitmap,
+};
+
+// Diagnostic benchmark harness surface — only built with
+// `--features diagnostic-scanner`. Pulls imageproc + fast_image_resize
+// and ~20 transitive crates. Must never ship in default production builds.
+#[cfg(feature = "diagnostic-scanner")]
 pub use diagnostic::{
     MobileCameraConfig, MobileDeviceCapabilityProfile, MobileFpsRange, MobilePlatform,
-    MobileQrBitmap, MobileQrConfig, MobileQrEccLevel, MobileQrTestPattern, MobileScoredConfig,
+    MobilePreprocessConfig, MobileQrConfig, MobileQrTestPattern, MobileScoredConfig,
     MobileSweepMatrix, MobileThroughputFrame, MobileTuningResult,
     diagnostic_generate_extended_qr_test_patterns, diagnostic_generate_qr_test_patterns,
     diagnostic_generate_sweep_matrix, diagnostic_generate_throughput_sequence,
-    diagnostic_rank_configs, diagnostic_score_config, generate_qr_bitmap,
+    diagnostic_rank_configs, diagnostic_scan_qr_with_config, diagnostic_score_config,
 };
-// Production QR scanner — rxing/rqrr are non-optional, always available.
-pub use diagnostic::{MobileScanResult, MobileScannerBackend, diagnostic_scan_qr};
-// Preprocessing config API — only built with diagnostic-scanner feature
-// (pulls imageproc + fast_image_resize).
-#[cfg(feature = "diagnostic-scanner")]
-pub use diagnostic::{MobilePreprocessConfig, diagnostic_scan_qr_with_config};
 use error::lock_or;
 pub use error::{KeychainError, MobileError};
 pub use exchange::{

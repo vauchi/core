@@ -110,6 +110,7 @@ mod crypto_shredding_integration_tests;
 mod crypto_shredding_storage_tests;
 mod crypto_signing_tests;
 mod crypto_tests;
+#[cfg(feature = "diagnostic-scanner")]
 mod debug_session_tests;
 mod deletion_manager_tests;
 mod deletion_sync_tests;
@@ -127,15 +128,21 @@ mod demo_contact_integration_tests;
 mod device_link_proximity_tests;
 mod device_linking_engine_tests;
 mod device_race_condition_tests;
+#[cfg(feature = "diagnostic-scanner")]
 mod diagnostic_extended_pattern_tests;
+#[cfg(feature = "diagnostic-scanner")]
 mod diagnostic_log_event_tests;
 #[cfg(feature = "diagnostic-scanner")]
 mod diagnostic_preprocess_tests;
+#[cfg(feature = "diagnostic-scanner")]
 mod diagnostic_qr_pattern_tests;
+#[cfg(feature = "diagnostic-scanner")]
 mod diagnostic_report_tests;
 #[cfg(feature = "diagnostic-scanner")]
 mod diagnostic_scanner_tests;
+#[cfg(feature = "diagnostic-scanner")]
 mod diagnostic_snapshot_tests;
+#[cfg(feature = "diagnostic-scanner")]
 mod diagnostic_tuner_tests;
 mod direct_transport_proptest;
 mod direct_transport_tests;

@@ -2,31 +2,42 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! UniFFI bindings for the diagnostic tuner module.
+//! UniFFI bindings for production QR scanning (always-on) and diagnostic
+//! benchmark harness (gated behind `diagnostic-scanner`).
 //!
-//! Wraps core diagnostic types, flattening tuples and converting `usize`
-//! to `u32` for UniFFI compatibility.
+//! Production surface: `generate_qr_bitmap`, `MobileQrBitmap`,
+//! `MobileQrEccLevel`, `MobileScannerBackend`, `MobileScanResult`,
+//! `diagnostic_scan_qr` (latter pending rename in a follow-up phase).
+//!
+//! Diagnostic surface (only compiled with `--features diagnostic-scanner`):
+//! camera/tuner types, sweep matrix generators, throughput sequences,
+//! config scoring, QR-with-preprocessing variant.
 
+// Tuner/bench imports are only needed when building the diagnostic surface.
+#[cfg(feature = "diagnostic-scanner")]
 use vauchi_core::diagnostic::{
     DeviceCapabilityProfile, ErrorCorrectionLevel, Platform, QrConfig, TuningResult,
     generate_extended_qr_test_patterns, generate_qr_test_patterns, generate_sweep_matrix,
     generate_throughput_sequence, rank_configs, score_config,
 };
 
-// === Mobile Wrapper Types ===
+// === Mobile Wrapper Types (diagnostic only) ===
 
+#[cfg(feature = "diagnostic-scanner")]
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum MobilePlatform {
     Android,
     Ios,
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileFpsRange {
     pub min: i32,
     pub max: i32,
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileDeviceCapabilityProfile {
     pub platform: MobilePlatform,
@@ -43,6 +54,7 @@ pub struct MobileDeviceCapabilityProfile {
     pub max_resolution_height: u32,
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileCameraConfig {
     pub id: u32,
@@ -57,6 +69,7 @@ pub struct MobileCameraConfig {
     pub screen_brightness: f32,
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileQrConfig {
     pub error_correction: MobileQrEccLevel,
@@ -64,6 +77,7 @@ pub struct MobileQrConfig {
     pub module_size_px: u32,
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileTuningResult {
     pub camera_config_id: u32,
@@ -80,26 +94,30 @@ pub struct MobileTuningResult {
     pub actual_exposure_ev: Option<i32>,
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileScoredConfig {
     pub config_id: u32,
     pub score: f32,
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileSweepMatrix {
     pub camera_configs: Vec<MobileCameraConfig>,
     pub qr_configs: Vec<MobileQrConfig>,
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileQrTestPattern {
     pub config: MobileQrConfig,
     pub data: String,
 }
 
-// === Conversions: Mobile -> Core ===
+// === Conversions: Mobile -> Core (diagnostic only) ===
 
+#[cfg(feature = "diagnostic-scanner")]
 impl From<&MobilePlatform> for Platform {
     fn from(p: &MobilePlatform) -> Self {
         match p {
@@ -109,6 +127,7 @@ impl From<&MobilePlatform> for Platform {
     }
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 impl From<&MobileQrEccLevel> for ErrorCorrectionLevel {
     fn from(ec: &MobileQrEccLevel) -> Self {
         match ec {
@@ -120,6 +139,7 @@ impl From<&MobileQrEccLevel> for ErrorCorrectionLevel {
     }
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 impl From<&MobileDeviceCapabilityProfile> for DeviceCapabilityProfile {
     fn from(p: &MobileDeviceCapabilityProfile) -> Self {
         let iso_range = match (p.iso_range_min, p.iso_range_max) {
@@ -144,6 +164,7 @@ impl From<&MobileDeviceCapabilityProfile> for DeviceCapabilityProfile {
     }
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 impl From<&MobileTuningResult> for TuningResult {
     fn from(r: &MobileTuningResult) -> Self {
         TuningResult {
@@ -165,8 +186,9 @@ impl From<&MobileTuningResult> for TuningResult {
     }
 }
 
-// === Conversions: Core -> Mobile ===
+// === Conversions: Core -> Mobile (diagnostic only) ===
 
+#[cfg(feature = "diagnostic-scanner")]
 fn ec_to_mobile(ec: &ErrorCorrectionLevel) -> MobileQrEccLevel {
     match ec {
         ErrorCorrectionLevel::L => MobileQrEccLevel::Low,
@@ -177,6 +199,7 @@ fn ec_to_mobile(ec: &ErrorCorrectionLevel) -> MobileQrEccLevel {
     }
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 fn camera_config_to_mobile(c: &vauchi_core::diagnostic::CameraConfig) -> MobileCameraConfig {
     MobileCameraConfig {
         id: c.id,
@@ -192,6 +215,7 @@ fn camera_config_to_mobile(c: &vauchi_core::diagnostic::CameraConfig) -> MobileC
     }
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 fn qr_config_to_mobile(q: &QrConfig) -> MobileQrConfig {
     MobileQrConfig {
         error_correction: ec_to_mobile(&q.error_correction),
@@ -200,8 +224,9 @@ fn qr_config_to_mobile(q: &QrConfig) -> MobileQrConfig {
     }
 }
 
-// === Exported Functions ===
+// === Exported Functions (diagnostic only) ===
 
+#[cfg(feature = "diagnostic-scanner")]
 #[uniffi::export]
 pub fn diagnostic_generate_sweep_matrix(
     profile: MobileDeviceCapabilityProfile,
@@ -218,12 +243,14 @@ pub fn diagnostic_generate_sweep_matrix(
     }
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 #[uniffi::export]
 pub fn diagnostic_score_config(result: MobileTuningResult) -> f32 {
     let core_result = TuningResult::from(&result);
     score_config(&core_result)
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 #[uniffi::export]
 pub fn diagnostic_rank_configs(results: Vec<MobileTuningResult>) -> Vec<MobileScoredConfig> {
     let core_results: Vec<TuningResult> = results.iter().map(TuningResult::from).collect();
@@ -233,6 +260,7 @@ pub fn diagnostic_rank_configs(results: Vec<MobileTuningResult>) -> Vec<MobileSc
         .collect()
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 #[uniffi::export]
 pub fn diagnostic_generate_qr_test_patterns() -> Vec<MobileQrTestPattern> {
     generate_qr_test_patterns()
@@ -244,6 +272,7 @@ pub fn diagnostic_generate_qr_test_patterns() -> Vec<MobileQrTestPattern> {
         .collect()
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 #[uniffi::export]
 pub fn diagnostic_generate_extended_qr_test_patterns() -> Vec<MobileQrTestPattern> {
     generate_extended_qr_test_patterns()
@@ -255,8 +284,9 @@ pub fn diagnostic_generate_extended_qr_test_patterns() -> Vec<MobileQrTestPatter
         .collect()
 }
 
-// === Throughput Sequence ===
+// === Throughput Sequence (diagnostic only) ===
 
+#[cfg(feature = "diagnostic-scanner")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileThroughputFrame {
     pub frame_index: u32,
@@ -264,6 +294,7 @@ pub struct MobileThroughputFrame {
     pub data: String,
 }
 
+#[cfg(feature = "diagnostic-scanner")]
 #[uniffi::export]
 pub fn diagnostic_generate_throughput_sequence(
     total_bytes: u32,

@@ -534,6 +534,25 @@ lint:module-boundaries:
           - "vauchi-core/src/**/*.rs"
           - "scripts/check-module-boundaries.sh"
 
+# Guard: no diagnostic_* UniFFI exports in default-feature binding surface.
+# Diagnostics must only ship in --features diagnostic-scanner builds
+# (test/debug). See 2026-04-19-diagnostics-out-of-production-plan.md.
+lint:no-diagnostic-in-default:
+  extends: [.linux-runner-nocache]
+  stage: lint
+  needs: []
+  script:
+    - bash scripts/check-no-diagnostic-in-default.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "vauchi-platform/src/**/*.rs"
+          - "vauchi-core/src/**/*.rs"
+          - "vauchi-platform/Cargo.toml"
+          - "scripts/check-no-diagnostic-in-default.sh"
+
 # Coverage job: run on main merges only (not MRs) — llvm-cov is too slow
 # for per-push feedback but still needed for coverage tracking/badges.
 # Measures both vauchi-core and vauchi-platform in a single instrumentation

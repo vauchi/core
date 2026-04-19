@@ -435,14 +435,18 @@ pub struct MobilePreprocessConfig {
     pub apply_threshold: bool,
 }
 
+/// Production QR scanner — decode a QR from a grayscale (Y-plane) frame.
+///
+/// Pipeline: rxing fast → rqrr → rxing tryHarder, gated by a sharpness
+/// check. Always available in default builds (no feature flag needed).
 #[uniffi::export]
-pub fn diagnostic_scan_qr(
+pub fn scan_qr(
     backend: MobileScannerBackend,
     luma_data: Vec<u8>,
     width: u32,
     height: u32,
 ) -> MobileScanResult {
-    use vauchi_core::diagnostic::scanner::{ScannerBackend, scan_qr_from_luma};
+    use vauchi_core::qr::scanner::{ScannerBackend, scan_qr_from_luma};
 
     let rust_backend = match backend {
         MobileScannerBackend::RqrrRaw => ScannerBackend::RqrrRaw,
@@ -459,6 +463,22 @@ pub fn diagnostic_scan_qr(
     }
 }
 
+/// Deprecated alias for [`scan_qr`] — kept to let Android/iOS consumers
+/// migrate from `diagnosticScanQr` → `scanQr` without a binding break.
+///
+/// Scheduled for removal in 0.20.0 once consumers update (Phase 9 of
+/// `2026-04-19-diagnostics-out-of-production-plan.md`).
+#[deprecated(since = "0.19.35", note = "use `scan_qr` — alias removed in 0.20")]
+#[uniffi::export]
+pub fn diagnostic_scan_qr(
+    backend: MobileScannerBackend,
+    luma_data: Vec<u8>,
+    width: u32,
+    height: u32,
+) -> MobileScanResult {
+    scan_qr(backend, luma_data, width, height)
+}
+
 #[cfg(feature = "diagnostic-scanner")]
 #[uniffi::export]
 pub fn diagnostic_scan_qr_with_config(
@@ -469,7 +489,7 @@ pub fn diagnostic_scan_qr_with_config(
     config: MobilePreprocessConfig,
 ) -> MobileScanResult {
     use vauchi_core::diagnostic::preprocess::PreprocessConfig;
-    use vauchi_core::diagnostic::scanner::{ScannerBackend, scan_qr_from_luma_with_config};
+    use vauchi_core::qr::scanner::{ScannerBackend, scan_qr_from_luma_with_config};
 
     let rust_backend = match backend {
         MobileScannerBackend::RqrrRaw => ScannerBackend::RqrrRaw,
@@ -532,7 +552,7 @@ pub fn diagnostic_scan_qr_yolo(
     height: u32,
     confidence_threshold: f32,
 ) -> MobileScanResult {
-    use vauchi_core::diagnostic::scanner::scan_qr_yolo;
+    use vauchi_core::qr::scanner::scan_qr_yolo;
     let mut guard = YOLO_DETECTOR.lock().unwrap();
     match guard.as_mut() {
         Some(detector) => {

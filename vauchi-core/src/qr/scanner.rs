@@ -2,14 +2,17 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! QR scanner backends for diagnostic benchmarking.
+//! Production QR scanner — rqrr + rxing multi-decoder pipeline.
 //!
-//! Provides rqrr-based QR decoding from raw grayscale (Y-plane) camera
-//! frames. Multi-decoder fallback pipeline: rxing fast → rqrr → rxing
-//! tryHarder, gated by a fast sharpness check to skip expensive fallbacks
-//! on blurry frames.
+//! Decodes QR codes from raw grayscale (Y-plane) camera frames. Pipeline:
+//! rxing fast → rqrr → rxing tryHarder, gated by a fast sharpness check
+//! that skips expensive fallbacks on blurry frames.
 //!
 //! Only the first detected QR grid per frame is decoded.
+//!
+//! Diagnostic variants (preprocessing-config wrapper, YOLO-based pipeline)
+//! remain in `crate::diagnostic` behind the `diagnostic-scanner` and
+//! `diagnostic-yolo` features.
 
 use image::GrayImage;
 use serde::{Deserialize, Serialize};
@@ -168,7 +171,7 @@ pub fn scan_qr_from_luma_with_config(
     luma_data: &[u8],
     width: u32,
     height: u32,
-    _preprocess_config: &super::preprocess::PreprocessConfig,
+    _preprocess_config: &crate::diagnostic::preprocess::PreprocessConfig,
 ) -> ScanResult {
     scan_qr_from_luma(backend, luma_data, width, height)
 }
@@ -180,7 +183,7 @@ pub fn scan_qr_from_luma_with_config(
 /// first successfully decoded QR content.
 #[cfg(feature = "diagnostic-yolo")]
 pub fn scan_qr_yolo(
-    detector: &mut super::yolo_detector::YoloDetector,
+    detector: &mut crate::diagnostic::yolo_detector::YoloDetector,
     luma_data: &[u8],
     width: u32,
     height: u32,
@@ -232,7 +235,7 @@ pub fn scan_qr_yolo(
     // Step 2: For each detection, crop → multi-decoder attempt
     let decode_start = std::time::Instant::now();
     for det in &detections {
-        let patch = super::yolo_detector::crop_detection(&img, det, 0.15);
+        let patch = crate::diagnostic::yolo_detector::crop_detection(&img, det, 0.15);
 
         // Fast path: rqrr raw decode
         let rqrr_result = decode_rqrr(patch.clone());

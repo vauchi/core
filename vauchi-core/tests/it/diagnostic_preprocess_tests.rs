@@ -163,7 +163,7 @@ fn preprocess_output_is_binary() {
 // @internal
 #[test]
 fn preprocessed_qr_still_decodable() {
-    use vauchi_core::diagnostic::scanner::*;
+    use vauchi_core::qr::scanner::*;
 
     // Generate a QR and add noise to simulate a camera frame
     let mut img = generate_qr_image("PREPROCESS_DECODE_TEST");

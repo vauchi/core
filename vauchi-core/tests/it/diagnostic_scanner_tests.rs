@@ -5,7 +5,7 @@
 #![cfg(feature = "diagnostic-scanner")]
 
 use image::GrayImage;
-use vauchi_core::diagnostic::scanner::*;
+use vauchi_core::qr::scanner::*;
 
 /// Convert a QrCode matrix to a GrayImage with quiet zone and module scaling.
 fn qr_to_gray_image(code: &qrcode::QrCode, module_px: u32) -> GrayImage {

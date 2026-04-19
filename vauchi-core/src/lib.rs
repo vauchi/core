@@ -100,6 +100,7 @@ pub use demo_contact::{
 };
 pub mod diagnostic;
 pub mod onboarding;
+pub mod qr;
 pub use onboarding::display_name_suggestions;
 pub mod social;
 pub use social::{ProfileValidation, SocialNetwork, SocialNetworkRegistry};

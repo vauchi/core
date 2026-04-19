@@ -62,11 +62,14 @@ pub use content::{
 // Production QR surface — always available.
 // - generate_qr_bitmap: own-card QR display on Android/iOS
 // - MobileQrBitmap, MobileQrEccLevel: params/return types for generation
-// - MobileScannerBackend, MobileScanResult, diagnostic_scan_qr:
-//   production scanner (rxing/rqrr). Rename pending in Phase 3 follow-up.
+// - MobileScannerBackend, MobileScanResult, scan_qr: production scanner
+//   (rxing/rqrr pipeline from `vauchi_core::qr::scanner`)
+// - diagnostic_scan_qr: deprecated alias (to be removed 0.20.0 — Phase 9)
+#[allow(deprecated)]
+pub use diagnostic::diagnostic_scan_qr;
 pub use diagnostic::{
-    MobileQrBitmap, MobileQrEccLevel, MobileScanResult, MobileScannerBackend, diagnostic_scan_qr,
-    generate_qr_bitmap,
+    MobileQrBitmap, MobileQrEccLevel, MobileScanResult, MobileScannerBackend, generate_qr_bitmap,
+    scan_qr,
 };
 
 // Diagnostic benchmark harness surface — only built with

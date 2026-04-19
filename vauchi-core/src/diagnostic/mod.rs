@@ -2,14 +2,15 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Production modules (always compiled):
-// - scanner: rxing/rqrr QR decoding used by Android/iOS mobile scanner
+// Production module (always compiled):
 // - exchange_debug: timestamped event log consumed by exchange/session.rs
+//
+// Production QR scanner lives in `crate::qr::scanner` (moved 2026-04-19
+// for architectural separation — no diagnostic code in production).
 #[cfg(feature = "testing")]
 pub mod exchange_debug;
 #[cfg(not(feature = "testing"))]
 pub(crate) mod exchange_debug;
-pub mod scanner;
 
 // Development/benchmark modules (gated behind diagnostic-scanner):
 // tuner, report, snapshot, debug_session, log_event, preprocess, yolo_detector.

@@ -367,17 +367,8 @@ impl ExchangeEngine {
             .collect()
     }
 
-    /// Advance to the next animated QR frame. Frontends call this on a
-    /// timer (e.g., every 100ms = 10fps) while the "Share Your Code" screen
-    /// is visible. Returns the new screen model.
-    pub fn advance_qr_frame(&mut self) -> ScreenModel {
-        if !self.qr_frames.is_empty() {
-            self.qr_frame_index = (self.qr_frame_index + 1) % self.qr_frames.len();
-        }
-        self.build_screen()
-    }
-
     /// Number of animated QR frames (1 for static QR, >1 for animated).
+    #[cfg(test)]
     pub fn qr_frame_count(&self) -> usize {
         self.qr_frames.len().max(1)
     }
@@ -1361,6 +1352,20 @@ impl WorkflowEngine for ExchangeEngine {
 
     fn as_any(&self) -> Option<&dyn std::any::Any> {
         Some(self)
+    }
+
+    /// Override the `WorkflowEngine::advance_qr_frame` default to cycle animated
+    /// QR frames while on the ShowQr step. Returns `None` on any other step (no
+    /// animation active) or when there are no frames (e.g. no session yet).
+    fn advance_qr_frame(&mut self) -> Option<ScreenModel> {
+        if !matches!(self.step, ExchangeStep::Qr(QrStep::ShowQr)) {
+            return None;
+        }
+        if self.qr_frames.len() <= 1 {
+            return None;
+        }
+        self.qr_frame_index = (self.qr_frame_index + 1) % self.qr_frames.len();
+        Some(self.build_screen())
     }
 }
 
@@ -3080,5 +3085,87 @@ mod tests {
             }
             other => panic!("expected QrCode, got {:?}", other),
         }
+    }
+
+    fn qr_data_from_screen(screen: &ScreenModel) -> &str {
+        for c in &screen.components {
+            if let Component::QrCode {
+                data,
+                mode: QrMode::Display,
+                ..
+            } = c
+            {
+                return data.as_str();
+            }
+        }
+        panic!("expected QrCode Display component in {:?}", screen);
+    }
+
+    // @internal
+    #[test]
+    fn test_advance_qr_frame_cycles_frames_on_show_qr() {
+        use crate::ui::engine::WorkflowEngine;
+
+        let session = create_test_session();
+        let mut engine = ExchangeEngine::with_session(config_no_groups(), session);
+        let _ = engine.drain_commands();
+
+        let total = engine.qr_frame_count();
+        assert!(
+            total > 1,
+            "test session payload should yield >1 animated frame, got {total}"
+        );
+
+        let initial = qr_data_from_screen(&engine.current_screen()).to_owned();
+
+        // Advance once — must return Some(ScreenModel) with different frame data.
+        let next = WorkflowEngine::advance_qr_frame(&mut engine)
+            .expect("advance on ShowQr with animated frames returns Some");
+        assert_eq!(next.screen_id, "exchange_show_qr");
+        let after_one = qr_data_from_screen(&next).to_owned();
+        assert_ne!(
+            initial, after_one,
+            "frame data should change after one advance"
+        );
+
+        // Advance `total - 1` more times — should return to the initial frame.
+        for _ in 0..(total - 1) {
+            WorkflowEngine::advance_qr_frame(&mut engine).expect("still on ShowQr");
+        }
+        let wrapped_screen = engine.current_screen();
+        let wrapped = qr_data_from_screen(&wrapped_screen);
+        assert_eq!(
+            wrapped, initial,
+            "cycling through all {total} frames should wrap to initial"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn test_advance_qr_frame_returns_none_off_show_qr() {
+        use crate::ui::engine::WorkflowEngine;
+
+        // Engine parked on ModeSelection (no pre-selected mode).
+        let mut engine = ExchangeEngine::new(config_mode_selection());
+        assert_ne!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
+        assert!(
+            WorkflowEngine::advance_qr_frame(&mut engine).is_none(),
+            "advance must return None off the ShowQr step"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn test_advance_qr_frame_returns_none_when_no_frames() {
+        use crate::ui::engine::WorkflowEngine;
+
+        // Force ShowQr step without a session → qr_frames is empty.
+        let mut engine = ExchangeEngine::new(config_no_groups());
+        engine.step = ExchangeStep::Qr(QrStep::ShowQr);
+        assert!(engine.qr_frames.is_empty());
+        assert!(
+            WorkflowEngine::advance_qr_frame(&mut engine).is_none(),
+            "advance must return None when qr_frames is empty"
+        );
     }
 }

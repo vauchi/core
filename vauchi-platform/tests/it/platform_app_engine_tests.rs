@@ -440,3 +440,79 @@ fn replacing_event_listener_unregisters_previous() {
         "second listener should have received events"
     );
 }
+
+// ============================================================================
+// Animated QR frame advancement (ADR-031)
+// ============================================================================
+
+/// Extract the `data` string from the first `QrCode` (Display) component in a
+/// serialized `ScreenModel` JSON.
+fn qr_data_from_screen_json(screen_json: &str) -> String {
+    let v: serde_json::Value = serde_json::from_str(screen_json).expect("parse screen");
+    for c in v["components"].as_array().expect("components array") {
+        if c["QrCode"].is_object() && c["QrCode"]["mode"] == "Display" {
+            return c["QrCode"]["data"]
+                .as_str()
+                .expect("qr data string")
+                .to_owned();
+        }
+    }
+    panic!("no QrCode Display in screen: {screen_json}");
+}
+
+/// Drive onboarding → Exchange → QR (Hover mode) so the engine is parked on
+/// `exchange_show_qr` with an animated-QR session ready to cycle frames.
+fn drive_to_show_qr(engine: &PlatformAppEngine) {
+    drive_onboarding(engine);
+    engine
+        .navigate_to_json(r#""Exchange""#.into())
+        .expect("navigate to Exchange");
+    // Pick Hover mode (standard category) to drop into ShowQr.
+    engine
+        .handle_action_json(
+            r#"{"ListItemSelected": {"component_id": "category:standard", "item_id": "mode:hover"}}"#.into(),
+        )
+        .expect("select hover mode");
+    // Regardless of which ActionResult shape mode-selection returns, the
+    // current screen must now be exchange_show_qr.
+    let id = engine
+        .current_screen_id()
+        .expect("screen id after mode select");
+    assert_eq!(
+        id, "exchange_show_qr",
+        "expected show_qr after selecting Hover, got {id}"
+    );
+}
+
+// @internal
+#[test]
+fn advance_qr_frame_json_cycles_frames_on_show_qr() {
+    let (engine, _dir) = create_engine();
+    drive_to_show_qr(&engine);
+
+    let initial = engine.current_screen_json().expect("screen json");
+    let initial_data = qr_data_from_screen_json(&initial);
+
+    let next = engine
+        .advance_qr_frame_json()
+        .expect("advance call")
+        .expect("Some(screen) on ShowQr with animated frames");
+    let after_data = qr_data_from_screen_json(&next);
+    assert_ne!(
+        initial_data, after_data,
+        "QR frame data must change after advance"
+    );
+}
+
+// @internal
+#[test]
+fn advance_qr_frame_json_returns_none_off_exchange_screen() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    // On my_info (not Exchange).
+    let result = engine.advance_qr_frame_json().expect("advance call");
+    assert!(
+        result.is_none(),
+        "advance must return None outside the Exchange screen"
+    );
+}

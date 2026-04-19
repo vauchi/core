@@ -185,6 +185,32 @@ impl PlatformAppEngine {
         }
     }
 
+    /// Advance the animated QR to the next frame.
+    ///
+    /// Returns the updated ScreenModel JSON when the active engine has animated
+    /// frames to cycle (currently only `ExchangeEngine` on the ShowQr step), or
+    /// `None` otherwise. Frontends call this on a ~100ms timer while displaying
+    /// the "Share Your Code" screen to cycle V6-sized QR chunks for reliable
+    /// 240p camera decode.
+    ///
+    /// # Usage from Swift
+    ///
+    /// ```swift
+    /// if let frameJson = try engine.advanceQrFrameJson() {
+    ///     applyScreen(decode(frameJson))
+    /// }
+    /// ```
+    pub fn advance_qr_frame_json(&self) -> Result<Option<String>, MobileError> {
+        let mut engine = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Internal(format!("Lock failed: {e}")))?;
+        match engine.advance_qr_frame() {
+            Some(screen) => Ok(Some(screen_to_json(&screen)?)),
+            None => Ok(None),
+        }
+    }
+
     /// Navigate to a screen (as JSON) and return the new screen model as JSON.
     ///
     /// The screen JSON must match the `AppScreen` enum format, e.g.:

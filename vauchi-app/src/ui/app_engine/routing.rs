@@ -7,6 +7,7 @@
 
 use super::AppEngine;
 use super::AppScreen;
+use crate::ui::ScreenModel;
 use crate::ui::action::{ActionResult, PostOnboardingDestination, UserAction};
 use crate::ui::form_dialog::FormDialogType;
 use vauchi_core::contact_card::FieldType;
@@ -130,6 +131,18 @@ impl AppEngine {
         }
 
         None
+    }
+
+    /// Advance the animated QR to its next frame (~10fps timer from the frontend).
+    ///
+    /// Delegates to the active engine's `WorkflowEngine::advance_qr_frame`. Only
+    /// `ExchangeEngine` on the ShowQr step responds — everything else returns
+    /// `None`, so frontends can safely tick the timer without guarding on screen.
+    pub fn advance_qr_frame(&mut self) -> Option<ScreenModel> {
+        if !matches!(self.screen, AppScreen::Exchange) {
+            return None;
+        }
+        self.engine.advance_qr_frame()
     }
 
     pub(super) fn handle_completion(&mut self) -> ActionResult {

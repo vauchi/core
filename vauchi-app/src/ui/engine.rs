@@ -58,6 +58,19 @@ pub trait WorkflowEngine: Send {
         None
     }
 
+    /// Advance the animated QR display to the next frame.
+    ///
+    /// Engines that render animated QR codes (currently only `ExchangeEngine`
+    /// on the ShowQr step) override this. Returns `Some(ScreenModel)` with the
+    /// next-frame QR data, or `None` if no animation is active (static QR or
+    /// non-QR screen). Default returns `None`.
+    ///
+    /// Frontends call this on a ~100ms timer while displaying the ShowQr screen
+    /// to cycle the V6 frames for reliable 240p-camera decode.
+    fn advance_qr_frame(&mut self) -> Option<ScreenModel> {
+        None
+    }
+
     /// Downcast to concrete type for AppEngine-level interception.
     ///
     /// Used by `MyInfoEntryDetailEngine` for group visibility persistence.

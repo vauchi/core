@@ -321,15 +321,19 @@ lint:semver:
       echo "Generating current rustdoc JSON for vauchi-core..."
       RUSTDOCFLAGS="-Z unstable-options --output-format json" cargo +nightly doc -p vauchi-core --no-deps
       echo "Generating baseline rustdoc JSON from origin/main..."
-      git worktree remove -f /tmp/baseline 2>/dev/null || true
+      # Per-job baseline path — shared shell runner persists /tmp across jobs,
+      # and a foreign-owned /tmp/baseline would fail both `rm -rf` and the
+      # subsequent worktree add with EACCES.
+      BASELINE_DIR="/tmp/baseline-${CI_JOB_ID}"
+      git worktree remove -f "$BASELINE_DIR" 2>/dev/null || true
       git worktree prune
-      rm -rf /tmp/baseline
-      git worktree add -f /tmp/baseline origin/main --detach
-      RUSTDOCFLAGS="-Z unstable-options --output-format json" cargo +nightly doc --manifest-path /tmp/baseline/Cargo.toml -p vauchi-core --no-deps
+      rm -rf "$BASELINE_DIR"
+      git worktree add -f "$BASELINE_DIR" origin/main --detach
+      RUSTDOCFLAGS="-Z unstable-options --output-format json" cargo +nightly doc --manifest-path "$BASELINE_DIR/Cargo.toml" -p vauchi-core --no-deps
       cargo semver-checks check-release -p vauchi-core \
         --current-rustdoc target/doc/vauchi_core.json \
-        --baseline-rustdoc /tmp/baseline/target/doc/vauchi_core.json
-      git worktree remove /tmp/baseline 2>/dev/null || true
+        --baseline-rustdoc "$BASELINE_DIR/target/doc/vauchi_core.json"
+      git worktree remove "$BASELINE_DIR" 2>/dev/null || true
     # vauchi-platform: include_bytes! references sibling themes/ repo —
     # skipped until themes are vendored or a similar workaround is applied
 
@@ -653,17 +657,20 @@ fuzz:nightly:
       TARGET_COUNT=$(echo $TARGETS | wc -w | tr -d ' ')
       echo "=== Fuzzing ${TARGET_COUNT} targets, ${FUZZ_JOBS} parallel, ${FUZZ_DURATION}s each ==="
 
+      # Per-job output log — shared shell runner persists /tmp across jobs.
+      FUZZ_LOG="/tmp/fuzz-output-${CI_JOB_ID}.log"
+
       # Run fuzz targets in parallel; capture exit code separately to avoid
       # pipefail killing the script before the CRASH/PASS count check runs.
       set +o pipefail
       echo "$TARGETS" | tr ' ' '\n' | grep -v '^$' | \
         xargs -P "$FUZZ_JOBS" -I{} sh -c \
           'echo "START: {}"; cargo +nightly fuzz run {} -- -max_total_time='"$FUZZ_DURATION"' 2>&1 && echo "PASS:{}" || echo "CRASH:{}"' \
-          | tee /tmp/fuzz-output.log
+          | tee "$FUZZ_LOG"
       set -o pipefail
 
-      FAILED=$(grep -c '^CRASH:' /tmp/fuzz-output.log || true)
-      PASSED=$(grep -c '^PASS:' /tmp/fuzz-output.log || true)
+      FAILED=$(grep -c '^CRASH:' "$FUZZ_LOG" || true)
+      PASSED=$(grep -c '^PASS:' "$FUZZ_LOG" || true)
 
       # Generate JUnit XML report for GitLab test tab
       cat > "$REPORT_DIR/fuzz-junit.xml" <<JUNIT_EOF
@@ -672,7 +679,7 @@ fuzz:nightly:
         <testsuite name="cargo-fuzz" tests="${TARGET_COUNT}" failures="${FAILED}">
       JUNIT_EOF
       for t in $TARGETS; do
-        STATUS=$(grep -E "^(PASS|CRASH):${t}$" /tmp/fuzz-output.log | head -1 | cut -d: -f1)
+        STATUS=$(grep -E "^(PASS|CRASH):${t}$" "$FUZZ_LOG" | head -1 | cut -d: -f1)
         if [ "$STATUS" = "CRASH" ]; then
           echo "    <testcase name=\"${t}\" classname=\"fuzz\"><failure message=\"Crash found\"/></testcase>" >> "$REPORT_DIR/fuzz-junit.xml"
         else
@@ -1622,16 +1629,22 @@ update:swift-bindings:
       }
       echo "✓ Cosign signature verified"
 
-      # Extract Swift bindings from local artifact (clean stale dirs from shared runners)
-      rm -rf /tmp/swift-bindings
+      # Per-job paths — shared shell runner persists /tmp across jobs, and a
+      # foreign-owned leftover dir would fail both `rm -rf` and the write with
+      # EACCES. CI_JOB_ID guarantees uniqueness + ownership.
+      SWIFT_BINDINGS_DIR="/tmp/swift-bindings-${CI_JOB_ID}"
+      PLATFORM_SWIFT_DIR="/tmp/platform-swift-${CI_JOB_ID}"
+
+      # Extract Swift bindings from local artifact
+      rm -rf "$SWIFT_BINDINGS_DIR"
       unzip -o -j dist/VauchiPlatform-${CLEAN_VERSION}.zip \
         "VauchiPlatform-${CLEAN_VERSION}/Sources/vauchi_platform.swift" \
-        -d /tmp/swift-bindings/
+        -d "$SWIFT_BINDINGS_DIR/"
 
-      # Clone platform-swift repo (clean up stale dir from previous runs on shared runners)
-      rm -rf /tmp/platform-swift
-      git clone --depth 1 "https://vauchi-gitlab-runner:${CI_PUSH_TOKEN_SWIFT}@gitlab.com/vauchi/vauchi-platform-swift.git" /tmp/platform-swift
-      cd /tmp/platform-swift
+      # Clone platform-swift repo
+      rm -rf "$PLATFORM_SWIFT_DIR"
+      git clone --depth 1 "https://vauchi-gitlab-runner:${CI_PUSH_TOKEN_SWIFT}@gitlab.com/vauchi/vauchi-platform-swift.git" "$PLATFORM_SWIFT_DIR"
+      cd "$PLATFORM_SWIFT_DIR"
 
       # Update Package.swift version + checksum
       sed -i "s/let version = \".*\"/let version = \"$CLEAN_VERSION\"/" Package.swift
@@ -1652,12 +1665,12 @@ update:swift-bindings:
         'repl = r"\g<1>.binaryTarget(" + "\n" + r"\g<1>    name: " + Q + "VauchiPlatformFFI" + Q + "," + "\n" + r"\g<1>    url: " + Q + url + Q + "," + "\n" + r"\g<1>    checksum: checksum" + "\n" + r"\g<1>),"' \
         'content = re.sub(pattern, repl, content)' \
         'with open(path, "w") as f: f.write(content)' \
-        > /tmp/fix-package-swift.py
-      python3 /tmp/fix-package-swift.py Package.swift "$REMOTE_URL"
+        > "/tmp/fix-package-swift-${CI_JOB_ID}.py"
+      python3 "/tmp/fix-package-swift-${CI_JOB_ID}.py" Package.swift "$REMOTE_URL"
       echo "Ensured Package.swift uses REMOTE binaryTarget"
 
       # Update Swift bindings source
-      cp /tmp/swift-bindings/vauchi_platform.swift Sources/VauchiPlatform/vauchi_platform.swift
+      cp "$SWIFT_BINDINGS_DIR/vauchi_platform.swift" Sources/VauchiPlatform/vauchi_platform.swift
 
       echo "Updated Package.swift:"
       head -12 Package.swift
@@ -1893,34 +1906,38 @@ verify:reproducible:
     - echo "Rust toolchain:"
     - rustc --version --verbose
 
+    # Per-job /tmp paths — shared shell runner persists /tmp across jobs,
+    # so fixed names risk EACCES on writes when a prior run (or a different
+    # user) left the file behind. CI_JOB_ID guarantees uniqueness + ownership.
+
     # Build 1
     - echo "=== Build 1 ==="
     - cargo build --release -p vauchi-core --lib
-    - cp target/release/libvauchi_core.rlib /tmp/build1.rlib 2>/dev/null || true
-    - cp target/release/libvauchi_core.a /tmp/build1.a 2>/dev/null || true
-    - sha256sum target/release/libvauchi_core.* 2>/dev/null | tee /tmp/build1-checksums.txt
+    - cp target/release/libvauchi_core.rlib "/tmp/build1-${CI_JOB_ID}.rlib" 2>/dev/null || true
+    - cp target/release/libvauchi_core.a "/tmp/build1-${CI_JOB_ID}.a" 2>/dev/null || true
+    - sha256sum target/release/libvauchi_core.* 2>/dev/null | tee "/tmp/build1-${CI_JOB_ID}-checksums.txt"
 
     # Clean and rebuild
     - cargo clean
     - echo "=== Build 2 ==="
     - cargo build --release -p vauchi-core --lib
-    - sha256sum target/release/libvauchi_core.* 2>/dev/null | tee /tmp/build2-checksums.txt
+    - sha256sum target/release/libvauchi_core.* 2>/dev/null | tee "/tmp/build2-${CI_JOB_ID}-checksums.txt"
 
     # Compare
     - echo "=== Comparison ==="
     - |
-      if diff /tmp/build1-checksums.txt /tmp/build2-checksums.txt; then
+      if diff "/tmp/build1-${CI_JOB_ID}-checksums.txt" "/tmp/build2-${CI_JOB_ID}-checksums.txt"; then
         echo "✓ Reproducible: both builds produced identical output"
       else
         echo "✗ NOT reproducible: builds differ"
-        echo "Build 1:" && cat /tmp/build1-checksums.txt
-        echo "Build 2:" && cat /tmp/build2-checksums.txt
+        echo "Build 1:" && cat "/tmp/build1-${CI_JOB_ID}-checksums.txt"
+        echo "Build 2:" && cat "/tmp/build2-${CI_JOB_ID}-checksums.txt"
         exit 1
       fi
   artifacts:
     paths:
-      - /tmp/build1-checksums.txt
-      - /tmp/build2-checksums.txt
+      - /tmp/build1-${CI_JOB_ID}-checksums.txt
+      - /tmp/build2-${CI_JOB_ID}-checksums.txt
     when: always
     expire_in: 30 days
 

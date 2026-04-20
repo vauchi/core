@@ -206,6 +206,7 @@ mod tests {
                     label: (*id).into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 })
                 .collect(),
         )

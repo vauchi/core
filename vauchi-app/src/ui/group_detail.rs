@@ -77,6 +77,7 @@ impl GroupDetailEngine {
                         label: format!("Preview as {}", m.name),
                         style: ActionStyle::Secondary,
                         enabled: true,
+                        a11y: None,
                     })
                     .collect();
                 actions.push(ScreenAction {
@@ -84,12 +85,14 @@ impl GroupDetailEngine {
                     label: "Rename".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 });
                 actions.push(ScreenAction {
                     id: "delete_group".into(),
                     label: "Delete Group".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
+                    a11y: None,
                 });
                 actions
             },

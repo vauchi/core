@@ -308,6 +308,7 @@ mod tests {
             label: id.into(),
             style: ActionStyle::Primary,
             enabled: true,
+            a11y: None,
         }
     }
 
@@ -573,6 +574,7 @@ mod tests {
                             label: "go".into(),
                             style: ActionStyle::Primary,
                             enabled: true,
+                            a11y: None,
                         }],
                     ),
                     _ => ScreenModel::new("end", "end", vec![], vec![]),
@@ -615,6 +617,7 @@ mod tests {
                         label: "done".into(),
                         style: ActionStyle::Primary,
                         enabled: true,
+                        a11y: None,
                     }],
                 )
             }

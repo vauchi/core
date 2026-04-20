@@ -30,6 +30,7 @@ fn test_screen_model_serde_roundtrip() {
             label: "Continue".to_string(),
             style: ActionStyle::Primary,
             enabled: true,
+            a11y: None,
         }],
         progress: Some(Progress {
             current_step: 1,
@@ -426,6 +427,7 @@ fn test_screen_action_styles() {
             label: "Test".into(),
             style,
             enabled: true,
+            a11y: None,
         };
         let json = serde_json::to_string(&action).unwrap();
         let restored: ScreenAction = serde_json::from_str(&json).unwrap();
@@ -529,6 +531,7 @@ fn test_screen_action_disabled() {
         label: "Submit".into(),
         style: ActionStyle::Primary,
         enabled: false,
+        a11y: None,
     };
 
     let json = serde_json::to_string(&action).unwrap();

@@ -100,6 +100,7 @@ impl DeviceLinkingEngine {
                     label: "Cancel".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 }],
                 progress: self.progress(),
                 ..Default::default()
@@ -134,12 +135,14 @@ impl DeviceLinkingEngine {
                             label: "Confirm".into(),
                             style: ActionStyle::Primary,
                             enabled: true,
+                            a11y: None,
                         },
                         ScreenAction {
                             id: "reject".into(),
                             label: "Reject".into(),
                             style: ActionStyle::Destructive,
                             enabled: true,
+                            a11y: None,
                         },
                     ],
                     progress: self.progress(),
@@ -187,6 +190,7 @@ impl DeviceLinkingEngine {
                     label: "Done".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 }],
                 progress: self.progress(),
                 ..Default::default()

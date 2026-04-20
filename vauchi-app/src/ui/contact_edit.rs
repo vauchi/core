@@ -168,6 +168,7 @@ impl ContactEditEngine {
                 label: "Continue".into(),
                 style: ActionStyle::Primary,
                 enabled: name_not_empty,
+                a11y: None,
             }],
             progress: Some(Progress {
                 current_step: 1,
@@ -232,12 +233,14 @@ impl ContactEditEngine {
                     label: "Back".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "continue".into(),
                     label: "Preview".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: Some(Progress {
@@ -279,12 +282,14 @@ impl ContactEditEngine {
                     label: "Back".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "save".into(),
                     label: "Save Changes".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: Some(Progress {

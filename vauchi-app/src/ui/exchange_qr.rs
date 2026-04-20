@@ -144,6 +144,7 @@ pub(super) fn build_show_qr_screen(
             label: "Scan Their Code".into(),
             style: ActionStyle::Primary,
             enabled: true,
+            a11y: None,
         }],
         progress: Some(progress),
         ..Default::default()
@@ -176,6 +177,7 @@ pub(super) fn build_scan_qr_screen(
             label: "Back".into(),
             style: ActionStyle::Secondary,
             enabled: true,
+            a11y: None,
         }],
         progress: Some(progress),
         ..Default::default()
@@ -209,12 +211,14 @@ pub(super) fn build_manual_entry_screen(progress: Progress) -> ScreenModel {
                 label: "Submit".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
+                a11y: None,
             },
             ScreenAction {
                 id: "back".into(),
                 label: "Back".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             },
         ],
         progress: Some(progress),

@@ -134,12 +134,14 @@ impl RecoveryClaimReviewEngine {
                     label: "Vouch".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 });
                 actions.push(ScreenAction {
                     id: "reject".into(),
                     label: "Reject".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
+                    a11y: None,
                 });
             }
             (ReviewMode::Acceptance, Confidence::High) => {
@@ -148,12 +150,14 @@ impl RecoveryClaimReviewEngine {
                     label: "Accept".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 });
                 actions.push(ScreenAction {
                     id: "reject".into(),
                     label: "Reject".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
+                    a11y: None,
                 });
             }
             // Medium: vouch/accept + remind
@@ -163,18 +167,21 @@ impl RecoveryClaimReviewEngine {
                     label: "Vouch".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 });
                 actions.push(ScreenAction {
                     id: "remind".into(),
                     label: "Remind Me Later".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 });
                 actions.push(ScreenAction {
                     id: "reject".into(),
                     label: "Reject".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
+                    a11y: None,
                 });
             }
             (ReviewMode::Acceptance, Confidence::Medium) => {
@@ -183,18 +190,21 @@ impl RecoveryClaimReviewEngine {
                     label: "Accept".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 });
                 actions.push(ScreenAction {
                     id: "remind".into(),
                     label: "Remind Me Later".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 });
                 actions.push(ScreenAction {
                     id: "reject".into(),
                     label: "Reject".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
+                    a11y: None,
                 });
             }
             // Low: verify + accept_anyway/vouch + reject
@@ -204,18 +214,21 @@ impl RecoveryClaimReviewEngine {
                     label: "Verify Another Way".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 });
                 actions.push(ScreenAction {
                     id: "vouch".into(),
                     label: "Vouch Anyway".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 });
                 actions.push(ScreenAction {
                     id: "reject".into(),
                     label: "Reject".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
+                    a11y: None,
                 });
             }
             (ReviewMode::Acceptance, Confidence::Low) => {
@@ -224,18 +237,21 @@ impl RecoveryClaimReviewEngine {
                     label: "Verify Another Way".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 });
                 actions.push(ScreenAction {
                     id: "accept_anyway".into(),
                     label: "Accept Anyway".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 });
                 actions.push(ScreenAction {
                     id: "reject".into(),
                     label: "Reject".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
+                    a11y: None,
                 });
             }
         }
@@ -287,6 +303,7 @@ impl RecoveryClaimReviewEngine {
                 label: "Back".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             }],
             progress: None,
             ..Default::default()
@@ -317,12 +334,14 @@ impl RecoveryClaimReviewEngine {
                     label: "Accept Anyway".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "cancel".into(),
                     label: "Cancel".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: None,
@@ -367,6 +386,7 @@ impl RecoveryClaimReviewEngine {
                 label: "Done".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
+                a11y: None,
             }],
             progress: None,
             ..Default::default()

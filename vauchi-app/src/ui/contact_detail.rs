@@ -475,18 +475,21 @@ impl ContactDetailEngine {
                     label: "Edit".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "verify_fingerprint".into(),
                     label: "Verify Fingerprint".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: format!("preview-as:{}", self.contact.id),
                     label: "What do they see?".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "toggle_hidden".into(),
@@ -497,6 +500,7 @@ impl ContactDetailEngine {
                     },
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 if self.is_imported {
                     ScreenAction {
@@ -504,6 +508,7 @@ impl ContactDetailEngine {
                         label: "Delete Contact".into(),
                         style: ActionStyle::Destructive,
                         enabled: true,
+                        a11y: None,
                     }
                 } else {
                     ScreenAction {
@@ -511,6 +516,7 @@ impl ContactDetailEngine {
                         label: "Archive Contact".into(),
                         style: ActionStyle::Secondary,
                         enabled: true,
+                        a11y: None,
                     }
                 },
                 ScreenAction {
@@ -518,6 +524,7 @@ impl ContactDetailEngine {
                     label: "Back".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: None,
@@ -645,6 +652,7 @@ impl WorkflowEngine for ContactNotFoundEngine {
                 label: "Back".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             }],
             progress: None,
             ..Default::default()

@@ -85,6 +85,7 @@ impl WorkflowEngine for ContactListEngine {
             label: "Add Contact".into(),
             style: ActionStyle::Primary,
             enabled: true,
+            a11y: None,
         }];
 
         // Add group filter actions
@@ -98,6 +99,7 @@ impl WorkflowEngine for ContactListEngine {
                     ActionStyle::Secondary
                 },
                 enabled: true,
+                a11y: None,
             });
         }
 
@@ -108,6 +110,7 @@ impl WorkflowEngine for ContactListEngine {
                 label: "All Contacts".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             });
         }
 
@@ -140,6 +143,7 @@ impl WorkflowEngine for ContactListEngine {
             label: "Archived Contacts".into(),
             style: ActionStyle::Secondary,
             enabled: true,
+            a11y: None,
         });
 
         // Find duplicates action
@@ -148,6 +152,7 @@ impl WorkflowEngine for ContactListEngine {
             label: "Find Duplicates".into(),
             style: ActionStyle::Secondary,
             enabled: true,
+            a11y: None,
         });
 
         // Add exchange shortcut when empty
@@ -159,6 +164,7 @@ impl WorkflowEngine for ContactListEngine {
                     label: "Exchange Now".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
             );
         }

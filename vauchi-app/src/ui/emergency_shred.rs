@@ -80,12 +80,14 @@ impl EmergencyShredEngine {
                     label: "I Understand".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "cancel".into(),
                     label: "Cancel".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: Some(Progress {
@@ -119,12 +121,14 @@ impl EmergencyShredEngine {
                     label: "Wipe All Data".into(),
                     style: ActionStyle::Destructive,
                     enabled: self.typed_confirmation == "DELETE",
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "cancel".into(),
                     label: "Cancel".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: Some(Progress {
@@ -177,6 +181,7 @@ impl EmergencyShredEngine {
                 label: "Done".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
+                a11y: None,
             }],
             progress: Some(Progress {
                 current_step: 3,

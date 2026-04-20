@@ -51,6 +51,7 @@ impl ContactVisibilityEngine {
                 label: "Save".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
+                a11y: None,
             }],
             progress: None,
             ..Default::default()

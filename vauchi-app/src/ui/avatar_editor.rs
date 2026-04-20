@@ -153,6 +153,7 @@ impl AvatarEditorEngine {
                 label: "Cancel".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             }],
         )
     }
@@ -193,12 +194,14 @@ impl AvatarEditorEngine {
                     label: "Cancel".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "save".into(),
                     label: "Save".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
         )
@@ -273,12 +276,14 @@ impl AvatarEditorEngine {
                 label: "Cancel".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             },
             ScreenAction {
                 id: "use".into(),
                 label: "Use".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
+                a11y: None,
             },
         ];
 
@@ -288,6 +293,7 @@ impl AvatarEditorEngine {
                 label: "Regenerate".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             });
         }
 

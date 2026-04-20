@@ -58,12 +58,14 @@ pub(super) fn build_share_url_screen(url: &str, progress: Progress) -> ScreenMod
                 label: "Share".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
+                a11y: None,
             },
             ScreenAction {
                 id: "cancel".into(),
                 label: "Cancel".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             },
         ],
         progress: Some(progress),
@@ -96,6 +98,7 @@ pub(super) fn build_waiting_screen(progress: Progress) -> ScreenModel {
             label: "Cancel".into(),
             style: ActionStyle::Secondary,
             enabled: true,
+            a11y: None,
         }],
         progress: Some(progress),
         ..Default::default()

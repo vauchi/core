@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::component::Component;
+use super::component::{A11y, Component};
 use crate::theme::DesignTokens;
 
 /// Current schema version. Increment when adding new Component types.
@@ -187,6 +187,28 @@ pub struct Progress {
 }
 
 /// A button or action the user can take on the screen.
+///
+/// Frontends render this as the primary button row on a screen.
+/// The `id` is the stable action identifier consumed by
+/// `handle_action` via `UserAction::ActionPressed { action_id }`;
+/// the `label` is the localized display string.
+///
+/// # Accessibility contract
+///
+/// - `id` is the stable accessibility identifier (Compose
+///   `testTag`, SwiftUI `accessibilityIdentifier`). Frontends
+///   map `ScreenAction.id` onto the platform a11y identifier
+///   so Maestro (or any a11y-based test driver) can tap by
+///   `id:` rather than by localized visible text. When `a11y`
+///   is `None`, `label` serves as the screen-reader
+///   announcement.
+/// - `a11y.label`, when `Some`, overrides `label` for screen
+///   readers. Use this for destructive buttons
+///   ("Delete permanently, this cannot be undone") or
+///   toggles-as-buttons ("Turned on" vs the visible "On").
+///   For 95%+ of screens, leave `a11y` as `None`.
+///
+/// See `_private/docs/problems/2026-04-20-screen-action-a11y-identifier-gap`.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScreenAction {
@@ -194,6 +216,9 @@ pub struct ScreenAction {
     pub label: String,
     pub style: ActionStyle,
     pub enabled: bool,
+    /// Accessibility override. `None` means "use `label`".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub a11y: Option<A11y>,
 }
 
 /// Metadata for a navigation tab. Core resolves localized labels so

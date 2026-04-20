@@ -112,6 +112,7 @@ impl SyncStatusEngine {
                     label: "Sync Now".into(),
                     style: ActionStyle::Primary,
                     enabled: !is_offline,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "test_connection".into(),
@@ -122,6 +123,7 @@ impl SyncStatusEngine {
                     },
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: None,

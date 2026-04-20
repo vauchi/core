@@ -210,18 +210,21 @@ impl DeviceReplacementEngine {
                     label: "Transfer via QR".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "lost_device".into(),
                     label: "Restore from backup".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "back".into(),
                     label: "Back".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: self.progress(),
@@ -265,6 +268,7 @@ impl DeviceReplacementEngine {
                 label: "Cancel".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             }],
             progress: self.progress(),
             ..Default::default()
@@ -301,12 +305,14 @@ impl DeviceReplacementEngine {
                     label: "Codes match".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "reject".into(),
                     label: "Codes don't match".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: self.progress(),
@@ -360,6 +366,7 @@ impl DeviceReplacementEngine {
                 label: "Continue".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
+                a11y: None,
             }]
         } else {
             vec![ScreenAction {
@@ -367,6 +374,7 @@ impl DeviceReplacementEngine {
                 label: "Done".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
+                a11y: None,
             }]
         };
         ScreenModel {
@@ -420,12 +428,14 @@ impl DeviceReplacementEngine {
                     label: "Remove this device".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "keep_both".into(),
                     label: "Keep both".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: self.progress(),
@@ -494,12 +504,14 @@ impl DeviceReplacementEngine {
                     label: "Social Recovery".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "done".into(),
                     label: "I'll do this later".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: self.progress(),

@@ -534,6 +534,7 @@ impl AppEngine {
                     label: "Update Now".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 }],
             ),
         }

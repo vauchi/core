@@ -110,6 +110,7 @@ impl FingerprintVerifyEngine {
                 label: "Remove verification".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             });
         } else {
             actions.push(ScreenAction {
@@ -117,6 +118,7 @@ impl FingerprintVerifyEngine {
                 label: "I've verified in person".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
+                a11y: None,
             });
         }
         actions.push(ScreenAction {
@@ -124,6 +126,7 @@ impl FingerprintVerifyEngine {
             label: "Back".into(),
             style: ActionStyle::Secondary,
             enabled: true,
+            a11y: None,
         });
 
         ScreenModel {

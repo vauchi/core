@@ -73,12 +73,14 @@ impl ContactLimitEngine {
                     label: "Save".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "cancel_edit".into(),
                     label: "Cancel".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
             ]
         } else {
@@ -87,6 +89,7 @@ impl ContactLimitEngine {
                 label: "Edit Limit".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
+                a11y: None,
             }]
         };
 

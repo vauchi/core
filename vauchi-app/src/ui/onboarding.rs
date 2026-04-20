@@ -154,12 +154,14 @@ impl OnboardingEngine {
                     label: "Create new identity".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "have_identity".into(),
                     label: "I already have an identity".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: None,
@@ -207,24 +209,28 @@ impl OnboardingEngine {
                     label: "Transfer from another device".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "link_device".into(),
                     label: "Link from another device".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "restore_backup".into(),
                     label: "Restore from backup".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "back".into(),
                     label: "Back".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: None,
@@ -265,6 +271,7 @@ impl OnboardingEngine {
                 label: "Continue".into(),
                 style: ActionStyle::Primary,
                 enabled: name_filled,
+                a11y: None,
             }],
             progress: self.progress(1),
             ..Default::default()
@@ -347,12 +354,14 @@ impl OnboardingEngine {
                     label: "Continue".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "skip".into(),
                     label: "Skip".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: self.progress(2),
@@ -419,6 +428,7 @@ impl OnboardingEngine {
                 label: "Add phone number".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             });
         }
         if !self.email_input_visible {
@@ -427,6 +437,7 @@ impl OnboardingEngine {
                 label: "Add email address".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             });
         }
         actions.push(ScreenAction {
@@ -434,18 +445,21 @@ impl OnboardingEngine {
             label: "Add social profile".into(),
             style: ActionStyle::Secondary,
             enabled: true,
+            a11y: None,
         });
         actions.push(ScreenAction {
             id: "continue".into(),
             label: "Continue".into(),
             style: ActionStyle::Primary,
             enabled: true,
+            a11y: None,
         });
         actions.push(ScreenAction {
             id: "skip".into(),
             label: "Skip".into(),
             style: ActionStyle::Secondary,
             enabled: true,
+            a11y: None,
         });
 
         ScreenModel {
@@ -471,30 +485,35 @@ impl OnboardingEngine {
                     label: "Exchange cards".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "import_contacts".into(),
                     label: "Import existing contacts".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "read_security".into(),
                     label: "Read about security".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "read_backup".into(),
                     label: "Read about backup".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "start_app".into(),
                     label: "Start using the app".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: self.progress(4),

@@ -109,6 +109,7 @@ pub(super) fn build_discovering_screen(mode: ExchangeMode, progress: Progress) -
             label: "Cancel".into(),
             style: ActionStyle::Secondary,
             enabled: true,
+            a11y: None,
         }],
         progress: Some(progress),
         ..Default::default()

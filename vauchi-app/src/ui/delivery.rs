@@ -57,6 +57,7 @@ impl DeliveryStatusEngine {
                 label: "Retry Failed".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
+                a11y: None,
             }]
         } else {
             vec![]

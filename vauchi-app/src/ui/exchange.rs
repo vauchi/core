@@ -763,6 +763,7 @@ impl ExchangeEngine {
                     label: "Cancel".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 }],
                 progress: Some(self.progress()),
                 ..Default::default()
@@ -801,6 +802,7 @@ impl ExchangeEngine {
                     label: "Done".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 }],
                 progress: Some(self.progress()),
                 ..Default::default()
@@ -811,6 +813,7 @@ impl ExchangeEngine {
                     label: "Retry".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 }];
                 // BLE failures offer QR and relay fallbacks
                 if self.qr_fallback_available {
@@ -819,6 +822,7 @@ impl ExchangeEngine {
                         label: "Switch to QR".into(),
                         style: ActionStyle::Secondary,
                         enabled: true,
+                        a11y: None,
                     });
                 }
                 if self.ble_fallback_available {
@@ -827,6 +831,7 @@ impl ExchangeEngine {
                         label: "Switch to encrypted relay".into(),
                         style: ActionStyle::Secondary,
                         enabled: true,
+                        a11y: None,
                     });
                 }
                 actions.push(ScreenAction {
@@ -834,6 +839,7 @@ impl ExchangeEngine {
                     label: "Cancel".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 });
                 ScreenModel {
                     screen_id: "exchange_failed".into(),
@@ -896,12 +902,14 @@ fn build_group_selection_screen(
                 label: "Continue".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
+                a11y: None,
             },
             ScreenAction {
                 id: "skip".into(),
                 label: "Skip".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             },
         ],
         progress: Some(progress),

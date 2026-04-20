@@ -76,6 +76,7 @@ impl WorkflowEngine for LockScreenEngine {
             label: "Unlock".into(),
             style: ActionStyle::Primary,
             enabled: !self.entered_pin.is_empty(),
+            a11y: None,
         }];
 
         ScreenModel {

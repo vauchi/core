@@ -117,6 +117,7 @@ impl DuressPinEngine {
             },
             style: ActionStyle::Primary,
             enabled: true,
+            a11y: None,
         }];
 
         if self.config.enabled {
@@ -125,6 +126,7 @@ impl DuressPinEngine {
                 label: "Disable".into(),
                 style: ActionStyle::Destructive,
                 enabled: true,
+                a11y: None,
             });
         }
 
@@ -181,12 +183,14 @@ impl DuressPinEngine {
                     label: "Back".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "continue".into(),
                     label: "Continue".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: Some(self.progress()),
@@ -218,12 +222,14 @@ impl DuressPinEngine {
                     label: "Back".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "continue".into(),
                     label: "Continue".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: Some(self.progress()),
@@ -272,12 +278,14 @@ impl DuressPinEngine {
                     label: "Back".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "save".into(),
                     label: "Save".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
+                    a11y: None,
                 },
             ],
             progress: Some(self.progress()),

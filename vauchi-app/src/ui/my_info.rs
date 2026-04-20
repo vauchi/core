@@ -302,6 +302,7 @@ impl WorkflowEngine for MyInfoEngine {
                 label: "Exit Preview".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             }];
             return ScreenModel {
                 screen_id: "my_info".into(),
@@ -379,6 +380,7 @@ impl WorkflowEngine for MyInfoEngine {
                 label: "Exchange Now".into(),
                 style: ActionStyle::Primary,
                 enabled: true,
+                a11y: None,
             });
         }
 
@@ -399,18 +401,21 @@ impl WorkflowEngine for MyInfoEngine {
                     ActionStyle::Primary
                 },
                 enabled: !at_field_limit,
+                a11y: None,
             },
             ScreenAction {
                 id: "toggle_view".into(),
                 label: view_label.into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             },
             ScreenAction {
                 id: "preview-as-picker".into(),
                 label: "Preview as...".into(),
                 style: ActionStyle::Secondary,
                 enabled: true,
+                a11y: None,
             },
         ]);
 

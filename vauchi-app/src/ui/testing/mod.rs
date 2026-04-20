@@ -22,6 +22,8 @@
 //! Plan:
 //! `_private/docs/planning/todo/2026-04-20-frontend-correctness-strategy-plan.md`.
 
+pub mod reachability;
 pub mod screen_walker;
 
+pub use reachability::{ReachabilityReport, assert_reachability, check_static_reachability};
 pub use screen_walker::{all_reachable_screens, walk_actions};

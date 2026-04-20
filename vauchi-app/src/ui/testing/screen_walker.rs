@@ -569,10 +569,10 @@ mod tests {
                 }
             }
             fn handle_action(&mut self, action: UserAction) -> ActionResult {
-                if let UserAction::ActionPressed { action_id } = &action {
-                    if action_id == "go" {
-                        self.step = 1;
-                    }
+                if let UserAction::ActionPressed { action_id } = &action
+                    && action_id == "go"
+                {
+                    self.step = 1;
                 }
                 ActionResult::UpdateScreen(self.current_screen())
             }

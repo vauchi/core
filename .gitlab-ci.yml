@@ -420,6 +420,37 @@ test:platform:
       junit: target/nextest/ci/junit.xml
     expire_in: 1 week
 
+# Layer 1 ScreenModel reachability gate — catches orphan handler arms
+# (declared but no affordance emits the action_id) and orphan
+# affordances (emitted ScreenActions nothing handles). Today pins
+# three known Onboarding orphans (submit_custom_group,
+# submit_display_name, add_social); failure indicates either a
+# regression or a fix that wasn't reflected in the test's pinned
+# set. Gated behind test-support feature to keep default tests fast.
+#
+# Plan:
+#   _private/docs/planning/todo/2026-04-20-frontend-correctness-strategy-plan.md
+#   Phase 1 Task 1.4.
+test:reachability:
+  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  stage: test
+  needs:
+    - job: lint:format
+      optional: true
+    - job: lint:clippy
+      optional: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
+  script:
+    - cargo nextest run --profile ci -p vauchi-app --features vauchi-app/test-support --test reachability
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/junit.xml
+    expire_in: 1 week
+
 # Schema contract validation — detect drift between core UI types and
 # generated JSON schemas. Runs when UI type definitions change.
 validate:schema:

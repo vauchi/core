@@ -1027,6 +1027,74 @@ build:validate-bindings:
   allow_failure: false
 
 # ============================================================
+# Layer 2 ABI parity gate — Phase 2 Task 2.3 of the frontend
+# correctness strategy plan (`_private/docs/planning/todo/
+# 2026-04-20-frontend-correctness-strategy-plan.md`). Runs after
+# the per-platform builds produce paired bindings + artifacts,
+# before package:*. Fails the pipeline if the UniFFI symbols
+# referenced by the bindings do not match the dynamic exports
+# of the packaged native artifact — the class of bug that
+# caused the 2026-04-20 Android startup crash.
+#
+# Script is fetched from vauchi/scripts at runtime, same API
+# convention as `lint:claude-md` in the workspace root.
+# ============================================================
+
+.check-binding-abi-fetch: &check-binding-abi-fetch |
+  curl --silent --fail \
+    --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+    "${CI_API_V4_URL}/projects/vauchi%2Fscripts/repository/files/scripts%2Fcheck-binding-abi.sh/raw?ref=main" \
+    -o /tmp/check-binding-abi.sh
+  chmod +x /tmp/check-binding-abi.sh
+
+check:binding-abi-android:
+  extends: [.linux-runner, .release-or-rc, .timeout-quick]
+  stage: build
+  needs:
+    - job: build:android
+      artifacts: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - *check-binding-abi-fetch
+    # NDK for llvm-nm (find it the same way build:android does).
+    - |
+      for ndk_path in /opt/android-sdk/ndk/* /opt/android-ndk $HOME/Android/Sdk/ndk/*; do
+        if [ -d "$ndk_path" ]; then
+          export ANDROID_NDK_HOME="$ndk_path"
+          echo "Found Android NDK at: $ANDROID_NDK_HOME"
+          break
+        fi
+      done
+      if [ -z "$ANDROID_NDK_HOME" ]; then
+        echo "ERROR: Android NDK not found (needed for llvm-nm symbol extraction)"
+        exit 1
+      fi
+  script:
+    - |
+      /tmp/check-binding-abi.sh \
+        --platform android \
+        --artifact target/bindings/android/jniLibs/arm64-v8a/libvauchi_platform.so \
+        --bindings target/bindings/android/kotlin/uniffi/vauchi_platform/vauchi_platform.kt
+  allow_failure: false
+
+check:binding-abi-ios:
+  extends: [.macos-runner, .release-or-rc, .timeout-quick]
+  stage: build
+  needs:
+    - job: build:apple
+      artifacts: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - *check-binding-abi-fetch
+  script:
+    - |
+      /tmp/check-binding-abi.sh \
+        --platform ios \
+        --artifact target/bindings/ios/libs/libvauchi_platform_device.a \
+        --bindings target/bindings/ios/generated/vauchi_platform.swift
+  allow_failure: false
+
+# ============================================================
 # Package Stage (Tags only)
 # ============================================================
 
@@ -1291,6 +1359,10 @@ publish:packages:
   needs:
     - package:xcframework
     - package:android
+    # Layer 2 ABI parity gate — block publishing if bindings
+    # and artifacts drift. Plan Phase 2 Task 2.3.
+    - check:binding-abi-android
+    - check:binding-abi-ios
     # sbom is .release-only (not RC) — must be optional here since
     # publish:packages runs on RC tags too (.release-or-rc)
     - job: package:sbom
@@ -1470,7 +1542,10 @@ publish:maven:
   stage: publish
   image: cimg/android:2025.01
   interruptible: false
-  needs: [package:android]
+  # Layer 2 ABI parity gate (plan Phase 2 Task 2.3) — Maven
+  # publication of the AAR must not ship bindings that reference
+  # symbols the shipped .so does not export.
+  needs: [package:android, check:binding-abi-android]
   variables:
     VERSION: "${CI_COMMIT_TAG}"
   rules:

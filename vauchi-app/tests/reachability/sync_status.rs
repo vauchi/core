@@ -15,6 +15,7 @@ fn factory() -> SyncStatusEngine {
     SyncStatusEngine::new("https://relay.example".into(), 0, 0)
 }
 
+// @internal
 #[test]
 fn sync_status_screen_is_fully_reachable() {
     let engine = factory();
@@ -22,6 +23,7 @@ fn sync_status_screen_is_fully_reachable() {
     assert_reachability_across_screens(factory, HANDLED);
 }
 
+// @internal
 #[test]
 fn sync_status_has_no_orphans() {
     let report = check_reachability(factory, HANDLED);

@@ -19,6 +19,7 @@ use vauchi_app::ui::{RecoveryEngine, WorkflowEngine};
 /// `core/vauchi-app/src/ui/recovery_status.rs:336-344`.
 const STATUS_STEP_HANDLED: &[&str] = &["start_recovery", "check_status"];
 
+// @internal
 #[test]
 fn recovery_initial_status_screen_is_reachable() {
     // Quorum threshold 3, no trusted contacts — minimal realistic

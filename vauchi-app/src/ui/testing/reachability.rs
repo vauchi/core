@@ -211,6 +211,7 @@ mod tests {
         )
     }
 
+    // @internal
     #[test]
     fn matched_sets_are_reachable() {
         let engine = ToyEngine {
@@ -221,6 +222,7 @@ mod tests {
         assert_reachability(&engine, &["continue", "skip"]);
     }
 
+    // @internal
     #[test]
     fn declared_handler_without_affordance_is_an_orphan_handler() {
         let engine = ToyEngine {
@@ -236,6 +238,7 @@ mod tests {
         assert!(report.orphan_affordances.is_empty());
     }
 
+    // @internal
     #[test]
     fn affordance_without_handler_is_an_orphan_affordance() {
         let engine = ToyEngine {
@@ -250,6 +253,7 @@ mod tests {
         assert!(report.orphan_handlers.is_empty());
     }
 
+    // @internal
     #[test]
     fn both_orphan_classes_are_reported_independently() {
         let engine = ToyEngine {
@@ -267,6 +271,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     #[should_panic(expected = "orphan handlers")]
     fn assert_reachability_panics_with_orphan_details() {
@@ -276,6 +281,7 @@ mod tests {
         assert_reachability(&engine, &["continue", "submit_custom_group"]);
     }
 
+    // @internal
     #[test]
     fn non_action_pressed_affordances_are_ignored_by_static_diff() {
         // A `ToggleList` or `TextInput` produces `ItemToggled` /

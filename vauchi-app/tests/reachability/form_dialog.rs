@@ -23,6 +23,7 @@ use vauchi_app::ui::{FormDialogEngine, FormDialogType, WorkflowEngine};
 /// `InlineConfirm`; tested manually elsewhere.
 const CREATE_GROUP_CLEAN_HANDLED: &[&str] = &["submit", "cancel"];
 
+// @internal
 #[test]
 fn create_group_initial_screen_is_reachable() {
     let engine = FormDialogEngine::new(FormDialogType::CreateGroup);

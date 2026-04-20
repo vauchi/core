@@ -39,6 +39,7 @@ fn factory() -> ExchangeEngine {
     })
 }
 
+// @internal
 #[test]
 fn exchange_initial_mode_selection_is_reachable() {
     let engine = factory();

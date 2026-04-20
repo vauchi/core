@@ -311,6 +311,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn screen_actions_become_action_pressed() {
         let screen = screen_with(
@@ -331,6 +332,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn text_input_emits_text_changed_with_placeholder() {
         let screen = screen_with(vec![text_input("display_name")], vec![]);
@@ -344,6 +346,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn toggle_list_emits_item_toggled_per_item() {
         let screen = screen_with(vec![toggle_list("groups", &["family", "work"])], vec![]);
@@ -363,6 +366,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn inline_confirm_emits_confirm_and_cancel_action_pressed() {
         let screen = screen_with(vec![inline_confirm("emergency_wipe")], vec![]);
@@ -380,6 +384,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn action_list_items_emit_list_item_selected() {
         let component = Component::ActionList {
@@ -420,6 +425,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn contact_list_items_emit_list_item_selected() {
         let component = Component::ContactList {
@@ -446,6 +452,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn dropdown_options_emit_list_item_selected() {
         let component = Component::Dropdown {
@@ -481,6 +488,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn mixed_screen_returns_actions_in_order() {
         let screen = screen_with(
@@ -516,6 +524,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn all_reachable_screens_yields_single_screen_from_no_op_engine() {
         use crate::notification_types::PendingNotification;
@@ -542,6 +551,7 @@ mod tests {
         assert_eq!(reachable, vec![s]);
     }
 
+    // @internal
     #[test]
     fn all_reachable_screens_discovers_second_screen_via_action() {
         use crate::notification_types::PendingNotification;
@@ -586,6 +596,7 @@ mod tests {
         assert_eq!(ids, vec!["start".to_string(), "end".to_string()]);
     }
 
+    // @internal
     #[test]
     fn all_reachable_screens_stops_at_terminal_action_results() {
         use crate::notification_types::PendingNotification;

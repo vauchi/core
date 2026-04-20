@@ -54,6 +54,7 @@ const ONBOARDING_ALL_HANDLED: &[&str] = &[
     "start_app",
 ];
 
+// @internal
 #[test]
 fn initial_identity_check_screen_is_reachable() {
     let engine = OnboardingEngine::new();
@@ -61,6 +62,7 @@ fn initial_identity_check_screen_is_reachable() {
     assert_reachability(&engine, IDENTITY_CHECK_HANDLED);
 }
 
+// @internal
 #[test]
 fn initial_screen_affordance_set_matches_plan() {
     let engine = OnboardingEngine::new();
@@ -96,6 +98,7 @@ fn initial_screen_affordance_set_matches_plan() {
 ///   `handle_contact_info` consumes it; tap is a silent no-op.
 ///   No dedicated record yet — this test is its initial landing
 ///   ground.
+// @internal
 #[test]
 fn bfs_pins_three_known_orphans() {
     let report = check_reachability(OnboardingEngine::new, ONBOARDING_ALL_HANDLED);
@@ -122,6 +125,7 @@ fn bfs_pins_three_known_orphans() {
 /// Guards the BFS itself: the full flow should reach six distinct
 /// screens. If this drops, the BFS regressed or a screen
 /// disappeared silently.
+// @internal
 #[test]
 fn bfs_reaches_all_six_onboarding_screens() {
     use vauchi_app::ui::testing::all_reachable_screens;

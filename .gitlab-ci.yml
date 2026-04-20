@@ -40,6 +40,7 @@ include:
     ref: main
     file:
       - '/ci-templates/rust-base.yml'
+      - '/ci-templates/content-fetch.yml'
       - '/ci-templates/security.yml'
       - '/ci-templates/coverage.yml'
       - '/ci-templates/mr-rules.yml'

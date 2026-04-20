@@ -41,6 +41,10 @@ network = ["network-rustls", "network-http", "storage"]
 network-native-tls = ["network"]
 # JSON Schema generation (dev tooling, forwarded from vauchi-core)
 schema-gen = ["schemars", "vauchi-core/schema-gen"]
+# Test-support primitives (ScreenModel walkers, reachability harness).
+# Downstream crates add this to dev-dependencies to drive Layer 1
+# reachability property tests against WorkflowEngine impls.
+test-support = []
 
 [package.metadata.cargo-machete]
 ignored = ["tokio"]  # Optional dep behind content-updates feature

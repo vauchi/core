@@ -56,6 +56,8 @@ mod settings;
 mod support;
 #[cfg(feature = "network-rustls")]
 mod sync_status;
+#[cfg(any(test, feature = "test-support"))]
+pub mod testing;
 pub use action::{ActionResult, PostOnboardingDestination, UserAction};
 pub use activity_log::{ActivityLogEngine, ActivityLogItem};
 #[cfg(feature = "network-rustls")]

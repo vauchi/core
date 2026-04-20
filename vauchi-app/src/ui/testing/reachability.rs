@@ -32,7 +32,7 @@
 
 use std::collections::BTreeSet;
 
-use super::screen_walker::walk_actions;
+use super::screen_walker::{all_reachable_screens, walk_actions};
 use crate::ui::{UserAction, WorkflowEngine};
 
 /// Outcome of a static reachability check.
@@ -104,6 +104,62 @@ pub fn assert_reachability<E: WorkflowEngine + ?Sized>(engine: &E, declared_acti
         orphan_handlers = report.orphan_handlers,
         orphan_affordances = report.orphan_affordances,
     );
+}
+
+/// Multi-screen variant: diffs declared handler action ids against
+/// the union of `walk_actions` outputs over every `ScreenModel`
+/// reachable from a freshly-constructed engine, via the BFS in
+/// [`all_reachable_screens`].
+///
+/// `factory` must produce an equivalent engine on every call — the
+/// BFS replays action paths from scratch for each frontier node,
+/// so the engine itself need not be `Clone`.
+pub fn check_reachability<E, F>(factory: F, declared_action_ids: &[&str]) -> ReachabilityReport
+where
+    E: WorkflowEngine,
+    F: Fn() -> E,
+{
+    let screens = all_reachable_screens(factory);
+
+    let walked_action_ids: BTreeSet<String> = screens
+        .iter()
+        .flat_map(walk_actions)
+        .filter_map(|action| match action {
+            UserAction::ActionPressed { action_id } => Some(action_id),
+            _ => None,
+        })
+        .collect();
+
+    let declared: BTreeSet<String> = declared_action_ids
+        .iter()
+        .map(|id| (*id).to_string())
+        .collect();
+
+    ReachabilityReport {
+        orphan_handlers: declared.difference(&walked_action_ids).cloned().collect(),
+        orphan_affordances: walked_action_ids.difference(&declared).cloned().collect(),
+    }
+}
+
+/// Panicking assertion form of [`check_reachability`].
+#[track_caller]
+pub fn assert_reachability_across_screens<E, F>(factory: F, declared_action_ids: &[&str])
+where
+    E: WorkflowEngine,
+    F: Fn() -> E,
+{
+    let report = check_reachability(&factory, declared_action_ids);
+    if !report.is_reachable() {
+        let initial = factory().current_screen().screen_id;
+        panic!(
+            "ScreenModel reachability violation reaching from `{screen_id}` via BFS:\n\
+             \torphan handlers (declared, no affordance emits): {orphan_handlers:?}\n\
+             \torphan affordances (emitted, no declared handler): {orphan_affordances:?}",
+            screen_id = initial,
+            orphan_handlers = report.orphan_handlers,
+            orphan_affordances = report.orphan_affordances,
+        );
+    }
 }
 
 // INLINE_TEST_REQUIRED: the harness's correctness is defined by the

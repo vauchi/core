@@ -8,8 +8,11 @@
 //! `_private/docs/planning/todo/2026-04-20-frontend-correctness-strategy-plan.md`
 //! Phase 0 Task 0.1.
 
-use crate::ui::action::UserAction;
+use std::collections::HashSet;
+
+use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::component::Component;
+use crate::ui::engine::WorkflowEngine;
 use crate::ui::screen::ScreenModel;
 
 /// Returns every `UserAction` the frontends can legitimately emit
@@ -43,9 +46,13 @@ pub fn walk_actions(screen: &ScreenModel) -> Vec<UserAction> {
 fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
     match component {
         Component::TextInput { id, .. } | Component::EditableText { id, .. } => {
+            // Non-empty placeholder so engines with non-empty
+            // validators (e.g. `handle_default_name` rejecting a
+            // blank display_name) can advance past text-entry
+            // screens during BFS.
             out.push(UserAction::TextChanged {
                 component_id: id.clone(),
-                value: String::new(),
+                value: PLACEHOLDER_TEXT.to_string(),
             });
         }
         Component::ToggleList { id, items, .. } => {
@@ -106,14 +113,133 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
     }
 }
 
-/// Enumerate every `ScreenModel` reachable from `initial`.
+/// Placeholder text emitted for every `TextInput` / `EditableText`
+/// affordance. Non-empty so engines that reject empty strings
+/// (e.g. `OnboardingEngine::handle_default_name` →
+/// `ValidationError`) still advance during BFS. Short enough that
+/// `max_length` constraints rarely reject it.
+pub const PLACEHOLDER_TEXT: &str = "x";
+
+/// Safety cap on BFS node expansion to bound harness runtime.
 ///
-/// Phase 0 stub: returns the initial screen only. Phase 1 replaces
-/// this with a BFS traversal that feeds `walk_actions` back through
-/// the engine's `handle_action` and collects every `ScreenModel`
-/// produced.
-pub fn all_reachable_screens(initial: ScreenModel) -> Vec<ScreenModel> {
-    vec![initial]
+/// An engine that produces a novel `screen_id` on every action
+/// would otherwise make the traversal unbounded. Real engines
+/// cycle; this is a correctness guard, not a budget target.
+const MAX_BFS_SCREENS: usize = 256;
+
+/// Enumerate every `ScreenModel` reachable from the engine
+/// produced by `factory()`, by BFS over action outcomes.
+///
+/// The factory must return a fresh engine on each call — the
+/// harness replays the path-to-a-screen from scratch before
+/// exploring that screen's affordances, so no `Clone` bound is
+/// required on the engine itself.
+///
+/// # What counts as "reached"
+///
+/// - An action on the current screen yields a new
+///   `ScreenModel` whose `screen_id` has not been seen before.
+///   The harness follows `ActionResult::UpdateScreen`,
+///   `NavigateTo`, and any variant that leaves the engine on a
+///   new rendered screen.
+/// - `Complete` / `CompleteWith` / `StartDeviceLink` /
+///   `StartBackupImport` / `OpenContact` / `EditContact` /
+///   `OpenUrl` / `BackupExportComplete` / `WipeComplete` are
+///   terminal from the engine's POV — BFS stops following that
+///   path. Other non-screen-changing results
+///   (`ValidationError`, `ShowAlert`, `ShowToast`, `Notify`,
+///   `ShowInfoOverlay`, `RequestCamera`, `ExchangeCommands`,
+///   `PreviewAs`, `ShowContactPicker`, `VerifyFingerprint`,
+///   `ShowFormDialog`, `OpenEntryDetail`) are treated as no-ops
+///   for the traversal (the engine's `current_screen()` is
+///   re-queried; unchanged screens are not re-queued).
+///
+/// # Ordering and limits
+///
+/// Screens are returned in BFS discovery order. Traversal caps
+/// at `MAX_BFS_SCREENS` screens to guarantee termination on
+/// misbehaving engines.
+pub fn all_reachable_screens<E, F>(factory: F) -> Vec<ScreenModel>
+where
+    E: WorkflowEngine,
+    F: Fn() -> E,
+{
+    let mut screens: Vec<ScreenModel> = Vec::new();
+    let mut visited: HashSet<String> = HashSet::new();
+    let mut frontier_paths: Vec<Vec<UserAction>> = vec![Vec::new()];
+
+    while let Some(path) = frontier_paths.pop() {
+        if screens.len() >= MAX_BFS_SCREENS {
+            break;
+        }
+
+        let mut engine = factory();
+        let mut bailed = false;
+        for action in &path {
+            if is_terminal(&engine.handle_action(action.clone())) {
+                bailed = true;
+                break;
+            }
+        }
+        if bailed {
+            continue;
+        }
+
+        let screen = engine.current_screen();
+        if !visited.insert(screen.screen_id.clone()) {
+            continue;
+        }
+        screens.push(screen.clone());
+
+        // Split affordances into priming (fills inputs, toggles
+        // state — does not typically navigate) vs. triggers
+        // (buttons, list selections — may navigate to a new
+        // screen). Each child path applies every priming action
+        // on the current screen first, then the trigger. Without
+        // this, engines that gate navigation on a non-empty
+        // `TextChanged` would deadlock on the first entry screen.
+        let walked = walk_actions(&screen);
+        let (priming, triggers): (Vec<_>, Vec<_>) = walked.into_iter().partition(is_priming_action);
+
+        for trigger in triggers {
+            let mut next = path.clone();
+            next.extend(priming.iter().cloned());
+            next.push(trigger);
+            frontier_paths.push(next);
+        }
+    }
+
+    screens
+}
+
+fn is_priming_action(action: &UserAction) -> bool {
+    matches!(
+        action,
+        UserAction::TextChanged { .. }
+            | UserAction::ItemToggled { .. }
+            | UserAction::SearchChanged { .. }
+            | UserAction::SettingsToggled { .. }
+            | UserAction::FieldVisibilityChanged { .. }
+            | UserAction::SliderChanged { .. }
+    )
+}
+
+/// Returns `true` when the engine has left its own screen space
+/// — further BFS along this path explores a different engine's
+/// territory and is out of scope for single-engine reachability.
+fn is_terminal(result: &ActionResult) -> bool {
+    matches!(
+        result,
+        ActionResult::Complete
+            | ActionResult::CompleteWith { .. }
+            | ActionResult::StartDeviceLink
+            | ActionResult::StartBackupImport
+            | ActionResult::OpenContact { .. }
+            | ActionResult::EditContact { .. }
+            | ActionResult::OpenUrl { .. }
+            | ActionResult::BackupExportComplete { .. }
+            | ActionResult::WipeComplete
+    )
 }
 
 // INLINE_TEST_REQUIRED: walker arms map 1:1 to private `Component` variants
@@ -206,14 +332,14 @@ mod tests {
     }
 
     #[test]
-    fn text_input_emits_text_changed() {
+    fn text_input_emits_text_changed_with_placeholder() {
         let screen = screen_with(vec![text_input("display_name")], vec![]);
         let actions = walk_actions(&screen);
         assert_eq!(
             actions,
             vec![UserAction::TextChanged {
                 component_id: "display_name".into(),
-                value: String::new(),
+                value: PLACEHOLDER_TEXT.into(),
             }]
         );
     }
@@ -374,7 +500,7 @@ mod tests {
                 },
                 UserAction::TextChanged {
                     component_id: "name".into(),
-                    value: String::new(),
+                    value: PLACEHOLDER_TEXT.into(),
                 },
                 UserAction::ItemToggled {
                     component_id: "groups".into(),
@@ -391,9 +517,106 @@ mod tests {
     }
 
     #[test]
-    fn all_reachable_screens_returns_initial_only_in_phase_0() {
-        let screen = screen_with(vec![], vec![]);
-        let reachable = all_reachable_screens(screen.clone());
-        assert_eq!(reachable, vec![screen]);
+    fn all_reachable_screens_yields_single_screen_from_no_op_engine() {
+        use crate::notification_types::PendingNotification;
+        use crate::ui::action::ActionResult;
+
+        struct StaticEngine {
+            screen: ScreenModel,
+        }
+
+        impl WorkflowEngine for StaticEngine {
+            fn current_screen(&self) -> ScreenModel {
+                self.screen.clone()
+            }
+            fn handle_action(&mut self, _action: UserAction) -> ActionResult {
+                ActionResult::UpdateScreen(self.screen.clone())
+            }
+            fn poll_notifications(&mut self) -> Vec<PendingNotification> {
+                Vec::new()
+            }
+        }
+
+        let s = screen_with(vec![], vec![screen_action("anything")]);
+        let reachable = all_reachable_screens(|| StaticEngine { screen: s.clone() });
+        assert_eq!(reachable, vec![s]);
+    }
+
+    #[test]
+    fn all_reachable_screens_discovers_second_screen_via_action() {
+        use crate::notification_types::PendingNotification;
+        use crate::ui::action::ActionResult;
+
+        struct TwoScreenEngine {
+            step: u8,
+        }
+
+        impl WorkflowEngine for TwoScreenEngine {
+            fn current_screen(&self) -> ScreenModel {
+                match self.step {
+                    0 => ScreenModel::new(
+                        "start",
+                        "start",
+                        vec![],
+                        vec![ScreenAction {
+                            id: "go".into(),
+                            label: "go".into(),
+                            style: ActionStyle::Primary,
+                            enabled: true,
+                        }],
+                    ),
+                    _ => ScreenModel::new("end", "end", vec![], vec![]),
+                }
+            }
+            fn handle_action(&mut self, action: UserAction) -> ActionResult {
+                if let UserAction::ActionPressed { action_id } = &action {
+                    if action_id == "go" {
+                        self.step = 1;
+                    }
+                }
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            fn poll_notifications(&mut self) -> Vec<PendingNotification> {
+                Vec::new()
+            }
+        }
+
+        let reachable = all_reachable_screens(|| TwoScreenEngine { step: 0 });
+        let ids: Vec<_> = reachable.iter().map(|s| s.screen_id.clone()).collect();
+        assert_eq!(ids, vec!["start".to_string(), "end".to_string()]);
+    }
+
+    #[test]
+    fn all_reachable_screens_stops_at_terminal_action_results() {
+        use crate::notification_types::PendingNotification;
+        use crate::ui::action::ActionResult;
+
+        struct TerminalEngine;
+
+        impl WorkflowEngine for TerminalEngine {
+            fn current_screen(&self) -> ScreenModel {
+                ScreenModel::new(
+                    "lock",
+                    "lock",
+                    vec![],
+                    vec![ScreenAction {
+                        id: "done".into(),
+                        label: "done".into(),
+                        style: ActionStyle::Primary,
+                        enabled: true,
+                    }],
+                )
+            }
+            fn handle_action(&mut self, _action: UserAction) -> ActionResult {
+                ActionResult::Complete
+            }
+            fn poll_notifications(&mut self) -> Vec<PendingNotification> {
+                Vec::new()
+            }
+        }
+
+        let reachable = all_reachable_screens(|| TerminalEngine);
+        assert_eq!(reachable.len(), 1);
+        assert_eq!(reachable[0].screen_id, "lock");
     }
 }

@@ -25,5 +25,8 @@
 pub mod reachability;
 pub mod screen_walker;
 
-pub use reachability::{ReachabilityReport, assert_reachability, check_static_reachability};
+pub use reachability::{
+    ReachabilityReport, assert_reachability, assert_reachability_across_screens,
+    check_reachability, check_static_reachability,
+};
 pub use screen_walker::{all_reachable_screens, walk_actions};

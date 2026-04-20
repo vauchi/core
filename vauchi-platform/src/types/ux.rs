@@ -76,6 +76,35 @@ impl From<MobileAhaMomentType> for vauchi_core::AhaMomentType {
     }
 }
 
+/// Tab metadata for top-level navigation.
+///
+/// Mirrors `vauchi_app::ui::TabInfo` for UniFFI consumers so frontends
+/// can render tabs without hardcoding labels or icons (G1 of the
+/// pure-renderer remediation; ADR-021 / ADR-038).
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileTabInfo {
+    /// Stable identifier matching the screen's `screen_id()`.
+    pub id: String,
+    /// Localized display label resolved by core.
+    pub label: String,
+    /// Icon name in SF Symbol format. Frontends map to platform equivalents
+    /// (Material Icons on Android, Win UI icons on Windows, etc.).
+    pub icon: String,
+    /// Badge count (e.g. pending contact updates). Zero means no badge.
+    pub badge_count: u32,
+}
+
+impl From<vauchi_app::ui::TabInfo> for MobileTabInfo {
+    fn from(value: vauchi_app::ui::TabInfo) -> Self {
+        Self {
+            id: value.id,
+            label: value.label,
+            icon: value.icon,
+            badge_count: value.badge_count,
+        }
+    }
+}
+
 /// An aha moment to display to the user.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileAhaMoment {

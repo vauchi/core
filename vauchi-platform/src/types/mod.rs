@@ -40,6 +40,7 @@ pub use ux::{
     MobileDemoContactState, MobileDesignTokens, MobileFaqItem, MobileHelpCategory,
     MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo, MobileMotionTokens,
     MobileOnboardingProgress, MobileOnboardingStep, MobileSpacingDirectionTokens,
-    MobileSpacingTokens, MobileTheme, MobileThemeColors, MobileThemeMode, MobileTouchTargetTokens,
-    MobileTypographyTokens, mobile_get_string, mobile_get_string_with_args,
+    MobileSpacingTokens, MobileTabInfo, MobileTheme, MobileThemeColors, MobileThemeMode,
+    MobileTouchTargetTokens, MobileTypographyTokens, mobile_get_string,
+    mobile_get_string_with_args,
 };

@@ -2,7 +2,16 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Mobile-friendly error types.
+//! Mobile-friendly error types (ADR-044).
+//!
+//! `MobileError` is a flat struct-variant enum whose variants match the UI
+//! branches frontends actually take. Each variant either stands alone
+//! (self-describing — e.g. `WrongPassword`) or carries the minimum fields
+//! needed for its UI decision. Pattern-match on the variant, not on the
+//! message.
+//!
+//! See `_private/docs/decisions/2026-04-20-adr-044-mobile-error-typing.md`
+//! for rationale and the list of rejected designs.
 
 /// Error type for platform keychain callback interface.
 ///
@@ -14,84 +23,101 @@ pub enum KeychainError {
     OperationFailed { msg: String },
 }
 
-/// Mobile-friendly error type.
+/// Mobile-friendly error type surfaced across the UniFFI boundary.
+///
+/// Marked `#[non_exhaustive]`: adding a variant is non-breaking, but
+/// Swift/Kotlin consumers must include a default arm.
 #[derive(Debug, thiserror::Error, uniffi::Error)]
+#[non_exhaustive]
 pub enum MobileError {
-    #[error("Library not initialized")]
-    NotInitialized,
+    /// Supplied password/PIN did not match the stored credential.
+    /// Frontends show an inline "Incorrect password" hint and keep the
+    /// dialog open.
+    #[error("Incorrect password")]
+    WrongPassword,
 
-    #[error("Already initialized")]
-    AlreadyInitialized,
+    /// Decryption produced an authentication-tag failure. Typically
+    /// irrecoverable — the file/blob is either corrupt or was encrypted
+    /// with a different key. Disable retry.
+    #[error("Decryption failed")]
+    DecryptFailed,
 
-    #[error("Identity not found")]
-    IdentityNotFound,
+    /// Input failed a validation rule owned by core. `field` is a stable
+    /// id (or empty when not applicable). `message` is English and is for
+    /// logs / the escape-hatch display path only — frontends localize
+    /// via their own `t()` keyed by variant name.
+    #[error("Invalid input on '{field}': {message}")]
+    InvalidInput { field: String, message: String },
 
-    #[error("Contact not found: {0}")]
-    ContactNotFound(String),
+    /// Transient network failure (unreachable relay, DNS, timeout).
+    /// Frontends show a "Check your connection" banner and enable retry.
+    #[error("Network unavailable")]
+    NetworkUnavailable,
 
-    #[error("Invalid QR code")]
-    InvalidQrCode,
+    /// Non-transient network failure reported by the relay (4xx/5xx).
+    #[error("Relay error {status}: {message}")]
+    RelayError { status: u16, message: String },
 
-    #[error("Exchange failed: {0}")]
-    ExchangeFailed(String),
+    /// Relay rate-limit in effect. Frontends show a cooldown timer and
+    /// schedule automatic retry after `retry_after_secs`.
+    #[error("Rate limited — retry after {retry_after_secs}s")]
+    RateLimited { retry_after_secs: u64 },
 
-    #[error("Sync failed: {0}")]
-    SyncFailed(String),
+    /// Local storage failure (SQLite, disk full, permission denied,
+    /// corrupt keychain).
+    #[error("Storage error: {message}")]
+    StorageError { message: String },
 
-    #[error("Storage error: {0}")]
-    StorageError(String),
-
-    #[error("Crypto error: {0}")]
-    CryptoError(String),
-
-    #[error("Serialization error: {0}")]
-    SerializationError(String),
-
-    #[error("Network error: {0}")]
-    NetworkError(String),
-
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
-
-    #[error("GDPR error: {0}")]
-    GdprError(String),
-
-    #[error("Deletion not allowed: {0}")]
-    DeletionNotAllowed(String),
-
-    #[error("Shred error: {0}")]
-    ShredError(String),
-
-    #[error("Init error: {0}")]
-    InitError(String),
-
-    #[error("Internal error: {0}")]
-    Internal(String),
-
-    #[error("BLE exchange not available: {0}")]
-    BleNotAvailable(String),
-
-    #[error("Rate limited (retry after {retry_after_secs}s)")]
-    RateLimited {
-        /// Seconds to wait before retrying.
-        retry_after_secs: u64,
-    },
+    /// Escape hatch. Frontends display `message` verbatim and log the
+    /// full error. Promote recurring uses of `Other` to a dedicated
+    /// variant in a follow-up ADR amendment when a real UI branch
+    /// appears.
+    #[error("{message}")]
+    Other { message: String },
 }
 
-/// Acquire a mutex lock, converting poison errors to `MobileError::Internal`.
-///
-/// Uses `Internal` (not a dedicated variant) to avoid breaking UniFFI enum
-/// exhaustiveness on iOS/Android consumers.
+impl MobileError {
+    /// Convenience constructor for `Other { message }`. Used by call
+    /// sites that previously built `MobileError::Internal(...)`,
+    /// `MobileError::ExchangeFailed(...)`, etc. — all of which collapse
+    /// into the `Other` escape hatch per ADR-044.
+    #[inline]
+    pub fn other(message: impl Into<String>) -> Self {
+        MobileError::Other {
+            message: message.into(),
+        }
+    }
+
+    /// Convenience constructor for `InvalidInput { field: "", message }`.
+    /// Call sites that know the field id pass it directly; the rest use
+    /// this shim so the migration stays mechanical.
+    #[inline]
+    pub fn invalid_input(message: impl Into<String>) -> Self {
+        MobileError::InvalidInput {
+            field: String::new(),
+            message: message.into(),
+        }
+    }
+
+    /// Convenience constructor for `StorageError { message }`.
+    #[inline]
+    pub fn storage(message: impl Into<String>) -> Self {
+        MobileError::StorageError {
+            message: message.into(),
+        }
+    }
+}
+
+/// Acquire a mutex lock, converting poison errors to `MobileError::Other`.
 pub(crate) fn lock_or<T>(
     mutex: &std::sync::Mutex<T>,
 ) -> Result<std::sync::MutexGuard<'_, T>, MobileError> {
     mutex
         .lock()
-        .map_err(|_| MobileError::Internal(LOCK_POISON_MSG.into()))
+        .map_err(|_| MobileError::other(LOCK_POISON_MSG))
 }
 
-/// Consistent message for lock-poison errors, used by both `lock_or` and
-/// non-Result functions that handle poison via `let-else`.
+/// Consistent message for lock-poison errors.
 pub(crate) const LOCK_POISON_MSG: &str = "lock poisoned";
 
 impl From<vauchi_core::network::NetworkError> for MobileError {
@@ -100,7 +126,7 @@ impl From<vauchi_core::network::NetworkError> for MobileError {
             vauchi_core::network::NetworkError::RateLimited { retry_after_secs } => {
                 MobileError::RateLimited { retry_after_secs }
             }
-            other => MobileError::NetworkError(other.to_string()),
+            other => MobileError::other(other.to_string()),
         }
     }
 }
@@ -108,18 +134,17 @@ impl From<vauchi_core::network::NetworkError> for MobileError {
 impl From<vauchi_core::StorageError> for MobileError {
     fn from(err: vauchi_core::StorageError) -> Self {
         // Use user_message() to strip internal details (F9 audit fix)
-        MobileError::StorageError(err.user_message().to_string())
+        MobileError::storage(err.user_message().to_string())
     }
 }
 
 impl From<vauchi_core::VauchiError> for MobileError {
     fn from(err: vauchi_core::VauchiError) -> Self {
         match err {
-            vauchi_core::VauchiError::ContactNotFound(id) => MobileError::ContactNotFound(id),
             vauchi_core::VauchiError::Storage(e) => {
-                MobileError::StorageError(e.user_message().to_string())
+                MobileError::storage(e.user_message().to_string())
             }
-            other => MobileError::Internal(other.to_string()),
+            other => MobileError::other(other.to_string()),
         }
     }
 }

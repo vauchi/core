@@ -95,6 +95,47 @@ fn current_screen_id_returns_lightweight_id() {
     assert_eq!(id, "identity_check");
 }
 
+// @internal
+// @internal
+#[test]
+fn tab_info_pre_identity_returns_only_onboarding() {
+    let (engine, _dir) = create_engine();
+    let tabs = engine.tab_info().expect("tab info");
+    assert_eq!(tabs.len(), 1, "pre-identity should expose just onboarding");
+    let tab = &tabs[0];
+    assert_eq!(tab.id, "onboarding");
+    assert!(!tab.label.is_empty(), "label must be non-empty");
+    assert!(!tab.icon.is_empty(), "icon must be non-empty");
+    assert_eq!(tab.badge_count, 0);
+}
+
+// @internal
+// @internal
+#[test]
+fn tab_info_post_identity_returns_top_level_tabs() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    let tabs = engine.tab_info().expect("tab info");
+    let ids: Vec<&str> = tabs.iter().map(|t| t.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        vec!["my_info", "contacts", "exchange", "groups", "more"],
+        "post-identity tab order must be stable for frontends"
+    );
+    for tab in &tabs {
+        assert!(
+            !tab.label.is_empty(),
+            "label must be non-empty for {}",
+            tab.id
+        );
+        assert!(
+            !tab.icon.is_empty(),
+            "icon must be non-empty for {}",
+            tab.id
+        );
+    }
+}
+
 // ============================================================================
 // Onboarding flow
 // ============================================================================

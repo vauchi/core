@@ -87,9 +87,9 @@ impl VauchiPlatform {
     /// Get own contact card.
     pub fn get_own_card(&self) -> Result<MobileContactCard, MobileError> {
         let storage = self.open_storage()?;
-        let card = storage
-            .load_own_card()?
-            .ok_or(MobileError::IdentityNotFound)?;
+        let card = storage.load_own_card()?.ok_or(MobileError::Other {
+            message: "Identity not found".to_string(),
+        })?;
         Ok(MobileContactCard::from(&card))
     }
 
@@ -102,13 +102,16 @@ impl VauchiPlatform {
     ) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
 
-        let mut card = storage
-            .load_own_card()?
-            .ok_or(MobileError::IdentityNotFound)?;
+        let mut card = storage.load_own_card()?.ok_or(MobileError::Other {
+            message: "Identity not found".to_string(),
+        })?;
 
         let field = ContactField::new(field_type.into(), &label, &value);
         card.add_field(field)
-            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                message: e.to_string(),
+            })?;
 
         storage.save_own_card(&card)?;
         Ok(())
@@ -118,20 +121,26 @@ impl VauchiPlatform {
     pub fn update_field(&self, label: String, new_value: String) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
 
-        let mut card = storage
-            .load_own_card()?
-            .ok_or(MobileError::IdentityNotFound)?;
+        let mut card = storage.load_own_card()?.ok_or(MobileError::Other {
+            message: "Identity not found".to_string(),
+        })?;
 
         let field_id = card
             .fields()
             .iter()
             .find(|f| f.label() == label)
-            .ok_or_else(|| MobileError::InvalidInput(format!("Field '{}' not found", label)))?
+            .ok_or_else(|| MobileError::InvalidInput {
+                field: String::new(),
+                message: format!("Field '{}' not found", label),
+            })?
             .id()
             .to_string();
 
         card.update_field_value(&field_id, &new_value)
-            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                message: e.to_string(),
+            })?;
 
         storage.save_own_card(&card)?;
         Ok(())
@@ -141,9 +150,9 @@ impl VauchiPlatform {
     pub fn remove_field(&self, label: String) -> Result<bool, MobileError> {
         let storage = self.open_storage()?;
 
-        let mut card = storage
-            .load_own_card()?
-            .ok_or(MobileError::IdentityNotFound)?;
+        let mut card = storage.load_own_card()?.ok_or(MobileError::Other {
+            message: "Identity not found".to_string(),
+        })?;
 
         let field_id = match card.fields().iter().find(|f| f.label() == label) {
             Some(f) => f.id().to_string(),
@@ -151,7 +160,10 @@ impl VauchiPlatform {
         };
 
         card.remove_field(&field_id)
-            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                message: e.to_string(),
+            })?;
         storage.save_own_card(&card)?;
 
         Ok(true)
@@ -161,12 +173,15 @@ impl VauchiPlatform {
     pub fn set_display_name(&self, name: String) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
 
-        let mut card = storage
-            .load_own_card()?
-            .ok_or(MobileError::IdentityNotFound)?;
+        let mut card = storage.load_own_card()?.ok_or(MobileError::Other {
+            message: "Identity not found".to_string(),
+        })?;
 
         card.set_display_name(&name)
-            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                message: e.to_string(),
+            })?;
         storage.save_own_card(&card)?;
 
         Ok(())
@@ -179,12 +194,15 @@ impl VauchiPlatform {
     pub fn set_own_avatar(&self, avatar_bytes: Vec<u8>) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
 
-        let mut card = storage
-            .load_own_card()?
-            .ok_or(MobileError::IdentityNotFound)?;
+        let mut card = storage.load_own_card()?.ok_or(MobileError::Other {
+            message: "Identity not found".to_string(),
+        })?;
 
         card.set_avatar(avatar_bytes)
-            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                message: e.to_string(),
+            })?;
         storage.save_own_card(&card)?;
 
         Ok(())
@@ -194,9 +212,9 @@ impl VauchiPlatform {
     pub fn clear_own_avatar(&self) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
 
-        let mut card = storage
-            .load_own_card()?
-            .ok_or(MobileError::IdentityNotFound)?;
+        let mut card = storage.load_own_card()?.ok_or(MobileError::Other {
+            message: "Identity not found".to_string(),
+        })?;
 
         card.clear_avatar();
         storage.save_own_card(&card)?;
@@ -247,11 +265,16 @@ impl VauchiPlatform {
 
         let mut contact = storage
             .load_contact(&id)?
-            .ok_or_else(|| MobileError::ContactNotFound(id.clone()))?;
+            .ok_or_else(|| MobileError::Other {
+                message: format!("Contact not found: {}", id.clone()),
+            })?;
 
         contact
             .mark_fingerprint_verified()
-            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                message: e.to_string(),
+            })?;
         storage.save_contact(&contact)?;
 
         Ok(())
@@ -265,17 +288,23 @@ impl VauchiPlatform {
 
         let mut contact = storage
             .load_contact(&id)?
-            .ok_or_else(|| MobileError::ContactNotFound(id.clone()))?;
+            .ok_or_else(|| MobileError::Other {
+                message: format!("Contact not found: {}", id.clone()),
+            })?;
 
         if contact.is_blocked() {
-            return Err(MobileError::InvalidInput(
-                "Blocked contacts cannot be trusted for recovery".to_string(),
-            ));
+            return Err(MobileError::InvalidInput {
+                field: String::new(),
+                message: "Blocked contacts cannot be trusted for recovery".to_string(),
+            });
         }
 
         contact
             .trust_for_recovery()
-            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                message: e.to_string(),
+            })?;
         storage.save_contact(&contact)?;
 
         Ok(())
@@ -287,11 +316,16 @@ impl VauchiPlatform {
 
         let mut contact = storage
             .load_contact(&id)?
-            .ok_or_else(|| MobileError::ContactNotFound(id.clone()))?;
+            .ok_or_else(|| MobileError::Other {
+                message: format!("Contact not found: {}", id.clone()),
+            })?;
 
         contact
             .untrust_for_recovery()
-            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                message: e.to_string(),
+            })?;
         storage.save_contact(&contact)?;
 
         Ok(())
@@ -443,8 +477,11 @@ impl VauchiPlatform {
         contact_id: String,
         pref_json: String,
     ) -> Result<(), MobileError> {
-        let pref: vauchi_core::DisplayNamePreference = serde_json::from_str(&pref_json)
-            .map_err(|e| MobileError::InvalidInput(format!("Invalid preference JSON: {}", e)))?;
+        let pref: vauchi_core::DisplayNamePreference =
+            serde_json::from_str(&pref_json).map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                message: format!("Invalid preference JSON: {}", e),
+            })?;
         let vauchi = self.open_vauchi()?;
         vauchi.set_display_name_preference(&contact_id, pref)?;
         Ok(())
@@ -459,8 +496,11 @@ impl VauchiPlatform {
         contact_id: String,
         pref_json: String,
     ) -> Result<(), MobileError> {
-        let pref: vauchi_core::AvatarPreference = serde_json::from_str(&pref_json)
-            .map_err(|e| MobileError::InvalidInput(format!("Invalid preference JSON: {}", e)))?;
+        let pref: vauchi_core::AvatarPreference =
+            serde_json::from_str(&pref_json).map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                message: format!("Invalid preference JSON: {}", e),
+            })?;
         let vauchi = self.open_vauchi()?;
         vauchi.set_avatar_preference(&contact_id, pref)?;
         Ok(())
@@ -478,8 +518,8 @@ impl VauchiPlatform {
             .into_iter()
             .map(|n| {
                 Ok(MobileNameOption {
-                    source: serde_json::to_string(&n.source).map_err(|e| {
-                        MobileError::Internal(format!("Serialize name source: {}", e))
+                    source: serde_json::to_string(&n.source).map_err(|e| MobileError::Other {
+                        message: format!("Serialize name source: {}", e),
                     })?,
                     name: n.name,
                     is_primary: n.is_primary,
@@ -491,8 +531,8 @@ impl VauchiPlatform {
             .into_iter()
             .map(|a| {
                 Ok(MobileAvatarOption {
-                    source: serde_json::to_string(&a.source).map_err(|e| {
-                        MobileError::Internal(format!("Serialize avatar source: {}", e))
+                    source: serde_json::to_string(&a.source).map_err(|e| MobileError::Other {
+                        message: format!("Serialize avatar source: {}", e),
                     })?,
                     has_data: a.has_data,
                     is_primary: a.is_primary,
@@ -502,10 +542,15 @@ impl VauchiPlatform {
         Ok(MobileContactDisplayOptions {
             names,
             avatars,
-            active_name_preference: serde_json::to_string(&opts.active_name_preference)
-                .map_err(|e| MobileError::Internal(format!("Serialize name pref: {}", e)))?,
+            active_name_preference: serde_json::to_string(&opts.active_name_preference).map_err(
+                |e| MobileError::Other {
+                    message: format!("Serialize name pref: {}", e),
+                },
+            )?,
             active_avatar_preference: serde_json::to_string(&opts.active_avatar_preference)
-                .map_err(|e| MobileError::Internal(format!("Serialize avatar pref: {}", e)))?,
+                .map_err(|e| MobileError::Other {
+                    message: format!("Serialize avatar pref: {}", e),
+                })?,
         })
     }
 
@@ -523,11 +568,16 @@ impl VauchiPlatform {
 
         let mut contact = storage
             .load_contact(&contact_id)?
-            .ok_or_else(|| MobileError::ContactNotFound(contact_id.clone()))?;
+            .ok_or_else(|| MobileError::Other {
+                message: format!("Contact not found: {}", contact_id.clone()),
+            })?;
 
         contact
             .set_proposal_trusted(trusted)
-            .map_err(|e| MobileError::InvalidInput(e.to_string()))?;
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                message: e.to_string(),
+            })?;
         storage.save_contact(&contact)?;
 
         Ok(())

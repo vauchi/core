@@ -318,7 +318,10 @@ impl MobileMultipartDecoder {
     pub fn add_chunk(&self, chunk: String) -> Result<bool, MobileError> {
         lock_or(&self.inner)?
             .add_chunk(&chunk)
-            .map_err(|e| MobileError::InvalidInput(e.to_string()))
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                message: e.to_string(),
+            })
     }
 
     /// Number of unique chunks received so far.
@@ -351,7 +354,10 @@ impl MobileMultipartDecoder {
     pub fn assemble(&self) -> Result<Vec<u8>, MobileError> {
         lock_or(&self.inner)?
             .assemble()
-            .map_err(|e| MobileError::InvalidInput(e.to_string()))
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                message: e.to_string(),
+            })
     }
 }
 

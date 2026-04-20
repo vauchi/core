@@ -23,8 +23,9 @@ impl VauchiPlatform {
         let storage = self.open_storage()?;
         let export = vauchi_core::api::export_all_data(&storage)?;
 
-        let json_data = serde_json::to_string_pretty(&export)
-            .map_err(|e| MobileError::GdprError(e.to_string()))?;
+        let json_data = serde_json::to_string_pretty(&export).map_err(|e| MobileError::Other {
+            message: e.to_string(),
+        })?;
 
         Ok(MobileGdprExport {
             json_data,
@@ -39,11 +40,13 @@ impl VauchiPlatform {
         let manager = vauchi_core::api::DeletionManager::new(&storage);
         manager
             .schedule_deletion()
-            .map_err(|e| MobileError::DeletionNotAllowed(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
 
-        let state = manager
-            .deletion_state()
-            .map_err(|e| MobileError::GdprError(e.to_string()))?;
+        let state = manager.deletion_state().map_err(|e| MobileError::Other {
+            message: e.to_string(),
+        })?;
         Ok(MobileDeletionInfo::from(&state))
     }
 
@@ -51,9 +54,9 @@ impl VauchiPlatform {
     pub fn cancel_identity_deletion(&self) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
         let manager = vauchi_core::api::DeletionManager::new(&storage);
-        manager
-            .cancel_deletion()
-            .map_err(|e| MobileError::GdprError(e.to_string()))?;
+        manager.cancel_deletion().map_err(|e| MobileError::Other {
+            message: e.to_string(),
+        })?;
         Ok(())
     }
 
@@ -68,7 +71,9 @@ impl VauchiPlatform {
         let manager = vauchi_core::api::DeletionManager::new(&storage);
         let result = manager
             .execute_deletion(&identity)
-            .map_err(|e| MobileError::DeletionNotAllowed(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
         Ok(result.revocations.len() as u32)
     }
 
@@ -76,9 +81,9 @@ impl VauchiPlatform {
     pub fn get_deletion_state(&self) -> Result<MobileDeletionInfo, MobileError> {
         let storage = self.open_storage()?;
         let manager = vauchi_core::api::DeletionManager::new(&storage);
-        let state = manager
-            .deletion_state()
-            .map_err(|e| MobileError::GdprError(e.to_string()))?;
+        let state = manager.deletion_state().map_err(|e| MobileError::Other {
+            message: e.to_string(),
+        })?;
         Ok(MobileDeletionInfo::from(&state))
     }
 
@@ -113,9 +118,9 @@ impl VauchiPlatform {
         let data_dir = self.data_dir();
 
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
-        let token = manager
-            .soft_shred()
-            .map_err(|e| MobileError::ShredError(e.to_string()))?;
+        let token = manager.soft_shred().map_err(|e| MobileError::Other {
+            message: e.to_string(),
+        })?;
         Ok(MobileShredToken::from(&token))
     }
 
@@ -130,7 +135,9 @@ impl VauchiPlatform {
         let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
         manager
             .cancel_shred(core_token)
-            .map_err(|e| MobileError::ShredError(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
         Ok(())
     }
 
@@ -171,7 +178,9 @@ impl VauchiPlatform {
                     .as_mut()
                     .map(|s| s as &mut dyn vauchi_core::api::RevocationSender),
             )
-            .map_err(|e| MobileError::ShredError(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
         let mut mobile_report = MobileShredReport::from(&report);
         if let Some(err) = purge_error {
             mobile_report.purge_failed = true;
@@ -218,7 +227,9 @@ impl VauchiPlatform {
                     .as_mut()
                     .map(|s| s as &mut dyn vauchi_core::api::RevocationSender),
             )
-            .map_err(|e| MobileError::ShredError(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
         let mut mobile_report = MobileShredReport::from(&report);
         if let Some(err) = purge_error {
             mobile_report.purge_failed = true;
@@ -252,9 +263,9 @@ impl VauchiPlatform {
     pub fn shred_status(&self) -> Result<MobileShredStatus, MobileError> {
         let storage = self.open_storage()?;
         let manager = vauchi_core::api::DeletionManager::new(&storage);
-        let state = manager
-            .deletion_state()
-            .map_err(|e| MobileError::ShredError(e.to_string()))?;
+        let state = manager.deletion_state().map_err(|e| MobileError::Other {
+            message: e.to_string(),
+        })?;
 
         match state {
             vauchi_core::storage::DeletionState::None => Ok(MobileShredStatus::None),
@@ -317,9 +328,12 @@ impl VauchiPlatform {
     pub fn get_consent_records(&self) -> Result<Vec<MobileConsentRecord>, MobileError> {
         let storage = self.open_storage()?;
         let manager = vauchi_core::api::ConsentManager::new(&storage);
-        let records = manager
-            .export_consent_log_with_version()
-            .map_err(|e| MobileError::GdprError(e.to_string()))?;
+        let records =
+            manager
+                .export_consent_log_with_version()
+                .map_err(|e| MobileError::Other {
+                    message: e.to_string(),
+                })?;
         Ok(records.iter().map(MobileConsentRecord::from).collect())
     }
 }

@@ -260,7 +260,9 @@ fn map_state(state: &NfcHandshakeState) -> MobileNfcState {
 }
 
 fn exchange_error_to_mobile(e: ExchangeError) -> MobileError {
-    MobileError::ExchangeFailed(format!("{:?}", e))
+    MobileError::Other {
+        message: format!("{:?}", e),
+    }
 }
 
 fn nfc_result_to_mobile(result: &NfcExchangeResult) -> MobileNfcExchangeResult {

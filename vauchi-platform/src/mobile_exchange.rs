@@ -36,22 +36,22 @@ fn serialize_exchange_payload(public_key: &[u8; 32], card: &ContactCard) -> Vec<
 /// Deserialize an exchange payload into (public_key, ContactCard).
 fn deserialize_exchange_payload(data: &[u8]) -> Result<([u8; 32], ContactCard), MobileError> {
     if data.len() < 34 {
-        return Err(MobileError::ExchangeFailed(
-            "Exchange payload too short".to_string(),
-        ));
+        return Err(MobileError::Other {
+            message: "Exchange payload too short".to_string(),
+        });
     }
     let version = data[0];
     if version != EXCHANGE_PAYLOAD_VERSION {
-        return Err(MobileError::ExchangeFailed(format!(
-            "Unsupported exchange payload version: {}",
-            version
-        )));
+        return Err(MobileError::Other {
+            message: format!("Unsupported exchange payload version: {}", version),
+        });
     }
     let mut public_key = [0u8; 32];
     public_key.copy_from_slice(&data[1..33]);
-    let card: ContactCard = serde_json::from_slice(&data[33..]).map_err(|e| {
-        MobileError::ExchangeFailed(format!("Failed to deserialize contact card: {}", e))
-    })?;
+    let card: ContactCard =
+        serde_json::from_slice(&data[33..]).map_err(|e| MobileError::Other {
+            message: format!("Failed to deserialize contact card: {}", e),
+        })?;
     Ok((public_key, card))
 }
 
@@ -126,7 +126,9 @@ impl VauchiPlatform {
             .public_key()
             .expect("exchange contact has public key");
         let ratchet = DoubleRatchetState::initialize_initiator(&shared_key, their_exchange_key)
-            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
         storage.save_ratchet_state(&contact_id, &ratchet, true)?;
 
         Ok(MobileExchangeResult {
@@ -166,13 +168,19 @@ impl VauchiPlatform {
     ) -> Result<MobileExchangeResult, MobileError> {
         let received_data = session
             .get_received_data()
-            .ok_or_else(|| MobileError::ExchangeFailed("No received data".to_string()))?;
+            .ok_or_else(|| MobileError::Other {
+                message: "No received data".to_string(),
+            })?;
 
         let transport_key_bytes: [u8; 32] = session
             .get_transport_key()
-            .ok_or_else(|| MobileError::ExchangeFailed("No transport key".to_string()))?
+            .ok_or_else(|| MobileError::Other {
+                message: "No transport key".to_string(),
+            })?
             .try_into()
-            .map_err(|_| MobileError::ExchangeFailed("Invalid transport key length".to_string()))?;
+            .map_err(|_| MobileError::Other {
+                message: "Invalid transport key length".to_string(),
+            })?;
 
         let (public_key, card) = deserialize_exchange_payload(&received_data)?;
         let shared_key = SymmetricKey::from_bytes(transport_key_bytes);
@@ -189,8 +197,12 @@ impl VauchiPlatform {
         storage.save_contact(&contact)?;
 
         // Initialize double ratchet with transport-derived shared key
-        let ratchet = DoubleRatchetState::initialize_initiator(&shared_key, public_key)
-            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
+        let ratchet =
+            DoubleRatchetState::initialize_initiator(&shared_key, public_key).map_err(|e| {
+                MobileError::Other {
+                    message: e.to_string(),
+                }
+            })?;
         storage.save_ratchet_state(&contact_id, &ratchet, true)?;
 
         Ok(MobileExchangeResult {

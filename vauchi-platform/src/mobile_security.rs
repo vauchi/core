@@ -25,7 +25,9 @@ impl VauchiPlatform {
         let identity = self.get_identity()?;
         vauchi
             .set_identity(identity)
-            .map_err(|e| MobileError::Internal(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
         vauchi.setup_app_password(&password)?;
         Ok(())
     }
@@ -38,7 +40,9 @@ impl VauchiPlatform {
         let identity = self.get_identity()?;
         vauchi
             .set_identity(identity)
-            .map_err(|e| MobileError::Internal(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
         vauchi.setup_duress_password(&duress_password)?;
         Ok(())
     }
@@ -54,7 +58,9 @@ impl VauchiPlatform {
         let identity = self.get_identity()?;
         vauchi
             .set_identity(identity)
-            .map_err(|e| MobileError::Internal(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
         let mode = vauchi.authenticate(&password)?;
         match mode {
             vauchi_core::AuthMode::Normal => Ok(MobileAuthMode::Normal),
@@ -133,7 +139,9 @@ impl VauchiPlatform {
         let identity = self.get_identity()?;
         vauchi
             .set_identity(identity)
-            .map_err(|e| MobileError::Internal(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
         vauchi.configure_emergency_broadcast(contact_ids, message, include_location)?;
         Ok(())
     }
@@ -146,7 +154,9 @@ impl VauchiPlatform {
         let identity = self.get_identity()?;
         vauchi
             .set_identity(identity)
-            .map_err(|e| MobileError::Internal(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
         let result = vauchi.send_emergency_broadcast()?;
         Ok(MobileBroadcastResult {
             sent: result.sent as u32,
@@ -186,8 +196,10 @@ impl VauchiPlatform {
         card_json: String,
     ) -> Result<String, MobileError> {
         let vauchi = self.open_vauchi()?;
-        let card: ContactCard = serde_json::from_str(&card_json)
-            .map_err(|e| MobileError::SerializationError(e.to_string()))?;
+        let card: ContactCard =
+            serde_json::from_str(&card_json).map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
         let id = format!(
             "decoy-{}",
             std::time::SystemTime::now()

@@ -94,7 +94,10 @@ impl VauchiPlatform {
         qr_data: String,
     ) -> Result<MobileDeviceLinkInfo, MobileError> {
         let qr =
-            DeviceLinkQR::from_data_string(&qr_data).map_err(|_| MobileError::InvalidQrCode)?;
+            DeviceLinkQR::from_data_string(&qr_data).map_err(|_| MobileError::InvalidInput {
+                field: "qr".to_string(),
+                message: "Invalid QR code".to_string(),
+            })?;
 
         Ok(MobileDeviceLinkInfo {
             identity_public_key: hex::encode(qr.identity_public_key()),
@@ -133,10 +136,15 @@ impl VauchiPlatform {
         device_name: String,
     ) -> Result<Arc<MobileDeviceLinkResponder>, MobileError> {
         let qr =
-            DeviceLinkQR::from_data_string(&qr_data).map_err(|_| MobileError::InvalidQrCode)?;
+            DeviceLinkQR::from_data_string(&qr_data).map_err(|_| MobileError::InvalidInput {
+                field: "qr".to_string(),
+                message: "Invalid QR code".to_string(),
+            })?;
 
-        let responder = DeviceLinkResponder::from_qr(qr, device_name)
-            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
+        let responder =
+            DeviceLinkResponder::from_qr(qr, device_name).map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
 
         Ok(Arc::new(MobileDeviceLinkResponder {
             inner: Mutex::new(responder),
@@ -165,8 +173,11 @@ impl VauchiPlatform {
         let transport = self
             .open_vauchi_for_relay()?
             .build_relay_transport(self.relay_url.clone(), 10_000);
-        device_link_relay::send_and_receive(&transport, &msg, timeout_secs)
-            .map_err(|e| MobileError::NetworkError(e.to_string()))
+        device_link_relay::send_and_receive(&transport, &msg, timeout_secs).map_err(|e| {
+            MobileError::Other {
+                message: e.to_string(),
+            }
+        })
     }
 
     /// Listen for incoming device link request via relay (existing device / initiator).
@@ -184,8 +195,11 @@ impl VauchiPlatform {
             .open_vauchi_for_relay()?
             .build_relay_transport(self.relay_url.clone(), 10_000);
         let (payload, sender_token) =
-            device_link_relay::listen_for_request(&transport, &identity_id, timeout_secs)
-                .map_err(|e| MobileError::NetworkError(e.to_string()))?;
+            device_link_relay::listen_for_request(&transport, &identity_id, timeout_secs).map_err(
+                |e| MobileError::Other {
+                    message: e.to_string(),
+                },
+            )?;
 
         Ok(MobileDeviceLinkRequest {
             encrypted_payload: payload,
@@ -205,8 +219,11 @@ impl VauchiPlatform {
         let transport = self
             .open_vauchi_for_relay()?
             .build_relay_transport(self.relay_url.clone(), 10_000);
-        device_link_relay::send_response(&transport, &sender_token, encrypted_response)
-            .map_err(|e| MobileError::NetworkError(e.to_string()))
+        device_link_relay::send_response(&transport, &sender_token, encrypted_response).map_err(
+            |e| MobileError::Other {
+                message: e.to_string(),
+            },
+        )
     }
 
     /// Get the device count.
@@ -250,9 +267,10 @@ impl VauchiPlatform {
 
         // Cannot unlink current device
         if device_id == *current_device_id {
-            return Err(MobileError::InvalidInput(
-                "Cannot unlink the current device".to_string(),
-            ));
+            return Err(MobileError::InvalidInput {
+                field: String::new(),
+                message: "Cannot unlink the current device".to_string(),
+            });
         }
 
         // Try to revoke the device

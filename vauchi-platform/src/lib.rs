@@ -51,8 +51,10 @@ mod mobile_wifi_aware;
 mod multipart_qr;
 mod multistage_exchange;
 mod platform_app_engine;
+mod policies;
 mod protocol;
 mod types;
+mod validation;
 
 // Re-export public types
 pub use content::{
@@ -113,6 +115,10 @@ pub use mobile_verifier_event::{
 pub use mobile_wifi_aware::{MobileWifiAwareStatus, wifi_aware_check_availability};
 pub use multipart_qr::{MobileMultipartDecoder, MultipartDecoder, encode_multipart};
 pub use platform_app_engine::{PlatformAppEngine, PlatformEventListener};
+pub use policies::{
+    MobileClipboardPolicy, mobile_clipboard_policy, mobile_generate_storage_key,
+    mobile_storage_key_byte_length,
+};
 pub use types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBorderRadiusTokens,
     MobileBroadcastResult, MobileConsentRecord, MobileConsentStatus, MobileConsentType,
@@ -129,8 +135,12 @@ pub use types::{
     MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
     MobileShredStatus, MobileShredToken, MobileShredVerification, MobileSocialNetwork,
     MobileSpacingDirectionTokens, MobileSpacingTokens, MobileSyncResult, MobileSyncStatus,
-    MobileTheme, MobileThemeColors, MobileThemeMode, MobileTouchTargetTokens,
+    MobileTabInfo, MobileTheme, MobileThemeColors, MobileThemeMode, MobileTouchTargetTokens,
     MobileTypographyTokens, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+};
+pub use validation::{
+    mobile_is_valid_email, mobile_is_valid_phone, mobile_is_valid_relay_url, passcode_max_length,
+    passcode_min_length, password_min_length,
 };
 
 uniffi::setup_scaffolding!();
@@ -204,9 +214,12 @@ impl MobileDeviceLinkInitiator {
         encrypted_request: Vec<u8>,
     ) -> Result<MobileDeviceLinkConfirmation, MobileError> {
         let initiator = lock_or(&self.inner)?;
-        let (confirmation, request) = initiator
-            .prepare_confirmation(&encrypted_request)
-            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
+        let (confirmation, request) =
+            initiator
+                .prepare_confirmation(&encrypted_request)
+                .map_err(|e| MobileError::Other {
+                    message: e.to_string(),
+                })?;
 
         // Store request for confirm_link
         *lock_or(&self.pending_request)? = Some(request);
@@ -228,9 +241,12 @@ impl MobileDeviceLinkInitiator {
         challenge_response: Vec<u8>,
         verified_at: u64,
     ) -> Result<MobileDeviceLinkResult, MobileError> {
-        let response_bytes: [u8; 16] = challenge_response.try_into().map_err(|_| {
-            MobileError::ExchangeFailed("challenge_response must be exactly 16 bytes".into())
-        })?;
+        let response_bytes: [u8; 16] =
+            challenge_response
+                .try_into()
+                .map_err(|_| MobileError::Other {
+                    message: "challenge_response must be exactly 16 bytes".into(),
+                })?;
         let proof = ProximityProof::Ultrasonic {
             challenge_response: response_bytes,
             verified_at,
@@ -270,16 +286,18 @@ impl MobileDeviceLinkInitiator {
         &self,
         proof: &ProximityProof,
     ) -> Result<MobileDeviceLinkResult, MobileError> {
-        let request = lock_or(&self.pending_request)?.take().ok_or_else(|| {
-            MobileError::ExchangeFailed(
-                "No pending request — call prepare_confirmation first".into(),
-            )
-        })?;
+        let request = lock_or(&self.pending_request)?
+            .take()
+            .ok_or_else(|| MobileError::Other {
+                message: "No pending request — call prepare_confirmation first".into(),
+            })?;
 
         let initiator = lock_or(&self.inner)?;
         let (encrypted_response, _registry, device_info) = initiator
             .confirm_link(&request, proof)
-            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
 
         Ok(MobileDeviceLinkResult {
             success: true,
@@ -303,14 +321,18 @@ impl MobileDeviceLinkResponder {
     pub fn create_request(&self) -> Result<Vec<u8>, MobileError> {
         lock_or(&self.inner)?
             .create_request()
-            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })
     }
 
     /// Computes the confirmation code (must call create_request first).
     pub fn compute_confirmation_code(&self) -> Result<String, MobileError> {
         lock_or(&self.inner)?
             .compute_confirmation_code()
-            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })
     }
 
     /// Returns the identity fingerprint from the QR.
@@ -329,7 +351,9 @@ impl MobileDeviceLinkResponder {
         let responder = lock_or(&self.inner)?;
         let response = responder
             .process_response(&encrypted_response)
-            .map_err(|e| MobileError::ExchangeFailed(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
 
         Ok(MobileDeviceJoinResult {
             success: true,
@@ -587,8 +611,9 @@ pub fn get_default_theme_id(prefer_dark: bool) -> String {
 /// (e.g., en.json, de.json, fr.json, es.json).
 #[uniffi::export]
 pub fn init_locales(resource_dir: String) -> Result<(), MobileError> {
-    vauchi_app::i18n::init(std::path::Path::new(&resource_dir))
-        .map_err(|e| MobileError::InitError(e.to_string()))
+    vauchi_app::i18n::init(std::path::Path::new(&resource_dir)).map_err(|e| MobileError::Other {
+        message: e.to_string(),
+    })
 }
 
 /// Get all available locales.
@@ -795,8 +820,10 @@ pub fn widget_panic_shred(
         callback: Arc::from(keychain),
     };
     let path = std::path::Path::new(&data_dir);
-    let report = vauchi_core::api::widget_panic_shred(path, &bridge)
-        .map_err(|e| MobileError::ShredError(e.to_string()))?;
+    let report =
+        vauchi_core::api::widget_panic_shred(path, &bridge).map_err(|e| MobileError::Other {
+            message: e.to_string(),
+        })?;
     Ok(MobileShredReport::from(&report))
 }
 
@@ -890,8 +917,11 @@ pub struct VauchiPlatform {
 impl VauchiPlatform {
     /// Opens a storage connection.
     pub(crate) fn open_storage(&self) -> Result<Storage, MobileError> {
-        Storage::open(&self.storage_path, self.storage_key.clone())
-            .map_err(|e| MobileError::StorageError(e.to_string()))
+        Storage::open(&self.storage_path, self.storage_key.clone()).map_err(|e| {
+            MobileError::StorageError {
+                message: e.to_string(),
+            }
+        })
     }
 
     /// Opens a Vauchi API instance backed by the same storage.
@@ -902,7 +932,9 @@ impl VauchiPlatform {
         let config = VauchiConfig::with_storage_path(&self.storage_path)
             .with_relay_url(&self.relay_url)
             .with_storage_key(self.storage_key.clone());
-        Vauchi::new(config).map_err(|e| MobileError::Internal(e.to_string()))
+        Vauchi::new(config).map_err(|e| MobileError::Other {
+            message: e.to_string(),
+        })
     }
 
     /// Opens a Vauchi instance with identity loaded **and** the OHTTP
@@ -929,7 +961,9 @@ impl VauchiPlatform {
         let identity = self.get_identity()?;
         vauchi
             .set_identity(identity)
-            .map_err(|e| MobileError::Internal(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
         let _ = vauchi.connect();
         Ok(vauchi)
     }
@@ -976,7 +1010,9 @@ impl VauchiPlatform {
         let storage = self.open_storage()?;
         storage
             .save_contact(contact)
-            .map_err(|e| MobileError::StorageError(e.to_string()))
+            .map_err(|e| MobileError::StorageError {
+                message: e.to_string(),
+            })
     }
 
     /// Returns the data directory (parent of the database file).
@@ -992,10 +1028,8 @@ impl VauchiPlatform {
         let lock = lock_or(&self.platform_keychain)?;
         let callback = lock
             .as_ref()
-            .ok_or_else(|| {
-                MobileError::ShredError(
-                    "Platform keychain not set. Call set_platform_keychain() first.".into(),
-                )
+            .ok_or_else(|| MobileError::Other {
+                message: "Platform keychain not set. Call set_platform_keychain() first.".into(),
             })?
             .clone();
         Ok(KeychainBridge { callback })
@@ -1004,11 +1038,16 @@ impl VauchiPlatform {
     /// Gets the identity from stored data.
     pub(crate) fn get_identity(&self) -> Result<Identity, MobileError> {
         let data = lock_or(&self.identity_data)?;
-        let identity_data = data.as_ref().ok_or(MobileError::IdentityNotFound)?;
+        let identity_data = data.as_ref().ok_or(MobileError::Other {
+            message: "Identity not found".to_string(),
+        })?;
 
         let backup = IdentityBackup::new(identity_data.backup_data.clone());
-        Identity::import_backup(&backup, "__internal_storage_key__")
-            .map_err(|e| MobileError::CryptoError(e.to_string()))
+        Identity::import_backup(&backup, "__internal_storage_key__").map_err(|e| {
+            MobileError::Other {
+                message: e.to_string(),
+            }
+        })
     }
 
     /// Get our contact card, or create a default one from the identity.
@@ -1058,10 +1097,12 @@ impl VauchiPlatform {
         tracker: &vauchi_core::AhaMomentTracker,
     ) -> Result<(), MobileError> {
         let path = self.aha_moments_path();
-        let data = tracker
-            .to_json()
-            .map_err(|e| MobileError::StorageError(e.to_string()))?;
-        std::fs::write(&path, data).map_err(|e| MobileError::StorageError(e.to_string()))?;
+        let data = tracker.to_json().map_err(|e| MobileError::StorageError {
+            message: e.to_string(),
+        })?;
+        std::fs::write(&path, data).map_err(|e| MobileError::StorageError {
+            message: e.to_string(),
+        })?;
         Ok(())
     }
 
@@ -1091,10 +1132,12 @@ impl VauchiPlatform {
         state: &vauchi_core::DemoContactState,
     ) -> Result<(), MobileError> {
         let path = self.demo_contact_path();
-        let data = state
-            .to_json()
-            .map_err(|e| MobileError::StorageError(e.to_string()))?;
-        std::fs::write(&path, data).map_err(|e| MobileError::StorageError(e.to_string()))?;
+        let data = state.to_json().map_err(|e| MobileError::StorageError {
+            message: e.to_string(),
+        })?;
+        std::fs::write(&path, data).map_err(|e| MobileError::StorageError {
+            message: e.to_string(),
+        })?;
         Ok(())
     }
 }
@@ -1115,17 +1158,22 @@ impl VauchiPlatform {
     ) -> Result<Arc<Self>, MobileError> {
         let data_path = PathBuf::from(&data_dir);
 
-        std::fs::create_dir_all(&data_path)
-            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        std::fs::create_dir_all(&data_path).map_err(|e| MobileError::StorageError {
+            message: e.to_string(),
+        })?;
 
         let storage_path = data_path.join("vauchi.db");
 
-        let key_array: [u8; 32] = storage_key_bytes.try_into().map_err(|_| {
-            MobileError::StorageError("Storage key must be exactly 32 bytes".to_string())
-        })?;
-        let storage_key = SymmetricKey::try_from_bytes(key_array).map_err(|_| {
-            MobileError::StorageError("Degenerate storage key rejected".to_string())
-        })?;
+        let key_array: [u8; 32] =
+            storage_key_bytes
+                .try_into()
+                .map_err(|_| MobileError::StorageError {
+                    message: "Storage key must be exactly 32 bytes".to_string(),
+                })?;
+        let storage_key =
+            SymmetricKey::try_from_bytes(key_array).map_err(|_| MobileError::StorageError {
+                message: "Degenerate storage key rejected".to_string(),
+            })?;
 
         // Storage handle is opened lazily on first use; the constructor does not
         // pre-open it. Pre-opening would run schema migrations and startup
@@ -1155,25 +1203,31 @@ impl VauchiPlatform {
     pub fn new(data_dir: String, relay_url: String) -> Result<Arc<Self>, MobileError> {
         let data_path = PathBuf::from(&data_dir);
 
-        std::fs::create_dir_all(&data_path)
-            .map_err(|e| MobileError::StorageError(e.to_string()))?;
+        std::fs::create_dir_all(&data_path).map_err(|e| MobileError::StorageError {
+            message: e.to_string(),
+        })?;
 
         let storage_path = data_path.join("vauchi.db");
         let key_path = data_path.join("storage.key");
 
         let storage_key = if key_path.exists() {
-            let key_bytes = std::fs::read(&key_path)
-                .map_err(|e| MobileError::StorageError(format!("Failed to read key: {}", e)))?;
-            let key_array: [u8; 32] = key_bytes
-                .try_into()
-                .map_err(|_| MobileError::StorageError("Invalid key length".to_string()))?;
-            SymmetricKey::try_from_bytes(key_array).map_err(|_| {
-                MobileError::StorageError("Degenerate storage key rejected".to_string())
+            let key_bytes = std::fs::read(&key_path).map_err(|e| MobileError::StorageError {
+                message: format!("Failed to read key: {}", e),
+            })?;
+            let key_array: [u8; 32] =
+                key_bytes
+                    .try_into()
+                    .map_err(|_| MobileError::StorageError {
+                        message: "Invalid key length".to_string(),
+                    })?;
+            SymmetricKey::try_from_bytes(key_array).map_err(|_| MobileError::StorageError {
+                message: "Degenerate storage key rejected".to_string(),
             })?
         } else {
             let key = SymmetricKey::generate();
-            std::fs::write(&key_path, key.as_bytes())
-                .map_err(|e| MobileError::StorageError(format!("Failed to save key: {}", e)))?;
+            std::fs::write(&key_path, key.as_bytes()).map_err(|e| MobileError::StorageError {
+                message: format!("Failed to save key: {}", e),
+            })?;
             key
         };
 
@@ -2114,8 +2168,11 @@ mod tests {
             .set_proposal_trusted("nonexistent_id".to_string(), true)
             .unwrap_err();
         assert!(
-            matches!(err, MobileError::ContactNotFound(_)),
-            "expected ContactNotFound, got {err:?}"
+            matches!(
+                &err,
+                MobileError::Other { message } if message.starts_with("Contact not found:")
+            ),
+            "expected Other(Contact not found: …), got {err:?}"
         );
     }
 
@@ -2392,8 +2449,11 @@ mod tests {
         let result = wb.open_vauchi_for_relay();
         assert!(result.is_err(), "expected IdentityNotFound error");
         assert!(
-            matches!(result, Err(MobileError::IdentityNotFound)),
-            "open_vauchi_for_relay should fail with IdentityNotFound when no identity exists"
+            matches!(
+                &result,
+                Err(MobileError::Other { message }) if message == "Identity not found"
+            ),
+            "open_vauchi_for_relay should fail with Other(Identity not found) when no identity exists"
         );
     }
 

@@ -1089,6 +1089,17 @@
                 },
                 "mode": {
                   "$ref": "#/definitions/QrMode"
+                },
+                "scan_quality": {
+                  "description": "Real-time scan quality for the viewfinder frame indicator. Only meaningful when `mode` is `Scan`; `None` when `Display`.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/ScanQuality"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               }
             }
@@ -2212,6 +2223,16 @@
       "enum": [
         "Display",
         "Scan"
+      ]
+    },
+    "ScanQuality": {
+      "description": "Real-time scan quality indicator for QR camera viewfinder.\n\nFrontends render this as a colored border/frame around the camera preview to guide the user's device positioning: - `Good` → green frame (QR reliably detected) - `Weak` → yellow frame (QR detected but low confidence) - `Poor` → orange frame (intermittent detection) - `NoSignal` → red frame (nothing detected / wrong pointing)",
+      "type": "string",
+      "enum": [
+        "Good",
+        "Weak",
+        "Poor",
+        "NoSignal"
       ]
     },
     "ScreenAction": {

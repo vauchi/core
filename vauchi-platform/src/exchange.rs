@@ -237,9 +237,9 @@ impl MobileExchangeSession {
         let inner = lock_or(&self.inner)?;
         match inner.state() {
             ExchangeState::Complete { contact } => Ok(*contact.clone()),
-            _ => Err(MobileError::ExchangeFailed(
-                "Session not in Complete state — drive the state machine first".into(),
-            )),
+            _ => Err(MobileError::Other {
+                message: "Session not in Complete state — drive the state machine first".into(),
+            }),
         }
     }
 }
@@ -280,24 +280,33 @@ impl MobileExchangeSession {
         let mut inner = lock_or(&self.inner)?;
         inner
             .apply(ExchangeEvent::StartQR)
-            .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))?;
+            .map_err(|e| MobileError::Other {
+                message: format!("{:?}", e),
+            })?;
 
         // Return the QR data string
         inner
             .qr()
             .map(|qr| format!("wb://{}", qr.to_data_string()))
-            .ok_or_else(|| MobileError::ExchangeFailed("QR not generated".into()))
+            .ok_or_else(|| MobileError::Other {
+                message: "QR not generated".into(),
+            })
     }
 
     /// Process a scanned QR code. Transitions DisplayingQr -> PeerScanned.
     pub fn process_qr(&self, qr_data: String) -> Result<(), MobileError> {
         let data_str = qr_data.strip_prefix("wb://").unwrap_or(&qr_data);
-        let qr = ExchangeQR::from_data_string(data_str).map_err(|_| MobileError::InvalidQrCode)?;
+        let qr = ExchangeQR::from_data_string(data_str).map_err(|_| MobileError::InvalidInput {
+            field: "qr".to_string(),
+            message: "Invalid QR code".to_string(),
+        })?;
 
         let mut inner = lock_or(&self.inner)?;
         inner
             .apply(ExchangeEvent::ProcessQR(qr))
-            .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
+            .map_err(|e| MobileError::Other {
+                message: format!("{:?}", e),
+            })
     }
 
     /// Signal that the other party scanned our QR. Transitions PeerScanned -> AwaitingKeyAgreement.
@@ -305,7 +314,9 @@ impl MobileExchangeSession {
         let mut inner = lock_or(&self.inner)?;
         inner
             .apply(ExchangeEvent::TheyScannedOurQR)
-            .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
+            .map_err(|e| MobileError::Other {
+                message: format!("{:?}", e),
+            })
     }
 
     /// Perform key agreement. Transitions AwaitingKeyAgreement -> AwaitingCardExchange.
@@ -313,7 +324,9 @@ impl MobileExchangeSession {
         let mut inner = lock_or(&self.inner)?;
         inner
             .apply(ExchangeEvent::PerformKeyAgreement)
-            .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
+            .map_err(|e| MobileError::Other {
+                message: format!("{:?}", e),
+            })
     }
 
     /// Complete the card exchange. Transitions AwaitingCardExchange -> Complete.
@@ -325,7 +338,9 @@ impl MobileExchangeSession {
         let mut inner = lock_or(&self.inner)?;
         inner
             .apply(ExchangeEvent::CompleteExchange(card))
-            .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
+            .map_err(|e| MobileError::Other {
+                message: format!("{:?}", e),
+            })
     }
 
     /// Confirm physical proximity (manual verification).
@@ -453,7 +468,9 @@ impl MobileExchangeSession {
     ) -> Result<(), MobileError> {
         lock_or(&self.inner)?
             .apply_hardware_event(event.into())
-            .map_err(|e| MobileError::ExchangeFailed(format!("{:?}", e)))
+            .map_err(|e| MobileError::Other {
+                message: format!("{:?}", e),
+            })
     }
 
     /// Returns the event log from the last proximity verification.

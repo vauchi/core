@@ -32,7 +32,9 @@ impl VauchiPlatform {
         let vauchi = self.open_vauchi()?;
         let result = vauchi
             .import_contacts_from_vcf(&data)
-            .map_err(|e| MobileError::Internal(e.to_string()))?;
+            .map_err(|e| MobileError::Other {
+                message: e.to_string(),
+            })?;
         Ok(MobileImportResult {
             imported: result.imported as u32,
             skipped: result.skipped as u32,

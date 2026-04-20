@@ -79,6 +79,39 @@ pub fn is_valid_phone(value: &str) -> bool {
     })
 }
 
+/// Validate whether a string is a well-formed email address.
+///
+/// Rules (intentionally permissive — same checks the contact-card
+/// `Email` field type performs):
+/// - Must contain exactly one `@`
+/// - Local part must be non-empty
+/// - Domain must be non-empty (a missing TLD is allowed for
+///   intranet addresses like `user@localhost`)
+///
+/// # Examples
+///
+/// ```
+/// use vauchi_core::contact_card::is_valid_email;
+///
+/// assert!(is_valid_email("alice@example.com"));
+/// assert!(is_valid_email("alice@localhost"));
+/// assert!(!is_valid_email("not-an-email"));
+/// assert!(!is_valid_email("@nolocal.com"));
+/// assert!(!is_valid_email("nodomain@"));
+/// assert!(!is_valid_email("two@@signs.com"));
+/// ```
+pub fn is_valid_email(value: &str) -> bool {
+    let value = value.trim();
+    if value.is_empty() {
+        return false;
+    }
+    let parts: Vec<&str> = value.split('@').collect();
+    if parts.len() != 2 {
+        return false;
+    }
+    !parts[0].is_empty() && !parts[1].is_empty()
+}
+
 /// Check if a URI scheme is allowed.
 pub fn is_allowed_scheme(scheme: &str) -> bool {
     let lower = scheme.to_lowercase();

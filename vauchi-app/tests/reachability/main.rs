@@ -9,4 +9,7 @@
 //! `Cargo.toml` and wired into the `just reachability` recipe
 //! (plan Task 1.4).
 
+mod form_dialog;
 mod onboarding;
+mod recovery;
+mod sync_status;

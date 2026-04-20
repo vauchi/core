@@ -366,7 +366,7 @@ pub fn generate_qr_bitmap(
 
     let code = QrCode::with_error_correction_level(data.as_bytes(), ec).map_err(|e| {
         crate::error::MobileError::Other {
-            message: format!("QR generation failed: {e}"),
+            detail: format!("QR generation failed: {e}"),
         }
     })?;
 

@@ -26,7 +26,7 @@ impl VauchiPlatform {
         vauchi
             .set_identity(identity)
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
         vauchi.setup_app_password(&password)?;
         Ok(())
@@ -41,7 +41,7 @@ impl VauchiPlatform {
         vauchi
             .set_identity(identity)
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
         vauchi.setup_duress_password(&duress_password)?;
         Ok(())
@@ -59,7 +59,7 @@ impl VauchiPlatform {
         vauchi
             .set_identity(identity)
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
         let mode = vauchi.authenticate(&password)?;
         match mode {
@@ -140,7 +140,7 @@ impl VauchiPlatform {
         vauchi
             .set_identity(identity)
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
         vauchi.configure_emergency_broadcast(contact_ids, message, include_location)?;
         Ok(())
@@ -155,7 +155,7 @@ impl VauchiPlatform {
         vauchi
             .set_identity(identity)
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
         let result = vauchi.send_emergency_broadcast()?;
         Ok(MobileBroadcastResult {
@@ -198,7 +198,7 @@ impl VauchiPlatform {
         let vauchi = self.open_vauchi()?;
         let card: ContactCard =
             serde_json::from_str(&card_json).map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
         let id = format!(
             "decoy-{}",

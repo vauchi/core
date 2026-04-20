@@ -23,11 +23,11 @@ impl VauchiPlatform {
         let mut contact = storage
             .load_contact(&contact_id)?
             .ok_or_else(|| MobileError::Other {
-                message: format!("Contact not found: {}", contact_id.clone()),
+                detail: format!("Contact not found: {}", contact_id.clone()),
             })?;
 
         let card = storage.load_own_card()?.ok_or(MobileError::Other {
-            message: "Identity not found".to_string(),
+            detail: "Identity not found".to_string(),
         })?;
         let field = card
             .fields()
@@ -35,14 +35,14 @@ impl VauchiPlatform {
             .find(|f| f.label() == field_label)
             .ok_or_else(|| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Field not found: {}", field_label),
+                detail: format!("Field not found: {}", field_label),
             })?;
 
         contact
             .visibility_rules_mut()
             .ok_or(MobileError::InvalidInput {
                 field: String::new(),
-                message: "Visibility rules require an exchanged contact".to_string(),
+                detail: "Visibility rules require an exchanged contact".to_string(),
             })?
             .set_nobody(field.id());
         storage.save_contact(&contact)?;
@@ -61,11 +61,11 @@ impl VauchiPlatform {
         let mut contact = storage
             .load_contact(&contact_id)?
             .ok_or_else(|| MobileError::Other {
-                message: format!("Contact not found: {}", contact_id.clone()),
+                detail: format!("Contact not found: {}", contact_id.clone()),
             })?;
 
         let card = storage.load_own_card()?.ok_or(MobileError::Other {
-            message: "Identity not found".to_string(),
+            detail: "Identity not found".to_string(),
         })?;
         let field = card
             .fields()
@@ -73,14 +73,14 @@ impl VauchiPlatform {
             .find(|f| f.label() == field_label)
             .ok_or_else(|| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Field not found: {}", field_label),
+                detail: format!("Field not found: {}", field_label),
             })?;
 
         contact
             .visibility_rules_mut()
             .ok_or(MobileError::InvalidInput {
                 field: String::new(),
-                message: "Visibility rules require an exchanged contact".to_string(),
+                detail: "Visibility rules require an exchanged contact".to_string(),
             })?
             .set_everyone(field.id());
         storage.save_contact(&contact)?;
@@ -99,11 +99,11 @@ impl VauchiPlatform {
         let contact = storage
             .load_contact(&contact_id)?
             .ok_or_else(|| MobileError::Other {
-                message: format!("Contact not found: {}", contact_id.clone()),
+                detail: format!("Contact not found: {}", contact_id.clone()),
             })?;
 
         let card = storage.load_own_card()?.ok_or(MobileError::Other {
-            message: "Identity not found".to_string(),
+            detail: "Identity not found".to_string(),
         })?;
         let field = card
             .fields()
@@ -111,7 +111,7 @@ impl VauchiPlatform {
             .find(|f| f.label() == field_label)
             .ok_or_else(|| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Field not found: {}", field_label),
+                detail: format!("Field not found: {}", field_label),
             })?;
 
         Ok(contact
@@ -198,7 +198,7 @@ impl VauchiPlatform {
         let storage = self.open_storage()?;
 
         let card = storage.load_own_card()?.ok_or(MobileError::Other {
-            message: "Identity not found".to_string(),
+            detail: "Identity not found".to_string(),
         })?;
         let field = card
             .fields()
@@ -206,7 +206,7 @@ impl VauchiPlatform {
             .find(|f| f.label() == field_label)
             .ok_or_else(|| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Field not found: {}", field_label),
+                detail: format!("Field not found: {}", field_label),
             })?;
 
         storage.set_group_field_visibility(&label_id, field.id(), is_visible)?;
@@ -225,7 +225,7 @@ impl VauchiPlatform {
         let storage = self.open_storage()?;
 
         let card = storage.load_own_card()?.ok_or(MobileError::Other {
-            message: "Identity not found".to_string(),
+            detail: "Identity not found".to_string(),
         })?;
         let field = card
             .fields()
@@ -233,7 +233,7 @@ impl VauchiPlatform {
             .find(|f| f.label() == field_label)
             .ok_or_else(|| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Field not found: {}", field_label),
+                detail: format!("Field not found: {}", field_label),
             })?;
 
         storage.save_contact_override(&contact_id, field.id(), is_visible)?;
@@ -249,7 +249,7 @@ impl VauchiPlatform {
         let storage = self.open_storage()?;
 
         let card = storage.load_own_card()?.ok_or(MobileError::Other {
-            message: "Identity not found".to_string(),
+            detail: "Identity not found".to_string(),
         })?;
         let field = card
             .fields()
@@ -257,7 +257,7 @@ impl VauchiPlatform {
             .find(|f| f.label() == field_label)
             .ok_or_else(|| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Field not found: {}", field_label),
+                detail: format!("Field not found: {}", field_label),
             })?;
 
         storage.delete_contact_override(&contact_id, field.id())?;

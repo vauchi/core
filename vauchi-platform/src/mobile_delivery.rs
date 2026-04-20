@@ -35,11 +35,11 @@ impl VauchiPlatform {
             let mut vauchi = Vauchi::new(config)?;
 
             vauchi.connect().map_err(|e| MobileError::Other {
-                message: format!("Connect: {e}"),
+                detail: format!("Connect: {e}"),
             })?;
 
             let outcome = vauchi.sync().map_err(|e| MobileError::Other {
-                message: format!("{e}"),
+                detail: format!("{e}"),
             })?;
 
             vauchi.disconnect();
@@ -68,10 +68,10 @@ impl VauchiPlatform {
                     updated_contact_names: vec![],
                 }),
                 VauchiSyncOutcome::NotConnected => Err(MobileError::Other {
-                    message: "Not connected".into(),
+                    detail: "Not connected".into(),
                 }),
                 VauchiSyncOutcome::NoIdentity => Err(MobileError::Other {
-                    message: "No identity".into(),
+                    detail: "No identity".into(),
                 }),
             }
         })();
@@ -296,7 +296,7 @@ impl VauchiPlatform {
         queue
             .is_full(&storage)
             .map_err(|e| MobileError::StorageError {
-                message: e.to_string(),
+                detail: e.to_string(),
             })
     }
 
@@ -309,7 +309,7 @@ impl VauchiPlatform {
             queue
                 .remaining_capacity(&storage)
                 .map_err(|e| MobileError::StorageError {
-                    message: e.to_string(),
+                    detail: e.to_string(),
                 })?;
         Ok(remaining as u32)
     }
@@ -372,7 +372,7 @@ impl VauchiPlatform {
         let backup = identity
             .export_backup(&password)
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
 
         use base64::Engine;
@@ -387,7 +387,7 @@ impl VauchiPlatform {
             let data = lock_or(&self.identity_data)?;
             if data.is_some() {
                 return Err(MobileError::Other {
-                    message: "Already initialized".to_string(),
+                    detail: "Already initialized".to_string(),
                 });
             }
         }
@@ -397,19 +397,19 @@ impl VauchiPlatform {
             .decode(&backup_data)
             .map_err(|_| MobileError::InvalidInput {
                 field: String::new(),
-                message: "Invalid base64".to_string(),
+                detail: "Invalid base64".to_string(),
             })?;
 
         let backup = IdentityBackup::new(bytes);
         let identity =
             Identity::import_backup(&backup, &password).map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
 
         let internal_backup = identity
             .export_backup("__internal_storage_key__")
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
 
         let internal_backup_data = internal_backup.as_bytes().to_vec();
@@ -441,18 +441,18 @@ impl VauchiPlatform {
         vauchi
             .set_identity(identity)
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
 
         let backup_hex = vauchi
             .export_full_backup(&password)
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
 
         // Re-encode hex → bytes → base64 for mobile transport
         let bytes = hex::decode(&backup_hex).map_err(|e| MobileError::Other {
-            message: e.to_string(),
+            detail: e.to_string(),
         })?;
         use base64::Engine;
         Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
@@ -470,7 +470,7 @@ impl VauchiPlatform {
             let data = lock_or(&self.identity_data)?;
             if data.is_some() {
                 return Err(MobileError::Other {
-                    message: "Already initialized".to_string(),
+                    detail: "Already initialized".to_string(),
                 });
             }
         }
@@ -481,7 +481,7 @@ impl VauchiPlatform {
             .decode(&backup_data)
             .map_err(|_| MobileError::InvalidInput {
                 field: String::new(),
-                message: "Invalid base64".to_string(),
+                detail: "Invalid base64".to_string(),
             })?;
         let backup_hex = hex::encode(&bytes);
 
@@ -489,17 +489,17 @@ impl VauchiPlatform {
         vauchi
             .import_full_backup(&backup_hex, &password)
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
 
         // Sync platform identity state from restored Vauchi
         let identity = vauchi.identity().ok_or(MobileError::Other {
-            message: "Identity not found".to_string(),
+            detail: "Identity not found".to_string(),
         })?;
         let internal_backup = identity
             .export_backup("__internal_storage_key__")
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
 
         let identity_data_val = IdentityData {
@@ -526,7 +526,7 @@ impl VauchiPlatform {
         tokio::task::spawn_blocking(move || platform.sync())
             .await
             .map_err(|e| MobileError::Other {
-                message: format!("Sync task panicked: {e}"),
+                detail: format!("Sync task panicked: {e}"),
             })?
     }
 }

@@ -31,13 +31,13 @@ impl VauchiPlatform {
         // Parse old public key
         let old_pk_bytes = hex::decode(&old_pk_hex).map_err(|e| MobileError::InvalidInput {
             field: String::new(),
-            message: format!("Invalid hex: {}", e),
+            detail: format!("Invalid hex: {}", e),
         })?;
         let old_pk: [u8; 32] = old_pk_bytes
             .try_into()
             .map_err(|_| MobileError::InvalidInput {
                 field: String::new(),
-                message: "Public key must be 32 bytes".to_string(),
+                detail: "Public key must be 32 bytes".to_string(),
             })?;
 
         // Create claim
@@ -49,11 +49,11 @@ impl VauchiPlatform {
         std::fs::write(
             self.recovery_proof_path(),
             proof.to_bytes().map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?,
         )
         .map_err(|e| MobileError::StorageError {
-            message: e.to_string(),
+            detail: e.to_string(),
         })?;
 
         // Encode claim for sharing
@@ -79,13 +79,13 @@ impl VauchiPlatform {
             .decode(&claim_b64)
             .map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Invalid base64: {}", e),
+                detail: format!("Invalid base64: {}", e),
             })?;
 
         let claim =
             RecoveryClaim::from_bytes(&claim_bytes).map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Invalid claim: {}", e),
+                detail: format!("Invalid claim: {}", e),
             })?;
 
         Ok(MobileRecoveryClaim {
@@ -111,25 +111,25 @@ impl VauchiPlatform {
             .decode(&claim_b64)
             .map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Invalid base64: {}", e),
+                detail: format!("Invalid base64: {}", e),
             })?;
 
         let claim =
             RecoveryClaim::from_bytes(&claim_bytes).map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Invalid claim: {}", e),
+                detail: format!("Invalid claim: {}", e),
             })?;
 
         if claim.is_expired() {
             return Err(MobileError::InvalidInput {
                 field: String::new(),
-                message: "Claim has expired".to_string(),
+                detail: "Claim has expired".to_string(),
             });
         }
 
         let voucher = RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair(), None)
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
 
         let voucher_data = base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes());
@@ -152,19 +152,19 @@ impl VauchiPlatform {
             .decode(&voucher_b64)
             .map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Invalid base64: {}", e),
+                detail: format!("Invalid base64: {}", e),
             })?;
 
         let voucher =
             RecoveryVoucher::from_bytes(&voucher_bytes).map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Invalid voucher: {}", e),
+                detail: format!("Invalid voucher: {}", e),
             })?;
 
         if !voucher.verify() {
             return Err(MobileError::InvalidInput {
                 field: String::new(),
-                message: "Invalid voucher signature".to_string(),
+                detail: "Invalid voucher signature".to_string(),
             });
         }
 
@@ -173,16 +173,16 @@ impl VauchiPlatform {
         let mut proof = if proof_path.exists() {
             let proof_bytes =
                 std::fs::read(&proof_path).map_err(|e| MobileError::StorageError {
-                    message: e.to_string(),
+                    detail: e.to_string(),
                 })?;
             RecoveryProof::from_bytes(&proof_bytes).map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Invalid proof: {}", e),
+                detail: format!("Invalid proof: {}", e),
             })?
         } else {
             return Err(MobileError::InvalidInput {
                 field: String::new(),
-                message: "No recovery in progress".to_string(),
+                detail: "No recovery in progress".to_string(),
             });
         };
 
@@ -198,15 +198,14 @@ impl VauchiPlatform {
         match proof.add_voucher_trusted(voucher, &trusted_keys) {
             Ok(()) => {}
             Err(vauchi_core::recovery::RecoveryError::UntrustedVoucher) => {
-                return Err(MobileError::InvalidInput {
-                    field: String::new(),
-                    message: "Voucher is from an untrusted contact. Only contacts marked as recovery-trusted can provide valid vouchers.".to_string(),
-                });
+                return Err(MobileError::InvalidInput { field: String::new(),
+                    detail: "Voucher is from an untrusted contact. Only contacts marked as recovery-trusted can provide valid vouchers.".to_string(),
+                 });
             }
             Err(e) => {
                 return Err(MobileError::InvalidInput {
                     field: String::new(),
-                    message: format!("Cannot add voucher: {}", e),
+                    detail: format!("Cannot add voucher: {}", e),
                 });
             }
         }
@@ -215,11 +214,11 @@ impl VauchiPlatform {
         std::fs::write(
             &proof_path,
             proof.to_bytes().map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?,
         )
         .map_err(|e| MobileError::StorageError {
-            message: e.to_string(),
+            detail: e.to_string(),
         })?;
 
         let is_complete = proof.voucher_count() >= proof.threshold() as usize;
@@ -244,13 +243,13 @@ impl VauchiPlatform {
         }
 
         let proof_bytes = std::fs::read(&proof_path).map_err(|e| MobileError::StorageError {
-            message: e.to_string(),
+            detail: e.to_string(),
         })?;
 
         let proof =
             RecoveryProof::from_bytes(&proof_bytes).map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Invalid proof: {}", e),
+                detail: format!("Invalid proof: {}", e),
             })?;
 
         let is_complete = proof.voucher_count() >= proof.threshold() as usize;
@@ -276,19 +275,19 @@ impl VauchiPlatform {
         }
 
         let proof_bytes = std::fs::read(&proof_path).map_err(|e| MobileError::StorageError {
-            message: e.to_string(),
+            detail: e.to_string(),
         })?;
 
         let proof =
             RecoveryProof::from_bytes(&proof_bytes).map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Invalid proof: {}", e),
+                detail: format!("Invalid proof: {}", e),
             })?;
 
         if proof.voucher_count() >= proof.threshold() as usize {
             let proof_data = base64::engine::general_purpose::STANDARD.encode(
                 proof.to_bytes().map_err(|e| MobileError::Other {
-                    message: e.to_string(),
+                    detail: e.to_string(),
                 })?,
             );
             Ok(Some(proof_data))
@@ -312,26 +311,26 @@ impl VauchiPlatform {
             .decode(&proof_b64)
             .map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Invalid base64: {}", e),
+                detail: format!("Invalid base64: {}", e),
             })?;
 
         let proof =
             RecoveryProof::from_bytes(&proof_bytes).map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
-                message: format!("Invalid proof: {}", e),
+                detail: format!("Invalid proof: {}", e),
             })?;
 
         // Validate the proof
         proof.validate().map_err(|e| MobileError::InvalidInput {
             field: String::new(),
-            message: format!("Proof validation failed: {}", e),
+            detail: format!("Proof validation failed: {}", e),
         })?;
 
         // Count known vouchers (vouchers from our contacts)
         let contacts = storage
             .list_contacts()
             .map_err(|e| MobileError::StorageError {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
 
         let contact_pks: std::collections::HashSet<[u8; 32]> = contacts
@@ -384,7 +383,7 @@ impl VauchiPlatform {
         vauchi
             .upload_guardian_entries()
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })
     }
 
@@ -402,7 +401,7 @@ impl VauchiPlatform {
         vauchi
             .save_recovery_response_action(&claim_id, &contact_id, &response, remind_at)
             .map_err(|e| MobileError::StorageError {
-                message: e.to_string(),
+                detail: e.to_string(),
             })
     }
 }

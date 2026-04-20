@@ -17,7 +17,7 @@ impl VauchiPlatform {
         let storage = self.open_storage()?;
         let progress = storage.load_or_create_onboarding_progress().map_err(|e| {
             MobileError::StorageError {
-                message: e.to_string(),
+                detail: e.to_string(),
             }
         })?;
         Ok(MobileOnboardingProgress::from(&progress))
@@ -31,14 +31,14 @@ impl VauchiPlatform {
         let storage = self.open_storage()?;
         let mut progress = storage.load_or_create_onboarding_progress().map_err(|e| {
             MobileError::StorageError {
-                message: e.to_string(),
+                detail: e.to_string(),
             }
         })?;
         progress.advance();
         storage
             .save_onboarding_progress(&progress)
             .map_err(|e| MobileError::StorageError {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
         Ok(MobileOnboardingProgress::from(&progress))
     }
@@ -50,14 +50,14 @@ impl VauchiPlatform {
         let storage = self.open_storage()?;
         let mut progress = storage.load_or_create_onboarding_progress().map_err(|e| {
             MobileError::StorageError {
-                message: e.to_string(),
+                detail: e.to_string(),
             }
         })?;
         progress.skip_step();
         storage
             .save_onboarding_progress(&progress)
             .map_err(|e| MobileError::StorageError {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
         Ok(MobileOnboardingProgress::from(&progress))
     }
@@ -69,14 +69,14 @@ impl VauchiPlatform {
         let storage = self.open_storage()?;
         let mut progress = storage.load_or_create_onboarding_progress().map_err(|e| {
             MobileError::StorageError {
-                message: e.to_string(),
+                detail: e.to_string(),
             }
         })?;
         progress.reset();
         storage
             .save_onboarding_progress(&progress)
             .map_err(|e| MobileError::StorageError {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
         Ok(())
     }
@@ -86,7 +86,7 @@ impl VauchiPlatform {
         let storage = self.open_storage()?;
         let progress = storage.load_or_create_onboarding_progress().map_err(|e| {
             MobileError::StorageError {
-                message: e.to_string(),
+                detail: e.to_string(),
             }
         })?;
         Ok(progress.is_complete())
@@ -97,7 +97,7 @@ impl VauchiPlatform {
         let storage = self.open_storage()?;
         let progress = storage.load_or_create_onboarding_progress().map_err(|e| {
             MobileError::StorageError {
-                message: e.to_string(),
+                detail: e.to_string(),
             }
         })?;
         Ok(progress.current_step().into())

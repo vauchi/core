@@ -238,7 +238,7 @@ impl MobileExchangeSession {
         match inner.state() {
             ExchangeState::Complete { contact } => Ok(*contact.clone()),
             _ => Err(MobileError::Other {
-                message: "Session not in Complete state — drive the state machine first".into(),
+                detail: "Session not in Complete state — drive the state machine first".into(),
             }),
         }
     }
@@ -281,7 +281,7 @@ impl MobileExchangeSession {
         inner
             .apply(ExchangeEvent::StartQR)
             .map_err(|e| MobileError::Other {
-                message: format!("{:?}", e),
+                detail: format!("{:?}", e),
             })?;
 
         // Return the QR data string
@@ -289,7 +289,7 @@ impl MobileExchangeSession {
             .qr()
             .map(|qr| format!("wb://{}", qr.to_data_string()))
             .ok_or_else(|| MobileError::Other {
-                message: "QR not generated".into(),
+                detail: "QR not generated".into(),
             })
     }
 
@@ -298,14 +298,14 @@ impl MobileExchangeSession {
         let data_str = qr_data.strip_prefix("wb://").unwrap_or(&qr_data);
         let qr = ExchangeQR::from_data_string(data_str).map_err(|_| MobileError::InvalidInput {
             field: "qr".to_string(),
-            message: "Invalid QR code".to_string(),
+            detail: "Invalid QR code".to_string(),
         })?;
 
         let mut inner = lock_or(&self.inner)?;
         inner
             .apply(ExchangeEvent::ProcessQR(qr))
             .map_err(|e| MobileError::Other {
-                message: format!("{:?}", e),
+                detail: format!("{:?}", e),
             })
     }
 
@@ -315,7 +315,7 @@ impl MobileExchangeSession {
         inner
             .apply(ExchangeEvent::TheyScannedOurQR)
             .map_err(|e| MobileError::Other {
-                message: format!("{:?}", e),
+                detail: format!("{:?}", e),
             })
     }
 
@@ -325,7 +325,7 @@ impl MobileExchangeSession {
         inner
             .apply(ExchangeEvent::PerformKeyAgreement)
             .map_err(|e| MobileError::Other {
-                message: format!("{:?}", e),
+                detail: format!("{:?}", e),
             })
     }
 
@@ -339,7 +339,7 @@ impl MobileExchangeSession {
         inner
             .apply(ExchangeEvent::CompleteExchange(card))
             .map_err(|e| MobileError::Other {
-                message: format!("{:?}", e),
+                detail: format!("{:?}", e),
             })
     }
 
@@ -469,7 +469,7 @@ impl MobileExchangeSession {
         lock_or(&self.inner)?
             .apply_hardware_event(event.into())
             .map_err(|e| MobileError::Other {
-                message: format!("{:?}", e),
+                detail: format!("{:?}", e),
             })
     }
 

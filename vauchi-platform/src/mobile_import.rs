@@ -33,7 +33,7 @@ impl VauchiPlatform {
         let result = vauchi
             .import_contacts_from_vcf(&data)
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
         Ok(MobileImportResult {
             imported: result.imported as u32,

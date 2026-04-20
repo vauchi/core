@@ -33,7 +33,7 @@ fn decrypt_failed_display_is_human_readable() {
 fn invalid_input_display_includes_field_and_message() {
     let err = MobileError::InvalidInput {
         field: "pin".to_string(),
-        message: "Must be at least 4 digits".to_string(),
+        detail: "Must be at least 4 digits".to_string(),
     };
     assert_eq!(
         format!("{err}"),
@@ -53,7 +53,7 @@ fn network_unavailable_display_is_human_readable() {
 fn relay_error_display_includes_status_and_message() {
     let err = MobileError::RelayError {
         status: 503,
-        message: "service unavailable".to_string(),
+        detail: "service unavailable".to_string(),
     };
     assert_eq!(format!("{err}"), "Relay error 503: service unavailable");
 }
@@ -71,7 +71,7 @@ fn rate_limited_display_includes_retry_seconds() {
 #[test]
 fn storage_error_display_includes_message() {
     let err = MobileError::StorageError {
-        message: "disk full".to_string(),
+        detail: "disk full".to_string(),
     };
     assert_eq!(format!("{err}"), "Storage error: disk full");
 }
@@ -80,7 +80,7 @@ fn storage_error_display_includes_message() {
 #[test]
 fn other_display_is_raw_message() {
     let err = MobileError::Other {
-        message: "unexpected".to_string(),
+        detail: "unexpected".to_string(),
     };
     assert_eq!(format!("{err}"), "unexpected");
 }
@@ -93,10 +93,10 @@ fn storage_error_from_uses_user_message() {
     let storage_err = StorageError::NotFound("test record".to_string());
     let mobile_err: MobileError = storage_err.into();
     match mobile_err {
-        MobileError::StorageError { message } => {
+        MobileError::StorageError { detail } => {
             assert!(
-                message.contains("storage error occurred"),
-                "expected sanitized user_message (F9 audit), got: {message}"
+                detail.contains("storage error occurred"),
+                "expected sanitized user_message (F9 audit), got: {detail}"
             );
         }
         other => panic!("expected StorageError, got {other:?}"),
@@ -109,10 +109,10 @@ fn vauchi_error_contact_not_found_maps_to_other_with_id() {
     let err = VauchiError::ContactNotFound("abc123".to_string());
     let mobile_err: MobileError = err.into();
     match mobile_err {
-        MobileError::Other { message } => {
+        MobileError::Other { detail } => {
             assert!(
-                message.contains("abc123"),
-                "contact id must survive the mapping, got: {message}"
+                detail.contains("abc123"),
+                "contact id must survive the mapping, got: {detail}"
             );
         }
         other => panic!("expected Other, got {other:?}"),
@@ -158,9 +158,9 @@ fn other_constructor_accepts_str_and_string() {
 fn invalid_input_constructor_defaults_field_to_empty() {
     let err = MobileError::invalid_input("missing phone");
     match err {
-        MobileError::InvalidInput { field, message } => {
+        MobileError::InvalidInput { field, detail } => {
             assert_eq!(field, "");
-            assert_eq!(message, "missing phone");
+            assert_eq!(detail, "missing phone");
         }
         other => panic!("expected InvalidInput, got {other:?}"),
     }

@@ -50,7 +50,7 @@ impl VauchiPlatform {
             let data = lock_or(&self.identity_data)?;
             if data.is_some() {
                 return Err(MobileError::Other {
-                    message: "Already initialized".to_string(),
+                    detail: "Already initialized".to_string(),
                 });
             }
         }
@@ -60,7 +60,7 @@ impl VauchiPlatform {
         let backup = identity
             .export_backup("__internal_storage_key__")
             .map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
 
         let backup_data = backup.as_bytes().to_vec();
@@ -107,7 +107,7 @@ impl VauchiPlatform {
     pub fn get_display_name(&self) -> Result<String, MobileError> {
         let storage = self.open_storage()?;
         let card = storage.load_own_card()?.ok_or(MobileError::Other {
-            message: "Identity not found".to_string(),
+            detail: "Identity not found".to_string(),
         })?;
         Ok(card.display_name().to_string())
     }
@@ -191,7 +191,7 @@ impl VauchiPlatform {
         let contacts = storage
             .list_contacts()
             .map_err(|e| MobileError::StorageError {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
 
         if !contacts.is_empty() {

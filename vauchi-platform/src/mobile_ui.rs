@@ -93,7 +93,7 @@ impl MobileOnboardingWorkflow {
     /// ```
     pub fn current_screen_json(&self) -> Result<String, MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Failed to lock onboarding engine: {e}"),
+            detail: format!("Failed to lock onboarding engine: {e}"),
         })?;
         screen_to_json(&engine.current_screen())
     }
@@ -115,7 +115,7 @@ impl MobileOnboardingWorkflow {
     pub fn handle_action_json(&self, action_json: String) -> Result<String, MobileError> {
         let action = user_action_from_json(&action_json)?;
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Failed to lock onboarding engine: {e}"),
+            detail: format!("Failed to lock onboarding engine: {e}"),
         })?;
         let result = engine.handle_action(action);
         action_result_to_json(&result)
@@ -133,10 +133,10 @@ impl MobileOnboardingWorkflow {
     /// ```
     pub fn onboarding_data_json(&self) -> Result<String, MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Failed to lock onboarding engine: {e}"),
+            detail: format!("Failed to lock onboarding engine: {e}"),
         })?;
         serde_json::to_string(engine.data()).map_err(|e| MobileError::Other {
-            message: format!("Failed to serialize OnboardingData: {e}"),
+            detail: format!("Failed to serialize OnboardingData: {e}"),
         })
     }
 }
@@ -173,7 +173,7 @@ macro_rules! mobile_workflow {
                 let engine = self
                     .engine
                     .lock()
-                    .map_err(|e| MobileError::Other { message: format!("Lock failed: {e}") })?;
+                    .map_err(|e| MobileError::Other { detail: format!("Lock failed: {e}")  })?;
                 screen_to_json(&engine.current_screen())
             }
 
@@ -182,7 +182,7 @@ macro_rules! mobile_workflow {
                 let mut engine = self
                     .engine
                     .lock()
-                    .map_err(|e| MobileError::Other { message: format!("Lock failed: {e}") })?;
+                    .map_err(|e| MobileError::Other { detail: format!("Lock failed: {e}")  })?;
                 action_result_to_json(&engine.handle_action(action))
             }
         }
@@ -195,7 +195,7 @@ mobile_workflow! {
     MobileHomeWorkflow wraps MyInfoEngine {
         constructor(progress_json: String) -> {
             let progress: MyInfoProgress = serde_json::from_str(&progress_json)
-                .map_err(|e| MobileError::InvalidInput { field: String::new(), message: format!("Failed to parse progress: {e}") })?;
+                .map_err(|e| MobileError::InvalidInput { field: String::new(), detail: format!("Failed to parse progress: {e}")  })?;
             MyInfoEngine::new(progress)
         }
     }
@@ -207,7 +207,7 @@ mobile_workflow! {
     MobileContactListWorkflow wraps ContactListEngine {
         constructor(contacts_json: String) -> {
             let contacts: Vec<ContactItem> = serde_json::from_str(&contacts_json)
-                .map_err(|e| MobileError::InvalidInput { field: String::new(), message: format!("Failed to parse contacts: {e}") })?;
+                .map_err(|e| MobileError::InvalidInput { field: String::new(), detail: format!("Failed to parse contacts: {e}")  })?;
             ContactListEngine::new(contacts)
         }
     }
@@ -219,7 +219,7 @@ mobile_workflow! {
     MobileSettingsWorkflow wraps SettingsEngine {
         constructor(config_json: String) -> {
             let config: SettingsConfig = serde_json::from_str(&config_json)
-                .map_err(|e| MobileError::InvalidInput { field: String::new(), message: format!("Failed to parse config: {e}") })?;
+                .map_err(|e| MobileError::InvalidInput { field: String::new(), detail: format!("Failed to parse config: {e}")  })?;
             SettingsEngine::new(config)
         }
     }
@@ -231,7 +231,7 @@ mobile_workflow! {
     MobileHelpWorkflow wraps HelpEngine {
         constructor(items_json: String) -> {
             let items: Vec<HelpItem> = serde_json::from_str(&items_json)
-                .map_err(|e| MobileError::InvalidInput { field: String::new(), message: format!("Failed to parse help items: {e}") })?;
+                .map_err(|e| MobileError::InvalidInput { field: String::new(), detail: format!("Failed to parse help items: {e}")  })?;
             HelpEngine::new(items)
         }
     }
@@ -243,7 +243,7 @@ mobile_workflow! {
     MobileDeliveryStatusWorkflow wraps DeliveryStatusEngine {
         constructor(items_json: String) -> {
             let items: Vec<DeliveryItem> = serde_json::from_str(&items_json)
-                .map_err(|e| MobileError::InvalidInput { field: String::new(), message: format!("Failed to parse delivery items: {e}") })?;
+                .map_err(|e| MobileError::InvalidInput { field: String::new(), detail: format!("Failed to parse delivery items: {e}")  })?;
             DeliveryStatusEngine::new(items)
         }
     }
@@ -265,9 +265,9 @@ mobile_workflow! {
     MobileContactEditWorkflow wraps ContactEditEngine {
         constructor(contact_json: String, groups_json: String) -> {
             let contact: EditableContact = serde_json::from_str(&contact_json)
-                .map_err(|e| MobileError::InvalidInput { field: String::new(), message: format!("Failed to parse contact: {e}") })?;
+                .map_err(|e| MobileError::InvalidInput { field: String::new(), detail: format!("Failed to parse contact: {e}")  })?;
             let groups: Vec<String> = serde_json::from_str(&groups_json)
-                .map_err(|e| MobileError::InvalidInput { field: String::new(), message: format!("Failed to parse groups: {e}") })?;
+                .map_err(|e| MobileError::InvalidInput { field: String::new(), detail: format!("Failed to parse groups: {e}")  })?;
             ContactEditEngine::new(contact, groups)
         }
     }
@@ -279,7 +279,7 @@ mobile_workflow! {
     MobileExchangeWorkflow wraps ExchangeEngine {
         constructor(config_json: String) -> {
             let config: ExchangeConfig = serde_json::from_str(&config_json)
-                .map_err(|e| MobileError::InvalidInput { field: String::new(), message: format!("Failed to parse exchange config: {e}") })?;
+                .map_err(|e| MobileError::InvalidInput { field: String::new(), detail: format!("Failed to parse exchange config: {e}")  })?;
             ExchangeEngine::new(config)
         }
     }
@@ -290,7 +290,7 @@ impl MobileExchangeWorkflow {
     /// Signal that exchange verification succeeded.
     pub fn mark_success(&self) -> Result<String, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         engine.mark_success();
         screen_to_json(&engine.current_screen())
@@ -299,7 +299,7 @@ impl MobileExchangeWorkflow {
     /// Signal that exchange verification failed.
     pub fn mark_failed(&self) -> Result<String, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         engine.mark_failed();
         screen_to_json(&engine.current_screen())
@@ -308,7 +308,7 @@ impl MobileExchangeWorkflow {
     /// Returns the scanned QR data, if any.
     pub fn scanned_data(&self) -> Result<Option<String>, MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         Ok(engine.scanned_data().map(|s| s.to_string()))
     }
@@ -329,7 +329,7 @@ impl MobileDeviceLinkingWorkflow {
     /// Signal that a peer device has connected with a verification code.
     pub fn peer_connected(&self, verification_code: String) -> Result<String, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         engine.peer_connected(verification_code);
         screen_to_json(&engine.current_screen())
@@ -338,7 +338,7 @@ impl MobileDeviceLinkingWorkflow {
     /// Signal that data sync has completed.
     pub fn sync_complete(&self) -> Result<String, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         engine.sync_complete();
         screen_to_json(&engine.current_screen())
@@ -351,7 +351,7 @@ mobile_workflow! {
     MobileBackupRecoveryWorkflow wraps BackupRecoveryEngine {
         constructor(mode_json: String, has_identity: bool) -> {
             let mode: Option<BackupMode> = serde_json::from_str(&mode_json)
-                .map_err(|e| MobileError::InvalidInput { field: String::new(), message: format!("Failed to parse backup mode: {e}") })?;
+                .map_err(|e| MobileError::InvalidInput { field: String::new(), detail: format!("Failed to parse backup mode: {e}")  })?;
             BackupRecoveryEngine::new(mode, has_identity)
         }
     }
@@ -362,7 +362,7 @@ impl MobileBackupRecoveryWorkflow {
     /// Signal that async processing completed successfully.
     pub fn processing_complete(&self) -> Result<String, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         engine.processing_complete();
         screen_to_json(&engine.current_screen())
@@ -371,7 +371,7 @@ impl MobileBackupRecoveryWorkflow {
     /// Signal that async processing failed.
     pub fn processing_failed(&self) -> Result<String, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         engine.processing_failed();
         screen_to_json(&engine.current_screen())
@@ -384,7 +384,7 @@ mobile_workflow! {
     MobileDuressPinWorkflow wraps DuressPinEngine {
         constructor(config_json: String) -> {
             let config: DuressConfig = serde_json::from_str(&config_json)
-                .map_err(|e| MobileError::InvalidInput { field: String::new(), message: format!("Failed to parse duress config: {e}") })?;
+                .map_err(|e| MobileError::InvalidInput { field: String::new(), detail: format!("Failed to parse duress config: {e}")  })?;
             DuressPinEngine::new(config)
         }
     }
@@ -395,10 +395,10 @@ impl MobileDuressPinWorkflow {
     /// Returns the current duress config as JSON.
     pub fn config_json(&self) -> Result<String, MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         serde_json::to_string(engine.config()).map_err(|e| MobileError::Other {
-            message: format!("Failed to serialize DuressConfig: {e}"),
+            detail: format!("Failed to serialize DuressConfig: {e}"),
         })
     }
 }
@@ -418,7 +418,7 @@ impl MobileEmergencyShredWorkflow {
     /// Signal that the wipe operation has finished.
     pub fn wipe_complete(&self) -> Result<String, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         engine.wipe_complete();
         screen_to_json(&engine.current_screen())
@@ -433,7 +433,7 @@ impl MobileLockScreenWorkflow {
     /// Check the response for lockout state.
     pub fn record_failed_attempt(&self) -> Result<String, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         let _locked_out = engine.record_failed_attempt();
         screen_to_json(&engine.current_screen())

@@ -43,11 +43,16 @@ pub enum MobileError {
     DecryptFailed,
 
     /// Input failed a validation rule owned by core. `field` is a stable
-    /// id (or empty when not applicable). `message` is English and is for
+    /// id (or empty when not applicable). `detail` is English and is for
     /// logs / the escape-hatch display path only — frontends localize
     /// via their own `t()` keyed by variant name.
-    #[error("Invalid input on '{field}': {message}")]
-    InvalidInput { field: String, message: String },
+    ///
+    /// The field is named `detail` rather than `message` because UniFFI's
+    /// Kotlin binding generates `MobileError` as a `Throwable` subclass,
+    /// and a Record field called `message` collides with the inherited
+    /// `Throwable.message`. Same reasoning for every other variant below.
+    #[error("Invalid input on '{field}': {detail}")]
+    InvalidInput { field: String, detail: String },
 
     /// Transient network failure (unreachable relay, DNS, timeout).
     /// Frontends show a "Check your connection" banner and enable retry.
@@ -55,8 +60,8 @@ pub enum MobileError {
     NetworkUnavailable,
 
     /// Non-transient network failure reported by the relay (4xx/5xx).
-    #[error("Relay error {status}: {message}")]
-    RelayError { status: u16, message: String },
+    #[error("Relay error {status}: {detail}")]
+    RelayError { status: u16, detail: String },
 
     /// Relay rate-limit in effect. Frontends show a cooldown timer and
     /// schedule automatic retry after `retry_after_secs`.
@@ -65,45 +70,45 @@ pub enum MobileError {
 
     /// Local storage failure (SQLite, disk full, permission denied,
     /// corrupt keychain).
-    #[error("Storage error: {message}")]
-    StorageError { message: String },
+    #[error("Storage error: {detail}")]
+    StorageError { detail: String },
 
-    /// Escape hatch. Frontends display `message` verbatim and log the
+    /// Escape hatch. Frontends display `detail` verbatim and log the
     /// full error. Promote recurring uses of `Other` to a dedicated
     /// variant in a follow-up ADR amendment when a real UI branch
     /// appears.
-    #[error("{message}")]
-    Other { message: String },
+    #[error("{detail}")]
+    Other { detail: String },
 }
 
 impl MobileError {
-    /// Convenience constructor for `Other { message }`. Used by call
+    /// Convenience constructor for `Other { detail }`. Used by call
     /// sites that previously built `MobileError::Internal(...)`,
     /// `MobileError::ExchangeFailed(...)`, etc. — all of which collapse
     /// into the `Other` escape hatch per ADR-044.
     #[inline]
-    pub fn other(message: impl Into<String>) -> Self {
+    pub fn other(detail: impl Into<String>) -> Self {
         MobileError::Other {
-            message: message.into(),
+            detail: detail.into(),
         }
     }
 
-    /// Convenience constructor for `InvalidInput { field: "", message }`.
+    /// Convenience constructor for `InvalidInput { field: "", detail }`.
     /// Call sites that know the field id pass it directly; the rest use
     /// this shim so the migration stays mechanical.
     #[inline]
-    pub fn invalid_input(message: impl Into<String>) -> Self {
+    pub fn invalid_input(detail: impl Into<String>) -> Self {
         MobileError::InvalidInput {
             field: String::new(),
-            message: message.into(),
+            detail: detail.into(),
         }
     }
 
-    /// Convenience constructor for `StorageError { message }`.
+    /// Convenience constructor for `StorageError { detail }`.
     #[inline]
-    pub fn storage(message: impl Into<String>) -> Self {
+    pub fn storage(detail: impl Into<String>) -> Self {
         MobileError::StorageError {
-            message: message.into(),
+            detail: detail.into(),
         }
     }
 }

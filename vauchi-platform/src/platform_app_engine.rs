@@ -102,7 +102,7 @@ impl PlatformAppEngine {
         let data_path = PathBuf::from(&data_dir);
 
         std::fs::create_dir_all(&data_path).map_err(|e| MobileError::StorageError {
-            message: e.to_string(),
+            detail: e.to_string(),
         })?;
 
         let storage_path = data_path.join("vauchi.db");
@@ -111,11 +111,11 @@ impl PlatformAppEngine {
             storage_key_bytes
                 .try_into()
                 .map_err(|_| MobileError::StorageError {
-                    message: "Storage key must be exactly 32 bytes".to_string(),
+                    detail: "Storage key must be exactly 32 bytes".to_string(),
                 })?;
         let storage_key =
             SymmetricKey::try_from_bytes(key_array).map_err(|_| MobileError::StorageError {
-                message: "Degenerate storage key rejected".to_string(),
+                detail: "Degenerate storage key rejected".to_string(),
             })?;
 
         let config = VauchiConfig::with_storage_path(&storage_path)
@@ -123,7 +123,7 @@ impl PlatformAppEngine {
             .with_storage_key(storage_key);
 
         let vauchi = Vauchi::new(config).map_err(|e| MobileError::Other {
-            message: e.to_string(),
+            detail: e.to_string(),
         })?;
 
         Ok(Arc::new(Self {
@@ -137,7 +137,7 @@ impl PlatformAppEngine {
     /// The JSON structure matches `ScreenModel` from vauchi-core.
     pub fn current_screen_json(&self) -> Result<String, MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         screen_to_json(&engine.current_screen())
     }
@@ -149,7 +149,7 @@ impl PlatformAppEngine {
     /// frontend pure-renderer remediation; ADR-021 / ADR-038).
     pub fn tab_info(&self) -> Result<Vec<MobileTabInfo>, MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         Ok(engine
             .tab_info()
@@ -168,7 +168,7 @@ impl PlatformAppEngine {
     pub fn handle_action_json(&self, action_json: String) -> Result<String, MobileError> {
         let action = user_action_from_json(&action_json)?;
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         let result = engine.handle_action(action);
         action_result_to_json(&result)
@@ -197,7 +197,7 @@ impl PlatformAppEngine {
     ) -> Result<Option<String>, MobileError> {
         let hw_event: vauchi_core::exchange::ExchangeHardwareEvent = event.into();
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         match engine.handle_hardware_event(hw_event) {
             Some(result) => Ok(Some(action_result_to_json(&result)?)),
@@ -222,7 +222,7 @@ impl PlatformAppEngine {
     /// ```
     pub fn advance_qr_frame_json(&self) -> Result<Option<String>, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         match engine.advance_qr_frame() {
             Some(screen) => Ok(Some(screen_to_json(&screen)?)),
@@ -238,7 +238,7 @@ impl PlatformAppEngine {
     pub fn navigate_to_json(&self, screen_json: String) -> Result<String, MobileError> {
         let screen = app_screen_from_json(&screen_json)?;
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         let model = engine.navigate_to(screen);
         screen_to_json(&model)
@@ -249,7 +249,7 @@ impl PlatformAppEngine {
     /// Returns the previous screen model as JSON.
     pub fn navigate_back_json(&self) -> Result<String, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         let model = engine.navigate_back();
         screen_to_json(&model)
@@ -260,11 +260,11 @@ impl PlatformAppEngine {
     /// These are the screens that should appear in the navigation bar/tabs.
     pub fn available_screens_json(&self) -> Result<String, MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         let screens = engine.available_screens();
         serde_json::to_string(&screens).map_err(|e| MobileError::Other {
-            message: format!("Failed to serialize screens: {e}"),
+            detail: format!("Failed to serialize screens: {e}"),
         })
     }
 
@@ -273,11 +273,11 @@ impl PlatformAppEngine {
     /// Returns MyInfo when no contacts, Contacts when >=1 contact.
     pub fn default_screen_json(&self) -> Result<String, MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         let screen = engine.default_screen();
         serde_json::to_string(&screen).map_err(|e| MobileError::Other {
-            message: format!("Failed to serialize screen: {e}"),
+            detail: format!("Failed to serialize screen: {e}"),
         })
     }
 
@@ -286,7 +286,7 @@ impl PlatformAppEngine {
     /// Useful for tab bar highlighting without deserializing the full ScreenModel.
     pub fn current_screen_id(&self) -> Result<String, MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         let model = engine.current_screen();
         Ok(model.screen_id)
@@ -298,7 +298,7 @@ impl PlatformAppEngine {
     /// `current_screen_json()` rebuilds engines with fresh data.
     pub fn invalidate_all(&self) -> Result<(), MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         engine.invalidate_all();
         Ok(())
@@ -310,7 +310,7 @@ impl PlatformAppEngine {
     pub fn invalidate_screen_json(&self, screen_json: String) -> Result<(), MobileError> {
         let screen = app_screen_from_json(&screen_json)?;
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         engine.invalidate_screen(&screen);
         Ok(())
@@ -321,7 +321,7 @@ impl PlatformAppEngine {
     /// Used by frontends to decide between onboarding and main UI.
     pub fn has_identity(&self) -> Result<bool, MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         Ok(engine.has_identity())
     }
@@ -331,7 +331,7 @@ impl PlatformAppEngine {
     /// Used by frontends to show a "discard changes?" prompt on back navigation.
     pub fn form_has_data(&self) -> Result<bool, MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         Ok(engine.form_has_data())
     }
@@ -344,12 +344,12 @@ impl PlatformAppEngine {
     /// or `onPause()` (Android).
     pub fn handle_app_backgrounded(&self) -> Result<Option<String>, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         match engine.handle_app_backgrounded() {
             Some(screen) => {
                 let json = serde_json::to_string(&screen).map_err(|e| MobileError::Other {
-                    message: e.to_string(),
+                    detail: e.to_string(),
                 })?;
                 Ok(Some(json))
             }
@@ -360,7 +360,7 @@ impl PlatformAppEngine {
     /// Poll core for pending OS notifications to render.
     pub fn poll_notifications(&self) -> Result<Vec<MobilePendingNotification>, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         let items = engine.poll_notifications();
         let mapped = items
@@ -393,10 +393,10 @@ impl PlatformAppEngine {
     ) -> Result<(), MobileError> {
         let caps: vauchi_core::exchange::capability::types::DeviceCapabilities =
             serde_json::from_str(&capabilities_json).map_err(|e| MobileError::Other {
-                message: format!("Invalid capabilities JSON: {e}"),
+                detail: format!("Invalid capabilities JSON: {e}"),
             })?;
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         engine.set_device_capabilities(caps);
         Ok(())
@@ -454,7 +454,7 @@ impl PlatformAppEngine {
         let listener = Arc::new(listener);
 
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
 
         // Remove previous handler if any
@@ -462,7 +462,7 @@ impl PlatformAppEngine {
             .event_handler_id
             .lock()
             .map_err(|e| MobileError::Other {
-                message: format!("Lock failed: {e}"),
+                detail: format!("Lock failed: {e}"),
             })?;
         if let Some(old_id) = handler_id_slot.take() {
             engine.vauchi().remove_event_handler(old_id);
@@ -496,7 +496,7 @@ impl PlatformAppEngine {
         &self,
     ) -> Result<Vec<MobilePendingNotification>, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            message: format!("Lock failed: {e}"),
+            detail: format!("Lock failed: {e}"),
         })?;
         let notifications = engine.drain_pending_notifications();
         Ok(notifications

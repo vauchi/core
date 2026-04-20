@@ -320,7 +320,7 @@ impl MobileMultipartDecoder {
             .add_chunk(&chunk)
             .map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
-                message: e.to_string(),
+                detail: e.to_string(),
             })
     }
 
@@ -356,7 +356,7 @@ impl MobileMultipartDecoder {
             .assemble()
             .map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
-                message: e.to_string(),
+                detail: e.to_string(),
             })
     }
 }

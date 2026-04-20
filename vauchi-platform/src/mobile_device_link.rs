@@ -96,7 +96,7 @@ impl VauchiPlatform {
         let qr =
             DeviceLinkQR::from_data_string(&qr_data).map_err(|_| MobileError::InvalidInput {
                 field: "qr".to_string(),
-                message: "Invalid QR code".to_string(),
+                detail: "Invalid QR code".to_string(),
             })?;
 
         Ok(MobileDeviceLinkInfo {
@@ -138,12 +138,12 @@ impl VauchiPlatform {
         let qr =
             DeviceLinkQR::from_data_string(&qr_data).map_err(|_| MobileError::InvalidInput {
                 field: "qr".to_string(),
-                message: "Invalid QR code".to_string(),
+                detail: "Invalid QR code".to_string(),
             })?;
 
         let responder =
             DeviceLinkResponder::from_qr(qr, device_name).map_err(|e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             })?;
 
         Ok(Arc::new(MobileDeviceLinkResponder {
@@ -175,7 +175,7 @@ impl VauchiPlatform {
             .build_relay_transport(self.relay_url.clone(), 10_000);
         device_link_relay::send_and_receive(&transport, &msg, timeout_secs).map_err(|e| {
             MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             }
         })
     }
@@ -197,7 +197,7 @@ impl VauchiPlatform {
         let (payload, sender_token) =
             device_link_relay::listen_for_request(&transport, &identity_id, timeout_secs).map_err(
                 |e| MobileError::Other {
-                    message: e.to_string(),
+                    detail: e.to_string(),
                 },
             )?;
 
@@ -221,7 +221,7 @@ impl VauchiPlatform {
             .build_relay_transport(self.relay_url.clone(), 10_000);
         device_link_relay::send_response(&transport, &sender_token, encrypted_response).map_err(
             |e| MobileError::Other {
-                message: e.to_string(),
+                detail: e.to_string(),
             },
         )
     }
@@ -269,7 +269,7 @@ impl VauchiPlatform {
         if device_id == *current_device_id {
             return Err(MobileError::InvalidInput {
                 field: String::new(),
-                message: "Cannot unlink the current device".to_string(),
+                detail: "Cannot unlink the current device".to_string(),
             });
         }
 

@@ -14,14 +14,14 @@ use crate::error::MobileError;
 /// Serialize a `ScreenModel` to JSON.
 pub(crate) fn screen_to_json(screen: &ScreenModel) -> Result<String, MobileError> {
     serde_json::to_string(screen).map_err(|e| MobileError::Other {
-        message: format!("Failed to serialize ScreenModel: {e}"),
+        detail: format!("Failed to serialize ScreenModel: {e}"),
     })
 }
 
 /// Serialize an `ActionResult` to JSON.
 pub(crate) fn action_result_to_json(result: &ActionResult) -> Result<String, MobileError> {
     serde_json::to_string(result).map_err(|e| MobileError::Other {
-        message: format!("Failed to serialize ActionResult: {e}"),
+        detail: format!("Failed to serialize ActionResult: {e}"),
     })
 }
 
@@ -29,7 +29,7 @@ pub(crate) fn action_result_to_json(result: &ActionResult) -> Result<String, Mob
 pub(crate) fn user_action_from_json(json: &str) -> Result<UserAction, MobileError> {
     serde_json::from_str(json).map_err(|e| MobileError::InvalidInput {
         field: String::new(),
-        message: format!("Failed to parse UserAction JSON: {e}"),
+        detail: format!("Failed to parse UserAction JSON: {e}"),
     })
 }
 
@@ -37,6 +37,6 @@ pub(crate) fn user_action_from_json(json: &str) -> Result<UserAction, MobileErro
 pub(crate) fn app_screen_from_json(json: &str) -> Result<AppScreen, MobileError> {
     serde_json::from_str(json).map_err(|e| MobileError::InvalidInput {
         field: String::new(),
-        message: format!("Failed to parse AppScreen JSON: {e}"),
+        detail: format!("Failed to parse AppScreen JSON: {e}"),
     })
 }

@@ -152,8 +152,8 @@ pub use emergency::{BroadcastResult, EmergencyWipeStatus, MAX_TRUSTED_CONTACTS};
 
 // Vauchi
 pub use vauchi::{
-    AuthMode, DeviceInfo, DeviceLinkResult, ExchangeQrData, ImportResult, RecoveryReadiness,
-    SetupProgress, Vauchi, VauchiBuilder, VauchiSyncOutcome,
+    AuthMode, DeviceInfo, DeviceLinkResult, ExchangeQrData, ImportResult, ImportWarning,
+    RecoveryReadiness, SetupProgress, Vauchi, VauchiBuilder, VauchiSyncOutcome,
 };
 #[cfg(feature = "network-http")]
 pub use vauchi::{RelayExchangeOffer, RelayExchangeResult};

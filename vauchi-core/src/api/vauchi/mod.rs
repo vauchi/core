@@ -32,7 +32,7 @@ pub use devices::{DeviceInfo, DeviceLinkResult};
 pub use exchange::ExchangeQrData;
 #[cfg(feature = "network-http")]
 pub use exchange_relay::{RelayExchangeOffer, RelayExchangeResult};
-pub use import::ImportResult;
+pub use import::{ImportResult, ImportWarning};
 pub use setup::SetupProgress;
 
 use std::sync::{Arc, Mutex};

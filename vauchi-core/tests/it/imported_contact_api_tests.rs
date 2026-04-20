@@ -422,8 +422,11 @@ fn import_vcf_respects_contact_limit() {
     assert_eq!(result.imported, 1, "only one contact should be imported");
     assert_eq!(result.skipped, 1, "one contact should be skipped");
     assert!(
-        result.warnings.iter().any(|w| w.contains("limit")),
-        "warnings must mention the contact limit, got: {:?}",
+        result.warnings.iter().any(|w| matches!(
+            w,
+            vauchi_core::api::ImportWarning::ContactLimitReached { .. }
+        )),
+        "warnings must include ContactLimitReached, got: {:?}",
         result.warnings
     );
 
@@ -477,8 +480,11 @@ fn test_reimport_same_vcf_no_duplicates() {
     assert_eq!(second.imported, 0, "second import should import nothing");
     assert_eq!(second.skipped, 1, "second import should skip the duplicate");
     assert!(
-        second.warnings.iter().any(|w| w.contains("duplicate")),
-        "warnings must mention duplicate, got: {:?}",
+        second
+            .warnings
+            .iter()
+            .any(|w| matches!(w, vauchi_core::api::ImportWarning::DuplicateUid { .. })),
+        "warnings must include DuplicateUid, got: {:?}",
         second.warnings
     );
 

@@ -98,7 +98,7 @@ pub use mobile_ble::{
     MobileBleDelegate, MobileBleError, MobileBleExchangeResult, MobileBleExchangeSession,
     MobileBleField, MobileBleState, MobileBleTransportError,
 };
-pub use mobile_import::MobileImportResult;
+pub use mobile_import::{MobileImportResult, MobileImportWarning};
 pub use mobile_nfc::{
     MobileNfcExchangeResult, MobileNfcHandshake, MobileNfcKeyAckResult, MobileNfcState,
     MobileNfcTransport, MobileNfcTransportError,
@@ -2426,7 +2426,8 @@ mod tests {
         let r2 = wb.import_contacts_from_vcf(vcf.to_vec()).unwrap();
         assert_eq!(r2.imported, 0);
         assert_eq!(r2.skipped, 1);
-        assert!(r2.warnings[0].contains("duplicate"));
+        assert_eq!(r2.warnings[0].key, "import.warning.duplicate_uid");
+        assert!(r2.warnings[0].legacy_text.contains("duplicate"));
     }
 
     // @scenario: contact_import.feature - Empty vCard data returns zero imports

@@ -40,6 +40,14 @@ pub enum UserAction {
         component_id: String,
         item_id: String,
     },
+    /// User invoked a per-row action (swipe, long-press, or overflow
+    /// menu). `action_id` matches the id on the
+    /// [`crate::ui::ListItemAction`] the engine produced for that row.
+    ListItemAction {
+        component_id: String,
+        item_id: String,
+        action_id: String,
+    },
     SettingsToggled {
         component_id: String,
         item_id: String,
@@ -62,6 +70,24 @@ pub enum UserAction {
     InfoRequested {
         key: String,
     },
+}
+
+/// Classification of the mutation requested by
+/// [`ActionResult::ContactAction`]. Mirrors
+/// [`crate::ui::ListItemActionKind`] but lives on the result side so the
+/// app layer can dispatch without re-parsing action ids.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum ContactActionKind {
+    Archive,
+    Unarchive,
+    Hide,
+    Unhide,
+    /// Soft-delete (imported contacts only). The inverse is `Undelete`.
+    Delete,
+    Undelete,
 }
 
 /// Where to navigate after onboarding completes.
@@ -99,6 +125,14 @@ pub enum ActionResult {
     /// Frontend should open the contact detail view.
     OpenContact {
         contact_id: String,
+    },
+    /// App layer should perform a per-row mutation on a contact
+    /// (archive/hide/delete and their inverses). The app layer maps this
+    /// to the appropriate `Vauchi` call, then shows a toast with an
+    /// undo action pointing to the inverse [`ContactActionKind`].
+    ContactAction {
+        contact_id: String,
+        kind: ContactActionKind,
     },
     /// Frontend should open the contact edit view.
     EditContact {

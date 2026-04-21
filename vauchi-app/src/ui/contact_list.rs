@@ -203,7 +203,155 @@ impl WorkflowEngine for ContactListEngine {
                 self.group_filter = None;
                 ActionResult::UpdateScreen(self.current_screen())
             }
+            UserAction::ListItemAction {
+                item_id, action_id, ..
+            } => {
+                // Validate that `action_id` was one we actually offered
+                // for this item. Stale/forged action ids drop to a
+                // no-op screen refresh rather than performing a random
+                // mutation on the wrong contact.
+                let offered = self
+                    .all_contacts
+                    .iter()
+                    .find(|c| c.id == item_id)
+                    .and_then(|c| c.actions.iter().find(|a| a.id == action_id))
+                    .map(|a| a.kind);
+                if let Some(kind) = offered
+                    && let Some(contact_kind) = contact_action_kind_from(kind)
+                {
+                    return ActionResult::ContactAction {
+                        contact_id: item_id,
+                        kind: contact_kind,
+                    };
+                }
+                ActionResult::UpdateScreen(self.current_screen())
+            }
             _ => ActionResult::UpdateScreen(self.current_screen()),
+        }
+    }
+}
+
+fn contact_action_kind_from(kind: ListItemActionKind) -> Option<ContactActionKind> {
+    match kind {
+        ListItemActionKind::Archive => Some(ContactActionKind::Archive),
+        ListItemActionKind::Unarchive => Some(ContactActionKind::Unarchive),
+        ListItemActionKind::Hide => Some(ContactActionKind::Hide),
+        ListItemActionKind::Unhide => Some(ContactActionKind::Unhide),
+        ListItemActionKind::Delete => Some(ContactActionKind::Delete),
+        ListItemActionKind::Undelete => Some(ContactActionKind::Undelete),
+        ListItemActionKind::Custom => None,
+    }
+}
+
+// INLINE_TEST_REQUIRED: tests exercise the private `contact_action_kind_from`
+// helper. Moving them to tests/ would require making the helper public, which
+// is a wider surface than the invariant they protect.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn item(id: &str, actions: Vec<ListItemAction>) -> ContactItem {
+        ContactItem {
+            id: id.into(),
+            name: format!("Contact {id}"),
+            subtitle: None,
+            avatar_initials: "C".into(),
+            status: None,
+            searchable_fields: vec![],
+            actions,
+            a11y: None,
+        }
+    }
+
+    fn archive_action() -> ListItemAction {
+        ListItemAction {
+            id: "archive".into(),
+            label: "Archive".into(),
+            kind: ListItemActionKind::Archive,
+            destructive: false,
+        }
+    }
+
+    // @internal
+    #[test]
+    fn list_item_action_archive_returns_contact_action_archive() {
+        let mut engine = ContactListEngine::new(vec![item("c1", vec![archive_action()])]);
+        let result = engine.handle_action(UserAction::ListItemAction {
+            component_id: "contacts".into(),
+            item_id: "c1".into(),
+            action_id: "archive".into(),
+        });
+        assert_eq!(
+            result,
+            ActionResult::ContactAction {
+                contact_id: "c1".into(),
+                kind: ContactActionKind::Archive,
+            }
+        );
+    }
+
+    // @internal
+    #[test]
+    fn list_item_action_unknown_action_id_is_noop() {
+        let mut engine = ContactListEngine::new(vec![item("c1", vec![archive_action()])]);
+        let result = engine.handle_action(UserAction::ListItemAction {
+            component_id: "contacts".into(),
+            item_id: "c1".into(),
+            action_id: "hide".into(), // not in item's actions
+        });
+        assert!(matches!(result, ActionResult::UpdateScreen(_)));
+    }
+
+    // @internal
+    #[test]
+    fn list_item_action_unknown_item_id_is_noop() {
+        let mut engine = ContactListEngine::new(vec![item("c1", vec![archive_action()])]);
+        let result = engine.handle_action(UserAction::ListItemAction {
+            component_id: "contacts".into(),
+            item_id: "c999".into(),
+            action_id: "archive".into(),
+        });
+        assert!(matches!(result, ActionResult::UpdateScreen(_)));
+    }
+
+    // @internal
+    #[test]
+    fn list_item_action_custom_kind_is_noop() {
+        let mut engine = ContactListEngine::new(vec![item(
+            "c1",
+            vec![ListItemAction {
+                id: "pin".into(),
+                label: "Pin".into(),
+                kind: ListItemActionKind::Custom,
+                destructive: false,
+            }],
+        )]);
+        let result = engine.handle_action(UserAction::ListItemAction {
+            component_id: "contacts".into(),
+            item_id: "c1".into(),
+            action_id: "pin".into(),
+        });
+        // Custom kinds require dedicated handling — engine refuses rather
+        // than guessing, so screen refreshes without a mutation.
+        assert!(matches!(result, ActionResult::UpdateScreen(_)));
+    }
+
+    // @internal
+    #[test]
+    fn all_kinds_round_trip() {
+        // Every ListItemActionKind (except Custom) must map to a
+        // ContactActionKind — otherwise the engine silently drops it.
+        use ListItemActionKind::*;
+        for (k, expected) in [
+            (Archive, Some(ContactActionKind::Archive)),
+            (Unarchive, Some(ContactActionKind::Unarchive)),
+            (Hide, Some(ContactActionKind::Hide)),
+            (Unhide, Some(ContactActionKind::Unhide)),
+            (Delete, Some(ContactActionKind::Delete)),
+            (Undelete, Some(ContactActionKind::Undelete)),
+            (Custom, None),
+        ] {
+            assert_eq!(contact_action_kind_from(k), expected, "kind={k:?}");
         }
     }
 }

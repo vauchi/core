@@ -58,7 +58,7 @@ mod support;
 mod sync_status;
 #[cfg(any(test, feature = "test-support"))]
 pub mod testing;
-pub use action::{ActionResult, PostOnboardingDestination, UserAction};
+pub use action::{ActionResult, ContactActionKind, PostOnboardingDestination, UserAction};
 pub use activity_log::{ActivityLogEngine, ActivityLogItem};
 #[cfg(feature = "network-rustls")]
 pub use app_engine::{AppEngine, AppScreen};
@@ -67,8 +67,9 @@ pub use avatar_editor::AvatarEditorEngine;
 pub use backup_recovery::{BackupLevel, BackupMode, BackupRecoveryEngine};
 pub use component::{
     A11y, AccessibilityRole, ActionListItem, Component, ContactItem, DropdownOption, FieldDisplay,
-    GroupCardView, InfoItem, InputType, QrMode, ScanQuality, SettingsItem, SettingsItemKind,
-    Status, TextStyle, ToggleItem, UiFieldVisibility, VisibilityMode,
+    GroupCardView, InfoItem, InputType, ListItemAction, ListItemActionKind, QrMode, ScanQuality,
+    SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem, UiFieldVisibility,
+    VisibilityMode,
 };
 pub use contact_detail::{
     ContactDetailEngine, ContactNotFoundEngine, ContactViewMode, DeliverySummary, SharedInfoView,

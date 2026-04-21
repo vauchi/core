@@ -13,6 +13,7 @@ fn sample_contacts() -> Vec<ContactItem> {
             avatar_initials: "AL".into(),
             status: None,
             searchable_fields: vec![],
+            actions: vec![],
             a11y: None,
         },
         ContactItem {
@@ -22,6 +23,7 @@ fn sample_contacts() -> Vec<ContactItem> {
             avatar_initials: "BO".into(),
             status: Some("Updated".into()),
             searchable_fields: vec![],
+            actions: vec![],
             a11y: None,
         },
         ContactItem {
@@ -31,6 +33,7 @@ fn sample_contacts() -> Vec<ContactItem> {
             avatar_initials: "CH".into(),
             status: None,
             searchable_fields: vec![],
+            actions: vec![],
             a11y: None,
         },
     ]
@@ -214,6 +217,7 @@ fn contacts_with_fields() -> Vec<ContactItem> {
             avatar_initials: "AL".into(),
             status: None,
             searchable_fields: vec!["+1-555-0100".into(), "alice@example.com".into()],
+            actions: vec![],
             a11y: None,
         },
         ContactItem {
@@ -223,6 +227,7 @@ fn contacts_with_fields() -> Vec<ContactItem> {
             avatar_initials: "BO".into(),
             status: None,
             searchable_fields: vec!["bob@work.com".into(), "+1-555-0200".into()],
+            actions: vec![],
             a11y: None,
         },
         ContactItem {
@@ -232,6 +237,7 @@ fn contacts_with_fields() -> Vec<ContactItem> {
             avatar_initials: "CH".into(),
             status: None,
             searchable_fields: vec![],
+            actions: vec![],
             a11y: None,
         },
     ]
@@ -325,6 +331,7 @@ fn contacts_with_groups() -> (Vec<ContactItem>, Vec<(String, String)>) {
             avatar_initials: "AL".into(),
             status: None,
             searchable_fields: vec![],
+            actions: vec![],
             a11y: None,
         },
         ContactItem {
@@ -334,6 +341,7 @@ fn contacts_with_groups() -> (Vec<ContactItem>, Vec<(String, String)>) {
             avatar_initials: "BO".into(),
             status: None,
             searchable_fields: vec![],
+            actions: vec![],
             a11y: None,
         },
         ContactItem {
@@ -343,6 +351,7 @@ fn contacts_with_groups() -> (Vec<ContactItem>, Vec<(String, String)>) {
             avatar_initials: "CH".into(),
             status: None,
             searchable_fields: vec![],
+            actions: vec![],
             a11y: None,
         },
     ];

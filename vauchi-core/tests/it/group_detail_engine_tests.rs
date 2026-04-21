@@ -13,6 +13,7 @@ fn sample_members() -> Vec<ContactItem> {
             avatar_initials: "AL".into(),
             status: None,
             searchable_fields: vec![],
+            actions: vec![],
             a11y: None,
         },
         ContactItem {
@@ -22,6 +23,7 @@ fn sample_members() -> Vec<ContactItem> {
             avatar_initials: "BO".into(),
             status: None,
             searchable_fields: vec![],
+            actions: vec![],
             a11y: None,
         },
     ]

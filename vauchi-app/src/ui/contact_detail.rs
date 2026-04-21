@@ -682,6 +682,7 @@ mod tests {
             avatar_initials: "A".into(),
             status: None,
             searchable_fields: vec![],
+            actions: vec![],
             a11y: None,
         }
     }

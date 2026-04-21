@@ -12,7 +12,9 @@ use super::initials;
 use crate::ui::activity_log::{ActivityLogEngine, ActivityLogItem};
 use crate::ui::archived_contacts::ArchivedContactsEngine;
 use crate::ui::backup_recovery::BackupRecoveryEngine;
-use crate::ui::component::{A11y, ContactItem, FieldDisplay, Status, UiFieldVisibility};
+use crate::ui::component::{
+    A11y, ContactItem, FieldDisplay, ListItemAction, ListItemActionKind, Status, UiFieldVisibility,
+};
 use crate::ui::contact_detail::{
     ContactDetailEngine, ContactNotFoundEngine, DeliverySummary, SharedInfoView,
 };
@@ -305,6 +307,7 @@ impl AppEngine {
                                     avatar_initials: initials(c.display_name()),
                                     status: None,
                                     searchable_fields: vec![],
+                                    actions: vec![],
                                     a11y: Some(A11y {
                                         label: Some(format!("Contact: {}", c.display_name())),
                                         hint: Some("Double tap to view contact details".into()),
@@ -381,6 +384,7 @@ impl AppEngine {
                         avatar_initials: initials(c.display_name()),
                         status: None,
                         searchable_fields: vec![],
+                        actions: vec![],
                         a11y: Some(A11y {
                             label: Some(format!("Contact: {}", c.display_name())),
                             hint: Some("Double tap to view contact details".into()),
@@ -480,6 +484,7 @@ impl AppEngine {
                             .iter()
                             .map(|f| f.value().to_string())
                             .collect(),
+                        actions: vec![],
                         a11y: Some(A11y {
                             label: Some(format!("Contact: {}", contact.display_name())),
                             hint: Some("Double tap to view contact details".into()),
@@ -891,6 +896,7 @@ impl AppEngine {
                         avatar_initials: initials(c.display_name()),
                         status,
                         searchable_fields: fields,
+                        actions: contact_row_actions(c.is_imported(), c.is_hidden()),
                         a11y: Some(A11y {
                             label: Some(format!("Contact: {}", c.display_name())),
                             hint: Some("Double tap to view contact details".into()),
@@ -1107,6 +1113,44 @@ impl AppEngine {
         }
         out
     }
+}
+
+/// Per-row swipe actions offered on the contact list. Imported contacts
+/// get a reversible soft-delete; exchanged ones get archive. Both can
+/// be hidden/unhidden.
+fn contact_row_actions(is_imported: bool, is_hidden: bool) -> Vec<ListItemAction> {
+    let mut actions = Vec::new();
+    if is_hidden {
+        actions.push(ListItemAction {
+            id: "unhide".into(),
+            label: "Unhide".into(),
+            kind: ListItemActionKind::Unhide,
+            destructive: false,
+        });
+    } else {
+        actions.push(ListItemAction {
+            id: "hide".into(),
+            label: "Hide".into(),
+            kind: ListItemActionKind::Hide,
+            destructive: false,
+        });
+    }
+    if is_imported {
+        actions.push(ListItemAction {
+            id: "delete".into(),
+            label: "Delete".into(),
+            kind: ListItemActionKind::Delete,
+            destructive: false,
+        });
+    } else {
+        actions.push(ListItemAction {
+            id: "archive".into(),
+            label: "Archive".into(),
+            kind: ListItemActionKind::Archive,
+            destructive: false,
+        });
+    }
+    actions
 }
 
 /// Format a Unix timestamp as a human-readable relative time string.

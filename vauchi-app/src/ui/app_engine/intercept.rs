@@ -571,6 +571,19 @@ impl AppEngine {
             return Some(ActionResult::NavigateTo(screen));
         }
 
+        // Swipe-undo from Contacts list: restore and stay on the list.
+        if let Some(contact_id) = action_id.strip_prefix("undo_hide_contact:") {
+            let _ = self.vauchi.unhide_contact(contact_id);
+            self.engine_cache.remove(&AppScreen::Contacts);
+            return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
+        }
+
+        if let Some(contact_id) = action_id.strip_prefix("undo_delete_contact:") {
+            let _ = self.vauchi.undo_delete_imported_contact(contact_id);
+            self.engine_cache.remove(&AppScreen::Contacts);
+            return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
+        }
+
         None
     }
 }

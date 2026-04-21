@@ -8,7 +8,7 @@
 use super::AppEngine;
 use super::AppScreen;
 use crate::ui::ScreenModel;
-use crate::ui::action::{ActionResult, PostOnboardingDestination, UserAction};
+use crate::ui::action::{ActionResult, ContactActionKind, PostOnboardingDestination, UserAction};
 use crate::ui::form_dialog::FormDialogType;
 use vauchi_core::contact_card::FieldType;
 use vauchi_core::exchange::ExchangeHardwareEvent;
@@ -715,6 +715,9 @@ impl AppEngine {
     /// Route engine results to appropriate navigation targets.
     pub(super) fn route_result(&mut self, result: ActionResult) -> ActionResult {
         match result {
+            ActionResult::ContactAction { contact_id, kind } => {
+                self.apply_contact_action(&contact_id, kind)
+            }
             ActionResult::Complete => self.handle_completion(),
             ActionResult::CompleteWith { destination } => {
                 let base_result = self.handle_completion();
@@ -865,6 +868,72 @@ impl AppEngine {
             Err(_) => {
                 self.engine.processing_failed();
                 ActionResult::NavigateTo(self.engine.current_screen())
+            }
+        }
+    }
+
+    /// Apply a per-row contact mutation triggered by `ContactListEngine`.
+    ///
+    /// Calls the matching `Vauchi` op, invalidates the contact-list cache so
+    /// the next screen read reflects the new state, then emits a
+    /// `ShowToast` carrying an `undo_action_id` for reversible mutations.
+    /// The undo id is a `undo_<verb>_contact:<contact_id>` string that
+    /// `AppEngine::handle_undo` already matches on — see
+    /// `intercept.rs::handle_undo`.
+    pub(super) fn apply_contact_action(
+        &mut self,
+        contact_id: &str,
+        kind: ContactActionKind,
+    ) -> ActionResult {
+        // Invalidate the list cache regardless of outcome so a failed op
+        // still yields a fresh screen read.
+        self.engine_cache.remove(&AppScreen::Contacts);
+        self.engine_cache.remove(&AppScreen::ArchivedContacts);
+        match kind {
+            ContactActionKind::Archive => {
+                let _ = self.vauchi.archive_contact(contact_id);
+                self.pending_contact_undo = Some(super::PendingContactUndo::Archive {
+                    contact_id: contact_id.to_string(),
+                });
+                ActionResult::ShowToast {
+                    message: "Contact archived".into(),
+                    undo_action_id: Some(format!("undo_archive_contact:{contact_id}")),
+                }
+            }
+            ContactActionKind::Unarchive => {
+                let _ = self.vauchi.unarchive_contact(contact_id);
+                ActionResult::ShowToast {
+                    message: "Contact unarchived".into(),
+                    undo_action_id: None,
+                }
+            }
+            ContactActionKind::Hide => {
+                let _ = self.vauchi.hide_contact(contact_id);
+                ActionResult::ShowToast {
+                    message: "Contact hidden".into(),
+                    undo_action_id: Some(format!("undo_hide_contact:{contact_id}")),
+                }
+            }
+            ContactActionKind::Unhide => {
+                let _ = self.vauchi.unhide_contact(contact_id);
+                ActionResult::ShowToast {
+                    message: "Contact unhidden".into(),
+                    undo_action_id: None,
+                }
+            }
+            ContactActionKind::Delete => {
+                let _ = self.vauchi.soft_delete_imported_contact(contact_id);
+                ActionResult::ShowToast {
+                    message: "Contact deleted".into(),
+                    undo_action_id: Some(format!("undo_delete_contact:{contact_id}")),
+                }
+            }
+            ContactActionKind::Undelete => {
+                let _ = self.vauchi.undo_delete_imported_contact(contact_id);
+                ActionResult::ShowToast {
+                    message: "Contact restored".into(),
+                    undo_action_id: None,
+                }
             }
         }
     }

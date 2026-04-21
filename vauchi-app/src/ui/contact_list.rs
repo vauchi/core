@@ -189,9 +189,11 @@ impl WorkflowEngine for ContactListEngine {
             UserAction::ListItemSelected { item_id, .. } => ActionResult::OpenContact {
                 contact_id: item_id,
             },
-            UserAction::ActionPressed { ref action_id } if action_id == "add_contact" => {
-                ActionResult::NavigateTo(self.current_screen())
-            }
+            // `add_contact` is intercepted by `AppEngine` and routed to
+            // the Exchange screen (see `app_engine/mod.rs`). If the engine
+            // is driven standalone (e.g. in a unit test) the action falls
+            // through to the `_` arm and produces a harmless screen
+            // refresh — the engine itself has no navigation authority.
             UserAction::ActionPressed { ref action_id }
                 if action_id.starts_with("filter_group:") =>
             {

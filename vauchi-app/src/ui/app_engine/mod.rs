@@ -743,10 +743,16 @@ impl WorkflowEngine for AppEngine {
             }
         }
 
-        // "Go exchange" from empty contacts or MyInfo → navigate to Exchange screen
+        // "Go exchange" (empty-state CTA) and "Add contact" (always-visible
+        // Primary button on the contact list) share the same target — on
+        // MVP we only acquire contacts via in-person exchange, so both
+        // affordances carry the same user intent. `add_contact` is only
+        // emitted on Contacts; `go_exchange` also fires from MyInfo when
+        // the list is empty. A dedicated VCF-import path can later redirect
+        // `add_contact` via a frontend capability hint.
         if matches!(
             &action,
-            UserAction::ActionPressed { action_id } if action_id == "go_exchange"
+            UserAction::ActionPressed { action_id } if action_id == "go_exchange" || action_id == "add_contact"
         ) && matches!(self.screen, AppScreen::Contacts | AppScreen::MyInfo)
         {
             let screen = self.navigate_to(AppScreen::Exchange);

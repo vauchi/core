@@ -87,6 +87,12 @@
   ],
   "actions": [
     {
+      "id": "submit_custom_group",
+      "label": "Add group",
+      "style": "Secondary",
+      "enabled": false
+    },
+    {
       "id": "continue",
       "label": "Continue",
       "style": "Primary",

@@ -81,7 +81,7 @@ fn initial_screen_affordance_set_matches_plan() {
 /// a non-empty name), `contact_info`, `what_next`, and
 /// `link_choice` (via `have_identity`). Six screens.
 ///
-/// The orphans:
+/// The remaining orphans (post-fix for `submit_custom_group`):
 /// - `submit_display_name` — handler arm at
 ///   `onboarding.rs:551`, no `ScreenAction` in `build_default_name`
 ///   (`onboarding.rs:263`) emits that id. Pressing "Continue" on
@@ -89,26 +89,25 @@ fn initial_screen_affordance_set_matches_plan() {
 ///   instead. Documented indirectly in
 ///   `_private/docs/problems/2026-04-20-frontend-correctness-strategy/`
 ///   as a Layer 1 false positive.
-/// - `submit_custom_group` — handler arm at `onboarding.rs:606`,
-///   no `ScreenAction` in `build_groups_setup` (`onboarding.rs:344`)
-///   emits that id. Record:
-///   `_private/docs/problems/2026-04-20-onboarding-custom-group-add-invisible`.
 /// - `add_social` — `ScreenAction` in `build_contact_info`
 ///   (`onboarding.rs:432`) but no handler arm in
 ///   `handle_contact_info` consumes it; tap is a silent no-op.
 ///   No dedicated record yet — this test is its initial landing
 ///   ground.
+///
+/// Flipped 2026-04-21: `submit_custom_group` was the third orphan
+/// here until `build_groups_setup` gained an "Add group"
+/// `ScreenAction` in the same commit that ships this test change.
+/// Record `_private/docs/problems/2026-04-20-onboarding-custom-group-add-invisible`
+/// tracks the user-facing fix.
 // @internal
 #[test]
-fn bfs_pins_three_known_orphans() {
+fn bfs_pins_remaining_orphans() {
     let report = check_reachability(OnboardingEngine::new, ONBOARDING_ALL_HANDLED);
 
     assert_eq!(
         report.orphan_handlers,
-        BTreeSet::from([
-            "submit_custom_group".to_string(),
-            "submit_display_name".to_string(),
-        ]),
+        BTreeSet::from(["submit_display_name".to_string()]),
         "orphan handler set drifted — if a fix landed, remove the\n\
          corresponding id from the expected set and (if applicable)\n\
          from ONBOARDING_ALL_HANDLED."

@@ -349,6 +349,19 @@ impl OnboardingEngine {
                 },
             ],
             actions: vec![
+                // Commit the pending `custom_group` TextInput on the
+                // current screen, keeping the user on groups_setup so
+                // they can see the entry appear and optionally add
+                // another. Wired to the existing `submit_custom_group`
+                // handler at `handle_groups_setup`. Resolves
+                // `_private/docs/problems/2026-04-20-onboarding-custom-group-add-invisible`.
+                ScreenAction {
+                    id: "submit_custom_group".into(),
+                    label: "Add group".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: !self.custom_group_input.trim().is_empty(),
+                    a11y: None,
+                },
                 ScreenAction {
                     id: "continue".into(),
                     label: "Continue".into(),

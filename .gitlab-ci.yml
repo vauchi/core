@@ -1092,11 +1092,37 @@ check:binding-abi-ios:
     - !reference [.self-hosted, before_script]
     - *check-binding-abi-fetch
   script:
+    # Capture everything to a file and upload on failure. GitLab's
+    # self-hosted runner truncates the step-script trace to ~10 KB in
+    # some cases (observed on v0.21.0/v0.21.2 tag pipelines), which
+    # swallowed the script's diff output and made the failure
+    # undebuggable from the web UI.
     - |
+      set +e
       /tmp/check-binding-abi.sh \
         --platform ios \
         --artifact target/bindings/ios/libs/libvauchi_platform_device.a \
-        --bindings target/bindings/ios/generated/vauchi_platform.swift
+        --bindings target/bindings/ios/generated/vauchi_platform.swift \
+        2>&1 | tee abi-check-ios.log
+      rc=${PIPESTATUS[0]}
+      if [ "$rc" -ne 0 ]; then
+        {
+          echo
+          echo "=== artifact ==="
+          ls -la target/bindings/ios/libs/libvauchi_platform_device.a || true
+          file target/bindings/ios/libs/libvauchi_platform_device.a || true
+          echo
+          echo "=== bindings ==="
+          ls -la target/bindings/ios/generated/vauchi_platform.swift || true
+          wc -l target/bindings/ios/generated/vauchi_platform.swift || true
+        } | tee -a abi-check-ios.log
+      fi
+      exit "$rc"
+  artifacts:
+    when: always
+    paths:
+      - abi-check-ios.log
+    expire_in: 1 week
   allow_failure: false
 
 # ============================================================

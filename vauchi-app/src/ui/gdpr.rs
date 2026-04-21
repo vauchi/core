@@ -181,7 +181,20 @@ impl GdprEngine {
                     label: "Delete Identity".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    // Screen-reader context for the most irreversible
+                    // action in the app. VoiceOver / TalkBack announce
+                    // the explicit label rather than the shorter visible
+                    // "Delete Identity" button text, then read the hint
+                    // as the usage guidance.
+                    a11y: Some(A11y {
+                        label: Some("Delete identity permanently".into()),
+                        hint: Some(
+                            "Starts a 7-day grace period after which all your data is destroyed. \
+                             Cannot be undone once the grace period ends."
+                                .into(),
+                        ),
+                        role: None,
+                    }),
                 },
                 ScreenAction {
                     id: "cancel".into(),

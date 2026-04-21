@@ -155,7 +155,21 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                     label: "Delete".into(),
                     style: ActionStyle::Destructive,
                     enabled: true,
-                    a11y: None,
+                    // Make the button's target explicit to screen
+                    // readers — "Delete" alone, on a detail screen for
+                    // a specific field, is ambiguous. Announce the
+                    // field label so VoiceOver says "Delete email,
+                    // button" (etc.) rather than just "Delete".
+                    a11y: Some(A11y {
+                        label: Some(format!("Delete {}", self.label)),
+                        hint: Some(
+                            "Removes this entry from your contact card. \
+                             Contacts who already have it keep their copy \
+                             until their next sync."
+                                .into(),
+                        ),
+                        role: None,
+                    }),
                 },
                 ScreenAction {
                     id: "back".into(),

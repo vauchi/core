@@ -1041,9 +1041,14 @@ build:validate-bindings:
 # ============================================================
 
 .check-binding-abi-fetch: &check-binding-abi-fetch |
+  # vauchi/scripts is a public project (id=77957857), so the raw-file
+  # API needs no auth. Sending JOB-TOKEN here made tag pipelines 403
+  # because GitLab's job-token allowlist on the *target* project
+  # rejects tokens from projects not on its list — even when the
+  # project itself is public. `security:vet` above demonstrates the
+  # auth-less pattern; mirror it here.
   curl --silent --fail \
-    --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-    "${CI_API_V4_URL}/projects/vauchi%2Fscripts/repository/files/scripts%2Fcheck-binding-abi.sh/raw?ref=main" \
+    "${CI_API_V4_URL}/projects/77957857/repository/files/scripts%2Fcheck-binding-abi.sh/raw?ref=main" \
     -o /tmp/check-binding-abi.sh
   chmod +x /tmp/check-binding-abi.sh
 

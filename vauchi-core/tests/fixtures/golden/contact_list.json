@@ -15,6 +15,7 @@
             "avatar_initials": "A",
             "status": null,
             "searchable_fields": [],
+            "actions": [],
             "a11y": null
           },
           {
@@ -24,6 +25,7 @@
             "avatar_initials": "B",
             "status": "Updated",
             "searchable_fields": [],
+            "actions": [],
             "a11y": null
           }
         ],

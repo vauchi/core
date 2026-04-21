@@ -935,28 +935,10 @@ release:verify:
         exit 1
       fi
 
-# Anchor used by both build:apple (inline iOS ABI check) and the
-# standalone check:binding-abi-android job further down. Defined here
-# so both callers can reference it.
-.check-binding-abi-fetch: &check-binding-abi-fetch |
-  # vauchi/scripts is a public project (id=77957857), so the raw-file
-  # API needs no auth. Sending JOB-TOKEN here made tag pipelines 403
-  # because GitLab's job-token allowlist on the *target* project
-  # rejects tokens from projects not on its list — even when the
-  # project itself is public. `security:vet` above demonstrates the
-  # auth-less pattern; mirror it here.
-  curl --silent --fail \
-    "${CI_API_V4_URL}/projects/77957857/repository/files/scripts%2Fcheck-binding-abi.sh/raw?ref=main" \
-    -o /tmp/check-binding-abi.sh
-  chmod +x /tmp/check-binding-abi.sh
-
 build:apple:
   extends: [.macos-runner, .release-or-rc, .timeout-extended]
   stage: build
   needs: [release:verify]
-  before_script:
-    - !reference [.self-hosted, before_script]
-    - *check-binding-abi-fetch
   script:
     - |
       # Try to download prebuild artifacts cached on main merge
@@ -982,20 +964,6 @@ build:apple:
         echo "⚠ No prebuild found (HTTP $HTTP_CODE) — building from scratch"
         ./scripts/build-bindings.sh --apple
       fi
-    # Run the UniFFI binding/artifact ABI parity check inline on the
-    # same session that just produced both sides. Splitting this out
-    # as a separate job forced the 142 MB .a to round-trip through
-    # GitLab artifact storage onto a runner that then appeared to
-    # truncate its trace buffer at ~10 KB and kill the step; running
-    # it here avoids the round-trip and the environment drift. If
-    # the diff fails here, build:apple fails and the whole release
-    # pipeline blocks — same effective gate as the former separate
-    # check:binding-abi-ios job.
-    - |
-      /tmp/check-binding-abi.sh \
-        --platform ios \
-        --artifact target/bindings/ios/libs/libvauchi_platform_device.a \
-        --bindings target/bindings/ios/generated/vauchi_platform.swift
   artifacts:
     paths:
       - target/bindings/ios/
@@ -1072,6 +1040,18 @@ build:validate-bindings:
 # convention as `lint:claude-md` in the workspace root.
 # ============================================================
 
+.check-binding-abi-fetch: &check-binding-abi-fetch |
+  # vauchi/scripts is a public project (id=77957857), so the raw-file
+  # API needs no auth. Sending JOB-TOKEN here made tag pipelines 403
+  # because GitLab's job-token allowlist on the *target* project
+  # rejects tokens from projects not on its list — even when the
+  # project itself is public. `security:vet` above demonstrates the
+  # auth-less pattern; mirror it here.
+  curl --silent --fail \
+    "${CI_API_V4_URL}/projects/77957857/repository/files/scripts%2Fcheck-binding-abi.sh/raw?ref=main" \
+    -o /tmp/check-binding-abi.sh
+  chmod +x /tmp/check-binding-abi.sh
+
 check:binding-abi-android:
   extends: [.linux-runner, .release-or-rc, .timeout-quick]
   stage: build
@@ -1102,15 +1082,48 @@ check:binding-abi-android:
         --bindings target/bindings/android/kotlin/uniffi/vauchi_platform/vauchi_platform.kt
   allow_failure: false
 
-# check:binding-abi-ios was split out as a standalone job earlier. It
-# consistently failed on the self-hosted "nell" runner because the
-# runner truncated the trace buffer to ~10 KB and appeared to kill
-# the step mid-run, making the 142 MB .a re-hydrated from artifact
-# storage impossible to diff reliably. The check now runs inline
-# inside `build:apple` (same runner, same session, no cross-job
-# artifact download), so it diffs the artifact the build just
-# produced against the bindings the build just generated — no
-# environment drift.
+check:binding-abi-ios:
+  extends: [.macos-runner, .release-or-rc, .timeout-quick]
+  stage: build
+  needs:
+    - job: build:apple
+      artifacts: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - *check-binding-abi-fetch
+  script:
+    # Capture everything to a file and upload on failure. GitLab's
+    # self-hosted runner truncates the step-script trace to ~10 KB in
+    # some cases (observed on v0.21.0/v0.21.2 tag pipelines), which
+    # swallowed the script's diff output and made the failure
+    # undebuggable from the web UI.
+    - |
+      set +e
+      /tmp/check-binding-abi.sh \
+        --platform ios \
+        --artifact target/bindings/ios/libs/libvauchi_platform_device.a \
+        --bindings target/bindings/ios/generated/vauchi_platform.swift \
+        2>&1 | tee abi-check-ios.log
+      rc=${PIPESTATUS[0]}
+      if [ "$rc" -ne 0 ]; then
+        {
+          echo
+          echo "=== artifact ==="
+          ls -la target/bindings/ios/libs/libvauchi_platform_device.a || true
+          file target/bindings/ios/libs/libvauchi_platform_device.a || true
+          echo
+          echo "=== bindings ==="
+          ls -la target/bindings/ios/generated/vauchi_platform.swift || true
+          wc -l target/bindings/ios/generated/vauchi_platform.swift || true
+        } | tee -a abi-check-ios.log
+      fi
+      exit "$rc"
+  artifacts:
+    when: always
+    paths:
+      - abi-check-ios.log
+    expire_in: 1 week
+  allow_failure: false
 
 # ============================================================
 # Package Stage (Tags only)
@@ -1379,9 +1392,8 @@ publish:packages:
     - package:android
     # Layer 2 ABI parity gate — block publishing if bindings
     # and artifacts drift. Plan Phase 2 Task 2.3.
-    # iOS parity runs inline inside build:apple (already a need
-    # above), so no separate job to list here.
     - check:binding-abi-android
+    - check:binding-abi-ios
     # sbom is .release-only (not RC) — must be optional here since
     # publish:packages runs on RC tags too (.release-or-rc)
     - job: package:sbom

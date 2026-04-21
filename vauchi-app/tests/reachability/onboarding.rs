@@ -22,11 +22,13 @@ use vauchi_app::ui::{OnboardingEngine, WorkflowEngine};
 /// (`core/vauchi-app/src/ui/onboarding.rs:512`).
 const IDENTITY_CHECK_HANDLED: &[&str] = &["have_identity", "create_new"];
 
-/// Union of action ids consumed by every `handle_*` in
-/// `OnboardingEngine` — `handle_identity_check`,
-/// `handle_link_choice`, `handle_default_name`,
-/// `handle_groups_setup`, `handle_contact_info`, and
-/// `handle_what_next` (file: `core/vauchi-app/src/ui/onboarding.rs`).
+/// Union of action ids reachable from `OnboardingEngine`'s
+/// rendered screens. Most are consumed by one of the six
+/// `handle_*` arms in `core/vauchi-app/src/ui/onboarding.rs`;
+/// a few are intercepted at the `AppEngine` layer BEFORE they
+/// reach `OnboardingEngine::handle_action` — those are still
+/// "handled" from the user's perspective and belong in this set
+/// so the Layer 1 reachability diff doesn't false-positive.
 const ONBOARDING_ALL_HANDLED: &[&str] = &[
     // identity_check
     "have_identity",
@@ -46,6 +48,11 @@ const ONBOARDING_ALL_HANDLED: &[&str] = &[
     // contact_info
     "show_phone",
     "show_email",
+    // contact_info — intercepted by
+    // `AppEngine::intercept_add_field` (app_engine/intercept.rs:159),
+    // which opens the AddField `FormDialog` before the action
+    // reaches `handle_contact_info`.
+    "add_social",
     // what_next
     "exchange",
     "import_contacts",
@@ -81,25 +88,25 @@ fn initial_screen_affordance_set_matches_plan() {
 /// a non-empty name), `contact_info`, `what_next`, and
 /// `link_choice` (via `have_identity`). Six screens.
 ///
-/// The remaining orphans (post-fix for `submit_custom_group`):
+/// The single remaining orphan:
 /// - `submit_display_name` — handler arm at
 ///   `onboarding.rs:551`, no `ScreenAction` in `build_default_name`
 ///   (`onboarding.rs:263`) emits that id. Pressing "Continue" on
 ///   default_name routes through the shared `continue` branch
-///   instead. Documented indirectly in
-///   `_private/docs/problems/2026-04-20-frontend-correctness-strategy/`
-///   as a Layer 1 false positive.
-/// - `add_social` — `ScreenAction` in `build_contact_info`
-///   (`onboarding.rs:432`) but no handler arm in
-///   `handle_contact_info` consumes it; tap is a silent no-op.
-///   No dedicated record yet — this test is its initial landing
-///   ground.
+///   instead. Dead code; separate tidy MR will remove.
 ///
-/// Flipped 2026-04-21: `submit_custom_group` was the third orphan
-/// here until `build_groups_setup` gained an "Add group"
-/// `ScreenAction` in the same commit that ships this test change.
-/// Record `_private/docs/problems/2026-04-20-onboarding-custom-group-add-invisible`
-/// tracks the user-facing fix.
+/// Flipped 2026-04-21 (session #1): `submit_custom_group` was an
+/// orphan handler until `build_groups_setup` gained an "Add group"
+/// `ScreenAction` (core !634). First observed L1 regression-gate
+/// flip for a user-facing fix.
+///
+/// Flipped 2026-04-21 (session #2): `add_social` was an apparent
+/// orphan AFFORDANCE until this commit added it to the declared
+/// set. Audit revealed `AppEngine::intercept_add_field`
+/// (`app_engine/intercept.rs:159`) already opens the AddField
+/// `FormDialog` on tap — a Layer 1 false-positive, not a user
+/// bug. Documenting the interception path in the declared set
+/// keeps the harness honest.
 // @internal
 #[test]
 fn bfs_pins_remaining_orphans() {
@@ -113,11 +120,14 @@ fn bfs_pins_remaining_orphans() {
          from ONBOARDING_ALL_HANDLED."
     );
 
-    assert_eq!(
-        report.orphan_affordances,
-        BTreeSet::from(["add_social".to_string()]),
-        "orphan affordance set drifted — if `add_social` now has a\n\
-         handler, remove it from this expected set."
+    assert!(
+        report.orphan_affordances.is_empty(),
+        "orphan affordance set drifted — if a new unhandled\n\
+         `ScreenAction` appeared, either wire it to a handler\n\
+         arm (in `onboarding.rs` or via `AppEngine::intercept_*`)\n\
+         or add it to ONBOARDING_ALL_HANDLED with a note.\n\
+         Got: {:?}",
+        report.orphan_affordances
     );
 }
 

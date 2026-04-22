@@ -316,7 +316,7 @@ version = "0.3.2"
 criteria = "safe-to-run"
 
 [[exemptions.fraction]]
-version = "0.15.3"
+version = "0.15.4"
 criteria = "safe-to-run"
 
 [[exemptions.fs-err]]
@@ -752,7 +752,7 @@ version = "1.14.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.rustls-webpki]]
-version = "0.103.12"
+version = "0.103.13"
 criteria = "safe-to-deploy"
 
 [[exemptions.rusty-fork]]

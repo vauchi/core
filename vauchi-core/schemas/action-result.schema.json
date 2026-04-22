@@ -114,6 +114,31 @@
       "additionalProperties": false
     },
     {
+      "description": "App layer should perform a per-row mutation on a contact (archive/hide/delete and their inverses). The app layer maps this to the appropriate `Vauchi` call, then shows a toast with an undo action pointing to the inverse [`ContactActionKind`].",
+      "type": "object",
+      "required": [
+        "ContactAction"
+      ],
+      "properties": {
+        "ContactAction": {
+          "type": "object",
+          "required": [
+            "contact_id",
+            "kind"
+          ],
+          "properties": {
+            "contact_id": {
+              "type": "string"
+            },
+            "kind": {
+              "$ref": "#/definitions/ContactActionKind"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "description": "Frontend should open the contact edit view.",
       "type": "object",
       "required": [
@@ -1451,6 +1476,28 @@
         }
       ]
     },
+    "ContactActionKind": {
+      "description": "Classification of the mutation requested by [`ActionResult::ContactAction`]. Mirrors [`crate::ui::ListItemActionKind`] but lives on the result side so the app layer can dispatch without re-parsing action ids.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "archive",
+            "unarchive",
+            "hide",
+            "unhide",
+            "undelete"
+          ]
+        },
+        {
+          "description": "Soft-delete (imported contacts only). The inverse is `Undelete`.",
+          "type": "string",
+          "enum": [
+            "delete"
+          ]
+        }
+      ]
+    },
     "ContactItem": {
       "description": "A lightweight contact summary for list display.",
       "type": "object",
@@ -1470,6 +1517,14 @@
               "type": "null"
             }
           ]
+        },
+        "actions": {
+          "description": "Declarative per-row actions (swipe/long-press/context-menu on mobile, overflow menu on desktop). Empty = no per-row actions. The engine that produced this item chooses which actions make sense given the contact's state (e.g. `Unhide` only on hidden contacts).",
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ListItemAction"
+          }
         },
         "avatar_initials": {
           "type": "string"
@@ -2107,6 +2162,79 @@
         "Password"
       ]
     },
+    "ListItemAction": {
+      "description": "A per-row action on a list component. Rendered as swipe on iOS/Android, as overflow menu on desktop. Sent back via [`UserAction::ListItemAction`] when invoked.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "label"
+      ],
+      "properties": {
+        "destructive": {
+          "description": "True for permanently-destructive ops that must route through an `InlineConfirm` per ADR-022. Reversible ops (Archive, Hide, soft-Delete) should leave this `false` and rely on toast+undo.",
+          "default": false,
+          "type": "boolean"
+        },
+        "id": {
+          "description": "Stable identifier echoed back in [`UserAction::ListItemAction`].",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Semantic hint driving icon choice and confirmation affordances.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ListItemActionKind"
+            }
+          ]
+        },
+        "label": {
+          "description": "Localized label. Frontends may prefer the `kind`-implied icon + localized string keyed on `kind` for swipe UX.",
+          "type": "string"
+        }
+      }
+    },
+    "ListItemActionKind": {
+      "description": "Semantic classification of a [`ListItemAction`]. Frontends map this to the appropriate icon and optional confirmation flow.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "unarchive",
+            "unhide",
+            "undelete"
+          ]
+        },
+        {
+          "description": "Reversible — move contact to the archive (exchanged contacts).",
+          "type": "string",
+          "enum": [
+            "archive"
+          ]
+        },
+        {
+          "description": "Reversible — hide contact from the main list.",
+          "type": "string",
+          "enum": [
+            "hide"
+          ]
+        },
+        {
+          "description": "Reversible via soft-delete (imported contacts only).",
+          "type": "string",
+          "enum": [
+            "delete"
+          ]
+        },
+        {
+          "description": "Escape hatch for new kinds before they get a dedicated variant.",
+          "type": "string",
+          "enum": [
+            "custom"
+          ]
+        }
+      ]
+    },
     "MotionTokens": {
       "description": "Motion/animation duration tokens in milliseconds.",
       "type": "object",
@@ -2236,7 +2364,7 @@
       ]
     },
     "ScreenAction": {
-      "description": "A button or action the user can take on the screen.",
+      "description": "A button or action the user can take on the screen.\n\nFrontends render this as the primary button row on a screen. The `id` is the stable action identifier consumed by `handle_action` via `UserAction::ActionPressed { action_id }`; the `label` is the localized display string.\n\n# Accessibility contract\n\n- `id` is the stable accessibility identifier (Compose `testTag`, SwiftUI `accessibilityIdentifier`). Frontends map `ScreenAction.id` onto the platform a11y identifier so Maestro (or any a11y-based test driver) can tap by `id:` rather than by localized visible text. When `a11y` is `None`, `label` serves as the screen-reader announcement. - `a11y.label`, when `Some`, overrides `label` for screen readers. Use this for destructive buttons (\"Delete permanently, this cannot be undone\") or toggles-as-buttons (\"Turned on\" vs the visible \"On\"). For 95%+ of screens, leave `a11y` as `None`.\n\nSee `_private/docs/problems/2026-04-20-screen-action-a11y-identifier-gap`.",
       "type": "object",
       "required": [
         "enabled",
@@ -2245,6 +2373,17 @@
         "style"
       ],
       "properties": {
+        "a11y": {
+          "description": "Accessibility override. `None` means \"use `label`\".",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/A11y"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "enabled": {
           "type": "boolean"
         },

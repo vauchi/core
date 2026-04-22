@@ -170,6 +170,35 @@
       "additionalProperties": false
     },
     {
+      "description": "User invoked a per-row action (swipe, long-press, or overflow menu). `action_id` matches the id on the [`crate::ui::ListItemAction`] the engine produced for that row.",
+      "type": "object",
+      "required": [
+        "ListItemAction"
+      ],
+      "properties": {
+        "ListItemAction": {
+          "type": "object",
+          "required": [
+            "action_id",
+            "component_id",
+            "item_id"
+          ],
+          "properties": {
+            "action_id": {
+              "type": "string"
+            },
+            "component_id": {
+              "type": "string"
+            },
+            "item_id": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "type": "object",
       "required": [
         "SettingsToggled"

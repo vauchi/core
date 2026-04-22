@@ -78,6 +78,10 @@ include:
   # Extracted 2026-04-22 as T2.3 Phase 0 Part 5 — main file now under
   # 700 lines.
   - local: ci/publish-and-trigger.yml
+  # Local include — main-branch prebuild: cache Apple+Android bindings
+  # so tag pipelines skip ~45 min (Apple) + ~35 min (Android) of rebuild.
+  # Extracted 2026-04-22 as T2.3 Phase 0 Part 6.
+  - local: ci/prebuild.yml
 
 # Cosign pinned version + checksum (used by update:swift-bindings and publish:maven)
 # Single source of truth for cosign binary integrity — update BOTH values together.
@@ -555,116 +559,6 @@ secret_detection:
   needs:
     - job: lint:format
       optional: true
-
-# ============================================================
-# Prebuild Stage — Cache bindings on main merge
-# ============================================================
-# Pre-builds Apple and Android bindings on every merge to main and
-# uploads them to the GitLab Generic Package Registry keyed by commit SHA.
-# The release pipeline (build stage) checks for cached artifacts before
-# building from scratch, saving ~45 min (Apple) + ~35 min (Android).
-#
-# Artifacts expire after 7 days in the package registry — only the
-# latest main merge matters for the next release.
-
-prebuild:apple:
-  extends: [.macos-runner, .timeout-extended]
-  stage: prebuild
-  needs: []
-  # Narrowed 2026-04-22 (T3.1): was **/*.rs (fires on every Rust change
-  # including tests/benches/examples which cannot affect compiled bindings).
-  # Now limited to src/ and build.rs — bindings ABI only depends on these.
-  # A test-only change on core main used to cost ~4-8 min of Apple prebuild;
-  # with this filter those commits skip prebuild entirely.
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes:
-        paths:
-          - "**/src/**/*.rs"
-          - "**/build.rs"
-          - "**/Cargo.toml"
-          - "**/Cargo.lock"
-          - "scripts/build-bindings.sh"
-          - "scripts/package-xcframework.sh"
-  before_script:
-    - !reference [.self-hosted, before_script]
-    - !reference [.clone-locales, before_script]
-    - !reference [.clone-themes, before_script]
-  script:
-    # Build ALL Apple targets (device + simulator + macOS) so prebuild
-    # artifacts are complete for tag pipelines that need xcframework packaging.
-    # --release-only was removed: it skipped sim targets, making every tag
-    # pipeline fall back to a full rebuild (defeating the prebuild cache).
-    - ./scripts/build-bindings.sh --apple
-    - |
-      echo "Uploading Apple binding artifacts for SHA ${CI_COMMIT_SHA}..."
-      tar czf bindings-apple.tar.gz -C target/bindings ios/ macos/
-      HTTP_CODE=$(curl -s -w '%{http_code}' -o /dev/null \
-           --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-           --upload-file bindings-apple.tar.gz \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-prebuild/${CI_COMMIT_SHA}/bindings-apple.tar.gz")
-      if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-        echo "✓ Apple bindings cached for SHA ${CI_COMMIT_SHA}"
-      elif [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "409" ]; then
-        echo "✓ Apple bindings already cached for SHA ${CI_COMMIT_SHA} — skipping"
-      else
-        echo "✗ Upload failed with HTTP ${HTTP_CODE}"
-        exit 1
-      fi
-
-prebuild:android:
-  extends: [.linux-runner, .timeout-long]
-  stage: prebuild
-  needs: []
-  # Narrowed 2026-04-22 (T3.1): was **/*.rs (fires on every Rust change
-  # including tests/benches/examples which cannot affect compiled bindings).
-  # Now limited to src/ and build.rs — bindings ABI only depends on these.
-  # A test-only change on core main used to cost ~9 min of Android prebuild;
-  # with this filter those commits skip prebuild entirely.
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes:
-        paths:
-          - "**/src/**/*.rs"
-          - "**/build.rs"
-          - "**/Cargo.toml"
-          - "**/Cargo.lock"
-          - "scripts/build-bindings.sh"
-          - "scripts/package-android.sh"
-  before_script:
-    - !reference [.self-hosted, before_script]
-    - !reference [.clone-locales, before_script]
-    - !reference [.clone-themes, before_script]
-    - |
-      for ndk_path in /opt/android-sdk/ndk/* /opt/android-ndk $HOME/Android/Sdk/ndk/*; do
-        if [ -d "$ndk_path" ]; then
-          export ANDROID_NDK_HOME="$ndk_path"
-          echo "Found Android NDK at: $ANDROID_NDK_HOME"
-          break
-        fi
-      done
-      if [ -z "$ANDROID_NDK_HOME" ]; then
-        echo "ERROR: Android NDK not found. Please install it or set ANDROID_NDK_HOME."
-        exit 1
-      fi
-    - rustup target add aarch64-linux-android x86_64-linux-android
-  script:
-    - ./scripts/build-bindings.sh --android --release-only
-    - |
-      echo "Uploading Android binding artifacts for SHA ${CI_COMMIT_SHA}..."
-      tar czf bindings-android.tar.gz -C target/bindings android/
-      HTTP_CODE=$(curl -s -w '%{http_code}' -o /dev/null \
-           --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-           --upload-file bindings-android.tar.gz \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-prebuild/${CI_COMMIT_SHA}/bindings-android.tar.gz")
-      if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-        echo "✓ Android bindings cached for SHA ${CI_COMMIT_SHA}"
-      elif [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "409" ]; then
-        echo "✓ Android bindings already cached for SHA ${CI_COMMIT_SHA} — skipping"
-      else
-        echo "✗ Upload failed with HTTP ${HTTP_CODE}"
-        exit 1
-      fi
 
 # ============================================================
 # Deploy Stage — Badge Pages

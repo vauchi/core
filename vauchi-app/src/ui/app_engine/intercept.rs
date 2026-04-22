@@ -482,15 +482,49 @@ impl AppEngine {
 
     /// Intercept the "merge" action on the ContactDuplicates screen.
     ///
-    /// Loads the first duplicate pair, stores IDs as `pending_merge`, and
-    /// navigates to `ContactMerge` with display names and field summaries.
-    /// Returns `None` if there are no pairs to merge.
+    /// Reads the engine's `selected_pair_index` to pick the user-selected
+    /// pair (the merge button is gated on selection so this should always
+    /// be `Some`). Falls back to pair `[0]` if no selection is recorded —
+    /// this only happens if a frontend skips the selection step entirely.
+    ///
+    /// Cross-kind pairs (one imported + one exchanged) cannot be merged —
+    /// `vauchi.merge_contacts` would reject with `InvalidState`. We catch
+    /// that case here and surface a `ShowAlert` instead of navigating to
+    /// the merge preview screen.
+    ///
+    /// Returns `None` if there are no pairs at all.
     pub(super) fn intercept_merge_action(&mut self) -> Option<ActionResult> {
         let pairs = self.vauchi.find_duplicates().unwrap_or_default();
-        let pair = pairs.into_iter().next()?;
+        if pairs.is_empty() {
+            return None;
+        }
+
+        let selected_idx = self
+            .engine
+            .as_any()
+            .and_then(|a| {
+                a.downcast_ref::<crate::ui::duplicate_detection::DuplicateDetectionEngine>()
+            })
+            .and_then(|e| e.selected_pair_index())
+            .unwrap_or(0);
+
+        let pair = pairs.get(selected_idx).cloned()?;
 
         let primary = self.vauchi.get_contact(&pair.id1).ok().flatten()?;
         let secondary = self.vauchi.get_contact(&pair.id2).ok().flatten()?;
+
+        // Cross-kind pairs can't merge — surface a clear alert instead of
+        // navigating to a merge preview the user can't actually confirm.
+        if primary.is_imported() != secondary.is_imported() {
+            return Some(ActionResult::ShowAlert {
+                title: "Can't Merge".into(),
+                message: "These contacts can't be merged because one was \
+                          exchanged in person and the other was imported. \
+                          Delete the imported one if it duplicates the \
+                          exchanged contact."
+                    .into(),
+            });
+        }
 
         let primary_name = primary.display_name().to_string();
         let secondary_name = secondary.display_name().to_string();
@@ -516,6 +550,48 @@ impl AppEngine {
             secondary_fields,
         });
         Some(ActionResult::NavigateTo(screen))
+    }
+
+    /// Intercept the "dismiss" action on the ContactDuplicates screen.
+    ///
+    /// Reads the engine's `selected_pair_index`, calls
+    /// `vauchi.dismiss_duplicate(id1, id2)` for that pair, then refreshes
+    /// the screen so the dismissed pair drops out of the list. Returns a
+    /// non-blocking toast so the user knows the action took effect.
+    ///
+    /// Returns `None` when no pairs exist or no selection is recorded.
+    pub(super) fn intercept_dismiss_duplicate_action(&mut self) -> Option<ActionResult> {
+        let pairs = self.vauchi.find_duplicates().unwrap_or_default();
+        if pairs.is_empty() {
+            return None;
+        }
+
+        let selected_idx = self
+            .engine
+            .as_any()
+            .and_then(|a| {
+                a.downcast_ref::<crate::ui::duplicate_detection::DuplicateDetectionEngine>()
+            })
+            .and_then(|e| e.selected_pair_index())?;
+
+        let pair = pairs.get(selected_idx).cloned()?;
+        let _ = self.vauchi.dismiss_duplicate(&pair.id1, &pair.id2);
+
+        // Recreate the engine so the dismissed pair drops from the list
+        // and the selection state resets.
+        self.engine_cache.remove(&AppScreen::ContactDuplicates);
+        let screen = self.screen.clone();
+        self.engine = Self::create_engine(
+            &self.vauchi,
+            &screen,
+            self.preview_as_contact.as_deref(),
+            &self.device_capabilities,
+        );
+
+        Some(ActionResult::ShowToast {
+            message: "Duplicate dismissed".into(),
+            undo_action_id: None,
+        })
     }
 
     /// Intercept `InfoRequested` and resolve the key to localized help content.

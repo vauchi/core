@@ -31,15 +31,19 @@ fn sample_pairs() -> Vec<DuplicatePair> {
         DuplicatePair {
             id1: "c1".into(),
             name1: "Alice".into(),
+            is_imported_1: false,
             id2: "c2".into(),
             name2: "Alicia".into(),
+            is_imported_2: false,
             similarity: 0.85,
         },
         DuplicatePair {
             id1: "c3".into(),
             name1: "Bob".into(),
+            is_imported_1: false,
             id2: "c4".into(),
             name2: "Robert".into(),
+            is_imported_2: false,
             similarity: 0.72,
         },
     ]
@@ -126,19 +130,17 @@ fn duplicate_detection_merge_completes() {
 }
 
 // @internal
+// Dismiss now signals Complete so the outer AppEngine intercept can perform
+// the actual `vauchi.dismiss_duplicate(id1, id2)` call against the
+// user-selected pair (engine itself has no Vauchi access).
 #[test]
-fn duplicate_detection_dismiss_stays_on_screen() {
+fn duplicate_detection_dismiss_completes() {
     let mut engine = make_engine_with_pairs();
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "dismiss".into(),
     });
 
-    match result {
-        ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.screen_id, "duplicate_detection");
-        }
-        other => panic!("Expected UpdateScreen, got {:?}", other),
-    }
+    assert_eq!(result, ActionResult::Complete);
 }
 
 // @internal

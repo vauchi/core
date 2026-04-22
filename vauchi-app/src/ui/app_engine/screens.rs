@@ -655,23 +655,29 @@ impl AppEngine {
                 let ui_pairs: Vec<_> = pairs
                     .iter()
                     .map(|p| {
-                        let name1 = vauchi
-                            .get_contact(&p.id1)
-                            .ok()
-                            .flatten()
+                        let c1 = vauchi.get_contact(&p.id1).ok().flatten();
+                        let c2 = vauchi.get_contact(&p.id2).ok().flatten();
+                        let name1 = c1
+                            .as_ref()
                             .map(|c| c.display_name().to_string())
                             .unwrap_or_else(|| p.id1.clone());
-                        let name2 = vauchi
-                            .get_contact(&p.id2)
-                            .ok()
-                            .flatten()
+                        let name2 = c2
+                            .as_ref()
                             .map(|c| c.display_name().to_string())
                             .unwrap_or_else(|| p.id2.clone());
+                        // Cross-kind detection drives the merge-vs-delete-imported
+                        // routing in intercept; populate even when one side is
+                        // missing (treat missing as not-imported, mirrors get_contact
+                        // failure path elsewhere).
+                        let is_imported_1 = c1.as_ref().map(|c| c.is_imported()).unwrap_or(false);
+                        let is_imported_2 = c2.as_ref().map(|c| c.is_imported()).unwrap_or(false);
                         DuplicatePair {
                             id1: p.id1.clone(),
                             name1,
+                            is_imported_1,
                             id2: p.id2.clone(),
                             name2,
+                            is_imported_2,
                             similarity: p.similarity,
                         }
                     })

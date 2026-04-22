@@ -787,6 +787,15 @@ impl WorkflowEngine for AppEngine {
             return result;
         }
 
+        // "dismiss" from ContactDuplicates → drop the selected pair from
+        // the duplicate set (reversible — re-detects on next find_duplicates).
+        if self.screen == AppScreen::ContactDuplicates
+            && matches!(&action, UserAction::ActionPressed { action_id } if action_id == "dismiss")
+            && let Some(result) = self.intercept_dismiss_duplicate_action()
+        {
+            return result;
+        }
+
         // Unarchive from ArchivedContacts screen
         if self.screen == AppScreen::ArchivedContacts
             && let UserAction::ActionPressed { ref action_id } = action

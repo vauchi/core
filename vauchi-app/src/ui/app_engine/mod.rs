@@ -816,6 +816,16 @@ impl WorkflowEngine for AppEngine {
             return result;
         }
 
+        // Recovery screen (EnterOldKey step): hex-decode + sign claim
+        // need Vauchi/Identity access; engine signals Complete and the
+        // intercept does the actual work via Vauchi::create_recovery_claim_hex_b64.
+        if self.screen == AppScreen::Recovery
+            && matches!(&action, UserAction::ActionPressed { action_id } if action_id == "create_claim")
+            && let Some(result) = self.intercept_create_claim_action()
+        {
+            return result;
+        }
+
         // Unarchive from ArchivedContacts screen
         if self.screen == AppScreen::ArchivedContacts
             && let UserAction::ActionPressed { ref action_id } = action

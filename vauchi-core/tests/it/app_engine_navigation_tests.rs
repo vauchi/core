@@ -500,20 +500,28 @@ fn navigate_to_sync_shows_sync_status() {
 
 // @internal
 #[test]
-fn navigate_to_recovery_shows_recovery_status() {
+fn navigate_to_recovery_shows_recovery_intro() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Recovery);
     assert_eq!(screen.screen_id, "recovery_status");
     assert_eq!(screen.title, "Social Recovery");
-    // Fresh identity has 0 contacts, quorum not met — Start Recovery disabled
+    // Fresh identity has 0 contacts, quorum not met — Start Recovery
+    // Process disabled. Action ID is `start_recovery_process` on the
+    // new Intro step (was `start_recovery` on the legacy Status step,
+    // which is now reached after creating a claim).
     assert!(
         screen
             .actions
             .iter()
-            .any(|a| a.id == "start_recovery" && !a.enabled),
-        "Recovery start_recovery action must be disabled when quorum not met"
+            .any(|a| a.id == "start_recovery_process" && !a.enabled),
+        "Recovery Intro must offer start_recovery_process and disable it when quorum not met, got actions: {:?}",
+        screen
+            .actions
+            .iter()
+            .map(|a| (&a.id, a.enabled))
+            .collect::<Vec<_>>()
     );
 }
 

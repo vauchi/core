@@ -24,21 +24,32 @@ fn make_contact(id: &str, name: &str, initials: &str) -> ContactItem {
     }
 }
 
+// Tests in this file exercise the legacy Status → ShowClaimQr →
+// CollectVouchers → Complete flow. The engine now starts at the new
+// Intro step (added for the Recover-tab core-driven UI per
+// `2026-04-04-core-gui-architecture-alignment` 1B.4), so the
+// `quorum_*` helpers jump straight to Status so the existing
+// assertions still apply.
+
 fn quorum_not_met() -> RecoveryEngine {
     // 1 contact, threshold 3 => quorum not met
-    RecoveryEngine::new(vec![make_contact("c1", "Alice", "AL")], 3)
+    let mut engine = RecoveryEngine::new(vec![make_contact("c1", "Alice", "AL")], 3);
+    engine._jump_to_status_for_testing();
+    engine
 }
 
 fn quorum_met() -> RecoveryEngine {
     // 3 contacts, threshold 3 => quorum met
-    RecoveryEngine::new(
+    let mut engine = RecoveryEngine::new(
         vec![
             make_contact("c1", "Alice", "AL"),
             make_contact("c2", "Bob", "BO"),
             make_contact("c3", "Carol", "CA"),
         ],
         3,
-    )
+    );
+    engine._jump_to_status_for_testing();
+    engine
 }
 
 // ── Status screen ────────────────────────────────────────────────

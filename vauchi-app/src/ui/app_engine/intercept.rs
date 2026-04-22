@@ -552,6 +552,36 @@ impl AppEngine {
         Some(ActionResult::NavigateTo(screen))
     }
 
+    /// Intercept the "create_claim" action on the Recovery screen
+    /// (EnterOldKey step).
+    ///
+    /// Reads the engine's `old_key_input` (a hex-encoded public key),
+    /// passes it to `Vauchi::create_recovery_claim_hex_b64`, then either
+    /// advances the engine to ShowGeneratedClaim (success) or attaches
+    /// a validation error to the input (failure). Returns `UpdateScreen`
+    /// so the rendered screen reflects the new engine state.
+    pub(super) fn intercept_create_claim_action(&mut self) -> Option<ActionResult> {
+        let old_key = self
+            .engine
+            .as_any()
+            .and_then(|a| a.downcast_ref::<crate::ui::RecoveryEngine>())?
+            .old_key_input()
+            .trim()
+            .to_string();
+
+        let result = self.vauchi.create_recovery_claim_hex_b64(&old_key);
+
+        let engine = self
+            .engine
+            .as_any_mut()
+            .and_then(|a| a.downcast_mut::<crate::ui::RecoveryEngine>())?;
+        match result {
+            Ok(claim_b64) => engine.set_generated_claim(claim_b64),
+            Err(e) => engine.set_create_claim_error(format!("{e}")),
+        }
+        Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+    }
+
     /// Intercept the "verify_claim" action on the RecoveryHelp screen.
     ///
     /// Reads the user-pasted claim payload from the engine, base64-decodes

@@ -34,7 +34,7 @@ vauchi-core/src/storage/rekey.rs 1390
 vauchi-core/src/storage/mod.rs 1079
 
 # SPLIT DONE — Phase 3: app_engine.rs (1437) split into mod.rs + routing.rs + screens.rs
-vauchi-app/src/ui/app_engine/mod.rs 970
+vauchi-app/src/ui/app_engine/mod.rs 980
 vauchi-app/src/ui/app_engine/routing.rs 953
 vauchi-app/src/ui/app_engine/screens.rs 1194
 

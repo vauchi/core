@@ -13,7 +13,20 @@ use crate::ui::*;
 /// Steps in the outgoing recovery workflow.
 #[derive(Clone, Debug, PartialEq)]
 enum RecoveryStep {
-    /// Initial screen: quorum status + trusted contacts list.
+    /// Initial screen: "Lost your device?" intro card + recovery
+    /// settings (required vouchers, claim expiry, trusted-contact
+    /// readiness) + 4-step instructions + "Start Recovery" button.
+    /// Reached on fresh navigation when no recovery is in progress.
+    Intro,
+    /// Old-public-key entry: TextInput for the lost identity's public
+    /// key (hex), then a "Create Claim" action that the AppEngine
+    /// intercept turns into a base64 claim payload.
+    EnterOldKey,
+    /// Generated claim is shown to the user so they can copy it and
+    /// share with their trusted contacts. Reached after successful
+    /// claim creation from EnterOldKey.
+    ShowGeneratedClaim,
+    /// In-progress recovery: quorum status + trusted contacts list.
     Status,
     /// Display the recovery claim as a QR code for guardians to scan.
     ShowClaimQr,
@@ -44,18 +57,70 @@ pub struct RecoveryEngine {
     claim_data: Option<[u8; 32]>,
     /// Vouchers collected so far (display records).
     collected_vouchers: Vec<CollectedVoucher>,
+    /// User-entered hex string for the old identity's public key.
+    /// Updated on `TextChanged` from the EnterOldKey screen, read by
+    /// the AppEngine intercept when the user presses "create_claim".
+    old_key_input: String,
+    /// Validation error to display on the old-key input (set by the
+    /// AppEngine intercept when claim creation fails).
+    old_key_error: Option<String>,
+    /// Generated claim payload (base64), populated by the AppEngine
+    /// intercept after `Vauchi::create_recovery_claim_hex_b64` succeeds.
+    generated_claim_b64: Option<String>,
 }
 
 impl RecoveryEngine {
     pub fn new(trusted_contacts: Vec<ContactItem>, quorum_threshold: usize) -> Self {
         Self {
-            step: RecoveryStep::Status,
+            step: RecoveryStep::Intro,
             trusted_contacts,
             quorum_threshold,
             linked_device_count: 0,
             claim_data: None,
             collected_vouchers: Vec::new(),
+            old_key_input: String::new(),
+            old_key_error: None,
+            generated_claim_b64: None,
         }
+    }
+
+    /// Returns the user-entered old public key hex (set via `TextChanged`).
+    /// Read by the AppEngine intercept when handling "create_claim".
+    pub fn old_key_input(&self) -> &str {
+        &self.old_key_input
+    }
+
+    /// True while the user is on the EnterOldKey step — i.e. the
+    /// AppEngine intercept should look at `old_key_input` to drive
+    /// claim creation when "create_claim" is pressed.
+    pub fn is_at_enter_old_key_step(&self) -> bool {
+        self.step == RecoveryStep::EnterOldKey
+    }
+
+    /// Records the generated claim payload and advances to ShowGeneratedClaim.
+    /// Called by the AppEngine intercept after a successful
+    /// `Vauchi::create_recovery_claim_hex_b64`.
+    pub fn set_generated_claim(&mut self, claim_b64: impl Into<String>) {
+        self.generated_claim_b64 = Some(claim_b64.into());
+        self.old_key_error = None;
+        self.step = RecoveryStep::ShowGeneratedClaim;
+    }
+
+    /// Records a claim-creation failure and stays on the EnterOldKey
+    /// step with an error attached to the input.
+    pub fn set_create_claim_error(&mut self, message: impl Into<String>) {
+        self.old_key_error = Some(message.into());
+    }
+
+    /// Test-only entry point: jump the engine to the in-progress
+    /// `Status` step so tests for the legacy flow (Status → ShowClaimQr
+    /// → CollectVouchers → Complete) can keep exercising those states
+    /// without first walking through the new Intro / EnterOldKey
+    /// claim-creation steps. Production code reaches Status via the
+    /// new flow plus future "resume in-progress recovery" wiring.
+    #[doc(hidden)]
+    pub fn _jump_to_status_for_testing(&mut self) {
+        self.step = RecoveryStep::Status;
     }
 
     /// Sets the number of linked devices (other than the current one).
@@ -84,10 +149,230 @@ impl RecoveryEngine {
 
     fn build_screen(&self) -> ScreenModel {
         match &self.step {
+            RecoveryStep::Intro => self.build_intro_screen(),
+            RecoveryStep::EnterOldKey => self.build_enter_old_key_screen(),
+            RecoveryStep::ShowGeneratedClaim => self.build_generated_claim_screen(),
             RecoveryStep::Status => self.build_status_screen(),
             RecoveryStep::ShowClaimQr => self.build_claim_qr_screen(),
             RecoveryStep::CollectVouchers => self.build_collect_screen(),
             RecoveryStep::Complete => self.build_complete_screen(),
+        }
+    }
+
+    fn build_intro_screen(&self) -> ScreenModel {
+        let trusted = self.trusted_contacts.len();
+        let threshold = self.quorum_threshold;
+        let quorum_met = trusted >= threshold;
+        let trusted_detail = format!("{trusted}/{threshold}");
+
+        let mut components = vec![
+            Component::InfoPanel {
+                id: "intro".into(),
+                icon: Some("recovery".into()),
+                title: "Lost Your Device?".into(),
+                items: vec![InfoItem {
+                    icon: None,
+                    title: String::new(),
+                    detail: "You can recover your contact relationships through \
+                             social vouching."
+                        .into(),
+                }],
+                a11y: None,
+            },
+            Component::InfoPanel {
+                id: "settings".into(),
+                icon: None,
+                title: "Recovery Settings".into(),
+                items: vec![
+                    InfoItem {
+                        icon: None,
+                        title: "Required vouchers".into(),
+                        detail: threshold.to_string(),
+                    },
+                    InfoItem {
+                        icon: None,
+                        title: "Claim expiry".into(),
+                        // 7 days matches RecoveryClaim::is_expired logic
+                        // (claim is valid for 7 days from creation).
+                        detail: "7 days".into(),
+                    },
+                    InfoItem {
+                        icon: None,
+                        title: "Trusted contacts".into(),
+                        detail: trusted_detail,
+                    },
+                ],
+                a11y: None,
+            },
+        ];
+
+        if !quorum_met {
+            components.push(Component::StatusIndicator {
+                id: "low_trusted_warning".into(),
+                icon: Some("warning".into()),
+                title: "Not enough trusted contacts".into(),
+                detail: Some(format!(
+                    "Mark {} more contact(s) as trusted for recovery before \
+                     starting the recovery process.",
+                    threshold.saturating_sub(trusted)
+                )),
+                status: Status::Warning,
+                a11y: None,
+            });
+        }
+
+        components.push(Component::InfoPanel {
+            id: "how_it_works".into(),
+            icon: None,
+            title: "How it works".into(),
+            items: vec![
+                InfoItem {
+                    icon: None,
+                    title: "1. Create New Identity".into(),
+                    detail: "First, create a new identity on your new device.".into(),
+                },
+                InfoItem {
+                    icon: None,
+                    title: "2. Generate Recovery Claim".into(),
+                    detail: "Create a claim using your OLD public key from your \
+                             lost identity."
+                        .into(),
+                },
+                InfoItem {
+                    icon: None,
+                    title: "3. Collect Vouchers".into(),
+                    detail: "Meet with trusted contacts in person. Have them vouch \
+                             for your recovery."
+                        .into(),
+                },
+                InfoItem {
+                    icon: None,
+                    title: "4. Share Recovery Proof".into(),
+                    detail: "Once you have enough vouchers, share your recovery \
+                             proof with all contacts."
+                        .into(),
+                },
+            ],
+            a11y: None,
+        });
+
+        ScreenModel {
+            screen_id: "recovery_status".into(),
+            title: "Social Recovery".into(),
+            subtitle: None,
+            components,
+            actions: vec![ScreenAction {
+                id: "start_recovery_process".into(),
+                label: "Start Recovery Process".into(),
+                style: ActionStyle::Primary,
+                enabled: quorum_met,
+                a11y: None,
+            }],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    fn build_enter_old_key_screen(&self) -> ScreenModel {
+        let components = vec![
+            Component::Text {
+                id: "instructions".into(),
+                content: "Enter your OLD public key (from backup or previous \
+                          device). The key is a 64-character hex string."
+                    .into(),
+                style: TextStyle::Body,
+            },
+            Component::TextInput {
+                id: "old_public_key".into(),
+                label: "Old Public Key (hex)".into(),
+                value: self.old_key_input.clone(),
+                placeholder: Some("64 hex characters".into()),
+                max_length: Some(64),
+                validation_error: self.old_key_error.clone(),
+                input_type: InputType::Text,
+                a11y: None,
+                info_key: None,
+            },
+        ];
+
+        // Match Android's UX: Create Claim enabled once the user has
+        // typed a 64-character hex string. Real validation (hex parse +
+        // 32-byte length) happens in the AppEngine intercept.
+        let create_enabled = self.old_key_input.trim().len() >= 64;
+
+        ScreenModel {
+            screen_id: "recovery_status".into(),
+            title: "Create Recovery Claim".into(),
+            subtitle: None,
+            components,
+            actions: vec![
+                ScreenAction {
+                    id: "create_claim".into(),
+                    label: "Create Claim".into(),
+                    style: ActionStyle::Primary,
+                    enabled: create_enabled,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: "cancel".into(),
+                    label: "Cancel".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    fn build_generated_claim_screen(&self) -> ScreenModel {
+        let claim = self
+            .generated_claim_b64
+            .as_deref()
+            .unwrap_or("(claim unavailable)");
+
+        ScreenModel {
+            screen_id: "recovery_status".into(),
+            title: "Recovery Claim Created".into(),
+            subtitle: None,
+            components: vec![
+                Component::StatusIndicator {
+                    id: "claim_ready".into(),
+                    icon: Some("checkmark.circle.fill".into()),
+                    title: "Share with trusted contacts".into(),
+                    detail: Some(
+                        "Give this claim to each of your trusted contacts so \
+                         they can vouch for your recovery."
+                            .into(),
+                    ),
+                    status: Status::Success,
+                    a11y: None,
+                },
+                Component::Text {
+                    id: "claim_data".into(),
+                    content: claim.into(),
+                    style: TextStyle::Caption,
+                },
+            ],
+            actions: vec![
+                ScreenAction {
+                    id: "copy_claim".into(),
+                    label: "Copy Claim Data".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: "done".into(),
+                    label: "Done".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+            progress: None,
+            ..Default::default()
         }
     }
 
@@ -338,6 +623,64 @@ impl WorkflowEngine for RecoveryEngine {
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match (&self.step, action) {
+            // Intro → EnterOldKey
+            (RecoveryStep::Intro, UserAction::ActionPressed { ref action_id })
+                if action_id == "start_recovery_process" =>
+            {
+                self.step = RecoveryStep::EnterOldKey;
+                self.old_key_input.clear();
+                self.old_key_error = None;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+
+            // EnterOldKey: text input updates
+            (
+                RecoveryStep::EnterOldKey,
+                UserAction::TextChanged {
+                    ref component_id,
+                    ref value,
+                },
+            ) if component_id == "old_public_key" => {
+                self.old_key_input = value.clone();
+                // Clear validation error as soon as the user edits.
+                self.old_key_error = None;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+
+            // EnterOldKey: create_claim → outer AppEngine intercept does
+            // the hex parse + Vauchi::create_recovery_claim_hex_b64 call,
+            // then either set_generated_claim (advances to ShowGeneratedClaim)
+            // or set_create_claim_error (stays on screen with error).
+            (RecoveryStep::EnterOldKey, UserAction::ActionPressed { ref action_id })
+                if action_id == "create_claim" && self.old_key_input.trim().len() >= 64 =>
+            {
+                ActionResult::Complete
+            }
+
+            // EnterOldKey cancel → back to Intro
+            (RecoveryStep::EnterOldKey, UserAction::ActionPressed { ref action_id })
+                if action_id == "cancel" =>
+            {
+                self.step = RecoveryStep::Intro;
+                self.old_key_input.clear();
+                self.old_key_error = None;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+
+            // ShowGeneratedClaim: copy is informational only — frontend
+            // handles the clipboard write. Done navigates back to Intro
+            // so the user can start another recovery if needed.
+            (RecoveryStep::ShowGeneratedClaim, UserAction::ActionPressed { ref action_id })
+                if action_id == "copy_claim" =>
+            {
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            (RecoveryStep::ShowGeneratedClaim, UserAction::ActionPressed { ref action_id })
+                if action_id == "done" =>
+            {
+                ActionResult::Complete
+            }
+
             // Status screen actions
             (RecoveryStep::Status, UserAction::ActionPressed { ref action_id })
                 if action_id == "start_recovery" =>
@@ -394,5 +737,240 @@ impl WorkflowEngine for RecoveryEngine {
             // Default: refresh current screen
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }
+    }
+
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        Some(self)
+    }
+}
+
+// INLINE_TEST_REQUIRED: tests assert engine state machine across the new
+// Intro → EnterOldKey → ShowGeneratedClaim transitions and validate the
+// setter methods that the AppEngine intercept depends on.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn engine() -> RecoveryEngine {
+        RecoveryEngine::new(vec![], 3)
+    }
+
+    fn engine_with_quorum() -> RecoveryEngine {
+        let contacts = (0..3)
+            .map(|i| ContactItem {
+                id: format!("c{i}"),
+                name: format!("Contact {i}"),
+                avatar_initials: format!("C{i}"),
+                ..Default::default()
+            })
+            .collect();
+        RecoveryEngine::new(contacts, 3)
+    }
+
+    fn press(engine: &mut RecoveryEngine, action_id: &str) -> ActionResult {
+        engine.handle_action(UserAction::ActionPressed {
+            action_id: action_id.into(),
+        })
+    }
+
+    fn type_old_key(engine: &mut RecoveryEngine, value: &str) {
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: "old_public_key".into(),
+            value: value.into(),
+        });
+    }
+
+    // @internal
+    #[test]
+    fn starts_on_intro_screen() {
+        let engine = engine();
+        let screen = engine.build_screen();
+        assert_eq!(screen.title, "Social Recovery");
+        // Intro shows the "Lost Your Device?" intro panel.
+        assert!(
+            screen.components.iter().any(|c| matches!(
+                c,
+                Component::InfoPanel { id, .. } if id == "intro"
+            )),
+            "Intro screen must include the intro panel"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn intro_disables_start_when_quorum_short() {
+        let engine = engine();
+        let screen = engine.build_screen();
+        let start = screen
+            .actions
+            .iter()
+            .find(|a| a.id == "start_recovery_process")
+            .unwrap();
+        assert!(!start.enabled);
+        // Warning banner must be visible.
+        assert!(
+            screen.components.iter().any(|c| matches!(
+                c,
+                Component::StatusIndicator { id, .. } if id == "low_trusted_warning"
+            )),
+            "low_trusted_warning must be shown when quorum is short"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn intro_enables_start_when_quorum_met() {
+        let engine = engine_with_quorum();
+        let screen = engine.build_screen();
+        let start = screen
+            .actions
+            .iter()
+            .find(|a| a.id == "start_recovery_process")
+            .unwrap();
+        assert!(start.enabled);
+    }
+
+    // @internal
+    #[test]
+    fn start_recovery_process_advances_to_enter_old_key() {
+        let mut engine = engine_with_quorum();
+        let _ = press(&mut engine, "start_recovery_process");
+        let screen = engine.build_screen();
+        assert_eq!(screen.title, "Create Recovery Claim");
+        assert!(engine.is_at_enter_old_key_step());
+    }
+
+    // @internal
+    #[test]
+    fn create_claim_disabled_until_64_hex_chars() {
+        let mut engine = engine_with_quorum();
+        let _ = press(&mut engine, "start_recovery_process");
+
+        // Empty input → disabled
+        let screen = engine.build_screen();
+        let create = screen
+            .actions
+            .iter()
+            .find(|a| a.id == "create_claim")
+            .unwrap();
+        assert!(!create.enabled);
+
+        // Short input → still disabled
+        type_old_key(&mut engine, "abcd");
+        let screen = engine.build_screen();
+        let create = screen
+            .actions
+            .iter()
+            .find(|a| a.id == "create_claim")
+            .unwrap();
+        assert!(!create.enabled);
+
+        // 64+ chars → enabled
+        type_old_key(&mut engine, &"a".repeat(64));
+        let screen = engine.build_screen();
+        let create = screen
+            .actions
+            .iter()
+            .find(|a| a.id == "create_claim")
+            .unwrap();
+        assert!(create.enabled);
+    }
+
+    // @internal
+    #[test]
+    fn create_claim_returns_complete_so_intercept_can_sign() {
+        let mut engine = engine_with_quorum();
+        let _ = press(&mut engine, "start_recovery_process");
+        type_old_key(&mut engine, &"f".repeat(64));
+
+        let result = press(&mut engine, "create_claim");
+        assert!(matches!(result, ActionResult::Complete));
+        // Engine stays on EnterOldKey until intercept calls
+        // set_generated_claim or set_create_claim_error.
+        assert!(engine.is_at_enter_old_key_step());
+    }
+
+    // @internal
+    #[test]
+    fn set_generated_claim_advances_to_show_generated_claim() {
+        let mut engine = engine_with_quorum();
+        engine.set_generated_claim("base64claimpayload");
+
+        let screen = engine.build_screen();
+        assert_eq!(screen.title, "Recovery Claim Created");
+        let claim_text = screen.components.iter().find_map(|c| match c {
+            Component::Text { id, content, .. } if id == "claim_data" => Some(content.clone()),
+            _ => None,
+        });
+        assert_eq!(claim_text.as_deref(), Some("base64claimpayload"));
+    }
+
+    // @internal
+    #[test]
+    fn set_create_claim_error_keeps_user_on_enter_old_key_screen() {
+        let mut engine = engine_with_quorum();
+        let _ = press(&mut engine, "start_recovery_process");
+        type_old_key(&mut engine, &"a".repeat(64));
+        let _ = press(&mut engine, "create_claim");
+
+        engine.set_create_claim_error("Invalid hex");
+        assert!(engine.is_at_enter_old_key_step());
+
+        let screen = engine.build_screen();
+        let error = screen.components.iter().find_map(|c| match c {
+            Component::TextInput {
+                id,
+                validation_error,
+                ..
+            } if id == "old_public_key" => validation_error.clone(),
+            _ => None,
+        });
+        assert_eq!(error.as_deref(), Some("Invalid hex"));
+    }
+
+    // @internal
+    #[test]
+    fn editing_old_key_clears_validation_error() {
+        let mut engine = engine_with_quorum();
+        let _ = press(&mut engine, "start_recovery_process");
+        engine.set_create_claim_error("Invalid hex");
+
+        type_old_key(&mut engine, "fixing");
+        let screen = engine.build_screen();
+        let error = screen.components.iter().find_map(|c| match c {
+            Component::TextInput {
+                id,
+                validation_error,
+                ..
+            } if id == "old_public_key" => validation_error.clone(),
+            _ => None,
+        });
+        assert_eq!(error, None);
+    }
+
+    // @internal
+    #[test]
+    fn cancel_from_enter_old_key_returns_to_intro_and_clears_input() {
+        let mut engine = engine_with_quorum();
+        let _ = press(&mut engine, "start_recovery_process");
+        type_old_key(&mut engine, "in-progress-input");
+        let _ = press(&mut engine, "cancel");
+
+        let screen = engine.build_screen();
+        assert_eq!(screen.title, "Social Recovery");
+        assert_eq!(engine.old_key_input(), "");
+    }
+
+    // @internal
+    #[test]
+    fn done_on_show_generated_claim_completes_engine() {
+        let mut engine = engine_with_quorum();
+        engine.set_generated_claim("payload");
+        let result = press(&mut engine, "done");
+        assert!(matches!(result, ActionResult::Complete));
     }
 }

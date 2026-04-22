@@ -300,49 +300,46 @@ if $BUILD_ANDROID; then
     # Ensure targets are installed
     for t in $ANDROID_TARGETS; do rustup target add "$t" 2>/dev/null || true; done
 
-    # Multi-target build: dependencies compiled once, cross-compiled per target
+    # Multi-target build: dependencies compiled once, cross-compiled per target.
+    # RUSTFLAGS="-Cstrip=none" preserves UniFFI metadata so the cross-compiled
+    # aarch64 .so can be used directly for Kotlin binding generation — the
+    # native rebuild that used to dominate this job (~7.4 min of ~12 min on
+    # 2026-04-22 pipeline 2471208697) is gone. Matches iOS's existing
+    # approach: iOS reads metadata from the cross-compiled aarch64-apple-ios
+    # static lib without a separate native build. See T3.1 of
+    # 2026-04-22-ci-pipeline-health-audit.
     TARGET_FLAGS=""
     for t in $ANDROID_TARGETS; do TARGET_FLAGS="$TARGET_FLAGS --target $t"; done
     echo -e "${YELLOW}Building Android targets: $ANDROID_TARGETS${NC}"
-    cargo build -p vauchi-platform $TARGET_FLAGS --release
-    echo -e "${GREEN}Android build complete ($(echo $ANDROID_TARGETS | wc -w | tr -d ' ') targets)${NC}"
+    RUSTFLAGS="-Cstrip=none" cargo build -p vauchi-platform $TARGET_FLAGS --release
+    echo -e "${GREEN}Android build complete ($(echo $ANDROID_TARGETS | wc -w | tr -d ' ') targets, metadata preserved)${NC}"
 
-    # Copy native libraries
-    echo -e "${YELLOW}Copying native libraries...${NC}"
+    # Generate Kotlin bindings from the cross-compiled aarch64 .so BEFORE
+    # stripping. Strip happens after so UniFFI sees the metadata sections.
+    echo -e "${YELLOW}Generating Kotlin bindings from cross-compiled aarch64-linux-android .so...${NC}"
+    mkdir -p "$ANDROID_KOTLIN_DIR"
+    cargo run -p vauchi-platform --bin uniffi-bindgen --release -- generate \
+        --library target/aarch64-linux-android/release/libvauchi_platform.so \
+        --language kotlin \
+        --out-dir "$ANDROID_KOTLIN_DIR"
+    echo -e "${GREEN}Kotlin bindings generated at: $ANDROID_KOTLIN_DIR${NC}"
+
+    # Copy native libraries into jniLibs, then strip via the NDK's
+    # llvm-strip to restore the release-profile size reduction. llvm-strip
+    # defaults to stripping debug + unreferenced symbols but preserves the
+    # UniFFI metadata sections — matching what release-profile strip=true
+    # would have done on the cross-compile.
+    echo -e "${YELLOW}Copying + stripping native libraries for distribution...${NC}"
     mkdir -p "$ANDROID_JNI_DIR/arm64-v8a"
     cp target/aarch64-linux-android/release/libvauchi_platform.so "$ANDROID_JNI_DIR/arm64-v8a/"
+    "$NDK_TOOLCHAIN/llvm-strip" "$ANDROID_JNI_DIR/arm64-v8a/libvauchi_platform.so"
     if ! $RELEASE_ONLY; then
         mkdir -p "$ANDROID_JNI_DIR/x86_64"
         cp target/x86_64-linux-android/release/libvauchi_platform.so "$ANDROID_JNI_DIR/x86_64/"
+        "$NDK_TOOLCHAIN/llvm-strip" "$ANDROID_JNI_DIR/x86_64/libvauchi_platform.so"
     fi
 
-    # Generate Kotlin bindings
-    # Note: uniffi-bindgen can't read metadata from cross-compiled libraries,
-    # so we build a native library first and use that for binding generation.
-    # We use --library mode to extract types from proc macros, matching iOS approach.
-    # IMPORTANT: Build without symbol stripping to preserve UniFFI metadata!
-    echo -e "${YELLOW}Generating Kotlin bindings...${NC}"
-    mkdir -p "$ANDROID_KOTLIN_DIR"
-
-    # Build native library for binding generation (without stripping to preserve metadata)
-    echo -e "${YELLOW}Building native library for metadata extraction...${NC}"
-    RUSTFLAGS="-Cstrip=none" cargo build -p vauchi-platform --release
-
-    # Determine native library extension (.so on Linux, .dylib on macOS)
-    if [[ "$(uname)" == "Darwin" ]]; then
-        NATIVE_LIB="target/release/libvauchi_platform.dylib"
-    else
-        NATIVE_LIB="target/release/libvauchi_platform.so"
-    fi
-
-    cargo run -p vauchi-platform --bin uniffi-bindgen --release -- generate \
-        --library "$NATIVE_LIB" \
-        --language kotlin \
-        --out-dir "$ANDROID_KOTLIN_DIR"
-
-    echo -e "${GREEN}Kotlin bindings generated at: $ANDROID_KOTLIN_DIR${NC}"
-
-    echo -e "${GREEN}Android libraries:${NC}"
+    echo -e "${GREEN}Android libraries (stripped, ready for aar):${NC}"
     ls -lh "$ANDROID_JNI_DIR"/*/libvauchi_platform.so
 fi
 

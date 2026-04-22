@@ -125,6 +125,11 @@ stages:
 lint:images:
   extends: .image-lint
 
+# Informational: tells the MR author whether the upcoming merge will
+# bump the public version (and create a release tag) or fall through
+# to an auto-dev-tag. allow_failure: true because there is no "wrong"
+# answer — both branches of the script print useful info, and the
+# job exists for visibility, not gating. Audited 2026-04-22 T2.5.
 lint:version-check:
   extends: [.linux-runner-nocache, .timeout-quick]
   stage: lint

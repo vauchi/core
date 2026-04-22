@@ -68,6 +68,8 @@ pub enum AppScreen {
     Recovery,
     /// Helper-side recovery — vouch for a contact who lost their device.
     RecoveryHelp,
+    /// Social graph view — contacts grouped by trust level.
+    SocialGraph,
     Groups,
     GroupDetail {
         group_id: String,
@@ -126,6 +128,7 @@ impl AppScreen {
             Self::Sync => "sync",
             Self::Recovery => "recovery",
             Self::RecoveryHelp => "recovery_help",
+            Self::SocialGraph => "social_graph",
             Self::Groups => "groups",
             Self::GroupDetail { .. } => "group_detail",
             Self::Privacy => "privacy",
@@ -167,6 +170,7 @@ impl AppScreen {
             "sync" => Self::Sync,
             "recovery" => Self::Recovery,
             "recovery_help" => Self::RecoveryHelp,
+            "social_graph" => Self::SocialGraph,
             "groups" => Self::Groups,
             "privacy" => Self::Privacy,
             "support" => Self::Support,

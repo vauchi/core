@@ -350,6 +350,38 @@ impl AppEngine {
             AppScreen::RecoveryHelp => {
                 Box::new(crate::ui::recovery_help::RecoveryHelpEngine::new())
             }
+            AppScreen::SocialGraph => {
+                use crate::ui::social_graph::{SocialContactEntry, SocialTrustLevel};
+                use vauchi_core::contact::TrustLevel;
+
+                let contact_items = Self::load_contact_items(vauchi);
+                let entries: Vec<SocialContactEntry> = contact_items
+                    .into_iter()
+                    .map(|item| {
+                        let trust_level = vauchi
+                            .get_contact(&item.id)
+                            .ok()
+                            .flatten()
+                            .map(|c| match c.trust_level() {
+                                TrustLevel::Cautious => SocialTrustLevel::Cautious,
+                                TrustLevel::Verified => SocialTrustLevel::Verified,
+                                TrustLevel::High => SocialTrustLevel::High,
+                                TrustLevel::Standard => SocialTrustLevel::Standard,
+                                // TrustLevel is #[non_exhaustive] — default
+                                // any future variant to Standard (lowest-trust
+                                // bucket) so it surfaces without a warning.
+                                _ => SocialTrustLevel::Standard,
+                            })
+                            .unwrap_or(SocialTrustLevel::Standard);
+                        SocialContactEntry {
+                            contact: item,
+                            trust_level,
+                        }
+                    })
+                    .collect();
+                let group_count = vauchi.list_groups().map(|g| g.len()).unwrap_or(0);
+                Box::new(crate::ui::SocialGraphEngine::new(entries, group_count))
+            }
             AppScreen::Groups => {
                 let all_groups = vauchi.list_groups().unwrap_or_default();
                 let contacts = Self::load_contact_items(vauchi);

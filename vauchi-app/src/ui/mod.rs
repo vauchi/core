@@ -54,6 +54,7 @@ mod recovery_help;
 mod recovery_status;
 mod screen;
 mod settings;
+mod social_graph;
 mod support;
 #[cfg(feature = "network-rustls")]
 mod sync_status;
@@ -106,6 +107,7 @@ pub use screen::{
     ActionStyle, CURRENT_SCHEMA_VERSION, Progress, ScreenAction, ScreenModel, TabInfo,
 };
 pub use settings::{SettingsConfig, SettingsEngine};
+pub use social_graph::{SocialContactEntry, SocialGraphEngine, SocialTrustLevel};
 pub use support::SupportEngine;
 #[cfg(feature = "network-rustls")]
 pub use sync_status::SyncStatusEngine;

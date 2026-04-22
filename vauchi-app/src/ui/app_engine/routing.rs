@@ -741,6 +741,19 @@ impl AppEngine {
                 let screen = self.navigate_to(AppScreen::ContactEdit { contact_id });
                 ActionResult::NavigateTo(screen)
             }
+            // DeviceManagementEngine emits StartDeviceLink when the user
+            // taps "Link New Device". The link flow is fully core-driven
+            // (`DeviceLinkingEngine` shows the QR + handles verify code +
+            // sync), so route the user straight there. Onboarding and
+            // DeviceReplacement also emit StartDeviceLink, but those
+            // happen on screens with their own existing native flows
+            // — we leave their results untouched so frontends keep
+            // calling `viewModel.startDeviceLinkInitiator()` /
+            // equivalent during onboarding.
+            ActionResult::StartDeviceLink if self.screen == AppScreen::DeviceManagement => {
+                let screen = self.navigate_to(AppScreen::DeviceLinking);
+                ActionResult::NavigateTo(screen)
+            }
             ActionResult::OpenEntryDetail { field_id } => {
                 let screen = self.navigate_to(AppScreen::MyInfoEntryDetail { field_id });
                 ActionResult::NavigateTo(screen)

@@ -83,6 +83,40 @@ fn navigate_to_emergency_shred_shows_warning() {
 }
 
 // @internal
+// "Link New Device" on the DeviceManagement screen used to return a raw
+// `StartDeviceLink` ActionResult that frontends had to handle natively
+// (no-op on every shipped frontend). AppEngine now intercepts that
+// result when the user is on DeviceManagement and routes to the
+// core-driven DeviceLinkingEngine, so frontends only need to render
+// the resulting screen.
+// @internal
+#[test]
+fn link_new_device_from_device_management_navigates_to_device_linking() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::DeviceManagement);
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "link_device".into(),
+    });
+
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(
+                screen.screen_id, "link_show_qr",
+                "tapping link_device on DeviceManagement should land on the link_show_qr screen, got {}",
+                screen.screen_id
+            );
+        }
+        other => panic!(
+            "expected NavigateTo(link_show_qr), got {other:?} — \
+             AppEngine intercept on DeviceManagement→StartDeviceLink missing"
+        ),
+    }
+}
+
+// @internal
 #[test]
 fn navigate_to_backup_shows_backup() {
     let mut vauchi = Vauchi::in_memory().unwrap();

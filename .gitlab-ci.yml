@@ -822,11 +822,17 @@ prebuild:apple:
   extends: [.macos-runner, .timeout-extended]
   stage: prebuild
   needs: []
+  # Narrowed 2026-04-22 (T3.1): was **/*.rs (fires on every Rust change
+  # including tests/benches/examples which cannot affect compiled bindings).
+  # Now limited to src/ and build.rs — bindings ABI only depends on these.
+  # A test-only change on core main used to cost ~4-8 min of Apple prebuild;
+  # with this filter those commits skip prebuild entirely.
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
         paths:
-          - "**/*.rs"
+          - "**/src/**/*.rs"
+          - "**/build.rs"
           - "**/Cargo.toml"
           - "**/Cargo.lock"
           - "scripts/build-bindings.sh"
@@ -861,11 +867,17 @@ prebuild:android:
   extends: [.linux-runner, .timeout-long]
   stage: prebuild
   needs: []
+  # Narrowed 2026-04-22 (T3.1): was **/*.rs (fires on every Rust change
+  # including tests/benches/examples which cannot affect compiled bindings).
+  # Now limited to src/ and build.rs — bindings ABI only depends on these.
+  # A test-only change on core main used to cost ~9 min of Android prebuild;
+  # with this filter those commits skip prebuild entirely.
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
         paths:
-          - "**/*.rs"
+          - "**/src/**/*.rs"
+          - "**/build.rs"
           - "**/Cargo.toml"
           - "**/Cargo.lock"
           - "scripts/build-bindings.sh"

@@ -50,6 +50,7 @@ mod my_info_entry_detail;
 mod onboarding;
 pub mod reciprocity_confirmer;
 pub mod recovery_claim_review;
+mod recovery_help;
 mod recovery_status;
 mod screen;
 mod settings;
@@ -99,6 +100,7 @@ pub use more::MoreEngine;
 pub use my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, MyInfoViewMode, OwnFieldInfo};
 pub use my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};
+pub use recovery_help::{ParsedClaimSummary, RecoveryHelpEngine};
 pub use recovery_status::RecoveryEngine;
 pub use screen::{
     ActionStyle, CURRENT_SCHEMA_VERSION, Progress, ScreenAction, ScreenModel, TabInfo,

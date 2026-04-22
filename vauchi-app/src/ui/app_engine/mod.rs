@@ -66,6 +66,8 @@ pub enum AppScreen {
     DeliveryStatus,
     Sync,
     Recovery,
+    /// Helper-side recovery — vouch for a contact who lost their device.
+    RecoveryHelp,
     Groups,
     GroupDetail {
         group_id: String,
@@ -123,6 +125,7 @@ impl AppScreen {
             Self::DeliveryStatus => "delivery_status",
             Self::Sync => "sync",
             Self::Recovery => "recovery",
+            Self::RecoveryHelp => "recovery_help",
             Self::Groups => "groups",
             Self::GroupDetail { .. } => "group_detail",
             Self::Privacy => "privacy",
@@ -163,6 +166,7 @@ impl AppScreen {
             "delivery_status" => Self::DeliveryStatus,
             "sync" => Self::Sync,
             "recovery" => Self::Recovery,
+            "recovery_help" => Self::RecoveryHelp,
             "groups" => Self::Groups,
             "privacy" => Self::Privacy,
             "support" => Self::Support,
@@ -792,6 +796,22 @@ impl WorkflowEngine for AppEngine {
         if self.screen == AppScreen::ContactDuplicates
             && matches!(&action, UserAction::ActionPressed { action_id } if action_id == "dismiss")
             && let Some(result) = self.intercept_dismiss_duplicate_action()
+        {
+            return result;
+        }
+
+        // RecoveryHelp screen: parse claim + create voucher need Vauchi
+        // access (identity keypair for signing) so they're handled at the
+        // AppEngine layer rather than inside the engine.
+        if self.screen == AppScreen::RecoveryHelp
+            && matches!(&action, UserAction::ActionPressed { action_id } if action_id == "verify_claim")
+            && let Some(result) = self.intercept_verify_claim_action()
+        {
+            return result;
+        }
+        if self.screen == AppScreen::RecoveryHelp
+            && matches!(&action, UserAction::ActionPressed { action_id } if action_id == "create_voucher")
+            && let Some(result) = self.intercept_create_voucher_action()
         {
             return result;
         }

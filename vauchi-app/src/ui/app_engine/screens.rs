@@ -347,6 +347,9 @@ impl AppEngine {
                 engine.set_linked_device_count(device_count);
                 Box::new(engine)
             }
+            AppScreen::RecoveryHelp => {
+                Box::new(crate::ui::recovery_help::RecoveryHelpEngine::new())
+            }
             AppScreen::Groups => {
                 let all_groups = vauchi.list_groups().unwrap_or_default();
                 let contacts = Self::load_contact_items(vauchi);

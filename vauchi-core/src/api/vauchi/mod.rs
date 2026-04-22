@@ -21,6 +21,7 @@ mod onboarding;
 mod propagation;
 #[cfg(feature = "network-http")]
 mod recovery;
+mod recovery_offline;
 mod security;
 mod setup;
 #[cfg(feature = "network-http")]

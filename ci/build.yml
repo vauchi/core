@@ -1,0 +1,246 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Core — Build Stage (release-or-rc tag pipelines only)
+#
+# Extracted from core/.gitlab-ci.yml on 2026-04-22 as Phase 0 Part 3
+# of the T2.3 split (2026-04-22-ci-pipeline-health-audit).
+# Pure extraction — byte-identical to the deleted block. Included as
+# `local: ci/build.yml` from core/.gitlab-ci.yml.
+#
+# Contents (only runs on stable/rc/dev tag pipelines):
+#   - release:verify              — tag-is-on-main gate
+#   - build:apple                 — Apple targets (uses prebuild cache)
+#   - build:android               — Android targets (uses prebuild cache)
+#   - build:cabi-windows          — CABI DLL for Windows (C ABI export)
+#   - build:cabi-linux            — CABI .so for Linux (C ABI export)
+#   - build:validate-bindings     — post-build binding validation
+
+# ============================================================
+# Build Stage — All version tags (stable, RC, dev)
+# Builds platform bindings for iOS and Android on every version tag.
+# Checks for prebuild cache first — falls back to full build on miss.
+# ============================================================
+
+# Verify tag is on main branch before proceeding with release
+# Overrides .self-hosted SSH clone — tag pipelines need HTTPS checkout
+# since the runner may not have gitlab.com in known_hosts
+release:verify:
+  extends: [.linux-runner, .release-or-rc]
+  stage: build
+  needs: []
+  interruptible: false
+  variables:
+    GIT_STRATEGY: clone
+    GIT_DEPTH: "100"
+  before_script: []
+  script:
+    - |
+      echo "Verifying tag $CI_COMMIT_TAG is on main branch..."
+      git fetch origin main --depth=100
+      if git merge-base --is-ancestor "$CI_COMMIT_SHA" origin/main; then
+        echo "✓ Tag $CI_COMMIT_TAG is on main branch"
+      else
+        echo "✗ ERROR: Tag $CI_COMMIT_TAG is NOT on main branch!"
+        echo "  Tags must only be created on commits that are on main."
+        exit 1
+      fi
+
+build:apple:
+  extends: [.macos-runner, .release-or-rc, .timeout-extended]
+  stage: build
+  needs: [release:verify]
+  script:
+    - |
+      # Try to download prebuild artifacts cached on main merge
+      echo "Checking for prebuild Apple bindings at SHA ${CI_COMMIT_SHA}..."
+      HTTP_CODE=$(curl -s -o bindings-apple.tar.gz -w "%{http_code}" \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-prebuild/${CI_COMMIT_SHA}/bindings-apple.tar.gz")
+      if [ "$HTTP_CODE" = "200" ]; then
+        echo "✓ Found prebuild Apple bindings — extracting"
+        mkdir -p target/bindings
+        tar xzf bindings-apple.tar.gz -C target/bindings
+        rm bindings-apple.tar.gz
+        # Prebuild uses --release-only (device ARM64 only, for speed).
+        # Tag pipelines need sim lib too for xcframework packaging.
+        # Self-healing: rebuild all targets if prebuild is incomplete.
+        if [ ! -f "target/bindings/ios/libs/libvauchi_platform_sim.a" ]; then
+          echo "⚠ Prebuild lacks simulator library — rebuilding full Apple targets..."
+          ./scripts/build-bindings.sh --apple
+        else
+          echo "  ✓ Prebuild complete (device + simulator)"
+        fi
+      else
+        echo "⚠ No prebuild found (HTTP $HTTP_CODE) — building from scratch"
+        ./scripts/build-bindings.sh --apple
+      fi
+  artifacts:
+    paths:
+      - target/bindings/ios/
+      - target/bindings/macos/
+    # 7 days: release pipeline retries may span multiple days
+    expire_in: 7 days
+
+build:android:
+  extends: [.linux-runner, .release-or-rc, .timeout-long]
+  stage: build
+  needs: [release:verify]
+  before_script:
+    - !reference [.self-hosted, before_script]
+    # Find Android NDK - check common locations
+    - |
+      for ndk_path in /opt/android-sdk/ndk/* /opt/android-ndk $HOME/Android/Sdk/ndk/*; do
+        if [ -d "$ndk_path" ]; then
+          export ANDROID_NDK_HOME="$ndk_path"
+          echo "Found Android NDK at: $ANDROID_NDK_HOME"
+          break
+        fi
+      done
+      if [ -z "$ANDROID_NDK_HOME" ]; then
+        echo "ERROR: Android NDK not found. Please install it or set ANDROID_NDK_HOME."
+        exit 1
+      fi
+    - rustup target add aarch64-linux-android x86_64-linux-android
+  script:
+    - |
+      # Try to download prebuild artifacts cached on main merge
+      echo "Checking for prebuild Android bindings at SHA ${CI_COMMIT_SHA}..."
+      HTTP_CODE=$(curl -s -o bindings-android.tar.gz -w "%{http_code}" \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vauchi-prebuild/${CI_COMMIT_SHA}/bindings-android.tar.gz")
+      if [ "$HTTP_CODE" = "200" ]; then
+        echo "✓ Found prebuild Android bindings — extracting (skipping ~35 min build)"
+        mkdir -p target/bindings
+        tar xzf bindings-android.tar.gz -C target/bindings
+        rm bindings-android.tar.gz
+      else
+        echo "⚠ No prebuild found (HTTP $HTTP_CODE) — building from scratch"
+        ./scripts/build-bindings.sh --android
+      fi
+  artifacts:
+    paths:
+      - target/bindings/android/
+    # 7 days: release pipeline retries may span multiple days
+    expire_in: 7 days
+
+# Validate generated bindings have all expected types
+build:validate-bindings:
+  extends: [.linux-runner, .release-or-rc]
+  stage: build
+  needs:
+    - job: build:apple
+      artifacts: true
+    - job: build:android
+      artifacts: true
+  script:
+    - ./scripts/validate-bindings.sh
+  allow_failure: false
+
+# ============================================================
+# Layer 2 ABI parity gate — Phase 2 Task 2.3 of the frontend
+# correctness strategy plan (`_private/docs/planning/todo/
+# 2026-04-20-frontend-correctness-strategy-plan.md`). Runs after
+# the per-platform builds produce paired bindings + artifacts,
+# before package:*. Fails the pipeline if the UniFFI symbols
+# referenced by the bindings do not match the dynamic exports
+# of the packaged native artifact — the class of bug that
+# caused the 2026-04-20 Android startup crash.
+#
+# Script is fetched from vauchi/scripts at runtime, same API
+# convention as `lint:claude-md` in the workspace root.
+# ============================================================
+
+.check-binding-abi-fetch: &check-binding-abi-fetch |
+  # vauchi/scripts is a public project (id=77957857), so the raw-file
+  # API needs no auth. Sending JOB-TOKEN here made tag pipelines 403
+  # because GitLab's job-token allowlist on the *target* project
+  # rejects tokens from projects not on its list — even when the
+  # project itself is public. `security:vet` above demonstrates the
+  # auth-less pattern; mirror it here.
+  curl --silent --fail \
+    "${CI_API_V4_URL}/projects/77957857/repository/files/scripts%2Fcheck-binding-abi.sh/raw?ref=main" \
+    -o /tmp/check-binding-abi.sh
+  chmod +x /tmp/check-binding-abi.sh
+
+check:binding-abi-android:
+  extends: [.linux-runner, .release-or-rc, .timeout-quick]
+  stage: build
+  needs:
+    - job: build:android
+      artifacts: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - *check-binding-abi-fetch
+    # NDK for llvm-nm (find it the same way build:android does).
+    - |
+      for ndk_path in /opt/android-sdk/ndk/* /opt/android-ndk $HOME/Android/Sdk/ndk/*; do
+        if [ -d "$ndk_path" ]; then
+          export ANDROID_NDK_HOME="$ndk_path"
+          echo "Found Android NDK at: $ANDROID_NDK_HOME"
+          break
+        fi
+      done
+      if [ -z "$ANDROID_NDK_HOME" ]; then
+        echo "ERROR: Android NDK not found (needed for llvm-nm symbol extraction)"
+        exit 1
+      fi
+  script:
+    - |
+      /tmp/check-binding-abi.sh \
+        --platform android \
+        --artifact target/bindings/android/jniLibs/arm64-v8a/libvauchi_platform.so \
+        --bindings target/bindings/android/kotlin/uniffi/vauchi_platform/vauchi_platform.kt
+  allow_failure: false
+
+check:binding-abi-ios:
+  # Parity gate marked allow_failure:true temporarily. The self-hosted
+  # "nell" macOS runner truncates this job's step-script trace buffer
+  # to ~10 KB and appears to kill the step mid-run (confirmed on
+  # v0.21.0 through v0.21.4 tag pipelines). Local runs of the same
+  # script against the same bindings+artifact show 799 symbols
+  # matching — parity itself is fine; the CI-side observation is
+  # broken. Inlining the check into build:apple (v0.21.4) broke
+  # build:apple with the same symptom. Keeping the job so any future
+  # pass is visible, but not gating on it. Re-enable `allow_failure:
+  # false` once the runner is fixed (see infra ticket TBD) or once
+  # the check is relocated to a Linux runner using llvm-nm on Mach-O.
+  # Android parity is still gated; all 799 symbols match cross-
+  # platform so the Android gate alone catches real binding drift.
+  extends: [.macos-runner, .release-or-rc, .timeout-quick]
+  stage: build
+  needs:
+    - job: build:apple
+      artifacts: true
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - *check-binding-abi-fetch
+  script:
+    - |
+      set +e
+      /tmp/check-binding-abi.sh \
+        --platform ios \
+        --artifact target/bindings/ios/libs/libvauchi_platform_device.a \
+        --bindings target/bindings/ios/generated/vauchi_platform.swift \
+        2>&1 | tee abi-check-ios.log
+      rc=${PIPESTATUS[0]}
+      if [ "$rc" -ne 0 ]; then
+        {
+          echo
+          echo "=== artifact ==="
+          ls -la target/bindings/ios/libs/libvauchi_platform_device.a || true
+          file target/bindings/ios/libs/libvauchi_platform_device.a || true
+          echo
+          echo "=== bindings ==="
+          ls -la target/bindings/ios/generated/vauchi_platform.swift || true
+          wc -l target/bindings/ios/generated/vauchi_platform.swift || true
+        } | tee -a abi-check-ios.log
+      fi
+      exit "$rc"
+  artifacts:
+    when: always
+    paths:
+      - abi-check-ios.log
+    expire_in: 1 week
+  allow_failure: true

@@ -56,6 +56,10 @@ include:
       - '/ci-templates/image-lint.yml'
       - '/ci-templates/badges.yml'
       - '/ci-templates/github-mirror.yml'
+  # Local include — nightly-only mutation + fuzz + slow tests extracted
+  # 2026-04-22 under T2.3 split (2026-04-22-ci-pipeline-health-audit
+  # Phase 2). Pure Phase 0 tidy — no behaviour change.
+  - local: ci/mutation-and-fuzz.yml
 
 # Cosign pinned version + checksum (used by update:swift-bindings and publish:maven)
 # Single source of truth for cosign binary integrity — update BOTH values together.
@@ -635,119 +639,6 @@ bench:compare:
   variables:
     BENCH_PACKAGE: "vauchi-core"
     BENCH_TARGETS: "--bench crypto_benchmarks --bench performance_regression"
-
-# ============================================================
-# Mutation Stage (uses shared template from vauchi/scripts)
-# ============================================================
-
-mutation:nightly:
-  extends: [.mutation-nightly, .linux-runner]
-  timeout: 12h
-  variables:
-    MUTATION_PACKAGE: "vauchi-core"
-    # Baseline needs ~60s for 3651 tests (argon2-based backup tests take 5-20s each).
-    # Default 30s causes baseline timeout → zero mutants tested.
-    MUTATION_TIMEOUT_NIGHTLY: "240"
-    # --in-place: test in source tree so include_bytes!("../../../themes/...") resolves.
-    # Copying to /tmp/ breaks relative paths to sibling repos (themes/, locales/).
-    MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs --in-place"
-  before_script:
-    - !reference [.self-hosted, before_script]
-    - !reference [.clone-locales, before_script]
-    - !reference [.clone-themes, before_script]
-
-# ============================================================
-# Fuzz Testing (Nightly scheduled, T2-10)
-# ============================================================
-
-# Nightly fuzz run — cycles through all 11 fuzz targets for 5 minutes each
-fuzz:nightly:
-  extends: [.linux-runner]
-  timeout: 12h
-  stage: mutation
-  resource_group: fuzz-nightly
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $FUZZ_ENABLED == "true"
-  allow_failure: true
-  script:
-    - |
-      # cargo-fuzz requires nightly for -Zsanitizer=address
-      rustup toolchain install nightly --profile minimal --component llvm-tools-preview 2>/dev/null || true
-      command -v cargo-fuzz >/dev/null 2>&1 || cargo +nightly install cargo-fuzz --locked --force
-
-      cd vauchi-core/fuzz
-      FUZZ_DURATION="${FUZZ_DURATION_SECS:-300}"
-      FUZZ_JOBS="${FUZZ_PARALLEL_JOBS:-4}"
-      REPORT_DIR="../fuzz-report"
-      mkdir -p "$REPORT_DIR"
-
-      TARGETS="fuzz_decode_message fuzz_qr_payload fuzz_unpad fuzz_delta_decode \
-               fuzz_recovery_claim fuzz_nfc_payload fuzz_ble_payload \
-               fuzz_ble_advertisement fuzz_exchange_payload fuzz_encrypted_exchange \
-               fuzz_ratchet_state"
-
-      TARGET_COUNT=$(echo $TARGETS | wc -w | tr -d ' ')
-      echo "=== Fuzzing ${TARGET_COUNT} targets, ${FUZZ_JOBS} parallel, ${FUZZ_DURATION}s each ==="
-
-      # Per-job output log — shared shell runner persists /tmp across jobs.
-      FUZZ_LOG="/tmp/fuzz-output-${CI_JOB_ID}.log"
-
-      # Run fuzz targets in parallel; capture exit code separately to avoid
-      # pipefail killing the script before the CRASH/PASS count check runs.
-      set +o pipefail
-      echo "$TARGETS" | tr ' ' '\n' | grep -v '^$' | \
-        xargs -P "$FUZZ_JOBS" -I{} sh -c \
-          'echo "START: {}"; cargo +nightly fuzz run {} -- -max_total_time='"$FUZZ_DURATION"' 2>&1 && echo "PASS:{}" || echo "CRASH:{}"' \
-          | tee "$FUZZ_LOG"
-      set -o pipefail
-
-      FAILED=$(grep -c '^CRASH:' "$FUZZ_LOG" || true)
-      PASSED=$(grep -c '^PASS:' "$FUZZ_LOG" || true)
-
-      # Generate JUnit XML report for GitLab test tab
-      cat > "$REPORT_DIR/fuzz-junit.xml" <<JUNIT_EOF
-      <?xml version="1.0" encoding="UTF-8"?>
-      <testsuites name="fuzz:nightly" tests="${TARGET_COUNT}" failures="${FAILED}">
-        <testsuite name="cargo-fuzz" tests="${TARGET_COUNT}" failures="${FAILED}">
-      JUNIT_EOF
-      for t in $TARGETS; do
-        STATUS=$(grep -E "^(PASS|CRASH):${t}$" "$FUZZ_LOG" | head -1 | cut -d: -f1)
-        if [ "$STATUS" = "CRASH" ]; then
-          echo "    <testcase name=\"${t}\" classname=\"fuzz\"><failure message=\"Crash found\"/></testcase>" >> "$REPORT_DIR/fuzz-junit.xml"
-        else
-          echo "    <testcase name=\"${t}\" classname=\"fuzz\"/>" >> "$REPORT_DIR/fuzz-junit.xml"
-        fi
-      done
-      echo "  </testsuite>" >> "$REPORT_DIR/fuzz-junit.xml"
-      echo "</testsuites>" >> "$REPORT_DIR/fuzz-junit.xml"
-
-      echo "=== Fuzz Summary ==="
-      echo "Targets: ${TARGET_COUNT}, Passed: $PASSED, Crashes: $FAILED"
-      [ "$FAILED" -eq 0 ] || exit 1
-  cache:
-    key: fuzz-corpus-core
-    paths:
-      - vauchi-core/fuzz/corpus/
-    policy: pull-push
-  artifacts:
-    when: always
-    paths:
-      - vauchi-core/fuzz/artifacts/
-      - vauchi-core/fuzz-report/
-    reports:
-      junit: vauchi-core/fuzz-report/fuzz-junit.xml
-    expire_in: 1 month
-
-# Slow property tests — timing-sensitive exchange tests with wall-clock jitter.
-# Runs #[ignore] tests that are too slow for per-push CI (~2 min).
-test:slow:
-  extends: [.linux-runner, .timeout-standard]
-  stage: mutation
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $SLOW_TESTS_ENABLED == "true"
-  allow_failure: true
-  script:
-    - cargo test --workspace -- --ignored --nocapture
 
 # ============================================================
 # Security Stage (MR only, gated by lint, parallel with test)

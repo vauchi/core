@@ -6,7 +6,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use vauchi_platform::{PlatformAppEngine, PlatformEventListener};
+use vauchi_platform::{MobileLocale, PlatformAppEngine, PlatformEventListener};
 
 /// Helper: create a PlatformAppEngine with a temp directory.
 fn create_engine() -> (std::sync::Arc<PlatformAppEngine>, tempfile::TempDir) {
@@ -96,11 +96,10 @@ fn current_screen_id_returns_lightweight_id() {
 }
 
 // @internal
-// @internal
 #[test]
 fn tab_info_pre_identity_returns_only_onboarding() {
     let (engine, _dir) = create_engine();
-    let tabs = engine.tab_info().expect("tab info");
+    let tabs = engine.tab_info(MobileLocale::English).expect("tab info");
     assert_eq!(tabs.len(), 1, "pre-identity should expose just onboarding");
     let tab = &tabs[0];
     assert_eq!(tab.id, "onboarding");
@@ -110,12 +109,11 @@ fn tab_info_pre_identity_returns_only_onboarding() {
 }
 
 // @internal
-// @internal
 #[test]
 fn tab_info_post_identity_returns_top_level_tabs() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
-    let tabs = engine.tab_info().expect("tab info");
+    let tabs = engine.tab_info(MobileLocale::English).expect("tab info");
     let ids: Vec<&str> = tabs.iter().map(|t| t.id.as_str()).collect();
     assert_eq!(
         ids,
@@ -133,6 +131,98 @@ fn tab_info_post_identity_returns_top_level_tabs() {
             "icon must be non-empty for {}",
             tab.id
         );
+    }
+}
+
+// @internal
+#[test]
+fn tab_info_english_labels_come_from_locale() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    let tabs = engine.tab_info(MobileLocale::English).expect("tab info");
+    let by_id: std::collections::HashMap<_, _> = tabs
+        .iter()
+        .map(|t| (t.id.as_str(), t.label.as_str()))
+        .collect();
+    assert_eq!(by_id.get("my_info"), Some(&"My Card"));
+    assert_eq!(by_id.get("contacts"), Some(&"Contacts"));
+    assert_eq!(by_id.get("exchange"), Some(&"Exchange"));
+    assert_eq!(by_id.get("groups"), Some(&"Groups"));
+    assert_eq!(by_id.get("more"), Some(&"More"));
+}
+
+// @internal
+#[test]
+fn tab_info_german_labels_differ_from_english_once_locales_loaded() {
+    // Non-English locales are only populated after `init_locales()` loads
+    // the bundled JSON files — without that, `get_string` falls back to
+    // the compile-time-bundled English map. This test exercises the
+    // intended production path: init locales, then ask for German.
+    let locales_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
+    vauchi_platform::init_locales(locales_dir.to_string_lossy().to_string()).expect("init_locales");
+
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    let en = engine.tab_info(MobileLocale::English).expect("en");
+    let de = engine.tab_info(MobileLocale::German).expect("de");
+    // Same screen IDs in the same order
+    let en_ids: Vec<&str> = en.iter().map(|t| t.id.as_str()).collect();
+    let de_ids: Vec<&str> = de.iter().map(|t| t.id.as_str()).collect();
+    assert_eq!(en_ids, de_ids);
+    let en_contacts = en.iter().find(|t| t.id == "contacts").expect("en contacts");
+    let de_contacts = de.iter().find(|t| t.id == "contacts").expect("de contacts");
+    assert_eq!(en_contacts.label, "Contacts");
+    assert_eq!(de_contacts.label, "Kontakte");
+}
+
+// @internal
+#[test]
+fn sidebar_items_pre_identity_returns_only_onboarding() {
+    let (engine, _dir) = create_engine();
+    let items = engine
+        .sidebar_items(MobileLocale::English)
+        .expect("sidebar items");
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].id, "onboarding");
+}
+
+// @internal
+#[test]
+fn sidebar_items_post_identity_is_broader_than_tab_info() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    let tabs = engine.tab_info(MobileLocale::English).expect("tab info");
+    let items = engine
+        .sidebar_items(MobileLocale::English)
+        .expect("sidebar items");
+    assert!(
+        items.len() > tabs.len(),
+        "sidebar must be broader than the mobile tab bar (tabs={}, sidebar={})",
+        tabs.len(),
+        items.len()
+    );
+    let sidebar_ids: Vec<&str> = items.iter().map(|t| t.id.as_str()).collect();
+    // Desktop-specific entries that the mobile tab bar does not expose
+    for expected in [
+        "settings",
+        "recovery",
+        "device_management",
+        "backup",
+        "privacy",
+        "support",
+        "help",
+        "activity_log",
+        "sync",
+    ] {
+        assert!(
+            sidebar_ids.contains(&expected),
+            "sidebar missing expected entry: {}",
+            expected
+        );
+    }
+    for item in &items {
+        assert!(!item.label.is_empty(), "label must be non-empty");
+        assert!(!item.icon.is_empty(), "icon must be non-empty");
     }
 }
 

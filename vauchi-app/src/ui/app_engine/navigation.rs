@@ -6,6 +6,7 @@
 
 use super::AppEngine;
 use super::AppScreen;
+use crate::i18n::{Locale, get_string};
 use crate::ui::screen::{ScreenModel, TabInfo};
 
 impl AppEngine {
@@ -98,30 +99,92 @@ impl AppEngine {
         ]
     }
 
-    /// Returns tab metadata with labels and icon names.
-    /// Frontends can render tabs without hardcoding any strings or icons.
+    /// Returns metadata for the mobile bottom-tab bar — the 5 top-level
+    /// tabs after identity creation (MyInfo, Contacts, Exchange, Groups,
+    /// More); just Onboarding before. Labels resolve via
+    /// `i18n::get_string(locale, "nav.*")` with English fallback.
     ///
-    /// Labels are English for now — will use `i18n::get_string(locale, "nav.*")`
-    /// when the i18n system is wired into the UI layer.
-    pub fn tab_info(&self) -> Vec<TabInfo> {
+    /// Frontends render the returned `TabInfo` directly — no local
+    /// screen-to-tab map or label lookup needed.
+    pub fn tab_info(&self, locale: Locale) -> Vec<TabInfo> {
         self.available_screens()
             .into_iter()
-            .map(|screen| {
-                let (label, icon) = match &screen {
-                    AppScreen::MyInfo => ("My Card", "person.crop.rectangle"),
-                    AppScreen::Contacts => ("Contacts", "person.2"),
-                    AppScreen::Exchange => ("Exchange", "qrcode"),
-                    AppScreen::Groups => ("Groups", "folder"),
-                    AppScreen::More => ("More", "ellipsis.circle"),
-                    _ => ("Home", "house"),
-                };
-                TabInfo {
-                    id: screen.screen_id().to_string(),
-                    label: label.to_string(),
-                    icon: icon.to_string(),
-                    badge_count: 0,
-                }
-            })
+            .map(|screen| Self::tab_info_for(screen, locale))
             .collect()
+    }
+
+    /// Returns metadata for a desktop sidebar — all top-level navigable
+    /// screens (MyInfo, Contacts, Exchange, Groups, Settings, Recovery,
+    /// Device Management, Backup, Privacy, Support, Help, Activity Log,
+    /// Sync, More). Wider than `tab_info()` because desktop frames have
+    /// vertical space that a phone bottom-tab bar does not. Labels
+    /// resolve via `i18n::get_string(locale, "nav.*")`.
+    ///
+    /// Used by linux-gtk, linux-qt, Windows, macOS sidebars so those
+    /// frontends can stop maintaining their own `AppScreen`-to-label
+    /// match tables (§6 pure-renderer remediation).
+    pub fn sidebar_items(&self, locale: Locale) -> Vec<TabInfo> {
+        if !self.vauchi.has_identity() {
+            return vec![Self::tab_info_for(AppScreen::Onboarding, locale)];
+        }
+        [
+            AppScreen::MyInfo,
+            AppScreen::Contacts,
+            AppScreen::Exchange,
+            AppScreen::Groups,
+            AppScreen::Settings,
+            AppScreen::Recovery,
+            AppScreen::DeviceManagement,
+            AppScreen::Backup,
+            AppScreen::Privacy,
+            AppScreen::Support,
+            AppScreen::Help,
+            AppScreen::ActivityLog,
+            AppScreen::Sync,
+            AppScreen::More,
+        ]
+        .into_iter()
+        .map(|s| Self::tab_info_for(s, locale))
+        .collect()
+    }
+
+    /// Resolve a `TabInfo` for a single `AppScreen`: looks up the
+    /// localized label, returns the SF Symbol icon name, and produces
+    /// a zero badge count (callers can overlay badge counts separately).
+    fn tab_info_for(screen: AppScreen, locale: Locale) -> TabInfo {
+        let (key, icon, fallback) = match &screen {
+            AppScreen::MyInfo => ("nav.myCard", "person.crop.rectangle", "My Card"),
+            AppScreen::Contacts => ("nav.contacts", "person.2", "Contacts"),
+            AppScreen::Exchange => ("nav.exchange", "qrcode", "Exchange"),
+            AppScreen::Groups => ("nav.groups", "folder", "Groups"),
+            AppScreen::More => ("nav.more", "ellipsis.circle", "More"),
+            AppScreen::Onboarding => ("nav.onboarding", "person.badge.plus", "Welcome"),
+            AppScreen::Settings => ("nav.settings", "gearshape", "Settings"),
+            AppScreen::Help => ("nav.help", "questionmark.circle", "Help"),
+            AppScreen::Recovery => ("nav.recovery", "key.horizontal", "Recovery"),
+            AppScreen::DeviceManagement => ("nav.devices", "laptopcomputer", "Devices"),
+            AppScreen::Backup => ("nav.backup", "externaldrive", "Backup"),
+            AppScreen::Privacy => ("nav.privacy", "hand.raised", "Privacy"),
+            AppScreen::Support => ("nav.support", "bubble.left.and.bubble.right", "Support"),
+            AppScreen::ActivityLog => ("nav.activity", "list.bullet.rectangle", "Activity"),
+            AppScreen::Sync => ("nav.sync", "arrow.triangle.2.circlepath", "Sync"),
+            _ => ("nav.home", "house", "Home"),
+        };
+        // `get_string` returns the sentinel "Missing: <key>" when the key
+        // is absent from both the requested locale and the English
+        // fallback; fall back to the hardcoded English label so UIs
+        // never display the sentinel.
+        let label = get_string(locale, key);
+        let label = if label.starts_with("Missing:") {
+            fallback.to_string()
+        } else {
+            label
+        };
+        TabInfo {
+            id: screen.screen_id().to_string(),
+            label,
+            icon: icon.to_string(),
+            badge_count: 0,
+        }
     }
 }

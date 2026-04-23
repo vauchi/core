@@ -371,8 +371,25 @@ char *vauchi_app_device_link_sync_complete(struct VauchiApp *handle);
 /**
  * Import contacts from vCard (.vcf) data.
  *
- * Returns a JSON object: `{"imported":N,"skipped":N,"warnings":["..."]}`,
- * or `{"error":"..."}` on failure. Returns null if `handle` or `data` is null.
+ * Returns a JSON object on success:
+ * ```json
+ * {
+ *   "imported": 3,
+ *   "skipped": 1,
+ *   "warnings": [
+ *     {"key": "import.warning.duplicate_uid", "args": {"uid": "abc"}, "legacy_text": "Skipped duplicate (UID: abc)"}
+ *   ]
+ * }
+ * ```
+ *
+ * Each warning object carries the stable i18n `key`, a string map of
+ * placeholder `args`, and a pre-rendered English `legacy_text` frontends
+ * may use as a fallback. The shape matches the UniFFI
+ * `MobileImportWarning` record so CABI + UniFFI consumers stay aligned
+ * (G6 of the pure-renderer remediation).
+ *
+ * Returns `{"error":"..."}` on failure. Returns null if `handle` or
+ * `data` is null.
  *
  * The caller must free the returned string with `vauchi_string_free`.
  *

@@ -16,6 +16,7 @@ use vauchi_core::api::Vauchi;
 use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier};
 
 mod app;
+mod app_import_warnings;
 mod config;
 mod device_link;
 mod exchange;

@@ -6,6 +6,26 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.22.0] — 2026-04-24
+
+### Added
+
+- `MultiStageSessionListener` UniFFI callback interface plus
+  `MobileMultiStageSession::set_listener` / `start` / `cancel` lifecycle —
+  core now owns the multi-stage exchange protocol clock via a
+  `vauchi-exchange-cycle` thread. Frontends drop their `Timer` /
+  `LaunchedEffect` polling loops and render events (`on_qr_payload`,
+  `on_state_changed`, `on_finalized(contact_name)`, `on_session_ended`)
+  as they arrive. G4 Phase 1 — see
+  `_private/docs/problems/2026-04-23-g4-exchange-event-api/`.
+
+### Deprecated
+
+- `MobileMultiStageSession::get_display_qr`, `get_state`,
+  `get_received_data`, `get_transport_key` — use the listener callbacks
+  instead. Retained through 0.22.x so iOS + Android can migrate in
+  sequence; removed in 0.23.
+
 ## [0.11.1] — 2026-03-29
 
 ### Fixed

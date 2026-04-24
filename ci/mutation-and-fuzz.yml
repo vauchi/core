@@ -26,9 +26,15 @@ mutation:nightly:
     # Baseline needs ~60s for 3651 tests (argon2-based backup tests take 5-20s each).
     # Default 30s causes baseline timeout → zero mutants tested.
     MUTATION_TIMEOUT_NIGHTLY: "240"
-    # --in-place: test in source tree so include_bytes!("../../../themes/...") resolves.
-    # Copying to /tmp/ breaks relative paths to sibling repos (themes/, locales/).
-    MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs --in-place"
+    # --in-place:       test in source tree so include_bytes!("../../../themes/...") resolves.
+    #                   Copying to /tmp/ breaks relative paths to sibling repos (themes/, locales/).
+    # --jobs $(nproc):  parallel mutant evaluation. Single-threaded with 11k mutants × ~32s
+    #                   each projects ~98h, far past the 12h job budget. nproc lets the
+    #                   runner decide (≥8 cores needed to fit; self-hosted allyson-shell has
+    #                   enough). resource_group: mutation-nightly already serializes across
+    #                   projects, so no cross-pipeline contention concern.
+    #                   See _private/docs/problems/2026-04-24-mutation-nightly-timeout/.
+    MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs --in-place --jobs $(nproc)"
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]

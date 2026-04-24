@@ -419,6 +419,45 @@ char *vauchi_app_import_contacts_from_vcf(struct VauchiApp *handle,
 char *vauchi_app_drain_notifications(struct VauchiApp *handle);
 
 /**
+ * Return the mobile tab-bar metadata as a JSON array.
+ *
+ * Mirrors `PlatformAppEngine::tab_info(MobileLocale)` (UniFFI) — each
+ * element is `{id, label, icon, badge_count}`. Pre-identity the
+ * result is a single-element `[{onboarding ...}]` array; post-identity
+ * it is the 5-element bottom-tab set (MyInfo / Contacts / Exchange /
+ * Groups / More). Labels are pre-localized via core i18n, with an
+ * English fallback when the key is missing.
+ *
+ * `locale_code` is a null-terminated ISO code (`"en"`, `"de"`, ...).
+ * Null, malformed, or unknown codes fall back to the default locale.
+ *
+ * Returns null when `handle` is null. The caller must free the
+ * returned string with `vauchi_string_free`.
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null. `locale_code` must be
+ * a valid null-terminated C string or null.
+ */
+char *vauchi_app_tab_info(struct VauchiApp *handle, const char *locale_code);
+
+/**
+ * Return the desktop sidebar metadata as a JSON array.
+ *
+ * Mirrors `PlatformAppEngine::sidebar_items(MobileLocale)` (UniFFI) —
+ * the broader 14-entry top-level set used by desktop frames
+ * (MyInfo, Contacts, Exchange, Groups, Settings, Recovery,
+ * DeviceManagement, Backup, Privacy, Support, Help, ActivityLog,
+ * Sync, More). Pre-identity returns a single-element `[{onboarding}]`
+ * array.
+ *
+ * `locale_code`: see `vauchi_app_tab_info`.
+ *
+ * # Safety
+ * Same as `vauchi_app_tab_info`.
+ */
+char *vauchi_app_sidebar_items(struct VauchiApp *handle, const char *locale_code);
+
+/**
  * Start a device link as the existing device (initiator).
  *
  * Creates an initiator from the app's identity and device registry.

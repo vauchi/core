@@ -17,6 +17,7 @@ use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier};
 
 mod app;
 mod app_import_warnings;
+mod app_navigation;
 mod config;
 mod device_link;
 mod exchange;
@@ -25,6 +26,7 @@ pub(crate) mod platform_event;
 mod workflow;
 
 pub use app::*;
+pub use app_navigation::*;
 pub use device_link::*;
 pub use exchange::*;
 pub use i18n::*;

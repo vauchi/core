@@ -72,10 +72,16 @@ fuzz:nightly:
 
       # Run fuzz targets in parallel; capture exit code separately to avoid
       # pipefail killing the script before the CRASH/PASS count check runs.
+      # libFuzzer flags:
+      #   -verbosity=0        suppresses per-iteration pulse lines (NEW/REDUCE/cov/ft/corp).
+      #                       Without it, 11 × 300s of fuzzing emits ~27k progress lines and
+      #                       blows past GitLab's 4 MiB trace cap (last PASS echoes get truncated).
+      #   -print_final_stats=1 keeps one summary line per target so we still see exec counts.
+      # Crash output is unconditional — silencing progress does not hide failures.
       set +o pipefail
       echo "$TARGETS" | tr ' ' '\n' | grep -v '^$' | \
         xargs -P "$FUZZ_JOBS" -I{} sh -c \
-          'echo "START: {}"; cargo +nightly fuzz run {} -- -max_total_time='"$FUZZ_DURATION"' 2>&1 && echo "PASS:{}" || echo "CRASH:{}"' \
+          'echo "START: {}"; cargo +nightly fuzz run {} -- -max_total_time='"$FUZZ_DURATION"' -verbosity=0 -print_final_stats=1 2>&1 && echo "PASS:{}" || echo "CRASH:{}"' \
           | tee "$FUZZ_LOG"
       set -o pipefail
 

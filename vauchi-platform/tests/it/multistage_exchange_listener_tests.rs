@@ -142,6 +142,7 @@ fn wait_for(timeout: Duration, mut predicate: impl FnMut() -> bool) -> bool {
 
 // ── T1.T1 — Lifecycle: start emits initial QR + state transition ────
 
+// @internal
 #[test]
 fn start_emits_initial_qr_and_state_transition() {
     let session = session_with_dummy_payload("alice");
@@ -164,6 +165,7 @@ fn start_emits_initial_qr_and_state_transition() {
 
 // ── T1.T2 — on_state_changed fires only on actual transitions ───────
 
+// @internal
 #[test]
 fn state_changed_fires_only_on_actual_transitions() {
     let session = session_with_dummy_payload("alice");
@@ -195,6 +197,7 @@ fn state_changed_fires_only_on_actual_transitions() {
 
 // ── T1.T3 — Cancellation ────────────────────────────────────────────
 
+// @internal
 #[test]
 fn cancel_stops_callbacks_and_joins_thread() {
     let session = session_with_dummy_payload("alice");
@@ -245,6 +248,7 @@ fn cancel_stops_callbacks_and_joins_thread() {
 
 // ── T1.T5 — Idempotency of start / cancel ──────────────────────────
 
+// @internal
 #[test]
 fn start_is_idempotent() {
     let session = session_with_dummy_payload("alice");
@@ -268,6 +272,7 @@ fn start_is_idempotent() {
     );
 }
 
+// @internal
 #[test]
 fn cancel_before_start_is_noop() {
     let session = session_with_dummy_payload("alice");
@@ -283,6 +288,7 @@ fn cancel_before_start_is_noop() {
     assert_eq!(listener.session_ended_count(), 0);
 }
 
+// @internal
 #[test]
 fn cancel_is_idempotent() {
     let session = session_with_dummy_payload("alice");
@@ -306,6 +312,7 @@ fn cancel_is_idempotent() {
 
 // ── T1.T6 — Listener re-registration ────────────────────────────────
 
+// @internal
 #[test]
 fn listener_rebind_routes_new_callbacks_only_to_b() {
     let session = session_with_dummy_payload("alice");
@@ -344,6 +351,7 @@ fn listener_rebind_routes_new_callbacks_only_to_b() {
 
 // ── T1.T7 — Deprecated-API parity ───────────────────────────────────
 
+// @internal
 #[test]
 fn deprecated_getters_still_return_coherent_values() {
     let session = session_with_dummy_payload("alice");
@@ -406,6 +414,7 @@ fn exchange_payload_for(display_name: &str) -> Vec<u8> {
     payload
 }
 
+// @internal
 #[test]
 fn end_to_end_exchange_fires_on_finalized_with_peer_display_name() {
     let alice = Arc::new(MobileMultiStageSession::new(exchange_payload_for("Alice")));
@@ -481,6 +490,7 @@ fn end_to_end_exchange_fires_on_finalized_with_peer_display_name() {
 
 // ── T1.T4 — Concurrent process_scanned_qr + cycle thread ────────────
 
+// @internal
 #[test]
 fn process_scanned_qr_is_safe_concurrent_with_cycle_thread() {
     let session = session_with_dummy_payload("alice");

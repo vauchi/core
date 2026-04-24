@@ -4,12 +4,36 @@
 
 //! UniFFI bindings for the multi-stage exchange session.
 //!
-//! Wraps [`MultiStageSession`] in a thread-safe handle (`Mutex`)
-//! and exposes mobile-friendly enums/records for state and QR payloads.
+//! Wraps [`MultiStageSession`] in a thread-safe handle (`Mutex`) and exposes
+//! mobile-friendly enums/records for state and QR payloads.
+//!
+//! # Lifecycle (ADR-031 + G4 event API)
+//!
+//! ```text
+//! let session = VauchiPlatform::create_multistage_session()?;   // or ::new(card) in tests
+//! session.set_listener(Box::new(my_listener));
+//! session.start();                                              // spawns cycle thread
+//! // while the camera is scanning:
+//! session.process_scanned_qr(scanned_data);                     // may be called concurrently
+//! // on leaving the screen / error:
+//! session.cancel();                                             // idempotent; joins cycle thread
+//! ```
+//!
+//! The cycle thread owns the protocol clock — frontends must **not** run their
+//! own timers. All state progress arrives via [`MultiStageSessionListener`]
+//! callbacks from the `vauchi-exchange-cycle` thread. Consumers must dispatch
+//! to their UI thread before touching UI state.
 
 use std::sync::Mutex;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, AtomicU32, Ordering},
+};
+use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 use crate::error::LOCK_POISON_MSG;
+use crate::mobile_exchange::deserialize_exchange_payload;
 
 use vauchi_core::exchange::{MultiStageSession, ProtocolState, QrPayload};
 
@@ -79,31 +103,151 @@ impl From<QrPayload> for MobileQrPayload {
     }
 }
 
+/// Push-based callback interface for multi-stage exchange events.
+///
+/// Frontends implement this trait (in Swift/Kotlin via UniFFI) and register
+/// it with [`MobileMultiStageSession::set_listener`] before calling
+/// [`MobileMultiStageSession::start`]. Once `start()` is called, an internal
+/// `vauchi-exchange-cycle` thread drives the protocol clock and invokes these
+/// callbacks as state advances.
+///
+/// # Threading
+///
+/// Callbacks fire from the cycle thread, **not** the main/UI thread.
+/// Consumers must marshal to their platform's UI thread before touching UI
+/// state (`DispatchQueue.main.async` on iOS, `withContext(Dispatchers.Main)`
+/// on Android).
+///
+/// # Callback contract
+///
+/// - [`on_qr_payload`](Self::on_qr_payload) — fires for every QR frame the
+///   frontend should render.
+/// - [`on_state_changed`](Self::on_state_changed) — fires only when the
+///   protocol state actually changes (no duplicates).
+/// - [`on_finalized`](Self::on_finalized) — fires exactly once per successful
+///   session, carries the peer's display name for UX.
+/// - [`on_session_ended`](Self::on_session_ended) — final callback on the
+///   session (grace expired, FAIL broadcast done, or cancelled). Always last.
+#[uniffi::export(callback_interface)]
+pub trait MultiStageSessionListener: Send + Sync {
+    /// New QR payload to render. Core handles the cycle timing; the frontend
+    /// just renders whatever this emits and stops when the next callback
+    /// arrives.
+    fn on_qr_payload(&self, payload: MobileQrPayload);
+
+    /// Protocol state changed. Fires once per actual transition.
+    fn on_state_changed(&self, state: MobileProtocolState);
+
+    /// Exchange finalized successfully. `contact_name` is the peer's card
+    /// display name. Fires exactly once per successful session, before
+    /// [`on_session_ended`](Self::on_session_ended).
+    fn on_finalized(&self, contact_name: String);
+
+    /// Session has fully ended — grace period expired, FAIL broadcast
+    /// completed, or `cancel()` was called. Always the last callback.
+    fn on_session_ended(&self);
+}
+
+/// Fallback sleep duration (ms) when a QR payload does not carry a hint.
+///
+/// Matches the protocol's minimum `DISPLAY_MS_INIT` so the cycle thread
+/// stays responsive to cancellation.
+const DEFAULT_CYCLE_SLEEP_MS: u32 = 400;
+
+type ListenerSlot = Arc<Mutex<Option<Arc<dyn MultiStageSessionListener>>>>;
+
 /// Multi-stage exchange session handle for mobile platforms.
+///
+/// Holds the protocol state machine plus the event-cycle thread that drives
+/// it. `listener` is an `Arc<Mutex<…>>` so the cycle thread and
+/// `set_listener` share one slot — rebinds mid-session propagate immediately.
 #[derive(uniffi::Object)]
 pub struct MobileMultiStageSession {
-    inner: Mutex<MultiStageSession>,
+    inner: Arc<Mutex<MultiStageSession>>,
+    listener: ListenerSlot,
+    cancel_flag: Arc<AtomicBool>,
+    thread_handle: Mutex<Option<JoinHandle<()>>>,
+    /// Test-only sleep override (ms). `0` means "use the payload's
+    /// `display_duration_ms`" (production). Non-zero forces every cycle
+    /// iteration to sleep this many ms regardless of the payload hint — used
+    /// by the test harness to drive an exchange at wall-clock speeds that fit
+    /// inside a unit test.
+    cycle_sleep_override_ms: Arc<AtomicU32>,
 }
 
 #[uniffi::export]
 impl MobileMultiStageSession {
-    /// Create a new session with the local contact card to share.
+    /// Create a new session for the given local contact card payload.
+    ///
+    /// The session starts in `Idle` with no listener attached. The caller
+    /// must:
+    ///
+    /// 1. Register a listener via [`set_listener`](Self::set_listener).
+    /// 2. Call [`start`](Self::start) to spawn the cycle thread.
+    /// 3. Feed camera scans via
+    ///    [`process_scanned_qr`](Self::process_scanned_qr).
+    /// 4. Call [`cancel`](Self::cancel) when leaving the exchange view.
+    ///
+    /// `local_card` is the raw payload the protocol will transfer — normally
+    /// produced by `VauchiPlatform::create_multistage_session`.
     #[uniffi::constructor]
     pub fn new(local_card: Vec<u8>) -> Self {
         MobileMultiStageSession {
-            inner: Mutex::new(MultiStageSession::new(local_card)),
+            inner: Arc::new(Mutex::new(MultiStageSession::new(local_card))),
+            listener: Arc::new(Mutex::new(None)),
+            cancel_flag: Arc::new(AtomicBool::new(false)),
+            thread_handle: Mutex::new(None),
+            cycle_sleep_override_ms: Arc::new(AtomicU32::new(0)),
         }
     }
 
-    /// Get the QR payload the app should display right now.
-    pub fn get_display_qr(&self) -> Option<MobileQrPayload> {
-        let Ok(mut session) = self.inner.lock() else {
-            return None;
+    /// Register (or replace) the event listener. Safe to call before or
+    /// after [`start`](Self::start); subsequent callbacks route to the most
+    /// recently installed listener.
+    pub fn set_listener(&self, listener: Box<dyn MultiStageSessionListener>) {
+        if let Ok(mut slot) = self.listener.lock() {
+            *slot = Some(Arc::from(listener));
+        }
+    }
+
+    /// Spawn the cycle thread. Idempotent — a second call while the thread
+    /// is running is a no-op. Requires [`set_listener`](Self::set_listener)
+    /// to have been called; without a listener the thread still runs but
+    /// drops every event.
+    pub fn start(&self) {
+        let Ok(mut handle_slot) = self.thread_handle.lock() else {
+            return;
         };
-        session.get_display_qr().map(MobileQrPayload::from)
+        if handle_slot.as_ref().is_some_and(|h| !h.is_finished()) {
+            return;
+        }
+        // Clear any stale handle from a prior completed run.
+        *handle_slot = None;
+
+        // Reset cancellation for this run.
+        self.cancel_flag.store(false, Ordering::Relaxed);
+
+        let inner = Arc::clone(&self.inner);
+        let listener = Arc::clone(&self.listener);
+        let cancel_flag = Arc::clone(&self.cancel_flag);
+        let sleep_override = Arc::clone(&self.cycle_sleep_override_ms);
+
+        let spawn_result = thread::Builder::new()
+            .name("vauchi-exchange-cycle".into())
+            .spawn(move || {
+                cycle_loop(inner, listener, cancel_flag, sleep_override);
+            });
+        if let Ok(handle) = spawn_result {
+            *handle_slot = Some(handle);
+        }
     }
 
     /// Feed a scanned QR string into the protocol engine.
+    ///
+    /// Safe to call concurrently with the cycle thread — the inner
+    /// `MultiStageSession` is serialized by the same `Mutex` both paths
+    /// hold. Returns the post-scan state so frontends that are still on the
+    /// deprecated polling path observe a synchronous update.
     pub fn process_scanned_qr(&self, raw: String) -> MobileProtocolState {
         let Ok(mut session) = self.inner.lock() else {
             return MobileProtocolState::Failed {
@@ -113,7 +257,58 @@ impl MobileMultiStageSession {
         session.process_scanned_qr(&raw).into()
     }
 
+    /// Cancel the session. Sets the cancellation flag, waits for the cycle
+    /// thread to exit, wipes sensitive state, and drops the registered
+    /// listener. Idempotent — safe to call before `start`, multiple times,
+    /// or from any thread.
+    pub fn cancel(&self) {
+        self.cancel_flag.store(true, Ordering::Relaxed);
+
+        // Wipe sensitive protocol state.
+        if let Ok(mut session) = self.inner.lock() {
+            session.cancel();
+        }
+
+        // Join the cycle thread outside the inner lock so a mid-flight
+        // iteration can complete and observe the cancel flag.
+        let handle_opt = self
+            .thread_handle
+            .lock()
+            .ok()
+            .and_then(|mut slot| slot.take());
+        if let Some(handle) = handle_opt {
+            let _ = handle.join();
+        }
+
+        // Drop the listener last so a concurrent `cancel()` racing with a
+        // final `on_session_ended` still observes a coherent state.
+        if let Ok(mut slot) = self.listener.lock() {
+            *slot = None;
+        }
+    }
+
+    // ── Deprecated polling API ────────────────────────────────────────
+    //
+    // Retained through 0.22.x so frontends can migrate in sequence.
+    // Removed in 0.23 (implementation-plan.md Phase 3).
+
+    /// Get the QR payload the app should display right now.
+    #[deprecated(
+        since = "0.22.0",
+        note = "use MultiStageSessionListener via set_listener/start"
+    )]
+    pub fn get_display_qr(&self) -> Option<MobileQrPayload> {
+        let Ok(mut session) = self.inner.lock() else {
+            return None;
+        };
+        session.get_display_qr().map(MobileQrPayload::from)
+    }
+
     /// Poll current state.
+    #[deprecated(
+        since = "0.22.0",
+        note = "use MultiStageSessionListener via set_listener/start"
+    )]
     pub fn get_state(&self) -> MobileProtocolState {
         let Ok(session) = self.inner.lock() else {
             return MobileProtocolState::Failed {
@@ -124,6 +319,10 @@ impl MobileMultiStageSession {
     }
 
     /// On Complete: retrieve the peer's decrypted contact card.
+    #[deprecated(
+        since = "0.22.0",
+        note = "use MultiStageSessionListener via set_listener/start"
+    )]
     pub fn get_received_data(&self) -> Option<Vec<u8>> {
         let Ok(session) = self.inner.lock() else {
             return None;
@@ -132,21 +331,155 @@ impl MobileMultiStageSession {
     }
 
     /// Returns the ECDH transport key established during the exchange.
-    ///
-    /// Used by `VauchiPlatform::finalize_multistage_exchange` to derive
-    /// the shared secret for the double ratchet.
+    #[deprecated(
+        since = "0.22.0",
+        note = "use MultiStageSessionListener via set_listener/start"
+    )]
     pub fn get_transport_key(&self) -> Option<Vec<u8>> {
         let Ok(session) = self.inner.lock() else {
             return None;
         };
         session.get_transport_key().map(|k| k.to_vec())
     }
+}
 
-    /// Abort and wipe session.
-    pub fn cancel(&self) {
-        let Ok(mut session) = self.inner.lock() else {
-            return;
+impl MobileMultiStageSession {
+    /// Integration-test hook: force the cycle thread to sleep for a fixed
+    /// duration each iteration instead of honouring the payload's
+    /// `display_duration_ms`. Set to `0` to restore production behaviour.
+    ///
+    /// Exposed as `pub` (rather than `pub(crate)`) because integration
+    /// tests live in a separate crate. Not part of the UniFFI surface —
+    /// the `_for_test` suffix is the load-bearing contract with callers.
+    #[doc(hidden)]
+    pub fn set_cycle_sleep_override_ms_for_test(&self, override_ms: u32) {
+        self.cycle_sleep_override_ms
+            .store(override_ms, Ordering::Relaxed);
+    }
+
+    /// Integration-test hook: returns true if the cycle thread has exited.
+    #[doc(hidden)]
+    pub fn cycle_thread_finished_for_test(&self) -> bool {
+        self.thread_handle
+            .lock()
+            .ok()
+            .and_then(|slot| slot.as_ref().map(|h| h.is_finished()))
+            .unwrap_or(true)
+    }
+}
+
+/// Body of the cycle thread. Runs until `cancel_flag` flips or the inner
+/// session reports no further QR to display (natural termination after the
+/// finalized grace period or FAIL broadcast window).
+fn cycle_loop(
+    inner: Arc<Mutex<MultiStageSession>>,
+    listener_slot: ListenerSlot,
+    cancel_flag: Arc<AtomicBool>,
+    sleep_override_ms: Arc<AtomicU32>,
+) {
+    let mut prev_state: Option<MobileProtocolState> = None;
+    let mut finalized_fired = false;
+
+    loop {
+        if cancel_flag.load(Ordering::Relaxed) {
+            break;
+        }
+
+        let step = {
+            let Ok(mut session) = inner.lock() else {
+                break;
+            };
+            let qr = session.get_display_qr();
+            let after_state: MobileProtocolState = session.get_state().into();
+            let received_for_finalize = (matches!(after_state, MobileProtocolState::Finalized)
+                && !finalized_fired)
+                .then(|| session.get_received_data())
+                .flatten();
+            CycleStep {
+                qr_payload: qr.map(MobileQrPayload::from),
+                new_state: after_state,
+                finalize_payload: received_for_finalize,
+            }
         };
-        session.cancel();
+
+        let transitioned_to = match &prev_state {
+            Some(prev) if prev != &step.new_state => Some(step.new_state.clone()),
+            None => Some(step.new_state.clone()),
+            _ => None,
+        };
+
+        let listener = listener_slot.lock().ok().and_then(|g| g.clone());
+
+        if let (Some(listener), Some(payload)) = (listener.as_ref(), step.qr_payload.as_ref()) {
+            listener.on_qr_payload(payload.clone());
+        }
+
+        if let (Some(listener), Some(state)) = (listener.as_ref(), transitioned_to.as_ref()) {
+            listener.on_state_changed(state.clone());
+        }
+
+        if !finalized_fired
+            && matches!(step.new_state, MobileProtocolState::Finalized)
+            && let Some(ref payload) = step.finalize_payload
+        {
+            let name = contact_name_from_payload(payload);
+            if let Some(listener) = listener.as_ref() {
+                listener.on_finalized(name);
+            }
+            finalized_fired = true;
+        }
+
+        prev_state = Some(step.new_state.clone());
+
+        if step.qr_payload.is_none() {
+            break;
+        }
+
+        let sleep_ms = match sleep_override_ms.load(Ordering::Relaxed) {
+            0 => step
+                .qr_payload
+                .as_ref()
+                .map(|p| p.display_duration_ms)
+                .unwrap_or(DEFAULT_CYCLE_SLEEP_MS),
+            override_ms => override_ms,
+        };
+        responsive_sleep(Duration::from_millis(sleep_ms as u64), &cancel_flag);
+    }
+
+    // Final callback — fires once per session on any exit path: cancel,
+    // natural termination (grace expired / FAIL broadcast complete), or a
+    // poisoned inner lock. Callers rely on this as the "session cleanup
+    // complete" signal.
+    if let Some(listener) = listener_slot.lock().ok().and_then(|g| g.clone()) {
+        listener.on_session_ended();
+    }
+}
+
+struct CycleStep {
+    qr_payload: Option<MobileQrPayload>,
+    new_state: MobileProtocolState,
+    finalize_payload: Option<Vec<u8>>,
+}
+
+/// Best-effort peer display name extraction. Falls back to an empty string
+/// if the payload is malformed — the session is already Finalized by the
+/// time we get here, so we must deliver *some* name to `on_finalized`.
+fn contact_name_from_payload(data: &[u8]) -> String {
+    deserialize_exchange_payload(data)
+        .map(|(_, card)| card.display_name().to_string())
+        .unwrap_or_default()
+}
+
+/// Sleep for up to `total`, waking every ~25 ms to check for cancellation.
+fn responsive_sleep(total: Duration, cancel_flag: &AtomicBool) {
+    const CHUNK: Duration = Duration::from_millis(25);
+    let mut remaining = total;
+    while !remaining.is_zero() {
+        if cancel_flag.load(Ordering::Relaxed) {
+            return;
+        }
+        let chunk = remaining.min(CHUNK);
+        thread::sleep(chunk);
+        remaining = remaining.saturating_sub(chunk);
     }
 }

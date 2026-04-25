@@ -6,9 +6,7 @@
 //!
 //! These tests cover Phase 1 of `_private/docs/problems/2026-04-23-g4-exchange-event-api/`:
 //! listener registration, cycle-thread lifecycle, cancellation, idempotency,
-//! listener rebind, and deprecated-API parity.
-
-#![allow(deprecated)] // parity tests intentionally exercise the deprecated polling path.
+//! and listener rebind.
 
 use std::sync::{
     Arc, Mutex,
@@ -347,29 +345,6 @@ fn listener_rebind_routes_new_callbacks_only_to_b() {
         1,
         "listener B should receive the final on_session_ended"
     );
-}
-
-// ── T1.T7 — Deprecated-API parity ───────────────────────────────────
-
-// @internal
-#[test]
-fn deprecated_getters_still_return_coherent_values() {
-    let session = session_with_dummy_payload("alice");
-
-    // Before start: Idle and no QR.
-    assert_eq!(session.get_state(), MobileProtocolState::Idle);
-
-    // get_display_qr advances state machine to Advertising.
-    let qr = session.get_display_qr();
-    assert!(
-        qr.is_some(),
-        "get_display_qr should yield an Advertising QR"
-    );
-    assert_eq!(session.get_state(), MobileProtocolState::Advertising);
-
-    // Transport key and received data only exist post-exchange.
-    assert!(session.get_transport_key().is_none());
-    assert!(session.get_received_data().is_none());
 }
 
 // ── T1.T1 — End-to-end exchange: Alice ↔ Bob with auto-finalize ─────

@@ -246,8 +246,9 @@ impl MobileMultiStageSession {
     ///
     /// Safe to call concurrently with the cycle thread — the inner
     /// `MultiStageSession` is serialized by the same `Mutex` both paths
-    /// hold. Returns the post-scan state so frontends that are still on the
-    /// deprecated polling path observe a synchronous update.
+    /// hold. Returns the post-scan state so the camera pipeline has an
+    /// immediate signal even before the next listener cycle observes the
+    /// transition.
     pub fn process_scanned_qr(&self, raw: String) -> MobileProtocolState {
         let Ok(mut session) = self.inner.lock() else {
             return MobileProtocolState::Failed {
@@ -285,61 +286,6 @@ impl MobileMultiStageSession {
         if let Ok(mut slot) = self.listener.lock() {
             *slot = None;
         }
-    }
-
-    // ── Deprecated polling API ────────────────────────────────────────
-    //
-    // Retained through 0.22.x so frontends can migrate in sequence.
-    // Removed in 0.23 (implementation-plan.md Phase 3).
-
-    /// Get the QR payload the app should display right now.
-    #[deprecated(
-        since = "0.22.0",
-        note = "use MultiStageSessionListener via set_listener/start"
-    )]
-    pub fn get_display_qr(&self) -> Option<MobileQrPayload> {
-        let Ok(mut session) = self.inner.lock() else {
-            return None;
-        };
-        session.get_display_qr().map(MobileQrPayload::from)
-    }
-
-    /// Poll current state.
-    #[deprecated(
-        since = "0.22.0",
-        note = "use MultiStageSessionListener via set_listener/start"
-    )]
-    pub fn get_state(&self) -> MobileProtocolState {
-        let Ok(session) = self.inner.lock() else {
-            return MobileProtocolState::Failed {
-                reason: LOCK_POISON_MSG.into(),
-            };
-        };
-        session.get_state().into()
-    }
-
-    /// On Complete: retrieve the peer's decrypted contact card.
-    #[deprecated(
-        since = "0.22.0",
-        note = "use MultiStageSessionListener via set_listener/start"
-    )]
-    pub fn get_received_data(&self) -> Option<Vec<u8>> {
-        let Ok(session) = self.inner.lock() else {
-            return None;
-        };
-        session.get_received_data()
-    }
-
-    /// Returns the ECDH transport key established during the exchange.
-    #[deprecated(
-        since = "0.22.0",
-        note = "use MultiStageSessionListener via set_listener/start"
-    )]
-    pub fn get_transport_key(&self) -> Option<Vec<u8>> {
-        let Ok(session) = self.inner.lock() else {
-            return None;
-        };
-        session.get_transport_key().map(|k| k.to_vec())
     }
 }
 

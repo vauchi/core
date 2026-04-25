@@ -896,8 +896,8 @@ impl vauchi_core::api::PurgeSender for MobileRelaySender {
 /// Uses on-demand storage connections for thread safety.
 #[derive(uniffi::Object)]
 pub struct VauchiPlatform {
-    storage_path: PathBuf,
-    storage_key: SymmetricKey,
+    pub(crate) storage_path: PathBuf,
+    pub(crate) storage_key: SymmetricKey,
     relay_url: String,
     /// Optional PEM-encoded certificate for TLS pinning.
     pinned_cert_pem: Mutex<Option<String>>,

@@ -149,6 +149,10 @@ impl VauchiPlatform {
         let identity = self.get_identity()?;
         let card = self.get_own_card_or_default(&identity)?;
         let payload = serialize_exchange_payload(identity.signing_public_key(), &card);
-        Ok(Arc::new(MobileMultiStageSession::new(payload)))
+        Ok(Arc::new(MobileMultiStageSession::with_persistence(
+            payload,
+            self.storage_path.clone(),
+            self.storage_key.clone(),
+        )))
     }
 }

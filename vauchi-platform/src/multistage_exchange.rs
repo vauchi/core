@@ -24,6 +24,7 @@
 //! callbacks from the `vauchi-exchange-cycle` thread. Consumers must dispatch
 //! to their UI thread before touching UI state.
 
+use std::path::PathBuf;
 use std::sync::Mutex;
 use std::sync::{
     Arc,
@@ -32,10 +33,14 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use crate::error::LOCK_POISON_MSG;
+use crate::error::{LOCK_POISON_MSG, MobileError};
 use crate::mobile_exchange::deserialize_exchange_payload;
 
+use vauchi_core::contact::Contact;
+use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::{MultiStageSession, ProtocolState, QrPayload};
+use vauchi_core::storage::Storage;
 
 /// Mobile-friendly protocol state enum (UniFFI-compatible).
 #[derive(uniffi::Enum, Debug, Clone, PartialEq)]
@@ -156,6 +161,20 @@ const DEFAULT_CYCLE_SLEEP_MS: u32 = 400;
 
 type ListenerSlot = Arc<Mutex<Option<Arc<dyn MultiStageSessionListener>>>>;
 
+/// Persistence handle the cycle thread uses to land the peer contact in
+/// storage when the protocol reaches `Finalized`. Cheaply cloned (a path
+/// string + the storage key) so each `start()` call can move a copy into
+/// the cycle thread without sharing state with the session struct.
+///
+/// `None` for harness/test sessions constructed via
+/// [`MobileMultiStageSession::new`]; `Some` for production sessions
+/// constructed via [`VauchiPlatform::create_multistage_session`].
+#[derive(Clone)]
+pub(crate) struct PersistenceContext {
+    pub(crate) storage_path: PathBuf,
+    pub(crate) storage_key: SymmetricKey,
+}
+
 /// Multi-stage exchange session handle for mobile platforms.
 ///
 /// Holds the protocol state machine plus the event-cycle thread that drives
@@ -173,6 +192,10 @@ pub struct MobileMultiStageSession {
     /// by the test harness to drive an exchange at wall-clock speeds that fit
     /// inside a unit test.
     cycle_sleep_override_ms: Arc<AtomicU32>,
+    /// Storage handle for the cycle thread's Finalized-state persistence
+    /// path. `Some` for sessions created from a `VauchiPlatform`, `None`
+    /// for the harness constructor used by listener-only unit tests.
+    persistence: Option<PersistenceContext>,
 }
 
 #[uniffi::export]
@@ -192,13 +215,7 @@ impl MobileMultiStageSession {
     /// produced by `VauchiPlatform::create_multistage_session`.
     #[uniffi::constructor]
     pub fn new(local_card: Vec<u8>) -> Self {
-        MobileMultiStageSession {
-            inner: Arc::new(Mutex::new(MultiStageSession::new(local_card))),
-            listener: Arc::new(Mutex::new(None)),
-            cancel_flag: Arc::new(AtomicBool::new(false)),
-            thread_handle: Mutex::new(None),
-            cycle_sleep_override_ms: Arc::new(AtomicU32::new(0)),
-        }
+        MobileMultiStageSession::build(local_card, None)
     }
 
     /// Register (or replace) the event listener. Safe to call before or
@@ -231,11 +248,12 @@ impl MobileMultiStageSession {
         let listener = Arc::clone(&self.listener);
         let cancel_flag = Arc::clone(&self.cancel_flag);
         let sleep_override = Arc::clone(&self.cycle_sleep_override_ms);
+        let persistence = self.persistence.clone();
 
         let spawn_result = thread::Builder::new()
             .name("vauchi-exchange-cycle".into())
             .spawn(move || {
-                cycle_loop(inner, listener, cancel_flag, sleep_override);
+                cycle_loop(inner, listener, cancel_flag, sleep_override, persistence);
             });
         if let Ok(handle) = spawn_result {
             *handle_slot = Some(handle);
@@ -290,6 +308,34 @@ impl MobileMultiStageSession {
 }
 
 impl MobileMultiStageSession {
+    /// Internal constructor used by `VauchiPlatform::create_multistage_session`
+    /// to attach the persistence context the cycle thread needs to land the
+    /// peer contact in storage at the `Finalized` transition.
+    pub(crate) fn with_persistence(
+        local_card: Vec<u8>,
+        storage_path: PathBuf,
+        storage_key: SymmetricKey,
+    ) -> Self {
+        MobileMultiStageSession::build(
+            local_card,
+            Some(PersistenceContext {
+                storage_path,
+                storage_key,
+            }),
+        )
+    }
+
+    fn build(local_card: Vec<u8>, persistence: Option<PersistenceContext>) -> Self {
+        MobileMultiStageSession {
+            inner: Arc::new(Mutex::new(MultiStageSession::new(local_card))),
+            listener: Arc::new(Mutex::new(None)),
+            cancel_flag: Arc::new(AtomicBool::new(false)),
+            thread_handle: Mutex::new(None),
+            cycle_sleep_override_ms: Arc::new(AtomicU32::new(0)),
+            persistence,
+        }
+    }
+
     /// Integration-test hook: force the cycle thread to sleep for a fixed
     /// duration each iteration instead of honouring the payload's
     /// `display_duration_ms`. Set to `0` to restore production behaviour.
@@ -322,6 +368,7 @@ fn cycle_loop(
     listener_slot: ListenerSlot,
     cancel_flag: Arc<AtomicBool>,
     sleep_override_ms: Arc<AtomicU32>,
+    persistence: Option<PersistenceContext>,
 ) {
     let mut prev_state: Option<MobileProtocolState> = None;
     let mut finalized_fired = false;
@@ -337,14 +384,19 @@ fn cycle_loop(
             };
             let qr = session.get_display_qr();
             let after_state: MobileProtocolState = session.get_state().into();
-            let received_for_finalize = (matches!(after_state, MobileProtocolState::Finalized)
-                && !finalized_fired)
+            let entering_finalized =
+                matches!(after_state, MobileProtocolState::Finalized) && !finalized_fired;
+            let received_for_finalize = entering_finalized
                 .then(|| session.get_received_data())
+                .flatten();
+            let transport_key_for_finalize = entering_finalized
+                .then(|| session.get_transport_key())
                 .flatten();
             CycleStep {
                 qr_payload: qr.map(MobileQrPayload::from),
                 new_state: after_state,
                 finalize_payload: received_for_finalize,
+                finalize_transport_key: transport_key_for_finalize,
             }
         };
 
@@ -369,9 +421,37 @@ fn cycle_loop(
             && let Some(ref payload) = step.finalize_payload
         {
             let name = contact_name_from_payload(payload);
-            if let Some(listener) = listener.as_ref() {
-                listener.on_finalized(name);
+
+            // Persist the peer contact *before* notifying the frontend.
+            // If persistence is configured (production path) and fails,
+            // surface a Failed state instead of a misleading on_finalized.
+            // Sessions without persistence (harness/listener unit tests)
+            // still fire on_finalized as before.
+            let persist_result = persistence.as_ref().map(|ctx| {
+                let transport_key =
+                    step.finalize_transport_key
+                        .ok_or_else(|| MobileError::Other {
+                            detail: "Finalized without transport key — cannot persist contact"
+                                .to_string(),
+                        })?;
+                persist_finalized_contact(ctx, payload, transport_key)
+            });
+
+            match persist_result {
+                None | Some(Ok(())) => {
+                    if let Some(listener) = listener.as_ref() {
+                        listener.on_finalized(name);
+                    }
+                }
+                Some(Err(err)) => {
+                    if let Some(listener) = listener.as_ref() {
+                        listener.on_state_changed(MobileProtocolState::Failed {
+                            reason: format!("persistence failed: {err}"),
+                        });
+                    }
+                }
             }
+
             finalized_fired = true;
         }
 
@@ -405,6 +485,42 @@ struct CycleStep {
     qr_payload: Option<MobileQrPayload>,
     new_state: MobileProtocolState,
     finalize_payload: Option<Vec<u8>>,
+    finalize_transport_key: Option<[u8; 32]>,
+}
+
+/// Persist the peer contact + initialise the double ratchet.
+///
+/// Mirrors the body that previously lived in
+/// `VauchiPlatform::finalize_multistage_exchange` (removed in Phase 3
+/// partial alongside the deprecated polling getters): deserialize the
+/// exchange payload, build a `Contact`, upsert via `save_contact`, then
+/// initialise the ratchet keyed off the transport secret. Runs on the
+/// cycle thread, so any error here stays local to that thread and is
+/// reported through `on_state_changed(Failed{…})`.
+fn persist_finalized_contact(
+    ctx: &PersistenceContext,
+    received_data: &[u8],
+    transport_key: [u8; 32],
+) -> Result<(), MobileError> {
+    let (public_key, card) = deserialize_exchange_payload(received_data)?;
+    let shared_key = SymmetricKey::from_bytes(transport_key);
+    let contact = Contact::from_exchange(public_key, card, shared_key.clone());
+
+    let storage =
+        Storage::open(&ctx.storage_path, ctx.storage_key.clone()).map_err(MobileError::from)?;
+    let contact_id = contact.id().to_string();
+
+    storage.save_contact(&contact)?;
+
+    let ratchet =
+        DoubleRatchetState::initialize_initiator(&shared_key, public_key).map_err(|e| {
+            MobileError::Other {
+                detail: e.to_string(),
+            }
+        })?;
+    storage.save_ratchet_state(&contact_id, &ratchet, true)?;
+
+    Ok(())
 }
 
 /// Best-effort peer display name extraction. Falls back to an empty string

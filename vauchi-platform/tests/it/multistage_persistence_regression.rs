@@ -127,11 +127,11 @@ fn wait_until(timeout: Duration, mut predicate: impl FnMut() -> bool) -> bool {
 
 // @internal
 //
-// **RED on main / Phase 3 partial.** Persistence regression — see the
-// problem record. Remove the `#[ignore]` as the Phase 2.5 fix lands;
-// at that point this becomes the green contract test.
+// Phase 2.5 contract test — the cycle thread persists the peer contact
+// (and ratchet) at the `Finalized` transition before firing
+// `on_finalized`. RED on main pre-Phase-2.5; green once
+// `MobileMultiStageSession::with_persistence` is wired.
 #[test]
-#[ignore = "regression — see _private/docs/problems/2026-04-23-g4-exchange-event-api Phase 2.5"]
 fn listener_path_persists_peer_contact_after_finalized() {
     let (alice, _alice_dir) = new_platform("Alice");
     let (bob, _bob_dir) = new_platform("Bob");

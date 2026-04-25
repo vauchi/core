@@ -6,9 +6,7 @@
 
 use std::sync::Arc;
 
-use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
 
 use super::VauchiPlatform;
@@ -152,67 +150,5 @@ impl VauchiPlatform {
         let card = self.get_own_card_or_default(&identity)?;
         let payload = serialize_exchange_payload(identity.signing_public_key(), &card);
         Ok(Arc::new(MobileMultiStageSession::new(payload)))
-    }
-
-    /// Finalize a completed multi-stage exchange session.
-    ///
-    /// Deserializes the peer's exchange payload (public key + contact card),
-    /// creates a Contact using the transport key as the shared secret,
-    /// saves it to storage, and initializes the double ratchet.
-    ///
-    /// On repeat exchange: same ratchet-reset semantics as `finalize_exchange` —
-    /// card is upserted, ratchet re-initialized, in-flight messages lost.
-    ///
-    /// The session must be in the Complete state with received data available.
-    #[allow(deprecated)] // session getters deprecated in 0.22, removed in Phase 3 alongside this method
-    pub fn finalize_multistage_exchange(
-        &self,
-        session: &MobileMultiStageSession,
-    ) -> Result<MobileExchangeResult, MobileError> {
-        let received_data = session
-            .get_received_data()
-            .ok_or_else(|| MobileError::Other {
-                detail: "No received data".to_string(),
-            })?;
-
-        let transport_key_bytes: [u8; 32] = session
-            .get_transport_key()
-            .ok_or_else(|| MobileError::Other {
-                detail: "No transport key".to_string(),
-            })?
-            .try_into()
-            .map_err(|_| MobileError::Other {
-                detail: "Invalid transport key length".to_string(),
-            })?;
-
-        let (public_key, card) = deserialize_exchange_payload(&received_data)?;
-        let shared_key = SymmetricKey::from_bytes(transport_key_bytes);
-
-        let contact = Contact::from_exchange(public_key, card, shared_key.clone());
-        let storage = self.open_storage()?;
-
-        let contact_id = contact.id().to_string();
-        let contact_name = contact.display_name().to_string();
-
-        // Upsert: save_contact uses INSERT ON CONFLICT UPDATE, so
-        // repeated exchanges with the same peer update the card data
-        // rather than failing.
-        storage.save_contact(&contact)?;
-
-        // Initialize double ratchet with transport-derived shared key
-        let ratchet =
-            DoubleRatchetState::initialize_initiator(&shared_key, public_key).map_err(|e| {
-                MobileError::Other {
-                    detail: e.to_string(),
-                }
-            })?;
-        storage.save_ratchet_state(&contact_id, &ratchet, true)?;
-
-        Ok(MobileExchangeResult {
-            contact_id,
-            contact_name,
-            success: true,
-            error_message: None,
-        })
     }
 }

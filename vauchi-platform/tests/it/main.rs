@@ -12,6 +12,7 @@ mod ffi_boundary_tests;
 mod mobile_contact_display_tests;
 mod mobile_ui_tests;
 mod multistage_exchange_listener_tests;
+mod multistage_persistence_regression;
 mod platform_app_engine_tests;
 mod policies_tests;
 mod validation_tests;

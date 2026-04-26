@@ -22,8 +22,9 @@
 //! TODO(B): Migrate to dedicated `/v2/device-link` relay endpoints for
 //! a single-round-trip flow. See problem record.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -85,46 +86,54 @@ fn decode_device_link_message(data: &[u8]) -> Result<DeviceLinkRelayMessage, Dev
     Ok(serde_json::from_slice(data)?)
 }
 
-/// Send a device link request via relay and wait for the response.
+/// Create a device-link offer for the existing device (initiator).
 ///
-/// Used by the **new device** (responder). Two exchange cycles:
-/// 1. Create a return channel via `exchange_offer`
-/// 2. Claim the existing device's offer with our request + return code
-/// 3. Poll the return channel for the existing device's response
-pub fn send_and_receive(
+/// Posts an `exchange_offer` with the identity info and returns the
+/// broker code that gets embedded in the QR. This is the first step
+/// of the initiator's relay flow; the second step is
+/// [`poll_for_claim`].
+pub fn create_offer(
     transport: &HttpTransport,
-    message: &DeviceLinkRelayMessage,
+    identity_id: &str,
     timeout_secs: u64,
-) -> Result<Vec<u8>, DeviceLinkError> {
-    // 1. Create return channel
-    let response_code = transport
-        .exchange_offer(&BASE64.encode(b""), Some(timeout_secs))
-        .map_err(|e| DeviceLinkError::OfferFailed(e.to_string()))?;
+) -> Result<String, DeviceLinkError> {
+    transport
+        .exchange_offer(&BASE64.encode(identity_id.as_bytes()), Some(timeout_secs))
+        .map_err(|e| DeviceLinkError::OfferFailed(e.to_string()))
+}
 
-    // 2. Claim the existing device's offer (code = sender_token from QR)
-    let claim_payload = ClaimPayload {
-        request: message.payload.clone(),
-        response_code: response_code.clone(),
-    };
-    let claim_json = serde_json::to_vec(&claim_payload)
-        .map_err(|e| DeviceLinkError::ClaimFailed(e.to_string()))?;
-
-    let _identity_info = transport
-        .exchange_claim(&message.sender_token, &BASE64.encode(&claim_json))
-        .map_err(|e| DeviceLinkError::ClaimFailed(e.to_string()))?;
-
-    // 3. Poll for response on the return channel
-    let deadline = std::time::Instant::now() + Duration::from_secs(timeout_secs);
+/// Poll a previously-created offer until the new device claims it.
+///
+/// Used by the orchestrator's cycle thread on the initiator side.
+/// Loops calling `exchange_complete(code)` once per second until one of:
+///
+/// - `Ok(Some(...))` — peer claimed; returns `(request_payload, response_code)`
+/// - `Instant::now() >= deadline` — `Err(RequestTimeout)`
+/// - `cancel.load(Relaxed)` — `Err(RequestTimeout)` (cancellation surfaces
+///   as the same timeout error today; the orchestrator tags it semantically
+///   based on which condition tripped first)
+/// - transport error — `Err(Network)` propagated immediately
+///
+/// The 1-second poll cadence is the granularity at which cancel and
+/// expiry are observed; both usually surface within ~1 s.
+pub fn poll_for_claim(
+    transport: &HttpTransport,
+    code: &str,
+    deadline: Instant,
+    cancel: &AtomicBool,
+) -> Result<(Vec<u8>, String), DeviceLinkError> {
     loop {
-        if std::time::Instant::now() >= deadline {
-            return Err(DeviceLinkError::ResponseTimeout);
+        if cancel.load(Ordering::Relaxed) || Instant::now() >= deadline {
+            return Err(DeviceLinkError::RequestTimeout);
         }
-        match transport.exchange_complete(&response_code) {
-            Ok(Some(response_b64)) => {
-                let bytes = BASE64
-                    .decode(&response_b64)
+        match transport.exchange_complete(code) {
+            Ok(Some(claim_b64)) => {
+                let claim_bytes = BASE64
+                    .decode(&claim_b64)
                     .map_err(|e| DeviceLinkError::Network(format!("decode: {e}")))?;
-                return Ok(bytes);
+                let claim: ClaimPayload =
+                    serde_json::from_slice(&claim_bytes).map_err(DeviceLinkError::DecodeFailed)?;
+                return Ok((claim.request, claim.response_code));
             }
             Ok(None) => {
                 thread::sleep(Duration::from_secs(1));
@@ -134,39 +143,54 @@ pub fn send_and_receive(
     }
 }
 
-/// Listen for an incoming device link request via relay.
+/// Claim the existing device's offer and post our encrypted request
+/// (responder side). Returns the `response_code` for the return channel
+/// the orchestrator polls via [`poll_for_response`].
 ///
-/// Used by the **existing device** (initiator):
-/// 1. Post an offer with our identity info → get code (for QR)
-/// 2. Poll `exchange_complete` until the new device claims it
-/// 3. Return the request payload and response_code (as sender_token)
-///
-/// Returns `(code, payload, sender_token)` where `code` is the exchange
-/// code to embed in the QR, and `sender_token` is the response_code.
-pub fn create_offer_and_listen(
+/// Two HTTP roundtrips: `exchange_offer("")` to allocate the return
+/// channel, then `exchange_claim(message.sender_token, …)` to deposit
+/// the encrypted request alongside the return code.
+pub fn claim_and_send_request(
     transport: &HttpTransport,
-    identity_id: &str,
+    message: &DeviceLinkRelayMessage,
     timeout_secs: u64,
-) -> Result<(String, Vec<u8>, String), DeviceLinkError> {
-    // 1. Create offer with identity info
-    let code = transport
-        .exchange_offer(&BASE64.encode(identity_id.as_bytes()), Some(timeout_secs))
+) -> Result<String, DeviceLinkError> {
+    let response_code = transport
+        .exchange_offer(&BASE64.encode(b""), Some(timeout_secs))
         .map_err(|e| DeviceLinkError::OfferFailed(e.to_string()))?;
 
-    // 2. Poll until claimed
-    let deadline = std::time::Instant::now() + Duration::from_secs(timeout_secs);
+    let claim_payload = ClaimPayload {
+        request: message.payload.clone(),
+        response_code: response_code.clone(),
+    };
+    let claim_json = serde_json::to_vec(&claim_payload)
+        .map_err(|e| DeviceLinkError::ClaimFailed(e.to_string()))?;
+
+    transport
+        .exchange_claim(&message.sender_token, &BASE64.encode(&claim_json))
+        .map_err(|e| DeviceLinkError::ClaimFailed(e.to_string()))?;
+
+    Ok(response_code)
+}
+
+/// Poll a previously-claimed return channel for the initiator's
+/// response (responder side). Same poll/cancel/deadline shape as
+/// [`poll_for_claim`]; returns the raw response bytes.
+pub fn poll_for_response(
+    transport: &HttpTransport,
+    response_code: &str,
+    deadline: Instant,
+    cancel: &AtomicBool,
+) -> Result<Vec<u8>, DeviceLinkError> {
     loop {
-        if std::time::Instant::now() >= deadline {
-            return Err(DeviceLinkError::RequestTimeout);
+        if cancel.load(Ordering::Relaxed) || Instant::now() >= deadline {
+            return Err(DeviceLinkError::ResponseTimeout);
         }
-        match transport.exchange_complete(&code) {
-            Ok(Some(claim_b64)) => {
-                let claim_bytes = BASE64
-                    .decode(&claim_b64)
-                    .map_err(|e| DeviceLinkError::Network(format!("decode: {e}")))?;
-                let claim: ClaimPayload =
-                    serde_json::from_slice(&claim_bytes).map_err(DeviceLinkError::DecodeFailed)?;
-                return Ok((code, claim.request, claim.response_code));
+        match transport.exchange_complete(response_code) {
+            Ok(Some(response_b64)) => {
+                return BASE64
+                    .decode(&response_b64)
+                    .map_err(|e| DeviceLinkError::Network(format!("decode: {e}")));
             }
             Ok(None) => {
                 thread::sleep(Duration::from_secs(1));
@@ -174,6 +198,40 @@ pub fn create_offer_and_listen(
             Err(e) => return Err(DeviceLinkError::Network(e.to_string())),
         }
     }
+}
+
+/// Send a device link request via relay and wait for the response
+/// (responder; legacy single-call API). Now a thin shim over
+/// [`claim_and_send_request`] + [`poll_for_response`] with a
+/// never-tripped cancel flag.
+pub fn send_and_receive(
+    transport: &HttpTransport,
+    message: &DeviceLinkRelayMessage,
+    timeout_secs: u64,
+) -> Result<Vec<u8>, DeviceLinkError> {
+    let response_code = claim_and_send_request(transport, message, timeout_secs)?;
+    let deadline = Instant::now() + Duration::from_secs(timeout_secs);
+    let never_cancel = AtomicBool::new(false);
+    poll_for_response(transport, &response_code, deadline, &never_cancel)
+}
+
+/// Listen for an incoming device link request via relay (initiator;
+/// legacy single-call API). Now a thin shim over [`create_offer`] +
+/// [`poll_for_claim`] with a never-tripped cancel flag.
+///
+/// Returns `(code, payload, sender_token)` — `code` is the exchange
+/// broker code (embedded in the QR) and `sender_token` is the return
+/// channel's response_code that the initiator uses to send its reply.
+pub fn create_offer_and_listen(
+    transport: &HttpTransport,
+    identity_id: &str,
+    timeout_secs: u64,
+) -> Result<(String, Vec<u8>, String), DeviceLinkError> {
+    let code = create_offer(transport, identity_id, timeout_secs)?;
+    let deadline = Instant::now() + Duration::from_secs(timeout_secs);
+    let never_cancel = AtomicBool::new(false);
+    let (payload, sender_token) = poll_for_claim(transport, &code, deadline, &never_cancel)?;
+    Ok((code, payload, sender_token))
 }
 
 /// Listen for an incoming device link request (legacy API adapter).

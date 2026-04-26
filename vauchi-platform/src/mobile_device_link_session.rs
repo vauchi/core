@@ -396,6 +396,24 @@ impl MobileDeviceLinkSession {
         }
     }
 
+    /// Integration-test harness constructor. Mirrors G4's
+    /// `MobileMultiStageSession::new(local_card)` shape: takes a
+    /// pre-built `DeviceLinkInitiator` plus an `HttpTransport`
+    /// (typically pointed at a dead/stub URL via
+    /// `HttpTransportConfig::for_testing`), no persistence. Not part
+    /// of the UniFFI surface — `_for_test` is the load-bearing
+    /// contract with callers, and `DeviceLinkInitiator` /
+    /// `HttpTransport` are not UniFFI types.
+    #[doc(hidden)]
+    pub fn new_initiator_for_test(
+        initiator: DeviceLinkInitiator,
+        transport: HttpTransport,
+        identity_id: String,
+        relay_timeout_secs: u64,
+    ) -> Self {
+        Self::build_initiator(initiator, transport, identity_id, relay_timeout_secs, None)
+    }
+
     /// Integration-test hook: shorten the user-action poll cadence
     /// so listener tests do not have to wait the production 250 ms
     /// per iteration. `0` restores production behaviour. Exposed

@@ -6,6 +6,7 @@
 
 mod contact_lifecycle_tests;
 mod content_tests;
+mod device_link_listener_tests;
 mod error_tests;
 mod exchange_session_mobile_tests;
 mod ffi_boundary_tests;

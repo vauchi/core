@@ -433,28 +433,28 @@ update:swift-bindings:
       git clone --depth 1 "https://vauchi-gitlab-runner:${CI_PUSH_TOKEN_SWIFT}@gitlab.com/vauchi/vauchi-platform-swift.git" "$PLATFORM_SWIFT_DIR"
       cd "$PLATFORM_SWIFT_DIR"
 
-      # Update Package.swift version + checksum
+      # Update Package.swift version + checksum only.
+      # The binaryTarget structure is env-var-aware upstream — see
+      # vauchi-platform-swift Package.swift's `useLocalXCFramework` block
+      # (problem 2026-04-26-vauchi-platform-swift-resolve-hang). Do NOT
+      # rewrite the binaryTarget here: the URL form would clobber the
+      # `path:` escape hatch that ios/macos CI relies on to bypass
+      # SwiftPM's hung URLSession download path.
       sed -i "s/let version = \".*\"/let version = \"$CLEAN_VERSION\"/" Package.swift
       sed -i "s/let checksum = \".*\"/let checksum = \"$CHECKSUM\"/" Package.swift
 
-      # Enforce REMOTE binaryTarget (wire-bindings-local.sh may have switched to LOCAL)
-      # Rewrite the binaryTarget section to always use REMOTE URL mode.
-      # This guards against wire-bindings-local.sh changes being committed.
-      REMOTE_URL='https://gitlab.com/api/v4/projects/vauchi%2Fcore/packages/generic/vauchi-platform/\(version)/VauchiPlatformFFI.xcframework.zip'
-      printf '%s\n' \
-        'import re, sys' \
-        'path, url = sys.argv[1], sys.argv[2]' \
-        'Q = chr(34)' \
-        'with open(path) as f: content = f.read()' \
-        'content = re.sub(r"[ \t]+// REMOTE \(original.*?\n(?:[ \t]+//[^\n]*\n)*", "", content)' \
-        'content = re.sub(r"[ \t]+// LOCAL \(set by wire-bindings-local\.sh\):\n", "", content)' \
-        'pattern = r"([ \t]+)(?://[^\n]*\n\s*)*\.binaryTarget\([\s\S]*?\),"' \
-        'repl = r"\g<1>.binaryTarget(" + "\n" + r"\g<1>    name: " + Q + "VauchiPlatformFFI" + Q + "," + "\n" + r"\g<1>    url: " + Q + url + Q + "," + "\n" + r"\g<1>    checksum: checksum" + "\n" + r"\g<1>),"' \
-        'content = re.sub(pattern, repl, content)' \
-        'with open(path, "w") as f: f.write(content)' \
-        > "/tmp/fix-package-swift-${CI_JOB_ID}.py"
-      python3 "/tmp/fix-package-swift-${CI_JOB_ID}.py" Package.swift "$REMOTE_URL"
-      echo "Ensured Package.swift uses REMOTE binaryTarget"
+      # Sanity-check: the env-var-aware binaryTarget must still be present.
+      # If a future commit removes it, the next bump-MR pipeline will hang
+      # again on the URLSession path — fail loudly here instead.
+      if ! grep -q "VAUCHI_PLATFORM_USE_LOCAL_XCFRAMEWORK" Package.swift; then
+        echo "ERROR: vauchi-platform-swift Package.swift no longer contains"
+        echo "       the VAUCHI_PLATFORM_USE_LOCAL_XCFRAMEWORK env-var switch."
+        echo "       This is the documented escape hatch for CI consumers —"
+        echo "       see _private/docs/problems/2026-04-26-vauchi-platform-swift-resolve-hang/."
+        echo "       Restore the conditional binaryTarget before re-releasing."
+        exit 1
+      fi
+      echo "Package.swift retains env-var-aware binaryTarget (Fix C intact)"
 
       # Update Swift bindings source
       cp "$SWIFT_BINDINGS_DIR/vauchi_platform.swift" Sources/VauchiPlatform/vauchi_platform.swift

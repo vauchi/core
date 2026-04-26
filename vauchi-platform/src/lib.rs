@@ -36,6 +36,7 @@ mod mobile_contacts;
 mod mobile_content;
 mod mobile_delivery;
 mod mobile_device_link;
+mod mobile_device_link_session;
 mod mobile_exchange;
 mod mobile_gdpr;
 mod mobile_identity;
@@ -98,6 +99,7 @@ pub use mobile_ble::{
     MobileBleDelegate, MobileBleError, MobileBleExchangeResult, MobileBleExchangeSession,
     MobileBleField, MobileBleState, MobileBleTransportError,
 };
+pub use mobile_device_link_session::{DeviceLinkSessionListener, MobileDeviceLinkSession};
 pub use mobile_import::{MobileImportResult, MobileImportWarning};
 pub use mobile_nfc::{
     MobileNfcExchangeResult, MobileNfcHandshake, MobileNfcKeyAckResult, MobileNfcState,

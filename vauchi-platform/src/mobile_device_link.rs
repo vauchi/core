@@ -14,8 +14,10 @@ use super::types::{
     MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDeviceLinkRequest,
 };
 use super::{
-    MobileDeviceLinkInitiator, MobileDeviceLinkResponder, VauchiPlatform, device_link_relay,
+    MobileDeviceLinkInitiator, MobileDeviceLinkResponder, MobileDeviceLinkSession, VauchiPlatform,
+    device_link_relay,
 };
+use crate::mobile_device_link_session;
 
 #[uniffi::export]
 impl VauchiPlatform {
@@ -106,10 +108,61 @@ impl VauchiPlatform {
         })
     }
 
+    /// Create a device-link session for the existing device
+    /// (initiator side).
+    ///
+    /// This is the orchestrator entry point — frontends register a
+    /// `DeviceLinkSessionListener`, call `start()` on the returned
+    /// session, and forward user actions via `confirm_manual` /
+    /// `confirm_ultrasonic` / `deny`. The session owns the relay-poll
+    /// loop, the QR-expiry deadline, and the user-confirm gate.
+    /// Replaces the legacy split between `start_device_link()`,
+    /// `listen_for_device_link_request()`, and
+    /// `send_device_link_response()`.
+    ///
+    /// Persistence: the session saves the updated `DeviceRegistry`
+    /// after `confirm_link` succeeds, closing a pre-existing gap
+    /// where the legacy single-shot path discarded it.
+    pub fn create_device_link_session_initiator(
+        &self,
+    ) -> Result<Arc<MobileDeviceLinkSession>, MobileError> {
+        let identity = self.get_identity()?;
+        let storage = self.open_storage()?;
+
+        let registry = storage
+            .load_device_registry()?
+            .unwrap_or_else(|| identity.initial_device_registry());
+
+        let initiator = identity.create_device_link_initiator(registry);
+        let identity_id = hex::encode(identity.signing_public_key());
+
+        let transport = self
+            .open_vauchi_for_relay()?
+            .build_relay_transport(self.relay_url.clone(), 10_000);
+
+        // ADR-035: device-link QR expiry is 300 s. Use the same
+        // value as the relay-listen budget so the cycle thread's
+        // deadline aligns with the QR expiry observed by the peer.
+        const RELAY_TIMEOUT_SECS: u64 = 300;
+
+        Ok(Arc::new(
+            mobile_device_link_session::MobileDeviceLinkSession::with_persistence_initiator(
+                initiator,
+                transport,
+                identity_id,
+                RELAY_TIMEOUT_SECS,
+                self.storage_path.clone(),
+                self.storage_key.clone(),
+            ),
+        ))
+    }
+
     /// Start a device link as the existing device (initiator).
     ///
     /// Returns a `MobileDeviceLinkInitiator` that holds the QR data and can
     /// process incoming link requests from new devices.
+    #[deprecated(note = "Use create_device_link_session_initiator (orchestrator). \
+                Will be removed in Phase 3 of the device-link orchestrator rollout.")]
     pub fn start_device_link(&self) -> Result<Arc<MobileDeviceLinkInitiator>, MobileError> {
         let identity = self.get_identity()?;
         let storage = self.open_storage()?;

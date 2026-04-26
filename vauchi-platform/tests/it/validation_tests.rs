@@ -5,8 +5,8 @@
 //! Integration tests for the G3 validation UniFFI exports.
 
 use vauchi_platform::{
-    mobile_is_valid_email, mobile_is_valid_phone, mobile_is_valid_relay_url, passcode_max_length,
-    passcode_min_length, password_min_length,
+    mobile_is_valid_email, mobile_is_valid_pem_certificate, mobile_is_valid_phone,
+    mobile_is_valid_relay_url, passcode_max_length, passcode_min_length, password_min_length,
 };
 
 // @internal
@@ -42,4 +42,58 @@ fn relay_url_validator_rejects_non_loopback_http() {
     assert!(mobile_is_valid_relay_url("http://localhost:8080".into()));
     assert!(!mobile_is_valid_relay_url("http://example.com".into()));
     assert!(!mobile_is_valid_relay_url("ftp://example.com".into()));
+}
+
+// @internal
+#[test]
+fn pem_validator_accepts_well_formed_certificate() {
+    // The body content is opaque to the validator — it only checks
+    // BEGIN/END markers. Real certs are validated downstream by the
+    // rustls verifier; using opaque base64-shaped placeholder bytes
+    // keeps this test independent of cert generation tooling.
+    let pem = "-----BEGIN CERTIFICATE-----\nbase64body\n-----END CERTIFICATE-----";
+    assert!(mobile_is_valid_pem_certificate(pem.into()));
+}
+
+// @internal
+#[test]
+fn pem_validator_trims_surrounding_whitespace() {
+    let pem = "  \n\t-----BEGIN CERTIFICATE-----\nbody\n-----END CERTIFICATE-----  \n";
+    assert!(mobile_is_valid_pem_certificate(pem.into()));
+}
+
+// @internal
+#[test]
+fn pem_validator_rejects_missing_begin_marker() {
+    let pem = "body\n-----END CERTIFICATE-----";
+    assert!(!mobile_is_valid_pem_certificate(pem.into()));
+}
+
+// @internal
+#[test]
+fn pem_validator_rejects_missing_end_marker() {
+    let pem = "-----BEGIN CERTIFICATE-----\nbody";
+    assert!(!mobile_is_valid_pem_certificate(pem.into()));
+}
+
+// @internal
+#[test]
+fn pem_validator_rejects_wrong_label() {
+    // Only X.509 certificates are accepted; PRIVATE KEY and other PEM
+    // labels are rejected so frontends can give the right user hint.
+    let pem = "-----BEGIN PRIVATE KEY-----\nbody\n-----END PRIVATE KEY-----";
+    assert!(!mobile_is_valid_pem_certificate(pem.into()));
+}
+
+// @internal
+#[test]
+fn pem_validator_rejects_empty_and_whitespace_only_input() {
+    assert!(!mobile_is_valid_pem_certificate(String::new()));
+    assert!(!mobile_is_valid_pem_certificate("   \n\t  ".into()));
+}
+
+// @internal
+#[test]
+fn pem_validator_rejects_garbage() {
+    assert!(!mobile_is_valid_pem_certificate("not a certificate".into()));
 }

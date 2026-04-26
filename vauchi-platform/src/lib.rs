@@ -137,8 +137,8 @@ pub use types::{
     MobileTypographyTokens, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 pub use validation::{
-    mobile_is_valid_email, mobile_is_valid_phone, mobile_is_valid_relay_url, passcode_max_length,
-    passcode_min_length, password_min_length,
+    mobile_is_valid_email, mobile_is_valid_pem_certificate, mobile_is_valid_phone,
+    mobile_is_valid_relay_url, passcode_max_length, passcode_min_length, password_min_length,
 };
 
 uniffi::setup_scaffolding!();

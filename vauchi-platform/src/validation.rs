@@ -60,3 +60,24 @@ pub fn mobile_is_valid_phone(value: String) -> bool {
 pub fn mobile_is_valid_relay_url(url: String) -> bool {
     is_valid_relay_url(&url)
 }
+
+/// Check whether a string is a well-formed PEM-encoded X.509 certificate.
+///
+/// Accepts the trimmed input if it begins with
+/// `-----BEGIN CERTIFICATE-----` and ends with
+/// `-----END CERTIFICATE-----`. Other PEM labels (`PRIVATE KEY`,
+/// `RSA PRIVATE KEY`, …) are rejected so the surface that consumes
+/// the result can render a "this is not a certificate" hint.
+///
+/// This is the surface frontends use for certificate-pinning UI input
+/// validation (replaces the per-frontend prefix/suffix checks). The
+/// real cryptographic validation happens in the TLS layer when
+/// [`crate::VauchiPlatform::set_pinned_certificate`] is consumed by
+/// the rustls verifier; this helper exists to give users immediate
+/// inline feedback while typing.
+#[uniffi::export]
+pub fn mobile_is_valid_pem_certificate(value: String) -> bool {
+    let trimmed = value.trim();
+    trimmed.starts_with("-----BEGIN CERTIFICATE-----")
+        && trimmed.ends_with("-----END CERTIFICATE-----")
+}

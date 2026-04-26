@@ -165,7 +165,26 @@ impl ContactDetailEngine {
     pub fn is_imported(&self) -> bool {
         self.is_imported
     }
+}
 
+/// Returns the footer-button `ScreenAction` id that
+/// `ContactDetailEngine::build_screen` emits for a given
+/// imported-vs-exchanged contact.
+///
+/// Imported contacts get `"delete_contact"` (Destructive); exchanged
+/// contacts get `"archive_contact"` (Secondary). Frontends should
+/// dispatch on the returned id rather than re-deriving the choice from
+/// `MobileContact.is_imported`, per the §1A pure-renderer rule —
+/// `_private/docs/problems/2026-04-25-isimported-frontend-cleanup/`.
+pub fn footer_action_id(is_imported: bool) -> &'static str {
+    if is_imported {
+        "delete_contact"
+    } else {
+        "archive_contact"
+    }
+}
+
+impl ContactDetailEngine {
     /// Toggles hidden state in-memory. Callers must persist via Vauchi.
     pub fn toggle_hidden(&mut self) {
         self.is_hidden = !self.is_hidden;
@@ -502,22 +521,20 @@ impl ContactDetailEngine {
                     enabled: true,
                     a11y: None,
                 },
-                if self.is_imported {
-                    ScreenAction {
-                        id: "delete_contact".into(),
-                        label: "Delete Contact".into(),
-                        style: ActionStyle::Destructive,
-                        enabled: true,
-                        a11y: None,
-                    }
-                } else {
-                    ScreenAction {
-                        id: "archive_contact".into(),
-                        label: "Archive Contact".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        a11y: None,
-                    }
+                ScreenAction {
+                    id: footer_action_id(self.is_imported).into(),
+                    label: if self.is_imported {
+                        "Delete Contact".into()
+                    } else {
+                        "Archive Contact".into()
+                    },
+                    style: if self.is_imported {
+                        ActionStyle::Destructive
+                    } else {
+                        ActionStyle::Secondary
+                    },
+                    enabled: true,
+                    a11y: None,
                 },
                 ScreenAction {
                     id: "back".into(),
@@ -1115,5 +1132,37 @@ mod tests {
         let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
             .with_imported(true);
         assert!(engine.is_imported(), "with_imported(true) must set flag");
+    }
+
+    // @internal
+    #[test]
+    fn test_footer_action_id_imported_returns_delete() {
+        assert_eq!(footer_action_id(true), "delete_contact");
+    }
+
+    // @internal
+    #[test]
+    fn test_footer_action_id_not_imported_returns_archive() {
+        assert_eq!(footer_action_id(false), "archive_contact");
+    }
+
+    // @internal
+    #[test]
+    fn test_footer_action_id_matches_build_screen_emission() {
+        // The helper must agree with what build_screen emits, so frontends
+        // that switch on the helper's return value see the same id the
+        // engine would put in the ScreenModel.
+        for is_imported in [true, false] {
+            let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new())
+                .with_imported(is_imported);
+            let screen = engine.current_screen();
+            let expected_id = footer_action_id(is_imported);
+            let footer_action_present = screen.actions.iter().any(|a| a.id == expected_id);
+            assert!(
+                footer_action_present,
+                "build_screen must emit ScreenAction with id `{}` for is_imported={}",
+                expected_id, is_imported
+            );
+        }
     }
 }

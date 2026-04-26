@@ -196,3 +196,53 @@ fn test_lifecycle_operations_on_missing_contact_return_error() {
     assert!(wb.archive_contact(fake_id.clone()).is_err());
     assert!(wb.unarchive_contact(fake_id).is_err());
 }
+
+// === Contact Detail Footer Action ===
+//
+// Frontends call `contact_detail_footer_action_id` so the view layer
+// stops branching on `MobileContact.is_imported` directly. Verifies the
+// id matches what `ContactDetailEngine` would emit at the bottom of the
+// detail screen.
+
+// @internal
+#[test]
+fn test_contact_detail_footer_action_id_imported_returns_delete() {
+    let (wb, _dir) = setup();
+    let id = add_imported_contact(&wb, "Karen");
+
+    let action_id = wb.contact_detail_footer_action_id(id).unwrap();
+
+    assert_eq!(action_id, "delete_contact");
+}
+
+// @internal
+#[test]
+fn test_contact_detail_footer_action_id_exchanged_returns_archive() {
+    let (wb, _dir) = setup();
+    let id = add_exchanged_contact(&wb, "Liam");
+
+    let action_id = wb.contact_detail_footer_action_id(id).unwrap();
+
+    assert_eq!(action_id, "archive_contact");
+}
+
+// @internal
+#[test]
+fn test_contact_detail_footer_action_id_unknown_returns_invalid_input() {
+    let (wb, _dir) = setup();
+
+    let result = wb.contact_detail_footer_action_id("nonexistent-id".to_string());
+
+    match result {
+        Err(vauchi_platform::MobileError::InvalidInput { field, .. }) => {
+            assert_eq!(
+                field, "contact_id",
+                "InvalidInput must name the offending field"
+            );
+        }
+        other => panic!(
+            "expected MobileError::InvalidInput {{ field: \"contact_id\", .. }}, got {:?}",
+            other
+        ),
+    }
+}

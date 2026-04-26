@@ -238,6 +238,32 @@ impl VauchiPlatform {
         Ok(contact.as_ref().map(|c| Self::enrich_contact(&storage, c)))
     }
 
+    /// Returns the footer-button `ScreenAction` id that
+    /// `ContactDetailEngine` would emit for the given contact —
+    /// `"delete_contact"` for imported contacts, `"archive_contact"`
+    /// for exchanged contacts.
+    ///
+    /// Frontends call this and dispatch on the returned id so the
+    /// view layer never reads `MobileContact.is_imported` directly,
+    /// per the §1A pure-renderer rule
+    /// (`_private/docs/problems/2026-04-25-isimported-frontend-cleanup/`).
+    /// Returns `MobileError::InvalidInput { field: "contact_id" }`
+    /// if no contact with the given id exists.
+    pub fn contact_detail_footer_action_id(
+        &self,
+        contact_id: String,
+    ) -> Result<String, MobileError> {
+        let storage = self.open_storage()?;
+        let contact =
+            storage
+                .load_contact(&contact_id)?
+                .ok_or_else(|| MobileError::InvalidInput {
+                    field: "contact_id".to_string(),
+                    detail: format!("contact not found: {}", contact_id),
+                })?;
+        Ok(vauchi_app::ui::contact_detail_footer_action_id(contact.is_imported()).to_string())
+    }
+
     /// Search contacts using SQL-level search.
     pub fn search_contacts(&self, query: String) -> Result<Vec<MobileContact>, MobileError> {
         let storage = self.open_storage()?;

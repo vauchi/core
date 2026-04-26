@@ -55,7 +55,7 @@ vauchi-core/tests/it/migration_tests.rs 1224
 
 # vauchi-app — extracted from vauchi-core, inherits exemption
 vauchi-app/src/ui/exchange.rs 3179
-vauchi-app/src/ui/contact_detail.rs 1119
+vauchi-app/src/ui/contact_detail.rs 1168
 
 # EXEMPT — BLE exchange sub-flow: inline tests access private state (proximity_runner, shake_envelope_sent)
 vauchi-app/src/ui/exchange_ble.rs 1051

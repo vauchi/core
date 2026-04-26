@@ -6,6 +6,52 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.24.0] — 2026-04-26
+
+### Added
+
+- `VauchiPlatform::contact_detail_footer_action_id(contact_id)` —
+  returns `"delete_contact"` (imported) or `"archive_contact"`
+  (exchanged), the footer-button id `ContactDetailEngine` would emit.
+  Frontends dispatch on the returned id so the view layer stops
+  branching on `MobileContact.is_imported` directly. Closes the
+  iOS/Android tail of §1A pure-renderer cleanup —
+  `_private/docs/problems/2026-04-25-isimported-frontend-cleanup/`.
+  Helper also exposed as `vauchi_app::ui::contact_detail_footer_action_id`
+  for desktop frontends.
+- `mobile_is_valid_pem_certificate(value)` — UniFFI free function
+  that returns `true` if the trimmed input begins with
+  `-----BEGIN CERTIFICATE-----` and ends with
+  `-----END CERTIFICATE-----`. Replaces the per-frontend
+  `isValidPem` regex on iOS `SettingsView`. Other PEM labels
+  (`PRIVATE KEY`, …) are rejected so the consumer can render a
+  "this is not a certificate" hint. Real cryptographic validation
+  still happens in the rustls verifier when the cert is consumed by
+  `set_pinned_certificate`.
+
+## [0.23.0] — 2026-04-25
+
+### Removed
+
+- Deprecated polling getters on `MobileMultiStageSession`:
+  `get_display_qr`, `get_state`, `get_received_data`,
+  `get_transport_key`. Use the `MultiStageSessionListener` callbacks
+  introduced in 0.22.0 instead. G4 Phase 3 dead-code removal.
+- `VauchiPlatform::finalize_multistage_exchange` — listener-path
+  persistence (Phase 2.5) makes the explicit finalize call
+  unnecessary; the cycle thread persists the contact + ratchet state
+  before firing `on_finalized`.
+
+### Fixed
+
+- Listener-path contact persistence regression: cycle thread now
+  captures `received_data` + `transport_key` at the Finalized
+  transition and runs the `Contact::from_exchange` →
+  `save_contact` → `DoubleRatchetState::initialize_initiator` →
+  `save_ratchet_state` body before `on_finalized` fires. On
+  persistence failure emits `on_state_changed(Failed{reason})` and
+  skips `on_finalized`. G4 Phase 2.5.
+
 ## [0.22.0] — 2026-04-24
 
 ### Added

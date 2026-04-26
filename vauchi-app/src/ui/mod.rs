@@ -75,6 +75,7 @@ pub use component::{
 };
 pub use contact_detail::{
     ContactDetailEngine, ContactNotFoundEngine, ContactViewMode, DeliverySummary, SharedInfoView,
+    footer_action_id as contact_detail_footer_action_id,
 };
 pub use contact_edit::{ContactEditEngine, EditableContact, EditableField};
 pub use contact_limit::ContactLimitEngine;

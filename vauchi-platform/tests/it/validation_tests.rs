@@ -7,6 +7,7 @@
 use vauchi_platform::{
     mobile_is_valid_email, mobile_is_valid_pem_certificate, mobile_is_valid_phone,
     mobile_is_valid_relay_url, passcode_max_length, passcode_min_length, password_min_length,
+    recovery_claim_min_input_length, recovery_public_key_hex_length,
 };
 
 // @internal
@@ -96,4 +97,19 @@ fn pem_validator_rejects_empty_and_whitespace_only_input() {
 #[test]
 fn pem_validator_rejects_garbage() {
     assert!(!mobile_is_valid_pem_certificate("not a certificate".into()));
+}
+
+// @internal
+#[test]
+fn recovery_public_key_hex_length_is_64() {
+    // 32 bytes (Ed25519 public key) × 2 hex characters = 64.
+    assert_eq!(recovery_public_key_hex_length(), 64);
+}
+
+// @internal
+#[test]
+fn recovery_claim_min_input_length_is_20() {
+    // The 20-character heuristic that core's `recovery_help` engine
+    // also uses to gate the "Verify Claim" button.
+    assert_eq!(recovery_claim_min_input_length(), 20);
 }

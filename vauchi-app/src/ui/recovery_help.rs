@@ -15,6 +15,7 @@
 //! `set_parsed_claim` / `set_voucher_data` and advances the step.
 
 use crate::ui::*;
+use vauchi_core::recovery::RECOVERY_CLAIM_MIN_INPUT_LEN;
 
 /// Steps in the helper-side recovery workflow.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -232,10 +233,12 @@ impl RecoveryHelpEngine {
             },
         ];
 
-        // Match the Android UX: Verify button enabled once the input has
-        // enough bytes to plausibly be a base64-encoded claim. The actual
-        // parse happens in the AppEngine intercept.
-        let verify_enabled = self.claim_input.trim().len() >= 20;
+        // Verify button enabled once the input has enough bytes to
+        // plausibly be a base64-encoded claim. The actual parse happens
+        // in the AppEngine intercept. Frontends (iOS RecoveryView,
+        // Android RecoveryScreen) source the same threshold via
+        // `recovery_claim_min_input_length()` UniFFI export.
+        let verify_enabled = self.claim_input.trim().len() >= RECOVERY_CLAIM_MIN_INPUT_LEN;
 
         ScreenModel {
             screen_id: "recovery_help".into(),
@@ -428,7 +431,8 @@ impl WorkflowEngine for RecoveryHelpEngine {
             // the parse and either calls set_parsed_claim (advances state)
             // or set_claim_parse_error (stays on screen with error).
             (HelpStep::PasteClaim, UserAction::ActionPressed { ref action_id })
-                if action_id == "verify_claim" && self.claim_input.trim().len() >= 20 =>
+                if action_id == "verify_claim"
+                    && self.claim_input.trim().len() >= RECOVERY_CLAIM_MIN_INPUT_LEN =>
             {
                 ActionResult::Complete
             }

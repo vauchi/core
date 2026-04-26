@@ -519,6 +519,23 @@ impl RecoveryVoucher {
 /// Current serialization format version for recovery proofs (#72).
 pub const RECOVERY_PROOF_VERSION: u8 = 2;
 
+/// Hex-encoded length of an Ed25519 identity public key.
+///
+/// 32 bytes × 2 hex characters per byte = 64 characters. Used by
+/// recovery flow input validation in core's `recovery_help` engine
+/// and by frontend RecoveryView/Screen consumers (iOS / Android) to
+/// gate the "Create Claim" button on a plausible old-pk paste.
+pub const RECOVERY_PUBLIC_KEY_HEX_LEN: usize = 64;
+
+/// Minimum length (in characters) of a recovery claim input string
+/// before the "Verify Claim" button is enabled.
+///
+/// Heuristic — the actual claim parse happens in the AppEngine
+/// intercept; this is the UX gate. Mirrored across iOS / Android
+/// recovery views and core's `recovery_help` engine so all surfaces
+/// agree on when the affordance should be active.
+pub const RECOVERY_CLAIM_MIN_INPUT_LEN: usize = 20;
+
 /// Complete recovery proof with multiple vouchers.
 ///
 /// The `version` field enables schema evolution: new fields can be added in future

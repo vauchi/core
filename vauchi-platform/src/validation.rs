@@ -15,6 +15,7 @@
 
 use vauchi_core::contact_card::{is_valid_email, is_valid_phone, is_valid_relay_url};
 use vauchi_core::identity::password::MIN_PASSWORD_LENGTH;
+use vauchi_core::recovery::{RECOVERY_CLAIM_MIN_INPUT_LEN, RECOVERY_PUBLIC_KEY_HEX_LEN};
 
 /// Minimum length accepted for a numeric PIN (e.g. duress PIN, app unlock PIN).
 ///
@@ -59,6 +60,30 @@ pub fn mobile_is_valid_phone(value: String) -> bool {
 #[uniffi::export]
 pub fn mobile_is_valid_relay_url(url: String) -> bool {
     is_valid_relay_url(&url)
+}
+
+/// Hex-encoded length of an Ed25519 identity public key (32 bytes ×
+/// 2 hex characters = 64 characters).
+///
+/// Frontends (iOS `RecoveryView`, Android `RecoveryScreen`) gate the
+/// "Create Claim" button on `oldPublicKey.length >= recovery_public_key_hex_length()`
+/// instead of hardcoding `64`. Stays in sync with core's own usage in
+/// the recovery flow.
+#[uniffi::export]
+pub fn recovery_public_key_hex_length() -> u32 {
+    RECOVERY_PUBLIC_KEY_HEX_LEN as u32
+}
+
+/// Minimum length (in characters) of a recovery claim input string
+/// before the "Verify Claim" button is enabled.
+///
+/// Heuristic — the actual claim parse happens in the `AppEngine`
+/// intercept. Frontends gate the affordance on
+/// `claim.length >= recovery_claim_min_input_length()` instead of
+/// hardcoding `20`. Mirrors core's own usage in `recovery_help.rs`.
+#[uniffi::export]
+pub fn recovery_claim_min_input_length() -> u32 {
+    RECOVERY_CLAIM_MIN_INPUT_LEN as u32
 }
 
 /// Check whether a string is a well-formed PEM-encoded X.509 certificate.

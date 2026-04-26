@@ -22,7 +22,7 @@ vauchi-core/src/exchange/multistage/session.rs 1189
 vauchi-core/src/network/http_transport.rs 1187
 
 # EXEMPT — security-critical: crypto + verification belong together
-vauchi-core/src/recovery/mod.rs 1236
+vauchi-core/src/recovery/mod.rs 1253
 
 # EXEMPT — migration ledger: coherence over size, version history must be co-located
 vauchi-core/src/storage/migration.rs 1811

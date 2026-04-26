@@ -6,6 +6,22 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.25.0] — 2026-04-26
+
+### Added
+
+- `recovery_public_key_hex_length()` and `recovery_claim_min_input_length()`
+  UniFFI free functions returning `64` and `20` respectively. Frontends
+  (iOS `RecoveryView`, Android `RecoveryScreen`) source these instead
+  of hardcoding the magic numbers, closing the recovery-flow tail of
+  §1B in
+  `_private/docs/problems/2026-04-16-frontend-pure-renderer-violations/`.
+  The constants live as `pub const RECOVERY_PUBLIC_KEY_HEX_LEN` /
+  `RECOVERY_CLAIM_MIN_INPUT_LEN` in `vauchi-core::recovery` and are now
+  also consumed by `vauchi-app::ui::recovery_help` (replacing two
+  inline literal `>= 20` checks) so the rule has one source of truth
+  across core and frontends.
+
 ## [0.24.1] — 2026-04-26
 
 ### Added

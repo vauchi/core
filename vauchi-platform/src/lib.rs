@@ -141,6 +141,7 @@ pub use types::{
 pub use validation::{
     mobile_is_valid_email, mobile_is_valid_pem_certificate, mobile_is_valid_phone,
     mobile_is_valid_relay_url, passcode_max_length, passcode_min_length, password_min_length,
+    recovery_claim_min_input_length, recovery_public_key_hex_length,
 };
 
 uniffi::setup_scaffolding!();

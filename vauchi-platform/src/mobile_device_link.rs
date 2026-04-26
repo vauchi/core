@@ -183,6 +183,9 @@ impl VauchiPlatform {
     ///
     /// Parses the QR data scanned from the existing device and returns a
     /// `MobileDeviceLinkResponder` that can create requests and process responses.
+    #[deprecated(note = "Reserved for the deferred responder-side orchestrator. \
+                Will be replaced by create_device_link_session_responder \
+                in a future Phase.")]
     pub fn start_device_join(
         &self,
         qr_data: String,
@@ -210,6 +213,9 @@ impl VauchiPlatform {
     ///
     /// Uses two HTTP exchange cycles: creates a return channel, claims the
     /// existing device's offer with our request, then polls for the response.
+    #[deprecated(note = "Reserved for the deferred responder-side orchestrator. \
+                Will be replaced by create_device_link_session_responder \
+                in a future Phase.")]
     pub fn send_device_link_request(
         &self,
         _target_identity: String,
@@ -237,6 +243,8 @@ impl VauchiPlatform {
     ///
     /// Creates an exchange offer with our identity, then polls until the new
     /// device claims it. Returns the encrypted request and a token for the response.
+    #[deprecated(note = "Use create_device_link_session_initiator (orchestrator). \
+                Will be removed in Phase 3 of the device-link orchestrator rollout.")]
     pub fn listen_for_device_link_request(
         &self,
         timeout_secs: u64,
@@ -264,6 +272,8 @@ impl VauchiPlatform {
     ///
     /// Claims the return channel created by the new device, depositing the
     /// encrypted response payload.
+    #[deprecated(note = "Use create_device_link_session_initiator (orchestrator). \
+                Will be removed in Phase 3 of the device-link orchestrator rollout.")]
     pub fn send_device_link_response(
         &self,
         sender_token: String,

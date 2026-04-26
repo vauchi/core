@@ -173,6 +173,10 @@ use vauchi_core::exchange::{
 /// Uses Mutex for interior mutability (required by UniFFI's Arc<T>).
 /// Holds both the initiator and a pending request between prepare_confirmation
 /// and confirm_link calls.
+#[deprecated(
+    note = "Use MobileDeviceLinkSession via create_device_link_session_initiator. \
+            Will be removed in Phase 3 of the device-link orchestrator rollout."
+)]
 #[derive(uniffi::Object)]
 pub struct MobileDeviceLinkInitiator {
     inner: Mutex<DeviceLinkInitiator>,
@@ -310,6 +314,9 @@ impl MobileDeviceLinkInitiator {
 }
 
 /// UniFFI-exposed wrapper around DeviceLinkResponder.
+#[deprecated(note = "Reserved for the deferred responder-side orchestrator. \
+            Will be replaced by MobileDeviceLinkSession's responder \
+            constructor in a future Phase.")]
 #[derive(uniffi::Object)]
 pub struct MobileDeviceLinkResponder {
     inner: Mutex<DeviceLinkResponder>,

@@ -6,6 +6,52 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.24.1] — 2026-04-26
+
+### Added
+
+- `MobileDeviceLinkSession` + `DeviceLinkSessionListener` (UniFFI) —
+  Phase 1 of the device-link orchestrator
+  (`_private/docs/problems/2026-04-25-device-link-orchestrator/`).
+  Single core-owned session handle replaces the four per-frontend
+  device-link state machines. Cycle thread drives QR-ready emit →
+  relay listen → confirmation prompt → user-action wait via
+  `mpsc::sync_channel(1)` (capacity 1 = double-tap idempotent) →
+  `confirm_link` → `save_device_registry` → response send → terminal
+  callbacks. Mirrors G4 Phase 2.5 (`MultiStageSessionListener`,
+  `core!668`). Initiator-only Phase 1 — responder-side reserved for a
+  follow-up record. The session also closes a pre-existing gap: the
+  legacy `MobileDeviceLinkInitiator::confirm_link_with_proof`
+  discarded the updated `DeviceRegistry`; the orchestrator persists
+  it before posting the response.
+- `VauchiPlatform::create_device_link_session_initiator()` —
+  production factory for the new session.
+
+### Internal
+
+- `device_link_relay` split into `create_offer` + `poll_for_claim`
+  and `claim_and_send_request` + `poll_for_response`. Legacy
+  `create_offer_and_listen` / `send_and_receive` become 3-line shims
+  with a never-tripped cancel flag. Lets the orchestrator own the
+  deadline math (`qr_timestamp + LINK_QR_EXPIRY_SECONDS`) and observe
+  cancel on the existing 1 s poll cadence.
+
+### Deprecated
+
+The seven legacy device-link UniFFI items (4 `VauchiPlatform`
+methods + 2 wrapper structs) are marked `#[deprecated]`. Frontends
+have one binding-republish cycle to migrate before Phase 3 deletes
+them:
+
+- `VauchiPlatform::start_device_link`
+- `VauchiPlatform::listen_for_device_link_request`
+- `VauchiPlatform::send_device_link_response`
+- `MobileDeviceLinkInitiator` (struct)
+- `VauchiPlatform::start_device_join` (responder, reserved for the
+  deferred responder orchestrator)
+- `VauchiPlatform::send_device_link_request` (responder, reserved)
+- `MobileDeviceLinkResponder` (struct, reserved)
+
 ## [0.24.0] — 2026-04-26
 
 ### Added

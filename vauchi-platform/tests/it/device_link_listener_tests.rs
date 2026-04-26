@@ -183,6 +183,7 @@ fn wait_until<F: Fn() -> bool>(total: Duration, pred: F) -> bool {
 
 // ── Test 1 — registration + start emits on_qr_ready ────────────────
 
+// @internal
 #[test]
 fn device_link_listener_registers_and_starts() {
     let session = session_against_dead_relay();
@@ -224,6 +225,7 @@ fn device_link_listener_registers_and_starts() {
 
 // ── Test 2 — cancel idempotency before / during / after start ──────
 
+// @internal
 #[test]
 fn device_link_cancel_idempotent() {
     // Cancel before start: no thread spawned, no callbacks.
@@ -286,6 +288,7 @@ fn device_link_cancel_idempotent() {
 // most-recently-set listener observes any callbacks fired after
 // the replacement.
 
+// @internal
 #[test]
 fn device_link_listener_set_replaces_previous() {
     let session = session_against_dead_relay();
@@ -323,6 +326,7 @@ fn device_link_listener_set_replaces_previous() {
 
 // ── Test 7 — user action methods after cancel are no-ops ──────────
 
+// @internal
 #[test]
 fn device_link_user_action_after_cancel_is_noop() {
     let session = session_against_dead_relay();

@@ -310,6 +310,7 @@ mod recovery_tests;
 mod recovery_voucher_v2_tests;
 mod rekey_all_columns_tests;
 mod rekey_coverage_tests;
+mod rekey_self_heal_tests;
 mod relay_exchange_tests;
 mod relay_proptests;
 mod relay_simulation_tests;

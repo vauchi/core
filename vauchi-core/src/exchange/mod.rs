@@ -69,7 +69,6 @@ pub mod link_mode;
 pub mod mode;
 pub mod mode_availability;
 pub mod mode_payload;
-pub mod persisted_state;
 pub mod proximity_runner;
 pub mod reciprocity;
 pub mod relay_exchange;
@@ -153,4 +152,3 @@ pub use mode::{
 };
 pub use mode_availability::{ModeAvailability, check_mode_availability, recommend_mode};
 pub use mode_payload::ExchangeModePayload;
-pub use persisted_state::{ExchangeLifecycleState, PersistedExchangeState};

@@ -217,6 +217,7 @@ mod guardian_token_proptest;
 mod guardian_token_tests;
 mod help_engine_tests;
 mod hidden_contact_tests;
+mod http_transport_endpoint_tests;
 mod http_transport_ohttp_key_tests;
 mod i18n_cache_tests;
 mod i18n_integration_tests;

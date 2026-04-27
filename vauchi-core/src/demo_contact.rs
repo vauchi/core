@@ -249,19 +249,44 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_demo_tips_not_empty() {
+    fn test_demo_tips_count_and_first_id() {
         let tips = get_demo_tips();
-        assert!(!tips.is_empty());
-        assert!(tips.len() >= 5);
+        assert_eq!(tips.len(), 8, "tip catalog must have exactly 8 entries");
+        assert_eq!(tips[0].id, "tip-share");
+        assert_eq!(tips[0].category, DemoTipCategory::GettingStarted);
+        assert_eq!(tips[7].id, "tip-multi-device");
+        assert_eq!(tips[7].category, DemoTipCategory::Features);
     }
 
     #[test]
-    fn test_demo_tip_categories() {
+    fn test_demo_tip_categories_has_distinct_values() {
         let tips = get_demo_tips();
         let categories: std::collections::HashSet<_> = tips.iter().map(|t| t.category).collect();
+        // Tips span exactly 6 distinct categories. Pinning the count kills
+        // mutations that drop a tip or change categories.
+        assert_eq!(categories.len(), 6);
+        assert!(categories.contains(&DemoTipCategory::GettingStarted));
+        assert!(categories.contains(&DemoTipCategory::Privacy));
+        assert!(categories.contains(&DemoTipCategory::Updates));
+        assert!(categories.contains(&DemoTipCategory::Recovery));
+        assert!(categories.contains(&DemoTipCategory::Contacts));
+        assert!(categories.contains(&DemoTipCategory::Features));
+    }
 
-        // Should have multiple categories
-        assert!(categories.len() >= 3);
+    #[test]
+    fn test_demo_tip_category_all_returns_six_in_order() {
+        let all = DemoTipCategory::all();
+        assert_eq!(
+            all,
+            &[
+                DemoTipCategory::GettingStarted,
+                DemoTipCategory::Privacy,
+                DemoTipCategory::Updates,
+                DemoTipCategory::Recovery,
+                DemoTipCategory::Contacts,
+                DemoTipCategory::Features,
+            ]
+        );
     }
 
     #[test]
@@ -270,6 +295,8 @@ mod tests {
         assert!(!state.is_active);
         assert!(!state.was_dismissed);
         assert!(!state.auto_removed);
+        assert_eq!(state.current_tip_index, 0);
+        assert_eq!(state.update_count, 0);
     }
 
     #[test]
@@ -277,85 +304,163 @@ mod tests {
         let state = DemoContactState::new_active();
         assert!(state.is_active);
         assert!(!state.was_dismissed);
+        assert!(!state.auto_removed);
+        assert_eq!(state.current_tip_index, 0);
+        assert_eq!(state.update_count, 0);
+        assert_eq!(state.shown_tip_ids, vec!["tip-share".to_string()]);
         assert!(state.last_update_timestamp > 0);
     }
 
     #[test]
-    fn test_demo_state_current_tip() {
+    fn test_demo_state_current_tip_returns_first_for_index_zero() {
         let state = DemoContactState::new_active();
-        let tip = state.current_tip();
-        tip.expect("expected Some");
+        let tip = state.current_tip().expect("expected Some");
+        assert_eq!(tip.id, "tip-share");
+        assert_eq!(tip.category, DemoTipCategory::GettingStarted);
     }
 
     #[test]
-    fn test_demo_state_advance_tip() {
+    fn test_demo_state_current_tip_wraps_modulo_len() {
         let mut state = DemoContactState::new_active();
-        let initial_index = state.current_tip_index;
-
-        let tip = state.advance_to_next_tip();
-        tip.expect("expected Some");
-        assert_ne!(state.current_tip_index, initial_index);
-        assert_eq!(state.update_count, 1);
+        let len = get_demo_tips().len();
+        // Equivalent index by modulus must yield the same tip.
+        state.current_tip_index = len * 3 + 2;
+        let tip = state.current_tip().expect("expected Some");
+        assert_eq!(tip.id, get_demo_tips()[2].id);
     }
 
     #[test]
-    fn test_demo_state_dismiss() {
+    fn test_demo_state_advance_tip_index_is_one_after_first_advance() {
+        let mut state = DemoContactState::new_active();
+        assert_eq!(state.current_tip_index, 0);
+
+        let tip = state.advance_to_next_tip().expect("expected Some");
+        assert_eq!(
+            state.current_tip_index, 1,
+            "first advance must land on index 1"
+        );
+        assert_eq!(tip.id, get_demo_tips()[1].id);
+        assert_eq!(state.update_count, 1);
+        // The newly shown tip is appended to shown_tip_ids.
+        assert!(state.shown_tip_ids.contains(&get_demo_tips()[1].id));
+    }
+
+    #[test]
+    fn test_demo_state_advance_tip_wraps_at_end() {
+        let mut state = DemoContactState::new_active();
+        let len = get_demo_tips().len();
+        state.current_tip_index = len - 1;
+
+        state.advance_to_next_tip().expect("expected Some");
+        assert_eq!(
+            state.current_tip_index, 0,
+            "advancing from last must wrap to 0"
+        );
+    }
+
+    #[test]
+    fn test_demo_state_advance_increments_update_count_each_call() {
+        let mut state = DemoContactState::new_active();
+        for expected in 1..=3u32 {
+            state.advance_to_next_tip();
+            assert_eq!(state.update_count, expected);
+        }
+    }
+
+    #[test]
+    fn test_demo_state_advance_does_not_duplicate_shown_ids() {
+        let mut state = DemoContactState::new_active();
+        let len = get_demo_tips().len();
+        // Advance twice through the full catalog — every tip is now shown.
+        for _ in 0..(len * 2) {
+            state.advance_to_next_tip();
+        }
+        // shown_tip_ids must contain each id exactly once.
+        let mut sorted = state.shown_tip_ids.clone();
+        sorted.sort();
+        let mut dedup = sorted.clone();
+        dedup.dedup();
+        assert_eq!(sorted, dedup, "shown_tip_ids must contain no duplicates");
+        assert_eq!(sorted.len(), len);
+    }
+
+    #[test]
+    fn test_demo_state_dismiss_sets_flags() {
         let mut state = DemoContactState::new_active();
         state.dismiss();
-
         assert!(!state.is_active);
         assert!(state.was_dismissed);
+        assert!(!state.auto_removed, "dismiss must not set auto_removed");
     }
 
     #[test]
-    fn test_demo_state_auto_remove() {
+    fn test_demo_state_auto_remove_sets_flags() {
         let mut state = DemoContactState::new_active();
         state.auto_remove();
-
         assert!(!state.is_active);
         assert!(state.auto_removed);
+        assert!(
+            !state.was_dismissed,
+            "auto_remove must not set was_dismissed"
+        );
     }
 
     #[test]
-    fn test_demo_state_restore() {
+    fn test_demo_state_restore_clears_both_flags() {
+        // Restore must reset BOTH dismissed and auto_removed.
         let mut state = DemoContactState::new_active();
         state.dismiss();
-        state.restore();
+        state.auto_remove();
+        assert!(state.was_dismissed);
+        assert!(state.auto_removed);
 
+        state.restore();
         assert!(state.is_active);
         assert!(!state.was_dismissed);
+        assert!(!state.auto_removed, "restore must clear auto_removed");
     }
 
     #[test]
-    fn test_demo_state_serialization() {
+    fn test_demo_state_serialization_roundtrip_preserves_all_fields() {
         let mut state = DemoContactState::new_active();
         state.advance_to_next_tip();
+        state.advance_to_next_tip();
+        state.was_dismissed = true; // exercise non-default values
 
         let json = state.to_json().unwrap();
         let restored = DemoContactState::from_json(&json).unwrap();
 
         assert_eq!(state.is_active, restored.is_active);
+        assert_eq!(state.was_dismissed, restored.was_dismissed);
+        assert_eq!(state.auto_removed, restored.auto_removed);
         assert_eq!(state.current_tip_index, restored.current_tip_index);
+        assert_eq!(state.last_update_timestamp, restored.last_update_timestamp);
+        assert_eq!(state.shown_tip_ids, restored.shown_tip_ids);
         assert_eq!(state.update_count, restored.update_count);
     }
 
     #[test]
-    fn test_generate_demo_card() {
-        let tips = get_demo_tips();
-        let card = generate_demo_contact_card(&tips[0]);
-
+    fn test_generate_demo_card_uses_constants_and_tip_fields() {
+        let tip = DemoTip {
+            id: "x".to_string(),
+            category: DemoTipCategory::Privacy,
+            title: "Title".to_string(),
+            content: "Content".to_string(),
+        };
+        let card = generate_demo_contact_card(&tip);
         assert_eq!(card.id, DEMO_CONTACT_ID);
         assert_eq!(card.display_name, DEMO_CONTACT_NAME);
         assert!(card.is_demo);
-        assert!(!card.tip_title.is_empty());
-        assert!(!card.tip_content.is_empty());
+        assert_eq!(card.tip_title, "Title");
+        assert_eq!(card.tip_content, "Content");
+        // Debug formatting of the category must end up in tip_category.
+        assert_eq!(card.tip_category, "Privacy");
     }
 
     #[test]
-    fn test_update_due_initial() {
+    fn test_update_due_just_created_is_false() {
         let state = DemoContactState::new_active();
-        // Just created, update not due yet
-        assert!(!state.is_update_due());
+        assert!(!state.is_update_due(), "fresh state cannot be due");
     }
 
     #[test]
@@ -366,15 +471,58 @@ mod tests {
     }
 
     #[test]
-    fn test_tip_rotation_wraps() {
+    fn test_update_due_when_interval_elapsed() {
+        // Pretend the last update was longer than INTERVAL ago. The
+        // function takes `now` from the wall clock, so a `last` of 0
+        // guarantees `now >= 0 + INTERVAL` is true (now is a unix
+        // timestamp far above 7200). Kills mutations that flip the
+        // `>=` comparison or mutate the `+ INTERVAL` arithmetic into
+        // multiplication (which would push the threshold to ~1e13).
+        let mut state = DemoContactState::new_active();
+        state.last_update_timestamp = 1; // ~1970
+        assert!(
+            state.is_update_due(),
+            "interval should have elapsed for a 1970 timestamp"
+        );
+    }
+
+    #[test]
+    fn test_update_due_boundary_off_by_one() {
+        // last_update_timestamp = now − INTERVAL: due (>= boundary).
+        // last_update_timestamp = now − INTERVAL + 1: not due.
+        // Kills the `>=` ↔ `>` mutation.
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let mut state = DemoContactState::new_active();
+        state.last_update_timestamp = now - DEMO_UPDATE_INTERVAL_SECS;
+        assert!(state.is_update_due());
+
+        state.last_update_timestamp = now - DEMO_UPDATE_INTERVAL_SECS + 1;
+        assert!(!state.is_update_due());
+    }
+
+    #[test]
+    fn test_tip_rotation_wraps_to_specific_index() {
         let mut state = DemoContactState::new_active();
         let tip_count = get_demo_tips().len();
-
-        // Advance through all tips and verify it wraps
-        for _ in 0..tip_count + 2 {
+        // Start at 0. After tip_count advances, we are back at 0.
+        for _ in 0..tip_count {
             state.advance_to_next_tip();
         }
+        assert_eq!(state.current_tip_index, 0);
+        // After tip_count + 3 total advances, we are at index 3.
+        for _ in 0..3 {
+            state.advance_to_next_tip();
+        }
+        assert_eq!(state.current_tip_index, 3);
+    }
 
-        assert!(state.current_tip_index < tip_count);
+    #[test]
+    fn test_demo_update_interval_is_two_hours() {
+        // Pin the constant so a `2 * 60 * 60` mutation (e.g. + → *)
+        // is caught.
+        assert_eq!(DEMO_UPDATE_INTERVAL_SECS, 7200);
     }
 }

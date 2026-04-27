@@ -17,6 +17,7 @@
 //! - Backward transitions (#23)
 //! - JSON serialization roundtrip
 
+use rstest::rstest;
 use vauchi_core::onboarding::display_name_suggestions;
 use vauchi_core::types::{OnboardingProgress, OnboardingStep};
 
@@ -568,4 +569,152 @@ fn test_display_name_suggestions_unicode() {
         suggestions.contains(&"M. Schmidt".to_string()),
         "Should contain initial + last name"
     );
+}
+
+// =============================================================================
+// Mutation-coverage tests
+// =============================================================================
+// Pin specific values so arithmetic / comparison mutations cannot survive.
+
+// @scenario: onboarding:completion_percentage_table
+#[rstest]
+#[case(0, 0)]
+#[case(1, 16)]
+#[case(2, 33)]
+#[case(3, 50)]
+#[case(4, 66)]
+#[case(5, 83)]
+#[case(6, 100)]
+fn test_completion_percentage_exact_per_completed_step(
+    #[case] completed: usize,
+    #[case] expected_pct: u8,
+) {
+    // Pinning the percentage at every completed-count value eliminates
+    // surviving arithmetic mutations on `(completed * 100) / total`:
+    // - `* with +`: 1+100=101/6=16 (matches at 1 only) → fails at 5/6
+    // - `* with /`: 1/100/6=0 → fails at any non-zero
+    // - `/ with %`: 100%6=4 → fails at 1
+    // - `/ with *`: 100*6=600 → clamps to 100 at any non-zero → fails
+    // - `100 with 0/1`: 0/total or 1/total → fails everywhere
+    let mut progress = OnboardingProgress::new();
+    for _ in 0..completed {
+        progress.advance();
+    }
+    assert_eq!(progress.completion_percentage(), expected_pct);
+}
+
+// @scenario: onboarding:total_steps_constant
+#[test]
+fn test_total_steps_is_six() {
+    // Pin OnboardingStep::total() so mutations to `with 0`/`with 1` and
+    // `Vec::leak(Vec::new())` for `all()` are caught.
+    assert_eq!(OnboardingStep::total(), 6);
+    assert_eq!(OnboardingStep::all().len(), 6);
+}
+
+// @scenario: onboarding:step_index_per_variant
+#[rstest]
+#[case(OnboardingStep::IdentityCheck, 0)]
+#[case(OnboardingStep::LinkChoice, 1)]
+#[case(OnboardingStep::DefaultName, 2)]
+#[case(OnboardingStep::GroupsSetup, 3)]
+#[case(OnboardingStep::ContactInfo, 4)]
+#[case(OnboardingStep::WhatNext, 5)]
+fn test_step_index_per_variant(#[case] step: OnboardingStep, #[case] expected_idx: usize) {
+    assert_eq!(step.index(), expected_idx);
+}
+
+// @scenario: onboarding:step_next_per_variant
+#[rstest]
+#[case(OnboardingStep::IdentityCheck, Some(OnboardingStep::LinkChoice))]
+#[case(OnboardingStep::LinkChoice, Some(OnboardingStep::DefaultName))]
+#[case(OnboardingStep::DefaultName, Some(OnboardingStep::GroupsSetup))]
+#[case(OnboardingStep::GroupsSetup, Some(OnboardingStep::ContactInfo))]
+#[case(OnboardingStep::ContactInfo, Some(OnboardingStep::WhatNext))]
+#[case(OnboardingStep::WhatNext, None)]
+fn test_step_next_per_variant(
+    #[case] step: OnboardingStep,
+    #[case] expected: Option<OnboardingStep>,
+) {
+    // Catches `+ with -` (would underflow on IdentityCheck → panic, caught
+    // there too) and `+ with *` (idx*1 = idx → returns same step, caught
+    // for every non-final variant).
+    assert_eq!(step.next(), expected);
+}
+
+// @scenario: onboarding:step_previous_per_variant
+#[rstest]
+#[case(OnboardingStep::IdentityCheck, None)]
+#[case(OnboardingStep::LinkChoice, Some(OnboardingStep::IdentityCheck))]
+#[case(OnboardingStep::DefaultName, Some(OnboardingStep::LinkChoice))]
+#[case(OnboardingStep::GroupsSetup, Some(OnboardingStep::DefaultName))]
+#[case(OnboardingStep::ContactInfo, Some(OnboardingStep::GroupsSetup))]
+#[case(OnboardingStep::WhatNext, Some(OnboardingStep::ContactInfo))]
+fn test_step_previous_per_variant(
+    #[case] step: OnboardingStep,
+    #[case] expected: Option<OnboardingStep>,
+) {
+    // Catches `== with !=` on the `idx == 0` guard, and `- with +/-/...`
+    // on the `idx - 1` index expression.
+    assert_eq!(step.previous(), expected);
+}
+
+// @scenario: onboarding:advance_completed_at_only_set_at_final
+#[test]
+fn test_advance_does_not_set_completed_at_before_final_step() {
+    // Catches `OnboardingProgress::advance -> with Default::default()` for
+    // the intermediate steps: a no-op body would leave completed_at unset
+    // — but it would also fail to advance current_step, already covered.
+    // This adds the converse pin: completed_at must STAY None until the
+    // final advance.
+    let mut progress = OnboardingProgress::new();
+    for _ in 0..5 {
+        progress.advance();
+    }
+    assert_eq!(progress.current_step(), OnboardingStep::WhatNext);
+    assert!(progress.completed_at.is_none());
+    assert!(!progress.is_complete());
+    progress.advance();
+    assert!(progress.completed_at.is_some());
+    assert!(progress.is_complete());
+}
+
+// @scenario: onboarding:skip_step_completed_at_only_set_at_final
+#[test]
+fn test_skip_does_not_mark_completed_steps() {
+    // skip_step must NOT add the current step to completed_steps. This
+    // catches a mutation that swaps skip_step's body for advance's.
+    let mut progress = OnboardingProgress::new();
+    progress.skip_step();
+    progress.skip_step();
+    assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
+    assert!(progress.completed_steps.is_empty());
+}
+
+// @scenario: onboarding:display_name_first_letter_present
+#[rstest]
+#[case("Alexandra Johnson", "A. Johnson")]
+#[case("Bob Marley", "B. Marley")]
+#[case("Müller Schmidt", "M. Schmidt")]
+fn test_display_name_initial_last(#[case] name: &str, #[case] expected: &str) {
+    let suggestions = display_name_suggestions(name);
+    assert!(
+        suggestions.contains(&expected.to_string()),
+        "expected {} in {:?}",
+        expected,
+        suggestions
+    );
+}
+
+// @scenario: onboarding:display_name_short_threshold
+#[rstest]
+#[case("Bob", 1)] // 3 chars: just first
+#[case("Anne", 1)] // 4 chars: just first (boundary, < 5)
+#[case("Alice", 2)] // 5 chars: first + Alic
+#[case("Albert", 2)] // 6 chars: first + Albe
+fn test_display_name_single_word_count(#[case] name: &str, #[case] expected: usize) {
+    // Pins the `>= 5` threshold for the shortened-name branch. Mutations
+    // changing it to `< 5` or `> 5` produce different counts.
+    let suggestions = display_name_suggestions(name);
+    assert_eq!(suggestions.len(), expected, "for {}", name);
 }

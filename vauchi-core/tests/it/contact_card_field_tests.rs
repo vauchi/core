@@ -206,3 +206,190 @@ fn test_field_type_is_social() {
     assert!(!FieldType::Email.is_social());
     assert!(!FieldType::Custom.is_social());
 }
+
+// =============================================================================
+// Mutation-coverage tests: birthday validation, label/note boundaries, aliases
+// =============================================================================
+
+use rstest::rstest;
+
+// @scenario: field_validation :: Validate ISO 8601 birthday format
+#[rstest]
+#[case::canonical("1990-05-15", true)]
+#[case::leap_day_div_by_4("2020-02-29", true)]
+#[case::not_leap_div_by_100("1900-02-29", false)]
+#[case::leap_div_by_400("2000-02-29", true)]
+#[case::feb_28_non_leap("2021-02-28", true)]
+#[case::feb_29_non_leap("2021-02-29", false)]
+#[case::month_zero("1990-00-15", false)]
+#[case::month_thirteen("1990-13-15", false)]
+#[case::day_zero("1990-05-00", false)]
+#[case::day_32_in_31day_month("1990-01-32", false)]
+#[case::day_31_in_30day_month("1990-04-31", false)]
+#[case::day_31_in_april_invalid("1990-04-31", false)]
+#[case::day_30_in_april_valid("1990-04-30", true)]
+#[case::day_31_in_july_valid("1990-07-31", true)]
+#[case::wrong_separator("1990/05/15", false)]
+#[case::short_format("1990-5-15", false)]
+#[case::extra_chars("1990-05-15Z", false)]
+#[case::empty("", false)]
+fn test_validate_birthday_per_input(#[case] input: &str, #[case] expected_valid: bool) {
+    let field = ContactField::new(FieldType::Birthday, "DOB", input);
+    let actual = field.validate().is_ok();
+    assert_eq!(actual, expected_valid, "for {}", input);
+}
+
+// @scenario: field_validation :: Birthday days-per-month table
+// Pins every month's max-day boundary at once. Kills mutations to the
+// `match month` arms (e.g. swapping a 30/31 case).
+#[rstest]
+#[case(1, 31, true)]
+#[case(1, 32, false)]
+#[case(2, 28, true)] // non-leap
+#[case(2, 29, false)] // non-leap year (1990)
+#[case(3, 31, true)]
+#[case(4, 30, true)]
+#[case(4, 31, false)]
+#[case(5, 31, true)]
+#[case(6, 30, true)]
+#[case(6, 31, false)]
+#[case(7, 31, true)]
+#[case(8, 31, true)]
+#[case(9, 30, true)]
+#[case(9, 31, false)]
+#[case(10, 31, true)]
+#[case(11, 30, true)]
+#[case(11, 31, false)]
+#[case(12, 31, true)]
+fn test_validate_birthday_month_max_day_table(
+    #[case] month: u8,
+    #[case] day: u8,
+    #[case] expected: bool,
+) {
+    let s = format!("1990-{:02}-{:02}", month, day);
+    let field = ContactField::new(FieldType::Birthday, "DOB", &s);
+    assert_eq!(field.validate().is_ok(), expected, "for {}", s);
+}
+
+// @scenario: field_validation :: Field label truncation at MAX_LABEL_LENGTH
+#[test]
+fn test_set_label_truncates_at_max_length() {
+    use vauchi_core::contact_card::field::MAX_LABEL_LENGTH;
+    let mut f = ContactField::new(FieldType::Custom, "x", "v");
+    let long_label = "a".repeat(MAX_LABEL_LENGTH + 17);
+    f.set_label(&long_label);
+    // Truncation pins the exact boundary: longer-than-MAX is cut, shorter
+    // stays. Catches mutations to the `>` comparison or the `take` count.
+    assert_eq!(f.label().chars().count(), MAX_LABEL_LENGTH);
+
+    // Boundary: exactly MAX_LABEL_LENGTH must survive intact.
+    let exact = "b".repeat(MAX_LABEL_LENGTH);
+    f.set_label(&exact);
+    assert_eq!(f.label(), exact);
+
+    // Just under MAX must survive intact.
+    let under = "c".repeat(MAX_LABEL_LENGTH - 1);
+    f.set_label(&under);
+    assert_eq!(f.label(), under);
+}
+
+// @scenario: field_validation :: Field note truncation boundary
+#[test]
+fn test_set_note_truncation_boundary() {
+    use vauchi_core::contact_card::field::MAX_FIELD_NOTE_LEN;
+    let f = ContactField::new(FieldType::Custom, "x", "v");
+
+    // Exactly MAX must survive intact.
+    let exact = "y".repeat(MAX_FIELD_NOTE_LEN);
+    let f2 = f.clone().with_note(exact.clone());
+    assert_eq!(f2.note().unwrap().chars().count(), MAX_FIELD_NOTE_LEN);
+    assert_eq!(f2.note().unwrap(), exact);
+
+    // One over MAX gets truncated.
+    let over = "z".repeat(MAX_FIELD_NOTE_LEN + 1);
+    let f3 = f.clone().with_note(over);
+    assert_eq!(f3.note().unwrap().chars().count(), MAX_FIELD_NOTE_LEN);
+
+    // Empty note is canonicalized to None.
+    let f4 = f.clone().with_note(String::new());
+    assert_eq!(f4.note(), None);
+}
+
+// @scenario: field_validation :: set_value updates timestamp
+#[test]
+fn test_set_value_updates_timestamp() {
+    let mut f = ContactField::new(FieldType::Custom, "x", "old");
+    let t0 = f.updated_at();
+    // sleep-free: make sure updated_at is set on construction.
+    assert!(t0 > 0);
+
+    // After set_value the timestamp must be at least t0 (monotonic).
+    f.set_value("new");
+    assert!(f.updated_at() >= t0);
+    assert_eq!(f.value(), "new");
+}
+
+// @scenario: contact_card_management :: Field type alias resolution exhaustive
+#[rstest]
+#[case::phone("phone", FieldType::Phone, None)]
+#[case::tel("tel", FieldType::Phone, None)]
+#[case::telephone("telephone", FieldType::Phone, None)]
+#[case::email("email", FieldType::Email, None)]
+#[case::mail("mail", FieldType::Email, None)]
+#[case::address("address", FieldType::Address, None)]
+#[case::addr("addr", FieldType::Address, None)]
+#[case::home("home", FieldType::Address, None)]
+#[case::website("website", FieldType::Website, None)]
+#[case::web("web", FieldType::Website, None)]
+#[case::url("url", FieldType::Website, None)]
+#[case::birthday("birthday", FieldType::Birthday, None)]
+#[case::bday("bday", FieldType::Birthday, None)]
+#[case::dob("dob", FieldType::Birthday, None)]
+#[case::social("social", FieldType::Social, None)]
+#[case::twitter("twitter", FieldType::Social, Some("Twitter"))]
+#[case::x_alias("x", FieldType::Social, Some("Twitter"))]
+#[case::instagram("instagram", FieldType::Social, Some("Instagram"))]
+#[case::ig("ig", FieldType::Social, Some("Instagram"))]
+#[case::linkedin("linkedin", FieldType::Social, Some("LinkedIn"))]
+#[case::github("github", FieldType::Social, Some("GitHub"))]
+#[case::gh("gh", FieldType::Social, Some("GitHub"))]
+#[case::custom("custom", FieldType::Custom, None)]
+#[case::other("other", FieldType::Custom, None)]
+#[case::note("note", FieldType::Custom, None)]
+fn test_field_type_from_alias_table(
+    #[case] alias: &str,
+    #[case] expected_type: FieldType,
+    #[case] expected_label: Option<&'static str>,
+) {
+    let (ft, label) = FieldType::from_alias(alias).expect("alias must resolve");
+    assert_eq!(ft, expected_type);
+    assert_eq!(label.as_deref(), expected_label);
+}
+
+#[test]
+fn test_field_type_is_social_per_variant() {
+    // Pin one assertion per FieldType variant so a `matches!` mutation
+    // (returning true for the wrong arm) gets caught.
+    assert!(FieldType::Social.is_social());
+    assert!(!FieldType::Phone.is_social());
+    assert!(!FieldType::Email.is_social());
+    assert!(!FieldType::Address.is_social());
+    assert!(!FieldType::Website.is_social());
+    assert!(!FieldType::Birthday.is_social());
+    assert!(!FieldType::Custom.is_social());
+}
+
+#[test]
+fn test_validate_value_too_long_returns_specific_error() {
+    use vauchi_core::contact_card::ValidationError;
+    use vauchi_core::contact_card::field::MAX_VALUE_LENGTH;
+    // Build a value that exceeds MAX_VALUE_LENGTH bytes.
+    let f = ContactField::new(FieldType::Custom, "k", &"x".repeat(MAX_VALUE_LENGTH + 1));
+    let err = f.validate().unwrap_err();
+    // Pin the exact variant — kills mutations that swap which error is
+    // returned for the length-overflow path.
+    match err {
+        ValidationError::ValueTooLong { max } => assert_eq!(max, MAX_VALUE_LENGTH),
+        other => panic!("expected ValueTooLong, got {:?}", other),
+    }
+}

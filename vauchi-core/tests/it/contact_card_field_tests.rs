@@ -320,12 +320,19 @@ fn test_set_note_truncation_boundary() {
 fn test_set_value_updates_timestamp() {
     let mut f = ContactField::new(FieldType::Custom, "x", "old");
     let t0 = f.updated_at();
-    // sleep-free: make sure updated_at is set on construction.
-    assert!(t0 > 0);
+    // updated_at must be a real Unix timestamp, not a stub like 0 or 1.
+    // 1_700_000_000 is 2023-11; any healthy clock is well past this.
+    // Catches `updated_at -> u64 with 0` and `with 1` mutations.
+    assert!(
+        t0 > 1_700_000_000,
+        "expected real Unix timestamp, got {}",
+        t0
+    );
 
     // After set_value the timestamp must be at least t0 (monotonic).
     f.set_value("new");
     assert!(f.updated_at() >= t0);
+    assert!(f.updated_at() > 1_700_000_000);
     assert_eq!(f.value(), "new");
 }
 

@@ -258,3 +258,151 @@ fn initials_avatar_decoded_dimensions_are_at_most_size(#[case] size: u32) {
     assert_eq!(img.width(), size);
     assert_eq!(img.height(), size);
 }
+
+// ── Initials pixel-pin tests (kill arithmetic mutations) ────────
+// At size=64 the inscribed circle has center (32, 32) and radius
+// sqrt(32*32) = 32. We pin specific pixels whose coloring is
+// determined by the mask arithmetic, so any mutation in lines
+// 20-26 (radius_sq, dx, dy, mask comparison) flips at least one
+// of these assertions.
+//
+// Reasoning per pixel:
+//   * (48, 32): dx=16.5, dy=0.5 → dx²+dy²≈272.5 < 1024. ORIG colored.
+//     A `* with +` mutation on `radius_sq = center * center` would
+//     give radius_sq=64; 272.5 > 64 → transparent. ↗ caught.
+//   * (32, 0):  dx=0.5, dy=-31.5 → dx²+dy²≈992.5 < 1024. ORIG colored.
+//     A `+ with -` mutation on `dy = y - center + 0.5` would give
+//     dy=-32.5, total ≈1056.5 → transparent. ↗ caught.
+//   * (10, 5):  dx=-21.5, dy=-26.5 → dx²+dy²≈1164.5 > 1024. ORIG transparent.
+//     A `+ with *` mutation on `dy = y - center + 0.5` collapses
+//     dy toward zero, putting the pixel inside the disc → colored.
+//     ↗ caught.
+//   * (15, 15): dx=-16.5, dy=-16.5 → dx²+dy²=544.5 < 1024. ORIG colored.
+//     A `+ with *` mutation on `dx*dx + dy*dy` evaluates dx²·dy² =
+//     74 120, far above 1024 → transparent. ↗ caught.
+#[test]
+fn initials_avatar_disc_mask_pins_specific_pixels() {
+    let bg = [200u8, 50, 100];
+    let size = 64u32;
+    let bytes = generate_initials_avatar(bg, size);
+    let img = decode_rgba(&bytes);
+
+    let colored = [bg[0], bg[1], bg[2], 255];
+
+    assert_eq!(
+        img.get_pixel(48, 32).0,
+        colored,
+        "pixel (48, 32) must be inside the inscribed disc"
+    );
+    assert_eq!(
+        img.get_pixel(32, 0).0,
+        colored,
+        "pixel (32, 0) must be inside the inscribed disc (dy²≈992.25)"
+    );
+    assert_eq!(
+        img.get_pixel(10, 5).0[3],
+        0,
+        "pixel (10, 5) must be transparent (corner region)"
+    );
+    assert_eq!(
+        img.get_pixel(15, 15).0,
+        colored,
+        "pixel (15, 15) must be colored (well inside the disc)"
+    );
+}
+
+// ── Mandelbrot seed-specific pixel pins ─────────────────────────
+// Pinning a handful of pixel values for a known (seed, size) catches
+// the arithmetic mutations in the Mandelbrot iteration loop and color
+// mapping. Values were captured from the unmodified implementation;
+// any mutation that changes iteration count, escape condition, color
+// formula, or center/zoom math will perturb at least one of them.
+#[test]
+fn mandelbrot_avatar_seed_zero_pixel_table() {
+    let bytes = generate_mandelbrot_avatar(0, 64);
+    let img = decode_rgba(&bytes);
+
+    // Center (32, 32): c = -0.5 + 0i → in the Mandelbrot set, black.
+    assert_eq!(img.get_pixel(32, 32).0, [0, 0, 0, 255]);
+
+    // (16, 32): c ≈ -1.125 + 0i → in the set (period-2 bulb), black.
+    assert_eq!(img.get_pixel(16, 32).0, [0, 0, 0, 255]);
+
+    // (48, 32): c ≈ 0.125 + 0i → in the set (main cardioid), black.
+    assert_eq!(img.get_pixel(48, 32).0, [0, 0, 0, 255]);
+
+    // Top corner (0, 0) is outside the inscribed disc → transparent.
+    assert_eq!(img.get_pixel(0, 0).0, [0, 0, 0, 0]);
+
+    // (60, 32) is inside the inscribed disc but c ≈ 0.594 escapes
+    // quickly (~iter 5). Pinning the exact RGB catches mutations to
+    // both the iteration loop AND the color formula.
+    let escape = img.get_pixel(60, 32).0;
+    assert_eq!(
+        escape[3], 255,
+        "outside-set pixel must be opaque (alpha=255)"
+    );
+    // It must NOT be black — it escaped before max_iter.
+    assert_ne!(
+        &escape[..3],
+        &[0, 0, 0],
+        "outside-set pixel must NOT be in-set black; got {:?}",
+        escape
+    );
+    // Red channel dominates because the formula multiplies by 9.0.
+    assert!(
+        escape[0] > escape[1] && escape[0] > escape[2],
+        "Red channel must dominate (formula t*9*255 vs t*3*255 vs t*255), got {:?}",
+        escape
+    );
+}
+
+// ── Mandelbrot byte-level snapshot ──────────────────────────────
+// A hash of the WebP bytes for a known seed/size pins the entire
+// pipeline end-to-end. Any mutation in the iteration math or color
+// mapping that survives the per-pixel checks above will still flip
+// at least one byte and thus the hash. The hash is a one-line
+// constant — easy to update intentionally if the implementation
+// or encoder changes.
+#[test]
+fn mandelbrot_avatar_seed_zero_size_64_byte_hash() {
+    use sha2::{Digest, Sha256};
+    let bytes = generate_mandelbrot_avatar(0, 64);
+    let hash = Sha256::digest(&bytes);
+    let hex = format!("{:x}", hash);
+    // Captured 2026-04-27 against an unmutated build.
+    // If the avatar implementation or libwebp encoder version changes
+    // intentionally, regenerate via:
+    //   cargo test mandelbrot_avatar_seed_zero_size_64_byte_hash -- --nocapture
+    // and replace this constant.
+    const EXPECTED: &str = "b78992c22889235547b3cbf26edf779bf89232d66b18509c6b49a24bb1b09fc2";
+    assert_eq!(hex, EXPECTED, "mandelbrot output bytes changed");
+}
+
+// Snapshot at a non-zero seed%10 — catches mutations to center_x math
+// (line 42) that collapse to identity for seed=0 (e.g. `+ with -` on
+// `-0.5 + (seed%10)*0.05` since `seed%10==0` makes both forms equal).
+#[test]
+fn mandelbrot_avatar_seed_five_size_64_byte_hash() {
+    use sha2::{Digest, Sha256};
+    let bytes = generate_mandelbrot_avatar(5, 64);
+    let hash = Sha256::digest(&bytes);
+    let hex = format!("{:x}", hash);
+    const EXPECTED: &str = "4236bab2352b30f81f7760b5540cc8196632a58d75bb56d2c65d29b7c67d2c93";
+    assert_eq!(hex, EXPECTED, "mandelbrot seed=5 output bytes changed");
+}
+
+// Snapshot at a non-zero seed/10%10 — catches mutations to center_y
+// math (line 43) and y-axis symmetry-breaking (lines 57, 63) that
+// collapse to identity for seed=0. (Mandelbrot is y-symmetric, so
+// `y = 2xy - y0` produces the same iter count as `y = 2xy + y0`
+// when center_y=0.)
+#[test]
+fn mandelbrot_avatar_seed_ten_size_64_byte_hash() {
+    use sha2::{Digest, Sha256};
+    let bytes = generate_mandelbrot_avatar(10, 64);
+    let hash = Sha256::digest(&bytes);
+    let hex = format!("{:x}", hash);
+    const EXPECTED: &str = "c94b5dba79590bb10c2af440cfa5e8cbe3ddb46547580cb3a6afbdbf509762eb";
+    assert_eq!(hex, EXPECTED, "mandelbrot seed=10 output bytes changed");
+}

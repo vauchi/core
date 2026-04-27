@@ -56,6 +56,8 @@ impl AppScreen {
             Self::DeviceLinking | Self::DeviceReplacement => Self::DeviceManagement,
             Self::FormDialog { .. } => return None,
             Self::Lock => return None,
+            // Deep-link consent is modal-shaped — no parent tab.
+            Self::DeepLinkConsent { .. } => return None,
             other => other.clone(),
         };
 
@@ -158,7 +160,10 @@ impl AppEngine {
     /// Onboarding IS cacheable: user navigates to FormDialog (add field)
     /// and back, must return to their current step with accumulated data.
     fn is_cacheable(screen: &AppScreen) -> bool {
-        !matches!(screen, AppScreen::Lock | AppScreen::FormDialog { .. })
+        !matches!(
+            screen,
+            AppScreen::Lock | AppScreen::FormDialog { .. } | AppScreen::DeepLinkConsent { .. }
+        )
     }
 
     /// Invalidates a cached engine for a specific screen.

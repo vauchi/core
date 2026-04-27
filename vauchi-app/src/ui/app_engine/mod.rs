@@ -101,6 +101,12 @@ pub enum AppScreen {
     DeviceReplacement,
     AvatarEditor,
     RecoveryClaimReview,
+    /// Consent gate for an incoming `vauchi://exchange?...` deep link.
+    /// Holds the parsed payload until the user grants or denies. Per
+    /// `_private/docs/problems/2026-04-25-deeplink-consent-orchestrator`.
+    DeepLinkConsent {
+        payload: vauchi_core::exchange::link_mode::DeepLinkPayload,
+    },
 }
 
 impl AppScreen {
@@ -147,6 +153,7 @@ impl AppScreen {
             Self::DeviceReplacement => "device_replacement",
             Self::AvatarEditor => "avatar_editor",
             Self::RecoveryClaimReview => "recovery_claim_review",
+            Self::DeepLinkConsent { .. } => "deep_link_consent",
         }
     }
 

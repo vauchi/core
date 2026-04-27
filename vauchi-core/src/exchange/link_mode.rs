@@ -14,6 +14,7 @@
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use rand::rngs::OsRng;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
 use zeroize::Zeroizing;
@@ -166,7 +167,7 @@ pub fn initiator_complete(
 // =========================================================================
 
 /// Parsed Link URL components.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ParsedLinkUrl {
     /// Initiator's ephemeral X25519 public key (32 bytes).
     pub initiator_public_key: [u8; 32],
@@ -226,7 +227,7 @@ pub fn parse_link_url(url: &str) -> Option<ParsedLinkUrl> {
 /// Wraps [`ParsedLinkUrl`]; held by the consent screen until the user
 /// grants or denies, at which point the gate's grant action drives
 /// [`responder_respond`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DeepLinkPayload {
     inner: ParsedLinkUrl,
 }

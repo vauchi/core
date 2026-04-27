@@ -400,3 +400,118 @@ fn test_validate_value_too_long_returns_specific_error() {
         other => panic!("expected ValueTooLong, got {:?}", other),
     }
 }
+
+// =============================================================================
+// validate() dispatch table — kill `delete match arm` mutations
+// =============================================================================
+//
+// `validate()` matches on FieldType and dispatches to per-type validators.
+// A `delete match arm FieldType::Website` mutation makes Website fall
+// through to the catch-all `_ => Ok(())`, silently accepting invalid
+// URLs. Asserting that an invalid Website returns Err catches it.
+#[test]
+fn test_validate_dispatches_to_website_validator() {
+    let f = ContactField::new(FieldType::Website, "site", "no protocol no dot has space");
+    assert!(
+        f.validate().is_err(),
+        "Website dispatch must call validate_website (catches deletion of the Website match arm)"
+    );
+}
+
+// =============================================================================
+// validate_phone boundaries — kill `<`/`>` ↔ `<=`/`>=`/`==` mutations
+// =============================================================================
+#[test]
+fn test_validate_phone_exactly_seven_digits_is_valid() {
+    // The check is `if digit_count < 7 { Err }`. A `< with <=` mutation
+    // would reject 7-digit numbers; pinning a 7-digit-valid case kills it.
+    let f = ContactField::new(FieldType::Phone, "p", "1234567");
+    f.validate().expect("7-digit phone must validate");
+}
+
+#[test]
+fn test_validate_phone_six_digits_is_invalid() {
+    // Mirror of the above to keep the < boundary tight on both sides.
+    let f = ContactField::new(FieldType::Phone, "p", "123456");
+    assert!(f.validate().is_err());
+}
+
+#[test]
+fn test_validate_phone_exactly_thirty_chars_is_valid() {
+    // The check is `if value.len() > 30 { Err }`. Mutations to
+    // `==` or `>=` would reject a 30-char phone. Build a 30-char
+    // value using only allowed phone characters (digits, space,
+    // dash, parens, plus — no '.').
+    let exactly_30 = "+1 (555) 123-4567 0000 1234567";
+    assert_eq!(exactly_30.len(), 30);
+    let f = ContactField::new(FieldType::Phone, "p", exactly_30);
+    f.validate().expect("30-char phone must validate");
+}
+
+#[test]
+fn test_validate_phone_thirty_one_chars_is_invalid() {
+    let v = "+1 (555) 123-4567 0000 12345678"; // 31 chars
+    assert_eq!(v.len(), 31);
+    let f = ContactField::new(FieldType::Phone, "p", v);
+    assert!(f.validate().is_err());
+}
+
+// =============================================================================
+// validate_website branches — kill || ↔ && and missing-! mutations
+// =============================================================================
+#[test]
+fn test_validate_website_http_without_dot_is_valid() {
+    // Pins the `starts_with("http://") || starts_with("https://")` branch
+    // by using a URL with no dot in the authority. Catches:
+    //   - 290:41 `|| with &&`: with &&, the protocol branch never fires
+    //     (a string cannot start with both); falls through to `contains('.')`
+    //     which is false → Err. Different from orig (Ok).
+    //   - 288:9 `-> Ok(())`: trivially caught by the no-dot/has-space test below.
+    let f = ContactField::new(FieldType::Website, "w", "http://localhost");
+    f.validate().expect("http://localhost must validate");
+}
+
+#[test]
+fn test_validate_website_plain_domain_is_valid() {
+    // Pins `value.contains('.') && !value.contains(' ')` by using a
+    // plain domain without protocol. Catches `delete !` (293:35): with
+    // `contains('.') && contains(' ')` the test fails because there's
+    // no space in "example.com".
+    let f = ContactField::new(FieldType::Website, "w", "example.com");
+    f.validate().expect("plain domain must validate");
+}
+
+#[test]
+fn test_validate_website_dotted_with_space_is_invalid() {
+    // Pins `value.contains('.') && !value.contains(' ')` by using a
+    // value that contains both a dot AND a space. Catches `&& with ||`
+    // (293:32): with ||, dot OR no-space is true → returns Ok.
+    let f = ContactField::new(FieldType::Website, "w", "abc.de f");
+    assert!(f.validate().is_err());
+}
+
+#[test]
+fn test_validate_website_no_protocol_no_dot_is_invalid() {
+    // Catches `validate_website -> Ok(())` (288:9): a body that
+    // returns Ok unconditionally would pass this, but the real
+    // implementation rejects values without protocol AND without
+    // a dot.
+    let f = ContactField::new(FieldType::Website, "w", "noproto");
+    assert!(f.validate().is_err());
+}
+
+// =============================================================================
+// validate_birthday format check — kill || ↔ && in separator check
+// =============================================================================
+#[test]
+fn test_validate_birthday_wrong_seventh_byte_is_invalid() {
+    // The format check is:
+    //   if value.len() != 10 || bytes[4] != b'-' || bytes[7] != b'-' { Err }
+    // A `|| with &&` on the LAST `||` (304:61) makes the check:
+    //   len != 10 || (bytes[4] != b'-' && bytes[7] != b'-')
+    // For "1990-05/15": len=10, bytes[4]='-', bytes[7]='/'. Orig
+    // returns Err (third clause). Mutation: false || (false && true)
+    // → false → falls through to parsing, eventually returns Ok.
+    let f = ContactField::new(FieldType::Birthday, "b", "1990-05/15");
+    assert!(f.validate().is_err());
+}

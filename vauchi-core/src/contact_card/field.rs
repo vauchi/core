@@ -145,12 +145,12 @@ impl ContactField {
 
     /// Sets the field label. Truncates to MAX_LABEL_LENGTH chars (#192).
     pub fn set_label(&mut self, label: &str) {
-        let normalized = normalize_text(label);
-        if normalized.chars().count() > MAX_LABEL_LENGTH {
-            self.label = normalized.chars().take(MAX_LABEL_LENGTH).collect();
-        } else {
-            self.label = normalized;
-        }
+        // `take(MAX)` is a no-op for inputs with ≤ MAX chars and a
+        // truncation otherwise — no length-comparison branch needed.
+        self.label = normalize_text(label)
+            .chars()
+            .take(MAX_LABEL_LENGTH)
+            .collect();
     }
 
     /// Returns the field value.
@@ -182,13 +182,12 @@ impl ContactField {
 
     /// Mutably set (or clear) the private note. Truncates to 500 chars.
     pub fn set_note(&mut self, note: Option<String>) {
+        // `take(MAX)` is a no-op for inputs with ≤ MAX chars and a
+        // truncation otherwise — no length-comparison branch needed.
         self.note = match note {
             None => None,
             Some(n) if n.is_empty() => None,
-            Some(n) if n.chars().count() > MAX_FIELD_NOTE_LEN => {
-                Some(n.chars().take(MAX_FIELD_NOTE_LEN).collect())
-            }
-            Some(n) => Some(n),
+            Some(n) => Some(n.chars().take(MAX_FIELD_NOTE_LEN).collect()),
         };
     }
 
@@ -270,14 +269,11 @@ impl ContactField {
             return Err(ValidationError::InvalidEmail);
         }
 
-        // Domain must have at least one character and contain a dot (for TLD)
-        // Or at least be non-empty
-        if domain.is_empty() || !domain.contains('.') {
-            // Allow domains without dots for flexibility (e.g., localhost)
-            // But require at least some content
-            if domain.is_empty() {
-                return Err(ValidationError::InvalidEmail);
-            }
+        // Domain must be non-empty. We intentionally allow domains
+        // without a dot (e.g. `user@localhost`) — only emptiness is
+        // a hard reject.
+        if domain.is_empty() {
+            return Err(ValidationError::InvalidEmail);
         }
 
         Ok(())

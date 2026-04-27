@@ -8,10 +8,39 @@
 # Exclude test infrastructure, generated code, and benchmarks from mutation
 exclude_globs = ["tests/**", "benches/**", "fuzz/**"]
 
-# Exclude functions that use include_bytes! with cross-repo relative paths
-# (themes.json from sibling themes/ repo). cargo-mutants copies source to
-# a temp dir where these paths break.
-exclude_re = ["test_themes_json_not_empty", "test_theme_by_id_found_in_json", "test_theme_by_id_not_found_in_json"]
+# Mutants we never expect to catch.
+#
+# Each entry is a regex matched against cargo-mutants' textual mutant
+# description (e.g. `path/to/file.rs:LINE:COL: replace X with Y in fn`).
+# Anchor by `path:line:col` for precision — every mutation cargo-mutants
+# emits has a unique (file, line, col, replacement) tuple.
+exclude_re = [
+    # Cross-repo include_bytes! escapes the temp source copy that
+    # cargo-mutants creates when --in-place is not used. Themes JSON
+    # lives in a sibling repo so the path resolves outside the workspace.
+    "test_themes_json_not_empty",
+    "test_theme_by_id_found_in_json",
+    "test_theme_by_id_not_found_in_json",
+
+    # ── Equivalent mutations in vauchi-core/src/avatar/mod.rs ──
+    # Verified 2026-04-27 against an unmutated build. Each of these
+    # produces source code that is observably indistinguishable from
+    # the original for every reachable input. Refactoring would change
+    # rendered avatar bytes, which is user-visible behavior.
+    #
+    # Boundary `dx*dx + dy*dy > radius_sq`. With size=N integer,
+    # radius_sq = (N/2)² is an integer; dx and dy are integer+0.5,
+    # so dx²+dy² has a non-integer fractional part. The two sides
+    # can never be exactly equal, so `>` and `>=` partition the
+    # plane identically.
+    "vauchi-core/src/avatar/mod\\.rs:52:30: replace > with >=",
+    # `y = 2.0 * x * y + y0` ↔ `y = 2.0 * x * y - y0`. Replacing y0
+    # with -y0 in the iteration replaces c with conj(c). The
+    # Mandelbrot set is invariant under conjugation, so the iter
+    # count for any pixel is the same with either sign — colors
+    # match exactly.
+    "vauchi-core/src/avatar/mod\\.rs:63:29: replace \\+ with -",
+]
 
 # Allow 1.5x the normal test timeout per mutant
 timeout_multiplier = 1.5

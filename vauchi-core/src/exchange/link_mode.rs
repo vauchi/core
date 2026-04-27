@@ -166,6 +166,7 @@ pub fn initiator_complete(
 // =========================================================================
 
 /// Parsed Link URL components.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedLinkUrl {
     /// Initiator's ephemeral X25519 public key (32 bytes).
     pub initiator_public_key: [u8; 32],
@@ -213,6 +214,81 @@ pub fn parse_link_url(url: &str) -> Option<ParsedLinkUrl> {
         initiator_public_key: pk_bytes?,
         nonce: nonce_bytes?,
     })
+}
+
+// =========================================================================
+// Deep-link consent gate parser (problem record
+// 2026-04-25-deeplink-consent-orchestrator)
+// =========================================================================
+
+/// Parsed payload from a deep-link URI handed in by the OS.
+///
+/// Wraps [`ParsedLinkUrl`]; held by the consent screen until the user
+/// grants or denies, at which point the gate's grant action drives
+/// [`responder_respond`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeepLinkPayload {
+    inner: ParsedLinkUrl,
+}
+
+impl DeepLinkPayload {
+    /// Initiator's ephemeral X25519 public key (32 bytes).
+    pub fn initiator_public_key(&self) -> &[u8; 32] {
+        &self.inner.initiator_public_key
+    }
+
+    /// Random nonce from the URL.
+    pub fn nonce(&self) -> &[u8; 32] {
+        &self.inner.nonce
+    }
+
+    /// Borrow the wrapped [`ParsedLinkUrl`] so the responder flow can
+    /// drive the existing link-mode functions without re-parsing.
+    pub fn as_parsed(&self) -> &ParsedLinkUrl {
+        &self.inner
+    }
+}
+
+/// Reason an external deep-link URI was rejected.
+///
+/// Variants are distinct so the consent layer can surface a typed
+/// rejection reason in the toast / error banner that replaces the
+/// dropped `DeepLinkHandler.swift` / `DeepLinkHandler.kt` invalid
+/// branch.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum DeepLinkParseError {
+    /// URI scheme is not `vauchi`.
+    #[error("invalid scheme")]
+    InvalidScheme,
+    /// URI host is not `exchange`.
+    #[error("invalid host")]
+    InvalidHost,
+    /// URI uses the legacy `vauchi://exchange/<payload>` path-component
+    /// form. This shape was a placeholder in the original frontend
+    /// handlers; it never lit up in production and the live core
+    /// link-mode generator emits the query form
+    /// `vauchi://exchange?pk=<b64>&n=<b64>`. Distinguished from
+    /// `MalformedQuery` so a future frontend can show "this link uses
+    /// an old format — ask the sender for a fresh one" if useful.
+    #[error("legacy path form")]
+    LegacyPathForm,
+    /// Query parameters are missing, malformed (bad base64), or have
+    /// wrong-length keys.
+    #[error("malformed query")]
+    MalformedQuery,
+}
+
+/// Parse a `vauchi://exchange?pk=<b64>&n=<b64>` URI into a
+/// [`DeepLinkPayload`] suitable for handing to the consent screen.
+///
+/// Returns a typed [`DeepLinkParseError`] for every rejection reason;
+/// the consent layer maps these to user-visible messages. The path
+/// component form `vauchi://exchange/<payload>` (a defunct placeholder
+/// from the original frontend handlers) is rejected with
+/// [`DeepLinkParseError::LegacyPathForm`].
+pub fn parse_exchange_deep_link(uri: &str) -> Result<DeepLinkPayload, DeepLinkParseError> {
+    let _ = uri;
+    unimplemented!("parse_exchange_deep_link — Phase 1 T1 stub, impl follows")
 }
 
 /// Commands for the responder after parsing the link URL.

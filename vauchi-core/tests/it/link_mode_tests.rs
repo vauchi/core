@@ -366,3 +366,133 @@ fn responder_rejects_small_order_point_in_url() {
         "Responder DH with small-order point must be rejected"
     );
 }
+
+// ================================================================
+// parse_exchange_deep_link — deep-link consent gate parser
+// (problem record 2026-04-25-deeplink-consent-orchestrator)
+// ================================================================
+
+// @internal
+#[test]
+fn parse_deep_link_accepts_canonical_query_form() {
+    let (init, _) = initiator_generate();
+    let payload = parse_exchange_deep_link(&init.url).expect("canonical link_mode URL must parse");
+    assert_eq!(*payload.nonce(), init.nonce);
+    let pk_bytes = parse_link_url(&init.url).unwrap().initiator_public_key;
+    assert_eq!(*payload.initiator_public_key(), pk_bytes);
+}
+
+// @internal
+#[test]
+fn parse_deep_link_round_trips_through_as_parsed() {
+    let (init, _) = initiator_generate();
+    let payload = parse_exchange_deep_link(&init.url).unwrap();
+    let direct = parse_link_url(&init.url).unwrap();
+    assert_eq!(
+        payload.as_parsed().initiator_public_key,
+        direct.initiator_public_key
+    );
+    assert_eq!(payload.as_parsed().nonce, direct.nonce);
+}
+
+// @internal
+#[test]
+fn parse_deep_link_rejects_non_vauchi_scheme() {
+    assert_eq!(
+        parse_exchange_deep_link("https://exchange?pk=AAAA&n=BBBB"),
+        Err(DeepLinkParseError::InvalidScheme),
+    );
+    assert_eq!(
+        parse_exchange_deep_link("ftp://exchange?pk=AAAA&n=BBBB"),
+        Err(DeepLinkParseError::InvalidScheme),
+    );
+}
+
+// @internal
+#[test]
+fn parse_deep_link_rejects_wrong_host() {
+    assert_eq!(
+        parse_exchange_deep_link("vauchi://recover?pk=AAAA&n=BBBB"),
+        Err(DeepLinkParseError::InvalidHost),
+    );
+    assert_eq!(
+        parse_exchange_deep_link("vauchi://other?pk=AAAA&n=BBBB"),
+        Err(DeepLinkParseError::InvalidHost),
+    );
+}
+
+// @internal
+#[test]
+fn parse_deep_link_rejects_legacy_path_form() {
+    // The defunct shape the original DeepLinkHandler.swift / .kt parsed.
+    assert_eq!(
+        parse_exchange_deep_link("vauchi://exchange/somepayload"),
+        Err(DeepLinkParseError::LegacyPathForm),
+    );
+    assert_eq!(
+        parse_exchange_deep_link("vauchi://exchange/abc/def"),
+        Err(DeepLinkParseError::LegacyPathForm),
+    );
+}
+
+// @internal
+#[test]
+fn parse_deep_link_rejects_malformed_query() {
+    // Missing pk
+    assert_eq!(
+        parse_exchange_deep_link("vauchi://exchange?n=AAAA"),
+        Err(DeepLinkParseError::MalformedQuery),
+    );
+    // Missing n
+    assert_eq!(
+        parse_exchange_deep_link("vauchi://exchange?pk=AAAA"),
+        Err(DeepLinkParseError::MalformedQuery),
+    );
+    // Bad base64 in pk
+    assert_eq!(
+        parse_exchange_deep_link("vauchi://exchange?pk=!@#$&n=AAAA"),
+        Err(DeepLinkParseError::MalformedQuery),
+    );
+    // Wrong-length pk (decoded != 32 bytes)
+    let short = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0u8; 16]);
+    let nonce = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0u8; 32]);
+    assert_eq!(
+        parse_exchange_deep_link(&format!("vauchi://exchange?pk={short}&n={nonce}")),
+        Err(DeepLinkParseError::MalformedQuery),
+    );
+}
+
+// @internal
+#[test]
+fn parse_deep_link_rejects_empty_and_whitespace() {
+    assert_eq!(
+        parse_exchange_deep_link(""),
+        Err(DeepLinkParseError::InvalidScheme),
+    );
+    assert_eq!(
+        parse_exchange_deep_link("   "),
+        Err(DeepLinkParseError::InvalidScheme),
+    );
+}
+
+// @internal
+#[test]
+fn parse_deep_link_rejects_no_query_separator() {
+    // host=exchange, no `?` — shouldn't fall through to MalformedQuery silently
+    assert_eq!(
+        parse_exchange_deep_link("vauchi://exchange"),
+        Err(DeepLinkParseError::MalformedQuery),
+    );
+}
+
+// @internal
+#[test]
+fn parse_deep_link_tolerates_unknown_extra_params() {
+    // The live parse_link_url ignores unknown params; the deep-link
+    // wrapper preserves that behaviour so future protocol additions
+    // don't break existing senders.
+    let (init, _) = initiator_generate();
+    let with_extra = format!("{}&extra=junk&future=v2", init.url);
+    let payload = parse_exchange_deep_link(&with_extra).expect("extra params must not block parse");
+    assert_eq!(*payload.nonce(), init.nonce);
+}

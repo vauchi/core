@@ -1,0 +1,228 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Tests for the G4 ContactDetail typed view-state surface.
+//!
+//! Verifies that `VauchiPlatform::contact_detail_view_state()` returns
+//! the canonical `actions`/`badges`/`banners` lists for various contact
+//! states — closes the iOS/Android Verify-button divergence (audit V4)
+//! and replaces frontend `if contact.isVerified | isRecoveryTrusted |
+//! isHidden | reciprocity == ...` branches with a typed list.
+
+use std::sync::Arc;
+
+use tempfile::TempDir;
+
+use vauchi_platform::{
+    MobileContactDetailAction, MobileContactDetailBadge, MobileContactDetailBanner, VauchiPlatform,
+};
+
+fn setup() -> (Arc<VauchiPlatform>, TempDir) {
+    let dir = TempDir::new().unwrap();
+    let wb = VauchiPlatform::new(
+        dir.path().to_string_lossy().to_string(),
+        "http://localhost:8080".to_string(),
+    )
+    .unwrap();
+    wb.create_identity("Alice".to_string()).unwrap();
+    (wb, dir)
+}
+
+fn add_exchanged(wb: &VauchiPlatform, name: &str, pk_seed: u8) -> String {
+    let card = vauchi_core::contact_card::ContactCard::new(name);
+    let contact = vauchi_core::Contact::from_exchange(
+        [pk_seed; 32],
+        card,
+        vauchi_core::crypto::SymmetricKey::generate(),
+    );
+    let id = contact.id().to_string();
+    wb.save_test_contact(&contact).unwrap();
+    id
+}
+
+fn add_imported(wb: &VauchiPlatform, name: &str) -> String {
+    let card = vauchi_core::contact_card::ContactCard::new(name);
+    let contact =
+        vauchi_core::Contact::from_import(card, vauchi_core::ImportSource::VcardFile, None);
+    let id = contact.id().to_string();
+    wb.save_test_contact(&contact).unwrap();
+    id
+}
+
+fn has_action(actions: &[MobileContactDetailAction], target: &MobileContactDetailAction) -> bool {
+    actions.iter().any(|a| a == target)
+}
+
+// @internal
+#[test]
+fn contact_detail_view_state_returns_error_when_contact_missing() {
+    let (wb, _dir) = setup();
+    let result = wb.contact_detail_view_state("nonexistent-id".to_string());
+    assert!(
+        result.is_err(),
+        "missing contact must return an error, not a default view state"
+    );
+}
+
+// @internal
+#[test]
+fn fresh_exchanged_contact_has_no_verified_badge_no_recovery_badge() {
+    let (wb, _dir) = setup();
+    let id = add_exchanged(&wb, "Bob", 0x01);
+
+    let state = wb.contact_detail_view_state(id).unwrap();
+
+    assert!(
+        !state.badges.contains(&MobileContactDetailBadge::Verified),
+        "fresh exchanged contact must not show Verified badge"
+    );
+    assert!(
+        !state
+            .badges
+            .contains(&MobileContactDetailBadge::RecoveryTrusted),
+        "fresh exchanged contact must not show RecoveryTrusted badge"
+    );
+}
+
+// @internal
+#[test]
+fn imported_contact_actions_include_delete_not_archive() {
+    let (wb, _dir) = setup();
+    let id = add_imported(&wb, "Eve");
+
+    let state = wb.contact_detail_view_state(id).unwrap();
+
+    assert!(
+        has_action(&state.actions, &MobileContactDetailAction::Delete),
+        "imported contact must offer Delete action (hard-delete)"
+    );
+    assert!(
+        !has_action(&state.actions, &MobileContactDetailAction::Archive),
+        "imported contact must NOT offer Archive — that's for exchanged contacts only"
+    );
+}
+
+// @internal
+#[test]
+fn exchanged_contact_actions_include_archive_not_delete() {
+    let (wb, _dir) = setup();
+    let id = add_exchanged(&wb, "Bob", 0x01);
+
+    let state = wb.contact_detail_view_state(id).unwrap();
+
+    assert!(
+        has_action(&state.actions, &MobileContactDetailAction::Archive),
+        "exchanged contact must offer Archive action (soft-delete)"
+    );
+    assert!(
+        !has_action(&state.actions, &MobileContactDetailAction::Delete),
+        "exchanged contact must NOT offer Delete — that's for imported only"
+    );
+}
+
+// @internal
+#[test]
+fn toggle_recovery_trust_carries_current_state_for_label_flip() {
+    let (wb, _dir) = setup();
+    let id = add_exchanged(&wb, "Bob", 0x01);
+
+    let state = wb.contact_detail_view_state(id).unwrap();
+
+    let toggle = state
+        .actions
+        .iter()
+        .find_map(|a| match a {
+            MobileContactDetailAction::ToggleRecoveryTrust { currently_trusted } => {
+                Some(*currently_trusted)
+            }
+            _ => None,
+        })
+        .expect("ToggleRecoveryTrust must be present");
+    assert!(
+        !toggle,
+        "fresh contact must report currently_trusted=false so the button labels as 'Trust', not 'Untrust'"
+    );
+}
+
+// @internal
+#[test]
+fn toggle_hidden_carries_current_state_for_label_flip() {
+    let (wb, _dir) = setup();
+    let id = add_exchanged(&wb, "Bob", 0x01);
+
+    let state = wb.contact_detail_view_state(id).unwrap();
+
+    let toggle = state
+        .actions
+        .iter()
+        .find_map(|a| match a {
+            MobileContactDetailAction::ToggleHidden { currently_hidden } => Some(*currently_hidden),
+            _ => None,
+        })
+        .expect("ToggleHidden must be present");
+    assert!(
+        !toggle,
+        "fresh contact must report currently_hidden=false so the button labels as 'Hide', not 'Unhide'"
+    );
+}
+
+// @internal
+#[test]
+fn preview_as_action_carries_contact_id() {
+    let (wb, _dir) = setup();
+    let id = add_exchanged(&wb, "Bob", 0x01);
+
+    let state = wb.contact_detail_view_state(id.clone()).unwrap();
+
+    let preview_id = state
+        .actions
+        .iter()
+        .find_map(|a| match a {
+            MobileContactDetailAction::PreviewAs { contact_id } => Some(contact_id.clone()),
+            _ => None,
+        })
+        .expect("PreviewAs action must be present");
+    assert_eq!(
+        preview_id, id,
+        "PreviewAs must carry the contact_id, not the user's own id or empty string"
+    );
+}
+
+// @internal
+#[test]
+fn standard_actions_back_edit_verify_fingerprint_always_present() {
+    let (wb, _dir) = setup();
+    let id = add_exchanged(&wb, "Bob", 0x01);
+
+    let state = wb.contact_detail_view_state(id).unwrap();
+
+    assert!(has_action(&state.actions, &MobileContactDetailAction::Back));
+    assert!(has_action(&state.actions, &MobileContactDetailAction::Edit));
+    assert!(has_action(
+        &state.actions,
+        &MobileContactDetailAction::VerifyFingerprint
+    ));
+}
+
+// @internal
+#[test]
+fn no_banner_for_pre_feature_contact_with_unknown_reciprocity() {
+    let (wb, _dir) = setup();
+    // Imported contacts have Reciprocity::Unknown by construction.
+    let id = add_imported(&wb, "Eve");
+
+    let state = wb.contact_detail_view_state(id).unwrap();
+
+    let has_reciprocity_banner = state.banners.iter().any(|b| {
+        matches!(
+            b,
+            MobileContactDetailBanner::ReciprocityPending { .. }
+                | MobileContactDetailBanner::ReciprocityUnreciprocated { .. }
+        )
+    });
+    assert!(
+        !has_reciprocity_banner,
+        "Reciprocity::Unknown (pre-feature / imported) must surface no banner"
+    );
+}

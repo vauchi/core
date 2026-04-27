@@ -31,6 +31,7 @@ mod exchange;
 mod json_helpers;
 mod mobile_animated_qr;
 mod mobile_ble;
+mod mobile_contact_detail;
 mod mobile_contacts;
 mod mobile_content;
 mod mobile_delivery;
@@ -97,6 +98,10 @@ pub use mobile_animated_qr::{
 pub use mobile_ble::{
     MobileBleDelegate, MobileBleError, MobileBleExchangeResult, MobileBleExchangeSession,
     MobileBleField, MobileBleState, MobileBleTransportError,
+};
+pub use mobile_contact_detail::{
+    MobileContactDetailAction, MobileContactDetailBadge, MobileContactDetailBanner,
+    MobileContactDetailViewState,
 };
 pub use mobile_device_link_session::{DeviceLinkSessionListener, MobileDeviceLinkSession};
 pub use mobile_import::{MobileImportResult, MobileImportWarning};

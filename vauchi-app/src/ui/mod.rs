@@ -75,8 +75,10 @@ pub use component::{
     VisibilityMode,
 };
 pub use contact_detail::{
-    ContactDetailEngine, ContactNotFoundEngine, ContactViewMode, DeliverySummary, SharedInfoView,
-    footer_action_id as contact_detail_footer_action_id,
+    ContactDetailEngine, ContactNotFoundEngine, ContactViewMode, DeliverySummary,
+    ReciprocityBannerKind, SharedInfoView, footer_action_id as contact_detail_footer_action_id,
+    reciprocity_banner, show_recovery_trusted_indicator, show_verified_badge,
+    verify_button_visible,
 };
 pub use contact_edit::{ContactEditEngine, EditableContact, EditableField};
 pub use contact_limit::ContactLimitEngine;

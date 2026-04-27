@@ -26,23 +26,31 @@ mutation:nightly:
     # Baseline needs ~60s for 3651 tests (argon2-based backup tests take 5-20s each).
     # Default 30s causes baseline timeout → zero mutants tested.
     MUTATION_TIMEOUT_NIGHTLY: "240"
-    # --in-place: test in source tree so include_bytes!("../../../themes/...")
-    #             resolves. Copying to /tmp/ breaks relative paths to sibling
-    #             repos (themes/, locales/). cargo-mutants 26.x rejects --in-place
-    #             together with --jobs (mutually exclusive), so we cannot
-    #             parallelize while keeping in-place — Option A from the problem
-    #             record is dropped on this lever. The job will currently time
-    #             out at 12h; allow_failure: true keeps the pipeline green and
-    #             whatever mutants ran in the window land in Grafana via
-    #             push-mutation.sh. Next step is Option B (scope reduction) or
-    #             Option C (sharding via --shard k/n across multiple CI jobs),
-    #             tracked in the problem record:
-    #             _private/docs/problems/2026-04-24-mutation-nightly-timeout/.
-    MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs --in-place"
+    # `--in-place` was previously required because vauchi-platform's THEMES_JSON
+    # const did include_bytes!("../../../themes/generated/themes.json") — a path
+    # relative to a *sibling* of the cargo workspace that cargo-mutants' temp
+    # copy did not preserve. That forced --in-place, and cargo-mutants 26.x
+    # disallows --in-place + --jobs, so the nightly was stuck single-threaded
+    # at ~98h projected for 11k mutants vs. a 12h budget.
+    #
+    # Now that vauchi-platform's build.rs materializes themes.json into OUT_DIR
+    # (with VAUCHI_THEMES_DIR override + minimal `[]` fallback), the temp-copy
+    # build works on its own and --in-place is no longer needed. We export
+    # absolute paths to themes/ and locales/ via VAUCHI_THEMES_DIR /
+    # VAUCHI_LOCALES_DIR so the build scripts pick them up regardless of where
+    # cargo-mutants relocates the workspace.
+    #
+    # --jobs $(nproc) is appended in before_script (not in this variable)
+    # because GitLab parameter expansion does not recursively evaluate $(...)
+    # — see core!673 for the original substitution bug.
+    MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs"
   before_script:
     - !reference [.self-hosted, before_script]
     - !reference [.clone-locales, before_script]
     - !reference [.clone-themes, before_script]
+    - export VAUCHI_THEMES_DIR="$(cd ../themes && pwd)"
+    - export VAUCHI_LOCALES_DIR="$(cd ../locales && pwd)"
+    - export MUTATION_EXTRA_FLAGS="${MUTATION_EXTRA_FLAGS} --jobs $(nproc)"
 
 # ============================================================
 # Fuzz Testing (Nightly scheduled, T2-10)

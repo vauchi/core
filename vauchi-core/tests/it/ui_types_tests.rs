@@ -388,6 +388,14 @@ fn test_component_card_preview_roundtrip() {
             }],
         }],
         selected_group: Some("family".into()),
+        visible_fields: vec![FieldDisplay {
+            id: "phone".into(),
+            field_type: "phone".into(),
+            label: "Phone".into(),
+            value: "+1234567890".into(),
+            visibility: UiFieldVisibility::Shown,
+            a11y: None,
+        }],
         a11y: None,
     };
 

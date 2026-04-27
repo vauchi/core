@@ -259,6 +259,10 @@ impl ContactEditEngine {
             .iter()
             .map(|f| self.field_to_display(f))
             .collect();
+        let group_views = self.build_group_views();
+        let selected_group = self.selected_preview_group.clone();
+        let visible_fields =
+            crate::ui::component::build_visible_fields(&fields, &group_views, &selected_group);
 
         ScreenModel {
             screen_id: "edit_preview".into(),
@@ -268,8 +272,9 @@ impl ContactEditEngine {
                 name: self.contact.display_name.clone(),
                 avatar_data: self.avatar_data.clone(),
                 fields,
-                group_views: self.build_group_views(),
-                selected_group: self.selected_preview_group.clone(),
+                group_views,
+                selected_group,
+                visible_fields,
                 a11y: Some(A11y {
                     label: Some(format!("Card preview: {}", self.contact.display_name)),
                     hint: Some("Shows how your card appears to others".into()),

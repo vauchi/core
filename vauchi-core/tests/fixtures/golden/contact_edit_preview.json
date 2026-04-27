@@ -113,6 +113,41 @@
           }
         ],
         "selected_group": null,
+        "visible_fields": [
+          {
+            "id": "f1",
+            "field_type": "Phone",
+            "label": "Mobile",
+            "value": "+1-555-0100",
+            "visibility": {
+              "Groups": [
+                "Family"
+              ]
+            },
+            "a11y": {
+              "label": "Mobile: +1-555-0100",
+              "hint": "Visible to specific groups",
+              "role": null
+            }
+          },
+          {
+            "id": "f2",
+            "field_type": "Email",
+            "label": "Work",
+            "value": "alice@example.com",
+            "visibility": {
+              "Groups": [
+                "Friends",
+                "Work"
+              ]
+            },
+            "a11y": {
+              "label": "Work: alice@example.com",
+              "hint": "Visible to specific groups",
+              "role": null
+            }
+          }
+        ],
         "a11y": {
           "label": "Card preview: Alice",
           "hint": "Shows how your card appears to others",

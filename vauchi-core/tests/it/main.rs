@@ -290,6 +290,7 @@ mod pin_cache_tests;
 mod pin_config_verification_tests;
 mod pre_signed_operations_tests;
 mod preview_as_proptest;
+mod propagation_sync_item_variant_tests;
 mod property_tests;
 mod protocol_compatibility_tests;
 mod proximity_confidence_tests;

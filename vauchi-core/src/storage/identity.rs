@@ -64,6 +64,17 @@ impl Storage {
         Ok(count > 0)
     }
 
+    /// Deletes the persisted identity row.
+    ///
+    /// Used by `Vauchi::perform_emergency_wipe` to clear identity from
+    /// storage. After this call, `has_identity()` returns `false` and
+    /// `load_identity()` returns `None`. Idempotent — succeeds even if
+    /// no row exists.
+    pub fn delete_identity(&self) -> Result<(), StorageError> {
+        self.conn.execute("DELETE FROM identity WHERE id = 1", [])?;
+        Ok(())
+    }
+
     // === App Password / Duress PIN Operations ===
 
     /// Saves the app password hash and salt to the identity table.

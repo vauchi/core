@@ -243,8 +243,13 @@ impl Vauchi {
         self.storage
             .save_deletion_state(&crate::storage::DeletionState::Executed { executed_at: now })?;
 
-        // Clear identity
+        // Clear identity — both in-memory and the persisted row.
+        // Without delete_identity() the wipe leaves the identity row in
+        // storage; has_identity() (which falls back to storage) would
+        // still return true and the user's master seed would survive a
+        // restart.
         self.identity = None;
+        self.storage.delete_identity()?;
 
         Ok(())
     }

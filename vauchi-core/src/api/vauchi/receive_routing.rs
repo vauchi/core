@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Receive-phase blob routing.
+//! Receive-phase blob routing for **contact card updates**.
 //!
 //! Owns the per-blob routing logic that `sync_http::run_receive_phase`
 //! delegates to: build a `mailbox_token → contact_id` map from the local
@@ -17,6 +17,19 @@
 //! contact whose token we just computed. Anything else is malformed or
 //! out-of-protocol; ACK as `Stored` and move on.
 //!
+//! ## Scope: contact updates only
+//!
+//! Device-sync inbound (blobs sent to `compute_self_token(master_seed)`,
+//! see `network/relay_client.rs::send_device_sync_message`) is **not**
+//! handled here. The recipient registers self-tokens via
+//! `batch_register_tokens`, so the relay may return self-token blobs in
+//! the same fetch response — this function returns `TokenUnresolved`
+//! for them and the receive loop ACKs them as `Stored`. A separate path
+//! (`sync_controller::process_device_sync` /
+//! `sync::device_orchestrator::DeviceSyncOrchestrator`) is responsible
+//! for device-sync; this module's `token_to_contact_map` intentionally
+//! omits self-tokens.
+//!
 //! Pure with respect to network I/O — the caller drives ACKs from the
 //! returned outcomes. Storage is only mutated on successful decryption
 //! via `process_single_card_update`.
@@ -29,14 +42,24 @@ use crate::sync::card_update::process_single_card_update;
 
 /// Outcome of processing a single received blob.
 ///
-/// `decrypted = true` means the resolved contact's ratchet successfully
-/// decoded the payload and the card update was applied to storage. A
-/// `false` value means either the mailbox token didn't resolve (unknown
-/// or stale) or `process_single_card_update` rejected the message
-/// (signature, replay, blocked, etc.).
+/// `token_resolved` reports whether the blob's `mailbox_token` matched a
+/// contact in the local routing map. Together with `decrypted` this
+/// distinguishes three operationally distinct states:
+///
+/// - `decrypted = true` (implies `token_resolved = true`): card update
+///   applied successfully.
+/// - `token_resolved = true`, `decrypted = false`: contact found, but
+///   `process_single_card_update` rejected the payload (signature,
+///   replay, blocked sender, garbage ratchet message, etc.). Indicates
+///   ratchet desync or storage state that warrants investigation.
+/// - `token_resolved = false`, `decrypted = false`: the blob's token
+///   matched no known contact (relay regression, attacker probe, drift
+///   beyond ±1-day window, or a self-token forwarded to the wrong path).
+///   Indicates a protocol or deployment issue.
 #[derive(Debug, Clone)]
 pub struct BlobOutcome {
     pub message_id: String,
+    pub token_resolved: bool,
     pub decrypted: bool,
 }
 
@@ -65,14 +88,16 @@ pub fn process_received_blobs(
 
     let mut outcomes = Vec::with_capacity(blobs.len());
     for (message_id, mailbox_token_hex, ciphertext) in blobs {
-        let decrypted = match token_to_contact.get(&mailbox_token_hex) {
-            Some(contact_id) => {
-                process_single_card_update(identity, storage, contact_id, &ciphertext).is_ok()
-            }
-            None => false,
+        let (token_resolved, decrypted) = match token_to_contact.get(&mailbox_token_hex) {
+            Some(contact_id) => (
+                true,
+                process_single_card_update(identity, storage, contact_id, &ciphertext).is_ok(),
+            ),
+            None => (false, false),
         };
         outcomes.push(BlobOutcome {
             message_id,
+            token_resolved,
             decrypted,
         });
     }

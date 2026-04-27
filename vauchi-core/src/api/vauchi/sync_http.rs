@@ -240,9 +240,9 @@ impl Vauchi {
 
         // 2. Fetch all pending blobs (collect before processing).
         //    `mailbox_token_hex` is the hex-encoded daily-rotating token the
-        //    blob arrived for, when the relay populates it (see
-        //    `FetchedBlob::mailbox_token`). Empty string means the relay did
-        //    not attribute the blob — fall back to brute-force decryption.
+        //    blob arrived for, populated by the relay per ADR-029 addendum
+        //    2026-04-27. Blobs whose token doesn't resolve to a known
+        //    contact are dropped (post-Step 2: no brute-force fallback).
         let mut blobs: Vec<(String, String, Vec<u8>)> = Vec::new();
         while let Some(envelope) = adapter.receive().map_err(VauchiError::Network)? {
             if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
@@ -257,12 +257,29 @@ impl Vauchi {
         // 3. Route + apply each blob, build per-blob ACK envelopes.
         let outcomes = process_received_blobs(identity, &self.storage, contacts, blobs);
         let received = outcomes.iter().filter(|o| o.decrypted).count();
-        let dropped = outcomes.len() - received;
-        tracing::debug!(
-            received,
-            dropped,
-            "sync.receive_phase: token-routed (dropped = no contact match or rejected)"
-        );
+        let rejected = outcomes
+            .iter()
+            .filter(|o| o.token_resolved && !o.decrypted)
+            .count();
+        let unresolved = outcomes.iter().filter(|o| !o.token_resolved).count();
+        if unresolved > 0 {
+            // Operational signal: a non-zero unresolved count after the
+            // 2026-04-27 relay rollout indicates one of:
+            //   - the relay regressed and stopped emitting mailbox_token,
+            //   - we received a self-token blob (device-sync — handled
+            //     separately, see receive_routing module doc),
+            //   - clock drift beyond ±1 day, or
+            //   - an attacker probing with random tokens.
+            // No payload contents logged (logging-rules.md).
+            tracing::warn!(
+                unresolved,
+                received,
+                rejected,
+                "sync.receive_phase: blobs with no contact-token match — investigate"
+            );
+        } else {
+            tracing::debug!(received, rejected, "sync.receive_phase: token-routed");
+        }
 
         // 4. Send ACK envelopes — best-effort, transport failures don't fail
         //    the receive cycle.

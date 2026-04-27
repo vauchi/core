@@ -6,10 +6,12 @@
 //!
 //! Exercises `process_received_blobs` end-to-end:
 //! - mailbox-token attribution → O(1) fast path
-//! - missing/unknown attribution → brute-force fallback
+//! - missing/unknown attribution → dropped (post-Step 2)
+//! - replay rejection: same blob twice yields one decrypt, then drop
+//! - mixed batches: per-blob outcomes returned in input order
 //! - card delta is applied to the resolved contact
 //!
-//! Traces to: `_private/docs/problems/2026-04-27-sync-receive-quadratic-contacts/`
+//! Traces to: `_private/docs/problems/done/2026-04-27-sync-receive-quadratic-contacts/`
 //! Decision: ADR-029 addendum 2026-04-27
 
 use crate::common;
@@ -148,6 +150,7 @@ fn test_receive_routes_via_mailbox_token_fast_path() {
         process_received_blobs(alice.identity().unwrap(), alice.storage(), &contacts, blobs);
 
     assert_eq!(outcomes.len(), 1);
+    assert!(outcomes[0].token_resolved, "token must resolve to Bob");
     assert!(outcomes[0].decrypted, "blob must decrypt via the fast path");
 
     // Card on Alice's side reflects Bob's update.
@@ -189,6 +192,14 @@ fn test_receive_drops_blob_when_token_missing() {
         &new_card,
     );
 
+    // Snapshot Bob's ratchet state BEFORE — drop path must not advance it.
+    let (ratchet_before, _) = alice
+        .storage()
+        .load_ratchet_state(&bob_link.peer_contact_id)
+        .unwrap()
+        .unwrap();
+    let ratchet_before_bytes = serde_json::to_vec(&ratchet_before.serialize()).unwrap();
+
     let blobs = vec![("blob-2".to_string(), String::new(), ciphertext)];
 
     let contacts = alice.storage().list_contacts().unwrap();
@@ -196,6 +207,7 @@ fn test_receive_drops_blob_when_token_missing() {
         process_received_blobs(alice.identity().unwrap(), alice.storage(), &contacts, blobs);
 
     assert_eq!(outcomes.len(), 1);
+    assert!(!outcomes[0].token_resolved, "empty token must not resolve");
     assert!(
         !outcomes[0].decrypted,
         "missing token: no fallback, blob is dropped"
@@ -215,6 +227,20 @@ fn test_receive_drops_blob_when_token_missing() {
     assert!(
         !has_email,
         "no fallback: Bob's card must NOT be updated when the token is missing"
+    );
+
+    // Ratchet state must not have advanced — drop path returns before
+    // any ratchet load. A future refactor that splits the atomic txn
+    // would silently regress without this assertion.
+    let (ratchet_after, _) = alice
+        .storage()
+        .load_ratchet_state(&bob_link.peer_contact_id)
+        .unwrap()
+        .unwrap();
+    let ratchet_after_bytes = serde_json::to_vec(&ratchet_after.serialize()).unwrap();
+    assert_eq!(
+        ratchet_before_bytes, ratchet_after_bytes,
+        "drop path must not mutate ratchet state"
     );
 }
 
@@ -251,6 +277,10 @@ fn test_receive_drops_blob_when_token_unknown() {
         process_received_blobs(alice.identity().unwrap(), alice.storage(), &contacts, blobs);
 
     assert_eq!(outcomes.len(), 1);
+    assert!(
+        !outcomes[0].token_resolved,
+        "unknown token must not resolve"
+    );
     assert!(
         !outcomes[0].decrypted,
         "unknown token: no fallback, blob is dropped"
@@ -294,17 +324,27 @@ fn test_receive_reports_undecryptable_blob() {
 
     assert_eq!(outcomes.len(), 1);
     assert!(
+        outcomes[0].token_resolved,
+        "valid token must resolve, even if payload is garbage"
+    );
+    assert!(
         !outcomes[0].decrypted,
         "garbage payload must not be reported as decrypted"
     );
 }
 
 // @scenario: receive_phase :: fast path is the only path for in-spec input
-/// Property-style regression test for Step 2 of receive-phase-token-attribution.
-/// Sets up Alice with 5+ exchanged contacts; each sends a card update;
-/// some blobs use today's token, one uses yesterday's (clock-skew). Every
-/// blob must decrypt — no fallback path exists, so any failure here would
-/// indicate the fast path doesn't cover an in-spec case.
+/// Multi-contact regression test for Step 2 of
+/// receive-phase-token-attribution. Sets up Alice with 6 exchanged
+/// contacts; each sends a card update; one blob uses yesterday's token
+/// (clock-skew tolerance). Every blob must decrypt via the fast path —
+/// no fallback exists, so any failure here would indicate the fast path
+/// doesn't cover an in-spec case.
+///
+/// Deterministic on purpose (small fixed contact set). A `proptest`
+/// version covering N in 1..32 was considered but the current shape
+/// already exercises both today/yesterday branches and multi-contact
+/// resolution; converting buys little for the additional complexity.
 // @internal
 #[test]
 fn test_receive_fast_path_handles_all_in_spec_input() {
@@ -379,4 +419,246 @@ fn test_receive_fast_path_handles_all_in_spec_input() {
             labels[i]
         );
     }
+}
+
+// @scenario: receive_phase :: replayed blob is rejected on second submission
+/// CC-13 stateful: process the same `(token, ciphertext)` twice. First
+/// invocation decrypts and applies the update; second invocation must
+/// be rejected by `process_single_card_update`'s replay check
+/// (`storage.is_replay_nonce`). Token still resolves both times — the
+/// rejection is at the rules layer, not the routing layer.
+// @internal
+#[test]
+fn test_receive_rejects_replayed_blob() {
+    let alice = create_vauchi_with_identity("Alice");
+    let bob = create_vauchi_with_identity("Bob");
+    let bob_link = link_contacts(&alice, &bob, "Bob");
+
+    let alice_pk = *alice.identity().unwrap().signing_public_key();
+    let old_card = ContactCard::new("Bob");
+    let mut new_card = ContactCard::new("Bob");
+    new_card
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "bob@replay.test",
+        ))
+        .unwrap();
+    let ciphertext = encrypt_update(
+        &bob,
+        &alice_pk,
+        &bob_link.host_contact_id,
+        &old_card,
+        &new_card,
+    );
+    let token = token_hex(&compute_mailbox_token(
+        bob_link.shared_secret.as_bytes(),
+        current_day_epoch(),
+    ));
+
+    let contacts = alice.storage().list_contacts().unwrap();
+
+    // First submission — must succeed.
+    let first = process_received_blobs(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &contacts,
+        vec![(
+            "blob-replay-1".to_string(),
+            token.clone(),
+            ciphertext.clone(),
+        )],
+    );
+    assert!(first[0].decrypted, "first submission must decrypt");
+
+    // Snapshot card and ratchet state after the first submission.
+    let card_after_first = alice
+        .storage()
+        .load_contact(&bob_link.peer_contact_id)
+        .unwrap()
+        .unwrap()
+        .card()
+        .clone();
+    let (ratchet_after_first, _) = alice
+        .storage()
+        .load_ratchet_state(&bob_link.peer_contact_id)
+        .unwrap()
+        .unwrap();
+    let ratchet_after_first_bytes = serde_json::to_vec(&ratchet_after_first.serialize()).unwrap();
+
+    // Second submission of the SAME ciphertext under the SAME token.
+    let second = process_received_blobs(
+        alice.identity().unwrap(),
+        alice.storage(),
+        &contacts,
+        vec![("blob-replay-2".to_string(), token, ciphertext)],
+    );
+    assert!(
+        second[0].token_resolved,
+        "replay still resolves to the same contact"
+    );
+    assert!(
+        !second[0].decrypted,
+        "second submission must be rejected (replay nonce or ratchet desync)"
+    );
+
+    // Card and ratchet state must NOT have changed on the second pass.
+    let card_after_second = alice
+        .storage()
+        .load_contact(&bob_link.peer_contact_id)
+        .unwrap()
+        .unwrap()
+        .card()
+        .clone();
+    let (ratchet_after_second, _) = alice
+        .storage()
+        .load_ratchet_state(&bob_link.peer_contact_id)
+        .unwrap()
+        .unwrap();
+    let ratchet_after_second_bytes = serde_json::to_vec(&ratchet_after_second.serialize()).unwrap();
+    assert_eq!(
+        serde_json::to_string(&card_after_first).unwrap(),
+        serde_json::to_string(&card_after_second).unwrap(),
+        "replay must not mutate card"
+    );
+    assert_eq!(
+        ratchet_after_first_bytes, ratchet_after_second_bytes,
+        "replay must not advance ratchet (atomic txn rollback)"
+    );
+}
+
+// @scenario: receive_phase :: mixed batch yields per-blob outcomes in input order
+/// Single batch with {success, drop-on-unknown-token, garbage-with-valid-token, success}.
+/// Verifies per-index outcome correctness, that decrypted blobs apply
+/// their cards, and that drop/reject blobs leave state untouched.
+// @internal
+#[test]
+fn test_receive_mixed_batch_preserves_order() {
+    let alice = create_vauchi_with_identity("Alice");
+    let bob = create_vauchi_with_identity("Bob");
+    let charlie = create_vauchi_with_identity("Charlie");
+
+    let bob_link = link_contacts(&alice, &bob, "Bob");
+    let charlie_link = link_contacts(&alice, &charlie, "Charlie");
+
+    let alice_pk = *alice.identity().unwrap().signing_public_key();
+
+    // Bob update — index 0, success.
+    let mut bob_new = ContactCard::new("Bob");
+    bob_new
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "bob@mixed.test",
+        ))
+        .unwrap();
+    let bob_ct = encrypt_update(
+        &bob,
+        &alice_pk,
+        &bob_link.host_contact_id,
+        &ContactCard::new("Bob"),
+        &bob_new,
+    );
+    let bob_token = token_hex(&compute_mailbox_token(
+        bob_link.shared_secret.as_bytes(),
+        current_day_epoch(),
+    ));
+
+    // Charlie update for index 3 — also success.
+    let mut charlie_new = ContactCard::new("Charlie");
+    charlie_new
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "charlie@mixed.test",
+        ))
+        .unwrap();
+    let charlie_ct = encrypt_update(
+        &charlie,
+        &alice_pk,
+        &charlie_link.host_contact_id,
+        &ContactCard::new("Charlie"),
+        &charlie_new,
+    );
+    let charlie_token = token_hex(&compute_mailbox_token(
+        charlie_link.shared_secret.as_bytes(),
+        current_day_epoch(),
+    ));
+
+    let blobs = vec![
+        ("idx-0-bob-ok".to_string(), bob_token, bob_ct),
+        (
+            "idx-1-unknown".to_string(),
+            "ee".repeat(32),
+            b"any garbage".to_vec(),
+        ),
+        (
+            "idx-2-rejected".to_string(),
+            // Use Bob's token but garbage payload — token resolves, payload rejected.
+            token_hex(&compute_mailbox_token(
+                bob_link.shared_secret.as_bytes(),
+                current_day_epoch(),
+            )),
+            b"not a ratchet message".to_vec(),
+        ),
+        ("idx-3-charlie-ok".to_string(), charlie_token, charlie_ct),
+    ];
+
+    let contacts = alice.storage().list_contacts().unwrap();
+    let outcomes =
+        process_received_blobs(alice.identity().unwrap(), alice.storage(), &contacts, blobs);
+
+    assert_eq!(outcomes.len(), 4, "one outcome per input blob");
+
+    // Order is preserved.
+    assert_eq!(outcomes[0].message_id, "idx-0-bob-ok");
+    assert_eq!(outcomes[1].message_id, "idx-1-unknown");
+    assert_eq!(outcomes[2].message_id, "idx-2-rejected");
+    assert_eq!(outcomes[3].message_id, "idx-3-charlie-ok");
+
+    // Per-index flags.
+    assert!(
+        outcomes[0].token_resolved && outcomes[0].decrypted,
+        "idx 0: success"
+    );
+    assert!(
+        !outcomes[1].token_resolved && !outcomes[1].decrypted,
+        "idx 1: unknown token, dropped"
+    );
+    assert!(
+        outcomes[2].token_resolved && !outcomes[2].decrypted,
+        "idx 2: token resolved, payload rejected"
+    );
+    assert!(
+        outcomes[3].token_resolved && outcomes[3].decrypted,
+        "idx 3: success"
+    );
+
+    // Bob's card has the Email; Charlie's card too.
+    let bob_at_alice = alice
+        .storage()
+        .load_contact(&bob_link.peer_contact_id)
+        .unwrap()
+        .unwrap();
+    assert!(
+        bob_at_alice
+            .card()
+            .fields()
+            .iter()
+            .any(|f| f.value() == "bob@mixed.test"),
+        "Bob's card must reflect idx-0 update"
+    );
+    let charlie_at_alice = alice
+        .storage()
+        .load_contact(&charlie_link.peer_contact_id)
+        .unwrap()
+        .unwrap();
+    assert!(
+        charlie_at_alice
+            .card()
+            .fields()
+            .iter()
+            .any(|f| f.value() == "charlie@mixed.test"),
+        "Charlie's card must reflect idx-3 update"
+    );
 }

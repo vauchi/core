@@ -256,52 +256,23 @@ impl Vauchi {
             return Ok(0);
         }
 
-        // 3. Build a `token → contact_id` map for O(1) routing. Covers the
-        //    current and previous day to absorb clock-skew at the daily
-        //    rotation boundary, matching the registration window.
-        let day = current_day_epoch();
-        let token_to_contact = build_token_to_contact_map(contacts, day);
-        let contact_ids: Vec<String> = contacts
-            .iter()
-            .filter(|c| c.is_exchanged() && !c.is_blocked())
-            .map(|c| c.id().to_string())
-            .collect();
+        // 3. Route + apply each blob, build per-blob ACK envelopes.
+        let outcomes = process_received_blobs(identity, &self.storage, contacts, blobs);
+        let received = outcomes.iter().filter(|o| o.decrypted).count();
+        let via_token_count = outcomes.iter().filter(|o| o.via_token).count();
+        tracing::debug!(
+            received,
+            via_token = via_token_count,
+            fallback = received.saturating_sub(via_token_count),
+            "sync.receive_phase: routing breakdown"
+        );
 
-        // 4. For each blob: route via mailbox token if attributed, else
-        //    brute-force. ACK in either case (success or undecryptable).
-        let mut received = 0usize;
-        for (message_id, mailbox_token_hex, ciphertext) in &blobs {
-            let mut decrypted = false;
-
-            if let Some(contact_id) = token_to_contact.get(mailbox_token_hex)
-                && process_single_card_update(identity, &self.storage, contact_id, ciphertext)
-                    .is_ok()
-            {
-                received += 1;
-                decrypted = true;
-            }
-
-            if !decrypted {
-                // Fallback: relay didn't attribute (older relay, padding
-                // token match, or device-sync blob). Try every exchanged,
-                // non-blocked contact's ratchet.
-                for contact_id in &contact_ids {
-                    if process_single_card_update(identity, &self.storage, contact_id, ciphertext)
-                        .is_ok()
-                    {
-                        received += 1;
-                        decrypted = true;
-                        break;
-                    }
-                }
-            }
-
-            // ACK after attempting decryption — whether it succeeded or not.
-            // Success: message processed, relay can discard.
-            // Failure: undecryptable message, ACK prevents infinite redelivery.
+        // 4. Send ACK envelopes — best-effort, transport failures don't fail
+        //    the receive cycle.
+        for outcome in &outcomes {
             let ack_envelope = create_envelope(MessagePayload::Acknowledgment(Acknowledgment {
-                message_id: message_id.clone(),
-                status: if decrypted {
+                message_id: outcome.message_id.clone(),
+                status: if outcome.decrypted {
                     AckStatus::ReceivedByRecipient
                 } else {
                     AckStatus::Stored // best-effort ACK for undecryptable
@@ -677,6 +648,80 @@ fn merge_pins(target: &mut Vec<PinnedCertificate>, source: &[PinnedCertificate])
             target.push(pin.clone());
         }
     }
+}
+
+/// Outcome of processing a single received blob.
+///
+/// `decrypted = true` means a contact's ratchet successfully decoded the
+/// payload and the resulting card update was applied to storage.
+/// `via_token = true` means the fast path (mailbox-token attribution) was
+/// the one that succeeded; `false` means the brute-force fallback fired
+/// (older relay, missing attribution, or padding-token match).
+#[derive(Debug, Clone)]
+pub struct BlobOutcome {
+    pub message_id: String,
+    pub decrypted: bool,
+    pub via_token: bool,
+}
+
+/// Route and apply a batch of received blobs.
+///
+/// Each blob is first looked up via its mailbox token in a local
+/// `token → contact_id` map (O(1)); on miss or attempt failure, the
+/// function falls back to brute-forcing every exchanged, non-blocked
+/// contact's ratchet (O(N)). Returns one outcome per input blob in the
+/// same order.
+///
+/// Pure with respect to network I/O — caller is responsible for sending
+/// any ACKs derived from the returned outcomes. Mutates `storage` only
+/// on successful decryption (see `process_single_card_update`).
+///
+/// Exposed for integration tests so they can exercise the receive-phase
+/// routing logic without spinning up a transport.
+pub fn process_received_blobs(
+    identity: &crate::identity::Identity,
+    storage: &crate::storage::Storage,
+    contacts: &[Contact],
+    blobs: Vec<(String, String, Vec<u8>)>,
+) -> Vec<BlobOutcome> {
+    let day = current_day_epoch();
+    let token_to_contact = build_token_to_contact_map(contacts, day);
+    let contact_ids: Vec<String> = contacts
+        .iter()
+        .filter(|c| c.is_exchanged() && !c.is_blocked())
+        .map(|c| c.id().to_string())
+        .collect();
+
+    let mut outcomes = Vec::with_capacity(blobs.len());
+    for (message_id, mailbox_token_hex, ciphertext) in blobs {
+        let mut decrypted = false;
+        let mut via_token = false;
+
+        if let Some(contact_id) = token_to_contact.get(&mailbox_token_hex)
+            && process_single_card_update(identity, storage, contact_id, &ciphertext).is_ok()
+        {
+            decrypted = true;
+            via_token = true;
+        }
+
+        if !decrypted {
+            // Fallback: relay didn't attribute, padding-token match, or
+            // device-sync blob. Try every exchanged, non-blocked contact.
+            for contact_id in &contact_ids {
+                if process_single_card_update(identity, storage, contact_id, &ciphertext).is_ok() {
+                    decrypted = true;
+                    break;
+                }
+            }
+        }
+
+        outcomes.push(BlobOutcome {
+            message_id,
+            decrypted,
+            via_token,
+        });
+    }
+    outcomes
 }
 
 /// Build a `mailbox_token → contact_id` lookup map for the receive loop.

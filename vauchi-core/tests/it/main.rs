@@ -337,6 +337,7 @@ mod sync_device_conflict_tests;
 mod sync_device_orchestrator_tests;
 mod sync_device_sync_tests;
 mod sync_progress_tests;
+mod sync_receive_routing_tests;
 mod sync_state_tests;
 mod sync_status_engine_tests;
 mod tcp_transport_tests;

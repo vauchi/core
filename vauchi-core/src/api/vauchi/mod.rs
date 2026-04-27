@@ -20,6 +20,8 @@ mod merge;
 mod onboarding;
 mod propagation;
 #[cfg(feature = "network-http")]
+mod receive_routing;
+#[cfg(feature = "network-http")]
 mod recovery;
 mod recovery_offline;
 mod security;
@@ -34,11 +36,11 @@ pub use exchange::ExchangeQrData;
 #[cfg(feature = "network-http")]
 pub use exchange_relay::{RelayExchangeOffer, RelayExchangeResult};
 pub use import::{ImportResult, ImportWarning};
-pub use setup::SetupProgress;
 #[cfg(feature = "network-http")]
 #[allow(unused_imports)]
 // re-exported for integration tests; lint can't see external consumers
-pub use sync_http::{BlobOutcome, process_received_blobs};
+pub use receive_routing::{BlobOutcome, process_received_blobs};
+pub use setup::SetupProgress;
 
 use std::sync::{Arc, Mutex};
 

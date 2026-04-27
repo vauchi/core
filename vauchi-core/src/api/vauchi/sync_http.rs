@@ -1047,7 +1047,7 @@ mod tests {
         let map = build_token_to_contact_map(&[alice], day);
 
         assert!(
-            map.get(&alice_today).is_none(),
+            !map.contains_key(&alice_today),
             "blocked contacts must not appear in the token-routing map"
         );
     }
@@ -1057,6 +1057,6 @@ mod tests {
     fn test_build_token_to_contact_map_returns_none_for_unknown_token() {
         let alice = exchanged_contact("A");
         let map = build_token_to_contact_map(&[alice], 100);
-        assert!(map.get("00".repeat(32).as_str()).is_none());
+        assert!(!map.contains_key("00".repeat(32).as_str()));
     }
 }

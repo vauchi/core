@@ -6,11 +6,16 @@
 //!
 //! Owns the per-blob routing logic that `sync_http::run_receive_phase`
 //! delegates to: build a `mailbox_token → contact_id` map from the local
-//! contact list (O(N) HKDF), then resolve each fetched blob in O(1) when
-//! the relay populated `FetchedBlob.mailbox_token` (ADR-029 addendum
-//! 2026-04-27). Falls back to brute-forcing every contact's ratchet when
-//! the relay omits the attribution (older relays, padding-token matches,
-//! or device-sync blobs).
+//! contact list (O(N) HKDF), then resolve each fetched blob in O(1) via
+//! `FetchedBlob.mailbox_token` (ADR-029 addendum 2026-04-27).
+//!
+//! Step 2 of the receive-phase-token-attribution plan removed the
+//! brute-force fallback. The relay now always populates `mailbox_token`
+//! (deployed 2026-04-27). Blobs whose token doesn't appear in the local
+//! map cannot be card updates from any contact we know — the recipient
+//! registered the token, so a blob arriving for it must come from a
+//! contact whose token we just computed. Anything else is malformed or
+//! out-of-protocol; ACK as `Stored` and move on.
 //!
 //! Pure with respect to network I/O — the caller drives ACKs from the
 //! returned outcomes. Storage is only mutated on successful decryption
@@ -24,25 +29,24 @@ use crate::sync::card_update::process_single_card_update;
 
 /// Outcome of processing a single received blob.
 ///
-/// `decrypted = true` means a contact's ratchet successfully decoded the
-/// payload and the resulting card update was applied to storage.
-/// `via_token = true` means the fast path (mailbox-token attribution) was
-/// the one that succeeded; `false` means the brute-force fallback fired
-/// (older relay, missing attribution, or padding-token match).
+/// `decrypted = true` means the resolved contact's ratchet successfully
+/// decoded the payload and the card update was applied to storage. A
+/// `false` value means either the mailbox token didn't resolve (unknown
+/// or stale) or `process_single_card_update` rejected the message
+/// (signature, replay, blocked, etc.).
 #[derive(Debug, Clone)]
 pub struct BlobOutcome {
     pub message_id: String,
     pub decrypted: bool,
-    pub via_token: bool,
 }
 
 /// Route and apply a batch of received blobs.
 ///
-/// Each blob is first looked up via its mailbox token in a local
-/// `token → contact_id` map (O(1)); on miss or attempt failure, the
-/// function falls back to brute-forcing every exchanged, non-blocked
-/// contact's ratchet (O(N)). Returns one outcome per input blob in the
-/// same order.
+/// Each blob is resolved via its mailbox token in a local
+/// `token → contact_id` map (O(1)). Blobs whose token isn't in the map
+/// are dropped — the recipient registered every legitimate token, so a
+/// non-resolvable token indicates a malformed or out-of-protocol blob.
+/// Returns one outcome per input blob in the same order.
 ///
 /// Pure with respect to network I/O — caller is responsible for sending
 /// any ACKs derived from the returned outcomes. Mutates `storage` only
@@ -58,39 +62,18 @@ pub fn process_received_blobs(
 ) -> Vec<BlobOutcome> {
     let day = current_day_epoch();
     let token_to_contact = build_token_to_contact_map(contacts, day);
-    let contact_ids: Vec<String> = contacts
-        .iter()
-        .filter(|c| c.is_exchanged() && !c.is_blocked())
-        .map(|c| c.id().to_string())
-        .collect();
 
     let mut outcomes = Vec::with_capacity(blobs.len());
     for (message_id, mailbox_token_hex, ciphertext) in blobs {
-        let mut decrypted = false;
-        let mut via_token = false;
-
-        if let Some(contact_id) = token_to_contact.get(&mailbox_token_hex)
-            && process_single_card_update(identity, storage, contact_id, &ciphertext).is_ok()
-        {
-            decrypted = true;
-            via_token = true;
-        }
-
-        if !decrypted {
-            // Fallback: relay didn't attribute, padding-token match, or
-            // device-sync blob. Try every exchanged, non-blocked contact.
-            for contact_id in &contact_ids {
-                if process_single_card_update(identity, storage, contact_id, &ciphertext).is_ok() {
-                    decrypted = true;
-                    break;
-                }
+        let decrypted = match token_to_contact.get(&mailbox_token_hex) {
+            Some(contact_id) => {
+                process_single_card_update(identity, storage, contact_id, &ciphertext).is_ok()
             }
-        }
-
+            None => false,
+        };
         outcomes.push(BlobOutcome {
             message_id,
             decrypted,
-            via_token,
         });
     }
     outcomes

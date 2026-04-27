@@ -257,12 +257,11 @@ impl Vauchi {
         // 3. Route + apply each blob, build per-blob ACK envelopes.
         let outcomes = process_received_blobs(identity, &self.storage, contacts, blobs);
         let received = outcomes.iter().filter(|o| o.decrypted).count();
-        let via_token_count = outcomes.iter().filter(|o| o.via_token).count();
+        let dropped = outcomes.len() - received;
         tracing::debug!(
             received,
-            via_token = via_token_count,
-            fallback = received.saturating_sub(via_token_count),
-            "sync.receive_phase: routing breakdown"
+            dropped,
+            "sync.receive_phase: token-routed (dropped = no contact match or rejected)"
         );
 
         // 4. Send ACK envelopes — best-effort, transport failures don't fail

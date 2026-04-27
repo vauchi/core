@@ -25,7 +25,6 @@ use vauchi_core::{
 // === Modules ===
 
 mod content;
-mod device_link_relay;
 mod diagnostic;
 mod error;
 mod exchange;

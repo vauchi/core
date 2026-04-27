@@ -4917,6 +4917,7 @@ dependencies = [
 name = "vauchi-app"
 version = "0.26.0"
 dependencies = [
+ "base64",
  "hex",
  "log",
  "proptest",

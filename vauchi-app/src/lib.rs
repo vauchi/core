@@ -39,3 +39,5 @@ pub mod notification_emitter;
 pub mod activity_log_writer;
 
 pub mod ui;
+
+pub mod orchestrator;

@@ -54,7 +54,10 @@ use vauchi_core::exchange::{ProximityProof, compute_confirmation_mac};
 use vauchi_core::network::HttpTransport;
 use vauchi_core::storage::Storage;
 
-use crate::device_link_relay::{DeviceLinkError, create_offer, poll_for_claim, send_response};
+use vauchi_app::orchestrator::device_link_relay::{
+    DeviceLinkError, create_offer, poll_for_claim, send_response,
+};
+
 use crate::error::MobileError;
 
 // === Listener trait ===

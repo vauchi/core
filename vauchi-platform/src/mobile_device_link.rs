@@ -15,9 +15,9 @@ use super::types::{
 };
 use super::{
     MobileDeviceLinkInitiator, MobileDeviceLinkResponder, MobileDeviceLinkSession, VauchiPlatform,
-    device_link_relay,
 };
 use crate::mobile_device_link_session;
+use vauchi_app::orchestrator::device_link_relay;
 
 #[uniffi::export]
 impl VauchiPlatform {

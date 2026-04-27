@@ -22,6 +22,10 @@ hex = "0.4"
 subtle = "2.6"
 zeroize = { version = "1.8", features = ["derive"] }
 
+# Base64 encoding — used by orchestrator::device_link_relay for the
+# request/response payloads that flow through the relay's V2 exchange API.
+base64 = "0.22"
+
 # JSON Schema generation (optional, behind schema-gen feature)
 schemars = { version = "0.8", optional = true }
 

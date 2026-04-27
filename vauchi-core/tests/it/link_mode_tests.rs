@@ -496,3 +496,20 @@ fn parse_deep_link_tolerates_unknown_extra_params() {
     let payload = parse_exchange_deep_link(&with_extra).expect("extra params must not block parse");
     assert_eq!(*payload.nonce(), init.nonce);
 }
+
+// @internal
+proptest::proptest! {
+    /// Parser must never panic on arbitrary input and must never return
+    /// `Ok` for any input that doesn't start with `vauchi://`.
+    /// Property test (CC-04) covering scheme/host/payload fuzz.
+    #[test]
+    fn parse_deep_link_never_panics_or_misclassifies(input in ".*") {
+        let result = parse_exchange_deep_link(&input);
+        if let Ok(_) = result {
+            // The parser only accepts canonical `vauchi://exchange?...`
+            // shapes — anything else MUST be a typed error.
+            proptest::prop_assert!(input.starts_with("vauchi://exchange?"),
+                "parser accepted non-canonical input: {input:?}");
+        }
+    }
+}

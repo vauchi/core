@@ -287,8 +287,38 @@ pub enum DeepLinkParseError {
 /// from the original frontend handlers) is rejected with
 /// [`DeepLinkParseError::LegacyPathForm`].
 pub fn parse_exchange_deep_link(uri: &str) -> Result<DeepLinkPayload, DeepLinkParseError> {
-    let _ = uri;
-    unimplemented!("parse_exchange_deep_link — Phase 1 T1 stub, impl follows")
+    // Walk the URI manually rather than pulling in a URL crate — the
+    // accepted shape is fully constrained by `LINK_URL_PREFIX`, and
+    // every divergence corresponds to one typed error variant.
+
+    // 1. Scheme must be `vauchi`.
+    let after_scheme = uri
+        .strip_prefix("vauchi://")
+        .ok_or(DeepLinkParseError::InvalidScheme)?;
+
+    // 2. Host (up to next `?` or `/` or end) must be `exchange`.
+    let host_end = after_scheme
+        .find(|c: char| c == '?' || c == '/')
+        .unwrap_or(after_scheme.len());
+    let host = &after_scheme[..host_end];
+    if host != "exchange" {
+        return Err(DeepLinkParseError::InvalidHost);
+    }
+
+    // 3. Distinguish path-form from query-form. The legacy frontend
+    //    handlers parsed `vauchi://exchange/<payload>`; the live core
+    //    generator emits `vauchi://exchange?pk=...&n=...`.
+    let after_host = &after_scheme[host_end..];
+    if after_host.starts_with('/') {
+        return Err(DeepLinkParseError::LegacyPathForm);
+    }
+
+    // 4. Query form: delegate to the existing parser, mapping its
+    //    `Option::None` to `MalformedQuery`. This covers missing
+    //    params, bad base64, and wrong-length keys — every failure
+    //    `parse_link_url` bails on.
+    let parsed = parse_link_url(uri).ok_or(DeepLinkParseError::MalformedQuery)?;
+    Ok(DeepLinkPayload { inner: parsed })
 }
 
 /// Commands for the responder after parsing the link URL.

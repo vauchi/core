@@ -28,6 +28,7 @@ fn fresh_link_url() -> String {
     init.url
 }
 
+// @internal
 #[test]
 fn valid_uri_navigates_to_consent_screen() {
     let (engine, _dir) = create_engine();
@@ -44,6 +45,7 @@ fn valid_uri_navigates_to_consent_screen() {
     assert_eq!(actions[1]["id"], "deny");
 }
 
+// @internal
 #[test]
 fn invalid_scheme_returns_typed_invalid_input() {
     let (engine, _dir) = create_engine();
@@ -56,6 +58,7 @@ fn invalid_scheme_returns_typed_invalid_input() {
     }
 }
 
+// @internal
 #[test]
 fn invalid_host_returns_typed_invalid_input() {
     let (engine, _dir) = create_engine();
@@ -68,6 +71,7 @@ fn invalid_host_returns_typed_invalid_input() {
     }
 }
 
+// @internal
 #[test]
 fn legacy_path_form_returns_typed_invalid_input() {
     let (engine, _dir) = create_engine();
@@ -80,6 +84,7 @@ fn legacy_path_form_returns_typed_invalid_input() {
     }
 }
 
+// @internal
 #[test]
 fn malformed_query_returns_typed_invalid_input() {
     let (engine, _dir) = create_engine();
@@ -92,6 +97,7 @@ fn malformed_query_returns_typed_invalid_input() {
     }
 }
 
+// @internal
 #[test]
 fn after_dispatch_current_screen_is_consent_gate() {
     let (engine, _dir) = create_engine();
@@ -103,6 +109,7 @@ fn after_dispatch_current_screen_is_consent_gate() {
     assert_eq!(id, "deep_link_consent");
 }
 
+// @internal
 #[test]
 fn grant_action_completes_consent_gate() {
     // Drive the full flow: handle_deep_link_uri → grant → engine
@@ -125,6 +132,7 @@ fn grant_action_completes_consent_gate() {
     );
 }
 
+// @internal
 #[test]
 fn deny_action_completes_consent_gate() {
     let (engine, _dir) = create_engine();

@@ -24,6 +24,7 @@ fn fresh_engine() -> DeepLinkConsentEngine {
     DeepLinkConsentEngine::new(payload)
 }
 
+// @internal
 #[test]
 fn starts_in_pending_with_grant_and_deny_actions() {
     let engine = fresh_engine();
@@ -38,6 +39,7 @@ fn starts_in_pending_with_grant_and_deny_actions() {
     assert_eq!(screen.actions[1].style, ActionStyle::Secondary);
 }
 
+// @internal
 #[test]
 fn screen_does_not_leak_payload_bytes() {
     // Privacy: the consent prompt must never echo the parsed pk
@@ -58,6 +60,7 @@ fn screen_does_not_leak_payload_bytes() {
     );
 }
 
+// @internal
 #[test]
 fn grant_action_completes_with_granted_decision() {
     let mut engine = fresh_engine();
@@ -69,6 +72,7 @@ fn grant_action_completes_with_granted_decision() {
     assert!(!engine.was_cancelled(), "grant is not a cancel");
 }
 
+// @internal
 #[test]
 fn deny_action_completes_with_denied_decision_and_cancelled_flag() {
     let mut engine = fresh_engine();
@@ -83,6 +87,7 @@ fn deny_action_completes_with_denied_decision_and_cancelled_flag() {
     );
 }
 
+// @internal
 #[test]
 fn unknown_action_id_returns_screen_unchanged() {
     let mut engine = fresh_engine();
@@ -98,6 +103,7 @@ fn unknown_action_id_returns_screen_unchanged() {
     assert_eq!(engine.decision(), ConsentDecision::Pending);
 }
 
+// @internal
 #[test]
 fn second_grant_after_first_decision_is_inert() {
     // Race-safety: a fast double-tap must not transition state twice.
@@ -115,6 +121,7 @@ fn second_grant_after_first_decision_is_inert() {
     assert_eq!(engine.decision(), ConsentDecision::Granted);
 }
 
+// @internal
 #[test]
 fn deny_after_grant_is_inert() {
     // Once the user grants, a subsequent deny must not flip the
@@ -130,6 +137,7 @@ fn deny_after_grant_is_inert() {
     assert!(!engine.was_cancelled());
 }
 
+// @internal
 #[test]
 fn text_changed_action_is_inert() {
     // No text inputs on the consent screen — TextChanged must not
@@ -146,6 +154,7 @@ fn text_changed_action_is_inert() {
     assert_eq!(engine.decision(), ConsentDecision::Pending);
 }
 
+// @internal
 #[test]
 fn payload_round_trips_through_engine() {
     let (init, _) = initiator_generate();

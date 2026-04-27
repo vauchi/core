@@ -303,6 +303,7 @@ mod recovery_readiness_tests;
 mod recovery_storage_tests;
 mod recovery_tests;
 mod recovery_voucher_v2_tests;
+mod rekey_all_columns_tests;
 mod rekey_coverage_tests;
 mod relay_exchange_tests;
 mod relay_proptests;

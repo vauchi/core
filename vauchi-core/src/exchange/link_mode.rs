@@ -298,9 +298,7 @@ pub fn parse_exchange_deep_link(uri: &str) -> Result<DeepLinkPayload, DeepLinkPa
         .ok_or(DeepLinkParseError::InvalidScheme)?;
 
     // 2. Host (up to next `?` or `/` or end) must be `exchange`.
-    let host_end = after_scheme
-        .find(|c: char| c == '?' || c == '/')
-        .unwrap_or(after_scheme.len());
+    let host_end = after_scheme.find(['?', '/']).unwrap_or(after_scheme.len());
     let host = &after_scheme[..host_end];
     if host != "exchange" {
         return Err(DeepLinkParseError::InvalidHost);

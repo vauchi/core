@@ -507,6 +507,47 @@ mod tests {
         }
     }
 
+    // @internal
+    #[test]
+    fn app_current_tab_id_onboarding_routes_to_onboarding_on_both_layouts() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let handle = vauchi_app_create();
+            // Pre-identity, the active screen is onboarding/identity_check —
+            // both the mobile and desktop layouts return "onboarding".
+            for layout in [0, 1] {
+                let id_ptr = vauchi_app_current_tab_id(handle, layout);
+                assert!(!id_ptr.is_null(), "layout {layout}: expected Some");
+                let id = CStr::from_ptr(id_ptr).to_str().unwrap();
+                assert_eq!(id, "onboarding", "layout {layout}");
+                vauchi_string_free(id_ptr);
+            }
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    // @internal
+    #[test]
+    fn app_current_tab_id_invalid_layout_returns_null() {
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let handle = vauchi_app_create();
+            let id_ptr = vauchi_app_current_tab_id(handle, 42);
+            assert!(id_ptr.is_null(), "invalid layout should return null");
+            vauchi_app_destroy(handle);
+        }
+    }
+
+    // @internal
+    #[test]
+    fn app_current_tab_id_null_handle_returns_null() {
+        // SAFETY: Calling FFI with null inputs from this test scope.
+        unsafe {
+            let id_ptr = vauchi_app_current_tab_id(std::ptr::null_mut(), 0);
+            assert!(id_ptr.is_null());
+        }
+    }
+
     #[test]
     fn app_create_with_config_returns_non_null_handle() {
         // SAFETY: Calling FFI with valid inputs from this test scope.

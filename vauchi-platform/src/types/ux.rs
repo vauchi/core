@@ -462,6 +462,25 @@ impl From<&vauchi_app::theme::Theme> for MobileTheme {
 // i18n Types
 // ============================================================
 
+/// Form-factor lens for tab-resolution queries (§1D pure-renderer
+/// remediation). Mobile collapses Settings/Recovery/Help/etc under
+/// `More`; Desktop has them as first-class sidebar items. Frontends
+/// pass the layout matching their nav surface.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileTabLayout {
+    Mobile,
+    Desktop,
+}
+
+impl From<MobileTabLayout> for vauchi_app::ui::TabLayout {
+    fn from(layout: MobileTabLayout) -> Self {
+        match layout {
+            MobileTabLayout::Mobile => Self::Mobile,
+            MobileTabLayout::Desktop => Self::Desktop,
+        }
+    }
+}
+
 /// Supported locales for the app.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum MobileLocale {

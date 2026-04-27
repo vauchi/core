@@ -257,6 +257,25 @@ char *vauchi_app_available_screens(struct VauchiApp *handle);
 char *vauchi_app_default_screen(struct VauchiApp *handle);
 
 /**
+ * Get the canonical screen-id of the parent tab the active screen
+ * belongs to under the requested layout.
+ *
+ * `layout` selects the tab universe:
+ * - `0` = Mobile (5-tab bottom nav, matches `vauchi_app_tab_info`)
+ * - `1` = Desktop (14-tab sidebar, matches `vauchi_app_sidebar_items`)
+ *
+ * Returns:
+ * - A C string with the parent tab's screen_id (caller must free
+ *   with `vauchi_string_free`)
+ * - Null when the active screen is a transient overlay (Lock,
+ *   FormDialog) — frontend should leave selection unchanged.
+ *
+ * # Safety
+ * `handle` must be a valid app handle or null.
+ */
+char *vauchi_app_current_tab_id(struct VauchiApp *handle, int32_t layout);
+
+/**
  * Check whether the app has an identity.
  *
  * Returns 1 if an identity exists, 0 if not, -1 on error (null handle, lock failure).

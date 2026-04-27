@@ -13,6 +13,8 @@ mod navigation;
 mod routing;
 mod screens;
 
+pub use navigation::TabLayout;
+
 use std::collections::HashMap;
 use std::sync::mpsc;
 use std::time::{SystemTime, UNIX_EPOCH};

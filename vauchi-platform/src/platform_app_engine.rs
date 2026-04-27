@@ -21,6 +21,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::types::{
     MobileLocale, MobileNotificationCategory, MobilePendingNotification, MobileTabInfo,
+    MobileTabLayout,
 };
 use vauchi_app::notification_types::NotificationCategory as CoreNotificationCategory;
 use vauchi_app::ui::{AppEngine, WorkflowEngine};
@@ -310,6 +311,22 @@ impl PlatformAppEngine {
         })?;
         let model = engine.current_screen();
         Ok(model.screen_id)
+    }
+
+    /// Returns the canonical screen-id of the parent tab the active
+    /// screen belongs to under the given layout, or `None` for
+    /// transient overlays (Lock, FormDialog).
+    ///
+    /// `Mobile` matches the 5-tab bottom nav from `tab_info`;
+    /// `Desktop` matches the 14-tab sidebar from `sidebar_items`.
+    /// Frontends use this to keep tab/sidebar selection in sync with
+    /// the active screen without maintaining their own
+    /// `screen_id` → `parent_tab` map (§1D pure-renderer remediation).
+    pub fn current_tab_id(&self, layout: MobileTabLayout) -> Result<Option<String>, MobileError> {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        Ok(engine.current_tab_id(layout.into()).map(|s| s.to_string()))
     }
 
     /// Invalidate all cached engines.

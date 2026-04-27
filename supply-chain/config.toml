@@ -519,6 +519,10 @@ criteria = "safe-to-deploy"
 version = "0.15.7"
 criteria = "safe-to-deploy"
 
+[[exemptions.matchers]]
+version = "0.2.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.matrixmultiply]]
 version = "0.3.10"
 criteria = "safe-to-deploy"
@@ -562,6 +566,10 @@ criteria = "safe-to-deploy"
 [[exemptions.nom_locate]]
 version = "4.2.0"
 criteria = "safe-to-run"
+
+[[exemptions.nu-ansi-term]]
+version = "0.50.3"
+criteria = "safe-to-deploy"
 
 [[exemptions.num_enum]]
 version = "0.7.6"
@@ -827,6 +835,10 @@ criteria = "safe-to-deploy"
 version = "3.18.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.sharded-slab]]
+version = "0.1.7"
+criteria = "safe-to-deploy"
+
 [[exemptions.simba]]
 version = "0.8.1"
 criteria = "safe-to-deploy"
@@ -879,6 +891,10 @@ criteria = "safe-to-deploy"
 version = "0.4.4"
 criteria = "safe-to-deploy"
 
+[[exemptions.thread_local]]
+version = "1.1.9"
+criteria = "safe-to-deploy"
+
 [[exemptions.time]]
 version = "0.3.47"
 criteria = "safe-to-deploy"
@@ -916,6 +932,10 @@ version = "0.1.36"
 criteria = "safe-to-deploy"
 
 [[exemptions.tracing-flame]]
+version = "0.2.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.tracing-log]]
 version = "0.2.0"
 criteria = "safe-to-deploy"
 
@@ -970,6 +990,10 @@ criteria = "safe-to-deploy"
 [[exemptions.uuid-simd]]
 version = "0.8.0"
 criteria = "safe-to-run"
+
+[[exemptions.valuable]]
+version = "0.1.1"
+criteria = "safe-to-deploy"
 
 [[exemptions.vsimd]]
 version = "0.8.0"

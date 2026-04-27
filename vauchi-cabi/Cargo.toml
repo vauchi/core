@@ -18,7 +18,7 @@ secure-storage = ["vauchi-core/secure-storage-linux"]
 
 [dependencies]
 vauchi-core = { workspace = true, default-features = false, features = ["storage", "network-rustls", "network-http"] }
-vauchi-app = { workspace = true, default-features = false, features = ["network-rustls"] }
+vauchi-app = { workspace = true, default-features = false, features = ["network-rustls", "network-http"] }
 base64 = "0.22"
 hex = "0.4"
 serde = { version = "1.0", features = ["derive"] }

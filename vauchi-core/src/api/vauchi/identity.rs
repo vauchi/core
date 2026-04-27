@@ -324,8 +324,21 @@ impl Vauchi {
     }
 
     /// Returns true if an identity has been created or set.
+    ///
+    /// If the in-memory `identity` is `None`, falls back to checking
+    /// storage. This handles the case where another `Vauchi` instance
+    /// pointing at the same database (e.g. `PlatformAppEngine`'s
+    /// internal Vauchi vs. `VauchiPlatform`'s Vauchi on Android) wrote
+    /// an identity to disk after this instance was constructed —
+    /// without the storage check we would incorrectly return `false`
+    /// for the lifetime of the process, which left mobile bottom-tab
+    /// nav empty after onboarding (only the Onboarding tab was
+    /// returned by `tab_info`).
     pub fn has_identity(&self) -> bool {
-        self.identity.is_some()
+        if self.identity.is_some() {
+            return true;
+        }
+        matches!(self.storage.load_identity(), Ok(Some(_)))
     }
 
     /// Updates the user's display name.

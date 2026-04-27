@@ -19,7 +19,8 @@ vauchi-core/src/exchange/session.rs 1756
 vauchi-core/src/exchange/multistage/session.rs 1189
 
 # EXEMPT — transport layer: all relay methods must be co-located for protocol coherence
-vauchi-core/src/network/http_transport.rs 1187
+# (+2 for #[tracing::instrument] on send_update + fetch — profiling, no logic change)
+vauchi-core/src/network/http_transport.rs 1189
 
 # EXEMPT — security-critical: crypto + verification belong together
 vauchi-core/src/recovery/mod.rs 1253
@@ -34,8 +35,9 @@ vauchi-core/src/storage/rekey.rs 1390
 vauchi-core/src/storage/mod.rs 1079
 
 # SPLIT DONE — Phase 3: app_engine.rs (1437) split into mod.rs + routing.rs + screens.rs
-vauchi-app/src/ui/app_engine/mod.rs 993
-vauchi-app/src/ui/app_engine/routing.rs 953
+# (+1 each on mod.rs + routing.rs for #[tracing::instrument] on handle_action + handle_hardware_event)
+vauchi-app/src/ui/app_engine/mod.rs 994
+vauchi-app/src/ui/app_engine/routing.rs 954
 vauchi-app/src/ui/app_engine/screens.rs 1229
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files

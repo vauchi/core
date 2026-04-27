@@ -242,6 +242,7 @@ fn test_validate_birthday_per_input(#[case] input: &str, #[case] expected_valid:
 // @scenario: field_validation :: Birthday days-per-month table
 // Pins every month's max-day boundary at once. Kills mutations to the
 // `match month` arms (e.g. swapping a 30/31 case).
+// @internal
 #[rstest]
 #[case(1, 31, true)]
 #[case(1, 32, false)]
@@ -373,6 +374,7 @@ fn test_field_type_from_alias_table(
     assert_eq!(label.as_deref(), expected_label);
 }
 
+// @internal
 #[test]
 fn test_field_type_is_social_per_variant() {
     // Pin one assertion per FieldType variant so a `matches!` mutation
@@ -386,6 +388,7 @@ fn test_field_type_is_social_per_variant() {
     assert!(!FieldType::Custom.is_social());
 }
 
+// @internal
 #[test]
 fn test_validate_value_too_long_returns_specific_error() {
     use vauchi_core::contact_card::ValidationError;
@@ -409,6 +412,7 @@ fn test_validate_value_too_long_returns_specific_error() {
 // A `delete match arm FieldType::Website` mutation makes Website fall
 // through to the catch-all `_ => Ok(())`, silently accepting invalid
 // URLs. Asserting that an invalid Website returns Err catches it.
+// @internal
 #[test]
 fn test_validate_dispatches_to_website_validator() {
     let f = ContactField::new(FieldType::Website, "site", "no protocol no dot has space");
@@ -421,6 +425,7 @@ fn test_validate_dispatches_to_website_validator() {
 // =============================================================================
 // validate_phone boundaries — kill `<`/`>` ↔ `<=`/`>=`/`==` mutations
 // =============================================================================
+// @internal
 #[test]
 fn test_validate_phone_exactly_seven_digits_is_valid() {
     // The check is `if digit_count < 7 { Err }`. A `< with <=` mutation
@@ -429,6 +434,7 @@ fn test_validate_phone_exactly_seven_digits_is_valid() {
     f.validate().expect("7-digit phone must validate");
 }
 
+// @internal
 #[test]
 fn test_validate_phone_six_digits_is_invalid() {
     // Mirror of the above to keep the < boundary tight on both sides.
@@ -436,6 +442,7 @@ fn test_validate_phone_six_digits_is_invalid() {
     assert!(f.validate().is_err());
 }
 
+// @internal
 #[test]
 fn test_validate_phone_exactly_thirty_chars_is_valid() {
     // The check is `if value.len() > 30 { Err }`. Mutations to
@@ -448,6 +455,7 @@ fn test_validate_phone_exactly_thirty_chars_is_valid() {
     f.validate().expect("30-char phone must validate");
 }
 
+// @internal
 #[test]
 fn test_validate_phone_thirty_one_chars_is_invalid() {
     let v = "+1 (555) 123-4567 0000 12345678"; // 31 chars
@@ -459,6 +467,7 @@ fn test_validate_phone_thirty_one_chars_is_invalid() {
 // =============================================================================
 // validate_website branches — kill || ↔ && and missing-! mutations
 // =============================================================================
+// @internal
 #[test]
 fn test_validate_website_http_without_dot_is_valid() {
     // Pins the `starts_with("http://") || starts_with("https://")` branch
@@ -471,6 +480,7 @@ fn test_validate_website_http_without_dot_is_valid() {
     f.validate().expect("http://localhost must validate");
 }
 
+// @internal
 #[test]
 fn test_validate_website_plain_domain_is_valid() {
     // Pins `value.contains('.') && !value.contains(' ')` by using a
@@ -481,6 +491,7 @@ fn test_validate_website_plain_domain_is_valid() {
     f.validate().expect("plain domain must validate");
 }
 
+// @internal
 #[test]
 fn test_validate_website_dotted_with_space_is_invalid() {
     // Pins `value.contains('.') && !value.contains(' ')` by using a
@@ -490,6 +501,7 @@ fn test_validate_website_dotted_with_space_is_invalid() {
     assert!(f.validate().is_err());
 }
 
+// @internal
 #[test]
 fn test_validate_website_no_protocol_no_dot_is_invalid() {
     // Catches `validate_website -> Ok(())` (288:9): a body that
@@ -503,6 +515,7 @@ fn test_validate_website_no_protocol_no_dot_is_invalid() {
 // =============================================================================
 // validate_birthday format check — kill || ↔ && in separator check
 // =============================================================================
+// @internal
 #[test]
 fn test_validate_birthday_wrong_seventh_byte_is_invalid() {
     // The format check is:

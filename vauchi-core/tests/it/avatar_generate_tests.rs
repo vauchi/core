@@ -280,6 +280,7 @@ fn initials_avatar_decoded_dimensions_are_at_most_size(#[case] size: u32) {
 //   * (15, 15): dx=-16.5, dy=-16.5 → dx²+dy²=544.5 < 1024. ORIG colored.
 //     A `+ with *` mutation on `dx*dx + dy*dy` evaluates dx²·dy² =
 //     74 120, far above 1024 → transparent. ↗ caught.
+// @internal
 #[test]
 fn initials_avatar_disc_mask_pins_specific_pixels() {
     let bg = [200u8, 50, 100];
@@ -317,6 +318,7 @@ fn initials_avatar_disc_mask_pins_specific_pixels() {
 // mapping. Values were captured from the unmodified implementation;
 // any mutation that changes iteration count, escape condition, color
 // formula, or center/zoom math will perturb at least one of them.
+// @internal
 #[test]
 fn mandelbrot_avatar_seed_zero_pixel_table() {
     let bytes = generate_mandelbrot_avatar(0, 64);
@@ -364,6 +366,7 @@ fn mandelbrot_avatar_seed_zero_pixel_table() {
 // at least one byte and thus the hash. The hash is a one-line
 // constant — easy to update intentionally if the implementation
 // or encoder changes.
+// @internal
 #[test]
 fn mandelbrot_avatar_seed_zero_size_64_byte_hash() {
     use sha2::{Digest, Sha256};
@@ -382,6 +385,7 @@ fn mandelbrot_avatar_seed_zero_size_64_byte_hash() {
 // Snapshot at a non-zero seed%10 — catches mutations to center_x math
 // (line 42) that collapse to identity for seed=0 (e.g. `+ with -` on
 // `-0.5 + (seed%10)*0.05` since `seed%10==0` makes both forms equal).
+// @internal
 #[test]
 fn mandelbrot_avatar_seed_five_size_64_byte_hash() {
     use sha2::{Digest, Sha256};
@@ -397,6 +401,7 @@ fn mandelbrot_avatar_seed_five_size_64_byte_hash() {
 // collapse to identity for seed=0. (Mandelbrot is y-symmetric, so
 // `y = 2xy - y0` produces the same iter count as `y = 2xy + y0`
 // when center_y=0.)
+// @internal
 #[test]
 fn mandelbrot_avatar_seed_ten_size_64_byte_hash() {
     use sha2::{Digest, Sha256};

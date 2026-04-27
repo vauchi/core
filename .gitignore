@@ -39,7 +39,7 @@ dist/
 
 # Mutation testing output (cargo-mutants)
 mutants.out/
-mutants.out.old/
+mutants.out.*/
 
 # Coverage artifacts
 *.profraw

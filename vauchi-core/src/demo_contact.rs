@@ -248,6 +248,7 @@ pub struct DemoContactCard {
 mod tests {
     use super::*;
 
+    // @internal
     #[test]
     fn test_demo_tips_count_and_first_id() {
         let tips = get_demo_tips();
@@ -258,6 +259,7 @@ mod tests {
         assert_eq!(tips[7].category, DemoTipCategory::Features);
     }
 
+    // @internal
     #[test]
     fn test_demo_tip_categories_has_distinct_values() {
         let tips = get_demo_tips();
@@ -273,6 +275,7 @@ mod tests {
         assert!(categories.contains(&DemoTipCategory::Features));
     }
 
+    // @internal
     #[test]
     fn test_demo_tip_category_all_returns_six_in_order() {
         let all = DemoTipCategory::all();
@@ -289,6 +292,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn test_demo_state_default() {
         let state = DemoContactState::default();
@@ -299,6 +303,7 @@ mod tests {
         assert_eq!(state.update_count, 0);
     }
 
+    // @internal
     #[test]
     fn test_demo_state_new_active() {
         let state = DemoContactState::new_active();
@@ -311,6 +316,7 @@ mod tests {
         assert!(state.last_update_timestamp > 0);
     }
 
+    // @internal
     #[test]
     fn test_demo_state_current_tip_returns_first_for_index_zero() {
         let state = DemoContactState::new_active();
@@ -319,6 +325,7 @@ mod tests {
         assert_eq!(tip.category, DemoTipCategory::GettingStarted);
     }
 
+    // @internal
     #[test]
     fn test_demo_state_current_tip_wraps_modulo_len() {
         let mut state = DemoContactState::new_active();
@@ -329,6 +336,7 @@ mod tests {
         assert_eq!(tip.id, get_demo_tips()[2].id);
     }
 
+    // @internal
     #[test]
     fn test_demo_state_advance_tip_index_is_one_after_first_advance() {
         let mut state = DemoContactState::new_active();
@@ -345,6 +353,7 @@ mod tests {
         assert!(state.shown_tip_ids.contains(&get_demo_tips()[1].id));
     }
 
+    // @internal
     #[test]
     fn test_demo_state_advance_tip_wraps_at_end() {
         let mut state = DemoContactState::new_active();
@@ -358,6 +367,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn test_demo_state_advance_increments_update_count_each_call() {
         let mut state = DemoContactState::new_active();
@@ -367,6 +377,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn test_demo_state_advance_does_not_duplicate_shown_ids() {
         let mut state = DemoContactState::new_active();
@@ -384,6 +395,7 @@ mod tests {
         assert_eq!(sorted.len(), len);
     }
 
+    // @internal
     #[test]
     fn test_demo_state_dismiss_sets_flags() {
         let mut state = DemoContactState::new_active();
@@ -393,6 +405,7 @@ mod tests {
         assert!(!state.auto_removed, "dismiss must not set auto_removed");
     }
 
+    // @internal
     #[test]
     fn test_demo_state_auto_remove_sets_flags() {
         let mut state = DemoContactState::new_active();
@@ -405,6 +418,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn test_demo_state_restore_clears_both_flags() {
         // Restore must reset BOTH dismissed and auto_removed.
@@ -420,6 +434,7 @@ mod tests {
         assert!(!state.auto_removed, "restore must clear auto_removed");
     }
 
+    // @internal
     #[test]
     fn test_demo_state_serialization_roundtrip_preserves_all_fields() {
         let mut state = DemoContactState::new_active();
@@ -439,6 +454,7 @@ mod tests {
         assert_eq!(state.update_count, restored.update_count);
     }
 
+    // @internal
     #[test]
     fn test_generate_demo_card_uses_constants_and_tip_fields() {
         let tip = DemoTip {
@@ -457,12 +473,14 @@ mod tests {
         assert_eq!(card.tip_category, "Privacy");
     }
 
+    // @internal
     #[test]
     fn test_update_due_just_created_is_false() {
         let state = DemoContactState::new_active();
         assert!(!state.is_update_due(), "fresh state cannot be due");
     }
 
+    // @internal
     #[test]
     fn test_update_not_due_when_inactive() {
         let mut state = DemoContactState::new_active();
@@ -470,6 +488,7 @@ mod tests {
         assert!(!state.is_update_due());
     }
 
+    // @internal
     #[test]
     fn test_update_due_when_interval_elapsed() {
         // Pretend the last update was longer than INTERVAL ago. The
@@ -486,6 +505,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn test_update_due_boundary_off_by_one() {
         // last_update_timestamp = now − INTERVAL: due (>= boundary).
@@ -503,6 +523,7 @@ mod tests {
         assert!(!state.is_update_due());
     }
 
+    // @internal
     #[test]
     fn test_tip_rotation_wraps_to_specific_index() {
         let mut state = DemoContactState::new_active();
@@ -519,6 +540,7 @@ mod tests {
         assert_eq!(state.current_tip_index, 3);
     }
 
+    // @internal
     #[test]
     fn test_demo_update_interval_is_two_hours() {
         // Pin the constant so a `2 * 60 * 60` mutation (e.g. + → *)

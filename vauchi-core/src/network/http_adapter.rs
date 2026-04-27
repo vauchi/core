@@ -455,6 +455,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn test_blob_to_envelope_propagates_mailbox_token() {
         let blob = FetchedBlob {

@@ -254,14 +254,10 @@ pub(super) fn build_verifying_screen(progress: Progress) -> ScreenModel {
 ///
 /// Returns `Some(result)` if the action was handled, `None` if
 /// it should fall through to the parent engine.
-pub(super) fn handle_qr_action(
-    step: &QrStep,
-    action: &UserAction,
-    session_active: bool,
-) -> Option<QrActionOutcome> {
+pub(super) fn handle_qr_action(step: &QrStep, action: &UserAction) -> Option<QrActionOutcome> {
     match (step, action) {
         (QrStep::ShowQr, UserAction::ActionPressed { action_id }) if action_id == "continue" => {
-            Some(QrActionOutcome::AdvanceToScan { session_active })
+            Some(QrActionOutcome::AdvanceToScan)
         }
         (QrStep::ScanQr, UserAction::ActionPressed { action_id }) if action_id == "back" => {
             Some(QrActionOutcome::BackToShowQr)
@@ -300,7 +296,7 @@ pub(super) fn handle_qr_action(
 /// Outcome of a QR sub-flow action, interpreted by the parent engine.
 pub(super) enum QrActionOutcome {
     /// User pressed "Scan Their Code" — advance to ScanQr step.
-    AdvanceToScan { session_active: bool },
+    AdvanceToScan,
     /// User pressed "Back" on scan/manual screen — return to ShowQr.
     BackToShowQr,
     /// User scanned a QR code — store data and move to Verifying.

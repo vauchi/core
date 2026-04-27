@@ -1234,19 +1234,21 @@ impl WorkflowEngine for ExchangeEngine {
             }
             // QR sub-flow actions — delegated to exchange_qr module
             (ExchangeStep::Qr(qr_step), ref user_action) => {
-                if let Some(outcome) =
-                    exchange_qr::handle_qr_action(qr_step, user_action, self.session.is_some())
-                {
+                if let Some(outcome) = exchange_qr::handle_qr_action(qr_step, user_action) {
                     match outcome {
-                        QrActionOutcome::AdvanceToScan { session_active } => {
+                        QrActionOutcome::AdvanceToScan => {
+                            // Always emit QrRequestScan — the legacy
+                            // `RequestCamera` ActionResult is deprecated
+                            // (see ADR-022 Addendum D) and is a silent
+                            // no-op on the mobile frontends, which only
+                            // implement the command/event protocol. This
+                            // is the gap that left the Android Glance
+                            // "Tap to Scan" button unresponsive on first
+                            // tap (verified on Pixel 3a 2026-04-27).
                             self.step = ExchangeStep::Qr(QrStep::ScanQr);
                             self.scan_quality_tracker.reset();
-                            if session_active {
-                                ActionResult::ExchangeCommands {
-                                    commands: vec![ExchangeCommand::QrRequestScan],
-                                }
-                            } else {
-                                ActionResult::RequestCamera
+                            ActionResult::ExchangeCommands {
+                                commands: vec![ExchangeCommand::QrRequestScan],
                             }
                         }
                         QrActionOutcome::BackToShowQr => {
@@ -1618,17 +1620,26 @@ mod tests {
     }
 
     #[test]
-    fn test_without_session_preserves_legacy_behavior() {
+    fn test_without_session_emits_qr_request_scan_command() {
         let mut engine = ExchangeEngine::new(config_no_groups());
 
         // No session
         assert!(engine.session().is_none());
 
-        // ShowQr → ScanQr should return RequestCamera (legacy)
+        // ShowQr → ScanQr emits the QrRequestScan ExchangeCommand even
+        // without an active peer session. The legacy `RequestCamera`
+        // ActionResult is deprecated (ADR-022 Addendum D) — frontends
+        // implement the command/event protocol only.
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
-        assert!(matches!(result, ActionResult::RequestCamera));
+        match &result {
+            ActionResult::ExchangeCommands { commands } => assert_eq!(
+                commands,
+                &vec![vauchi_core::exchange::command::ExchangeCommand::QrRequestScan]
+            ),
+            other => panic!("Expected ExchangeCommands with QrRequestScan, got {other:?}"),
+        }
 
         // handle_hardware_event handles QrScanned via legacy TextChanged path
         let result =
@@ -2032,11 +2043,19 @@ mod tests {
         assert_eq!(engine.config.mode, Some(ExchangeMode::Glance));
         assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
 
-        // QR flow works identically for both modes at engine level
+        // QR flow works identically for both modes at engine level —
+        // emits ExchangeCommand::QrRequestScan (no longer the deprecated
+        // RequestCamera ActionResult).
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
-        assert!(matches!(result, ActionResult::RequestCamera));
+        match &result {
+            ActionResult::ExchangeCommands { commands } => assert_eq!(
+                commands,
+                &vec![vauchi_core::exchange::command::ExchangeCommand::QrRequestScan]
+            ),
+            other => panic!("Expected ExchangeCommands with QrRequestScan, got {other:?}"),
+        }
         assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
     }
 

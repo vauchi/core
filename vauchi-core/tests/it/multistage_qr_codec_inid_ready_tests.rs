@@ -214,12 +214,28 @@ fn fail_qr_roundtrips() {
 
 // @internal
 #[test]
-fn fail_qr_with_extra_trailing_chars_is_still_parseable_or_errors_gracefully() {
+fn fail_qr_with_extra_trailing_chars_does_not_panic() {
     // Padded payload — implementation may accept or reject; either way
-    // it must NOT panic.
+    // it must NOT panic. We pin the prefix-recognition invariant: even
+    // on malformed input the parser still recognises the FAIL prefix
+    // (i.e. it does not return UnknownPrefix), and a successful parse
+    // produces a Fail variant rather than something else.
+    use vauchi_core::exchange::multistage::qr_codec::QrCodecError;
+
     let mut qr = format_fail_qr(&SID);
     qr.push_str("extra-data");
-    let _ = parse_qr(&qr);
+    let result = parse_qr(&qr);
+    let acceptable = match &result {
+        Ok(StageQr::Fail { .. }) => true,
+        Ok(_) => false,
+        Err(QrCodecError::UnknownPrefix) => false,
+        Err(_) => true,
+    };
+    assert!(
+        acceptable,
+        "FAIL with trailing junk must either parse as Fail or fail with a non-UnknownPrefix error; got {:?}",
+        result
+    );
 }
 
 // ============================================================

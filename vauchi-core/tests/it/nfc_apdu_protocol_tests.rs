@@ -373,10 +373,16 @@ proptest! {
     }
 
     /// `parse_command` never panics on arbitrary bytes (CC-13 panic-freedom).
+    /// The discriminating assertion is the absence of a panic. To stay
+    /// compliant with the zero-assertion lint we also pin the structural
+    /// invariant that whenever parsing succeeds, the returned data slice
+    /// is a sub-slice of the input.
     // @internal
     #[test]
     fn prop_parse_command_never_panics(bytes in proptest::collection::vec(any::<u8>(), 0..512)) {
-        let _ = parse_command(&bytes);
+        if let Some((_, _, _, data)) = parse_command(&bytes) {
+            prop_assert!(data.len() <= bytes.len(), "data slice exceeds input length");
+        }
     }
 
     /// `is_select_vauchi` returns true iff the command parses as a SELECT

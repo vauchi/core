@@ -6,7 +6,65 @@
 
 use super::VauchiPlatform;
 use super::error::MobileError;
-use super::types::{MobileVisibilityLabel, MobileVisibilityLabelDetail};
+use super::types::{
+    MobileLabelContactRow, MobileLabelContactStatus, MobileVisibilityLabel,
+    MobileVisibilityLabelDetail,
+};
+
+/// Resolve raw contact IDs against storage into rendered rows.
+///
+/// Active contacts produce `MobileLabelContactRow` entries with the same
+/// display-name pipeline `enrich_contact()` uses for `list_contacts` (so a
+/// contact with a nickname renders the same in both surfaces). Missing or
+/// errored IDs are dropped from the rows and counted in the second tuple
+/// member; this is the conservative default per the planning record's
+/// missing-contact policy decision (`omit + stale_reference_count`).
+///
+/// Order is preserved: the i-th row corresponds to the next active id from
+/// `contact_ids` left-to-right. The invariant
+/// `rows.len() + stale_count as usize == contact_ids.len()` is verified in
+/// `mobile_visibility_resolve_tests`.
+fn resolve_label_contacts(
+    storage: &vauchi_core::Storage,
+    contact_ids: &[String],
+) -> (Vec<MobileLabelContactRow>, u32) {
+    let mut rows = Vec::with_capacity(contact_ids.len());
+    let mut stale: u32 = 0;
+
+    for id in contact_ids {
+        match storage.load_contact(id) {
+            Ok(Some(contact)) => {
+                let nickname = storage.load_contact_nickname(id).ok().flatten();
+                let shared_names = storage.list_shared_names(id).unwrap_or_default();
+                let (name_pref, _) = storage.load_display_preferences(id).unwrap_or((
+                    vauchi_core::DisplayNamePreference::Primary,
+                    vauchi_core::AvatarPreference::Primary,
+                ));
+                let display_name = vauchi_core::contact::display::resolve_display_name(
+                    contact.display_name(),
+                    &name_pref,
+                    &shared_names,
+                    nickname.as_deref(),
+                );
+                rows.push(MobileLabelContactRow {
+                    id: id.clone(),
+                    display_name,
+                    trust_level: contact.trust_level().into(),
+                    status: MobileLabelContactStatus::Active,
+                });
+            }
+            // Missing or error → omit from rows and bump stale_reference_count.
+            // Per the planning record (G2 missing-contact policy default):
+            // never expose unresolved contact IDs to the UI; surface the
+            // count instead so the frontend can render a footer hint.
+            _ => {
+                stale = stale.saturating_add(1);
+            }
+        }
+    }
+
+    (rows, stale)
+}
 
 #[uniffi::export]
 impl VauchiPlatform {
@@ -136,10 +194,20 @@ impl VauchiPlatform {
     }
 
     /// Get a label by ID with full details.
+    ///
+    /// Populates `label_contacts` and `stale_reference_count` by resolving
+    /// the label's `contact_ids` against storage — frontends should render
+    /// `label_contacts` instead of joining `contact_ids` against the
+    /// contacts list themselves (ADR-021/043 Humble UI). See
+    /// `resolve_label_contacts` for the missing-contact policy.
     pub fn get_label(&self, label_id: String) -> Result<MobileVisibilityLabelDetail, MobileError> {
         let storage = self.open_storage()?;
         let label = storage.load_group(&label_id)?;
-        Ok(MobileVisibilityLabelDetail::from(&label))
+        let mut detail = MobileVisibilityLabelDetail::from(&label);
+        let (rows, stale_count) = resolve_label_contacts(&storage, &detail.contact_ids);
+        detail.label_contacts = rows;
+        detail.stale_reference_count = stale_count;
+        Ok(detail)
     }
 
     /// Rename a label.

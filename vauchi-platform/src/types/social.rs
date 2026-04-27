@@ -6,6 +6,8 @@
 //!
 //! Social networks and visibility labels.
 
+use super::MobileContactTrustLevel;
+
 /// Social network info.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileSocialNetwork {
@@ -44,18 +46,68 @@ impl From<&vauchi_core::Group> for MobileVisibilityLabel {
     }
 }
 
+/// Status of a contact reference within a label.
+///
+/// Today only `Active` is emitted — deleted-contact references are omitted
+/// from `label_contacts` and counted in `stale_reference_count` instead.
+/// Future variants may distinguish stale/tombstoned/etc. without a binding
+/// break thanks to UniFFI's enum-extension semantics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileLabelContactStatus {
+    /// The contact resolves to an active contact in storage.
+    Active,
+}
+
+/// A resolved contact row for a visibility label.
+///
+/// Frontends should render `MobileVisibilityLabelDetail.label_contacts`
+/// instead of joining `contact_ids` against the contacts list themselves
+/// (ADR-021/043 Humble UI). Display name resolution honors nicknames,
+/// shared-name preferences, and avatar preferences — same pipeline used by
+/// `enrich_contact()` for `list_contacts`.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MobileLabelContactRow {
+    /// Contact ID — same as the matching entry in `contact_ids`.
+    pub id: String,
+    /// Display name resolved per the user's nickname/shared-name preferences.
+    pub display_name: String,
+    /// Cryptographically-derived trust level (never user-editable).
+    pub trust_level: MobileContactTrustLevel,
+    /// Status of this row in the label (today always `Active`).
+    pub status: MobileLabelContactStatus,
+}
+
 /// Detailed label info including contacts and visible fields.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileVisibilityLabelDetail {
     /// Basic label info.
     pub id: String,
     pub name: String,
-    /// Contact IDs in this label.
+    /// Raw contact IDs in this label — superseded by `label_contacts`.
+    ///
+    /// Retained for backwards compatibility for one binding cycle so
+    /// existing consumers don't break. Frontends should render
+    /// `label_contacts` instead — that list is pre-resolved against
+    /// storage so missing contacts cannot leak raw IDs into the UI.
     pub contact_ids: Vec<String>,
     /// Field IDs visible to contacts in this label.
     pub visible_field_ids: Vec<String>,
     pub created_at: u64,
     pub modified_at: u64,
+    /// Resolved contact rows for the UI to render.
+    ///
+    /// Populated by `VauchiPlatform::get_label`; the bare `From<&Group>`
+    /// impl leaves this empty (Group does not carry storage access).
+    /// Order matches `contact_ids` insertion order.
+    pub label_contacts: Vec<MobileLabelContactRow>,
+    /// Number of `contact_ids` that did not resolve to an active contact.
+    ///
+    /// When `> 0`, the label references contacts that were removed from
+    /// storage. UI may surface this as e.g. "(N stale references)".
+    /// `label_contacts.len() + stale_reference_count == contact_ids.len()`
+    /// is an invariant on the resolver output (verified in
+    /// `mobile_visibility_resolve_tests`).
+    pub stale_reference_count: u32,
 }
 
 impl From<&vauchi_core::Group> for MobileVisibilityLabelDetail {
@@ -67,6 +119,10 @@ impl From<&vauchi_core::Group> for MobileVisibilityLabelDetail {
             visible_field_ids: label.visible_fields().iter().cloned().collect(),
             created_at: label.created_at(),
             modified_at: label.modified_at(),
+            // Populated by VauchiPlatform::get_label after construction —
+            // Group does not carry storage access. See mobile_visibility.rs.
+            label_contacts: Vec::new(),
+            stale_reference_count: 0,
         }
     }
 }

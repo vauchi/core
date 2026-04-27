@@ -24,7 +24,7 @@ use crate::types::{
     MobileTabLayout,
 };
 use vauchi_app::notification_types::NotificationCategory as CoreNotificationCategory;
-use vauchi_app::ui::{AppEngine, WorkflowEngine};
+use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
 use vauchi_core::api::{HandlerId, Vauchi, VauchiConfig, VauchiEvent};
 use vauchi_core::crypto::SymmetricKey;
 
@@ -89,6 +89,30 @@ pub struct PlatformAppEngine {
     event_handler_id: Mutex<Option<HandlerId>>,
 }
 
+/// Self-heal: if the engine is parked on `Onboarding` but identity now
+/// exists in storage (a sibling `Vauchi` instance — `VauchiPlatform`
+/// on iOS/Android — wrote it after this AppEngine was constructed),
+/// jump to the post-auth `default_screen()`. Called from every UniFFI
+/// entry that returns a rendered screen, so the very next read after
+/// identity creation reflects the post-auth UI without the frontend
+/// hand-coding the navigation. Workflow decision lives in core
+/// (ADR-021 Humble UI). Idempotent — once `screen != Onboarding`,
+/// this is a no-op.
+fn self_heal_post_auth(engine: &mut AppEngine) {
+    if matches!(engine.current_app_screen(), AppScreen::Onboarding) && engine.has_identity() {
+        let target = engine.default_screen();
+        // `navigate_to` (not `_internal`) pushes Onboarding onto the
+        // nav history. That's harmless — the user can't reasonably
+        // navigate "back" to Onboarding once an identity exists, and
+        // any back-navigation falls through to MyInfo via
+        // `navigate_back`'s default. The companion fix in
+        // `AppEngine::navigate_to_internal` calls
+        // `vauchi.refresh_identity_from_storage()` so the new screen's
+        // engine sees the on-disk identity.
+        engine.navigate_to(target);
+    }
+}
+
 #[uniffi::export]
 impl PlatformAppEngine {
     /// Create a new PlatformAppEngine with platform-provided secure key.
@@ -139,9 +163,18 @@ impl PlatformAppEngine {
     ///
     /// The JSON structure matches `ScreenModel` from vauchi-core.
     pub fn current_screen_json(&self) -> Result<String, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
         })?;
+        // Self-heal: when AppEngine was constructed without an identity
+        // (engine = OnboardingEngine, screen = Onboarding) and a sibling
+        // Vauchi instance — `VauchiPlatform` on iOS/Android — has since
+        // written identity to the shared DB, the live engine is stale.
+        // Auto-navigate to the post-auth default so frontends never have
+        // to hand-code "after onboarding, navigate to MyInfo": the
+        // workflow decision lives in core (ADR-021 Humble UI). Idempotent
+        // — once `screen != Onboarding`, this is a no-op.
+        self_heal_post_auth(&mut engine);
         screen_to_json(&engine.current_screen())
     }
 
@@ -152,9 +185,10 @@ impl PlatformAppEngine {
     /// local screen-to-tab map or label lookup needed (G1 of the
     /// frontend pure-renderer remediation; ADR-021 / ADR-038).
     pub fn tab_info(&self, locale: MobileLocale) -> Result<Vec<MobileTabInfo>, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
         })?;
+        self_heal_post_auth(&mut engine);
         Ok(engine
             .tab_info(locale.into())
             .into_iter()
@@ -355,9 +389,10 @@ impl PlatformAppEngine {
     ///
     /// Useful for tab bar highlighting without deserializing the full ScreenModel.
     pub fn current_screen_id(&self) -> Result<String, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
         })?;
+        self_heal_post_auth(&mut engine);
         let model = engine.current_screen();
         Ok(model.screen_id)
     }

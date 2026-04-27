@@ -129,6 +129,15 @@ impl AppEngine {
 
     /// Navigate without pushing to history (used by back-navigation and completion routing).
     pub(super) fn navigate_to_internal(&mut self, screen: AppScreen) -> ScreenModel {
+        // Refresh identity from storage if a sibling `Vauchi` instance
+        // (e.g. `VauchiPlatform` on iOS/Android) wrote one to disk after
+        // this AppEngine was constructed. Without this, screen builders
+        // that read `vauchi.identity` directly (MyInfo, Contacts, etc.)
+        // would still see `None` and render the unauthenticated/onboarding
+        // variant — even after `has_identity()` correctly returned true
+        // via the storage fallback. Idempotent.
+        self.vauchi.refresh_identity_from_storage();
+
         // Swap in the new screen, get the old one back
         let old_screen = std::mem::replace(&mut self.screen, screen.clone());
 

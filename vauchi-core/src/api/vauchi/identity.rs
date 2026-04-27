@@ -341,6 +341,28 @@ impl Vauchi {
         matches!(self.storage.load_identity(), Ok(Some(_)))
     }
 
+    /// Re-load identity from storage into `self.identity` if currently None.
+    ///
+    /// Companion to [`Vauchi::has_identity`]'s storage-fallback. Use this
+    /// before code paths that read `self.identity` directly (e.g. screen
+    /// builders inside the AppEngine, signing/encryption flows). Without
+    /// it, those paths would still see `None` after a sibling Vauchi
+    /// instance — pointing at the same DB — wrote an identity to storage,
+    /// because the in-memory cache wasn't refreshed.
+    ///
+    /// Idempotent: returns immediately if `self.identity` is already
+    /// populated.
+    pub fn refresh_identity_from_storage(&mut self) {
+        if self.identity.is_some() {
+            return;
+        }
+        if let Ok(Some((bytes, _display_name))) = self.storage.load_identity()
+            && let Ok(identity) = Identity::from_storage_bytes(&bytes)
+        {
+            self.identity = Some(identity);
+        }
+    }
+
     /// Updates the user's display name.
     ///
     /// Updates both the identity and contact card display name.

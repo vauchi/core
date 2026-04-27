@@ -28,13 +28,20 @@ for full specification.
 flowchart TB
     Alice["Alice<br/>(Device)"]
     Bob["Bob<br/>(Device)"]
+    Gateway["OHTTP Gateway<br/>(strips client IP)"]
     RelayA["Relay Server"]
     RelayB["Relay Server"]
     Alice <-- "QR Code<br/>X3DH Keys" --> Bob
-    Alice -- "Encrypted Updates" --> RelayA
-    Bob -- "Encrypted Updates" --> RelayB
+    Alice -- "OHTTP encrypted" --> Gateway
+    Bob -- "OHTTP encrypted" --> Gateway
+    Gateway -- "TLS" --> RelayA
+    Gateway -- "TLS" --> RelayB
     RelayA <-- "Store & Fwd" --> RelayB
 ```
+
+> **Note:** All remote client↔relay traffic flows through an OHTTP
+> gateway per ADR-037 — the relay never sees client IP addresses,
+> and the gateway never sees request content.
 
 1. **Exchange** - Users scan QR codes to exchange X3DH keys
 2. **Encrypt** - Card updates are encrypted with Double Ratchet

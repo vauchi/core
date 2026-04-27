@@ -210,6 +210,7 @@ fn v2_response_with_blobs_roundtrip() {
         blob_id: "b1".into(),
         ciphertext: "dGVzdA==".into(),
         created_at: 12345,
+        mailbox_token: None,
     }]);
     let json = serde_json::to_string(&resp).unwrap();
     let parsed: V2Response = serde_json::from_str(&json).unwrap();
@@ -228,12 +229,41 @@ fn fetched_blob_roundtrip() {
         blob_id: "fb-1".into(),
         ciphertext: "Y2lwaGVy".into(),
         created_at: 99999,
+        mailbox_token: None,
     };
     let json = serde_json::to_string(&blob).unwrap();
     let parsed: FetchedBlob = serde_json::from_str(&json).unwrap();
     assert_eq!(parsed.blob_id, "fb-1");
     assert_eq!(parsed.ciphertext, "Y2lwaGVy");
     assert_eq!(parsed.created_at, 99999);
+    assert!(
+        parsed.mailbox_token.is_none(),
+        "mailbox_token defaults to None when not serialized"
+    );
+}
+
+// @internal
+#[test]
+fn fetched_blob_with_mailbox_token_roundtrip() {
+    let blob = FetchedBlob {
+        blob_id: "fb-2".into(),
+        ciphertext: "Y2lwaGVy".into(),
+        created_at: 99999,
+        mailbox_token: Some("aabbccdd".into()),
+    };
+    let json = serde_json::to_string(&blob).unwrap();
+    let parsed: FetchedBlob = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.mailbox_token.as_deref(), Some("aabbccdd"));
+}
+
+// @internal
+#[test]
+fn fetched_blob_legacy_relay_compat() {
+    // Older relays do not emit `mailbox_token` — the field must default to None.
+    let json = r#"{"blob_id":"old","ciphertext":"YQ==","created_at":1}"#;
+    let parsed: FetchedBlob = serde_json::from_str(json).unwrap();
+    assert_eq!(parsed.blob_id, "old");
+    assert!(parsed.mailbox_token.is_none());
 }
 
 // @internal

@@ -82,6 +82,16 @@ pub struct FetchedBlob {
     /// Base64-encoded ciphertext.
     pub ciphertext: String,
     pub created_at: u64,
+    /// Mailbox token the blob arrived for. Returned to the recipient
+    /// (who already knows token→contact via local registration) so the
+    /// receive loop can route in O(1) instead of brute-forcing every
+    /// contact's ratchet. Privacy-neutral: the relay already has the
+    /// token, the recipient computed it locally.
+    ///
+    /// `None` for older relays that have not deployed this field;
+    /// clients fall back to brute-force routing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mailbox_token: Option<String>,
 }
 
 /// V2 recovery proof store request body.

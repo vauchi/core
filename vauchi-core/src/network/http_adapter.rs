@@ -99,6 +99,12 @@ impl HttpTransportAdapter {
 
     /// Convert a `FetchedBlob` into a `MessageEnvelope` containing an
     /// `EncryptedUpdate`.
+    ///
+    /// When the relay populates `FetchedBlob.mailbox_token`, the value is
+    /// forwarded into `EncryptedUpdate.recipient_id` so the receive loop
+    /// can resolve the blob's contact in O(1) via a local
+    /// `token → contact_id` map. When absent, the field is empty and the
+    /// receive loop falls back to brute-force ratchet attempts.
     fn blob_to_envelope(blob: &FetchedBlob) -> Result<MessageEnvelope, NetworkError> {
         let ciphertext = base64::engine::general_purpose::STANDARD
             .decode(&blob.ciphertext)
@@ -109,8 +115,8 @@ impl HttpTransportAdapter {
             message_id: blob.blob_id.clone(),
             timestamp: blob.created_at,
             payload: MessagePayload::EncryptedUpdate(EncryptedUpdate {
-                recipient_id: String::new(), // filled by caller from token context
-                sender_id: String::new(),    // opaque — relay doesn't know sender
+                recipient_id: blob.mailbox_token.clone().unwrap_or_default(),
+                sender_id: String::new(), // opaque — relay doesn't know sender
                 ratchet_header: RatchetHeader {
                     dh_public: [0u8; 32],
                     dh_generation: 0,
@@ -433,12 +439,37 @@ mod tests {
             blob_id: "blob-123".into(),
             ciphertext: base64::engine::general_purpose::STANDARD.encode(b"encrypted-data"),
             created_at: 1234567890,
+            mailbox_token: None,
         };
         let envelope = HttpTransportAdapter::blob_to_envelope(&blob).unwrap();
         assert_eq!(envelope.message_id, "blob-123");
         assert_eq!(envelope.timestamp, 1234567890);
         if let MessagePayload::EncryptedUpdate(update) = &envelope.payload {
             assert_eq!(update.ciphertext, b"encrypted-data");
+            assert_eq!(
+                update.recipient_id, "",
+                "no token attribution when relay omits mailbox_token"
+            );
+        } else {
+            panic!("expected EncryptedUpdate payload");
+        }
+    }
+
+    #[test]
+    fn test_blob_to_envelope_propagates_mailbox_token() {
+        let blob = FetchedBlob {
+            blob_id: "blob-with-token".into(),
+            ciphertext: base64::engine::general_purpose::STANDARD.encode(b"x"),
+            created_at: 1,
+            mailbox_token: Some("a".repeat(64)),
+        };
+        let envelope = HttpTransportAdapter::blob_to_envelope(&blob).unwrap();
+        if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
+            assert_eq!(
+                update.recipient_id,
+                "a".repeat(64),
+                "mailbox_token must be carried into recipient_id for the receive loop"
+            );
         } else {
             panic!("expected EncryptedUpdate payload");
         }
@@ -450,6 +481,7 @@ mod tests {
             blob_id: "bad".into(),
             ciphertext: "not-valid-base64!!!".into(),
             created_at: 0,
+            mailbox_token: None,
         };
         let result = HttpTransportAdapter::blob_to_envelope(&blob);
         assert!(result.is_err());

@@ -181,6 +181,21 @@ impl VauchiPlatform {
         Ok(count as u32)
     }
 
+    /// Get all failed delivery records.
+    ///
+    /// Frontends should call this instead of fetching `get_all_delivery_records()`
+    /// and filtering by `status == Failed` themselves — see ADR-021/043
+    /// (the Humble UI). The partition decision lives in core so iOS, Android,
+    /// and any future frontend render the same list without divergence.
+    pub fn get_failed_delivery_records(&self) -> Result<Vec<MobileDeliveryRecord>, MobileError> {
+        use vauchi_core::storage::DeliveryStatus;
+        let storage = self.open_storage()?;
+        let records = storage.get_delivery_records_by_status(&DeliveryStatus::Failed {
+            reason: String::new(),
+        })?;
+        Ok(records.iter().map(MobileDeliveryRecord::from).collect())
+    }
+
     /// Manually retry a failed delivery.
     ///
     /// Returns true if the retry entry was found and rescheduled.

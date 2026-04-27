@@ -1022,6 +1022,24 @@ impl VauchiPlatform {
             })
     }
 
+    /// Save a delivery record directly to storage.
+    ///
+    /// Used by integration tests that need delivery records of specific statuses
+    /// without running the full sync/delivery pipeline.
+    /// Not exported via UniFFI (outside `#[uniffi::export]` block).
+    #[doc(hidden)]
+    pub fn save_test_delivery_record(
+        &self,
+        record: &vauchi_core::storage::DeliveryRecord,
+    ) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        storage
+            .create_delivery_record(record)
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })
+    }
+
     /// Returns the data directory (parent of the database file).
     pub(crate) fn data_dir(&self) -> PathBuf {
         self.storage_path

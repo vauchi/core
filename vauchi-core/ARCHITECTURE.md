@@ -24,18 +24,16 @@ for full specification.
 
 ## Data Flow
 
-```text
-┌─────────────┐     QR Code      ┌─────────────┐
-│   Alice     │ ───────────────► │    Bob      │
-│  (Device)   │ ◄─────────────── │  (Device)   │
-└─────────────┘    X3DH Keys     └─────────────┘
-       │                                │
-       │  Encrypted Updates             │
-       ▼                                ▼
-┌─────────────┐                 ┌─────────────┐
-│   Relay     │ ◄─────────────► │   Relay     │
-│   Server    │   Store & Fwd   │   Server    │
-└─────────────┘                 └─────────────┘
+```mermaid
+flowchart TB
+    Alice["Alice<br/>(Device)"]
+    Bob["Bob<br/>(Device)"]
+    RelayA["Relay Server"]
+    RelayB["Relay Server"]
+    Alice <-- "QR Code<br/>X3DH Keys" --> Bob
+    Alice -- "Encrypted Updates" --> RelayA
+    Bob -- "Encrypted Updates" --> RelayB
+    RelayA <-- "Store & Fwd" --> RelayB
 ```
 
 1. **Exchange** - Users scan QR codes to exchange X3DH keys

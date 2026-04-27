@@ -116,5 +116,5 @@ pub mod onboarding;
 pub mod qr;
 pub use onboarding::display_name_suggestions;
 pub mod social;
-pub use social::{ProfileValidation, SocialNetwork, SocialNetworkRegistry};
+pub use social::{SocialNetwork, SocialNetworkRegistry};
 pub mod version;

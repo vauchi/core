@@ -4,19 +4,11 @@
 
 //! Social Network Support
 //!
-//! This module provides:
-//! - A registry of known social networks with profile URL templates
-//! - Signed validation records for field attestation
+//! Provides a registry of known social networks with profile URL templates.
 
 #[cfg(feature = "testing")]
 pub mod registry;
 #[cfg(not(feature = "testing"))]
 mod registry;
 
-#[cfg(feature = "testing")]
-pub mod validation;
-#[cfg(not(feature = "testing"))]
-mod validation;
-
 pub use registry::{SocialNetwork, SocialNetworkRegistry};
-pub use validation::ProfileValidation;

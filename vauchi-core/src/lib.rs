@@ -13,6 +13,19 @@
 pub mod crypto;
 pub use crypto::{DhError, PublicKey, Signature, SigningKeyPair, SymmetricKey, decrypt, encrypt};
 
+#[cfg(feature = "flame")]
+pub mod flame;
+
+// Auto-install the flame subscriber when the crate is compiled with the
+// `flame` feature AND `cfg(test)`. Without `cfg(test)` this would also
+// fire for downstream consumers that happen to enable the feature, which
+// is undesirable — flame is a dev tool.
+#[cfg(all(test, feature = "flame"))]
+#[ctor::ctor]
+fn _flame_install() {
+    crate::flame::init_layer();
+}
+
 pub mod types;
 
 pub mod text;

@@ -90,6 +90,7 @@ pub struct CardUpdateResult {
 ///
 /// Individual failures are skipped (logged at caller's discretion) so that
 /// one bad update does not prevent processing of the rest.
+#[tracing::instrument(level = "debug", skip_all, fields(updates_len = updates.len()), name = "sync.process_card_updates")]
 pub fn process_card_updates(
     identity: &Identity,
     storage: &Storage,
@@ -126,6 +127,7 @@ pub fn process_card_updates(
 /// Processes a single card update with all security checks.
 ///
 /// Returns `Ok(())` on success or a `CardUpdateError` describing the failure.
+#[tracing::instrument(level = "debug", skip_all, fields(ct_len = ciphertext.len()), name = "sync.process_single_card_update")]
 pub fn process_single_card_update(
     identity: &Identity,
     storage: &Storage,

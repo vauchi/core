@@ -47,6 +47,10 @@ mutants.out.old/
 lcov.info
 tarpaulin-report.*
 
+# Profiling artifacts (tracing-flame folded traces, rendered SVGs, samply profiles)
+**/artifacts/flame/
+**/artifacts/samply/
+
 # Locale files loaded from sibling locales/ repo at runtime
 vauchi-core/locales/
 

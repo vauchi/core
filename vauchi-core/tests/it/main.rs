@@ -8,6 +8,12 @@
 //! the ~340-binary link overhead. See matklad (2021):
 //! "Delete Cargo Integration Tests"
 
+#[cfg(feature = "flame")]
+#[ctor::ctor]
+fn _flame_install() {
+    vauchi_core::flame::init_layer();
+}
+
 #[allow(dead_code)]
 mod common;
 mod content;

@@ -658,6 +658,7 @@ impl WorkflowEngine for AppEngine {
         self.apply_update_overlay(screen)
     }
 
+    #[tracing::instrument(level = "debug", skip_all, name = "app.handle_action")]
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         self.drain_events_to_log();
 

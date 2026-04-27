@@ -55,6 +55,7 @@ const MAX_AVATAR_DIMENSION: u32 = 512;
 /// Decodes the input, resizes if either dimension exceeds `MAX_AVATAR_DIMENSION`,
 /// and encodes as WebP. If the result still exceeds the size budget, the dimension
 /// is halved repeatedly until the output fits or the dimension reaches 32 px.
+#[tracing::instrument(level = "debug", skip_all, fields(in_len = data.len()), name = "avatar.normalize")]
 pub fn normalize_avatar(data: &[u8]) -> Result<Vec<u8>, ContactCardError> {
     if data.is_empty() {
         return Err(ContactCardError::AvatarInvalidFormat);

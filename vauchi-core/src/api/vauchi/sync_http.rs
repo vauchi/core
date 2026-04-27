@@ -46,6 +46,7 @@ impl Vauchi {
     /// 2. Attempt sync. On OHTTP key error, refresh key and retry once.
     /// 3. Update timing (C1/C2 jitter) on success.
     /// 4. Return combined outcome.
+    #[tracing::instrument(level = "info", skip_all, name = "vauchi.sync")]
     pub fn sync(&mut self) -> VauchiResult<VauchiSyncOutcome> {
         // 1. Gate checks
         if self.identity.is_none() {
@@ -90,6 +91,7 @@ impl Vauchi {
     /// Inner sync body — assumes gate checks already passed.
     ///
     /// Extracted so that `sync()` can retry on stale OHTTP key errors.
+    #[tracing::instrument(level = "debug", skip_all, name = "vauchi.sync_inner")]
     fn sync_inner(&mut self) -> VauchiResult<VauchiSyncOutcome> {
         let identity = self.identity.as_ref().expect("identity checked in sync()");
         let ohttp_key = self
@@ -226,6 +228,7 @@ impl Vauchi {
     /// advancing ratchet state.
     ///
     /// Returns the number of successfully received (decrypted + applied) updates.
+    #[tracing::instrument(level = "debug", skip_all, name = "sync.receive_phase")]
     fn run_receive_phase(
         &self,
         identity: &crate::identity::Identity,
@@ -332,6 +335,7 @@ impl Vauchi {
     /// Moves the adapter into a `RelayClient` which is wrapped by a
     /// `SyncController`. Contact ratchets are loaded from storage and
     /// registered on the controller before calling `sync()`.
+    #[tracing::instrument(level = "debug", skip_all, name = "sync.send_phase")]
     fn run_send_phase(
         &self,
         identity: &crate::identity::Identity,

@@ -77,6 +77,7 @@ impl AppEngine {
     /// commands, or a screen update if the engine state changed.
     ///
     /// Returns `None` if the current screen doesn't handle hardware events.
+    #[tracing::instrument(level = "debug", skip_all, name = "app.handle_hardware_event")]
     pub fn handle_hardware_event(&mut self, event: ExchangeHardwareEvent) -> Option<ActionResult> {
         if !matches!(
             self.screen,

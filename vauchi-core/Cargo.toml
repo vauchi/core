@@ -45,6 +45,10 @@ schema-gen = ["schemars", "vauchi-app/schema-gen"]
 diagnostic-scanner = ["imageproc", "fast_image_resize"]
 # YOLO-based QR detector for diagnostic scanner (adds ~15MB ONNX runtime)
 diagnostic-yolo = ["diagnostic-scanner", "ort"]
+# Profiling: install a tracing-flame layer at the start of every test run.
+# Writes folded traces to `core/vauchi-core/artifacts/flame/` (gitignored).
+# See `just flame-core <test_filter>`.
+flame = ["dep:tracing-subscriber", "dep:tracing-flame", "dep:ctor"]
 
 [dependencies]
 # Cryptography (audited libraries)
@@ -83,6 +87,18 @@ bitflags = { version = "2.6", features = ["serde"] }
 
 # Error handling
 thiserror = "2.0"
+
+# Tracing spans for profiling. Events follow `.claude/rules/logging-rules.md`:
+# never log PII (names, keys, tokens, card content). All `#[instrument]`
+# attributes use `skip_all` and only emit non-sensitive metadata (sizes,
+# variant tags, success/failure). At default level=info there is near-zero
+# overhead — spans only emit when a subscriber matches the level.
+tracing = "0.1"
+
+# Profiling layer (enabled via `flame` feature; dev-only, gated to test builds).
+tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
+tracing-flame = { version = "0.2", optional = true }
+ctor = { version = "0.2", optional = true }
 
 # Random number generation
 rand = "0.8"

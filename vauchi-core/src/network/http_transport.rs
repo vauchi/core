@@ -321,6 +321,7 @@ impl HttpTransport {
     }
 
     /// Sends an encrypted update to a recipient's mailbox.
+    #[tracing::instrument(level = "debug", skip_all, fields(ct_b64_len = ciphertext_b64.len()), name = "http.send_update")]
     pub fn send_update(
         &self,
         recipient_id: &str,
@@ -340,6 +341,7 @@ impl HttpTransport {
     }
 
     /// Fetches pending blobs for the given mailbox tokens.
+    #[tracing::instrument(level = "debug", skip_all, fields(token_count = mailbox_tokens.len()), name = "http.fetch")]
     pub fn fetch(&self, mailbox_tokens: &[String]) -> Result<Vec<FetchedBlob>, NetworkError> {
         let req = V2FetchRequest {
             mailbox_tokens: mailbox_tokens.to_vec(),

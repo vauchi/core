@@ -37,6 +37,7 @@ impl Vauchi {
     ///
     /// If SecureStorage is set, derives SMK from the identity's master seed,
     /// stores it in SecureStorage, and re-encrypts storage with the SMK-derived SEK.
+    #[tracing::instrument(level = "info", skip_all, name = "vauchi.create_identity")]
     pub fn create_identity(&mut self, display_name: &str) -> VauchiResult<()> {
         if self.identity.is_some() {
             return Err(VauchiError::AlreadyInitialized);

@@ -42,6 +42,7 @@ pub(crate) const ARGON2_P_COST: u32 = 4;
 /// Derives a 32-byte symmetric key from a password using Argon2id.
 ///
 /// Parameters: m=64MB, t=3, p=4 per OWASP recommendations.
+#[tracing::instrument(level = "debug", skip_all, name = "crypto.argon2id_derive")]
 pub fn derive_key_argon2id(password: &[u8], salt: &[u8]) -> Result<SymmetricKey, PasswordKdfError> {
     let params = argon2::Params::new(ARGON2_M_COST, ARGON2_T_COST, ARGON2_P_COST, Some(32))
         .map_err(|e| PasswordKdfError::DerivationFailed(e.to_string()))?;

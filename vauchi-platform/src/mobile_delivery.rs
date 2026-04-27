@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use vauchi_core::{ContactCard, Identity, IdentityBackup, Vauchi, VauchiConfig};
+use vauchi_core::{ContactCard, Identity, IdentityBackup};
 
 use super::error::{MobileError, lock_or};
 use super::types::{
@@ -29,11 +29,11 @@ impl VauchiPlatform {
         *lock_or(&self.sync_status)? = MobileSyncStatus::Syncing;
 
         let result = (|| -> Result<MobileSyncResult, MobileError> {
-            let config = VauchiConfig::with_storage_path(&self.storage_path)
-                .with_relay_url(&self.relay_url)
-                .with_storage_key(self.storage_key.clone());
-            let mut vauchi = Vauchi::new(config)?;
-
+            // open_vauchi_for_relay() loads identity via self.get_identity()
+            // (avoiding the silent `.ok()` swallow in Vauchi::init that
+            // returns IdentityNotInitialized when from_storage_bytes parsing
+            // fails) and pre-resolves the OHTTP gateway key.
+            let mut vauchi = self.open_vauchi_for_relay()?;
             vauchi.connect().map_err(|e| MobileError::Other {
                 detail: format!("Connect: {e}"),
             })?;

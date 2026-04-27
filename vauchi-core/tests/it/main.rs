@@ -39,6 +39,7 @@ mod api_relay_exchange_tests;
 mod api_shared_avatars_tests;
 mod api_shared_names_tests;
 mod api_sync_controller_tests;
+mod api_vauchi_recovery_tests;
 mod api_vauchi_tests;
 mod api_visibility_persistence_tests;
 mod app_engine_auto_lock_tests;

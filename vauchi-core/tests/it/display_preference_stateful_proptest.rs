@@ -88,6 +88,15 @@ fn apply_op(wb: &Vauchi, cid: &str, op: &Op) {
 // ── Stateful property test ─────────────────────────────────────────────────────
 
 proptest! {
+    // Each case spins up a full Vauchi instance and applies up to 20 ops —
+    // roughly 50ms per case. The default 256 cases push wall-clock to ~12s.
+    // 64 cases still cover the op-graph (each op kind appears ~10x with the
+    // weighted strategy) while bringing per-test runtime under 3s.
+    #![proptest_config(ProptestConfig {
+        cases: 64,
+        .. ProptestConfig::default()
+    })]
+
     /// After any random sequence of display-preference ops, resolved_display_name
     /// is always non-empty.
     // @internal

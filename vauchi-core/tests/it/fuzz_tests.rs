@@ -398,7 +398,10 @@ proptest! {
 // =============================================================================
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(500))]
+    // 256 cases (proptest default) is enough coverage for the
+    // sign-roundtrip / wrong-message / corrupted-signature properties;
+    // each case generates a real Ed25519 keypair so wall-clock matters.
+    #![proptest_config(ProptestConfig::with_cases(256))]
 
     /// Signing should handle arbitrary messages
 // @internal

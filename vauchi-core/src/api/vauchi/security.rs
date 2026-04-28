@@ -4,13 +4,27 @@
 
 //! Delivery status, events, app password, duress PIN, and duress settings.
 
+use std::time::{Duration, Instant};
+
 use super::super::app_password::{AppPasswordConfig, AuthResult};
 use super::super::duress::{DuressAlert, DuressAlertType};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventCallback, VauchiEvent};
-use super::{AuthMode, Vauchi};
+use super::{AuthMode, BiometricUnlockOutcome, Vauchi};
 use crate::storage::ActivityLogRow;
 use crate::types::DuressSettings;
+
+/// Minimum wall-clock duration for [`Vauchi::biometric_unlock_check`].
+///
+/// Padding the call to a fixed floor hides whether a duress PIN is
+/// configured: an observer cannot distinguish "biometric → straight
+/// to ready" from "biometric → PIN screen for duress check" by
+/// timing the unlock animation. iOS / Android previously enforced
+/// this floor in their own code paths (see audit
+/// `_private/docs/problems/2026-04-28-lifecycle-session-residue-umbrella`
+/// item P2-B); core now owns the constant so the two language
+/// implementations cannot drift apart.
+pub const BIOMETRIC_UNLOCK_MIN_DURATION: Duration = Duration::from_millis(300);
 
 impl Vauchi {
     // === Delivery Status Operations ===
@@ -98,6 +112,49 @@ impl Vauchi {
                 Ok(AuthMode::Duress)
             }
             AuthResult::Invalid => Err(VauchiError::InvalidState("invalid password".into())),
+        }
+    }
+
+    /// Decides what to do after a successful platform biometric
+    /// authentication, in constant wall-clock time.
+    ///
+    /// The frontend (iOS LAContext / Android BiometricPrompt) calls
+    /// this immediately after the OS biometric prompt resolves with
+    /// success. Returns:
+    ///
+    /// - [`BiometricUnlockOutcome::Unlocked`] when no duress PIN is
+    ///   configured. `auth_mode` is set to [`AuthMode::Normal`] —
+    ///   biometric proves the real user.
+    /// - [`BiometricUnlockOutcome::PromptForDuressPin`] when duress is
+    ///   configured. The frontend must show the PIN entry screen so
+    ///   the user enters either the real PIN (-> `Normal` via
+    ///   [`Vauchi::authenticate`]) or the duress PIN (-> `Duress`).
+    ///   `auth_mode` is left untouched in this case.
+    ///
+    /// The call always takes at least
+    /// [`BIOMETRIC_UNLOCK_MIN_DURATION`]. The
+    /// `is_duress_enabled()` SQLite read is observably fast on most
+    /// devices, so without padding the difference between the two
+    /// outcomes would leak via the unlock-screen animation timing.
+    /// Padding in core means iOS and Android cannot diverge on the
+    /// floor (audit item
+    /// `2026-04-28-lifecycle-session-residue-umbrella` P2-B).
+    pub fn biometric_unlock_check(&mut self) -> VauchiResult<BiometricUnlockOutcome> {
+        let start = Instant::now();
+        let outcome = self.biometric_unlock_decision()?;
+        pad_to_minimum(start, BIOMETRIC_UNLOCK_MIN_DURATION);
+        Ok(outcome)
+    }
+
+    /// Inner decision logic for [`Self::biometric_unlock_check`] without
+    /// the constant-time floor — exposed for tests so the assertion
+    /// suite does not pay the 300 ms padding on every case.
+    pub(crate) fn biometric_unlock_decision(&mut self) -> VauchiResult<BiometricUnlockOutcome> {
+        if self.is_duress_enabled()? {
+            Ok(BiometricUnlockOutcome::PromptForDuressPin)
+        } else {
+            self.auth_mode = AuthMode::Normal;
+            Ok(BiometricUnlockOutcome::Unlocked)
         }
     }
 
@@ -249,5 +306,15 @@ impl Vauchi {
             .as_ref()
             .map(|id| hex::encode(id.signing_public_key()))
             .unwrap_or_else(|| "unknown-device".to_string())
+    }
+}
+
+/// Sleep just long enough that the elapsed time since `start` is at
+/// least `floor`. No-op when the elapsed time already meets or
+/// exceeds the floor.
+fn pad_to_minimum(start: Instant, floor: Duration) {
+    let elapsed = start.elapsed();
+    if elapsed < floor {
+        std::thread::sleep(floor - elapsed);
     }
 }

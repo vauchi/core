@@ -15,7 +15,7 @@ use crate::common;
 
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::storage::Storage;
-use vauchi_core::{AppPasswordConfig, AuthMode, AuthResult};
+use vauchi_core::{AppPasswordConfig, AuthMode, AuthResult, BiometricUnlockOutcome};
 
 use common::helpers::{create_vauchi_with_identity, setup_alice_bob_exchange};
 
@@ -467,6 +467,108 @@ fn test_disable_duress() {
     wb.disable_duress().expect("disable should succeed");
 
     assert!(!wb.is_duress_enabled().expect("check should succeed"));
+}
+
+// =============================================================================
+// Biometric Unlock Tests (P2-B — constant-time check moved to core)
+// =============================================================================
+
+// Lifecycle / Session Residue umbrella, item P2-B: the duress-aware
+// post-biometric step lives in core so iOS and Android cannot drift on
+// the floor or on the decision logic.
+
+#[test]
+fn biometric_unlock_decision_unlocked_when_no_duress() {
+    let mut wb = create_vauchi_with_identity("Alice");
+    wb.setup_app_password("my-pin-1234").expect("setup app pw");
+
+    let outcome = wb
+        .biometric_unlock_check()
+        .expect("biometric check should succeed");
+
+    assert_eq!(
+        outcome,
+        BiometricUnlockOutcome::Unlocked,
+        "no duress configured -> Unlocked"
+    );
+    assert_eq!(
+        wb.auth_mode(),
+        AuthMode::Normal,
+        "Unlocked outcome must promote auth_mode to Normal"
+    );
+}
+
+#[test]
+fn biometric_unlock_decision_prompts_for_pin_when_duress_enabled() {
+    let mut wb = create_vauchi_with_identity("Alice");
+    wb.setup_app_password("my-pin-1234").expect("setup app pw");
+    wb.setup_duress_password("duress-999")
+        .expect("setup duress");
+
+    let outcome = wb
+        .biometric_unlock_check()
+        .expect("biometric check should succeed");
+
+    assert_eq!(
+        outcome,
+        BiometricUnlockOutcome::PromptForDuressPin,
+        "duress configured -> PromptForDuressPin"
+    );
+    assert_eq!(
+        wb.auth_mode(),
+        AuthMode::Unauthenticated,
+        "PromptForDuressPin must NOT promote auth_mode — the PIN \
+         step decides Normal vs Duress"
+    );
+}
+
+#[test]
+fn biometric_unlock_check_pads_to_minimum_duration() {
+    use std::time::Instant;
+    use vauchi_core::api::vauchi::BIOMETRIC_UNLOCK_MIN_DURATION;
+
+    let mut wb = create_vauchi_with_identity("Alice");
+    wb.setup_app_password("my-pin-1234").expect("setup app pw");
+
+    let start = Instant::now();
+    let _ = wb.biometric_unlock_check().expect("check");
+    let elapsed = start.elapsed();
+
+    assert!(
+        elapsed >= BIOMETRIC_UNLOCK_MIN_DURATION,
+        "biometric_unlock_check must pad to ≥{:?}, observed {:?}",
+        BIOMETRIC_UNLOCK_MIN_DURATION,
+        elapsed
+    );
+}
+
+#[test]
+fn biometric_unlock_check_constant_time_across_duress_states() {
+    use std::time::Instant;
+    use vauchi_core::api::vauchi::BIOMETRIC_UNLOCK_MIN_DURATION;
+
+    let mut wb_no_duress = create_vauchi_with_identity("Alice");
+    wb_no_duress.setup_app_password("pw").expect("setup");
+
+    let mut wb_with_duress = create_vauchi_with_identity("Bob");
+    wb_with_duress.setup_app_password("pw").expect("setup");
+    wb_with_duress
+        .setup_duress_password("duress-999")
+        .expect("setup duress");
+
+    let t_no = {
+        let s = Instant::now();
+        let _ = wb_no_duress.biometric_unlock_check().expect("check");
+        s.elapsed()
+    };
+    let t_with = {
+        let s = Instant::now();
+        let _ = wb_with_duress.biometric_unlock_check().expect("check");
+        s.elapsed()
+    };
+
+    assert!(t_no >= BIOMETRIC_UNLOCK_MIN_DURATION);
+    assert!(t_with >= BIOMETRIC_UNLOCK_MIN_DURATION);
 }
 
 // =============================================================================

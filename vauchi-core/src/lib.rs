@@ -93,9 +93,10 @@ pub use sync::{CardDelta, DeltaError, FieldChange, SyncError, SyncManager, SyncS
 pub mod api;
 #[cfg(feature = "network-rustls")]
 pub use api::{
-    AppPasswordConfig, AuthMode, AuthResult, BroadcastResult, ConsentStatus, DuressAlert,
-    DuressAlertType, EmergencyWipeStatus, HandlerId, RecoveryReadiness, SetupProgress, Vauchi,
-    VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult, VauchiSyncOutcome,
+    AppPasswordConfig, AuthMode, AuthResult, BiometricUnlockOutcome, BroadcastResult,
+    ConsentStatus, DuressAlert, DuressAlertType, EmergencyWipeStatus, HandlerId, RecoveryReadiness,
+    SetupProgress, Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult,
+    VauchiSyncOutcome,
 };
 pub mod aha_moments;
 pub mod avatar;

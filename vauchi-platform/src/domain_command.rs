@@ -30,7 +30,8 @@
 use crate::content::{MobileApplyResult, MobileUpdateStatus};
 use crate::types::{
     MobileAhaMoment, MobileAhaMomentType, MobileConsentRecord, MobileConsentStatus,
-    MobileConsentType, MobileDemoContact, MobileDemoContactState, MobileSocialNetwork,
+    MobileConsentType, MobileDeletionInfo, MobileDemoContact, MobileDemoContactState,
+    MobileGdprExport, MobileShredStatus, MobileSocialNetwork,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -54,7 +55,7 @@ pub enum DomainCommand {
     /// All persisted consent records.
     GetConsentRecords,
 
-    // ── Content Updates (B7 batch 2, this MR) ──
+    // ── Content Updates (B7 batch 2) ──
     /// Returns `true` when the `content-updates` Cargo feature is
     /// enabled at compile time.
     IsContentUpdatesSupported,
@@ -67,6 +68,27 @@ pub enum DomainCommand {
     /// Reload the social-networks list from the content cache after
     /// `ApplyContentUpdates` succeeds.
     ReloadSocialNetworks,
+
+    // ── GDPR / Deletion + read-only shred status (B7 batch 3) ──
+    //
+    // Note: the 5 keychain-bound shred methods (panic_shred, soft_shred,
+    // hard_shred, cancel_shred, verify_shred) are NOT in this batch —
+    // they require platform-keychain plumbing that PlatformAppEngine
+    // doesn't have yet. Tracked as a separate B7 batch.
+    /// Export all user data as JSON (GDPR right-to-export).
+    ExportGdprData,
+    /// Schedule identity deletion with a 7-day grace period.
+    ScheduleIdentityDeletion,
+    /// Cancel a scheduled identity deletion during the grace period.
+    CancelIdentityDeletion,
+    /// Execute a scheduled identity deletion after the grace period.
+    /// Returns the count of revocations queued.
+    ExecuteIdentityDeletion,
+    /// Read the current deletion state.
+    GetDeletionState,
+    /// Read-only shred-process status. Mirrors the legacy
+    /// `VauchiPlatform::shred_status` — does NOT require keychain.
+    ShredStatus,
 
     // ── Aha Moments (B7 batch 5) ──
     /// Read whether the user has already seen a given milestone.
@@ -133,9 +155,17 @@ pub enum DomainCommandResult {
     ApplyResult { result: MobileApplyResult },
     /// List of `MobileSocialNetwork` (B7 batch 2 — `ReloadSocialNetworks`).
     SocialNetworks { networks: Vec<MobileSocialNetwork> },
-    /// Numeric `u32` result (B7 batch 5 — `AhaMomentsSeenCount`,
-    /// `AhaMomentsTotalCount`).
+    /// Numeric `u32` result — used by both B7 batch 3
+    /// (`ExecuteIdentityDeletion` revocation count) and B7 batch 5
+    /// (`AhaMomentsSeenCount`, `AhaMomentsTotalCount`).
     Count { value: u32 },
+    /// GDPR export payload (B7 batch 3 — `ExportGdprData`).
+    GdprExport { export: MobileGdprExport },
+    /// Deletion-state snapshot (B7 batch 3 — `ScheduleIdentityDeletion`,
+    /// `GetDeletionState`).
+    DeletionInfo { info: MobileDeletionInfo },
+    /// Shred-process status snapshot (B7 batch 3 — `ShredStatus`).
+    ShredStatus { status: MobileShredStatus },
     /// Optional aha-moment payload (B7 batch 5 —
     /// `TryTriggerAhaMoment` and friends).
     AhaMomentOpt { moment: Option<MobileAhaMoment> },

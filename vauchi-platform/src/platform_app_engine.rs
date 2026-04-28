@@ -1717,6 +1717,110 @@ impl PlatformAppEngine {
                 });
                 Ok(DomainCommandResult::DemoContactOpt { contact })
             }
+
+            // ── GDPR / Deletion + shred-status (B7 batch 3) ──
+            DomainCommand::ExportGdprData => {
+                let storage = engine.vauchi().storage();
+                let export =
+                    vauchi_core::api::export_all_data(storage).map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                let json_data =
+                    serde_json::to_string_pretty(&export).map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                Ok(DomainCommandResult::GdprExport {
+                    export: crate::types::MobileGdprExport {
+                        json_data,
+                        exported_at: export.exported_at,
+                        version: export.version,
+                    },
+                })
+            }
+            DomainCommand::ScheduleIdentityDeletion => {
+                let storage = engine.vauchi().storage();
+                let manager = vauchi_core::api::DeletionManager::new(storage);
+                manager
+                    .schedule_deletion()
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                let state = manager.deletion_state().map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                engine.invalidate_screen(&AppScreen::EmergencyShred);
+                Ok(DomainCommandResult::DeletionInfo {
+                    info: crate::types::MobileDeletionInfo::from(&state),
+                })
+            }
+            DomainCommand::CancelIdentityDeletion => {
+                let storage = engine.vauchi().storage();
+                let manager = vauchi_core::api::DeletionManager::new(storage);
+                manager.cancel_deletion().map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                engine.invalidate_screen(&AppScreen::EmergencyShred);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::ExecuteIdentityDeletion => {
+                let revocation_count = {
+                    let vauchi = engine.vauchi();
+                    let identity = vauchi.identity().ok_or_else(|| MobileError::Other {
+                        detail: "Identity not initialized".into(),
+                    })?;
+                    let manager = vauchi_core::api::DeletionManager::new(vauchi.storage());
+                    let result =
+                        manager
+                            .execute_deletion(identity)
+                            .map_err(|e| MobileError::Other {
+                                detail: e.to_string(),
+                            })?;
+                    result.revocations.len() as u32
+                };
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                engine.invalidate_screen(&AppScreen::EmergencyShred);
+                Ok(DomainCommandResult::Count {
+                    value: revocation_count,
+                })
+            }
+            DomainCommand::GetDeletionState => {
+                let storage = engine.vauchi().storage();
+                let manager = vauchi_core::api::DeletionManager::new(storage);
+                let state = manager.deletion_state().map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+                Ok(DomainCommandResult::DeletionInfo {
+                    info: crate::types::MobileDeletionInfo::from(&state),
+                })
+            }
+            DomainCommand::ShredStatus => {
+                use crate::types::MobileShredStatus as MShred;
+                let storage = engine.vauchi().storage();
+                let manager = vauchi_core::api::DeletionManager::new(storage);
+                let state = manager.deletion_state().map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+                let status = match state {
+                    vauchi_core::storage::DeletionState::None => MShred::None,
+                    vauchi_core::storage::DeletionState::Scheduled { execute_at, .. } => {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0);
+                        MShred::Scheduled {
+                            remaining_secs: execute_at.saturating_sub(now),
+                        }
+                    }
+                    vauchi_core::storage::DeletionState::Executed { .. } => MShred::Executed,
+                    _ => MShred::None,
+                };
+                Ok(DomainCommandResult::ShredStatus { status })
+            }
         }
     }
 

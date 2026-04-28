@@ -640,6 +640,38 @@ impl PlatformAppEngine {
         Ok(engine.form_has_data())
     }
 
+    /// Report frontend-observed network reachability to core.
+    ///
+    /// Frontends call this from their platform reachability monitor
+    /// (`NWPathMonitor` on iOS, `ConnectivityManager` on Android)
+    /// callback. While `online == false`, every emitted
+    /// `ScreenModel` carries a presentational offline `Component::Banner`
+    /// that frontends render automatically — no
+    /// `MainViewModel.isOnline` mirror flag, no `OfflineBanner()`
+    /// switch in the view tree.
+    ///
+    /// Audit `2026-04-28-lifecycle-session-residue-umbrella` P2-D.
+    pub fn set_network_online(&self, online: bool) -> Result<(), MobileError> {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        engine.set_network_online(online);
+        Ok(())
+    }
+
+    /// Returns the last frontend-reported network reachability.
+    ///
+    /// Defaults to `true` until the frontend reports otherwise. Used
+    /// by reachability tests; frontends do not need to query this —
+    /// the offline banner is injected into emitted `ScreenModel`s
+    /// automatically when the state is `false`.
+    pub fn is_network_online(&self) -> Result<bool, MobileError> {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        Ok(engine.is_network_online())
+    }
+
     /// Notify core that the app was backgrounded.
     ///
     /// If a password is set and the app is not already locked,

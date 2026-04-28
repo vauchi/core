@@ -39,6 +39,10 @@ use super::screen::{ActionStyle, ScreenAction, ScreenModel};
 
 /// Shared action ID for the update link button/banner.
 const ACTION_OPEN_UPDATE_LINK: &str = "open_update_link";
+/// Action id used by the offline `Component::Banner` injected by
+/// `apply_offline_overlay`. Currently presentational only — no
+/// dispatcher arm. Frontends rendering the banner can ignore taps.
+const ACTION_OFFLINE_BANNER: &str = "offline_banner";
 
 /// Top-level screens in the application.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -276,6 +280,15 @@ pub struct AppEngine {
     pub(super) pending_merge: Option<(String, String)>,
     /// Whether a backup reminder toast should be shown on next main-screen render.
     pending_backup_reminder: bool,
+    /// Frontend-reported network reachability (`NWPathMonitor` on iOS,
+    /// `ConnectivityManager` on Android). When `false`, every emitted
+    /// `ScreenModel` is decorated with an offline `Component::Banner`
+    /// via `apply_offline_overlay`, so frontends never decide whether
+    /// to render the banner themselves (audit
+    /// `2026-04-28-lifecycle-session-residue-umbrella` item P2-D).
+    /// Defaults to `true` so installs without a network monitor (CLI,
+    /// tests, embedded) behave as if always-online.
+    network_online: bool,
 }
 
 impl AppEngine {
@@ -376,6 +389,7 @@ impl AppEngine {
             _event_handler_id: event_handler_id,
             pending_merge: None,
             pending_backup_reminder,
+            network_online: true,
         }
     }
 
@@ -581,6 +595,54 @@ impl AppEngine {
         false
     }
 
+    /// Set the frontend-reported network reachability.
+    ///
+    /// Frontends call this from their `NWPathMonitor` (iOS) or
+    /// `ConnectivityManager` (Android) callback. The decision of
+    /// "is this network usable for sync" stays in core; the
+    /// frontend just forwards the platform signal. While
+    /// `network_online == false`, every emitted `ScreenModel` is
+    /// decorated with an offline `Component::Banner` via
+    /// `apply_offline_overlay`. Audit
+    /// `2026-04-28-lifecycle-session-residue-umbrella` P2-D.
+    pub fn set_network_online(&mut self, online: bool) {
+        self.network_online = online;
+    }
+
+    /// Returns the last frontend-reported network reachability.
+    pub fn is_network_online(&self) -> bool {
+        self.network_online
+    }
+
+    /// Decorate the given screen with an offline `Component::Banner`
+    /// when `network_online == false`. Idempotent — only inserts a
+    /// banner; never duplicates one already present.
+    ///
+    /// Inserted at the bottom of the existing components so an
+    /// active update banner (`apply_update_overlay`) keeps its
+    /// top-of-screen position.
+    fn apply_offline_overlay(&self, mut screen: ScreenModel) -> ScreenModel {
+        if self.network_online {
+            return screen;
+        }
+        let already_present = screen.components.iter().any(|c| {
+            matches!(
+                c,
+                Component::Banner { action_id, .. } if action_id == ACTION_OFFLINE_BANNER
+            )
+        });
+        if already_present {
+            return screen;
+        }
+        screen.components.push(Component::Banner {
+            text: "You're offline. Changes will sync when you reconnect.".into(),
+            action_label: String::new(),
+            action_id: ACTION_OFFLINE_BANNER.into(),
+            a11y: None,
+        });
+        screen
+    }
+
     /// Modify a `ScreenModel` to inject update banners or replace with a blocking screen.
     ///
     /// - `UpToDate` → no change
@@ -739,7 +801,8 @@ mod proptests {
 impl WorkflowEngine for AppEngine {
     fn current_screen(&self) -> ScreenModel {
         let screen = self.engine.current_screen();
-        self.apply_update_overlay(screen)
+        let screen = self.apply_update_overlay(screen);
+        self.apply_offline_overlay(screen)
     }
 
     #[tracing::instrument(level = "debug", skip_all, name = "app.handle_action")]
@@ -1040,12 +1103,12 @@ impl AppEngine {
     /// Apply the update overlay to any `ScreenModel` inside an `ActionResult`.
     fn apply_update_overlay_to_result(&self, result: ActionResult) -> ActionResult {
         match result {
-            ActionResult::UpdateScreen(screen) => {
-                ActionResult::UpdateScreen(self.apply_update_overlay(screen))
-            }
-            ActionResult::NavigateTo(screen) => {
-                ActionResult::NavigateTo(self.apply_update_overlay(screen))
-            }
+            ActionResult::UpdateScreen(screen) => ActionResult::UpdateScreen(
+                self.apply_offline_overlay(self.apply_update_overlay(screen)),
+            ),
+            ActionResult::NavigateTo(screen) => ActionResult::NavigateTo(
+                self.apply_offline_overlay(self.apply_update_overlay(screen)),
+            ),
             other => other,
         }
     }

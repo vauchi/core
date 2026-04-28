@@ -1414,6 +1414,267 @@ impl PlatformAppEngine {
         engine.invalidate_screen(&AppScreen::EmergencyShred);
         Ok(())
     }
+
+    // ── Device Linking (Phase B4 — collapse-vauchi-platform-into-app-engine) ──
+    //
+    // Wraps the **post-orchestrator** device-linking surface. The
+    // pre-orchestrator legacy methods (`start_device_link`,
+    // `start_device_join`, `send_device_link_request`,
+    // `listen_for_device_link_request`, `send_device_link_response`)
+    // are intentionally NOT migrated — they were superseded by the
+    // orchestrator session in
+    // `done/2026-04-27-device-link-orchestrator-phase2d-windows`.
+
+    /// List devices linked to the active identity. The first entry
+    /// (index 0) is the primary device.
+    pub fn get_devices(&self) -> Result<Vec<crate::types::MobileDeviceInfo>, MobileError> {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let identity = engine
+            .vauchi()
+            .identity()
+            .ok_or_else(|| MobileError::Other {
+                detail: "Identity not initialized".into(),
+            })?;
+        let storage = engine.vauchi().storage();
+
+        let registry =
+            match storage
+                .load_device_registry()
+                .map_err(|e| MobileError::StorageError {
+                    detail: e.to_string(),
+                })? {
+                Some(r) => r,
+                None => {
+                    let device_info = identity.device_info();
+                    return Ok(vec![crate::types::MobileDeviceInfo {
+                        device_index: device_info.device_index(),
+                        device_name: device_info.device_name().to_string(),
+                        is_current: true,
+                        is_active: true,
+                        public_key_prefix: hex::encode(&device_info.device_id()[..8]),
+                        created_at: device_info.created_at(),
+                    }]);
+                }
+            };
+
+        let current_device_id = identity.device_info().device_id();
+        Ok(registry
+            .all_devices()
+            .iter()
+            .enumerate()
+            .map(
+                |(idx, d): (usize, &vauchi_core::identity::RegisteredDevice)| {
+                    crate::types::MobileDeviceInfo {
+                        device_index: idx as u32,
+                        device_name: d.device_name.clone(),
+                        is_current: d.device_id == *current_device_id,
+                        is_active: d.is_active(),
+                        public_key_prefix: hex::encode(&d.device_id[..8]),
+                        created_at: d.created_at,
+                    }
+                },
+            )
+            .collect())
+    }
+
+    /// Number of devices linked to the active identity. Returns 1 when
+    /// no registry exists yet (only the current device).
+    pub fn device_count(&self) -> Result<u32, MobileError> {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let storage = engine.vauchi().storage();
+
+        match storage
+            .load_device_registry()
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })? {
+            Some(r) => Ok(r.device_count() as u32),
+            None => Ok(1),
+        }
+    }
+
+    /// Returns whether the current device is the primary device
+    /// (`device_index == 0`).
+    pub fn is_primary_device(&self) -> Result<bool, MobileError> {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let identity = engine
+            .vauchi()
+            .identity()
+            .ok_or_else(|| MobileError::Other {
+                detail: "Identity not initialized".into(),
+            })?;
+        Ok(identity.device_info().device_index() == 0)
+    }
+
+    /// Revoke the device at `device_index`. Returns `true` when a
+    /// device was revoked, `false` when the index is out of range or
+    /// no registry exists. Errors when the caller targets the
+    /// current device — frontends must use identity deletion instead.
+    pub fn unlink_device(&self, device_index: u32) -> Result<bool, MobileError> {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let identity = engine
+            .vauchi()
+            .identity()
+            .ok_or_else(|| MobileError::Other {
+                detail: "Identity not initialized".into(),
+            })?;
+        let storage = engine.vauchi().storage();
+
+        let mut registry =
+            match storage
+                .load_device_registry()
+                .map_err(|e| MobileError::StorageError {
+                    detail: e.to_string(),
+                })? {
+                Some(r) => r,
+                None => return Ok(false),
+            };
+
+        let devices = registry.all_devices();
+        if device_index as usize >= devices.len() {
+            return Ok(false);
+        }
+
+        let device_id = devices[device_index as usize].device_id;
+        if device_id == *identity.device_info().device_id() {
+            return Err(MobileError::InvalidInput {
+                field: String::new(),
+                detail: "Cannot unlink the current device".into(),
+            });
+        }
+
+        let result = match registry.revoke_device(&device_id, identity.signing_keypair()) {
+            Ok(()) => {
+                storage
+                    .save_device_registry(&registry)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                true
+            }
+            Err(_) => false,
+        };
+
+        engine.invalidate_screen(&AppScreen::DeviceManagement);
+        engine.invalidate_screen(&AppScreen::DeviceLinking);
+        Ok(result)
+    }
+
+    /// Generate the QR shown to a peer for device linking. Read-only
+    /// — does not persist any state. The QR expires after 300 s
+    /// (ADR-035).
+    pub fn generate_device_link_qr(
+        &self,
+    ) -> Result<crate::types::MobileDeviceLinkData, MobileError> {
+        use vauchi_core::exchange::device_link::DeviceLinkQR;
+
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let identity = engine
+            .vauchi()
+            .identity()
+            .ok_or_else(|| MobileError::Other {
+                detail: "Identity not initialized".into(),
+            })?;
+
+        let qr = DeviceLinkQR::generate(identity);
+        Ok(crate::types::MobileDeviceLinkData {
+            qr_data: qr.to_data_string(),
+            identity_public_key: hex::encode(identity.signing_public_key()),
+            timestamp: qr.timestamp(),
+            expires_at: qr.expires_at(),
+        })
+    }
+
+    /// Parse a peer's device-link QR. Read-only — does not
+    /// persist any state.
+    pub fn parse_device_link_qr(
+        &self,
+        qr_data: String,
+    ) -> Result<crate::types::MobileDeviceLinkInfo, MobileError> {
+        use vauchi_core::exchange::device_link::DeviceLinkQR;
+
+        let qr =
+            DeviceLinkQR::from_data_string(&qr_data).map_err(|_| MobileError::InvalidInput {
+                field: "qr".into(),
+                detail: "Invalid QR code".into(),
+            })?;
+
+        Ok(crate::types::MobileDeviceLinkInfo {
+            identity_public_key: hex::encode(qr.identity_public_key()),
+            timestamp: qr.timestamp(),
+            is_expired: qr.is_expired(),
+        })
+    }
+
+    /// Create the orchestrator session for the initiator side of a
+    /// device link. The frontend registers a
+    /// `DeviceLinkSessionListener`, calls `start()` on the returned
+    /// session, and forwards user actions via `confirm_manual` /
+    /// `confirm_ultrasonic` / `deny`. The session owns the
+    /// relay-poll loop, the QR-expiry deadline, and the
+    /// user-confirm gate. Replaces the legacy split between
+    /// `start_device_link()`, `listen_for_device_link_request()`,
+    /// and `send_device_link_response()`.
+    ///
+    /// Persistence: the session saves the updated `DeviceRegistry`
+    /// after `confirm_link` succeeds, closing a pre-existing gap
+    /// where the legacy single-shot path discarded it.
+    pub fn create_device_link_session_initiator(
+        &self,
+    ) -> Result<Arc<crate::MobileDeviceLinkSession>, MobileError> {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let identity = engine
+            .vauchi()
+            .identity()
+            .ok_or_else(|| MobileError::Other {
+                detail: "Identity not initialized".into(),
+            })?;
+        let storage = engine.vauchi().storage();
+
+        let registry = storage
+            .load_device_registry()
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })?
+            .unwrap_or_else(|| identity.initial_device_registry());
+
+        let initiator = identity.create_device_link_initiator(registry);
+        let identity_id = hex::encode(identity.signing_public_key());
+
+        // ADR-035: device-link QR expiry is 300 s — align the
+        // relay-listen budget so the cycle thread's deadline matches
+        // the QR expiry observed by the peer.
+        const RELAY_TIMEOUT_SECS: u64 = 300;
+
+        let relay_url = engine.vauchi().config().relay.server_url.clone();
+        let connect_timeout_ms = engine.vauchi().config().relay.connect_timeout_ms;
+        let transport = engine
+            .vauchi()
+            .build_relay_transport(relay_url, connect_timeout_ms.max(10_000));
+
+        Ok(Arc::new(
+            crate::mobile_device_link_session::MobileDeviceLinkSession::with_persistence_initiator(
+                initiator,
+                transport,
+                identity_id,
+                RELAY_TIMEOUT_SECS,
+                self.storage_path.clone(),
+                self.storage_key.clone(),
+            ),
+        ))
+    }
 }
 
 impl PlatformAppEngine {

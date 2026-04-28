@@ -106,11 +106,17 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1151
 # Bumped 2026-04-28 to 1723 by Phases B2 + B3 of
 # `2026-04-28-collapse-vauchi-platform-into-app-engine`. B2 added the
 # 9 recovery-domain wrappers (+412); B3 adds the 4 emergency-broadcast
-# wrappers (configure / send / get_config / disable, +95). Phases B4
-# / B7 will bump this further as more legacy domains migrate onto the
-# engine. Splitting is not an option (UniFFI facade — see
+# wrappers (configure / send / get_config / disable, +95).
+# Bumped 2026-04-28 to 1984 by Phase B4 — post-orchestrator
+# device-linking wrappers (get_devices, device_count, is_primary_device,
+# unlink_device, generate/parse_device_link_qr,
+# create_device_link_session_initiator, +261). The 5 pre-orchestrator
+# legacy methods are intentionally NOT migrated (superseded by the
+# orchestrator session in
+# `done/2026-04-27-device-link-orchestrator-phase2d-windows`).
+# Splitting is not an option (UniFFI facade — see
 # `.claude/rules/file-size.md` Structural Exemptions).
-vauchi-platform/src/platform_app_engine.rs 1723
+vauchi-platform/src/platform_app_engine.rs 1984
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

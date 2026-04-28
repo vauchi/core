@@ -28,6 +28,7 @@
 //! treats added enum cases as additive on the binding side.
 
 use crate::content::{MobileApplyResult, MobileUpdateStatus};
+use crate::mobile_import::MobileImportResult;
 use crate::types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileConsentRecord, MobileConsentStatus,
     MobileConsentType, MobileContact, MobileContactCard, MobileDecoyContact, MobileDeletionInfo,
@@ -407,6 +408,29 @@ pub enum DomainCommand {
     /// Returns the footer-button `ScreenAction` id that
     /// `ContactDetailEngine` would emit for the given contact.
     ContactDetailFooterActionId { contact_id: String },
+
+    // ── Backup + Import (B7 batch 12) ──
+    /// Encrypt + export the active identity (legacy v1 backup).
+    /// Returns base64-encoded backup data.
+    ExportBackup { password: String },
+    /// Import an identity-only backup. Engine must have no active
+    /// identity. `backup_data` is base64-encoded from `ExportBackup`.
+    ImportBackup {
+        backup_data: String,
+        password: String,
+    },
+    /// Encrypt + export full v3 backup (identity + contacts + own
+    /// card + labels). Returns base64-encoded data.
+    ExportFullBackup { password: String },
+    /// Import a full v3 backup. Engine must have no active identity.
+    /// `backup_data` is base64-encoded from `ExportFullBackup`.
+    ImportFullBackup {
+        backup_data: String,
+        password: String,
+    },
+    /// Import contacts from a vCard 2.1/3.0/4.0 file. `data` is the
+    /// raw `.vcf` bytes. Duplicates (by UID) are skipped.
+    ImportContactsFromVcf { data: Vec<u8> },
 }
 
 /// Sum type of every legitimate return shape from
@@ -515,4 +539,6 @@ pub enum DomainCommandResult {
     DuplicatePairs { pairs: Vec<MobileDuplicatePair> },
     /// List of field-notes (B7 batch 11 — `GetContactFieldNotes`).
     FieldNotes { notes: Vec<MobileFieldNote> },
+    /// vCard import outcome (B7 batch 12 — `ImportContactsFromVcf`).
+    ImportResult { result: MobileImportResult },
 }

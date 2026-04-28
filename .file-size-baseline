@@ -175,7 +175,12 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # Id (19 commands; +287 lines of dispatch arms; reuses pub(crate)
 # enrich_contact / enrich_contacts_batch helpers promoted in the
 # same MR).
-vauchi-platform/src/platform_app_engine.rs 4253
+# Bumped 2026-04-29 to 4346 by Phase B7 batch 12 — Backup + Import
+# (5 commands: ExportBackup, ImportBackup, ExportFullBackup,
+# ImportFullBackup, ImportContactsFromVcf; +93 lines of dispatch
+# arms with hex⇄base64 transport encoding mirroring legacy
+# mobile_delivery + mobile_import).
+vauchi-platform/src/platform_app_engine.rs 4346
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

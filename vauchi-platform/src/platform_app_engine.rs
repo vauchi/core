@@ -3485,6 +3485,99 @@ impl PlatformAppEngine {
                     .to_string();
                 Ok(DomainCommandResult::Text { value })
             }
+
+            // ── Backup + Import (B7 batch 12) ──
+            DomainCommand::ExportBackup { password } => {
+                let backup_hex =
+                    engine
+                        .vauchi()
+                        .export_backup(&password)
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?;
+                use base64::Engine;
+                let bytes = hex::decode(&backup_hex).map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+                let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+                Ok(DomainCommandResult::Text { value: encoded })
+            }
+            DomainCommand::ImportBackup {
+                backup_data,
+                password,
+            } => {
+                if engine.vauchi().identity().is_some() {
+                    return Err(MobileError::Other {
+                        detail: "Already initialized".to_string(),
+                    });
+                }
+                use base64::Engine;
+                let bytes = base64::engine::general_purpose::STANDARD
+                    .decode(&backup_data)
+                    .map_err(|_| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: "Invalid base64".to_string(),
+                    })?;
+                let backup_hex = hex::encode(&bytes);
+                engine
+                    .vauchi_mut()
+                    .import_backup(&backup_hex, &password)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_all();
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::ExportFullBackup { password } => {
+                let backup_hex = engine.vauchi().export_full_backup(&password).map_err(|e| {
+                    MobileError::Other {
+                        detail: e.to_string(),
+                    }
+                })?;
+                use base64::Engine;
+                let bytes = hex::decode(&backup_hex).map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+                let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+                Ok(DomainCommandResult::Text { value: encoded })
+            }
+            DomainCommand::ImportFullBackup {
+                backup_data,
+                password,
+            } => {
+                use base64::Engine;
+                let bytes = base64::engine::general_purpose::STANDARD
+                    .decode(&backup_data)
+                    .map_err(|_| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: "Invalid base64".to_string(),
+                    })?;
+                let backup_hex = hex::encode(&bytes);
+                engine
+                    .vauchi_mut()
+                    .import_full_backup(&backup_hex, &password)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_all();
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::ImportContactsFromVcf { data } => {
+                let result = engine
+                    .vauchi()
+                    .import_contacts_from_vcf(&data)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Contacts);
+                Ok(DomainCommandResult::ImportResult {
+                    result: crate::mobile_import::MobileImportResult {
+                        imported: result.imported as u32,
+                        skipped: result.skipped as u32,
+                        warnings: result.warnings.into_iter().map(Into::into).collect(),
+                    },
+                })
+            }
         }
     }
 

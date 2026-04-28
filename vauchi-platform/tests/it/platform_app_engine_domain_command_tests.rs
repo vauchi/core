@@ -2254,3 +2254,170 @@ fn contact_detail_footer_action_id_returns_error_for_missing_contact() {
 // Suppress unused-import warning when no tests reference these types.
 #[allow(dead_code)]
 const _BATCH11_UNUSED: Option<MobileAhaMomentType> = None;
+
+// ── B7 batch 12: Backup + Import ───────────────────────────────────────
+
+// @internal
+#[test]
+fn export_backup_returns_base64_string() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ExportBackup {
+            password: "correct horse battery staple".into(),
+        })
+        .expect("export_backup")
+    {
+        DomainCommandResult::Text { value } => {
+            assert!(!value.is_empty(), "backup must contain bytes");
+            // Base64 should decode without error.
+            use base64::Engine;
+            let decoded = base64::engine::general_purpose::STANDARD
+                .decode(&value)
+                .expect("must be valid base64");
+            assert!(!decoded.is_empty(), "decoded backup must contain bytes");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn export_full_backup_returns_base64_string() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ExportFullBackup {
+            password: "correct horse battery staple".into(),
+        })
+        .expect("export_full_backup")
+    {
+        DomainCommandResult::Text { value } => {
+            assert!(!value.is_empty(), "full backup must contain bytes");
+            use base64::Engine;
+            let decoded = base64::engine::general_purpose::STANDARD
+                .decode(&value)
+                .expect("must be valid base64");
+            assert!(decoded.len() > 100, "full backup should be non-trivial");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn import_backup_rejects_when_identity_already_initialized() {
+    // Engine already has an identity from drive_onboarding.
+    let (engine, _dir) = create_engine_with_identity();
+
+    let backup = match engine
+        .dispatch_domain_command(DomainCommand::ExportBackup {
+            password: "correct horse battery staple".into(),
+        })
+        .expect("export")
+    {
+        DomainCommandResult::Text { value } => value,
+        other => panic!("unexpected result: {other:?}"),
+    };
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::ImportBackup {
+            backup_data: backup,
+            password: "correct horse battery staple".into(),
+        })
+        .expect_err("must reject second import");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("already") || msg.contains("initialized"),
+        "expected already-initialized error, got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn import_full_backup_rejects_when_identity_already_initialized() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let backup = match engine
+        .dispatch_domain_command(DomainCommand::ExportFullBackup {
+            password: "correct horse battery staple".into(),
+        })
+        .expect("export_full")
+    {
+        DomainCommandResult::Text { value } => value,
+        other => panic!("unexpected result: {other:?}"),
+    };
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::ImportFullBackup {
+            backup_data: backup,
+            password: "correct horse battery staple".into(),
+        })
+        .expect_err("must reject second import");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("already") || msg.contains("initialized"),
+        "expected already-initialized error, got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn import_backup_rejects_invalid_base64() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::ImportBackup {
+            backup_data: "this is not base64!!!".into(),
+            password: "correct horse battery staple".into(),
+        })
+        .expect_err("must reject invalid base64");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("base64") || msg.contains("already") || msg.contains("invalid"),
+        "expected base64/invalid error, got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn import_contacts_from_vcf_handles_empty_input() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ImportContactsFromVcf { data: Vec::new() })
+        .expect("vcf import")
+    {
+        DomainCommandResult::ImportResult { result } => {
+            assert_eq!(result.imported, 0, "no contacts in empty vcf");
+            assert_eq!(result.skipped, 0, "no contacts to skip");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn import_contacts_from_vcf_imports_minimal_vcard() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let vcard = b"BEGIN:VCARD\r\n\
+VERSION:3.0\r\n\
+FN:Imported Friend\r\n\
+N:Friend;Imported;;;\r\n\
+EMAIL:imported@example.test\r\n\
+END:VCARD\r\n";
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ImportContactsFromVcf {
+            data: vcard.to_vec(),
+        })
+        .expect("vcf import")
+    {
+        DomainCommandResult::ImportResult { result } => {
+            assert_eq!(result.imported, 1, "exactly one vcard imported");
+            assert_eq!(result.skipped, 0, "no duplicates on fresh storage");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}

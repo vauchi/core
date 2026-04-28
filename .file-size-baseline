@@ -48,8 +48,13 @@ vauchi-core/src/storage/mod.rs 1079
 # (+60 on mod.rs for apply_multi_stage_{state,qr_payload,finalized,session_ended} bridge convenience methods 2026-04-28 Pair 4)
 # (+31 on routing.rs for ActionResult::RetryFailedDeliveries handler 2026-04-28 Pair 1 retry-routing fix)
 # (+10 on routing.rs for ActionResult::StartMultiStageExchange handler 2026-04-28 Pair 4 L8)
-vauchi-app/src/ui/app_engine/mod.rs 1067
-vauchi-app/src/ui/app_engine/routing.rs 1014
+# (+77 on mod.rs for Round 2 audit P2-D — set_network_online + apply_offline_overlay
+#   + ACTION_OFFLINE_BANNER + boot decision comment 2026-04-28
+#   feature/round2-core-lifecycle-surface)
+# (+7 on routing.rs for create_identity_with_onboarding atomic switch comment
+#   2026-04-28 P1 §2.5)
+vauchi-app/src/ui/app_engine/mod.rs 1144
+vauchi-app/src/ui/app_engine/routing.rs 1021
 vauchi-app/src/ui/app_engine/screens.rs 1296
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
@@ -93,7 +98,12 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1151
 # session.process_scanned_qr, restarts on retry). Splitting would
 # fragment the lifecycle hooks across multiple files.
 # Pair 4 of `_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens` (2026-04-28).
-vauchi-platform/src/platform_app_engine.rs 1076
+# (+140 for Round 2 audit core surface: boot(), biometric_unlock_check(),
+# set_network_online() / is_network_online(), periodic_sync_tick() +
+# periodic_sync_interval_seconds() + periodic_sync_max_retries() —
+# `2026-04-28-lifecycle-session-residue-umbrella` items P1 / P2-B / P2-C
+# / P2-D 2026-04-28 feature/round2-core-lifecycle-surface)
+vauchi-platform/src/platform_app_engine.rs 1216
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

@@ -19,6 +19,9 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use crate::multistage_exchange::{
+    MobileMultiStageSession, MobileProtocolState, MobileQrPayload, MultiStageSessionListener,
+};
 use crate::types::{
     MobileLocale, MobileNotificationCategory, MobilePendingNotification, MobileTabInfo,
     MobileTabLayout,
@@ -27,6 +30,7 @@ use vauchi_app::notification_types::NotificationCategory as CoreNotificationCate
 use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
 use vauchi_core::api::{HandlerId, Vauchi, VauchiConfig, VauchiEvent};
 use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::exchange::ProtocolState;
 
 use crate::error::MobileError;
 use crate::json_helpers::{
@@ -87,6 +91,13 @@ pub struct PlatformAppEngine {
     engine: Mutex<AppEngine>,
     /// Active event listener handler ID, used to unregister on replacement.
     event_handler_id: Mutex<Option<HandlerId>>,
+    /// Direct handle to the active `PlatformEventListener`. The
+    /// existing `set_event_listener` path routes via `VauchiEvent` →
+    /// `affected_screens(...)`; the multi-stage cycle thread does not
+    /// emit `VauchiEvent`s, so this slot lets the bridge call
+    /// `on_screens_invalidated` directly when the engine state changes
+    /// from a listener callback (Pair 4 of pure-humble-ui-retire-native-screens).
+    direct_listener: Mutex<Option<Arc<Box<dyn PlatformEventListener>>>>,
 }
 
 /// Self-heal: if the engine is parked on `Onboarding` but identity now
@@ -156,6 +167,7 @@ impl PlatformAppEngine {
         Ok(Arc::new(Self {
             engine: Mutex::new(AppEngine::new(vauchi)),
             event_handler_id: Mutex::new(None),
+            direct_listener: Mutex::new(None),
         }))
     }
 
@@ -602,6 +614,137 @@ impl PlatformAppEngine {
             }));
 
         *handler_id_slot = Some(new_id);
+
+        // Mirror the listener arc into the direct-call slot used by
+        // bridges (Pair 4 multi-stage exchange) that bypass the
+        // VauchiEvent path. Held under a separate lock so callers
+        // observing one do not block the other.
+        let mut direct = self
+            .direct_listener
+            .lock()
+            .map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+        *direct = Some(listener);
+        Ok(())
+    }
+
+    /// Bridge entry point — push a `ProtocolState` into the active
+    /// `MultiStageExchangeEngine`.
+    ///
+    /// Pair 4 of `_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens`.
+    /// `MultiStageSessionListener::on_state_changed` fires from the
+    /// cycle thread; the bridge listener (see
+    /// [`bind_multi_stage_session`](Self::bind_multi_stage_session))
+    /// forwards each transition through this method so the engine's
+    /// next `current_screen()` call reflects the new chrome.
+    ///
+    /// No-op if the active engine is not the multi-stage one — the
+    /// frontend left the screen between callback dispatch and lock
+    /// acquisition.
+    pub fn apply_multi_stage_state(&self, state: MobileProtocolState) -> Result<(), MobileError> {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let core_state: ProtocolState = match state {
+            MobileProtocolState::Idle => ProtocolState::Idle,
+            MobileProtocolState::Advertising => ProtocolState::Advertising,
+            MobileProtocolState::Discovered => ProtocolState::Discovered,
+            MobileProtocolState::Transferring {
+                chunks_sent,
+                chunks_total,
+                chunks_received,
+                peer_chunks_total,
+            } => ProtocolState::Transferring {
+                chunks_sent,
+                chunks_total,
+                chunks_received,
+                peer_chunks_total,
+            },
+            MobileProtocolState::Verifying => ProtocolState::Verifying,
+            MobileProtocolState::Confirming => ProtocolState::Confirming,
+            MobileProtocolState::Complete => ProtocolState::Complete,
+            MobileProtocolState::Finalized => ProtocolState::Finalized,
+            MobileProtocolState::Failed { reason } => ProtocolState::Failed(reason),
+        };
+        let applied = engine.apply_multi_stage_state(core_state);
+        drop(engine);
+        if applied {
+            self.notify_multi_stage_invalidated();
+        }
+        Ok(())
+    }
+
+    /// Bridge entry point — push the latest QR payload into the active
+    /// `MultiStageExchangeEngine`. Forwarded from
+    /// `MultiStageSessionListener::on_qr_payload`. No-op when the
+    /// active engine is not the multi-stage one.
+    pub fn apply_multi_stage_qr_payload(
+        &self,
+        payload: MobileQrPayload,
+    ) -> Result<(), MobileError> {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let qr = vauchi_core::exchange::QrPayload {
+            data: payload.data,
+            error_correction: payload.error_correction,
+            display_duration_ms: payload.display_duration_ms,
+        };
+        let applied = engine.apply_multi_stage_qr_payload(&qr);
+        drop(engine);
+        if applied {
+            self.notify_multi_stage_invalidated();
+        }
+        Ok(())
+    }
+
+    /// Bridge entry point — record the peer display name on
+    /// `Finalized`. Forwarded from
+    /// `MultiStageSessionListener::on_finalized`.
+    pub fn apply_multi_stage_finalized(&self, contact_name: String) -> Result<(), MobileError> {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let applied = engine.apply_multi_stage_finalized(contact_name);
+        drop(engine);
+        if applied {
+            self.notify_multi_stage_invalidated();
+        }
+        Ok(())
+    }
+
+    /// Bridge entry point — flag the cycle thread as ended so the
+    /// engine can flip to the success/failure terminal screen.
+    /// Forwarded from `MultiStageSessionListener::on_session_ended`.
+    pub fn apply_multi_stage_session_ended(&self) -> Result<(), MobileError> {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let applied = engine.apply_multi_stage_session_ended();
+        drop(engine);
+        if applied {
+            self.notify_multi_stage_invalidated();
+        }
+        Ok(())
+    }
+
+    /// Register a core-supplied `MultiStageSessionListener` on
+    /// `session` that translates each cycle-thread callback into the
+    /// `apply_multi_stage_*` methods above.
+    ///
+    /// Frontends should call this once after creating the session
+    /// (`VauchiPlatform::create_multistage_session`) and **before**
+    /// calling `session.start()`. Replaces any prior listener on the
+    /// session.
+    pub fn bind_multi_stage_session(
+        self: Arc<Self>,
+        session: Arc<MobileMultiStageSession>,
+    ) -> Result<(), MobileError> {
+        let bridge = MultiStageEngineBridge {
+            engine: Arc::clone(&self),
+        };
+        session.set_listener(Box::new(bridge));
         Ok(())
     }
 
@@ -640,5 +783,57 @@ impl PlatformAppEngine {
                 }
             })
             .collect())
+    }
+}
+
+impl PlatformAppEngine {
+    /// Notify the registered `PlatformEventListener` that the
+    /// `multi_stage_exchange` screen needs a refresh. Internal helper
+    /// for the four `apply_multi_stage_*` bridge entry points.
+    ///
+    /// Lock is acquired briefly to clone the listener arc; the
+    /// callback fires *outside* the lock so a frontend implementation
+    /// that re-enters Rust (for example to call
+    /// `current_screen_json()`) does not deadlock.
+    fn notify_multi_stage_invalidated(&self) {
+        let listener = self
+            .direct_listener
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone());
+        if let Some(listener) = listener {
+            listener.on_screens_invalidated(vec!["multi_stage_exchange".into()]);
+        }
+    }
+}
+
+/// Core-supplied `MultiStageSessionListener` that bridges cycle-thread
+/// callbacks into the active `MultiStageExchangeEngine` via the
+/// `apply_multi_stage_*` entry points on `PlatformAppEngine`.
+///
+/// Holds an `Arc<PlatformAppEngine>` so callbacks can run on the cycle
+/// thread without violating UniFFI's lifetime constraints.
+struct MultiStageEngineBridge {
+    engine: Arc<PlatformAppEngine>,
+}
+
+impl MultiStageSessionListener for MultiStageEngineBridge {
+    fn on_qr_payload(&self, payload: MobileQrPayload) {
+        // Errors here are non-actionable — the cycle thread is the
+        // only caller and re-attempting won't help. Drop silently per
+        // logging-rules.md (no PII; cycle is hot-path).
+        let _ = self.engine.apply_multi_stage_qr_payload(payload);
+    }
+
+    fn on_state_changed(&self, state: MobileProtocolState) {
+        let _ = self.engine.apply_multi_stage_state(state);
+    }
+
+    fn on_finalized(&self, contact_name: String) {
+        let _ = self.engine.apply_multi_stage_finalized(contact_name);
+    }
+
+    fn on_session_ended(&self) {
+        let _ = self.engine.apply_multi_stage_session_ended();
     }
 }

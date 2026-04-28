@@ -563,6 +563,16 @@ impl WorkflowEngine for MultiStageExchangeEngine {
             _ => None,
         }
     }
+
+    /// Downcast for the platform-side bridge.
+    ///
+    /// `core/vauchi-platform/src/platform_app_engine.rs::apply_multi_stage_*`
+    /// uses this to mutate the active multi-stage engine via the bridge
+    /// setters when `MultiStageSessionListener` callbacks fire from the
+    /// cycle thread. No other downcast site is supported.
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        Some(self)
+    }
 }
 
 // INLINE_TEST_REQUIRED: covers private build_screen branches per
@@ -974,7 +984,7 @@ mod tests {
         }
         assert!(engine.use_front_camera());
         // Toggle back.
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: SWITCH_CAMERA_ACTION_ID.into(),
         });
         assert!(!engine.use_front_camera());
@@ -992,7 +1002,7 @@ mod tests {
             .map(|a| a.label)
             .unwrap();
         assert_eq!(label_rear, "Use Front Camera");
-        engine.handle_action(UserAction::ActionPressed {
+        let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: SWITCH_CAMERA_ACTION_ID.into(),
         });
         let label_front = engine

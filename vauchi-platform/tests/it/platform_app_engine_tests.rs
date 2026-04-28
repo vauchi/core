@@ -647,3 +647,168 @@ fn advance_qr_frame_json_returns_none_off_exchange_screen() {
         "advance must return None outside the Exchange screen"
     );
 }
+
+// ============================================================================
+// Pair 4 — multi-stage exchange engine bridge
+// ============================================================================
+
+/// Drive onboarding then navigate to MultiStageExchange so the cached
+/// engine is the multi-stage one. Returns the engine ready for bridge
+/// pushes.
+fn drive_to_multi_stage(engine: &PlatformAppEngine) {
+    drive_onboarding(engine);
+    engine
+        .navigate_to_json(r#""MultiStageExchange""#.into())
+        .expect("navigate to MultiStageExchange");
+    let id = engine
+        .current_screen_id()
+        .expect("screen id after navigate");
+    assert_eq!(id, "multi_stage_exchange");
+}
+
+fn screen_action_ids(json: &str) -> Vec<String> {
+    let v: serde_json::Value = serde_json::from_str(json).expect("parse screen json");
+    v["actions"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|a| a["id"].as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+// @internal
+#[test]
+fn apply_multi_stage_state_finalized_with_session_ended_renders_success_screen() {
+    use vauchi_platform::MobileProtocolState;
+    let (engine, _dir) = create_engine();
+    drive_to_multi_stage(&engine);
+
+    engine
+        .apply_multi_stage_state(MobileProtocolState::Finalized)
+        .expect("apply Finalized");
+    engine
+        .apply_multi_stage_finalized("Alice".into())
+        .expect("apply finalized name");
+    engine
+        .apply_multi_stage_session_ended()
+        .expect("apply session ended");
+
+    let screen = engine.current_screen_json().expect("screen json");
+    assert!(
+        screen.contains("Exchange Complete"),
+        "session_ended Finalized must render success indicator: {screen}"
+    );
+    assert!(
+        screen.contains("Exchanged with Alice"),
+        "success screen must include peer name: {screen}"
+    );
+    assert_eq!(screen_action_ids(&screen), vec!["done".to_string()]);
+}
+
+// @internal
+#[test]
+fn apply_multi_stage_state_failed_renders_retry_cancel() {
+    use vauchi_platform::MobileProtocolState;
+    let (engine, _dir) = create_engine();
+    drive_to_multi_stage(&engine);
+
+    engine
+        .apply_multi_stage_state(MobileProtocolState::Failed {
+            reason: "lost peer".into(),
+        })
+        .expect("apply Failed");
+
+    let screen = engine.current_screen_json().expect("screen json");
+    assert!(
+        screen.contains("Exchange Failed"),
+        "Failed must render Exchange Failed indicator: {screen}"
+    );
+    assert!(
+        screen.contains("lost peer"),
+        "Failed must surface reason detail: {screen}"
+    );
+    let ids = screen_action_ids(&screen);
+    assert!(ids.contains(&"retry".to_string()));
+    assert!(ids.contains(&"cancel".to_string()));
+}
+
+// @internal
+#[test]
+fn apply_multi_stage_qr_payload_renders_own_qr_data_in_active_chrome() {
+    use vauchi_platform::{MobileProtocolState, MobileQrPayload};
+    let (engine, _dir) = create_engine();
+    drive_to_multi_stage(&engine);
+
+    engine
+        .apply_multi_stage_state(MobileProtocolState::Advertising)
+        .expect("apply Advertising");
+    engine
+        .apply_multi_stage_qr_payload(MobileQrPayload {
+            data: "vauchi://INIT/zzz".into(),
+            error_correction: "L".into(),
+            display_duration_ms: 400,
+        })
+        .expect("apply qr payload");
+
+    let screen = engine.current_screen_json().expect("screen json");
+    assert!(
+        screen.contains("vauchi://INIT/zzz"),
+        "Active chrome must render the bridge-supplied QR data: {screen}"
+    );
+}
+
+// @internal
+#[test]
+fn apply_multi_stage_state_is_no_op_when_active_engine_is_not_multi_stage() {
+    use vauchi_platform::MobileProtocolState;
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    // On `my_info` (post-onboarding default), not the multi-stage screen.
+    let pre_id = engine.current_screen_id().expect("screen id before apply");
+    engine
+        .apply_multi_stage_state(MobileProtocolState::Finalized)
+        .expect("apply must succeed even when not the active engine");
+    let post_id = engine.current_screen_id().expect("screen id after apply");
+    assert_eq!(
+        pre_id, post_id,
+        "bridge push must not affect non-multi-stage screens",
+    );
+}
+
+// @internal
+#[test]
+fn apply_multi_stage_state_notifies_event_listener() {
+    use vauchi_platform::MobileProtocolState;
+    let (engine, _dir) = create_engine();
+    drive_to_multi_stage(&engine);
+
+    let invalidations: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
+
+    struct CaptureListener {
+        sink: Arc<Mutex<Vec<Vec<String>>>>,
+    }
+    impl PlatformEventListener for CaptureListener {
+        fn on_screens_invalidated(&self, screen_ids: Vec<String>) {
+            self.sink.lock().expect("lock").push(screen_ids);
+        }
+    }
+    engine
+        .set_event_listener(Box::new(CaptureListener {
+            sink: Arc::clone(&invalidations),
+        }))
+        .expect("set listener");
+
+    engine
+        .apply_multi_stage_state(MobileProtocolState::Discovered)
+        .expect("apply Discovered");
+
+    let calls = invalidations.lock().expect("lock").clone();
+    assert!(
+        calls
+            .iter()
+            .any(|ids| ids.iter().any(|id| id == "multi_stage_exchange")),
+        "bridge push must notify the listener with multi_stage_exchange screen id; got {calls:?}",
+    );
+}

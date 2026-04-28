@@ -507,6 +507,66 @@ impl AppEngine {
         }
     }
 
+    /// Bridge from the multi-stage cycle thread — push a state
+    /// transition into the active `MultiStageExchangeEngine`.
+    ///
+    /// No-op when the active engine is not the multi-stage one
+    /// (frontend left the screen between callback dispatch and lock
+    /// acquisition). Returns `true` when the bridge applied the
+    /// state, `false` otherwise — useful for the platform layer to
+    /// decide whether to fire screen-invalidation notifications.
+    ///
+    /// Pair 4 of `_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens`.
+    pub fn apply_multi_stage_state(&mut self, state: vauchi_core::exchange::ProtocolState) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_state(state);
+            return true;
+        }
+        false
+    }
+
+    /// Bridge from the multi-stage cycle thread — push the latest QR
+    /// payload (own card) into the active `MultiStageExchangeEngine`.
+    pub fn apply_multi_stage_qr_payload(
+        &mut self,
+        payload: &vauchi_core::exchange::QrPayload,
+    ) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_qr_payload(payload);
+            return true;
+        }
+        false
+    }
+
+    /// Bridge from the multi-stage cycle thread — record the peer
+    /// display name on the `Finalized` transition.
+    pub fn apply_multi_stage_finalized(&mut self, contact_name: String) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_finalized(contact_name);
+            return true;
+        }
+        false
+    }
+
+    /// Bridge from the multi-stage cycle thread — flag the cycle as
+    /// ended so the engine flips to the success / failure terminal
+    /// chrome.
+    pub fn apply_multi_stage_session_ended(&mut self) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_session_ended();
+            return true;
+        }
+        false
+    }
+
     /// Modify a `ScreenModel` to inject update banners or replace with a blocking screen.
     ///
     /// - `UpToDate` → no change

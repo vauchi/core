@@ -1997,3 +1997,260 @@ fn reset_onboarding_returns_unit() {
         other => panic!("unexpected result: {other:?}"),
     }
 }
+
+// ── B7 batch 11: Contact verification + duplicates + notes + misc ──────
+
+// @internal
+#[test]
+fn find_duplicates_returns_empty_for_fresh_identity() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::FindDuplicates)
+        .expect("find_duplicates")
+    {
+        DomainCommandResult::DuplicatePairs { pairs } => {
+            assert!(pairs.is_empty(), "no contacts → no duplicates");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn list_hidden_contacts_returns_empty_for_fresh_identity() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListHiddenContacts)
+        .expect("list_hidden")
+    {
+        DomainCommandResult::Contacts { contacts } => {
+            assert!(contacts.is_empty(), "no hidden contacts on fresh identity");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn search_social_networks_returns_results_for_known_query() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::SearchSocialNetworks {
+            query: "twitter".into(),
+        })
+        .expect("search_social")
+    {
+        DomainCommandResult::SocialNetworks { networks } => {
+            assert!(
+                !networks.is_empty(),
+                "twitter must match at least one network"
+            );
+            assert!(
+                networks.iter().any(|n| n.id.contains("twitter")
+                    || n.display_name.to_lowercase().contains("twitter")),
+                "twitter network expected in results"
+            );
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn search_social_networks_returns_empty_for_unknown_query() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::SearchSocialNetworks {
+            query: "thisIsNotARealNetworkXYZ123".into(),
+        })
+        .expect("search_social")
+    {
+        DomainCommandResult::SocialNetworks { networks } => {
+            assert!(networks.is_empty(), "unknown query → no matches");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_profile_url_returns_some_for_known_network() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    // First find the twitter network id from the registry.
+    let networks = match engine
+        .dispatch_domain_command(DomainCommand::SearchSocialNetworks {
+            query: "twitter".into(),
+        })
+        .expect("search_social")
+    {
+        DomainCommandResult::SocialNetworks { networks } => networks,
+        other => panic!("unexpected result: {other:?}"),
+    };
+    let net = networks.first().expect("twitter result expected");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetProfileUrl {
+            network_id: net.id.clone(),
+            username: "alice".into(),
+        })
+        .expect("get_profile_url")
+    {
+        DomainCommandResult::StringOpt { value } => {
+            let url = value.expect("known network must produce a URL");
+            assert!(
+                url.contains("alice"),
+                "URL must include username: got {url}"
+            );
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_profile_url_returns_none_for_unknown_network() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetProfileUrl {
+            network_id: "not_a_real_network".into(),
+            username: "alice".into(),
+        })
+        .expect("get_profile_url")
+    {
+        DomainCommandResult::StringOpt { value } => {
+            assert!(value.is_none(), "unknown network → None");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn verify_contact_returns_error_for_missing_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::VerifyContact {
+            id: "nonexistent_contact_id".into(),
+        })
+        .expect_err("verify on missing contact must error");
+    assert!(
+        format!("{err:?}").to_lowercase().contains("not found"),
+        "error must mention 'not found', got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn set_proposal_trusted_returns_error_for_missing_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::SetProposalTrusted {
+            contact_id: "nonexistent".into(),
+            trusted: true,
+        })
+        .expect_err("set_proposal_trusted on missing contact must error");
+    assert!(
+        format!("{err:?}").to_lowercase().contains("not found"),
+        "error must mention 'not found', got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn dismiss_duplicate_succeeds_for_unknown_pair() {
+    // dismiss_duplicate is idempotent — recording a dismissal for an
+    // unknown pair is allowed (it just adds the pair to the dismissed set).
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::DismissDuplicate {
+            id1: "a".into(),
+            id2: "b".into(),
+        })
+        .expect("dismiss_duplicate idempotent")
+    {
+        DomainCommandResult::Unit => {}
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_contact_note_errors_for_unknown_contact() {
+    // Storage layer requires contact to exist — returns StorageError otherwise.
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::GetContactNote {
+            contact_id: "ghost_contact".into(),
+        })
+        .expect_err("must error for unknown contact");
+    assert!(
+        format!("{err:?}").to_lowercase().contains("not found"),
+        "error must mention 'not found', got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn get_contact_field_notes_returns_empty_for_unknown_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetContactFieldNotes {
+            contact_id: "ghost_contact".into(),
+        })
+        .expect("get_contact_field_notes")
+    {
+        DomainCommandResult::FieldNotes { notes } => {
+            assert!(notes.is_empty(), "no field notes for unknown contact");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_contact_custom_avatar_errors_for_unknown_contact() {
+    // Vauchi-layer get_contact_custom_avatar requires contact to exist.
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::GetContactCustomAvatar {
+            contact_id: "ghost_contact".into(),
+        })
+        .expect_err("must error on missing contact");
+    assert!(
+        format!("{err:?}").to_lowercase().contains("not found"),
+        "error must mention 'not found', got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn contact_detail_footer_action_id_returns_error_for_missing_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::ContactDetailFooterActionId {
+            contact_id: "nonexistent".into(),
+        })
+        .expect_err("must error on missing contact");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("not found"),
+        "error must mention 'not found', got: {err:?}"
+    );
+}
+
+// Suppress unused-import warning when no tests reference these types.
+#[allow(dead_code)]
+const _BATCH11_UNUSED: Option<MobileAhaMomentType> = None;

@@ -169,7 +169,13 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # (CreateIdentity, GetPublicId, GetDisplayName, GetOwnFingerprint)
 # + Onboarding helpers (DisplayNameSuggestions, ResetOnboarding).
 # 6 commands; +76 lines of dispatch arms.
-vauchi-platform/src/platform_app_engine.rs 3966
+# Bumped 2026-04-29 to 4253 by Phase B7 batch 11 — Contact
+# Verification + Duplicates + Notes + Field Notes + Nicknames +
+# Custom Avatars + Social Search + Hidden Contacts + Footer Action
+# Id (19 commands; +287 lines of dispatch arms; reuses pub(crate)
+# enrich_contact / enrich_contacts_batch helpers promoted in the
+# same MR).
+vauchi-platform/src/platform_app_engine.rs 4253
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

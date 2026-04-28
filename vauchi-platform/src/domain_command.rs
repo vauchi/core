@@ -32,9 +32,10 @@ use crate::types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileConsentRecord, MobileConsentStatus,
     MobileConsentType, MobileContact, MobileContactCard, MobileDecoyContact, MobileDeletionInfo,
     MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
-    MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDuressSettings, MobileFieldType,
-    MobileGdprExport, MobileRecoveryVerification, MobileRetryEntry, MobileShredStatus,
-    MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDuplicatePair, MobileDuressSettings,
+    MobileFieldNote, MobileFieldType, MobileGdprExport, MobileRecoveryVerification,
+    MobileRetryEntry, MobileShredStatus, MobileSocialNetwork, MobileVisibilityLabel,
+    MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -354,6 +355,58 @@ pub enum DomainCommand {
     DisplayNameSuggestions { full_name: String },
     /// Reset the onboarding progress to step 0.
     ResetOnboarding,
+    // ── Contact Verification + Duplicates + Notes + Misc (B7 batch 11) ──
+    /// Mark a contact's fingerprint as verified.
+    VerifyContact { id: String },
+    /// Mark a contact as trusted for simplified contact proposals
+    /// (local-only flag).
+    SetProposalTrusted { contact_id: String, trusted: bool },
+    /// Find duplicate-contact pairs.
+    FindDuplicates,
+    /// Dismiss a duplicate-contact pair so it stops being suggested.
+    DismissDuplicate { id1: String, id2: String },
+    /// Save a personal note for a contact (cleared by passing "").
+    SetContactNote { contact_id: String, note: String },
+    /// Read the personal note for a contact, if any.
+    GetContactNote { contact_id: String },
+    /// Delete the personal note for a contact.
+    DeleteContactNote { contact_id: String },
+    /// Save a private note on a specific field of a contact.
+    SetContactFieldNote {
+        contact_id: String,
+        field_id: String,
+        note: String,
+    },
+    /// Read all private field notes for a contact (sorted by
+    /// `field_id` for deterministic output).
+    GetContactFieldNotes { contact_id: String },
+    /// Delete the private note on a specific field of a contact.
+    DeleteContactFieldNote {
+        contact_id: String,
+        field_id: String,
+    },
+    /// Set a local nickname for a contact.
+    SetContactNickname { contact_id: String, name: String },
+    /// Clear the local nickname for a contact.
+    ClearContactNickname { contact_id: String },
+    /// Set a custom avatar for a contact (must be WebP, ≤ 32 KB).
+    SetContactCustomAvatar { contact_id: String, data: Vec<u8> },
+    /// Clear the custom avatar for a contact.
+    ClearContactCustomAvatar { contact_id: String },
+    /// Get the custom avatar for a contact, if set.
+    GetContactCustomAvatar { contact_id: String },
+    /// Search the social-network registry by query.
+    SearchSocialNetworks { query: String },
+    /// Format a profile URL for a given social network and username.
+    GetProfileUrl {
+        network_id: String,
+        username: String,
+    },
+    /// List hidden contacts (enriched).
+    ListHiddenContacts,
+    /// Returns the footer-button `ScreenAction` id that
+    /// `ContactDetailEngine` would emit for the given contact.
+    ContactDetailFooterActionId { contact_id: String },
 }
 
 /// Sum type of every legitimate return shape from
@@ -453,4 +506,13 @@ pub enum DomainCommandResult {
     DeviceDeliveries {
         records: Vec<MobileDeviceDeliveryRecord>,
     },
+    /// Optional `String` payload (B7 batch 11 — `GetContactNote`,
+    /// `GetProfileUrl`).
+    StringOpt { value: Option<String> },
+    /// Optional avatar bytes (B7 batch 11 — `GetContactCustomAvatar`).
+    AvatarOpt { data: Option<Vec<u8>> },
+    /// List of duplicate-contact pairs (B7 batch 11 — `FindDuplicates`).
+    DuplicatePairs { pairs: Vec<MobileDuplicatePair> },
+    /// List of field-notes (B7 batch 11 — `GetContactFieldNotes`).
+    FieldNotes { notes: Vec<MobileFieldNote> },
 }

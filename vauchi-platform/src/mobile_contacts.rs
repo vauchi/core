@@ -20,7 +20,7 @@ use super::types::{
 ///
 /// Promoted from a private associated function on `VauchiPlatform` to
 /// a `pub(crate)` free function so `PlatformAppEngine` dispatch arms
-/// (B7 batch 10) can reuse the same enrichment helper.
+/// (B7 batch 10/11) can reuse the same enrichment helper.
 pub(crate) fn enrich_contact(
     storage: &vauchi_core::Storage,
     contact: &vauchi_core::Contact,
@@ -47,8 +47,9 @@ pub(crate) fn enrich_contact(
 /// Issues four queries total (shared names, nicknames, preferences, avatar flags)
 /// regardless of the number of contacts, eliminating the N+1 pattern in list methods.
 ///
-/// `pub(crate)` so the `PlatformAppEngine` dispatch arms (B7 batch 10)
-/// reuse the helper.
+/// Promoted from a private associated function on `VauchiPlatform` to
+/// a `pub(crate)` free function so `PlatformAppEngine` dispatch arms
+/// (B7 batch 10/11) can reuse the same enrichment helper.
 pub(crate) fn enrich_contacts_batch(
     storage: &vauchi_core::Storage,
     contacts: &[vauchi_core::Contact],

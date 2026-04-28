@@ -13,6 +13,7 @@ mod deep_link_consent;
 mod delivery_status;
 mod exchange;
 mod form_dialog;
+mod group_detail;
 mod onboarding;
 mod recovery;
 mod sync_status;

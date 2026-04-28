@@ -404,9 +404,9 @@ impl AppEngine {
                 Box::new(GroupsEngine::new(group_infos, GroupsMode::Members))
             }
             AppScreen::GroupDetail { group_id } => {
-                let group_name = vauchi
-                    .get_group(group_id)
-                    .ok()
+                let group = vauchi.get_group(group_id).ok();
+                let group_name = group
+                    .as_ref()
                     .map(|g| g.name().to_string())
                     .unwrap_or_else(|| "Group".into());
                 let mut members: Vec<ContactItem> = vauchi
@@ -429,11 +429,29 @@ impl AppEngine {
                     })
                     .collect();
                 members.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-                Box::new(GroupDetailEngine::new(
-                    group_id.clone(),
-                    group_name,
-                    members,
-                ))
+
+                // Field visibility — own card fields with their per-group
+                // visible flag. Drives the LabelDetail field-toggle UI
+                // (Pair 2 of Pure Humble UI retirement).
+                let field_visibility: Vec<crate::ui::group_detail::GroupFieldVisibility> =
+                    match (vauchi.own_card().ok().flatten(), group.as_ref()) {
+                        (Some(card), Some(g)) => card
+                            .fields()
+                            .iter()
+                            .map(|f| crate::ui::group_detail::GroupFieldVisibility {
+                                field_id: f.id().to_string(),
+                                label: f.label().to_string(),
+                                value: f.value().to_string(),
+                                is_visible: g.is_field_visible(f.id()),
+                            })
+                            .collect(),
+                        _ => Vec::new(),
+                    };
+
+                Box::new(
+                    GroupDetailEngine::new(group_id.clone(), group_name, members)
+                        .with_field_visibility(field_visibility),
+                )
             }
             AppScreen::Privacy => {
                 let contact_count = vauchi.contact_count().unwrap_or(0);

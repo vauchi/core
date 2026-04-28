@@ -204,4 +204,15 @@ pub enum ActionResult {
         title: String,
         body: String,
     },
+    /// App layer should persist a per-field visibility change for a group
+    /// (a.k.a. visibility label). Emitted by `GroupDetailEngine` when the
+    /// user toggles a field in the visibility list. AppEngine routing
+    /// applies the change via
+    /// `vauchi.set_group_field_visibility_and_repropagate` and re-emits
+    /// the screen so any downstream count (Visible Fields) refreshes.
+    SetGroupFieldVisibility {
+        group_id: String,
+        field_id: String,
+        visible: bool,
+    },
 }

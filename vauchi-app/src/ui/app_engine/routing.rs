@@ -827,6 +827,22 @@ impl AppEngine {
             {
                 self.execute_backup()
             }
+            // Persist field-visibility toggles emitted by GroupDetailEngine
+            // (Pair 2 of Pure Humble UI retirement). Calls the
+            // repropagating variant so downstream contacts re-fetch the
+            // visible field set on the next sync. Engine cache is
+            // invalidated so the Visible Fields count refreshes.
+            ActionResult::SetGroupFieldVisibility {
+                group_id,
+                field_id,
+                visible,
+            } => {
+                let _ = self
+                    .vauchi
+                    .set_group_field_visibility_and_repropagate(&group_id, &field_id, visible);
+                self.engine_cache.remove(&self.screen);
+                ActionResult::UpdateScreen(self.engine.current_screen())
+            }
             other => other,
         }
     }

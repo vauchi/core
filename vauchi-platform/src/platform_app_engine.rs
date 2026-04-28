@@ -3578,6 +3578,70 @@ impl PlatformAppEngine {
                     },
                 })
             }
+
+            // ── Search + Display Prefs + Merge (B7 batch 14) ──
+            // SearchContacts arm already provided by batch 10 above.
+            DomainCommand::SetDisplayNamePreference {
+                contact_id,
+                pref_json,
+            } => {
+                let pref: vauchi_core::DisplayNamePreference = serde_json::from_str(&pref_json)
+                    .map_err(|e| MobileError::InvalidInput {
+                        field: "pref_json".into(),
+                        detail: format!("Invalid preference JSON: {e}"),
+                    })?;
+                engine
+                    .vauchi()
+                    .set_display_name_preference(&contact_id, pref)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: contact_id.clone(),
+                });
+                engine.invalidate_screen(&AppScreen::Contacts);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::SetAvatarPreference {
+                contact_id,
+                pref_json,
+            } => {
+                let pref: vauchi_core::AvatarPreference = serde_json::from_str(&pref_json)
+                    .map_err(|e| MobileError::InvalidInput {
+                        field: "pref_json".into(),
+                        detail: format!("Invalid preference JSON: {e}"),
+                    })?;
+                engine
+                    .vauchi()
+                    .set_avatar_preference(&contact_id, pref)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: contact_id.clone(),
+                });
+                engine.invalidate_screen(&AppScreen::Contacts);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::MergeContacts {
+                primary_id,
+                secondary_id,
+            } => {
+                let merged = engine
+                    .vauchi()
+                    .merge_contacts(&primary_id, &secondary_id)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                let storage = engine.vauchi().storage();
+                let contact = crate::mobile_contacts::enrich_contact(storage, &merged);
+                engine.invalidate_screen(&AppScreen::Contacts);
+                engine.invalidate_screen(&AppScreen::ContactDuplicates);
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: primary_id.clone(),
+                });
+                Ok(DomainCommandResult::ContactSingle { contact })
+            }
         }
     }
 

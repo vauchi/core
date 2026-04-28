@@ -2577,3 +2577,96 @@ fn add_decoy_contact_rejects_invalid_card_json() {
         "expected invalid-input error, got: {err:?}"
     );
 }
+
+// ── B7 batch 14: Search + display prefs + merge ────────────────────────
+
+// @internal
+#[test]
+fn search_contacts_returns_empty_for_fresh_identity() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::SearchContacts {
+            query: "nonexistent".into(),
+        })
+        .expect("search")
+    {
+        DomainCommandResult::Contacts { contacts } => {
+            assert!(contacts.is_empty(), "no contacts on fresh identity");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn set_display_name_preference_rejects_invalid_json() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::SetDisplayNamePreference {
+            contact_id: "any".into(),
+            pref_json: "not json".into(),
+        })
+        .expect_err("must reject invalid JSON");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("invalid") || msg.contains("expected"),
+        "expected invalid-input, got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn set_avatar_preference_rejects_invalid_json() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::SetAvatarPreference {
+            contact_id: "any".into(),
+            pref_json: "not json".into(),
+        })
+        .expect_err("must reject invalid JSON");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("invalid") || msg.contains("expected"),
+        "expected invalid-input, got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn set_display_name_preference_errors_for_unknown_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::SetDisplayNamePreference {
+            contact_id: "ghost".into(),
+            pref_json: r#""primary""#.into(),
+        })
+        .expect_err("must error on missing contact");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("not found") || msg.contains("contact"),
+        "expected contact-not-found error, got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn merge_contacts_errors_for_unknown_ids() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::MergeContacts {
+            primary_id: "ghost1".into(),
+            secondary_id: "ghost2".into(),
+        })
+        .expect_err("must error on missing contacts");
+    // exact message varies; just confirm it didn't silently succeed.
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        !msg.is_empty(),
+        "error message must be non-empty, got: {err:?}"
+    );
+}

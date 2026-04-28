@@ -436,6 +436,30 @@ pub enum DomainCommand {
     // IsOfflineQueueFull, GetOfflineQueueCapacity were already added by
     // batch 8. AddDecoyContact, ListDecoyContacts, DeleteDecoyContact
     // were added by batch 7. No new variants in batch 13.
+
+    // ── Search + Display Prefs + Merge (B7 batch 14) ──
+    // SearchContacts already declared by batch 10.
+    /// Set the display-name preference for a contact. `pref_json`
+    /// is a JSON-serialized `vauchi_core::DisplayNamePreference`
+    /// (`"primary"`, `{"shared_name":{"name":"Alice"}}`, `"custom"`).
+    SetDisplayNamePreference {
+        contact_id: String,
+        pref_json: String,
+    },
+    /// Set the avatar preference for a contact. `pref_json` is a
+    /// JSON-serialized `vauchi_core::AvatarPreference`.
+    SetAvatarPreference {
+        contact_id: String,
+        pref_json: String,
+    },
+    /// Merge `secondary_id` into `primary_id`. The secondary
+    /// contact's unique fields are merged into the primary; the
+    /// secondary is removed from storage. Returns the enriched
+    /// merged contact.
+    MergeContacts {
+        primary_id: String,
+        secondary_id: String,
+    },
 }
 
 /// Sum type of every legitimate return shape from
@@ -546,4 +570,6 @@ pub enum DomainCommandResult {
     FieldNotes { notes: Vec<MobileFieldNote> },
     /// vCard import outcome (B7 batch 12 — `ImportContactsFromVcf`).
     ImportResult { result: MobileImportResult },
+    /// Single enriched contact (B7 batch 14 — `MergeContacts`).
+    ContactSingle { contact: MobileContact },
 }

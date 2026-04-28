@@ -184,7 +184,18 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # decoy CRUD + counts (note: variants are duplicates of batch 7/8 —
 # kept here only for the test additions; dispatch arms removed in
 # combine merge).
-vauchi-platform/src/platform_app_engine.rs 4347
+# Bumped 2026-04-29 to 4410 by Phase B7 batch 14 — Search + display
+# prefs + merge (4 commands: SetDisplayNamePreference,
+# SetAvatarPreference, MergeContacts; SearchContacts variant
+# de-duplicated against batch 10).
+vauchi-platform/src/platform_app_engine.rs 4410
+
+# EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
+# tests that share the create_engine_with_identity / drive_onboarding
+# helpers; splitting per-batch would force duplicating those helpers
+# across files and complicates the read-after-write smoke pattern.
+# Will be split into per-domain test files only after B7 phase completes.
+vauchi-platform/tests/it/platform_app_engine_domain_command_tests.rs 2672
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

@@ -307,3 +307,251 @@ fn reload_social_networks_returns_default_registry() {
         other => panic!("unexpected result: {other:?}"),
     }
 }
+
+// ── Visibility Labels + Field Visibility (B7 batch 6) ──────────────
+
+// @internal
+#[test]
+fn list_labels_is_empty_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListLabels)
+        .expect("list_labels")
+    {
+        DomainCommandResult::Labels { labels } => {
+            assert!(labels.is_empty(), "no labels created yet");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn create_label_returns_label_with_name() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::CreateLabel {
+            name: "Family".into(),
+        })
+        .expect("create")
+    {
+        DomainCommandResult::Label { label } => {
+            assert_eq!(label.name, "Family");
+            assert_eq!(label.contact_count, 0);
+            assert!(!label.id.is_empty(), "id must be populated");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn list_labels_includes_created_label() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::CreateLabel {
+            name: "Friends".into(),
+        })
+        .expect("create");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListLabels)
+        .expect("list")
+    {
+        DomainCommandResult::Labels { labels } => {
+            assert_eq!(labels.len(), 1);
+            assert_eq!(labels[0].name, "Friends");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn rename_label_persists_new_name() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let label = match engine
+        .dispatch_domain_command(DomainCommand::CreateLabel { name: "Old".into() })
+        .expect("create")
+    {
+        DomainCommandResult::Label { label } => label,
+        other => panic!("unexpected result: {other:?}"),
+    };
+
+    engine
+        .dispatch_domain_command(DomainCommand::RenameLabel {
+            label_id: label.id.clone(),
+            new_name: "New".into(),
+        })
+        .expect("rename");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetLabel { label_id: label.id })
+        .expect("get")
+    {
+        DomainCommandResult::LabelDetail { detail } => {
+            assert_eq!(detail.name, "New", "rename must persist");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn delete_label_removes_from_list() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let label = match engine
+        .dispatch_domain_command(DomainCommand::CreateLabel {
+            name: "Temp".into(),
+        })
+        .expect("create")
+    {
+        DomainCommandResult::Label { label } => label,
+        other => panic!("unexpected result: {other:?}"),
+    };
+
+    engine
+        .dispatch_domain_command(DomainCommand::DeleteLabel { label_id: label.id })
+        .expect("delete");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListLabels)
+        .expect("list")
+    {
+        DomainCommandResult::Labels { labels } => {
+            assert!(labels.is_empty(), "label must be gone");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn add_contact_to_group_errors_on_unknown_label() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let result = engine.dispatch_domain_command(DomainCommand::AddContactToGroup {
+        label_id: "nonexistent".into(),
+        contact_id: "contact-x".into(),
+    });
+    assert!(result.is_err(), "unknown label must error");
+}
+
+// @internal
+#[test]
+fn get_groups_for_contact_is_empty_for_unknown_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetGroupsForContact {
+            contact_id: "nonexistent".into(),
+        })
+        .expect("query")
+    {
+        DomainCommandResult::Labels { labels } => {
+            assert!(labels.is_empty(), "no groups for unknown contact");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn set_group_field_visibility_errors_on_unknown_field() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let label = match engine
+        .dispatch_domain_command(DomainCommand::CreateLabel {
+            name: "Inner".into(),
+        })
+        .expect("create")
+    {
+        DomainCommandResult::Label { label } => label,
+        other => panic!("unexpected result: {other:?}"),
+    };
+
+    let result = engine.dispatch_domain_command(DomainCommand::SetGroupFieldVisibility {
+        label_id: label.id,
+        field_label: "DoesNotExist".into(),
+        is_visible: false,
+    });
+    assert!(result.is_err(), "unknown field label must error");
+}
+
+// @internal
+#[test]
+fn hide_field_from_contact_errors_on_unknown_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let result = engine.dispatch_domain_command(DomainCommand::HideFieldFromContact {
+        contact_id: "nonexistent".into(),
+        field_label: "Phone".into(),
+    });
+    assert!(result.is_err(), "unknown contact must error");
+}
+
+// @internal
+#[test]
+fn show_field_to_contact_errors_on_unknown_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let result = engine.dispatch_domain_command(DomainCommand::ShowFieldToContact {
+        contact_id: "nonexistent".into(),
+        field_label: "Phone".into(),
+    });
+    assert!(result.is_err(), "unknown contact must error");
+}
+
+// @internal
+#[test]
+fn is_field_visible_to_contact_errors_on_unknown_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let result = engine.dispatch_domain_command(DomainCommand::IsFieldVisibleToContact {
+        contact_id: "nonexistent".into(),
+        field_label: "Phone".into(),
+    });
+    assert!(result.is_err(), "unknown contact must error");
+}
+
+// @internal
+#[test]
+fn get_suggested_labels_returns_non_empty_list() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetSuggestedLabels)
+        .expect("suggested")
+    {
+        DomainCommandResult::Strings { values } => {
+            assert!(!values.is_empty(), "core ships >=1 suggested label");
+            for v in &values {
+                assert!(!v.is_empty(), "suggestion must be non-empty");
+            }
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn create_label_invalidates_groups_screen() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::CreateLabel {
+            name: "Cached".into(),
+        })
+        .expect("create");
+
+    engine.invalidate_all().expect("invalidate_all");
+    let json = engine
+        .current_screen_json()
+        .expect("current_screen_json after create");
+    assert!(!json.is_empty());
+}

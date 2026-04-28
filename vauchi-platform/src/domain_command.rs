@@ -30,6 +30,7 @@
 use crate::content::{MobileApplyResult, MobileUpdateStatus};
 use crate::types::{
     MobileConsentRecord, MobileConsentStatus, MobileConsentType, MobileSocialNetwork,
+    MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -66,6 +67,65 @@ pub enum DomainCommand {
     /// Reload the social-networks list from the content cache after
     /// `ApplyContentUpdates` succeeds.
     ReloadSocialNetworks,
+
+    // ── Visibility Labels + Field Visibility (B7 batch 6) ──
+    /// List every visibility label.
+    ListLabels,
+    /// Create a new label by name.
+    CreateLabel { name: String },
+    /// Read a label by id, including resolved contact rows.
+    GetLabel { label_id: String },
+    /// Rename a label.
+    RenameLabel { label_id: String, new_name: String },
+    /// Delete a label.
+    DeleteLabel { label_id: String },
+    /// Add a contact to a label.
+    AddContactToGroup {
+        label_id: String,
+        contact_id: String,
+    },
+    /// Remove a contact from a label.
+    RemoveContactFromGroup {
+        label_id: String,
+        contact_id: String,
+    },
+    /// List labels that contain a contact.
+    GetGroupsForContact { contact_id: String },
+    /// Set whether a card field is visible to contacts in a label.
+    SetGroupFieldVisibility {
+        label_id: String,
+        field_label: String,
+        is_visible: bool,
+    },
+    /// Set a per-contact override for field visibility.
+    SetContactFieldOverride {
+        contact_id: String,
+        field_label: String,
+        is_visible: bool,
+    },
+    /// Remove a per-contact field-visibility override.
+    RemoveContactFieldOverride {
+        contact_id: String,
+        field_label: String,
+    },
+    /// Hide a field from a specific contact (sets the visibility rule
+    /// on the contact's `visibility_rules`).
+    HideFieldFromContact {
+        contact_id: String,
+        field_label: String,
+    },
+    /// Show a field to a specific contact.
+    ShowFieldToContact {
+        contact_id: String,
+        field_label: String,
+    },
+    /// Read whether a field is visible to a specific contact.
+    IsFieldVisibleToContact {
+        contact_id: String,
+        field_label: String,
+    },
+    /// Suggested default labels (from `vauchi_core::SUGGESTED_LABELS`).
+    GetSuggestedLabels,
 }
 
 /// Sum type of every legitimate return shape from
@@ -93,4 +153,14 @@ pub enum DomainCommandResult {
     ApplyResult { result: MobileApplyResult },
     /// List of `MobileSocialNetwork` (B7 batch 2 — `ReloadSocialNetworks`).
     SocialNetworks { networks: Vec<MobileSocialNetwork> },
+    /// List of visibility labels (B7 batch 6 — `ListLabels`,
+    /// `GetGroupsForContact`).
+    Labels { labels: Vec<MobileVisibilityLabel> },
+    /// Single visibility label (B7 batch 6 — `CreateLabel`).
+    Label { label: MobileVisibilityLabel },
+    /// Visibility label with resolved contact rows (B7 batch 6 —
+    /// `GetLabel`).
+    LabelDetail { detail: MobileVisibilityLabelDetail },
+    /// List of `String` payload (B7 batch 6 — `GetSuggestedLabels`).
+    Strings { values: Vec<String> },
 }

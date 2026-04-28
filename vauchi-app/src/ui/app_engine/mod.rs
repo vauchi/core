@@ -107,6 +107,14 @@ pub enum AppScreen {
     DeepLinkConsent {
         payload: vauchi_core::exchange::link_mode::DeepLinkPayload,
     },
+    /// Multi-stage face-to-face exchange (Pair 4 of pure-humble-ui-retire-native-screens).
+    ///
+    /// Renders the simultaneous bilateral QR + camera flow that
+    /// `MobileMultiStageSession` drives via cycle-thread callbacks. The
+    /// screen state mirrors `vauchi_core::exchange::ProtocolState`; the
+    /// AppEngine bridge converts session listener callbacks into engine
+    /// state mutations (see `multi_stage_exchange.rs` for the contract).
+    MultiStageExchange,
 }
 
 impl AppScreen {
@@ -154,6 +162,7 @@ impl AppScreen {
             Self::AvatarEditor => "avatar_editor",
             Self::RecoveryClaimReview => "recovery_claim_review",
             Self::DeepLinkConsent { .. } => "deep_link_consent",
+            Self::MultiStageExchange => "multi_stage_exchange",
         }
     }
 
@@ -191,6 +200,7 @@ impl AppScreen {
             "device_replacement" => Self::DeviceReplacement,
             "avatar_editor" => Self::AvatarEditor,
             "recovery_claim_review" => Self::RecoveryClaimReview,
+            "multi_stage_exchange" => Self::MultiStageExchange,
             _ => return None,
         })
     }

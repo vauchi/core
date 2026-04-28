@@ -127,7 +127,11 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 #  existing QrScanned hardware-event auto-route — feeds the
 #  cycle-thread session when the QR-scanner Component fires from
 #  the multi-stage screen 2026-04-28)
-vauchi-platform/src/platform_app_engine.rs 2102
+# Bumped 2026-04-29 to 2200 by Phase B7 batch 4 — Recovery leftovers
+# (3 commands: VerifyRecoveryProof, UploadGuardianEntries,
+# SaveRecoveryResponse). Completes the recovery domain (B2 covered
+# the 9 main typed methods).
+vauchi-platform/src/platform_app_engine.rs 2200
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

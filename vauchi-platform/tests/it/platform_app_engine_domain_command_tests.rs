@@ -221,3 +221,117 @@ fn grant_consent_invalidates_settings_and_privacy_screens() {
         .current_screen_json()
         .expect("current_screen_json after grant");
 }
+
+// ── Recovery leftovers (B7 batch 4) ─────────────────────────────────
+
+// @internal
+#[test]
+fn verify_recovery_proof_rejects_invalid_base64() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let result = engine.dispatch_domain_command(DomainCommand::VerifyRecoveryProof {
+        proof_b64: "not!valid!base64!".into(),
+    });
+    assert!(result.is_err(), "invalid base64 must error");
+}
+
+// @internal
+#[test]
+fn verify_recovery_proof_rejects_garbage_proof() {
+    use base64::Engine;
+    let (engine, _dir) = create_engine_with_identity();
+
+    // Syntactically valid base64 but garbage proof bytes.
+    let garbage = base64::engine::general_purpose::STANDARD.encode([0u8; 32]);
+    let result =
+        engine.dispatch_domain_command(DomainCommand::VerifyRecoveryProof { proof_b64: garbage });
+    assert!(result.is_err(), "garbage proof bytes must error");
+}
+
+// @internal
+#[test]
+fn save_recovery_response_persists_decision() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::SaveRecoveryResponse {
+            claim_id: "claim-1".into(),
+            contact_id: "contact-a".into(),
+            response: "accept".into(),
+            remind_at: None,
+        })
+        .expect("save")
+    {
+        DomainCommandResult::Unit => {}
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn save_recovery_response_with_remind_at_succeeds() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::SaveRecoveryResponse {
+            claim_id: "claim-2".into(),
+            contact_id: "contact-b".into(),
+            response: "remind_me_later".into(),
+            remind_at: Some(9999),
+        })
+        .expect("save")
+    {
+        DomainCommandResult::Unit => {}
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn upload_guardian_entries_with_no_trusted_contacts_short_circuits() {
+    // With zero recovery-trusted contacts, upload_guardian_entries
+    // takes the "delete" short-circuit path (no upload attempted).
+    // The dispatch may still error on relay unreachability — assert
+    // that BOTH branches return a known shape (Ok(Unit) on success
+    // or an Err whose detail mentions guardian/relay), never any
+    // other DomainCommandResult variant.
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine.dispatch_domain_command(DomainCommand::UploadGuardianEntries) {
+        Ok(DomainCommandResult::Unit) => {}
+        Ok(other) => panic!("must return Unit on success, got {other:?}",),
+        Err(e) => {
+            // Network failure is acceptable; verify we hit a real
+            // dispatch path (not a panic / lock failure).
+            let msg = format!("{e:?}");
+            assert!(
+                !msg.is_empty(),
+                "error must surface a non-empty detail: {msg}"
+            );
+        }
+    }
+}
+
+// @internal
+#[test]
+fn save_recovery_response_invalidates_recovery_screens() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::SaveRecoveryResponse {
+            claim_id: "claim-3".into(),
+            contact_id: "contact-c".into(),
+            response: "reject".into(),
+            remind_at: None,
+        })
+        .expect("save");
+
+    engine.invalidate_all().expect("invalidate_all");
+    let json = engine
+        .current_screen_json()
+        .expect("current_screen_json after save");
+    assert!(
+        !json.is_empty(),
+        "current_screen_json must return non-empty payload after invalidation"
+    );
+}

@@ -1530,6 +1530,104 @@ impl PlatformAppEngine {
                         .collect(),
                 })
             }
+
+            // ── Recovery leftovers (B7 batch 4) ──
+            DomainCommand::VerifyRecoveryProof { proof_b64 } => {
+                use base64::Engine as _;
+                use vauchi_core::recovery::RecoveryProof;
+
+                let storage = engine.vauchi().storage();
+
+                let proof_bytes = base64::engine::general_purpose::STANDARD
+                    .decode(&proof_b64)
+                    .map_err(|e| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: format!("Invalid base64: {e}"),
+                    })?;
+                let proof = RecoveryProof::from_bytes(&proof_bytes).map_err(|e| {
+                    MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: format!("Invalid proof: {e}"),
+                    }
+                })?;
+                proof.validate().map_err(|e| MobileError::InvalidInput {
+                    field: String::new(),
+                    detail: format!("Proof validation failed: {e}"),
+                })?;
+
+                let contacts = storage
+                    .list_contacts()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                let contact_pks: std::collections::HashSet<[u8; 32]> = contacts
+                    .iter()
+                    .filter_map(|c| c.public_key().copied())
+                    .collect();
+                let known_voucher_count = proof
+                    .vouchers()
+                    .iter()
+                    .filter(|v| contact_pks.contains(v.voucher_pk()))
+                    .count();
+
+                let (confidence, recommendation) = if known_voucher_count >= 2 {
+                    (
+                        "high".to_string(),
+                        "Multiple contacts you know have vouched. Safe to accept.".to_string(),
+                    )
+                } else if known_voucher_count == 1 {
+                    (
+                        "medium".to_string(),
+                        "One contact you know has vouched. Consider verifying in person."
+                            .to_string(),
+                    )
+                } else {
+                    (
+                        "low".to_string(),
+                        "No known contacts have vouched. Verify identity carefully before accepting."
+                            .to_string(),
+                    )
+                };
+
+                Ok(DomainCommandResult::RecoveryVerification {
+                    verification: crate::types::MobileRecoveryVerification {
+                        old_public_key: hex::encode(proof.old_pk()),
+                        new_public_key: hex::encode(proof.new_pk()),
+                        voucher_count: proof.voucher_count() as u32,
+                        known_vouchers: known_voucher_count as u32,
+                        confidence,
+                        recommendation,
+                    },
+                })
+            }
+            DomainCommand::UploadGuardianEntries => {
+                engine
+                    .vauchi()
+                    .upload_guardian_entries()
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                // Guardian entries don't directly drive any visible
+                // screen — they're a network-side artefact. No cache
+                // invalidation needed.
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::SaveRecoveryResponse {
+                claim_id,
+                contact_id,
+                response,
+                remind_at,
+            } => {
+                engine
+                    .vauchi()
+                    .save_recovery_response_action(&claim_id, &contact_id, &response, remind_at)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Recovery);
+                engine.invalidate_screen(&AppScreen::RecoveryHelp);
+                Ok(DomainCommandResult::Unit)
+            }
         }
     }
 

@@ -27,7 +27,9 @@
 //! with new variants without breaking existing call sites — UniFFI
 //! treats added enum cases as additive on the binding side.
 
-use crate::types::{MobileConsentRecord, MobileConsentStatus, MobileConsentType};
+use crate::types::{
+    MobileConsentRecord, MobileConsentStatus, MobileConsentType, MobileRecoveryVerification,
+};
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
 /// don't justify their own `#[uniffi::export]` method.
@@ -49,6 +51,27 @@ pub enum DomainCommand {
     GetConsentStatus { consent_type: MobileConsentType },
     /// All persisted consent records.
     GetConsentRecords,
+
+    // ── Recovery leftovers (B7 batch 4 — completes the recovery
+    // domain; B2 covered the main 9 typed methods, this batch covers
+    // the 3 long-tail methods that don't justify their own
+    // PlatformAppEngine surface). ──
+    /// Verify a recovery proof from a contact and produce a confidence
+    /// recommendation (high / medium / low) based on known vouchers.
+    VerifyRecoveryProof { proof_b64: String },
+    /// Upload encrypted guardian entries (one per recovery-trusted
+    /// contact) to the relay. Called after `trust_contact_for_recovery`
+    /// or `untrust_contact_for_recovery` toggles the trust set.
+    UploadGuardianEntries,
+    /// Persist a user's recovery response (accept / reject /
+    /// remind_me_later). Used by the `RecoveryClaimReviewEngine` to
+    /// store the decision when the user reviews an incoming claim.
+    SaveRecoveryResponse {
+        claim_id: String,
+        contact_id: String,
+        response: String,
+        remind_at: Option<u64>,
+    },
 }
 
 /// Sum type of every legitimate return shape from
@@ -70,4 +93,9 @@ pub enum DomainCommandResult {
     ConsentStatus { status: MobileConsentStatus },
     /// List of `MobileConsentRecord` (B7 batch 1).
     ConsentRecords { records: Vec<MobileConsentRecord> },
+    /// Recovery-proof verification result (B7 batch 4 —
+    /// `VerifyRecoveryProof`).
+    RecoveryVerification {
+        verification: MobileRecoveryVerification,
+    },
 }

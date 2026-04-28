@@ -11,7 +11,9 @@
 
 use std::sync::Arc;
 
-use vauchi_platform::{DomainCommand, DomainCommandResult, MobileConsentType, PlatformAppEngine};
+use vauchi_platform::{
+    DomainCommand, DomainCommandResult, MobileAhaMomentType, MobileConsentType, PlatformAppEngine,
+};
 
 fn create_engine_with_identity() -> (Arc<PlatformAppEngine>, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -303,6 +305,229 @@ fn reload_social_networks_returns_default_registry() {
                 assert!(!n.id.is_empty(), "network id must be non-empty");
                 assert!(!n.url_template.is_empty(), "url template must be non-empty");
             }
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// ── Aha Moments (B7 batch 5) ────────────────────────────────────────
+
+// @internal
+#[test]
+fn has_seen_aha_moment_returns_false_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::HasSeenAhaMoment {
+            moment_type: MobileAhaMomentType::CardCreationComplete,
+        })
+        .expect("has_seen")
+    {
+        DomainCommandResult::Bool { value } => assert!(!value, "no moments seen yet"),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn try_trigger_aha_moment_returns_payload_on_first_call_only() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::TryTriggerAhaMoment {
+            moment_type: MobileAhaMomentType::FirstEdit,
+        })
+        .expect("first trigger")
+    {
+        DomainCommandResult::AhaMomentOpt { moment } => {
+            let m = moment.expect("first trigger must return Some");
+            assert!(!m.title.is_empty(), "title must be present");
+            assert!(!m.message.is_empty(), "message must be present");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+
+    match engine
+        .dispatch_domain_command(DomainCommand::TryTriggerAhaMoment {
+            moment_type: MobileAhaMomentType::FirstEdit,
+        })
+        .expect("second trigger")
+    {
+        DomainCommandResult::AhaMomentOpt { moment } => {
+            assert!(moment.is_none(), "second trigger must return None");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn aha_moments_seen_count_increments_after_trigger() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::AhaMomentsSeenCount)
+        .expect("initial")
+    {
+        DomainCommandResult::Count { value } => assert_eq!(value, 0),
+        other => panic!("unexpected result: {other:?}"),
+    }
+
+    engine
+        .dispatch_domain_command(DomainCommand::TryTriggerAhaMoment {
+            moment_type: MobileAhaMomentType::CardCreationComplete,
+        })
+        .expect("trigger");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::AhaMomentsSeenCount)
+        .expect("after-trigger")
+    {
+        DomainCommandResult::Count { value } => {
+            assert_eq!(value, 1, "must increment after trigger")
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn aha_moments_total_count_is_positive() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::AhaMomentsTotalCount)
+        .expect("total")
+    {
+        DomainCommandResult::Count { value } => {
+            assert!(value > 0, "core defines >= 1 aha moment");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn reset_aha_moments_clears_seen_count() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::TryTriggerAhaMoment {
+            moment_type: MobileAhaMomentType::FirstEdit,
+        })
+        .expect("trigger");
+    engine
+        .dispatch_domain_command(DomainCommand::ResetAhaMoments)
+        .expect("reset");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::AhaMomentsSeenCount)
+        .expect("after-reset")
+    {
+        DomainCommandResult::Count { value } => assert_eq!(value, 0, "reset clears seen count"),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// ── Demo Contact (B7 batch 5) ───────────────────────────────────────
+
+// @internal
+#[test]
+fn init_demo_contact_if_needed_returns_some_for_fresh_identity() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::InitDemoContactIfNeeded)
+        .expect("init")
+    {
+        DomainCommandResult::DemoContactOpt { contact } => {
+            let c = contact.expect("fresh identity gets a demo contact");
+            assert!(c.is_demo, "demo flag must be set");
+            assert!(!c.id.is_empty(), "id must be populated");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_demo_contact_state_initially_inactive() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetDemoContactState)
+        .expect("state")
+    {
+        DomainCommandResult::DemoContactState { state } => {
+            assert!(!state.is_active, "no init yet → inactive");
+            assert!(!state.was_dismissed);
+            assert!(!state.auto_removed);
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn dismiss_demo_contact_persists_dismissal() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::InitDemoContactIfNeeded)
+        .expect("init");
+    engine
+        .dispatch_domain_command(DomainCommand::DismissDemoContact)
+        .expect("dismiss");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetDemoContactState)
+        .expect("state")
+    {
+        DomainCommandResult::DemoContactState { state } => {
+            assert!(state.was_dismissed, "dismissal must persist");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn auto_remove_demo_contact_returns_false_when_inactive() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::AutoRemoveDemoContact)
+        .expect("auto_remove")
+    {
+        DomainCommandResult::Bool { value } => {
+            assert!(!value, "no active demo → no removal");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn restore_demo_contact_clears_dismissal() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::InitDemoContactIfNeeded)
+        .expect("init");
+    engine
+        .dispatch_domain_command(DomainCommand::DismissDemoContact)
+        .expect("dismiss");
+
+    let _ = engine
+        .dispatch_domain_command(DomainCommand::RestoreDemoContact)
+        .expect("restore");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetDemoContactState)
+        .expect("state")
+    {
+        DomainCommandResult::DemoContactState { state } => {
+            assert!(!state.was_dismissed, "restore clears dismissal");
         }
         other => panic!("unexpected result: {other:?}"),
     }

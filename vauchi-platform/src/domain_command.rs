@@ -29,7 +29,8 @@
 
 use crate::content::{MobileApplyResult, MobileUpdateStatus};
 use crate::types::{
-    MobileConsentRecord, MobileConsentStatus, MobileConsentType, MobileSocialNetwork,
+    MobileAhaMoment, MobileAhaMomentType, MobileConsentRecord, MobileConsentStatus,
+    MobileConsentType, MobileDemoContact, MobileDemoContactState, MobileSocialNetwork,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -66,6 +67,45 @@ pub enum DomainCommand {
     /// Reload the social-networks list from the content cache after
     /// `ApplyContentUpdates` succeeds.
     ReloadSocialNetworks,
+
+    // ── Aha Moments (B7 batch 5) ──
+    /// Read whether the user has already seen a given milestone.
+    HasSeenAhaMoment { moment_type: MobileAhaMomentType },
+    /// Try to trigger a milestone if not yet seen. Returns the moment
+    /// payload (title / message / animation flag) on first trigger,
+    /// `None` once seen.
+    TryTriggerAhaMoment { moment_type: MobileAhaMomentType },
+    /// Like `TryTriggerAhaMoment` but with a context string (e.g. a
+    /// contact name) substituted into the message template.
+    TryTriggerAhaMomentWithContext {
+        moment_type: MobileAhaMomentType,
+        context: String,
+    },
+    /// Count of milestones already seen by the user.
+    AhaMomentsSeenCount,
+    /// Total count of milestones defined in core.
+    AhaMomentsTotalCount,
+    /// Reset every milestone to "unseen" (debug / settings affordance).
+    ResetAhaMoments,
+
+    // ── Demo Contact (B7 batch 5) ──
+    /// Initialize the demo contact if the user has zero real contacts
+    /// and never dismissed/auto-removed the demo. Idempotent.
+    InitDemoContactIfNeeded,
+    /// Read the current active demo contact, if any.
+    GetDemoContact,
+    /// Read the demo-contact tracker state.
+    GetDemoContactState,
+    /// Read whether a demo update is due.
+    IsDemoUpdateAvailable,
+    /// Advance the demo contact to the next tip and persist the state.
+    TriggerDemoUpdate,
+    /// Mark the demo contact as user-dismissed.
+    DismissDemoContact,
+    /// Mark the demo contact as auto-removed (after first real exchange).
+    AutoRemoveDemoContact,
+    /// Restore a previously-dismissed demo contact.
+    RestoreDemoContact,
 }
 
 /// Sum type of every legitimate return shape from
@@ -93,4 +133,17 @@ pub enum DomainCommandResult {
     ApplyResult { result: MobileApplyResult },
     /// List of `MobileSocialNetwork` (B7 batch 2 — `ReloadSocialNetworks`).
     SocialNetworks { networks: Vec<MobileSocialNetwork> },
+    /// Numeric `u32` result (B7 batch 5 — `AhaMomentsSeenCount`,
+    /// `AhaMomentsTotalCount`).
+    Count { value: u32 },
+    /// Optional aha-moment payload (B7 batch 5 —
+    /// `TryTriggerAhaMoment` and friends).
+    AhaMomentOpt { moment: Option<MobileAhaMoment> },
+    /// Optional demo-contact payload (B7 batch 5 —
+    /// `InitDemoContactIfNeeded`, `GetDemoContact`,
+    /// `TriggerDemoUpdate`, `RestoreDemoContact`).
+    DemoContactOpt { contact: Option<MobileDemoContact> },
+    /// Demo-contact tracker state snapshot (B7 batch 5 —
+    /// `GetDemoContactState`).
+    DemoContactState { state: MobileDemoContactState },
 }

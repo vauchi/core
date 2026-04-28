@@ -21,6 +21,9 @@ impl VauchiPlatform {
     /// The old_pk_hex is the hex-encoded public key of the lost identity.
     /// This starts the recovery process by creating a claim that contacts
     /// can vouch for.
+    #[deprecated(note = "Use PlatformAppEngine::create_recovery_claim instead. \
+                VauchiPlatform recovery surface will be removed in 0.40.0 \
+                (collapse-vauchi-platform-into-app-engine D3).")]
     pub fn create_recovery_claim(
         &self,
         old_pk_hex: String,
@@ -70,6 +73,8 @@ impl VauchiPlatform {
     /// Parse a recovery claim from base64.
     ///
     /// Used to inspect a claim before vouching for it.
+    #[deprecated(note = "Use PlatformAppEngine::parse_recovery_claim instead. \
+                VauchiPlatform recovery surface will be removed in 0.40.0.")]
     pub fn parse_recovery_claim(
         &self,
         claim_b64: String,
@@ -100,6 +105,8 @@ impl VauchiPlatform {
     ///
     /// This vouches that you trust the person claiming to own the old identity
     /// is the same person as the new identity.
+    #[deprecated(note = "Use PlatformAppEngine::create_recovery_voucher instead. \
+                VauchiPlatform recovery surface will be removed in 0.40.0.")]
     pub fn create_recovery_voucher(
         &self,
         claim_b64: String,
@@ -143,6 +150,8 @@ impl VauchiPlatform {
     /// Add a voucher to the current recovery claim.
     ///
     /// Returns the updated progress.
+    #[deprecated(note = "Use PlatformAppEngine::add_recovery_voucher instead. \
+                VauchiPlatform recovery surface will be removed in 0.40.0.")]
     pub fn add_recovery_voucher(
         &self,
         voucher_b64: String,
@@ -235,6 +244,8 @@ impl VauchiPlatform {
     /// Get the current recovery progress.
     ///
     /// Returns None if no recovery is in progress.
+    #[deprecated(note = "Use PlatformAppEngine::get_recovery_status instead. \
+                VauchiPlatform recovery surface will be removed in 0.40.0.")]
     pub fn get_recovery_status(&self) -> Result<Option<MobileRecoveryProgress>, MobileError> {
         let proof_path = self.recovery_proof_path();
 
@@ -266,6 +277,8 @@ impl VauchiPlatform {
     /// Get the completed recovery proof as base64.
     ///
     /// Returns None if recovery is not complete.
+    #[deprecated(note = "Use PlatformAppEngine::get_recovery_proof instead. \
+                VauchiPlatform recovery surface will be removed in 0.40.0.")]
     pub fn get_recovery_proof(&self) -> Result<Option<String>, MobileError> {
         use base64::Engine;
         let proof_path = self.recovery_proof_path();

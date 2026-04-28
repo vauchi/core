@@ -129,6 +129,11 @@ impl VauchiPlatform {
     ///
     /// Sets which contacts receive emergency alerts, the alert message,
     /// and whether to include device location.
+    #[deprecated(
+        note = "Use PlatformAppEngine::configure_emergency_broadcast instead. \
+                VauchiPlatform emergency-broadcast surface will be removed in 0.40.0 \
+                (collapse-vauchi-platform-into-app-engine D3)."
+    )]
     pub fn configure_emergency_broadcast(
         &self,
         contact_ids: Vec<String>,
@@ -149,6 +154,8 @@ impl VauchiPlatform {
     /// Sends an emergency broadcast to all trusted contacts.
     ///
     /// Returns the number of alerts sent and total configured.
+    #[deprecated(note = "Use PlatformAppEngine::send_emergency_broadcast instead. \
+                VauchiPlatform emergency-broadcast surface will be removed in 0.40.0.")]
     pub fn send_emergency_broadcast(&self) -> Result<MobileBroadcastResult, MobileError> {
         let mut vauchi = self.open_vauchi()?;
         let identity = self.get_identity()?;
@@ -167,6 +174,8 @@ impl VauchiPlatform {
     /// Gets the current emergency broadcast configuration.
     ///
     /// Returns `None` if no configuration has been set.
+    #[deprecated(note = "Use PlatformAppEngine::get_emergency_config instead. \
+                VauchiPlatform emergency-broadcast surface will be removed in 0.40.0.")]
     pub fn get_emergency_config(&self) -> Result<Option<MobileEmergencyConfig>, MobileError> {
         let vauchi = self.open_vauchi()?;
         let config = vauchi.load_emergency_config()?;
@@ -178,6 +187,8 @@ impl VauchiPlatform {
     }
 
     /// Disables the emergency broadcast by deleting the configuration.
+    #[deprecated(note = "Use PlatformAppEngine::disable_emergency_broadcast instead. \
+                VauchiPlatform emergency-broadcast surface will be removed in 0.40.0.")]
     pub fn disable_emergency_broadcast(&self) -> Result<(), MobileError> {
         let mut vauchi = self.open_vauchi()?;
         vauchi.delete_emergency_config()?;

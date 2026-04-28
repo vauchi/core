@@ -27,6 +27,8 @@ impl VauchiPlatform {
     ///
     /// Returns information about all devices linked to this identity.
     /// The first device (index 0) is the primary device.
+    #[deprecated(note = "Use PlatformAppEngine::get_devices instead. \
+                VauchiPlatform device-linking surface will be removed in 0.40.0.")]
     pub fn get_devices(&self) -> Result<Vec<MobileDeviceInfo>, MobileError> {
         let storage = self.open_storage()?;
         let identity = self.get_identity()?;
@@ -72,6 +74,8 @@ impl VauchiPlatform {
     ///
     /// Display this QR code on the existing device for a new device to scan.
     /// The QR expires after 5 minutes (per ADR-035).
+    #[deprecated(note = "Use PlatformAppEngine::generate_device_link_qr instead. \
+                VauchiPlatform device-linking surface will be removed in 0.40.0.")]
     pub fn generate_device_link_qr(&self) -> Result<MobileDeviceLinkData, MobileError> {
         let identity = self.get_identity()?;
 
@@ -91,6 +95,8 @@ impl VauchiPlatform {
     /// Call this on the new device after scanning the QR code displayed
     /// on an existing device. Returns information about the identity
     /// to link with.
+    #[deprecated(note = "Use PlatformAppEngine::parse_device_link_qr instead. \
+                VauchiPlatform device-linking surface will be removed in 0.40.0.")]
     pub fn parse_device_link_qr(
         &self,
         qr_data: String,
@@ -123,6 +129,10 @@ impl VauchiPlatform {
     /// Persistence: the session saves the updated `DeviceRegistry`
     /// after `confirm_link` succeeds, closing a pre-existing gap
     /// where the legacy single-shot path discarded it.
+    #[deprecated(
+        note = "Use PlatformAppEngine::create_device_link_session_initiator instead. \
+                VauchiPlatform device-linking surface will be removed in 0.40.0."
+    )]
     pub fn create_device_link_session_initiator(
         &self,
     ) -> Result<Arc<MobileDeviceLinkSession>, MobileError> {
@@ -292,6 +302,8 @@ impl VauchiPlatform {
     /// Get the device count.
     ///
     /// Returns the number of devices linked to this identity.
+    #[deprecated(note = "Use PlatformAppEngine::device_count instead. \
+                VauchiPlatform device-linking surface will be removed in 0.40.0.")]
     pub fn device_count(&self) -> Result<u32, MobileError> {
         let storage = self.open_storage()?;
 
@@ -309,6 +321,8 @@ impl VauchiPlatform {
     ///
     /// Note: Cannot unlink the current device (use identity deletion instead).
     /// The device_index is the position in the devices list (0-based).
+    #[deprecated(note = "Use PlatformAppEngine::unlink_device instead. \
+                VauchiPlatform device-linking surface will be removed in 0.40.0.")]
     pub fn unlink_device(&self, device_index: u32) -> Result<bool, MobileError> {
         let storage = self.open_storage()?;
         let identity = self.get_identity()?;
@@ -347,6 +361,8 @@ impl VauchiPlatform {
     }
 
     /// Check if this device is the primary device (index 0).
+    #[deprecated(note = "Use PlatformAppEngine::is_primary_device instead. \
+                VauchiPlatform device-linking surface will be removed in 0.40.0.")]
     pub fn is_primary_device(&self) -> Result<bool, MobileError> {
         let identity = self.get_identity()?;
         Ok(identity.device_info().device_index() == 0)

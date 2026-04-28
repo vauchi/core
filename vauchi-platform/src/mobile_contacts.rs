@@ -309,6 +309,8 @@ impl VauchiPlatform {
     /// Mark a contact as trusted for recovery.
     ///
     /// Blocked contacts cannot be trusted for recovery.
+    #[deprecated(note = "Use PlatformAppEngine::trust_contact_for_recovery instead. \
+                VauchiPlatform recovery surface will be removed in 0.40.0.")]
     pub fn trust_contact_for_recovery(&self, id: String) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
 
@@ -337,6 +339,8 @@ impl VauchiPlatform {
     }
 
     /// Remove recovery trust from a contact.
+    #[deprecated(note = "Use PlatformAppEngine::untrust_contact_for_recovery instead. \
+                VauchiPlatform recovery surface will be removed in 0.40.0.")]
     pub fn untrust_contact_for_recovery(&self, id: String) -> Result<(), MobileError> {
         let storage = self.open_storage()?;
 
@@ -358,6 +362,8 @@ impl VauchiPlatform {
     }
 
     /// Get the number of contacts trusted for recovery.
+    #[deprecated(note = "Use PlatformAppEngine::trusted_contact_count instead. \
+                VauchiPlatform recovery surface will be removed in 0.40.0.")]
     pub fn trusted_contact_count(&self) -> Result<u32, MobileError> {
         let storage = self.open_storage()?;
         let contacts = storage.list_contacts()?;

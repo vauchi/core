@@ -131,7 +131,12 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 #  existing QrScanned hardware-event auto-route — feeds the
 #  cycle-thread session when the QR-scanner Component fires from
 #  the multi-stage screen 2026-04-28)
-vauchi-platform/src/platform_app_engine.rs 2264
+# Bumped 2026-04-29 to 2430 by Phase B7 batch 7 — Passcode + Duress
+# + Decoy (11 commands: SetupAppPassword, SetupDuressPassword,
+# Authenticate, IsPasswordEnabled, IsDuressEnabled, DisableDuress,
+# ConfigureDuressAlerts, GetDuressSettings, AddDecoyContact,
+# ListDecoyContacts, DeleteDecoyContact; +166 lines).
+vauchi-platform/src/platform_app_engine.rs 2430
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

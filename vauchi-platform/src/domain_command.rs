@@ -29,7 +29,8 @@
 
 use crate::content::{MobileApplyResult, MobileUpdateStatus};
 use crate::types::{
-    MobileConsentRecord, MobileConsentStatus, MobileConsentType, MobileSocialNetwork,
+    MobileAuthMode, MobileConsentRecord, MobileConsentStatus, MobileConsentType,
+    MobileDecoyContact, MobileDuressSettings, MobileSocialNetwork,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -66,6 +67,34 @@ pub enum DomainCommand {
     /// Reload the social-networks list from the content cache after
     /// `ApplyContentUpdates` succeeds.
     ReloadSocialNetworks,
+
+    // ── Passcode + Duress + Decoy (B7 batch 7) ──
+    /// Set up the app password (PIN). Requires identity.
+    SetupAppPassword { password: String },
+    /// Set up the duress PIN. Requires app password configured.
+    SetupDuressPassword { duress_password: String },
+    /// Authenticate with a password. Returns Normal vs Duress mode.
+    Authenticate { password: String },
+    /// Whether an app password is configured.
+    IsPasswordEnabled,
+    /// Whether duress mode is configured.
+    IsDuressEnabled,
+    /// Disable duress mode and clear duress hash/salt.
+    DisableDuress,
+    /// Configure the duress alert destination set + message.
+    ConfigureDuressAlerts {
+        contact_ids: Vec<String>,
+        message: String,
+    },
+    /// Read the persisted duress alert settings.
+    GetDuressSettings,
+    /// Add a decoy contact (shown in duress mode). `card_json` is a
+    /// JSON-serialised `ContactCard`. Returns the generated decoy id.
+    AddDecoyContact { name: String, card_json: String },
+    /// List configured decoy contacts.
+    ListDecoyContacts,
+    /// Delete a decoy contact by id.
+    DeleteDecoyContact { id: String },
 }
 
 /// Sum type of every legitimate return shape from
@@ -93,4 +122,16 @@ pub enum DomainCommandResult {
     ApplyResult { result: MobileApplyResult },
     /// List of `MobileSocialNetwork` (B7 batch 2 — `ReloadSocialNetworks`).
     SocialNetworks { networks: Vec<MobileSocialNetwork> },
+    /// Generic `String` payload (B7 batch 7 — `AddDecoyContact`
+    /// returns the generated decoy id).
+    Text { value: String },
+    /// Authentication-mode result (B7 batch 7 — `Authenticate`).
+    AuthMode { mode: MobileAuthMode },
+    /// Optional duress-settings payload (B7 batch 7 —
+    /// `GetDuressSettings`).
+    DuressSettingsOpt {
+        settings: Option<MobileDuressSettings>,
+    },
+    /// List of decoy contacts (B7 batch 7 — `ListDecoyContacts`).
+    DecoyContacts { contacts: Vec<MobileDecoyContact> },
 }

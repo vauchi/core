@@ -477,6 +477,7 @@ fn test_disable_duress() {
 // post-biometric step lives in core so iOS and Android cannot drift on
 // the floor or on the decision logic.
 
+// @internal
 #[test]
 fn biometric_unlock_decision_unlocked_when_no_duress() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -498,6 +499,7 @@ fn biometric_unlock_decision_unlocked_when_no_duress() {
     );
 }
 
+// @internal
 #[test]
 fn biometric_unlock_decision_prompts_for_pin_when_duress_enabled() {
     let mut wb = create_vauchi_with_identity("Alice");
@@ -522,6 +524,7 @@ fn biometric_unlock_decision_prompts_for_pin_when_duress_enabled() {
     );
 }
 
+// @internal
 #[test]
 fn biometric_unlock_check_pads_to_minimum_duration() {
     use std::time::Instant;
@@ -542,6 +545,7 @@ fn biometric_unlock_check_pads_to_minimum_duration() {
     );
 }
 
+// @internal
 #[test]
 fn biometric_unlock_check_constant_time_across_duress_states() {
     use std::time::Instant;

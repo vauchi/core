@@ -23,6 +23,7 @@ fn create_test_vauchi() -> Vauchi {
 // `2026-04-28-app-launch-and-identity-orchestration-in-core` §2.5)
 // =============================================================================
 
+// @internal
 #[test]
 fn create_identity_with_onboarding_marks_complete_in_one_call() {
     let mut vauchi = create_test_vauchi();
@@ -39,6 +40,7 @@ fn create_identity_with_onboarding_marks_complete_in_one_call() {
     );
 }
 
+// @internal
 #[test]
 fn create_identity_with_onboarding_rejects_second_call() {
     let mut vauchi = create_test_vauchi();
@@ -54,6 +56,7 @@ fn create_identity_with_onboarding_rejects_second_call() {
     );
 }
 
+// @internal
 #[test]
 fn mark_onboarding_complete_is_idempotent() {
     let vauchi = create_test_vauchi();
@@ -64,6 +67,7 @@ fn mark_onboarding_complete_is_idempotent() {
     assert!(vauchi.is_onboarding_complete().unwrap());
 }
 
+// @internal
 #[test]
 fn create_identity_with_onboarding_then_boot_lands_on_main() {
     // Atomic-helper version of the existing
@@ -88,6 +92,7 @@ fn create_identity_with_onboarding_then_boot_lands_on_main() {
 // `2026-04-28-lifecycle-session-residue-umbrella` item P2-C)
 // =============================================================================
 
+// @internal
 #[cfg(feature = "network-http")]
 #[test]
 fn periodic_sync_tick_returns_no_identity_when_no_identity() {
@@ -101,6 +106,7 @@ fn periodic_sync_tick_returns_no_identity_when_no_identity() {
     );
 }
 
+// @internal
 #[cfg(feature = "network-http")]
 #[test]
 fn periodic_sync_tick_returns_not_connected_after_identity_no_connect() {
@@ -113,6 +119,7 @@ fn periodic_sync_tick_returns_not_connected_after_identity_no_connect() {
     );
 }
 
+// @internal
 #[cfg(feature = "network-http")]
 #[test]
 fn periodic_sync_constants_match_audit_recommendation() {

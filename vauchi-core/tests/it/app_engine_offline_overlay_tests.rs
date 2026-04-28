@@ -32,6 +32,7 @@ fn has_offline_banner(screen: &vauchi_app::ui::ScreenModel) -> bool {
     })
 }
 
+// @internal
 #[test]
 fn online_default_emits_no_offline_banner() {
     let engine = unlocked_engine();
@@ -42,6 +43,7 @@ fn online_default_emits_no_offline_banner() {
     );
 }
 
+// @internal
 #[test]
 fn set_offline_injects_banner_into_current_screen() {
     let mut engine = unlocked_engine();
@@ -53,6 +55,7 @@ fn set_offline_injects_banner_into_current_screen() {
     );
 }
 
+// @internal
 #[test]
 fn flipping_back_online_removes_banner_on_next_render() {
     let mut engine = unlocked_engine();
@@ -66,6 +69,7 @@ fn flipping_back_online_removes_banner_on_next_render() {
     );
 }
 
+// @internal
 #[test]
 fn offline_banner_is_idempotent_across_repeated_renders() {
     let mut engine = unlocked_engine();
@@ -95,6 +99,7 @@ fn offline_banner_is_idempotent_across_repeated_renders() {
     }
 }
 
+// @internal
 #[test]
 fn offline_banner_persists_after_screen_navigation() {
     let mut engine = unlocked_engine();
@@ -111,6 +116,7 @@ fn offline_banner_persists_after_screen_navigation() {
     );
 }
 
+// @internal
 #[test]
 fn is_network_online_reflects_setter_state() {
     let mut engine = unlocked_engine();

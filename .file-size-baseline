@@ -103,14 +103,14 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1151
 # periodic_sync_interval_seconds() + periodic_sync_max_retries() —
 # `2026-04-28-lifecycle-session-residue-umbrella` items P1 / P2-B / P2-C
 # / P2-D 2026-04-28 feature/round2-core-lifecycle-surface)
-# Bumped 2026-04-28 to 1628 by Phase B2 of
-# `2026-04-28-collapse-vauchi-platform-into-app-engine` — adds the 9
-# recovery-domain wrappers that previously lived only on
-# `VauchiPlatform`. Phases B3 / B4 / B7 will bump this further as more
-# legacy domains migrate onto the engine. Splitting is not an option
-# (UniFFI facade — see `.claude/rules/file-size.md` Structural
-# Exemptions).
-vauchi-platform/src/platform_app_engine.rs 1628
+# Bumped 2026-04-28 to 1723 by Phases B2 + B3 of
+# `2026-04-28-collapse-vauchi-platform-into-app-engine`. B2 added the
+# 9 recovery-domain wrappers (+412); B3 adds the 4 emergency-broadcast
+# wrappers (configure / send / get_config / disable, +95). Phases B4
+# / B7 will bump this further as more legacy domains migrate onto the
+# engine. Splitting is not an option (UniFFI facade — see
+# `.claude/rules/file-size.md` Structural Exemptions).
+vauchi-platform/src/platform_app_engine.rs 1723
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

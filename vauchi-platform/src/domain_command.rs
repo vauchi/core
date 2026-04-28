@@ -106,6 +106,22 @@ pub enum DomainCommand {
     AutoRemoveDemoContact,
     /// Restore a previously-dismissed demo contact.
     RestoreDemoContact,
+
+    // ── Identity reads + Onboarding helpers (B7 batch 9) ──
+    /// Programmatically create an identity bypassing the onboarding
+    /// `UserAction` flow. Errors when an identity already exists.
+    CreateIdentity { display_name: String },
+    /// Read the active identity's public id (hex-encoded signing key).
+    GetPublicId,
+    /// Read the active identity's display name (own card).
+    GetDisplayName,
+    /// Read the active identity's signing-key fingerprint, formatted
+    /// as 16 groups of 4 uppercase hex characters.
+    GetOwnFingerprint,
+    /// Compute display-name suggestions from a full name. Pure.
+    DisplayNameSuggestions { full_name: String },
+    /// Reset the onboarding progress to step 0.
+    ResetOnboarding,
 }
 
 /// Sum type of every legitimate return shape from
@@ -146,4 +162,10 @@ pub enum DomainCommandResult {
     /// Demo-contact tracker state snapshot (B7 batch 5 —
     /// `GetDemoContactState`).
     DemoContactState { state: MobileDemoContactState },
+    /// Plain `String` payload (B7 batch 9 — `GetPublicId`,
+    /// `GetDisplayName`, `GetOwnFingerprint`).
+    Text { value: String },
+    /// List of `String` payload (B7 batch 9 —
+    /// `DisplayNameSuggestions`).
+    Strings { values: Vec<String> },
 }

@@ -1717,6 +1717,82 @@ impl PlatformAppEngine {
                 });
                 Ok(DomainCommandResult::DemoContactOpt { contact })
             }
+
+            // ── Identity reads + Onboarding helpers (B7 batch 9) ──
+            DomainCommand::CreateIdentity { display_name } => {
+                engine
+                    .vauchi_mut()
+                    .create_identity(&display_name)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_all();
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::GetPublicId => {
+                let value = engine
+                    .vauchi()
+                    .identity()
+                    .ok_or_else(|| MobileError::Other {
+                        detail: "Identity not initialized".into(),
+                    })?
+                    .public_id();
+                Ok(DomainCommandResult::Text { value })
+            }
+            DomainCommand::GetDisplayName => {
+                let value = engine
+                    .vauchi()
+                    .storage()
+                    .load_own_card()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?
+                    .ok_or(MobileError::Other {
+                        detail: "Identity not found".into(),
+                    })?
+                    .display_name()
+                    .to_string();
+                Ok(DomainCommandResult::Text { value })
+            }
+            DomainCommand::GetOwnFingerprint => {
+                let identity = engine
+                    .vauchi()
+                    .identity()
+                    .ok_or_else(|| MobileError::Other {
+                        detail: "Identity not initialized".into(),
+                    })?;
+                let hex = hex::encode(identity.signing_public_key());
+                let formatted = hex
+                    .chars()
+                    .collect::<Vec<_>>()
+                    .chunks(4)
+                    .map(|c| c.iter().collect::<String>())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+                    .to_uppercase();
+                Ok(DomainCommandResult::Text { value: formatted })
+            }
+            DomainCommand::DisplayNameSuggestions { full_name } => {
+                Ok(DomainCommandResult::Strings {
+                    values: vauchi_core::display_name_suggestions(&full_name),
+                })
+            }
+            DomainCommand::ResetOnboarding => {
+                let storage = engine.vauchi().storage();
+                let mut progress = storage.load_or_create_onboarding_progress().map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
+                progress.reset();
+                storage.save_onboarding_progress(&progress).map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
+                engine.invalidate_screen(&AppScreen::Onboarding);
+                Ok(DomainCommandResult::Unit)
+            }
         }
     }
 

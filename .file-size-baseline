@@ -136,7 +136,11 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # `.demo_contact` JSON files mirroring the legacy VauchiPlatform
 # layout; +221 lines split between dispatch arms and 6
 # file-helper methods).
-vauchi-platform/src/platform_app_engine.rs 2485
+# Bumped 2026-04-29 to 2561 by Phase B7 batch 9 — Identity reads
+# (CreateIdentity, GetPublicId, GetDisplayName, GetOwnFingerprint)
+# + Onboarding helpers (DisplayNameSuggestions, ResetOnboarding).
+# 6 commands; +76 lines of dispatch arms.
+vauchi-platform/src/platform_app_engine.rs 2561
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

@@ -532,3 +532,118 @@ fn restore_demo_contact_clears_dismissal() {
         other => panic!("unexpected result: {other:?}"),
     }
 }
+
+// ── Identity reads + Onboarding helpers (B7 batch 9) ────────────────
+
+// @internal
+#[test]
+fn get_public_id_returns_hex_string() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetPublicId)
+        .expect("get_public_id")
+    {
+        DomainCommandResult::Text { value } => {
+            assert!(!value.is_empty(), "public_id must be non-empty");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_display_name_returns_onboarding_name() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetDisplayName)
+        .expect("get_display_name")
+    {
+        DomainCommandResult::Text { value } => {
+            assert_eq!(value, "Alice", "drive_onboarding sets name to Alice");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_own_fingerprint_formats_hex_in_groups() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetOwnFingerprint)
+        .expect("fingerprint")
+    {
+        DomainCommandResult::Text { value } => {
+            // 16 groups of 4 hex chars separated by spaces = 79 chars.
+            assert_eq!(
+                value.len(),
+                79,
+                "fingerprint must be formatted as 16x4 groups"
+            );
+            assert!(
+                value.chars().all(|c| c.is_ascii_hexdigit() || c == ' '),
+                "fingerprint must only contain hex + spaces"
+            );
+            assert!(
+                value
+                    .chars()
+                    .filter(|c| c.is_ascii_alphabetic())
+                    .all(|c| c.is_ascii_uppercase()),
+                "fingerprint hex must be uppercase"
+            );
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn create_identity_errors_when_already_initialized() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let result = engine.dispatch_domain_command(DomainCommand::CreateIdentity {
+        display_name: "Bob".into(),
+    });
+    assert!(
+        result.is_err(),
+        "create_identity must error when an identity already exists"
+    );
+}
+
+// @internal
+#[test]
+fn display_name_suggestions_returns_non_empty_list_for_valid_name() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::DisplayNameSuggestions {
+            full_name: "Alice Anderson".into(),
+        })
+        .expect("suggestions")
+    {
+        DomainCommandResult::Strings { values } => {
+            assert!(!values.is_empty(), "suggestions must be non-empty");
+            for v in &values {
+                assert!(!v.is_empty(), "suggestion must be non-empty");
+            }
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn reset_onboarding_returns_unit() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ResetOnboarding)
+        .expect("reset")
+    {
+        DomainCommandResult::Unit => {}
+        other => panic!("unexpected result: {other:?}"),
+    }
+}

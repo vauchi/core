@@ -846,6 +846,37 @@ impl AppEngine {
                 self.engine_cache.remove(&self.screen);
                 ActionResult::UpdateScreen(self.engine.current_screen())
             }
+            // Reschedule every failed delivery for immediate retry —
+            // mirror of `mobile_delivery::manual_retry`, applied per id.
+            // Emitted by DeliveryStatusEngine on the "Retry Failed"
+            // footer (Pair 1 of Pure Humble UI retirement).
+            ActionResult::RetryFailedDeliveries { message_ids } => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let mut rescheduled = 0u32;
+                for id in &message_ids {
+                    if let Ok(Some(_)) = self.vauchi.storage().get_retry_entry(id)
+                        && self
+                            .vauchi
+                            .storage()
+                            .update_retry_next_time(id, now)
+                            .is_ok()
+                    {
+                        rescheduled += 1;
+                    }
+                }
+                self.engine_cache.remove(&self.screen);
+                ActionResult::ShowToast {
+                    message: if rescheduled == 1 {
+                        "Retry scheduled for 1 message".to_string()
+                    } else {
+                        format!("Retry scheduled for {rescheduled} messages")
+                    },
+                    undo_action_id: None,
+                }
+            }
             other => other,
         }
     }

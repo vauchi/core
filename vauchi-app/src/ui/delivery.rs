@@ -191,7 +191,17 @@ impl WorkflowEngine for DeliveryStatusEngine {
                 contact_id: item_id,
             },
             UserAction::ActionPressed { action_id } if action_id == RETRY_ALL_ACTION_ID => {
-                ActionResult::UpdateScreen(self.build_screen())
+                let message_ids: Vec<String> = self
+                    .items
+                    .iter()
+                    .filter(|i| i.retryable)
+                    .map(|i| i.message_id.clone())
+                    .collect();
+                if message_ids.is_empty() {
+                    ActionResult::UpdateScreen(self.build_screen())
+                } else {
+                    ActionResult::RetryFailedDeliveries { message_ids }
+                }
             }
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }
@@ -353,8 +363,27 @@ mod tests {
 
     // @internal
     #[test]
-    fn retry_all_action_returns_update_screen() {
-        let mut engine = DeliveryStatusEngine::new(vec![failed("alice")]);
+    fn retry_all_action_returns_retry_failed_deliveries() {
+        let mut engine =
+            DeliveryStatusEngine::new(vec![failed("alice"), delivered("bob"), failed("carol")]);
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: RETRY_ALL_ACTION_ID.into(),
+        });
+        match result {
+            ActionResult::RetryFailedDeliveries { message_ids } => {
+                assert_eq!(
+                    message_ids,
+                    vec!["msg-alice".to_string(), "msg-carol".into()]
+                );
+            }
+            other => panic!("expected RetryFailedDeliveries, got {other:?}"),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn retry_all_action_with_no_failed_returns_update_screen() {
+        let mut engine = DeliveryStatusEngine::new(vec![delivered("alice")]);
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: RETRY_ALL_ACTION_ID.into(),
         });

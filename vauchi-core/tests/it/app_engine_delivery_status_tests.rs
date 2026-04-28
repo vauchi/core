@@ -207,6 +207,10 @@ fn test_delivery_status_maps_statuses_correctly() {
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::DeliveryStatus);
 
+    // The screen now groups records into sections (Recent / Failed /
+    // Pending Retries). Within "Recent" the storage created_at DESC
+    // order is preserved; "Failed" is its own section, so the failed
+    // record appears after the recent ones (not interleaved).
     let statuses: Vec<&Status> = screen
         .components
         .iter()
@@ -217,9 +221,9 @@ fn test_delivery_status_maps_statuses_correctly() {
         .collect();
 
     assert_eq!(statuses.len(), 3, "Expected 3 status indicators");
-
-    // Records are ordered by created_at DESC, so: failed (ts+2), delivered (ts+1), queued (ts)
-    assert_eq!(statuses[0], &Status::Failed, "Failed → Status::Failed");
-    assert_eq!(statuses[1], &Status::Success, "Delivered → Status::Success");
-    assert_eq!(statuses[2], &Status::Pending, "Queued → Status::Pending");
+    // Recent section: delivered (ts+1), queued (ts) — failed is excluded
+    assert_eq!(statuses[0], &Status::Success, "Delivered → Status::Success");
+    assert_eq!(statuses[1], &Status::Pending, "Queued → Status::Pending");
+    // Failed section: failed
+    assert_eq!(statuses[2], &Status::Failed, "Failed → Status::Failed");
 }

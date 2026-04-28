@@ -119,6 +119,7 @@ fn sample_help_items() -> Vec<HelpItem> {
 fn sample_delivery_items() -> Vec<DeliveryItem> {
     vec![
         DeliveryItem {
+            message_id: "m1".into(),
             contact_id: "c1".into(),
             contact_name: "Alice".into(),
             status: Status::Success,
@@ -126,6 +127,7 @@ fn sample_delivery_items() -> Vec<DeliveryItem> {
             retryable: false,
         },
         DeliveryItem {
+            message_id: "m2".into(),
             contact_id: "c2".into(),
             contact_name: "Bob".into(),
             status: Status::Failed,

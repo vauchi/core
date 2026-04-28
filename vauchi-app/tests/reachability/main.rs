@@ -10,6 +10,7 @@
 //! (plan Task 1.4).
 
 mod deep_link_consent;
+mod delivery_status;
 mod exchange;
 mod form_dialog;
 mod onboarding;

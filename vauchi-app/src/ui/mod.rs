@@ -23,7 +23,7 @@ mod contact_list;
 mod contact_merge;
 mod contact_visibility;
 mod deep_link_consent;
-mod delivery;
+pub mod delivery;
 mod device_linking;
 mod device_management;
 mod device_replacement;

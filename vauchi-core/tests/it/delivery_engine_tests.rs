@@ -2,11 +2,26 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//! Cross-crate integration tests for `DeliveryStatusEngine`.
+//!
+//! Engine-internal unit tests live in `vauchi-app/src/ui/delivery.rs`'s
+//! `mod tests`. The tests here verify that the engine remains usable
+//! through the public re-exports from `vauchi_app::ui::*` (the surface
+//! consumers like the platform layer see) and capture cross-section
+//! integration cases that are hard to cover from inside the crate.
+
 use vauchi_app::ui::*;
 
-fn make_item(id: &str, name: &str, status: Status, retryable: bool) -> DeliveryItem {
+fn make_item(
+    message: &str,
+    contact: &str,
+    name: &str,
+    status: Status,
+    retryable: bool,
+) -> DeliveryItem {
     DeliveryItem {
-        contact_id: id.to_string(),
+        message_id: message.to_string(),
+        contact_id: contact.to_string(),
         contact_name: name.to_string(),
         status,
         detail: None,
@@ -16,15 +31,16 @@ fn make_item(id: &str, name: &str, status: Status, retryable: bool) -> DeliveryI
 
 // @internal
 #[test]
-fn delivery_screen_id() {
+fn delivery_screen_id_and_title() {
     let engine = DeliveryStatusEngine::new(vec![]);
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "delivery_status");
+    assert_eq!(screen.title, "Delivery Status");
 }
 
 // @internal
 #[test]
-fn delivery_empty_shows_all_delivered() {
+fn delivery_empty_shows_all_delivered_panel() {
     let engine = DeliveryStatusEngine::new(vec![]);
     let screen = engine.current_screen();
 
@@ -48,26 +64,24 @@ fn delivery_empty_shows_all_delivered() {
 
 // @internal
 #[test]
-fn delivery_shows_status_per_item() {
-    let items = vec![
-        make_item("c1", "Alice", Status::Success, false),
-        make_item("c2", "Bob", Status::Failed, true),
-    ];
+fn delivery_shows_recent_section_for_delivered_items() {
+    let items = vec![make_item("m1", "c1", "Alice", Status::Success, false)];
     let engine = DeliveryStatusEngine::new(items);
     let screen = engine.current_screen();
 
+    // Section header + 1 indicator
     assert_eq!(screen.components.len(), 2);
     match &screen.components[0] {
-        Component::StatusIndicator { id, title, .. } => {
-            assert_eq!(id, "c1");
-            assert_eq!(title, "Alice");
-        }
-        other => panic!("expected StatusIndicator, got {:?}", other),
+        Component::Text { content, .. } => assert_eq!(content, "Recent"),
+        other => panic!("expected Text section header, got {:?}", other),
     }
     match &screen.components[1] {
-        Component::StatusIndicator { id, title, .. } => {
-            assert_eq!(id, "c2");
-            assert_eq!(title, "Bob");
+        Component::StatusIndicator {
+            id, title, status, ..
+        } => {
+            assert_eq!(id, "m1");
+            assert_eq!(title, "Alice");
+            assert_eq!(*status, Status::Success);
         }
         other => panic!("expected StatusIndicator, got {:?}", other),
     }
@@ -75,13 +89,13 @@ fn delivery_shows_status_per_item() {
 
 // @internal
 #[test]
-fn delivery_select_contact_opens_it() {
-    let items = vec![make_item("c1", "Alice", Status::Success, false)];
+fn delivery_select_routes_to_open_contact() {
+    let items = vec![make_item("m1", "c1", "Alice", Status::Success, false)];
     let mut engine = DeliveryStatusEngine::new(items);
 
     let result = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "status_list".to_string(),
-        item_id: "c1".to_string(),
+        component_id: "section_recent".into(),
+        item_id: "c1".into(),
     });
 
     match result {
@@ -92,10 +106,10 @@ fn delivery_select_contact_opens_it() {
 
 // @internal
 #[test]
-fn delivery_retry_button_when_retryable() {
+fn delivery_failed_section_emits_retry_all_action() {
     let items = vec![
-        make_item("c1", "Alice", Status::Success, false),
-        make_item("c2", "Bob", Status::Failed, true),
+        make_item("m1", "c1", "Alice", Status::Success, false),
+        make_item("m2", "c2", "Bob", Status::Failed, true),
     ];
     let engine = DeliveryStatusEngine::new(items);
     let screen = engine.current_screen();
@@ -111,8 +125,8 @@ fn delivery_retry_button_when_retryable() {
 #[test]
 fn delivery_no_retry_when_all_success() {
     let items = vec![
-        make_item("c1", "Alice", Status::Success, false),
-        make_item("c2", "Bob", Status::Success, false),
+        make_item("m1", "c1", "Alice", Status::Success, false),
+        make_item("m2", "c2", "Bob", Status::Success, false),
     ];
     let engine = DeliveryStatusEngine::new(items);
     let screen = engine.current_screen();
@@ -122,35 +136,15 @@ fn delivery_no_retry_when_all_success() {
 
 // @internal
 #[test]
-fn delivery_mixed_statuses() {
-    let items = vec![
-        make_item("c1", "Alice", Status::Success, false),
-        make_item("c2", "Bob", Status::Failed, true),
-        make_item("c3", "Carol", Status::Pending, false),
-        make_item("c4", "Dave", Status::InProgress, false),
-        make_item("c5", "Eve", Status::Warning, false),
-    ];
+fn delivery_failed_row_id_is_message_id() {
+    let items = vec![make_item("msg-bob", "c-bob", "Bob", Status::Failed, true)];
     let engine = DeliveryStatusEngine::new(items);
     let screen = engine.current_screen();
 
-    assert_eq!(screen.components.len(), 5);
-
-    let expected = [
-        ("c1", Status::Success),
-        ("c2", Status::Failed),
-        ("c3", Status::Pending),
-        ("c4", Status::InProgress),
-        ("c5", Status::Warning),
-    ];
-
-    for (component, (expected_id, expected_status)) in screen.components.iter().zip(expected.iter())
-    {
-        match component {
-            Component::StatusIndicator { id, status, .. } => {
-                assert_eq!(id, expected_id);
-                assert_eq!(status, expected_status);
-            }
-            other => panic!("expected StatusIndicator, got {:?}", other),
-        }
+    // Header + 1 failed indicator
+    assert_eq!(screen.components.len(), 2);
+    match &screen.components[1] {
+        Component::StatusIndicator { id, .. } => assert_eq!(id, "msg-bob"),
+        other => panic!("expected StatusIndicator, got {:?}", other),
     }
 }

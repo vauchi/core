@@ -5,8 +5,15 @@
   "subtitle": null,
   "components": [
     {
+      "Text": {
+        "id": "section_recent",
+        "content": "Recent",
+        "style": "Subtitle"
+      }
+    },
+    {
       "StatusIndicator": {
-        "id": "c1",
+        "id": "m1",
         "icon": null,
         "title": "Alice",
         "detail": "Delivered 2 min ago",
@@ -14,9 +21,17 @@
         "a11y": null
       }
     },
+    "Divider",
+    {
+      "Text": {
+        "id": "section_failed",
+        "content": "Failed (1)",
+        "style": "Subtitle"
+      }
+    },
     {
       "StatusIndicator": {
-        "id": "c2",
+        "id": "m2",
         "icon": null,
         "title": "Bob",
         "detail": "Relay unreachable",

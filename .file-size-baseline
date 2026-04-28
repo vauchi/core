@@ -36,9 +36,11 @@ vauchi-core/src/storage/mod.rs 1079
 
 # SPLIT DONE — Phase 3: app_engine.rs (1437) split into mod.rs + routing.rs + screens.rs
 # (+1 each on mod.rs + routing.rs for #[tracing::instrument] on handle_action + handle_hardware_event)
+# (+32 on screens.rs for load_retry_entries + DeliveryItem.message_id wiring 2026-04-28
+#  Pure Humble UI retirement Pair 1)
 vauchi-app/src/ui/app_engine/mod.rs 994
 vauchi-app/src/ui/app_engine/routing.rs 954
-vauchi-app/src/ui/app_engine/screens.rs 1229
+vauchi-app/src/ui/app_engine/screens.rs 1261
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

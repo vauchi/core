@@ -23,7 +23,7 @@ use crate::ui::contact_limit::ContactLimitEngine;
 use crate::ui::contact_list::ContactListEngine;
 use crate::ui::contact_merge::{ContactMergeEngine, MergePreview};
 use crate::ui::contact_visibility::ContactVisibilityEngine;
-use crate::ui::delivery::{DeliveryItem, DeliveryStatusEngine};
+use crate::ui::delivery::{DeliveryItem, DeliveryStatusEngine, RetryEntry};
 use crate::ui::device_linking::DeviceLinkingEngine;
 use crate::ui::device_management::{DeviceListItem, DeviceManagementEngine};
 use crate::ui::duplicate_detection::{DuplicateDetectionEngine, DuplicatePair};
@@ -329,7 +329,8 @@ impl AppEngine {
             AppScreen::EmergencyShred => Box::new(EmergencyShredEngine::new()),
             AppScreen::DeliveryStatus => {
                 let items = Self::load_delivery_items(vauchi);
-                Box::new(DeliveryStatusEngine::new(items))
+                let retries = Self::load_retry_entries(vauchi);
+                Box::new(DeliveryStatusEngine::new(items).with_retries(retries))
             }
             AppScreen::Sync => {
                 let relay_url = vauchi.config().relay.server_url.clone();
@@ -998,11 +999,42 @@ impl AppEngine {
                 };
 
                 DeliveryItem {
+                    message_id: r.message_id,
                     contact_id: r.recipient_id,
                     contact_name,
                     status,
                     detail,
                     retryable,
+                }
+            })
+            .collect()
+    }
+
+    fn load_retry_entries(vauchi: &Vauchi) -> Vec<RetryEntry> {
+        let entries = vauchi.storage().get_all_retry_entries().unwrap_or_default();
+
+        let contacts: HashMap<String, String> = vauchi
+            .list_contacts()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|c| (c.id().to_string(), c.display_name().to_string()))
+            .collect();
+
+        entries
+            .into_iter()
+            .map(|e| {
+                let contact_name = contacts
+                    .get(&e.recipient_id)
+                    .cloned()
+                    .unwrap_or_else(|| e.recipient_id.clone());
+                let max_exceeded = e.is_max_attempts_exceeded();
+                RetryEntry {
+                    message_id: e.message_id,
+                    contact_id: e.recipient_id,
+                    contact_name,
+                    attempt: e.attempt,
+                    max_attempts: e.max_attempts,
+                    max_exceeded,
                 }
             })
             .collect()

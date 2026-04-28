@@ -42,6 +42,8 @@ pub use import::{ImportResult, ImportWarning};
 pub use receive_routing::{BlobOutcome, process_received_blobs};
 pub use security::BIOMETRIC_UNLOCK_MIN_DURATION;
 pub use setup::SetupProgress;
+#[cfg(feature = "network-http")]
+pub use sync_http::{PERIODIC_SYNC_INTERVAL_SECONDS, PERIODIC_SYNC_MAX_RETRIES};
 
 use std::sync::{Arc, Mutex};
 

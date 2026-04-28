@@ -84,6 +84,47 @@ fn create_identity_with_onboarding_then_boot_lands_on_main() {
 }
 
 // =============================================================================
+// Periodic sync tick (audit
+// `2026-04-28-lifecycle-session-residue-umbrella` item P2-C)
+// =============================================================================
+
+#[cfg(feature = "network-http")]
+#[test]
+fn periodic_sync_tick_returns_no_identity_when_no_identity() {
+    let mut vauchi = create_test_vauchi();
+    let outcome = vauchi
+        .periodic_sync_tick()
+        .expect("tick should not error before identity");
+    assert!(
+        matches!(outcome, vauchi_core::VauchiSyncOutcome::NoIdentity),
+        "expected NoIdentity, got {outcome:?}"
+    );
+}
+
+#[cfg(feature = "network-http")]
+#[test]
+fn periodic_sync_tick_returns_not_connected_after_identity_no_connect() {
+    let mut vauchi = create_test_vauchi();
+    vauchi.create_identity_with_onboarding("Alice").unwrap();
+    let outcome = vauchi.periodic_sync_tick().expect("tick should not error");
+    assert!(
+        matches!(outcome, vauchi_core::VauchiSyncOutcome::NotConnected),
+        "expected NotConnected, got {outcome:?}"
+    );
+}
+
+#[cfg(feature = "network-http")]
+#[test]
+fn periodic_sync_constants_match_audit_recommendation() {
+    // Audit P2-C calls out a 15-min interval and a 3-retry policy
+    // — both currently duplicated as platform-side magic numbers.
+    // Locking the values here means a frontend-side change cannot
+    // drift silently.
+    assert_eq!(vauchi_core::PERIODIC_SYNC_INTERVAL_SECONDS, 900);
+    assert_eq!(vauchi_core::PERIODIC_SYNC_MAX_RETRIES, 3);
+}
+
+// =============================================================================
 // Vauchi API Integration Tests
 // =============================================================================
 

@@ -157,4 +157,7 @@ pub use vauchi::{
     VauchiBuilder, VauchiSyncOutcome,
 };
 #[cfg(feature = "network-http")]
-pub use vauchi::{RelayExchangeOffer, RelayExchangeResult};
+pub use vauchi::{
+    PERIODIC_SYNC_INTERVAL_SECONDS, PERIODIC_SYNC_MAX_RETRIES, RelayExchangeOffer,
+    RelayExchangeResult,
+};

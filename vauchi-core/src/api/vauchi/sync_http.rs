@@ -23,6 +23,19 @@
 
 use std::time::{Duration, Instant, SystemTime};
 
+/// Recommended interval (seconds) between scheduled sync ticks.
+///
+/// Frontends use this to configure their platform scheduler
+/// (`BGTaskScheduler` on iOS, `WorkManager` on Android) so the
+/// 15-minute cadence lives in core, not duplicated as a magic
+/// constant on each platform. Audit
+/// `2026-04-28-lifecycle-session-residue-umbrella` item P2-C.
+pub const PERIODIC_SYNC_INTERVAL_SECONDS: u64 = 900;
+
+/// Maximum number of retry attempts the platform scheduler should
+/// configure for a failed periodic sync. Audit P2-C.
+pub const PERIODIC_SYNC_MAX_RETRIES: u32 = 3;
+
 use super::receive_routing::process_received_blobs;
 use super::{Vauchi, VauchiSyncOutcome};
 use crate::api::error::{VauchiError, VauchiResult};
@@ -149,6 +162,40 @@ impl Vauchi {
             None => new_deadline,
         });
         self.last_exchange_time = Some(Instant::now());
+    }
+
+    /// Run one periodic sync tick — invoked by the platform
+    /// scheduler (`BGTaskScheduler` / `WorkManager`).
+    ///
+    /// This is the single entry point that frontends call from
+    /// their background-task handler. Core owns the per-tick
+    /// behaviour:
+    ///
+    /// 1. If the instance is missing identity or OHTTP key, returns
+    ///    the corresponding `VauchiSyncOutcome` variant — no
+    ///    connect attempt (the user hasn't onboarded / connected
+    ///    yet). The platform scheduler can use the result to
+    ///    decide whether to keep firing.
+    /// 2. Otherwise delegates to `Vauchi::sync()`. Throttle / retry
+    ///    timing already lives on `next_sync_allowed`, so a tick
+    ///    fired during a back-off window returns
+    ///    `VauchiSyncOutcome::TooSoon` without doing work.
+    ///
+    /// Audit `2026-04-28-lifecycle-session-residue-umbrella`
+    /// item P2-C — moves the per-tick decision into core so iOS
+    /// `BackgroundSyncService` and Android `SyncWorker` shrink to
+    /// a one-call wrapper. The scheduler-level constants
+    /// ([`PERIODIC_SYNC_INTERVAL_SECONDS`] /
+    /// [`PERIODIC_SYNC_MAX_RETRIES`]) live above so the cadence
+    /// and retry policy match across platforms.
+    pub fn periodic_sync_tick(&mut self) -> VauchiResult<VauchiSyncOutcome> {
+        if self.identity.is_none() {
+            return Ok(VauchiSyncOutcome::NoIdentity);
+        }
+        if self.ohttp_key.is_none() {
+            return Ok(VauchiSyncOutcome::NotConnected);
+        }
+        self.sync()
     }
 
     /// Disconnect: clear the cached OHTTP key and sync timing state.

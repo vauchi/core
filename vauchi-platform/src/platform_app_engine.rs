@@ -640,6 +640,56 @@ impl PlatformAppEngine {
         Ok(engine.form_has_data())
     }
 
+    /// Run one periodic sync tick.
+    ///
+    /// Frontends call this from their platform-scheduler handler
+    /// (`BGTaskScheduler` on iOS, `WorkManager` on Android). Per-tick
+    /// behaviour lives in core: gate on identity / OHTTP key,
+    /// honour the throttle window, delegate to `Vauchi::sync()`.
+    /// Frontends do not duplicate the "sync if due" logic.
+    ///
+    /// Returns the [`vauchi_core::VauchiSyncOutcome`] serialised as
+    /// JSON so the platform shell can log/observe without binding
+    /// the full sync types over UniFFI.
+    ///
+    /// Audit `2026-04-28-lifecycle-session-residue-umbrella` P2-C.
+    /// Companion constants on the core side
+    /// (`PERIODIC_SYNC_INTERVAL_SECONDS = 900`,
+    /// `PERIODIC_SYNC_MAX_RETRIES = 3`) replace the duplicated
+    /// 15-min interval / 3-retry magic numbers in
+    /// `BackgroundSyncService` / `SyncWorker`.
+    pub fn periodic_sync_tick(&self) -> Result<String, MobileError> {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let outcome = engine
+            .vauchi_mut()
+            .periodic_sync_tick()
+            .map_err(|e| MobileError::Other {
+                detail: e.to_string(),
+            })?;
+        serde_json::to_string(&format!("{outcome:?}")).map_err(|e| MobileError::Other {
+            detail: format!("serialize sync outcome: {e}"),
+        })
+    }
+
+    /// Recommended interval (seconds) between periodic sync ticks.
+    ///
+    /// Frontends call this once at scheduler-registration time to
+    /// configure their `BGTaskScheduler` / `WorkManager` interval.
+    /// Single source of truth lives in core
+    /// ([`vauchi_core::PERIODIC_SYNC_INTERVAL_SECONDS`]).
+    pub fn periodic_sync_interval_seconds(&self) -> u64 {
+        vauchi_core::PERIODIC_SYNC_INTERVAL_SECONDS
+    }
+
+    /// Maximum retries the platform scheduler should configure for
+    /// a failed periodic sync. Single source of truth lives in core
+    /// ([`vauchi_core::PERIODIC_SYNC_MAX_RETRIES`]).
+    pub fn periodic_sync_max_retries(&self) -> u32 {
+        vauchi_core::PERIODIC_SYNC_MAX_RETRIES
+    }
+
     /// Report frontend-observed network reachability to core.
     ///
     /// Frontends call this from their platform reachability monitor

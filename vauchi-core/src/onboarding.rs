@@ -141,6 +141,24 @@ impl OnboardingProgress {
         self.completed_at.is_some()
     }
 
+    /// Stamps the progress as complete without changing the current
+    /// step. Idempotent. Used by `Vauchi::mark_onboarding_complete`
+    /// to atomically pair identity creation with onboarding
+    /// completion (closes the crash window between
+    /// `create_identity` and `set_onboarding_completed` that the
+    /// audit `2026-04-28-app-launch-and-identity-orchestration-in-core`
+    /// §2.5 calls out).
+    pub fn mark_complete(&mut self) {
+        if self.completed_at.is_none() {
+            self.completed_at = Some(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or(Duration::ZERO)
+                    .as_secs(),
+            );
+        }
+    }
+
     /// Resets onboarding to the beginning.
     ///
     /// Clears all progress, timestamps, and flags.

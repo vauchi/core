@@ -200,6 +200,27 @@ impl PlatformAppEngine {
         }))
     }
 
+    /// Returns the cold-start `ScreenModel` JSON for whatever the
+    /// app's current persistent state is.
+    ///
+    /// Frontends call this **once** on cold start (after constructing
+    /// `PlatformAppEngine`) and render the result. They do **not**
+    /// branch on `has_identity` / `is_password_enabled` /
+    /// `is_onboarding_complete` themselves — that decision lives
+    /// inside core's `AppEngine::new()` boot logic and the
+    /// idempotent `self_heal_post_auth` self-heal that follows.
+    ///
+    /// Equivalent to `current_screen_json()` plus an explicit
+    /// contract: the audit
+    /// `2026-04-28-app-launch-and-identity-orchestration-in-core`
+    /// §2.1 elevates "first read after instance construction" from
+    /// "implicit / by convention" to "named API method", so iOS
+    /// `AppState` and Android `UiState` shadow enums can be deleted
+    /// without ambiguity. Subsequent reads use `current_screen_json`.
+    pub fn boot(&self) -> Result<String, MobileError> {
+        self.current_screen_json()
+    }
+
     /// Returns the current screen as a JSON string.
     ///
     /// The JSON structure matches `ScreenModel` from vauchi-core.

@@ -80,6 +80,31 @@ impl Vauchi {
         Ok(())
     }
 
+    /// Creates an identity and atomically marks onboarding as
+    /// complete in a single FFI call.
+    ///
+    /// This closes the crash window that exists when frontends
+    /// orchestrate the two writes themselves
+    /// (`createIdentity → setOnboardingCompleted`) — a process
+    /// kill between the two left the next launch in a state where
+    /// identity exists but onboarding is "incomplete", and the
+    /// next launch's onboarding flow would attempt a second
+    /// `create_identity` (which fails loudly with
+    /// `AlreadyInitialized`, but the user sees a confusing screen).
+    ///
+    /// On error from the second step (the storage write of
+    /// `mark_onboarding_complete`), the identity stays created but
+    /// onboarding stays incomplete — the next launch resumes
+    /// onboarding from the existing identity rather than asking
+    /// the user to create a duplicate. See audit
+    /// `2026-04-28-app-launch-and-identity-orchestration-in-core`
+    /// §2.5.
+    pub fn create_identity_with_onboarding(&mut self, display_name: &str) -> VauchiResult<()> {
+        self.create_identity(display_name)?;
+        self.mark_onboarding_complete()?;
+        Ok(())
+    }
+
     /// Migrates an existing installation from old storage_key to SMK-derived SEK.
     ///
     /// Requires:

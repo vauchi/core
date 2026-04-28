@@ -19,6 +19,71 @@ fn create_test_vauchi() -> Vauchi {
 }
 
 // =============================================================================
+// Atomic identity-creation + onboarding-completion (audit
+// `2026-04-28-app-launch-and-identity-orchestration-in-core` §2.5)
+// =============================================================================
+
+#[test]
+fn create_identity_with_onboarding_marks_complete_in_one_call() {
+    let mut vauchi = create_test_vauchi();
+    assert!(!vauchi.has_identity());
+    assert!(!vauchi.is_onboarding_complete().unwrap());
+
+    vauchi.create_identity_with_onboarding("Alice").unwrap();
+
+    assert!(vauchi.has_identity(), "identity must be created");
+    assert!(
+        vauchi.is_onboarding_complete().unwrap(),
+        "onboarding must be marked complete in the same call — \
+         no crash window between identity creation and completion flag"
+    );
+}
+
+#[test]
+fn create_identity_with_onboarding_rejects_second_call() {
+    let mut vauchi = create_test_vauchi();
+    vauchi.create_identity_with_onboarding("Alice").unwrap();
+
+    let err = vauchi
+        .create_identity_with_onboarding("Bob")
+        .expect_err("second create must fail loudly, not overwrite");
+    let msg = format!("{:?}", err);
+    assert!(
+        msg.contains("AlreadyInitialized") || msg.contains("Already"),
+        "expected AlreadyInitialized error, got {msg}"
+    );
+}
+
+#[test]
+fn mark_onboarding_complete_is_idempotent() {
+    let vauchi = create_test_vauchi();
+    vauchi.mark_onboarding_complete().unwrap();
+    assert!(vauchi.is_onboarding_complete().unwrap());
+    // Calling again is a no-op.
+    vauchi.mark_onboarding_complete().unwrap();
+    assert!(vauchi.is_onboarding_complete().unwrap());
+}
+
+#[test]
+fn create_identity_with_onboarding_then_boot_lands_on_main() {
+    // Atomic-helper version of the existing
+    // "create-identity-then-boot" path: the new helper marks
+    // onboarding complete in the same call, so post-boot the user
+    // lands on the default screen (MyInfo when no password).
+    let mut vauchi = create_test_vauchi();
+    vauchi.create_identity_with_onboarding("Alice").unwrap();
+    assert!(vauchi.is_onboarding_complete().unwrap());
+
+    let engine = vauchi_app::ui::AppEngine::new(vauchi);
+    assert_eq!(
+        engine.current_app_screen(),
+        &vauchi_app::ui::AppScreen::MyInfo,
+        "atomic create_identity_with_onboarding -> identity + \
+         onboarding complete -> boot lands on MyInfo"
+    );
+}
+
+// =============================================================================
 // Vauchi API Integration Tests
 // =============================================================================
 

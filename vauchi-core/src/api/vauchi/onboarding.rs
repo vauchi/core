@@ -65,6 +65,25 @@ impl Vauchi {
         Ok(progress.is_complete())
     }
 
+    /// Marks onboarding as complete, irrespective of which step the
+    /// progress is currently on.
+    ///
+    /// Idempotent — calling on already-complete progress is a no-op.
+    /// Used by [`Vauchi::create_identity_with_onboarding`] so an
+    /// atomic create-and-complete can be expressed as one FFI call,
+    /// closing the crash window the audit
+    /// `2026-04-28-app-launch-and-identity-orchestration-in-core`
+    /// §2.5 calls out.
+    pub fn mark_onboarding_complete(&self) -> VauchiResult<()> {
+        let mut progress = self.storage.load_or_create_onboarding_progress()?;
+        if progress.is_complete() {
+            return Ok(());
+        }
+        progress.mark_complete();
+        self.storage.save_onboarding_progress(&progress)?;
+        Ok(())
+    }
+
     /// Returns the current onboarding step.
     pub fn current_onboarding_step(&self) -> VauchiResult<OnboardingStep> {
         let progress = self.storage.load_or_create_onboarding_progress()?;

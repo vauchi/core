@@ -177,7 +177,14 @@ impl AppEngine {
                             .collect()
                     })
                     .unwrap_or_default();
-                match self.vauchi.create_identity(&name) {
+                // Use the atomic helper so identity creation +
+                // onboarding-complete flag land in one call. Closes
+                // the crash window the audit
+                // `2026-04-28-app-launch-and-identity-orchestration-in-core`
+                // §2.5 calls out — a kill between the two writes
+                // used to leave the next launch in a state where
+                // identity exists but onboarding is "incomplete".
+                match self.vauchi.create_identity_with_onboarding(&name) {
                     Ok(()) => {
                         // Persist onboarding groups
                         for group_name in &onboarding_groups {

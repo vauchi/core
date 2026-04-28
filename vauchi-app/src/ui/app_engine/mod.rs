@@ -299,6 +299,20 @@ impl AppEngine {
     }
 
     pub fn new(vauchi: Vauchi) -> Self {
+        // Boot decision (audit
+        // `2026-04-28-app-launch-and-identity-orchestration-in-core`
+        // §2.1). Frontends call `boot()` and trust the returned
+        // `ScreenModel` — they do not duplicate this decision tree.
+        //
+        // The "identity exists but onboarding never marked complete"
+        // resume-path called out by §2.5 is gated behind a future
+        // migration: existing installs ship `OnboardingProgress` at
+        // default (`completed_at == None`) so honouring the flag
+        // today would route every legacy user back through
+        // onboarding. Until the legacy heal lands, "identity exists"
+        // implies "past onboarding"; the atomic
+        // `create_identity_with_onboarding` helper still closes the
+        // *new* crash window for installs after this commit.
         let screen = if !vauchi.has_identity() {
             AppScreen::Onboarding
         } else if vauchi.is_password_enabled().unwrap_or(false) {

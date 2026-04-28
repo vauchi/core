@@ -25,7 +25,7 @@ const SCAN_QUALITY_WINDOW: usize = 10;
 /// - `Poor`     (orange): >= 10% detected
 /// - `NoSignal` (red):    < 10% detected
 #[derive(Debug, Clone)]
-pub(super) struct ScanQualityTracker {
+pub(crate) struct ScanQualityTracker {
     /// Circular buffer: `true` = QR detected in that frame.
     frames: [bool; SCAN_QUALITY_WINDOW],
     /// Write position in the circular buffer.
@@ -35,7 +35,7 @@ pub(super) struct ScanQualityTracker {
 }
 
 impl ScanQualityTracker {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             frames: [false; SCAN_QUALITY_WINDOW],
             cursor: 0,
@@ -44,14 +44,14 @@ impl ScanQualityTracker {
     }
 
     /// Record a frame result. `detected` = whether a QR was found.
-    pub(super) fn record_frame(&mut self, detected: bool) {
+    pub(crate) fn record_frame(&mut self, detected: bool) {
         self.frames[self.cursor] = detected;
         self.cursor = (self.cursor + 1) % SCAN_QUALITY_WINDOW;
         self.total += 1;
     }
 
     /// Current scan quality based on rolling detection rate.
-    pub(super) fn quality(&self) -> ScanQuality {
+    pub(crate) fn quality(&self) -> ScanQuality {
         if self.total == 0 {
             return ScanQuality::NoSignal;
         }
@@ -78,7 +78,7 @@ impl ScanQualityTracker {
     }
 
     /// Reset the tracker (e.g., when leaving and re-entering scan mode).
-    pub(super) fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.frames = [false; SCAN_QUALITY_WINDOW];
         self.cursor = 0;
         self.total = 0;

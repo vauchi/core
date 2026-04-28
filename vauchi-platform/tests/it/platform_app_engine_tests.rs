@@ -890,6 +890,69 @@ fn qr_scanned_hardware_event_routes_to_session_when_on_multi_stage_screen() {
 
 // @internal
 #[test]
+fn text_changed_from_peer_scan_routes_to_multi_stage_session() {
+    // Pair 4 — the iOS / Android QrCode { mode: Scan } component emits
+    // `UserAction::TextChanged { component_id: "peer_scan", value }`
+    // on every successful camera decode. On the multi-stage screen the
+    // engine itself does not own the cycle-thread session; the platform
+    // layer must side-effect-route this scan into
+    // `session.process_scanned_qr` the same way it routes the
+    // `QrScanned` hardware-event variant. Without that route the scan
+    // falls through to the engine's `UpdateScreen` default and is
+    // silently dropped.
+    let (engine, _dir) = create_engine();
+    drive_to_multi_stage(&engine);
+
+    // The action must succeed (not error). The session swallows the
+    // garbage payload (no valid init frame) but the route itself runs.
+    // Result is `UpdateScreen` — same as the engine's default for an
+    // unhandled `TextChanged`. We verify the screen id is unchanged
+    // and the action did not error: the side-effect route happens
+    // before the engine's fall-through, so a panic / lock-poisoning
+    // would surface here.
+    let result_json = engine
+        .handle_action_json(
+            r#"{"TextChanged": {"component_id": "peer_scan", "value": "garbage-not-an-init-frame"}}"#
+                .into(),
+        )
+        .expect("text changed action accepted");
+    let v: serde_json::Value = serde_json::from_str(&result_json).expect("parse action result");
+    assert_eq!(
+        v["UpdateScreen"]["screen_id"], "multi_stage_exchange",
+        "TextChanged from peer_scan must update the multi-stage screen, got {v:?}",
+    );
+    assert_eq!(
+        engine.current_screen_id().expect("current screen"),
+        "multi_stage_exchange",
+        "scan must not navigate away from multi_stage_exchange",
+    );
+}
+
+// @internal
+#[test]
+fn text_changed_from_unknown_component_does_not_panic_on_multi_stage() {
+    // Negative case for the auto-route: a `TextChanged` whose
+    // `component_id` is not the peer-scan component must NOT call
+    // `session.process_scanned_qr` (a different component might emit
+    // text — for example a future manual-entry fallback). The action
+    // should still succeed and resolve to `UpdateScreen`.
+    let (engine, _dir) = create_engine();
+    drive_to_multi_stage(&engine);
+
+    let result_json = engine
+        .handle_action_json(
+            r#"{"TextChanged": {"component_id": "some_other_field", "value": "hello"}}"#.into(),
+        )
+        .expect("text changed action accepted");
+    let v: serde_json::Value = serde_json::from_str(&result_json).expect("parse action result");
+    assert_eq!(
+        v["UpdateScreen"]["screen_id"], "multi_stage_exchange",
+        "TextChanged from a non-peer-scan component must update the multi-stage screen, got {v:?}",
+    );
+}
+
+// @internal
+#[test]
 fn cancel_action_on_multi_stage_screen_stops_session_after_navigate() {
     let (engine, _dir) = create_engine();
     drive_to_multi_stage(&engine);

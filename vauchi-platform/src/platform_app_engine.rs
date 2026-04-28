@@ -308,6 +308,35 @@ impl PlatformAppEngine {
             self.ensure_multi_stage_session()?;
         }
 
+        // Pair 4 — auto-route the peer-scan QR text into the live
+        // cycle-thread session. The QR-scanner Component (iOS
+        // QrCodeView, Android QrCodeComponent) emits
+        // `UserAction::TextChanged { component_id: "peer_scan", value }`
+        // per the existing `exchange_qr.rs` single-direction contract.
+        // On the multi-stage screen the engine has no session handle,
+        // so without this side-effect the scan would be dropped on
+        // `MultiStageExchangeEngine::handle_action`'s default
+        // `UpdateScreen` fall-through. Mirrors the `QrScanned`
+        // hardware-event auto-route in `handle_hardware_event`.
+        if on_multi_stage
+            && let vauchi_app::ui::UserAction::TextChanged {
+                component_id,
+                value,
+            } = &action
+            && component_id == vauchi_app::ui::MULTI_STAGE_PEER_SCAN_COMPONENT_ID
+        {
+            let session_clone = self
+                .multi_stage_session
+                .lock()
+                .map_err(|e| MobileError::Other {
+                    detail: format!("Lock failed: {e}"),
+                })?
+                .clone();
+            if let Some(session) = session_clone {
+                let _ = session.process_scanned_qr(value.clone());
+            }
+        }
+
         let result = {
             let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),

@@ -53,7 +53,14 @@ pub const GRANT_CAMERA_PERMISSION_ACTION_ID: &str = "grant_camera_permission";
 // ── Component IDs ──────────────────────────────────────────────────
 
 const COMPONENT_ID_OWN_QR: &str = "own_qr";
-const COMPONENT_ID_PEER_SCAN: &str = "peer_scan";
+/// Component id of the peer-scanning `QrCode { mode: Scan }` rendered
+/// while the multi-stage exchange is active. Frontends emit
+/// `UserAction::TextChanged { component_id: PEER_SCAN_COMPONENT_ID, value }`
+/// per the existing `exchange_qr.rs` single-direction contract; the
+/// platform layer auto-routes those scans into the live cycle-thread
+/// session (see `core/vauchi-platform/src/platform_app_engine.rs`).
+pub const PEER_SCAN_COMPONENT_ID: &str = "peer_scan";
+const COMPONENT_ID_PEER_SCAN: &str = PEER_SCAN_COMPONENT_ID;
 const COMPONENT_ID_STATUS: &str = "status";
 const COMPONENT_ID_PEER_NAME: &str = "peer_name";
 const COMPONENT_ID_PERMISSION: &str = "permission_required";

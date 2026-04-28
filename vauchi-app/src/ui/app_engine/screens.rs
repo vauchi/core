@@ -824,6 +824,16 @@ impl AppEngine {
                     is_verified,
                 ))
             }
+            AppScreen::MultiStageExchange => {
+                // The cycle-thread session lives in vauchi-platform —
+                // the bridge from MultiStageSessionListener callbacks
+                // into this engine's `set_state` / `set_qr_payload` /
+                // `set_finalized` / `set_session_ended` setters is
+                // wired at the platform-binding layer (Phase 4b).
+                // The engine itself starts in `Idle` so the screen
+                // renders the "Waiting for peer…" chrome immediately.
+                Box::new(crate::ui::MultiStageExchangeEngine::new())
+            }
         }
     }
 

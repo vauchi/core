@@ -15,6 +15,7 @@ mod delivery_status;
 mod exchange;
 mod form_dialog;
 mod group_detail;
+mod multi_stage_exchange;
 mod onboarding;
 mod recovery;
 mod sync_status;

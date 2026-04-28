@@ -37,6 +37,7 @@ fn app_screen_serde_roundtrip_simple_variants() {
         AppScreen::Support,
         AppScreen::ContactDuplicates,
         AppScreen::ContactLimit,
+        AppScreen::MultiStageExchange,
     ];
     for screen in &screens {
         let json = serde_json::to_string(screen).expect("serialize");
@@ -297,6 +298,75 @@ fn exchange_hardware_unavailable_shows_toast() {
         }
         other => panic!("Expected ShowToast, got {:?}", other),
     }
+}
+
+// ── Pair 4 — MultiStageExchange routing ──────────────────────────
+
+// @internal
+#[test]
+fn multi_stage_exchange_navigates_to_engine_idle_screen() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MultiStageExchange);
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "multi_stage_exchange");
+    // Initial screen must show the active chrome with cancel + switch
+    // camera, not the success or failed terminal screens.
+    let action_ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+    assert!(action_ids.contains(&"cancel"));
+    assert!(action_ids.contains(&"switch_camera"));
+    assert!(!action_ids.contains(&"done"));
+    assert!(!action_ids.contains(&"retry"));
+}
+
+// @internal
+#[test]
+fn multi_stage_exchange_camera_permission_denied_event_swaps_chrome() {
+    use vauchi_core::exchange::ExchangeHardwareEvent;
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MultiStageExchange);
+    let result = engine.handle_hardware_event(ExchangeHardwareEvent::PermissionDenied {
+        transport: "camera".into(),
+    });
+    // AppEngine routes hardware-error events through a ShowToast
+    // ui_override before the engine's own UpdateScreen — that's the
+    // existing pattern shared with `ExchangeEngine`. The user sees the
+    // toast immediately; the screen state on the next render flips to
+    // the engine's permission-required chrome.
+    assert!(
+        result.is_some(),
+        "permission denial must be handled by the multi-stage engine",
+    );
+    let screen = engine.current_screen();
+    let action_ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+    assert!(
+        action_ids.contains(&"grant_camera_permission"),
+        "engine must surface Grant Permission action after camera denial; got actions {action_ids:?}",
+    );
+}
+
+// @internal
+#[test]
+fn multi_stage_exchange_cancel_action_completes() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MultiStageExchange);
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel".into(),
+    });
+    // AppEngine routes ActionResult::Complete by navigating away — the
+    // exact target is policy (typically Exchange parent tab), but the
+    // engine's Complete signal must propagate without crash and the
+    // screen must change away from multi_stage_exchange.
+    let screen_id_after = engine.current_screen().screen_id.clone();
+    assert_ne!(
+        screen_id_after, "multi_stage_exchange",
+        "Complete must navigate away (got result: {result:?})",
+    );
 }
 
 // ── stateful proptest: onboarding random actions (CC-13) ─────────────

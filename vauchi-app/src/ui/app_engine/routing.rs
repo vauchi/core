@@ -81,7 +81,10 @@ impl AppEngine {
     pub fn handle_hardware_event(&mut self, event: ExchangeHardwareEvent) -> Option<ActionResult> {
         if !matches!(
             self.screen,
-            AppScreen::Exchange | AppScreen::AvatarEditor | AppScreen::Recovery
+            AppScreen::Exchange
+                | AppScreen::AvatarEditor
+                | AppScreen::Recovery
+                | AppScreen::MultiStageExchange
         ) {
             return None;
         }

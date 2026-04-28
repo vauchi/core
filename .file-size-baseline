@@ -42,9 +42,12 @@ vauchi-core/src/storage/mod.rs 1079
 # (+16 on routing.rs for ActionResult::SetGroupFieldVisibility handler 2026-04-28 Pair 2)
 # (+3 on mod.rs for intercept_recovery_trust_toggle wiring 2026-04-28 Pair 3)
 # (+7 on screens.rs for is_verified/fingerprint/recovery_trusted plumbing 2026-04-28 Pair 3)
-vauchi-app/src/ui/app_engine/mod.rs 997
-vauchi-app/src/ui/app_engine/routing.rs 970
-vauchi-app/src/ui/app_engine/screens.rs 1286
+# (+10 on mod.rs for AppScreen::MultiStageExchange variant + screen_id/from_screen_id 2026-04-28 Pair 4)
+# (+3 on routing.rs for handle_hardware_event allowlist entry 2026-04-28 Pair 4)
+# (+10 on screens.rs for AppScreen::MultiStageExchange engine factory 2026-04-28 Pair 4)
+vauchi-app/src/ui/app_engine/mod.rs 1007
+vauchi-app/src/ui/app_engine/routing.rs 973
+vauchi-app/src/ui/app_engine/screens.rs 1296
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081
@@ -71,6 +74,11 @@ vauchi-app/src/ui/contact_detail.rs 1423
 
 # EXEMPT — BLE exchange sub-flow: inline tests access private state (proximity_runner, shake_envelope_sent)
 vauchi-app/src/ui/exchange_ble.rs 1051
+
+# EXEMPT — state machine: 9 ProtocolState variants + camera-gate transitions need cohesion;
+# inline tests access private state (state, peer_name, session_ended, camera_gate, scan_quality_tracker).
+# Pair 4 of `_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens` (2026-04-28).
+vauchi-app/src/ui/multi_stage_exchange.rs 1141
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

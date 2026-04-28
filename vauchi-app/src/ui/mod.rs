@@ -46,6 +46,7 @@ mod help;
 pub mod info_content;
 mod lock_screen;
 mod more;
+pub mod multi_stage_exchange;
 mod my_info;
 mod my_info_entry_detail;
 mod onboarding;
@@ -106,6 +107,12 @@ pub use groups_list::{GroupInfo, GroupsEngine, GroupsMode};
 pub use help::{HelpEngine, HelpItem};
 pub use lock_screen::{DEFAULT_LOCK_MAX_ATTEMPTS, LockScreenEngine};
 pub use more::MoreEngine;
+pub use multi_stage_exchange::{
+    CANCEL_ACTION_ID as MULTI_STAGE_CANCEL_ACTION_ID, DONE_ACTION_ID as MULTI_STAGE_DONE_ACTION_ID,
+    GRANT_CAMERA_PERMISSION_ACTION_ID as MULTI_STAGE_GRANT_CAMERA_PERMISSION_ACTION_ID,
+    MultiStageExchangeEngine, RETRY_ACTION_ID as MULTI_STAGE_RETRY_ACTION_ID,
+    SWITCH_CAMERA_ACTION_ID as MULTI_STAGE_SWITCH_CAMERA_ACTION_ID,
+};
 pub use my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, MyInfoViewMode, OwnFieldInfo};
 pub use my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};

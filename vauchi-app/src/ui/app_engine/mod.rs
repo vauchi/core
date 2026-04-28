@@ -753,6 +753,9 @@ impl WorkflowEngine for AppEngine {
             if let Some(result) = self.intercept_proposal_trust_toggle(&contact_id, &action) {
                 return result;
             }
+            if let Some(result) = self.intercept_recovery_trust_toggle(&contact_id, &action) {
+                return result;
+            }
             if let Some(result) = self.intercept_hide_toggle(&contact_id, &action) {
                 return result;
             }

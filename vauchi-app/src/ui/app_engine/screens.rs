@@ -569,9 +569,13 @@ impl AppEngine {
 
                     // Trust data
                     let trust_level = contact.trust_level().to_string();
+                    let trust_level_enum = contact.trust_level();
                     let proposal_trusted = contact.is_proposal_trusted();
                     let is_hidden = contact.is_hidden();
                     let is_imported = contact.is_imported();
+                    let is_verified = contact.is_fingerprint_verified();
+                    let fingerprint = contact.fingerprint();
+                    let is_recovery_trusted = contact.is_recovery_trusted();
 
                     // Reciprocity status (design spec §6.3)
                     use vauchi_core::exchange::reciprocity::Reciprocity;
@@ -619,7 +623,10 @@ impl AppEngine {
                             .with_trust(trust_level, proposal_trusted)
                             .with_reciprocity(reciprocity_status)
                             .with_hidden(is_hidden)
-                            .with_imported(is_imported);
+                            .with_imported(is_imported)
+                            .with_verification(is_verified, trust_level_enum)
+                            .with_fingerprint(fingerprint)
+                            .with_recovery_trusted(is_recovery_trusted);
                         if let Some(summary) = delivery_summary
                             && summary.total > 0
                         {

@@ -40,9 +40,11 @@ vauchi-core/src/storage/mod.rs 1079
 #  Pure Humble UI retirement Pair 1)
 # (+18 on screens.rs for GroupDetail field_visibility wiring 2026-04-28 Pair 2)
 # (+16 on routing.rs for ActionResult::SetGroupFieldVisibility handler 2026-04-28 Pair 2)
-vauchi-app/src/ui/app_engine/mod.rs 994
+# (+3 on mod.rs for intercept_recovery_trust_toggle wiring 2026-04-28 Pair 3)
+# (+7 on screens.rs for is_verified/fingerprint/recovery_trusted plumbing 2026-04-28 Pair 3)
+vauchi-app/src/ui/app_engine/mod.rs 997
 vauchi-app/src/ui/app_engine/routing.rs 970
-vauchi-app/src/ui/app_engine/screens.rs 1279
+vauchi-app/src/ui/app_engine/screens.rs 1286
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081
@@ -62,8 +64,10 @@ vauchi-core/tests/it/migration_tests.rs 1224
 # vauchi-app — extracted from vauchi-core, inherits exemption
 # (+150 for G4 visibility helpers + ReciprocityBannerKind + inline tests
 # supporting ScreenModel API gaps 2026-04-27)
+# (+105 for is_verified/fingerprint/is_recovery_trusted fields + recovery
+# permissions SettingsGroup + verify_button gating 2026-04-28 Pair 3)
 vauchi-app/src/ui/exchange.rs 3198
-vauchi-app/src/ui/contact_detail.rs 1318
+vauchi-app/src/ui/contact_detail.rs 1423
 
 # EXEMPT — BLE exchange sub-flow: inline tests access private state (proximity_runner, shake_envelope_sent)
 vauchi-app/src/ui/exchange_ble.rs 1051

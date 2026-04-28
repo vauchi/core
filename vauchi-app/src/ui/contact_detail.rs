@@ -56,8 +56,23 @@ pub struct ContactDetailEngine {
     field_notes: HashMap<String, String>,
     /// Computed trust level display string (read-only).
     trust_level: String,
+    /// Trust level enum used to gate `verify_fingerprint` action via
+    /// `verify_button_visible(is_verified, trust_level_enum)`. Defaults to
+    /// `Standard` so legacy callers that only pass the display string get
+    /// the same visibility behaviour as before this field existed.
+    trust_level_enum: TrustLevel,
     /// Exchange reciprocity status display string (read-only).
     reciprocity_status: String,
+    /// Whether the user has manually verified this contact's fingerprint
+    /// — gates the "Verify" affordance per `verify_button_visible`.
+    is_verified: bool,
+    /// Hex / formatted fingerprint string for the InfoPanel (G6 added
+    /// 2026-04-28 to close the Pair 3 ContactDetail engine gap).
+    fingerprint: String,
+    /// Whether this contact is configured as a recovery trustee.
+    /// Drives both the `Recovery Trusted` indicator and the
+    /// `recovery_permissions` SettingsGroup toggle.
+    is_recovery_trusted: bool,
     /// Whether this contact is trusted for simplified contact proposals (user-editable).
     proposal_trusted: bool,
     /// Whether this contact is hidden from the main contact list.
@@ -83,7 +98,11 @@ impl ContactDetailEngine {
             personal_note,
             field_notes: HashMap::new(),
             trust_level: String::new(),
+            trust_level_enum: TrustLevel::Standard,
             reciprocity_status: String::new(),
+            is_verified: false,
+            fingerprint: String::new(),
+            is_recovery_trusted: false,
             proposal_trusted: false,
             is_hidden: false,
             is_imported: false,
@@ -108,7 +127,11 @@ impl ContactDetailEngine {
             personal_note,
             field_notes: HashMap::new(),
             trust_level: String::new(),
+            trust_level_enum: TrustLevel::Standard,
             reciprocity_status: String::new(),
+            is_verified: false,
+            fingerprint: String::new(),
+            is_recovery_trusted: false,
             proposal_trusted: false,
             is_hidden: false,
             is_imported: false,
@@ -161,9 +184,37 @@ impl ContactDetailEngine {
         self
     }
 
+    /// Attach the verification flag + the canonical TrustLevel enum so
+    /// `verify_button_visible` can gate the `verify_fingerprint` action.
+    pub fn with_verification(mut self, is_verified: bool, trust_level_enum: TrustLevel) -> Self {
+        self.is_verified = is_verified;
+        self.trust_level_enum = trust_level_enum;
+        self
+    }
+
+    /// Attach the fingerprint string for the contact_info InfoPanel.
+    pub fn with_fingerprint(mut self, fingerprint: String) -> Self {
+        self.fingerprint = fingerprint;
+        self
+    }
+
+    /// Attach the recovery-trusted flag. Drives the Recovery Trusted
+    /// indicator and the recovery_permissions SettingsGroup toggle.
+    pub fn with_recovery_trusted(mut self, is_recovery_trusted: bool) -> Self {
+        self.is_recovery_trusted = is_recovery_trusted;
+        self
+    }
+
     /// Returns whether this contact is imported (non-crypto).
     pub fn is_imported(&self) -> bool {
         self.is_imported
+    }
+
+    /// Flip the in-memory `is_recovery_trusted` flag — called by AppEngine
+    /// intercept after a successful `vauchi.trust_contact_for_recovery` /
+    /// `untrust_contact_for_recovery` call. Mirror of `toggle_proposal_trusted`.
+    pub fn toggle_recovery_trusted(&mut self) {
+        self.is_recovery_trusted = !self.is_recovery_trusted;
     }
 }
 
@@ -448,6 +499,27 @@ impl ContactDetailEngine {
                         detail: self.trust_level.clone(),
                     });
                 }
+                if show_verified_badge(self.is_verified) {
+                    contact_info_items.push(InfoItem {
+                        icon: Some("checkmark.seal".into()),
+                        title: "Verified".into(),
+                        detail: "Yes".into(),
+                    });
+                }
+                if show_recovery_trusted_indicator(self.is_recovery_trusted) {
+                    contact_info_items.push(InfoItem {
+                        icon: Some("shield".into()),
+                        title: "Recovery Trusted".into(),
+                        detail: "Yes".into(),
+                    });
+                }
+                if !self.fingerprint.is_empty() {
+                    contact_info_items.push(InfoItem {
+                        icon: None,
+                        title: "Fingerprint".into(),
+                        detail: self.fingerprint.clone(),
+                    });
+                }
                 if !self.reciprocity_status.is_empty() {
                     contact_info_items.push(InfoItem {
                         icon: None,
@@ -523,6 +595,27 @@ impl ContactDetailEngine {
                             label: Some("Can propose contacts toggle".into()),
                             hint: Some(
                                 "Allow this contact to suggest other people you should connect with".into(),
+                            ),
+                            role: None,
+                        }),
+                        info_key: None,
+                    }],
+                });
+                // Recovery permissions group — gate the recovery-trustee toggle
+                // (Pair 3 ContactDetail engine extension, 2026-04-28).
+                components.push(Component::SettingsGroup {
+                    id: "recovery_permissions".into(),
+                    label: "Recovery".into(),
+                    items: vec![SettingsItem {
+                        id: "recovery_trusted".into(),
+                        label: "Trust for recovery".into(),
+                        kind: SettingsItemKind::Toggle {
+                            enabled: self.is_recovery_trusted,
+                        },
+                        a11y: Some(A11y {
+                            label: Some("Trust for recovery toggle".into()),
+                            hint: Some(
+                                "Allow this contact to help you recover access if you lose your device".into(),
                             ),
                             role: None,
                         }),
@@ -638,29 +731,32 @@ impl ContactDetailEngine {
             title,
             subtitle: self.contact.subtitle.clone(),
             components,
-            actions: vec![
-                ScreenAction {
+            actions: {
+                let mut actions: Vec<ScreenAction> = Vec::new();
+                actions.push(ScreenAction {
                     id: "edit".into(),
                     label: "Edit".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
-                },
-                ScreenAction {
-                    id: "verify_fingerprint".into(),
-                    label: "Verify Fingerprint".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                },
-                ScreenAction {
+                });
+                if verify_button_visible(self.is_verified, self.trust_level_enum) {
+                    actions.push(ScreenAction {
+                        id: "verify_fingerprint".into(),
+                        label: "Verify Fingerprint".into(),
+                        style: ActionStyle::Secondary,
+                        enabled: true,
+                        a11y: None,
+                    });
+                }
+                actions.push(ScreenAction {
                     id: format!("preview-as:{}", self.contact.id),
                     label: "What do they see?".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
-                },
-                ScreenAction {
+                });
+                actions.push(ScreenAction {
                     id: "toggle_hidden".into(),
                     label: if self.is_hidden {
                         "Unhide contact".into()
@@ -670,8 +766,8 @@ impl ContactDetailEngine {
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
-                },
-                ScreenAction {
+                });
+                actions.push(ScreenAction {
                     id: footer_action_id(self.is_imported).into(),
                     label: if self.is_imported {
                         "Delete Contact".into()
@@ -685,15 +781,16 @@ impl ContactDetailEngine {
                     },
                     enabled: true,
                     a11y: None,
-                },
-                ScreenAction {
+                });
+                actions.push(ScreenAction {
                     id: "back".into(),
                     label: "Back".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
-                },
-            ],
+                });
+                actions
+            },
             progress: None,
             ..Default::default()
         }
@@ -733,6 +830,14 @@ impl WorkflowEngine for ContactDetailEngine {
                 ref item_id,
             } if component_id == "trust_permissions" && item_id == "proposal_trusted" => {
                 self.proposal_trusted = !self.proposal_trusted;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            // Recovery trust toggle (local state; AppEngine intercept persists)
+            UserAction::SettingsToggled {
+                ref component_id,
+                ref item_id,
+            } if component_id == "recovery_permissions" && item_id == "recovery_trusted" => {
+                self.is_recovery_trusted = !self.is_recovery_trusted;
                 ActionResult::UpdateScreen(self.build_screen())
             }
             UserAction::ActionPressed { action_id } if action_id == "edit" => {

@@ -414,6 +414,41 @@ impl AppEngine {
             })
     }
 
+    /// Intercept the recovery-trust SettingsToggled on ContactDetail and
+    /// persist to storage. Mirror of `intercept_proposal_trust_toggle`,
+    /// added 2026-04-28 for the Pair 3 (ContactDetail) Pure Humble UI
+    /// retirement work.
+    pub(super) fn intercept_recovery_trust_toggle(
+        &mut self,
+        contact_id: &str,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        let UserAction::SettingsToggled {
+            component_id,
+            item_id,
+        } = action
+        else {
+            return None;
+        };
+        if component_id != "recovery_permissions" || item_id != "recovery_trusted" {
+            return None;
+        }
+
+        // Toggle recovery trust via the canonical Vauchi API. Errors are
+        // swallowed here — the engine's optimistic flip will be reverted
+        // on the next AppScreen::ContactDetail engine read if storage
+        // didn't actually change.
+        let _ = self.vauchi.toggle_recovery_trust(contact_id);
+
+        self.engine
+            .as_any_mut()
+            .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
+            .map(|engine| {
+                engine.toggle_recovery_trusted();
+                ActionResult::UpdateScreen(engine.current_screen())
+            })
+    }
+
     /// Intercept hide/unhide toggle on ContactDetail and persist to storage.
     pub(super) fn intercept_hide_toggle(
         &mut self,

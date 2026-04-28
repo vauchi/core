@@ -1496,8 +1496,7 @@ mod tests {
         // SAFETY: Valid config handle with temp directory.
         unsafe {
             let tmp = tempfile::tempdir().unwrap();
-            let db_path = tmp.path().join("vauchi.db");
-            let dir = CString::new(db_path.to_str().unwrap()).unwrap();
+            let dir = CString::new(tmp.path().to_str().unwrap()).unwrap();
             let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
             assert!(!config.is_null());
 
@@ -1506,6 +1505,10 @@ mod tests {
 
             let handle = vauchi_app_create_from_config(config);
             assert!(!handle.is_null(), "should create app from config");
+            assert!(
+                tmp.path().join("vauchi.db").exists(),
+                "vauchi.db should be created inside the data dir"
+            );
 
             vauchi_app_destroy(handle);
         }
@@ -1525,12 +1528,13 @@ mod tests {
         // SAFETY: Two sequential app creates with the same data dir to test persistence.
         unsafe {
             let tmp = tempfile::tempdir().unwrap();
-            let db_path = tmp.path().join("vauchi.db");
+            let data_dir = tmp.path();
+            let db_path = data_dir.join("vauchi.db");
             let key: [u8; 32] = [0x42; 32];
 
             // First launch: create identity
             {
-                let dir = CString::new(db_path.to_str().unwrap()).unwrap();
+                let dir = CString::new(data_dir.to_str().unwrap()).unwrap();
                 let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
                 vauchi_config_set_storage_key(config, key.as_ptr(), 32);
                 let handle = vauchi_app_create_from_config(config);
@@ -1549,14 +1553,16 @@ mod tests {
 
             // Second launch: should have persisted data
             {
-                let dir = CString::new(db_path.to_str().unwrap()).unwrap();
+                let dir = CString::new(data_dir.to_str().unwrap()).unwrap();
                 let config = vauchi_config_new(dir.as_ptr(), std::ptr::null());
                 vauchi_config_set_storage_key(config, key.as_ptr(), 32);
                 let handle = vauchi_app_create_from_config(config);
                 assert!(!handle.is_null());
 
-                // Verify data dir exists (persistence was used)
-                assert!(db_path.exists(), "database file should persist");
+                assert!(
+                    db_path.exists(),
+                    "vauchi.db should persist inside the data dir"
+                );
 
                 vauchi_app_destroy(handle);
             }

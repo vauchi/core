@@ -34,8 +34,18 @@ impl CabiConfig {
     }
 
     pub fn into_vauchi_config(self) -> VauchiConfig {
+        // The CABI contract (per `vauchi_config_new` doc) is that
+        // `data_dir` is a *directory*. `VauchiConfig::with_storage_path`
+        // expects a SQLite database *file* path, so join `vauchi.db`
+        // here. Matches the older `vauchi_app_create_with_config`
+        // (`app.rs`) pattern and the linux-qt persistence test
+        // (`tests/app_engine_test.cpp` asserts `dir / "vauchi.db"`).
+        // `create_dir_all` is idempotent — the C caller may have
+        // already created the dir for its own logging.
+        let _ = std::fs::create_dir_all(&self.data_dir);
+        let storage_path = self.data_dir.join("vauchi.db");
         let mut config =
-            VauchiConfig::with_storage_path(&self.data_dir).with_relay_url(&self.relay_url);
+            VauchiConfig::with_storage_path(&storage_path).with_relay_url(&self.relay_url);
         if let Some(key) = self.storage_key {
             config = config.with_storage_key(key);
         }

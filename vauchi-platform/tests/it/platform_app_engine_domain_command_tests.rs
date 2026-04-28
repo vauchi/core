@@ -2670,3 +2670,98 @@ fn merge_contacts_errors_for_unknown_ids() {
         "error message must be non-empty, got: {err:?}"
     );
 }
+
+// ── B7 batch 15: Field visibility ──────────────────────────────────────
+
+// @internal
+#[test]
+fn hide_field_from_contact_errors_for_unknown_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::HideFieldFromContact {
+            contact_id: "ghost".into(),
+            field_label: "any".into(),
+        })
+        .expect_err("must error on missing contact");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("not found"),
+        "expected not-found, got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn show_field_to_contact_errors_for_unknown_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::ShowFieldToContact {
+            contact_id: "ghost".into(),
+            field_label: "any".into(),
+        })
+        .expect_err("must error on missing contact");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("not found"),
+        "expected not-found, got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn is_field_visible_to_contact_errors_for_unknown_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::IsFieldVisibleToContact {
+            contact_id: "ghost".into(),
+            field_label: "any".into(),
+        })
+        .expect_err("must error on missing contact");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("not found"),
+        "expected not-found, got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn set_contact_field_override_errors_for_unknown_field_label() {
+    // Identity exists (drive_onboarding) but no field with this label
+    // exists on the own card.
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::SetContactFieldOverride {
+            contact_id: "any".into(),
+            field_label: "no-such-field".into(),
+            is_visible: true,
+        })
+        .expect_err("must error on missing field");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("field not found") || msg.contains("not found"),
+        "expected field-not-found, got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn remove_contact_field_override_errors_for_unknown_field_label() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::RemoveContactFieldOverride {
+            contact_id: "any".into(),
+            field_label: "no-such-field".into(),
+        })
+        .expect_err("must error on missing field");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("field not found") || msg.contains("not found"),
+        "expected field-not-found, got: {err:?}"
+    );
+}

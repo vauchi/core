@@ -460,6 +460,10 @@ pub enum DomainCommand {
         primary_id: String,
         secondary_id: String,
     },
+    // ── Field Visibility (B7 batch 15) ──
+    // HideFieldFromContact, ShowFieldToContact, IsFieldVisibleToContact,
+    // SetContactFieldOverride, RemoveContactFieldOverride were already
+    // added by batch 6 (Field Visibility section).
 }
 
 /// Sum type of every legitimate return shape from

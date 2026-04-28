@@ -46,8 +46,9 @@ vauchi-core/src/storage/mod.rs 1079
 # (+3 on routing.rs for handle_hardware_event allowlist entry 2026-04-28 Pair 4)
 # (+10 on screens.rs for AppScreen::MultiStageExchange engine factory 2026-04-28 Pair 4)
 # (+60 on mod.rs for apply_multi_stage_{state,qr_payload,finalized,session_ended} bridge convenience methods 2026-04-28 Pair 4)
+# (+31 on routing.rs for ActionResult::RetryFailedDeliveries handler 2026-04-28 Pair 1 retry-routing fix)
 vauchi-app/src/ui/app_engine/mod.rs 1067
-vauchi-app/src/ui/app_engine/routing.rs 973
+vauchi-app/src/ui/app_engine/routing.rs 1004
 vauchi-app/src/ui/app_engine/screens.rs 1296
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files

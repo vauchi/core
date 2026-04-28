@@ -472,6 +472,7 @@
                   }
                 },
                 "fields": {
+                  "description": "All fields on the card (raw — retained for backwards compatibility).\n\nFrontends should render `visible_fields` instead. This field is kept additive for one binding cycle so consumers can migrate without an ABI break; a follow-up MR removes it.",
                   "type": "array",
                   "items": {
                     "$ref": "#/definitions/FieldDisplay"
@@ -491,6 +492,14 @@
                     "string",
                     "null"
                   ]
+                },
+                "visible_fields": {
+                  "description": "Pre-filtered fields to render — what the user actually sees.\n\nComputed by [`build_visible_fields`]: when `selected_group` is set and matches a `GroupCardView`, returns that group's `visible_fields`. Otherwise returns `fields` filtered to keep only `Shown` and `Groups` visibility variants. Frontends render this list directly — no `.filter` over `fields` should appear in view code (ADR-021/043 Humble UI).",
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/FieldDisplay"
+                  }
                 }
               }
             }

@@ -43,70 +43,125 @@ const SECONDS_PER_WEEK: u64 = 7 * SECONDS_PER_DAY;
 const SECONDS_PER_MONTH: u64 = 30 * SECONDS_PER_DAY;
 const SECONDS_PER_YEAR: u64 = 365 * SECONDS_PER_DAY;
 
+/// The sentinel `i18n::get_string` returns when a key isn't found in
+/// any locale (including the bundled English fallback). Surfacing
+/// "Missing: <key>" to a user is always wrong for this affordance —
+/// fall back to a hardcoded English template instead.
+const MISSING_PREFIX: &str = "Missing:";
+
 /// Format a relative timestamp using locale-aware strings.
 ///
 /// `now` and `then` are seconds-since-Unix-epoch. Returns the localized
 /// string for the bucket containing `now − then`. Future timestamps
 /// (`then > now`) collapse to "Just now" — see module docs.
+///
+/// **Resilient lookup:** when the locale store doesn't have the
+/// `time.relative.*` keys (e.g. CI builds against a stale bundled
+/// English fallback whose JSON pre-dates these keys), the formatter
+/// falls back to a hardcoded English template instead of returning
+/// `i18n`'s `"Missing: <key>"` sentinel. Frontend never sees the
+/// sentinel for this surface.
 pub fn format_relative_time(now: u64, then: u64, locale: Locale) -> String {
     let delta = now.saturating_sub(then);
 
     if delta < SECONDS_PER_MINUTE {
-        return get_string(locale, "time.relative.just_now");
+        return localize_or_default(locale, "time.relative.just_now", "Just now");
     }
     if delta < SECONDS_PER_HOUR {
         let count = delta / SECONDS_PER_MINUTE;
-        return scaled(locale, count, "minute_ago", "minutes_ago");
+        return scaled(
+            locale,
+            count,
+            "minute_ago",
+            "minutes_ago",
+            "minute",
+            "minutes",
+        );
     }
     if delta < SECONDS_PER_DAY {
         let count = delta / SECONDS_PER_HOUR;
-        return scaled(locale, count, "hour_ago", "hours_ago");
+        return scaled(locale, count, "hour_ago", "hours_ago", "hour", "hours");
     }
     // 1 day exactly — use the calendar shortcut.
     if delta < 2 * SECONDS_PER_DAY {
-        return get_string(locale, "time.relative.yesterday");
+        return localize_or_default(locale, "time.relative.yesterday", "Yesterday");
     }
     if delta < SECONDS_PER_WEEK {
         let count = delta / SECONDS_PER_DAY;
         // Always plural — "Yesterday" already covered the singular.
-        return get_string_with_args(
-            locale,
-            "time.relative.days_ago",
-            &[("count", &count.to_string())],
-        );
+        return localize_with_count_or_default(locale, "time.relative.days_ago", count, "days");
     }
     if delta < SECONDS_PER_MONTH {
         let count = delta / SECONDS_PER_WEEK;
-        return scaled(locale, count, "week_ago", "weeks_ago");
+        return scaled(locale, count, "week_ago", "weeks_ago", "week", "weeks");
     }
     if delta < SECONDS_PER_YEAR {
         let count = delta / SECONDS_PER_MONTH;
-        return scaled(locale, count, "month_ago", "months_ago");
+        return scaled(locale, count, "month_ago", "months_ago", "month", "months");
     }
     let count = delta / SECONDS_PER_YEAR;
-    scaled(locale, count, "year_ago", "years_ago")
+    scaled(locale, count, "year_ago", "years_ago", "year", "years")
 }
 
-/// Resolve the singular vs plural i18n key based on `count`.
+/// Resolve the singular vs plural i18n key based on `count`. Falls
+/// back to a hardcoded English template if the locale lookup misses.
 ///
-/// `singular_suffix` and `plural_suffix` are the bare suffixes (e.g.
-/// `"minute_ago"` / `"minutes_ago"`); the function prepends
-/// `"time.relative."` to construct the full key.
-fn scaled(locale: Locale, count: u64, singular_suffix: &str, plural_suffix: &str) -> String {
+/// `singular_key` / `plural_key` are the bare suffixes (e.g.
+/// `"minute_ago"` / `"minutes_ago"`); `singular_unit` / `plural_unit`
+/// are the English unit names used in the fallback template.
+fn scaled(
+    locale: Locale,
+    count: u64,
+    singular_key: &str,
+    plural_key: &str,
+    singular_unit: &str,
+    plural_unit: &str,
+) -> String {
     if count == 1 {
         // Singular keys still use {count} so the formatter is uniform —
         // e.g. English "1 minute ago" embeds "1" via the placeholder.
-        get_string_with_args(
-            locale,
-            &format!("time.relative.{singular_suffix}"),
-            &[("count", "1")],
-        )
+        let key = format!("time.relative.{singular_key}");
+        let value = get_string_with_args(locale, &key, &[("count", "1")]);
+        if value.starts_with(MISSING_PREFIX) {
+            format!("1 {singular_unit} ago")
+        } else {
+            value
+        }
     } else {
-        get_string_with_args(
+        localize_with_count_or_default(
             locale,
-            &format!("time.relative.{plural_suffix}"),
-            &[("count", &count.to_string())],
+            &format!("time.relative.{plural_key}"),
+            count,
+            plural_unit,
         )
+    }
+}
+
+/// Look up `key` in the locale store; if missing, return the
+/// `default_en` string verbatim.
+fn localize_or_default(locale: Locale, key: &str, default_en: &str) -> String {
+    let value = get_string(locale, key);
+    if value.starts_with(MISSING_PREFIX) {
+        default_en.to_string()
+    } else {
+        value
+    }
+}
+
+/// Look up a `{count}`-templated `key` in the locale store; if missing,
+/// fall back to `"{count} {plural_unit} ago"`.
+fn localize_with_count_or_default(
+    locale: Locale,
+    key: &str,
+    count: u64,
+    plural_unit: &str,
+) -> String {
+    let count_str = count.to_string();
+    let value = get_string_with_args(locale, key, &[("count", &count_str)]);
+    if value.starts_with(MISSING_PREFIX) {
+        format!("{count_str} {plural_unit} ago")
+    } else {
+        value
     }
 }
 

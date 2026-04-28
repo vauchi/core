@@ -23,6 +23,8 @@
 use super::VauchiPlatform;
 use super::error::MobileError;
 
+use vauchi_app::i18n::Locale;
+use vauchi_app::relative_time::format_relative_time;
 use vauchi_app::ui::{
     ReciprocityBannerKind, reciprocity_banner, show_recovery_trusted_indicator,
     show_verified_badge, verify_button_visible,
@@ -96,6 +98,14 @@ pub struct MobileContactDetailViewState {
     pub banners: Vec<MobileContactDetailBanner>,
     /// Action buttons to render in the screen footer/action bar.
     pub actions: Vec<MobileContactDetailAction>,
+    /// Localized "Added X ago" display string, or `None` for imported
+    /// contacts (no exchange timestamp). Closes G6 (a) — frontends
+    /// stop calling Swift's `RelativeDateTimeFormatter` /
+    /// Android's `DateUtils.getRelativeTimeSpanString` directly and
+    /// instead render this string verbatim. The locale used today is
+    /// English; per-locale plumbing is the follow-up
+    /// (`contact_detail_view_state_localized` overload).
+    pub added_time_display: Option<String>,
 }
 
 #[uniffi::export]
@@ -167,10 +177,36 @@ impl VauchiPlatform {
         }
         actions.push(MobileContactDetailAction::Back);
 
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let added_time_display = compute_added_time_display(&contact, now, Locale::English);
+
         Ok(MobileContactDetailViewState {
             badges,
             banners,
             actions,
+            added_time_display,
         })
     }
+}
+
+/// Compute the "Added X ago" display string from the contact's exchange
+/// timestamp.
+///
+/// Returns `None` for imported contacts (no exchange timestamp) and for
+/// contacts with `exchange_timestamp == 0` (legacy / migration sentinel).
+/// Factored out for tests so the bucket boundaries can be exercised
+/// without mocking `SystemTime`.
+pub(crate) fn compute_added_time_display(
+    contact: &vauchi_core::Contact,
+    now: u64,
+    locale: Locale,
+) -> Option<String> {
+    let then = contact.exchange_timestamp()?;
+    if then == 0 {
+        return None;
+    }
+    Some(format_relative_time(now, then, locale))
 }

@@ -31,6 +31,9 @@ pub mod content;
 pub mod aha_moments;
 pub use aha_moments::{aha_moment_message_localized, aha_moment_title_localized};
 
+pub mod relative_time;
+pub use relative_time::format_relative_time;
+
 pub mod notification_types;
 
 pub mod notification_emitter;

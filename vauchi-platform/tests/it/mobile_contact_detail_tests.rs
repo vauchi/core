@@ -226,3 +226,46 @@ fn no_banner_for_pre_feature_contact_with_unknown_reciprocity() {
         "Reciprocity::Unknown (pre-feature / imported) must surface no banner"
     );
 }
+
+// @internal
+#[test]
+fn imported_contact_has_no_added_time_display() {
+    // Imported contacts have no exchange_timestamp, so the field is None.
+    // Frontends render nothing rather than a misleading "0 years ago".
+    let (wb, _dir) = setup();
+    let id = add_imported(&wb, "Eve");
+
+    let state = wb.contact_detail_view_state(id).unwrap();
+
+    assert!(
+        state.added_time_display.is_none(),
+        "imported contact must not surface added_time_display, got {:?}",
+        state.added_time_display,
+    );
+}
+
+// @internal
+#[test]
+fn exchanged_contact_surfaces_added_time_display_string() {
+    // Exchanged contacts have a real exchange_timestamp so the formatter
+    // produces a string. Without mocking SystemTime we cannot pin the
+    // exact bucket — assert non-None and non-"Missing:" sentinel only.
+    // Bucket-level coverage lives in the formatter's inline tests.
+    let (wb, _dir) = setup();
+    let id = add_exchanged(&wb, "Bob", 0x01);
+
+    let state = wb.contact_detail_view_state(id).unwrap();
+
+    let display = state
+        .added_time_display
+        .as_deref()
+        .expect("exchanged contact must surface added_time_display");
+    assert!(
+        !display.starts_with("Missing:"),
+        "added_time_display must not surface the i18n Missing sentinel, got {display:?}",
+    );
+    assert!(
+        !display.is_empty(),
+        "added_time_display must not be an empty string",
+    );
+}

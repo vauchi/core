@@ -221,3 +221,89 @@ fn grant_consent_invalidates_settings_and_privacy_screens() {
         .current_screen_json()
         .expect("current_screen_json after grant");
 }
+
+// ── Content Updates (B7 batch 2) ────────────────────────────────────
+
+// @internal
+#[test]
+fn is_content_updates_supported_returns_compile_time_flag() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let expected = cfg!(feature = "content-updates");
+    match engine
+        .dispatch_domain_command(DomainCommand::IsContentUpdatesSupported)
+        .expect("dispatch")
+    {
+        DomainCommandResult::Bool { value } => {
+            assert_eq!(value, expected, "must reflect compile-time feature");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn check_content_updates_returns_disabled_when_feature_off() {
+    // The default test build does not enable `content-updates`, so the
+    // dispatch must return `Disabled`. With the feature on the call
+    // would attempt a network check we don't want in unit-time tests.
+    if cfg!(feature = "content-updates") {
+        return;
+    }
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::CheckContentUpdates)
+        .expect("dispatch")
+    {
+        DomainCommandResult::UpdateStatus { status } => match status {
+            vauchi_platform::MobileUpdateStatus::Disabled => {}
+            other => panic!("expected Disabled, got {other:?}"),
+        },
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn apply_content_updates_returns_disabled_when_feature_off() {
+    if cfg!(feature = "content-updates") {
+        return;
+    }
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ApplyContentUpdates)
+        .expect("dispatch")
+    {
+        DomainCommandResult::ApplyResult { result } => match result {
+            vauchi_platform::MobileApplyResult::Disabled => {}
+            other => panic!("expected Disabled, got {other:?}"),
+        },
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn reload_social_networks_returns_default_registry() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ReloadSocialNetworks)
+        .expect("dispatch")
+    {
+        DomainCommandResult::SocialNetworks { networks } => {
+            // Default registry ships several known networks.
+            assert!(
+                !networks.is_empty(),
+                "default registry must contain entries"
+            );
+            for n in &networks {
+                assert!(!n.id.is_empty(), "network id must be non-empty");
+                assert!(!n.url_template.is_empty(), "url template must be non-empty");
+            }
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}

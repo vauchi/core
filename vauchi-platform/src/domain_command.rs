@@ -27,7 +27,10 @@
 //! with new variants without breaking existing call sites — UniFFI
 //! treats added enum cases as additive on the binding side.
 
-use crate::types::{MobileConsentRecord, MobileConsentStatus, MobileConsentType};
+use crate::content::{MobileApplyResult, MobileUpdateStatus};
+use crate::types::{
+    MobileConsentRecord, MobileConsentStatus, MobileConsentType, MobileSocialNetwork,
+};
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
 /// don't justify their own `#[uniffi::export]` method.
@@ -49,6 +52,20 @@ pub enum DomainCommand {
     GetConsentStatus { consent_type: MobileConsentType },
     /// All persisted consent records.
     GetConsentRecords,
+
+    // ── Content Updates (B7 batch 2, this MR) ──
+    /// Returns `true` when the `content-updates` Cargo feature is
+    /// enabled at compile time.
+    IsContentUpdatesSupported,
+    /// Check the remote update server for available content updates.
+    /// Blocking — returns `Disabled` when the feature is off.
+    CheckContentUpdates,
+    /// Download and cache available updates. Returns the per-type
+    /// outcome (applied vs failed). `Disabled` when the feature is off.
+    ApplyContentUpdates,
+    /// Reload the social-networks list from the content cache after
+    /// `ApplyContentUpdates` succeeds.
+    ReloadSocialNetworks,
 }
 
 /// Sum type of every legitimate return shape from
@@ -70,4 +87,10 @@ pub enum DomainCommandResult {
     ConsentStatus { status: MobileConsentStatus },
     /// List of `MobileConsentRecord` (B7 batch 1).
     ConsentRecords { records: Vec<MobileConsentRecord> },
+    /// Outcome of `CheckContentUpdates` (B7 batch 2).
+    UpdateStatus { status: MobileUpdateStatus },
+    /// Outcome of `ApplyContentUpdates` (B7 batch 2).
+    ApplyResult { result: MobileApplyResult },
+    /// List of `MobileSocialNetwork` (B7 batch 2 — `ReloadSocialNetworks`).
+    SocialNetworks { networks: Vec<MobileSocialNetwork> },
 }

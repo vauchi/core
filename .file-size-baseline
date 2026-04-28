@@ -119,15 +119,19 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # `done/2026-04-27-device-link-orchestrator-phase2d-windows`).
 # Bumped 2026-04-28 to 2073 by Phase B7 skeleton — adds
 # `dispatch_domain_command(DomainCommand) -> DomainCommandResult` plus
-# the first batch of variants (Consent: 5 commands). Subsequent B7
-# batch MRs add new domains by extending the dispatch arms.
+# the first batch of variants (Consent: 5 commands).
+# Bumped 2026-04-28 to 2235 by Phase B7 batch 2 — Content Updates (4
+# commands: IsContentUpdatesSupported, CheckContentUpdates,
+# ApplyContentUpdates, ReloadSocialNetworks; +162 incl. duplicated
+# feature-gated impl that mirrors mobile_content.rs and will become
+# the only copy after D3).
 # Splitting is not an option (UniFFI facade — see
 # `.claude/rules/file-size.md` Structural Exemptions).
 # (+29 for Pair 4 peer_scan TextChanged auto-route mirroring the
 #  existing QrScanned hardware-event auto-route — feeds the
 #  cycle-thread session when the QR-scanner Component fires from
 #  the multi-stage screen 2026-04-28)
-vauchi-platform/src/platform_app_engine.rs 2102
+vauchi-platform/src/platform_app_engine.rs 2264
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

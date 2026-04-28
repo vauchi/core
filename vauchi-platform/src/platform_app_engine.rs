@@ -1530,6 +1530,36 @@ impl PlatformAppEngine {
                         .collect(),
                 })
             }
+
+            // ── Content Updates (B7 batch 2) ──
+            DomainCommand::IsContentUpdatesSupported => Ok(DomainCommandResult::Bool {
+                value: cfg!(feature = "content-updates"),
+            }),
+            DomainCommand::CheckContentUpdates => {
+                let status = self.check_content_updates_dispatch();
+                Ok(DomainCommandResult::UpdateStatus { status })
+            }
+            DomainCommand::ApplyContentUpdates => {
+                let result = self.apply_content_updates_dispatch();
+                // Content updates can refresh on-disk content cache;
+                // invalidate any screen that reads social-network labels.
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::MyInfo);
+                Ok(DomainCommandResult::ApplyResult { result })
+            }
+            DomainCommand::ReloadSocialNetworks => {
+                let registry = vauchi_core::SocialNetworkRegistry::with_defaults();
+                let networks = registry
+                    .all()
+                    .iter()
+                    .map(|sn| crate::types::MobileSocialNetwork {
+                        id: sn.id().to_string(),
+                        display_name: sn.display_name().to_string(),
+                        url_template: sn.profile_url_template().to_string(),
+                    })
+                    .collect();
+                Ok(DomainCommandResult::SocialNetworks { networks })
+            }
         }
     }
 
@@ -1805,6 +1835,34 @@ impl PlatformAppEngine {
             .parent()
             .unwrap_or(&self.storage_path)
             .join(".recovery_proof")
+    }
+
+    /// Feature-gated content-update check (B7 batch 2). Returns
+    /// `MobileUpdateStatus::Disabled` when the `content-updates` Cargo
+    /// feature is off — matches legacy `VauchiPlatform::check_content_updates`.
+    fn check_content_updates_dispatch(&self) -> crate::content::MobileUpdateStatus {
+        #[cfg(feature = "content-updates")]
+        {
+            self.check_content_updates_impl_engine()
+        }
+        #[cfg(not(feature = "content-updates"))]
+        {
+            crate::content::MobileUpdateStatus::Disabled
+        }
+    }
+
+    /// Feature-gated content-update apply (B7 batch 2). Mirrors the
+    /// legacy `VauchiPlatform::apply_content_updates` semantics —
+    /// returns `Disabled` when the feature is off.
+    fn apply_content_updates_dispatch(&self) -> crate::content::MobileApplyResult {
+        #[cfg(feature = "content-updates")]
+        {
+            self.apply_content_updates_impl_engine()
+        }
+        #[cfg(not(feature = "content-updates"))]
+        {
+            crate::content::MobileApplyResult::Disabled
+        }
     }
 
     /// Detect transitions in/out of `MultiStageExchange` and manage the
@@ -2098,5 +2156,109 @@ fn mobile_state_to_core(state: MobileProtocolState) -> ProtocolState {
         MobileProtocolState::Complete => ProtocolState::Complete,
         MobileProtocolState::Finalized => ProtocolState::Finalized,
         MobileProtocolState::Failed { reason } => ProtocolState::Failed(reason),
+    }
+}
+
+// ── Content updates internals (B7 batch 2 — feature-gated) ─────────
+//
+// These mirror the `VauchiPlatform::*_content_updates_impl` methods
+// in `mobile_content.rs` line-for-line. Once D3 deletes the legacy
+// `VauchiPlatform` surface, these become the only copies.
+
+#[cfg(feature = "content-updates")]
+impl PlatformAppEngine {
+    fn check_content_updates_impl_engine(&self) -> crate::content::MobileUpdateStatus {
+        use crate::content::MobileUpdateStatus;
+        use vauchi_app::content::{ContentConfig, ContentManager};
+
+        let config = ContentConfig {
+            storage_path: self
+                .storage_path
+                .parent()
+                .unwrap_or(&self.storage_path)
+                .to_path_buf(),
+            remote_updates_enabled: true,
+            ..Default::default()
+        };
+
+        let manager = match ContentManager::new(config) {
+            Ok(m) => m,
+            Err(e) => {
+                return MobileUpdateStatus::CheckFailed {
+                    error: e.to_string(),
+                };
+            }
+        };
+
+        let rt: tokio::runtime::Runtime = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                return MobileUpdateStatus::CheckFailed {
+                    error: e.to_string(),
+                };
+            }
+        };
+
+        rt.block_on(async { manager.check_for_updates().await.into() })
+    }
+
+    fn apply_content_updates_impl_engine(&self) -> crate::content::MobileApplyResult {
+        use crate::content::{MobileApplyFailure, MobileApplyResult, MobileContentType};
+        use vauchi_app::content::{ContentConfig, ContentManager};
+
+        let config = ContentConfig {
+            storage_path: self
+                .storage_path
+                .parent()
+                .unwrap_or(&self.storage_path)
+                .to_path_buf(),
+            remote_updates_enabled: true,
+            ..Default::default()
+        };
+
+        let manager = match ContentManager::new(config) {
+            Ok(m) => m,
+            Err(e) => {
+                return MobileApplyResult::Error {
+                    error: e.to_string(),
+                };
+            }
+        };
+
+        let rt: tokio::runtime::Runtime = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                return MobileApplyResult::Error {
+                    error: e.to_string(),
+                };
+            }
+        };
+
+        rt.block_on(async {
+            match manager.apply_updates().await {
+                Ok(result) => match result {
+                    vauchi_app::content::ApplyResult::NoUpdates => MobileApplyResult::NoUpdates,
+                    vauchi_app::content::ApplyResult::Disabled => MobileApplyResult::Disabled,
+                    vauchi_app::content::ApplyResult::Applied { applied, failed } => {
+                        MobileApplyResult::Applied {
+                            applied: applied.into_iter().map(MobileContentType::from).collect(),
+                            failed: failed
+                                .into_iter()
+                                .map(|(ct, err)| MobileApplyFailure {
+                                    content_type: MobileContentType::from(ct),
+                                    error: err,
+                                })
+                                .collect(),
+                        }
+                    }
+                    _ => MobileApplyResult::Error {
+                        error: "unknown apply result".to_string(),
+                    },
+                },
+                Err(e) => MobileApplyResult::Error {
+                    error: e.to_string(),
+                },
+            }
+        })
     }
 }

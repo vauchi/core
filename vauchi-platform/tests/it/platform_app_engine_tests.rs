@@ -686,13 +686,13 @@ fn apply_multi_stage_state_finalized_with_session_ended_renders_success_screen()
     drive_to_multi_stage(&engine);
 
     engine
-        .apply_multi_stage_state(MobileProtocolState::Finalized)
+        .apply_multi_stage_state_for_test(MobileProtocolState::Finalized)
         .expect("apply Finalized");
     engine
-        .apply_multi_stage_finalized("Alice".into())
+        .apply_multi_stage_finalized_for_test("Alice".into())
         .expect("apply finalized name");
     engine
-        .apply_multi_stage_session_ended()
+        .apply_multi_stage_session_ended_for_test()
         .expect("apply session ended");
 
     let screen = engine.current_screen_json().expect("screen json");
@@ -715,7 +715,7 @@ fn apply_multi_stage_state_failed_renders_retry_cancel() {
     drive_to_multi_stage(&engine);
 
     engine
-        .apply_multi_stage_state(MobileProtocolState::Failed {
+        .apply_multi_stage_state_for_test(MobileProtocolState::Failed {
             reason: "lost peer".into(),
         })
         .expect("apply Failed");
@@ -742,10 +742,10 @@ fn apply_multi_stage_qr_payload_renders_own_qr_data_in_active_chrome() {
     drive_to_multi_stage(&engine);
 
     engine
-        .apply_multi_stage_state(MobileProtocolState::Advertising)
+        .apply_multi_stage_state_for_test(MobileProtocolState::Advertising)
         .expect("apply Advertising");
     engine
-        .apply_multi_stage_qr_payload(MobileQrPayload {
+        .apply_multi_stage_qr_payload_for_test(MobileQrPayload {
             data: "vauchi://INIT/zzz".into(),
             error_correction: "L".into(),
             display_duration_ms: 400,
@@ -768,12 +768,167 @@ fn apply_multi_stage_state_is_no_op_when_active_engine_is_not_multi_stage() {
     // On `my_info` (post-onboarding default), not the multi-stage screen.
     let pre_id = engine.current_screen_id().expect("screen id before apply");
     engine
-        .apply_multi_stage_state(MobileProtocolState::Finalized)
+        .apply_multi_stage_state_for_test(MobileProtocolState::Finalized)
         .expect("apply must succeed even when not the active engine");
     let post_id = engine.current_screen_id().expect("screen id after apply");
     assert_eq!(
         pre_id, post_id,
         "bridge push must not affect non-multi-stage screens",
+    );
+}
+
+// @internal
+#[test]
+fn picking_glance_from_mode_selection_auto_navigates_to_multi_stage_exchange() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    engine
+        .navigate_to_json(r#""Exchange""#.into())
+        .expect("navigate to Exchange");
+    assert_eq!(
+        engine.current_screen_id().expect("screen id"),
+        "exchange_mode_selection",
+    );
+    // User picks Glance — the simplest face-to-face mode. No further
+    // frontend call needed: AppEngine routes `StartMultiStageExchange`
+    // → `AppScreen::MultiStageExchange`, the platform layer
+    // auto-creates the session.
+    engine
+        .handle_action_json(
+            r#"{"ListItemSelected": {"component_id": "category:quick", "item_id": "mode:glance"}}"#
+                .into(),
+        )
+        .expect("select Glance");
+    assert_eq!(
+        engine.current_screen_id().expect("screen id after select"),
+        "multi_stage_exchange",
+        "Glance must route through the multi-stage screen — frontend never makes this decision",
+    );
+}
+
+// @internal
+#[test]
+fn navigate_to_multi_stage_auto_creates_session_no_frontend_call_needed() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+
+    // Capture invalidation calls — once the session starts the cycle
+    // thread fires `on_state_changed(Idle/Advertising)` which the bridge
+    // forwards as a `multi_stage_exchange` invalidation.
+    let invalidations: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
+    struct CaptureListener {
+        sink: Arc<Mutex<Vec<Vec<String>>>>,
+    }
+    impl PlatformEventListener for CaptureListener {
+        fn on_screens_invalidated(&self, screen_ids: Vec<String>) {
+            self.sink.lock().expect("lock").push(screen_ids);
+        }
+    }
+    engine
+        .set_event_listener(Box::new(CaptureListener {
+            sink: Arc::clone(&invalidations),
+        }))
+        .expect("set listener");
+
+    engine
+        .navigate_to_json(r#""MultiStageExchange""#.into())
+        .expect("navigate");
+    // Engine is now on multi_stage_exchange. The frontend never asked
+    // for a session — core created one.
+    assert_eq!(
+        engine
+            .current_screen_id()
+            .expect("screen id after navigate"),
+        "multi_stage_exchange",
+    );
+
+    // Give the cycle thread a moment to push at least one state.
+    std::thread::sleep(std::time::Duration::from_millis(150));
+    let calls = invalidations.lock().expect("lock").clone();
+    let saw_multi_stage = calls
+        .iter()
+        .any(|ids| ids.iter().any(|id| id == "multi_stage_exchange"));
+    assert!(
+        saw_multi_stage,
+        "auto-managed session must push at least one invalidation; got {calls:?}",
+    );
+
+    // Navigating away cancels the session and stops further pushes.
+    engine
+        .navigate_back_json()
+        .expect("navigate back away from multi_stage_exchange");
+    let pre_count = invalidations.lock().expect("lock").len();
+    std::thread::sleep(std::time::Duration::from_millis(150));
+    let post_count = invalidations.lock().expect("lock").len();
+    assert_eq!(
+        pre_count, post_count,
+        "session must stop pushing after navigate_back; pre={pre_count} post={post_count}",
+    );
+}
+
+// @internal
+#[test]
+fn qr_scanned_hardware_event_routes_to_session_when_on_multi_stage_screen() {
+    use vauchi_platform::MobileExchangeHardwareEvent;
+    let (engine, _dir) = create_engine();
+    drive_to_multi_stage(&engine);
+
+    // QrScanned must not return an ActionResult — the bridge handles
+    // the post-scan state push asynchronously. Returning Some here
+    // would mean the engine handled it directly (the legacy path),
+    // which is the leak we just fixed.
+    let result = engine
+        .handle_hardware_event(MobileExchangeHardwareEvent::QrScanned {
+            data: "garbage-not-an-init-frame".into(),
+        })
+        .expect("hardware event accepted");
+    assert!(
+        result.is_none(),
+        "QrScanned on multi_stage_exchange must be routed to session, not the engine — got {result:?}",
+    );
+}
+
+// @internal
+#[test]
+fn cancel_action_on_multi_stage_screen_stops_session_after_navigate() {
+    let (engine, _dir) = create_engine();
+    drive_to_multi_stage(&engine);
+
+    // Capture invalidations to detect post-cancel quiesce.
+    let invalidations: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
+    struct CaptureListener {
+        sink: Arc<Mutex<Vec<Vec<String>>>>,
+    }
+    impl PlatformEventListener for CaptureListener {
+        fn on_screens_invalidated(&self, screen_ids: Vec<String>) {
+            self.sink.lock().expect("lock").push(screen_ids);
+        }
+    }
+    engine
+        .set_event_listener(Box::new(CaptureListener {
+            sink: Arc::clone(&invalidations),
+        }))
+        .expect("set listener");
+
+    // Press Cancel — engine returns Complete, AppEngine routes that
+    // through handle_completion to navigate_back. After the action
+    // resolves the screen has changed away from multi_stage_exchange.
+    engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "cancel"}}"#.into())
+        .expect("cancel action");
+    let post_screen = engine.current_screen_id().expect("screen id");
+    assert_ne!(
+        post_screen, "multi_stage_exchange",
+        "cancel must navigate away; still on multi_stage_exchange",
+    );
+
+    // Wait — no further multi_stage invalidations should arrive.
+    let pre_count = invalidations.lock().expect("lock").len();
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    let post_count = invalidations.lock().expect("lock").len();
+    assert_eq!(
+        pre_count, post_count,
+        "session must be cancelled after handle_action(cancel); pre={pre_count} post={post_count}",
     );
 }
 
@@ -801,7 +956,7 @@ fn apply_multi_stage_state_notifies_event_listener() {
         .expect("set listener");
 
     engine
-        .apply_multi_stage_state(MobileProtocolState::Discovered)
+        .apply_multi_stage_state_for_test(MobileProtocolState::Discovered)
         .expect("apply Discovered");
 
     let calls = invalidations.lock().expect("lock").clone();

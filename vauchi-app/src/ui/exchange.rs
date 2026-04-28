@@ -1147,6 +1147,19 @@ impl WorkflowEngine for ExchangeEngine {
                                 self.step = ExchangeStep::Ble(BleStep::Discovering);
                                 return self.start_ble_mode();
                             }
+                            // Pair 4 — `Glance` is the canonical face-to-face
+                            // mode (bilateral simultaneous QR with no proximity
+                            // signal); route it through the new core-driven
+                            // `MultiStageExchange` screen so the multi-stage
+                            // protocol drives both QR display and scan from a
+                            // pure ScreenModel rather than the legacy bespoke
+                            // step state machine. Hover (QR + ultrasonic) and
+                            // Broadcast (one-to-many) keep the legacy path until
+                            // their proximity / fan-out semantics are also
+                            // captured in the new engine.
+                            if mode == ExchangeMode::Glance {
+                                return ActionResult::StartMultiStageExchange;
+                            }
                             self.step = ExchangeStep::Qr(QrStep::ShowQr);
                             return self.start_session_if_needed();
                         } else {
@@ -1970,29 +1983,24 @@ mod tests {
     }
 
     #[test]
-    fn mode_selection_pick_advances_to_qr() {
+    fn mode_selection_pick_advances_past_selection_via_multi_stage_handoff() {
         let mut engine = ExchangeEngine::new(config_mode_selection());
         assert_eq!(engine.step, ExchangeStep::ModeSelection);
 
-        // Pick Glance mode
+        // Pick Glance mode — Pair 4 hands this off to MultiStageExchange.
         let result = engine.handle_action(UserAction::ListItemSelected {
             component_id: "category:quick".into(),
             item_id: "mode:glance".into(),
         });
 
-        // Should advance past mode selection
-        assert_ne!(engine.step, ExchangeStep::ModeSelection);
-        // Mode should be stored in config
+        // Mode is recorded in config; the engine remains on
+        // ModeSelection because the flow leaves Exchange entirely
+        // when AppEngine routes the StartMultiStageExchange result.
         assert_eq!(engine.config.mode, Some(ExchangeMode::Glance));
-        // Should navigate to QR (no groups in this config)
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
         assert!(
-            matches!(engine.step, ExchangeStep::Qr(QrStep::ShowQr)),
-            "Expected Qr(ShowQr), got {:?}",
-            engine.step
-        );
-        assert!(
-            matches!(result, ActionResult::NavigateTo(_)),
-            "Expected NavigateTo, got {:?}",
+            matches!(result, ActionResult::StartMultiStageExchange),
+            "Expected StartMultiStageExchange handoff, got {:?}",
             result
         );
     }
@@ -2032,31 +2040,30 @@ mod tests {
     }
 
     #[test]
-    fn glance_mode_routes_through_qr_flow() {
+    fn glance_mode_routes_through_multi_stage_handoff() {
+        // Pair 4 — Glance is the canonical bilateral simultaneous QR
+        // mode and now hands off to the new core-driven
+        // `MultiStageExchange` screen instead of the legacy
+        // ExchangeStep::Qr sub-flow. The engine emits
+        // `StartMultiStageExchange`; AppEngine routing translates it
+        // into navigation, and PlatformAppEngine auto-creates the
+        // session.
         let mut engine = ExchangeEngine::new(config_mode_selection());
 
-        // Pick Glance
-        let _ = engine.handle_action(UserAction::ListItemSelected {
+        let result = engine.handle_action(UserAction::ListItemSelected {
             component_id: "category:quick".into(),
             item_id: "mode:glance".into(),
         });
         assert_eq!(engine.config.mode, Some(ExchangeMode::Glance));
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
-
-        // QR flow works identically for both modes at engine level —
-        // emits ExchangeCommand::QrRequestScan (no longer the deprecated
-        // RequestCamera ActionResult).
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-        match &result {
-            ActionResult::ExchangeCommands { commands } => assert_eq!(
-                commands,
-                &vec![vauchi_core::exchange::command::ExchangeCommand::QrRequestScan]
-            ),
-            other => panic!("Expected ExchangeCommands with QrRequestScan, got {other:?}"),
-        }
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
+        // Engine stays on ModeSelection — the flow leaves Exchange
+        // entirely once AppEngine routes the StartMultiStageExchange
+        // result. Step is never advanced into Qr/Ble/Link sub-flows
+        // for Glance.
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
+        assert!(
+            matches!(result, ActionResult::StartMultiStageExchange),
+            "Glance must hand off to multi-stage; got {result:?}",
+        );
     }
 
     #[test]

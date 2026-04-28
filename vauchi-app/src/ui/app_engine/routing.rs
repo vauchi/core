@@ -758,6 +758,16 @@ impl AppEngine {
                 let screen = self.navigate_to(AppScreen::DeviceLinking);
                 ActionResult::NavigateTo(screen)
             }
+            // Pair 4 — `ExchangeEngine` emits StartMultiStageExchange when
+            // the user picks `ExchangeMode::Glance` from the mode list.
+            // Route to the dedicated screen so `PlatformAppEngine` can
+            // auto-create the `MobileMultiStageSession` on entry. The
+            // frontend never decides this — picking a mode is a
+            // user-action, the rest is core's responsibility.
+            ActionResult::StartMultiStageExchange => {
+                let screen = self.navigate_to(AppScreen::MultiStageExchange);
+                ActionResult::NavigateTo(screen)
+            }
             ActionResult::OpenEntryDetail { field_id } => {
                 let screen = self.navigate_to(AppScreen::MyInfoEntryDetail { field_id });
                 ActionResult::NavigateTo(screen)

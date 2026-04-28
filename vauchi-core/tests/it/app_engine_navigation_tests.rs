@@ -231,10 +231,14 @@ fn navigate_away_and_back_preserves_engine_state() {
     let first_visit = engine.navigate_to(AppScreen::Exchange);
     assert_eq!(first_visit.screen_id, "exchange_mode_selection");
 
-    // Pick Glance mode via ListItemSelected → advances to QR
+    // Pick Hover mode (still routes through legacy ExchangeStep::Qr —
+    // Glance now hands off to MultiStageExchange and so leaves the
+    // Exchange engine entirely; using Hover keeps this regression test
+    // exercising the cache-preserves-state behavior on a single
+    // engine).
     let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:quick".into(),
-        item_id: "mode:glance".into(),
+        component_id: "category:standard".into(),
+        item_id: "mode:hover".into(),
     });
     let qr_screen = engine.current_screen();
     assert_eq!(

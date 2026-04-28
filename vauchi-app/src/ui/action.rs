@@ -225,4 +225,14 @@ pub enum ActionResult {
     RetryFailedDeliveries {
         message_ids: Vec<String>,
     },
+    /// App layer should navigate to the multi-stage face-to-face
+    /// exchange screen (`AppScreen::MultiStageExchange`).
+    ///
+    /// Emitted by `ExchangeEngine` when the user picks a mode whose
+    /// implementation is the new core-driven multi-stage protocol
+    /// (Pair 4 of `2026-04-28-pure-humble-ui-retire-native-screens`).
+    /// Frontends never see this — `PlatformAppEngine` routes it to the
+    /// dedicated screen which then auto-creates the
+    /// `MobileMultiStageSession` and binds the bridge listener.
+    StartMultiStageExchange,
 }

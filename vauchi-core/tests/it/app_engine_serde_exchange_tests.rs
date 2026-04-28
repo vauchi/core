@@ -231,10 +231,12 @@ fn exchange_screen_with_identity_has_session() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_mode_selection");
 
-    // Pick a mode to advance to QR
+    // Pick Hover to advance to the legacy QR sub-flow. Glance now
+    // hands off to MultiStageExchange (Pair 4) — Hover still drives
+    // the legacy ExchangeStep::Qr session that this test asserts on.
     let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:quick".into(),
-        item_id: "mode:glance".into(),
+        component_id: "category:standard".into(),
+        item_id: "mode:hover".into(),
     });
 
     let screen = engine.current_screen();

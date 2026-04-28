@@ -1415,6 +1415,95 @@ impl PlatformAppEngine {
         Ok(())
     }
 
+    // ── DomainCommand dispatch (Phase B7 — collapse-vauchi-platform-into-app-engine) ──
+    //
+    // Long-tail domain operations that don't justify their own typed
+    // method. The R3 hybrid keeps Recovery / Emergency Broadcast /
+    // Device Linking as direct typed methods (B2/B3/B4); everything
+    // else collapses into `DomainCommand`. New domains are added
+    // batch-by-batch in their own MRs.
+    //
+    // First batch (this MR): Consent (5 variants).
+
+    /// Dispatch a typed domain command. Pattern match on the
+    /// returned [`DomainCommandResult`] in the calling code; see
+    /// `core/vauchi-platform/src/domain_command.rs` for the
+    /// variant set.
+    pub fn dispatch_domain_command(
+        &self,
+        command: crate::domain_command::DomainCommand,
+    ) -> Result<crate::domain_command::DomainCommandResult, MobileError> {
+        use crate::domain_command::{DomainCommand, DomainCommandResult};
+
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+
+        match command {
+            DomainCommand::GrantConsent { consent_type } => {
+                let storage = engine.vauchi().storage();
+                let manager = vauchi_core::api::ConsentManager::new(storage);
+                manager
+                    .grant(vauchi_core::api::ConsentType::from(consent_type))
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::RevokeConsent { consent_type } => {
+                let storage = engine.vauchi().storage();
+                let manager = vauchi_core::api::ConsentManager::new(storage);
+                manager
+                    .revoke(vauchi_core::api::ConsentType::from(consent_type))
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::CheckConsent { consent_type } => {
+                let storage = engine.vauchi().storage();
+                let manager = vauchi_core::api::ConsentManager::new(storage);
+                let value = manager
+                    .check(&vauchi_core::api::ConsentType::from(consent_type))
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                Ok(DomainCommandResult::Bool { value })
+            }
+            DomainCommand::GetConsentStatus { consent_type } => {
+                let status = engine
+                    .vauchi()
+                    .get_consent_status(vauchi_core::api::ConsentType::from(consent_type))
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                Ok(DomainCommandResult::ConsentStatus {
+                    status: crate::types::MobileConsentStatus::from(status),
+                })
+            }
+            DomainCommand::GetConsentRecords => {
+                let storage = engine.vauchi().storage();
+                let manager = vauchi_core::api::ConsentManager::new(storage);
+                let records =
+                    manager
+                        .export_consent_log_with_version()
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?;
+                Ok(DomainCommandResult::ConsentRecords {
+                    records: records
+                        .iter()
+                        .map(crate::types::MobileConsentRecord::from)
+                        .collect(),
+                })
+            }
+        }
+    }
+
     // ── Device Linking (Phase B4 — collapse-vauchi-platform-into-app-engine) ──
     //
     // Wraps the **post-orchestrator** device-linking surface. The

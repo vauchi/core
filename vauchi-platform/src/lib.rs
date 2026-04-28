@@ -26,6 +26,7 @@ use vauchi_core::{
 
 mod content;
 mod diagnostic;
+mod domain_command;
 mod error;
 mod exchange;
 mod json_helpers;
@@ -84,6 +85,7 @@ pub use diagnostic::{
     diagnostic_generate_sweep_matrix, diagnostic_generate_throughput_sequence,
     diagnostic_rank_configs, diagnostic_scan_qr_with_config, diagnostic_score_config,
 };
+pub use domain_command::{DomainCommand, DomainCommandResult};
 use error::lock_or;
 pub use error::{KeychainError, MobileError};
 pub use exchange::{

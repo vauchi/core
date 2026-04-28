@@ -13,71 +13,76 @@ use super::types::{
     MobileDuplicatePair, MobileFieldNote, MobileFieldType, MobileNameOption, MobileSocialNetwork,
 };
 
-impl VauchiPlatform {
-    /// Enriches a single contact with display context (nickname, resolved name, custom avatar flag).
-    ///
-    /// Use this for single-contact operations (`get_contact`). For list operations use
-    /// `enrich_contacts_batch` to avoid N+1 queries.
-    fn enrich_contact(
-        storage: &vauchi_core::Storage,
-        contact: &vauchi_core::Contact,
-    ) -> MobileContact {
-        let cid = contact.id();
-        let nickname = storage.load_contact_nickname(cid).ok().flatten();
-        let has_custom_avatar = storage.has_contact_custom_avatar(cid).unwrap_or(false);
-        let shared_names = storage.list_shared_names(cid).unwrap_or_default();
-        let (name_pref, _avatar_pref) = storage.load_display_preferences(cid).unwrap_or((
-            vauchi_core::DisplayNamePreference::Primary,
-            vauchi_core::AvatarPreference::Primary,
-        ));
-        let resolved = vauchi_core::contact::display::resolve_display_name(
-            contact.display_name(),
-            &name_pref,
-            &shared_names,
-            nickname.as_deref(),
-        );
-        MobileContact::with_display_context(contact, nickname, resolved, has_custom_avatar)
+/// Enriches a single contact with display context (nickname, resolved name, custom avatar flag).
+///
+/// Use this for single-contact operations (`get_contact`). For list operations use
+/// `enrich_contacts_batch` to avoid N+1 queries.
+///
+/// Promoted from a private associated function on `VauchiPlatform` to
+/// a `pub(crate)` free function so `PlatformAppEngine` dispatch arms
+/// (B7 batch 10) can reuse the same enrichment helper.
+pub(crate) fn enrich_contact(
+    storage: &vauchi_core::Storage,
+    contact: &vauchi_core::Contact,
+) -> MobileContact {
+    let cid = contact.id();
+    let nickname = storage.load_contact_nickname(cid).ok().flatten();
+    let has_custom_avatar = storage.has_contact_custom_avatar(cid).unwrap_or(false);
+    let shared_names = storage.list_shared_names(cid).unwrap_or_default();
+    let (name_pref, _avatar_pref) = storage.load_display_preferences(cid).unwrap_or((
+        vauchi_core::DisplayNamePreference::Primary,
+        vauchi_core::AvatarPreference::Primary,
+    ));
+    let resolved = vauchi_core::contact::display::resolve_display_name(
+        contact.display_name(),
+        &name_pref,
+        &shared_names,
+        nickname.as_deref(),
+    );
+    MobileContact::with_display_context(contact, nickname, resolved, has_custom_avatar)
+}
+
+/// Batch-enriches a slice of contacts using a single round of queries per data type.
+///
+/// Issues four queries total (shared names, nicknames, preferences, avatar flags)
+/// regardless of the number of contacts, eliminating the N+1 pattern in list methods.
+///
+/// `pub(crate)` so the `PlatformAppEngine` dispatch arms (B7 batch 10)
+/// reuse the helper.
+pub(crate) fn enrich_contacts_batch(
+    storage: &vauchi_core::Storage,
+    contacts: &[vauchi_core::Contact],
+) -> Vec<MobileContact> {
+    if contacts.is_empty() {
+        return Vec::new();
     }
+    let ids: Vec<&str> = contacts.iter().map(|c| c.id()).collect();
 
-    /// Batch-enriches a slice of contacts using a single round of queries per data type.
-    ///
-    /// Issues four queries total (shared names, nicknames, preferences, avatar flags)
-    /// regardless of the number of contacts, eliminating the N+1 pattern in list methods.
-    fn enrich_contacts_batch(
-        storage: &vauchi_core::Storage,
-        contacts: &[vauchi_core::Contact],
-    ) -> Vec<MobileContact> {
-        if contacts.is_empty() {
-            return Vec::new();
-        }
-        let ids: Vec<&str> = contacts.iter().map(|c| c.id()).collect();
+    let shared_names_map = storage.batch_shared_names(&ids).unwrap_or_default();
+    let nicknames_map = storage.batch_nicknames(&ids).unwrap_or_default();
+    let prefs_map = storage.batch_display_preferences(&ids).unwrap_or_default();
+    let has_avatar_set = storage.batch_has_custom_avatar(&ids).unwrap_or_default();
 
-        let shared_names_map = storage.batch_shared_names(&ids).unwrap_or_default();
-        let nicknames_map = storage.batch_nicknames(&ids).unwrap_or_default();
-        let prefs_map = storage.batch_display_preferences(&ids).unwrap_or_default();
-        let has_avatar_set = storage.batch_has_custom_avatar(&ids).unwrap_or_default();
-
-        contacts
-            .iter()
-            .map(|contact| {
-                let cid = contact.id();
-                let nickname = nicknames_map.get(cid).cloned();
-                let has_custom_avatar = has_avatar_set.contains(cid);
-                let shared_names = shared_names_map.get(cid).cloned().unwrap_or_default();
-                let (name_pref, _avatar_pref) = prefs_map.get(cid).cloned().unwrap_or((
-                    vauchi_core::DisplayNamePreference::Primary,
-                    vauchi_core::AvatarPreference::Primary,
-                ));
-                let resolved = vauchi_core::contact::display::resolve_display_name(
-                    contact.display_name(),
-                    &name_pref,
-                    &shared_names,
-                    nickname.as_deref(),
-                );
-                MobileContact::with_display_context(contact, nickname, resolved, has_custom_avatar)
-            })
-            .collect()
-    }
+    contacts
+        .iter()
+        .map(|contact| {
+            let cid = contact.id();
+            let nickname = nicknames_map.get(cid).cloned();
+            let has_custom_avatar = has_avatar_set.contains(cid);
+            let shared_names = shared_names_map.get(cid).cloned().unwrap_or_default();
+            let (name_pref, _avatar_pref) = prefs_map.get(cid).cloned().unwrap_or((
+                vauchi_core::DisplayNamePreference::Primary,
+                vauchi_core::AvatarPreference::Primary,
+            ));
+            let resolved = vauchi_core::contact::display::resolve_display_name(
+                contact.display_name(),
+                &name_pref,
+                &shared_names,
+                nickname.as_deref(),
+            );
+            MobileContact::with_display_context(contact, nickname, resolved, has_custom_avatar)
+        })
+        .collect()
 }
 
 #[uniffi::export]
@@ -228,14 +233,14 @@ impl VauchiPlatform {
     pub fn list_contacts(&self) -> Result<Vec<MobileContact>, MobileError> {
         let storage = self.open_storage()?;
         let contacts = storage.list_contacts()?;
-        Ok(Self::enrich_contacts_batch(&storage, &contacts))
+        Ok(enrich_contacts_batch(&storage, &contacts))
     }
 
     /// Get single contact by ID.
     pub fn get_contact(&self, id: String) -> Result<Option<MobileContact>, MobileError> {
         let storage = self.open_storage()?;
         let contact = storage.load_contact(&id)?;
-        Ok(contact.as_ref().map(|c| Self::enrich_contact(&storage, c)))
+        Ok(contact.as_ref().map(|c| enrich_contact(&storage, c)))
     }
 
     /// Returns the footer-button `ScreenAction` id that
@@ -268,7 +273,7 @@ impl VauchiPlatform {
     pub fn search_contacts(&self, query: String) -> Result<Vec<MobileContact>, MobileError> {
         let storage = self.open_storage()?;
         let contacts = storage.search_contacts(&query)?;
-        Ok(Self::enrich_contacts_batch(&storage, &contacts))
+        Ok(enrich_contacts_batch(&storage, &contacts))
     }
 
     /// Get contact count.
@@ -667,7 +672,7 @@ impl VauchiPlatform {
         let vauchi = self.open_vauchi()?;
         let storage = self.open_storage()?;
         let contacts = vauchi.list_archived_contacts()?;
-        Ok(Self::enrich_contacts_batch(&storage, &contacts))
+        Ok(enrich_contacts_batch(&storage, &contacts))
     }
 
     // === Duplicate Detection & Merge Operations ===
@@ -705,7 +710,7 @@ impl VauchiPlatform {
         let vauchi = self.open_vauchi()?;
         let storage = self.open_storage()?;
         let merged = vauchi.merge_contacts(&primary_id, &secondary_id)?;
-        Ok(Self::enrich_contact(&storage, &merged))
+        Ok(enrich_contact(&storage, &merged))
     }
 
     // === Hidden Contact Operations ===
@@ -735,7 +740,7 @@ impl VauchiPlatform {
         let vauchi = self.open_vauchi()?;
         let storage = self.open_storage()?;
         let contacts = vauchi.list_hidden_contacts()?;
-        Ok(Self::enrich_contacts_batch(&storage, &contacts))
+        Ok(enrich_contacts_batch(&storage, &contacts))
     }
 
     /// List contacts with pagination.
@@ -746,7 +751,7 @@ impl VauchiPlatform {
     ) -> Result<Vec<MobileContact>, MobileError> {
         let storage = self.open_storage()?;
         let contacts = storage.list_contacts_paginated(offset as usize, limit as usize)?;
-        Ok(Self::enrich_contacts_batch(&storage, &contacts))
+        Ok(enrich_contacts_batch(&storage, &contacts))
     }
 
     // === Social Networks ===

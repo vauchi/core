@@ -30,7 +30,8 @@
 use crate::content::{MobileApplyResult, MobileUpdateStatus};
 use crate::types::{
     MobileAhaMoment, MobileAhaMomentType, MobileConsentRecord, MobileConsentStatus,
-    MobileConsentType, MobileDemoContact, MobileDemoContactState, MobileSocialNetwork,
+    MobileConsentType, MobileContact, MobileContactCard, MobileDemoContact, MobileDemoContactState,
+    MobileFieldType, MobileSocialNetwork,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -106,6 +107,56 @@ pub enum DomainCommand {
     AutoRemoveDemoContact,
     /// Restore a previously-dismissed demo contact.
     RestoreDemoContact,
+
+    // ── Contact Card + CRUD (B7 batch 10) ──
+    /// Read the active identity's own contact card.
+    GetOwnCard,
+    /// Append a field to the own card.
+    AddField {
+        field_type: MobileFieldType,
+        label: String,
+        value: String,
+    },
+    /// Update an existing field's value (looked up by label).
+    UpdateField { label: String, new_value: String },
+    /// Remove a field by label. Returns `true` if it existed.
+    RemoveField { label: String },
+    /// Set the own card's display name.
+    SetDisplayName { name: String },
+    /// Replace the own card's avatar (any common image format,
+    /// normalised to WebP ≤ 32 KB by core).
+    SetOwnAvatar { avatar_bytes: Vec<u8> },
+    /// Clear the own card's avatar.
+    ClearOwnAvatar,
+
+    // ── Contact CRUD (B7 batch 10) ──
+    /// List every contact (enriched with display-name + avatar
+    /// resolution).
+    ListContacts,
+    /// Read a single contact by id (enriched).
+    GetContact { id: String },
+    /// SQL-level search across contacts.
+    SearchContacts { query: String },
+    /// Total contact count.
+    ContactCount,
+    /// Hard-delete an exchanged contact. Returns `true` if removed.
+    RemoveContact { id: String },
+    /// Soft-delete an imported contact (keeps it in trash).
+    SoftDeleteImportedContact { id: String },
+    /// Undo a soft-delete on an imported contact.
+    UndoDeleteImportedContact { id: String },
+    /// Hard-delete an imported contact (no undo).
+    HardDeleteImportedContact { id: String },
+    /// Move an exchanged contact to the archive.
+    ArchiveContact { id: String },
+    /// Restore an archived contact to the active list.
+    UnarchiveContact { id: String },
+    /// List archived contacts (enriched).
+    ListArchivedContacts,
+    /// Hide a contact (keeps record but excludes from default views).
+    HideContact { contact_id: String },
+    /// Unhide a contact.
+    UnhideContact { contact_id: String },
 }
 
 /// Sum type of every legitimate return shape from
@@ -146,4 +197,11 @@ pub enum DomainCommandResult {
     /// Demo-contact tracker state snapshot (B7 batch 5 —
     /// `GetDemoContactState`).
     DemoContactState { state: MobileDemoContactState },
+    /// Own contact card (B7 batch 10 — `GetOwnCard`).
+    ContactCardPayload { card: MobileContactCard },
+    /// Optional contact (B7 batch 10 — `GetContact`).
+    ContactOpt { contact: Option<MobileContact> },
+    /// List of contacts (B7 batch 10 — `ListContacts`,
+    /// `SearchContacts`, `ListArchivedContacts`).
+    Contacts { contacts: Vec<MobileContact> },
 }

@@ -136,7 +136,13 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # `.demo_contact` JSON files mirroring the legacy VauchiPlatform
 # layout; +221 lines split between dispatch arms and 6
 # file-helper methods).
-vauchi-platform/src/platform_app_engine.rs 2485
+# Bumped 2026-04-29 to 2826 by Phase B7 batch 10 — Contact Card +
+# CRUD (19 commands: GetOwnCard, AddField, UpdateField, RemoveField,
+# SetDisplayName, SetOwnAvatar, ClearOwnAvatar, ListContacts,
+# GetContact, SearchContacts, ContactCount, RemoveContact,
+# Soft/Undo/Hard delete imported, Archive/Unarchive/ListArchived,
+# Hide/Unhide; +341 lines).
+vauchi-platform/src/platform_app_engine.rs 2826
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

@@ -1717,6 +1717,347 @@ impl PlatformAppEngine {
                 });
                 Ok(DomainCommandResult::DemoContactOpt { contact })
             }
+
+            // ── Contact Card + CRUD (B7 batch 10) ──
+            //
+            // Cache invalidation: own-card writes invalidate `MyInfo`;
+            // contact writes invalidate `Contacts` + the specific
+            // `ContactDetail { contact_id }` (where applicable);
+            // archive writes invalidate `ArchivedContacts`. Reads
+            // invalidate nothing.
+            DomainCommand::GetOwnCard => {
+                let card = engine
+                    .vauchi()
+                    .storage()
+                    .load_own_card()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?
+                    .ok_or(MobileError::Other {
+                        detail: "Identity not found".into(),
+                    })?;
+                Ok(DomainCommandResult::ContactCardPayload {
+                    card: crate::types::MobileContactCard::from(&card),
+                })
+            }
+            DomainCommand::AddField {
+                field_type,
+                label,
+                value,
+            } => {
+                let storage = engine.vauchi().storage();
+                let mut card = storage
+                    .load_own_card()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?
+                    .ok_or(MobileError::Other {
+                        detail: "Identity not found".into(),
+                    })?;
+                let field = vauchi_core::ContactField::new(field_type.into(), &label, &value);
+                card.add_field(field)
+                    .map_err(|e| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: e.to_string(),
+                    })?;
+                storage
+                    .save_own_card(&card)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::MyInfo);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::UpdateField { label, new_value } => {
+                let storage = engine.vauchi().storage();
+                let mut card = storage
+                    .load_own_card()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?
+                    .ok_or(MobileError::Other {
+                        detail: "Identity not found".into(),
+                    })?;
+                let field_id = card
+                    .fields()
+                    .iter()
+                    .find(|f| f.label() == label)
+                    .ok_or_else(|| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: format!("Field '{label}' not found"),
+                    })?
+                    .id()
+                    .to_string();
+                card.update_field_value(&field_id, &new_value)
+                    .map_err(|e| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: e.to_string(),
+                    })?;
+                storage
+                    .save_own_card(&card)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::MyInfo);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::RemoveField { label } => {
+                let storage = engine.vauchi().storage();
+                let mut card = storage
+                    .load_own_card()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?
+                    .ok_or(MobileError::Other {
+                        detail: "Identity not found".into(),
+                    })?;
+                let field_id = match card.fields().iter().find(|f| f.label() == label) {
+                    Some(f) => f.id().to_string(),
+                    None => return Ok(DomainCommandResult::Bool { value: false }),
+                };
+                card.remove_field(&field_id)
+                    .map_err(|e| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: e.to_string(),
+                    })?;
+                storage
+                    .save_own_card(&card)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::MyInfo);
+                Ok(DomainCommandResult::Bool { value: true })
+            }
+            DomainCommand::SetDisplayName { name } => {
+                let storage = engine.vauchi().storage();
+                let mut card = storage
+                    .load_own_card()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?
+                    .ok_or(MobileError::Other {
+                        detail: "Identity not found".into(),
+                    })?;
+                card.set_display_name(&name)
+                    .map_err(|e| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: e.to_string(),
+                    })?;
+                storage
+                    .save_own_card(&card)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::MyInfo);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::SetOwnAvatar { avatar_bytes } => {
+                let storage = engine.vauchi().storage();
+                let mut card = storage
+                    .load_own_card()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?
+                    .ok_or(MobileError::Other {
+                        detail: "Identity not found".into(),
+                    })?;
+                card.set_avatar(avatar_bytes)
+                    .map_err(|e| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: e.to_string(),
+                    })?;
+                storage
+                    .save_own_card(&card)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::MyInfo);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::ClearOwnAvatar => {
+                let storage = engine.vauchi().storage();
+                let mut card = storage
+                    .load_own_card()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?
+                    .ok_or(MobileError::Other {
+                        detail: "Identity not found".into(),
+                    })?;
+                card.clear_avatar();
+                storage
+                    .save_own_card(&card)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::MyInfo);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::ListContacts => {
+                let storage = engine.vauchi().storage();
+                let contacts = storage
+                    .list_contacts()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                Ok(DomainCommandResult::Contacts {
+                    contacts: crate::mobile_contacts::enrich_contacts_batch(storage, &contacts),
+                })
+            }
+            DomainCommand::GetContact { id } => {
+                let storage = engine.vauchi().storage();
+                let contact = storage
+                    .load_contact(&id)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                Ok(DomainCommandResult::ContactOpt {
+                    contact: contact
+                        .as_ref()
+                        .map(|c| crate::mobile_contacts::enrich_contact(storage, c)),
+                })
+            }
+            DomainCommand::SearchContacts { query } => {
+                let storage = engine.vauchi().storage();
+                let contacts =
+                    storage
+                        .search_contacts(&query)
+                        .map_err(|e| MobileError::StorageError {
+                            detail: e.to_string(),
+                        })?;
+                Ok(DomainCommandResult::Contacts {
+                    contacts: crate::mobile_contacts::enrich_contacts_batch(storage, &contacts),
+                })
+            }
+            DomainCommand::ContactCount => {
+                let count = engine
+                    .vauchi()
+                    .storage()
+                    .list_contacts()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?
+                    .len() as u32;
+                Ok(DomainCommandResult::Count { value: count })
+            }
+            DomainCommand::RemoveContact { id } => {
+                let removed = engine.vauchi().storage().delete_contact(&id).map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
+                if removed {
+                    engine.invalidate_screen(&AppScreen::Contacts);
+                    engine.invalidate_screen(&AppScreen::ContactDetail {
+                        contact_id: id.clone(),
+                    });
+                }
+                Ok(DomainCommandResult::Bool { value: removed })
+            }
+            DomainCommand::SoftDeleteImportedContact { id } => {
+                engine
+                    .vauchi()
+                    .soft_delete_imported_contact(&id)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Contacts);
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: id.clone(),
+                });
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::UndoDeleteImportedContact { id } => {
+                engine
+                    .vauchi()
+                    .undo_delete_imported_contact(&id)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Contacts);
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: id.clone(),
+                });
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::HardDeleteImportedContact { id } => {
+                engine
+                    .vauchi()
+                    .hard_delete_imported_contact(&id)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Contacts);
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: id.clone(),
+                });
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::ArchiveContact { id } => {
+                engine
+                    .vauchi()
+                    .archive_contact(&id)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Contacts);
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: id.clone(),
+                });
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::UnarchiveContact { id } => {
+                engine
+                    .vauchi()
+                    .unarchive_contact(&id)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Contacts);
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: id.clone(),
+                });
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::ListArchivedContacts => {
+                let storage = engine.vauchi().storage();
+                let contacts =
+                    engine
+                        .vauchi()
+                        .list_archived_contacts()
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?;
+                Ok(DomainCommandResult::Contacts {
+                    contacts: crate::mobile_contacts::enrich_contacts_batch(storage, &contacts),
+                })
+            }
+            DomainCommand::HideContact { contact_id } => {
+                engine
+                    .vauchi()
+                    .hide_contact(&contact_id)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Contacts);
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: contact_id.clone(),
+                });
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::UnhideContact { contact_id } => {
+                engine
+                    .vauchi()
+                    .unhide_contact(&contact_id)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Contacts);
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: contact_id.clone(),
+                });
+                Ok(DomainCommandResult::Unit)
+            }
         }
     }
 

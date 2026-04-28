@@ -532,3 +532,225 @@ fn restore_demo_contact_clears_dismissal() {
         other => panic!("unexpected result: {other:?}"),
     }
 }
+
+// ── Contact Card + CRUD (B7 batch 10) ───────────────────────────────
+
+// @internal
+#[test]
+fn get_own_card_returns_onboarded_card() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetOwnCard)
+        .expect("get_own_card")
+    {
+        DomainCommandResult::ContactCardPayload { card } => {
+            assert_eq!(card.display_name, "Alice");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn list_contacts_is_empty_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListContacts)
+        .expect("list")
+    {
+        DomainCommandResult::Contacts { contacts } => assert!(contacts.is_empty()),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn contact_count_is_zero_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ContactCount)
+        .expect("count")
+    {
+        DomainCommandResult::Count { value } => assert_eq!(value, 0),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_contact_returns_none_for_unknown_id() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetContact {
+            id: "nonexistent".into(),
+        })
+        .expect("get")
+    {
+        DomainCommandResult::ContactOpt { contact } => assert!(contact.is_none()),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn search_contacts_is_empty_for_unknown_query() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::SearchContacts {
+            query: "definitely-not-a-name".into(),
+        })
+        .expect("search")
+    {
+        DomainCommandResult::Contacts { contacts } => assert!(contacts.is_empty()),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn remove_contact_returns_false_for_unknown_id() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::RemoveContact {
+            id: "nonexistent".into(),
+        })
+        .expect("remove")
+    {
+        DomainCommandResult::Bool { value } => assert!(!value),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn list_archived_contacts_is_empty_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListArchivedContacts)
+        .expect("archived")
+    {
+        DomainCommandResult::Contacts { contacts } => assert!(contacts.is_empty()),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn add_field_updates_own_card() {
+    use vauchi_platform::MobileFieldType;
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::AddField {
+            field_type: MobileFieldType::Email,
+            label: "Work".into(),
+            value: "alice@example.com".into(),
+        })
+        .expect("add_field");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetOwnCard)
+        .expect("get")
+    {
+        DomainCommandResult::ContactCardPayload { card } => {
+            assert!(
+                card.fields.iter().any(|f| f.label == "Work"),
+                "added field must appear on card"
+            );
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn update_field_errors_on_unknown_label() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let result = engine.dispatch_domain_command(DomainCommand::UpdateField {
+        label: "DoesNotExist".into(),
+        new_value: "x".into(),
+    });
+    assert!(result.is_err(), "unknown label must error");
+}
+
+// @internal
+#[test]
+fn remove_field_returns_false_for_unknown_label() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::RemoveField {
+            label: "DoesNotExist".into(),
+        })
+        .expect("remove")
+    {
+        DomainCommandResult::Bool { value } => assert!(!value),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn set_display_name_updates_card() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::SetDisplayName {
+            name: "Renamed".into(),
+        })
+        .expect("set");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetOwnCard)
+        .expect("get")
+    {
+        DomainCommandResult::ContactCardPayload { card } => {
+            assert_eq!(card.display_name, "Renamed");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn clear_own_avatar_returns_unit() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ClearOwnAvatar)
+        .expect("clear")
+    {
+        DomainCommandResult::Unit => {}
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn archive_unknown_contact_errors() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let result = engine.dispatch_domain_command(DomainCommand::ArchiveContact {
+        id: "nonexistent".into(),
+    });
+    assert!(result.is_err(), "archiving unknown contact must error");
+}
+
+// @internal
+#[test]
+fn hide_unknown_contact_errors() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let result = engine.dispatch_domain_command(DomainCommand::HideContact {
+        contact_id: "nonexistent".into(),
+    });
+    assert!(result.is_err(), "hiding unknown contact must error");
+}

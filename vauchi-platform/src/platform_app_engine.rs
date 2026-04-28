@@ -918,9 +918,421 @@ impl PlatformAppEngine {
             })
             .collect())
     }
+
+    // ── Recovery (Phase B2 — collapse-vauchi-platform-into-app-engine) ──
+    //
+    // Wraps the recovery domain that previously only lived on
+    // `VauchiPlatform`. Frontends migrating in Phase C1 / C7 stop
+    // touching the legacy struct and route every recovery operation
+    // through the engine. Cache invalidation targets the `Recovery`
+    // and `RecoveryHelp` screens so reads after a write reflect the
+    // mutation without an explicit `invalidate_*` call from the caller.
+
+    /// Create a recovery claim binding `old_pk_hex` (lost identity) to
+    /// the active identity's signing public key.
+    pub fn create_recovery_claim(
+        &self,
+        old_pk_hex: String,
+    ) -> Result<crate::types::MobileRecoveryClaim, MobileError> {
+        use base64::Engine as _;
+        use vauchi_core::recovery::{RecoveryClaim, RecoveryProof};
+
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let identity = engine
+            .vauchi()
+            .identity()
+            .ok_or_else(|| MobileError::Other {
+                detail: "Identity not initialized".into(),
+            })?;
+
+        let old_pk_bytes = hex::decode(&old_pk_hex).map_err(|e| MobileError::InvalidInput {
+            field: String::new(),
+            detail: format!("Invalid hex: {e}"),
+        })?;
+        let old_pk: [u8; 32] = old_pk_bytes
+            .try_into()
+            .map_err(|_| MobileError::InvalidInput {
+                field: String::new(),
+                detail: "Public key must be 32 bytes".into(),
+            })?;
+
+        let new_pk = *identity.signing_public_key();
+        let claim = RecoveryClaim::new(&old_pk, &new_pk);
+
+        // Persist a `RecoveryProof` shell beside the database — this
+        // mirrors the legacy `VauchiPlatform` file layout so the two
+        // surfaces share state during the Phase-C migration window.
+        // Threshold matches the legacy default (3).
+        let proof = RecoveryProof::new(&old_pk, &new_pk, 3);
+        let proof_bytes = proof.to_bytes().map_err(|e| MobileError::Other {
+            detail: e.to_string(),
+        })?;
+        std::fs::write(self.recovery_proof_path(), proof_bytes).map_err(|e| {
+            MobileError::StorageError {
+                detail: e.to_string(),
+            }
+        })?;
+
+        let claim_data = base64::engine::general_purpose::STANDARD.encode(claim.to_bytes());
+        let result = crate::types::MobileRecoveryClaim {
+            old_public_key: old_pk_hex,
+            new_public_key: hex::encode(new_pk),
+            claim_data,
+            is_expired: claim.is_expired(),
+        };
+
+        engine.invalidate_screen(&AppScreen::Recovery);
+        engine.invalidate_screen(&AppScreen::RecoveryHelp);
+        Ok(result)
+    }
+
+    /// Parse a base64-encoded recovery claim. Read-only — does not
+    /// touch the recovery proof file.
+    pub fn parse_recovery_claim(
+        &self,
+        claim_b64: String,
+    ) -> Result<crate::types::MobileRecoveryClaim, MobileError> {
+        use base64::Engine as _;
+        use vauchi_core::recovery::RecoveryClaim;
+
+        let claim_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&claim_b64)
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                detail: format!("Invalid base64: {e}"),
+            })?;
+        let claim =
+            RecoveryClaim::from_bytes(&claim_bytes).map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                detail: format!("Invalid claim: {e}"),
+            })?;
+
+        Ok(crate::types::MobileRecoveryClaim {
+            old_public_key: hex::encode(claim.old_pk()),
+            new_public_key: hex::encode(claim.new_pk()),
+            claim_data: claim_b64,
+            is_expired: claim.is_expired(),
+        })
+    }
+
+    /// Create a voucher for someone else's recovery claim using the
+    /// active identity's signing key.
+    pub fn create_recovery_voucher(
+        &self,
+        claim_b64: String,
+    ) -> Result<crate::types::MobileRecoveryVoucher, MobileError> {
+        use base64::Engine as _;
+        use vauchi_core::recovery::{RecoveryClaim, RecoveryVoucher};
+
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let identity = engine
+            .vauchi()
+            .identity()
+            .ok_or_else(|| MobileError::Other {
+                detail: "Identity not initialized".into(),
+            })?;
+
+        let claim_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&claim_b64)
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                detail: format!("Invalid base64: {e}"),
+            })?;
+        let claim =
+            RecoveryClaim::from_bytes(&claim_bytes).map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                detail: format!("Invalid claim: {e}"),
+            })?;
+
+        if claim.is_expired() {
+            return Err(MobileError::InvalidInput {
+                field: String::new(),
+                detail: "Claim has expired".into(),
+            });
+        }
+
+        let voucher = RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair(), None)
+            .map_err(|e| MobileError::Other {
+                detail: e.to_string(),
+            })?;
+        let voucher_data = base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes());
+
+        Ok(crate::types::MobileRecoveryVoucher {
+            voucher_public_key: hex::encode(voucher.voucher_pk()),
+            voucher_data,
+        })
+    }
+
+    /// Add a voucher to the in-progress recovery proof. Requires that
+    /// `create_recovery_claim` was called first.
+    pub fn add_recovery_voucher(
+        &self,
+        voucher_b64: String,
+    ) -> Result<crate::types::MobileRecoveryProgress, MobileError> {
+        use base64::Engine as _;
+        use vauchi_core::recovery::{RecoveryProof, RecoveryVoucher};
+
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+
+        let voucher_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&voucher_b64)
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                detail: format!("Invalid base64: {e}"),
+            })?;
+        let voucher =
+            RecoveryVoucher::from_bytes(&voucher_bytes).map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                detail: format!("Invalid voucher: {e}"),
+            })?;
+
+        if !voucher.verify() {
+            return Err(MobileError::InvalidInput {
+                field: String::new(),
+                detail: "Invalid voucher signature".into(),
+            });
+        }
+
+        let proof_path = self.recovery_proof_path();
+        if !proof_path.exists() {
+            return Err(MobileError::InvalidInput {
+                field: String::new(),
+                detail: "No recovery in progress".into(),
+            });
+        }
+        let proof_bytes = std::fs::read(&proof_path).map_err(|e| MobileError::StorageError {
+            detail: e.to_string(),
+        })?;
+        let mut proof =
+            RecoveryProof::from_bytes(&proof_bytes).map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                detail: format!("Invalid proof: {e}"),
+            })?;
+
+        let contacts =
+            engine
+                .vauchi()
+                .storage()
+                .list_contacts()
+                .map_err(|e| MobileError::StorageError {
+                    detail: e.to_string(),
+                })?;
+        let trusted_keys: std::collections::HashSet<[u8; 32]> = contacts
+            .iter()
+            .filter(|c| c.is_recovery_trusted())
+            .filter_map(|c| c.public_key().copied())
+            .collect();
+
+        match proof.add_voucher_trusted(voucher, &trusted_keys) {
+            Ok(()) => {}
+            Err(vauchi_core::recovery::RecoveryError::UntrustedVoucher) => {
+                return Err(MobileError::InvalidInput {
+                    field: String::new(),
+                    detail: "Voucher is from an untrusted contact. Only contacts marked as recovery-trusted can provide valid vouchers.".into(),
+                });
+            }
+            Err(e) => {
+                return Err(MobileError::InvalidInput {
+                    field: String::new(),
+                    detail: format!("Cannot add voucher: {e}"),
+                });
+            }
+        }
+
+        let updated_bytes = proof.to_bytes().map_err(|e| MobileError::Other {
+            detail: e.to_string(),
+        })?;
+        std::fs::write(&proof_path, updated_bytes).map_err(|e| MobileError::StorageError {
+            detail: e.to_string(),
+        })?;
+
+        let progress = crate::types::MobileRecoveryProgress {
+            old_public_key: hex::encode(proof.old_pk()),
+            new_public_key: hex::encode(proof.new_pk()),
+            vouchers_collected: proof.voucher_count() as u32,
+            vouchers_needed: proof.threshold(),
+            is_complete: proof.voucher_count() >= proof.threshold() as usize,
+        };
+
+        engine.invalidate_screen(&AppScreen::Recovery);
+        engine.invalidate_screen(&AppScreen::RecoveryHelp);
+        Ok(progress)
+    }
+
+    /// Read the in-progress recovery status, if any.
+    pub fn get_recovery_status(
+        &self,
+    ) -> Result<Option<crate::types::MobileRecoveryProgress>, MobileError> {
+        use vauchi_core::recovery::RecoveryProof;
+
+        let proof_path = self.recovery_proof_path();
+        if !proof_path.exists() {
+            return Ok(None);
+        }
+
+        let proof_bytes = std::fs::read(&proof_path).map_err(|e| MobileError::StorageError {
+            detail: e.to_string(),
+        })?;
+        let proof =
+            RecoveryProof::from_bytes(&proof_bytes).map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                detail: format!("Invalid proof: {e}"),
+            })?;
+
+        Ok(Some(crate::types::MobileRecoveryProgress {
+            old_public_key: hex::encode(proof.old_pk()),
+            new_public_key: hex::encode(proof.new_pk()),
+            vouchers_collected: proof.voucher_count() as u32,
+            vouchers_needed: proof.threshold(),
+            is_complete: proof.voucher_count() >= proof.threshold() as usize,
+        }))
+    }
+
+    /// Read the completed recovery proof as base64. Returns `None`
+    /// until the threshold is met.
+    pub fn get_recovery_proof(&self) -> Result<Option<String>, MobileError> {
+        use base64::Engine as _;
+        use vauchi_core::recovery::RecoveryProof;
+
+        let proof_path = self.recovery_proof_path();
+        if !proof_path.exists() {
+            return Ok(None);
+        }
+
+        let proof_bytes = std::fs::read(&proof_path).map_err(|e| MobileError::StorageError {
+            detail: e.to_string(),
+        })?;
+        let proof =
+            RecoveryProof::from_bytes(&proof_bytes).map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                detail: format!("Invalid proof: {e}"),
+            })?;
+
+        if proof.voucher_count() >= proof.threshold() as usize {
+            let bytes = proof.to_bytes().map_err(|e| MobileError::Other {
+                detail: e.to_string(),
+            })?;
+            Ok(Some(
+                base64::engine::general_purpose::STANDARD.encode(bytes),
+            ))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Mark a contact as recovery-trusted. Blocked contacts cannot be
+    /// trusted for recovery.
+    pub fn trust_contact_for_recovery(&self, contact_id: String) -> Result<(), MobileError> {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let storage = engine.vauchi().storage();
+
+        let mut contact = storage
+            .load_contact(&contact_id)
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })?
+            .ok_or_else(|| MobileError::Other {
+                detail: format!("Contact not found: {contact_id}"),
+            })?;
+
+        if contact.is_blocked() {
+            return Err(MobileError::InvalidInput {
+                field: String::new(),
+                detail: "Blocked contacts cannot be trusted for recovery".into(),
+            });
+        }
+
+        contact
+            .trust_for_recovery()
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                detail: e.to_string(),
+            })?;
+        storage
+            .save_contact(&contact)
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })?;
+
+        engine.invalidate_screen(&AppScreen::Recovery);
+        engine.invalidate_screen(&AppScreen::ContactDetail {
+            contact_id: contact_id.clone(),
+        });
+        Ok(())
+    }
+
+    /// Remove recovery trust from a contact.
+    pub fn untrust_contact_for_recovery(&self, contact_id: String) -> Result<(), MobileError> {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let storage = engine.vauchi().storage();
+
+        let mut contact = storage
+            .load_contact(&contact_id)
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })?
+            .ok_or_else(|| MobileError::Other {
+                detail: format!("Contact not found: {contact_id}"),
+            })?;
+
+        contact
+            .untrust_for_recovery()
+            .map_err(|e| MobileError::InvalidInput {
+                field: String::new(),
+                detail: e.to_string(),
+            })?;
+        storage
+            .save_contact(&contact)
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })?;
+
+        engine.invalidate_screen(&AppScreen::Recovery);
+        engine.invalidate_screen(&AppScreen::ContactDetail {
+            contact_id: contact_id.clone(),
+        });
+        Ok(())
+    }
+
+    /// Count the contacts marked as recovery-trusted.
+    pub fn trusted_contact_count(&self) -> Result<u32, MobileError> {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let contacts =
+            engine
+                .vauchi()
+                .storage()
+                .list_contacts()
+                .map_err(|e| MobileError::StorageError {
+                    detail: e.to_string(),
+                })?;
+        Ok(contacts.iter().filter(|c| c.is_recovery_trusted()).count() as u32)
+    }
 }
 
 impl PlatformAppEngine {
+    /// File path holding the in-progress recovery proof, parallel to
+    /// the SQLite database. Mirrors the legacy `VauchiPlatform` layout
+    /// so both surfaces observe the same on-disk state during the
+    /// Phase-C migration window.
+    fn recovery_proof_path(&self) -> std::path::PathBuf {
+        self.storage_path
+            .parent()
+            .unwrap_or(&self.storage_path)
+            .join(".recovery_proof")
+    }
+
     /// Detect transitions in/out of `MultiStageExchange` and manage the
     /// session lifecycle accordingly. Called after every operation
     /// that mutates the active screen.

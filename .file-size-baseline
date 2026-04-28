@@ -180,7 +180,11 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # ImportFullBackup, ImportContactsFromVcf; +93 lines of dispatch
 # arms with hex⇄base64 transport encoding mirroring legacy
 # mobile_delivery + mobile_import).
-vauchi-platform/src/platform_app_engine.rs 4346
+# Bumped 2026-04-29 to 4347 by Phase B7 batch 13 — Offline queue +
+# decoy CRUD + counts (note: variants are duplicates of batch 7/8 —
+# kept here only for the test additions; dispatch arms removed in
+# combine merge).
+vauchi-platform/src/platform_app_engine.rs 4347
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

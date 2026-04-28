@@ -2421,3 +2421,159 @@ END:VCARD\r\n";
         other => panic!("unexpected result: {other:?}"),
     }
 }
+
+// ── B7 batch 13: Offline queue + counts + decoy CRUD ──────────────────
+
+// @internal
+#[test]
+fn pending_update_count_returns_zero_for_fresh_identity() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::PendingUpdateCount)
+        .expect("pending_update_count")
+    {
+        DomainCommandResult::Count { value } => assert_eq!(value, 0),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn count_failed_deliveries_returns_zero_for_fresh_identity() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::CountFailedDeliveries)
+        .expect("count_failed")
+    {
+        DomainCommandResult::Count { value } => assert_eq!(value, 0),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_total_pending_count_returns_zero_for_fresh_identity() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetTotalPendingCount)
+        .expect("total_pending")
+    {
+        DomainCommandResult::Count { value } => assert_eq!(value, 0),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn is_offline_queue_full_returns_false_for_fresh_identity() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsOfflineQueueFull)
+        .expect("is_full")
+    {
+        DomainCommandResult::Bool { value } => assert!(!value),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_offline_queue_capacity_returns_full_capacity_for_fresh_identity() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetOfflineQueueCapacity)
+        .expect("capacity")
+    {
+        DomainCommandResult::Count { value } => {
+            assert!(value > 0, "fresh queue must have capacity");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn list_decoy_contacts_is_empty_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListDecoyContacts)
+        .expect("list_decoy")
+    {
+        DomainCommandResult::DecoyContacts { contacts } => assert!(contacts.is_empty()),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn add_then_list_then_delete_decoy_contact_round_trip() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    // Use a real serialized ContactCard so deserialization succeeds.
+    let card = vauchi_core::ContactCard::new("Decoy McDecoyface");
+    let card_json = serde_json::to_string(&card).expect("serialize card");
+    let id = match engine
+        .dispatch_domain_command(DomainCommand::AddDecoyContact {
+            name: "Decoy McDecoyface".into(),
+            card_json,
+        })
+        .expect("add_decoy")
+    {
+        DomainCommandResult::Text { value } => value,
+        other => panic!("unexpected result: {other:?}"),
+    };
+    assert!(id.starts_with("decoy-"), "id must use decoy- prefix: {id}");
+
+    let listed = match engine
+        .dispatch_domain_command(DomainCommand::ListDecoyContacts)
+        .expect("list_decoy")
+    {
+        DomainCommandResult::DecoyContacts { contacts } => contacts,
+        other => panic!("unexpected result: {other:?}"),
+    };
+    assert_eq!(listed.len(), 1, "exactly one decoy after add");
+    assert_eq!(listed[0].id, id);
+    assert_eq!(listed[0].display_name, "Decoy McDecoyface");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::DeleteDecoyContact { id: id.clone() })
+        .expect("delete_decoy")
+    {
+        DomainCommandResult::Unit => {}
+        other => panic!("unexpected result: {other:?}"),
+    }
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListDecoyContacts)
+        .expect("list_decoy after delete")
+    {
+        DomainCommandResult::DecoyContacts { contacts } => {
+            assert!(contacts.is_empty(), "decoy must be gone after delete");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn add_decoy_contact_rejects_invalid_card_json() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::AddDecoyContact {
+            name: "Bad".into(),
+            card_json: "not json".into(),
+        })
+        .expect_err("must reject invalid JSON");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("invalid") || msg.contains("expected"),
+        "expected invalid-input error, got: {err:?}"
+    );
+}

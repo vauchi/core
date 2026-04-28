@@ -431,6 +431,11 @@ pub enum DomainCommand {
     /// Import contacts from a vCard 2.1/3.0/4.0 file. `data` is the
     /// raw `.vcf` bytes. Duplicates (by UID) are skipped.
     ImportContactsFromVcf { data: Vec<u8> },
+    // ── Offline Queue + Counts (B7 batch 13) ──
+    // PendingUpdateCount, CountFailedDeliveries, GetTotalPendingCount,
+    // IsOfflineQueueFull, GetOfflineQueueCapacity were already added by
+    // batch 8. AddDecoyContact, ListDecoyContacts, DeleteDecoyContact
+    // were added by batch 7. No new variants in batch 13.
 }
 
 /// Sum type of every legitimate return shape from

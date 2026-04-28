@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use tempfile::TempDir;
 
-use vauchi_platform::{MobileLabelContactStatus, VauchiPlatform};
+use vauchi_platform::{MobileLabelContactBadge, MobileLabelContactStatus, VauchiPlatform};
 
 fn setup() -> (Arc<VauchiPlatform>, TempDir) {
     let dir = TempDir::new().unwrap();
@@ -37,6 +37,24 @@ fn add_exchanged_contact(wb: &VauchiPlatform, name: &str, pk_seed: u8) -> String
         card,
         vauchi_core::crypto::SymmetricKey::generate(),
     );
+    let id = contact.id().to_string();
+    wb.save_test_contact(&contact).unwrap();
+    id
+}
+
+/// Same as `add_exchanged_contact` but marks the contact's fingerprint
+/// verified before saving — used to drive the `MobileLabelContactBadge::Verified`
+/// branch of `resolve_label_contacts`.
+fn add_verified_contact(wb: &VauchiPlatform, name: &str, pk_seed: u8) -> String {
+    let card = vauchi_core::contact_card::ContactCard::new(name);
+    let mut contact = vauchi_core::Contact::from_exchange(
+        [pk_seed; 32],
+        card,
+        vauchi_core::crypto::SymmetricKey::generate(),
+    );
+    contact
+        .mark_fingerprint_verified()
+        .expect("mark verified on fresh exchange contact");
     let id = contact.id().to_string();
     wb.save_test_contact(&contact).unwrap();
     id
@@ -163,6 +181,56 @@ fn invariant_label_contacts_plus_stale_equals_contact_ids() {
         detail.label_contacts.len() + detail.stale_reference_count as usize,
         detail.contact_ids.len(),
         "invariant: rows + stale = total contact_ids"
+    );
+}
+
+// @internal
+#[test]
+fn verified_contact_in_label_renders_verified_badge() {
+    // G6 follow-up — restores the verified-checkmark dropped from
+    // iOS LabelDetailView during the G4 ContactDetail consumer
+    // migration. The badge is computed in core; frontends iterate
+    // `row.badges`, never branching on raw `MobileContact` flags.
+    let (wb, _dir) = setup();
+    let bob_id = add_verified_contact(&wb, "Bob", 0x20);
+    let label = wb.create_label("Verified".to_string()).unwrap();
+    wb.add_contact_to_group(label.id.clone(), bob_id.clone())
+        .unwrap();
+
+    let detail = wb.get_label(label.id).unwrap();
+    let row = detail
+        .label_contacts
+        .iter()
+        .find(|r| r.id == bob_id)
+        .expect("Bob must appear in label_contacts");
+    assert!(
+        row.badges.contains(&MobileLabelContactBadge::Verified),
+        "fingerprint-verified contact must surface MobileLabelContactBadge::Verified, got {:?}",
+        row.badges
+    );
+}
+
+// @internal
+#[test]
+fn unverified_contact_in_label_has_empty_badges() {
+    // Mirror of the verified case — make sure we don't accidentally
+    // emit Verified for fresh exchanged contacts.
+    let (wb, _dir) = setup();
+    let bob_id = add_exchanged_contact(&wb, "Bob", 0x21);
+    let label = wb.create_label("Unverified".to_string()).unwrap();
+    wb.add_contact_to_group(label.id.clone(), bob_id.clone())
+        .unwrap();
+
+    let detail = wb.get_label(label.id).unwrap();
+    let row = detail
+        .label_contacts
+        .iter()
+        .find(|r| r.id == bob_id)
+        .expect("Bob must appear in label_contacts");
+    assert!(
+        row.badges.is_empty(),
+        "fresh exchanged contact must have no badges, got {:?}",
+        row.badges
     );
 }
 

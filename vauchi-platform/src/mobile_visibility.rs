@@ -7,8 +7,8 @@
 use super::VauchiPlatform;
 use super::error::MobileError;
 use super::types::{
-    MobileLabelContactRow, MobileLabelContactStatus, MobileVisibilityLabel,
-    MobileVisibilityLabelDetail,
+    MobileLabelContactBadge, MobileLabelContactRow, MobileLabelContactStatus,
+    MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 /// Resolve raw contact IDs against storage into rendered rows.
@@ -46,11 +46,16 @@ fn resolve_label_contacts(
                     &shared_names,
                     nickname.as_deref(),
                 );
+                let mut badges = Vec::new();
+                if contact.is_fingerprint_verified() {
+                    badges.push(MobileLabelContactBadge::Verified);
+                }
                 rows.push(MobileLabelContactRow {
                     id: id.clone(),
                     display_name,
                     trust_level: contact.trust_level().into(),
                     status: MobileLabelContactStatus::Active,
+                    badges,
                 });
             }
             // Missing or error → omit from rows and bump stale_reference_count.

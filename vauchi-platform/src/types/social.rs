@@ -58,6 +58,21 @@ pub enum MobileLabelContactStatus {
     Active,
 }
 
+/// A status badge to render next to a label-contact row.
+///
+/// Mirrors `MobileContactDetailBadge` so the LabelDetail and
+/// ContactDetail screens share the same canonical predicate set —
+/// frontends iterate the list, never branching on raw `MobileContact`
+/// flags (ADR-021/043 Humble UI). Future variants may surface
+/// recovery-trust or other typed signals without a binding break
+/// thanks to UniFFI's enum-extension semantics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileLabelContactBadge {
+    /// Fingerprint manually verified out-of-band — the iOS / Android
+    /// LabelDetail screens render a checkmark next to the row.
+    Verified,
+}
+
 /// A resolved contact row for a visibility label.
 ///
 /// Frontends should render `MobileVisibilityLabelDetail.label_contacts`
@@ -75,6 +90,12 @@ pub struct MobileLabelContactRow {
     pub trust_level: MobileContactTrustLevel,
     /// Status of this row in the label (today always `Active`).
     pub status: MobileLabelContactStatus,
+    /// Status badges for the row. Populated by `get_label`. Closes the
+    /// G6 follow-up — restores the verified-checkmark dropped during the
+    /// G4 ContactDetail consumer migration so iOS / Android LabelDetail
+    /// can render it from typed data instead of branching on a raw
+    /// `MobileContact` field.
+    pub badges: Vec<MobileLabelContactBadge>,
 }
 
 /// Detailed label info including contacts and visible fields.

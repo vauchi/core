@@ -35,8 +35,8 @@ pub use security::{
     MobileShredReport, MobileShredStatus, MobileShredToken, MobileShredVerification,
 };
 pub use social::{
-    MobileLabelContactRow, MobileLabelContactStatus, MobileSocialNetwork, MobileVisibilityLabel,
-    MobileVisibilityLabelDetail,
+    MobileLabelContactBadge, MobileLabelContactRow, MobileLabelContactStatus, MobileSocialNetwork,
+    MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 pub use ux::{
     MobileAhaMoment, MobileAhaMomentType, MobileBorderRadiusTokens, MobileDemoContact,

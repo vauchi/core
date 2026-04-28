@@ -140,6 +140,15 @@ pub enum ExchangeCommand {
     /// [`ExchangeHardwareEvent::ImagePickCancelled`] if the user
     /// cancels.
     ImagePickFromFile,
+
+    // ── Camera control (multi-stage exchange) ──────────────────────
+    // Appended to preserve serde discriminant ordering.
+    /// Switch the active camera between front- and rear-facing.
+    ///
+    /// Used by the multi-stage face-to-face exchange screen so the user
+    /// can flip the scanner orientation without the frontend owning the
+    /// preference. `use_front == true` selects the front camera.
+    SwitchCamera { use_front: bool },
 }
 
 impl ExchangeCommand {
@@ -170,6 +179,7 @@ impl ExchangeCommand {
             Self::ImagePickFromLibrary => "ImagePickFromLibrary",
             Self::ImageCaptureFromCamera => "ImageCaptureFromCamera",
             Self::ImagePickFromFile => "ImagePickFromFile",
+            Self::SwitchCamera { .. } => "SwitchCamera",
         }
     }
 }
@@ -442,6 +452,8 @@ mod tests {
             ExchangeCommand::ImagePickFromLibrary,
             ExchangeCommand::ImageCaptureFromCamera,
             ExchangeCommand::ImagePickFromFile,
+            ExchangeCommand::SwitchCamera { use_front: true },
+            ExchangeCommand::SwitchCamera { use_front: false },
         ];
         for cmd in &commands {
             let json = serde_json::to_string(cmd).expect("serialize");
@@ -601,9 +613,10 @@ mod tests {
             ExchangeCommand::ImagePickFromLibrary,
             ExchangeCommand::ImageCaptureFromCamera,
             ExchangeCommand::ImagePickFromFile,
+            ExchangeCommand::SwitchCamera { use_front: false },
         ];
-        // 24 total command variants
-        assert_eq!(variants.len(), 24);
+        // 25 total command variants
+        assert_eq!(variants.len(), 25);
     }
 
     #[test]

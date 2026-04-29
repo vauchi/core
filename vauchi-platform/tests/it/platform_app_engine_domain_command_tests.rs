@@ -1261,3 +1261,300 @@ fn create_label_invalidates_groups_screen() {
         .expect("current_screen_json after create");
     assert!(!json.is_empty());
 }
+
+// ── Passcode + Duress + Decoy (B7 batch 7) ──────────────────────────
+
+// @internal
+#[test]
+fn is_password_enabled_returns_false_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsPasswordEnabled)
+        .expect("is_password_enabled")
+    {
+        DomainCommandResult::Bool { value } => assert!(!value),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn is_duress_enabled_returns_false_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsDuressEnabled)
+        .expect("is_duress_enabled")
+    {
+        DomainCommandResult::Bool { value } => assert!(!value),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn setup_app_password_enables_password() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::SetupAppPassword {
+            password: "secret123".into(),
+        })
+        .expect("setup");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsPasswordEnabled)
+        .expect("check")
+    {
+        DomainCommandResult::Bool { value } => assert!(value, "must be enabled after setup"),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn authenticate_with_correct_password_returns_normal() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::SetupAppPassword {
+            password: "rightpw".into(),
+        })
+        .expect("setup");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::Authenticate {
+            password: "rightpw".into(),
+        })
+        .expect("auth")
+    {
+        DomainCommandResult::AuthMode { mode } => {
+            assert!(matches!(mode, vauchi_platform::MobileAuthMode::Normal));
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn authenticate_with_wrong_password_errors() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::SetupAppPassword {
+            password: "rightpw".into(),
+        })
+        .expect("setup");
+
+    let result = engine.dispatch_domain_command(DomainCommand::Authenticate {
+        password: "wrong".into(),
+    });
+    assert!(result.is_err(), "wrong password must error");
+}
+
+// @internal
+#[test]
+fn setup_duress_password_enables_duress() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::SetupAppPassword {
+            password: "rightpw".into(),
+        })
+        .expect("app pw");
+    engine
+        .dispatch_domain_command(DomainCommand::SetupDuressPassword {
+            duress_password: "duresspw".into(),
+        })
+        .expect("duress");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsDuressEnabled)
+        .expect("check")
+    {
+        DomainCommandResult::Bool { value } => assert!(value),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn authenticate_with_duress_password_returns_duress_mode() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::SetupAppPassword {
+            password: "rightpw".into(),
+        })
+        .expect("app pw");
+    engine
+        .dispatch_domain_command(DomainCommand::SetupDuressPassword {
+            duress_password: "duresspw".into(),
+        })
+        .expect("duress");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::Authenticate {
+            password: "duresspw".into(),
+        })
+        .expect("auth")
+    {
+        DomainCommandResult::AuthMode { mode } => {
+            assert!(matches!(mode, vauchi_platform::MobileAuthMode::Duress));
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn disable_duress_clears_duress_state() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::SetupAppPassword {
+            password: "rightpw".into(),
+        })
+        .expect("app pw");
+    engine
+        .dispatch_domain_command(DomainCommand::SetupDuressPassword {
+            duress_password: "duresspw".into(),
+        })
+        .expect("duress");
+    engine
+        .dispatch_domain_command(DomainCommand::DisableDuress)
+        .expect("disable");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsDuressEnabled)
+        .expect("check")
+    {
+        DomainCommandResult::Bool { value } => assert!(!value, "must be disabled"),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_duress_settings_returns_none_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetDuressSettings)
+        .expect("get")
+    {
+        DomainCommandResult::DuressSettingsOpt { settings } => {
+            assert!(settings.is_none(), "no settings yet");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn configure_duress_alerts_persists_to_get_settings() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::ConfigureDuressAlerts {
+            contact_ids: vec!["c1".into(), "c2".into()],
+            message: "help".into(),
+        })
+        .expect("configure");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetDuressSettings)
+        .expect("get")
+    {
+        DomainCommandResult::DuressSettingsOpt { settings } => {
+            let s = settings.expect("must be configured");
+            assert_eq!(s.alert_contact_ids, vec!["c1".to_string(), "c2".into()]);
+            assert_eq!(s.alert_message, "help");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn list_decoy_contacts_is_empty_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListDecoyContacts)
+        .expect("list")
+    {
+        DomainCommandResult::DecoyContacts { contacts } => {
+            assert!(contacts.is_empty(), "no decoys yet");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn add_decoy_contact_returns_id_and_lists() {
+    let (engine, _dir) = create_engine_with_identity();
+    let card_json =
+        r#"{"id":"x","display_name":"Decoy Friend","fields":[],"avatar":null,"public_key":null}"#;
+
+    let id = match engine
+        .dispatch_domain_command(DomainCommand::AddDecoyContact {
+            name: "Decoy Friend".into(),
+            card_json: card_json.into(),
+        })
+        .expect("add")
+    {
+        DomainCommandResult::Text { value } => {
+            assert!(value.starts_with("decoy-"), "id must use decoy- prefix");
+            value
+        }
+        other => panic!("unexpected result: {other:?}"),
+    };
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListDecoyContacts)
+        .expect("list")
+    {
+        DomainCommandResult::DecoyContacts { contacts } => {
+            assert_eq!(contacts.len(), 1);
+            assert_eq!(contacts[0].id, id);
+            assert_eq!(contacts[0].display_name, "Decoy Friend");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn delete_decoy_contact_removes_from_list() {
+    let (engine, _dir) = create_engine_with_identity();
+    let card_json =
+        r#"{"id":"x","display_name":"Doomed Decoy","fields":[],"avatar":null,"public_key":null}"#;
+
+    let id = match engine
+        .dispatch_domain_command(DomainCommand::AddDecoyContact {
+            name: "Doomed Decoy".into(),
+            card_json: card_json.into(),
+        })
+        .expect("add")
+    {
+        DomainCommandResult::Text { value } => value,
+        other => panic!("unexpected result: {other:?}"),
+    };
+
+    engine
+        .dispatch_domain_command(DomainCommand::DeleteDecoyContact { id })
+        .expect("delete");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListDecoyContacts)
+        .expect("list")
+    {
+        DomainCommandResult::DecoyContacts { contacts } => {
+            assert!(contacts.is_empty(), "decoy must be gone");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}

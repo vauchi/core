@@ -2641,6 +2641,172 @@ impl PlatformAppEngine {
                     .collect();
                 Ok(DomainCommandResult::Strings { values })
             }
+
+            // ── Passcode + Duress + Decoy (B7 batch 7) ──
+            //
+            // The legacy VauchiPlatform code calls `set_identity` per
+            // method because each call opens a fresh Vauchi instance.
+            // PlatformAppEngine's persistent Vauchi already holds the
+            // identity from construction, so the wrappers can call the
+            // password / duress methods directly without
+            // re-installation.
+            DomainCommand::SetupAppPassword { password } => {
+                engine
+                    .vauchi_mut()
+                    .setup_app_password(&password)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Lock);
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::SetupDuressPassword { duress_password } => {
+                engine
+                    .vauchi_mut()
+                    .setup_duress_password(&duress_password)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::DuressPin);
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::Authenticate { password } => {
+                let mode = engine.vauchi_mut().authenticate(&password).map_err(|e| {
+                    MobileError::Other {
+                        detail: e.to_string(),
+                    }
+                })?;
+                let mapped = match mode {
+                    vauchi_core::AuthMode::Normal => crate::types::MobileAuthMode::Normal,
+                    vauchi_core::AuthMode::Duress => crate::types::MobileAuthMode::Duress,
+                    _ => crate::types::MobileAuthMode::Normal,
+                };
+                Ok(DomainCommandResult::AuthMode { mode: mapped })
+            }
+            DomainCommand::IsPasswordEnabled => {
+                let value =
+                    engine
+                        .vauchi()
+                        .is_password_enabled()
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?;
+                Ok(DomainCommandResult::Bool { value })
+            }
+            DomainCommand::IsDuressEnabled => {
+                let value =
+                    engine
+                        .vauchi()
+                        .is_duress_enabled()
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?;
+                Ok(DomainCommandResult::Bool { value })
+            }
+            DomainCommand::DisableDuress => {
+                engine
+                    .vauchi_mut()
+                    .disable_duress()
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::DuressPin);
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::ConfigureDuressAlerts {
+                contact_ids,
+                message,
+            } => {
+                let settings = vauchi_core::DuressSettings {
+                    alert_contact_ids: contact_ids,
+                    alert_message: message,
+                    include_location: false,
+                };
+                engine
+                    .vauchi()
+                    .save_duress_settings(&settings)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::GetDuressSettings => {
+                let settings =
+                    engine
+                        .vauchi()
+                        .load_duress_settings()
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?;
+                Ok(DomainCommandResult::DuressSettingsOpt {
+                    settings: settings.map(|s| crate::types::MobileDuressSettings {
+                        alert_contact_ids: s.alert_contact_ids,
+                        alert_message: s.alert_message,
+                        include_location: s.include_location,
+                    }),
+                })
+            }
+            DomainCommand::AddDecoyContact { name, card_json } => {
+                let card: vauchi_core::ContactCard =
+                    serde_json::from_str(&card_json).map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                let id = format!(
+                    "decoy-{}",
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_millis())
+                        .unwrap_or(0)
+                );
+                engine
+                    .vauchi()
+                    .add_decoy_contact(&id, &name, &card)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                Ok(DomainCommandResult::Text { value: id })
+            }
+            DomainCommand::ListDecoyContacts => {
+                let decoys =
+                    engine
+                        .vauchi()
+                        .list_decoy_contacts()
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?;
+                Ok(DomainCommandResult::DecoyContacts {
+                    contacts: decoys
+                        .into_iter()
+                        .map(
+                            |(id, display_name, _card)| crate::types::MobileDecoyContact {
+                                id,
+                                display_name,
+                            },
+                        )
+                        .collect(),
+                })
+            }
+            DomainCommand::DeleteDecoyContact { id } => {
+                engine
+                    .vauchi()
+                    .remove_decoy_contact(&id)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                Ok(DomainCommandResult::Unit)
+            }
         }
     }
 

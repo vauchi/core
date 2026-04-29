@@ -19,6 +19,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use crate::MobileDeviceLinkSession;
 use crate::mobile_exchange::serialize_exchange_payload;
 use crate::multistage_exchange::{
     MobileMultiStageSession, MobileProtocolState, MobileQrPayload, MultiStageSessionListener,
@@ -62,7 +63,7 @@ pub trait PlatformEventListener: Send + Sync {
 /// by `set_event_listener` (to mirror the listener arc) and by the
 /// Pair 4 multi-stage bridge listener (cycle thread side) to fire
 /// invalidation callbacks for the multi-stage screen.
-type DirectListenerSlot = Arc<Mutex<Option<Arc<Box<dyn PlatformEventListener>>>>>;
+pub(crate) type DirectListenerSlot = Arc<Mutex<Option<Arc<Box<dyn PlatformEventListener>>>>>;
 
 // ── PlatformAppEngine ───────────────────────────────────────────────
 
@@ -156,6 +157,13 @@ pub struct PlatformAppEngine {
     /// never see this — they only fire `UserAction`s and
     /// `ExchangeHardwareEvent`s and render the resulting `ScreenModel`.
     multi_stage_session: Mutex<Option<Arc<MobileMultiStageSession>>>,
+    /// Pair 5 — auto-managed `MobileDeviceLinkSession` for the
+    /// `DeviceLinking` screen. Same lifecycle pattern as multi-stage:
+    /// created on navigation in, cancelled on navigation out. The
+    /// `DeviceLinkEngineBridge` listener pushes cycle-thread events
+    /// (`on_qr_ready`, `on_confirmation_required`, `on_completed`,
+    /// `on_failed`) into `AppEngine`'s receiver-side bridge methods.
+    device_link_session: Mutex<Option<Arc<MobileDeviceLinkSession>>>,
     /// Storage path retained for in-place session creation.
     /// Mirrors `VauchiPlatform::storage_path` so the engine can build
     /// `MobileMultiStageSession::with_persistence` instances without
@@ -235,6 +243,7 @@ impl PlatformAppEngine {
             event_handler_id: Mutex::new(None),
             direct_listener: Arc::new(Mutex::new(None)),
             multi_stage_session: Mutex::new(None),
+            device_link_session: Mutex::new(None),
             storage_path,
             storage_key,
         }))
@@ -383,6 +392,12 @@ impl PlatformAppEngine {
             })?;
             engine.handle_action(action)
         };
+        // Pair 5 — translate device-link typed ActionResults into
+        // `MobileDeviceLinkSession` calls. The engine has already
+        // advanced its step (e.g. Completing for ConfirmManual,
+        // QrPending for Retry); the session push then drives the next
+        // state via the bridge.
+        self.dispatch_device_link_side_effects(&result)?;
         self.after_screen_transition(pre_screen)?;
         action_result_to_json(&result)
     }
@@ -4398,8 +4413,9 @@ impl PlatformAppEngine {
         }
     }
 
-    /// Detect transitions in/out of `MultiStageExchange` and manage the
-    /// session lifecycle accordingly. Called after every operation
+    /// Detect transitions in/out of session-bound screens
+    /// (`MultiStageExchange`, `DeviceLinking`) and manage the
+    /// corresponding session lifecycle. Called after every operation
     /// that mutates the active screen.
     fn after_screen_transition(&self, pre: AppScreen) -> Result<(), MobileError> {
         let post = self
@@ -4415,6 +4431,13 @@ impl PlatformAppEngine {
         match (was_multi, is_multi) {
             (true, false) => self.cancel_multi_stage_session(),
             (false, true) => self.ensure_multi_stage_session()?,
+            _ => {}
+        }
+        let was_link = matches!(pre, AppScreen::DeviceLinking);
+        let is_link = matches!(post, AppScreen::DeviceLinking);
+        match (was_link, is_link) {
+            (true, false) => self.cancel_device_link_session(),
+            (false, true) => self.ensure_device_link_session()?,
             _ => {}
         }
         Ok(())
@@ -4487,6 +4510,22 @@ impl PlatformAppEngine {
         if let Some(session) = session_to_cancel {
             session.cancel();
         }
+    }
+
+    /// Internal accessor: `engine` Mutex. Used by the Pair 5
+    /// device-link wiring in `platform_app_engine_device_link.rs`.
+    pub(crate) fn engine(&self) -> &Arc<Mutex<AppEngine>> {
+        &self.engine
+    }
+
+    /// Internal accessor: `direct_listener` slot.
+    pub(crate) fn direct_listener(&self) -> &DirectListenerSlot {
+        &self.direct_listener
+    }
+
+    /// Internal accessor: device-link session slot.
+    pub(crate) fn device_link_session(&self) -> &Mutex<Option<Arc<MobileDeviceLinkSession>>> {
+        &self.device_link_session
     }
 
     // ── Test-only helpers ──────────────────────────────────────────

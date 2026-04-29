@@ -53,6 +53,7 @@ mod mobile_wifi_aware;
 mod multipart_qr;
 mod multistage_exchange;
 mod platform_app_engine;
+mod platform_app_engine_device_link;
 mod policies;
 mod protocol;
 mod types;

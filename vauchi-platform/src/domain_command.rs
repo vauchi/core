@@ -28,6 +28,7 @@
 //! treats added enum cases as additive on the binding side.
 
 use crate::content::{MobileApplyResult, MobileUpdateStatus};
+use crate::mobile_contact_detail::MobileContactDetailViewState;
 use crate::mobile_import::MobileImportResult;
 use crate::types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileConsentRecord, MobileConsentStatus,
@@ -500,6 +501,16 @@ pub enum DomainCommand {
     IsSuppressPresenceEnabled,
     /// Set the suppress-presence flag. Persisted across restarts.
     SetSuppressPresenceEnabled { enabled: bool },
+
+    // ── Contact detail view state + social registry (B7 batch 19) ──
+    /// Pre-computed contact-detail view (badges, banners, actions,
+    /// added-time-display) — frontends iterate the returned arrays
+    /// rather than branching on raw `MobileContact` flags. Closes
+    /// ADR-021/043 audit V4.
+    ContactDetailViewState { contact_id: String },
+    /// All social networks in the default registry. Complement to
+    /// `SearchSocialNetworks`.
+    ListSocialNetworks,
 }
 
 /// Sum type of every legitimate return shape from
@@ -623,4 +634,7 @@ pub enum DomainCommandResult {
     ContactDisplayOptions {
         options: MobileContactDisplayOptions,
     },
+    /// Pre-computed contact-detail view state (B7 batch 19 —
+    /// `ContactDetailViewState`).
+    ContactDetailView { state: MobileContactDetailViewState },
 }

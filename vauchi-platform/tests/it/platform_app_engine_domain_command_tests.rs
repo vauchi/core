@@ -3019,3 +3019,53 @@ fn sync_flags_persist_across_engine_recreation() {
         other => panic!("unexpected result: {other:?}"),
     }
 }
+
+// ── B7 batch 19: Contact detail view state + list social networks ──────
+
+// @internal
+#[test]
+fn contact_detail_view_state_errors_for_unknown_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::ContactDetailViewState {
+            contact_id: "ghost".into(),
+        })
+        .expect_err("must error on missing contact");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("not found"),
+        "expected contact-not-found, got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn list_social_networks_returns_default_registry() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListSocialNetworks)
+        .expect("list_social_networks")
+    {
+        DomainCommandResult::SocialNetworks { networks } => {
+            assert!(
+                !networks.is_empty(),
+                "default registry must have well-known networks"
+            );
+            // Verify shape: each network has id + display_name + url_template
+            for net in &networks {
+                assert!(!net.id.is_empty(), "id must be non-empty");
+                assert!(
+                    !net.display_name.is_empty(),
+                    "display_name must be non-empty"
+                );
+                assert!(
+                    !net.url_template.is_empty(),
+                    "url_template must be non-empty"
+                );
+            }
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}

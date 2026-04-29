@@ -205,14 +205,18 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # SetSuppressPresenceEnabled). Adds a `SyncFlags` JSON sidecar at
 # `.sync_flags` so the legacy mutex-only flags now survive
 # restarts; +95 lines incl. the sidecar helpers + struct.
-vauchi-platform/src/platform_app_engine.rs 4646
+# Bumped 2026-04-29 to 4753 by Phase B7 batch 19 — Contact detail
+# view state + list social networks (2 commands:
+# ContactDetailViewState, ListSocialNetworks; +107 lines incl. the
+# badges/banners/actions builder mirroring mobile_contact_detail).
+vauchi-platform/src/platform_app_engine.rs 4753
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding
 # helpers; splitting per-batch would force duplicating those helpers
 # across files and complicates the read-after-write smoke pattern.
 # Will be split into per-domain test files only after B7 phase completes.
-vauchi-platform/tests/it/platform_app_engine_domain_command_tests.rs 3021
+vauchi-platform/tests/it/platform_app_engine_domain_command_tests.rs 3071
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

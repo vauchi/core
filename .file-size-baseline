@@ -142,7 +142,14 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # GetContact, SearchContacts, ContactCount, RemoveContact,
 # Soft/Undo/Hard delete imported, Archive/Unarchive/ListArchived,
 # Hide/Unhide; +341 lines).
-vauchi-platform/src/platform_app_engine.rs 2826
+# Bumped 2026-04-29 to 2931 by Phase B7 batch 3 — GDPR / Deletion
+# (5 commands: ExportGdprData, ScheduleIdentityDeletion,
+# CancelIdentityDeletion, ExecuteIdentityDeletion, GetDeletionState)
+# + read-only ShredStatus. The 5 keychain-bound shred methods
+# (panic_shred / soft_shred / hard_shred / cancel_shred /
+# verify_shred) are deferred to a separate batch that adds
+# MobilePlatformKeychain plumbing to PlatformAppEngine.
+vauchi-platform/src/platform_app_engine.rs 2931
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

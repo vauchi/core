@@ -754,3 +754,148 @@ fn hide_unknown_contact_errors() {
     });
     assert!(result.is_err(), "hiding unknown contact must error");
 }
+
+// ── GDPR / Deletion + shred-status (B7 batch 3) ─────────────────────
+
+// @internal
+#[test]
+fn export_gdpr_data_returns_json_payload() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ExportGdprData)
+        .expect("export")
+    {
+        DomainCommandResult::GdprExport { export } => {
+            assert!(!export.json_data.is_empty(), "json_data must be present");
+            // Must round-trip as JSON (`{...}` envelope).
+            let parsed: serde_json::Value =
+                serde_json::from_str(&export.json_data).expect("parse json");
+            assert!(parsed.is_object(), "export must be a JSON object");
+            assert!(export.exported_at > 0, "exported_at must be set");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn schedule_identity_deletion_returns_scheduled_state() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ScheduleIdentityDeletion)
+        .expect("schedule")
+    {
+        DomainCommandResult::DeletionInfo { info } => {
+            assert!(
+                info.scheduled_at > 0,
+                "scheduled_at must be set after schedule"
+            );
+            assert!(info.execute_at > info.scheduled_at, "grace period > 0");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn cancel_identity_deletion_after_schedule_returns_to_none() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::ScheduleIdentityDeletion)
+        .expect("schedule");
+    match engine
+        .dispatch_domain_command(DomainCommand::CancelIdentityDeletion)
+        .expect("cancel")
+    {
+        DomainCommandResult::Unit => {}
+        other => panic!("unexpected result: {other:?}"),
+    }
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetDeletionState)
+        .expect("get_state")
+    {
+        DomainCommandResult::DeletionInfo { info } => {
+            assert_eq!(info.scheduled_at, 0, "cancel must clear scheduled_at");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_deletion_state_returns_none_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetDeletionState)
+        .expect("state")
+    {
+        DomainCommandResult::DeletionInfo { info } => {
+            assert_eq!(info.scheduled_at, 0, "no schedule yet");
+            assert_eq!(info.execute_at, 0);
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn shred_status_is_none_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ShredStatus)
+        .expect("status")
+    {
+        DomainCommandResult::ShredStatus { status } => {
+            assert!(
+                matches!(status, vauchi_platform::MobileShredStatus::None),
+                "shred status must be None initially"
+            );
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn shred_status_after_schedule_reports_scheduled() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::ScheduleIdentityDeletion)
+        .expect("schedule");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ShredStatus)
+        .expect("status")
+    {
+        DomainCommandResult::ShredStatus { status } => match status {
+            vauchi_platform::MobileShredStatus::Scheduled { remaining_secs } => {
+                assert!(remaining_secs > 0, "grace period must be positive");
+            }
+            other => panic!("expected Scheduled, got {other:?}"),
+        },
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn schedule_deletion_invalidates_settings_cache() {
+    // Cache invalidation contract for GDPR/Deletion writes.
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::ScheduleIdentityDeletion)
+        .expect("schedule");
+
+    engine.invalidate_all().expect("invalidate_all");
+    let _ = engine
+        .current_screen_json()
+        .expect("current_screen_json after schedule");
+}

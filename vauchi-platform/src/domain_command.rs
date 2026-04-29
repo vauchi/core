@@ -31,8 +31,8 @@ use crate::content::{MobileApplyResult, MobileUpdateStatus};
 use crate::types::{
     MobileAhaMoment, MobileAhaMomentType, MobileConsentRecord, MobileConsentStatus,
     MobileConsentType, MobileContact, MobileContactCard, MobileDeletionInfo, MobileDemoContact,
-    MobileDemoContactState, MobileFieldType, MobileGdprExport, MobileShredStatus,
-    MobileSocialNetwork,
+    MobileDemoContactState, MobileFieldType, MobileGdprExport, MobileRecoveryVerification,
+    MobileShredStatus, MobileSocialNetwork,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -179,6 +179,27 @@ pub enum DomainCommand {
     HideContact { contact_id: String },
     /// Unhide a contact.
     UnhideContact { contact_id: String },
+
+    // ── Recovery leftovers (B7 batch 4 — completes the recovery
+    // domain; B2 covered the main 9 typed methods, this batch covers
+    // the 3 long-tail methods that don't justify their own
+    // PlatformAppEngine surface). ──
+    /// Verify a recovery proof from a contact and produce a confidence
+    /// recommendation (high / medium / low) based on known vouchers.
+    VerifyRecoveryProof { proof_b64: String },
+    /// Upload encrypted guardian entries (one per recovery-trusted
+    /// contact) to the relay. Called after `trust_contact_for_recovery`
+    /// or `untrust_contact_for_recovery` toggles the trust set.
+    UploadGuardianEntries,
+    /// Persist a user's recovery response (accept / reject /
+    /// remind_me_later). Used by the `RecoveryClaimReviewEngine` to
+    /// store the decision when the user reviews an incoming claim.
+    SaveRecoveryResponse {
+        claim_id: String,
+        contact_id: String,
+        response: String,
+        remind_at: Option<u64>,
+    },
 }
 
 /// Sum type of every legitimate return shape from
@@ -234,4 +255,9 @@ pub enum DomainCommandResult {
     /// List of contacts (B7 batch 10 — `ListContacts`,
     /// `SearchContacts`, `ListArchivedContacts`).
     Contacts { contacts: Vec<MobileContact> },
+    /// Recovery-proof verification result (B7 batch 4 —
+    /// `VerifyRecoveryProof`).
+    RecoveryVerification {
+        verification: MobileRecoveryVerification,
+    },
 }

@@ -149,7 +149,11 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # (panic_shred / soft_shred / hard_shred / cancel_shred /
 # verify_shred) are deferred to a separate batch that adds
 # MobilePlatformKeychain plumbing to PlatformAppEngine.
-vauchi-platform/src/platform_app_engine.rs 2931
+# Bumped 2026-04-29 to 3029 by Phase B7 batch 4 — Recovery leftovers
+# (3 commands: VerifyRecoveryProof, UploadGuardianEntries,
+# SaveRecoveryResponse). Completes the recovery domain (B2 covered
+# the 9 main typed methods).
+vauchi-platform/src/platform_app_engine.rs 3029
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

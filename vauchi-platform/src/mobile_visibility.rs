@@ -24,7 +24,7 @@ use super::types::{
 /// `contact_ids` left-to-right. The invariant
 /// `rows.len() + stale_count as usize == contact_ids.len()` is verified in
 /// `mobile_visibility_resolve_tests`.
-fn resolve_label_contacts(
+pub(crate) fn resolve_label_contacts(
     storage: &vauchi_core::Storage,
     contact_ids: &[String],
 ) -> (Vec<MobileLabelContactRow>, u32) {

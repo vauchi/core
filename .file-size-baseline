@@ -153,7 +153,9 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # (3 commands: VerifyRecoveryProof, UploadGuardianEntries,
 # SaveRecoveryResponse). Completes the recovery domain (B2 covered
 # the 9 main typed methods).
-vauchi-platform/src/platform_app_engine.rs 3029
+# Bumped 2026-04-29 to 3409 by Phase B7 batch 6 — Visibility Labels
+# + Field Visibility (15 commands; +381 lines of dispatch).
+vauchi-platform/src/platform_app_engine.rs 3409
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

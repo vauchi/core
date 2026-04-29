@@ -2885,3 +2885,137 @@ fn get_contact_display_options_errors_for_unknown_contact() {
         "expected contact-not-found, got: {err:?}"
     );
 }
+
+// ── B7 batch 18: Sync flag persistence ─────────────────────────────────
+
+// @internal
+#[test]
+fn delivery_receipts_default_to_enabled() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsDeliveryReceiptsEnabled)
+        .expect("read")
+    {
+        DomainCommandResult::Bool { value } => {
+            assert!(value, "delivery receipts default to true");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn suppress_presence_defaults_to_disabled() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsSuppressPresenceEnabled)
+        .expect("read")
+    {
+        DomainCommandResult::Bool { value } => {
+            assert!(!value, "suppress presence defaults to false");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn set_then_read_delivery_receipts_round_trip() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::SetDeliveryReceiptsEnabled { enabled: false })
+        .expect("set");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsDeliveryReceiptsEnabled)
+        .expect("read")
+    {
+        DomainCommandResult::Bool { value } => assert!(!value, "must reflect set value"),
+        other => panic!("unexpected result: {other:?}"),
+    }
+
+    engine
+        .dispatch_domain_command(DomainCommand::SetDeliveryReceiptsEnabled { enabled: true })
+        .expect("set back");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsDeliveryReceiptsEnabled)
+        .expect("read")
+    {
+        DomainCommandResult::Bool { value } => assert!(value, "must flip back to true"),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn set_then_read_suppress_presence_round_trip() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::SetSuppressPresenceEnabled { enabled: true })
+        .expect("set");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsSuppressPresenceEnabled)
+        .expect("read")
+    {
+        DomainCommandResult::Bool { value } => assert!(value, "must reflect set value"),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn sync_flags_persist_across_engine_recreation() {
+    // Same storage path → fresh engine instance → flags persist via
+    // the .sync_flags sidecar JSON.
+    let dir = tempfile::tempdir().expect("temp dir");
+    let key = vauchi_core::crypto::SymmetricKey::generate();
+
+    let engine_a = PlatformAppEngine::new(
+        dir.path().to_string_lossy().to_string(),
+        "https://relay.test".into(),
+        key.as_bytes().to_vec(),
+    )
+    .expect("engine A");
+    drive_onboarding(&engine_a);
+
+    engine_a
+        .dispatch_domain_command(DomainCommand::SetDeliveryReceiptsEnabled { enabled: false })
+        .expect("set");
+    engine_a
+        .dispatch_domain_command(DomainCommand::SetSuppressPresenceEnabled { enabled: true })
+        .expect("set");
+    drop(engine_a);
+
+    let engine_b = PlatformAppEngine::new(
+        dir.path().to_string_lossy().to_string(),
+        "https://relay.test".into(),
+        key.as_bytes().to_vec(),
+    )
+    .expect("engine B");
+
+    match engine_b
+        .dispatch_domain_command(DomainCommand::IsDeliveryReceiptsEnabled)
+        .expect("read")
+    {
+        DomainCommandResult::Bool { value } => {
+            assert!(!value, "delivery_receipts persisted across restart");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+
+    match engine_b
+        .dispatch_domain_command(DomainCommand::IsSuppressPresenceEnabled)
+        .expect("read")
+    {
+        DomainCommandResult::Bool { value } => {
+            assert!(value, "suppress_presence persisted across restart");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}

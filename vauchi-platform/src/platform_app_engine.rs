@@ -94,6 +94,46 @@ type DirectListenerSlot = Arc<Mutex<Option<Arc<Box<dyn PlatformEventListener>>>>
 /// // After VauchiPlatform mutations, invalidate
 /// try engine.invalidateAll()
 /// ```
+/// Persisted sync-flag state (B7 batch 18). Stored as JSON next
+/// to the storage directory; mirrors the legacy `VauchiPlatform`
+/// in-memory mutex slots but survives restarts.
+struct SyncFlags {
+    delivery_receipts_enabled: bool,
+    suppress_presence: bool,
+}
+
+impl Default for SyncFlags {
+    fn default() -> Self {
+        Self {
+            delivery_receipts_enabled: true,
+            suppress_presence: false,
+        }
+    }
+}
+
+impl SyncFlags {
+    fn to_json(&self) -> String {
+        format!(
+            "{{\"delivery_receipts_enabled\":{},\"suppress_presence\":{}}}",
+            self.delivery_receipts_enabled, self.suppress_presence
+        )
+    }
+
+    fn from_json(s: &str) -> Option<Self> {
+        let v: serde_json::Value = serde_json::from_str(s).ok()?;
+        Some(Self {
+            delivery_receipts_enabled: v
+                .get("delivery_receipts_enabled")
+                .and_then(|x| x.as_bool())
+                .unwrap_or(true),
+            suppress_presence: v
+                .get("suppress_presence")
+                .and_then(|x| x.as_bool())
+                .unwrap_or(false),
+        })
+    }
+}
+
 #[derive(uniffi::Object)]
 pub struct PlatformAppEngine {
     /// Wrapped in `Arc<Mutex<…>>` rather than plain `Mutex<…>` so the
@@ -3783,6 +3823,34 @@ impl PlatformAppEngine {
                     contacts: crate::mobile_contacts::enrich_contacts_batch(storage, &contacts),
                 })
             }
+
+            // ── Sync flag persistence (B7 batch 18) ──
+            DomainCommand::IsDeliveryReceiptsEnabled => {
+                drop(engine);
+                Ok(DomainCommandResult::Bool {
+                    value: self.load_sync_flags_engine().delivery_receipts_enabled,
+                })
+            }
+            DomainCommand::SetDeliveryReceiptsEnabled { enabled } => {
+                drop(engine);
+                let mut flags = self.load_sync_flags_engine();
+                flags.delivery_receipts_enabled = enabled;
+                self.save_sync_flags_engine(&flags)?;
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::IsSuppressPresenceEnabled => {
+                drop(engine);
+                Ok(DomainCommandResult::Bool {
+                    value: self.load_sync_flags_engine().suppress_presence,
+                })
+            }
+            DomainCommand::SetSuppressPresenceEnabled { enabled } => {
+                drop(engine);
+                let mut flags = self.load_sync_flags_engine();
+                flags.suppress_presence = enabled;
+                self.save_sync_flags_engine(&flags)?;
+                Ok(DomainCommandResult::Unit)
+            }
         }
     }
 
@@ -4119,6 +4187,33 @@ impl PlatformAppEngine {
             detail: e.to_string(),
         })?;
         std::fs::write(&path, data).map_err(|e| MobileError::StorageError {
+            detail: e.to_string(),
+        })?;
+        Ok(())
+    }
+
+    /// File path holding the persisted sync-flags JSON (B7 batch 18).
+    /// Mirrors the aha-moments / demo-contact sidecar layout.
+    fn sync_flags_path_engine(&self) -> std::path::PathBuf {
+        self.storage_path
+            .parent()
+            .unwrap_or(&self.storage_path)
+            .join(".sync_flags")
+    }
+
+    fn load_sync_flags_engine(&self) -> SyncFlags {
+        let path = self.sync_flags_path_engine();
+        if let Ok(data) = std::fs::read_to_string(&path)
+            && let Some(flags) = SyncFlags::from_json(&data)
+        {
+            return flags;
+        }
+        SyncFlags::default()
+    }
+
+    fn save_sync_flags_engine(&self, flags: &SyncFlags) -> Result<(), MobileError> {
+        let path = self.sync_flags_path_engine();
+        std::fs::write(&path, flags.to_json()).map_err(|e| MobileError::StorageError {
             detail: e.to_string(),
         })?;
         Ok(())

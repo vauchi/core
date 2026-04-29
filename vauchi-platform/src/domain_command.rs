@@ -487,6 +487,19 @@ pub enum DomainCommand {
     /// applied at the storage layer; output is enriched.
     ListContactsPaginated { offset: u32, limit: u32 },
     // ListArchivedContacts is already declared in batch 10.
+
+    // ── Sync flag persistence (B7 batch 18) ──
+    /// Whether delivery-receipt ACKs (`ReceivedByRecipient`) are
+    /// enabled. Persisted to a JSON sidecar file next to the storage
+    /// directory.
+    IsDeliveryReceiptsEnabled,
+    /// Set the delivery-receipts flag. Persisted across restarts.
+    SetDeliveryReceiptsEnabled { enabled: bool },
+    /// Whether presence suppression is enabled (the relay never
+    /// learns whether the user is online). Persisted.
+    IsSuppressPresenceEnabled,
+    /// Set the suppress-presence flag. Persisted across restarts.
+    SetSuppressPresenceEnabled { enabled: bool },
 }
 
 /// Sum type of every legitimate return shape from

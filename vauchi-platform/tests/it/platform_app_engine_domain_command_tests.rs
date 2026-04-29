@@ -2830,3 +2830,58 @@ fn skip_onboarding_step_returns_progress_variant() {
         other => panic!("unexpected result: {other:?}"),
     }
 }
+
+// ── B7 batch 17: Display options + paginated contact lists ─────────────
+
+// @internal
+#[test]
+fn list_contacts_paginated_returns_empty_for_fresh_identity() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListContactsPaginated {
+            offset: 0,
+            limit: 50,
+        })
+        .expect("paginated")
+    {
+        DomainCommandResult::Contacts { contacts } => {
+            assert!(contacts.is_empty(), "fresh identity has no contacts");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn list_contacts_paginated_with_zero_limit_returns_empty() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ListContactsPaginated {
+            offset: 0,
+            limit: 0,
+        })
+        .expect("paginated")
+    {
+        DomainCommandResult::Contacts { contacts } => assert!(contacts.is_empty()),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_contact_display_options_errors_for_unknown_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let err = engine
+        .dispatch_domain_command(DomainCommand::GetContactDisplayOptions {
+            contact_id: "ghost".into(),
+        })
+        .expect_err("must error on missing contact");
+    let msg = format!("{err:?}").to_lowercase();
+    assert!(
+        msg.contains("not found") || msg.contains("contact"),
+        "expected contact-not-found, got: {err:?}"
+    );
+}

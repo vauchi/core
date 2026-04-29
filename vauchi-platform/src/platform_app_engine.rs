@@ -3714,6 +3714,75 @@ impl PlatformAppEngine {
                     progress: crate::types::MobileOnboardingProgress::from(&progress),
                 })
             }
+
+            // ── Contact display options + paginated/archived lists (B7 batch 17) ──
+            DomainCommand::GetContactDisplayOptions { contact_id } => {
+                let opts = engine
+                    .vauchi()
+                    .get_contact_display_options(&contact_id)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                let names = opts
+                    .names
+                    .into_iter()
+                    .map(|n| {
+                        Ok(crate::types::MobileNameOption {
+                            source: serde_json::to_string(&n.source).map_err(|e| {
+                                MobileError::Other {
+                                    detail: format!("Serialize name source: {e}"),
+                                }
+                            })?,
+                            name: n.name,
+                            is_primary: n.is_primary,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, MobileError>>()?;
+                let avatars = opts
+                    .avatars
+                    .into_iter()
+                    .map(|a| {
+                        Ok(crate::types::MobileAvatarOption {
+                            source: serde_json::to_string(&a.source).map_err(|e| {
+                                MobileError::Other {
+                                    detail: format!("Serialize avatar source: {e}"),
+                                }
+                            })?,
+                            has_data: a.has_data,
+                            is_primary: a.is_primary,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, MobileError>>()?;
+                let active_name_preference = serde_json::to_string(&opts.active_name_preference)
+                    .map_err(|e| MobileError::Other {
+                        detail: format!("Serialize name pref: {e}"),
+                    })?;
+                let active_avatar_preference =
+                    serde_json::to_string(&opts.active_avatar_preference).map_err(|e| {
+                        MobileError::Other {
+                            detail: format!("Serialize avatar pref: {e}"),
+                        }
+                    })?;
+                Ok(DomainCommandResult::ContactDisplayOptions {
+                    options: crate::types::MobileContactDisplayOptions {
+                        names,
+                        avatars,
+                        active_name_preference,
+                        active_avatar_preference,
+                    },
+                })
+            }
+            DomainCommand::ListContactsPaginated { offset, limit } => {
+                let storage = engine.vauchi().storage();
+                let contacts = storage
+                    .list_contacts_paginated(offset as usize, limit as usize)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                Ok(DomainCommandResult::Contacts {
+                    contacts: crate::mobile_contacts::enrich_contacts_batch(storage, &contacts),
+                })
+            }
         }
     }
 

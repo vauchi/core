@@ -31,12 +31,12 @@ use crate::content::{MobileApplyResult, MobileUpdateStatus};
 use crate::mobile_import::MobileImportResult;
 use crate::types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileConsentRecord, MobileConsentStatus,
-    MobileConsentType, MobileContact, MobileContactCard, MobileDecoyContact, MobileDeletionInfo,
-    MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
-    MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDuplicatePair, MobileDuressSettings,
-    MobileFieldNote, MobileFieldType, MobileGdprExport, MobileOnboardingProgress,
-    MobileOnboardingStep, MobileRecoveryVerification, MobileRetryEntry, MobileShredStatus,
-    MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileConsentType, MobileContact, MobileContactCard, MobileContactDisplayOptions,
+    MobileDecoyContact, MobileDeletionInfo, MobileDeliveryRecord, MobileDeliveryStatus,
+    MobileDeliverySummary, MobileDemoContact, MobileDemoContactState, MobileDeviceDeliveryRecord,
+    MobileDuplicatePair, MobileDuressSettings, MobileFieldNote, MobileFieldType, MobileGdprExport,
+    MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryVerification, MobileRetryEntry,
+    MobileShredStatus, MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -478,6 +478,15 @@ pub enum DomainCommand {
     /// Mark the current step as skipped and advance. Returns the
     /// updated progress.
     SkipOnboardingStep,
+
+    // ── Contact display options + paginated lists (B7 batch 17) ──
+    /// Read all display options (names + avatars) for a contact, with
+    /// the active preference highlighted. Used by the chooser screen.
+    GetContactDisplayOptions { contact_id: String },
+    /// List contacts with offset+limit pagination. Both bounds are
+    /// applied at the storage layer; output is enriched.
+    ListContactsPaginated { offset: u32, limit: u32 },
+    // ListArchivedContacts is already declared in batch 10.
 }
 
 /// Sum type of every legitimate return shape from
@@ -596,4 +605,9 @@ pub enum DomainCommandResult {
     OnboardingProgress { progress: MobileOnboardingProgress },
     /// Current onboarding step (B7 batch 16 — `CurrentOnboardingStep`).
     OnboardingStep { step: MobileOnboardingStep },
+    /// Contact display options snapshot (B7 batch 17 —
+    /// `GetContactDisplayOptions`).
+    ContactDisplayOptions {
+        options: MobileContactDisplayOptions,
+    },
 }

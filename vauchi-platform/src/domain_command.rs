@@ -31,9 +31,10 @@ use crate::content::{MobileApplyResult, MobileUpdateStatus};
 use crate::types::{
     MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileConsentRecord, MobileConsentStatus,
     MobileConsentType, MobileContact, MobileContactCard, MobileDecoyContact, MobileDeletionInfo,
-    MobileDemoContact, MobileDemoContactState, MobileDuressSettings, MobileFieldType,
-    MobileGdprExport, MobileRecoveryVerification, MobileShredStatus, MobileSocialNetwork,
-    MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
+    MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDuressSettings, MobileFieldType,
+    MobileGdprExport, MobileRecoveryVerification, MobileRetryEntry, MobileShredStatus,
+    MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -286,6 +287,58 @@ pub enum DomainCommand {
     ListDecoyContacts,
     /// Delete a decoy contact by id.
     DeleteDecoyContact { id: String },
+    // ── Sync / Delivery / Retry — read paths + simple writes (B7 batch 8) ──
+    //
+    // The state-heavy methods (sync, get_sync_status, delivery
+    // receipts / suppress-presence flags, backup export/import) need
+    // engine-resident state and are deferred to a separate "sync
+    // orchestration" batch. This batch covers the 21 storage-only
+    // delegations that translate cleanly into dispatch arms today.
+    /// Total pending updates across all contacts.
+    PendingUpdateCount,
+    /// Read a delivery record by message id.
+    GetDeliveryRecord { message_id: String },
+    /// All delivery records.
+    GetAllDeliveryRecords,
+    /// Delivery records for a specific recipient.
+    GetDeliveryRecordsForContact { recipient_id: String },
+    /// Count of failed deliveries.
+    CountFailedDeliveries,
+    /// All failed delivery records.
+    GetFailedDeliveryRecords,
+    /// Reschedule a failed delivery for immediate retry.
+    /// Returns `true` if the retry entry was found and rescheduled.
+    ManualRetry { message_id: String },
+    /// All non-terminal pending deliveries.
+    GetPendingDeliveries,
+    /// Count of deliveries in a specific status.
+    GetDeliveryCountByStatus { status: MobileDeliveryStatus },
+    /// All retry entries due for retry now.
+    GetDueRetries,
+    /// Retry entries for a specific contact.
+    GetRetriesForContact { contact_id: String },
+    /// Total count of retry entries.
+    GetRetryCount,
+    /// Delete a retry entry by message id.
+    DeleteRetry { message_id: String },
+    /// Compute the backoff (seconds) for a retry attempt. Pure.
+    CalculateRetryBackoff { attempt: u32 },
+    /// Total pending updates count (alias for `PendingUpdateCount`'s
+    /// alternative implementation — counts via storage directly).
+    GetTotalPendingCount,
+    /// Whether the offline queue is at capacity.
+    IsOfflineQueueFull,
+    /// Remaining capacity in the offline queue.
+    GetOfflineQueueCapacity,
+    /// Drop all pending updates for a contact. Returns the cleared
+    /// count.
+    ClearPendingUpdatesForContact { contact_id: String },
+    /// Multi-device delivery summary for a message.
+    GetDeliverySummary { message_id: String },
+    /// All device delivery records for a message.
+    GetDeviceDeliveries { message_id: String },
+    /// All pending device deliveries.
+    GetPendingDeviceDeliveries,
 }
 
 /// Sum type of every legitimate return shape from
@@ -368,4 +421,21 @@ pub enum DomainCommandResult {
     },
     /// List of decoy contacts (B7 batch 7 — `ListDecoyContacts`).
     DecoyContacts { contacts: Vec<MobileDecoyContact> },
+    /// Numeric u64 result (B7 batch 8 — `CalculateRetryBackoff`).
+    BackoffSeconds { seconds: u64 },
+    /// Optional delivery record (B7 batch 8 — `GetDeliveryRecord`).
+    DeliveryRecordOpt {
+        record: Option<MobileDeliveryRecord>,
+    },
+    /// List of delivery records (B7 batch 8 — multiple).
+    DeliveryRecords { records: Vec<MobileDeliveryRecord> },
+    /// List of retry entries (B7 batch 8).
+    RetryEntries { entries: Vec<MobileRetryEntry> },
+    /// Multi-device delivery summary (B7 batch 8 — `GetDeliverySummary`).
+    DeliverySummary { summary: MobileDeliverySummary },
+    /// List of device delivery records (B7 batch 8 —
+    /// `GetDeviceDeliveries`, `GetPendingDeviceDeliveries`).
+    DeviceDeliveries {
+        records: Vec<MobileDeviceDeliveryRecord>,
+    },
 }

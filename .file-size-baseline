@@ -131,7 +131,6 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 #  existing QrScanned hardware-event auto-route — feeds the
 #  cycle-thread session when the QR-scanner Component fires from
 #  the multi-stage screen 2026-04-28)
-<<<<<<< HEAD
 # Bumped 2026-04-29 to 2485 by Phase B7 batch 5 — Aha Moments +
 # Demo Contact (14 commands; backed by `.aha_moments` +
 # `.demo_contact` JSON files mirroring the legacy VauchiPlatform
@@ -161,7 +160,12 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # Authenticate, IsPasswordEnabled, IsDuressEnabled, DisableDuress,
 # ConfigureDuressAlerts, GetDuressSettings, AddDecoyContact,
 # ListDecoyContacts, DeleteDecoyContact; +166 lines).
-vauchi-platform/src/platform_app_engine.rs 3575
+# Bumped 2026-04-29 to 3890 by Phase B7 batch 8 — Delivery records,
+# retry queue, offline queue counts (21 storage-only commands;
+# +315 lines of dispatch arms). State-heavy methods (sync,
+# get_sync_status, delivery-receipts / suppress-presence flags,
+# backup export/import) deferred to a separate orchestration batch.
+vauchi-platform/src/platform_app_engine.rs 3890
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

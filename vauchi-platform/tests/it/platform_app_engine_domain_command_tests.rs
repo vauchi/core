@@ -1558,3 +1558,327 @@ fn delete_decoy_contact_removes_from_list() {
         other => panic!("unexpected result: {other:?}"),
     }
 }
+
+// ── Sync / Delivery / Retry (B7 batch 8) ────────────────────────────
+
+// @internal
+#[test]
+fn pending_update_count_is_zero_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::PendingUpdateCount)
+        .expect("count")
+    {
+        DomainCommandResult::Count { value } => assert_eq!(value, 0),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_total_pending_count_is_zero_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetTotalPendingCount)
+        .expect("count")
+    {
+        DomainCommandResult::Count { value } => assert_eq!(value, 0),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn count_failed_deliveries_is_zero_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::CountFailedDeliveries)
+        .expect("count")
+    {
+        DomainCommandResult::Count { value } => assert_eq!(value, 0),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_all_delivery_records_is_empty_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetAllDeliveryRecords)
+        .expect("records")
+    {
+        DomainCommandResult::DeliveryRecords { records } => {
+            assert!(records.is_empty());
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_failed_delivery_records_is_empty_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetFailedDeliveryRecords)
+        .expect("records")
+    {
+        DomainCommandResult::DeliveryRecords { records } => {
+            assert!(records.is_empty());
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_pending_deliveries_is_empty_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetPendingDeliveries)
+        .expect("records")
+    {
+        DomainCommandResult::DeliveryRecords { records } => {
+            assert!(records.is_empty());
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_delivery_record_returns_none_for_unknown_id() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetDeliveryRecord {
+            message_id: "nonexistent".into(),
+        })
+        .expect("get")
+    {
+        DomainCommandResult::DeliveryRecordOpt { record } => {
+            assert!(record.is_none());
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_delivery_records_for_contact_is_empty_for_unknown_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetDeliveryRecordsForContact {
+            recipient_id: "nonexistent".into(),
+        })
+        .expect("records")
+    {
+        DomainCommandResult::DeliveryRecords { records } => {
+            assert!(records.is_empty());
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn manual_retry_returns_false_for_unknown_message() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ManualRetry {
+            message_id: "nonexistent".into(),
+        })
+        .expect("retry")
+    {
+        DomainCommandResult::Bool { value } => assert!(!value, "no entry → false"),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn delete_retry_returns_false_for_unknown_message() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::DeleteRetry {
+            message_id: "nonexistent".into(),
+        })
+        .expect("delete")
+    {
+        DomainCommandResult::Bool { value } => assert!(!value, "no entry → false"),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_due_retries_is_empty_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetDueRetries)
+        .expect("entries")
+    {
+        DomainCommandResult::RetryEntries { entries } => {
+            assert!(entries.is_empty());
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_retry_count_is_zero_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetRetryCount)
+        .expect("count")
+    {
+        DomainCommandResult::Count { value } => assert_eq!(value, 0),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_retries_for_contact_is_empty_for_unknown_contact() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetRetriesForContact {
+            contact_id: "nonexistent".into(),
+        })
+        .expect("entries")
+    {
+        DomainCommandResult::RetryEntries { entries } => {
+            assert!(entries.is_empty());
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn calculate_retry_backoff_grows_with_attempt() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let backoff_at = |attempt: u32| -> u64 {
+        match engine
+            .dispatch_domain_command(DomainCommand::CalculateRetryBackoff { attempt })
+            .expect("backoff")
+        {
+            DomainCommandResult::BackoffSeconds { seconds } => seconds,
+            other => panic!("unexpected result: {other:?}"),
+        }
+    };
+
+    let b0 = backoff_at(0);
+    let b3 = backoff_at(3);
+    assert!(b3 >= b0, "backoff must be non-decreasing in attempt count");
+}
+
+// @internal
+#[test]
+fn is_offline_queue_full_is_false_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsOfflineQueueFull)
+        .expect("full")
+    {
+        DomainCommandResult::Bool { value } => assert!(!value),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_offline_queue_capacity_is_positive_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetOfflineQueueCapacity)
+        .expect("capacity")
+    {
+        DomainCommandResult::Count { value } => {
+            assert!(value > 0, "fresh queue has positive remaining capacity");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn clear_pending_updates_for_unknown_contact_returns_zero() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ClearPendingUpdatesForContact {
+            contact_id: "nonexistent".into(),
+        })
+        .expect("clear")
+    {
+        DomainCommandResult::Count { value } => assert_eq!(value, 0),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_delivery_count_by_status_is_zero_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetDeliveryCountByStatus {
+            status: vauchi_platform::MobileDeliveryStatus::Queued,
+        })
+        .expect("count")
+    {
+        DomainCommandResult::Count { value } => assert_eq!(value, 0),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_pending_device_deliveries_is_empty_initially() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetPendingDeviceDeliveries)
+        .expect("records")
+    {
+        DomainCommandResult::DeviceDeliveries { records } => {
+            assert!(records.is_empty());
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn get_device_deliveries_for_unknown_message_is_empty() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetDeviceDeliveries {
+            message_id: "nonexistent".into(),
+        })
+        .expect("records")
+    {
+        DomainCommandResult::DeviceDeliveries { records } => {
+            assert!(records.is_empty());
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}

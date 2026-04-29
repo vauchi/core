@@ -165,7 +165,11 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # +315 lines of dispatch arms). State-heavy methods (sync,
 # get_sync_status, delivery-receipts / suppress-presence flags,
 # backup export/import) deferred to a separate orchestration batch.
-vauchi-platform/src/platform_app_engine.rs 3890
+# Bumped 2026-04-29 to 3966 by Phase B7 batch 9 — Identity reads
+# (CreateIdentity, GetPublicId, GetDisplayName, GetOwnFingerprint)
+# + Onboarding helpers (DisplayNameSuggestions, ResetOnboarding).
+# 6 commands; +76 lines of dispatch arms.
+vauchi-platform/src/platform_app_engine.rs 3966
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

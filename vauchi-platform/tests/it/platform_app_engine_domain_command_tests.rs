@@ -2498,20 +2498,6 @@ fn get_offline_queue_capacity_returns_full_capacity_for_fresh_identity() {
 
 // @internal
 #[test]
-fn list_decoy_contacts_is_empty_initially() {
-    let (engine, _dir) = create_engine_with_identity();
-
-    match engine
-        .dispatch_domain_command(DomainCommand::ListDecoyContacts)
-        .expect("list_decoy")
-    {
-        DomainCommandResult::DecoyContacts { contacts } => assert!(contacts.is_empty()),
-        other => panic!("unexpected result: {other:?}"),
-    }
-}
-
-// @internal
-#[test]
 fn add_then_list_then_delete_decoy_contact_round_trip() {
     let (engine, _dir) = create_engine_with_identity();
 

@@ -235,4 +235,26 @@ pub enum ActionResult {
     /// dedicated screen which then auto-creates the
     /// `MobileMultiStageSession` and binds the bridge listener.
     StartMultiStageExchange,
+    /// App layer should call `MobileDeviceLinkSession::confirm_manual`
+    /// with the given confirmation code and the current unix timestamp.
+    ///
+    /// Emitted by `DeviceLinkingEngine` from the `VerifyingProximity`
+    /// step when the user taps the manual-confirm action. Pair 5 of
+    /// `2026-04-28-pure-humble-ui-retire-native-screens`. Ultrasonic
+    /// confirmation flows through ADR-031 hardware events instead.
+    DeviceLinkConfirmManual {
+        code: String,
+    },
+    /// App layer should call `MobileDeviceLinkSession::deny`. Emitted
+    /// by `DeviceLinkingEngine` from the `ConfirmingDevice` step when
+    /// the user denies the request. The session's cycle thread fires
+    /// `on_failed("user_denied")` followed by `on_session_ended()`.
+    DeviceLinkDeny,
+    /// App layer should create a fresh `MobileDeviceLinkSession`
+    /// (single-shot — sessions cannot be reused) and call `start()`.
+    /// Emitted by `DeviceLinkingEngine` from `QrExpired` and
+    /// `LinkFailed` when the user taps Retry. The engine is already
+    /// in the `QrPending` state when this is emitted; the new session
+    /// will fire `on_qr_ready` to advance it.
+    DeviceLinkRetry,
 }

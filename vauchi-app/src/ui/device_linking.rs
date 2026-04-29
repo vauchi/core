@@ -744,23 +744,28 @@ impl WorkflowEngine for DeviceLinkingEngine {
                 };
                 ActionResult::NavigateTo(self.build_screen())
             }
-            // `deny` from receiver-side ConfirmingDevice closes the
-            // sheet. The app_engine inspects screen+action_id in
-            // `routing.rs` to call `Vauchi::reject_device_link`.
-            (DeviceLinkStep::ConfirmingDevice { .. }, DENY_ACTION_ID) => ActionResult::Complete,
-            // `confirm_manual` from VerifyingProximity moves to the
-            // ephemeral Completing state. The app_engine intercepts
-            // the action to call `Vauchi::approve_device_link_manual`
-            // with the stored challenge — Pair 5 follow-up MR.
-            (DeviceLinkStep::VerifyingProximity { .. }, CONFIRM_MANUAL_ACTION_ID) => {
+            // `deny` from receiver-side ConfirmingDevice. The app
+            // engine intercepts `DeviceLinkDeny` to call
+            // `MobileDeviceLinkSession::deny`; the cycle thread
+            // emits `on_failed("user_denied")` + `on_session_ended()`
+            // which collapses the sheet.
+            (DeviceLinkStep::ConfirmingDevice { .. }, DENY_ACTION_ID) => {
+                ActionResult::DeviceLinkDeny
+            }
+            // `confirm_manual` from VerifyingProximity. Engine moves
+            // to the ephemeral Completing state and emits the typed
+            // result so the app engine can call
+            // `MobileDeviceLinkSession::confirm_manual(code, now)`.
+            (DeviceLinkStep::VerifyingProximity { code, .. }, CONFIRM_MANUAL_ACTION_ID) => {
+                let code = code.clone();
                 self.step = DeviceLinkStep::Completing;
-                ActionResult::NavigateTo(self.build_screen())
+                ActionResult::DeviceLinkConfirmManual { code }
             }
             (DeviceLinkStep::QrExpired, RETRY_ACTION_ID)
             | (DeviceLinkStep::LinkFailed { .. }, RETRY_ACTION_ID) => {
                 self.step = DeviceLinkStep::QrPending;
                 self.verification_code = None;
-                ActionResult::NavigateTo(self.build_screen())
+                ActionResult::DeviceLinkRetry
             }
             (DeviceLinkStep::Complete, DONE_ACTION_ID) => ActionResult::Complete,
             // `cancel` is universal across every screen that shows it.
@@ -1006,18 +1011,21 @@ mod tests {
 
     // @internal
     #[test]
-    fn deny_from_confirming_device_completes() {
+    fn deny_from_confirming_device_emits_device_link_deny() {
         let mut e = DeviceLinkingEngine::new("qr-data".into());
         e.transition_to_confirming_device("New iPad".into(), "654321".into(), "deadbeef".into());
         let result = e.handle_action(UserAction::ActionPressed {
             action_id: DENY_ACTION_ID.into(),
         });
-        assert!(matches!(result, ActionResult::Complete));
+        assert!(
+            matches!(result, ActionResult::DeviceLinkDeny),
+            "expected DeviceLinkDeny, got {result:?}"
+        );
     }
 
     // @internal
     #[test]
-    fn confirm_manual_advances_to_completing() {
+    fn confirm_manual_emits_typed_result_with_code_and_advances_step() {
         let mut e = DeviceLinkingEngine::new("qr-data".into());
         e.transition_to_confirming_device("New iPad".into(), "654321".into(), "deadbeef".into());
         let _ = e.handle_action(UserAction::ActionPressed {
@@ -1027,9 +1035,11 @@ mod tests {
             action_id: CONFIRM_MANUAL_ACTION_ID.into(),
         });
         match result {
-            ActionResult::NavigateTo(s) => assert_eq!(s.screen_id, "link_completing"),
-            other => panic!("expected NavigateTo, got {other:?}"),
+            ActionResult::DeviceLinkConfirmManual { code } => assert_eq!(code, "654321"),
+            other => panic!("expected DeviceLinkConfirmManual, got {other:?}"),
         }
+        // Step still advanced — next render shows the Completing screen.
+        assert_eq!(e.current_screen().screen_id, "link_completing");
     }
 
     // @internal
@@ -1071,30 +1081,32 @@ mod tests {
 
     // @internal
     #[test]
-    fn retry_from_qr_expired_returns_to_pending() {
+    fn retry_from_qr_expired_emits_device_link_retry_and_advances_step() {
         let mut e = DeviceLinkingEngine::new("qr-data".into());
         e.transition_to_qr_expired();
         let result = e.handle_action(UserAction::ActionPressed {
             action_id: RETRY_ACTION_ID.into(),
         });
-        match result {
-            ActionResult::NavigateTo(s) => assert_eq!(s.screen_id, "link_qr_pending"),
-            other => panic!("expected NavigateTo, got {other:?}"),
-        }
+        assert!(
+            matches!(result, ActionResult::DeviceLinkRetry),
+            "expected DeviceLinkRetry, got {result:?}"
+        );
+        assert_eq!(e.current_screen().screen_id, "link_qr_pending");
     }
 
     // @internal
     #[test]
-    fn retry_from_link_failed_returns_to_pending() {
+    fn retry_from_link_failed_emits_device_link_retry_and_advances_step() {
         let mut e = DeviceLinkingEngine::new("qr-data".into());
         e.transition_to_link_failed("oops".into());
         let result = e.handle_action(UserAction::ActionPressed {
             action_id: RETRY_ACTION_ID.into(),
         });
-        match result {
-            ActionResult::NavigateTo(s) => assert_eq!(s.screen_id, "link_qr_pending"),
-            other => panic!("expected NavigateTo, got {other:?}"),
-        }
+        assert!(
+            matches!(result, ActionResult::DeviceLinkRetry),
+            "expected DeviceLinkRetry, got {result:?}"
+        );
+        assert_eq!(e.current_screen().screen_id, "link_qr_pending");
     }
 
     // @internal

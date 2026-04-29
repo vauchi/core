@@ -23,6 +23,7 @@ fn engine_on_device_linking() -> AppEngine {
     engine
 }
 
+// @scenario: pair5_device_link_bridge :: cycle thread can push QrPending into the engine
 #[test]
 fn qr_pending_bridge_renders_pending_screen() {
     let mut engine = engine_on_device_linking();
@@ -32,6 +33,7 @@ fn qr_pending_bridge_renders_pending_screen() {
     assert_eq!(screen.screen_id, "link_qr_pending");
 }
 
+// @scenario: pair5_device_link_bridge :: on_qr_ready surfaces QR data + expiry
 #[test]
 fn qr_ready_bridge_renders_waiting_with_qr() {
     let mut engine = engine_on_device_linking();
@@ -50,6 +52,7 @@ fn qr_ready_bridge_renders_waiting_with_qr() {
     assert_eq!(qr, "fresh-qr");
 }
 
+// @scenario: pair5_device_link_bridge :: qr_expired failure renders retry+cancel surface
 #[test]
 fn qr_expired_bridge_renders_expired_screen() {
     let mut engine = engine_on_device_linking();
@@ -61,6 +64,7 @@ fn qr_expired_bridge_renders_expired_screen() {
     assert_eq!(ids, vec!["retry", "cancel"]);
 }
 
+// @scenario: pair5_device_link_bridge :: on_confirmation_required surfaces device name + code
 #[test]
 fn request_received_bridge_renders_confirming_device_screen() {
     let mut engine = engine_on_device_linking();
@@ -71,6 +75,7 @@ fn request_received_bridge_renders_confirming_device_screen() {
     assert_eq!(screen.subtitle.as_deref(), Some("Device: New iPad"));
 }
 
+// @scenario: pair5_device_link_bridge :: codes_match preserves confirmation code into proximity step
 #[test]
 fn request_received_then_codes_match_advances_to_proximity_with_code() {
     let mut engine = engine_on_device_linking();
@@ -95,6 +100,7 @@ fn request_received_then_codes_match_advances_to_proximity_with_code() {
     }
 }
 
+// @scenario: pair5_device_link_bridge :: confirm_manual emits typed action result with code
 #[test]
 fn confirm_manual_emits_typed_result_carrying_code() {
     let mut engine = engine_on_device_linking();
@@ -112,6 +118,7 @@ fn confirm_manual_emits_typed_result_carrying_code() {
     assert_eq!(engine.current_screen().screen_id, "link_completing");
 }
 
+// @scenario: pair5_device_link_bridge :: deny on confirming device emits DeviceLinkDeny
 #[test]
 fn deny_emits_device_link_deny_result() {
     let mut engine = engine_on_device_linking();
@@ -125,6 +132,7 @@ fn deny_emits_device_link_deny_result() {
     );
 }
 
+// @scenario: pair5_device_link_bridge :: retry from expired emits DeviceLinkRetry and advances to pending
 #[test]
 fn retry_from_expired_emits_device_link_retry_and_advances_to_pending() {
     let mut engine = engine_on_device_linking();
@@ -139,6 +147,7 @@ fn retry_from_expired_emits_device_link_retry_and_advances_to_pending() {
     assert_eq!(engine.current_screen().screen_id, "link_qr_pending");
 }
 
+// @scenario: pair5_device_link_bridge :: on_completed transitions to terminal Complete screen
 #[test]
 fn completed_bridge_renders_complete_screen() {
     let mut engine = engine_on_device_linking();
@@ -148,6 +157,7 @@ fn completed_bridge_renders_complete_screen() {
     assert_eq!(screen.screen_id, "link_complete");
 }
 
+// @scenario: pair5_device_link_bridge :: on_failed message surfaces in the LinkFailed screen
 #[test]
 fn failed_bridge_renders_failed_screen_with_message() {
     let mut engine = engine_on_device_linking();
@@ -166,6 +176,7 @@ fn failed_bridge_renders_failed_screen_with_message() {
     assert_eq!(detail, "relay timeout");
 }
 
+// @scenario: pair5_device_link_bridge :: cancel from any device-link step navigates away
 #[test]
 fn cancel_from_any_step_navigates_away_from_device_linking() {
     // The engine emits ActionResult::Complete on cancel; AppEngine's
@@ -194,6 +205,7 @@ fn cancel_from_any_step_navigates_away_from_device_linking() {
 
 // ── Off-screen guards ──────────────────────────────────────────
 
+// @scenario: pair5_device_link_bridge :: bridges no-op (return None) off the device-linking screen
 #[test]
 fn bridges_return_none_when_not_on_device_linking_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();

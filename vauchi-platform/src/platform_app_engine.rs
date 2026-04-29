@@ -3965,6 +3965,34 @@ impl PlatformAppEngine {
                 let frames = crate::multipart_qr::encode_multipart(&data, 1800);
                 Ok(DomainCommandResult::Strings { values: frames })
             }
+
+            // ── Certificate pinning (B7 batch 21) ──
+            DomainCommand::SetPinnedCertificate { cert_pem } => {
+                drop(engine);
+                let path = self.cert_pin_path_engine();
+                if cert_pem.is_empty() {
+                    // Empty string clears the pin: remove the sidecar file.
+                    // Ignore NotFound — already-cleared is idempotent.
+                    if let Err(e) = std::fs::remove_file(&path)
+                        && e.kind() != std::io::ErrorKind::NotFound
+                    {
+                        return Err(MobileError::StorageError {
+                            detail: e.to_string(),
+                        });
+                    }
+                } else {
+                    std::fs::write(&path, cert_pem).map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                }
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::IsCertificatePinningEnabled => {
+                drop(engine);
+                Ok(DomainCommandResult::Bool {
+                    value: self.cert_pin_path_engine().exists(),
+                })
+            }
         }
     }
 
@@ -4313,6 +4341,15 @@ impl PlatformAppEngine {
             .parent()
             .unwrap_or(&self.storage_path)
             .join(".sync_flags")
+    }
+
+    /// File path holding the pinned TLS certificate PEM (B7 batch 21).
+    /// Existence of the file = pinning enabled. Empty / missing = disabled.
+    fn cert_pin_path_engine(&self) -> std::path::PathBuf {
+        self.storage_path
+            .parent()
+            .unwrap_or(&self.storage_path)
+            .join(".cert_pin")
     }
 
     fn load_sync_flags_engine(&self) -> SyncFlags {

@@ -212,14 +212,19 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # Bumped 2026-04-29 to 4760 by Phase B7 batch 20 — Multipart QR
 # encoding (1 command: EncodeMultipartQr; stateless wrapper around
 # multipart_qr::encode_multipart; +7 lines).
-vauchi-platform/src/platform_app_engine.rs 4760
+# Bumped 2026-04-29 to 4797 by Phase B7 batch 21 — Certificate
+# pinning persistence (2 commands: SetPinnedCertificate,
+# IsCertificatePinningEnabled). Persists the PEM to a `.cert_pin`
+# sidecar file so the choice survives restarts; +37 lines incl.
+# the file-existence-as-state pattern + path helper.
+vauchi-platform/src/platform_app_engine.rs 4797
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding
 # helpers; splitting per-batch would force duplicating those helpers
 # across files and complicates the read-after-write smoke pattern.
 # Will be split into per-domain test files only after B7 phase completes.
-vauchi-platform/tests/it/platform_app_engine_domain_command_tests.rs 3134
+vauchi-platform/tests/it/platform_app_engine_domain_command_tests.rs 3251
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

@@ -518,6 +518,15 @@ pub enum DomainCommand {
     /// the decode side is a separate `MobileMultipartDecoder`
     /// object.
     EncodeMultipartQr { data: Vec<u8> },
+
+    // ── Certificate pinning (B7 batch 21) ──
+    /// Set the pinned TLS certificate (PEM-encoded). Empty string
+    /// disables pinning. Persisted to a sidecar file at `.cert_pin`
+    /// so the choice survives restarts. Mirrors the legacy
+    /// `VauchiPlatform::set_pinned_certificate`.
+    SetPinnedCertificate { cert_pem: String },
+    /// Read whether certificate pinning is currently enabled.
+    IsCertificatePinningEnabled,
 }
 
 /// Sum type of every legitimate return shape from

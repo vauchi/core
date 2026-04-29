@@ -3132,3 +3132,120 @@ fn encode_multipart_qr_large_payload_spans_multiple_frames() {
         other => panic!("unexpected result: {other:?}"),
     }
 }
+
+// ── B7 batch 21: Certificate pinning persistence ───────────────────────
+
+// @internal
+#[test]
+fn certificate_pinning_disabled_by_default() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsCertificatePinningEnabled)
+        .expect("read")
+    {
+        DomainCommandResult::Bool { value } => {
+            assert!(!value, "no pin file by default → pinning disabled");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn set_pinned_certificate_enables_pinning() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let pem = "-----BEGIN CERTIFICATE-----\nMIITESTSTUFF\n-----END CERTIFICATE-----\n";
+    engine
+        .dispatch_domain_command(DomainCommand::SetPinnedCertificate {
+            cert_pem: pem.into(),
+        })
+        .expect("set");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsCertificatePinningEnabled)
+        .expect("read")
+    {
+        DomainCommandResult::Bool { value } => assert!(value, "pin must be active after set"),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn set_pinned_certificate_with_empty_string_clears_pin() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    engine
+        .dispatch_domain_command(DomainCommand::SetPinnedCertificate {
+            cert_pem: "PEM".into(),
+        })
+        .expect("set");
+
+    engine
+        .dispatch_domain_command(DomainCommand::SetPinnedCertificate {
+            cert_pem: String::new(),
+        })
+        .expect("clear");
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsCertificatePinningEnabled)
+        .expect("read")
+    {
+        DomainCommandResult::Bool { value } => assert!(!value, "empty PEM clears the pin"),
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn certificate_pinning_persists_across_engine_recreation() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let key = vauchi_core::crypto::SymmetricKey::generate();
+
+    let engine_a = PlatformAppEngine::new(
+        dir.path().to_string_lossy().to_string(),
+        "https://relay.test".into(),
+        key.as_bytes().to_vec(),
+    )
+    .expect("engine A");
+    drive_onboarding(&engine_a);
+
+    engine_a
+        .dispatch_domain_command(DomainCommand::SetPinnedCertificate {
+            cert_pem: "-----BEGIN CERTIFICATE-----\nDATA\n-----END CERTIFICATE-----".into(),
+        })
+        .expect("set");
+    drop(engine_a);
+
+    let engine_b = PlatformAppEngine::new(
+        dir.path().to_string_lossy().to_string(),
+        "https://relay.test".into(),
+        key.as_bytes().to_vec(),
+    )
+    .expect("engine B");
+
+    match engine_b
+        .dispatch_domain_command(DomainCommand::IsCertificatePinningEnabled)
+        .expect("read")
+    {
+        DomainCommandResult::Bool { value } => {
+            assert!(value, "pinning persisted across restart");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn clearing_pin_when_already_disabled_is_idempotent() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    // No prior set — clear should not error.
+    engine
+        .dispatch_domain_command(DomainCommand::SetPinnedCertificate {
+            cert_pem: String::new(),
+        })
+        .expect("idempotent clear");
+}

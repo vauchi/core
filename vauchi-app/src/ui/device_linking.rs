@@ -30,6 +30,15 @@ enum DeviceLinkStep {
 pub const TRANSPORT_INTERNET_ACTION_ID: &str = "select_internet";
 pub const TRANSPORT_OFFLINE_ACTION_ID: &str = "select_offline";
 
+/// Action ids handled by `DeviceLinkingEngine`. Extracted for the
+/// reachability test (`tests/reachability/device_linking.rs`) so the
+/// declared handler set can't drift from the live ScreenModel.
+pub const BACK_TO_TRANSPORT_ACTION_ID: &str = "back_to_transport";
+pub const CANCEL_ACTION_ID: &str = "cancel";
+pub const CONFIRM_ACTION_ID: &str = "confirm";
+pub const REJECT_ACTION_ID: &str = "reject";
+pub const DONE_ACTION_ID: &str = "done";
+
 /// Engine that drives the device linking workflow.
 #[derive(Clone, Debug)]
 pub struct DeviceLinkingEngine {
@@ -152,7 +161,7 @@ impl DeviceLinkingEngine {
                         a11y: None,
                     },
                     ScreenAction {
-                        id: "cancel".into(),
+                        id: CANCEL_ACTION_ID.into(),
                         label: "Cancel".into(),
                         style: ActionStyle::Secondary,
                         enabled: true,
@@ -179,14 +188,14 @@ impl DeviceLinkingEngine {
                 }],
                 actions: vec![
                     ScreenAction {
-                        id: "back_to_transport".into(),
+                        id: BACK_TO_TRANSPORT_ACTION_ID.into(),
                         label: "Back".into(),
                         style: ActionStyle::Primary,
                         enabled: true,
                         a11y: None,
                     },
                     ScreenAction {
-                        id: "cancel".into(),
+                        id: CANCEL_ACTION_ID.into(),
                         label: "Cancel".into(),
                         style: ActionStyle::Secondary,
                         enabled: true,
@@ -223,7 +232,7 @@ impl DeviceLinkingEngine {
                     },
                 ],
                 actions: vec![ScreenAction {
-                    id: "cancel".into(),
+                    id: CANCEL_ACTION_ID.into(),
                     label: "Cancel".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
@@ -258,14 +267,14 @@ impl DeviceLinkingEngine {
                     ],
                     actions: vec![
                         ScreenAction {
-                            id: "confirm".into(),
+                            id: CONFIRM_ACTION_ID.into(),
                             label: "Confirm".into(),
                             style: ActionStyle::Primary,
                             enabled: true,
                             a11y: None,
                         },
                         ScreenAction {
-                            id: "reject".into(),
+                            id: REJECT_ACTION_ID.into(),
                             label: "Reject".into(),
                             style: ActionStyle::Destructive,
                             enabled: true,
@@ -313,7 +322,7 @@ impl DeviceLinkingEngine {
                     }),
                 }],
                 actions: vec![ScreenAction {
-                    id: "done".into(),
+                    id: DONE_ACTION_ID.into(),
                     label: "Done".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
@@ -351,28 +360,28 @@ impl WorkflowEngine for DeviceLinkingEngine {
                         self.step = DeviceLinkStep::OfflineStub;
                         ActionResult::NavigateTo(self.build_screen())
                     }
-                    "cancel" => ActionResult::Complete,
+                    CANCEL_ACTION_ID => ActionResult::Complete,
                     _ => ActionResult::UpdateScreen(self.build_screen()),
                 },
                 DeviceLinkStep::OfflineStub => match action_id.as_str() {
-                    "back_to_transport" => {
+                    BACK_TO_TRANSPORT_ACTION_ID => {
                         self.step = DeviceLinkStep::TransportSelection;
                         ActionResult::NavigateTo(self.build_screen())
                     }
-                    "cancel" => ActionResult::Complete,
+                    CANCEL_ACTION_ID => ActionResult::Complete,
                     _ => ActionResult::UpdateScreen(self.build_screen()),
                 },
-                DeviceLinkStep::ShowQr if action_id == "cancel" => ActionResult::Complete,
-                DeviceLinkStep::VerifyCode if action_id == "confirm" => {
+                DeviceLinkStep::ShowQr if action_id == CANCEL_ACTION_ID => ActionResult::Complete,
+                DeviceLinkStep::VerifyCode if action_id == CONFIRM_ACTION_ID => {
                     self.step = DeviceLinkStep::Syncing;
                     ActionResult::NavigateTo(self.build_screen())
                 }
-                DeviceLinkStep::VerifyCode if action_id == "reject" => {
+                DeviceLinkStep::VerifyCode if action_id == REJECT_ACTION_ID => {
                     self.step = DeviceLinkStep::ShowQr;
                     self.verification_code = None;
                     ActionResult::NavigateTo(self.build_screen())
                 }
-                DeviceLinkStep::Complete if action_id == "done" => ActionResult::Complete,
+                DeviceLinkStep::Complete if action_id == DONE_ACTION_ID => ActionResult::Complete,
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             _ => ActionResult::UpdateScreen(self.build_screen()),

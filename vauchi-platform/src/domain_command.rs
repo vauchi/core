@@ -511,6 +511,13 @@ pub enum DomainCommand {
     /// All social networks in the default registry. Complement to
     /// `SearchSocialNetworks`.
     ListSocialNetworks,
+
+    // ── Multipart QR encoding (B7 batch 20) ──
+    /// Encode arbitrary bytes into a sequence of multipart-QR
+    /// payload strings (max ~1800 bytes per frame). Stateless —
+    /// the decode side is a separate `MobileMultipartDecoder`
+    /// object.
+    EncodeMultipartQr { data: Vec<u8> },
 }
 
 /// Sum type of every legitimate return shape from

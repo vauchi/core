@@ -3069,3 +3069,66 @@ fn list_social_networks_returns_default_registry() {
         other => panic!("unexpected result: {other:?}"),
     }
 }
+
+// ── B7 batch 20: Multipart QR encoding ─────────────────────────────────
+
+// @internal
+#[test]
+fn encode_multipart_qr_empty_input_returns_empty_or_one_frame() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::EncodeMultipartQr { data: Vec::new() })
+        .expect("encode_multipart_qr")
+    {
+        DomainCommandResult::Strings { values } => {
+            // Empty input deterministically produces zero or one frame —
+            // either is acceptable from the encoder's perspective.
+            assert!(
+                values.len() <= 1,
+                "empty input must not span multiple frames"
+            );
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn encode_multipart_qr_small_payload_fits_in_one_frame() {
+    let (engine, _dir) = create_engine_with_identity();
+    let data = b"hello vauchi multipart qr".to_vec();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::EncodeMultipartQr { data })
+        .expect("encode_multipart_qr")
+    {
+        DomainCommandResult::Strings { values } => {
+            assert_eq!(values.len(), 1, "small payload fits in one frame");
+            assert!(!values[0].is_empty(), "frame must contain encoded data");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn encode_multipart_qr_large_payload_spans_multiple_frames() {
+    let (engine, _dir) = create_engine_with_identity();
+    // 5KB of bytes > 1800 byte frame limit → multiple frames.
+    let data = vec![0xAB; 5_000];
+
+    match engine
+        .dispatch_domain_command(DomainCommand::EncodeMultipartQr { data })
+        .expect("encode_multipart_qr")
+    {
+        DomainCommandResult::Strings { values } => {
+            assert!(
+                values.len() >= 2,
+                "5KB payload must span at least 2 frames, got {}",
+                values.len()
+            );
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}

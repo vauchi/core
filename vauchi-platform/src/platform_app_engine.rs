@@ -3958,6 +3958,13 @@ impl PlatformAppEngine {
                     .collect();
                 Ok(DomainCommandResult::SocialNetworks { networks })
             }
+
+            // ── Multipart QR encoding (B7 batch 20) ──
+            DomainCommand::EncodeMultipartQr { data } => {
+                drop(engine); // stateless: no engine state needed
+                let frames = crate::multipart_qr::encode_multipart(&data, 1800);
+                Ok(DomainCommandResult::Strings { values: frames })
+            }
         }
     }
 

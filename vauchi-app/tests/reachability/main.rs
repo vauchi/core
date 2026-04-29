@@ -12,6 +12,7 @@
 mod contact_detail;
 mod deep_link_consent;
 mod delivery_status;
+mod device_linking;
 mod exchange;
 mod form_dialog;
 mod group_detail;

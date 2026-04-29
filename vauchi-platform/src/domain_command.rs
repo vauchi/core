@@ -34,9 +34,9 @@ use crate::types::{
     MobileConsentType, MobileContact, MobileContactCard, MobileDecoyContact, MobileDeletionInfo,
     MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
     MobileDemoContactState, MobileDeviceDeliveryRecord, MobileDuplicatePair, MobileDuressSettings,
-    MobileFieldNote, MobileFieldType, MobileGdprExport, MobileRecoveryVerification,
-    MobileRetryEntry, MobileShredStatus, MobileSocialNetwork, MobileVisibilityLabel,
-    MobileVisibilityLabelDetail,
+    MobileFieldNote, MobileFieldType, MobileGdprExport, MobileOnboardingProgress,
+    MobileOnboardingStep, MobileRecoveryVerification, MobileRetryEntry, MobileShredStatus,
+    MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -464,6 +464,20 @@ pub enum DomainCommand {
     // HideFieldFromContact, ShowFieldToContact, IsFieldVisibleToContact,
     // SetContactFieldOverride, RemoveContactFieldOverride were already
     // added by batch 6 (Field Visibility section).
+
+    // ── Onboarding state ops (B7 batch 16) ──
+    /// Read the current onboarding progress (step + completed steps).
+    GetOnboardingProgress,
+    /// Read the current onboarding step.
+    CurrentOnboardingStep,
+    /// Read whether onboarding has been completed end-to-end.
+    IsOnboardingComplete,
+    /// Mark the current step as completed and advance. Returns the
+    /// updated progress.
+    AdvanceOnboarding,
+    /// Mark the current step as skipped and advance. Returns the
+    /// updated progress.
+    SkipOnboardingStep,
 }
 
 /// Sum type of every legitimate return shape from
@@ -576,4 +590,10 @@ pub enum DomainCommandResult {
     ImportResult { result: MobileImportResult },
     /// Single enriched contact (B7 batch 14 — `MergeContacts`).
     ContactSingle { contact: MobileContact },
+    /// Onboarding progress snapshot (B7 batch 16 —
+    /// `GetOnboardingProgress`, `AdvanceOnboarding`,
+    /// `SkipOnboardingStep`).
+    OnboardingProgress { progress: MobileOnboardingProgress },
+    /// Current onboarding step (B7 batch 16 — `CurrentOnboardingStep`).
+    OnboardingStep { step: MobileOnboardingStep },
 }

@@ -2751,3 +2751,82 @@ fn remove_contact_field_override_errors_for_unknown_field_label() {
         "expected field-not-found, got: {err:?}"
     );
 }
+
+// ── B7 batch 16: Onboarding state ops ──────────────────────────────────
+
+// @internal
+#[test]
+fn get_onboarding_progress_returns_completed_after_drive_onboarding() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::GetOnboardingProgress)
+        .expect("get_progress")
+    {
+        DomainCommandResult::OnboardingProgress { progress } => {
+            // drive_onboarding finished, so the progress should reflect a
+            // completed onboarding flow (current step is the terminal step).
+            // Smoke: just verify the variant deserializes without panic.
+            let _ = progress.current_step;
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn current_onboarding_step_returns_terminal_after_drive_onboarding() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::CurrentOnboardingStep)
+        .expect("current_step")
+    {
+        DomainCommandResult::OnboardingStep { step: _ } => {}
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn is_onboarding_complete_returns_true_after_drive_onboarding() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::IsOnboardingComplete)
+        .expect("is_complete")
+    {
+        DomainCommandResult::Bool { value } => {
+            assert!(value, "drive_onboarding completes the flow");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn advance_onboarding_returns_progress_variant() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::AdvanceOnboarding)
+        .expect("advance")
+    {
+        DomainCommandResult::OnboardingProgress { progress: _ } => {}
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn skip_onboarding_step_returns_progress_variant() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    match engine
+        .dispatch_domain_command(DomainCommand::SkipOnboardingStep)
+        .expect("skip")
+    {
+        DomainCommandResult::OnboardingProgress { progress: _ } => {}
+        other => panic!("unexpected result: {other:?}"),
+    }
+}

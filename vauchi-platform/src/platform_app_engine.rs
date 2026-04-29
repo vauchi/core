@@ -3642,6 +3642,78 @@ impl PlatformAppEngine {
                 });
                 Ok(DomainCommandResult::ContactSingle { contact })
             }
+
+            // ── Onboarding state ops (B7 batch 16) ──
+            DomainCommand::GetOnboardingProgress => {
+                let progress = engine
+                    .vauchi()
+                    .storage()
+                    .load_or_create_onboarding_progress()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                Ok(DomainCommandResult::OnboardingProgress {
+                    progress: crate::types::MobileOnboardingProgress::from(&progress),
+                })
+            }
+            DomainCommand::CurrentOnboardingStep => {
+                let progress = engine
+                    .vauchi()
+                    .storage()
+                    .load_or_create_onboarding_progress()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                Ok(DomainCommandResult::OnboardingStep {
+                    step: progress.current_step().into(),
+                })
+            }
+            DomainCommand::IsOnboardingComplete => {
+                let progress = engine
+                    .vauchi()
+                    .storage()
+                    .load_or_create_onboarding_progress()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                Ok(DomainCommandResult::Bool {
+                    value: progress.is_complete(),
+                })
+            }
+            DomainCommand::AdvanceOnboarding => {
+                let storage = engine.vauchi().storage();
+                let mut progress = storage.load_or_create_onboarding_progress().map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
+                progress.advance();
+                storage.save_onboarding_progress(&progress).map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
+                Ok(DomainCommandResult::OnboardingProgress {
+                    progress: crate::types::MobileOnboardingProgress::from(&progress),
+                })
+            }
+            DomainCommand::SkipOnboardingStep => {
+                let storage = engine.vauchi().storage();
+                let mut progress = storage.load_or_create_onboarding_progress().map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
+                progress.skip_step();
+                storage.save_onboarding_progress(&progress).map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
+                Ok(DomainCommandResult::OnboardingProgress {
+                    progress: crate::types::MobileOnboardingProgress::from(&progress),
+                })
+            }
         }
     }
 

@@ -132,6 +132,23 @@ impl AppEngine {
         self.navigate_to_internal(screen)
     }
 
+    /// Set the initial screen during frontend bootstrap **without**
+    /// pushing the prior screen to nav history.
+    ///
+    /// `AppEngine::new` initializes `screen = AppScreen::Onboarding`
+    /// when no identity exists. Frontends that detect identity at
+    /// startup (TUI, iOS, Android) then need to swap to MyInfo / Lock /
+    /// Contacts. Using `navigate_to` for that swap pollutes
+    /// `nav_history` with a stale Onboarding entry, so the user's
+    /// first `navigate_back` lands on Onboarding instead of the
+    /// expected parent. This method is the bootstrap-only entry point.
+    ///
+    /// **Do not call this for user-driven navigation.** Use
+    /// `navigate_to` for that.
+    pub fn set_initial_screen(&mut self, screen: AppScreen) -> ScreenModel {
+        self.navigate_to_internal(screen)
+    }
+
     /// Navigate without pushing to history (used by back-navigation and completion routing).
     pub(super) fn navigate_to_internal(&mut self, screen: AppScreen) -> ScreenModel {
         // Refresh identity from storage if a sibling `Vauchi` instance

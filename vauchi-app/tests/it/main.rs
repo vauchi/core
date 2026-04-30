@@ -8,6 +8,7 @@ mod activity_log_engine_tests;
 mod activity_log_writer_tests;
 mod affected_screens_tests;
 mod app_engine_activity_log_tests;
+mod app_engine_navigation_tests;
 mod avatar_editor_tests;
 mod avatar_editor_wiring_tests;
 mod backup_recovery_confirm_replace_tests;

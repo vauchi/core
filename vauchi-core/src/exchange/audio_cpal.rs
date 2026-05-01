@@ -189,6 +189,7 @@ impl CpalAudioBackend {
         let supported_config = device
             .default_input_config()
             .map_err(|e| ProximityError::HardwareError(format!("Config error: {}", e)))?;
+        let recorded_sample_rate = supported_config.sample_rate().0;
 
         // Buffer for recording
         let recorded = Arc::new(Mutex::new(Vec::<f32>::new()));
@@ -224,8 +225,9 @@ impl CpalAudioBackend {
 
             // Check if we have enough data and can decode
             let samples = recorded.lock().expect("mutex poisoned");
-            if samples.len() > (config.sample_rate as usize / 2)
-                && let Ok(data) = audio_modem::decode_fsk_samples(&samples, config)
+            if samples.len() > (recorded_sample_rate as usize / 2)
+                && let Ok(data) =
+                    audio_modem::decode_fsk_samples(&samples, recorded_sample_rate, config)
                 && !data.is_empty()
             {
                 drop(samples);
@@ -240,7 +242,7 @@ impl CpalAudioBackend {
 
         // Final decode attempt
         let samples = recorded.lock().expect("mutex poisoned");
-        audio_modem::decode_fsk_samples(&samples, config)
+        audio_modem::decode_fsk_samples(&samples, recorded_sample_rate, config)
     }
 
     /// Returns true if currently emitting or receiving.

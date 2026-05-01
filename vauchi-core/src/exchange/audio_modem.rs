@@ -101,10 +101,24 @@ pub(crate) fn generate_fsk_samples(data: &[u8], config: &AudioConfig) -> Vec<f32
 }
 
 /// Decodes FSK-modulated audio samples back to data.
+///
+/// `recorded_sample_rate` is the rate the caller recorded `samples`
+/// at — usually the device's native rate (44.1 kHz or 48 kHz).
+/// If it differs from `config.sample_rate` the samples are
+/// resampled internally before decoding.
 pub(crate) fn decode_fsk_samples(
     samples: &[f32],
+    recorded_sample_rate: u32,
     config: &AudioConfig,
 ) -> Result<Vec<u8>, ProximityError> {
+    let resampled;
+    let samples = if recorded_sample_rate == config.sample_rate {
+        samples
+    } else {
+        resampled = resample(samples, recorded_sample_rate, config.sample_rate);
+        &resampled
+    };
+
     let sample_rate = config.sample_rate as f32;
     let carrier = config.carrier_frequency as f32;
     let shift = config.frequency_shift as f32;
@@ -254,8 +268,24 @@ mod tests {
         // Should have preamble + gap + data + trailing
         assert!(samples.len() > 1000);
 
-        // Decode should recover original data
-        let decoded = decode_fsk_samples(&samples, &config).unwrap();
+        // Decode should recover original data — recorded at the
+        // same rate the modem encodes at, no resample path.
+        let decoded = decode_fsk_samples(&samples, config.sample_rate, &config).unwrap();
+        assert_eq!(decoded, data);
+    }
+
+    // @internal
+    #[test]
+    fn decode_fsk_samples_resamples_from_48k_to_44k1() {
+        let config = AudioConfig::default();
+        let data = vec![0x12, 0x34, 0x56];
+
+        // Encode at the modem's native 44.1 kHz, then upsample to
+        // simulate samples captured by a 48 kHz microphone.
+        let native = generate_fsk_samples(&data, &config);
+        let recorded_at_48k = resample(&native, config.sample_rate, 48000);
+
+        let decoded = decode_fsk_samples(&recorded_at_48k, 48000, &config).unwrap();
         assert_eq!(decoded, data);
     }
 

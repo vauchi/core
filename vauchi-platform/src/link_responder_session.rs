@@ -41,7 +41,9 @@ use crate::error::MobileError;
 use crate::exchange::MobileExchangeCommand;
 use crate::exchange::MobileExchangeHardwareEvent;
 
-use vauchi_core::exchange::link_mode::{LinkModeError, ParsedLinkUrl, responder_respond};
+use vauchi_core::exchange::link_mode::{
+    LinkModeError, ParsedLinkUrl, responder_respond_with_card_bytes,
+};
 use vauchi_core::exchange::link_responder::{
     LinkResponderFailureReason, LinkResponderSession, LinkResponderState,
 };
@@ -175,22 +177,24 @@ pub struct MobileLinkResponderSession {
 
 #[uniffi::export]
 impl MobileLinkResponderSession {
-    /// Create a new responder session for the given parsed deep-link
-    /// URL + the responder's own encrypted card payload.
+    /// Create a new responder session for the given deep-link URL and
+    /// the responder's own raw card-payload bytes.
     ///
-    /// The session derives `EscrowKeys` via DH, builds the two
-    /// deposit commands + a `RelayEscrowCheck`, and lands in `Polling`.
-    /// Returns a typed [`MobileError`] if the DH output is
-    /// non-contributory (small-order point) — the only failure path
-    /// at construction time.
+    /// The session derives `EscrowKeys` via DH, encrypts `our_card_bytes`
+    /// with the derived `card_key`, builds the two deposit commands +
+    /// a `RelayEscrowCheck`, and lands in `Polling`.
+    ///
+    /// Returns a typed [`MobileError`] if the URL is malformed, the DH
+    /// output is non-contributory (small-order point), or the AEAD
+    /// encryption RNG fails.
     ///
     /// `set_listener` must be called before `start`; otherwise the
     /// cycle thread runs but every callback is dropped.
     #[uniffi::constructor]
-    pub fn new(parsed_url: String, our_encrypted_card: Vec<u8>) -> Result<Arc<Self>, MobileError> {
+    pub fn new(parsed_url: String, our_card_bytes: Vec<u8>) -> Result<Arc<Self>, MobileError> {
         let parsed = parse_url(&parsed_url)?;
-        let (keys, deposits) =
-            responder_respond(&parsed, our_encrypted_card).map_err(map_link_mode_error)?;
+        let (keys, deposits) = responder_respond_with_card_bytes(&parsed, &our_card_bytes)
+            .map_err(map_link_mode_error)?;
         let deadline = Instant::now() + Duration::from_secs(POLLING_DEADLINE_SECS);
         let session = LinkResponderSession::new(keys, deposits, deadline);
         Ok(Arc::new(Self {

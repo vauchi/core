@@ -366,6 +366,69 @@ pub fn responder_respond(
     Ok((keys, commands))
 }
 
+/// Responder-side single-shot helper: ECDH, derive keys, encrypt the
+/// caller-supplied raw card bytes with the derived `card_key`, and
+/// produce the same two deposit commands as
+/// [`responder_respond`].
+///
+/// This is the production-ergonomic counterpart to [`responder_respond`],
+/// which takes pre-encrypted bytes — but the encryption depends on
+/// keys [`responder_respond`] derives internally, leaving callers with a
+/// chicken-and-egg problem. This helper closes the gap so frontends
+/// can pass their raw card serialization without exposing
+/// [`EscrowKeys::encrypt_card`] through the UniFFI surface.
+///
+/// # Errors
+///
+/// - [`LinkModeError::NonContributoryDh`] if the initiator's public
+///   key is a small-order point.
+/// - [`LinkModeError::CardCryptoFailed`] if encryption fails (e.g.,
+///   the AEAD nonce RNG fails — extremely rare but typed for the
+///   cycle thread to surface as `on_failed(DecryptError)`).
+pub fn responder_respond_with_card_bytes(
+    parsed: &ParsedLinkUrl,
+    raw_card_bytes: &[u8],
+) -> Result<(EscrowKeys, Vec<ExchangeCommand>), LinkModeError> {
+    // ECDH + key derivation, identical to `responder_respond`. We
+    // duplicate rather than refactor so neither path's tests have to
+    // change shape — `responder_respond` stays a stable opaque-bytes
+    // entry point for tests and future direct callers, while this
+    // helper layers the encrypt step on top.
+    let secret = EphemeralSecret::random_from_rng(OsRng);
+    let our_public = PublicKey::from(&secret);
+    let their_public = PublicKey::from(parsed.initiator_public_key);
+    let shared_secret = secret.diffie_hellman(&their_public);
+    if !shared_secret.was_contributory() {
+        return Err(LinkModeError::NonContributoryDh);
+    }
+    let keys = EscrowKeys::derive(shared_secret.as_bytes(), EscrowRole::Responder);
+
+    // Encrypt the raw card bytes with the freshly-derived `card_key`.
+    let encrypted = keys
+        .encrypt_card(raw_card_bytes)
+        .map_err(|e| LinkModeError::CardCryptoFailed(e.to_string()))?;
+
+    let handshake_slot = derive_handshake_slot(&parsed.nonce);
+    let epk_slot = derive_epk_slot(&parsed.nonce);
+
+    let commands = vec![
+        ExchangeCommand::RelayEscrowDeposit {
+            gate_hash: hex::decode(&handshake_slot).expect("hex from hex::encode is always valid"),
+            slot_hash: hex::decode(&epk_slot).expect("hex from hex::encode is always valid"),
+            encrypted_card: our_public.as_bytes().to_vec(),
+            ttl_seconds: DEFAULT_TTL_SECONDS,
+        },
+        ExchangeCommand::RelayEscrowDeposit {
+            gate_hash: hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid"),
+            slot_hash: hex::decode(&keys.our_slot).expect("hex from hex::encode is always valid"),
+            encrypted_card: encrypted,
+            ttl_seconds: DEFAULT_TTL_SECONDS,
+        },
+    ];
+
+    Ok((keys, commands))
+}
+
 /// Decrypt the initiator's encrypted card retrieved from escrow.
 ///
 /// Symmetric counterpart to [`responder_respond`]: after the responder

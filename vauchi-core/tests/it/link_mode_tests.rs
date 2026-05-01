@@ -589,6 +589,34 @@ fn responder_complete_rejects_wrong_key() {
     );
 }
 
+// ================================================================
+// Responder-side: responder_respond_with_card_bytes encrypt-helper
+// ================================================================
+
+/// Production-ergonomic helper round-trips: caller supplies raw card
+/// bytes; helper internally derives keys + encrypts; the second
+/// deposit's blob can be decrypted back to the raw bytes via
+/// `responder_complete` using the same returned keys.
+// @internal
+#[test]
+fn responder_respond_with_card_bytes_round_trips_via_responder_complete() {
+    let (init, _) = initiator_generate();
+    let parsed = parse_link_url(&init.url).unwrap();
+
+    let raw = b"alice serialized card";
+    let (keys, commands) = responder_respond_with_card_bytes(&parsed, raw).unwrap();
+
+    // The second command is the encrypted-card deposit. Pull the
+    // ciphertext out and round-trip it back through responder_complete.
+    let encrypted_blob = match &commands[1] {
+        ExchangeCommand::RelayEscrowDeposit { encrypted_card, .. } => encrypted_card.clone(),
+        other => panic!("expected RelayEscrowDeposit at index 1, got {other:?}"),
+    };
+
+    let recovered = responder_complete(&keys, &encrypted_blob).expect("decrypt round-trip");
+    assert_eq!(recovered.as_slice(), raw);
+}
+
 // @internal
 proptest::proptest! {
     /// `responder_complete` never panics on arbitrary blob bytes and

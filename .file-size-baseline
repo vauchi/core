@@ -23,7 +23,7 @@ vauchi-platform/src/exchange.rs 1017
 # EXEMPT — state machine: scattered transitions create protocol bugs
 # (+8 for ADR-031 audio-as-samples migration — encode at emit, accept
 #  AudioSamplesRecorded at receive 2026-05-01)
-vauchi-core/src/exchange/session.rs 1764
+vauchi-core/src/exchange/session.rs 1765
 vauchi-core/src/exchange/multistage/session.rs 1189
 
 # EXEMPT — transport layer: all relay methods must be co-located for protocol coherence

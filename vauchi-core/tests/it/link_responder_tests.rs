@@ -13,7 +13,7 @@
 
 use std::time::{Duration, Instant};
 
-use proptest::prelude::any;
+use proptest::prelude::{Strategy, any};
 use vauchi_core::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
 use vauchi_core::exchange::link_mode::*;
 use vauchi_core::exchange::link_responder::{

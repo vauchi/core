@@ -67,6 +67,7 @@ pub mod escrow;
 pub mod exchange_id;
 pub mod exchange_record;
 pub mod link_mode;
+pub mod link_responder;
 pub mod mode;
 pub mod mode_availability;
 pub mod mode_payload;

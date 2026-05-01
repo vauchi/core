@@ -5,6 +5,7 @@
 //! Tests for Link mode URL generation, parsing, and escrow command production.
 
 use base64::Engine as _;
+use proptest::prelude::any;
 use vauchi_core::exchange::command::ExchangeCommand;
 use vauchi_core::exchange::link_mode::*;
 
@@ -510,6 +511,99 @@ proptest::proptest! {
             // shapes — anything else MUST be a typed error.
             proptest::prop_assert!(input.starts_with("vauchi://exchange?"),
                 "parser accepted non-canonical input: {input:?}");
+        }
+    }
+}
+
+// ================================================================
+// Responder-side: responder_complete decrypts retrieved blob
+// ================================================================
+
+/// Round-trip: a payload encrypted with `EscrowKeys::encrypt_card` is
+/// recovered byte-identically by `responder_complete`.
+///
+/// The crypto layer (RustCrypto AEAD) is already covered by `escrow.rs`
+/// tests; this pin is specifically for the link-mode wrapper so the
+/// cycle thread's happy path stays sound under refactoring.
+#[test]
+fn responder_complete_round_trips_initiator_payload() {
+    let (init, _) = initiator_generate();
+    let parsed = parse_link_url(&init.url).unwrap();
+    let (keys, _) = responder_respond(&parsed, b"_".to_vec()).unwrap();
+
+    let plaintext = b"Alice's serialized contact card";
+    let ciphertext = keys.encrypt_card(plaintext).expect("encrypt");
+
+    let recovered =
+        responder_complete(&keys, &ciphertext).expect("responder_complete must round-trip");
+    assert_eq!(recovered, plaintext);
+}
+
+/// Decrypting a truncated ciphertext returns a typed
+/// `LinkModeError::CardCryptoFailed`, never a panic. Pins the error
+/// path the cycle thread relies on to fire `on_failed(DecryptError)`.
+#[test]
+fn responder_complete_rejects_truncated_ciphertext() {
+    let (init, _) = initiator_generate();
+    let parsed = parse_link_url(&init.url).unwrap();
+    let (keys, _) = responder_respond(&parsed, b"_".to_vec()).unwrap();
+
+    // Empty blob — fails the AEAD nonce-length check inside decrypt_card.
+    let err = responder_complete(&keys, &[]).expect_err("empty ciphertext must error");
+    assert!(
+        matches!(err, LinkModeError::CardCryptoFailed(_)),
+        "expected CardCryptoFailed, got {err:?}"
+    );
+
+    // 4-byte blob (smaller than the nonce) — same shape.
+    let err = responder_complete(&keys, &[0u8; 4]).expect_err("undersized ciphertext must error");
+    assert!(
+        matches!(err, LinkModeError::CardCryptoFailed(_)),
+        "expected CardCryptoFailed, got {err:?}"
+    );
+}
+
+/// Decrypting a ciphertext encrypted with a *different* key returns
+/// `LinkModeError::CardCryptoFailed`, not a silent garbled-bytes
+/// success. Pins authenticated-encryption integrity.
+#[test]
+fn responder_complete_rejects_wrong_key() {
+    let (init_a, _) = initiator_generate();
+    let parsed_a = parse_link_url(&init_a.url).unwrap();
+    let (keys_a, _) = responder_respond(&parsed_a, b"_".to_vec()).unwrap();
+
+    let (init_b, _) = initiator_generate();
+    let parsed_b = parse_link_url(&init_b.url).unwrap();
+    let (keys_b, _) = responder_respond(&parsed_b, b"_".to_vec()).unwrap();
+
+    let ciphertext = keys_a.encrypt_card(b"secret").expect("encrypt");
+
+    let err = responder_complete(&keys_b, &ciphertext)
+        .expect_err("wrong-key decrypt must error, not garble silently");
+    assert!(
+        matches!(err, LinkModeError::CardCryptoFailed(_)),
+        "expected CardCryptoFailed, got {err:?}"
+    );
+}
+
+// @internal
+proptest::proptest! {
+    /// `responder_complete` never panics on arbitrary blob bytes and
+    /// always returns either Ok with the decrypted bytes (when keys
+    /// match the ciphertext) or a typed `LinkModeError::CardCryptoFailed`.
+    /// Property test (CC-04) covering blob fuzz.
+    #[test]
+    fn responder_complete_never_panics(blob in proptest::collection::vec(any::<u8>(), 0..512)) {
+        let (init, _) = initiator_generate();
+        let parsed = parse_link_url(&init.url).unwrap();
+        let (keys, _) = responder_respond(&parsed, b"_".to_vec()).unwrap();
+
+        let result = responder_complete(&keys, &blob);
+        if let Err(e) = result {
+            proptest::prop_assert!(
+                matches!(e, LinkModeError::CardCryptoFailed(_)),
+                "any decrypt failure must be CardCryptoFailed, got {e:?}"
+            );
         }
     }
 }

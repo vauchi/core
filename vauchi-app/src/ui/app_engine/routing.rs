@@ -716,6 +716,28 @@ impl AppEngine {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)
             }
+            AppScreen::DeepLinkConsent { payload } => {
+                // Phase 1 T7 of `2026-04-27-deep-link-responder-flow`:
+                // grant → DeepLinkResponder, deny / cancel → back. Read
+                // the consent decision off the engine before
+                // navigate_back / navigate_to_internal replaces it.
+                let granted = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::DeepLinkConsentEngine>())
+                    .map(|e| matches!(e.decision(), crate::ui::ConsentDecision::Granted))
+                    .unwrap_or(false);
+
+                if granted {
+                    let payload = payload.clone();
+                    let screen =
+                        self.navigate_to_internal(AppScreen::DeepLinkResponder { payload });
+                    ActionResult::NavigateTo(screen)
+                } else {
+                    let screen = self.navigate_back();
+                    ActionResult::NavigateTo(screen)
+                }
+            }
             _ => {
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)

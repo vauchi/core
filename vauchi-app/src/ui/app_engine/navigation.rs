@@ -56,8 +56,8 @@ impl AppScreen {
             Self::DeviceLinking | Self::DeviceReplacement => Self::DeviceManagement,
             Self::FormDialog { .. } => return None,
             Self::Lock => return None,
-            // Deep-link consent is modal-shaped — no parent tab.
-            Self::DeepLinkConsent { .. } => return None,
+            // Deep-link consent + responder are modal-shaped — no parent tab.
+            Self::DeepLinkConsent { .. } | Self::DeepLinkResponder { .. } => return None,
             other => other.clone(),
         };
 
@@ -193,7 +193,10 @@ impl AppEngine {
     fn is_cacheable(screen: &AppScreen) -> bool {
         !matches!(
             screen,
-            AppScreen::Lock | AppScreen::FormDialog { .. } | AppScreen::DeepLinkConsent { .. }
+            AppScreen::Lock
+                | AppScreen::FormDialog { .. }
+                | AppScreen::DeepLinkConsent { .. }
+                | AppScreen::DeepLinkResponder { .. }
         )
     }
 

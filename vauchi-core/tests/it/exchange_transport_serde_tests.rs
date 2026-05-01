@@ -14,6 +14,7 @@ use vauchi_core::types::ExchangeTransport;
 /// payload. Adding a variant without extending this table is a
 /// compile-error-adjacent failure: the test runs, the new variant is
 /// missing, and someone notices.
+// @internal
 #[test]
 fn every_variant_round_trips_snake_case() {
     let cases: &[(ExchangeTransport, &str)] = &[
@@ -45,6 +46,7 @@ fn every_variant_round_trips_snake_case() {
 /// rows wrote those before the snake_case rename. New variants like
 /// `Link` only need the snake_case form because they post-date the
 /// alias migration.
+// @internal
 #[test]
 fn pascalcase_aliases_still_decode() {
     let qr: ExchangeTransport = serde_json::from_str("\"Qr\"").expect("Qr alias decodes");

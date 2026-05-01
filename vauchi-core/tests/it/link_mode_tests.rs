@@ -525,6 +525,7 @@ proptest::proptest! {
 /// The crypto layer (RustCrypto AEAD) is already covered by `escrow.rs`
 /// tests; this pin is specifically for the link-mode wrapper so the
 /// cycle thread's happy path stays sound under refactoring.
+// @internal
 #[test]
 fn responder_complete_round_trips_initiator_payload() {
     let (init, _) = initiator_generate();
@@ -542,6 +543,7 @@ fn responder_complete_round_trips_initiator_payload() {
 /// Decrypting a truncated ciphertext returns a typed
 /// `LinkModeError::CardCryptoFailed`, never a panic. Pins the error
 /// path the cycle thread relies on to fire `on_failed(DecryptError)`.
+// @internal
 #[test]
 fn responder_complete_rejects_truncated_ciphertext() {
     let (init, _) = initiator_generate();
@@ -566,6 +568,7 @@ fn responder_complete_rejects_truncated_ciphertext() {
 /// Decrypting a ciphertext encrypted with a *different* key returns
 /// `LinkModeError::CardCryptoFailed`, not a silent garbled-bytes
 /// success. Pins authenticated-encryption integrity.
+// @internal
 #[test]
 fn responder_complete_rejects_wrong_key() {
     let (init_a, _) = initiator_generate();
@@ -592,6 +595,7 @@ proptest::proptest! {
     /// always returns either Ok with the decrypted bytes (when keys
     /// match the ciphertext) or a typed `LinkModeError::CardCryptoFailed`.
     /// Property test (CC-04) covering blob fuzz.
+    // @internal
     #[test]
     fn responder_complete_never_panics(blob in proptest::collection::vec(any::<u8>(), 0..512)) {
         let (init, _) = initiator_generate();

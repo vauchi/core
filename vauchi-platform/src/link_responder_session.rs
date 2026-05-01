@@ -193,16 +193,7 @@ impl MobileLinkResponderSession {
     #[uniffi::constructor]
     pub fn new(parsed_url: String, our_card_bytes: Vec<u8>) -> Result<Arc<Self>, MobileError> {
         let parsed = parse_url(&parsed_url)?;
-        let (keys, deposits) = responder_respond_with_card_bytes(&parsed, &our_card_bytes)
-            .map_err(map_link_mode_error)?;
-        let deadline = Instant::now() + Duration::from_secs(POLLING_DEADLINE_SECS);
-        let session = LinkResponderSession::new(keys, deposits, deadline);
-        Ok(Arc::new(Self {
-            inner: Arc::new(Mutex::new(session)),
-            listener: Arc::new(Mutex::new(None)),
-            cancel_flag: Arc::new(AtomicBool::new(false)),
-            thread_handle: Mutex::new(None),
-        }))
+        Self::from_parsed(&parsed, our_card_bytes)
     }
 
     /// Register (or replace) the event listener. Safe to call before or
@@ -289,6 +280,31 @@ impl MobileLinkResponderSession {
         if let Ok(mut slot) = self.listener.lock() {
             *slot = None;
         }
+    }
+}
+
+impl MobileLinkResponderSession {
+    /// Construct a session directly from an already-parsed URL. Used by
+    /// `PlatformAppEngine::ensure_link_responder_session` to avoid
+    /// round-tripping the URL through the string form when the engine
+    /// already holds a typed [`DeepLinkPayload`] / [`ParsedLinkUrl`].
+    /// Not exposed via UniFFI; frontends call the public string-form
+    /// constructor or — preferably — fetch the engine-owned session
+    /// via `PlatformAppEngine::current_link_responder_session`.
+    pub(crate) fn from_parsed(
+        parsed: &ParsedLinkUrl,
+        our_card_bytes: Vec<u8>,
+    ) -> Result<Arc<Self>, MobileError> {
+        let (keys, deposits) = responder_respond_with_card_bytes(parsed, &our_card_bytes)
+            .map_err(map_link_mode_error)?;
+        let deadline = Instant::now() + Duration::from_secs(POLLING_DEADLINE_SECS);
+        let session = LinkResponderSession::new(keys, deposits, deadline);
+        Ok(Arc::new(Self {
+            inner: Arc::new(Mutex::new(session)),
+            listener: Arc::new(Mutex::new(None)),
+            cancel_flag: Arc::new(AtomicBool::new(false)),
+            thread_handle: Mutex::new(None),
+        }))
     }
 }
 

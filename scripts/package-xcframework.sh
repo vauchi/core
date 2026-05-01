@@ -301,26 +301,58 @@ echo "$CHECKSUM" > "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256"
 # Sign checksum with cosign (T1-5: required in CI, optional locally)
 # GitLab masked file variables store base64-encoded content — decode if needed.
 if [[ -n "${COSIGN_KEY:-}" ]]; then
-    # GitLab file-type variable: env holds a path to a staged file. If the
-    # path is set but the file is missing, the runner failed to stage it
-    # (known intermittent issue on nell — see project memory). Fail fast
-    # with an actionable error instead of cascading head/base64 errors.
+    # GitLab file-type variable: env holds a path to a staged file. The
+    # nell runner has been observed to drop staging intermittently — env
+    # is set but file is missing. Retry briefly to absorb a staging race;
+    # if still missing, fail fast with an actionable message instead of
+    # cascading head/base64 errors.
+    for attempt in 1 2 3; do
+        [[ -f "$COSIGN_KEY" ]] && break
+        if [[ "$attempt" -lt 3 ]]; then
+            echo -e "${YELLOW}COSIGN_KEY path '$COSIGN_KEY' not present (attempt $attempt/3) — retrying in 2s${NC}" >&2
+            sleep 2
+        fi
+    done
     if [[ ! -f "$COSIGN_KEY" ]]; then
-        echo -e "${RED}ERROR: COSIGN_KEY env is set to '$COSIGN_KEY' but file does not exist.${NC}" >&2
+        echo -e "${RED}ERROR: COSIGN_KEY env is set to '$COSIGN_KEY' but file does not exist after 3 attempts.${NC}" >&2
         echo -e "${RED}This is a GitLab Runner file-variable staging failure (runner-side issue).${NC}" >&2
         echo -e "${RED}Retry the job; if it persists, check runner config on the host.${NC}" >&2
         exit 1
     fi
+    if [[ ! -s "$COSIGN_KEY" ]]; then
+        echo -e "${RED}ERROR: COSIGN_KEY file '$COSIGN_KEY' is empty — staging produced a zero-byte file.${NC}" >&2
+        exit 1
+    fi
+    if ! command -v cosign >/dev/null 2>&1; then
+        echo -e "${RED}ERROR: cosign not found on PATH — install via .cosign-install template${NC}" >&2
+        exit 1
+    fi
     COSIGN_KEY_FILE="$COSIGN_KEY"
+    DECODED_KEY_FILE=""
+    # Plaintext key files start with "-----BEGIN". Anything else is treated
+    # as base64-encoded (GitLab's masked file-variable encoding).
     if ! head -1 "$COSIGN_KEY" | grep -q -- "-----BEGIN"; then
-        COSIGN_KEY_FILE=$(mktemp)
-        base64 -d < "$COSIGN_KEY" > "$COSIGN_KEY_FILE"
+        DECODED_KEY_FILE=$(mktemp)
+        # Cleanup trap: secret material must not linger on disk if cosign fails.
+        trap 'rm -f "$DECODED_KEY_FILE"' EXIT INT TERM
+        if ! base64 -d < "$COSIGN_KEY" > "$DECODED_KEY_FILE" 2>/dev/null; then
+            echo -e "${RED}ERROR: failed to base64-decode COSIGN_KEY at '$COSIGN_KEY'${NC}" >&2
+            exit 1
+        fi
+        if ! head -1 "$DECODED_KEY_FILE" | grep -q -- "-----BEGIN"; then
+            echo -e "${RED}ERROR: decoded COSIGN_KEY is not a PEM-formatted key (no -----BEGIN header)${NC}" >&2
+            exit 1
+        fi
+        COSIGN_KEY_FILE="$DECODED_KEY_FILE"
     fi
     echo -e "${YELLOW}Signing checksum with cosign...${NC}"
     cosign sign-blob --yes --key "$COSIGN_KEY_FILE" \
         --bundle "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256.bundle" \
         "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256"
-    [[ "$COSIGN_KEY_FILE" != "$COSIGN_KEY" ]] && rm -f "$COSIGN_KEY_FILE"
+    if [[ -n "$DECODED_KEY_FILE" ]]; then
+        rm -f "$DECODED_KEY_FILE"
+        trap - EXIT INT TERM
+    fi
     echo -e "${GREEN}Checksum signed${NC}"
 elif [[ -n "${CI:-}" ]] && [[ "$VERSION" != dev-* ]]; then
     echo -e "${RED}ERROR: COSIGN_KEY is required in CI for release signing${NC}"

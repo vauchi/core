@@ -111,6 +111,12 @@ pub enum AppScreen {
     DeepLinkConsent {
         payload: vauchi_core::exchange::link_mode::DeepLinkPayload,
     },
+    /// Post-grant link-mode responder flow — drives the cycle thread
+    /// through Polling / Retrieving until a contact is finalized.
+    /// Per `_private/docs/problems/2026-04-27-deep-link-responder-flow`.
+    DeepLinkResponder {
+        payload: vauchi_core::exchange::link_mode::DeepLinkPayload,
+    },
     /// Multi-stage face-to-face exchange (Pair 4 of pure-humble-ui-retire-native-screens).
     ///
     /// Renders the simultaneous bilateral QR + camera flow that
@@ -166,6 +172,7 @@ impl AppScreen {
             Self::AvatarEditor => "avatar_editor",
             Self::RecoveryClaimReview => "recovery_claim_review",
             Self::DeepLinkConsent { .. } => "deep_link_consent",
+            Self::DeepLinkResponder { .. } => "deep_link_responder",
             Self::MultiStageExchange => "multi_stage_exchange",
         }
     }

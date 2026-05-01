@@ -806,6 +806,9 @@ impl AppEngine {
             AppScreen::DeepLinkConsent { payload } => {
                 Box::new(crate::ui::DeepLinkConsentEngine::new(payload.clone()))
             }
+            AppScreen::DeepLinkResponder { payload } => {
+                Box::new(crate::ui::LinkResponderEngine::new(payload.clone()))
+            }
             AppScreen::VerifyFingerprint { contact_id } => {
                 let contact = vauchi.get_contact(contact_id).ok().flatten();
                 let their_fp = contact

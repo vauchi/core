@@ -44,6 +44,7 @@ pub mod group_detail;
 mod groups_list;
 mod help;
 pub mod info_content;
+mod link_responder;
 mod lock_screen;
 mod more;
 pub mod multi_stage_exchange;
@@ -105,6 +106,7 @@ pub use gdpr::GdprEngine;
 pub use group_detail::{GroupDetailEngine, GroupFieldVisibility};
 pub use groups_list::{GroupInfo, GroupsEngine, GroupsMode};
 pub use help::{HelpEngine, HelpItem};
+pub use link_responder::{ACTION_CANCEL as LINK_RESPONDER_ACTION_CANCEL, LinkResponderEngine};
 pub use lock_screen::{DEFAULT_LOCK_MAX_ATTEMPTS, LockScreenEngine};
 pub use more::MoreEngine;
 pub use multi_stage_exchange::{

@@ -85,10 +85,11 @@ fn audio_response_received_advances_state() {
     alice.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
     let _ = alice.drain_commands();
 
-    // Simulate audio response
+    // Simulate audio response — frontend captured samples at 44.1 kHz.
     alice
-        .apply_hardware_event(ExchangeHardwareEvent::AudioResponseReceived {
-            data: vec![0x01; 16],
+        .apply_hardware_event(ExchangeHardwareEvent::AudioSamplesRecorded {
+            samples: vec![0.1, -0.1, 0.2, -0.2],
+            sample_rate: 44100,
         })
         .unwrap();
 

@@ -22,7 +22,6 @@
 //! - Some devices may not support 18+ kHz (speaker/mic limitations)
 //! - Background noise rejection via bandpass filtering
 
-use super::audio_modem::{self, AudioConfig};
 use super::proximity::ProximityError;
 use crate::types::AudioCapability;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -88,8 +87,14 @@ impl CpalAudioBackend {
         self.capability.clone()
     }
 
-    /// Emits an ultrasonic signal encoding the given data.
-    pub fn emit_signal(&self, data: &[u8], config: &AudioConfig) -> Result<(), ProximityError> {
+    /// Emits raw PCM samples through the default output device.
+    ///
+    /// Frontends receive ready-to-play samples on
+    /// [`crate::exchange::ExchangeCommand::AudioEmitChallenge`] —
+    /// FSK encoding has already happened in core. The `sample_rate`
+    /// argument is the rate the samples were generated at; the
+    /// device's native rate is used for playback regardless.
+    pub fn emit_samples(&self, samples: &[f32], sample_rate: u32) -> Result<(), ProximityError> {
         if self.capability == AudioCapability::None
             || self.capability == AudioCapability::ReceiveOnly
         {
@@ -108,9 +113,7 @@ impl CpalAudioBackend {
             .default_output_config()
             .map_err(|e| ProximityError::HardwareError(format!("Config error: {}", e)))?;
 
-        // Generate samples
-        let samples = audio_modem::generate_fsk_samples(data, config);
-        let samples = Arc::new(Mutex::new(samples));
+        let samples = Arc::new(Mutex::new(samples.to_vec()));
         let sample_idx = Arc::new(Mutex::new(0usize));
         let done = Arc::new(AtomicBool::new(false));
 
@@ -153,7 +156,7 @@ impl CpalAudioBackend {
 
         // Wait for playback to complete
         let samples_len = samples.lock().expect("mutex poisoned").len();
-        let duration_ms = (samples_len as f32 / config.sample_rate as f32 * 1000.0) as u64 + 100;
+        let duration_ms = (samples_len as f32 / sample_rate as f32 * 1000.0) as u64 + 100;
 
         let start = std::time::Instant::now();
         while !done.load(Ordering::SeqCst) {
@@ -167,12 +170,12 @@ impl CpalAudioBackend {
         Ok(())
     }
 
-    /// Listens for an ultrasonic signal and returns decoded data.
-    pub fn receive_signal(
-        &self,
-        timeout: Duration,
-        config: &AudioConfig,
-    ) -> Result<Vec<u8>, ProximityError> {
+    /// Records raw PCM samples from the default input device.
+    ///
+    /// Returns the captured samples paired with the device's native
+    /// sample rate. Core decodes the FSK signal; the frontend just
+    /// ships raw audio.
+    pub fn record_samples(&self, timeout: Duration) -> Result<(Vec<f32>, u32), ProximityError> {
         if self.capability == AudioCapability::None || self.capability == AudioCapability::EmitOnly
         {
             return Err(ProximityError::NotSupported);
@@ -191,7 +194,6 @@ impl CpalAudioBackend {
             .map_err(|e| ProximityError::HardwareError(format!("Config error: {}", e)))?;
         let recorded_sample_rate = supported_config.sample_rate().0;
 
-        // Buffer for recording
         let recorded = Arc::new(Mutex::new(Vec::<f32>::new()));
         let recorded_clone = recorded.clone();
         let stop_signal = self.stop_signal.clone();
@@ -216,33 +218,13 @@ impl CpalAudioBackend {
             .play()
             .map_err(|e| ProximityError::HardwareError(format!("Record error: {}", e)))?;
 
-        // Record for timeout duration, checking periodically for signal
-        let start = std::time::Instant::now();
-        let check_interval = Duration::from_millis(100);
-
-        while start.elapsed() < timeout {
-            std::thread::sleep(check_interval);
-
-            // Check if we have enough data and can decode
-            let samples = recorded.lock().expect("mutex poisoned");
-            if samples.len() > (recorded_sample_rate as usize / 2)
-                && let Ok(data) =
-                    audio_modem::decode_fsk_samples(&samples, recorded_sample_rate, config)
-                && !data.is_empty()
-            {
-                drop(samples);
-                self.stop_signal.store(true, Ordering::SeqCst);
-                self.is_active.store(false, Ordering::SeqCst);
-                return Ok(data);
-            }
-        }
+        std::thread::sleep(timeout);
 
         self.stop_signal.store(true, Ordering::SeqCst);
         self.is_active.store(false, Ordering::SeqCst);
 
-        // Final decode attempt
-        let samples = recorded.lock().expect("mutex poisoned");
-        audio_modem::decode_fsk_samples(&samples, recorded_sample_rate, config)
+        let samples = recorded.lock().expect("mutex poisoned").clone();
+        Ok((samples, recorded_sample_rate))
     }
 
     /// Returns true if currently emitting or receiving.

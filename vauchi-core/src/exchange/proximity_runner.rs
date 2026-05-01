@@ -69,11 +69,19 @@ impl ProximityRunner {
     pub fn start(&self) -> Vec<ExchangeCommand> {
         match self.method {
             ProximityMethod::Audio => {
+                let modem_config = crate::exchange::audio_modem::AudioConfig::default();
+                let challenge = vec![0u8; 16]; // Populated from session key in Phase 1
+                let samples =
+                    crate::exchange::audio_modem::generate_fsk_samples(&challenge, &modem_config);
                 vec![
                     ExchangeCommand::AudioEmitChallenge {
-                        data: vec![0; 16], // Populated from session key in Phase 1
+                        samples,
+                        sample_rate: modem_config.sample_rate,
                     },
-                    ExchangeCommand::AudioListenForResponse { timeout_ms: 5000 },
+                    ExchangeCommand::AudioListenForResponse {
+                        timeout_ms: 5000,
+                        sample_rate: modem_config.sample_rate,
+                    },
                 ]
             }
             ProximityMethod::Accelerometer | ProximityMethod::Impact => {
@@ -91,9 +99,21 @@ impl ProximityRunner {
         }
 
         match (self.method, event) {
-            // Audio: response received — verify
-            (ProximityMethod::Audio, ExchangeHardwareEvent::AudioResponseReceived { data }) => {
-                let verified = !data.is_empty();
+            // Audio: samples received — decode and verify
+            (
+                ProximityMethod::Audio,
+                ExchangeHardwareEvent::AudioSamplesRecorded {
+                    samples,
+                    sample_rate,
+                },
+            ) => {
+                let modem_config = crate::exchange::audio_modem::AudioConfig::default();
+                let decoded = crate::exchange::audio_modem::decode_fsk_samples(
+                    samples,
+                    *sample_rate,
+                    &modem_config,
+                );
+                let verified = decoded.as_ref().is_ok_and(|d| !d.is_empty());
                 self.result = Some(ProximityRunnerResult {
                     method: self.method,
                     confidence: if verified { 0.85 } else { 0.0 },
@@ -377,8 +397,11 @@ mod tests {
     #[test]
     fn audio_response_emits_audio_stop() {
         let mut runner = ProximityRunner::new(ProximityMethod::Audio);
-        let cmds = runner.feed_event(&ExchangeHardwareEvent::AudioResponseReceived {
-            data: vec![1, 2, 3],
+        let modem_config = crate::exchange::audio_modem::AudioConfig::default();
+        let samples = crate::exchange::audio_modem::generate_fsk_samples(&[1, 2, 3], &modem_config);
+        let cmds = runner.feed_event(&ExchangeHardwareEvent::AudioSamplesRecorded {
+            samples,
+            sample_rate: modem_config.sample_rate,
         });
         assert!(runner.is_done());
         assert!(runner.result().unwrap().verified);
@@ -390,7 +413,10 @@ mod tests {
     #[test]
     fn audio_empty_response_is_unverified() {
         let mut runner = ProximityRunner::new(ProximityMethod::Audio);
-        runner.feed_event(&ExchangeHardwareEvent::AudioResponseReceived { data: vec![] });
+        runner.feed_event(&ExchangeHardwareEvent::AudioSamplesRecorded {
+            samples: vec![],
+            sample_rate: 44100,
+        });
         assert!(runner.is_done());
         let result = runner.result().unwrap();
         assert!(!result.verified);

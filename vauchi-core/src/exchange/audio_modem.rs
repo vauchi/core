@@ -55,7 +55,7 @@ impl Default for AudioConfig {
 }
 
 /// Generates FSK-modulated audio samples for the given data.
-pub(crate) fn generate_fsk_samples(data: &[u8], config: &AudioConfig) -> Vec<f32> {
+pub fn generate_fsk_samples(data: &[u8], config: &AudioConfig) -> Vec<f32> {
     let sample_rate = config.sample_rate as f32;
     let carrier = config.carrier_frequency as f32;
     let shift = config.frequency_shift as f32;
@@ -106,7 +106,7 @@ pub(crate) fn generate_fsk_samples(data: &[u8], config: &AudioConfig) -> Vec<f32
 /// at — usually the device's native rate (44.1 kHz or 48 kHz).
 /// If it differs from `config.sample_rate` the samples are
 /// resampled internally before decoding.
-pub(crate) fn decode_fsk_samples(
+pub fn decode_fsk_samples(
     samples: &[f32],
     recorded_sample_rate: u32,
     config: &AudioConfig,
@@ -175,7 +175,7 @@ pub(crate) fn decode_fsk_samples(
 }
 
 /// Finds the start of the preamble in recorded samples.
-pub(crate) fn find_preamble(samples: &[f32], sample_rate: f32) -> Result<usize, ProximityError> {
+pub fn find_preamble(samples: &[f32], sample_rate: f32) -> Result<usize, ProximityError> {
     let preamble_freq = 19000.0;
     let window_size = (sample_rate * 0.01) as usize; // 10ms windows
     let threshold = 0.05;
@@ -207,7 +207,7 @@ pub(crate) fn find_preamble(samples: &[f32], sample_rate: f32) -> Result<usize, 
 /// input is cloned. Suitable for narrowband ultrasonic signals where
 /// the FSK band (18-20 kHz) is well below the Nyquist frequency of
 /// any reasonable recording rate (44.1 kHz / 48 kHz).
-pub(crate) fn resample(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
+pub fn resample(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
     if from_rate == to_rate || samples.is_empty() {
         return samples.to_vec();
     }
@@ -233,7 +233,7 @@ pub(crate) fn resample(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32
 }
 
 /// Goertzel algorithm for efficient single-frequency detection.
-pub(crate) fn goertzel(samples: &[f32], target_freq: f32, sample_rate: f32) -> f32 {
+pub fn goertzel(samples: &[f32], target_freq: f32, sample_rate: f32) -> f32 {
     let n = samples.len();
     let k = (target_freq * n as f32 / sample_rate).round();
     let w = 2.0 * std::f32::consts::PI * k / n as f32;

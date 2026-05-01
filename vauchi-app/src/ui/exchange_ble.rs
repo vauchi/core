@@ -420,7 +420,7 @@ fn proximity_method_for_mode(mode: ExchangeMode) -> ProximityMethod {
 fn is_proximity_event(event: &ExchangeHardwareEvent) -> bool {
     matches!(
         event,
-        ExchangeHardwareEvent::AudioResponseReceived { .. }
+        ExchangeHardwareEvent::AudioSamplesRecorded { .. }
             | ExchangeHardwareEvent::AccelerometerData { .. }
             | ExchangeHardwareEvent::ImpactDetected { .. }
     )
@@ -628,9 +628,15 @@ mod tests {
             data: vec![10, 20, 30],
         });
 
-        // Audio response → proximity done → exchange complete
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::AudioResponseReceived {
-            data: vec![1, 2, 3],
+        // Audio response → proximity done → exchange complete.
+        // Build a real FSK-encoded sample buffer so the proximity
+        // runner's decode succeeds and the verified flag flips.
+        let modem_config = vauchi_core::exchange::audio_modem::AudioConfig::default();
+        let samples =
+            vauchi_core::exchange::audio_modem::generate_fsk_samples(&[1, 2, 3], &modem_config);
+        let outcome = flow.handle_event(&ExchangeHardwareEvent::AudioSamplesRecorded {
+            samples,
+            sample_rate: modem_config.sample_rate,
         });
 
         assert_eq!(*flow.step(), BleStep::Complete);

@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 /// platform cannot fulfil should be answered with
 /// [`ExchangeHardwareEvent::HardwareUnavailable`].
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum ExchangeCommand {
     // ── QR ───────────────────────────────────────────────────────────
@@ -54,10 +54,18 @@ pub enum ExchangeCommand {
     NfcDeactivate,
 
     // ── Audio (ultrasonic proximity) ─────────────────────────────────
-    /// Emit an ultrasonic challenge signal.
-    AudioEmitChallenge { data: Vec<u8> },
+    /// Emit ultrasonic PCM samples encoding a challenge.
+    ///
+    /// Core has already FSK-encoded the challenge bytes; the frontend
+    /// just plays the samples through the device speaker. Mono float
+    /// PCM at `sample_rate`.
+    AudioEmitChallenge { samples: Vec<f32>, sample_rate: u32 },
     /// Listen for an ultrasonic response within `timeout_ms`.
-    AudioListenForResponse { timeout_ms: u64 },
+    ///
+    /// `sample_rate` is the suggested capture rate; if the device's
+    /// preferred rate differs, the frontend reports its actual rate
+    /// in [`ExchangeHardwareEvent::AudioSamplesRecorded`].
+    AudioListenForResponse { timeout_ms: u64, sample_rate: u32 },
     /// Stop all audio operations.
     AudioStop,
 
@@ -189,7 +197,7 @@ impl ExchangeCommand {
 /// These are the results of previously issued [`ExchangeCommand`]s or
 /// asynchronous hardware notifications (e.g., BLE discovery, NFC tap).
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum ExchangeHardwareEvent {
     // ── QR ───────────────────────────────────────────────────────────
@@ -235,8 +243,11 @@ pub enum ExchangeHardwareEvent {
     NfcDataReceived { data: Vec<u8> },
 
     // ── Audio ────────────────────────────────────────────────────────
-    /// Ultrasonic response signal detected.
-    AudioResponseReceived { data: Vec<u8> },
+    /// Raw PCM samples from a microphone listen.
+    ///
+    /// Core decodes the FSK signal internally — the frontend ships
+    /// whatever it captured at its native rate. Mono float PCM.
+    AudioSamplesRecorded { samples: Vec<f32>, sample_rate: u32 },
 
     // ── Errors ───────────────────────────────────────────────────────
     /// A hardware operation failed.
@@ -334,10 +345,17 @@ mod tests {
 
     #[test]
     fn audio_listen_stores_timeout() {
-        let cmd = ExchangeCommand::AudioListenForResponse { timeout_ms: 5000 };
-        assert!(
-            matches!(cmd, ExchangeCommand::AudioListenForResponse { timeout_ms } if timeout_ms == 5000)
-        );
+        let cmd = ExchangeCommand::AudioListenForResponse {
+            timeout_ms: 5000,
+            sample_rate: 44100,
+        };
+        assert!(matches!(
+            cmd,
+            ExchangeCommand::AudioListenForResponse {
+                timeout_ms,
+                sample_rate,
+            } if timeout_ms == 5000 && sample_rate == 44100
+        ));
     }
 
     // ── ExchangeHardwareEvent construction ──────────────────────────
@@ -426,9 +444,13 @@ mod tests {
             },
             ExchangeCommand::NfcDeactivate,
             ExchangeCommand::AudioEmitChallenge {
-                data: vec![0x01; 16],
+                samples: vec![0.1, 0.2, 0.3],
+                sample_rate: 44100,
             },
-            ExchangeCommand::AudioListenForResponse { timeout_ms: 3000 },
+            ExchangeCommand::AudioListenForResponse {
+                timeout_ms: 3000,
+                sample_rate: 44100,
+            },
             ExchangeCommand::AudioStop,
             ExchangeCommand::AccelerometerStart,
             ExchangeCommand::AccelerometerStop,
@@ -482,8 +504,9 @@ mod tests {
                 reason: "timeout".into(),
             },
             ExchangeHardwareEvent::NfcDataReceived { data: vec![0xCC] },
-            ExchangeHardwareEvent::AudioResponseReceived {
-                data: vec![0x01; 8],
+            ExchangeHardwareEvent::AudioSamplesRecorded {
+                samples: vec![0.0, 0.5, -0.5],
+                sample_rate: 44100,
             },
             ExchangeHardwareEvent::HardwareError {
                 transport: "BLE".into(),
@@ -585,8 +608,14 @@ mod tests {
             ExchangeCommand::BleDisconnect,
             ExchangeCommand::NfcActivate { payload: vec![] },
             ExchangeCommand::NfcDeactivate,
-            ExchangeCommand::AudioEmitChallenge { data: vec![] },
-            ExchangeCommand::AudioListenForResponse { timeout_ms: 0 },
+            ExchangeCommand::AudioEmitChallenge {
+                samples: vec![],
+                sample_rate: 0,
+            },
+            ExchangeCommand::AudioListenForResponse {
+                timeout_ms: 0,
+                sample_rate: 0,
+            },
             ExchangeCommand::AudioStop,
             ExchangeCommand::AccelerometerStart,
             ExchangeCommand::AccelerometerStop,
@@ -641,7 +670,10 @@ mod tests {
             },
             ExchangeHardwareEvent::BleDisconnected { reason: "".into() },
             ExchangeHardwareEvent::NfcDataReceived { data: vec![] },
-            ExchangeHardwareEvent::AudioResponseReceived { data: vec![] },
+            ExchangeHardwareEvent::AudioSamplesRecorded {
+                samples: vec![],
+                sample_rate: 0,
+            },
             ExchangeHardwareEvent::HardwareError {
                 transport: "".into(),
                 error: "".into(),

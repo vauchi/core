@@ -529,12 +529,14 @@ pub enum MobileExchangeCommand {
         payload: Vec<u8>,
     },
     NfcDeactivate,
-    // Audio
+    // Audio (PCM samples — core encodes the FSK challenge before sending)
     AudioEmitChallenge {
-        data: Vec<u8>,
+        samples: Vec<f32>,
+        sample_rate: u32,
     },
     AudioListenForResponse {
         timeout_ms: u64,
+        sample_rate: u32,
     },
     AudioStop,
     // Accelerometer
@@ -590,10 +592,20 @@ impl From<ExchangeCommand> for MobileExchangeCommand {
             ExchangeCommand::BleDisconnect => Self::BleDisconnect,
             ExchangeCommand::NfcActivate { payload } => Self::NfcActivate { payload },
             ExchangeCommand::NfcDeactivate => Self::NfcDeactivate,
-            ExchangeCommand::AudioEmitChallenge { data } => Self::AudioEmitChallenge { data },
-            ExchangeCommand::AudioListenForResponse { timeout_ms } => {
-                Self::AudioListenForResponse { timeout_ms }
-            }
+            ExchangeCommand::AudioEmitChallenge {
+                samples,
+                sample_rate,
+            } => Self::AudioEmitChallenge {
+                samples,
+                sample_rate,
+            },
+            ExchangeCommand::AudioListenForResponse {
+                timeout_ms,
+                sample_rate,
+            } => Self::AudioListenForResponse {
+                timeout_ms,
+                sample_rate,
+            },
             ExchangeCommand::AudioStop => Self::AudioStop,
             ExchangeCommand::AccelerometerStart => Self::AccelerometerStart,
             ExchangeCommand::AccelerometerStop => Self::AccelerometerStop,
@@ -669,9 +681,10 @@ pub enum MobileExchangeHardwareEvent {
     NfcDataReceived {
         data: Vec<u8>,
     },
-    // Audio
-    AudioResponseReceived {
-        data: Vec<u8>,
+    // Audio (raw PCM — core decodes the FSK signal internally)
+    AudioSamplesRecorded {
+        samples: Vec<f32>,
+        sample_rate: u32,
     },
     // Accelerometer
     AccelerometerData {
@@ -743,9 +756,13 @@ impl From<MobileExchangeHardwareEvent> for ExchangeHardwareEvent {
                 Self::BleDisconnected { reason }
             }
             MobileExchangeHardwareEvent::NfcDataReceived { data } => Self::NfcDataReceived { data },
-            MobileExchangeHardwareEvent::AudioResponseReceived { data } => {
-                Self::AudioResponseReceived { data }
-            }
+            MobileExchangeHardwareEvent::AudioSamplesRecorded {
+                samples,
+                sample_rate,
+            } => Self::AudioSamplesRecorded {
+                samples,
+                sample_rate,
+            },
             MobileExchangeHardwareEvent::HardwareError { transport, error } => {
                 Self::HardwareError { transport, error }
             }

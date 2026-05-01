@@ -811,9 +811,10 @@ impl ExchangeSession {
             | ExchangeHardwareEvent::BleCharacteristicNotified { uuid, data } => {
                 self.handle_ble_characteristic_data(uuid, data)
             }
-            ExchangeHardwareEvent::AudioResponseReceived { .. } => {
+            ExchangeHardwareEvent::AudioSamplesRecorded { .. } => {
                 // Audio proximity response — trigger proximity check.
-                // The actual verification is done by the ProximityVerifier.
+                // Decoding lives in ProximityRunner; the session just
+                // ack-tracks that something arrived.
                 Ok(())
             }
             ExchangeHardwareEvent::BleDeviceDiscovered { id, .. } => {
@@ -957,20 +958,27 @@ impl ExchangeSession {
 
         // ADR-031: Also emit audio commands when QR challenges are available.
         // Frontends that support ultrasonic verification handle these and
-        // report AudioResponseReceived to upgrade confidence. Frontends that
+        // report AudioSamplesRecorded to upgrade confidence. Frontends that
         // don't support audio simply ignore them (confidence stays at baseline).
         if let Some(their) = self.their_audio_challenge {
             let is_initiator = self.their_audio_challenge.is_some();
+            let modem_config = crate::exchange::audio_modem::AudioConfig::default();
+            let modem_rate = modem_config.sample_rate;
+            let samples = crate::exchange::audio_modem::generate_fsk_samples(&their, &modem_config);
+            let emit = ExchangeCommand::AudioEmitChallenge {
+                samples: samples.clone(),
+                sample_rate: modem_rate,
+            };
+            let listen = ExchangeCommand::AudioListenForResponse {
+                timeout_ms: 5000,
+                sample_rate: modem_rate,
+            };
             if is_initiator {
-                self.emit_command(ExchangeCommand::AudioEmitChallenge {
-                    data: their.to_vec(),
-                });
-                self.emit_command(ExchangeCommand::AudioListenForResponse { timeout_ms: 5000 });
+                self.emit_command(emit);
+                self.emit_command(listen);
             } else {
-                self.emit_command(ExchangeCommand::AudioListenForResponse { timeout_ms: 5000 });
-                self.emit_command(ExchangeCommand::AudioEmitChallenge {
-                    data: their.to_vec(),
-                });
+                self.emit_command(listen);
+                self.emit_command(emit);
             }
         }
     }

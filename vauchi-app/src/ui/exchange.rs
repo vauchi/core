@@ -2519,10 +2519,15 @@ mod tests {
                 data: vec![1, 2, 3],
             },
         );
-        // Audio response → proximity done → complete
+        // Audio response → proximity done → complete. Build a real
+        // FSK-encoded sample buffer so the runner's decode succeeds.
+        let modem_config = vauchi_core::exchange::audio_modem::AudioConfig::default();
+        let samples =
+            vauchi_core::exchange::audio_modem::generate_fsk_samples(&[0xAA], &modem_config);
         let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::AudioResponseReceived {
-                data: vec![0xAA],
+            vauchi_core::exchange::ExchangeHardwareEvent::AudioSamplesRecorded {
+                samples,
+                sample_rate: modem_config.sample_rate,
             },
         );
         assert!(result.is_some());

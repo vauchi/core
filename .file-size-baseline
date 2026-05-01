@@ -232,7 +232,16 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # wiring. The bulk (bridge listener + ensure/cancel/dispatch + test
 # helpers, +328 lines) lives in the new sibling
 # `platform_app_engine_device_link.rs` to keep this file lean.
-vauchi-platform/src/platform_app_engine.rs 4836
+# Bumped 2026-05-01 to 4945 by Phase 1.6 link-mode responder session
+# lifecycle (`2026-04-27-deep-link-responder-flow`). Adds the
+# `link_responder_session` field, the lazy `ensure_link_responder_session`
+# private helper + idempotent `cancel_link_responder_session`, the
+# `after_screen_transition` cancel-on-leave wiring, and the public
+# UniFFI `current_link_responder_session()` getter (+109 lines). No
+# bridge listener lives here — frontends own `on_commands`,
+# `on_finalized`, `on_failed` dispatch, attached to the session
+# returned by the getter.
+vauchi-platform/src/platform_app_engine.rs 4945
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding

@@ -57,13 +57,13 @@ fn drive_to_link_responder(engine: &PlatformAppEngine) {
         .expect("deep link routes to consent");
     let consent_id = engine.current_screen_id().expect("screen id");
     assert_eq!(consent_id, "deep_link_consent");
-    engine
+    let grant_json = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "grant"}}"#.into())
         .expect("grant action");
     let post_id = engine.current_screen_id().expect("screen id after grant");
     assert_eq!(
         post_id, "link_responder_waiting",
-        "grant must route to the responder waiting screen",
+        "grant must route to the responder waiting screen — action returned {grant_json}",
     );
 }
 

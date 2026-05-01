@@ -164,6 +164,15 @@ pub struct PlatformAppEngine {
     /// (`on_qr_ready`, `on_confirmation_required`, `on_completed`,
     /// `on_failed`) into `AppEngine`'s receiver-side bridge methods.
     device_link_session: Mutex<Option<Arc<MobileDeviceLinkSession>>>,
+    /// Phase 1.6 — auto-managed `MobileLinkResponderSession` for the
+    /// `DeepLinkResponder` screen. Created lazily on the first
+    /// `current_link_responder_session()` call after navigation enters
+    /// the screen, cancelled when navigation leaves. Frontends fetch
+    /// the cached session via the public getter rather than building
+    /// one themselves — the deep-link `DeepLinkPayload` is private to
+    /// the cached `AppScreen`, and the local card payload is built
+    /// from the engine's own `Vauchi`.
+    link_responder_session: Mutex<Option<Arc<crate::MobileLinkResponderSession>>>,
     /// Storage path retained for in-place session creation.
     /// Mirrors `VauchiPlatform::storage_path` so the engine can build
     /// `MobileMultiStageSession::with_persistence` instances without
@@ -244,6 +253,7 @@ impl PlatformAppEngine {
             direct_listener: Arc::new(Mutex::new(None)),
             multi_stage_session: Mutex::new(None),
             device_link_session: Mutex::new(None),
+            link_responder_session: Mutex::new(None),
             storage_path,
             storage_key,
         }))
@@ -4271,6 +4281,36 @@ impl PlatformAppEngine {
             ),
         ))
     }
+
+    /// Fetch the engine-owned link-mode responder session for the
+    /// `DeepLinkResponder` screen. Lazily constructs + caches on the
+    /// first call after navigation enters the screen; subsequent calls
+    /// return the same `Arc`. Returns `None` whenever the engine is on
+    /// any other screen.
+    ///
+    /// Phase 1.6 of `_private/docs/problems/2026-04-27-deep-link-responder-flow`.
+    /// The frontend calls this when it observes
+    /// `screen_id == "link_responder_waiting"`, attaches its own
+    /// `LinkResponderSessionListener`, and calls `start()`. The engine
+    /// `cancel()`s + drops the cached session in
+    /// `after_screen_transition` whenever navigation leaves the
+    /// responder screen, so the same `current_link_responder_session()`
+    /// call after navigate-back returns `None` again.
+    pub fn current_link_responder_session(
+        &self,
+    ) -> Result<Option<Arc<crate::MobileLinkResponderSession>>, MobileError> {
+        // Lazy-build on demand. `ensure_link_responder_session` is a
+        // no-op if the engine is on any other screen, in which case
+        // the slot stays empty and we return `None`.
+        self.ensure_link_responder_session()?;
+        Ok(self
+            .link_responder_session
+            .lock()
+            .map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?
+            .clone())
+    }
 }
 
 impl PlatformAppEngine {
@@ -4440,6 +4480,19 @@ impl PlatformAppEngine {
             (false, true) => self.ensure_device_link_session()?,
             _ => {}
         }
+        let was_responder = matches!(pre, AppScreen::DeepLinkResponder { .. });
+        let is_responder = matches!(post, AppScreen::DeepLinkResponder { .. });
+        if was_responder && !is_responder {
+            self.cancel_link_responder_session();
+        }
+        // Note: we do NOT eagerly create on enter — frontends fetch the
+        // session lazily via `current_link_responder_session()`. Eager
+        // creation would force the engine to construct + cache a session
+        // even when the front-end has not yet rendered the screen, which
+        // wastes work if the user immediately backs out and means the
+        // cycle thread `start()` ordering would have to be coordinated
+        // here too. Lazy fetch keeps `start()` on the frontend side,
+        // after the listener is wired.
         Ok(())
     }
 
@@ -4504,6 +4557,62 @@ impl PlatformAppEngine {
     fn cancel_multi_stage_session(&self) {
         let session_to_cancel = self
             .multi_stage_session
+            .lock()
+            .ok()
+            .and_then(|mut slot| slot.take());
+        if let Some(session) = session_to_cancel {
+            session.cancel();
+        }
+    }
+
+    /// Lazily create the `MobileLinkResponderSession` for the current
+    /// `AppScreen::DeepLinkResponder`. Called from
+    /// `current_link_responder_session()` on demand — frontends pull the
+    /// cached session when they're ready to attach a listener and call
+    /// `start()`.
+    ///
+    /// Returns `Ok(())` if the engine is on the responder screen and the
+    /// slot is now populated (or was already). Returns
+    /// `Ok(())` as a no-op when the engine is on any other screen — the
+    /// public getter then surfaces `None`. Returns `MobileError` only
+    /// for genuine construction failures (no identity, lock poisoning,
+    /// non-contributory DH, AEAD RNG failure).
+    fn ensure_link_responder_session(&self) -> Result<(), MobileError> {
+        let mut slot = self
+            .link_responder_session
+            .lock()
+            .map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+        if slot.is_some() {
+            return Ok(());
+        }
+        // Snapshot the active payload under the engine lock, then drop
+        // the lock before doing any DH / encryption work — the helper
+        // pulls identity + own_card from the engine's `Vauchi` and we
+        // do not want to nest those locks.
+        let payload = {
+            let engine = self.engine.lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            match engine.current_app_screen() {
+                AppScreen::DeepLinkResponder { payload } => payload.clone(),
+                _ => return Ok(()),
+            }
+        };
+        let our_card_bytes = self.build_exchange_payload()?;
+        let session =
+            crate::MobileLinkResponderSession::from_parsed(payload.as_parsed(), our_card_bytes)?;
+        *slot = Some(session);
+        Ok(())
+    }
+
+    /// Cancel + drop the active `MobileLinkResponderSession`. Idempotent
+    /// — a no-op when no session is cached. Mirrors
+    /// `cancel_multi_stage_session`.
+    fn cancel_link_responder_session(&self) {
+        let session_to_cancel = self
+            .link_responder_session
             .lock()
             .ok()
             .and_then(|mut slot| slot.take());

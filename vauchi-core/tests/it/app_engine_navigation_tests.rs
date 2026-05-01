@@ -742,35 +742,39 @@ fn more_engine_has_expected_navigation_targets() {
         })
         .collect();
 
-    assert!(
-        action_ids.contains(&"sync".to_string()),
-        "More must contain sync"
+    // Expected items as of 2026-05-01 — extended for Android's
+    // MoreScreen retirement
+    // (`2026-05-01-more-engine-extension-android-retirement`):
+    // dropped `device_linking` (the link flow) in favor of
+    // `device_management` (the landing list, more sensible default
+    // tap target); added the 4 entries Android's MoreScreen exposes
+    // that core was missing (device_replacement, recovery,
+    // archived_contacts, contact_duplicates).
+    let expected: &[&str] = &[
+        "activity_log",
+        "sync",
+        "device_management",
+        "device_replacement",
+        "recovery",
+        "archived_contacts",
+        "contact_duplicates",
+        "settings",
+        "backup",
+        "privacy",
+        "help",
+    ];
+    for id in expected {
+        assert!(
+            action_ids.contains(&id.to_string()),
+            "More must contain {id}"
+        );
+    }
+    assert_eq!(
+        action_ids.len(),
+        expected.len(),
+        "More menu should have exactly {} items",
+        expected.len()
     );
-    assert!(
-        action_ids.contains(&"activity_log".to_string()),
-        "More must contain activity_log"
-    );
-    assert!(
-        action_ids.contains(&"device_linking".to_string()),
-        "More must contain device_linking"
-    );
-    assert!(
-        action_ids.contains(&"settings".to_string()),
-        "More must contain settings"
-    );
-    assert!(
-        action_ids.contains(&"backup".to_string()),
-        "More must contain backup"
-    );
-    assert!(
-        action_ids.contains(&"privacy".to_string()),
-        "More must contain privacy"
-    );
-    assert!(
-        action_ids.contains(&"help".to_string()),
-        "More must contain help"
-    );
-    assert_eq!(action_ids.len(), 7, "More menu should have exactly 7 items");
 }
 
 // @internal

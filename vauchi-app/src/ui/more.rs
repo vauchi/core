@@ -12,11 +12,21 @@
 
 use crate::ui::*;
 
-/// Navigation targets exposed through the More menu.
+/// Navigation targets exposed through the More menu. The set is the
+/// union of items every consuming platform (Android, TUI) needs to
+/// reach from a "More" navigation surface. Android's MoreScreen
+/// retirement (2026-05-01-more-engine-extension-android-retirement)
+/// added the device-management / device-replacement / recovery /
+/// archived-contacts / contact-duplicates entries; the legacy
+/// activity-log / sync / backup / privacy entries stay for TUI.
 const MORE_ITEMS: &[(&str, &str)] = &[
     ("activity_log", "Activity"),
     ("sync", "Sync"),
-    ("device_linking", "Devices"),
+    ("device_management", "Linked Devices"),
+    ("device_replacement", "Replace Device"),
+    ("recovery", "Backup & Recovery"),
+    ("archived_contacts", "Archived Contacts"),
+    ("contact_duplicates", "Merge Contacts"),
     ("settings", "Settings"),
     ("backup", "Backup"),
     ("privacy", "Privacy"),

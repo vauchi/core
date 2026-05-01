@@ -156,4 +156,8 @@ impl WorkflowEngine for DeepLinkConsentEngine {
     fn was_cancelled(&self) -> bool {
         self.cancelled
     }
+
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
 }

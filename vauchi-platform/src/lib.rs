@@ -30,6 +30,7 @@ mod domain_command;
 mod error;
 mod exchange;
 mod json_helpers;
+mod link_responder_session;
 mod mobile_animated_qr;
 mod mobile_ble;
 mod mobile_contact_detail;
@@ -93,6 +94,10 @@ pub use exchange::{
     MobileBleExchangeStatus, MobileExchangeCommand, MobileExchangeHardwareEvent,
     MobileExchangeSession, MobileExchangeState, MobileProximityHandler, create_qr_exchange_manual,
     create_qr_exchange_proximity,
+};
+pub use link_responder_session::{
+    LinkResponderSessionListener, MobileLinkResponderFailureReason, MobileLinkResponderSession,
+    MobileLinkResponderState,
 };
 pub use mobile_animated_qr::{
     MobileAnimatedQrConfig, MobileAnimatedQrError, MobileAnimatedQrProgress,

@@ -211,6 +211,7 @@ pub(crate) fn goertzel(samples: &[f32], target_freq: f32, sample_rate: f32) -> f
 mod tests {
     use super::*;
 
+    // @internal
     #[test]
     fn test_fsk_encode_decode() {
         let config = AudioConfig::default();
@@ -226,6 +227,7 @@ mod tests {
         assert_eq!(decoded, data);
     }
 
+    // @internal
     #[test]
     fn test_goertzel_detection() {
         let sample_rate = 44100.0;
@@ -247,6 +249,7 @@ mod tests {
     // AU-6: Goertzel boundary frequency discrimination test
     // Verifies that Goertzel can distinguish the two FSK frequencies
     // (carrier vs carrier+shift) which are only 200 Hz apart.
+    // @internal
     #[test]
     fn test_goertzel_boundary_fsk_discrimination() {
         let sample_rate = 44100.0;
@@ -294,6 +297,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn test_preamble_detection() {
         let config = AudioConfig::default();

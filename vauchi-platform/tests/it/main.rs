@@ -23,6 +23,7 @@ mod platform_app_engine_device_link_listener_tests;
 mod platform_app_engine_device_link_tests;
 mod platform_app_engine_domain_command_tests;
 mod platform_app_engine_emergency_broadcast_tests;
+mod platform_app_engine_link_responder_tests;
 mod platform_app_engine_recovery_tests;
 mod platform_app_engine_tests;
 mod policies_tests;

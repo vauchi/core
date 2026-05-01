@@ -301,6 +301,16 @@ echo "$CHECKSUM" > "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256"
 # Sign checksum with cosign (T1-5: required in CI, optional locally)
 # GitLab masked file variables store base64-encoded content — decode if needed.
 if [[ -n "${COSIGN_KEY:-}" ]]; then
+    # GitLab file-type variable: env holds a path to a staged file. If the
+    # path is set but the file is missing, the runner failed to stage it
+    # (known intermittent issue on nell — see project memory). Fail fast
+    # with an actionable error instead of cascading head/base64 errors.
+    if [[ ! -f "$COSIGN_KEY" ]]; then
+        echo -e "${RED}ERROR: COSIGN_KEY env is set to '$COSIGN_KEY' but file does not exist.${NC}" >&2
+        echo -e "${RED}This is a GitLab Runner file-variable staging failure (runner-side issue).${NC}" >&2
+        echo -e "${RED}Retry the job; if it persists, check runner config on the host.${NC}" >&2
+        exit 1
+    fi
     COSIGN_KEY_FILE="$COSIGN_KEY"
     if ! head -1 "$COSIGN_KEY" | grep -q -- "-----BEGIN"; then
         COSIGN_KEY_FILE=$(mktemp)

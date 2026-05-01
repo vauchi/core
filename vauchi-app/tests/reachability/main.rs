@@ -16,6 +16,7 @@ mod device_linking;
 mod exchange;
 mod form_dialog;
 mod group_detail;
+mod link_responder;
 mod multi_stage_exchange;
 mod onboarding;
 mod recovery;

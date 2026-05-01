@@ -366,6 +366,35 @@ pub fn responder_respond(
     Ok((keys, commands))
 }
 
+/// Decrypt the initiator's encrypted card retrieved from escrow.
+///
+/// Symmetric counterpart to [`responder_respond`]: after the responder
+/// polls the relay and the initiator's deposit lands at
+/// `(keys.gate_hash, keys.their_slot)`, this function turns the
+/// retrieved blob into plaintext bytes ready for parsing as a contact
+/// card payload.
+///
+/// # Errors
+///
+/// Returns [`LinkModeError::CardCryptoFailed`] for any decrypt failure
+/// (truncated nonce, AEAD authentication failure, wrong key). The cycle
+/// thread maps this to `on_failed(DecryptError)` so the frontend can
+/// render a typed toast instead of a silent dismissal.
+///
+/// # Why a thin wrapper
+///
+/// `EscrowKeys::decrypt_card` already does the work; this wrapper
+/// exists to (a) name the operation in domain terms ("responder
+/// completes by decrypting") and (b) map the crypto-layer error onto
+/// the link-mode error vocabulary that the cycle thread already speaks.
+pub fn responder_complete(
+    keys: &EscrowKeys,
+    encrypted_card_blob: &[u8],
+) -> Result<Vec<u8>, LinkModeError> {
+    keys.decrypt_card(encrypted_card_blob)
+        .map_err(|e| LinkModeError::CardCryptoFailed(e.to_string()))
+}
+
 // =========================================================================
 // Internal helpers
 // =========================================================================

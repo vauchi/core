@@ -651,6 +651,7 @@ impl ExchangeSession {
             ExchangeTransport::Ble => "ble",
             ExchangeTransport::Usb => "usb",
             ExchangeTransport::Audio => "audio",
+            ExchangeTransport::Link => "link",
         }
     }
 

@@ -196,6 +196,7 @@ mod exchange_session_tests;
 mod exchange_tests;
 mod exchange_to_update_e2e_test;
 mod exchange_transport_fallback_tests;
+mod exchange_transport_serde_tests;
 mod exchange_x3dh_tests;
 mod expanded_crypto_property_tests;
 mod field_catalog_tests;

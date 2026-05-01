@@ -42,6 +42,12 @@ pub enum ExchangeTransport {
     Usb,
     /// Audio data channel exchange: ultrasonic or audible payload transfer.
     Audio,
+    /// Asynchronous link-mode exchange: relay-mediated, initiated by sharing
+    /// a `vauchi://exchange?pk=…&n=…` URL. Both sides write `Link` at finalize
+    /// time — labels the exchange semantics (asynchronous, relay-mediated),
+    /// not the URL's delivery channel (SMS / email / messenger — unobservable).
+    /// Problem record: `2026-04-27-deep-link-responder-flow`.
+    Link,
 }
 
 /// Confidence level of physical proximity during contact exchange.

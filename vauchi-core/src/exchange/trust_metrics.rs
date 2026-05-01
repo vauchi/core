@@ -34,7 +34,12 @@ impl TransportProximity {
             ExchangeTransport::Usb => Self::Physical,
             ExchangeTransport::Nfc => Self::ContactRange,
             ExchangeTransport::Ble => Self::Proximate,
-            ExchangeTransport::Qr | ExchangeTransport::Audio => Self::None,
+            // Link mode is asynchronous and relay-mediated — no proximity
+            // attestation possible by construction. Group with Qr / Audio
+            // (transports without a built-in proximity signal).
+            ExchangeTransport::Qr | ExchangeTransport::Audio | ExchangeTransport::Link => {
+                Self::None
+            }
         }
     }
 

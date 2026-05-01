@@ -62,8 +62,8 @@ vauchi-core/src/storage/mod.rs 1079
 # (+7 on routing.rs for create_identity_with_onboarding atomic switch comment
 #   2026-04-28 P1 §2.5)
 vauchi-app/src/ui/app_engine/mod.rs 1144
-vauchi-app/src/ui/app_engine/routing.rs 1021
-vauchi-app/src/ui/app_engine/screens.rs 1296
+vauchi-app/src/ui/app_engine/routing.rs 1043
+vauchi-app/src/ui/app_engine/screens.rs 1299
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

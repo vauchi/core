@@ -186,6 +186,38 @@ pub(crate) fn find_preamble(samples: &[f32], sample_rate: f32) -> Result<usize, 
     Err(ProximityError::NoResponse)
 }
 
+/// Linearly resamples `samples` from `from_rate` to `to_rate`.
+///
+/// Returns a new `Vec<f32>` of length approximately
+/// `samples.len() * to_rate / from_rate`. When the rates match the
+/// input is cloned. Suitable for narrowband ultrasonic signals where
+/// the FSK band (18-20 kHz) is well below the Nyquist frequency of
+/// any reasonable recording rate (44.1 kHz / 48 kHz).
+pub(crate) fn resample(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
+    if from_rate == to_rate || samples.is_empty() {
+        return samples.to_vec();
+    }
+
+    let ratio = to_rate as f32 / from_rate as f32;
+    let new_count = (samples.len() as f32 * ratio) as usize;
+    let mut result = vec![0.0f32; new_count];
+
+    for (i, slot) in result.iter_mut().enumerate() {
+        let src_index = i as f32 / ratio;
+        let src_index_int = src_index as usize;
+        let fraction = src_index - src_index_int as f32;
+
+        if src_index_int + 1 < samples.len() {
+            *slot =
+                samples[src_index_int] * (1.0 - fraction) + samples[src_index_int + 1] * fraction;
+        } else if src_index_int < samples.len() {
+            *slot = samples[src_index_int];
+        }
+    }
+
+    result
+}
+
 /// Goertzel algorithm for efficient single-frequency detection.
 pub(crate) fn goertzel(samples: &[f32], target_freq: f32, sample_rate: f32) -> f32 {
     let n = samples.len();
@@ -321,5 +353,91 @@ mod tests {
             "Preamble should be found near start of signal, got {}",
             start
         );
+    }
+
+    // @internal
+    #[test]
+    fn resample_identity_returns_input_unchanged() {
+        let samples: Vec<f32> = (0..256).map(|i| (i as f32 * 0.13).sin()).collect();
+        let out = resample(&samples, 48000, 48000);
+        assert_eq!(out, samples);
+    }
+
+    // @internal
+    #[test]
+    fn resample_empty_input_returns_empty() {
+        let out = resample(&[], 48000, 44100);
+        assert!(out.is_empty());
+    }
+
+    // @internal
+    #[test]
+    fn resample_output_length_matches_ratio() {
+        // 1000 samples at 48 kHz → ~918 samples at 44.1 kHz
+        let samples = vec![0.5f32; 1000];
+        let out = resample(&samples, 48000, 44100);
+        let expected = (1000.0 * 44100.0 / 48000.0) as usize;
+        assert_eq!(out.len(), expected);
+    }
+
+    // @internal
+    #[test]
+    fn resample_preserves_dc_within_tolerance() {
+        // A constant signal should remain (approximately) constant after
+        // linear-interp resample — the only deviation is at the trailing
+        // boundary where the last sample isn't interpolated.
+        let samples = vec![0.7f32; 4096];
+        let out = resample(&samples, 48000, 44100);
+
+        let mean = out.iter().sum::<f32>() / out.len() as f32;
+        assert!(
+            (mean - 0.7).abs() < 0.01,
+            "DC mean should be ~0.7, got {mean}"
+        );
+    }
+
+    proptest::proptest! {
+        // @internal
+        #[test]
+        fn resample_identity_property(samples in proptest::collection::vec(-1.0f32..1.0, 0..512)) {
+            let out = resample(&samples, 44100, 44100);
+            proptest::prop_assert_eq!(out, samples);
+        }
+
+        // @internal
+        #[test]
+        fn resample_dc_preservation_property(
+            level in -0.9f32..0.9,
+            len in 256usize..2048,
+            from_rate in 8000u32..96000,
+            to_rate in 8000u32..96000,
+        ) {
+            let samples = vec![level; len];
+            let out = resample(&samples, from_rate, to_rate);
+            if out.is_empty() {
+                return Ok(());
+            }
+            let mean = out.iter().sum::<f32>() / out.len() as f32;
+            // Linear interp of a constant signal stays at that constant
+            // except for boundary effects that get vanishingly small as
+            // length grows.
+            proptest::prop_assert!(
+                (mean - level).abs() < 0.05,
+                "DC mean {mean} drifted too far from {level}"
+            );
+        }
+
+        // @internal
+        #[test]
+        fn resample_length_scales_with_ratio(
+            len in 16usize..2048,
+            from_rate in 8000u32..96000,
+            to_rate in 8000u32..96000,
+        ) {
+            let samples = vec![0.0f32; len];
+            let out = resample(&samples, from_rate, to_rate);
+            let expected = (len as f32 * to_rate as f32 / from_rate as f32) as usize;
+            proptest::prop_assert_eq!(out.len(), expected);
+        }
     }
 }

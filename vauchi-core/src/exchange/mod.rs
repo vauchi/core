@@ -55,6 +55,7 @@ mod ble;
 
 #[cfg(feature = "audio-cpal")]
 pub mod audio_cpal;
+pub mod audio_modem;
 
 pub mod capability;
 pub mod card_snapshot;
@@ -85,7 +86,8 @@ pub use accelerometer::{
     MockAccelerometerBackend,
 };
 #[cfg(feature = "audio-cpal")]
-pub use audio_cpal::{AudioConfig, CpalAudioBackend};
+pub use audio_cpal::CpalAudioBackend;
+pub use audio_modem::AudioConfig;
 #[allow(deprecated)]
 pub use ble::{
     BLE_DEFAULT_USABLE, BLE_MIN_MTU, BLE_PAYLOAD_SIZE, BLEAdvertisement, BLEDevice, BLEError,

@@ -56,7 +56,7 @@ pub enum Component {
         #[serde(default)]
         a11y: Option<A11y>,
     },
-    CardPreview {
+    Preview {
         name: String,
         /// Avatar image bytes (WebP). Frontends show this in the circular
         /// header area. Falls back to initials from `name` when None.

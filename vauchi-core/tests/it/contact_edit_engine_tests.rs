@@ -282,7 +282,7 @@ fn edit_preview_shows_card() {
     assert_eq!(screen.components.len(), 1);
 
     match &screen.components[0] {
-        Component::CardPreview {
+        Component::Preview {
             name,
             fields,
             group_views,
@@ -315,7 +315,7 @@ fn edit_preview_group_selection() {
 
     match result {
         ActionResult::UpdateScreen(screen) => match &screen.components[0] {
-            Component::CardPreview { selected_group, .. } => {
+            Component::Preview { selected_group, .. } => {
                 assert_eq!(selected_group.as_deref(), Some("Family"));
             }
             other => panic!("Expected CardPreview, got {:?}", other),
@@ -412,7 +412,7 @@ fn edit_data_persists_across_steps() {
     // Verify name is visible in preview
     let screen = engine.current_screen();
     match &screen.components[0] {
-        Component::CardPreview { name, .. } => {
+        Component::Preview { name, .. } => {
             assert_eq!(name, "Updated Alice");
         }
         other => panic!("Expected CardPreview, got {:?}", other),

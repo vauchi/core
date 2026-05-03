@@ -5,7 +5,7 @@
   "subtitle": null,
   "components": [
     {
-      "CardPreview": {
+      "Preview": {
         "name": "Alice",
         "fields": [
           {

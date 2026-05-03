@@ -364,7 +364,7 @@ fn test_component_field_list_roundtrip() {
 // @internal
 #[test]
 fn test_component_card_preview_roundtrip() {
-    let component = Component::CardPreview {
+    let component = Component::Preview {
         name: "Alice".into(),
         avatar_data: None,
         fields: vec![Field {
@@ -402,7 +402,7 @@ fn test_component_card_preview_roundtrip() {
     let json = serde_json::to_string(&component).unwrap();
     let restored: Component = serde_json::from_str(&json).unwrap();
     match restored {
-        Component::CardPreview {
+        Component::Preview {
             name,
             fields,
             group_views,

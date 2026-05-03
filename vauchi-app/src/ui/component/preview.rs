@@ -3,13 +3,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Preview-shape wire types: the field/visibility/group-view types
-//! consumed by `Component::CardPreview` and `Component::FieldList`.
+//! consumed by `Component::Preview` and `Component::FieldList`.
 //!
 //! Phase-0 prep for the Wire Humble Tier 0 rename
 //! (`2026-05-03-coreui-wire-humble-types`). The types here are
 //! scheduled to become UI-shaped at the wire boundary —
 //! `Field → Field`, `GroupCardView → PreviewVariant`,
-//! `Component::CardPreview → Component::Preview`.
+//! `Component::Preview → Component::Preview`.
 
 use serde::{Deserialize, Serialize};
 
@@ -50,7 +50,7 @@ pub struct GroupCardView {
     pub visible_fields: Vec<Field>,
 }
 
-/// Compute the visible-fields list for a [`super::Component::CardPreview`].
+/// Compute the visible-fields list for a [`super::Component::Preview`].
 ///
 /// - If `selected_group` is `Some` and matches a `GroupCardView`, returns
 ///   that group's `visible_fields` (already filtered by core's grouping
@@ -59,7 +59,7 @@ pub struct GroupCardView {
 ///   (drops `Hidden` so the preview never leaks fields the owner has
 ///   marked as hidden).
 ///
-/// Used by [`super::Component::CardPreview`]'s `visible_fields` field so
+/// Used by [`super::Component::Preview`]'s `visible_fields` field so
 /// that frontends never reproduce this filter in view code (ADR-021/043).
 pub fn build_visible_fields(
     fields: &[Field],
@@ -87,7 +87,7 @@ pub fn build_visible_fields(
 }
 
 // INLINE_TEST_REQUIRED: build_visible_fields is a pure helper with no public
-// behavior surface beyond Component::CardPreview's visible_fields field;
+// behavior surface beyond Component::Preview's visible_fields field;
 // inline tests keep the filter logic + its invariants co-located with the
 // helper so future changes to UiFieldVisibility variants surface here first.
 #[cfg(test)]

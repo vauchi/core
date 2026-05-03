@@ -100,7 +100,7 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
         // invariants are added.
         Component::Text { .. }
         | Component::FieldList { .. }
-        | Component::CardPreview { .. }
+        | Component::Preview { .. }
         | Component::InfoPanel { .. }
         | Component::SettingsGroup { .. }
         | Component::StatusIndicator { .. }

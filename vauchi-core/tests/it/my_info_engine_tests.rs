@@ -260,7 +260,7 @@ fn my_info_shows_exchange_prompt_when_no_contacts() {
             .iter()
             .map(|c| match c {
                 Component::InfoPanel { id, .. } => format!("InfoPanel({id})"),
-                Component::CardPreview { .. } => "CardPreview".into(),
+                Component::Preview { .. } => "CardPreview".into(),
                 Component::FieldList { .. } => "FieldList".into(),
                 _ => "Other".into(),
             })

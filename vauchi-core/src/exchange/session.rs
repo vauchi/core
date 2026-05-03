@@ -878,7 +878,11 @@ impl ExchangeSession {
             | ExchangeHardwareEvent::ImagePickCancelled
             // QrScanProgress is a UI-only signal handled by ExchangeEngine's
             // ScanQualityTracker — the session state machine ignores it.
-            | ExchangeHardwareEvent::QrScanProgress { .. } => Ok(()),
+            | ExchangeHardwareEvent::QrScanProgress { .. }
+            // File picking events drive vCard / backup import in vauchi-app —
+            // the exchange session state machine ignores them.
+            | ExchangeHardwareEvent::FilePickedFromUser { .. }
+            | ExchangeHardwareEvent::FilePickCancelledByUser => Ok(()),
         }
     }
 

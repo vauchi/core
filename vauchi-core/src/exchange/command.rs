@@ -157,6 +157,50 @@ pub enum ExchangeCommand {
     /// can flip the scanner orientation without the frontend owning the
     /// preference. `use_front == true` selects the front camera.
     SwitchCamera { use_front: bool },
+
+    // ── File picking (vCard / backup import, ADR-031) ──────────────
+    // Appended to preserve serde discriminant ordering.
+    /// Request the frontend to open a file picker.
+    ///
+    /// `accepted_mime_types` is advisory — frontends may default to a
+    /// coarser superset on platforms where the OS picker doesn't filter
+    /// by MIME (e.g., older Android versions). `purpose` lets the
+    /// frontend label the picker dialog without hardcoding strings;
+    /// label text comes from core's locale store via `t(key)`.
+    ///
+    /// Frontend should return [`ExchangeHardwareEvent::FilePickedFromUser`]
+    /// with the selected file's bytes, or
+    /// [`ExchangeHardwareEvent::FilePickCancelledByUser`] if the user
+    /// dismisses the picker.
+    ///
+    /// Distinct from [`ExchangeCommand::ImagePickFromFile`]: that variant
+    /// returns [`ExchangeHardwareEvent::ImageReceived`] which is shaped
+    /// for avatar normalization. File picking returns raw bytes plus
+    /// filename for arbitrary payloads (vCard, encrypted backup blob,
+    /// future key bundles, etc.).
+    FilePickFromUser {
+        accepted_mime_types: Vec<String>,
+        purpose: FilePickPurpose,
+    },
+}
+
+/// Why a file picker is being opened — lets frontends label the dialog
+/// (e.g., "Import Contacts" vs "Import Backup") without hardcoded strings.
+///
+/// Variants map 1:1 to a label key in the locale store. `Other` covers
+/// future imports (e.g., key-bundle import) without forcing every consumer
+/// to update for a new well-known purpose.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum FilePickPurpose {
+    /// vCard / VCF import on top of the contacts engine.
+    ImportContacts,
+    /// Encrypted vauchi backup blob.
+    ImportBackup,
+    /// Reserved for future imports — frontends look up `label_key`
+    /// in the locale store.
+    Other { label_key: String },
 }
 
 impl ExchangeCommand {
@@ -188,6 +232,7 @@ impl ExchangeCommand {
             Self::ImageCaptureFromCamera => "ImageCaptureFromCamera",
             Self::ImagePickFromFile => "ImagePickFromFile",
             Self::SwitchCamera { .. } => "SwitchCamera",
+            Self::FilePickFromUser { .. } => "FilePickFromUser",
         }
     }
 }
@@ -311,6 +356,19 @@ pub enum ExchangeHardwareEvent {
     ImageReceived { data: Vec<u8> },
     /// The user cancelled the image picker / camera without selecting.
     ImagePickCancelled,
+
+    // ── File picking (vCard / backup import, ADR-031) ──────────────
+    // Appended to preserve serde discriminant ordering.
+    /// File data received from a [`ExchangeCommand::FilePickFromUser`]
+    /// request.
+    ///
+    /// `bytes` is the entire file payload (no decoding — decoding lives
+    /// in core). `filename` is the OS-reported display name; some
+    /// platforms do not expose it, in which case the frontend reports
+    /// an empty string.
+    FilePickedFromUser { bytes: Vec<u8>, filename: String },
+    /// The user dismissed the file picker without selecting a file.
+    FilePickCancelledByUser,
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access
@@ -476,6 +534,20 @@ mod tests {
             ExchangeCommand::ImagePickFromFile,
             ExchangeCommand::SwitchCamera { use_front: true },
             ExchangeCommand::SwitchCamera { use_front: false },
+            ExchangeCommand::FilePickFromUser {
+                accepted_mime_types: vec!["text/vcard".into(), "text/x-vcard".into()],
+                purpose: FilePickPurpose::ImportContacts,
+            },
+            ExchangeCommand::FilePickFromUser {
+                accepted_mime_types: vec!["application/octet-stream".into()],
+                purpose: FilePickPurpose::ImportBackup,
+            },
+            ExchangeCommand::FilePickFromUser {
+                accepted_mime_types: vec![],
+                purpose: FilePickPurpose::Other {
+                    label_key: "import.key_bundle".into(),
+                },
+            },
         ];
         for cmd in &commands {
             let json = serde_json::to_string(cmd).expect("serialize");
@@ -553,6 +625,15 @@ mod tests {
                 confidence: None,
                 frame_skipped: true,
             },
+            ExchangeHardwareEvent::FilePickedFromUser {
+                bytes: vec![0x42; 8],
+                filename: "contacts.vcf".into(),
+            },
+            ExchangeHardwareEvent::FilePickedFromUser {
+                bytes: vec![],
+                filename: String::new(),
+            },
+            ExchangeHardwareEvent::FilePickCancelledByUser,
         ];
         for evt in &events {
             let json = serde_json::to_string(evt).expect("serialize");
@@ -643,9 +724,13 @@ mod tests {
             ExchangeCommand::ImageCaptureFromCamera,
             ExchangeCommand::ImagePickFromFile,
             ExchangeCommand::SwitchCamera { use_front: false },
+            ExchangeCommand::FilePickFromUser {
+                accepted_mime_types: vec![],
+                purpose: FilePickPurpose::ImportContacts,
+            },
         ];
-        // 25 total command variants
-        assert_eq!(variants.len(), 25);
+        // 26 total command variants
+        assert_eq!(variants.len(), 26);
     }
 
     #[test]
@@ -715,8 +800,109 @@ mod tests {
                 confidence: None,
                 frame_skipped: false,
             },
+            ExchangeHardwareEvent::FilePickedFromUser {
+                bytes: vec![],
+                filename: String::new(),
+            },
+            ExchangeHardwareEvent::FilePickCancelledByUser,
         ];
-        // 22 total event variants
-        assert_eq!(variants.len(), 22);
+        // 24 total event variants
+        assert_eq!(variants.len(), 24);
+    }
+
+    // ── File-picker variants (Phase 1: types only) ──────────────────
+
+    #[test]
+    fn file_pick_from_user_command_stores_purpose_and_mime() {
+        let cmd = ExchangeCommand::FilePickFromUser {
+            accepted_mime_types: vec!["text/vcard".into(), "text/x-vcard".into()],
+            purpose: FilePickPurpose::ImportContacts,
+        };
+        match cmd {
+            ExchangeCommand::FilePickFromUser {
+                accepted_mime_types,
+                purpose,
+            } => {
+                assert_eq!(accepted_mime_types, vec!["text/vcard", "text/x-vcard"]);
+                assert_eq!(purpose, FilePickPurpose::ImportContacts);
+            }
+            other => panic!("expected FilePickFromUser, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn file_pick_purpose_other_carries_label_key() {
+        let purpose = FilePickPurpose::Other {
+            label_key: "import.key_bundle".into(),
+        };
+        match purpose {
+            FilePickPurpose::Other { label_key } => assert_eq!(label_key, "import.key_bundle"),
+            other => panic!("expected Other, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn file_pick_purpose_variants_are_distinct() {
+        let a = FilePickPurpose::ImportContacts;
+        let b = FilePickPurpose::ImportBackup;
+        let c = FilePickPurpose::Other {
+            label_key: "x".into(),
+        };
+        assert_ne!(a, b);
+        assert_ne!(a, c);
+        assert_ne!(b, c);
+    }
+
+    #[test]
+    fn file_pick_purpose_serialization_roundtrip() {
+        let purposes = vec![
+            FilePickPurpose::ImportContacts,
+            FilePickPurpose::ImportBackup,
+            FilePickPurpose::Other {
+                label_key: "import.key_bundle".into(),
+            },
+            FilePickPurpose::Other {
+                label_key: String::new(),
+            },
+        ];
+        for p in &purposes {
+            let json = serde_json::to_string(p).expect("serialize");
+            let decoded: FilePickPurpose = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(p, &decoded, "roundtrip failed for {:?}", p);
+        }
+    }
+
+    #[test]
+    fn file_picked_from_user_event_stores_bytes_and_filename() {
+        let evt = ExchangeHardwareEvent::FilePickedFromUser {
+            bytes: vec![0x42, 0x43, 0x44],
+            filename: "contacts.vcf".into(),
+        };
+        match evt {
+            ExchangeHardwareEvent::FilePickedFromUser { bytes, filename } => {
+                assert_eq!(bytes, vec![0x42, 0x43, 0x44]);
+                assert_eq!(filename, "contacts.vcf");
+            }
+            other => panic!("expected FilePickedFromUser, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn file_picked_event_distinct_from_cancellation() {
+        let picked = ExchangeHardwareEvent::FilePickedFromUser {
+            bytes: vec![],
+            filename: String::new(),
+        };
+        let cancelled = ExchangeHardwareEvent::FilePickCancelledByUser;
+        assert_ne!(picked, cancelled);
+    }
+
+    #[test]
+    fn file_pick_from_user_variant_name_is_stable() {
+        let cmd = ExchangeCommand::FilePickFromUser {
+            accepted_mime_types: vec![],
+            purpose: FilePickPurpose::ImportBackup,
+        };
+        assert_eq!(cmd.variant_name(), "FilePickFromUser");
     }
 }

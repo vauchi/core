@@ -2201,6 +2201,34 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "description": "Request the frontend to open a file picker.\n\n`accepted_mime_types` is advisory — frontends may default to a coarser superset on platforms where the OS picker doesn't filter by MIME (e.g., older Android versions). `purpose` lets the frontend label the picker dialog without hardcoding strings; label text comes from core's locale store via `t(key)`.\n\nFrontend should return [`ExchangeHardwareEvent::FilePickedFromUser`] with the selected file's bytes, or [`ExchangeHardwareEvent::FilePickCancelledByUser`] if the user dismisses the picker.\n\nDistinct from [`ExchangeCommand::ImagePickFromFile`]: that variant returns [`ExchangeHardwareEvent::ImageReceived`] which is shaped for avatar normalization. File picking returns raw bytes plus filename for arbitrary payloads (vCard, encrypted backup blob, future key bundles, etc.).",
+          "type": "object",
+          "required": [
+            "FilePickFromUser"
+          ],
+          "properties": {
+            "FilePickFromUser": {
+              "type": "object",
+              "required": [
+                "accepted_mime_types",
+                "purpose"
+              ],
+              "properties": {
+                "accepted_mime_types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "purpose": {
+                  "$ref": "#/definitions/FilePickPurpose"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -2242,6 +2270,46 @@
           "$ref": "#/definitions/UiFieldVisibility"
         }
       }
+    },
+    "FilePickPurpose": {
+      "description": "Why a file picker is being opened — lets frontends label the dialog (e.g., \"Import Contacts\" vs \"Import Backup\") without hardcoded strings.\n\nVariants map 1:1 to a label key in the locale store. `Other` covers future imports (e.g., key-bundle import) without forcing every consumer to update for a new well-known purpose.",
+      "oneOf": [
+        {
+          "description": "vCard / VCF import on top of the contacts engine.",
+          "type": "string",
+          "enum": [
+            "ImportContacts"
+          ]
+        },
+        {
+          "description": "Encrypted vauchi backup blob.",
+          "type": "string",
+          "enum": [
+            "ImportBackup"
+          ]
+        },
+        {
+          "description": "Reserved for future imports — frontends look up `label_key` in the locale store.",
+          "type": "object",
+          "required": [
+            "Other"
+          ],
+          "properties": {
+            "Other": {
+              "type": "object",
+              "required": [
+                "label_key"
+              ],
+              "properties": {
+                "label_key": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "GroupCardView": {
       "description": "How a card looks to a specific group.",

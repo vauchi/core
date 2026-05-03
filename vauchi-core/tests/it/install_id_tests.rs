@@ -13,6 +13,7 @@ use vauchi_core::install_id::read_or_create_install_id;
 
 const INSTALL_ID_FILE: &str = "install_id";
 
+// @internal
 #[test]
 fn creates_new_uuid_on_first_call() {
     let dir = tempdir().unwrap();
@@ -21,6 +22,7 @@ fn creates_new_uuid_on_first_call() {
     assert!(dir.path().join(INSTALL_ID_FILE).exists());
 }
 
+// @internal
 #[test]
 fn persists_across_calls() {
     let dir = tempdir().unwrap();
@@ -29,6 +31,7 @@ fn persists_across_calls() {
     assert_eq!(id1, id2);
 }
 
+// @internal
 #[test]
 fn distinct_dirs_get_distinct_ids() {
     let dir_a = tempdir().unwrap();
@@ -38,6 +41,7 @@ fn distinct_dirs_get_distinct_ids() {
     assert_ne!(id_a, id_b);
 }
 
+// @internal
 #[test]
 fn creates_data_dir_if_missing() {
     let parent = tempdir().unwrap();
@@ -48,6 +52,7 @@ fn creates_data_dir_if_missing() {
     assert!(nested.exists());
 }
 
+// @internal
 #[test]
 fn invalid_uuid_in_file_returns_error() {
     let dir = tempdir().unwrap();
@@ -56,6 +61,7 @@ fn invalid_uuid_in_file_returns_error() {
     assert_eq!(err.kind(), io::ErrorKind::InvalidData);
 }
 
+// @internal
 #[test]
 fn id_survives_data_dir_rename() {
     // Regression: pre-fix, frontends derived OS-keychain entry names from
@@ -75,6 +81,7 @@ fn id_survives_data_dir_rename() {
 }
 
 #[cfg(unix)]
+// @internal
 #[test]
 fn install_id_file_has_0600_perms_on_unix() {
     use std::os::unix::fs::PermissionsExt;

@@ -7,17 +7,20 @@
 //! Phase-0 prep for the Wire Humble Tier 0 rename
 //! (`2026-05-03-coreui-wire-humble-types`). The types in this file
 //! are scheduled to become UI-shaped at the wire boundary —
-//! `ContactItem → Item`, `Component::ContactList → Component::List`.
+//! `Item → Item`, `Component::ContactList → Component::List`.
 //! Engine-side typing stays Rust-internal; `T` does not cross serde.
 
 use serde::{Deserialize, Serialize};
 
 use super::A11y;
 
-/// A lightweight contact summary for list display.
+/// A lightweight item shown in `Component::List` (and the legacy
+/// `Component::ContactList`). UI-shaped: the renderer doesn't know what
+/// kind of thing it represents — see `ListKind` on the parent component
+/// for purely-presentational hints (icon/empty-text key).
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ContactItem {
+pub struct Item {
     pub id: String,
     pub name: String,
     pub subtitle: Option<String>,

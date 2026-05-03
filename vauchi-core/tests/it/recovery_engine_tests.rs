@@ -11,8 +11,8 @@
 
 use vauchi_app::ui::*;
 
-fn make_contact(id: &str, name: &str, initials: &str) -> ContactItem {
-    ContactItem {
+fn make_contact(id: &str, name: &str, initials: &str) -> Item {
+    Item {
         id: id.into(),
         name: name.into(),
         subtitle: None,

@@ -44,9 +44,9 @@ fn assert_fixture_fresh(screen: &ScreenModel, filename: &str) {
 
 // ── Sample data builders ─────────────────────────────────────────
 
-fn sample_contacts() -> Vec<ContactItem> {
+fn sample_contacts() -> Vec<Item> {
     vec![
-        ContactItem {
+        Item {
             id: "c1".into(),
             name: "Alice".into(),
             subtitle: Some("Friend".into()),
@@ -56,7 +56,7 @@ fn sample_contacts() -> Vec<ContactItem> {
             actions: vec![],
             a11y: None,
         },
-        ContactItem {
+        Item {
             id: "c2".into(),
             name: "Bob".into(),
             subtitle: None,
@@ -288,7 +288,7 @@ fn sample_exchange_config() -> ExchangeConfig {
 fn sample_duress_config() -> DuressConfig {
     DuressConfig {
         enabled: false,
-        alert_contacts: vec![ContactItem {
+        alert_contacts: vec![Item {
             id: "c1".into(),
             name: "Emergency Contact".into(),
             subtitle: None,

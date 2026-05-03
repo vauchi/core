@@ -31,13 +31,13 @@ pub const FIELD_VISIBILITY_COMPONENT_ID: &str = "field_visibility";
 pub struct GroupDetailEngine {
     group_id: String,
     group_name: String,
-    members: Vec<ContactItem>,
+    members: Vec<Item>,
     fields: Vec<GroupFieldVisibility>,
     pending_delete: bool,
 }
 
 impl GroupDetailEngine {
-    pub fn new(group_id: String, group_name: String, members: Vec<ContactItem>) -> Self {
+    pub fn new(group_id: String, group_name: String, members: Vec<Item>) -> Self {
         Self {
             group_id,
             group_name,
@@ -246,8 +246,8 @@ impl WorkflowEngine for GroupDetailEngine {
 mod tests {
     use super::*;
 
-    fn member(id: &str, name: &str) -> ContactItem {
-        ContactItem {
+    fn member(id: &str, name: &str) -> Item {
+        Item {
             id: id.into(),
             name: name.into(),
             subtitle: None,

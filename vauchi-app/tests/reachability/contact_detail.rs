@@ -8,7 +8,7 @@
 //! (`_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens/`).
 
 use vauchi_app::ui::testing::{assert_reachability_across_screens, check_reachability};
-use vauchi_app::ui::{ContactDetailEngine, ContactItem, FieldDisplay, WorkflowEngine};
+use vauchi_app::ui::{ContactDetailEngine, FieldDisplay, Item, WorkflowEngine};
 use vauchi_core::contact::trust::TrustLevel;
 
 /// Action ids handled by `ContactDetailEngine` —
@@ -33,7 +33,7 @@ const HANDLED: &[&str] = &[
 ];
 
 fn factory() -> ContactDetailEngine {
-    let item = ContactItem {
+    let item = Item {
         id: "c-alice".into(),
         name: "Alice".into(),
         subtitle: None,

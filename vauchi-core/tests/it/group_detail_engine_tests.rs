@@ -4,9 +4,9 @@
 
 use vauchi_app::ui::*;
 
-fn sample_members() -> Vec<ContactItem> {
+fn sample_members() -> Vec<Item> {
     vec![
-        ContactItem {
+        Item {
             id: "c1".into(),
             name: "Alice".into(),
             subtitle: None,
@@ -16,7 +16,7 @@ fn sample_members() -> Vec<ContactItem> {
             actions: vec![],
             a11y: None,
         },
-        ContactItem {
+        Item {
             id: "c2".into(),
             name: "Bob".into(),
             subtitle: None,

@@ -8,12 +8,12 @@
 //! to a contact when viewing that contact's detail screen.
 
 use vauchi_app::ui::{
-    Component, ContactDetailEngine, ContactItem, DeliverySummary, FieldDisplay, UiFieldVisibility,
+    Component, ContactDetailEngine, DeliverySummary, FieldDisplay, Item, UiFieldVisibility,
     WorkflowEngine,
 };
 
-fn sample_contact() -> ContactItem {
-    ContactItem {
+fn sample_contact() -> Item {
+    Item {
         id: "c1".into(),
         name: "Bob".into(),
         subtitle: None,

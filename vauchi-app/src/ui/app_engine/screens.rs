@@ -13,7 +13,7 @@ use crate::ui::activity_log::{ActivityLogEngine, ActivityLogItem};
 use crate::ui::archived_contacts::ArchivedContactsEngine;
 use crate::ui::backup_recovery::BackupRecoveryEngine;
 use crate::ui::component::{
-    A11y, ContactItem, FieldDisplay, ListItemAction, ListItemActionKind, Status, UiFieldVisibility,
+    A11y, FieldDisplay, Item, ListItemAction, ListItemActionKind, Status, UiFieldVisibility,
 };
 use crate::ui::contact_detail::{
     ContactDetailEngine, ContactNotFoundEngine, DeliverySummary, SharedInfoView,
@@ -330,7 +330,7 @@ impl AppEngine {
                             .alert_contact_ids
                             .iter()
                             .filter_map(|id| {
-                                vauchi.get_contact(id).ok().flatten().map(|c| ContactItem {
+                                vauchi.get_contact(id).ok().flatten().map(|c| Item {
                                     id: c.id().to_string(),
                                     name: c.display_name().to_string(),
                                     subtitle: None,
@@ -448,11 +448,11 @@ impl AppEngine {
                     .as_ref()
                     .map(|g| g.name().to_string())
                     .unwrap_or_else(|| "Group".into());
-                let mut members: Vec<ContactItem> = vauchi
+                let mut members: Vec<Item> = vauchi
                     .get_group_members(group_id)
                     .unwrap_or_default()
                     .into_iter()
-                    .map(|c| ContactItem {
+                    .map(|c| Item {
                         id: c.id().to_string(),
                         name: c.display_name().to_string(),
                         subtitle: None,
@@ -565,7 +565,7 @@ impl AppEngine {
                     } else {
                         None
                     };
-                    let item = ContactItem {
+                    let item = Item {
                         id: contact.id().to_string(),
                         name: contact.display_name().to_string(),
                         subtitle: None,
@@ -992,7 +992,7 @@ impl AppEngine {
         ))
     }
 
-    pub(super) fn load_contact_items(vauchi: &Vauchi) -> Vec<ContactItem> {
+    pub(super) fn load_contact_items(vauchi: &Vauchi) -> Vec<Item> {
         match vauchi.list_contacts() {
             Ok(contacts) => contacts
                 .iter()
@@ -1011,7 +1011,7 @@ impl AppEngine {
                     } else {
                         None
                     };
-                    ContactItem {
+                    Item {
                         id: c.id().to_string(),
                         name: c.display_name().to_string(),
                         subtitle,

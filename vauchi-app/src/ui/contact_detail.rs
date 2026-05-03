@@ -46,7 +46,7 @@ pub struct DeliverySummary {
 /// perspective toggle.
 #[derive(Clone, Debug)]
 pub struct ContactDetailEngine {
-    contact: ContactItem,
+    contact: Item,
     fields: Vec<FieldDisplay>,
     shared_info: Option<SharedInfoView>,
     view_mode: ContactViewMode,
@@ -89,7 +89,7 @@ pub struct ContactDetailEngine {
 
 impl ContactDetailEngine {
     /// Create with only their info (no shared info available).
-    pub fn new(contact: ContactItem, fields: Vec<FieldDisplay>, personal_note: String) -> Self {
+    pub fn new(contact: Item, fields: Vec<FieldDisplay>, personal_note: String) -> Self {
         Self {
             contact,
             fields,
@@ -114,7 +114,7 @@ impl ContactDetailEngine {
 
     /// Create with both perspectives available.
     pub fn with_shared_info(
-        contact: ContactItem,
+        contact: Item,
         fields: Vec<FieldDisplay>,
         shared_info: SharedInfoView,
         personal_note: String,
@@ -946,8 +946,8 @@ impl WorkflowEngine for ContactNotFoundEngine {
 mod tests {
     use super::*;
 
-    fn sample_contact() -> ContactItem {
-        ContactItem {
+    fn sample_contact() -> Item {
+        Item {
             id: "c1".into(),
             name: "Alice".into(),
             subtitle: Some("+41 79 123 45 67".into()),

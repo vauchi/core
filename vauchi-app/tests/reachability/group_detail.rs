@@ -8,7 +8,7 @@
 //! (`_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens/`).
 
 use vauchi_app::ui::testing::{assert_reachability_across_screens, check_reachability};
-use vauchi_app::ui::{ContactItem, GroupDetailEngine, GroupFieldVisibility, WorkflowEngine};
+use vauchi_app::ui::{GroupDetailEngine, GroupFieldVisibility, Item, WorkflowEngine};
 
 /// Action ids handled by `GroupDetailEngine` —
 /// `core/vauchi-app/src/ui/group_detail.rs`. The `preview-as-member:<id>`
@@ -26,7 +26,7 @@ fn factory() -> GroupDetailEngine {
     GroupDetailEngine::new(
         "g1".into(),
         "Work".into(),
-        vec![ContactItem {
+        vec![Item {
             id: "c1".into(),
             name: "Alice".into(),
             subtitle: None,

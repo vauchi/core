@@ -13,7 +13,7 @@ use zeroize::Zeroize;
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct DuressConfig {
     pub enabled: bool,
-    pub alert_contacts: Vec<ContactItem>,
+    pub alert_contacts: Vec<Item>,
     pub alert_message: String,
     pub include_location: bool,
 }

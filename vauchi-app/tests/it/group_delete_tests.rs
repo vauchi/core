@@ -9,12 +9,12 @@
 //! Complete to vauchi.delete_group().
 
 use vauchi_app::ui::{
-    ActionResult, Component, ContactItem, GroupDetailEngine, GroupInfo, GroupsEngine, GroupsMode,
+    ActionResult, Component, GroupDetailEngine, GroupInfo, GroupsEngine, GroupsMode, Item,
     UserAction, WorkflowEngine,
 };
 
-fn sample_members() -> Vec<ContactItem> {
-    vec![ContactItem {
+fn sample_members() -> Vec<Item> {
+    vec![Item {
         id: "c1".into(),
         name: "Alice".into(),
         subtitle: None,

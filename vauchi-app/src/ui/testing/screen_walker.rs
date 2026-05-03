@@ -250,7 +250,7 @@ fn is_terminal(result: &ActionResult) -> bool {
 mod tests {
     use super::*;
     use crate::ui::component::{
-        ActionListItem, Component, ContactItem, DropdownOption, InputType, ToggleItem,
+        ActionListItem, Component, DropdownOption, InputType, Item, ToggleItem,
     };
     use crate::ui::screen::{ActionStyle, ScreenAction, ScreenModel};
 
@@ -431,7 +431,7 @@ mod tests {
     fn contact_list_items_emit_list_item_selected() {
         let component = Component::ContactList {
             id: "contacts_list".into(),
-            contacts: vec![ContactItem {
+            contacts: vec![Item {
                 id: "c-1".into(),
                 name: "Alice".into(),
                 subtitle: None,

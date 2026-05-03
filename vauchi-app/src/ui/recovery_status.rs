@@ -49,7 +49,7 @@ struct CollectedVoucher {
 #[derive(Clone, Debug)]
 pub struct RecoveryEngine {
     step: RecoveryStep,
-    trusted_contacts: Vec<ContactItem>,
+    trusted_contacts: Vec<Item>,
     quorum_threshold: usize,
     /// Number of linked devices (0 = this is the only device).
     linked_device_count: usize,
@@ -70,7 +70,7 @@ pub struct RecoveryEngine {
 }
 
 impl RecoveryEngine {
-    pub fn new(trusted_contacts: Vec<ContactItem>, quorum_threshold: usize) -> Self {
+    pub fn new(trusted_contacts: Vec<Item>, quorum_threshold: usize) -> Self {
         Self {
             step: RecoveryStep::Intro,
             trusted_contacts,
@@ -761,7 +761,7 @@ mod tests {
 
     fn engine_with_quorum() -> RecoveryEngine {
         let contacts = (0..3)
-            .map(|i| ContactItem {
+            .map(|i| Item {
                 id: format!("c{i}"),
                 name: format!("Contact {i}"),
                 avatar_initials: format!("C{i}"),

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 mod list;
 mod preview;
 
-pub use list::{ContactItem, ListItemAction, ListItemActionKind};
+pub use list::{Item, ListItemAction, ListItemActionKind};
 pub use preview::{FieldDisplay, GroupCardView, UiFieldVisibility, build_visible_fields};
 
 /// An option in a [`Component::Dropdown`].
@@ -93,7 +93,7 @@ pub enum Component {
     },
     ContactList {
         id: String,
-        contacts: Vec<ContactItem>,
+        contacts: Vec<Item>,
         searchable: bool,
     },
     SettingsGroup {

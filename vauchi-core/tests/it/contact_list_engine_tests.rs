@@ -4,9 +4,9 @@
 
 use vauchi_app::ui::*;
 
-fn sample_contacts() -> Vec<ContactItem> {
+fn sample_contacts() -> Vec<Item> {
     vec![
-        ContactItem {
+        Item {
             id: "c1".into(),
             name: "Alice".into(),
             subtitle: Some("Friend".into()),
@@ -16,7 +16,7 @@ fn sample_contacts() -> Vec<ContactItem> {
             actions: vec![],
             a11y: None,
         },
-        ContactItem {
+        Item {
             id: "c2".into(),
             name: "Bob".into(),
             subtitle: None,
@@ -26,7 +26,7 @@ fn sample_contacts() -> Vec<ContactItem> {
             actions: vec![],
             a11y: None,
         },
-        ContactItem {
+        Item {
             id: "c3".into(),
             name: "Charlie".into(),
             subtitle: Some("Coworker".into()),
@@ -39,7 +39,7 @@ fn sample_contacts() -> Vec<ContactItem> {
     ]
 }
 
-fn extract_contacts(screen: &ScreenModel) -> &Vec<ContactItem> {
+fn extract_contacts(screen: &ScreenModel) -> &Vec<Item> {
     match screen
         .components
         .iter()
@@ -208,9 +208,9 @@ fn contact_list_search_no_results_shows_empty_list_not_guidance() {
 
 // --- Field search tests ---
 
-fn contacts_with_fields() -> Vec<ContactItem> {
+fn contacts_with_fields() -> Vec<Item> {
     vec![
-        ContactItem {
+        Item {
             id: "c1".into(),
             name: "Alice".into(),
             subtitle: Some("+1-555-0100".into()),
@@ -220,7 +220,7 @@ fn contacts_with_fields() -> Vec<ContactItem> {
             actions: vec![],
             a11y: None,
         },
-        ContactItem {
+        Item {
             id: "c2".into(),
             name: "Bob".into(),
             subtitle: Some("bob@work.com".into()),
@@ -230,7 +230,7 @@ fn contacts_with_fields() -> Vec<ContactItem> {
             actions: vec![],
             a11y: None,
         },
-        ContactItem {
+        Item {
             id: "c3".into(),
             name: "Charlie".into(),
             subtitle: None,
@@ -322,9 +322,9 @@ fn search_no_match_returns_empty() {
 
 // --- Group filter tests ---
 
-fn contacts_with_groups() -> (Vec<ContactItem>, Vec<(String, String)>) {
+fn contacts_with_groups() -> (Vec<Item>, Vec<(String, String)>) {
     let contacts = vec![
-        ContactItem {
+        Item {
             id: "c1".into(),
             name: "Alice".into(),
             subtitle: None,
@@ -334,7 +334,7 @@ fn contacts_with_groups() -> (Vec<ContactItem>, Vec<(String, String)>) {
             actions: vec![],
             a11y: None,
         },
-        ContactItem {
+        Item {
             id: "c2".into(),
             name: "Bob".into(),
             subtitle: None,
@@ -344,7 +344,7 @@ fn contacts_with_groups() -> (Vec<ContactItem>, Vec<(String, String)>) {
             actions: vec![],
             a11y: None,
         },
-        ContactItem {
+        Item {
             id: "c3".into(),
             name: "Charlie".into(),
             subtitle: None,
@@ -467,7 +467,7 @@ fn available_groups_shown_in_screen() {
 // @internal
 #[test]
 fn contact_item_a11y_is_preserved_through_engine() {
-    let contacts = vec![ContactItem {
+    let contacts = vec![Item {
         id: "c1".into(),
         name: "Alice".into(),
         subtitle: None,
@@ -486,10 +486,7 @@ fn contact_item_a11y_is_preserved_through_engine() {
 
     let items = extract_contacts(&screen);
     assert_eq!(items.len(), 1);
-    let a11y = items[0]
-        .a11y
-        .as_ref()
-        .expect("ContactItem should carry a11y");
+    let a11y = items[0].a11y.as_ref().expect("Item should carry a11y");
     assert_eq!(
         a11y.label.as_deref(),
         Some("Contact: Alice"),

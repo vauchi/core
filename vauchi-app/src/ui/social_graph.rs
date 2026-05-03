@@ -76,7 +76,7 @@ impl SocialTrustLevel {
 /// doesn't need access to `Vauchi`/`MobileContact` types.
 #[derive(Clone, Debug)]
 pub struct SocialContactEntry {
-    pub contact: ContactItem,
+    pub contact: Item,
     pub trust_level: SocialTrustLevel,
 }
 
@@ -222,7 +222,7 @@ impl SocialGraphEngine {
             {
                 continue;
             }
-            let level_contacts: Vec<ContactItem> = self
+            let level_contacts: Vec<Item> = self
                 .contacts
                 .iter()
                 .filter(|e| e.trust_level == level)
@@ -318,7 +318,7 @@ mod tests {
 
     fn entry(id: &str, level: SocialTrustLevel) -> SocialContactEntry {
         SocialContactEntry {
-            contact: ContactItem {
+            contact: Item {
                 id: id.into(),
                 name: format!("Name {id}"),
                 avatar_initials: id.chars().take(2).collect::<String>().to_uppercase(),

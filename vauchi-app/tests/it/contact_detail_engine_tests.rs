@@ -8,12 +8,12 @@
 //! Exchanged contacts keep ShowToast + undo for archive (unchanged).
 
 use vauchi_app::ui::{
-    AccessibilityRole, ActionResult, Component, ContactDetailEngine, ContactItem, FieldDisplay,
+    AccessibilityRole, ActionResult, Component, ContactDetailEngine, FieldDisplay, Item,
     UiFieldVisibility, UserAction, WorkflowEngine,
 };
 
-fn sample_contact() -> ContactItem {
-    ContactItem {
+fn sample_contact() -> Item {
+    Item {
         id: "c1".into(),
         name: "Alice".into(),
         subtitle: Some("+41 79 123 45 67".into()),

@@ -10,8 +10,8 @@ use vauchi_core::crypto::SymmetricKey;
 
 // ── Test helpers ────────────────────────────────────────────────────
 
-fn sample_contact() -> ContactItem {
-    ContactItem {
+fn sample_contact() -> Item {
+    Item {
         id: "c1".into(),
         name: "Alice".into(),
         subtitle: Some("alice@example.com".into()),

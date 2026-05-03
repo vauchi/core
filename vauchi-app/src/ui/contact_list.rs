@@ -11,7 +11,7 @@ use crate::ui::*;
 /// Contact list engine — full contact list with search and group filtering.
 #[derive(Clone, Debug)]
 pub struct ContactListEngine {
-    all_contacts: Vec<ContactItem>,
+    all_contacts: Vec<Item>,
     search_query: String,
     /// Active group filter: None = show all, Some(group_id) = show only members.
     group_filter: Option<String>,
@@ -22,7 +22,7 @@ pub struct ContactListEngine {
 }
 
 impl ContactListEngine {
-    pub fn new(contacts: Vec<ContactItem>) -> Self {
+    pub fn new(contacts: Vec<Item>) -> Self {
         Self {
             all_contacts: contacts,
             search_query: String::new(),
@@ -34,7 +34,7 @@ impl ContactListEngine {
 
     /// Create engine with group information for filtering.
     pub fn with_groups(
-        contacts: Vec<ContactItem>,
+        contacts: Vec<Item>,
         groups: Vec<(String, String)>,
         memberships: HashMap<String, Vec<String>>,
     ) -> Self {
@@ -47,9 +47,9 @@ impl ContactListEngine {
         }
     }
 
-    fn filtered_contacts(&self) -> Vec<ContactItem> {
+    fn filtered_contacts(&self) -> Vec<Item> {
         // Clone is required: ScreenModel owns its components, so ContactList
-        // needs an owned Vec<ContactItem>. Caching would add complexity for
+        // needs an owned Vec<Item>. Caching would add complexity for
         // a list that is small in practice (< 1000 contacts).
         let base = if let Some(ref group_id) = self.group_filter {
             let member_ids = self.group_memberships.get(group_id);
@@ -252,8 +252,8 @@ fn contact_action_kind_from(kind: ListItemActionKind) -> Option<ContactActionKin
 mod tests {
     use super::*;
 
-    fn item(id: &str, actions: Vec<ListItemAction>) -> ContactItem {
-        ContactItem {
+    fn item(id: &str, actions: Vec<ListItemAction>) -> Item {
+        Item {
             id: id.into(),
             name: format!("Contact {id}"),
             subtitle: None,

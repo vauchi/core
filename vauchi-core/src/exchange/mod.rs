@@ -104,7 +104,7 @@ pub use ble_handshake::{
 };
 pub use ble_payload::BleCardPayload;
 pub use ble_rollback::BleRollback;
-pub use command::{ExchangeCommand, ExchangeHardwareEvent};
+pub use command::{ExchangeCommand, ExchangeHardwareEvent, FilePickPurpose};
 pub use device_link::{
     DeviceLinkConfirmation, DeviceLinkInitiator, DeviceLinkInitiatorRestored, DeviceLinkQR,
     DeviceLinkRequest, DeviceLinkResponder, DeviceLinkResponse, ProximityProof,

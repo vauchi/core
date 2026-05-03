@@ -742,7 +742,7 @@ fn more_engine_has_expected_navigation_targets() {
         })
         .collect();
 
-    // Expected items as of 2026-05-01 — extended for Android's
+    // Expected items as of 2026-05-03 — extended for Android's
     // MoreScreen retirement
     // (`2026-05-01-more-engine-extension-android-retirement`):
     // dropped `device_linking` (the link flow) in favor of
@@ -750,6 +750,11 @@ fn more_engine_has_expected_navigation_targets() {
     // tap target); added the 4 entries Android's MoreScreen exposes
     // that core was missing (device_replacement, recovery,
     // archived_contacts, contact_duplicates).
+    //
+    // Phase 2A of `2026-05-03-core-file-picker-command` adds
+    // `import_contacts` — the only entry that does not navigate to
+    // a screen (selecting it returns `ExchangeCommands` driving the
+    // file picker per ADR-031).
     let expected: &[&str] = &[
         "activity_log",
         "sync",
@@ -758,6 +763,7 @@ fn more_engine_has_expected_navigation_targets() {
         "recovery",
         "archived_contacts",
         "contact_duplicates",
+        "import_contacts",
         "settings",
         "backup",
         "privacy",

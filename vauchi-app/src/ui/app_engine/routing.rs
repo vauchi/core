@@ -79,6 +79,23 @@ impl AppEngine {
     /// Returns `None` if the current screen doesn't handle hardware events.
     #[tracing::instrument(level = "debug", skip_all, name = "app.handle_hardware_event")]
     pub fn handle_hardware_event(&mut self, event: ExchangeHardwareEvent) -> Option<ActionResult> {
+        // ADR-031 file-picker: dispatched by current screen, not by the
+        // narrow screen guard below. The picker is reachable from More
+        // (contacts import) and — once Phase 2B lands — Onboarding
+        // (backup restore). Phase 2A handles contacts only; backup
+        // restore is deferred (multi-step password flow).
+        match &event {
+            ExchangeHardwareEvent::FilePickedFromUser { bytes, filename } => {
+                return self.handle_file_picked(bytes.clone(), filename.clone());
+            }
+            ExchangeHardwareEvent::FilePickCancelledByUser => {
+                // User dismissed the picker — no-op. Frontend stays on
+                // the originating screen with no toast / alert.
+                return None;
+            }
+            _ => {}
+        }
+
         if !matches!(
             self.screen,
             AppScreen::Exchange
@@ -147,6 +164,45 @@ impl AppEngine {
             return None;
         }
         self.engine.advance_qr_frame()
+    }
+
+    /// ADR-031 file-picker handler: route picked bytes by the screen
+    /// that requested the pick. Phase 2A wires only `AppScreen::More`
+    /// (contacts import via vCard); Phase 2B adds `AppScreen::Onboarding`
+    /// (backup restore — needs multi-step password flow).
+    ///
+    /// Returns `Some(ActionResult)` describing the outcome (toast on
+    /// success, alert on failure, or further commands if a multi-step
+    /// flow continues), or `None` when the current screen does not
+    /// participate in the file-picker protocol.
+    fn handle_file_picked(&mut self, bytes: Vec<u8>, _filename: String) -> Option<ActionResult> {
+        match self.screen {
+            AppScreen::More => {
+                // Contacts import (vCard / VCF). Core handles bytes →
+                // import_contacts_from_vcf; result rendered as a toast
+                // with imported / skipped counts. Warnings beyond the
+                // counts surface in the next visit to ImportSummary
+                // (out of scope for Phase 2A).
+                match self.vauchi.import_contacts_from_vcf(&bytes) {
+                    Ok(result) => {
+                        // Refresh the Contacts screen cache so the
+                        // newly imported rows appear on next navigation.
+                        self.engine_cache.remove(&AppScreen::Contacts);
+                        Some(ActionResult::ShowToast {
+                            message: format_import_toast(result.imported, result.skipped),
+                            undo_action_id: None,
+                        })
+                    }
+                    Err(e) => Some(ActionResult::ShowAlert {
+                        title: "Import failed".into(),
+                        message: e.to_string(),
+                    }),
+                }
+            }
+            // Other screens don't participate in the file-picker
+            // protocol yet. Phase 2B adds Onboarding for backup restore.
+            _ => None,
+        }
     }
 
     pub(super) fn handle_completion(&mut self) -> ActionResult {
@@ -1039,5 +1095,27 @@ impl AppEngine {
                 }
             }
         }
+    }
+}
+
+/// Format the toast message shown after a vCard import completes.
+///
+/// Mirrors the existing macOS / iOS sheet copy so frontends that adopt
+/// the new core-driven flow render the same wording. Pluralization
+/// uses simple English rules — proper i18n is part of D3 (post-MVP).
+fn format_import_toast(imported: usize, skipped: usize) -> String {
+    let imported_word = if imported == 1 { "contact" } else { "contacts" };
+    if skipped == 0 {
+        format!("Imported {} {}", imported, imported_word)
+    } else {
+        let skipped_word = if skipped == 1 {
+            "duplicate"
+        } else {
+            "duplicates"
+        };
+        format!(
+            "Imported {} {} ({} {} skipped)",
+            imported, imported_word, skipped, skipped_word
+        )
     }
 }

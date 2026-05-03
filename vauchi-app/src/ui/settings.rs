@@ -665,44 +665,22 @@ impl WorkflowEngine for SettingsEngine {
             }
             // Theme + Language Dropdown selections — persistence happens
             // in `app_engine::intercept::persist_settings_toggle`. Engine
-            // updates the local label so the screen reflects the new
-            // pick on the very next render. The fresh config built on
-            // re-entry to AppScreen::Settings will read the persisted
-            // pref directly (Phase 2a/A3a).
+            // mirrors the new id locally so the screen reflects the pick
+            // on the very next render; the fresh config built on re-entry
+            // to AppScreen::Settings re-derives the id from the persisted
+            // AppPreferences (Phase 2a/A3a).
             UserAction::ListItemSelected {
                 ref component_id,
                 ref item_id,
             } if component_id == "theme" => {
-                if item_id == "follow_system" {
-                    self.config.theme_id = "System".to_string();
-                } else {
-                    let label = self
-                        .config
-                        .available_themes
-                        .iter()
-                        .find(|o| &o.id == item_id)
-                        .map(|o| o.label.clone())
-                        .unwrap_or_else(|| item_id.clone());
-                    self.config.theme_id = label;
-                }
+                self.config.theme_id = item_id.clone();
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected {
                 ref component_id,
                 ref item_id,
             } if component_id == "language" => {
-                if item_id == "follow_system" {
-                    self.config.language_id = "System".to_string();
-                } else {
-                    let label = self
-                        .config
-                        .available_languages
-                        .iter()
-                        .find(|o| &o.id == item_id)
-                        .map(|o| o.label.clone())
-                        .unwrap_or_else(|| item_id.clone());
-                    self.config.language_id = label;
-                }
+                self.config.language_id = item_id.clone();
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected {

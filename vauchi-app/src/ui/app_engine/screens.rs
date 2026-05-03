@@ -193,14 +193,11 @@ impl AppEngine {
                         label: t.name.clone(),
                     })
                     .collect();
-                let theme_label = match (prefs.follow_system_theme, prefs.theme_id.as_deref()) {
-                    (true, _) | (false, None) => "System".to_string(),
-                    (false, Some(id)) => bundled
-                        .iter()
-                        .find(|t| t.id == id)
-                        .map(|t| t.name.clone())
-                        .unwrap_or_else(|| id.to_string()),
-                };
+                // "follow_system" is the reserved Dropdown option id.
+                let theme_id = (!prefs.follow_system_theme)
+                    .then(|| prefs.theme_id.clone())
+                    .flatten()
+                    .unwrap_or_else(|| "follow_system".to_string());
                 let available_languages: Vec<crate::ui::component::DropdownOption> =
                     crate::i18n::get_available_locales()
                         .into_iter()
@@ -212,13 +209,10 @@ impl AppEngine {
                             }
                         })
                         .collect();
-                let language_label =
-                    match (prefs.follow_system_language, prefs.language_code.as_deref()) {
-                        (true, _) | (false, None) => "System".to_string(),
-                        (false, Some(code)) => crate::i18n::Locale::from_code(code)
-                            .map(|l| crate::i18n::get_locale_info(l).name.to_string())
-                            .unwrap_or_else(|| code.to_string()),
-                    };
+                let language_id = (!prefs.follow_system_language)
+                    .then(|| prefs.language_code.clone())
+                    .flatten()
+                    .unwrap_or_else(|| "follow_system".to_string());
                 let config = SettingsConfig {
                     display_name,
                     delivery_receipts_enabled: vauchi.config().delivery_receipts_enabled,
@@ -227,9 +221,9 @@ impl AppEngine {
                     relay_url: vauchi.config().relay.server_url.clone(),
                     device_count: 1,
                     password_set: vauchi.is_password_enabled().unwrap_or(false),
-                    theme_id: theme_label,
+                    theme_id,
                     available_themes,
-                    language_id: language_label,
+                    language_id,
                     available_languages,
                     reduce_motion: false,
                     high_contrast: false,

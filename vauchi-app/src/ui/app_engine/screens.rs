@@ -23,6 +23,7 @@ use crate::ui::contact_limit::ContactLimitEngine;
 use crate::ui::contact_list::ContactListEngine;
 use crate::ui::contact_merge::{ContactMergeEngine, MergePreview};
 use crate::ui::contact_visibility::ContactVisibilityEngine;
+use crate::ui::decoy_contacts::{DecoyContactItem, DecoyContactsEngine};
 use crate::ui::delivery::{DeliveryItem, DeliveryStatusEngine, RetryEntry};
 use crate::ui::device_linking::DeviceLinkingEngine;
 use crate::ui::device_management::{DeviceListItem, DeviceManagementEngine};
@@ -360,6 +361,15 @@ impl AppEngine {
                     })
                     .unwrap_or_default();
                 Box::new(DuressPinEngine::new(config))
+            }
+            AppScreen::DecoyContacts => {
+                let decoys: Vec<DecoyContactItem> = vauchi
+                    .list_decoy_contacts()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|(id, display_name, _card)| DecoyContactItem { id, display_name })
+                    .collect();
+                Box::new(DecoyContactsEngine::new(decoys))
             }
             AppScreen::EmergencyShred => Box::new(EmergencyShredEngine::new()),
             AppScreen::DeliveryStatus => {

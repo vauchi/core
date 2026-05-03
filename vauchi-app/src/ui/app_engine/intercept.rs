@@ -127,6 +127,10 @@ impl AppEngine {
                     let screen = self.navigate_to(AppScreen::DuressPin);
                     return Some(ActionResult::NavigateTo(screen));
                 }
+                "decoy_contacts" => {
+                    let screen = self.navigate_to(AppScreen::DecoyContacts);
+                    return Some(ActionResult::NavigateTo(screen));
+                }
                 "relay_url" => {
                     let current_url = self.vauchi.config().relay.server_url.clone();
                     let screen = self.navigate_to(AppScreen::FormDialog {
@@ -829,5 +833,75 @@ impl AppEngine {
         }
 
         None
+    }
+
+    /// Persist add/delete actions on the DecoyContacts screen.
+    ///
+    /// Mutations bypass the engine's own state (the engine is a humble
+    /// renderer); the intercept reads the engine's pending fields, calls
+    /// the storage API, then rebuilds the engine with the fresh list so
+    /// the user sees the updated screen without leaving it.
+    pub(super) fn intercept_decoy_contacts_action(
+        &mut self,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        if self.screen != AppScreen::DecoyContacts {
+            return None;
+        }
+        let UserAction::ActionPressed { action_id } = action else {
+            return None;
+        };
+
+        match action_id.as_str() {
+            "add_decoy" => {
+                let name = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::DecoyContactsEngine>())
+                    .map(|e| e.new_decoy_name().trim().to_string())
+                    .unwrap_or_default();
+                if name.is_empty() {
+                    return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
+                }
+                // Time-based ID matches the legacy mobile-platform helper.
+                // Storage uses INSERT OR REPLACE keyed by id, so collisions
+                // (rapid double-tap) overwrite — acceptable for a fake list.
+                let id = format!(
+                    "decoy-{}",
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_millis())
+                        .unwrap_or(0)
+                );
+                let card = vauchi_core::contact_card::ContactCard::new(&name);
+                let _ = self.vauchi.add_decoy_contact(&id, &name, &card);
+                self.refresh_decoy_engine();
+                Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+            }
+            "confirm_delete_decoy" => {
+                let pending = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::DecoyContactsEngine>())
+                    .and_then(|e| e.pending_delete_id().map(|s| s.to_string()));
+                if let Some(id) = pending {
+                    let _ = self.vauchi.remove_decoy_contact(&id);
+                }
+                self.refresh_decoy_engine();
+                Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+            }
+            _ => None,
+        }
+    }
+
+    fn refresh_decoy_engine(&mut self) {
+        self.engine_cache.remove(&AppScreen::DecoyContacts);
+        let screen = AppScreen::DecoyContacts;
+        self.engine = Self::create_engine(
+            &self.vauchi,
+            &screen,
+            self.preview_as_contact.as_deref(),
+            &self.device_capabilities,
+        );
     }
 }

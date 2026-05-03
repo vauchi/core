@@ -22,6 +22,7 @@ mod contact_limit;
 mod contact_list;
 mod contact_merge;
 mod contact_visibility;
+mod decoy_contacts;
 mod deep_link_consent;
 pub mod delivery;
 mod device_linking;
@@ -87,6 +88,7 @@ pub use contact_limit::ContactLimitEngine;
 pub use contact_list::ContactListEngine;
 pub use contact_merge::{ContactMergeEngine, MergePreview};
 pub use contact_visibility::ContactVisibilityEngine;
+pub use decoy_contacts::{DecoyContactItem, DecoyContactsEngine};
 pub use deep_link_consent::{
     ACTION_DENY as DEEP_LINK_ACTION_DENY, ACTION_GRANT as DEEP_LINK_ACTION_GRANT, ConsentDecision,
     DeepLinkConsentEngine,

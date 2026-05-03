@@ -68,6 +68,7 @@ pub enum AppScreen {
     DeviceLinking,
     DeviceManagement,
     DuressPin,
+    DecoyContacts,
     EmergencyShred,
     DeliveryStatus,
     Sync,
@@ -149,6 +150,7 @@ impl AppScreen {
             Self::DeviceLinking => "device_linking",
             Self::DeviceManagement => "device_management",
             Self::DuressPin => "duress_pin",
+            Self::DecoyContacts => "decoy_contacts",
             Self::EmergencyShred => "emergency_shred",
             Self::DeliveryStatus => "delivery_status",
             Self::Sync => "sync",
@@ -194,6 +196,7 @@ impl AppScreen {
             "device_linking" => Self::DeviceLinking,
             "device_management" => Self::DeviceManagement,
             "duress_pin" => Self::DuressPin,
+            "decoy_contacts" => Self::DecoyContacts,
             "emergency_shred" => Self::EmergencyShred,
             "delivery_status" => Self::DeliveryStatus,
             "sync" => Self::Sync,
@@ -848,6 +851,10 @@ impl WorkflowEngine for AppEngine {
         }
 
         if let Some(result) = self.intercept_settings_action(&action) {
+            return result;
+        }
+
+        if let Some(result) = self.intercept_decoy_contacts_action(&action) {
             return result;
         }
 

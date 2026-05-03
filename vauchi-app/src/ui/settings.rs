@@ -323,6 +323,17 @@ impl WorkflowEngine for SettingsEngine {
                             None
                         },
                     },
+                    SettingsItem {
+                        id: "decoy_contacts".into(),
+                        label: "Decoy Contacts".into(),
+                        kind: SettingsItemKind::Link { detail: None },
+                        a11y: Some(A11y {
+                            label: Some("Decoy Contacts".into()),
+                            hint: Some("Opens the decoy contact list shown in duress mode".into()),
+                            role: None,
+                        }),
+                        info_key: None,
+                    },
                 ],
             },
             Component::SettingsGroup {

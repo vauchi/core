@@ -253,6 +253,20 @@
               "role": null
             },
             "info_key": "duress_pin"
+          },
+          {
+            "id": "decoy_contacts",
+            "label": "Decoy Contacts",
+            "kind": {
+              "Link": {
+                "detail": null
+              }
+            },
+            "a11y": {
+              "label": "Decoy Contacts",
+              "hint": "Opens the decoy contact list shown in duress mode",
+              "role": null
+            }
           }
         ]
       }

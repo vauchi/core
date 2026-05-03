@@ -254,6 +254,25 @@ pub fn default_theme() -> Theme {
     default_dark()
 }
 
+/// Theme catalog baked at compile time from the sibling `themes/` repo
+/// (see `build.rs`). Falls back to a vec containing only `default_theme()`
+/// if the JSON is empty / malformed (e.g. when the build couldn't find
+/// the catalog file and substituted `[]`).
+///
+/// Used by `app_engine::screens.rs` to populate
+/// `SettingsConfig.available_themes` for the Settings dropdown
+/// (problem record `2026-05-01-android-humble-ui-deep-retirement`,
+/// Phase 2a/A3a).
+pub fn bundled_themes() -> Vec<Theme> {
+    const THEMES_JSON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/themes.json"));
+    let themes = load_themes_from_json(THEMES_JSON).unwrap_or_default();
+    if themes.is_empty() {
+        vec![default_theme()]
+    } else {
+        themes
+    }
+}
+
 fn default_dark() -> Theme {
     Theme {
         id: "catppuccin-mocha".to_string(),

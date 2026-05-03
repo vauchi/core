@@ -64,9 +64,12 @@ vauchi-core/src/storage/mod.rs 1079
 #   feature/round2-core-lifecycle-surface)
 # (+7 on routing.rs for create_identity_with_onboarding atomic switch comment
 #   2026-04-28 P1 §2.5)
+# (+35 on screens.rs for theme + language SettingsConfig population from
+#   bundled_themes() + i18n::get_available_locales() + AppPreferences,
+#   problem 2026-05-01-android-humble-ui-deep-retirement Phase 2a/A3a)
 vauchi-app/src/ui/app_engine/mod.rs 1144
 vauchi-app/src/ui/app_engine/routing.rs 1043
-vauchi-app/src/ui/app_engine/screens.rs 1299
+vauchi-app/src/ui/app_engine/screens.rs 1334
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

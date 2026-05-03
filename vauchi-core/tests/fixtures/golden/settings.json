@@ -104,34 +104,6 @@
         "label": "Appearance",
         "items": [
           {
-            "id": "theme",
-            "label": "Theme",
-            "kind": {
-              "Value": {
-                "value": ""
-              }
-            },
-            "a11y": {
-              "label": "Theme",
-              "hint": "The current color theme of the app",
-              "role": null
-            }
-          },
-          {
-            "id": "language",
-            "label": "Language",
-            "kind": {
-              "Value": {
-                "value": ""
-              }
-            },
-            "a11y": {
-              "label": "Language",
-              "hint": "The current display language of the app",
-              "role": null
-            }
-          },
-          {
             "id": "show_help_icons",
             "label": "Show help icons",
             "kind": {
@@ -146,6 +118,42 @@
             }
           }
         ]
+      }
+    },
+    {
+      "Dropdown": {
+        "id": "theme",
+        "label": "Theme",
+        "selected": "",
+        "options": [
+          {
+            "id": "follow_system",
+            "label": "System"
+          }
+        ],
+        "a11y": {
+          "label": "Theme",
+          "hint": "Pick the color theme of the app",
+          "role": null
+        }
+      }
+    },
+    {
+      "Dropdown": {
+        "id": "language",
+        "label": "Language",
+        "selected": "",
+        "options": [
+          {
+            "id": "follow_system",
+            "label": "System"
+          }
+        ],
+        "a11y": {
+          "label": "Language",
+          "hint": "Pick the display language of the app",
+          "role": null
+        }
       }
     },
     {

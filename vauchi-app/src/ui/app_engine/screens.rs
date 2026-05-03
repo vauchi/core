@@ -183,6 +183,41 @@ impl AppEngine {
                 let display_name = card
                     .map(|c| c.display_name().to_string())
                     .unwrap_or_default();
+                let prefs = vauchi.app_preferences().unwrap_or_default();
+                let bundled = crate::theme::bundled_themes();
+                let available_themes: Vec<crate::ui::component::DropdownOption> = bundled
+                    .iter()
+                    .map(|t| crate::ui::component::DropdownOption {
+                        id: t.id.clone(),
+                        label: t.name.clone(),
+                    })
+                    .collect();
+                let theme_label = match (prefs.follow_system_theme, prefs.theme_id.as_deref()) {
+                    (true, _) | (false, None) => "System".to_string(),
+                    (false, Some(id)) => bundled
+                        .iter()
+                        .find(|t| t.id == id)
+                        .map(|t| t.name.clone())
+                        .unwrap_or_else(|| id.to_string()),
+                };
+                let available_languages: Vec<crate::ui::component::DropdownOption> =
+                    crate::i18n::get_available_locales()
+                        .into_iter()
+                        .map(|l| {
+                            let info = crate::i18n::get_locale_info(l);
+                            crate::ui::component::DropdownOption {
+                                id: info.code.to_string(),
+                                label: info.name.to_string(),
+                            }
+                        })
+                        .collect();
+                let language_label =
+                    match (prefs.follow_system_language, prefs.language_code.as_deref()) {
+                        (true, _) | (false, None) => "System".to_string(),
+                        (false, Some(code)) => crate::i18n::Locale::from_code(code)
+                            .map(|l| crate::i18n::get_locale_info(l).name.to_string())
+                            .unwrap_or_else(|| code.to_string()),
+                    };
                 let config = SettingsConfig {
                     display_name,
                     delivery_receipts_enabled: vauchi.config().delivery_receipts_enabled,
@@ -191,10 +226,10 @@ impl AppEngine {
                     relay_url: vauchi.config().relay.server_url.clone(),
                     device_count: 1,
                     password_set: vauchi.is_password_enabled().unwrap_or(false),
-                    theme: String::new(),
-                    available_themes: vec![],
-                    language: String::new(),
-                    available_languages: vec![],
+                    theme: theme_label,
+                    available_themes,
+                    language: language_label,
+                    available_languages,
                     reduce_motion: false,
                     high_contrast: false,
                     large_touch: false,

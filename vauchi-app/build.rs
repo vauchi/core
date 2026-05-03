@@ -2,10 +2,23 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Build script for vauchi-core
+//! Build script for vauchi-app.
 //!
-//! Embeds the English locale from the sibling locales repo at compile time.
-//! This provides a complete fallback when locale files aren't loaded at runtime.
+//! Embeds two compile-time bundles into `OUT_DIR`:
+//!
+//! 1. **`bundled_locale.rs`** — English locale strings from the
+//!    sibling `locales/` repo. Provides a complete fallback when
+//!    runtime locale files aren't loaded.
+//! 2. **`themes.json`** — theme catalog from the sibling `themes/`
+//!    repo. Used by `theme::bundled_themes()` to populate
+//!    `SettingsConfig.available_themes` (problem record
+//!    `2026-05-01-android-humble-ui-deep-retirement` Phase 2a/A3a).
+//!
+//! The themes bundle deliberately mirrors `vauchi-platform/build.rs` —
+//! vauchi-platform depends on vauchi-app (not vice versa), so
+//! vauchi-app cannot reuse the platform constant. The 60 KB
+//! duplication is intentional; the source-of-truth is the
+//! `themes/` repo via the candidate paths.
 
 use std::env;
 use std::fs;
@@ -76,4 +89,51 @@ pub const BUNDLED_EN_JSON: &str = "{\"app.name\":\"Vauchi\",\"welcome.title\":\"
     };
 
     fs::write(&dest_path, generated).unwrap();
+
+    // ── themes.json bundling (Phase 2a/A3a) ───────────────────────
+    // Mirror of vauchi-platform/build.rs. Materializes
+    // themes/generated/themes.json into OUT_DIR/themes.json so
+    // theme::bundled_themes() can include_bytes! it.
+    println!("cargo::rerun-if-env-changed=VAUCHI_THEMES_DIR");
+
+    let themes_dest = Path::new(&out_dir).join("themes.json");
+
+    let themes_env = env::var("VAUCHI_THEMES_DIR")
+        .ok()
+        .map(|dir| format!("{}/generated/themes.json", dir));
+
+    let themes_relative = [
+        "../../themes/generated/themes.json",
+        "../../../themes/generated/themes.json",
+        "themes/generated/themes.json",
+    ];
+
+    let themes_candidates: Vec<String> = themes_env
+        .into_iter()
+        .chain(themes_relative.iter().map(|s| s.to_string()))
+        .collect();
+
+    let mut themes_resolved: Option<String> = None;
+    for path in &themes_candidates {
+        if Path::new(path).exists() {
+            println!("cargo::rerun-if-changed={}", path);
+            themes_resolved = Some(path.clone());
+            break;
+        }
+    }
+
+    let themes_bytes = match themes_resolved {
+        Some(path) => {
+            eprintln!("cargo:warning=Bundling themes.json from: {}", path);
+            fs::read(&path).unwrap_or_else(|e| panic!("read {}: {}", path, e))
+        }
+        None => {
+            eprintln!(
+                "cargo:warning=themes.json not found via VAUCHI_THEMES_DIR or sibling-repo paths — using empty `[]` fallback (runtime default_theme() will be used)"
+            );
+            b"[]".to_vec()
+        }
+    };
+
+    fs::write(&themes_dest, themes_bytes).expect("write OUT_DIR/themes.json");
 }

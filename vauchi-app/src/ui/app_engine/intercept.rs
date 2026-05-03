@@ -53,6 +53,43 @@ impl AppEngine {
             state.reminders_enabled = next != vauchi_core::types::ReminderFrequency::Never;
             let _ = self.vauchi.save_backup_reminder_state(&state);
         }
+
+        // Handle theme + language Dropdown selections (Phase 2a/A3a).
+        // Component::Dropdown emits UserAction::ListItemSelected with
+        // component_id = the dropdown id ("theme" / "language") and
+        // item_id = the picked option id. The reserved id "follow_system"
+        // means "let the OS decide". Persist via Vauchi::set_app_preferences
+        // so the next current_screen() call picks up the new value.
+        if let UserAction::ListItemSelected {
+            component_id,
+            item_id,
+        } = action
+            && (component_id == "theme" || component_id == "language")
+            && let Ok(mut prefs) = self.vauchi.app_preferences()
+        {
+            match component_id.as_str() {
+                "theme" => {
+                    if item_id == "follow_system" {
+                        prefs.follow_system_theme = true;
+                        prefs.theme_id = None;
+                    } else {
+                        prefs.follow_system_theme = false;
+                        prefs.theme_id = Some(item_id.clone());
+                    }
+                }
+                "language" => {
+                    if item_id == "follow_system" {
+                        prefs.follow_system_language = true;
+                        prefs.language_code = None;
+                    } else {
+                        prefs.follow_system_language = false;
+                        prefs.language_code = Some(item_id.clone());
+                    }
+                }
+                _ => unreachable!(),
+            }
+            let _ = self.vauchi.set_app_preferences(&prefs);
+        }
     }
 
     /// Intercept settings item selection to route to proper sub-screens.

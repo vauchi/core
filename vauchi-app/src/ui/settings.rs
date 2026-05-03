@@ -167,47 +167,62 @@ impl WorkflowEngine for SettingsEngine {
             Component::SettingsGroup {
                 id: "appearance".into(),
                 label: "Appearance".into(),
-                items: vec![
-                    SettingsItem {
-                        id: "theme".into(),
-                        label: "Theme".into(),
-                        kind: SettingsItemKind::Value {
-                            value: self.config.theme.clone(),
-                        },
-                        a11y: Some(A11y {
-                            label: Some("Theme".into()),
-                            hint: Some("The current color theme of the app".into()),
-                            role: None,
-                        }),
-                        info_key: None,
+                items: vec![SettingsItem {
+                    id: "show_help_icons".into(),
+                    label: "Show help icons".into(),
+                    kind: SettingsItemKind::Toggle {
+                        enabled: self.config.show_help_icons,
                     },
-                    SettingsItem {
-                        id: "language".into(),
-                        label: "Language".into(),
-                        kind: SettingsItemKind::Value {
-                            value: self.config.language.clone(),
-                        },
-                        a11y: Some(A11y {
-                            label: Some("Language".into()),
-                            hint: Some("The current display language of the app".into()),
-                            role: None,
-                        }),
-                        info_key: None,
-                    },
-                    SettingsItem {
-                        id: "show_help_icons".into(),
-                        label: "Show help icons".into(),
-                        kind: SettingsItemKind::Toggle {
-                            enabled: self.config.show_help_icons,
-                        },
-                        a11y: Some(A11y {
-                            label: None,
-                            hint: Some("Toggle contextual help icons on form fields".into()),
-                            role: None,
-                        }),
-                        info_key: None,
-                    },
-                ],
+                    a11y: Some(A11y {
+                        label: None,
+                        hint: Some("Toggle contextual help icons on form fields".into()),
+                        role: None,
+                    }),
+                    info_key: None,
+                }],
+            },
+            // Theme + Language dropdowns are first-class Component::Dropdown
+            // so they can render inline (no separate sub-screen). The
+            // selected_id semantics mirror AppPreferences: None when
+            // following system, Some(id) for an explicit pick. The action
+            // is dispatched as `UserAction::ListItemSelected` with
+            // component_id matching the dropdown id; a special "follow_system"
+            // option id is reserved.
+            Component::Dropdown {
+                id: "theme".into(),
+                label: "Theme".into(),
+                selected: Some(self.config.theme.clone()),
+                options: {
+                    let mut opts = vec![DropdownOption {
+                        id: "follow_system".into(),
+                        label: "System".into(),
+                    }];
+                    opts.extend(self.config.available_themes.iter().cloned());
+                    opts
+                },
+                a11y: Some(A11y {
+                    label: Some("Theme".into()),
+                    hint: Some("Pick the color theme of the app".into()),
+                    role: None,
+                }),
+            },
+            Component::Dropdown {
+                id: "language".into(),
+                label: "Language".into(),
+                selected: Some(self.config.language.clone()),
+                options: {
+                    let mut opts = vec![DropdownOption {
+                        id: "follow_system".into(),
+                        label: "System".into(),
+                    }];
+                    opts.extend(self.config.available_languages.iter().cloned());
+                    opts
+                },
+                a11y: Some(A11y {
+                    label: Some("Language".into()),
+                    hint: Some("Pick the display language of the app".into()),
+                    role: None,
+                }),
             },
             Component::SettingsGroup {
                 id: "accessibility".into(),
@@ -631,6 +646,48 @@ impl WorkflowEngine for SettingsEngine {
                 );
                 let next = current.next();
                 self.config.backup_reminder_frequency = next.label().to_string();
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            // Theme + Language Dropdown selections — persistence happens
+            // in `app_engine::intercept::persist_settings_toggle`. Engine
+            // updates the local label so the screen reflects the new
+            // pick on the very next render. The fresh config built on
+            // re-entry to AppScreen::Settings will read the persisted
+            // pref directly (Phase 2a/A3a).
+            UserAction::ListItemSelected {
+                ref component_id,
+                ref item_id,
+            } if component_id == "theme" => {
+                if item_id == "follow_system" {
+                    self.config.theme = "System".to_string();
+                } else {
+                    let label = self
+                        .config
+                        .available_themes
+                        .iter()
+                        .find(|o| &o.id == item_id)
+                        .map(|o| o.label.clone())
+                        .unwrap_or_else(|| item_id.clone());
+                    self.config.theme = label;
+                }
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::ListItemSelected {
+                ref component_id,
+                ref item_id,
+            } if component_id == "language" => {
+                if item_id == "follow_system" {
+                    self.config.language = "System".to_string();
+                } else {
+                    let label = self
+                        .config
+                        .available_languages
+                        .iter()
+                        .find(|o| &o.id == item_id)
+                        .map(|o| o.label.clone())
+                        .unwrap_or_else(|| item_id.clone());
+                    self.config.language = label;
+                }
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected {

@@ -238,18 +238,122 @@ fn settings_single_device_no_plural() {
 }
 
 // @internal
-// @internal
 #[test]
-fn settings_appearance_section_has_theme_and_language() {
+fn settings_emits_theme_and_language_dropdowns() {
+    use vauchi_app::ui::{Component, DropdownOption};
     let mut config = sample_config();
-    config.theme = "dark".into();
+    config.theme = "Catppuccin Mocha".into();
     config.language = "English".into();
+    config.available_themes = vec![
+        DropdownOption {
+            id: "catppuccin-mocha".into(),
+            label: "Catppuccin Mocha".into(),
+        },
+        DropdownOption {
+            id: "catppuccin-latte".into(),
+            label: "Catppuccin Latte".into(),
+        },
+    ];
+    config.available_languages = vec![DropdownOption {
+        id: "en".into(),
+        label: "English".into(),
+    }];
     let engine = SettingsEngine::new(config);
     let screen = engine.current_screen();
-    let theme = find_value(&screen, "appearance", "theme");
-    assert_eq!(theme, "dark");
-    let lang = find_value(&screen, "appearance", "language");
-    assert_eq!(lang, "English");
+
+    let theme_dropdown = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::Dropdown {
+                id,
+                selected,
+                options,
+                ..
+            } if id == "theme" => Some((selected.clone(), options.clone())),
+            _ => None,
+        })
+        .expect("theme Dropdown component");
+    assert_eq!(theme_dropdown.0.as_deref(), Some("Catppuccin Mocha"));
+    assert_eq!(theme_dropdown.1[0].id, "follow_system");
+    assert_eq!(theme_dropdown.1[0].label, "System");
+    assert_eq!(theme_dropdown.1[1].id, "catppuccin-mocha");
+    assert_eq!(theme_dropdown.1[2].id, "catppuccin-latte");
+
+    let language_dropdown = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::Dropdown {
+                id,
+                selected,
+                options,
+                ..
+            } if id == "language" => Some((selected.clone(), options.clone())),
+            _ => None,
+        })
+        .expect("language Dropdown component");
+    assert_eq!(language_dropdown.0.as_deref(), Some("English"));
+    assert_eq!(language_dropdown.1[0].id, "follow_system");
+    assert_eq!(language_dropdown.1[1].id, "en");
+}
+
+// @internal
+#[test]
+fn settings_theme_dropdown_selection_updates_label() {
+    use vauchi_app::ui::{Component, DropdownOption};
+    let mut config = sample_config();
+    config.theme = "System".into();
+    config.available_themes = vec![DropdownOption {
+        id: "ocean-dark".into(),
+        label: "Ocean Dark".into(),
+    }];
+    let mut engine = SettingsEngine::new(config);
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "theme".into(),
+        item_id: "ocean-dark".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("expected UpdateScreen, got {result:?}");
+    };
+    let selected = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::Dropdown { id, selected, .. } if id == "theme" => selected.clone(),
+            _ => None,
+        })
+        .expect("theme Dropdown selected");
+    assert_eq!(selected, "Ocean Dark");
+}
+
+// @internal
+#[test]
+fn settings_theme_dropdown_follow_system_resets_label() {
+    use vauchi_app::ui::{Component, DropdownOption};
+    let mut config = sample_config();
+    config.theme = "Ocean Dark".into();
+    config.available_themes = vec![DropdownOption {
+        id: "ocean-dark".into(),
+        label: "Ocean Dark".into(),
+    }];
+    let mut engine = SettingsEngine::new(config);
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "theme".into(),
+        item_id: "follow_system".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("expected UpdateScreen, got {result:?}");
+    };
+    let selected = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::Dropdown { id, selected, .. } if id == "theme" => selected.clone(),
+            _ => None,
+        })
+        .expect("theme Dropdown selected");
+    assert_eq!(selected, "System");
 }
 
 // @internal

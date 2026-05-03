@@ -723,6 +723,12 @@ pub enum MobileExchangeHardwareEvent {
         data: Vec<u8>,
     },
     ImagePickCancelled,
+    // File picking (vCard / backup import, ADR-031)
+    FilePickedFromUser {
+        bytes: Vec<u8>,
+        filename: String,
+    },
+    FilePickCancelledByUser,
     // Errors
     HardwareError {
         transport: String,
@@ -808,6 +814,10 @@ impl From<MobileExchangeHardwareEvent> for ExchangeHardwareEvent {
             }
             MobileExchangeHardwareEvent::ImageReceived { data } => Self::ImageReceived { data },
             MobileExchangeHardwareEvent::ImagePickCancelled => Self::ImagePickCancelled,
+            MobileExchangeHardwareEvent::FilePickedFromUser { bytes, filename } => {
+                Self::FilePickedFromUser { bytes, filename }
+            }
+            MobileExchangeHardwareEvent::FilePickCancelledByUser => Self::FilePickCancelledByUser,
         }
     }
 }

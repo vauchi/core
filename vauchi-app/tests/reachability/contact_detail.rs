@@ -8,7 +8,7 @@
 //! (`_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens/`).
 
 use vauchi_app::ui::testing::{assert_reachability_across_screens, check_reachability};
-use vauchi_app::ui::{ContactDetailEngine, FieldDisplay, Item, WorkflowEngine};
+use vauchi_app::ui::{ContactDetailEngine, Field, Item, WorkflowEngine};
 use vauchi_core::contact::trust::TrustLevel;
 
 /// Action ids handled by `ContactDetailEngine` —
@@ -43,7 +43,7 @@ fn factory() -> ContactDetailEngine {
         actions: vec![],
         a11y: None,
     };
-    let fields: Vec<FieldDisplay> = vec![];
+    let fields: Vec<Field> = vec![];
     ContactDetailEngine::new(item, fields, String::new())
         .with_imported(true)
         .with_verification(false, TrustLevel::Standard)

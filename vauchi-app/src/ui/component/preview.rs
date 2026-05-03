@@ -8,7 +8,7 @@
 //! Phase-0 prep for the Wire Humble Tier 0 rename
 //! (`2026-05-03-coreui-wire-humble-types`). The types here are
 //! scheduled to become UI-shaped at the wire boundary —
-//! `FieldDisplay → Field`, `GroupCardView → PreviewVariant`,
+//! `Field → Field`, `GroupCardView → PreviewVariant`,
 //! `Component::CardPreview → Component::Preview`.
 
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ use super::A11y;
 /// A contact field as displayed in the UI.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct FieldDisplay {
+pub struct Field {
     pub id: String,
     pub field_type: String,
     pub label: String,
@@ -47,7 +47,7 @@ pub enum UiFieldVisibility {
 pub struct GroupCardView {
     pub group_name: String,
     pub display_name: String,
-    pub visible_fields: Vec<FieldDisplay>,
+    pub visible_fields: Vec<Field>,
 }
 
 /// Compute the visible-fields list for a [`super::Component::CardPreview`].
@@ -62,10 +62,10 @@ pub struct GroupCardView {
 /// Used by [`super::Component::CardPreview`]'s `visible_fields` field so
 /// that frontends never reproduce this filter in view code (ADR-021/043).
 pub fn build_visible_fields(
-    fields: &[FieldDisplay],
+    fields: &[Field],
     group_views: &[GroupCardView],
     selected_group: &Option<String>,
-) -> Vec<FieldDisplay> {
+) -> Vec<Field> {
     // Selected group missing from group_views falls through to the filtered
     // `fields` list rather than passing raw fields — never leak `Hidden`
     // fields when the group lookup is stale.
@@ -94,8 +94,8 @@ pub fn build_visible_fields(
 mod build_visible_fields_tests {
     use super::*;
 
-    fn field(id: &str, visibility: UiFieldVisibility) -> FieldDisplay {
-        FieldDisplay {
+    fn field(id: &str, visibility: UiFieldVisibility) -> Field {
+        Field {
             id: id.into(),
             field_type: "text".into(),
             label: id.into(),

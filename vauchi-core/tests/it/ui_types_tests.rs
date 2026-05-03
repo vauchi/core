@@ -323,7 +323,7 @@ fn test_component_toggle_list_roundtrip() {
 fn test_component_field_list_roundtrip() {
     let component = Component::FieldList {
         id: "fields".into(),
-        fields: vec![FieldDisplay {
+        fields: vec![Field {
             id: "email".into(),
             field_type: "email".into(),
             label: "Email".into(),
@@ -367,7 +367,7 @@ fn test_component_card_preview_roundtrip() {
     let component = Component::CardPreview {
         name: "Alice".into(),
         avatar_data: None,
-        fields: vec![FieldDisplay {
+        fields: vec![Field {
             id: "phone".into(),
             field_type: "phone".into(),
             label: "Phone".into(),
@@ -378,7 +378,7 @@ fn test_component_card_preview_roundtrip() {
         group_views: vec![GroupCardView {
             group_name: "family".into(),
             display_name: "Family".into(),
-            visible_fields: vec![FieldDisplay {
+            visible_fields: vec![Field {
                 id: "phone".into(),
                 field_type: "phone".into(),
                 label: "Phone".into(),
@@ -388,7 +388,7 @@ fn test_component_card_preview_roundtrip() {
             }],
         }],
         selected_group: Some("family".into()),
-        visible_fields: vec![FieldDisplay {
+        visible_fields: vec![Field {
             id: "phone".into(),
             field_type: "phone".into(),
             label: "Phone".into(),

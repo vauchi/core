@@ -420,7 +420,7 @@
                 "fields": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/definitions/FieldDisplay"
+                    "$ref": "#/definitions/Field"
                   }
                 },
                 "id": {
@@ -475,7 +475,7 @@
                   "description": "All fields on the card (raw — retained for backwards compatibility).\n\nFrontends should render `visible_fields` instead. This field is kept additive for one binding cycle so consumers can migrate without an ABI break; a follow-up MR removes it.",
                   "type": "array",
                   "items": {
-                    "$ref": "#/definitions/FieldDisplay"
+                    "$ref": "#/definitions/Field"
                   }
                 },
                 "group_views": {
@@ -498,7 +498,7 @@
                   "default": [],
                   "type": "array",
                   "items": {
-                    "$ref": "#/definitions/FieldDisplay"
+                    "$ref": "#/definitions/Field"
                   }
                 }
               }
@@ -1200,7 +1200,7 @@
         }
       }
     },
-    "FieldDisplay": {
+    "Field": {
       "description": "A contact field as displayed in the UI.",
       "type": "object",
       "required": [
@@ -1257,7 +1257,7 @@
         "visible_fields": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/FieldDisplay"
+            "$ref": "#/definitions/Field"
           }
         }
       }

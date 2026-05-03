@@ -23,8 +23,8 @@ fn sample_contact() -> Item {
     }
 }
 
-fn sample_fields() -> Vec<FieldDisplay> {
-    vec![FieldDisplay {
+fn sample_fields() -> Vec<Field> {
+    vec![Field {
         id: "f1".into(),
         label: "Email".into(),
         value: "alice@example.com".into(),

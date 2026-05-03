@@ -157,7 +157,7 @@ fn sample_shared_info_view() -> SharedInfoView {
     SharedInfoView {
         shared_display_name: "Me (as Bob sees me)".into(),
         my_fields: vec![
-            FieldDisplay {
+            Field {
                 id: "mf1".into(),
                 field_type: "Phone".into(),
                 label: "Mobile".into(),
@@ -165,7 +165,7 @@ fn sample_shared_info_view() -> SharedInfoView {
                 visibility: UiFieldVisibility::Shown,
                 a11y: None,
             },
-            FieldDisplay {
+            Field {
                 id: "mf2".into(),
                 field_type: "Email".into(),
                 label: "Work".into(),

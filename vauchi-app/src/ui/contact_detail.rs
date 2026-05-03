@@ -27,7 +27,7 @@ pub struct SharedInfoView {
     /// The display name this contact sees (override or default).
     pub shared_display_name: String,
     /// My fields with visibility state for this contact.
-    pub my_fields: Vec<FieldDisplay>,
+    pub my_fields: Vec<Field>,
     /// Group names that grant this contact visibility to my fields.
     pub visible_groups: Vec<String>,
 }
@@ -47,7 +47,7 @@ pub struct DeliverySummary {
 #[derive(Clone, Debug)]
 pub struct ContactDetailEngine {
     contact: Item,
-    fields: Vec<FieldDisplay>,
+    fields: Vec<Field>,
     shared_info: Option<SharedInfoView>,
     view_mode: ContactViewMode,
     /// Private note about this contact (never shared). Stored as plain UTF-8.
@@ -89,7 +89,7 @@ pub struct ContactDetailEngine {
 
 impl ContactDetailEngine {
     /// Create with only their info (no shared info available).
-    pub fn new(contact: Item, fields: Vec<FieldDisplay>, personal_note: String) -> Self {
+    pub fn new(contact: Item, fields: Vec<Field>, personal_note: String) -> Self {
         Self {
             contact,
             fields,
@@ -115,7 +115,7 @@ impl ContactDetailEngine {
     /// Create with both perspectives available.
     pub fn with_shared_info(
         contact: Item,
-        fields: Vec<FieldDisplay>,
+        fields: Vec<Field>,
         shared_info: SharedInfoView,
         personal_note: String,
     ) -> Self {
@@ -959,8 +959,8 @@ mod tests {
         }
     }
 
-    fn sample_fields() -> Vec<FieldDisplay> {
-        vec![FieldDisplay {
+    fn sample_fields() -> Vec<Field> {
+        vec![Field {
             id: "f1".into(),
             field_type: "Phone".into(),
             label: "Mobile".into(),
@@ -974,7 +974,7 @@ mod tests {
         SharedInfoView {
             shared_display_name: "Bob (Work)".into(),
             my_fields: vec![
-                FieldDisplay {
+                Field {
                     id: "mf1".into(),
                     field_type: "Email".into(),
                     label: "Work Email".into(),
@@ -982,7 +982,7 @@ mod tests {
                     visibility: UiFieldVisibility::Shown,
                     a11y: None,
                 },
-                FieldDisplay {
+                Field {
                     id: "mf2".into(),
                     field_type: "Phone".into(),
                     label: "Personal".into(),

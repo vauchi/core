@@ -38,7 +38,7 @@ pub(super) fn build_field_preview_screen(
 ) -> ScreenModel {
     let share_all = config.visible_field_ids.is_empty();
 
-    let fields: Vec<FieldDisplay> = config
+    let fields: Vec<Field> = config
         .card
         .fields()
         .iter()
@@ -49,7 +49,7 @@ pub(super) fn build_field_preview_screen(
             } else {
                 UiFieldVisibility::Hidden
             };
-            FieldDisplay {
+            Field {
                 id: f.id().to_string(),
                 label: f.label().to_string(),
                 value: f.value().to_string(),
@@ -270,7 +270,7 @@ mod tests {
         );
     }
 
-    fn extract_fields(screen: &ScreenModel) -> &[FieldDisplay] {
+    fn extract_fields(screen: &ScreenModel) -> &[Field] {
         screen
             .components
             .iter()

@@ -8,8 +8,7 @@
 //! to a contact when viewing that contact's detail screen.
 
 use vauchi_app::ui::{
-    Component, ContactDetailEngine, DeliverySummary, FieldDisplay, Item, UiFieldVisibility,
-    WorkflowEngine,
+    Component, ContactDetailEngine, DeliverySummary, Field, Item, UiFieldVisibility, WorkflowEngine,
 };
 
 fn sample_contact() -> Item {
@@ -25,8 +24,8 @@ fn sample_contact() -> Item {
     }
 }
 
-fn sample_fields() -> Vec<FieldDisplay> {
-    vec![FieldDisplay {
+fn sample_fields() -> Vec<Field> {
+    vec![Field {
         id: "f1".into(),
         field_type: "Phone".into(),
         label: "Mobile".into(),

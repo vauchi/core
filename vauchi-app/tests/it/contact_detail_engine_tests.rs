@@ -8,7 +8,7 @@
 //! Exchanged contacts keep ShowToast + undo for archive (unchanged).
 
 use vauchi_app::ui::{
-    AccessibilityRole, ActionResult, Component, ContactDetailEngine, FieldDisplay, Item,
+    AccessibilityRole, ActionResult, Component, ContactDetailEngine, Field, Item,
     UiFieldVisibility, UserAction, WorkflowEngine,
 };
 
@@ -25,8 +25,8 @@ fn sample_contact() -> Item {
     }
 }
 
-fn sample_fields() -> Vec<FieldDisplay> {
-    vec![FieldDisplay {
+fn sample_fields() -> Vec<Field> {
+    vec![Field {
         id: "f1".into(),
         field_type: "Phone".into(),
         label: "Mobile".into(),

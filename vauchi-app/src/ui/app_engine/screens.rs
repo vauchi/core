@@ -13,7 +13,7 @@ use crate::ui::activity_log::{ActivityLogEngine, ActivityLogItem};
 use crate::ui::archived_contacts::ArchivedContactsEngine;
 use crate::ui::backup_recovery::BackupRecoveryEngine;
 use crate::ui::component::{
-    A11y, FieldDisplay, Item, ListItemAction, ListItemActionKind, Status, UiFieldVisibility,
+    A11y, Field, Item, ListItemAction, ListItemActionKind, Status, UiFieldVisibility,
 };
 use crate::ui::contact_detail::{
     ContactDetailEngine, ContactNotFoundEngine, DeliverySummary, SharedInfoView,
@@ -545,11 +545,11 @@ impl AppEngine {
             }
             AppScreen::ContactDetail { contact_id } => match vauchi.get_contact(contact_id) {
                 Ok(Some(contact)) => {
-                    let fields: Vec<FieldDisplay> = contact
+                    let fields: Vec<Field> = contact
                         .card()
                         .fields()
                         .iter()
-                        .map(|f| FieldDisplay {
+                        .map(|f| Field {
                             id: f.id().to_string(),
                             field_type: format!("{:?}", f.field_type()),
                             label: f.label().to_string(),
@@ -894,14 +894,14 @@ impl AppEngine {
             .unwrap_or_else(|| own_card.display_name().to_string());
 
         // Build my fields with effective visibility for this contact
-        let my_fields: Vec<FieldDisplay> = own_card
+        let my_fields: Vec<Field> = own_card
             .fields()
             .iter()
             .map(|f| {
                 let is_visible = vauchi
                     .get_effective_field_visibility(contact_id, f.id())
                     .unwrap_or(true);
-                FieldDisplay {
+                Field {
                     id: f.id().to_string(),
                     field_type: format!("{:?}", f.field_type()),
                     label: f.label().to_string(),

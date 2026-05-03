@@ -76,7 +76,7 @@ impl ContactEditEngine {
 
     // ── Private helpers ─────────────────────────────────────────────
 
-    fn field_to_display(&self, field: &EditableField) -> FieldDisplay {
+    fn field_to_display(&self, field: &EditableField) -> Field {
         let visibility = if !field.visible_to_groups.is_empty() {
             UiFieldVisibility::Groups(field.visible_to_groups.clone())
         } else if field.shown {
@@ -85,7 +85,7 @@ impl ContactEditEngine {
             UiFieldVisibility::Hidden
         };
 
-        FieldDisplay {
+        Field {
             id: field.id.clone(),
             field_type: field.field_type.clone(),
             label: field.label.clone(),
@@ -107,7 +107,7 @@ impl ContactEditEngine {
         self.available_groups
             .iter()
             .map(|group| {
-                let visible_fields: Vec<FieldDisplay> = self
+                let visible_fields: Vec<Field> = self
                     .contact
                     .fields
                     .iter()
@@ -125,7 +125,7 @@ impl ContactEditEngine {
     }
 
     fn build_edit_fields_screen(&self) -> ScreenModel {
-        let fields: Vec<FieldDisplay> = self
+        let fields: Vec<Field> = self
             .contact
             .fields
             .iter()
@@ -253,7 +253,7 @@ impl ContactEditEngine {
     }
 
     fn build_preview_screen(&self) -> ScreenModel {
-        let fields: Vec<FieldDisplay> = self
+        let fields: Vec<Field> = self
             .contact
             .fields
             .iter()

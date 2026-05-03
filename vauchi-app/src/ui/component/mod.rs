@@ -8,7 +8,7 @@ mod list;
 mod preview;
 
 pub use list::{Item, ListItemAction, ListItemActionKind};
-pub use preview::{FieldDisplay, GroupCardView, UiFieldVisibility, build_visible_fields};
+pub use preview::{Field, GroupCardView, UiFieldVisibility, build_visible_fields};
 
 /// An option in a [`Component::Dropdown`].
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -50,7 +50,7 @@ pub enum Component {
     },
     FieldList {
         id: String,
-        fields: Vec<FieldDisplay>,
+        fields: Vec<Field>,
         visibility_mode: VisibilityMode,
         available_groups: Vec<String>,
         #[serde(default)]
@@ -67,7 +67,7 @@ pub enum Component {
         /// Frontends should render `visible_fields` instead. This field is
         /// kept additive for one binding cycle so consumers can migrate
         /// without an ABI break; a follow-up MR removes it.
-        fields: Vec<FieldDisplay>,
+        fields: Vec<Field>,
         group_views: Vec<GroupCardView>,
         selected_group: Option<String>,
         /// Pre-filtered fields to render — what the user actually sees.
@@ -79,7 +79,7 @@ pub enum Component {
         /// list directly — no `.filter` over `fields` should appear in view
         /// code (ADR-021/043 Humble UI).
         #[serde(default)]
-        visible_fields: Vec<FieldDisplay>,
+        visible_fields: Vec<Field>,
         #[serde(default)]
         a11y: Option<A11y>,
     },

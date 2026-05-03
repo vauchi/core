@@ -242,8 +242,8 @@ fn settings_single_device_no_plural() {
 fn settings_emits_theme_and_language_dropdowns() {
     use vauchi_app::ui::{Component, DropdownOption};
     let mut config = sample_config();
-    config.theme_id = "Catppuccin Mocha".into();
-    config.language_id = "English".into();
+    config.theme_id = "catppuccin-mocha".into();
+    config.language_id = "en".into();
     config.available_themes = vec![
         DropdownOption {
             id: "catppuccin-mocha".into(),
@@ -274,7 +274,9 @@ fn settings_emits_theme_and_language_dropdowns() {
             _ => None,
         })
         .expect("theme Dropdown component");
-    assert_eq!(theme_dropdown.0.as_deref(), Some("Catppuccin Mocha"));
+    // Contract: Component::Dropdown.selected carries the option id, not the label.
+    // Frontends match `selected` against `options[i].id` to highlight the active choice.
+    assert_eq!(theme_dropdown.0.as_deref(), Some("catppuccin-mocha"));
     assert_eq!(theme_dropdown.1[0].id, "follow_system");
     assert_eq!(theme_dropdown.1[0].label, "System");
     assert_eq!(theme_dropdown.1[1].id, "catppuccin-mocha");
@@ -293,17 +295,17 @@ fn settings_emits_theme_and_language_dropdowns() {
             _ => None,
         })
         .expect("language Dropdown component");
-    assert_eq!(language_dropdown.0.as_deref(), Some("English"));
+    assert_eq!(language_dropdown.0.as_deref(), Some("en"));
     assert_eq!(language_dropdown.1[0].id, "follow_system");
     assert_eq!(language_dropdown.1[1].id, "en");
 }
 
 // @internal
 #[test]
-fn settings_theme_dropdown_selection_updates_label() {
+fn settings_theme_dropdown_selection_stores_id() {
     use vauchi_app::ui::{Component, DropdownOption};
     let mut config = sample_config();
-    config.theme_id = "System".into();
+    config.theme_id = "follow_system".into();
     config.available_themes = vec![DropdownOption {
         id: "ocean-dark".into(),
         label: "Ocean Dark".into(),
@@ -324,15 +326,15 @@ fn settings_theme_dropdown_selection_updates_label() {
             _ => None,
         })
         .expect("theme Dropdown selected");
-    assert_eq!(selected, "Ocean Dark");
+    assert_eq!(selected, "ocean-dark");
 }
 
 // @internal
 #[test]
-fn settings_theme_dropdown_follow_system_resets_label() {
+fn settings_theme_dropdown_follow_system_resets_to_reserved_id() {
     use vauchi_app::ui::{Component, DropdownOption};
     let mut config = sample_config();
-    config.theme_id = "Ocean Dark".into();
+    config.theme_id = "ocean-dark".into();
     config.available_themes = vec![DropdownOption {
         id: "ocean-dark".into(),
         label: "Ocean Dark".into(),
@@ -353,7 +355,36 @@ fn settings_theme_dropdown_follow_system_resets_label() {
             _ => None,
         })
         .expect("theme Dropdown selected");
-    assert_eq!(selected, "System");
+    assert_eq!(selected, "follow_system");
+}
+
+// @internal
+#[test]
+fn settings_language_dropdown_selection_stores_id() {
+    use vauchi_app::ui::{Component, DropdownOption};
+    let mut config = sample_config();
+    config.language_id = "follow_system".into();
+    config.available_languages = vec![DropdownOption {
+        id: "en".into(),
+        label: "English".into(),
+    }];
+    let mut engine = SettingsEngine::new(config);
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "language".into(),
+        item_id: "en".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("expected UpdateScreen, got {result:?}");
+    };
+    let selected = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::Dropdown { id, selected, .. } if id == "language" => selected.clone(),
+            _ => None,
+        })
+        .expect("language Dropdown selected");
+    assert_eq!(selected, "en");
 }
 
 // @internal

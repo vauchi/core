@@ -72,10 +72,9 @@ pub use archived_contacts::ArchivedContactsEngine;
 pub use avatar_editor::AvatarEditorEngine;
 pub use backup_recovery::{BackupLevel, BackupMode, BackupRecoveryEngine};
 pub use component::{
-    A11y, AccessibilityRole, ActionListItem, Component, DropdownOption, Field, GroupCardView,
-    InfoItem, InputType, Item, ListItemAction, ListItemActionKind, QrMode, ScanQuality,
-    SettingsItem, SettingsItemKind, Status, TextStyle, ToggleItem, UiFieldVisibility,
-    VisibilityMode,
+    A11y, AccessibilityRole, ActionListItem, Component, DropdownOption, Field, InfoItem, InputType,
+    Item, ListItemAction, ListItemActionKind, PreviewVariant, QrMode, ScanQuality, SettingsItem,
+    SettingsItemKind, Status, TextStyle, ToggleItem, UiFieldVisibility, VisibilityMode,
 };
 pub use contact_detail::{
     ContactDetailEngine, ContactNotFoundEngine, ContactViewMode, DeliverySummary,

@@ -103,7 +103,7 @@ impl ContactEditEngine {
         }
     }
 
-    fn build_group_views(&self) -> Vec<GroupCardView> {
+    fn build_variants(&self) -> Vec<PreviewVariant> {
         self.available_groups
             .iter()
             .map(|group| {
@@ -115,8 +115,8 @@ impl ContactEditEngine {
                     .map(|f| self.field_to_display(f))
                     .collect();
 
-                GroupCardView {
-                    group_name: group.clone(),
+                PreviewVariant {
+                    variant_id: group.clone(),
                     display_name: self.contact.display_name.clone(),
                     visible_fields,
                 }
@@ -259,10 +259,10 @@ impl ContactEditEngine {
             .iter()
             .map(|f| self.field_to_display(f))
             .collect();
-        let group_views = self.build_group_views();
-        let selected_group = self.selected_preview_group.clone();
+        let variants = self.build_variants();
+        let selected_variant = self.selected_preview_group.clone();
         let visible_fields =
-            crate::ui::component::build_visible_fields(&fields, &group_views, &selected_group);
+            crate::ui::component::build_visible_fields(&fields, &variants, &selected_variant);
 
         ScreenModel {
             screen_id: "edit_preview".into(),
@@ -272,8 +272,8 @@ impl ContactEditEngine {
                 name: self.contact.display_name.clone(),
                 avatar_data: self.avatar_data.clone(),
                 fields,
-                group_views,
-                selected_group,
+                variants,
+                selected_variant,
                 visible_fields,
                 a11y: Some(A11y {
                     label: Some(format!("Card preview: {}", self.contact.display_name)),

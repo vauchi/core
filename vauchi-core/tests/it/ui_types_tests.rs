@@ -375,8 +375,8 @@ fn test_component_card_preview_roundtrip() {
             visibility: UiFieldVisibility::Shown,
             a11y: None,
         }],
-        group_views: vec![GroupCardView {
-            group_name: "family".into(),
+        variants: vec![PreviewVariant {
+            variant_id: "family".into(),
             display_name: "Family".into(),
             visible_fields: vec![Field {
                 id: "phone".into(),
@@ -387,7 +387,7 @@ fn test_component_card_preview_roundtrip() {
                 a11y: None,
             }],
         }],
-        selected_group: Some("family".into()),
+        selected_variant: Some("family".into()),
         visible_fields: vec![Field {
             id: "phone".into(),
             field_type: "phone".into(),
@@ -405,18 +405,18 @@ fn test_component_card_preview_roundtrip() {
         Component::Preview {
             name,
             fields,
-            group_views,
-            selected_group,
+            variants,
+            selected_variant,
             ..
         } => {
             assert_eq!(name, "Alice");
             assert_eq!(fields.len(), 1);
-            assert_eq!(group_views.len(), 1);
-            assert_eq!(group_views[0].group_name, "family");
-            assert_eq!(group_views[0].display_name, "Family");
-            assert_eq!(selected_group.as_deref(), Some("family"));
+            assert_eq!(variants.len(), 1);
+            assert_eq!(variants[0].variant_id, "family");
+            assert_eq!(variants[0].display_name, "Family");
+            assert_eq!(selected_variant.as_deref(), Some("family"));
         }
-        other => panic!("Expected CardPreview, got {:?}", other),
+        other => panic!("Expected Preview, got {:?}", other),
     }
 }
 

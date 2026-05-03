@@ -2,14 +2,14 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Preview-shape wire types: the field/visibility/group-view types
-//! consumed by `Component::Preview` and `Component::FieldList`.
+//! Preview-shape wire types — `Field`, `UiFieldVisibility`,
+//! `PreviewVariant`, `build_visible_fields` — consumed by
+//! `Component::Preview` and `Component::FieldList`.
 //!
-//! Phase-0 prep for the Wire Humble Tier 0 rename
-//! (`2026-05-03-coreui-wire-humble-types`). The types here are
-//! scheduled to become UI-shaped at the wire boundary —
-//! `Field → Field`, `GroupCardView → PreviewVariant`,
-//! `Component::Preview → Component::Preview`.
+//! Lives in `ui/component/preview.rs` (Wire Humble Tier 0 Phase 1):
+//! UI-shaped names at the wire boundary, no domain leak. Engines map
+//! their domain types (group views, locale variants, etc.) to
+//! `PreviewVariant` at the wire boundary.
 
 use serde::{Deserialize, Serialize};
 
@@ -41,18 +41,26 @@ pub enum UiFieldVisibility {
     Groups(Vec<String>),
 }
 
-/// How a card looks to a specific group.
+/// One alternate look at a `Component::Preview` — a per-variant view
+/// of the same content. Today only contact-card group views populate
+/// this; future variants (per-locale views, accessibility variants,
+/// previews-as-other-relationship) reuse the same shape.
+///
+/// Engines populate `variant_id` with whatever stable identifier they
+/// know (group name, locale code, etc.); the renderer only matches it
+/// against `Component::Preview.selected_variant` and never reads the
+/// string for meaning.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct GroupCardView {
-    pub group_name: String,
+pub struct PreviewVariant {
+    pub variant_id: String,
     pub display_name: String,
     pub visible_fields: Vec<Field>,
 }
 
 /// Compute the visible-fields list for a [`super::Component::Preview`].
 ///
-/// - If `selected_group` is `Some` and matches a `GroupCardView`, returns
+/// - If `selected_variant` is `Some` and matches a `PreviewVariant`, returns
 ///   that group's `visible_fields` (already filtered by core's grouping
 ///   logic).
 /// - Otherwise filters `fields` keeping only `Shown` and `Groups` variants
@@ -63,14 +71,14 @@ pub struct GroupCardView {
 /// that frontends never reproduce this filter in view code (ADR-021/043).
 pub fn build_visible_fields(
     fields: &[Field],
-    group_views: &[GroupCardView],
-    selected_group: &Option<String>,
+    variants: &[PreviewVariant],
+    selected_variant: &Option<String>,
 ) -> Vec<Field> {
-    // Selected group missing from group_views falls through to the filtered
+    // Selected variant missing from variants falls through to the filtered
     // `fields` list rather than passing raw fields — never leak `Hidden`
-    // fields when the group lookup is stale.
-    if let Some(group_name) = selected_group
-        && let Some(view) = group_views.iter().find(|gv| &gv.group_name == group_name)
+    // fields when the variant lookup is stale.
+    if let Some(selected_id) = selected_variant
+        && let Some(view) = variants.iter().find(|v| &v.variant_id == selected_id)
     {
         return view.visible_fields.clone();
     }
@@ -129,12 +137,12 @@ mod build_visible_fields_tests {
             field("a", UiFieldVisibility::Shown),
             field("b", UiFieldVisibility::Hidden),
         ];
-        let group_views = vec![GroupCardView {
-            group_name: "work".into(),
+        let variants = vec![PreviewVariant {
+            variant_id: "work".into(),
             display_name: "Work".into(),
             visible_fields: vec![field("c", UiFieldVisibility::Shown)],
         }];
-        let result = build_visible_fields(&fields, &group_views, &Some("work".into()));
+        let result = build_visible_fields(&fields, &variants, &Some("work".into()));
         let ids: Vec<_> = result.iter().map(|f| f.id.as_str()).collect();
         assert_eq!(
             ids,
@@ -150,12 +158,12 @@ mod build_visible_fields_tests {
             field("a", UiFieldVisibility::Shown),
             field("b", UiFieldVisibility::Hidden),
         ];
-        let group_views = vec![GroupCardView {
-            group_name: "work".into(),
+        let variants = vec![PreviewVariant {
+            variant_id: "work".into(),
             display_name: "Work".into(),
             visible_fields: vec![field("c", UiFieldVisibility::Shown)],
         }];
-        let result = build_visible_fields(&fields, &group_views, &Some("nonexistent".into()));
+        let result = build_visible_fields(&fields, &variants, &Some("nonexistent".into()));
         let ids: Vec<_> = result.iter().map(|f| f.id.as_str()).collect();
         assert_eq!(
             ids,

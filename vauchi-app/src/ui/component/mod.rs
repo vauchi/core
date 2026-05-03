@@ -8,7 +8,7 @@ mod list;
 mod preview;
 
 pub use list::{Item, ListItemAction, ListItemActionKind};
-pub use preview::{Field, GroupCardView, UiFieldVisibility, build_visible_fields};
+pub use preview::{Field, PreviewVariant, UiFieldVisibility, build_visible_fields};
 
 /// An option in a [`Component::Dropdown`].
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -68,12 +68,12 @@ pub enum Component {
         /// kept additive for one binding cycle so consumers can migrate
         /// without an ABI break; a follow-up MR removes it.
         fields: Vec<Field>,
-        group_views: Vec<GroupCardView>,
-        selected_group: Option<String>,
+        variants: Vec<PreviewVariant>,
+        selected_variant: Option<String>,
         /// Pre-filtered fields to render — what the user actually sees.
         ///
-        /// Computed by [`build_visible_fields`]: when `selected_group` is set
-        /// and matches a `GroupCardView`, returns that group's
+        /// Computed by [`build_visible_fields`]: when `selected_variant` is set
+        /// and matches a `PreviewVariant`, returns that group's
         /// `visible_fields`. Otherwise returns `fields` filtered to keep only
         /// `Shown` and `Groups` visibility variants. Frontends render this
         /// list directly — no `.filter` over `fields` should appear in view

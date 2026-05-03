@@ -42,9 +42,9 @@
             }
           }
         ],
-        "group_views": [
+        "variants": [
           {
-            "group_name": "Family",
+            "variant_id": "Family",
             "display_name": "Alice",
             "visible_fields": [
               {
@@ -66,7 +66,7 @@
             ]
           },
           {
-            "group_name": "Friends",
+            "variant_id": "Friends",
             "display_name": "Alice",
             "visible_fields": [
               {
@@ -89,7 +89,7 @@
             ]
           },
           {
-            "group_name": "Work",
+            "variant_id": "Work",
             "display_name": "Alice",
             "visible_fields": [
               {
@@ -112,7 +112,7 @@
             ]
           }
         ],
-        "selected_group": null,
+        "selected_variant": null,
         "visible_fields": [
           {
             "id": "f1",

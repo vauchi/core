@@ -285,14 +285,14 @@ fn edit_preview_shows_card() {
         Component::Preview {
             name,
             fields,
-            group_views,
-            selected_group,
+            variants,
+            selected_variant,
             ..
         } => {
             assert_eq!(name, "Alice");
             assert_eq!(fields.len(), 2);
-            assert_eq!(group_views.len(), 3); // Family, Friends, Work
-            assert!(selected_group.is_none());
+            assert_eq!(variants.len(), 3); // Family, Friends, Work
+            assert!(selected_variant.is_none());
         }
         other => panic!("Expected CardPreview, got {:?}", other),
     }
@@ -315,8 +315,10 @@ fn edit_preview_group_selection() {
 
     match result {
         ActionResult::UpdateScreen(screen) => match &screen.components[0] {
-            Component::Preview { selected_group, .. } => {
-                assert_eq!(selected_group.as_deref(), Some("Family"));
+            Component::Preview {
+                selected_variant, ..
+            } => {
+                assert_eq!(selected_variant.as_deref(), Some("Family"));
             }
             other => panic!("Expected CardPreview, got {:?}", other),
         },

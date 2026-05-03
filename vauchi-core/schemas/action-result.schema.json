@@ -872,8 +872,8 @@
               "type": "object",
               "required": [
                 "fields",
-                "group_views",
-                "name"
+                "name",
+                "variants"
               ],
               "properties": {
                 "a11y": {
@@ -906,23 +906,23 @@
                     "$ref": "#/definitions/Field"
                   }
                 },
-                "group_views": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/definitions/GroupCardView"
-                  }
-                },
                 "name": {
                   "type": "string"
                 },
-                "selected_group": {
+                "selected_variant": {
                   "type": [
                     "string",
                     "null"
                   ]
                 },
+                "variants": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/PreviewVariant"
+                  }
+                },
                 "visible_fields": {
-                  "description": "Pre-filtered fields to render — what the user actually sees.\n\nComputed by [`build_visible_fields`]: when `selected_group` is set and matches a `GroupCardView`, returns that group's `visible_fields`. Otherwise returns `fields` filtered to keep only `Shown` and `Groups` visibility variants. Frontends render this list directly — no `.filter` over `fields` should appear in view code (ADR-021/043 Humble UI).",
+                  "description": "Pre-filtered fields to render — what the user actually sees.\n\nComputed by [`build_visible_fields`]: when `selected_variant` is set and matches a `PreviewVariant`, returns that group's `visible_fields`. Otherwise returns `fields` filtered to keep only `Shown` and `Groups` visibility variants. Frontends render this list directly — no `.filter` over `fields` should appear in view code (ADR-021/043 Humble UI).",
                   "default": [],
                   "type": "array",
                   "items": {
@@ -2253,29 +2253,6 @@
         }
       ]
     },
-    "GroupCardView": {
-      "description": "How a card looks to a specific group.",
-      "type": "object",
-      "required": [
-        "display_name",
-        "group_name",
-        "visible_fields"
-      ],
-      "properties": {
-        "display_name": {
-          "type": "string"
-        },
-        "group_name": {
-          "type": "string"
-        },
-        "visible_fields": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/Field"
-          }
-        }
-      }
-    },
     "InfoItem": {
       "description": "An item in an info panel.",
       "type": "object",
@@ -2523,6 +2500,29 @@
         "SecurityInfo",
         "BackupSetup"
       ]
+    },
+    "PreviewVariant": {
+      "description": "One alternate look at a `Component::Preview` — a per-variant view of the same content. Today only contact-card group views populate this; future variants (per-locale views, accessibility variants, previews-as-other-relationship) reuse the same shape.\n\nEngines populate `variant_id` with whatever stable identifier they know (group name, locale code, etc.); the renderer only matches it against `Component::Preview.selected_variant` and never reads the string for meaning.",
+      "type": "object",
+      "required": [
+        "display_name",
+        "variant_id",
+        "visible_fields"
+      ],
+      "properties": {
+        "display_name": {
+          "type": "string"
+        },
+        "variant_id": {
+          "type": "string"
+        },
+        "visible_fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        }
+      }
     },
     "Progress": {
       "description": "Step progress indicator.",

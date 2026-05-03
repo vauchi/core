@@ -16,6 +16,7 @@ fn temp_storage() -> Storage {
     Storage::in_memory(key).expect("storage::in_memory")
 }
 
+// @internal
 #[test]
 fn load_returns_default_when_unset() {
     let storage = temp_storage();
@@ -27,6 +28,7 @@ fn load_returns_default_when_unset() {
     assert!(prefs.follow_system_language);
 }
 
+// @internal
 #[test]
 fn save_then_load_roundtrips() {
     let storage = temp_storage();
@@ -41,6 +43,7 @@ fn save_then_load_roundtrips() {
     assert_eq!(loaded, written);
 }
 
+// @internal
 #[test]
 fn save_overwrites_singleton_row() {
     let storage = temp_storage();
@@ -62,6 +65,7 @@ fn save_overwrites_singleton_row() {
     assert_eq!(loaded, second);
 }
 
+// @internal
 #[test]
 fn follow_system_flags_round_trip_independently() {
     let storage = temp_storage();

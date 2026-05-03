@@ -236,9 +236,9 @@ impl SocialGraphEngine {
                 content: format!("{} ({})", level.display_name(), level_contacts.len()),
                 style: TextStyle::Subtitle,
             });
-            components.push(Component::ContactList {
+            components.push(Component::List {
                 id: format!("contacts_{}", level.id()),
-                contacts: level_contacts,
+                items: level_contacts,
                 searchable: false,
             });
         }
@@ -352,10 +352,8 @@ mod tests {
 
     fn list_contact_ids<'a>(screen: &'a ScreenModel, level_id: &str) -> Option<Vec<&'a str>> {
         screen.components.iter().find_map(|c| match c {
-            Component::ContactList { id, contacts, .. }
-                if id == &format!("contacts_{level_id}") =>
-            {
-                Some(contacts.iter().map(|c| c.id.as_str()).collect())
+            Component::List { id, items, .. } if id == &format!("contacts_{level_id}") => {
+                Some(items.iter().map(|c| c.id.as_str()).collect())
             }
             _ => None,
         })

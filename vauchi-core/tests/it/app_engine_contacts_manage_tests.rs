@@ -42,7 +42,7 @@ fn my_info_shows_own_fields_via_app_engine() {
     let has_contact_list = screen
         .components
         .iter()
-        .any(|c| matches!(c, Component::ContactList { .. }));
+        .any(|c| matches!(c, Component::List { .. }));
     assert!(!has_contact_list, "MyInfo should not show a ContactList");
 }
 
@@ -215,10 +215,10 @@ fn group_detail_shows_real_name_and_members() {
     );
     // With no contacts added, members list should be empty
     let has_member_list = screen.components.iter().any(|c| {
-        matches!(c, Component::ContactList { id, contacts, ..
-        } if id == "members" && contacts.is_empty())
+        matches!(c, Component::List { id, items, ..
+        } if id == "members" && items.is_empty())
     });
-    assert!(has_member_list, "Should have an empty members ContactList");
+    assert!(has_member_list, "Should have an empty members List");
 }
 
 // @internal

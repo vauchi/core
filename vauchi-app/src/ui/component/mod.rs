@@ -91,9 +91,14 @@ pub enum Component {
         #[serde(default)]
         a11y: Option<A11y>,
     },
-    ContactList {
+    /// A list of items rendered in a uniform row layout, with optional
+    /// search affordance. Frontends bind on `items`; the renderer doesn't
+    /// know what kind of thing is in the list (per ADR-021/043 + Wire
+    /// Humble). Engines that want to render lists of any domain emit this
+    /// variant with their data mapped to `Vec<Item>`.
+    List {
         id: String,
-        contacts: Vec<Item>,
+        items: Vec<Item>,
         searchable: bool,
     },
     SettingsGroup {

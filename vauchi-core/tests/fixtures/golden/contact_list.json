@@ -5,9 +5,9 @@
   "subtitle": null,
   "components": [
     {
-      "ContactList": {
+      "List": {
         "id": "contacts",
-        "contacts": [
+        "items": [
           {
             "id": "c1",
             "name": "Alice",

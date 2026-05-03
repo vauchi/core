@@ -130,9 +130,9 @@ impl WorkflowEngine for ContactListEngine {
                 a11y: None,
             }]
         } else {
-            vec![Component::ContactList {
+            vec![Component::List {
                 id: "contacts".into(),
-                contacts: filtered,
+                items: filtered,
                 searchable: true,
             }]
         };

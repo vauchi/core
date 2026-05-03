@@ -116,9 +116,9 @@ impl GroupDetailEngine {
             });
         }
 
-        components.push(Component::ContactList {
+        components.push(Component::List {
             id: "members".into(),
-            contacts: self.members.clone(),
+            items: self.members.clone(),
             searchable: false,
         });
 
@@ -278,10 +278,7 @@ mod tests {
         // InfoPanel + ContactList = 2 components (no field visibility toggles)
         assert_eq!(screen.components.len(), 2);
         assert!(matches!(&screen.components[0], Component::InfoPanel { .. }));
-        assert!(matches!(
-            &screen.components[1],
-            Component::ContactList { .. }
-        ));
+        assert!(matches!(&screen.components[1], Component::List { .. }));
     }
 
     // @internal

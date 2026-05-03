@@ -419,9 +419,9 @@ impl RecoveryEngine {
             a11y: None,
         });
 
-        components.push(Component::ContactList {
+        components.push(Component::List {
             id: "trusted_contacts".into(),
-            contacts: self.trusted_contacts.clone(),
+            items: self.trusted_contacts.clone(),
             searchable: false,
         });
 

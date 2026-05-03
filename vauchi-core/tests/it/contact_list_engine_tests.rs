@@ -43,10 +43,10 @@ fn extract_contacts(screen: &ScreenModel) -> &Vec<Item> {
     match screen
         .components
         .iter()
-        .find(|c| matches!(c, Component::ContactList { .. }))
+        .find(|c| matches!(c, Component::List { .. }))
     {
-        Some(Component::ContactList { contacts, .. }) => contacts,
-        _ => panic!("Expected ContactList component"),
+        Some(Component::List { items, .. }) => items,
+        _ => panic!("Expected List component"),
     }
 }
 
@@ -199,7 +199,7 @@ fn contact_list_search_no_results_shows_empty_list_not_guidance() {
     let has_contact_list = screen
         .components
         .iter()
-        .any(|c| matches!(c, Component::ContactList { .. }));
+        .any(|c| matches!(c, Component::List { .. }));
     assert!(
         has_contact_list,
         "Search with no results should show ContactList, not InfoPanel"

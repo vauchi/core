@@ -63,11 +63,11 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
                 });
             }
         }
-        Component::ContactList { contacts, .. } => {
-            for contact in contacts {
+        Component::List { items, .. } => {
+            for item in items {
                 out.push(UserAction::ListItemSelected {
                     component_id: "contacts".into(),
-                    item_id: contact.id.clone(),
+                    item_id: item.id.clone(),
                 });
             }
         }
@@ -429,9 +429,9 @@ mod tests {
     // @internal
     #[test]
     fn contact_list_items_emit_list_item_selected() {
-        let component = Component::ContactList {
+        let component = Component::List {
             id: "contacts_list".into(),
-            contacts: vec![Item {
+            items: vec![Item {
                 id: "c-1".into(),
                 name: "Alice".into(),
                 subtitle: None,

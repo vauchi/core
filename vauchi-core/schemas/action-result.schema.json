@@ -983,27 +983,28 @@
           "additionalProperties": false
         },
         {
+          "description": "A list of items rendered in a uniform row layout, with optional search affordance. Frontends bind on `items`; the renderer doesn't know what kind of thing is in the list (per ADR-021/043 + Wire Humble). Engines that want to render lists of any domain emit this variant with their data mapped to `Vec<Item>`.",
           "type": "object",
           "required": [
-            "ContactList"
+            "List"
           ],
           "properties": {
-            "ContactList": {
+            "List": {
               "type": "object",
               "required": [
-                "contacts",
                 "id",
+                "items",
                 "searchable"
               ],
               "properties": {
-                "contacts": {
+                "id": {
+                  "type": "string"
+                },
+                "items": {
                   "type": "array",
                   "items": {
                     "$ref": "#/definitions/Item"
                   }
-                },
-                "id": {
-                  "type": "string"
                 },
                 "searchable": {
                   "type": "boolean"
@@ -2308,7 +2309,7 @@
       ]
     },
     "Item": {
-      "description": "A lightweight item shown in `Component::List` (and the legacy `Component::ContactList`). UI-shaped: the renderer doesn't know what kind of thing it represents — see `ListKind` on the parent component for purely-presentational hints (icon/empty-text key).",
+      "description": "A lightweight item shown in `Component::List` (and the legacy `Component::List`). UI-shaped: the renderer doesn't know what kind of thing it represents — see `ListKind` on the parent component for purely-presentational hints (icon/empty-text key).",
       "type": "object",
       "required": [
         "avatar_initials",

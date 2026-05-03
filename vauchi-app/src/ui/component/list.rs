@@ -2,12 +2,12 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! List-shape wire types: items shown in `Component::ContactList`.
+//! List-shape wire types: items shown in `Component::List`.
 //!
 //! Phase-0 prep for the Wire Humble Tier 0 rename
 //! (`2026-05-03-coreui-wire-humble-types`). The types in this file
 //! are scheduled to become UI-shaped at the wire boundary —
-//! `Item → Item`, `Component::ContactList → Component::List`.
+//! `Item → Item`, `Component::List → Component::List`.
 //! Engine-side typing stays Rust-internal; `T` does not cross serde.
 
 use serde::{Deserialize, Serialize};
@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use super::A11y;
 
 /// A lightweight item shown in `Component::List` (and the legacy
-/// `Component::ContactList`). UI-shaped: the renderer doesn't know what
+/// `Component::List`). UI-shaped: the renderer doesn't know what
 /// kind of thing it represents — see `ListKind` on the parent component
 /// for purely-presentational hints (icon/empty-text key).
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]

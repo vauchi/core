@@ -29,6 +29,9 @@ fn _flame_install() {
 pub mod types;
 
 pub mod text;
+
+#[cfg(feature = "storage")]
+pub mod install_id;
 pub use types::{
     AhaMomentTracker, AhaMomentType, AudioCapability, BackupReminderState,
     DEFAULT_EMERGENCY_MESSAGE, DemoContactState, DuressSettings, EmergencyBroadcastConfig,

@@ -236,6 +236,7 @@ mod imported_contact_api_tests;
 mod imported_contact_storage_tests;
 mod imported_contact_sync_tests;
 mod info_key_proptest;
+mod install_id_tests;
 mod link_mode_tests;
 mod link_responder_tests;
 mod local_group_tests;

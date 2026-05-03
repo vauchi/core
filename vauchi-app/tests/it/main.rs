@@ -29,3 +29,4 @@ mod notification_proptest;
 mod reciprocity_confirmer_tests;
 mod sync_status_engine_tests;
 mod update_overlay_tests;
+mod wire_humble_keys_tests;

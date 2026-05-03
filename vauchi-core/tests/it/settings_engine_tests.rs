@@ -13,9 +13,9 @@ fn sample_config() -> SettingsConfig {
         relay_url: "https://relay.vauchi.app".into(),
         device_count: 3,
         password_set: true,
-        theme: String::new(),
+        theme_id: String::new(),
         available_themes: vec![],
-        language: String::new(),
+        language_id: String::new(),
         available_languages: vec![],
         reduce_motion: false,
         high_contrast: false,
@@ -242,8 +242,8 @@ fn settings_single_device_no_plural() {
 fn settings_emits_theme_and_language_dropdowns() {
     use vauchi_app::ui::{Component, DropdownOption};
     let mut config = sample_config();
-    config.theme = "Catppuccin Mocha".into();
-    config.language = "English".into();
+    config.theme_id = "Catppuccin Mocha".into();
+    config.language_id = "English".into();
     config.available_themes = vec![
         DropdownOption {
             id: "catppuccin-mocha".into(),
@@ -303,7 +303,7 @@ fn settings_emits_theme_and_language_dropdowns() {
 fn settings_theme_dropdown_selection_updates_label() {
     use vauchi_app::ui::{Component, DropdownOption};
     let mut config = sample_config();
-    config.theme = "System".into();
+    config.theme_id = "System".into();
     config.available_themes = vec![DropdownOption {
         id: "ocean-dark".into(),
         label: "Ocean Dark".into(),
@@ -332,7 +332,7 @@ fn settings_theme_dropdown_selection_updates_label() {
 fn settings_theme_dropdown_follow_system_resets_label() {
     use vauchi_app::ui::{Component, DropdownOption};
     let mut config = sample_config();
-    config.theme = "Ocean Dark".into();
+    config.theme_id = "Ocean Dark".into();
     config.available_themes = vec![DropdownOption {
         id: "ocean-dark".into(),
         label: "Ocean Dark".into(),

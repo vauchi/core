@@ -20,12 +20,16 @@ pub struct SettingsConfig {
     pub relay_url: String,
     pub device_count: usize,
     pub password_set: bool,
-    #[serde(default)]
-    pub theme: String,
+    /// Currently-selected theme dropdown option id.
+    /// `"follow_system"` is the reserved id meaning "let the OS decide";
+    /// every other value is a `DropdownOption.id` from `available_themes`.
+    #[serde(default, alias = "theme")]
+    pub theme_id: String,
     #[serde(default)]
     pub available_themes: Vec<DropdownOption>,
-    #[serde(default)]
-    pub language: String,
+    /// Currently-selected language dropdown option id (mirror of `theme_id`).
+    #[serde(default, alias = "language")]
+    pub language_id: String,
     #[serde(default)]
     pub available_languages: Vec<DropdownOption>,
     #[serde(default)]
@@ -191,7 +195,7 @@ impl WorkflowEngine for SettingsEngine {
             Component::Dropdown {
                 id: "theme".into(),
                 label: "Theme".into(),
-                selected: Some(self.config.theme.clone()),
+                selected: Some(self.config.theme_id.clone()),
                 options: {
                     let mut opts = vec![DropdownOption {
                         id: "follow_system".into(),
@@ -209,7 +213,7 @@ impl WorkflowEngine for SettingsEngine {
             Component::Dropdown {
                 id: "language".into(),
                 label: "Language".into(),
-                selected: Some(self.config.language.clone()),
+                selected: Some(self.config.language_id.clone()),
                 options: {
                     let mut opts = vec![DropdownOption {
                         id: "follow_system".into(),
@@ -670,7 +674,7 @@ impl WorkflowEngine for SettingsEngine {
                 ref item_id,
             } if component_id == "theme" => {
                 if item_id == "follow_system" {
-                    self.config.theme = "System".to_string();
+                    self.config.theme_id = "System".to_string();
                 } else {
                     let label = self
                         .config
@@ -679,7 +683,7 @@ impl WorkflowEngine for SettingsEngine {
                         .find(|o| &o.id == item_id)
                         .map(|o| o.label.clone())
                         .unwrap_or_else(|| item_id.clone());
-                    self.config.theme = label;
+                    self.config.theme_id = label;
                 }
                 ActionResult::UpdateScreen(self.current_screen())
             }
@@ -688,7 +692,7 @@ impl WorkflowEngine for SettingsEngine {
                 ref item_id,
             } if component_id == "language" => {
                 if item_id == "follow_system" {
-                    self.config.language = "System".to_string();
+                    self.config.language_id = "System".to_string();
                 } else {
                     let label = self
                         .config
@@ -697,7 +701,7 @@ impl WorkflowEngine for SettingsEngine {
                         .find(|o| &o.id == item_id)
                         .map(|o| o.label.clone())
                         .unwrap_or_else(|| item_id.clone());
-                    self.config.language = label;
+                    self.config.language_id = label;
                 }
                 ActionResult::UpdateScreen(self.current_screen())
             }

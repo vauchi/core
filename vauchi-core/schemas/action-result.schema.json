@@ -496,6 +496,41 @@
       "enum": [
         "StartMultiStageExchange"
       ]
+    },
+    {
+      "description": "App layer should call `MobileDeviceLinkSession::confirm_manual` with the given confirmation code and the current unix timestamp.\n\nEmitted by `DeviceLinkingEngine` from the `VerifyingProximity` step when the user taps the manual-confirm action. Pair 5 of `2026-04-28-pure-humble-ui-retire-native-screens`. Ultrasonic confirmation flows through ADR-031 hardware events instead.",
+      "type": "object",
+      "required": [
+        "DeviceLinkConfirmManual"
+      ],
+      "properties": {
+        "DeviceLinkConfirmManual": {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "App layer should call `MobileDeviceLinkSession::deny`. Emitted by `DeviceLinkingEngine` from the `ConfirmingDevice` step when the user denies the request. The session's cycle thread fires `on_failed(\"user_denied\")` followed by `on_session_ended()`.",
+      "type": "string",
+      "enum": [
+        "DeviceLinkDeny"
+      ]
+    },
+    {
+      "description": "App layer should create a fresh `MobileDeviceLinkSession` (single-shot — sessions cannot be reused) and call `start()`. Emitted by `DeviceLinkingEngine` from `QrExpired` and `LinkFailed` when the user taps Retry. The engine is already in the `QrPending` state when this is emitted; the new session will fire `on_qr_ready` to advance it.",
+      "type": "string",
+      "enum": [
+        "DeviceLinkRetry"
+      ]
     }
   ],
   "definitions": {
@@ -1869,7 +1904,7 @@
           ]
         },
         {
-          "description": "Emit an ultrasonic challenge signal.",
+          "description": "Emit ultrasonic PCM samples encoding a challenge.\n\nCore has already FSK-encoded the challenge bytes; the frontend just plays the samples through the device speaker. Mono float PCM at `sample_rate`.",
           "type": "object",
           "required": [
             "AudioEmitChallenge"
@@ -1878,15 +1913,20 @@
             "AudioEmitChallenge": {
               "type": "object",
               "required": [
-                "data"
+                "sample_rate",
+                "samples"
               ],
               "properties": {
-                "data": {
+                "sample_rate": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                },
+                "samples": {
                   "type": "array",
                   "items": {
-                    "type": "integer",
-                    "format": "uint8",
-                    "minimum": 0.0
+                    "type": "number",
+                    "format": "float"
                   }
                 }
               }
@@ -1895,7 +1935,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Listen for an ultrasonic response within `timeout_ms`.",
+          "description": "Listen for an ultrasonic response within `timeout_ms`.\n\n`sample_rate` is the suggested capture rate; if the device's preferred rate differs, the frontend reports its actual rate in [`ExchangeHardwareEvent::AudioSamplesRecorded`].",
           "type": "object",
           "required": [
             "AudioListenForResponse"
@@ -1904,9 +1944,15 @@
             "AudioListenForResponse": {
               "type": "object",
               "required": [
+                "sample_rate",
                 "timeout_ms"
               ],
               "properties": {
+                "sample_rate": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                },
                 "timeout_ms": {
                   "type": "integer",
                   "format": "uint64",

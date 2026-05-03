@@ -2223,9 +2223,9 @@ dependencies = [
 
 [[package]]
 name = "imageproc"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2393fb7808960751a52e8a154f67e7dd3f8a2ef9bd80d1553078a7b4e8ed3f0d"
+checksum = "602b4e8a4cc3e98372b766cd184ab532999bc0e839b7469e759511ccabc65d77"
 dependencies = [
  "ab_glyph",
  "approx",
@@ -3783,9 +3783,9 @@ dependencies = [
 
 [[package]]
 name = "rxing"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d4fcbbc6ac324d7018be17d2c94c6c4690ca2f95b9345ffbc001fe8e459ebeb"
+checksum = "dc56bde1cf7f3c9cc908ef2670efede68bbad283acb6674b709aa3befdab451d"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -4055,9 +4055,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "3.18.0"
+version = "3.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd5414fad8e6907dbdd5bc441a50ae8d6e26151a03b1de04d89a5576de61d01f"
+checksum = "f05839ce67618e14a09b286535c0d9c94e85ef25469b0e13cb4f844e5593eb19"
 dependencies = [
  "base64",
  "chrono",
@@ -4074,9 +4074,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "3.18.0"
+version = "3.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3db8978e608f1fe7357e211969fd9abdcae80bac1ba7a3369bb7eb6b404eb65"
+checksum = "cf2ebbe86054f9b45bc3881e865683ccfaccce97b9b4cb53f3039d67f355a334"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -5014,7 +5014,7 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vauchi-app"
-version = "0.38.0"
+version = "0.39.0"
 dependencies = [
  "base64",
  "hex",
@@ -5036,7 +5036,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-cabi"
-version = "0.38.0"
+version = "0.39.0"
 dependencies = [
  "base64",
  "cbindgen",
@@ -5051,7 +5051,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-core"
-version = "0.38.0"
+version = "0.39.0"
 dependencies = [
  "argon2",
  "async-trait",
@@ -5111,7 +5111,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-platform"
-version = "0.38.0"
+version = "0.39.0"
 dependencies = [
  "base64",
  "crc32fast",
@@ -5131,7 +5131,7 @@ dependencies = [
 
 [[package]]
 name = "vauchi-protocol"
-version = "0.38.0"
+version = "0.39.0"
 dependencies = [
  "serde",
  "serde_json",

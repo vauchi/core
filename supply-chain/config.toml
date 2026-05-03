@@ -448,7 +448,7 @@ version = "0.2.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.imageproc]]
-version = "0.25.0"
+version = "0.25.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.ipnet]]
@@ -708,10 +708,6 @@ version = "6.0.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.rand]]
-version = "0.8.6"
-criteria = "safe-to-deploy"
-
-[[exemptions.rand]]
 version = "0.9.4"
 criteria = "safe-to-deploy"
 
@@ -768,7 +764,7 @@ version = "0.3.1"
 criteria = "safe-to-run"
 
 [[exemptions.rxing]]
-version = "0.8.5"
+version = "0.8.6"
 criteria = "safe-to-deploy"
 
 [[exemptions.rxing-one-d-proc-derive]]
@@ -824,11 +820,11 @@ version = "0.7.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.serde_with]]
-version = "3.18.0"
+version = "3.19.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.serde_with_macros]]
-version = "3.18.0"
+version = "3.19.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.simba]]

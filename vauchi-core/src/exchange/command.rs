@@ -812,6 +812,7 @@ mod tests {
 
     // ── File-picker variants (Phase 1: types only) ──────────────────
 
+    // @internal
     #[test]
     fn file_pick_from_user_command_stores_purpose_and_mime() {
         let cmd = ExchangeCommand::FilePickFromUser {
@@ -830,6 +831,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn file_pick_purpose_other_carries_label_key() {
         let purpose = FilePickPurpose::Other {
@@ -841,6 +843,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn file_pick_purpose_variants_are_distinct() {
         let a = FilePickPurpose::ImportContacts;
@@ -853,6 +856,7 @@ mod tests {
         assert_ne!(b, c);
     }
 
+    // @internal
     #[test]
     fn file_pick_purpose_serialization_roundtrip() {
         let purposes = vec![
@@ -872,6 +876,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn file_picked_from_user_event_stores_bytes_and_filename() {
         let evt = ExchangeHardwareEvent::FilePickedFromUser {
@@ -887,6 +892,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn file_picked_event_distinct_from_cancellation() {
         let picked = ExchangeHardwareEvent::FilePickedFromUser {
@@ -897,6 +903,7 @@ mod tests {
         assert_ne!(picked, cancelled);
     }
 
+    // @internal
     #[test]
     fn file_pick_from_user_variant_name_is_stable() {
         let cmd = ExchangeCommand::FilePickFromUser {

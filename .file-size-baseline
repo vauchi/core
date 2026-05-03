@@ -18,12 +18,19 @@ vauchi-platform/src/lib.rs 2533
 # their From impls must be co-located so binding generation produces
 # matching iOS / Android variant shapes. Splitting would scatter the
 # round-trip mappings.
-vauchi-platform/src/exchange.rs 1017
+# (+10 for ADR-031 file-picker mirror: FilePickedFromUser +
+#  FilePickCancelledByUser variants + From arms 2026-05-03 Phase 1 of
+#  2026-05-03-core-file-picker-command)
+vauchi-platform/src/exchange.rs 1027
 
 # EXEMPT — state machine: scattered transitions create protocol bugs
 # (+8 for ADR-031 audio-as-samples migration — encode at emit, accept
 #  AudioSamplesRecorded at receive 2026-05-01)
-vauchi-core/src/exchange/session.rs 1765
+# (+4 for ADR-031 file-picker ack-arms: FilePickedFromUser +
+#  FilePickCancelledByUser handled identically to ImageReceived /
+#  ImagePickCancelled — exchange session ignores them, vauchi-app
+#  drives import 2026-05-03 Phase 1 of 2026-05-03-core-file-picker-command)
+vauchi-core/src/exchange/session.rs 1769
 vauchi-core/src/exchange/multistage/session.rs 1189
 
 # EXEMPT — transport layer: all relay methods must be co-located for protocol coherence

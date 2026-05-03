@@ -228,3 +228,227 @@ UID:carol-uid-1\r\n\
 FN:Carol Jones\r\n\
 N:Jones;Carol;;;\r\n\
 END:VCARD\r\n";
+
+// ── Phase 2B: backup-restore via file picker ───────────────────────
+
+fn fresh_engine() -> AppEngine {
+    let vauchi = Vauchi::in_memory().unwrap();
+    AppEngine::new(vauchi)
+}
+
+/// Helper: produce a real encrypted backup using a throwaway Vauchi
+/// then return the hex-string bytes. Mirrors the file the user would
+/// have picked via the OS picker.
+fn make_backup(password: &str, name: &str) -> Vec<u8> {
+    let mut donor = Vauchi::in_memory().unwrap();
+    donor.create_identity(name).unwrap();
+    let backup_hex = donor.export_full_backup(password).unwrap();
+    backup_hex.into_bytes()
+}
+
+// @scenario: core_file_picker :: restore_backup emits FilePickFromUser
+#[test]
+fn restore_backup_emits_file_pick_for_backup() {
+    let mut engine = fresh_engine();
+    let _ = engine.navigate_to(AppScreen::Onboarding);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "restore_backup".into(),
+    });
+    match result {
+        ActionResult::ExchangeCommands { commands } => {
+            assert_eq!(commands.len(), 1);
+            match &commands[0] {
+                ExchangeCommand::FilePickFromUser { purpose, .. } => {
+                    assert_eq!(*purpose, FilePickPurpose::ImportBackup);
+                }
+                other => panic!("expected FilePickFromUser, got {other:?}"),
+            }
+        }
+        other => panic!("expected ExchangeCommands, got {other:?}"),
+    }
+}
+
+// @scenario: core_file_picker :: file pick on Onboarding → BackupPasswordEntry
+#[test]
+fn file_picked_on_onboarding_transitions_to_backup_password_entry() {
+    let mut engine = fresh_engine();
+    let _ = engine.navigate_to(AppScreen::Onboarding);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "restore_backup".into(),
+    });
+
+    let result = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+        bytes: make_backup("correct horse battery staple", "Alice"),
+        filename: "alice-backup.txt".into(),
+    });
+
+    match result {
+        Some(ActionResult::NavigateTo(screen)) => {
+            assert_eq!(screen.screen_id, "backup_password_entry");
+        }
+        other => panic!("expected NavigateTo(backup_password_entry), got {other:?}"),
+    }
+}
+
+// @scenario: core_file_picker :: submit valid password completes restore
+#[test]
+fn submit_valid_password_imports_backup_and_navigates_to_main() {
+    let mut engine = fresh_engine();
+    let _ = engine.navigate_to(AppScreen::Onboarding);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "restore_backup".into(),
+    });
+    let _ = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+        bytes: make_backup("correct horse battery staple", "Bob"),
+        filename: "bob-backup.txt".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_password".into(),
+        value: "correct horse battery staple".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit_backup_password".into(),
+    });
+
+    match result {
+        ActionResult::NavigateTo(screen) => {
+            assert_eq!(screen.screen_id, "my_info");
+        }
+        other => panic!("expected NavigateTo(my_info), got {other:?}"),
+    }
+    assert!(
+        engine.vauchi().has_identity(),
+        "identity should be restored after import"
+    );
+}
+
+// @scenario: core_file_picker :: wrong password surfaces alert
+#[test]
+fn submit_wrong_password_returns_alert_and_clears_state() {
+    let mut engine = fresh_engine();
+    let _ = engine.navigate_to(AppScreen::Onboarding);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "restore_backup".into(),
+    });
+    let _ = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+        bytes: make_backup("correct horse battery staple", "Eve"),
+        filename: "eve-backup.txt".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_password".into(),
+        value: "wrong".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit_backup_password".into(),
+    });
+
+    assert!(
+        matches!(result, ActionResult::ShowAlert { .. }),
+        "wrong password must produce ShowAlert, got {result:?}"
+    );
+    assert!(
+        !engine.vauchi().has_identity(),
+        "identity must NOT be created on wrong-password import"
+    );
+}
+
+// @scenario: core_file_picker :: empty password is rejected before import
+#[test]
+fn submit_empty_password_surfaces_validation_error_in_component() {
+    use vauchi_app::ui::Component;
+    let mut engine = fresh_engine();
+    let _ = engine.navigate_to(AppScreen::Onboarding);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "restore_backup".into(),
+    });
+    let _ = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+        bytes: make_backup("correct horse battery staple", "Eve"),
+        filename: "eve-backup.txt".into(),
+    });
+    // Submit without typing a password. AppEngine's routing layer
+    // re-injects ValidationError into the matching component as
+    // `validation_error` and re-emits the screen — this is the
+    // pre-existing pattern (`ActionResult::ValidationError` is never
+    // returned to the frontend; see `action.rs:111`).
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit_backup_password".into(),
+    });
+
+    let screen = match result {
+        ActionResult::UpdateScreen(s) | ActionResult::NavigateTo(s) => s,
+        other => panic!("expected UpdateScreen with validation_error, got {other:?}"),
+    };
+    let backup_password_component = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::TextInput {
+                id,
+                validation_error,
+                ..
+            } if id == "backup_password" => Some(validation_error.clone()),
+            _ => None,
+        })
+        .expect("backup_password TextInput missing from screen");
+    let err = backup_password_component.expect("validation_error must be set on empty submit");
+    assert!(
+        err.to_lowercase().contains("password"),
+        "validation_error should mention the password field, got {err:?}"
+    );
+}
+
+// @scenario: core_file_picker :: back from password entry clears pending bytes
+#[test]
+fn back_from_password_entry_clears_pending_state() {
+    let mut engine = fresh_engine();
+    let _ = engine.navigate_to(AppScreen::Onboarding);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "have_identity".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "restore_backup".into(),
+    });
+    let _ = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+        bytes: make_backup("correct horse battery staple", "Eve"),
+        filename: "eve-backup.txt".into(),
+    });
+
+    // Tap "back" — should land on link_choice.
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "back".into(),
+    });
+
+    match result {
+        ActionResult::NavigateTo(screen) | ActionResult::UpdateScreen(screen) => {
+            assert_eq!(screen.screen_id, "link_choice");
+        }
+        other => panic!("expected NavigateTo(link_choice), got {other:?}"),
+    }
+}
+
+// Note: the lost-device end-to-end test through AppEngine isn't
+// exercised here. AppScreen::DeviceReplacement navigates via
+// `DeviceReplacementEngine::new_source()` (Source role / ShowQr step
+// — for the OLD device setting up a NEW one). The Target role /
+// SelectMode where "lost_device" is handled is reached via a
+// different navigation path that's out of scope for Phase 2B's
+// scope. The unit-level emit-FilePickFromUser behaviour is covered
+// by `device_replacement::tests::select_mode_lost_device_emits_
+// file_pick_for_backup` (inline tests).

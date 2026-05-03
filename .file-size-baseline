@@ -81,7 +81,12 @@ vauchi-app/src/ui/app_engine/mod.rs 1144
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
 #  import; Onboarding/backup-restore deferred to Phase 2B.)
-vauchi-app/src/ui/app_engine/routing.rs 1121
+# (+117 on routing.rs for Phase 2B of 2026-05-03-core-file-picker-command:
+#  AppScreen::Onboarding + AppScreen::DeviceReplacement arms in
+#  handle_file_picked, BackupPasswordEntry detection in handle_completion,
+#  execute_backup_restore helper that calls Vauchi::import_full_backup
+#  and routes to MainScreen on success / LinkChoice with alert on failure.)
+vauchi-app/src/ui/app_engine/routing.rs 1238
 vauchi-app/src/ui/app_engine/screens.rs 1344
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files

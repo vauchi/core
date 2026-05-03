@@ -143,7 +143,7 @@ const MAX_BFS_SCREENS: usize = 256;
 ///   `NavigateTo`, and any variant that leaves the engine on a
 ///   new rendered screen.
 /// - `Complete` / `CompleteWith` / `StartDeviceLink` /
-///   `StartBackupImport` / `OpenContact` / `EditContact` /
+///   `OpenContact` / `EditContact` /
 ///   `OpenUrl` / `BackupExportComplete` / `WipeComplete` are
 ///   terminal from the engine's POV — BFS stops following that
 ///   path. Other non-screen-changing results
@@ -233,7 +233,6 @@ fn is_terminal(result: &ActionResult) -> bool {
         ActionResult::Complete
             | ActionResult::CompleteWith { .. }
             | ActionResult::StartDeviceLink
-            | ActionResult::StartBackupImport
             | ActionResult::OpenContact { .. }
             | ActionResult::EditContact { .. }
             | ActionResult::OpenUrl { .. }

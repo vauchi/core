@@ -439,8 +439,11 @@ proptest! {
                 ActionResult::CompleteWith { .. } => {
                     // CompleteWith is valid — onboarding finished with destination
                 }
-                ActionResult::StartDeviceLink | ActionResult::StartBackupImport => {
+                ActionResult::StartDeviceLink => {
                     // External handoff — valid from LinkChoice step
+                    // (backup-restore now flows through ExchangeCommands /
+                    // FilePickFromUser per ADR-031 Phase 2B of
+                    // 2026-05-03-core-file-picker-command).
                 }
                 ActionResult::OpenContact { .. }
                 | ActionResult::EditContact { .. }

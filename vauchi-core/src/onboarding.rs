@@ -29,10 +29,15 @@ impl OnboardingStep {
     }
 
     /// Returns the zero-based index of this step in the wizard.
+    ///
+    /// `BackupPasswordEntry` is a side-flow off `LinkChoice` (entered when
+    /// the user picks `restore_backup`); reuses LinkChoice's index so the
+    /// 6-step wizard progress indicator stays accurate.
     pub fn index(&self) -> usize {
         match self {
             OnboardingStep::IdentityCheck => 0,
             OnboardingStep::LinkChoice => 1,
+            OnboardingStep::BackupPasswordEntry => 1,
             OnboardingStep::DefaultName => 2,
             OnboardingStep::GroupsSetup => 3,
             OnboardingStep::ContactInfo => 4,

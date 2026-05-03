@@ -10,6 +10,14 @@
 //! - **Flow C** (proactive): Settings entry → select mode → delegate to existing flows
 
 use crate::ui::*;
+use vauchi_core::exchange::{ExchangeCommand, FilePickPurpose};
+
+/// MIME types for the encrypted backup file picker. Mirrors
+/// `onboarding::backup_mime_types` — the picker drives an identical
+/// import flow regardless of entry point.
+fn backup_mime_types() -> Vec<String> {
+    vec!["application/octet-stream".into(), "text/plain".into()]
+}
 
 /// Which side of the replacement flow this device is on.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -542,7 +550,12 @@ impl WorkflowEngine for DeviceReplacementEngine {
             UserAction::ActionPressed { action_id } => match self.step {
                 Step::SelectMode => match action_id.as_str() {
                     "has_old_device" => ActionResult::StartDeviceLink,
-                    "lost_device" => ActionResult::StartBackupImport,
+                    "lost_device" => ActionResult::ExchangeCommands {
+                        commands: vec![ExchangeCommand::FilePickFromUser {
+                            accepted_mime_types: backup_mime_types(),
+                            purpose: FilePickPurpose::ImportBackup,
+                        }],
+                    },
                     "back" => {
                         self.cancelled = true;
                         ActionResult::Complete
@@ -830,12 +843,26 @@ mod tests {
 
     // @internal
     #[test]
-    fn select_mode_lost_device_starts_backup() {
+    fn select_mode_lost_device_emits_file_pick_for_backup() {
         let mut engine = DeviceReplacementEngine::new_target();
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "lost_device".into(),
         });
-        assert!(matches!(result, ActionResult::StartBackupImport));
+        match result {
+            ActionResult::ExchangeCommands { commands } => {
+                assert_eq!(commands.len(), 1);
+                match &commands[0] {
+                    ExchangeCommand::FilePickFromUser { purpose, .. } => {
+                        assert_eq!(*purpose, FilePickPurpose::ImportBackup);
+                    }
+                    other => panic!("expected FilePickFromUser, got {:?}", other),
+                }
+            }
+            other => panic!(
+                "expected ExchangeCommands(FilePickFromUser/ImportBackup), got {:?}",
+                other
+            ),
+        }
     }
 
     // @internal

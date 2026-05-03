@@ -38,6 +38,13 @@ const ONBOARDING_ALL_HANDLED: &[&str] = &[
     "link_device",
     "restore_backup",
     "back",
+    // backup_password_entry — reached only via the file-picker
+    // hardware-event path (`AppEngine::handle_file_picked` calls
+    // `OnboardingEngine::set_pending_backup_bytes`), which the BFS
+    // does not simulate. Declared here so CC-22's "every handler
+    // arm has an entry" rule holds. Phase 2B of
+    // `2026-05-03-core-file-picker-command`.
+    "submit_backup_password",
     // default_name + groups_setup + contact_info + what_next (shared)
     "continue",
     "skip",
@@ -88,12 +95,23 @@ fn initial_screen_affordance_set_matches_plan() {
 /// a non-empty name), `contact_info`, `what_next`, and
 /// `link_choice` (via `have_identity`). Six screens.
 ///
-/// The single remaining orphan:
+/// Two remaining orphans:
 /// - `submit_display_name` — handler arm at
 ///   `onboarding.rs:551`, no `ScreenAction` in `build_default_name`
 ///   (`onboarding.rs:263`) emits that id. Pressing "Continue" on
 ///   default_name routes through the shared `continue` branch
 ///   instead. Dead code; separate tidy MR will remove.
+/// - `submit_backup_password` — handler arm in
+///   `handle_backup_password_entry`, only reached via the file-picker
+///   hardware-event path (`AppEngine::handle_file_picked` calls
+///   `OnboardingEngine::set_pending_backup_bytes` which transitions to
+///   `Step::BackupPasswordEntry`). The BFS walker doesn't simulate
+///   `ExchangeHardwareEvent::FilePickedFromUser`, so the screen + its
+///   "Restore" affordance never appear in the BFS reach. Coverage of
+///   the live submit path lives in `tests/it/file_picker_wiring_tests.rs`
+///   (`submit_valid_password_imports_backup_and_navigates_to_main`,
+///   `submit_wrong_password_returns_alert_and_clears_state`). Phase 2B
+///   of `2026-05-03-core-file-picker-command`.
 ///
 /// Flipped 2026-04-21 (session #1): `submit_custom_group` was an
 /// orphan handler until `build_groups_setup` gained an "Add group"
@@ -114,7 +132,10 @@ fn bfs_pins_remaining_orphans() {
 
     assert_eq!(
         report.orphan_handlers,
-        BTreeSet::from(["submit_display_name".to_string()]),
+        BTreeSet::from([
+            "submit_display_name".to_string(),
+            "submit_backup_password".to_string(),
+        ]),
         "orphan handler set drifted — if a fix landed, remove the\n\
          corresponding id from the expected set and (if applicable)\n\
          from ONBOARDING_ALL_HANDLED."

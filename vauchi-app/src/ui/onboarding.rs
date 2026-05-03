@@ -9,7 +9,15 @@
 
 use crate::ui::*;
 use vauchi_core::contact::labels::SUGGESTED_LABELS;
+use vauchi_core::exchange::{ExchangeCommand, FilePickPurpose};
 use vauchi_core::types::OnboardingStep as Step;
+
+/// `accepted_mime_types` for the encrypted backup file picker. Frontends
+/// may default to a coarser superset on platforms where the OS picker
+/// doesn't filter by MIME (older Android variants).
+fn backup_mime_types() -> Vec<String> {
+    vec!["application/octet-stream".into(), "text/plain".into()]
+}
 
 // ── Public data types ───────────────────────────────────────────────
 
@@ -56,6 +64,15 @@ pub struct OnboardingEngine {
     email_value: String,
     /// When true, info icon keys are set on components that have help content.
     show_help_icons: bool,
+    /// Bytes of the encrypted backup file picked via
+    /// `ExchangeCommand::FilePickFromUser` while restoring an identity.
+    /// Set by `set_pending_backup_bytes` from the AppEngine
+    /// `handle_file_picked` Onboarding arm; consumed by the routing
+    /// layer's completion path when the user submits the password.
+    pending_backup_bytes: Option<Vec<u8>>,
+    /// Password the user typed on the BackupPasswordEntry screen.
+    /// Used in concert with `pending_backup_bytes` at submit time.
+    pending_backup_password: String,
 }
 
 impl Default for OnboardingEngine {
@@ -92,7 +109,38 @@ impl OnboardingEngine {
             phone_value: String::new(),
             email_value: String::new(),
             show_help_icons: false,
+            pending_backup_bytes: None,
+            pending_backup_password: String::new(),
         }
+    }
+
+    /// Stores the picked backup bytes and transitions the wizard to
+    /// the password-entry step. Called by `AppEngine::handle_file_picked`
+    /// (Onboarding arm) when the user picks a file via the
+    /// `ExchangeCommand::FilePickFromUser{purpose:ImportBackup}` flow.
+    pub fn set_pending_backup_bytes(&mut self, bytes: Vec<u8>) {
+        self.pending_backup_bytes = Some(bytes);
+        self.pending_backup_password.clear();
+        self.step = Step::BackupPasswordEntry;
+    }
+
+    /// Returns `Some(bytes, password)` when the user has submitted the
+    /// password on `BackupPasswordEntry`. Both the bytes and the
+    /// password are taken (cleared on the engine), so re-submitting
+    /// without re-picking the file is impossible. Used by the AppEngine
+    /// completion path to call `Vauchi::import_full_backup`.
+    pub fn take_pending_backup(&mut self) -> Option<(Vec<u8>, String)> {
+        let bytes = self.pending_backup_bytes.take()?;
+        let password = std::mem::take(&mut self.pending_backup_password);
+        Some((bytes, password))
+    }
+
+    /// Returns the current step. Used by the AppEngine completion path
+    /// to detect a `BackupPasswordEntry` submit (the engine re-uses
+    /// `ActionResult::Complete` for the submit signal — completion
+    /// handler routes by step).
+    pub fn current_step(&self) -> Step {
+        self.step
     }
 
     /// Enable or disable help icons on onboarding components.
@@ -234,6 +282,48 @@ impl OnboardingEngine {
                 },
             ],
             progress: None,
+            ..Default::default()
+        }
+    }
+
+    /// Password-entry screen for the backup-restore flow (ADR-031,
+    /// Phase 2B of `2026-05-03-core-file-picker-command`). Reached from
+    /// `LinkChoice` after the user picks a file via
+    /// `ExchangeCommand::FilePickFromUser{purpose:ImportBackup}`.
+    fn build_backup_password_entry(&self) -> ScreenModel {
+        let password_filled = !self.pending_backup_password.is_empty();
+        ScreenModel {
+            screen_id: "backup_password_entry".into(),
+            title: "Enter backup password".into(),
+            subtitle: Some("The password you set when you exported the backup.".into()),
+            components: vec![Component::TextInput {
+                id: "backup_password".into(),
+                label: "Password".into(),
+                value: String::new(),
+                placeholder: Some("Backup password".into()),
+                max_length: None,
+                validation_error: None,
+                input_type: InputType::Password,
+                a11y: None,
+                info_key: None,
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: "submit_backup_password".into(),
+                    label: "Restore".into(),
+                    style: ActionStyle::Primary,
+                    enabled: password_filled,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: "back".into(),
+                    label: "Back".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+            progress: self.progress(2),
             ..Default::default()
         }
     }
@@ -562,10 +652,59 @@ impl OnboardingEngine {
                 ActionResult::StartDeviceLink
             }
             UserAction::ActionPressed { action_id } if action_id == "restore_backup" => {
-                ActionResult::StartBackupImport
+                // ADR-031 file-picker: core drives the native picker
+                // dialog instead of returning a chrome hint.
+                // `AppEngine::handle_file_picked` (Onboarding arm)
+                // routes the picked bytes back into this engine via
+                // `set_pending_backup_bytes`, which transitions the
+                // wizard to `Step::BackupPasswordEntry`. Phase 2B of
+                // `2026-05-03-core-file-picker-command`.
+                ActionResult::ExchangeCommands {
+                    commands: vec![ExchangeCommand::FilePickFromUser {
+                        accepted_mime_types: backup_mime_types(),
+                        purpose: FilePickPurpose::ImportBackup,
+                    }],
+                }
             }
             UserAction::ActionPressed { action_id } if action_id == "back" => {
                 self.navigate_to(Step::IdentityCheck)
+            }
+            _ => ActionResult::UpdateScreen(self.current_screen()),
+        }
+    }
+
+    /// Handles user input on the `BackupPasswordEntry` step.
+    ///
+    /// - `TextChanged{component_id:"backup_password"}` updates the
+    ///   pending password so `Restore` enables once the field is non-empty.
+    /// - `submit_backup_password` returns `ActionResult::Complete` —
+    ///   the AppEngine completion path detects the step and calls
+    ///   `Vauchi::import_full_backup(hex(bytes), password)`.
+    /// - `back` clears pending bytes + password and returns to LinkChoice.
+    fn handle_backup_password_entry(&mut self, action: &UserAction) -> ActionResult {
+        match action {
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if component_id == "backup_password" => {
+                self.pending_backup_password = value.clone();
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::ActionPressed { action_id } if action_id == "submit_backup_password" => {
+                if self.pending_backup_password.is_empty() || self.pending_backup_bytes.is_none() {
+                    return ActionResult::ValidationError {
+                        component_id: "backup_password".into(),
+                        message: "Enter the backup password.".into(),
+                    };
+                }
+                // AppEngine completion routing reads `current_step()` and
+                // calls `take_pending_backup()` + `import_full_backup`.
+                ActionResult::Complete
+            }
+            UserAction::ActionPressed { action_id } if action_id == "back" => {
+                self.pending_backup_bytes = None;
+                self.pending_backup_password.clear();
+                self.navigate_to(Step::LinkChoice)
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }
@@ -778,6 +917,7 @@ impl WorkflowEngine for OnboardingEngine {
         match self.step {
             Step::IdentityCheck => self.build_identity_check(),
             Step::LinkChoice => self.build_link_choice(),
+            Step::BackupPasswordEntry => self.build_backup_password_entry(),
             Step::DefaultName => self.build_default_name(),
             Step::GroupsSetup => self.build_groups_setup(),
             Step::ContactInfo => self.build_contact_info(),
@@ -790,6 +930,7 @@ impl WorkflowEngine for OnboardingEngine {
         match self.step {
             Step::IdentityCheck => self.handle_identity_check(&action),
             Step::LinkChoice => self.handle_link_choice(&action),
+            Step::BackupPasswordEntry => self.handle_backup_password_entry(&action),
             Step::DefaultName => self.handle_default_name(&action),
             Step::GroupsSetup => self.handle_groups_setup(&action),
             Step::ContactInfo => self.handle_contact_info(&action),

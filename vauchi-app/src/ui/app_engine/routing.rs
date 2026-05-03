@@ -9,6 +9,7 @@ use super::AppEngine;
 use super::AppScreen;
 use crate::ui::ScreenModel;
 use crate::ui::action::{ActionResult, ContactActionKind, PostOnboardingDestination, UserAction};
+use crate::ui::engine::WorkflowEngine;
 use crate::ui::form_dialog::FormDialogType;
 use vauchi_core::contact_card::FieldType;
 use vauchi_core::exchange::ExchangeHardwareEvent;
@@ -199,13 +200,68 @@ impl AppEngine {
                     }),
                 }
             }
+            AppScreen::Onboarding => {
+                // ADR-031 Phase 2B: backup-restore. The picked bytes
+                // are the encrypted backup file (hex-encoded ASCII —
+                // matches `Vauchi::export_full_backup` output). Stash
+                // on the OnboardingEngine and transition to its new
+                // `BackupPasswordEntry` step so the user can enter
+                // the password core-side.
+                if let Some(eng) = self
+                    .engine
+                    .as_any_mut()
+                    .and_then(|a| a.downcast_mut::<crate::ui::onboarding::OnboardingEngine>())
+                {
+                    eng.set_pending_backup_bytes(bytes);
+                    return Some(ActionResult::NavigateTo(eng.current_screen()));
+                }
+                None
+            }
+            AppScreen::DeviceReplacement => {
+                // ADR-031 Phase 2B: lost-device backup restore. The
+                // user is on the DeviceReplacement SelectMode screen
+                // and just picked their encrypted backup. Swap to the
+                // OnboardingEngine seeded directly at
+                // BackupPasswordEntry (skipping IdentityCheck +
+                // LinkChoice — they already consented when they
+                // entered DeviceReplacement). Result: smooth password
+                // → import flow shared with the onboarding entry point.
+                let _ = self.navigate_to_internal(AppScreen::Onboarding);
+                if let Some(eng) = self
+                    .engine
+                    .as_any_mut()
+                    .and_then(|a| a.downcast_mut::<crate::ui::onboarding::OnboardingEngine>())
+                {
+                    eng.set_pending_backup_bytes(bytes);
+                    return Some(ActionResult::NavigateTo(eng.current_screen()));
+                }
+                None
+            }
             // Other screens don't participate in the file-picker
-            // protocol yet. Phase 2B adds Onboarding for backup restore.
+            // protocol. Phase 2B+ extends as new flows wire through.
             _ => None,
         }
     }
 
     pub(super) fn handle_completion(&mut self) -> ActionResult {
+        // ADR-031 Phase 2B (`2026-05-03-core-file-picker-command`):
+        // detect a `BackupPasswordEntry` submit on the OnboardingEngine
+        // BEFORE the default identity-creation path runs. The submit
+        // returns `ActionResult::Complete` from the engine; here we
+        // pull the pending bytes + password and call
+        // `Vauchi::import_full_backup`. Bytes are the file content
+        // verbatim — hex-encoded ASCII matching `export_full_backup`.
+        if matches!(self.screen, AppScreen::Onboarding)
+            && let Some(eng) = self
+                .engine
+                .as_any_mut()
+                .and_then(|a| a.downcast_mut::<crate::ui::onboarding::OnboardingEngine>())
+            && eng.current_step() == vauchi_core::types::OnboardingStep::BackupPasswordEntry
+            && let Some((bytes, password)) = eng.take_pending_backup()
+        {
+            return self.execute_backup_restore(bytes, password);
+        }
+
         match &self.screen {
             AppScreen::Onboarding => {
                 let name = match self.pending_display_name.take() {
@@ -981,9 +1037,70 @@ impl AppEngine {
     /// Called when the BackupRecoveryEngine transitions to Processing.
     /// Runs the backup operation synchronously (Argon2id KDF is slow but
     /// the platform already calls handle_action on a background thread).
+    /// Execute a backup-restore using bytes picked through the
+    /// ADR-031 file-picker (`ExchangeCommand::FilePickFromUser` with
+    /// `purpose = ImportBackup`) and the password the user typed on
+    /// the `OnboardingStep::BackupPasswordEntry` screen.
     ///
-    /// Import (restore) is not handled here — it needs the raw backup file
-    /// from a platform file picker, so restore uses `StartBackupImport`.
+    /// The picked file content is the exact output of
+    /// `Vauchi::export_full_backup` (hex-encoded ASCII). After UTF-8
+    /// decoding, it's passed straight to `Vauchi::import_full_backup`
+    /// which hex-decodes internally and rehydrates the identity, own
+    /// card, contacts, and labels.
+    ///
+    /// On success, navigate to MainScreen (MyInfo). On failure
+    /// (corrupt bytes, wrong password, IO), return to LinkChoice with
+    /// a `ShowAlert` so the user can retry.
+    fn execute_backup_restore(&mut self, bytes: Vec<u8>, password: String) -> ActionResult {
+        let backup_hex = match std::str::from_utf8(&bytes) {
+            Ok(s) => s.trim().to_string(),
+            Err(_) => {
+                self.reset_onboarding_to_link_choice();
+                return ActionResult::ShowAlert {
+                    title: "Restore failed".into(),
+                    message: "The selected file does not look like a Vauchi backup.".into(),
+                };
+            }
+        };
+
+        match self.vauchi.import_full_backup(&backup_hex, &password) {
+            Ok(()) => {
+                let target = AppScreen::MyInfo;
+                let screen = self.navigate_to_internal(target);
+                ActionResult::NavigateTo(screen)
+            }
+            Err(e) => {
+                self.reset_onboarding_to_link_choice();
+                ActionResult::ShowAlert {
+                    title: "Restore failed".into(),
+                    message: format!("{e}"),
+                }
+            }
+        }
+    }
+
+    /// Helper: rewind the OnboardingEngine to LinkChoice so the user
+    /// can retry restore after a failure. Called only from
+    /// `execute_backup_restore`'s error paths.
+    fn reset_onboarding_to_link_choice(&mut self) {
+        if let Some(eng) = self
+            .engine
+            .as_any_mut()
+            .and_then(|a| a.downcast_mut::<crate::ui::onboarding::OnboardingEngine>())
+        {
+            // Re-emitting "back" from BackupPasswordEntry clears
+            // pending bytes + password and routes to LinkChoice.
+            let _ = eng.handle_action(UserAction::ActionPressed {
+                action_id: "back".into(),
+            });
+        }
+    }
+
+    ///
+    /// Import (restore) flows through `execute_backup_restore` (Phase 2B
+    /// of `2026-05-03-core-file-picker-command`) which wires the file
+    /// picker + password entry through core. This helper handles the
+    /// export side only.
     fn execute_backup(&mut self) -> ActionResult {
         use crate::ui::backup_recovery::BackupRecoveryEngine;
 

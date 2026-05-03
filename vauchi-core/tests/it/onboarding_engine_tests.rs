@@ -126,7 +126,8 @@ fn link_choice_link_device_returns_start_device_link() {
 
 // @internal
 #[test]
-fn link_choice_restore_backup_returns_start_backup_import() {
+fn link_choice_restore_backup_emits_file_pick_command() {
+    use vauchi_core::exchange::{ExchangeCommand, FilePickPurpose};
     let mut engine = OnboardingEngine::new();
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "have_identity".into(),
@@ -134,10 +135,18 @@ fn link_choice_restore_backup_returns_start_backup_import() {
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "restore_backup".into(),
     });
-    assert!(
-        matches!(result, ActionResult::StartBackupImport),
-        "Expected StartBackupImport, got {result:?}"
-    );
+    match result {
+        ActionResult::ExchangeCommands { commands } => {
+            assert_eq!(commands.len(), 1);
+            match &commands[0] {
+                ExchangeCommand::FilePickFromUser { purpose, .. } => {
+                    assert_eq!(*purpose, FilePickPurpose::ImportBackup);
+                }
+                other => panic!("expected FilePickFromUser, got {other:?}"),
+            }
+        }
+        other => panic!("expected ExchangeCommands(FilePickFromUser/ImportBackup), got {other:?}"),
+    }
 }
 
 // @internal

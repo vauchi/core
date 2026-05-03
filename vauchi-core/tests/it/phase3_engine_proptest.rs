@@ -146,7 +146,6 @@ fn validate_result(
         | ActionResult::RequestCamera
         | ActionResult::ValidationError { .. }
         | ActionResult::StartDeviceLink
-        | ActionResult::StartBackupImport
         | ActionResult::OpenContact { .. }
         | ActionResult::EditContact { .. }
         | ActionResult::OpenUrl { .. }

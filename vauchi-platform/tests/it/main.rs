@@ -4,6 +4,7 @@
 
 //! Consolidated integration test binary for vauchi-platform.
 
+mod app_preferences_tests;
 mod contact_lifecycle_tests;
 mod content_tests;
 mod deep_link_uri_tests;

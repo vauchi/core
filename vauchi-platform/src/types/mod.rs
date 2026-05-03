@@ -39,9 +39,9 @@ pub use social::{
     MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 pub use ux::{
-    MobileAhaMoment, MobileAhaMomentType, MobileBorderRadiusTokens, MobileDemoContact,
-    MobileDemoContactState, MobileDesignTokens, MobileFaqItem, MobileHelpCategory,
-    MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo, MobileMotionTokens,
+    MobileAhaMoment, MobileAhaMomentType, MobileAppPreferences, MobileBorderRadiusTokens,
+    MobileDemoContact, MobileDemoContactState, MobileDesignTokens, MobileFaqItem,
+    MobileHelpCategory, MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo, MobileMotionTokens,
     MobileOnboardingProgress, MobileOnboardingStep, MobileSpacingDirectionTokens,
     MobileSpacingTokens, MobileTabInfo, MobileTabLayout, MobileTheme, MobileThemeColors,
     MobileThemeMode, MobileTouchTargetTokens, MobileTypographyTokens, mobile_get_string,

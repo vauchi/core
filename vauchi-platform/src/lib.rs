@@ -32,6 +32,7 @@ mod exchange;
 mod json_helpers;
 mod link_responder_session;
 mod mobile_animated_qr;
+mod mobile_app_preferences;
 mod mobile_ble;
 mod mobile_contact_detail;
 mod mobile_contacts;
@@ -132,18 +133,19 @@ pub use policies::{
     mobile_storage_key_byte_length,
 };
 pub use types::{
-    MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBorderRadiusTokens,
-    MobileBroadcastResult, MobileConsentRecord, MobileConsentStatus, MobileConsentType,
-    MobileContact, MobileContactCard, MobileContactField, MobileContactTrustLevel,
-    MobileDecoyContact, MobileDeletionInfo, MobileDeletionState, MobileDeliveryRecord,
-    MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact, MobileDemoContactState,
-    MobileDesignTokens, MobileDeviceDeliveryRecord, MobileDeviceDeliveryStatus, MobileDeviceInfo,
-    MobileDeviceJoinResult, MobileDeviceLinkConfirmation, MobileDeviceLinkData,
-    MobileDeviceLinkInfo, MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileDuressSettings,
-    MobileEmergencyConfig, MobileExchangeResult, MobileFaqItem, MobileFieldNote, MobileFieldType,
-    MobileGdprExport, MobileHelpCategory, MobileHelpCategoryInfo, MobileLabelContactBadge,
-    MobileLabelContactRow, MobileLabelContactStatus, MobileLocale, MobileLocaleInfo,
-    MobileMotionTokens, MobileNotificationCategory, MobileOnboardingProgress, MobileOnboardingStep,
+    MobileAhaMoment, MobileAhaMomentType, MobileAppPreferences, MobileAuthMode,
+    MobileBorderRadiusTokens, MobileBroadcastResult, MobileConsentRecord, MobileConsentStatus,
+    MobileConsentType, MobileContact, MobileContactCard, MobileContactField,
+    MobileContactTrustLevel, MobileDecoyContact, MobileDeletionInfo, MobileDeletionState,
+    MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact,
+    MobileDemoContactState, MobileDesignTokens, MobileDeviceDeliveryRecord,
+    MobileDeviceDeliveryStatus, MobileDeviceInfo, MobileDeviceJoinResult,
+    MobileDeviceLinkConfirmation, MobileDeviceLinkData, MobileDeviceLinkInfo,
+    MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileDuressSettings, MobileEmergencyConfig,
+    MobileExchangeResult, MobileFaqItem, MobileFieldNote, MobileFieldType, MobileGdprExport,
+    MobileHelpCategory, MobileHelpCategoryInfo, MobileLabelContactBadge, MobileLabelContactRow,
+    MobileLabelContactStatus, MobileLocale, MobileLocaleInfo, MobileMotionTokens,
+    MobileNotificationCategory, MobileOnboardingProgress, MobileOnboardingStep,
     MobilePendingNotification, MobileRecoveryClaim, MobileRecoveryProgress,
     MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
     MobileShredStatus, MobileShredToken, MobileShredVerification, MobileSocialNetwork,

@@ -253,7 +253,6 @@ mod tests {
             subtitle: None,
             avatar_initials: name.chars().next().unwrap_or('?').to_string(),
             status: None,
-            searchable_fields: vec![],
             actions: vec![],
             a11y: None,
         }

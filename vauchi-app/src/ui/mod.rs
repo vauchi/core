@@ -84,7 +84,7 @@ pub use contact_detail::{
 };
 pub use contact_edit::{ContactEditEngine, EditableContact, EditableField};
 pub use contact_limit::ContactLimitEngine;
-pub use contact_list::ContactListEngine;
+pub use contact_list::{ContactListEngine, IndexedItem};
 pub use contact_merge::{ContactMergeEngine, MergePreview};
 pub use contact_visibility::ContactVisibilityEngine;
 pub use decoy_contacts::{DecoyContactItem, DecoyContactsEngine};

@@ -20,7 +20,7 @@ use crate::ui::contact_detail::{
 };
 use crate::ui::contact_edit::{ContactEditEngine, EditableContact, EditableField};
 use crate::ui::contact_limit::ContactLimitEngine;
-use crate::ui::contact_list::ContactListEngine;
+use crate::ui::contact_list::{ContactListEngine, IndexedItem};
 use crate::ui::contact_merge::{ContactMergeEngine, MergePreview};
 use crate::ui::contact_visibility::ContactVisibilityEngine;
 use crate::ui::decoy_contacts::{DecoyContactItem, DecoyContactsEngine};
@@ -167,8 +167,8 @@ impl AppEngine {
                     for g in &all_groups {
                         let member_ids: Vec<String> = contacts
                             .iter()
-                            .filter(|c| g.contains_contact(&c.id))
-                            .map(|c| c.id.clone())
+                            .filter(|c| g.contains_contact(&c.item.id))
+                            .map(|c| c.item.id.clone())
                             .collect();
                         memberships.insert(g.id().to_string(), member_ids);
                     }
@@ -336,7 +336,6 @@ impl AppEngine {
                                     subtitle: None,
                                     avatar_initials: initials(c.display_name()),
                                     status: None,
-                                    searchable_fields: vec![],
                                     actions: vec![],
                                     a11y: Some(A11y {
                                         label: Some(format!("Contact: {}", c.display_name())),
@@ -378,7 +377,10 @@ impl AppEngine {
                 Box::new(SyncStatusEngine::new(relay_url, contact_count, pending))
             }
             AppScreen::Recovery => {
-                let contacts = Self::load_contact_items(vauchi);
+                let contacts: Vec<Item> = Self::load_contact_items(vauchi)
+                    .into_iter()
+                    .map(|c| c.item)
+                    .collect();
                 let device_count = vauchi
                     .list_devices()
                     .map(|d| d.len().saturating_sub(1))
@@ -397,7 +399,8 @@ impl AppEngine {
                 let contact_items = Self::load_contact_items(vauchi);
                 let entries: Vec<SocialContactEntry> = contact_items
                     .into_iter()
-                    .map(|item| {
+                    .map(|indexed| {
+                        let item = indexed.item;
                         let trust_level = vauchi
                             .get_contact(&item.id)
                             .ok()
@@ -430,7 +433,7 @@ impl AppEngine {
                     .map(|g| {
                         let member_count = contacts
                             .iter()
-                            .filter(|c| g.contains_contact(&c.id))
+                            .filter(|c| g.contains_contact(&c.item.id))
                             .count();
                         GroupInfo {
                             id: g.id().to_string(),
@@ -458,7 +461,6 @@ impl AppEngine {
                         subtitle: None,
                         avatar_initials: initials(c.display_name()),
                         status: None,
-                        searchable_fields: vec![],
                         actions: vec![],
                         a11y: Some(A11y {
                             label: Some(format!("Contact: {}", c.display_name())),
@@ -571,12 +573,6 @@ impl AppEngine {
                         subtitle: None,
                         avatar_initials: initials(contact.display_name()),
                         status,
-                        searchable_fields: contact
-                            .card()
-                            .fields()
-                            .iter()
-                            .map(|f| f.value().to_string())
-                            .collect(),
                         actions: vec![],
                         a11y: Some(A11y {
                             label: Some(format!("Contact: {}", contact.display_name())),
@@ -992,7 +988,7 @@ impl AppEngine {
         ))
     }
 
-    pub(super) fn load_contact_items(vauchi: &Vauchi) -> Vec<Item> {
+    pub(super) fn load_contact_items(vauchi: &Vauchi) -> Vec<IndexedItem> {
         match vauchi.list_contacts() {
             Ok(contacts) => contacts
                 .iter()
@@ -1011,20 +1007,20 @@ impl AppEngine {
                     } else {
                         None
                     };
-                    Item {
+                    let item = Item {
                         id: c.id().to_string(),
                         name: c.display_name().to_string(),
                         subtitle,
                         avatar_initials: initials(c.display_name()),
                         status,
-                        searchable_fields: fields,
                         actions: contact_row_actions(c.is_imported(), c.is_hidden()),
                         a11y: Some(A11y {
                             label: Some(format!("Contact: {}", c.display_name())),
                             hint: Some("Double tap to view contact details".into()),
                             role: None,
                         }),
-                    }
+                    };
+                    IndexedItem::new(item, fields)
                 })
                 .collect(),
             Err(_) => vec![],

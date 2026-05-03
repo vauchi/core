@@ -19,7 +19,6 @@ fn sample_contact() -> Item {
         subtitle: Some("+41 79 123 45 67".into()),
         avatar_initials: "A".into(),
         status: None,
-        searchable_fields: vec![],
         actions: vec![],
         a11y: None,
     }

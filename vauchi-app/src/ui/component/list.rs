@@ -4,20 +4,18 @@
 
 //! List-shape wire types: items shown in `Component::List`.
 //!
-//! Phase-0 prep for the Wire Humble Tier 0 rename
-//! (`2026-05-03-coreui-wire-humble-types`). The types in this file
-//! are scheduled to become UI-shaped at the wire boundary —
-//! `Item → Item`, `Component::List → Component::List`.
-//! Engine-side typing stays Rust-internal; `T` does not cross serde.
+//! Wire Humble: `Item` carries presentation only — id, displayed
+//! name/subtitle/avatar, per-row actions, a11y. Engine-side input
+//! (e.g. searchable text for `ContactListEngine`) lives in the
+//! engine's own sidecar (see `crate::ui::contact_list::IndexedItem`)
+//! and never crosses the serde boundary.
 
 use serde::{Deserialize, Serialize};
 
 use super::A11y;
 
-/// A lightweight item shown in `Component::List` (and the legacy
-/// `Component::List`). UI-shaped: the renderer doesn't know what
-/// kind of thing it represents — see `ListKind` on the parent component
-/// for purely-presentational hints (icon/empty-text key).
+/// A lightweight item shown in `Component::List`. UI-shaped: the
+/// renderer doesn't know what kind of thing it represents.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Item {
@@ -26,10 +24,6 @@ pub struct Item {
     pub subtitle: Option<String>,
     pub avatar_initials: String,
     pub status: Option<String>,
-    /// Field values available for search (phone numbers, emails, etc.).
-    /// Not displayed directly — used by ContactListEngine for full-text search.
-    #[serde(default)]
-    pub searchable_fields: Vec<String>,
     /// Declarative per-row actions (swipe/long-press/context-menu on mobile,
     /// overflow menu on desktop). Empty = no per-row actions. The engine
     /// that produced this item chooses which actions make sense given the

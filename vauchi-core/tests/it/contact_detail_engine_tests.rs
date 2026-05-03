@@ -17,7 +17,6 @@ fn sample_contact() -> Item {
         subtitle: Some("alice@example.com".into()),
         avatar_initials: "AL".into(),
         status: None,
-        searchable_fields: vec![],
         actions: vec![],
         a11y: None,
     }

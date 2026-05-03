@@ -1273,7 +1273,7 @@
       ]
     },
     "Item": {
-      "description": "A lightweight item shown in `Component::List` (and the legacy `Component::List`). UI-shaped: the renderer doesn't know what kind of thing it represents — see `ListKind` on the parent component for purely-presentational hints (icon/empty-text key).",
+      "description": "A lightweight item shown in `Component::List`. UI-shaped: the renderer doesn't know what kind of thing it represents.",
       "type": "object",
       "required": [
         "avatar_initials",
@@ -1308,14 +1308,6 @@
         },
         "name": {
           "type": "string"
-        },
-        "searchable_fields": {
-          "description": "Field values available for search (phone numbers, emails, etc.). Not displayed directly — used by ContactListEngine for full-text search.",
-          "default": [],
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         },
         "status": {
           "type": [

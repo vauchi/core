@@ -4,38 +4,35 @@
 
 use vauchi_app::ui::*;
 
-fn sample_contacts() -> Vec<Item> {
+fn sample_contacts() -> Vec<IndexedItem> {
     vec![
-        Item {
+        IndexedItem::from(Item {
             id: "c1".into(),
             name: "Alice".into(),
             subtitle: Some("Friend".into()),
             avatar_initials: "AL".into(),
             status: None,
-            searchable_fields: vec![],
             actions: vec![],
             a11y: None,
-        },
-        Item {
+        }),
+        IndexedItem::from(Item {
             id: "c2".into(),
             name: "Bob".into(),
             subtitle: None,
             avatar_initials: "BO".into(),
             status: Some("Updated".into()),
-            searchable_fields: vec![],
             actions: vec![],
             a11y: None,
-        },
-        Item {
+        }),
+        IndexedItem::from(Item {
             id: "c3".into(),
             name: "Charlie".into(),
             subtitle: Some("Coworker".into()),
             avatar_initials: "CH".into(),
             status: None,
-            searchable_fields: vec![],
             actions: vec![],
             a11y: None,
-        },
+        }),
     ]
 }
 
@@ -208,38 +205,41 @@ fn contact_list_search_no_results_shows_empty_list_not_guidance() {
 
 // --- Field search tests ---
 
-fn contacts_with_fields() -> Vec<Item> {
+fn contacts_with_fields() -> Vec<IndexedItem> {
     vec![
-        Item {
-            id: "c1".into(),
-            name: "Alice".into(),
-            subtitle: Some("+1-555-0100".into()),
-            avatar_initials: "AL".into(),
-            status: None,
-            searchable_fields: vec!["+1-555-0100".into(), "alice@example.com".into()],
-            actions: vec![],
-            a11y: None,
-        },
-        Item {
-            id: "c2".into(),
-            name: "Bob".into(),
-            subtitle: Some("bob@work.com".into()),
-            avatar_initials: "BO".into(),
-            status: None,
-            searchable_fields: vec!["bob@work.com".into(), "+1-555-0200".into()],
-            actions: vec![],
-            a11y: None,
-        },
-        Item {
+        IndexedItem::new(
+            Item {
+                id: "c1".into(),
+                name: "Alice".into(),
+                subtitle: Some("+1-555-0100".into()),
+                avatar_initials: "AL".into(),
+                status: None,
+                actions: vec![],
+                a11y: None,
+            },
+            vec!["+1-555-0100".into(), "alice@example.com".into()],
+        ),
+        IndexedItem::new(
+            Item {
+                id: "c2".into(),
+                name: "Bob".into(),
+                subtitle: Some("bob@work.com".into()),
+                avatar_initials: "BO".into(),
+                status: None,
+                actions: vec![],
+                a11y: None,
+            },
+            vec!["bob@work.com".into(), "+1-555-0200".into()],
+        ),
+        IndexedItem::from(Item {
             id: "c3".into(),
             name: "Charlie".into(),
             subtitle: None,
             avatar_initials: "CH".into(),
             status: None,
-            searchable_fields: vec![],
             actions: vec![],
             a11y: None,
-        },
+        }),
     ]
 }
 
@@ -322,38 +322,35 @@ fn search_no_match_returns_empty() {
 
 // --- Group filter tests ---
 
-fn contacts_with_groups() -> (Vec<Item>, Vec<(String, String)>) {
+fn contacts_with_groups() -> (Vec<IndexedItem>, Vec<(String, String)>) {
     let contacts = vec![
-        Item {
+        IndexedItem::from(Item {
             id: "c1".into(),
             name: "Alice".into(),
             subtitle: None,
             avatar_initials: "AL".into(),
             status: None,
-            searchable_fields: vec![],
             actions: vec![],
             a11y: None,
-        },
-        Item {
+        }),
+        IndexedItem::from(Item {
             id: "c2".into(),
             name: "Bob".into(),
             subtitle: None,
             avatar_initials: "BO".into(),
             status: None,
-            searchable_fields: vec![],
             actions: vec![],
             a11y: None,
-        },
-        Item {
+        }),
+        IndexedItem::from(Item {
             id: "c3".into(),
             name: "Charlie".into(),
             subtitle: None,
             avatar_initials: "CH".into(),
             status: None,
-            searchable_fields: vec![],
             actions: vec![],
             a11y: None,
-        },
+        }),
     ];
     let groups = vec![("g1".into(), "Family".into()), ("g2".into(), "Work".into())];
     (contacts, groups)
@@ -420,7 +417,7 @@ fn group_filter_clear_shows_all() {
 fn group_filter_combines_with_search() {
     let (mut contacts, groups) = contacts_with_groups();
     // Give Alice a field
-    contacts[0].searchable_fields = vec!["alice@example.com".into()];
+    contacts[0].searchable = vec!["alice@example.com".into()];
     let memberships = group_memberships();
     let mut engine = ContactListEngine::with_groups(contacts, groups, memberships);
 
@@ -467,20 +464,19 @@ fn available_groups_shown_in_screen() {
 // @internal
 #[test]
 fn contact_item_a11y_is_preserved_through_engine() {
-    let contacts = vec![Item {
+    let contacts = vec![IndexedItem::from(Item {
         id: "c1".into(),
         name: "Alice".into(),
         subtitle: None,
         avatar_initials: "AL".into(),
         status: None,
-        searchable_fields: vec![],
         actions: vec![],
         a11y: Some(A11y {
             label: Some("Contact: Alice".into()),
             hint: Some("Double tap to view contact details".into()),
             role: None,
         }),
-    }];
+    })];
     let engine = ContactListEngine::new(contacts);
     let screen = engine.current_screen();
 

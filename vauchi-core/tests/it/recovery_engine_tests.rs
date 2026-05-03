@@ -18,7 +18,6 @@ fn make_contact(id: &str, name: &str, initials: &str) -> Item {
         subtitle: None,
         avatar_initials: initials.into(),
         status: None,
-        searchable_fields: vec![],
         actions: vec![],
         a11y: None,
     }

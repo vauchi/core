@@ -8,10 +8,38 @@ use std::collections::HashMap;
 
 use crate::ui::*;
 
+/// An `Item` paired with its engine-internal search index.
+///
+/// `Item` is the wire shape (Wire Humble: presentation only). The
+/// per-contact searchable text — phone numbers, emails, etc. — is
+/// engine input that never crosses to the wire. Callers wrap each
+/// `Item` they want indexed, or pass `searchable: vec![]` for items
+/// they don't want returned by search.
+#[derive(Clone, Debug)]
+pub struct IndexedItem {
+    pub item: Item,
+    pub searchable: Vec<String>,
+}
+
+impl IndexedItem {
+    pub fn new(item: Item, searchable: Vec<String>) -> Self {
+        Self { item, searchable }
+    }
+}
+
+impl From<Item> for IndexedItem {
+    fn from(item: Item) -> Self {
+        Self {
+            item,
+            searchable: Vec::new(),
+        }
+    }
+}
+
 /// Contact list engine — full contact list with search and group filtering.
 #[derive(Clone, Debug)]
 pub struct ContactListEngine {
-    all_contacts: Vec<Item>,
+    all_contacts: Vec<IndexedItem>,
     search_query: String,
     /// Active group filter: None = show all, Some(group_id) = show only members.
     group_filter: Option<String>,
@@ -22,7 +50,7 @@ pub struct ContactListEngine {
 }
 
 impl ContactListEngine {
-    pub fn new(contacts: Vec<Item>) -> Self {
+    pub fn new(contacts: Vec<IndexedItem>) -> Self {
         Self {
             all_contacts: contacts,
             search_query: String::new(),
@@ -34,7 +62,7 @@ impl ContactListEngine {
 
     /// Create engine with group information for filtering.
     pub fn with_groups(
-        contacts: Vec<Item>,
+        contacts: Vec<IndexedItem>,
         groups: Vec<(String, String)>,
         memberships: HashMap<String, Vec<String>>,
     ) -> Self {
@@ -48,32 +76,36 @@ impl ContactListEngine {
     }
 
     fn filtered_contacts(&self) -> Vec<Item> {
-        // Clone is required: ScreenModel owns its components, so ContactList
-        // needs an owned Vec<Item>. Caching would add complexity for
-        // a list that is small in practice (< 1000 contacts).
-        let base = if let Some(ref group_id) = self.group_filter {
-            let member_ids = self.group_memberships.get(group_id);
-            self.all_contacts
-                .iter()
-                .filter(|c| member_ids.map(|ids| ids.contains(&c.id)).unwrap_or(false))
-                .cloned()
-                .collect()
-        } else {
-            self.all_contacts.clone()
-        };
-
-        if self.search_query.is_empty() {
-            return base;
-        }
-
+        // Clone is required: ScreenModel owns its components, so the
+        // emitted Vec<Item> needs to be owned. Caching would add
+        // complexity for a list that is small in practice (< 1000
+        // contacts).
         let query_lower = self.search_query.to_lowercase();
-        base.into_iter()
+        let search_active = !query_lower.is_empty();
+
+        self.all_contacts
+            .iter()
             .filter(|c| {
-                c.name.to_lowercase().contains(&query_lower)
-                    || c.searchable_fields
+                if let Some(group_id) = &self.group_filter {
+                    let member_ids = self.group_memberships.get(group_id);
+                    if !member_ids
+                        .map(|ids| ids.contains(&c.item.id))
+                        .unwrap_or(false)
+                    {
+                        return false;
+                    }
+                }
+                if search_active {
+                    let name_match = c.item.name.to_lowercase().contains(&query_lower);
+                    let field_match = c
+                        .searchable
                         .iter()
-                        .any(|f| f.to_lowercase().contains(&query_lower))
+                        .any(|f| f.to_lowercase().contains(&query_lower));
+                    return name_match || field_match;
+                }
+                true
             })
+            .map(|c| c.item.clone())
             .collect()
     }
 }
@@ -215,8 +247,8 @@ impl WorkflowEngine for ContactListEngine {
                 let offered = self
                     .all_contacts
                     .iter()
-                    .find(|c| c.id == item_id)
-                    .and_then(|c| c.actions.iter().find(|a| a.id == action_id))
+                    .find(|c| c.item.id == item_id)
+                    .and_then(|c| c.item.actions.iter().find(|a| a.id == action_id))
                     .map(|a| a.kind);
                 if let Some(kind) = offered
                     && let Some(contact_kind) = contact_action_kind_from(kind)
@@ -252,17 +284,16 @@ fn contact_action_kind_from(kind: ListItemActionKind) -> Option<ContactActionKin
 mod tests {
     use super::*;
 
-    fn item(id: &str, actions: Vec<ListItemAction>) -> Item {
-        Item {
+    fn item(id: &str, actions: Vec<ListItemAction>) -> IndexedItem {
+        IndexedItem::from(Item {
             id: id.into(),
             name: format!("Contact {id}"),
             subtitle: None,
             avatar_initials: "C".into(),
             status: None,
-            searchable_fields: vec![],
             actions,
             a11y: None,
-        }
+        })
     }
 
     fn archive_action() -> ListItemAction {

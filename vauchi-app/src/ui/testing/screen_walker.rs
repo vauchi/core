@@ -437,7 +437,6 @@ mod tests {
                 subtitle: None,
                 avatar_initials: "A".into(),
                 status: None,
-                searchable_fields: vec![],
                 actions: vec![],
                 a11y: None,
             }],

@@ -44,28 +44,26 @@ fn assert_fixture_fresh(screen: &ScreenModel, filename: &str) {
 
 // ── Sample data builders ─────────────────────────────────────────
 
-fn sample_contacts() -> Vec<Item> {
+fn sample_contacts() -> Vec<IndexedItem> {
     vec![
-        Item {
+        IndexedItem::from(Item {
             id: "c1".into(),
             name: "Alice".into(),
             subtitle: Some("Friend".into()),
             avatar_initials: "A".into(),
             status: None,
-            searchable_fields: vec![],
             actions: vec![],
             a11y: None,
-        },
-        Item {
+        }),
+        IndexedItem::from(Item {
             id: "c2".into(),
             name: "Bob".into(),
             subtitle: None,
             avatar_initials: "B".into(),
             status: Some("Updated".into()),
-            searchable_fields: vec![],
             actions: vec![],
             a11y: None,
-        },
+        }),
     ]
 }
 
@@ -294,7 +292,6 @@ fn sample_duress_config() -> DuressConfig {
             subtitle: None,
             avatar_initials: "E".into(),
             status: None,
-            searchable_fields: vec![],
             actions: vec![],
             a11y: None,
         }],

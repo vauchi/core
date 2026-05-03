@@ -489,6 +489,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "recovery_progress",
             action: MigrationAction::Sql(MIGRATION_V45_RECOVERY_PROGRESS),
         },
+        Migration {
+            version: 46,
+            name: "app_preferences",
+            action: MigrationAction::Sql(MIGRATION_V46_APP_PREFERENCES),
+        },
     ]
 }
 
@@ -818,6 +823,31 @@ const MIGRATION_V45_RECOVERY_PROGRESS: &str = "
     CREATE TABLE IF NOT EXISTS recovery_progress (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         progress_encrypted BLOB NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+";
+
+/// Migration v46: App preferences singleton table.
+///
+/// Singleton table (id = 1) storing the user's theme + language picks.
+/// `theme_id` and `language_code` are NULL when the user is following
+/// the system default (the corresponding `follow_system_*` flag is the
+/// authoritative signal — NULL alone could also mean "never set"). All
+/// fields are unencrypted (preferences are not sensitive).
+///
+/// Wired from the Theme + Language pickers in the Settings screen via
+/// `app_engine::intercept` and consumed by `SettingsConfig`. Replaces
+/// the per-platform `SharedPreferences` / `UserDefaults` storage that
+/// the bespoke `ThemeSettingsScreen` / `LanguageSettingsScreen`
+/// composables wrote on Android (problem record
+/// `2026-05-01-android-humble-ui-deep-retirement`, Phase 2a/A3a).
+const MIGRATION_V46_APP_PREFERENCES: &str = "
+    CREATE TABLE IF NOT EXISTS app_preferences (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        theme_id TEXT,
+        language_code TEXT,
+        follow_system_theme INTEGER NOT NULL DEFAULT 1,
+        follow_system_language INTEGER NOT NULL DEFAULT 1,
         updated_at INTEGER NOT NULL
     );
 ";

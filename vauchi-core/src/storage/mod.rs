@@ -104,6 +104,11 @@ pub mod duress_settings;
 mod duress_settings;
 
 #[cfg(feature = "testing")]
+pub mod app_preferences;
+#[cfg(not(feature = "testing"))]
+mod app_preferences;
+
+#[cfg(feature = "testing")]
 pub mod emergency;
 #[cfg(not(feature = "testing"))]
 mod emergency;

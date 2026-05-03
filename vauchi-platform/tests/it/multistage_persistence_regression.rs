@@ -177,14 +177,19 @@ fn listener_path_persists_peer_contact_after_finalized() {
     bob_session.start();
 
     // Both `on_finalized` callbacks must fire before we can assert
-    // persistence. Allow up to 10 s — the legacy timing proptest
-    // converges in well under 5 s with the override.
-    let finalized = wait_until(Duration::from_secs(10), || {
+    // persistence. Local: ~4.5 s with the 5 ms cycle override. CI is
+    // an 8x slower / more contended runner, so the original 10 s
+    // budget under-allocates and trips on shared-runner pipelines
+    // (vauchi/core!747 timed out; same test passed locally 5/5 at
+    // 4.4 s each). 30 s gives ~6x margin over local; CI runs that
+    // exceed this point to a real protocol regression rather than
+    // runner contention.
+    let finalized = wait_until(Duration::from_secs(30), || {
         alice_recorder.finalized_name().is_some() && bob_recorder.finalized_name().is_some()
     });
     assert!(
         finalized,
-        "exchange did not finalize on both sides within 10 s; alice={:?} bob={:?}",
+        "exchange did not finalize on both sides within 30 s; alice={:?} bob={:?}",
         alice_recorder.finalized_name(),
         bob_recorder.finalized_name()
     );

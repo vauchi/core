@@ -111,7 +111,7 @@ mod tests {
             hpke::Kem::X25519Sha256,
             vec![SymmetricSuite::new(
                 hpke::Kdf::HkdfSha256,
-                hpke::Aead::Aes128Gcm,
+                hpke::Aead::ChaCha20Poly1305,
             )],
         )
         .expect("KeyConfig::new must succeed");

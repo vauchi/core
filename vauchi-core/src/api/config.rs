@@ -378,11 +378,16 @@ pub struct OhttpConfig {
 /// key for the first OHTTP request instead of fetching it directly.
 /// The cached key from storage takes precedence if fresher.
 ///
+/// AEAD must be ChaCha20-Poly1305 (RFC 9180 codepoint `0x0003`) per
+/// ADR-046. The regression test below
+/// (`bundled_ohttp_key_advertises_only_chacha20_poly1305`) fails
+/// loudly if the next regen accidentally re-introduces an AES suite.
+///
 /// Update when the relay rotates its OHTTP key pair.
 const BUNDLED_OHTTP_KEY: &[u8] = &[
-    0x00, 0x00, 0x20, 0xdc, 0x7a, 0x27, 0xe6, 0x5d, 0xd7, 0x12, 0x50, 0xc9, 0x14, 0xe2, 0xf8, 0xe1,
-    0x78, 0x48, 0xf7, 0xf2, 0xc0, 0xa3, 0xc7, 0xdf, 0xd2, 0x8f, 0x9a, 0x80, 0x56, 0x47, 0x58, 0x66,
-    0xc1, 0xab, 0x41, 0x00, 0x04, 0x00, 0x01, 0x00, 0x01,
+    0x00, 0x00, 0x20, 0xc6, 0xb5, 0xa3, 0xed, 0xe1, 0xaa, 0xdf, 0xfb, 0xbe, 0xc7, 0xf0, 0xea, 0x55,
+    0xb6, 0x58, 0x96, 0x6a, 0xa4, 0xd9, 0x90, 0x2d, 0xf1, 0xc8, 0x5c, 0x82, 0xc6, 0x21, 0x7a, 0xcb,
+    0xd2, 0x44, 0x68, 0x00, 0x04, 0x00, 0x01, 0x00, 0x03,
 ];
 
 impl Default for OhttpConfig {
@@ -417,6 +422,78 @@ impl Default for RecoveryConfig {
             threshold: 3,
             auto_remind: true,
             remind_interval_days: 7,
+        }
+    }
+}
+
+// INLINE_TEST_REQUIRED: BUNDLED_OHTTP_KEY is a private const; an external
+// test would need a pub accessor, widening API surface for nothing. The
+// guard sits next to the bytes it protects so the next regen sees it.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// ADR-046: the bundled OHTTP key must advertise only
+    /// ChaCha20-Poly1305 (RFC 9180 AEAD codepoint `0x0003`). An AES
+    /// codepoint here means every fresh cli with `allow_direct: false`
+    /// (the documented production posture per ADR-037) silently encaps
+    /// with the wrong cipher and the gateway rejects with
+    /// `ohttp::Error::Unsupported`. See problem record
+    /// `2026-05-04-ohttp-gateway-decap-unsupported-via-outer-hop`.
+    ///
+    /// Wire format (RFC 9458 §3.1):
+    ///   1B key_id || 2B kem || pub_key || 2B suites_len || (2B kdf || 2B aead)+
+    /// AEAD codepoints (RFC 9180):
+    ///   0x0001 AES-128-GCM      (FORBIDDEN, ADR-019/046)
+    ///   0x0002 AES-256-GCM      (FORBIDDEN, ADR-019)
+    ///   0x0003 ChaCha20-Poly1305 (REQUIRED post-ADR-046)
+    // @internal
+    #[test]
+    fn bundled_ohttp_key_advertises_only_chacha20_poly1305() {
+        let key = BUNDLED_OHTTP_KEY;
+
+        // X25519 KEM (`0x0020`) → 32-byte pub key → suites_len at offset 35.
+        // Sanity-check the prefix so a future KEM swap fails here loudly
+        // instead of misparsing into a bogus suite list.
+        assert_eq!(
+            u16::from_be_bytes([key[1], key[2]]),
+            0x0020,
+            "bundled key KEM must remain X25519 (0x0020) — \
+             update this test if the KEM is intentionally changed"
+        );
+
+        let suites_len = u16::from_be_bytes([key[35], key[36]]) as usize;
+        assert_eq!(
+            suites_len % 4,
+            0,
+            "suites_len ({suites_len}) must be a multiple of 4 \
+             (each suite is 2B kdf + 2B aead per RFC 9458)"
+        );
+        assert!(
+            suites_len > 0,
+            "bundled key must advertise at least one suite"
+        );
+        assert_eq!(
+            key.len(),
+            37 + suites_len,
+            "bundled key length ({}) must equal 37 + suites_len ({suites_len}) — \
+             trailing bytes or truncation indicate a regen error",
+            key.len()
+        );
+
+        for chunk in key[37..37 + suites_len].chunks_exact(4) {
+            let kdf = u16::from_be_bytes([chunk[0], chunk[1]]);
+            let aead = u16::from_be_bytes([chunk[2], chunk[3]]);
+            assert_eq!(
+                kdf, 0x0001,
+                "bundled key KDF must remain HKDF-SHA256 (0x0001), got 0x{kdf:04x}"
+            );
+            assert_eq!(
+                aead, 0x0003,
+                "ADR-046: bundled key must advertise ChaCha20-Poly1305 only \
+                 (got AEAD 0x{aead:04x}); regenerate via \
+                 `curl -s https://ohttp.vauchi.app/v2/ohttp-key`"
+            );
         }
     }
 }

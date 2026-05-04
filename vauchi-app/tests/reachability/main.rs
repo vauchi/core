@@ -15,6 +15,7 @@ mod deep_link_consent;
 mod delivery_status;
 mod device_linking;
 mod exchange;
+mod exchange_ble;
 mod form_dialog;
 mod group_detail;
 mod link_responder;

@@ -120,12 +120,6 @@ pub enum ActionResult {
     },
     /// Frontend should switch to the device linking flow.
     StartDeviceLink,
-    /// Chrome hint kept for frontends that historically pattern-match on
-    /// it. Core no longer emits this — the backup-restore flow now goes
-    /// through `ExchangeCommand::FilePickFromUser { purpose: ImportBackup }`
-    /// (Phase 2B of `2026-05-03-core-file-picker-command`). Removed in
-    /// Phase 3 once all frontends migrate to the file-picker handler.
-    StartBackupImport,
     /// Frontend should open the contact detail view.
     OpenContact {
         contact_id: String,

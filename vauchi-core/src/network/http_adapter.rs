@@ -11,7 +11,18 @@
 //! interface and the HTTP request/response model:
 //! - `send(EncryptedUpdate)` → `POST /v2/send` (via OHTTP when configured)
 //! - `receive()` → `POST /v2/fetch` (polls with registered mailbox tokens)
-//! - `connect()` → health check + optional OHTTP key fetch
+//! - `connect()` → mark `Connected`; rely on the first OHTTP envelope to
+//!   exercise connectivity. Earlier versions issued a clear-text `GET
+//!   /v2/health` probe here. Removed per
+//!   `2026-05-04-cli-adapter-health-check-breaks-outer-hop` Option A
+//!   because the probe (a) broke routing through `vauchi-ohttp-relay`
+//!   (the outer privacy hop only proxies `/v2/ohttp` + `/v2/ohttp-key`)
+//!   and (b) acted as a pre-sync timing beacon — the relay (or
+//!   outer-hop) operator could correlate `health` request bursts with
+//!   the OHTTP envelopes that followed. The first real `send`/`receive`
+//!   surfaces the same `NetworkError::ConnectionFailed` if the relay
+//!   is down; the only difference is ~50 ms slower error path on a
+//!   failed relay, which is invisible for non-interactive sync.
 //! - `disconnect()` → no-op (HTTP is stateless)
 
 use std::collections::VecDeque;
@@ -131,18 +142,15 @@ impl HttpTransportAdapter {
 
 impl super::transport::Transport for HttpTransportAdapter {
     fn connect(&mut self, _config: &TransportConfig) -> TransportResult<()> {
-        self.state = ConnectionState::Connecting;
+        // No clear-text liveness probe here — see the module-level
+        // doc-comment for the F12 rationale (problem record
+        // `2026-05-04-cli-adapter-health-check-breaks-outer-hop`).
+        // The first OHTTP envelope is the de-facto liveness check;
+        // its `ConnectionFailed` error is what the previous
+        // `health_check()` would have surfaced.
         self.has_fetched = false;
-        match self.http.health_check() {
-            Ok(()) => {
-                self.state = ConnectionState::Connected;
-                Ok(())
-            }
-            Err(e) => {
-                self.state = ConnectionState::Disconnected;
-                Err(e)
-            }
-        }
+        self.state = ConnectionState::Connected;
+        Ok(())
     }
 
     fn disconnect(&mut self) -> TransportResult<()> {
@@ -288,12 +296,54 @@ mod tests {
         assert_eq!(adapter.state(), ConnectionState::Disconnected);
     }
 
+    // @internal
     #[test]
-    fn test_connect_fails_when_unreachable() {
+    fn test_connect_does_not_probe_relay() {
+        // F12 Option A: `connect()` no longer issues a `/v2/health` probe.
+        // It just marks the adapter `Connected`; connectivity errors
+        // surface on the first `send`/`receive`. This test pins that
+        // behaviour so a future "fast-fail" reintroduction can't slip
+        // through unnoticed.
         let mut adapter = make_adapter(true);
         let result = adapter.connect(&TransportConfig::default());
-        assert!(result.is_err());
-        assert_eq!(adapter.state(), ConnectionState::Disconnected);
+        assert!(
+            result.is_ok(),
+            "connect() must succeed unconditionally — no probe"
+        );
+        assert_eq!(adapter.state(), ConnectionState::Connected);
+    }
+
+    // @internal
+    #[test]
+    fn test_unreachable_relay_surfaces_on_first_receive() {
+        // F12: with the probe gone, the unreachable relay must still
+        // surface a `NetworkError::ConnectionFailed` — just at the
+        // first real envelope rather than at `connect()` time.
+        // Verifies the load-bearing claim from the F12 design that the
+        // error path is preserved. Uses `receive()` (which does an
+        // HTTP round trip) rather than `send()` because `send` of a
+        // `RegisterMailbox` message is local-only.
+        let mut adapter = make_adapter(true);
+        adapter
+            .connect(&TransportConfig::default())
+            .expect("connect succeeds without probe");
+        // Register a token so receive actually polls the relay.
+        let register = MessageEnvelope {
+            version: PROTOCOL_VERSION,
+            message_id: "reg".to_string(),
+            timestamp: 0,
+            payload: MessagePayload::RegisterMailbox(RegisterMailbox {
+                tokens: vec!["t".repeat(64)],
+            }),
+        };
+        adapter
+            .send(&register)
+            .expect("RegisterMailbox is local-only, must succeed");
+        let receive_result = adapter.receive();
+        assert!(
+            receive_result.is_err(),
+            "receive() against an unreachable relay must surface the connection error"
+        );
     }
 
     #[test]

@@ -76,7 +76,7 @@ vauchi-core/src/storage/mod.rs 1079
 #   problem 2026-05-01-android-humble-ui-deep-retirement Phase 2a/A3a)
 # (+10 on screens.rs for AppScreen::DecoyContacts engine factory,
 #   problem 2026-05-01-android-humble-ui-deep-retirement Phase 2c)
-vauchi-app/src/ui/app_engine/mod.rs 1144
+vauchi-app/src/ui/app_engine/mod.rs 1182
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts

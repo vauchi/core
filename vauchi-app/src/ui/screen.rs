@@ -222,12 +222,14 @@ mod tests {
     // `MapScreenToParentId`, linux-qt `screenrenderer.cpp:200` /
     // `device_linking`, macOS `DeviceLinkSheet:113` `link_` prefix check).
 
+    // @internal
     #[test]
     fn parent_screen_id_defaults_to_none() {
         let m = ScreenModel::new("test", "Title", vec![], vec![]);
         assert_eq!(m.parent_screen_id, None);
     }
 
+    // @internal
     #[test]
     fn parent_screen_id_omitted_when_none() {
         let m = ScreenModel::new("test", "Title", vec![], vec![]);
@@ -238,6 +240,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn parent_screen_id_roundtrips_when_set() {
         let mut m = ScreenModel::new("contact_detail", "Alice", vec![], vec![]);
@@ -255,12 +258,14 @@ mod tests {
     // Sheet (pre-empting the iOS/macOS native sheet semantics that today
     // live entirely in the frontend).
 
+    // @internal
     #[test]
     fn presentation_kind_defaults_to_page() {
         let m = ScreenModel::new("test", "Title", vec![], vec![]);
         assert_eq!(m.presentation_kind, ScreenPresentationKind::Page);
     }
 
+    // @internal
     #[test]
     fn presentation_kind_serializes() {
         let mut m = ScreenModel::new("form_dialog", "Pick a group", vec![], vec![]);
@@ -272,6 +277,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn presentation_kind_roundtrips_each_variant() {
         for kind in [
@@ -290,6 +296,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn legacy_json_without_presentation_kind_parses_as_page() {
         // Existing in-flight ScreenModel JSON predating these fields must

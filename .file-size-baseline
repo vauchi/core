@@ -33,6 +33,16 @@ vauchi-platform/src/exchange.rs 1027
 vauchi-core/src/exchange/session.rs 1769
 vauchi-core/src/exchange/multistage/session.rs 1189
 
+# EXEMPT — protocol command/event enum: variants + variant_name match
+# + From impls + serde-discriminant ordering must be co-located, splitting
+# scatters round-trip mappings (mirror of vauchi-platform/src/exchange.rs
+# rationale at line 17). Tracks ADR-031 hardware command/event
+# additions append-only.
+# (+111 for ADR-031 SetScreenBrightness + SetIdleTimerDisabled
+#  variants + variant_name arms + 6 unit tests, Phase 1 of
+#  2026-05-04-exchange-command-screen-presentation iOS retirement)
+vauchi-core/src/exchange/command.rs 1026
+
 # EXEMPT — transport layer: all relay methods must be co-located for protocol coherence
 # (+2 for #[tracing::instrument] on send_update + fetch — profiling, no logic change)
 vauchi-core/src/network/http_transport.rs 1189

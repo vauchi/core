@@ -588,7 +588,7 @@ version = "1.21.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.openssl]]
-version = "0.10.78"
+version = "0.10.79"
 criteria = "safe-to-deploy"
 
 [[exemptions.openssl-probe]]
@@ -596,7 +596,7 @@ version = "0.2.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.openssl-sys]]
-version = "0.9.114"
+version = "0.9.115"
 criteria = "safe-to-deploy"
 
 [[exemptions.ort]]
@@ -840,7 +840,7 @@ version = "0.3.11"
 criteria = "safe-to-deploy"
 
 [[exemptions.siphasher]]
-version = "1.0.2"
+version = "1.0.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.spin]]

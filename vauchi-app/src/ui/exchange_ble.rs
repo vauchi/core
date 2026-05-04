@@ -21,7 +21,6 @@ use vauchi_core::exchange::proximity_runner::{
 
 /// Steps specific to the BLE exchange sub-flow.
 #[derive(Clone, Debug, PartialEq)]
-#[allow(dead_code)] // Variants scaffolded for Phase 1–3
 pub(super) enum BleStep {
     /// Scanning for nearby BLE peers.
     Discovering,

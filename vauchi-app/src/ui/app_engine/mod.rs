@@ -235,6 +235,42 @@ impl AppScreen {
             _ => return Self::from_screen_id(id),
         })
     }
+
+    /// The sidebar/tab this screen belongs to, if it is a sub-screen of
+    /// a top-level tab. `None` for top-level tabs themselves and for
+    /// transient/global screens (lock, onboarding, deep-link consent).
+    /// Surfaced through `ScreenModel.parent_screen_id` per
+    /// `2026-05-01-screen-id-metadata-in-core` G1; replaces
+    /// `MapScreenToParentId`-style switch statements in frontends.
+    pub fn parent_screen_id(&self) -> Option<&'static str> {
+        match self {
+            Self::MyInfoEntryDetail { .. } => Some("my_info"),
+            Self::ContactDetail { .. }
+            | Self::ContactEdit { .. }
+            | Self::ContactVisibility { .. }
+            | Self::ContactDuplicates
+            | Self::ContactMerge { .. }
+            | Self::ContactLimit
+            | Self::ArchivedContacts
+            | Self::VerifyFingerprint { .. } => Some("contacts"),
+            Self::GroupDetail { .. } => Some("groups"),
+            Self::RecoveryHelp | Self::RecoveryClaimReview => Some("recovery"),
+            Self::DeviceLinking | Self::DeviceReplacement => Some("device_management"),
+            _ => None,
+        }
+    }
+
+    /// How the frontend should present this screen. Surfaced through
+    /// `ScreenModel.presentation_kind` per
+    /// `2026-05-01-screen-id-metadata-in-core` G2; replaces frontend-side
+    /// substring checks (e.g. windows `screen_id == "form_dialog"`).
+    pub fn presentation_kind(&self) -> super::screen::ScreenPresentationKind {
+        use super::screen::ScreenPresentationKind;
+        match self {
+            Self::FormDialog { .. } => ScreenPresentationKind::Modal,
+            _ => ScreenPresentationKind::Page,
+        }
+    }
 }
 
 /// Tracks which contact undo is pending (archive only — delete is now irrevocable).
@@ -591,6 +627,27 @@ impl AppEngine {
     }
 
     /// Decorate the given screen with an offline `Component::Banner`
+    /// Stamp `parent_screen_id` and `presentation_kind` onto the
+    /// inner-engine's screen model from the AppEngine-level
+    /// `AppScreen`. Per `2026-05-01-screen-id-metadata-in-core` G1+G2 —
+    /// frontends consume these instead of substring-matching
+    /// `screen_id` strings.
+    ///
+    /// Idempotent: if the inner engine already set non-default values
+    /// (it shouldn't, but the contract is clear), they are preserved.
+    fn apply_screen_id_metadata(&self, mut screen: ScreenModel) -> ScreenModel {
+        if screen.parent_screen_id.is_none() {
+            screen.parent_screen_id = self.screen.parent_screen_id().map(String::from);
+        }
+        if matches!(
+            screen.presentation_kind,
+            crate::ui::screen::ScreenPresentationKind::Page
+        ) {
+            screen.presentation_kind = self.screen.presentation_kind();
+        }
+        screen
+    }
+
     /// when `network_online == false`. Idempotent — only inserts a
     /// banner; never duplicates one already present.
     ///
@@ -778,7 +835,8 @@ impl WorkflowEngine for AppEngine {
     fn current_screen(&self) -> ScreenModel {
         let screen = self.engine.current_screen();
         let screen = self.apply_update_overlay(screen);
-        self.apply_offline_overlay(screen)
+        let screen = self.apply_offline_overlay(screen);
+        self.apply_screen_id_metadata(screen)
     }
 
     #[tracing::instrument(level = "debug", skip_all, name = "app.handle_action")]

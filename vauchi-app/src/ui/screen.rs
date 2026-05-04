@@ -11,6 +11,28 @@ use crate::theme::DesignTokens;
 /// Shells use this to detect unsupported components and degrade gracefully.
 pub const CURRENT_SCHEMA_VERSION: u16 = 3;
 
+/// How the frontend should present this screen. Replaces frontend-side
+/// substring checks on `screen_id` (e.g. windows
+/// `screen_id == "form_dialog"`, macOS `screen_id.hasPrefix("link_")`).
+///
+/// Per `2026-05-01-screen-id-metadata-in-core` G2 — the renderer routes
+/// on the discriminant; it doesn't read the screen-id strings.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum ScreenPresentationKind {
+    /// Standard pushed/replaced page in the navigation stack.
+    #[default]
+    Page,
+    /// Modal dialog stacked over the page (form dialogs, confirmations).
+    /// Tab switches must dismiss before navigating away.
+    Modal,
+    /// Bottom-sheet / system-sheet style presentation. Pre-empts the
+    /// iOS / macOS native sheet semantics that today live entirely in
+    /// the frontend.
+    Sheet,
+}
+
 /// Describes a full screen to render.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -33,6 +55,17 @@ pub struct ScreenModel {
     /// deprecation cycle is in progress (2 major versions before removal).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub deprecated_components: Vec<String>,
+    /// Sidebar/tab the screen belongs to, when it is a sub-screen of
+    /// a top-level tab (e.g. `contact_detail` belongs to `contacts`).
+    /// `None` for top-level tabs and transient/global screens (lock,
+    /// onboarding). Replaces frontend-side `MapScreenToParentId`-style
+    /// switch statements (`2026-05-01-screen-id-metadata-in-core` G1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_screen_id: Option<String>,
+    /// How to present the screen. See [`ScreenPresentationKind`]; G2 of
+    /// `2026-05-01-screen-id-metadata-in-core`.
+    #[serde(default)]
+    pub presentation_kind: ScreenPresentationKind,
 }
 
 fn default_schema_version() -> u16 {
@@ -51,6 +84,8 @@ impl Default for ScreenModel {
             progress: None,
             tokens: DesignTokens::default(),
             deprecated_components: Vec::new(),
+            parent_screen_id: None,
+            presentation_kind: ScreenPresentationKind::Page,
         }
     }
 }
@@ -73,6 +108,8 @@ impl ScreenModel {
             progress: None,
             tokens: DesignTokens::default(),
             deprecated_components: Vec::new(),
+            parent_screen_id: None,
+            presentation_kind: ScreenPresentationKind::Page,
         }
     }
 
@@ -174,6 +211,100 @@ mod tests {
         assert!(json.contains("\"deprecated_components\""));
         let restored: ScreenModel = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.deprecated_components, vec!["OldWidget"]);
+    }
+
+    // G1 of `2026-05-01-screen-id-metadata-in-core` — `parent_screen_id`
+    // surfaces the sidebar tab a sub-screen belongs to. Default is `None`
+    // (top-level screens are their own parent — frontends select the tab
+    // matching `screen_id`). Frontends use the new field to highlight the
+    // parent tab when rendering a detail screen, replacing per-frontend
+    // hardcoded `screenId` switch-statements (windows
+    // `MapScreenToParentId`, linux-qt `screenrenderer.cpp:200` /
+    // `device_linking`, macOS `DeviceLinkSheet:113` `link_` prefix check).
+
+    #[test]
+    fn parent_screen_id_defaults_to_none() {
+        let m = ScreenModel::new("test", "Title", vec![], vec![]);
+        assert_eq!(m.parent_screen_id, None);
+    }
+
+    #[test]
+    fn parent_screen_id_omitted_when_none() {
+        let m = ScreenModel::new("test", "Title", vec![], vec![]);
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(
+            !json.contains("parent_screen_id"),
+            "None parent_screen_id must be omitted from wire JSON: {json}"
+        );
+    }
+
+    #[test]
+    fn parent_screen_id_roundtrips_when_set() {
+        let mut m = ScreenModel::new("contact_detail", "Alice", vec![], vec![]);
+        m.parent_screen_id = Some("contacts".into());
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("\"parent_screen_id\":\"contacts\""));
+        let restored: ScreenModel = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.parent_screen_id, Some("contacts".into()));
+    }
+
+    // G2 of the same record — `presentation_kind` distinguishes Page /
+    // Modal / Sheet without forcing frontends to substring-match
+    // `screen_id`. Defaults to Page (regular pushed/replaced screens);
+    // form dialogs flip to Modal; bottom-sheet-style screens flip to
+    // Sheet (pre-empting the iOS/macOS native sheet semantics that today
+    // live entirely in the frontend).
+
+    #[test]
+    fn presentation_kind_defaults_to_page() {
+        let m = ScreenModel::new("test", "Title", vec![], vec![]);
+        assert_eq!(m.presentation_kind, ScreenPresentationKind::Page);
+    }
+
+    #[test]
+    fn presentation_kind_serializes() {
+        let mut m = ScreenModel::new("form_dialog", "Pick a group", vec![], vec![]);
+        m.presentation_kind = ScreenPresentationKind::Modal;
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(
+            json.contains("\"presentation_kind\":\"Modal\""),
+            "presentation_kind must serialize as the variant name: {json}"
+        );
+    }
+
+    #[test]
+    fn presentation_kind_roundtrips_each_variant() {
+        for kind in [
+            ScreenPresentationKind::Page,
+            ScreenPresentationKind::Modal,
+            ScreenPresentationKind::Sheet,
+        ] {
+            let mut m = ScreenModel::new("test", "Title", vec![], vec![]);
+            m.presentation_kind = kind.clone();
+            let json = serde_json::to_string(&m).unwrap();
+            let restored: ScreenModel = serde_json::from_str(&json).unwrap();
+            assert_eq!(
+                restored.presentation_kind, kind,
+                "presentation_kind round-trip failed for {kind:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn legacy_json_without_presentation_kind_parses_as_page() {
+        // Existing in-flight ScreenModel JSON predating these fields must
+        // still parse — frontends pinned to old core revs may emit it.
+        let legacy = r#"{
+            "screen_id": "test",
+            "title": "Test Screen",
+            "subtitle": null,
+            "components": [],
+            "actions": [],
+            "progress": null
+        }"#;
+        let m: ScreenModel = serde_json::from_str(legacy).expect("legacy JSON must parse");
+        assert_eq!(m.presentation_kind, ScreenPresentationKind::Page);
+        assert_eq!(m.parent_screen_id, None);
     }
 }
 

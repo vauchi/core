@@ -53,5 +53,6 @@
       "exit_duration_ms": 150,
       "emphasis_duration_ms": 300
     }
-  }
+  },
+  "presentation_kind": "Page"
 }

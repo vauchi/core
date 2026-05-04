@@ -123,7 +123,8 @@ pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};
 pub use recovery_help::{ParsedClaimSummary, RecoveryHelpEngine};
 pub use recovery_status::RecoveryEngine;
 pub use screen::{
-    ActionStyle, CURRENT_SCHEMA_VERSION, Progress, ScreenAction, ScreenModel, TabInfo,
+    ActionStyle, CURRENT_SCHEMA_VERSION, Progress, ScreenAction, ScreenModel,
+    ScreenPresentationKind, TabInfo,
 };
 pub use settings::{SettingsConfig, SettingsEngine};
 pub use social_graph::{SocialContactEntry, SocialGraphEngine, SocialTrustLevel};

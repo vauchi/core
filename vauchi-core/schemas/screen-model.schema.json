@@ -29,6 +29,22 @@
         "type": "string"
       }
     },
+    "parent_screen_id": {
+      "description": "Sidebar/tab the screen belongs to, when it is a sub-screen of a top-level tab (e.g. `contact_detail` belongs to `contacts`). `None` for top-level tabs and transient/global screens (lock, onboarding). Replaces frontend-side `MapScreenToParentId`-style switch statements (`2026-05-01-screen-id-metadata-in-core` G1).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "presentation_kind": {
+      "description": "How to present the screen. See [`ScreenPresentationKind`]; G2 of `2026-05-01-screen-id-metadata-in-core`.",
+      "default": "Page",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ScreenPresentationKind"
+        }
+      ]
+    },
     "progress": {
       "anyOf": [
         {
@@ -1523,6 +1539,32 @@
           "$ref": "#/definitions/ActionStyle"
         }
       }
+    },
+    "ScreenPresentationKind": {
+      "description": "How the frontend should present this screen. Replaces frontend-side substring checks on `screen_id` (e.g. windows `screen_id == \"form_dialog\"`, macOS `screen_id.hasPrefix(\"link_\")`).\n\nPer `2026-05-01-screen-id-metadata-in-core` G2 — the renderer routes on the discriminant; it doesn't read the screen-id strings.",
+      "oneOf": [
+        {
+          "description": "Standard pushed/replaced page in the navigation stack.",
+          "type": "string",
+          "enum": [
+            "Page"
+          ]
+        },
+        {
+          "description": "Modal dialog stacked over the page (form dialogs, confirmations). Tab switches must dismiss before navigating away.",
+          "type": "string",
+          "enum": [
+            "Modal"
+          ]
+        },
+        {
+          "description": "Bottom-sheet / system-sheet style presentation. Pre-empts the iOS / macOS native sheet semantics that today live entirely in the frontend.",
+          "type": "string",
+          "enum": [
+            "Sheet"
+          ]
+        }
+      ]
     },
     "SettingsItem": {
       "description": "An item in a settings group.",

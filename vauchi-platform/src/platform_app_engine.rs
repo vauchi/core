@@ -4646,6 +4646,22 @@ impl PlatformAppEngine {
     // (`MultiStageEngineBridge`) goes straight to
     // `AppEngine::apply_multi_stage_*`. The `_for_test` suffix mirrors
     // the existing convention (`set_cycle_sleep_override_ms_for_test`).
+    //
+    // Each method calls `cancel_multi_stage_session()` first because
+    // `navigate_to(MultiStageExchange)` (typically via the test helper
+    // `drive_to_multi_stage`) eagerly starts a real cycle thread via
+    // `after_screen_transition` → `ensure_multi_stage_session`. Without
+    // the cancel, the cycle thread races the test's manual state pushes
+    // — observed as ~20% flake on
+    // `apply_multi_stage_state_finalized_with_session_ended_renders_success_screen`
+    // where the cycle thread re-pushed `Idle` after the test set
+    // `Finalized`, leaving `session_ended` true but state Idle so the
+    // `Finalized | Complete | RetryReady if session_ended` arm in
+    // `MultiStageExchangeEngine::build_screen` missed and the screen
+    // fell through to the active "Waiting for peer…" chrome.
+    // `cancel_multi_stage_session` is idempotent (no-op when the slot
+    // is already None) so the four `_for_test` entries can call it
+    // unconditionally.
 
     /// Test-only: drive the active engine's protocol state directly.
     #[doc(hidden)]
@@ -4653,6 +4669,7 @@ impl PlatformAppEngine {
         &self,
         state: MobileProtocolState,
     ) -> Result<(), MobileError> {
+        self.cancel_multi_stage_session();
         let core_state = mobile_state_to_core(state);
         let applied = {
             let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
@@ -4672,6 +4689,7 @@ impl PlatformAppEngine {
         &self,
         payload: MobileQrPayload,
     ) -> Result<(), MobileError> {
+        self.cancel_multi_stage_session();
         let qr = vauchi_core::exchange::QrPayload {
             data: payload.data,
             error_correction: payload.error_correction,
@@ -4695,6 +4713,7 @@ impl PlatformAppEngine {
         &self,
         contact_name: String,
     ) -> Result<(), MobileError> {
+        self.cancel_multi_stage_session();
         let applied = {
             let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),
@@ -4710,6 +4729,7 @@ impl PlatformAppEngine {
     /// Test-only: flag the cycle thread as ended.
     #[doc(hidden)]
     pub fn apply_multi_stage_session_ended_for_test(&self) -> Result<(), MobileError> {
+        self.cancel_multi_stage_session();
         let applied = {
             let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),

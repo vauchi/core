@@ -265,7 +265,10 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # bridge listener lives here — frontends own `on_commands`,
 # `on_finalized`, `on_failed` dispatch, attached to the session
 # returned by the getter.
-vauchi-platform/src/platform_app_engine.rs 4945
+# (+20 lines for cancel-session-first guard in `apply_multi_stage_*_for_test`
+#  bridges — fixes flaky `apply_multi_stage_state_finalized_with_session_ended`
+#  caused by cycle-thread racing the test's manual state pushes.)
+vauchi-platform/src/platform_app_engine.rs 4965
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding

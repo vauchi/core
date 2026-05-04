@@ -182,6 +182,46 @@ pub enum ExchangeCommand {
         accepted_mime_types: Vec<String>,
         purpose: FilePickPurpose,
     },
+
+    // ── Screen presentation hardware (multi-stage exchange) ────────
+    // Appended to preserve serde discriminant ordering.
+    /// Set the device screen brightness, optionally restoring the
+    /// platform default when `level` is `None`.
+    ///
+    /// Used by screens that need a specific brightness for their
+    /// hardware to function (e.g., the multi-stage face-to-face
+    /// exchange uses 65% brightness so the front camera is not
+    /// over-exposed when scanning a peer's QR). The frontend is
+    /// responsible for snapshotting the prior value on the *first*
+    /// `Some(level)` after a `None` (or app start) so the
+    /// subsequent `None` correctly restores it.
+    ///
+    /// Frontends that have no programmatic brightness control (e.g.,
+    /// desktop, where the OS owns it) answer with
+    /// [`ExchangeHardwareEvent::HardwareUnavailable { transport: "screen_brightness" }`]
+    /// — core should treat that as "request honoured at platform
+    /// default" and not retry.
+    ///
+    /// Per `2026-05-01-screen-id-metadata-in-core` cousin
+    /// `2026-05-04-exchange-command-screen-presentation`, ADR-031
+    /// §Hardware. Phase 1 of the FaceToFaceExchangeView retirement.
+    SetScreenBrightness { level: Option<f32> },
+
+    /// Disable or re-enable the platform's idle / auto-lock timer.
+    ///
+    /// `disabled = true` keeps the screen awake (used by the
+    /// multi-stage exchange so a longer-than-30s handshake doesn't
+    /// trigger the device's auto-lock). `disabled = false` restores
+    /// the platform default on screen exit. Idempotent — frontends
+    /// MAY ignore a redundant set/clear.
+    ///
+    /// Frontends that have no programmatic idle-timer control answer
+    /// with [`ExchangeHardwareEvent::HardwareUnavailable { transport:
+    /// "idle_timer" }`].
+    ///
+    /// Phase 1 of the FaceToFaceExchangeView retirement (companion
+    /// to [`ExchangeCommand::SetScreenBrightness`]).
+    SetIdleTimerDisabled { disabled: bool },
 }
 
 /// Why a file picker is being opened — lets frontends label the dialog
@@ -233,6 +273,8 @@ impl ExchangeCommand {
             Self::ImagePickFromFile => "ImagePickFromFile",
             Self::SwitchCamera { .. } => "SwitchCamera",
             Self::FilePickFromUser { .. } => "FilePickFromUser",
+            Self::SetScreenBrightness { .. } => "SetScreenBrightness",
+            Self::SetIdleTimerDisabled { .. } => "SetIdleTimerDisabled",
         }
     }
 }
@@ -911,5 +953,74 @@ mod tests {
             purpose: FilePickPurpose::ImportBackup,
         };
         assert_eq!(cmd.variant_name(), "FilePickFromUser");
+    }
+
+    // @internal
+    #[test]
+    fn set_screen_brightness_with_some_level_round_trips() {
+        let cmd = ExchangeCommand::SetScreenBrightness { level: Some(0.65) };
+        let json = serde_json::to_string(&cmd).unwrap();
+        assert!(
+            json.contains("\"SetScreenBrightness\""),
+            "expected variant tag in serialized form, got {json}"
+        );
+        let restored: ExchangeCommand = serde_json::from_str(&json).unwrap();
+        assert_eq!(cmd, restored);
+    }
+
+    // @internal
+    #[test]
+    fn set_screen_brightness_with_none_means_restore_default() {
+        // The contract: `level: None` is the explicit "restore platform
+        // default" signal. Keep the wire shape pinned so frontends can
+        // distinguish it from a missing field.
+        let cmd = ExchangeCommand::SetScreenBrightness { level: None };
+        let json = serde_json::to_string(&cmd).unwrap();
+        let restored: ExchangeCommand = serde_json::from_str(&json).unwrap();
+        match restored {
+            ExchangeCommand::SetScreenBrightness { level } => assert_eq!(level, None),
+            other => panic!("expected SetScreenBrightness, got {other:?}"),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn set_screen_brightness_variant_name_is_stable() {
+        let cmd = ExchangeCommand::SetScreenBrightness { level: Some(0.5) };
+        assert_eq!(cmd.variant_name(), "SetScreenBrightness");
+    }
+
+    // @internal
+    #[test]
+    fn set_idle_timer_disabled_round_trips_each_state() {
+        for disabled in [true, false] {
+            let cmd = ExchangeCommand::SetIdleTimerDisabled { disabled };
+            let json = serde_json::to_string(&cmd).unwrap();
+            assert!(
+                json.contains("\"SetIdleTimerDisabled\""),
+                "expected variant tag, got {json}"
+            );
+            let restored: ExchangeCommand = serde_json::from_str(&json).unwrap();
+            assert_eq!(cmd, restored);
+        }
+    }
+
+    // @internal
+    #[test]
+    fn set_idle_timer_disabled_variant_name_is_stable() {
+        let cmd = ExchangeCommand::SetIdleTimerDisabled { disabled: true };
+        assert_eq!(cmd.variant_name(), "SetIdleTimerDisabled");
+    }
+
+    // @internal
+    #[test]
+    fn screen_presentation_commands_are_distinct() {
+        // Sanity-check that the two new variants are not accidentally
+        // matched as the same shape (both carry an option-like field
+        // that could collide if someone writes a sloppy match).
+        let bright = ExchangeCommand::SetScreenBrightness { level: None };
+        let idle = ExchangeCommand::SetIdleTimerDisabled { disabled: false };
+        assert_ne!(bright, idle);
+        assert_ne!(bright.variant_name(), idle.variant_name());
     }
 }

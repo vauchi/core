@@ -2164,6 +2164,49 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "description": "Set the device screen brightness, optionally restoring the platform default when `level` is `None`.\n\nUsed by screens that need a specific brightness for their hardware to function (e.g., the multi-stage face-to-face exchange uses 65% brightness so the front camera is not over-exposed when scanning a peer's QR). The frontend is responsible for snapshotting the prior value on the *first* `Some(level)` after a `None` (or app start) so the subsequent `None` correctly restores it.\n\nFrontends that have no programmatic brightness control (e.g., desktop, where the OS owns it) answer with [`ExchangeHardwareEvent::HardwareUnavailable { transport: \"screen_brightness\" }`] — core should treat that as \"request honoured at platform default\" and not retry.\n\nPer `2026-05-01-screen-id-metadata-in-core` cousin `2026-05-04-exchange-command-screen-presentation`, ADR-031 §Hardware. Phase 1 of the FaceToFaceExchangeView retirement.",
+          "type": "object",
+          "required": [
+            "SetScreenBrightness"
+          ],
+          "properties": {
+            "SetScreenBrightness": {
+              "type": "object",
+              "properties": {
+                "level": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "format": "float"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Disable or re-enable the platform's idle / auto-lock timer.\n\n`disabled = true` keeps the screen awake (used by the multi-stage exchange so a longer-than-30s handshake doesn't trigger the device's auto-lock). `disabled = false` restores the platform default on screen exit. Idempotent — frontends MAY ignore a redundant set/clear.\n\nFrontends that have no programmatic idle-timer control answer with [`ExchangeHardwareEvent::HardwareUnavailable { transport: \"idle_timer\" }`].\n\nPhase 1 of the FaceToFaceExchangeView retirement (companion to [`ExchangeCommand::SetScreenBrightness`]).",
+          "type": "object",
+          "required": [
+            "SetIdleTimerDisabled"
+          ],
+          "properties": {
+            "SetIdleTimerDisabled": {
+              "type": "object",
+              "required": [
+                "disabled"
+              ],
+              "properties": {
+                "disabled": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },

@@ -199,7 +199,7 @@
       "additionalProperties": false
     },
     {
-      "description": "Frontend should open the camera for QR scanning.\n\nDeprecated per ADR-022 Addendum D: use `ExchangeCommands` with `ExchangeCommand::QrRequestScan` instead. Will be removed after all frontends adopt the command/event protocol.",
+      "description": "Frontend should open the camera for QR scanning.\n\nDeprecated per ADR-022 Addendum D: use `Commands` with `Command::QrRequestScan` instead. Will be removed after all frontends adopt the command/event protocol.",
       "type": "string",
       "enum": [
         "RequestCamera"
@@ -282,13 +282,13 @@
       ]
     },
     {
-      "description": "Frontend should perform hardware actions for the exchange protocol (ADR-031). Each command maps to a platform-specific operation (QR display, BLE scan, etc.). Unsupported commands should be answered with `ExchangeHardwareEvent::HardwareUnavailable`.",
+      "description": "Frontend should perform hardware actions for the exchange protocol (ADR-031). Each command maps to a platform-specific operation (QR display, BLE scan, etc.). Unsupported commands should be answered with `Event::HardwareUnavailable`.",
       "type": "object",
       "required": [
-        "ExchangeCommands"
+        "Commands"
       ],
       "properties": {
-        "ExchangeCommands": {
+        "Commands": {
           "type": "object",
           "required": [
             "commands"
@@ -297,7 +297,7 @@
             "commands": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/ExchangeCommand"
+                "$ref": "#/definitions/Command"
               }
             }
           }
@@ -1644,8 +1644,8 @@
         }
       }
     },
-    "ExchangeCommand": {
-      "description": "A command from core to the frontend requesting a hardware action.\n\nFrontends match on these and dispatch to platform-specific APIs (camera, BLE stack, NFC reader, audio subsystem). Commands that the platform cannot fulfil should be answered with [`ExchangeHardwareEvent::HardwareUnavailable`].",
+    "Command": {
+      "description": "A command from core to the frontend requesting a hardware action.\n\nFrontends match on these and dispatch to platform-specific APIs (camera, BLE stack, NFC reader, audio subsystem). Commands that the platform cannot fulfil should be answered with [`Event::HardwareUnavailable`].",
       "oneOf": [
         {
           "description": "Display a QR code containing `data`.",
@@ -1870,7 +1870,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Listen for an ultrasonic response within `timeout_ms`.\n\n`sample_rate` is the suggested capture rate; if the device's preferred rate differs, the frontend reports its actual rate in [`ExchangeHardwareEvent::AudioSamplesRecorded`].",
+          "description": "Listen for an ultrasonic response within `timeout_ms`.\n\n`sample_rate` is the suggested capture rate; if the device's preferred rate differs, the frontend reports its actual rate in [`Event::AudioSamplesRecorded`].",
           "type": "object",
           "required": [
             "AudioListenForResponse"
@@ -2066,7 +2066,7 @@
           ]
         },
         {
-          "description": "Send an exchange payload over a direct transport (USB cable / local TCP).\n\nThe frontend should: 1. Send `payload` to the peer over the established TCP connection 2. Receive the peer's payload from the same connection 3. Report the peer's data via [`ExchangeHardwareEvent::DirectPayloadReceived`]\n\nThe `is_initiator` flag determines send/recv ordering to avoid deadlock (initiator sends first, responder receives first).",
+          "description": "Send an exchange payload over a direct transport (USB cable / local TCP).\n\nThe frontend should: 1. Send `payload` to the peer over the established TCP connection 2. Receive the peer's payload from the same connection 3. Report the peer's data via [`Event::DirectPayloadReceived`]\n\nThe `is_initiator` flag determines send/recv ordering to avoid deadlock (initiator sends first, responder receives first).",
           "type": "object",
           "required": [
             "DirectSend"
@@ -2096,21 +2096,21 @@
           "additionalProperties": false
         },
         {
-          "description": "Request the frontend to open the device photo library / gallery.\n\nFrontend should return [`ExchangeHardwareEvent::ImageReceived`] with the selected image bytes, or [`ExchangeHardwareEvent::ImagePickCancelled`] if the user dismisses the picker.",
+          "description": "Request the frontend to open the device photo library / gallery.\n\nFrontend should return [`Event::ImageReceived`] with the selected image bytes, or [`Event::ImagePickCancelled`] if the user dismisses the picker.",
           "type": "string",
           "enum": [
             "ImagePickFromLibrary"
           ]
         },
         {
-          "description": "Request the frontend to capture an image from the device camera.\n\nFrontend should return [`ExchangeHardwareEvent::ImageReceived`] with the captured image bytes, or [`ExchangeHardwareEvent::ImagePickCancelled`] if the user cancels.",
+          "description": "Request the frontend to capture an image from the device camera.\n\nFrontend should return [`Event::ImageReceived`] with the captured image bytes, or [`Event::ImagePickCancelled`] if the user cancels.",
           "type": "string",
           "enum": [
             "ImageCaptureFromCamera"
           ]
         },
         {
-          "description": "Request the frontend to open a file picker for image files.\n\nUsed on desktop platforms where a photo library may not exist. Frontend should return [`ExchangeHardwareEvent::ImageReceived`] with the selected image bytes, or [`ExchangeHardwareEvent::ImagePickCancelled`] if the user cancels.",
+          "description": "Request the frontend to open a file picker for image files.\n\nUsed on desktop platforms where a photo library may not exist. Frontend should return [`Event::ImageReceived`] with the selected image bytes, or [`Event::ImagePickCancelled`] if the user cancels.",
           "type": "string",
           "enum": [
             "ImagePickFromFile"
@@ -2138,7 +2138,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Request the frontend to open a file picker.\n\n`accepted_mime_types` is advisory — frontends may default to a coarser superset on platforms where the OS picker doesn't filter by MIME (e.g., older Android versions). `purpose` lets the frontend label the picker dialog without hardcoding strings; label text comes from core's locale store via `t(key)`.\n\nFrontend should return [`ExchangeHardwareEvent::FilePickedFromUser`] with the selected file's bytes, or [`ExchangeHardwareEvent::FilePickCancelledByUser`] if the user dismisses the picker.\n\nDistinct from [`ExchangeCommand::ImagePickFromFile`]: that variant returns [`ExchangeHardwareEvent::ImageReceived`] which is shaped for avatar normalization. File picking returns raw bytes plus filename for arbitrary payloads (vCard, encrypted backup blob, future key bundles, etc.).",
+          "description": "Request the frontend to open a file picker.\n\n`accepted_mime_types` is advisory — frontends may default to a coarser superset on platforms where the OS picker doesn't filter by MIME (e.g., older Android versions). `purpose` lets the frontend label the picker dialog without hardcoding strings; label text comes from core's locale store via `t(key)`.\n\nFrontend should return [`Event::FilePickedFromUser`] with the selected file's bytes, or [`Event::FilePickCancelledByUser`] if the user dismisses the picker.\n\nDistinct from [`Command::ImagePickFromFile`]: that variant returns [`Event::ImageReceived`] which is shaped for avatar normalization. File picking returns raw bytes plus filename for arbitrary payloads (vCard, encrypted backup blob, future key bundles, etc.).",
           "type": "object",
           "required": [
             "FilePickFromUser"
@@ -2166,7 +2166,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Set the device screen brightness, optionally restoring the platform default when `level` is `None`.\n\nUsed by screens that need a specific brightness for their hardware to function (e.g., the multi-stage face-to-face exchange uses 65% brightness so the front camera is not over-exposed when scanning a peer's QR). The frontend is responsible for snapshotting the prior value on the *first* `Some(level)` after a `None` (or app start) so the subsequent `None` correctly restores it.\n\nFrontends that have no programmatic brightness control (e.g., desktop, where the OS owns it) answer with [`ExchangeHardwareEvent::HardwareUnavailable { transport: \"screen_brightness\" }`] — core should treat that as \"request honoured at platform default\" and not retry.\n\nPer `2026-05-01-screen-id-metadata-in-core` cousin `2026-05-04-exchange-command-screen-presentation`, ADR-031 §Hardware. Phase 1 of the FaceToFaceExchangeView retirement.",
+          "description": "Set the device screen brightness, optionally restoring the platform default when `level` is `None`.\n\nUsed by screens that need a specific brightness for their hardware to function (e.g., the multi-stage face-to-face exchange uses 65% brightness so the front camera is not over-exposed when scanning a peer's QR). The frontend is responsible for snapshotting the prior value on the *first* `Some(level)` after a `None` (or app start) so the subsequent `None` correctly restores it.\n\nFrontends that have no programmatic brightness control (e.g., desktop, where the OS owns it) answer with [`Event::HardwareUnavailable { transport: \"screen_brightness\" }`] — core should treat that as \"request honoured at platform default\" and not retry.\n\nPer `2026-05-01-screen-id-metadata-in-core` cousin `2026-05-04-exchange-command-screen-presentation`, ADR-031 §Hardware. Phase 1 of the FaceToFaceExchangeView retirement.",
           "type": "object",
           "required": [
             "SetScreenBrightness"
@@ -2188,7 +2188,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Disable or re-enable the platform's idle / auto-lock timer.\n\n`disabled = true` keeps the screen awake (used by the multi-stage exchange so a longer-than-30s handshake doesn't trigger the device's auto-lock). `disabled = false` restores the platform default on screen exit. Idempotent — frontends MAY ignore a redundant set/clear.\n\nFrontends that have no programmatic idle-timer control answer with [`ExchangeHardwareEvent::HardwareUnavailable { transport: \"idle_timer\" }`].\n\nPhase 1 of the FaceToFaceExchangeView retirement (companion to [`ExchangeCommand::SetScreenBrightness`]).",
+          "description": "Disable or re-enable the platform's idle / auto-lock timer.\n\n`disabled = true` keeps the screen awake (used by the multi-stage exchange so a longer-than-30s handshake doesn't trigger the device's auto-lock). `disabled = false` restores the platform default on screen exit. Idempotent — frontends MAY ignore a redundant set/clear.\n\nFrontends that have no programmatic idle-timer control answer with [`Event::HardwareUnavailable { transport: \"idle_timer\" }`].\n\nPhase 1 of the FaceToFaceExchangeView retirement (companion to [`Command::SetScreenBrightness`]).",
           "type": "object",
           "required": [
             "SetIdleTimerDisabled"

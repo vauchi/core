@@ -133,7 +133,7 @@ pub fn exchange_payloads(
 /// TCP transport utility for desktop frontends.
 ///
 /// Wraps a `TcpStream` with the VXCH framing protocol. Used by platform
-/// frontends to execute [`ExchangeCommand::DirectSend`] — core never
+/// frontends to execute [`Command::DirectSend`] — core never
 /// calls this directly (ADR-031).
 ///
 /// USB cable connections use [`TcpDirectTransport::physical`] (no extra

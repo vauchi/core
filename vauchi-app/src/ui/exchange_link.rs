@@ -9,8 +9,8 @@
 //! action handler returning an outcome for the parent engine.
 
 use crate::ui::*;
-use vauchi_core::exchange::ExchangeHardwareEvent;
-use vauchi_core::exchange::command::ExchangeCommand;
+use vauchi_core::Command;
+use vauchi_core::Event;
 use vauchi_core::exchange::escrow::EscrowKeys;
 use vauchi_core::exchange::link_mode::{self, LinkInitiation, LinkModeError};
 
@@ -161,17 +161,17 @@ pub(super) enum LinkActionOutcome {
 /// Outcome of a Link hardware event, interpreted by the parent engine.
 pub(super) enum LinkHardwareOutcome {
     /// Start polling the handshake gate for the responder's epk.
-    PollHandshakeGate { commands: Vec<ExchangeCommand> },
+    PollHandshakeGate { commands: Vec<Command> },
     /// Handshake gate ready — retrieve responder's epk.
-    RetrieveFromHandshake { commands: Vec<ExchangeCommand> },
+    RetrieveFromHandshake { commands: Vec<Command> },
     /// Responder's epk received — DH done, card deposited, polling escrow gate.
     /// Engine must store the returned `EscrowKeys` for later decryption.
     DhCompleteCardDeposited {
-        commands: Vec<ExchangeCommand>,
+        commands: Vec<Command>,
         escrow_keys: EscrowKeys,
     },
     /// Escrow gate ready — retrieve responder's encrypted card.
-    RetrieveFromEscrow { commands: Vec<ExchangeCommand> },
+    RetrieveFromEscrow { commands: Vec<Command> },
     /// Responder's card decrypted — exchange complete.
     /// `card_bytes` contains the deserialized contact card (saved by AppEngine).
     #[allow(dead_code)] // Used once contact saving is wired via AppEngine callback
@@ -185,28 +185,28 @@ pub(super) enum LinkHardwareOutcome {
 /// Returns `Some(outcome)` if the event was handled, `None` if ignored.
 pub(super) fn handle_link_hw_event(
     li: &LinkInitiation,
-    event: &ExchangeHardwareEvent,
+    event: &Event,
 ) -> Option<LinkHardwareOutcome> {
     match event {
-        ExchangeHardwareEvent::LinkShared => {
+        Event::LinkShared => {
             let gate =
                 hex::decode(&li.handshake_slot).expect("hex from hex::encode is always valid");
             Some(LinkHardwareOutcome::PollHandshakeGate {
-                commands: vec![ExchangeCommand::RelayEscrowCheck {
+                commands: vec![Command::RelayEscrowCheck {
                     gate_hash: gate,
                     suggested_interval_ms: LINK_POLL_INTERVAL_MS,
                 }],
             })
         }
 
-        ExchangeHardwareEvent::RelayEscrowReady { gate_hash } => {
+        Event::RelayEscrowReady { gate_hash } => {
             let hs_gate =
                 hex::decode(&li.handshake_slot).expect("hex from hex::encode is always valid");
             if *gate_hash == hs_gate {
                 let slot =
                     hex::decode(&li.presence_slot).expect("hex from hex::encode is always valid");
                 return Some(LinkHardwareOutcome::RetrieveFromHandshake {
-                    commands: vec![ExchangeCommand::RelayEscrowRetrieve {
+                    commands: vec![Command::RelayEscrowRetrieve {
                         gate_hash: gate_hash.clone(),
                         slot_hash: slot,
                     }],
@@ -215,11 +215,9 @@ pub(super) fn handle_link_hw_event(
             None
         }
 
-        ExchangeHardwareEvent::RelayEscrowFailed { reason, .. } => {
-            Some(LinkHardwareOutcome::Failed {
-                reason: reason.clone(),
-            })
-        }
+        Event::RelayEscrowFailed { reason, .. } => Some(LinkHardwareOutcome::Failed {
+            reason: reason.clone(),
+        }),
 
         _ => None,
     }
@@ -250,7 +248,7 @@ pub(super) fn handle_link_opened(
 
     // Immediately start polling the escrow gate (responder already deposited)
     let escrow_gate = hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid");
-    commands.push(ExchangeCommand::RelayEscrowCheck {
+    commands.push(Command::RelayEscrowCheck {
         gate_hash: escrow_gate,
         suggested_interval_ms: 1_000, // 1s — user is actively waiting
     });
@@ -266,17 +264,17 @@ pub(super) fn handle_link_opened(
 /// Returns `Some(outcome)` if the event was handled, `None` if ignored.
 pub(super) fn handle_escrow_hw_event(
     keys: &EscrowKeys,
-    event: &ExchangeHardwareEvent,
+    event: &Event,
 ) -> Option<LinkHardwareOutcome> {
     match event {
-        ExchangeHardwareEvent::RelayEscrowReady { gate_hash } => {
+        Event::RelayEscrowReady { gate_hash } => {
             let expected =
                 hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid");
             if *gate_hash == expected {
                 let slot =
                     hex::decode(&keys.our_slot).expect("hex from hex::encode is always valid");
                 return Some(LinkHardwareOutcome::RetrieveFromEscrow {
-                    commands: vec![ExchangeCommand::RelayEscrowRetrieve {
+                    commands: vec![Command::RelayEscrowRetrieve {
                         gate_hash: gate_hash.clone(),
                         slot_hash: slot,
                     }],
@@ -285,20 +283,16 @@ pub(super) fn handle_escrow_hw_event(
             None
         }
 
-        ExchangeHardwareEvent::RelayEscrowBlobReceived { blob, .. } => {
-            match keys.decrypt_card(blob) {
-                Ok(card_bytes) => Some(LinkHardwareOutcome::ExchangeComplete { card_bytes }),
-                Err(e) => Some(LinkHardwareOutcome::Failed {
-                    reason: format!("Card decryption failed: {e}"),
-                }),
-            }
-        }
+        Event::RelayEscrowBlobReceived { blob, .. } => match keys.decrypt_card(blob) {
+            Ok(card_bytes) => Some(LinkHardwareOutcome::ExchangeComplete { card_bytes }),
+            Err(e) => Some(LinkHardwareOutcome::Failed {
+                reason: format!("Card decryption failed: {e}"),
+            }),
+        },
 
-        ExchangeHardwareEvent::RelayEscrowFailed { reason, .. } => {
-            Some(LinkHardwareOutcome::Failed {
-                reason: reason.clone(),
-            })
-        }
+        Event::RelayEscrowFailed { reason, .. } => Some(LinkHardwareOutcome::Failed {
+            reason: reason.clone(),
+        }),
 
         _ => None,
     }

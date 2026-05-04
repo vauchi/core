@@ -5,7 +5,7 @@
 //! Transport types and utilities for exchange protocols.
 //!
 //! Transport negotiation, capabilities, animated QR, and tracing.
-//! Hardware I/O uses the `ExchangeCommand`/`ExchangeHardwareEvent` protocol (ADR-031).
+//! Hardware I/O uses the `Command`/`Event` protocol (ADR-031).
 
 pub mod animated_qr;
 pub mod caps;

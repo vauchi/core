@@ -6,7 +6,7 @@ use std::any::Any;
 
 use super::{ActionResult, ScreenModel, UserAction};
 use crate::notification_types::PendingNotification;
-use vauchi_core::exchange::ExchangeHardwareEvent;
+use vauchi_core::Event;
 
 /// Trait that all core-driven workflows implement.
 ///
@@ -54,7 +54,7 @@ pub trait WorkflowEngine: Send {
     /// Engines that interact with platform hardware (camera, BLE, NFC,
     /// audio) override this to process events. Default returns `None`
     /// (engine does not handle hardware events).
-    fn handle_hardware_event(&mut self, _event: ExchangeHardwareEvent) -> Option<ActionResult> {
+    fn handle_hardware_event(&mut self, _event: Event) -> Option<ActionResult> {
         None
     }
 

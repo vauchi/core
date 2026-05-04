@@ -9,11 +9,9 @@
 //! handles the tap, and core processes the received data.
 
 use vauchi_core::ContactCard;
-use vauchi_core::exchange::{
-    ExchangeCommand, ExchangeHardwareEvent, ExchangeSession, ExchangeState,
-    ManualConfirmationVerifier,
-};
+use vauchi_core::exchange::{ExchangeSession, ExchangeState, ManualConfirmationVerifier};
 use vauchi_core::identity::Identity;
+use vauchi_core::{Command, Event};
 
 /// Helper: create an NFC exchange session.
 fn nfc_session(name: &str) -> ExchangeSession {
@@ -35,7 +33,7 @@ fn nfc_session_emits_activate_with_payload() {
     assert_eq!(cmds.len(), 1, "expected exactly one NfcActivate command");
 
     match &cmds[0] {
-        ExchangeCommand::NfcActivate { payload } => {
+        Command::NfcActivate { payload } => {
             assert!(
                 !payload.is_empty(),
                 "NfcActivate payload should contain our NFC exchange data, got empty"
@@ -57,13 +55,13 @@ fn nfc_data_received_with_valid_payload_completes_exchange() {
     bob.emit_initial_commands();
     let bob_cmds = bob.drain_commands();
     let bob_payload = match &bob_cmds[0] {
-        ExchangeCommand::NfcActivate { payload } => payload.clone(),
+        Command::NfcActivate { payload } => payload.clone(),
         _ => panic!("expected NfcActivate"),
     };
 
     // Alice receives Bob's NFC payload via tap
     alice
-        .apply_hardware_event(ExchangeHardwareEvent::NfcDataReceived { data: bob_payload })
+        .apply_hardware_event(Event::NfcDataReceived { data: bob_payload })
         .unwrap();
 
     // After NFC tap, session should reach AwaitingKeyAgreement or beyond
@@ -88,7 +86,7 @@ fn nfc_hardware_unavailable_does_not_crash() {
 
     // NFC unavailable should not fail the session fatally
     session
-        .apply_hardware_event(ExchangeHardwareEvent::HardwareUnavailable {
+        .apply_hardware_event(Event::HardwareUnavailable {
             transport: "NFC".into(),
         })
         .unwrap();
@@ -111,19 +109,17 @@ fn nfc_tap_emits_deactivate_after_processing() {
     bob.emit_initial_commands();
     let bob_cmds = bob.drain_commands();
     let bob_payload = match &bob_cmds[0] {
-        ExchangeCommand::NfcActivate { payload } => payload.clone(),
+        Command::NfcActivate { payload } => payload.clone(),
         _ => panic!("expected NfcActivate"),
     };
 
     alice
-        .apply_hardware_event(ExchangeHardwareEvent::NfcDataReceived { data: bob_payload })
+        .apply_hardware_event(Event::NfcDataReceived { data: bob_payload })
         .unwrap();
 
     // After processing, NFC interface should be deactivated
     let cmds = alice.drain_commands();
-    let has_deactivate = cmds
-        .iter()
-        .any(|c| matches!(c, ExchangeCommand::NfcDeactivate));
+    let has_deactivate = cmds.iter().any(|c| matches!(c, Command::NfcDeactivate));
     assert!(
         has_deactivate,
         "after NFC tap processing, should emit NfcDeactivate, got {:?}",

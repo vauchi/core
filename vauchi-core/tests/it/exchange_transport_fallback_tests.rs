@@ -9,10 +9,9 @@
 
 use vauchi_core::ContactCard;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
-use vauchi_core::exchange::{
-    ExchangeCommand, ExchangeHardwareEvent, ExchangeSession, ManualConfirmationVerifier,
-};
+use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier};
 use vauchi_core::identity::Identity;
+use vauchi_core::{Command, Event};
 
 fn ble_session_with_caps(name: &str, caps: DeviceCapabilities) -> ExchangeSession {
     let identity = Identity::create(name);
@@ -39,16 +38,14 @@ fn ble_unavailable_with_camera_falls_back_to_qr() {
 
     // BLE hardware reports unavailable
     session
-        .apply_hardware_event(ExchangeHardwareEvent::HardwareUnavailable {
+        .apply_hardware_event(Event::HardwareUnavailable {
             transport: "BLE".into(),
         })
         .unwrap();
 
     // Should fall back to QR — emit QrDisplay command
     let cmds = session.drain_commands();
-    let has_qr = cmds
-        .iter()
-        .any(|c| matches!(c, ExchangeCommand::QrDisplay { .. }));
+    let has_qr = cmds.iter().any(|c| matches!(c, Command::QrDisplay { .. }));
     assert!(
         has_qr,
         "BLE unavailable with camera should fall back to QR, got {:?}",
@@ -72,7 +69,7 @@ fn ble_unavailable_without_camera_does_not_fall_back() {
     let _ = session.drain_commands();
 
     session
-        .apply_hardware_event(ExchangeHardwareEvent::HardwareUnavailable {
+        .apply_hardware_event(Event::HardwareUnavailable {
             transport: "BLE".into(),
         })
         .unwrap();

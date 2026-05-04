@@ -11,8 +11,7 @@
 //! Handles the milli-g → g conversion for accelerometer data
 //! (audit F4: hardware events use i32 milli-g, verifier uses f32 g).
 
-use super::ExchangeHardwareEvent;
-use super::command::ExchangeCommand;
+use crate::{Command, Event};
 
 /// Which proximity method to run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,7 +65,7 @@ impl ProximityRunner {
     }
 
     /// Emit hardware commands to start this proximity method.
-    pub fn start(&self) -> Vec<ExchangeCommand> {
+    pub fn start(&self) -> Vec<Command> {
         match self.method {
             ProximityMethod::Audio => {
                 let modem_config = crate::exchange::audio_modem::AudioConfig::default();
@@ -74,18 +73,18 @@ impl ProximityRunner {
                 let samples =
                     crate::exchange::audio_modem::generate_fsk_samples(&challenge, &modem_config);
                 vec![
-                    ExchangeCommand::AudioEmitChallenge {
+                    Command::AudioEmitChallenge {
                         samples,
                         sample_rate: modem_config.sample_rate,
                     },
-                    ExchangeCommand::AudioListenForResponse {
+                    Command::AudioListenForResponse {
                         timeout_ms: 5000,
                         sample_rate: modem_config.sample_rate,
                     },
                 ]
             }
             ProximityMethod::Accelerometer | ProximityMethod::Impact => {
-                vec![ExchangeCommand::AccelerometerStart]
+                vec![Command::AccelerometerStart]
             }
         }
     }
@@ -93,7 +92,7 @@ impl ProximityRunner {
     /// Feed a hardware event. Returns commands to emit (if any).
     ///
     /// Handles milli-g → g conversion (audit F4).
-    pub fn feed_event(&mut self, event: &ExchangeHardwareEvent) -> Vec<ExchangeCommand> {
+    pub fn feed_event(&mut self, event: &Event) -> Vec<Command> {
         if self.done {
             return vec![];
         }
@@ -102,7 +101,7 @@ impl ProximityRunner {
             // Audio: samples received — decode and verify
             (
                 ProximityMethod::Audio,
-                ExchangeHardwareEvent::AudioSamplesRecorded {
+                Event::AudioSamplesRecorded {
                     samples,
                     sample_rate,
                 },
@@ -120,13 +119,13 @@ impl ProximityRunner {
                     verified,
                 });
                 self.done = true;
-                vec![ExchangeCommand::AudioStop]
+                vec![Command::AudioStop]
             }
 
             // Accelerometer: accumulate samples for correlation
             (
                 ProximityMethod::Accelerometer,
-                ExchangeHardwareEvent::AccelerometerData {
+                Event::AccelerometerData {
                     x_milli_g,
                     y_milli_g,
                     z_milli_g,
@@ -145,7 +144,7 @@ impl ProximityRunner {
             // Impact: detect peak from ImpactDetected event
             (
                 ProximityMethod::Impact,
-                ExchangeHardwareEvent::ImpactDetected {
+                Event::ImpactDetected {
                     magnitude_milli_g, ..
                 },
             ) => {
@@ -160,7 +159,7 @@ impl ProximityRunner {
                     verified,
                 });
                 self.done = true;
-                vec![ExchangeCommand::AccelerometerStop]
+                vec![Command::AccelerometerStop]
             }
 
             _ => vec![],
@@ -204,7 +203,7 @@ impl ProximityRunner {
     ///
     /// Returns `None` if not in Accelerometer mode, already done, or
     /// no samples recorded. Emits `AccelerometerStop`.
-    pub fn finish_recording(&mut self) -> Option<(Vec<u8>, Vec<ExchangeCommand>)> {
+    pub fn finish_recording(&mut self) -> Option<(Vec<u8>, Vec<Command>)> {
         if self.method != ProximityMethod::Accelerometer
             || self.done
             || self.accel_samples.is_empty()
@@ -213,14 +212,14 @@ impl ProximityRunner {
         }
         self.recording_done = true;
         let envelope = super::shake_protocol::encode_envelope(&self.accel_samples);
-        Some((envelope, vec![ExchangeCommand::AccelerometerStop]))
+        Some((envelope, vec![Command::AccelerometerStop]))
     }
 
     /// Receive the peer's magnitude envelope and compute cross-correlation
     /// (Shake mode only). Produces the final proximity result.
     ///
     /// Returns commands to emit (empty — correlation is computed locally).
-    pub fn receive_peer_envelope(&mut self, peer_data: &[u8]) -> Vec<ExchangeCommand> {
+    pub fn receive_peer_envelope(&mut self, peer_data: &[u8]) -> Vec<Command> {
         if self.method != ProximityMethod::Accelerometer || self.done {
             return vec![];
         }
@@ -298,14 +297,8 @@ mod tests {
         let runner = ProximityRunner::new(ProximityMethod::Audio);
         let cmds = runner.start();
         assert_eq!(cmds.len(), 2);
-        assert!(matches!(
-            cmds[0],
-            ExchangeCommand::AudioEmitChallenge { .. }
-        ));
-        assert!(matches!(
-            cmds[1],
-            ExchangeCommand::AudioListenForResponse { .. }
-        ));
+        assert!(matches!(cmds[0], Command::AudioEmitChallenge { .. }));
+        assert!(matches!(cmds[1], Command::AudioListenForResponse { .. }));
     }
 
     // @internal
@@ -314,7 +307,7 @@ mod tests {
         let runner = ProximityRunner::new(ProximityMethod::Accelerometer);
         let cmds = runner.start();
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], ExchangeCommand::AccelerometerStart));
+        assert!(matches!(cmds[0], Command::AccelerometerStart));
     }
 
     // @internal
@@ -323,7 +316,7 @@ mod tests {
         let runner = ProximityRunner::new(ProximityMethod::Impact);
         let cmds = runner.start();
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], ExchangeCommand::AccelerometerStart));
+        assert!(matches!(cmds[0], Command::AccelerometerStart));
     }
 
     // @internal
@@ -333,7 +326,7 @@ mod tests {
         assert!(!runner.is_done());
 
         // 3g impact (above 2.5g threshold)
-        let cmds = runner.feed_event(&ExchangeHardwareEvent::ImpactDetected {
+        let cmds = runner.feed_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 3000,
         });
@@ -344,7 +337,7 @@ mod tests {
         assert!(result.confidence > 0.0);
         assert!(result.confidence <= 0.6); // Capped per spec
         // Should emit AccelerometerStop
-        assert!(matches!(cmds[0], ExchangeCommand::AccelerometerStop));
+        assert!(matches!(cmds[0], Command::AccelerometerStop));
     }
 
     // @internal
@@ -352,7 +345,7 @@ mod tests {
     fn impact_runner_rejects_weak_impact() {
         let mut runner = ProximityRunner::new(ProximityMethod::Impact);
         // 1g impact (below 2.5g threshold)
-        runner.feed_event(&ExchangeHardwareEvent::ImpactDetected {
+        runner.feed_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 1000,
         });
@@ -365,7 +358,7 @@ mod tests {
     fn milli_g_to_g_conversion_is_correct() {
         let mut runner = ProximityRunner::new(ProximityMethod::Impact);
         // 5000 milli-g = 5.0g → confidence = min(5.0/5.0, 0.6) = 0.6
-        runner.feed_event(&ExchangeHardwareEvent::ImpactDetected {
+        runner.feed_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 5000,
         });
@@ -377,13 +370,13 @@ mod tests {
     #[test]
     fn accelerometer_accumulates_samples() {
         let mut runner = ProximityRunner::new(ProximityMethod::Accelerometer);
-        runner.feed_event(&ExchangeHardwareEvent::AccelerometerData {
+        runner.feed_event(&Event::AccelerometerData {
             x_milli_g: 1000,
             y_milli_g: 0,
             z_milli_g: 0,
             timestamp_ms: 0,
         });
-        runner.feed_event(&ExchangeHardwareEvent::AccelerometerData {
+        runner.feed_event(&Event::AccelerometerData {
             x_milli_g: 0,
             y_milli_g: 2000,
             z_milli_g: 0,
@@ -399,21 +392,21 @@ mod tests {
         let mut runner = ProximityRunner::new(ProximityMethod::Audio);
         let modem_config = crate::exchange::audio_modem::AudioConfig::default();
         let samples = crate::exchange::audio_modem::generate_fsk_samples(&[1, 2, 3], &modem_config);
-        let cmds = runner.feed_event(&ExchangeHardwareEvent::AudioSamplesRecorded {
+        let cmds = runner.feed_event(&Event::AudioSamplesRecorded {
             samples,
             sample_rate: modem_config.sample_rate,
         });
         assert!(runner.is_done());
         assert!(runner.result().unwrap().verified);
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], ExchangeCommand::AudioStop));
+        assert!(matches!(cmds[0], Command::AudioStop));
     }
 
     // @internal
     #[test]
     fn audio_empty_response_is_unverified() {
         let mut runner = ProximityRunner::new(ProximityMethod::Audio);
-        runner.feed_event(&ExchangeHardwareEvent::AudioSamplesRecorded {
+        runner.feed_event(&Event::AudioSamplesRecorded {
             samples: vec![],
             sample_rate: 44100,
         });
@@ -439,7 +432,7 @@ mod tests {
     #[test]
     fn done_runner_ignores_further_events() {
         let mut runner = ProximityRunner::new(ProximityMethod::Impact);
-        runner.feed_event(&ExchangeHardwareEvent::ImpactDetected {
+        runner.feed_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 3000,
         });
@@ -447,7 +440,7 @@ mod tests {
         let first_confidence = runner.result().unwrap().confidence;
 
         // Feed another event — should be ignored
-        runner.feed_event(&ExchangeHardwareEvent::ImpactDetected {
+        runner.feed_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 10000,
         });
@@ -458,7 +451,7 @@ mod tests {
 
     fn feed_shake_samples(runner: &mut ProximityRunner, count: usize) {
         for i in 0..count {
-            runner.feed_event(&ExchangeHardwareEvent::AccelerometerData {
+            runner.feed_event(&Event::AccelerometerData {
                 x_milli_g: ((i as f32 * 0.1).sin() * 2000.0) as i32,
                 y_milli_g: ((i as f32 * 0.1).cos() * 1500.0) as i32,
                 z_milli_g: 1000,
@@ -479,10 +472,7 @@ mod tests {
         assert!(runner.is_recording_done());
         assert!(!runner.is_done()); // Not done until peer envelope received
         assert!(!envelope.is_empty());
-        assert!(
-            cmds.iter()
-                .any(|c| matches!(c, ExchangeCommand::AccelerometerStop))
-        );
+        assert!(cmds.iter().any(|c| matches!(c, Command::AccelerometerStop)));
     }
 
     // @internal

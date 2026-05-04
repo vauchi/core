@@ -31,7 +31,8 @@
 //! `PermissionDenied { transport: "camera" }` flip the engine into
 //! the corresponding chrome.
 
-use vauchi_core::exchange::{ExchangeHardwareEvent, ProtocolState, QrPayload};
+use vauchi_core::Event;
+use vauchi_core::exchange::{ProtocolState, QrPayload};
 
 use crate::ui::exchange_qr::ScanQualityTracker;
 use crate::ui::*;
@@ -518,14 +519,14 @@ impl WorkflowEngine for MultiStageExchangeEngine {
                 self.peer_name = None;
                 self.session_ended = false;
                 self.scan_quality_tracker.reset();
-                ActionResult::ExchangeCommands {
-                    commands: vec![vauchi_core::exchange::ExchangeCommand::QrRequestScan],
+                ActionResult::Commands {
+                    commands: vec![vauchi_core::Command::QrRequestScan],
                 }
             }
             SWITCH_CAMERA_ACTION_ID => {
                 self.use_front_camera = !self.use_front_camera;
-                ActionResult::ExchangeCommands {
-                    commands: vec![vauchi_core::exchange::ExchangeCommand::SwitchCamera {
+                ActionResult::Commands {
+                    commands: vec![vauchi_core::Command::SwitchCamera {
                         use_front: self.use_front_camera,
                     }],
                 }
@@ -535,17 +536,17 @@ impl WorkflowEngine for MultiStageExchangeEngine {
                 // clear the gate; a second `PermissionDenied` event
                 // will re-set it if the user denies again.
                 self.camera_gate = CameraGate::Available;
-                ActionResult::ExchangeCommands {
-                    commands: vec![vauchi_core::exchange::ExchangeCommand::QrRequestScan],
+                ActionResult::Commands {
+                    commands: vec![vauchi_core::Command::QrRequestScan],
                 }
             }
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }
     }
 
-    fn handle_hardware_event(&mut self, event: ExchangeHardwareEvent) -> Option<ActionResult> {
+    fn handle_hardware_event(&mut self, event: Event) -> Option<ActionResult> {
         match event {
-            ExchangeHardwareEvent::QrScanProgress {
+            Event::QrScanProgress {
                 detected,
                 frame_skipped,
                 ..
@@ -555,13 +556,11 @@ impl WorkflowEngine for MultiStageExchangeEngine {
                 }
                 Some(ActionResult::UpdateScreen(self.build_screen()))
             }
-            ExchangeHardwareEvent::PermissionDenied { transport }
-                if transport.eq_ignore_ascii_case("camera") =>
-            {
+            Event::PermissionDenied { transport } if transport.eq_ignore_ascii_case("camera") => {
                 self.camera_gate = self.camera_gate.promote(CameraGate::PermissionDenied);
                 Some(ActionResult::UpdateScreen(self.build_screen()))
             }
-            ExchangeHardwareEvent::HardwareUnavailable { transport }
+            Event::HardwareUnavailable { transport }
                 if transport.eq_ignore_ascii_case("camera") =>
             {
                 self.camera_gate = self.camera_gate.promote(CameraGate::Unavailable);
@@ -850,7 +849,7 @@ mod tests {
     #[test]
     fn permission_denied_event_swaps_to_permission_screen() {
         let mut engine = MultiStageExchangeEngine::new();
-        let result = engine.handle_hardware_event(ExchangeHardwareEvent::PermissionDenied {
+        let result = engine.handle_hardware_event(Event::PermissionDenied {
             transport: "Camera".into(),
         });
         assert!(
@@ -879,7 +878,7 @@ mod tests {
     #[test]
     fn hardware_unavailable_event_swaps_to_hardware_screen() {
         let mut engine = MultiStageExchangeEngine::new();
-        engine.handle_hardware_event(ExchangeHardwareEvent::HardwareUnavailable {
+        engine.handle_hardware_event(Event::HardwareUnavailable {
             transport: "camera".into(),
         });
         let screen = engine.current_screen();
@@ -898,7 +897,7 @@ mod tests {
     #[test]
     fn unrelated_transport_does_not_engage_gate() {
         let mut engine = MultiStageExchangeEngine::new();
-        engine.handle_hardware_event(ExchangeHardwareEvent::PermissionDenied {
+        engine.handle_hardware_event(Event::PermissionDenied {
             transport: "BLE".into(),
         });
         // Still active rendering — the BLE permission denial does not
@@ -955,14 +954,11 @@ mod tests {
             action_id: RETRY_ACTION_ID.into(),
         });
         match result {
-            ActionResult::ExchangeCommands { commands } => {
+            ActionResult::Commands { commands } => {
                 assert_eq!(commands.len(), 1);
-                assert!(matches!(
-                    &commands[0],
-                    vauchi_core::exchange::ExchangeCommand::QrRequestScan,
-                ));
+                assert!(matches!(&commands[0], vauchi_core::Command::QrRequestScan,));
             }
-            other => panic!("expected ExchangeCommands, got {other:?}"),
+            other => panic!("expected Commands, got {other:?}"),
         }
         assert_eq!(engine.state, ProtocolState::Idle);
         assert!(
@@ -981,13 +977,13 @@ mod tests {
             action_id: SWITCH_CAMERA_ACTION_ID.into(),
         });
         match result {
-            ActionResult::ExchangeCommands { commands } => match &commands[0] {
-                vauchi_core::exchange::ExchangeCommand::SwitchCamera { use_front } => {
+            ActionResult::Commands { commands } => match &commands[0] {
+                vauchi_core::Command::SwitchCamera { use_front } => {
                     assert!(use_front, "first toggle must select front");
                 }
                 other => panic!("expected SwitchCamera, got {other:?}"),
             },
-            other => panic!("expected ExchangeCommands, got {other:?}"),
+            other => panic!("expected Commands, got {other:?}"),
         }
         assert!(engine.use_front_camera());
         // Toggle back.
@@ -1026,7 +1022,7 @@ mod tests {
     #[test]
     fn grant_permission_action_clears_gate_and_re_requests_scan() {
         let mut engine = MultiStageExchangeEngine::new();
-        engine.handle_hardware_event(ExchangeHardwareEvent::PermissionDenied {
+        engine.handle_hardware_event(Event::PermissionDenied {
             transport: "camera".into(),
         });
         assert_eq!(engine.camera_gate, CameraGate::PermissionDenied);
@@ -1035,13 +1031,10 @@ mod tests {
         });
         assert_eq!(engine.camera_gate, CameraGate::Available);
         match result {
-            ActionResult::ExchangeCommands { commands } => {
-                assert!(matches!(
-                    &commands[0],
-                    vauchi_core::exchange::ExchangeCommand::QrRequestScan,
-                ));
+            ActionResult::Commands { commands } => {
+                assert!(matches!(&commands[0], vauchi_core::Command::QrRequestScan,));
             }
-            other => panic!("expected ExchangeCommands, got {other:?}"),
+            other => panic!("expected Commands, got {other:?}"),
         }
     }
 
@@ -1049,11 +1042,11 @@ mod tests {
     #[test]
     fn unavailable_gate_cannot_be_recovered_by_grant_permission() {
         let mut engine = MultiStageExchangeEngine::new();
-        engine.handle_hardware_event(ExchangeHardwareEvent::HardwareUnavailable {
+        engine.handle_hardware_event(Event::HardwareUnavailable {
             transport: "camera".into(),
         });
         // Permission-denied event arrives later — still terminal.
-        engine.handle_hardware_event(ExchangeHardwareEvent::PermissionDenied {
+        engine.handle_hardware_event(Event::PermissionDenied {
             transport: "camera".into(),
         });
         assert_eq!(engine.camera_gate, CameraGate::Unavailable);
@@ -1070,7 +1063,7 @@ mod tests {
     fn qr_scan_progress_drives_quality_tracker() {
         let mut engine = MultiStageExchangeEngine::new();
         for _ in 0..10 {
-            engine.handle_hardware_event(ExchangeHardwareEvent::QrScanProgress {
+            engine.handle_hardware_event(Event::QrScanProgress {
                 detected: true,
                 confidence: Some(95),
                 frame_skipped: false,
@@ -1094,7 +1087,7 @@ mod tests {
         let mut engine = MultiStageExchangeEngine::new();
         // 10 detected frames — Good.
         for _ in 0..10 {
-            engine.handle_hardware_event(ExchangeHardwareEvent::QrScanProgress {
+            engine.handle_hardware_event(Event::QrScanProgress {
                 detected: true,
                 confidence: None,
                 frame_skipped: false,
@@ -1102,7 +1095,7 @@ mod tests {
         }
         // Skipped frames must NOT pollute the rolling rate.
         for _ in 0..20 {
-            engine.handle_hardware_event(ExchangeHardwareEvent::QrScanProgress {
+            engine.handle_hardware_event(Event::QrScanProgress {
                 detected: false,
                 confidence: None,
                 frame_skipped: true,

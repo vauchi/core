@@ -10,7 +10,7 @@
 //! - **Flow C** (proactive): Settings entry → select mode → delegate to existing flows
 
 use crate::ui::*;
-use vauchi_core::exchange::{ExchangeCommand, FilePickPurpose};
+use vauchi_core::{Command, FilePickPurpose};
 
 /// MIME types for the encrypted backup file picker. Mirrors
 /// `onboarding::backup_mime_types` — the picker drives an identical
@@ -550,8 +550,8 @@ impl WorkflowEngine for DeviceReplacementEngine {
             UserAction::ActionPressed { action_id } => match self.step {
                 Step::SelectMode => match action_id.as_str() {
                     "has_old_device" => ActionResult::StartDeviceLink,
-                    "lost_device" => ActionResult::ExchangeCommands {
-                        commands: vec![ExchangeCommand::FilePickFromUser {
+                    "lost_device" => ActionResult::Commands {
+                        commands: vec![Command::FilePickFromUser {
                             accepted_mime_types: backup_mime_types(),
                             purpose: FilePickPurpose::ImportBackup,
                         }],
@@ -849,17 +849,17 @@ mod tests {
             action_id: "lost_device".into(),
         });
         match result {
-            ActionResult::ExchangeCommands { commands } => {
+            ActionResult::Commands { commands } => {
                 assert_eq!(commands.len(), 1);
                 match &commands[0] {
-                    ExchangeCommand::FilePickFromUser { purpose, .. } => {
+                    Command::FilePickFromUser { purpose, .. } => {
                         assert_eq!(*purpose, FilePickPurpose::ImportBackup);
                     }
                     other => panic!("expected FilePickFromUser, got {:?}", other),
                 }
             }
             other => panic!(
-                "expected ExchangeCommands(FilePickFromUser/ImportBackup), got {:?}",
+                "expected Commands(FilePickFromUser/ImportBackup), got {:?}",
                 other
             ),
         }

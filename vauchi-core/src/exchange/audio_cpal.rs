@@ -90,7 +90,7 @@ impl CpalAudioBackend {
     /// Emits raw PCM samples through the default output device.
     ///
     /// Frontends receive ready-to-play samples on
-    /// [`crate::exchange::ExchangeCommand::AudioEmitChallenge`] —
+    /// [`crate::exchange::Command::AudioEmitChallenge`] —
     /// FSK encoding has already happened in core. The `sample_rate`
     /// argument is the rate the samples were generated at; the
     /// device's native rate is used for playback regardless.

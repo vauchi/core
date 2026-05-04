@@ -6,7 +6,7 @@
 //!
 //! Phase 2A of `2026-05-03-core-file-picker-command`: when the user
 //! triggers `import_contacts` on the More screen, AppEngine emits an
-//! `ExchangeCommand::FilePickFromUser`. The frontend opens the native
+//! `Command::FilePickFromUser`. The frontend opens the native
 //! picker, then sends `FilePickedFromUser{bytes, filename}` back. Core
 //! routes the bytes by current screen and calls
 //! `Vauchi::import_contacts_from_vcf`, returning a toast with the
@@ -14,7 +14,7 @@
 
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
-use vauchi_core::exchange::{ExchangeCommand, ExchangeHardwareEvent, FilePickPurpose};
+use vauchi_core::{Command, Event, FilePickPurpose};
 
 fn engine_with_identity() -> AppEngine {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -44,7 +44,7 @@ fn import_contacts_action_emits_file_pick_command() {
         action_id: "import_contacts".into(),
     });
     match result {
-        ActionResult::ExchangeCommands { commands } => {
+        ActionResult::Commands { commands } => {
             assert_eq!(
                 commands.len(),
                 1,
@@ -52,7 +52,7 @@ fn import_contacts_action_emits_file_pick_command() {
                 commands
             );
             match &commands[0] {
-                ExchangeCommand::FilePickFromUser {
+                Command::FilePickFromUser {
                     accepted_mime_types,
                     purpose,
                 } => {
@@ -66,7 +66,7 @@ fn import_contacts_action_emits_file_pick_command() {
                 other => panic!("expected FilePickFromUser, got {:?}", other),
             }
         }
-        other => panic!("expected ExchangeCommands, got {:?}", other),
+        other => panic!("expected Commands, got {:?}", other),
     }
 }
 
@@ -76,7 +76,7 @@ fn file_picked_from_more_imports_vcards() {
     let mut engine = engine_with_identity();
     let _ = engine.navigate_to(AppScreen::More);
 
-    let result = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+    let result = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: VALID_VCF.to_vec(),
         filename: "contacts.vcf".into(),
     });
@@ -99,7 +99,7 @@ fn file_picked_from_more_persists_contacts() {
     let mut engine = engine_with_identity();
     let _ = engine.navigate_to(AppScreen::More);
 
-    let _ = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+    let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: VALID_VCF.to_vec(),
         filename: "contacts.vcf".into(),
     });
@@ -120,7 +120,7 @@ fn file_picked_with_non_vcard_bytes_imports_zero_contacts() {
     let _ = engine.navigate_to(AppScreen::More);
 
     let garbage = b"NOT A VCARD AT ALL".to_vec();
-    let result = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+    let result = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: garbage,
         filename: "garbage.txt".into(),
     });
@@ -147,7 +147,7 @@ fn file_pick_cancelled_returns_none() {
     let mut engine = engine_with_identity();
     let _ = engine.navigate_to(AppScreen::More);
 
-    let result = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickCancelledByUser);
+    let result = engine.handle_hardware_event(Event::FilePickCancelledByUser);
     assert!(
         result.is_none(),
         "cancellation must produce None (no toast / alert), got {:?}",
@@ -162,7 +162,7 @@ fn file_picked_outside_more_is_ignored() {
     // Settings is not a participating screen for Phase 2A.
     let _ = engine.navigate_to(AppScreen::Settings);
 
-    let result = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+    let result = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: VALID_VCF.to_vec(),
         filename: "contacts.vcf".into(),
     });
@@ -187,13 +187,13 @@ fn file_picked_with_duplicates_reports_skipped_count() {
     let _ = engine.navigate_to(AppScreen::More);
 
     // Import once — both succeed.
-    let _ = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+    let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: VCF_WITH_UID.to_vec(),
         filename: "contacts.vcf".into(),
     });
 
     // Import the same vCards again — both should be skipped (UID match).
-    let result = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+    let result = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: VCF_WITH_UID.to_vec(),
         filename: "contacts.vcf".into(),
     });
@@ -258,16 +258,16 @@ fn restore_backup_emits_file_pick_for_backup() {
         action_id: "restore_backup".into(),
     });
     match result {
-        ActionResult::ExchangeCommands { commands } => {
+        ActionResult::Commands { commands } => {
             assert_eq!(commands.len(), 1);
             match &commands[0] {
-                ExchangeCommand::FilePickFromUser { purpose, .. } => {
+                Command::FilePickFromUser { purpose, .. } => {
                     assert_eq!(*purpose, FilePickPurpose::ImportBackup);
                 }
                 other => panic!("expected FilePickFromUser, got {other:?}"),
             }
         }
-        other => panic!("expected ExchangeCommands, got {other:?}"),
+        other => panic!("expected Commands, got {other:?}"),
     }
 }
 
@@ -283,7 +283,7 @@ fn file_picked_on_onboarding_transitions_to_backup_password_entry() {
         action_id: "restore_backup".into(),
     });
 
-    let result = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+    let result = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: make_backup("correct horse battery staple", "Alice"),
         filename: "alice-backup.txt".into(),
     });
@@ -307,7 +307,7 @@ fn submit_valid_password_imports_backup_and_navigates_to_main() {
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "restore_backup".into(),
     });
-    let _ = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+    let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: make_backup("correct horse battery staple", "Bob"),
         filename: "bob-backup.txt".into(),
     });
@@ -343,7 +343,7 @@ fn submit_wrong_password_returns_alert_and_clears_state() {
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "restore_backup".into(),
     });
-    let _ = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+    let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: make_backup("correct horse battery staple", "Eve"),
         filename: "eve-backup.txt".into(),
     });
@@ -378,7 +378,7 @@ fn submit_empty_password_surfaces_validation_error_in_component() {
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "restore_backup".into(),
     });
-    let _ = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+    let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: make_backup("correct horse battery staple", "Eve"),
         filename: "eve-backup.txt".into(),
     });
@@ -425,7 +425,7 @@ fn back_from_password_entry_clears_pending_state() {
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "restore_backup".into(),
     });
-    let _ = engine.handle_hardware_event(ExchangeHardwareEvent::FilePickedFromUser {
+    let _ = engine.handle_hardware_event(Event::FilePickedFromUser {
         bytes: make_backup("correct horse battery staple", "Eve"),
         filename: "eve-backup.txt".into(),
     });

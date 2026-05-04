@@ -6,7 +6,7 @@
 
 use base64::Engine as _;
 use proptest::prelude::any;
-use vauchi_core::exchange::command::ExchangeCommand;
+use vauchi_core::Command;
 use vauchi_core::exchange::link_mode::*;
 
 // ================================================================
@@ -102,15 +102,9 @@ fn responder_produces_two_deposit_commands() {
     assert_eq!(commands.len(), 2, "responder emits 2 deposits");
 
     // First command: handshake slot deposit (epk)
-    assert!(matches!(
-        &commands[0],
-        ExchangeCommand::RelayEscrowDeposit { .. }
-    ));
+    assert!(matches!(&commands[0], Command::RelayEscrowDeposit { .. }));
     // Second command: card deposit
-    assert!(matches!(
-        &commands[1],
-        ExchangeCommand::RelayEscrowDeposit { .. }
-    ));
+    assert!(matches!(&commands[1], Command::RelayEscrowDeposit { .. }));
 }
 
 // @internal
@@ -120,7 +114,7 @@ fn responder_handshake_deposit_contains_32_byte_epk() {
     let parsed = parse_link_url(&init.url).unwrap();
     let (_, commands) = responder_respond(&parsed, b"card".to_vec()).unwrap();
 
-    if let ExchangeCommand::RelayEscrowDeposit { encrypted_card, .. } = &commands[0] {
+    if let Command::RelayEscrowDeposit { encrypted_card, .. } = &commands[0] {
         assert_eq!(
             encrypted_card.len(),
             32,
@@ -149,10 +143,7 @@ fn initiator_complete_produces_one_deposit() {
     )
     .unwrap();
     assert_eq!(commands.len(), 1);
-    assert!(matches!(
-        &commands[0],
-        ExchangeCommand::RelayEscrowDeposit { .. }
-    ));
+    assert!(matches!(&commands[0], Command::RelayEscrowDeposit { .. }));
 }
 
 // ================================================================
@@ -174,7 +165,7 @@ fn initiator_and_responder_derive_same_gate_hash() {
 
     // Step 3: Extract responder's epk from handshake deposit
     let resp_epk: [u8; 32] =
-        if let ExchangeCommand::RelayEscrowDeposit { encrypted_card, .. } = &resp_commands[0] {
+        if let Command::RelayEscrowDeposit { encrypted_card, .. } = &resp_commands[0] {
             encrypted_card.as_slice().try_into().unwrap()
         } else {
             panic!("expected deposit");
@@ -242,11 +233,11 @@ fn handshake_slot_derived_from_nonce_not_secret() {
 
     // Extract handshake gate_hash from first command of each
     let gate1 = match &cmds1[0] {
-        ExchangeCommand::RelayEscrowDeposit { gate_hash, .. } => gate_hash.clone(),
+        Command::RelayEscrowDeposit { gate_hash, .. } => gate_hash.clone(),
         _ => panic!(),
     };
     let gate2 = match &cmds2[0] {
-        ExchangeCommand::RelayEscrowDeposit { gate_hash, .. } => gate_hash.clone(),
+        Command::RelayEscrowDeposit { gate_hash, .. } => gate_hash.clone(),
         _ => panic!(),
     };
 
@@ -269,17 +260,14 @@ fn initiator_generate_returns_presence_deposit_command() {
         1,
         "initiator must emit exactly 1 presence deposit command"
     );
-    assert!(matches!(
-        &commands[0],
-        ExchangeCommand::RelayEscrowDeposit { .. }
-    ));
+    assert!(matches!(&commands[0], Command::RelayEscrowDeposit { .. }));
 }
 
 // @internal
 #[test]
 fn presence_deposit_targets_handshake_gate() {
     let (init, commands) = initiator_generate();
-    if let ExchangeCommand::RelayEscrowDeposit { gate_hash, .. } = &commands[0] {
+    if let Command::RelayEscrowDeposit { gate_hash, .. } = &commands[0] {
         let handshake_gate = hex::decode(&init.handshake_slot).unwrap();
         assert_eq!(
             gate_hash, &handshake_gate,
@@ -294,7 +282,7 @@ fn presence_deposit_targets_handshake_gate() {
 #[test]
 fn presence_deposit_uses_initiator_epk_as_blob() {
     let (_init, commands) = initiator_generate();
-    if let ExchangeCommand::RelayEscrowDeposit { encrypted_card, .. } = &commands[0] {
+    if let Command::RelayEscrowDeposit { encrypted_card, .. } = &commands[0] {
         assert_eq!(
             encrypted_card.len(),
             32,
@@ -314,11 +302,11 @@ fn presence_and_responder_epk_use_different_slots() {
 
     // Extract slot hashes from handshake deposits
     let init_slot = match &init_cmds[0] {
-        ExchangeCommand::RelayEscrowDeposit { slot_hash, .. } => slot_hash.clone(),
+        Command::RelayEscrowDeposit { slot_hash, .. } => slot_hash.clone(),
         _ => panic!(),
     };
     let resp_slot = match &resp_cmds[0] {
-        ExchangeCommand::RelayEscrowDeposit { slot_hash, .. } => slot_hash.clone(),
+        Command::RelayEscrowDeposit { slot_hash, .. } => slot_hash.clone(),
         _ => panic!(),
     };
 
@@ -609,7 +597,7 @@ fn responder_respond_with_card_bytes_round_trips_via_responder_complete() {
     // The second command is the encrypted-card deposit. Pull the
     // ciphertext out and round-trip it back through responder_complete.
     let encrypted_blob = match &commands[1] {
-        ExchangeCommand::RelayEscrowDeposit { encrypted_card, .. } => encrypted_card.clone(),
+        Command::RelayEscrowDeposit { encrypted_card, .. } => encrypted_card.clone(),
         other => panic!("expected RelayEscrowDeposit at index 1, got {other:?}"),
     };
 

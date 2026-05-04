@@ -38,8 +38,8 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use crate::error::MobileError;
-use crate::exchange::MobileExchangeCommand;
-use crate::exchange::MobileExchangeHardwareEvent;
+use crate::exchange::MobileCommand;
+use crate::exchange::MobileEvent;
 
 use vauchi_core::exchange::link_mode::{
     LinkModeError, ParsedLinkUrl, responder_respond_with_card_bytes,
@@ -131,11 +131,11 @@ pub trait LinkResponderSessionListener: Send + Sync {
     fn on_state_changed(&self, state: MobileLinkResponderState);
 
     /// New commands the frontend should dispatch via its existing
-    /// `ExchangeCommandHandler` (or platform equivalent). The cycle
+    /// `CommandHandler` (or platform equivalent). The cycle
     /// thread emits these whenever the state machine adds entries
     /// to its pending queue. The frontend feeds the resulting hardware
     /// events back via [`MobileLinkResponderSession::apply_hardware_event`].
-    fn on_commands(&self, commands: Vec<MobileExchangeCommand>);
+    fn on_commands(&self, commands: Vec<MobileCommand>);
 
     /// Exchange finalized successfully. `card_bytes` carries the
     /// decrypted card payload the frontend hands to its persistence
@@ -252,7 +252,7 @@ impl MobileLinkResponderSession {
     /// Apply a hardware event from the relay layer. Threadsafe — the
     /// cycle thread holds the same `Mutex` so events serialize with
     /// inspection.
-    pub fn apply_hardware_event(&self, event: MobileExchangeHardwareEvent) {
+    pub fn apply_hardware_event(&self, event: MobileEvent) {
         let core_event = event.into();
         if let Ok(mut session) = self.inner.lock() {
             session.apply_hardware_event(core_event);
@@ -366,10 +366,8 @@ fn cycle_loop(
         if !commands.is_empty()
             && let Some(listener) = listener.as_ref()
         {
-            let mobile_commands: Vec<MobileExchangeCommand> = commands
-                .into_iter()
-                .map(MobileExchangeCommand::from)
-                .collect();
+            let mobile_commands: Vec<MobileCommand> =
+                commands.into_iter().map(MobileCommand::from).collect();
             listener.on_commands(mobile_commands);
         }
 

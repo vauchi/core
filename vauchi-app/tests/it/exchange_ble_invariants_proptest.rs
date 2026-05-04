@@ -22,55 +22,55 @@
 
 use proptest::prelude::*;
 use vauchi_app::ui::{ExchangeConfig, ExchangeEngine, WorkflowEngine};
-use vauchi_core::exchange::ExchangeHardwareEvent;
+use vauchi_core::Event;
 use vauchi_core::exchange::audio_modem::{AudioConfig, generate_fsk_samples};
 use vauchi_core::exchange::mode::ExchangeMode;
 
 /// Strategy: arbitrary BLE / proximity / hardware-error events that
 /// could plausibly arrive after exchange completes — spurious scans,
 /// stale GATT notifications, late disconnects, transport errors.
-fn arb_post_complete_event() -> impl Strategy<Value = ExchangeHardwareEvent> {
+fn arb_post_complete_event() -> impl Strategy<Value = Event> {
     prop_oneof![
         // BLE radio events
-        Just(ExchangeHardwareEvent::BleDeviceDiscovered {
+        Just(Event::BleDeviceDiscovered {
             id: "spurious".into(),
             rssi: -50,
             adv_data: vec![],
         }),
-        Just(ExchangeHardwareEvent::BleConnected {
+        Just(Event::BleConnected {
             device_id: "spurious".into(),
         }),
-        Just(ExchangeHardwareEvent::BleDisconnected {
+        Just(Event::BleDisconnected {
             reason: "late disconnect".into(),
         }),
-        Just(ExchangeHardwareEvent::BleCharacteristicNotified {
+        Just(Event::BleCharacteristicNotified {
             uuid: "spurious".into(),
             data: vec![1, 2, 3],
         }),
-        Just(ExchangeHardwareEvent::BleCharacteristicRead {
+        Just(Event::BleCharacteristicRead {
             uuid: "spurious".into(),
             data: vec![],
         }),
         // Proximity events (could fire from a still-recording adapter)
-        Just(ExchangeHardwareEvent::ImpactDetected {
+        Just(Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 3500,
         }),
-        Just(ExchangeHardwareEvent::AccelerometerData {
+        Just(Event::AccelerometerData {
             x_milli_g: 100,
             y_milli_g: 0,
             z_milli_g: 0,
             timestamp_ms: 0,
         }),
         // Transport-level error events scoped to BLE
-        Just(ExchangeHardwareEvent::HardwareError {
+        Just(Event::HardwareError {
             transport: "ble".into(),
             error: "spurious".into(),
         }),
-        Just(ExchangeHardwareEvent::PermissionDenied {
+        Just(Event::PermissionDenied {
             transport: "ble".into(),
         }),
-        Just(ExchangeHardwareEvent::HardwareUnavailable {
+        Just(Event::HardwareUnavailable {
             transport: "ble".into(),
         }),
     ]
@@ -92,21 +92,21 @@ fn config_for_mode(mode: ExchangeMode) -> ExchangeConfig {
 /// `ui::exchange::tests::magic_full_flow_discovery_to_success`.
 fn drive_magic_to_success() -> ExchangeEngine {
     let mut e = ExchangeEngine::new(config_for_mode(ExchangeMode::Magic));
-    e.handle_hardware_event(ExchangeHardwareEvent::BleDeviceDiscovered {
+    e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
         rssi: -45,
         adv_data: vec![],
     });
-    e.handle_hardware_event(ExchangeHardwareEvent::BleConnected {
+    e.handle_hardware_event(Event::BleConnected {
         device_id: "peer-1".into(),
     });
-    e.handle_hardware_event(ExchangeHardwareEvent::BleCharacteristicNotified {
+    e.handle_hardware_event(Event::BleCharacteristicNotified {
         uuid: "card".into(),
         data: vec![1, 2, 3],
     });
     let modem = AudioConfig::default();
     let samples = generate_fsk_samples(&[0xAA], &modem);
-    e.handle_hardware_event(ExchangeHardwareEvent::AudioSamplesRecorded {
+    e.handle_hardware_event(Event::AudioSamplesRecorded {
         samples,
         sample_rate: modem.sample_rate,
     });

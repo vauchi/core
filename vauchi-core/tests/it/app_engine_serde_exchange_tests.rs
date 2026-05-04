@@ -259,7 +259,7 @@ fn exchange_screen_with_identity_has_session() {
 // @internal
 #[test]
 fn exchange_hardware_event_delegated_to_session() {
-    use vauchi_core::exchange::ExchangeHardwareEvent;
+    use vauchi_core::Event;
 
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
@@ -267,7 +267,7 @@ fn exchange_hardware_event_delegated_to_session() {
     engine.navigate_to(AppScreen::Exchange);
 
     // Send a BLE discovery event — should be handled by the session
-    let result = engine.handle_hardware_event(ExchangeHardwareEvent::BleDeviceDiscovered {
+    let result = engine.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "device-1".into(),
         rssi: -42,
         adv_data: vec![],
@@ -283,14 +283,14 @@ fn exchange_hardware_event_delegated_to_session() {
 // @internal
 #[test]
 fn exchange_hardware_unavailable_shows_toast() {
-    use vauchi_core::exchange::ExchangeHardwareEvent;
+    use vauchi_core::Event;
 
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::Exchange);
 
-    let result = engine.handle_hardware_event(ExchangeHardwareEvent::HardwareUnavailable {
+    let result = engine.handle_hardware_event(Event::HardwareUnavailable {
         transport: "BLE".into(),
     });
 
@@ -325,12 +325,12 @@ fn multi_stage_exchange_navigates_to_engine_idle_screen() {
 // @internal
 #[test]
 fn multi_stage_exchange_camera_permission_denied_event_swaps_chrome() {
-    use vauchi_core::exchange::ExchangeHardwareEvent;
+    use vauchi_core::Event;
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::MultiStageExchange);
-    let result = engine.handle_hardware_event(ExchangeHardwareEvent::PermissionDenied {
+    let result = engine.handle_hardware_event(Event::PermissionDenied {
         transport: "camera".into(),
     });
     // AppEngine routes hardware-error events through a ShowToast

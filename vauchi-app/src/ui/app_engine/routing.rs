@@ -11,8 +11,8 @@ use crate::ui::ScreenModel;
 use crate::ui::action::{ActionResult, ContactActionKind, PostOnboardingDestination, UserAction};
 use crate::ui::engine::WorkflowEngine;
 use crate::ui::form_dialog::FormDialogType;
+use vauchi_core::Event;
 use vauchi_core::contact_card::FieldType;
-use vauchi_core::exchange::ExchangeHardwareEvent;
 
 impl AppEngine {
     /// Returns `true` if the current engine has user-entered data that differs
@@ -74,22 +74,22 @@ impl AppEngine {
     /// Handle a hardware event from the frontend (ADR-031).
     ///
     /// Frontends call this when hardware reports results (QR scanned, BLE data
-    /// received, image picked, etc.). Returns `ExchangeCommands` with response
+    /// received, image picked, etc.). Returns `Commands` with response
     /// commands, or a screen update if the engine state changed.
     ///
     /// Returns `None` if the current screen doesn't handle hardware events.
     #[tracing::instrument(level = "debug", skip_all, name = "app.handle_hardware_event")]
-    pub fn handle_hardware_event(&mut self, event: ExchangeHardwareEvent) -> Option<ActionResult> {
+    pub fn handle_hardware_event(&mut self, event: Event) -> Option<ActionResult> {
         // ADR-031 file-picker: dispatched by current screen, not by the
         // narrow screen guard below. The picker is reachable from More
         // (contacts import) and — once Phase 2B lands — Onboarding
         // (backup restore). Phase 2A handles contacts only; backup
         // restore is deferred (multi-step password flow).
         match &event {
-            ExchangeHardwareEvent::FilePickedFromUser { bytes, filename } => {
+            Event::FilePickedFromUser { bytes, filename } => {
                 return self.handle_file_picked(bytes.clone(), filename.clone());
             }
-            ExchangeHardwareEvent::FilePickCancelledByUser => {
+            Event::FilePickCancelledByUser => {
                 // User dismissed the picker — no-op. Frontend stays on
                 // the originating screen with no toast / alert.
                 return None;
@@ -110,24 +110,18 @@ impl AppEngine {
         // ADR-031: For error events, build a user-friendly UI response
         // before delegating to the engine (which may transition to Failed).
         let ui_override = match &event {
-            ExchangeHardwareEvent::HardwareUnavailable { transport } => {
-                Some(ActionResult::ShowToast {
-                    message: format!("{} is not available on this device", transport),
-                    undo_action_id: None,
-                })
-            }
-            ExchangeHardwareEvent::PermissionDenied { transport } => {
-                Some(ActionResult::ShowToast {
-                    message: format!("{} access was denied", transport),
-                    undo_action_id: None,
-                })
-            }
-            ExchangeHardwareEvent::HardwareError { transport, error } => {
-                Some(ActionResult::ShowAlert {
-                    title: format!("{} error", transport),
-                    message: error.clone(),
-                })
-            }
+            Event::HardwareUnavailable { transport } => Some(ActionResult::ShowToast {
+                message: format!("{} is not available on this device", transport),
+                undo_action_id: None,
+            }),
+            Event::PermissionDenied { transport } => Some(ActionResult::ShowToast {
+                message: format!("{} access was denied", transport),
+                undo_action_id: None,
+            }),
+            Event::HardwareError { transport, error } => Some(ActionResult::ShowAlert {
+                title: format!("{} error", transport),
+                message: error.clone(),
+            }),
             _ => None,
         };
 
@@ -140,7 +134,7 @@ impl AppEngine {
             // the engine returns a simple screen update.
             if matches!(
                 result,
-                ActionResult::NavigateTo(_) | ActionResult::ExchangeCommands { .. }
+                ActionResult::NavigateTo(_) | ActionResult::Commands { .. }
             ) {
                 return Some(result);
             }
@@ -1038,7 +1032,7 @@ impl AppEngine {
     /// Runs the backup operation synchronously (Argon2id KDF is slow but
     /// the platform already calls handle_action on a background thread).
     /// Execute a backup-restore using bytes picked through the
-    /// ADR-031 file-picker (`ExchangeCommand::FilePickFromUser` with
+    /// ADR-031 file-picker (`Command::FilePickFromUser` with
     /// `purpose = ImportBackup`) and the password the user typed on
     /// the `OnboardingStep::BackupPasswordEntry` screen.
     ///

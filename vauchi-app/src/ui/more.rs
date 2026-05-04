@@ -11,10 +11,10 @@
 //! maps it to the target `AppScreen`.
 
 use crate::ui::*;
-use vauchi_core::exchange::{ExchangeCommand, FilePickPurpose};
+use vauchi_core::{Command, FilePickPurpose};
 
 /// `action_id` for the contacts-import entry. Special-cased in
-/// `handle_action` to emit an `ExchangeCommand::FilePickFromUser`
+/// `handle_action` to emit an `Command::FilePickFromUser`
 /// rather than a navigation result — there is no "Import Contacts"
 /// screen, the action *is* the picker.
 pub(crate) const IMPORT_CONTACTS_ACTION_ID: &str = "import_contacts";
@@ -28,7 +28,7 @@ pub(crate) const IMPORT_CONTACTS_ACTION_ID: &str = "import_contacts";
 /// activity-log / sync / backup / privacy entries stay for TUI.
 ///
 /// `import_contacts` is the only entry that does not navigate to a
-/// screen — selecting it returns an `ExchangeCommands` result that
+/// screen — selecting it returns an `Commands` result that
 /// drives the frontend's native file picker per ADR-031.
 const MORE_ITEMS: &[(&str, &str)] = &[
     ("activity_log", "Activity"),
@@ -110,11 +110,11 @@ impl WorkflowEngine for MoreEngine {
                 if action_id == IMPORT_CONTACTS_ACTION_ID {
                     // ADR-031: drive the native file picker via core,
                     // not via a navigation. The picker bytes flow back
-                    // through `ExchangeHardwareEvent::FilePickedFromUser`
+                    // through `Event::FilePickedFromUser`
                     // and the AppEngine routes them to
                     // `Vauchi::import_contacts_from_vcf`.
-                    return ActionResult::ExchangeCommands {
-                        commands: vec![ExchangeCommand::FilePickFromUser {
+                    return ActionResult::Commands {
+                        commands: vec![Command::FilePickFromUser {
                             accepted_mime_types: vcf_mime_types(),
                             purpose: FilePickPurpose::ImportContacts,
                         }],
@@ -159,10 +159,10 @@ mod tests {
             action_id: IMPORT_CONTACTS_ACTION_ID.into(),
         });
         match result {
-            ActionResult::ExchangeCommands { commands } => {
+            ActionResult::Commands { commands } => {
                 assert_eq!(commands.len(), 1, "expected exactly one command");
                 match &commands[0] {
-                    ExchangeCommand::FilePickFromUser {
+                    Command::FilePickFromUser {
                         accepted_mime_types,
                         purpose,
                     } => {
@@ -176,10 +176,7 @@ mod tests {
                     other => panic!("expected FilePickFromUser, got {:?}", other),
                 }
             }
-            other => panic!(
-                "expected ExchangeCommands for import_contacts, got {:?}",
-                other
-            ),
+            other => panic!("expected Commands for import_contacts, got {:?}", other),
         }
     }
 
@@ -195,8 +192,8 @@ mod tests {
             item_id: IMPORT_CONTACTS_ACTION_ID.into(),
         });
         assert!(
-            matches!(result, ActionResult::ExchangeCommands { .. }),
-            "expected ExchangeCommands for import_contacts via list-item, got {:?}",
+            matches!(result, ActionResult::Commands { .. }),
+            "expected Commands for import_contacts via list-item, got {:?}",
             result
         );
     }

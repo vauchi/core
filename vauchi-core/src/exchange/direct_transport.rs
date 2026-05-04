@@ -5,8 +5,8 @@
 //! Types for direct transport exchange (USB cable / local network).
 //!
 //! Direct transports use the same ADR-031 command/event protocol as
-//! QR/NFC/BLE. Core emits [`ExchangeCommand::DirectSend`] and receives
-//! [`ExchangeHardwareEvent::DirectPayloadReceived`]. The actual TCP I/O
+//! QR/NFC/BLE. Core emits [`Command::DirectSend`] and receives
+//! [`Event::DirectPayloadReceived`]. The actual TCP I/O
 //! is performed by frontends using [`TcpDirectTransport`] or raw
 //! [`tcp_transport`] functions.
 

@@ -16,11 +16,11 @@ use std::thread;
 use proptest::prelude::*;
 
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
 use vauchi_core::exchange::session::{ExchangeSession, ExchangeState};
 use vauchi_core::exchange::tcp_transport::TcpDirectTransport;
 use vauchi_core::exchange::{ManualConfirmationVerifier, UsbRole};
 use vauchi_core::identity::Identity;
+use vauchi_core::{Command, Event};
 
 fn loopback_pair() -> (TcpStream, TcpStream) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
@@ -90,8 +90,7 @@ fn adversarial_empty_direct_payload_rejected() {
         UsbRole::Initiator,
     );
 
-    let result = session
-        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: Vec::new() });
+    let result = session.apply_hardware_event(Event::DirectPayloadReceived { data: Vec::new() });
     assert!(result.is_err(), "Empty payload should be rejected");
 }
 
@@ -107,7 +106,7 @@ fn adversarial_null_bytes_in_payload_rejected() {
         UsbRole::Initiator,
     );
 
-    let result = session.apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
+    let result = session.apply_hardware_event(Event::DirectPayloadReceived {
         data: b"\0\0\0\0\0\0\0\0".to_vec(),
     });
     assert!(result.is_err(), "Null bytes payload should be rejected");
@@ -126,7 +125,7 @@ fn adversarial_non_utf8_payload_rejected() {
     );
 
     // Invalid UTF-8 sequence
-    let result = session.apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
+    let result = session.apply_hardware_event(Event::DirectPayloadReceived {
         data: vec![0xFF, 0xFE, 0x80, 0x81, 0xC0],
     });
     assert!(result.is_err(), "Non-UTF-8 payload should be rejected");
@@ -144,7 +143,7 @@ fn adversarial_max_length_payload_rejected() {
         UsbRole::Initiator,
     );
 
-    let result = session.apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
+    let result = session.apply_hardware_event(Event::DirectPayloadReceived {
         data: b"A".repeat(100_000),
     });
     assert!(result.is_err(), "100KB garbage payload should be rejected");
@@ -164,7 +163,7 @@ fn adversarial_truncated_valid_payload() {
 
     bob_session.emit_initial_commands();
     let valid_payload = match &bob_session.drain_commands()[0] {
-        ExchangeCommand::DirectSend { payload, .. } => payload.clone(),
+        Command::DirectSend { payload, .. } => payload.clone(),
         other => panic!("expected DirectSend, got {:?}", other),
     };
 
@@ -179,8 +178,7 @@ fn adversarial_truncated_valid_payload() {
         );
 
         let truncated = valid_payload[..truncate_at].to_vec();
-        let result = session
-            .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: truncated });
+        let result = session.apply_hardware_event(Event::DirectPayloadReceived { data: truncated });
         assert!(
             result.is_err(),
             "Truncated payload at {} bytes should be rejected",
@@ -203,7 +201,7 @@ fn adversarial_corrupted_valid_payload() {
 
     bob_session.emit_initial_commands();
     let valid_payload = match &bob_session.drain_commands()[0] {
-        ExchangeCommand::DirectSend { payload, .. } => payload.clone(),
+        Command::DirectSend { payload, .. } => payload.clone(),
         other => panic!("expected DirectSend, got {:?}", other),
     };
 
@@ -223,8 +221,7 @@ fn adversarial_corrupted_valid_payload() {
         UsbRole::Initiator,
     );
 
-    let result = session
-        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: corrupted });
+    let result = session.apply_hardware_event(Event::DirectPayloadReceived { data: corrupted });
     assert!(result.is_err(), "Corrupted payload should be rejected");
 }
 
@@ -244,7 +241,7 @@ fn adversarial_replay_same_payload_twice() {
     );
     bob_session.emit_initial_commands();
     let bob_payload = match &bob_session.drain_commands()[0] {
-        ExchangeCommand::DirectSend { payload, .. } => payload.clone(),
+        Command::DirectSend { payload, .. } => payload.clone(),
         other => panic!("expected DirectSend, got {:?}", other),
     };
 
@@ -257,7 +254,7 @@ fn adversarial_replay_same_payload_twice() {
 
     // First apply succeeds
     session
-        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
+        .apply_hardware_event(Event::DirectPayloadReceived {
             data: bob_payload.clone(),
         })
         .expect("first should succeed");
@@ -268,8 +265,7 @@ fn adversarial_replay_same_payload_twice() {
     ));
 
     // Second apply fails (wrong state)
-    let result = session
-        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: bob_payload });
+    let result = session.apply_hardware_event(Event::DirectPayloadReceived { data: bob_payload });
     assert!(
         result.is_err(),
         "Replayed payload should be rejected (wrong state)"

@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use vauchi_app::ui::reciprocity_confirmer::ReciprocityConfirmer;
-use vauchi_core::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
 use vauchi_core::exchange::reciprocity::Reciprocity;
+use vauchi_core::{Command, Event};
 
 // Use valid hex strings for gate/slot hashes (matches production encoding)
 const GATE_HEX: &str = "aabbccdd00112233445566778899aabbccddeeff00112233445566778899aabb";
@@ -34,7 +34,7 @@ fn start_emits_deposit_command() {
     let cmds = confirmer.start();
     assert_eq!(cmds.len(), 1);
     match &cmds[0] {
-        ExchangeCommand::RelayEscrowDeposit {
+        Command::RelayEscrowDeposit {
             encrypted_card,
             ttl_seconds,
             ..
@@ -52,11 +52,11 @@ fn escrow_ready_triggers_retrieve() {
     let mut confirmer = make_confirmer();
     confirmer.start();
 
-    let cmds = confirmer.handle_event(&ExchangeHardwareEvent::RelayEscrowReady {
+    let cmds = confirmer.handle_event(&Event::RelayEscrowReady {
         gate_hash: gate_bytes(),
     });
     assert_eq!(cmds.len(), 1);
-    matches!(&cmds[0], ExchangeCommand::RelayEscrowRetrieve { .. });
+    matches!(&cmds[0], Command::RelayEscrowRetrieve { .. });
 }
 
 // @internal
@@ -65,7 +65,7 @@ fn correct_blob_confirms() {
     let mut confirmer = make_confirmer();
     confirmer.start();
 
-    confirmer.handle_event(&ExchangeHardwareEvent::RelayEscrowBlobReceived {
+    confirmer.handle_event(&Event::RelayEscrowBlobReceived {
         gate_hash: gate_bytes(),
         blob: [0xBB; 32].to_vec(),
     });
@@ -80,7 +80,7 @@ fn wrong_blob_falls_to_pending() {
     let mut confirmer = make_confirmer();
     confirmer.start();
 
-    confirmer.handle_event(&ExchangeHardwareEvent::RelayEscrowBlobReceived {
+    confirmer.handle_event(&Event::RelayEscrowBlobReceived {
         gate_hash: gate_bytes(),
         blob: [0xFF; 32].to_vec(),
     });
@@ -95,7 +95,7 @@ fn deposit_failure_retries_up_to_3_times() {
     let mut confirmer = make_confirmer();
     confirmer.start();
 
-    let fail_event = ExchangeHardwareEvent::RelayEscrowFailed {
+    let fail_event = Event::RelayEscrowFailed {
         gate_hash: gate_bytes(),
         reason: "network error".into(),
     };
@@ -142,7 +142,7 @@ fn resumed_confirmer_skips_to_polling() {
     let cmds = resumed.start();
 
     assert_eq!(cmds.len(), 1);
-    matches!(&cmds[0], ExchangeCommand::RelayEscrowCheck { .. });
+    matches!(&cmds[0], Command::RelayEscrowCheck { .. });
 }
 
 // @internal
@@ -151,7 +151,7 @@ fn ignores_events_for_different_gate() {
     let mut confirmer = make_confirmer();
     confirmer.start();
 
-    let cmds = confirmer.handle_event(&ExchangeHardwareEvent::RelayEscrowReady {
+    let cmds = confirmer.handle_event(&Event::RelayEscrowReady {
         gate_hash: b"other_gate".to_vec(),
     });
     assert!(cmds.is_empty(), "should ignore events for different gates");

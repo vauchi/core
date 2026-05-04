@@ -106,7 +106,7 @@ fn initial_screen_affordance_set_matches_plan() {
 ///   hardware-event path (`AppEngine::handle_file_picked` calls
 ///   `OnboardingEngine::set_pending_backup_bytes` which transitions to
 ///   `Step::BackupPasswordEntry`). The BFS walker doesn't simulate
-///   `ExchangeHardwareEvent::FilePickedFromUser`, so the screen + its
+///   `Event::FilePickedFromUser`, so the screen + its
 ///   "Restore" affordance never appear in the BFS reach. Coverage of
 ///   the live submit path lives in `tests/it/file_picker_wiring_tests.rs`
 ///   (`submit_valid_password_imports_backup_and_navigates_to_main`,

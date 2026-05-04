@@ -572,7 +572,7 @@ pub unsafe extern "C" fn vauchi_app_create_identity(
 
 /// Handle a hardware event during an exchange (ADR-031).
 ///
-/// `event_json` must be a JSON-encoded `ExchangeHardwareEvent`.
+/// `event_json` must be a JSON-encoded `Event`.
 /// Returns the action result as JSON, or null if the event was ignored
 /// (e.g., not on the exchange screen).
 ///
@@ -596,20 +596,16 @@ pub unsafe extern "C" fn vauchi_app_handle_hardware_event(
             };
             let app = &*handle;
             match app.engine.lock() {
-                Ok(mut engine) => {
-                    match serde_json::from_str::<vauchi_core::exchange::ExchangeHardwareEvent>(
-                        &json,
-                    ) {
-                        Ok(event) => match engine.handle_hardware_event(event) {
-                            Some(result) => serde_json::to_string(&result).map_or_else(
-                                |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                                |j| to_c_string(&j),
-                            ),
-                            None => std::ptr::null_mut(),
-                        },
-                        Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
-                    }
-                }
+                Ok(mut engine) => match serde_json::from_str::<vauchi_core::Event>(&json) {
+                    Ok(event) => match engine.handle_hardware_event(event) {
+                        Some(result) => serde_json::to_string(&result).map_or_else(
+                            |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                            |j| to_c_string(&j),
+                        ),
+                        None => std::ptr::null_mut(),
+                    },
+                    Err(e) => to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                },
                 Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
             }
         })) {

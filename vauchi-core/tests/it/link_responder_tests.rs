@@ -14,11 +14,11 @@
 use std::time::{Duration, Instant};
 
 use proptest::prelude::{Strategy, any};
-use vauchi_core::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
 use vauchi_core::exchange::link_mode::*;
 use vauchi_core::exchange::link_responder::{
     LinkResponderFailureReason, LinkResponderSession, LinkResponderState,
 };
+use vauchi_core::{Command, Event};
 
 /// Synthetic responder session — derives keys + commands the same way
 /// the production cycle thread will, but stays inside the test.
@@ -54,11 +54,11 @@ fn fresh_session_emits_deposit_and_check_commands() {
     // one RelayEscrowCheck so the relay starts watching the gate.
     let deposits = cmds
         .iter()
-        .filter(|c| matches!(c, ExchangeCommand::RelayEscrowDeposit { .. }))
+        .filter(|c| matches!(c, Command::RelayEscrowDeposit { .. }))
         .count();
     let checks = cmds
         .iter()
-        .filter(|c| matches!(c, ExchangeCommand::RelayEscrowCheck { .. }))
+        .filter(|c| matches!(c, Command::RelayEscrowCheck { .. }))
         .count();
     assert_eq!(deposits, 2, "expected 2 deposits, got {deposits}");
     assert_eq!(checks, 1, "expected 1 check, got {checks}");
@@ -84,7 +84,7 @@ fn relay_escrow_ready_on_our_gate_transitions_to_retrieving() {
     let _ = session.drain_pending_commands();
 
     let our_gate = session.gate_hash_bytes();
-    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowReady {
+    session.apply_hardware_event(Event::RelayEscrowReady {
         gate_hash: our_gate,
     });
 
@@ -98,7 +98,7 @@ fn relay_escrow_ready_on_our_gate_transitions_to_retrieving() {
     let cmds = session.drain_pending_commands();
     assert_eq!(cmds.len(), 1, "expected 1 command, got {}", cmds.len());
     assert!(
-        matches!(cmds[0], ExchangeCommand::RelayEscrowRetrieve { .. }),
+        matches!(cmds[0], Command::RelayEscrowRetrieve { .. }),
         "expected RelayEscrowRetrieve, got {:?}",
         cmds[0]
     );
@@ -112,7 +112,7 @@ fn relay_escrow_ready_on_unrelated_gate_is_noop() {
     let _ = session.drain_pending_commands();
 
     // Different gate hash — must not affect this session's state.
-    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowReady {
+    session.apply_hardware_event(Event::RelayEscrowReady {
         gate_hash: vec![0xAA; 32],
     });
 
@@ -137,7 +137,7 @@ fn blob_received_with_valid_ciphertext_transitions_to_finalized() {
 
     // Drive into Retrieving first.
     let our_gate = session.gate_hash_bytes();
-    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowReady {
+    session.apply_hardware_event(Event::RelayEscrowReady {
         gate_hash: our_gate.clone(),
     });
     let _ = session.drain_pending_commands();
@@ -149,7 +149,7 @@ fn blob_received_with_valid_ciphertext_transitions_to_finalized() {
     let plaintext = b"alice card bytes";
     let ciphertext = session.test_encrypt_card(plaintext).expect("encrypt");
 
-    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowBlobReceived {
+    session.apply_hardware_event(Event::RelayEscrowBlobReceived {
         gate_hash: our_gate,
         blob: ciphertext,
     });
@@ -174,12 +174,12 @@ fn blob_received_with_garbage_ciphertext_transitions_to_failed_decrypt() {
     let _ = session.drain_pending_commands();
 
     let our_gate = session.gate_hash_bytes();
-    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowReady {
+    session.apply_hardware_event(Event::RelayEscrowReady {
         gate_hash: our_gate.clone(),
     });
     let _ = session.drain_pending_commands();
 
-    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowBlobReceived {
+    session.apply_hardware_event(Event::RelayEscrowBlobReceived {
         gate_hash: our_gate,
         blob: vec![0xFF; 4], // too short for AEAD nonce
     });
@@ -206,7 +206,7 @@ fn relay_escrow_failed_on_our_gate_transitions_to_failed_deposit_rejected() {
     let _ = session.drain_pending_commands();
 
     let our_gate = session.gate_hash_bytes();
-    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowFailed {
+    session.apply_hardware_event(Event::RelayEscrowFailed {
         gate_hash: our_gate,
         reason: "slot already occupied".into(),
     });
@@ -279,13 +279,13 @@ fn finalized_is_terminal() {
     let _ = session.drain_pending_commands();
 
     let our_gate = session.gate_hash_bytes();
-    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowReady {
+    session.apply_hardware_event(Event::RelayEscrowReady {
         gate_hash: our_gate.clone(),
     });
     let _ = session.drain_pending_commands();
     let plaintext = b"x";
     let ciphertext = session.test_encrypt_card(plaintext).unwrap();
-    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowBlobReceived {
+    session.apply_hardware_event(Event::RelayEscrowBlobReceived {
         gate_hash: our_gate.clone(),
         blob: ciphertext,
     });
@@ -297,7 +297,7 @@ fn finalized_is_terminal() {
     // Subsequent events are inert.
     session.tick(now + Duration::from_secs(3600));
     session.cancel();
-    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowFailed {
+    session.apply_hardware_event(Event::RelayEscrowFailed {
         gate_hash: our_gate,
         reason: "should be ignored".into(),
     });
@@ -324,7 +324,7 @@ fn failed_is_terminal() {
 
     // Subsequent events do not flip the variant.
     let our_gate = session.gate_hash_bytes();
-    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowReady {
+    session.apply_hardware_event(Event::RelayEscrowReady {
         gate_hash: our_gate,
     });
     session.tick(now + Duration::from_secs(3600));
@@ -374,23 +374,23 @@ proptest::proptest! {
 
             match ev {
                 EventKind::ReadyOurs => {
-                    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowReady {
+                    session.apply_hardware_event(Event::RelayEscrowReady {
                         gate_hash: our_gate.clone(),
                     });
                 }
                 EventKind::ReadyOther => {
-                    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowReady {
+                    session.apply_hardware_event(Event::RelayEscrowReady {
                         gate_hash: vec![0u8; 32],
                     });
                 }
                 EventKind::FailedOurs => {
-                    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowFailed {
+                    session.apply_hardware_event(Event::RelayEscrowFailed {
                         gate_hash: our_gate.clone(),
                         reason: String::new(),
                     });
                 }
                 EventKind::FailedOther => {
-                    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowFailed {
+                    session.apply_hardware_event(Event::RelayEscrowFailed {
                         gate_hash: vec![0u8; 32],
                         reason: String::new(),
                     });
@@ -402,7 +402,7 @@ proptest::proptest! {
                     session.cancel();
                 }
                 EventKind::BlobOurs(byte) => {
-                    session.apply_hardware_event(ExchangeHardwareEvent::RelayEscrowBlobReceived {
+                    session.apply_hardware_event(Event::RelayEscrowBlobReceived {
                         gate_hash: our_gate.clone(),
                         blob: vec![byte; 4],
                     });

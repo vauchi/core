@@ -5,16 +5,16 @@
 //! Tests for the BLE exchange flow via the ADR-031 command/event protocol.
 //!
 //! These tests verify that `ExchangeSession` drives `BleHandshakeSession`
-//! through the full 4-phase handshake using only `ExchangeCommand`s and
-//! `ExchangeHardwareEvent`s -- no hardware traits, no mock transports.
+//! through the full 4-phase handshake using only `Command`s and
+//! `Event`s -- no hardware traits, no mock transports.
 
 use vauchi_core::ContactCard;
 use vauchi_core::exchange::{
     CHAR_DATA_NOTIFY, CHAR_DATA_WRITE, CHAR_HANDSHAKE_NOTIFY, CHAR_HANDSHAKE_WRITE,
-    ExchangeCommand, ExchangeHardwareEvent, ExchangeSession, ExchangeState,
-    ManualConfirmationVerifier, VAUCHI_BLE_SERVICE_UUID,
+    ExchangeSession, ExchangeState, ManualConfirmationVerifier, VAUCHI_BLE_SERVICE_UUID,
 };
 use vauchi_core::identity::Identity;
+use vauchi_core::{Command, Event};
 
 /// Helper: create a BLE exchange session with a fresh identity.
 fn ble_session(name: &str) -> ExchangeSession {
@@ -36,11 +36,11 @@ fn ble_session_emits_scan_and_advertise_on_start() {
     assert_eq!(cmds.len(), 2, "expected scan + advertise commands");
 
     let has_scan = cmds.iter().any(|c| {
-        matches!(c, ExchangeCommand::BleStartScanning { service_uuid }
+        matches!(c, Command::BleStartScanning { service_uuid }
             if service_uuid == VAUCHI_BLE_SERVICE_UUID)
     });
     let has_advertise = cmds.iter().any(|c| {
-        matches!(c, ExchangeCommand::BleStartAdvertising { service_uuid, .. }
+        matches!(c, Command::BleStartAdvertising { service_uuid, .. }
             if service_uuid == VAUCHI_BLE_SERVICE_UUID)
     });
 
@@ -56,7 +56,7 @@ fn ble_device_discovered_emits_connect_command() {
     let mut session = ble_session("Alice");
 
     session
-        .apply_hardware_event(ExchangeHardwareEvent::BleDeviceDiscovered {
+        .apply_hardware_event(Event::BleDeviceDiscovered {
             id: "peer-1".into(),
             rssi: -42,
             adv_data: vec![],
@@ -66,12 +66,12 @@ fn ble_device_discovered_emits_connect_command() {
     let cmds = session.drain_commands();
     assert_eq!(cmds.len(), 2, "expected BleStopScanning + BleConnect");
     assert!(
-        matches!(&cmds[0], ExchangeCommand::BleStopScanning),
+        matches!(&cmds[0], Command::BleStopScanning),
         "expected BleStopScanning first, got {:?}",
         cmds[0]
     );
     assert!(
-        matches!(&cmds[1], ExchangeCommand::BleConnect { device_id } if device_id == "peer-1"),
+        matches!(&cmds[1], Command::BleConnect { device_id } if device_id == "peer-1"),
         "expected BleConnect second, got {:?}",
         cmds[1]
     );
@@ -86,7 +86,7 @@ fn ble_connected_after_discovery_emits_key_offer_write() {
 
     // Discovery marks us as initiator
     session
-        .apply_hardware_event(ExchangeHardwareEvent::BleDeviceDiscovered {
+        .apply_hardware_event(Event::BleDeviceDiscovered {
             id: "peer-1".into(),
             rssi: -42,
             adv_data: vec![],
@@ -96,7 +96,7 @@ fn ble_connected_after_discovery_emits_key_offer_write() {
 
     // Connection established -- should emit KeyOffer write
     session
-        .apply_hardware_event(ExchangeHardwareEvent::BleConnected {
+        .apply_hardware_event(Event::BleConnected {
             device_id: "peer-1".into(),
         })
         .unwrap();
@@ -108,7 +108,7 @@ fn ble_connected_after_discovery_emits_key_offer_write() {
     );
 
     let write_cmd = cmds.iter().find(|c| {
-        matches!(c, ExchangeCommand::BleWriteCharacteristic { uuid, data }
+        matches!(c, Command::BleWriteCharacteristic { uuid, data }
             if uuid == CHAR_HANDSHAKE_WRITE && !data.is_empty())
     });
     assert!(
@@ -128,7 +128,7 @@ fn ble_full_initiator_flow_via_command_event() {
 
     // --- Step 1: Discovery + connect ---
     initiator
-        .apply_hardware_event(ExchangeHardwareEvent::BleDeviceDiscovered {
+        .apply_hardware_event(Event::BleDeviceDiscovered {
             id: "bob-device".into(),
             rssi: -30,
             adv_data: vec![],
@@ -137,7 +137,7 @@ fn ble_full_initiator_flow_via_command_event() {
     let _ = initiator.drain_commands(); // BleConnect
 
     initiator
-        .apply_hardware_event(ExchangeHardwareEvent::BleConnected {
+        .apply_hardware_event(Event::BleConnected {
             device_id: "bob-device".into(),
         })
         .unwrap();
@@ -147,9 +147,7 @@ fn ble_full_initiator_flow_via_command_event() {
     let key_offer = cmds
         .iter()
         .find_map(|c| match c {
-            ExchangeCommand::BleWriteCharacteristic { uuid, data }
-                if uuid == CHAR_HANDSHAKE_WRITE =>
-            {
+            Command::BleWriteCharacteristic { uuid, data } if uuid == CHAR_HANDSHAKE_WRITE => {
                 Some(data.clone())
             }
             _ => None,
@@ -169,14 +167,14 @@ fn ble_full_initiator_flow_via_command_event() {
 
     // Feed KeyAck and encrypted card back to initiator as hardware events
     initiator
-        .apply_hardware_event(ExchangeHardwareEvent::BleCharacteristicNotified {
+        .apply_hardware_event(Event::BleCharacteristicNotified {
             uuid: CHAR_HANDSHAKE_NOTIFY.into(),
             data: key_ack,
         })
         .unwrap();
 
     initiator
-        .apply_hardware_event(ExchangeHardwareEvent::BleCharacteristicNotified {
+        .apply_hardware_event(Event::BleCharacteristicNotified {
             uuid: CHAR_DATA_NOTIFY.into(),
             data: bob_encrypted_card.clone(),
         })
@@ -185,11 +183,11 @@ fn ble_full_initiator_flow_via_command_event() {
     // --- Step 3: Initiator should emit commitment + encrypted card ---
     let cmds = initiator.drain_commands();
     let commitment_write = cmds.iter().find(|c| {
-        matches!(c, ExchangeCommand::BleWriteCharacteristic { uuid, .. }
+        matches!(c, Command::BleWriteCharacteristic { uuid, .. }
             if uuid == CHAR_HANDSHAKE_WRITE)
     });
     let card_write = cmds.iter().find(|c| {
-        matches!(c, ExchangeCommand::BleWriteCharacteristic { uuid, .. }
+        matches!(c, Command::BleWriteCharacteristic { uuid, .. }
             if uuid == CHAR_DATA_WRITE)
     });
     assert!(
@@ -205,11 +203,11 @@ fn ble_full_initiator_flow_via_command_event() {
 
     // Extract Phase 3 data for responder processing
     let our_commitment = match commitment_write.unwrap() {
-        ExchangeCommand::BleWriteCharacteristic { data, .. } => data.clone(),
+        Command::BleWriteCharacteristic { data, .. } => data.clone(),
         _ => unreachable!(),
     };
     let our_encrypted_card = match card_write.unwrap() {
-        ExchangeCommand::BleWriteCharacteristic { data, .. } => data.clone(),
+        Command::BleWriteCharacteristic { data, .. } => data.clone(),
         _ => unreachable!(),
     };
 
@@ -220,7 +218,7 @@ fn ble_full_initiator_flow_via_command_event() {
 
     // Feed reveal back to initiator
     initiator
-        .apply_hardware_event(ExchangeHardwareEvent::BleCharacteristicNotified {
+        .apply_hardware_event(Event::BleCharacteristicNotified {
             uuid: CHAR_HANDSHAKE_NOTIFY.into(),
             data: reveal,
         })
@@ -242,7 +240,7 @@ fn ble_disconnect_during_connection_fails_session() {
     let mut session = ble_session("Alice");
 
     session
-        .apply_hardware_event(ExchangeHardwareEvent::BleDisconnected {
+        .apply_hardware_event(Event::BleDisconnected {
             reason: "remote closed".into(),
         })
         .unwrap();
@@ -261,7 +259,7 @@ fn ble_hardware_error_fails_session() {
     let mut session = ble_session("Alice");
 
     session
-        .apply_hardware_event(ExchangeHardwareEvent::HardwareError {
+        .apply_hardware_event(Event::HardwareError {
             transport: "BLE".into(),
             error: "adapter disabled".into(),
         })
@@ -283,7 +281,7 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
 
     // Discovery + connect + KeyOffer
     initiator
-        .apply_hardware_event(ExchangeHardwareEvent::BleDeviceDiscovered {
+        .apply_hardware_event(Event::BleDeviceDiscovered {
             id: "bob".into(),
             rssi: -30,
             adv_data: vec![],
@@ -291,7 +289,7 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
         .unwrap();
     let _ = initiator.drain_commands();
     initiator
-        .apply_hardware_event(ExchangeHardwareEvent::BleConnected {
+        .apply_hardware_event(Event::BleConnected {
             device_id: "bob".into(),
         })
         .unwrap();
@@ -300,9 +298,7 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
     let key_offer = cmds
         .iter()
         .find_map(|c| match c {
-            ExchangeCommand::BleWriteCharacteristic { uuid, data }
-                if uuid == CHAR_HANDSHAKE_WRITE =>
-            {
+            Command::BleWriteCharacteristic { uuid, data } if uuid == CHAR_HANDSHAKE_WRITE => {
                 Some(data.clone())
             }
             _ => None,
@@ -315,7 +311,7 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
 
     // Feed card data BEFORE key_ack (reversed order)
     initiator
-        .apply_hardware_event(ExchangeHardwareEvent::BleCharacteristicNotified {
+        .apply_hardware_event(Event::BleCharacteristicNotified {
             uuid: CHAR_DATA_NOTIFY.into(),
             data: encrypted_card,
         })
@@ -330,7 +326,7 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
 
     // Now send key_ack -- should trigger Phase 2 processing
     initiator
-        .apply_hardware_event(ExchangeHardwareEvent::BleCharacteristicNotified {
+        .apply_hardware_event(Event::BleCharacteristicNotified {
             uuid: CHAR_HANDSHAKE_NOTIFY.into(),
             data: key_ack,
         })

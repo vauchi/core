@@ -342,7 +342,7 @@ int32_t vauchi_app_create_identity(struct VauchiApp *handle, const char *display
 /**
  * Handle a hardware event during an exchange (ADR-031).
  *
- * `event_json` must be a JSON-encoded `ExchangeHardwareEvent`.
+ * `event_json` must be a JSON-encoded `Event`.
  * Returns the action result as JSON, or null if the event was ignored
  * (e.g., not on the exchange screen).
  *

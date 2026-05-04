@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 
 use super::ble_handshake::BleHandshakeSession;
 use super::ble_payload::BleCardPayload;
-use super::command::{ExchangeCommand, ExchangeHardwareEvent};
+use crate::{Command, Event};
 use super::direct_transport::UsbRole;
 use super::nfc_handshake::NfcHandshakeSession;
 use super::trust_metrics::TrustMetrics;
@@ -57,7 +57,7 @@ pub enum ExchangeState {
     /// Direct transport (USB/TCP): ready for payload exchange.
     /// `emit_initial_commands()` emits `DirectSend` with our payload.
     /// Frontend executes TCP exchange and reports the peer's payload
-    /// via `ExchangeHardwareEvent::DirectPayloadReceived`.
+    /// via `Event::DirectPayloadReceived`.
     AwaitingDirectPayload { our_qr: ExchangeQR },
     /// NFC: waiting for both devices to tap.
     AwaitingNfcTap,
@@ -174,7 +174,7 @@ pub struct ExchangeSession {
     debug_log: Option<ExchangeDebugLog>,
     /// Pending commands to be sent to the frontend (ADR-031).
     /// Populated by `apply_hardware_event()` and drained by `drain_commands()`.
-    pending_commands: Vec<ExchangeCommand>,
+    pending_commands: Vec<Command>,
     /// Our reciprocity confirmation token (derived in key agreement, zeroized on drop).
     our_confirmation_token: Option<zeroize::Zeroizing<[u8; 32]>>,
     /// Token we expect from the peer (derived in key agreement, zeroized on drop).
@@ -405,7 +405,7 @@ impl ExchangeSession {
     /// `AwaitingDirectPayload`. The ADR-031 command/event flow is:
     /// 1. Call `emit_initial_commands()` → emits `DirectSend` with our payload
     /// 2. Frontend executes TCP exchange, receives peer's payload
-    /// 3. Frontend reports `ExchangeHardwareEvent::DirectPayloadReceived`
+    /// 3. Frontend reports `Event::DirectPayloadReceived`
     /// 4. Then `PerformKeyAgreement` → `CompleteExchange` as usual
     pub fn new_usb(
         identity: Identity,
@@ -743,7 +743,7 @@ impl ExchangeSession {
     ///
     /// Frontends call this after `apply()` or `apply_hardware_event()` to
     /// get the list of hardware actions they need to perform.
-    pub fn drain_commands(&mut self) -> Vec<ExchangeCommand> {
+    pub fn drain_commands(&mut self) -> Vec<Command> {
         std::mem::take(&mut self.pending_commands)
     }
 
@@ -770,7 +770,7 @@ impl ExchangeSession {
     }
 
     /// Queues a command for the frontend.
-    fn emit_command(&mut self, cmd: ExchangeCommand) {
+    fn emit_command(&mut self, cmd: Command) {
         self.debug_event(ExchangeDebugEvent::CommandDispatched {
             command_name: cmd.variant_name().to_string(),
         });
@@ -788,44 +788,44 @@ impl ExchangeSession {
     /// After calling this, use `drain_commands()` to get outgoing commands.
     pub fn apply_hardware_event(
         &mut self,
-        event: ExchangeHardwareEvent,
+        event: Event,
     ) -> Result<(), ExchangeError> {
         match event {
-            ExchangeHardwareEvent::QrScanned { data } => {
+            Event::QrScanned { data } => {
                 let qr = ExchangeQR::from_data_string(&data)?;
                 self.apply(ExchangeEvent::ProcessQR(qr))
             }
-            ExchangeHardwareEvent::NfcDataReceived { data } => {
+            Event::NfcDataReceived { data } => {
                 let result = self.apply(ExchangeEvent::NfcTapComplete {
                     their_payload: data,
                 });
                 // Deactivate NFC interface after tap is processed
                 if result.is_ok() {
-                    self.emit_command(ExchangeCommand::NfcDeactivate);
+                    self.emit_command(Command::NfcDeactivate);
                 }
                 result
             }
-            ExchangeHardwareEvent::BleConnected { device_id } => {
+            Event::BleConnected { device_id } => {
                 self.handle_ble_connected(device_id)
             }
-            ExchangeHardwareEvent::BleCharacteristicRead { uuid, data }
-            | ExchangeHardwareEvent::BleCharacteristicNotified { uuid, data } => {
+            Event::BleCharacteristicRead { uuid, data }
+            | Event::BleCharacteristicNotified { uuid, data } => {
                 self.handle_ble_characteristic_data(uuid, data)
             }
-            ExchangeHardwareEvent::AudioSamplesRecorded { .. } => {
+            Event::AudioSamplesRecorded { .. } => {
                 // Audio proximity response — trigger proximity check.
                 // Decoding lives in ProximityRunner; the session just
                 // ack-tracks that something arrived.
                 Ok(())
             }
-            ExchangeHardwareEvent::BleDeviceDiscovered { id, .. } => {
+            Event::BleDeviceDiscovered { id, .. } => {
                 // Discovered a peer — stop scanning (battery), connect.
                 self.ble_is_initiator = true;
-                self.emit_command(ExchangeCommand::BleStopScanning);
-                self.emit_command(ExchangeCommand::BleConnect { device_id: id });
+                self.emit_command(Command::BleStopScanning);
+                self.emit_command(Command::BleConnect { device_id: id });
                 Ok(())
             }
-            ExchangeHardwareEvent::BleDisconnected { reason } => {
+            Event::BleDisconnected { reason } => {
                 if matches!(self.state, ExchangeState::AwaitingBleConnection) {
                     self.apply(ExchangeEvent::Fail(ExchangeError::BleConnectionLost))?;
                 }
@@ -834,13 +834,13 @@ impl ExchangeSession {
                 });
                 Ok(())
             }
-            ExchangeHardwareEvent::HardwareError { transport, error } => {
+            Event::HardwareError { transport, error } => {
                 self.apply(ExchangeEvent::Fail(ExchangeError::HardwareFailure {
                     transport,
                     error,
                 }))
             }
-            ExchangeHardwareEvent::HardwareUnavailable { transport } => {
+            Event::HardwareUnavailable { transport } => {
                 self.debug_event(ExchangeDebugEvent::ExchangeFailed {
                     error: format!("{} hardware unavailable", transport),
                 });
@@ -848,7 +848,7 @@ impl ExchangeSession {
                 self.attempt_transport_fallback(&transport);
                 Ok(())
             }
-            ExchangeHardwareEvent::PermissionDenied { transport } => {
+            Event::PermissionDenied { transport } => {
                 self.debug_event(ExchangeDebugEvent::ExchangeFailed {
                     error: format!("{} permission denied", transport),
                 });
@@ -858,7 +858,7 @@ impl ExchangeSession {
                 Ok(())
             }
             // Direct transport (USB/TCP)
-            ExchangeHardwareEvent::DirectPayloadReceived { data } => {
+            Event::DirectPayloadReceived { data } => {
                 let payload_str =
                     String::from_utf8(data).map_err(|_| ExchangeError::InvalidQRFormat)?;
                 self.handle_direct_payload_received(payload_str)
@@ -866,23 +866,23 @@ impl ExchangeSession {
             // New hardware event variants — not yet wired into the session state machine.
             // Frontends may send these; they are acknowledged without state change until
             // the corresponding session logic is implemented.
-            ExchangeHardwareEvent::AccelerometerData { .. }
-            | ExchangeHardwareEvent::ImpactDetected { .. }
-            | ExchangeHardwareEvent::RelayEscrowReady { .. }
-            | ExchangeHardwareEvent::RelayEscrowBlobReceived { .. }
-            | ExchangeHardwareEvent::RelayEscrowFailed { .. }
-            | ExchangeHardwareEvent::LinkShared
-            | ExchangeHardwareEvent::LinkOpened { .. }
+            Event::AccelerometerData { .. }
+            | Event::ImpactDetected { .. }
+            | Event::RelayEscrowReady { .. }
+            | Event::RelayEscrowBlobReceived { .. }
+            | Event::RelayEscrowFailed { .. }
+            | Event::LinkShared
+            | Event::LinkOpened { .. }
             // Image picking events are for the avatar editor, not exchanges.
-            | ExchangeHardwareEvent::ImageReceived { .. }
-            | ExchangeHardwareEvent::ImagePickCancelled
+            | Event::ImageReceived { .. }
+            | Event::ImagePickCancelled
             // QrScanProgress is a UI-only signal handled by ExchangeEngine's
             // ScanQualityTracker — the session state machine ignores it.
-            | ExchangeHardwareEvent::QrScanProgress { .. }
+            | Event::QrScanProgress { .. }
             // File picking events drive vCard / backup import in vauchi-app —
             // the exchange session state machine ignores them.
-            | ExchangeHardwareEvent::FilePickedFromUser { .. }
-            | ExchangeHardwareEvent::FilePickCancelledByUser => Ok(()),
+            | Event::FilePickedFromUser { .. }
+            | Event::FilePickCancelledByUser => Ok(()),
         }
     }
 
@@ -893,9 +893,9 @@ impl ExchangeSession {
     /// for BLE sessions). Use `drain_commands()` to retrieve them.
     pub fn emit_initial_commands(&mut self) {
         // Build commands first to avoid borrowing conflicts with emit_command().
-        let cmds: Vec<ExchangeCommand> = match (&self.state, self.transport) {
+        let cmds: Vec<Command> = match (&self.state, self.transport) {
             (ExchangeState::DisplayingQr { our_qr }, ExchangeTransport::Qr) => {
-                vec![ExchangeCommand::QrDisplay {
+                vec![Command::QrDisplay {
                     data: our_qr.to_data_string(),
                 }]
             }
@@ -911,21 +911,21 @@ impl ExchangeSession {
                         super::nfc_active::ExchangeNfc::generate(&self.identity, &self.our_x3dh);
                     nfc.to_bytes().to_vec()
                 };
-                vec![ExchangeCommand::NfcActivate { payload }]
+                vec![Command::NfcActivate { payload }]
             }
             (ExchangeState::AwaitingBleConnection, ExchangeTransport::Ble) => {
                 vec![
-                    ExchangeCommand::BleStartScanning {
+                    Command::BleStartScanning {
                         service_uuid: super::VAUCHI_BLE_SERVICE_UUID.to_string(),
                     },
-                    ExchangeCommand::BleStartAdvertising {
+                    Command::BleStartAdvertising {
                         service_uuid: super::VAUCHI_BLE_SERVICE_UUID.to_string(),
                         payload: Vec::new(),
                     },
                 ]
             }
             (ExchangeState::AwaitingDirectPayload { our_qr }, ExchangeTransport::Usb) => {
-                vec![ExchangeCommand::DirectSend {
+                vec![Command::DirectSend {
                     payload: our_qr.to_data_string().into_bytes(),
                     is_initiator: self.usb_role == Some(UsbRole::Initiator),
                 }]
@@ -970,11 +970,11 @@ impl ExchangeSession {
             let modem_config = crate::exchange::audio_modem::AudioConfig::default();
             let modem_rate = modem_config.sample_rate;
             let samples = crate::exchange::audio_modem::generate_fsk_samples(&their, &modem_config);
-            let emit = ExchangeCommand::AudioEmitChallenge {
+            let emit = Command::AudioEmitChallenge {
                 samples: samples.clone(),
                 sample_rate: modem_rate,
             };
-            let listen = ExchangeCommand::AudioListenForResponse {
+            let listen = Command::AudioListenForResponse {
                 timeout_ms: 5000,
                 sample_rate: modem_rate,
             };
@@ -1042,7 +1042,7 @@ impl ExchangeSession {
             None => return Ok(()),
         };
         let key_offer = hs.create_key_offer()?;
-        self.emit_command(ExchangeCommand::BleWriteCharacteristic {
+        self.emit_command(Command::BleWriteCharacteristic {
             uuid: super::CHAR_HANDSHAKE_WRITE.to_string(),
             data: key_offer,
         });
@@ -1120,11 +1120,11 @@ impl ExchangeSession {
             })?;
             let (our_commitment, our_encrypted_card) = hs.process_key_ack(&key_ack, &their_card)?;
 
-            self.emit_command(ExchangeCommand::BleWriteCharacteristic {
+            self.emit_command(Command::BleWriteCharacteristic {
                 uuid: super::CHAR_HANDSHAKE_WRITE.to_string(),
                 data: our_commitment,
             });
-            self.emit_command(ExchangeCommand::BleWriteCharacteristic {
+            self.emit_command(Command::BleWriteCharacteristic {
                 uuid: super::CHAR_DATA_WRITE.to_string(),
                 data: our_encrypted_card,
             });
@@ -1154,7 +1154,7 @@ impl ExchangeSession {
             let reveal = hs.process_committed_payload(&their_commitment, &their_card)?;
 
             // Send reveal back
-            self.emit_command(ExchangeCommand::BleWriteCharacteristic {
+            self.emit_command(Command::BleWriteCharacteristic {
                 uuid: super::CHAR_HANDSHAKE_NOTIFY.to_string(),
                 data: reveal,
             });

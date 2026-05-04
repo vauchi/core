@@ -12,7 +12,7 @@
 //! orphan handlers / no orphan affordances per screen.
 //!
 //! BFS coverage notes:
-//! - Sub-flow advancement is `ExchangeHardwareEvent`-driven, not
+//! - Sub-flow advancement is `Event`-driven, not
 //!   user-action-driven. The static-diff harness compares
 //!   `ActionPressed` action ids only, so per-step factories advance
 //!   the engine via hardware events, then `assert_reachability`
@@ -32,7 +32,7 @@
 
 use vauchi_app::ui::testing::assert_reachability;
 use vauchi_app::ui::{ExchangeConfig, ExchangeEngine, WorkflowEngine};
-use vauchi_core::exchange::ExchangeHardwareEvent;
+use vauchi_core::Event;
 use vauchi_core::exchange::audio_modem::{AudioConfig, generate_fsk_samples};
 use vauchi_core::exchange::mode::ExchangeMode;
 
@@ -65,7 +65,7 @@ fn discovering_factory(mode: ExchangeMode) -> ExchangeEngine {
 
 fn handshaking_factory(mode: ExchangeMode) -> ExchangeEngine {
     let mut e = discovering_factory(mode);
-    e.handle_hardware_event(ExchangeHardwareEvent::BleDeviceDiscovered {
+    e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
         rssi: -45,
         adv_data: vec![],
@@ -75,7 +75,7 @@ fn handshaking_factory(mode: ExchangeMode) -> ExchangeEngine {
 
 fn exchanging_factory(mode: ExchangeMode) -> ExchangeEngine {
     let mut e = handshaking_factory(mode);
-    e.handle_hardware_event(ExchangeHardwareEvent::BleConnected {
+    e.handle_hardware_event(Event::BleConnected {
         device_id: "peer-1".into(),
     });
     e
@@ -88,7 +88,7 @@ fn bump_verifying_factory() -> ExchangeEngine {
     let mut e = exchanging_factory(ExchangeMode::Bump);
     // Strong impact → proximity verified, but no card yet → advances to Verifying
     // (per `proximity_done_before_card_advances_to_verifying` test).
-    e.handle_hardware_event(ExchangeHardwareEvent::ImpactDetected {
+    e.handle_hardware_event(Event::ImpactDetected {
         timestamp_ms: 100,
         magnitude_milli_g: 3500,
     });
@@ -101,14 +101,14 @@ fn bump_verifying_factory() -> ExchangeEngine {
 fn magic_success_factory() -> ExchangeEngine {
     let mut e = exchanging_factory(ExchangeMode::Magic);
     // Card arrives
-    e.handle_hardware_event(ExchangeHardwareEvent::BleCharacteristicNotified {
+    e.handle_hardware_event(Event::BleCharacteristicNotified {
         uuid: "card".into(),
         data: vec![1, 2, 3],
     });
     // Audio proximity completes via FSK-encoded sample buffer
     let modem = AudioConfig::default();
     let samples = generate_fsk_samples(&[0xAA], &modem);
-    e.handle_hardware_event(ExchangeHardwareEvent::AudioSamplesRecorded {
+    e.handle_hardware_event(Event::AudioSamplesRecorded {
         samples,
         sample_rate: modem.sample_rate,
     });
@@ -118,7 +118,7 @@ fn magic_success_factory() -> ExchangeEngine {
 /// BLE-disconnected from Discovering → Failed with `ble_fallback_available`.
 fn ble_disconnect_failed_factory() -> ExchangeEngine {
     let mut e = discovering_factory(ExchangeMode::Magic);
-    e.handle_hardware_event(ExchangeHardwareEvent::BleDisconnected {
+    e.handle_hardware_event(Event::BleDisconnected {
         reason: "peer hung up".into(),
     });
     e

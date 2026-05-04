@@ -26,8 +26,8 @@ use std::time::{Duration, Instant};
 
 use vauchi_core::exchange::link_mode::initiator_generate;
 use vauchi_platform::{
-    LinkResponderSessionListener, MobileExchangeCommand, MobileExchangeHardwareEvent,
-    MobileLinkResponderFailureReason, MobileLinkResponderSession, MobileLinkResponderState,
+    LinkResponderSessionListener, MobileCommand, MobileEvent, MobileLinkResponderFailureReason,
+    MobileLinkResponderSession, MobileLinkResponderState,
 };
 
 /// Mock listener that captures the full callback sequence so tests can
@@ -80,7 +80,7 @@ impl LinkResponderSessionListener for CapturingListener {
     fn on_state_changed(&self, state: MobileLinkResponderState) {
         self.record(RecordedEvent::StateChanged(state));
     }
-    fn on_commands(&self, commands: Vec<MobileExchangeCommand>) {
+    fn on_commands(&self, commands: Vec<MobileCommand>) {
         self.record(RecordedEvent::Commands(commands.len()));
     }
     fn on_finalized(&self, card_bytes: Vec<u8>) {
@@ -103,7 +103,7 @@ impl LinkResponderSessionListener for ListenerForwarder {
     fn on_state_changed(&self, state: MobileLinkResponderState) {
         self.0.on_state_changed(state);
     }
-    fn on_commands(&self, commands: Vec<MobileExchangeCommand>) {
+    fn on_commands(&self, commands: Vec<MobileCommand>) {
         self.0.on_commands(commands);
     }
     fn on_finalized(&self, card_bytes: Vec<u8>) {
@@ -177,7 +177,7 @@ fn deposit_rejected_fires_failed_then_session_ended() {
     ));
 
     // Inject a relay failure for our gate.
-    session.apply_hardware_event(MobileExchangeHardwareEvent::RelayEscrowFailed {
+    session.apply_hardware_event(MobileEvent::RelayEscrowFailed {
         gate_hash: session.gate_hash_bytes(),
         reason: "slot already occupied".into(),
     });

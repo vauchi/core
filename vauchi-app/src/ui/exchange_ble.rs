@@ -11,11 +11,11 @@
 //! return outcomes for the parent engine to act on.
 
 use crate::ui::*;
-use vauchi_core::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::exchange::proximity_runner::{
     ProximityMethod, ProximityRunner, ProximityRunnerResult,
 };
+use vauchi_core::{Command, Event};
 
 // ── Step enum ──────────────────────────────────────────────────────────────
 
@@ -67,16 +67,16 @@ pub(super) enum BleActionOutcome {
 #[allow(dead_code)] // card_bytes used when card saving is integrated
 pub(super) enum BleHardwareOutcome {
     /// Step advanced — parent should update screen. May emit commands.
-    StepAdvanced { commands: Vec<ExchangeCommand> },
+    StepAdvanced { commands: Vec<Command> },
     /// BLE exchange completed — card bytes available.
     Complete {
         card_bytes: Vec<u8>,
-        commands: Vec<ExchangeCommand>,
+        commands: Vec<Command>,
     },
     /// BLE failed — offer relay fallback.
     FailedWithFallback { reason: String },
     /// Event consumed but no step change. May emit commands.
-    Consumed { commands: Vec<ExchangeCommand> },
+    Consumed { commands: Vec<Command> },
     /// Event not handled by BLE flow.
     Ignored,
 }
@@ -180,7 +180,7 @@ pub(super) fn handle_ble_action(step: &BleStep, action: &UserAction) -> Option<B
 /// creates this when entering a BLE mode and routes hardware events
 /// through it.
 ///
-/// ADR-031: emits `ExchangeCommand`s via outcomes; never calls
+/// ADR-031: emits `Command`s via outcomes; never calls
 /// hardware directly.
 /// BLE data characteristic UUID used for shake envelope exchange.
 const SHAKE_ENVELOPE_CHAR: &str = vauchi_core::exchange::CHAR_DATA_WRITE;
@@ -223,30 +223,30 @@ impl BleExchangeFlow {
     }
 
     /// Process a hardware event and return the outcome.
-    pub(super) fn handle_event(&mut self, event: &ExchangeHardwareEvent) -> BleHardwareOutcome {
+    pub(super) fn handle_event(&mut self, event: &Event) -> BleHardwareOutcome {
         // BLE disconnection is always a failure (any step)
-        if let ExchangeHardwareEvent::BleDisconnected { reason } = event {
+        if let Event::BleDisconnected { reason } = event {
             return BleHardwareOutcome::FailedWithFallback {
                 reason: format!("BLE disconnected: {reason}"),
             };
         }
 
         // Hardware errors/unavailability for BLE transport
-        if let ExchangeHardwareEvent::HardwareError { transport, error } = event
+        if let Event::HardwareError { transport, error } = event
             && transport.eq_ignore_ascii_case("ble")
         {
             return BleHardwareOutcome::FailedWithFallback {
                 reason: error.clone(),
             };
         }
-        if let ExchangeHardwareEvent::HardwareUnavailable { transport } = event
+        if let Event::HardwareUnavailable { transport } = event
             && transport.eq_ignore_ascii_case("ble")
         {
             return BleHardwareOutcome::FailedWithFallback {
                 reason: "Bluetooth not available".into(),
             };
         }
-        if let ExchangeHardwareEvent::PermissionDenied { transport } = event
+        if let Event::PermissionDenied { transport } = event
             && transport.eq_ignore_ascii_case("ble")
         {
             return BleHardwareOutcome::FailedWithFallback {
@@ -279,12 +279,12 @@ impl BleExchangeFlow {
         }
     }
 
-    fn handle_discovering(&mut self, event: &ExchangeHardwareEvent) -> BleHardwareOutcome {
-        if let ExchangeHardwareEvent::BleDeviceDiscovered { id, .. } = event {
+    fn handle_discovering(&mut self, event: &Event) -> BleHardwareOutcome {
+        if let Event::BleDeviceDiscovered { id, .. } = event {
             self.connected_device = Some(id.clone());
             self.step = BleStep::Handshaking;
             return BleHardwareOutcome::StepAdvanced {
-                commands: vec![ExchangeCommand::BleConnect {
+                commands: vec![Command::BleConnect {
                     device_id: id.clone(),
                 }],
             };
@@ -292,8 +292,8 @@ impl BleExchangeFlow {
         BleHardwareOutcome::Ignored
     }
 
-    fn handle_handshaking(&mut self, event: &ExchangeHardwareEvent) -> BleHardwareOutcome {
-        if let ExchangeHardwareEvent::BleConnected { .. } = event {
+    fn handle_handshaking(&mut self, event: &Event) -> BleHardwareOutcome {
+        if let Event::BleConnected { .. } = event {
             self.step = BleStep::Exchanging;
             // Start proximity runner for this mode
             let proximity_method = proximity_method_for_mode(self.mode);
@@ -305,7 +305,7 @@ impl BleExchangeFlow {
         BleHardwareOutcome::Ignored
     }
 
-    fn handle_exchanging(&mut self, event: &ExchangeHardwareEvent) -> BleHardwareOutcome {
+    fn handle_exchanging(&mut self, event: &Event) -> BleHardwareOutcome {
         // Feed proximity events to runner
         if is_proximity_event(event)
             && let Some(ref mut runner) = self.proximity_runner
@@ -320,7 +320,7 @@ impl BleExchangeFlow {
             {
                 self.shake_envelope_sent = true;
                 commands.extend(stop_cmds);
-                commands.push(ExchangeCommand::BleWriteCharacteristic {
+                commands.push(Command::BleWriteCharacteristic {
                     uuid: SHAKE_ENVELOPE_CHAR.to_string(),
                     data: envelope,
                 });
@@ -336,7 +336,7 @@ impl BleExchangeFlow {
         }
 
         // BLE characteristic notifications — could be card data or shake envelope
-        if let ExchangeHardwareEvent::BleCharacteristicNotified { uuid, data } = event
+        if let Event::BleCharacteristicNotified { uuid, data } = event
             && !data.is_empty()
         {
             // Shake envelope from peer (on data write characteristic)
@@ -371,9 +371,9 @@ impl BleExchangeFlow {
         BleHardwareOutcome::Ignored
     }
 
-    fn handle_verifying(&mut self, event: &ExchangeHardwareEvent) -> BleHardwareOutcome {
+    fn handle_verifying(&mut self, event: &Event) -> BleHardwareOutcome {
         // In verifying, we're waiting for card data (proximity already done)
-        if let ExchangeHardwareEvent::BleCharacteristicNotified { uuid, data } = event
+        if let Event::BleCharacteristicNotified { uuid, data } = event
             && !data.is_empty()
         {
             // Shake envelope in verifying — peer envelope arrived late
@@ -387,12 +387,12 @@ impl BleExchangeFlow {
     }
 
     /// Transition to Complete if both card data and proximity result are available.
-    fn try_complete(&mut self, extra_commands: Vec<ExchangeCommand>) -> BleHardwareOutcome {
+    fn try_complete(&mut self, extra_commands: Vec<Command>) -> BleHardwareOutcome {
         if let Some(card_bytes) = self.received_card.take() {
             self.step = BleStep::Complete;
             let mut commands = extra_commands;
-            commands.push(ExchangeCommand::AccelerometerStop);
-            commands.push(ExchangeCommand::BleDisconnect);
+            commands.push(Command::AccelerometerStop);
+            commands.push(Command::BleDisconnect);
             BleHardwareOutcome::Complete {
                 card_bytes,
                 commands,
@@ -416,12 +416,12 @@ fn proximity_method_for_mode(mode: ExchangeMode) -> ProximityMethod {
 }
 
 /// Whether the event is a proximity verification event.
-fn is_proximity_event(event: &ExchangeHardwareEvent) -> bool {
+fn is_proximity_event(event: &Event) -> bool {
     matches!(
         event,
-        ExchangeHardwareEvent::AudioSamplesRecorded { .. }
-            | ExchangeHardwareEvent::AccelerometerData { .. }
-            | ExchangeHardwareEvent::ImpactDetected { .. }
+        Event::AudioSamplesRecorded { .. }
+            | Event::AccelerometerData { .. }
+            | Event::ImpactDetected { .. }
     )
 }
 
@@ -438,7 +438,7 @@ mod tests {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
         assert_eq!(*flow.step(), BleStep::Discovering);
 
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleDeviceDiscovered {
+        let outcome = flow.handle_event(&Event::BleDeviceDiscovered {
             id: "device-1".into(),
             rssi: -42,
             adv_data: vec![],
@@ -450,7 +450,7 @@ mod tests {
                 assert_eq!(commands.len(), 1);
                 assert!(matches!(
                     &commands[0],
-                    ExchangeCommand::BleConnect { device_id } if device_id == "device-1"
+                    Command::BleConnect { device_id } if device_id == "device-1"
                 ));
             }
             other => panic!("Expected StepAdvanced, got {other:?}"),
@@ -461,7 +461,7 @@ mod tests {
     #[test]
     fn discovery_ignores_non_ble_events() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::QrScanned {
+        let outcome = flow.handle_event(&Event::QrScanned {
             data: "test".into(),
         });
         assert!(matches!(outcome, BleHardwareOutcome::Ignored));
@@ -475,7 +475,7 @@ mod tests {
     fn connection_starts_proximity_and_advances_to_exchanging() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
         // Discover
-        flow.handle_event(&ExchangeHardwareEvent::BleDeviceDiscovered {
+        flow.handle_event(&Event::BleDeviceDiscovered {
             id: "d1".into(),
             rssi: -40,
             adv_data: vec![],
@@ -483,7 +483,7 @@ mod tests {
         assert_eq!(*flow.step(), BleStep::Handshaking);
 
         // Connect
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleConnected {
+        let outcome = flow.handle_event(&Event::BleConnected {
             device_id: "d1".into(),
         });
 
@@ -494,12 +494,12 @@ mod tests {
                 assert!(
                     commands
                         .iter()
-                        .any(|c| matches!(c, ExchangeCommand::AudioEmitChallenge { .. }))
+                        .any(|c| matches!(c, Command::AudioEmitChallenge { .. }))
                 );
                 assert!(
                     commands
                         .iter()
-                        .any(|c| matches!(c, ExchangeCommand::AudioListenForResponse { .. }))
+                        .any(|c| matches!(c, Command::AudioListenForResponse { .. }))
                 );
             }
             other => panic!("Expected StepAdvanced, got {other:?}"),
@@ -510,12 +510,12 @@ mod tests {
     #[test]
     fn bump_connection_starts_accelerometer() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
-        flow.handle_event(&ExchangeHardwareEvent::BleDeviceDiscovered {
+        flow.handle_event(&Event::BleDeviceDiscovered {
             id: "d1".into(),
             rssi: -40,
             adv_data: vec![],
         });
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleConnected {
+        let outcome = flow.handle_event(&Event::BleConnected {
             device_id: "d1".into(),
         });
 
@@ -525,7 +525,7 @@ mod tests {
                 assert!(
                     commands
                         .iter()
-                        .any(|c| matches!(c, ExchangeCommand::AccelerometerStart))
+                        .any(|c| matches!(c, Command::AccelerometerStart))
                 );
             }
             other => panic!("Expected StepAdvanced, got {other:?}"),
@@ -541,13 +541,13 @@ mod tests {
         advance_to_exchanging(&mut flow);
 
         // Receive card data first
-        flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "card-char".into(),
             data: vec![1, 2, 3],
         });
 
         // Then impact → should complete
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::ImpactDetected {
+        let outcome = flow.handle_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 3000, // 3g > 2.5g threshold
         });
@@ -559,11 +559,7 @@ mod tests {
                 commands,
             } => {
                 assert_eq!(card_bytes, vec![1, 2, 3]);
-                assert!(
-                    commands
-                        .iter()
-                        .any(|c| matches!(c, ExchangeCommand::BleDisconnect))
-                );
+                assert!(commands.iter().any(|c| matches!(c, Command::BleDisconnect)));
             }
             other => panic!("Expected Complete, got {other:?}"),
         }
@@ -576,7 +572,7 @@ mod tests {
         advance_to_exchanging(&mut flow);
 
         // Impact first (no card yet)
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::ImpactDetected {
+        let outcome = flow.handle_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 3000,
         });
@@ -584,7 +580,7 @@ mod tests {
         assert!(matches!(outcome, BleHardwareOutcome::StepAdvanced { .. }));
 
         // Then card → complete
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "card-char".into(),
             data: vec![4, 5, 6],
         });
@@ -603,7 +599,7 @@ mod tests {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
         advance_to_exchanging(&mut flow);
 
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "card-char".into(),
             data: vec![1, 2, 3],
         });
@@ -622,7 +618,7 @@ mod tests {
         advance_to_exchanging(&mut flow);
 
         // Receive card data
-        flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "card-char".into(),
             data: vec![10, 20, 30],
         });
@@ -633,7 +629,7 @@ mod tests {
         let modem_config = vauchi_core::exchange::audio_modem::AudioConfig::default();
         let samples =
             vauchi_core::exchange::audio_modem::generate_fsk_samples(&[1, 2, 3], &modem_config);
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::AudioSamplesRecorded {
+        let outcome = flow.handle_event(&Event::AudioSamplesRecorded {
             samples,
             sample_rate: modem_config.sample_rate,
         });
@@ -646,16 +642,8 @@ mod tests {
             } => {
                 assert_eq!(card_bytes, vec![10, 20, 30]);
                 // Should include AudioStop from runner + BleDisconnect from flow
-                assert!(
-                    commands
-                        .iter()
-                        .any(|c| matches!(c, ExchangeCommand::AudioStop))
-                );
-                assert!(
-                    commands
-                        .iter()
-                        .any(|c| matches!(c, ExchangeCommand::BleDisconnect))
-                );
+                assert!(commands.iter().any(|c| matches!(c, Command::AudioStop)));
+                assert!(commands.iter().any(|c| matches!(c, Command::BleDisconnect)));
             }
             other => panic!("Expected Complete, got {other:?}"),
         }
@@ -681,7 +669,7 @@ mod tests {
         // Now receive card → should complete (audio failure = lower trust, not blocked)
         // We need to process a BLE event to trigger the flow check.
         // Provide card data — flow should detect proximity is done and complete.
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "card-char".into(),
             data: vec![7, 8, 9],
         });
@@ -704,7 +692,7 @@ mod tests {
     /// Feed accelerometer samples to a Shake flow in Exchanging step.
     fn feed_accel_samples(flow: &mut BleExchangeFlow, count: usize) {
         for i in 0..count {
-            flow.handle_event(&ExchangeHardwareEvent::AccelerometerData {
+            flow.handle_event(&Event::AccelerometerData {
                 x_milli_g: ((i as f32 * 0.1).sin() * 2000.0) as i32,
                 y_milli_g: ((i as f32 * 0.1).cos() * 1500.0) as i32,
                 z_milli_g: 1000,
@@ -744,13 +732,13 @@ mod tests {
         flow.shake_envelope_sent = true;
 
         // Receive card data
-        flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "card-char".into(),
             data: vec![10, 20, 30],
         });
 
         // Receive peer's envelope (same data = perfect correlation)
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: SHAKE_ENVELOPE_CHAR.into(),
             data: our_envelope,
         });
@@ -779,7 +767,7 @@ mod tests {
         flow.shake_envelope_sent = true;
 
         // Peer envelope first (no card yet)
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: SHAKE_ENVELOPE_CHAR.into(),
             data: our_envelope,
         });
@@ -788,7 +776,7 @@ mod tests {
         assert!(matches!(outcome, BleHardwareOutcome::StepAdvanced { .. }));
 
         // Then card → complete
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "card-char".into(),
             data: vec![1, 2, 3],
         });
@@ -803,7 +791,7 @@ mod tests {
         advance_to_exchanging(&mut flow);
 
         // Data on a non-envelope UUID is treated as card data
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "some-other-char".into(),
             data: vec![1, 2],
         });
@@ -833,7 +821,7 @@ mod tests {
     #[test]
     fn timeout_during_handshaking_triggers_fallback() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
-        flow.handle_event(&ExchangeHardwareEvent::BleDeviceDiscovered {
+        flow.handle_event(&Event::BleDeviceDiscovered {
             id: "d1".into(),
             rssi: -40,
             adv_data: vec![],
@@ -863,11 +851,11 @@ mod tests {
     fn timeout_during_complete_is_ignored() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
         advance_to_exchanging(&mut flow);
-        flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "c".into(),
             data: vec![1],
         });
-        flow.handle_event(&ExchangeHardwareEvent::ImpactDetected {
+        flow.handle_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 3000,
         });
@@ -884,7 +872,7 @@ mod tests {
     fn ble_disconnect_fails_at_any_step() {
         for mode in [ExchangeMode::Magic, ExchangeMode::Bump, ExchangeMode::Shake] {
             let mut flow = BleExchangeFlow::new(mode);
-            let outcome = flow.handle_event(&ExchangeHardwareEvent::BleDisconnected {
+            let outcome = flow.handle_event(&Event::BleDisconnected {
                 reason: "timeout".into(),
             });
             assert!(
@@ -898,7 +886,7 @@ mod tests {
     #[test]
     fn ble_hardware_error_fails() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::HardwareError {
+        let outcome = flow.handle_event(&Event::HardwareError {
             transport: "BLE".into(),
             error: "adapter off".into(),
         });
@@ -914,7 +902,7 @@ mod tests {
     #[test]
     fn ble_unavailable_fails() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::HardwareUnavailable {
+        let outcome = flow.handle_event(&Event::HardwareUnavailable {
             transport: "ble".into(),
         });
         assert!(matches!(
@@ -927,7 +915,7 @@ mod tests {
     #[test]
     fn non_ble_hardware_error_is_ignored() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::HardwareError {
+        let outcome = flow.handle_event(&Event::HardwareError {
             transport: "NFC".into(),
             error: "not supported".into(),
         });
@@ -943,13 +931,13 @@ mod tests {
         advance_to_exchanging(&mut flow);
 
         // Card data
-        flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "c".into(),
             data: vec![1, 2],
         });
 
         // Weak impact (1g < 2.5g threshold) — still completes (impact doesn't block)
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::ImpactDetected {
+        let outcome = flow.handle_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 1000, // 1g
         });
@@ -967,13 +955,13 @@ mod tests {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
         advance_to_exchanging(&mut flow);
 
-        flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "c".into(),
             data: vec![1],
         });
 
         // Very strong impact (10g) — confidence capped at 0.6 per spec
-        flow.handle_event(&ExchangeHardwareEvent::ImpactDetected {
+        flow.handle_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 10000,
         });
@@ -991,18 +979,18 @@ mod tests {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
         advance_to_exchanging(&mut flow);
         // Get card + impact to complete
-        flow.handle_event(&ExchangeHardwareEvent::BleCharacteristicNotified {
+        flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "c".into(),
             data: vec![1],
         });
-        flow.handle_event(&ExchangeHardwareEvent::ImpactDetected {
+        flow.handle_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 3000,
         });
         assert_eq!(*flow.step(), BleStep::Complete);
 
         // Further events ignored
-        let outcome = flow.handle_event(&ExchangeHardwareEvent::BleDeviceDiscovered {
+        let outcome = flow.handle_event(&Event::BleDeviceDiscovered {
             id: "d2".into(),
             rssi: -50,
             adv_data: vec![],
@@ -1043,12 +1031,12 @@ mod tests {
 
     /// Advance a flow to Exchanging step (discovery + connection).
     fn advance_to_exchanging(flow: &mut BleExchangeFlow) {
-        flow.handle_event(&ExchangeHardwareEvent::BleDeviceDiscovered {
+        flow.handle_event(&Event::BleDeviceDiscovered {
             id: "d1".into(),
             rssi: -40,
             adv_data: vec![],
         });
-        flow.handle_event(&ExchangeHardwareEvent::BleConnected {
+        flow.handle_event(&Event::BleConnected {
             device_id: "d1".into(),
         });
         assert_eq!(*flow.step(), BleStep::Exchanging);

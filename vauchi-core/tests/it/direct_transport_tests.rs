@@ -5,7 +5,7 @@
 //! Tests for the TcpDirectTransport frontend utility and ProximityLevel.
 //!
 //! TcpDirectTransport wraps the VXCH TCP framing protocol for frontends
-//! executing `ExchangeCommand::DirectSend` (ADR-031).
+//! executing `Command::DirectSend` (ADR-031).
 
 use std::net::{TcpListener, TcpStream};
 use std::thread;

@@ -8,7 +8,7 @@
 //! field preview → mode-specific sub-flow → result.
 
 use vauchi_app::ui::*;
-use vauchi_core::exchange::command::ExchangeCommand;
+use vauchi_core::Command;
 use vauchi_core::exchange::mode::ExchangeMode;
 
 fn config_with_mode_selection() -> ExchangeConfig {
@@ -164,7 +164,7 @@ fn link_full_flow_mode_to_share_to_waiting() {
         action_id: "start_exchange".to_string(),
     });
     assert!(
-        matches!(result, ActionResult::ExchangeCommands { ref commands } if commands.iter().any(|c| matches!(c, ExchangeCommand::RelayEscrowDeposit { .. }))),
+        matches!(result, ActionResult::Commands { ref commands } if commands.iter().any(|c| matches!(c, Command::RelayEscrowDeposit { .. }))),
         "Start exchange in Link mode must emit RelayEscrowDeposit (presence)"
     );
     let screen = engine.current_screen();
@@ -175,7 +175,7 @@ fn link_full_flow_mode_to_share_to_waiting() {
         action_id: "share".to_string(),
     });
     assert!(
-        matches!(result, ActionResult::ExchangeCommands { ref commands } if commands.iter().any(|c| matches!(c, ExchangeCommand::ShowShareSheet { .. }))),
+        matches!(result, ActionResult::Commands { ref commands } if commands.iter().any(|c| matches!(c, Command::ShowShareSheet { .. }))),
         "Share must emit ShowShareSheet command"
     );
     let screen = engine.current_screen();

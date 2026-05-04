@@ -187,7 +187,7 @@ pub enum OnboardingStep {
     #[serde(alias = "SecurityExplanation", alias = "BackupPrompt", alias = "Ready")]
     WhatNext,
     /// Password entry for backup restore (after the user has picked the
-    /// encrypted backup file via [`crate::exchange::ExchangeCommand::
+    /// encrypted backup file via [`crate::exchange::Command::
     /// FilePickFromUser`] with `purpose = FilePickPurpose::ImportBackup`).
     /// Submitting calls [`crate::api::Vauchi::import_full_backup`] in
     /// the AppEngine completion path; success creates identity from

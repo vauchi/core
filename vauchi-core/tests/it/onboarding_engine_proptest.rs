@@ -441,7 +441,7 @@ proptest! {
                 }
                 ActionResult::StartDeviceLink => {
                     // External handoff — valid from LinkChoice step
-                    // (backup-restore now flows through ExchangeCommands /
+                    // (backup-restore now flows through Commands /
                     // FilePickFromUser per ADR-031 Phase 2B of
                     // 2026-05-03-core-file-picker-command).
                 }
@@ -453,7 +453,7 @@ proptest! {
                 | ActionResult::RequestCamera
                 | ActionResult::OpenEntryDetail { .. }
                 | ActionResult::WipeComplete
-                | ActionResult::ExchangeCommands { .. }
+                | ActionResult::Commands { .. }
                 | ActionResult::PreviewAs { .. }
                 | ActionResult::ShowContactPicker
                 | ActionResult::VerifyFingerprint { .. }

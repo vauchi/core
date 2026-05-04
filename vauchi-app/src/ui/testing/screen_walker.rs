@@ -148,7 +148,7 @@ const MAX_BFS_SCREENS: usize = 256;
 ///   terminal from the engine's POV — BFS stops following that
 ///   path. Other non-screen-changing results
 ///   (`ValidationError`, `ShowAlert`, `ShowToast`, `Notify`,
-///   `ShowInfoOverlay`, `RequestCamera`, `ExchangeCommands`,
+///   `ShowInfoOverlay`, `RequestCamera`, `Commands`,
 ///   `PreviewAs`, `ShowContactPicker`, `VerifyFingerprint`,
 ///   `ShowFormDialog`, `OpenEntryDetail`) are treated as no-ops
 ///   for the traversal (the engine's `current_screen()` is

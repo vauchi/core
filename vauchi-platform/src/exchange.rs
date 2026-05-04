@@ -14,10 +14,10 @@ use std::time::Duration;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::{
-    ExchangeCommand, ExchangeEvent, ExchangeHardwareEvent, ExchangeQR, ExchangeSession,
-    ExchangeState, ManualConfirmationVerifier, ProximityError, ProximityVerifier, VerifierChain,
-    VerifierMethod,
+    ExchangeEvent, ExchangeQR, ExchangeSession, ExchangeState, ManualConfirmationVerifier,
+    ProximityError, ProximityVerifier, VerifierChain, VerifierMethod,
 };
+use vauchi_core::{Command, Event};
 
 use crate::error::{LOCK_POISON_MSG, lock_or};
 use vauchi_core::identity::Identity;
@@ -444,14 +444,14 @@ impl MobileExchangeSession {
     /// mobile app should execute (display QR, start BLE scan, emit audio, etc.).
     ///
     /// Returns an empty list if no commands are pending.
-    pub fn drain_pending_commands(&self) -> Vec<MobileExchangeCommand> {
+    pub fn drain_pending_commands(&self) -> Vec<MobileCommand> {
         let Ok(mut inner) = self.inner.lock() else {
             return Vec::new();
         };
         inner
             .drain_commands()
             .into_iter()
-            .map(MobileExchangeCommand::from)
+            .map(MobileCommand::from)
             .collect()
     }
 
@@ -462,10 +462,7 @@ impl MobileExchangeSession {
     /// advances its state machine and may produce new commands.
     ///
     /// After calling this, use `drain_pending_commands()` to get response commands.
-    pub fn apply_hardware_event(
-        &self,
-        event: MobileExchangeHardwareEvent,
-    ) -> Result<(), MobileError> {
+    pub fn apply_hardware_event(&self, event: MobileEvent) -> Result<(), MobileError> {
         lock_or(&self.inner)?
             .apply_hardware_event(event.into())
             .map_err(|e| MobileError::Other {
@@ -498,7 +495,7 @@ impl MobileExchangeSession {
 /// Mobile apps match on these and dispatch to platform-specific APIs
 /// (camera, BLE stack, NFC reader, audio subsystem).
 #[derive(uniffi::Enum, Debug, Clone)]
-pub enum MobileExchangeCommand {
+pub enum MobileCommand {
     // QR
     QrDisplay {
         data: String,
@@ -568,48 +565,46 @@ pub enum MobileExchangeCommand {
     },
 }
 
-impl From<ExchangeCommand> for MobileExchangeCommand {
-    fn from(cmd: ExchangeCommand) -> Self {
+impl From<Command> for MobileCommand {
+    fn from(cmd: Command) -> Self {
         match cmd {
-            ExchangeCommand::QrDisplay { data } => Self::QrDisplay { data },
-            ExchangeCommand::QrRequestScan => Self::QrRequestScan,
-            ExchangeCommand::BleStartAdvertising {
+            Command::QrDisplay { data } => Self::QrDisplay { data },
+            Command::QrRequestScan => Self::QrRequestScan,
+            Command::BleStartAdvertising {
                 service_uuid,
                 payload,
             } => Self::BleStartAdvertising {
                 service_uuid,
                 payload,
             },
-            ExchangeCommand::BleStartScanning { service_uuid } => {
-                Self::BleStartScanning { service_uuid }
-            }
-            ExchangeCommand::BleStopScanning => Self::BleStopScanning,
-            ExchangeCommand::BleConnect { device_id } => Self::BleConnect { device_id },
-            ExchangeCommand::BleWriteCharacteristic { uuid, data } => {
+            Command::BleStartScanning { service_uuid } => Self::BleStartScanning { service_uuid },
+            Command::BleStopScanning => Self::BleStopScanning,
+            Command::BleConnect { device_id } => Self::BleConnect { device_id },
+            Command::BleWriteCharacteristic { uuid, data } => {
                 Self::BleWriteCharacteristic { uuid, data }
             }
-            ExchangeCommand::BleReadCharacteristic { uuid } => Self::BleReadCharacteristic { uuid },
-            ExchangeCommand::BleDisconnect => Self::BleDisconnect,
-            ExchangeCommand::NfcActivate { payload } => Self::NfcActivate { payload },
-            ExchangeCommand::NfcDeactivate => Self::NfcDeactivate,
-            ExchangeCommand::AudioEmitChallenge {
+            Command::BleReadCharacteristic { uuid } => Self::BleReadCharacteristic { uuid },
+            Command::BleDisconnect => Self::BleDisconnect,
+            Command::NfcActivate { payload } => Self::NfcActivate { payload },
+            Command::NfcDeactivate => Self::NfcDeactivate,
+            Command::AudioEmitChallenge {
                 samples,
                 sample_rate,
             } => Self::AudioEmitChallenge {
                 samples,
                 sample_rate,
             },
-            ExchangeCommand::AudioListenForResponse {
+            Command::AudioListenForResponse {
                 timeout_ms,
                 sample_rate,
             } => Self::AudioListenForResponse {
                 timeout_ms,
                 sample_rate,
             },
-            ExchangeCommand::AudioStop => Self::AudioStop,
-            ExchangeCommand::AccelerometerStart => Self::AccelerometerStart,
-            ExchangeCommand::AccelerometerStop => Self::AccelerometerStop,
-            ExchangeCommand::RelayEscrowDeposit {
+            Command::AudioStop => Self::AudioStop,
+            Command::AccelerometerStart => Self::AccelerometerStart,
+            Command::AccelerometerStop => Self::AccelerometerStop,
+            Command::RelayEscrowDeposit {
                 gate_hash,
                 slot_hash,
                 encrypted_card,
@@ -620,22 +615,22 @@ impl From<ExchangeCommand> for MobileExchangeCommand {
                 encrypted_card,
                 ttl_seconds,
             },
-            ExchangeCommand::RelayEscrowCheck {
+            Command::RelayEscrowCheck {
                 gate_hash,
                 suggested_interval_ms,
             } => Self::RelayEscrowCheck {
                 gate_hash,
                 suggested_interval_ms,
             },
-            ExchangeCommand::RelayEscrowRetrieve {
+            Command::RelayEscrowRetrieve {
                 gate_hash,
                 slot_hash,
             } => Self::RelayEscrowRetrieve {
                 gate_hash,
                 slot_hash,
             },
-            ExchangeCommand::ShowShareSheet { url } => Self::ShowShareSheet { url },
-            ExchangeCommand::DirectSend {
+            Command::ShowShareSheet { url } => Self::ShowShareSheet { url },
+            Command::DirectSend {
                 payload,
                 is_initiator,
             } => Self::DirectSend {
@@ -652,7 +647,7 @@ impl From<ExchangeCommand> for MobileExchangeCommand {
 /// Mobile apps create these after executing a command (e.g., QR scanned,
 /// BLE data received) and feed them back via `apply_hardware_event()`.
 #[derive(uniffi::Enum, Debug, Clone)]
-pub enum MobileExchangeHardwareEvent {
+pub enum MobileEvent {
     // QR
     QrScanned {
         data: String,
@@ -742,43 +737,37 @@ pub enum MobileExchangeHardwareEvent {
     },
 }
 
-impl From<MobileExchangeHardwareEvent> for ExchangeHardwareEvent {
-    fn from(evt: MobileExchangeHardwareEvent) -> Self {
+impl From<MobileEvent> for Event {
+    fn from(evt: MobileEvent) -> Self {
         match evt {
-            MobileExchangeHardwareEvent::QrScanned { data } => Self::QrScanned { data },
-            MobileExchangeHardwareEvent::BleDeviceDiscovered { id, rssi, adv_data } => {
+            MobileEvent::QrScanned { data } => Self::QrScanned { data },
+            MobileEvent::BleDeviceDiscovered { id, rssi, adv_data } => {
                 Self::BleDeviceDiscovered { id, rssi, adv_data }
             }
-            MobileExchangeHardwareEvent::BleConnected { device_id } => {
-                Self::BleConnected { device_id }
-            }
-            MobileExchangeHardwareEvent::BleCharacteristicRead { uuid, data } => {
+            MobileEvent::BleConnected { device_id } => Self::BleConnected { device_id },
+            MobileEvent::BleCharacteristicRead { uuid, data } => {
                 Self::BleCharacteristicRead { uuid, data }
             }
-            MobileExchangeHardwareEvent::BleCharacteristicNotified { uuid, data } => {
+            MobileEvent::BleCharacteristicNotified { uuid, data } => {
                 Self::BleCharacteristicNotified { uuid, data }
             }
-            MobileExchangeHardwareEvent::BleDisconnected { reason } => {
-                Self::BleDisconnected { reason }
-            }
-            MobileExchangeHardwareEvent::NfcDataReceived { data } => Self::NfcDataReceived { data },
-            MobileExchangeHardwareEvent::AudioSamplesRecorded {
+            MobileEvent::BleDisconnected { reason } => Self::BleDisconnected { reason },
+            MobileEvent::NfcDataReceived { data } => Self::NfcDataReceived { data },
+            MobileEvent::AudioSamplesRecorded {
                 samples,
                 sample_rate,
             } => Self::AudioSamplesRecorded {
                 samples,
                 sample_rate,
             },
-            MobileExchangeHardwareEvent::HardwareError { transport, error } => {
+            MobileEvent::HardwareError { transport, error } => {
                 Self::HardwareError { transport, error }
             }
-            MobileExchangeHardwareEvent::HardwareUnavailable { transport } => {
+            MobileEvent::HardwareUnavailable { transport } => {
                 Self::HardwareUnavailable { transport }
             }
-            MobileExchangeHardwareEvent::PermissionDenied { transport } => {
-                Self::PermissionDenied { transport }
-            }
-            MobileExchangeHardwareEvent::AccelerometerData {
+            MobileEvent::PermissionDenied { transport } => Self::PermissionDenied { transport },
+            MobileEvent::AccelerometerData {
                 timestamp_ms,
                 x_milli_g,
                 y_milli_g,
@@ -789,35 +778,29 @@ impl From<MobileExchangeHardwareEvent> for ExchangeHardwareEvent {
                 y_milli_g,
                 z_milli_g,
             },
-            MobileExchangeHardwareEvent::ImpactDetected {
+            MobileEvent::ImpactDetected {
                 timestamp_ms,
                 magnitude_milli_g,
             } => Self::ImpactDetected {
                 timestamp_ms,
                 magnitude_milli_g,
             },
-            MobileExchangeHardwareEvent::RelayEscrowReady { gate_hash } => {
-                Self::RelayEscrowReady { gate_hash }
-            }
-            MobileExchangeHardwareEvent::RelayEscrowBlobReceived { gate_hash, blob } => {
+            MobileEvent::RelayEscrowReady { gate_hash } => Self::RelayEscrowReady { gate_hash },
+            MobileEvent::RelayEscrowBlobReceived { gate_hash, blob } => {
                 Self::RelayEscrowBlobReceived { gate_hash, blob }
             }
-            MobileExchangeHardwareEvent::RelayEscrowFailed { gate_hash, reason } => {
+            MobileEvent::RelayEscrowFailed { gate_hash, reason } => {
                 Self::RelayEscrowFailed { gate_hash, reason }
             }
-            MobileExchangeHardwareEvent::LinkShared => Self::LinkShared,
-            MobileExchangeHardwareEvent::LinkOpened { peer_public_key } => {
-                Self::LinkOpened { peer_public_key }
-            }
-            MobileExchangeHardwareEvent::DirectPayloadReceived { data } => {
-                Self::DirectPayloadReceived { data }
-            }
-            MobileExchangeHardwareEvent::ImageReceived { data } => Self::ImageReceived { data },
-            MobileExchangeHardwareEvent::ImagePickCancelled => Self::ImagePickCancelled,
-            MobileExchangeHardwareEvent::FilePickedFromUser { bytes, filename } => {
+            MobileEvent::LinkShared => Self::LinkShared,
+            MobileEvent::LinkOpened { peer_public_key } => Self::LinkOpened { peer_public_key },
+            MobileEvent::DirectPayloadReceived { data } => Self::DirectPayloadReceived { data },
+            MobileEvent::ImageReceived { data } => Self::ImageReceived { data },
+            MobileEvent::ImagePickCancelled => Self::ImagePickCancelled,
+            MobileEvent::FilePickedFromUser { bytes, filename } => {
                 Self::FilePickedFromUser { bytes, filename }
             }
-            MobileExchangeHardwareEvent::FilePickCancelledByUser => Self::FilePickCancelledByUser,
+            MobileEvent::FilePickCancelledByUser => Self::FilePickCancelledByUser,
         }
     }
 }
@@ -993,13 +976,13 @@ mod tests {
     // @internal
     #[test]
     fn direct_send_roundtrips_through_mobile_enum() {
-        let cmd = ExchangeCommand::DirectSend {
+        let cmd = Command::DirectSend {
             payload: vec![1, 2, 3],
             is_initiator: true,
         };
-        let mobile: MobileExchangeCommand = cmd.into();
+        let mobile: MobileCommand = cmd.into();
         match mobile {
-            MobileExchangeCommand::DirectSend {
+            MobileCommand::DirectSend {
                 payload,
                 is_initiator,
             } => {
@@ -1013,12 +996,12 @@ mod tests {
     // @internal
     #[test]
     fn direct_payload_received_roundtrips_through_mobile_enum() {
-        let evt = MobileExchangeHardwareEvent::DirectPayloadReceived {
+        let evt = MobileEvent::DirectPayloadReceived {
             data: vec![4, 5, 6],
         };
-        let core: ExchangeHardwareEvent = evt.into();
+        let core: Event = evt.into();
         match core {
-            ExchangeHardwareEvent::DirectPayloadReceived { data } => {
+            Event::DirectPayloadReceived { data } => {
                 assert_eq!(data, vec![4, 5, 6]);
             }
             other => panic!("expected DirectPayloadReceived, got {other:?}"),

@@ -11,7 +11,7 @@
 use std::any::Any;
 
 use vauchi_core::avatar::{generate_initials_avatar, generate_mandelbrot_avatar, normalize_avatar};
-use vauchi_core::exchange::{ExchangeCommand, ExchangeHardwareEvent};
+use vauchi_core::{Command, Event};
 
 use super::action::{ActionResult, UserAction};
 use super::component::{A11y, AccessibilityRole, ActionListItem, Component};
@@ -348,16 +348,13 @@ impl WorkflowEngine for AvatarEditorEngine {
 
             // ── Source picker actions ────────────────────────────
             UserAction::ActionPressed { action_id } if action_id == "source_camera" => {
-                ActionResult::ExchangeCommands {
-                    commands: vec![ExchangeCommand::ImageCaptureFromCamera],
+                ActionResult::Commands {
+                    commands: vec![Command::ImageCaptureFromCamera],
                 }
             }
             UserAction::ActionPressed { action_id } if action_id == "source_photos" => {
-                ActionResult::ExchangeCommands {
-                    commands: vec![
-                        ExchangeCommand::ImagePickFromLibrary,
-                        ExchangeCommand::ImagePickFromFile,
-                    ],
+                ActionResult::Commands {
+                    commands: vec![Command::ImagePickFromLibrary, Command::ImagePickFromFile],
                 }
             }
             UserAction::ActionPressed { action_id } if action_id == "source_generate" => {
@@ -458,9 +455,9 @@ impl WorkflowEngine for AvatarEditorEngine {
         }
     }
 
-    fn handle_hardware_event(&mut self, event: ExchangeHardwareEvent) -> Option<ActionResult> {
+    fn handle_hardware_event(&mut self, event: Event) -> Option<ActionResult> {
         match event {
-            ExchangeHardwareEvent::ImageReceived { data } => {
+            Event::ImageReceived { data } => {
                 match normalize_avatar(&data) {
                     Ok(webp) => {
                         self.state = State::Editing {
@@ -478,18 +475,18 @@ impl WorkflowEngine for AvatarEditorEngine {
                 }
                 Some(ActionResult::UpdateScreen(self.current_screen()))
             }
-            ExchangeHardwareEvent::ImagePickCancelled => {
+            Event::ImagePickCancelled => {
                 // Return to source picker (or stay if already there)
                 self.state = State::SourcePicker;
                 Some(ActionResult::UpdateScreen(self.current_screen()))
             }
-            ExchangeHardwareEvent::PermissionDenied { ref transport } if transport == "camera" => {
+            Event::PermissionDenied { ref transport } if transport == "camera" => {
                 Some(ActionResult::ShowAlert {
                     title: "Camera Access".into(),
                     message: "Camera permission was denied.".into(),
                 })
             }
-            ExchangeHardwareEvent::HardwareUnavailable { .. } => {
+            Event::HardwareUnavailable { .. } => {
                 // Platform doesn't support this — ignore silently
                 None
             }

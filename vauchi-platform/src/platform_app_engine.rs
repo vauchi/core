@@ -155,7 +155,7 @@ pub struct PlatformAppEngine {
     /// `MultiStageExchange` screen. Created by core when navigation
     /// enters the screen, cancelled when navigation leaves. Frontends
     /// never see this — they only fire `UserAction`s and
-    /// `ExchangeHardwareEvent`s and render the resulting `ScreenModel`.
+    /// `Event`s and render the resulting `ScreenModel`.
     multi_stage_session: Mutex<Option<Arc<MobileMultiStageSession>>>,
     /// Pair 5 — auto-managed `MobileDeviceLinkSession` for the
     /// `DeviceLinking` screen. Same lifecycle pattern as multi-stage:
@@ -431,9 +431,9 @@ impl PlatformAppEngine {
     /// ```
     pub fn handle_hardware_event(
         &self,
-        event: crate::MobileExchangeHardwareEvent,
+        event: crate::MobileEvent,
     ) -> Result<Option<String>, MobileError> {
-        let hw_event: vauchi_core::exchange::ExchangeHardwareEvent = event.into();
+        let hw_event: vauchi_core::Event = event.into();
         // Pair 4 — auto-route QrScanned to the live multi-stage session
         // when the multi-stage screen is active. The frontend never has
         // to know there is a session: it just emits the `QrScanned`
@@ -447,9 +447,7 @@ impl PlatformAppEngine {
                 .current_app_screen(),
             AppScreen::MultiStageExchange
         );
-        if on_multi_stage
-            && let vauchi_core::exchange::ExchangeHardwareEvent::QrScanned { data } = &hw_event
-        {
+        if on_multi_stage && let vauchi_core::Event::QrScanned { data } = &hw_event {
             let session_clone = self
                 .multi_stage_session
                 .lock()

@@ -5,7 +5,7 @@
 //! Tests for the AvatarEditorEngine (core-driven avatar editing screen).
 
 use vauchi_app::ui::{ActionResult, AvatarEditorEngine, Component, UserAction, WorkflowEngine};
-use vauchi_core::exchange::{ExchangeCommand, ExchangeHardwareEvent};
+use vauchi_core::{Command, Event};
 
 fn tiny_avatar() -> Vec<u8> {
     // Use core's avatar generation to produce valid image bytes
@@ -37,15 +37,15 @@ fn camera_action_emits_capture_command() {
         action_id: "source_camera".into(),
     });
     match result {
-        ActionResult::ExchangeCommands { commands } => {
+        ActionResult::Commands { commands } => {
             assert!(
                 commands
                     .iter()
-                    .any(|c| matches!(c, ExchangeCommand::ImageCaptureFromCamera)),
+                    .any(|c| matches!(c, Command::ImageCaptureFromCamera)),
                 "expected ImageCaptureFromCamera command"
             );
         }
-        other => panic!("expected ExchangeCommands, got {other:?}"),
+        other => panic!("expected Commands, got {other:?}"),
     }
 }
 
@@ -57,16 +57,16 @@ fn photos_action_emits_pick_command() {
         action_id: "source_photos".into(),
     });
     match result {
-        ActionResult::ExchangeCommands { commands } => {
+        ActionResult::Commands { commands } => {
             let has_pick = commands.iter().any(|c| {
                 matches!(
                     c,
-                    ExchangeCommand::ImagePickFromLibrary | ExchangeCommand::ImagePickFromFile
+                    Command::ImagePickFromLibrary | Command::ImagePickFromFile
                 )
             });
             assert!(has_pick, "expected image pick command");
         }
-        other => panic!("expected ExchangeCommands, got {other:?}"),
+        other => panic!("expected Commands, got {other:?}"),
     }
 }
 
@@ -97,7 +97,7 @@ fn generate_action_transitions_to_generator() {
 fn image_received_transitions_to_editing() {
     let mut engine = AvatarEditorEngine::new("Alice".into(), false);
     let result = engine
-        .handle_hardware_event(ExchangeHardwareEvent::ImageReceived {
+        .handle_hardware_event(Event::ImageReceived {
             data: tiny_avatar(),
         })
         .expect("should handle image received");
@@ -123,7 +123,7 @@ fn image_received_transitions_to_editing() {
 fn image_pick_cancelled_stays_on_source_picker() {
     let mut engine = AvatarEditorEngine::new("Alice".into(), false);
     let result = engine
-        .handle_hardware_event(ExchangeHardwareEvent::ImagePickCancelled)
+        .handle_hardware_event(Event::ImagePickCancelled)
         .expect("should handle cancel");
     assert!(matches!(result, ActionResult::UpdateScreen(_)));
     // Still on source picker — should have ActionList
@@ -141,7 +141,7 @@ fn image_pick_cancelled_stays_on_source_picker() {
 #[test]
 fn save_in_editing_completes() {
     let mut engine = AvatarEditorEngine::new("Alice".into(), false);
-    let _ = engine.handle_hardware_event(ExchangeHardwareEvent::ImageReceived {
+    let _ = engine.handle_hardware_event(Event::ImageReceived {
         data: tiny_avatar(),
     });
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -225,7 +225,7 @@ fn save_in_generator_completes_with_avatar() {
 #[test]
 fn brightness_slider_updates_preview() {
     let mut engine = AvatarEditorEngine::new("Alice".into(), false);
-    let _ = engine.handle_hardware_event(ExchangeHardwareEvent::ImageReceived {
+    let _ = engine.handle_hardware_event(Event::ImageReceived {
         data: tiny_avatar(),
     });
     let result = engine.handle_action(UserAction::SliderChanged {

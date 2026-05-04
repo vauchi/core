@@ -6,7 +6,7 @@
 //!
 //! ADR-031: ExchangeEngine holds an optional `ExchangeSession` to connect
 //! the UI workflow with the cryptographic protocol state machine. When a
-//! session is provided, transitions emit `ExchangeCommand`s that frontends
+//! session is provided, transitions emit `Command`s that frontends
 //! dispatch to platform hardware (camera, BLE, NFC, audio).
 
 use crate::ui::exchange_ble::{
@@ -17,8 +17,8 @@ use crate::ui::exchange_link::{self, LinkActionOutcome, LinkHardwareOutcome, Lin
 use crate::ui::exchange_mode_selection::{ModeSelectionEngine, ModeSelectionResult};
 use crate::ui::exchange_qr::{self, QrActionOutcome, QrStep, ScanQualityTracker};
 use crate::ui::*;
+use vauchi_core::Command;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
-use vauchi_core::exchange::command::ExchangeCommand;
 use vauchi_core::exchange::escrow::EscrowKeys;
 use vauchi_core::exchange::link_mode::{self, LinkInitiation};
 use vauchi_core::exchange::mode::ExchangeMode;
@@ -51,8 +51,8 @@ pub struct ExchangeConfig {
 /// Engine that drives the QR exchange workflow.
 ///
 /// ADR-031: When `session` is `Some`, the engine delegates protocol state
-/// transitions to `ExchangeSession` and emits `ExchangeCommand`s via
-/// `ActionResult::ExchangeCommands`. When `session` is `None`, the engine
+/// transitions to `ExchangeSession` and emits `Command`s via
+/// `ActionResult::Commands`. When `session` is `None`, the engine
 /// behaves as a UI-only workflow (legacy behavior).
 pub struct ExchangeEngine {
     step: ExchangeStep,
@@ -77,7 +77,7 @@ pub struct ExchangeEngine {
     link_initiation: Option<LinkInitiation>,
     /// Pending Link mode commands (presence deposit, relay calls).
     /// Drained via `drain_commands()` same as session commands.
-    pending_link_commands: Vec<ExchangeCommand>,
+    pending_link_commands: Vec<Command>,
     /// Escrow keys derived after DH with responder (Link mode only).
     /// Populated on `LinkOpened` event, used for card retrieval + decryption.
     escrow_keys: Option<EscrowKeys>,
@@ -240,7 +240,7 @@ impl ExchangeEngine {
 
     /// Creates a new ExchangeEngine with a protocol session (ADR-031).
     ///
-    /// When a session is provided, the engine emits `ExchangeCommand`s
+    /// When a session is provided, the engine emits `Command`s
     /// at each step transition, connecting the UI workflow with the
     /// cryptographic protocol state machine.
     ///
@@ -325,7 +325,7 @@ impl ExchangeEngine {
     /// Call this after construction with `with_session()` to get the
     /// initial `QrDisplay` command, or after `new()` with Link mode to get
     /// the initial presence deposit command.
-    pub fn drain_commands(&mut self) -> Vec<ExchangeCommand> {
+    pub fn drain_commands(&mut self) -> Vec<Command> {
         if !self.pending_link_commands.is_empty() {
             return std::mem::take(&mut self.pending_link_commands);
         }
@@ -430,7 +430,7 @@ impl ExchangeEngine {
     /// Start the protocol session (ADR-031) when entering ShowQr.
     ///
     /// If a session is present, applies `StartQR` to generate the QR code,
-    /// emits initial commands, and returns `ExchangeCommands`.
+    /// emits initial commands, and returns `Commands`.
     /// Otherwise, returns `NavigateTo` for legacy UI-only behavior.
     fn start_session_if_needed(&mut self) -> ActionResult {
         if let Some(ref mut session) = self.session {
@@ -441,7 +441,7 @@ impl ExchangeEngine {
                 let commands = session.drain_commands();
                 if !commands.is_empty() {
                     self.step = ExchangeStep::DirectTransport(DirectStep::Exchanging);
-                    return ActionResult::ExchangeCommands { commands };
+                    return ActionResult::Commands { commands };
                 }
             }
             // Existing QR path below...
@@ -453,7 +453,7 @@ impl ExchangeEngine {
                     self.qr_frame_index = 0;
                     let commands = session.drain_commands();
                     if !commands.is_empty() {
-                        return ActionResult::ExchangeCommands { commands };
+                        return ActionResult::Commands { commands };
                     }
                 }
                 Err(_) => {
@@ -473,7 +473,7 @@ impl ExchangeEngine {
     /// Start Link mode: generate URL, store initiation data, emit presence
     /// deposit command (ADR-031).
     ///
-    /// Returns `ExchangeCommands` with the presence deposit for the handshake
+    /// Returns `Commands` with the presence deposit for the handshake
     /// gate, or `NavigateTo` if no commands are needed (shouldn't happen).
     fn start_link_mode(&mut self) -> ActionResult {
         self.step = ExchangeStep::Link(LinkStep::ShareUrl);
@@ -482,7 +482,7 @@ impl ExchangeEngine {
         if commands.is_empty() {
             ActionResult::NavigateTo(self.build_screen())
         } else {
-            ActionResult::ExchangeCommands { commands }
+            ActionResult::Commands { commands }
         }
     }
 
@@ -495,22 +495,19 @@ impl ExchangeEngine {
         self.ble_flow = Some(BleExchangeFlow::new(mode));
         self.step = ExchangeStep::Ble(BleStep::Discovering);
         let service_uuid = vauchi_core::exchange::VAUCHI_BLE_SERVICE_UUID.to_string();
-        ActionResult::ExchangeCommands {
+        ActionResult::Commands {
             commands: vec![
-                ExchangeCommand::BleStartAdvertising {
+                Command::BleStartAdvertising {
                     service_uuid: service_uuid.clone(),
                     payload: vec![],
                 },
-                ExchangeCommand::BleStartScanning { service_uuid },
+                Command::BleStartScanning { service_uuid },
             ],
         }
     }
 
     /// Handle BLE mode hardware events via BleExchangeFlow.
-    fn handle_ble_hardware_event(
-        &mut self,
-        event: vauchi_core::exchange::ExchangeHardwareEvent,
-    ) -> Option<ActionResult> {
+    fn handle_ble_hardware_event(&mut self, event: vauchi_core::Event) -> Option<ActionResult> {
         let flow = self.ble_flow.as_mut()?;
         let outcome = flow.handle_event(&event);
 
@@ -528,7 +525,7 @@ impl ExchangeEngine {
                 if commands.is_empty() {
                     ActionResult::UpdateScreen(self.build_screen())
                 } else {
-                    ActionResult::ExchangeCommands { commands }
+                    ActionResult::Commands { commands }
                 }
             }
             BleHardwareOutcome::Complete {
@@ -540,7 +537,7 @@ impl ExchangeEngine {
                 if commands.is_empty() {
                     ActionResult::UpdateScreen(self.build_screen())
                 } else {
-                    ActionResult::ExchangeCommands { commands }
+                    ActionResult::Commands { commands }
                 }
             }
             BleHardwareOutcome::FailedWithFallback { reason } => {
@@ -558,12 +555,9 @@ impl ExchangeEngine {
     ///
     /// Routes to handshake-phase or escrow-phase handler depending on
     /// whether ECDH has completed (escrow_keys present).
-    fn handle_link_hardware_event(
-        &mut self,
-        event: vauchi_core::exchange::ExchangeHardwareEvent,
-    ) -> Option<ActionResult> {
+    fn handle_link_hardware_event(&mut self, event: vauchi_core::Event) -> Option<ActionResult> {
         // Special case: LinkOpened triggers DH + card encryption
-        if let vauchi_core::exchange::ExchangeHardwareEvent::LinkOpened {
+        if let vauchi_core::Event::LinkOpened {
             ref peer_public_key,
         } = event
         {
@@ -616,21 +610,21 @@ impl ExchangeEngine {
     fn apply_link_outcome(&mut self, outcome: LinkHardwareOutcome) -> ActionResult {
         match outcome {
             LinkHardwareOutcome::PollHandshakeGate { commands } => {
-                ActionResult::ExchangeCommands { commands }
+                ActionResult::Commands { commands }
             }
             LinkHardwareOutcome::RetrieveFromHandshake { commands } => {
                 self.step = ExchangeStep::Link(LinkStep::Retrieving);
-                ActionResult::ExchangeCommands { commands }
+                ActionResult::Commands { commands }
             }
             LinkHardwareOutcome::DhCompleteCardDeposited {
                 commands,
                 escrow_keys,
             } => {
                 self.escrow_keys = Some(escrow_keys);
-                ActionResult::ExchangeCommands { commands }
+                ActionResult::Commands { commands }
             }
             LinkHardwareOutcome::RetrieveFromEscrow { commands } => {
-                ActionResult::ExchangeCommands { commands }
+                ActionResult::Commands { commands }
             }
             LinkHardwareOutcome::ExchangeComplete { card_bytes } => {
                 self.link_received_card = Some(card_bytes);
@@ -922,10 +916,7 @@ impl WorkflowEngine for ExchangeEngine {
         self.build_screen()
     }
 
-    fn handle_hardware_event(
-        &mut self,
-        event: vauchi_core::exchange::ExchangeHardwareEvent,
-    ) -> Option<ActionResult> {
+    fn handle_hardware_event(&mut self, event: vauchi_core::Event) -> Option<ActionResult> {
         // BLE mode events — routed through BleExchangeFlow
         if matches!(self.step, ExchangeStep::Ble(_)) {
             return self.handle_ble_hardware_event(event);
@@ -940,7 +931,7 @@ impl WorkflowEngine for ExchangeEngine {
         // Skipped frames (sharpness gating) are excluded — they indicate
         // camera settling, not wrong pointing.
         if matches!(self.step, ExchangeStep::Qr(QrStep::ScanQr))
-            && let vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
+            && let vauchi_core::Event::QrScanProgress {
                 detected,
                 frame_skipped,
                 ..
@@ -956,8 +947,8 @@ impl WorkflowEngine for ExchangeEngine {
         if matches!(self.step, ExchangeStep::Qr(QrStep::ScanQr)) {
             let is_camera_fallback = matches!(
                 &event,
-                vauchi_core::exchange::ExchangeHardwareEvent::HardwareUnavailable { transport }
-                | vauchi_core::exchange::ExchangeHardwareEvent::PermissionDenied { transport }
+                vauchi_core::Event::HardwareUnavailable { transport }
+                | vauchi_core::Event::PermissionDenied { transport }
                     if transport.eq_ignore_ascii_case("camera")
             );
             if is_camera_fallback {
@@ -970,7 +961,7 @@ impl WorkflowEngine for ExchangeEngine {
         let session = match self.session.as_mut() {
             Some(s) => s,
             None => {
-                if let vauchi_core::exchange::ExchangeHardwareEvent::QrScanned { data } = event {
+                if let vauchi_core::Event::QrScanned { data } = event {
                     let result = self.handle_action(UserAction::TextChanged {
                         component_id: "scanned_data".into(),
                         value: data,
@@ -1123,7 +1114,7 @@ impl WorkflowEngine for ExchangeEngine {
         if commands.is_empty() {
             Some(ActionResult::UpdateScreen(self.build_screen()))
         } else {
-            Some(ActionResult::ExchangeCommands { commands })
+            Some(ActionResult::Commands { commands })
         }
     }
 
@@ -1260,8 +1251,8 @@ impl WorkflowEngine for ExchangeEngine {
                             // tap (verified on Pixel 3a 2026-04-27).
                             self.step = ExchangeStep::Qr(QrStep::ScanQr);
                             self.scan_quality_tracker.reset();
-                            ActionResult::ExchangeCommands {
-                                commands: vec![ExchangeCommand::QrRequestScan],
+                            ActionResult::Commands {
+                                commands: vec![Command::QrRequestScan],
                             }
                         }
                         QrActionOutcome::BackToShowQr => {
@@ -1306,8 +1297,8 @@ impl WorkflowEngine for ExchangeEngine {
                             self.step = ExchangeStep::Link(LinkStep::WaitingForResponse);
                             // Emit ShowShareSheet so the frontend presents the share UI
                             if let Some(ref li) = self.link_initiation {
-                                return ActionResult::ExchangeCommands {
-                                    commands: vec![ExchangeCommand::ShowShareSheet {
+                                return ActionResult::Commands {
+                                    commands: vec![Command::ShowShareSheet {
                                         url: li.url.clone(),
                                     }],
                                 };
@@ -1515,10 +1506,7 @@ mod tests {
         let commands = engine.drain_commands();
         assert_eq!(commands.len(), 1);
         assert!(
-            matches!(
-                &commands[0],
-                vauchi_core::exchange::command::ExchangeCommand::QrDisplay { .. }
-            ),
+            matches!(&commands[0], vauchi_core::Command::QrDisplay { .. }),
             "Expected QrDisplay command, got {:?}",
             commands[0]
         );
@@ -1557,20 +1545,17 @@ mod tests {
             action_id: "start_exchange".into(),
         });
 
-        // Should emit ExchangeCommands with QrDisplay
+        // Should emit Commands with QrDisplay
         match result {
-            ActionResult::ExchangeCommands { commands } => {
+            ActionResult::Commands { commands } => {
                 assert_eq!(commands.len(), 1);
                 assert!(
-                    matches!(
-                        &commands[0],
-                        vauchi_core::exchange::command::ExchangeCommand::QrDisplay { .. }
-                    ),
+                    matches!(&commands[0], vauchi_core::Command::QrDisplay { .. }),
                     "Expected QrDisplay command, got {:?}",
                     commands[0]
                 );
             }
-            other => panic!("Expected ExchangeCommands, got {:?}", other),
+            other => panic!("Expected Commands, got {:?}", other),
         }
         assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
     }
@@ -1588,17 +1573,11 @@ mod tests {
 
         // Should emit QrRequestScan command
         match result {
-            ActionResult::ExchangeCommands { commands } => {
+            ActionResult::Commands { commands } => {
                 assert_eq!(commands.len(), 1);
-                assert_eq!(
-                    commands[0],
-                    vauchi_core::exchange::command::ExchangeCommand::QrRequestScan
-                );
+                assert_eq!(commands[0], vauchi_core::Command::QrRequestScan);
             }
-            other => panic!(
-                "Expected ExchangeCommands with QrRequestScan, got {:?}",
-                other
-            ),
+            other => panic!("Expected Commands with QrRequestScan, got {:?}", other),
         }
         assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
     }
@@ -1610,22 +1589,19 @@ mod tests {
         let _ = engine.drain_commands();
 
         // Simulate BLE discovery
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::BleDeviceDiscovered {
-                id: "device-1".into(),
-                rssi: -42,
-                adv_data: vec![],
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::BleDeviceDiscovered {
+            id: "device-1".into(),
+            rssi: -42,
+            adv_data: vec![],
+        });
 
         // Should emit BleConnect command
         assert!(result.is_some(), "expected Some value");
-        if let Some(ActionResult::ExchangeCommands { commands }) = result {
+        if let Some(ActionResult::Commands { commands }) = result {
             assert!(
-                commands.iter().any(|c| matches!(
-                    c,
-                    vauchi_core::exchange::command::ExchangeCommand::BleConnect { .. }
-                )),
+                commands
+                    .iter()
+                    .any(|c| matches!(c, vauchi_core::Command::BleConnect { .. })),
                 "Expected BleConnect command in {:?}",
                 commands
             );
@@ -1639,7 +1615,7 @@ mod tests {
         // No session
         assert!(engine.session().is_none());
 
-        // ShowQr → ScanQr emits the QrRequestScan ExchangeCommand even
+        // ShowQr → ScanQr emits the QrRequestScan Command even
         // without an active peer session. The legacy `RequestCamera`
         // ActionResult is deprecated (ADR-022 Addendum D) — frontends
         // implement the command/event protocol only.
@@ -1647,31 +1623,27 @@ mod tests {
             action_id: "continue".into(),
         });
         match &result {
-            ActionResult::ExchangeCommands { commands } => assert_eq!(
-                commands,
-                &vec![vauchi_core::exchange::command::ExchangeCommand::QrRequestScan]
-            ),
-            other => panic!("Expected ExchangeCommands with QrRequestScan, got {other:?}"),
+            ActionResult::Commands { commands } => {
+                assert_eq!(commands, &vec![vauchi_core::Command::QrRequestScan])
+            }
+            other => panic!("Expected Commands with QrRequestScan, got {other:?}"),
         }
 
         // handle_hardware_event handles QrScanned via legacy TextChanged path
-        let result =
-            engine.handle_hardware_event(vauchi_core::exchange::ExchangeHardwareEvent::QrScanned {
-                data: "test".into(),
-            });
+        let result = engine.handle_hardware_event(vauchi_core::Event::QrScanned {
+            data: "test".into(),
+        });
         assert!(
             result.is_some(),
             "QrScanned should be handled even without session"
         );
 
         // Non-QR events return None without session
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::BleDeviceDiscovered {
-                id: "d1".into(),
-                rssi: -40,
-                adv_data: vec![],
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::BleDeviceDiscovered {
+            id: "d1".into(),
+            rssi: -40,
+            adv_data: vec![],
+        });
         assert!(
             result.is_none(),
             "BLE events should be ignored without session"
@@ -1719,9 +1691,7 @@ mod tests {
 
         // Simulate scanning Bob's QR — auto-advance drives session to Complete
         let result =
-            engine.handle_hardware_event(vauchi_core::exchange::ExchangeHardwareEvent::QrScanned {
-                data: bob_qr_data,
-            });
+            engine.handle_hardware_event(vauchi_core::Event::QrScanned { data: bob_qr_data });
 
         assert!(result.is_some(), "expected Some value");
         // With reciprocity gating: step is Verifying (relay) or Success (no relay).
@@ -1790,7 +1760,7 @@ mod tests {
         assert_eq!(commands.len(), 1);
         assert!(matches!(
             &commands[0],
-            vauchi_core::exchange::command::ExchangeCommand::QrDisplay { .. }
+            vauchi_core::Command::QrDisplay { .. }
         ));
 
         // 2. User presses "Scan Their Code" → QrRequestScan command
@@ -1798,21 +1768,16 @@ mod tests {
             action_id: "continue".into(),
         });
         match result {
-            ActionResult::ExchangeCommands { commands } => {
+            ActionResult::Commands { commands } => {
                 assert_eq!(commands.len(), 1);
-                assert_eq!(
-                    commands[0],
-                    vauchi_core::exchange::command::ExchangeCommand::QrRequestScan
-                );
+                assert_eq!(commands[0], vauchi_core::Command::QrRequestScan);
             }
-            other => panic!("Expected ExchangeCommands, got {:?}", other),
+            other => panic!("Expected Commands, got {:?}", other),
         }
 
         // 3. Frontend scans Bob's QR → auto-advance drives to Complete
         let result =
-            engine.handle_hardware_event(vauchi_core::exchange::ExchangeHardwareEvent::QrScanned {
-                data: bob_qr_data,
-            });
+            engine.handle_hardware_event(vauchi_core::Event::QrScanned { data: bob_qr_data });
         assert!(result.is_some(), "expected Some value");
 
         // 4. Engine should be on Verifying — waiting for reciprocity confirmation.
@@ -2203,10 +2168,7 @@ mod tests {
         });
         let commands = engine.drain_commands();
         assert_eq!(commands.len(), 1, "must emit 1 presence deposit command");
-        assert!(matches!(
-            &commands[0],
-            ExchangeCommand::RelayEscrowDeposit { .. }
-        ));
+        assert!(matches!(&commands[0], Command::RelayEscrowDeposit { .. }));
         // Second drain is empty
         assert!(engine.drain_commands().is_empty());
     }
@@ -2245,14 +2207,14 @@ mod tests {
             action_id: "share".into(),
         });
         match result {
-            ActionResult::ExchangeCommands { commands } => {
+            ActionResult::Commands { commands } => {
                 assert_eq!(commands.len(), 1);
                 assert!(
-                    matches!(&commands[0], ExchangeCommand::ShowShareSheet { url } if url.starts_with("vauchi://exchange?")),
+                    matches!(&commands[0], Command::ShowShareSheet { url } if url.starts_with("vauchi://exchange?")),
                     "Share must emit ShowShareSheet with the link URL"
                 );
             }
-            other => panic!("Expected ExchangeCommands, got {:?}", other),
+            other => panic!("Expected Commands, got {:?}", other),
         }
     }
 
@@ -2273,17 +2235,16 @@ mod tests {
             ExchangeStep::Link(LinkStep::WaitingForResponse)
         );
         // Frontend reports LinkShared
-        let result =
-            engine.handle_hardware_event(vauchi_core::exchange::ExchangeHardwareEvent::LinkShared);
+        let result = engine.handle_hardware_event(vauchi_core::Event::LinkShared);
         match result {
-            Some(ActionResult::ExchangeCommands { commands }) => {
+            Some(ActionResult::Commands { commands }) => {
                 assert_eq!(commands.len(), 1);
                 assert!(
-                    matches!(&commands[0], ExchangeCommand::RelayEscrowCheck { .. }),
+                    matches!(&commands[0], Command::RelayEscrowCheck { .. }),
                     "LinkShared must trigger escrow check polling"
                 );
             }
-            other => panic!("Expected ExchangeCommands, got {:?}", other),
+            other => panic!("Expected Commands, got {:?}", other),
         }
     }
 
@@ -2306,9 +2267,8 @@ mod tests {
         let li = engine.link_initiation.as_ref().unwrap();
         let hs_gate = hex::decode(&li.handshake_slot).unwrap();
         let expected_slot = hex::decode(&li.presence_slot).unwrap();
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::RelayEscrowReady { gate_hash: hs_gate },
-        );
+        let result = engine
+            .handle_hardware_event(vauchi_core::Event::RelayEscrowReady { gate_hash: hs_gate });
         // Must transition to Retrieving
         assert_eq!(
             engine.step,
@@ -2318,9 +2278,9 @@ mod tests {
         // Must emit RelayEscrowRetrieve with presence_slot (authenticates
         // with OUR slot; relay returns the OTHER slot's blob = responder's epk)
         match result {
-            Some(ActionResult::ExchangeCommands { commands }) => {
+            Some(ActionResult::Commands { commands }) => {
                 assert_eq!(commands.len(), 1);
-                if let ExchangeCommand::RelayEscrowRetrieve { slot_hash, .. } = &commands[0] {
+                if let Command::RelayEscrowRetrieve { slot_hash, .. } = &commands[0] {
                     assert_eq!(
                         slot_hash, &expected_slot,
                         "retrieve must use presence_slot for auth"
@@ -2329,7 +2289,7 @@ mod tests {
                     panic!("expected RelayEscrowRetrieve");
                 }
             }
-            other => panic!("Expected ExchangeCommands, got {:?}", other),
+            other => panic!("Expected Commands, got {:?}", other),
         }
     }
 
@@ -2344,12 +2304,10 @@ mod tests {
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "share".into(),
         });
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::RelayEscrowFailed {
-                gate_hash: vec![],
-                reason: "gate expired".into(),
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::RelayEscrowFailed {
+            gate_hash: vec![],
+            reason: "gate expired".into(),
+        });
         assert!(result.is_some());
         assert_eq!(engine.step, ExchangeStep::Failed);
         assert_eq!(
@@ -2371,11 +2329,9 @@ mod tests {
             action_id: "share".into(),
         });
         // Unknown gate_hash — should be ignored (returns None)
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::RelayEscrowReady {
-                gate_hash: vec![0xAA; 32],
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::RelayEscrowReady {
+            gate_hash: vec![0xAA; 32],
+        });
         assert!(result.is_none(), "unknown gate must be silently ignored");
         assert_eq!(
             engine.step,
@@ -2446,8 +2402,8 @@ mod tests {
         assert!(engine.failure_detail.is_none());
         // Should return commands for link mode setup
         assert!(
-            matches!(result, ActionResult::ExchangeCommands { .. }),
-            "Expected ExchangeCommands for link setup"
+            matches!(result, ActionResult::Commands { .. }),
+            "Expected Commands for link setup"
         );
     }
 
@@ -2486,22 +2442,18 @@ mod tests {
         assert_eq!(engine.step, ExchangeStep::Ble(BleStep::Discovering));
 
         // Discovery
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::BleDeviceDiscovered {
-                id: "peer-1".into(),
-                rssi: -45,
-                adv_data: vec![],
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::BleDeviceDiscovered {
+            id: "peer-1".into(),
+            rssi: -45,
+            adv_data: vec![],
+        });
         assert!(result.is_some());
         assert_eq!(engine.step, ExchangeStep::Ble(BleStep::Handshaking));
 
         // Connection
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::BleConnected {
-                device_id: "peer-1".into(),
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::BleConnected {
+            device_id: "peer-1".into(),
+        });
         assert!(result.is_some());
         assert_eq!(engine.step, ExchangeStep::Ble(BleStep::Exchanging));
         engine
@@ -2513,23 +2465,19 @@ mod tests {
         let mut engine = ble_engine_to_exchanging(ExchangeMode::Magic);
 
         // Card data
-        engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::BleCharacteristicNotified {
-                uuid: "card".into(),
-                data: vec![1, 2, 3],
-            },
-        );
+        engine.handle_hardware_event(vauchi_core::Event::BleCharacteristicNotified {
+            uuid: "card".into(),
+            data: vec![1, 2, 3],
+        });
         // Audio response → proximity done → complete. Build a real
         // FSK-encoded sample buffer so the runner's decode succeeds.
         let modem_config = vauchi_core::exchange::audio_modem::AudioConfig::default();
         let samples =
             vauchi_core::exchange::audio_modem::generate_fsk_samples(&[0xAA], &modem_config);
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::AudioSamplesRecorded {
-                samples,
-                sample_rate: modem_config.sample_rate,
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::AudioSamplesRecorded {
+            samples,
+            sample_rate: modem_config.sample_rate,
+        });
         assert!(result.is_some());
         assert_eq!(engine.step, ExchangeStep::Success);
     }
@@ -2540,19 +2488,15 @@ mod tests {
         let mut engine = ble_engine_to_exchanging(ExchangeMode::Bump);
 
         // Card data
-        engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::BleCharacteristicNotified {
-                uuid: "card".into(),
-                data: vec![4, 5, 6],
-            },
-        );
+        engine.handle_hardware_event(vauchi_core::Event::BleCharacteristicNotified {
+            uuid: "card".into(),
+            data: vec![4, 5, 6],
+        });
         // Impact → proximity done → complete
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::ImpactDetected {
-                timestamp_ms: 100,
-                magnitude_milli_g: 3500,
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::ImpactDetected {
+            timestamp_ms: 100,
+            magnitude_milli_g: 3500,
+        });
         assert!(result.is_some());
         assert_eq!(engine.step, ExchangeStep::Success);
     }
@@ -2564,32 +2508,26 @@ mod tests {
 
         // Feed accel samples (triggers recording + envelope send)
         for i in 0..50 {
-            engine.handle_hardware_event(
-                vauchi_core::exchange::ExchangeHardwareEvent::AccelerometerData {
-                    x_milli_g: ((i as f32 * 0.1).sin() * 2000.0) as i32,
-                    y_milli_g: ((i as f32 * 0.1).cos() * 1500.0) as i32,
-                    z_milli_g: 1000,
-                    timestamp_ms: i * 10,
-                },
-            );
+            engine.handle_hardware_event(vauchi_core::Event::AccelerometerData {
+                x_milli_g: ((i as f32 * 0.1).sin() * 2000.0) as i32,
+                y_milli_g: ((i as f32 * 0.1).cos() * 1500.0) as i32,
+                z_milli_g: 1000,
+                timestamp_ms: i * 10,
+            });
         }
 
         // Card data
-        engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::BleCharacteristicNotified {
-                uuid: "card".into(),
-                data: vec![7, 8, 9],
-            },
-        );
+        engine.handle_hardware_event(vauchi_core::Event::BleCharacteristicNotified {
+            uuid: "card".into(),
+            data: vec![7, 8, 9],
+        });
 
         // Peer shake envelope (use encoded constant data for simplicity)
         let peer_envelope = vauchi_core::exchange::shake_protocol::encode_envelope(&[1.5; 50]);
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::BleCharacteristicNotified {
-                uuid: vauchi_core::exchange::CHAR_DATA_WRITE.into(),
-                data: peer_envelope,
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::BleCharacteristicNotified {
+            uuid: vauchi_core::exchange::CHAR_DATA_WRITE.into(),
+            data: peer_envelope,
+        });
         assert!(result.is_some());
         assert_eq!(engine.step, ExchangeStep::Success);
     }
@@ -2599,11 +2537,9 @@ mod tests {
     fn ble_disconnect_during_exchange_offers_relay_fallback() {
         let mut engine = ble_engine_to_exchanging(ExchangeMode::Magic);
 
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::BleDisconnected {
-                reason: "connection lost".into(),
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::BleDisconnected {
+            reason: "connection lost".into(),
+        });
         assert!(result.is_some());
         assert_eq!(engine.step, ExchangeStep::Failed);
         assert!(engine.ble_fallback_available);
@@ -2633,11 +2569,9 @@ mod tests {
         let mut engine = ExchangeEngine::new(config_with_camera());
         engine.step = ExchangeStep::Qr(QrStep::ScanQr);
 
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::HardwareUnavailable {
-                transport: "camera".into(),
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::HardwareUnavailable {
+            transport: "camera".into(),
+        });
 
         assert_eq!(
             engine.step,
@@ -2656,11 +2590,9 @@ mod tests {
         let mut engine = ExchangeEngine::new(config_with_camera());
         engine.step = ExchangeStep::Qr(QrStep::ScanQr);
 
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::PermissionDenied {
-                transport: "camera".into(),
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::PermissionDenied {
+            transport: "camera".into(),
+        });
 
         assert_eq!(
             engine.step,
@@ -2835,11 +2767,9 @@ mod tests {
             ..config_no_groups()
         });
 
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::PermissionDenied {
-                transport: "BLE".into(),
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::PermissionDenied {
+            transport: "BLE".into(),
+        });
 
         assert_eq!(engine.step, ExchangeStep::Failed);
         assert!(engine.ble_fallback_available);
@@ -2856,11 +2786,9 @@ mod tests {
         // In ShowQr step — camera unavailable should not trigger manual entry
         assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
 
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::HardwareUnavailable {
-                transport: "camera".into(),
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::HardwareUnavailable {
+            transport: "camera".into(),
+        });
 
         assert_eq!(
             engine.step,
@@ -2973,13 +2901,11 @@ mod tests {
 
         // Send 10 detected frames
         for _ in 0..10 {
-            let result = engine.handle_hardware_event(
-                vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
-                    detected: true,
-                    confidence: Some(90),
-                    frame_skipped: false,
-                },
-            );
+            let result = engine.handle_hardware_event(vauchi_core::Event::QrScanProgress {
+                detected: true,
+                confidence: Some(90),
+                frame_skipped: false,
+            });
             assert!(
                 matches!(result, Some(ActionResult::UpdateScreen(_))),
                 "QrScanProgress must trigger screen update"
@@ -3005,13 +2931,11 @@ mod tests {
 
         // 2 detected, 8 missed → 20% → Poor
         for i in 0..10 {
-            engine.handle_hardware_event(
-                vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
-                    detected: i < 2,
-                    confidence: None,
-                    frame_skipped: false,
-                },
-            );
+            engine.handle_hardware_event(vauchi_core::Event::QrScanProgress {
+                detected: i < 2,
+                confidence: None,
+                frame_skipped: false,
+            });
         }
 
         let screen = engine.current_screen();
@@ -3033,13 +2957,11 @@ mod tests {
 
         // Build up quality
         for _ in 0..10 {
-            engine.handle_hardware_event(
-                vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
-                    detected: true,
-                    confidence: None,
-                    frame_skipped: false,
-                },
-            );
+            engine.handle_hardware_event(vauchi_core::Event::QrScanProgress {
+                detected: true,
+                confidence: None,
+                frame_skipped: false,
+            });
         }
 
         // Go back
@@ -3071,13 +2993,11 @@ mod tests {
         // Still on ShowQr step
         assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
 
-        let result = engine.handle_hardware_event(
-            vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
-                detected: true,
-                confidence: Some(100),
-                frame_skipped: false,
-            },
-        );
+        let result = engine.handle_hardware_event(vauchi_core::Event::QrScanProgress {
+            detected: true,
+            confidence: Some(100),
+            frame_skipped: false,
+        });
 
         // Should not be handled (no session, not in scan step)
         assert!(
@@ -3096,24 +3016,20 @@ mod tests {
 
         // Send 5 detected frames → Good quality
         for _ in 0..5 {
-            engine.handle_hardware_event(
-                vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
-                    detected: true,
-                    confidence: None,
-                    frame_skipped: false,
-                },
-            );
+            engine.handle_hardware_event(vauchi_core::Event::QrScanProgress {
+                detected: true,
+                confidence: None,
+                frame_skipped: false,
+            });
         }
 
         // Send 20 skipped frames — these should NOT count as misses
         for _ in 0..20 {
-            engine.handle_hardware_event(
-                vauchi_core::exchange::ExchangeHardwareEvent::QrScanProgress {
-                    detected: false,
-                    confidence: None,
-                    frame_skipped: true,
-                },
-            );
+            engine.handle_hardware_event(vauchi_core::Event::QrScanProgress {
+                detected: false,
+                confidence: None,
+                frame_skipped: true,
+            });
         }
 
         // Quality should still be Good (5/5 = 100%, skipped frames excluded)

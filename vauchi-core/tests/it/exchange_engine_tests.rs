@@ -57,16 +57,15 @@ fn exchange_continue_to_scan() {
         action_id: "continue".to_string(),
     });
 
-    // Always emits the QrRequestScan ExchangeCommand (the legacy
+    // Always emits the QrRequestScan Command (the legacy
     // RequestCamera ActionResult was deprecated per ADR-022 Addendum D
     // and silently no-op'd on the mobile frontends, leaving the
     // "Tap to Scan" button unresponsive on first tap).
     match &result {
-        ActionResult::ExchangeCommands { commands } => assert_eq!(
-            commands,
-            &vec![vauchi_core::exchange::command::ExchangeCommand::QrRequestScan]
-        ),
-        other => panic!("expected ExchangeCommands with QrRequestScan, got {other:?}"),
+        ActionResult::Commands { commands } => {
+            assert_eq!(commands, &vec![vauchi_core::Command::QrRequestScan])
+        }
+        other => panic!("expected Commands with QrRequestScan, got {other:?}"),
     }
 
     let screen = engine.current_screen();

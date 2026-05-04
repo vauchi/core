@@ -9,8 +9,8 @@
 //! deposits their card. Both sides derive escrow hashes from the shared
 //! secret using [`EscrowKeys`].
 //!
-//! Core produces [`ExchangeCommand`]s — frontends execute relay calls and
-//! report results via `ExchangeHardwareEvent`s (ADR-031).
+//! Core produces [`Command`]s — frontends execute relay calls and
+//! report results via `Event`s (ADR-031).
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use rand::rngs::OsRng;
@@ -19,8 +19,8 @@ use sha2::{Digest, Sha256};
 use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
 use zeroize::Zeroizing;
 
-use crate::exchange::command::ExchangeCommand;
 use crate::exchange::escrow::{EscrowKeys, EscrowRole};
+use crate::platform::Command;
 
 /// Default TTL for escrow deposits (7 days, matching protocol max).
 const DEFAULT_TTL_SECONDS: u32 = 604_800;
@@ -74,7 +74,7 @@ pub struct LinkInitiation {
 ///
 /// The caller must persist `secret_key_bytes` and `nonce` for later
 /// use in [`initiator_complete`].
-pub fn initiator_generate() -> (LinkInitiation, Vec<ExchangeCommand>) {
+pub fn initiator_generate() -> (LinkInitiation, Vec<Command>) {
     // Use StaticSecret (not EphemeralSecret) because we need to persist
     // the secret key bytes for later ECDH. StaticSecret supports to_bytes().
     let secret = StaticSecret::random_from_rng(OsRng);
@@ -92,7 +92,7 @@ pub fn initiator_generate() -> (LinkInitiation, Vec<ExchangeCommand>) {
     // Deposit initiator's public key as presence in the handshake gate.
     // This creates the initiator's slot so GET(handshake, presence_slot)
     // works after the responder deposits their epk as the second slot.
-    let commands = vec![ExchangeCommand::RelayEscrowDeposit {
+    let commands = vec![Command::RelayEscrowDeposit {
         gate_hash: hex::decode(&handshake_slot).expect("hex from hex::encode is always valid"),
         slot_hash: hex::decode(&presence_slot).expect("hex from hex::encode is always valid"),
         encrypted_card: public.as_bytes().to_vec(),
@@ -140,8 +140,8 @@ pub fn initiator_derive_keys(
 ///
 /// Call after [`initiator_derive_keys`] and encrypting the card with
 /// `EscrowKeys::encrypt_card`.
-pub fn build_initiator_deposit(keys: &EscrowKeys, encrypted_card: Vec<u8>) -> Vec<ExchangeCommand> {
-    vec![ExchangeCommand::RelayEscrowDeposit {
+pub fn build_initiator_deposit(keys: &EscrowKeys, encrypted_card: Vec<u8>) -> Vec<Command> {
+    vec![Command::RelayEscrowDeposit {
         gate_hash: hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid"),
         slot_hash: hex::decode(&keys.our_slot).expect("hex from hex::encode is always valid"),
         encrypted_card,
@@ -156,7 +156,7 @@ pub fn initiator_complete(
     secret_key_bytes: &[u8; 32],
     peer_public_key: &[u8; 32],
     encrypted_card: Vec<u8>,
-) -> Result<(EscrowKeys, Vec<ExchangeCommand>), LinkModeError> {
+) -> Result<(EscrowKeys, Vec<Command>), LinkModeError> {
     let keys = initiator_derive_keys(secret_key_bytes, peer_public_key)?;
     let commands = build_initiator_deposit(&keys, encrypted_card);
     Ok((keys, commands))
@@ -331,7 +331,7 @@ pub fn parse_exchange_deep_link(uri: &str) -> Result<DeepLinkPayload, DeepLinkPa
 pub fn responder_respond(
     parsed: &ParsedLinkUrl,
     encrypted_card: Vec<u8>,
-) -> Result<(EscrowKeys, Vec<ExchangeCommand>), LinkModeError> {
+) -> Result<(EscrowKeys, Vec<Command>), LinkModeError> {
     let secret = EphemeralSecret::random_from_rng(OsRng);
     let our_public = PublicKey::from(&secret);
     let their_public = PublicKey::from(parsed.initiator_public_key);
@@ -348,14 +348,14 @@ pub fn responder_respond(
 
     let commands = vec![
         // 1. Bootstrap: deposit our public key to handshake slot
-        ExchangeCommand::RelayEscrowDeposit {
+        Command::RelayEscrowDeposit {
             gate_hash: hex::decode(&handshake_slot).expect("hex from hex::encode is always valid"),
             slot_hash: hex::decode(&epk_slot).expect("hex from hex::encode is always valid"),
             encrypted_card: our_public.as_bytes().to_vec(),
             ttl_seconds: DEFAULT_TTL_SECONDS,
         },
         // 2. Deposit encrypted card to escrow gate
-        ExchangeCommand::RelayEscrowDeposit {
+        Command::RelayEscrowDeposit {
             gate_hash: hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid"),
             slot_hash: hex::decode(&keys.our_slot).expect("hex from hex::encode is always valid"),
             encrypted_card,
@@ -388,7 +388,7 @@ pub fn responder_respond(
 pub fn responder_respond_with_card_bytes(
     parsed: &ParsedLinkUrl,
     raw_card_bytes: &[u8],
-) -> Result<(EscrowKeys, Vec<ExchangeCommand>), LinkModeError> {
+) -> Result<(EscrowKeys, Vec<Command>), LinkModeError> {
     // ECDH + key derivation, identical to `responder_respond`. We
     // duplicate rather than refactor so neither path's tests have to
     // change shape — `responder_respond` stays a stable opaque-bytes
@@ -412,13 +412,13 @@ pub fn responder_respond_with_card_bytes(
     let epk_slot = derive_epk_slot(&parsed.nonce);
 
     let commands = vec![
-        ExchangeCommand::RelayEscrowDeposit {
+        Command::RelayEscrowDeposit {
             gate_hash: hex::decode(&handshake_slot).expect("hex from hex::encode is always valid"),
             slot_hash: hex::decode(&epk_slot).expect("hex from hex::encode is always valid"),
             encrypted_card: our_public.as_bytes().to_vec(),
             ttl_seconds: DEFAULT_TTL_SECONDS,
         },
-        ExchangeCommand::RelayEscrowDeposit {
+        Command::RelayEscrowDeposit {
             gate_hash: hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid"),
             slot_hash: hex::decode(&keys.our_slot).expect("hex from hex::encode is always valid"),
             encrypted_card: encrypted,

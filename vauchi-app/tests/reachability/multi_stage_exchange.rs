@@ -24,7 +24,8 @@
 
 use vauchi_app::ui::testing::{assert_reachability_across_screens, check_reachability};
 use vauchi_app::ui::{MultiStageExchangeEngine, WorkflowEngine};
-use vauchi_core::exchange::{ExchangeHardwareEvent, ProtocolState};
+use vauchi_core::Event;
+use vauchi_core::exchange::ProtocolState;
 
 /// Action ids handled by `MultiStageExchangeEngine` —
 /// `core/vauchi-app/src/ui/multi_stage_exchange.rs`.
@@ -53,7 +54,7 @@ fn success_factory() -> MultiStageExchangeEngine {
 
 fn permission_denied_factory() -> MultiStageExchangeEngine {
     let mut e = MultiStageExchangeEngine::new();
-    e.handle_hardware_event(ExchangeHardwareEvent::PermissionDenied {
+    e.handle_hardware_event(Event::PermissionDenied {
         transport: "camera".into(),
     });
     e

@@ -753,7 +753,7 @@ fn more_engine_has_expected_navigation_targets() {
     //
     // Phase 2A of `2026-05-03-core-file-picker-command` adds
     // `import_contacts` — the only entry that does not navigate to
-    // a screen (selecting it returns `ExchangeCommands` driving the
+    // a screen (selecting it returns `Commands` driving the
     // file picker per ADR-031).
     let expected: &[&str] = &[
         "activity_log",

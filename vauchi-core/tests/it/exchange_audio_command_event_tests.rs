@@ -10,10 +10,10 @@
 
 use vauchi_core::ContactCard;
 use vauchi_core::exchange::{
-    ExchangeCommand, ExchangeEvent, ExchangeHardwareEvent, ExchangeSession, ExchangeState,
-    ManualConfirmationVerifier,
+    ExchangeEvent, ExchangeSession, ExchangeState, ManualConfirmationVerifier,
 };
 use vauchi_core::identity::Identity;
+use vauchi_core::{Command, Event};
 
 fn qr_session(name: &str) -> ExchangeSession {
     let identity = Identity::create(name);
@@ -35,10 +35,10 @@ fn create_peer_scanned_sessions() -> (ExchangeSession, ExchangeSession) {
 
     // Alice scans Bob's QR
     alice
-        .apply_hardware_event(ExchangeHardwareEvent::QrScanned { data: bob_qr })
+        .apply_hardware_event(Event::QrScanned { data: bob_qr })
         .unwrap();
     // Bob scans Alice's QR
-    bob.apply_hardware_event(ExchangeHardwareEvent::QrScanned { data: alice_qr })
+    bob.apply_hardware_event(Event::QrScanned { data: alice_qr })
         .unwrap();
 
     (alice, bob)
@@ -63,8 +63,7 @@ fn qr_key_agreement_emits_audio_commands() {
     let has_audio = cmds.iter().any(|c| {
         matches!(
             c,
-            ExchangeCommand::AudioEmitChallenge { .. }
-                | ExchangeCommand::AudioListenForResponse { .. }
+            Command::AudioEmitChallenge { .. } | Command::AudioListenForResponse { .. }
         )
     });
     assert!(
@@ -87,7 +86,7 @@ fn audio_response_received_advances_state() {
 
     // Simulate audio response — frontend captured samples at 44.1 kHz.
     alice
-        .apply_hardware_event(ExchangeHardwareEvent::AudioSamplesRecorded {
+        .apply_hardware_event(Event::AudioSamplesRecorded {
             samples: vec![0.1, -0.1, 0.2, -0.2],
             sample_rate: 44100,
         })
@@ -114,7 +113,7 @@ fn audio_hardware_unavailable_does_not_block_key_agreement() {
 
     // Audio unavailable — should not fail the session
     alice
-        .apply_hardware_event(ExchangeHardwareEvent::HardwareUnavailable {
+        .apply_hardware_event(Event::HardwareUnavailable {
             transport: "Audio".into(),
         })
         .unwrap();

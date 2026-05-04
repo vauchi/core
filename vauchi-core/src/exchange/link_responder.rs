@@ -24,9 +24,9 @@
 
 use std::time::Instant;
 
-use crate::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
 use crate::exchange::escrow::EscrowKeys;
 use crate::exchange::link_mode::{LinkModeError, responder_complete};
+use crate::platform::{Command, Event};
 
 /// Suggested initial polling interval (ms) for the responder's
 /// `RelayEscrowCheck`. Mirrors `exchange_link.rs::LINK_POLL_INTERVAL_MS`
@@ -88,7 +88,7 @@ pub struct LinkResponderSession {
     /// than re-decoding the hex string.
     gate_hash_bytes: Vec<u8>,
     /// Commands queued for `drain_pending_commands`. One-shot per call.
-    pending: Vec<ExchangeCommand>,
+    pending: Vec<Command>,
 }
 
 impl LinkResponderSession {
@@ -102,18 +102,14 @@ impl LinkResponderSession {
     /// `poll_deadline` is the wall-clock instant after which the
     /// session transitions to `Failed(PollingTimedOut)` if no
     /// `RelayEscrowReady` event has arrived.
-    pub fn new(
-        keys: EscrowKeys,
-        deposit_commands: Vec<ExchangeCommand>,
-        poll_deadline: Instant,
-    ) -> Self {
+    pub fn new(keys: EscrowKeys, deposit_commands: Vec<Command>, poll_deadline: Instant) -> Self {
         let gate_hash_bytes =
             hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid");
 
         let mut pending = deposit_commands;
         // Tell the relay to start watching the gate so the deposit
         // count crossing 2 fires `RelayEscrowReady`.
-        pending.push(ExchangeCommand::RelayEscrowCheck {
+        pending.push(Command::RelayEscrowCheck {
             gate_hash: gate_hash_bytes.clone(),
             suggested_interval_ms: RESPONDER_POLL_INTERVAL_MS,
         });
@@ -133,7 +129,7 @@ impl LinkResponderSession {
     }
 
     /// Drain queued commands. Idempotent: a second call returns empty.
-    pub fn drain_pending_commands(&mut self) -> Vec<ExchangeCommand> {
+    pub fn drain_pending_commands(&mut self) -> Vec<Command> {
         std::mem::take(&mut self.pending)
     }
 
@@ -141,13 +137,13 @@ impl LinkResponderSession {
     /// gates are ignored. Terminal states (`Finalized` / `Failed`)
     /// ignore all events — once a session has completed, further
     /// events do not unset its outcome.
-    pub fn apply_hardware_event(&mut self, event: ExchangeHardwareEvent) {
+    pub fn apply_hardware_event(&mut self, event: Event) {
         if self.is_terminal() {
             return;
         }
 
         match event {
-            ExchangeHardwareEvent::RelayEscrowReady { gate_hash } => {
+            Event::RelayEscrowReady { gate_hash } => {
                 if gate_hash != self.gate_hash_bytes {
                     return;
                 }
@@ -155,13 +151,13 @@ impl LinkResponderSession {
                     self.transition_to_retrieving();
                 }
             }
-            ExchangeHardwareEvent::RelayEscrowFailed { gate_hash, .. } => {
+            Event::RelayEscrowFailed { gate_hash, .. } => {
                 if gate_hash != self.gate_hash_bytes {
                     return;
                 }
                 self.fail(LinkResponderFailureReason::DepositRejected);
             }
-            ExchangeHardwareEvent::RelayEscrowBlobReceived { gate_hash, blob } => {
+            Event::RelayEscrowBlobReceived { gate_hash, blob } => {
                 if gate_hash != self.gate_hash_bytes {
                     return;
                 }
@@ -244,7 +240,7 @@ impl LinkResponderSession {
 
     fn transition_to_retrieving(&mut self) {
         self.state = LinkResponderState::Retrieving;
-        self.pending.push(ExchangeCommand::RelayEscrowRetrieve {
+        self.pending.push(Command::RelayEscrowRetrieve {
             gate_hash: self.gate_hash_bytes.clone(),
             slot_hash: hex::decode(&self.keys.their_slot)
                 .expect("hex from hex::encode is always valid"),

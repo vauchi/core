@@ -152,7 +152,7 @@ fn validate_result(
         | ActionResult::ShowAlert { .. }
         | ActionResult::ShowToast { .. }
         | ActionResult::OpenEntryDetail { .. }
-        | ActionResult::ExchangeCommands { .. }
+        | ActionResult::Commands { .. }
         | ActionResult::PreviewAs { .. }
         | ActionResult::ShowContactPicker
         | ActionResult::VerifyFingerprint { .. } => {}

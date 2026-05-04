@@ -9,8 +9,8 @@
 
 use crate::ui::*;
 use vauchi_core::contact::labels::SUGGESTED_LABELS;
-use vauchi_core::exchange::{ExchangeCommand, FilePickPurpose};
 use vauchi_core::types::OnboardingStep as Step;
+use vauchi_core::{Command, FilePickPurpose};
 
 /// `accepted_mime_types` for the encrypted backup file picker. Frontends
 /// may default to a coarser superset on platforms where the OS picker
@@ -65,7 +65,7 @@ pub struct OnboardingEngine {
     /// When true, info icon keys are set on components that have help content.
     show_help_icons: bool,
     /// Bytes of the encrypted backup file picked via
-    /// `ExchangeCommand::FilePickFromUser` while restoring an identity.
+    /// `Command::FilePickFromUser` while restoring an identity.
     /// Set by `set_pending_backup_bytes` from the AppEngine
     /// `handle_file_picked` Onboarding arm; consumed by the routing
     /// layer's completion path when the user submits the password.
@@ -117,7 +117,7 @@ impl OnboardingEngine {
     /// Stores the picked backup bytes and transitions the wizard to
     /// the password-entry step. Called by `AppEngine::handle_file_picked`
     /// (Onboarding arm) when the user picks a file via the
-    /// `ExchangeCommand::FilePickFromUser{purpose:ImportBackup}` flow.
+    /// `Command::FilePickFromUser{purpose:ImportBackup}` flow.
     pub fn set_pending_backup_bytes(&mut self, bytes: Vec<u8>) {
         self.pending_backup_bytes = Some(bytes);
         self.pending_backup_password.clear();
@@ -289,7 +289,7 @@ impl OnboardingEngine {
     /// Password-entry screen for the backup-restore flow (ADR-031,
     /// Phase 2B of `2026-05-03-core-file-picker-command`). Reached from
     /// `LinkChoice` after the user picks a file via
-    /// `ExchangeCommand::FilePickFromUser{purpose:ImportBackup}`.
+    /// `Command::FilePickFromUser{purpose:ImportBackup}`.
     fn build_backup_password_entry(&self) -> ScreenModel {
         let password_filled = !self.pending_backup_password.is_empty();
         ScreenModel {
@@ -659,8 +659,8 @@ impl OnboardingEngine {
                 // `set_pending_backup_bytes`, which transitions the
                 // wizard to `Step::BackupPasswordEntry`. Phase 2B of
                 // `2026-05-03-core-file-picker-command`.
-                ActionResult::ExchangeCommands {
-                    commands: vec![ExchangeCommand::FilePickFromUser {
+                ActionResult::Commands {
+                    commands: vec![Command::FilePickFromUser {
                         accepted_mime_types: backup_mime_types(),
                         purpose: FilePickPurpose::ImportBackup,
                     }],

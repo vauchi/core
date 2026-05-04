@@ -9,8 +9,8 @@
 //! and that MyInfo shows an AvatarPreview component.
 
 use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
+use vauchi_core::Event;
 use vauchi_core::api::Vauchi;
-use vauchi_core::exchange::ExchangeHardwareEvent;
 
 fn engine_with_identity() -> AppEngine {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -67,8 +67,7 @@ fn save_avatar_persists_and_navigates_back() {
 
     // Simulate image received
     let avatar_data = vauchi_core::avatar::generate_initials_avatar([0, 128, 255], 32);
-    let _ =
-        engine.handle_hardware_event(ExchangeHardwareEvent::ImageReceived { data: avatar_data });
+    let _ = engine.handle_hardware_event(Event::ImageReceived { data: avatar_data });
 
     // Save
     let result = engine.handle_action(UserAction::ActionPressed {
@@ -122,8 +121,7 @@ fn hardware_events_routed_to_avatar_editor() {
     let _ = engine.navigate_to(AppScreen::AvatarEditor);
 
     let avatar_data = vauchi_core::avatar::generate_initials_avatar([255, 0, 0], 32);
-    let result =
-        engine.handle_hardware_event(ExchangeHardwareEvent::ImageReceived { data: avatar_data });
+    let result = engine.handle_hardware_event(Event::ImageReceived { data: avatar_data });
 
     assert!(result.is_some(), "hardware event should be handled");
     match result.unwrap() {
@@ -166,8 +164,7 @@ fn my_info_avatar_preview_shows_saved_avatar() {
     // Set avatar via the editor flow
     let _ = engine.navigate_to(AppScreen::AvatarEditor);
     let avatar_data = vauchi_core::avatar::generate_initials_avatar([0, 200, 100], 32);
-    let _ =
-        engine.handle_hardware_event(ExchangeHardwareEvent::ImageReceived { data: avatar_data });
+    let _ = engine.handle_hardware_event(Event::ImageReceived { data: avatar_data });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "save".into(),
     });

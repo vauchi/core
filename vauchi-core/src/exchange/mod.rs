@@ -59,7 +59,6 @@ pub mod audio_modem;
 
 pub mod capability;
 pub mod card_snapshot;
-pub mod command;
 pub mod confirmation_escrow;
 pub mod device_link;
 pub mod direct_transport;
@@ -104,7 +103,6 @@ pub use ble_handshake::{
 };
 pub use ble_payload::BleCardPayload;
 pub use ble_rollback::BleRollback;
-pub use command::{ExchangeCommand, ExchangeHardwareEvent, FilePickPurpose};
 pub use device_link::{
     DeviceLinkConfirmation, DeviceLinkInitiator, DeviceLinkInitiatorRestored, DeviceLinkQR,
     DeviceLinkRequest, DeviceLinkResponder, DeviceLinkResponse, ProximityProof,

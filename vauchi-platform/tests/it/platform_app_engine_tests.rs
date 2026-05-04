@@ -869,7 +869,7 @@ fn navigate_to_multi_stage_auto_creates_session_no_frontend_call_needed() {
 // @internal
 #[test]
 fn qr_scanned_hardware_event_routes_to_session_when_on_multi_stage_screen() {
-    use vauchi_platform::MobileExchangeHardwareEvent;
+    use vauchi_platform::MobileEvent;
     let (engine, _dir) = create_engine();
     drive_to_multi_stage(&engine);
 
@@ -878,7 +878,7 @@ fn qr_scanned_hardware_event_routes_to_session_when_on_multi_stage_screen() {
     // would mean the engine handled it directly (the legacy path),
     // which is the leak we just fixed.
     let result = engine
-        .handle_hardware_event(MobileExchangeHardwareEvent::QrScanned {
+        .handle_hardware_event(MobileEvent::QrScanned {
             data: "garbage-not-an-init-frame".into(),
         })
         .expect("hardware event accepted");

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::notification_types::PendingNotification;
 use crate::ui::screen::ScreenModel;
-use vauchi_core::exchange::ExchangeCommand;
+use vauchi_core::Command;
 
 /// An action the user performed in the UI.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -147,8 +147,8 @@ pub enum ActionResult {
     },
     /// Frontend should open the camera for QR scanning.
     ///
-    /// Deprecated per ADR-022 Addendum D: use `ExchangeCommands` with
-    /// `ExchangeCommand::QrRequestScan` instead. Will be removed after
+    /// Deprecated per ADR-022 Addendum D: use `Commands` with
+    /// `Command::QrRequestScan` instead. Will be removed after
     /// all frontends adopt the command/event protocol.
     RequestCamera,
     /// Frontend should open the entry detail view for a MyInfo field.
@@ -171,9 +171,9 @@ pub enum ActionResult {
     WipeComplete,
     /// Frontend should perform hardware actions for the exchange protocol (ADR-031).
     /// Each command maps to a platform-specific operation (QR display, BLE scan, etc.).
-    /// Unsupported commands should be answered with `ExchangeHardwareEvent::HardwareUnavailable`.
-    ExchangeCommands {
-        commands: Vec<ExchangeCommand>,
+    /// Unsupported commands should be answered with `Event::HardwareUnavailable`.
+    Commands {
+        commands: Vec<Command>,
     },
     /// App layer should navigate to MyInfo in preview mode for this contact.
     PreviewAs {

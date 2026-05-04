@@ -5,16 +5,16 @@
 //! Integration tests for the full ADR-031 command/event exchange protocol.
 //!
 //! These tests verify complete exchange flows (QR, BLE, NFC) using only
-//! `ExchangeCommand`s and `ExchangeHardwareEvent`s — no hardware traits,
+//! `Command`s and `Event`s — no hardware traits,
 //! no mock transports, no blocking calls.
 
 use vauchi_core::ContactCard;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::{
-    ExchangeCommand, ExchangeEvent, ExchangeHardwareEvent, ExchangeSession, ExchangeState,
-    ManualConfirmationVerifier,
+    ExchangeEvent, ExchangeSession, ExchangeState, ManualConfirmationVerifier,
 };
 use vauchi_core::identity::Identity;
+use vauchi_core::{Command, Event};
 
 // −− Helpers −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
@@ -60,7 +60,7 @@ fn qr_full_round_trip_via_commands_and_events() {
     let alice_qr_data = alice_cmds
         .iter()
         .find_map(|c| match c {
-            ExchangeCommand::QrDisplay { data } => Some(data.clone()),
+            Command::QrDisplay { data } => Some(data.clone()),
             _ => None,
         })
         .expect("Alice should emit QrDisplay");
@@ -68,18 +68,18 @@ fn qr_full_round_trip_via_commands_and_events() {
     let bob_qr_data = bob_cmds
         .iter()
         .find_map(|c| match c {
-            ExchangeCommand::QrDisplay { data } => Some(data.clone()),
+            Command::QrDisplay { data } => Some(data.clone()),
             _ => None,
         })
         .expect("Bob should emit QrDisplay");
 
     // Alice scans Bob's QR
     alice
-        .apply_hardware_event(ExchangeHardwareEvent::QrScanned { data: bob_qr_data })
+        .apply_hardware_event(Event::QrScanned { data: bob_qr_data })
         .unwrap();
 
     // Bob scans Alice's QR
-    bob.apply_hardware_event(ExchangeHardwareEvent::QrScanned {
+    bob.apply_hardware_event(Event::QrScanned {
         data: alice_qr_data,
     })
     .unwrap();
@@ -113,7 +113,7 @@ fn nfc_full_round_trip_via_commands_and_events() {
         .drain_commands()
         .into_iter()
         .find_map(|c| match c {
-            ExchangeCommand::NfcActivate { payload } => Some(payload),
+            Command::NfcActivate { payload } => Some(payload),
             _ => None,
         })
         .expect("Alice should emit NfcActivate with payload");
@@ -122,7 +122,7 @@ fn nfc_full_round_trip_via_commands_and_events() {
         .drain_commands()
         .into_iter()
         .find_map(|c| match c {
-            ExchangeCommand::NfcActivate { payload } => Some(payload),
+            Command::NfcActivate { payload } => Some(payload),
             _ => None,
         })
         .expect("Bob should emit NfcActivate with payload");
@@ -138,11 +138,11 @@ fn nfc_full_round_trip_via_commands_and_events() {
 
     // Alice taps Bob (receives Bob's payload)
     alice
-        .apply_hardware_event(ExchangeHardwareEvent::NfcDataReceived { data: bob_payload })
+        .apply_hardware_event(Event::NfcDataReceived { data: bob_payload })
         .unwrap();
 
     // Bob taps Alice (receives Alice's payload)
-    bob.apply_hardware_event(ExchangeHardwareEvent::NfcDataReceived {
+    bob.apply_hardware_event(Event::NfcDataReceived {
         data: alice_payload,
     })
     .unwrap();
@@ -163,13 +163,11 @@ fn nfc_full_round_trip_via_commands_and_events() {
     assert!(
         alice_cmds
             .iter()
-            .any(|c| matches!(c, ExchangeCommand::NfcDeactivate)),
+            .any(|c| matches!(c, Command::NfcDeactivate)),
         "Alice should emit NfcDeactivate after tap"
     );
     assert!(
-        bob_cmds
-            .iter()
-            .any(|c| matches!(c, ExchangeCommand::NfcDeactivate)),
+        bob_cmds.iter().any(|c| matches!(c, Command::NfcDeactivate)),
         "Bob should emit NfcDeactivate after tap"
     );
 }
@@ -190,14 +188,14 @@ fn ble_to_qr_fallback_produces_working_qr_session() {
 
     // BLE unavailable -> should fall back to QR
     session
-        .apply_hardware_event(ExchangeHardwareEvent::HardwareUnavailable {
+        .apply_hardware_event(Event::HardwareUnavailable {
             transport: "BLE".into(),
         })
         .unwrap();
 
     let cmds = session.drain_commands();
     let qr_data = cmds.iter().find_map(|c| match c {
-        ExchangeCommand::QrDisplay { data } => Some(data.clone()),
+        Command::QrDisplay { data } => Some(data.clone()),
         _ => None,
     });
     assert!(
@@ -212,7 +210,7 @@ fn ble_to_qr_fallback_produces_working_qr_session() {
     // Another session should be able to scan this QR
     let mut bob = qr_session("Bob");
     bob.apply(ExchangeEvent::StartQR).unwrap();
-    bob.apply_hardware_event(ExchangeHardwareEvent::QrScanned { data: qr_str })
+    bob.apply_hardware_event(Event::QrScanned { data: qr_str })
         .unwrap();
     assert!(
         matches!(bob.state(), ExchangeState::PeerScanned { .. }),
@@ -230,7 +228,7 @@ fn qr_session_ignores_ble_events() {
 
     // BLE events on a QR session should not crash or change state
     session
-        .apply_hardware_event(ExchangeHardwareEvent::BleDeviceDiscovered {
+        .apply_hardware_event(Event::BleDeviceDiscovered {
             id: "rogue".into(),
             rssi: -80,
             adv_data: vec![],
@@ -250,7 +248,7 @@ fn nfc_session_ignores_ble_events() {
     let mut session = nfc_session("Alice");
 
     session
-        .apply_hardware_event(ExchangeHardwareEvent::BleConnected {
+        .apply_hardware_event(Event::BleConnected {
             device_id: "rogue".into(),
         })
         .unwrap();

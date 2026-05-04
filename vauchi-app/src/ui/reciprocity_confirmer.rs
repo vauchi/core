@@ -9,12 +9,12 @@
 //! failure or timeout), letting relay sync confirm later.
 //!
 //! Sub-component of `ExchangeEngine` (ADR-031). Not a standalone
-//! `WorkflowEngine` — it emits `ExchangeCommand`s and receives
-//! `ExchangeHardwareEvent`s via the engine.
+//! `WorkflowEngine` — it emits `Command`s and receives
+//! `Event`s via the engine.
 
 use serde::{Deserialize, Serialize};
-use vauchi_core::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
 use vauchi_core::exchange::reciprocity::Reciprocity;
+use vauchi_core::{Command, Event};
 use zeroize::Zeroize;
 
 /// Confirmation cascade level (Phase 1: escrow only).
@@ -105,7 +105,7 @@ impl ReciprocityConfirmer {
     }
 
     /// Returns initial commands to start the cascade.
-    pub fn start(&mut self) -> Vec<ExchangeCommand> {
+    pub fn start(&mut self) -> Vec<Command> {
         match self.level {
             CascadeLevel::RelayEscrow => {
                 if self.deposit_sent {
@@ -120,23 +120,19 @@ impl ReciprocityConfirmer {
     }
 
     /// Process a hardware event. Returns commands to emit.
-    pub fn handle_event(&mut self, event: &ExchangeHardwareEvent) -> Vec<ExchangeCommand> {
+    pub fn handle_event(&mut self, event: &Event) -> Vec<Command> {
         match event {
-            ExchangeHardwareEvent::RelayEscrowReady { gate_hash }
-                if *gate_hash == self.gate_bytes() =>
-            {
+            Event::RelayEscrowReady { gate_hash } if *gate_hash == self.gate_bytes() => {
                 // Gate has ≥2 deposits — retrieve their blob
                 vec![self.make_retrieve_command()]
             }
-            ExchangeHardwareEvent::RelayEscrowBlobReceived { gate_hash, blob }
+            Event::RelayEscrowBlobReceived { gate_hash, blob }
                 if *gate_hash == self.gate_bytes() =>
             {
                 self.handle_blob_received(blob);
                 Vec::new()
             }
-            ExchangeHardwareEvent::RelayEscrowFailed { gate_hash, .. }
-                if *gate_hash == self.gate_bytes() =>
-            {
+            Event::RelayEscrowFailed { gate_hash, .. } if *gate_hash == self.gate_bytes() => {
                 self.handle_escrow_failed()
             }
             _ => Vec::new(),
@@ -200,7 +196,7 @@ impl ReciprocityConfirmer {
         }
     }
 
-    fn handle_escrow_failed(&mut self) -> Vec<ExchangeCommand> {
+    fn handle_escrow_failed(&mut self) -> Vec<Command> {
         // Retry up to MAX_DEPOSIT_RETRIES on any escrow failure
         // (deposit rejected, poll timeout, network error).
         // deposit_sent is for crash recovery only (skip re-deposit on relaunch).
@@ -213,9 +209,9 @@ impl ReciprocityConfirmer {
         Vec::new()
     }
 
-    fn make_deposit_command(&mut self) -> ExchangeCommand {
+    fn make_deposit_command(&mut self) -> Command {
         self.deposit_sent = true;
-        ExchangeCommand::RelayEscrowDeposit {
+        Command::RelayEscrowDeposit {
             gate_hash: self.gate_bytes(),
             slot_hash: self.our_slot_bytes(),
             encrypted_card: self.our_token.to_vec(),
@@ -223,15 +219,15 @@ impl ReciprocityConfirmer {
         }
     }
 
-    fn make_check_command(&self) -> ExchangeCommand {
-        ExchangeCommand::RelayEscrowCheck {
+    fn make_check_command(&self) -> Command {
+        Command::RelayEscrowCheck {
             gate_hash: self.gate_bytes(),
             suggested_interval_ms: ESCROW_POLL_INTERVAL_MS,
         }
     }
 
-    fn make_retrieve_command(&self) -> ExchangeCommand {
-        ExchangeCommand::RelayEscrowRetrieve {
+    fn make_retrieve_command(&self) -> Command {
+        Command::RelayEscrowRetrieve {
             gate_hash: self.gate_bytes(),
             slot_hash: self.their_slot_bytes(),
         }

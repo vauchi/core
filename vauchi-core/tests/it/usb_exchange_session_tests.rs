@@ -13,12 +13,12 @@ use std::net::{TcpListener, TcpStream};
 use std::thread;
 
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::exchange::command::{ExchangeCommand, ExchangeHardwareEvent};
 use vauchi_core::exchange::session::{ExchangeEvent, ExchangeSession, ExchangeState};
 use vauchi_core::exchange::tcp_transport::TcpDirectTransport;
 use vauchi_core::exchange::{ManualConfirmationVerifier, ProximityConfidence, UsbRole};
 use vauchi_core::identity::Identity;
 use vauchi_core::types::ExchangeTransport;
+use vauchi_core::{Command, Event};
 
 fn create_identity(name: &str) -> Identity {
     Identity::create(name)
@@ -66,7 +66,7 @@ fn new_usb_session_emits_direct_send_command() {
 
     assert_eq!(commands.len(), 1, "should emit exactly one command");
     assert!(
-        matches!(&commands[0], ExchangeCommand::DirectSend { payload, is_initiator }
+        matches!(&commands[0], Command::DirectSend { payload, is_initiator }
             if !payload.is_empty() && *is_initiator),
         "should emit DirectSend with non-empty payload"
     );
@@ -103,11 +103,11 @@ fn full_usb_exchange_ceremony_via_commands() {
     let bob_commands = bob_session.drain_commands();
 
     let alice_payload = match &alice_commands[0] {
-        ExchangeCommand::DirectSend { payload, .. } => payload.clone(),
+        Command::DirectSend { payload, .. } => payload.clone(),
         other => panic!("expected DirectSend, got {:?}", other),
     };
     let bob_payload = match &bob_commands[0] {
-        ExchangeCommand::DirectSend { payload, .. } => payload.clone(),
+        Command::DirectSend { payload, .. } => payload.clone(),
         other => panic!("expected DirectSend, got {:?}", other),
     };
 
@@ -116,10 +116,10 @@ fn full_usb_exchange_ceremony_via_commands() {
 
     // Step 3: Frontend reports received payloads as hardware events
     alice_session
-        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: bob_payload })
+        .apply_hardware_event(Event::DirectPayloadReceived { data: bob_payload })
         .expect("alice process payload");
     bob_session
-        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
+        .apply_hardware_event(Event::DirectPayloadReceived {
             data: alice_payload,
         })
         .expect("bob process payload");
@@ -203,12 +203,11 @@ fn usb_self_exchange_is_rejected() {
     session2.emit_initial_commands();
     let commands = session2.drain_commands();
     let payload = match &commands[0] {
-        ExchangeCommand::DirectSend { payload, .. } => payload.clone(),
+        Command::DirectSend { payload, .. } => payload.clone(),
         other => panic!("expected DirectSend, got {:?}", other),
     };
 
-    let result = session1
-        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: payload });
+    let result = session1.apply_hardware_event(Event::DirectPayloadReceived { data: payload });
     assert!(result.is_err(), "Self-exchange should be rejected");
 }
 
@@ -225,7 +224,7 @@ fn usb_invalid_payload_is_rejected() {
         UsbRole::Initiator,
     );
 
-    let result = session.apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
+    let result = session.apply_hardware_event(Event::DirectPayloadReceived {
         data: b"garbage-not-a-valid-qr-payload".to_vec(),
     });
     assert!(result.is_err(), "Invalid payload should be rejected");
@@ -254,20 +253,19 @@ fn usb_direct_payload_in_wrong_state_is_rejected() {
 
     bob_session.emit_initial_commands();
     let bob_payload = match &bob_session.drain_commands()[0] {
-        ExchangeCommand::DirectSend { payload, .. } => payload.clone(),
+        Command::DirectSend { payload, .. } => payload.clone(),
         other => panic!("expected DirectSend, got {:?}", other),
     };
 
     // Process payload once (valid)
     session
-        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
+        .apply_hardware_event(Event::DirectPayloadReceived {
             data: bob_payload.clone(),
         })
         .expect("first process should succeed");
 
     // Try to process again (wrong state — now in AwaitingKeyAgreement)
-    let result = session
-        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: bob_payload });
+    let result = session.apply_hardware_event(Event::DirectPayloadReceived { data: bob_payload });
     assert!(
         result.is_err(),
         "Should reject DirectPayloadReceived in AwaitingKeyAgreement state"
@@ -293,7 +291,7 @@ fn usb_initiator_emits_is_initiator_true() {
 
     assert_eq!(commands.len(), 1, "should emit exactly one command");
     match &commands[0] {
-        ExchangeCommand::DirectSend { is_initiator, .. } => {
+        Command::DirectSend { is_initiator, .. } => {
             assert!(*is_initiator, "Initiator role must set is_initiator: true");
         }
         other => panic!("expected DirectSend, got {:?}", other),
@@ -317,7 +315,7 @@ fn usb_responder_emits_is_initiator_false() {
 
     assert_eq!(commands.len(), 1, "should emit exactly one command");
     match &commands[0] {
-        ExchangeCommand::DirectSend { is_initiator, .. } => {
+        Command::DirectSend { is_initiator, .. } => {
             assert!(
                 !*is_initiator,
                 "Responder role must set is_initiator: false"
@@ -357,14 +355,14 @@ fn full_usb_exchange_over_tcp_loopback() {
 
     // Extract payloads and initiator flags
     let (alice_payload, alice_init) = match &alice_cmds[0] {
-        ExchangeCommand::DirectSend {
+        Command::DirectSend {
             payload,
             is_initiator,
         } => (payload.clone(), *is_initiator),
         other => panic!("expected DirectSend from alice, got {:?}", other),
     };
     let (bob_payload, bob_init) = match &bob_cmds[0] {
-        ExchangeCommand::DirectSend {
+        Command::DirectSend {
             payload,
             is_initiator,
         } => (payload.clone(), *is_initiator),
@@ -394,10 +392,10 @@ fn full_usb_exchange_over_tcp_loopback() {
 
     // Feed received payloads back to sessions
     alice_session
-        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: bob_received })
+        .apply_hardware_event(Event::DirectPayloadReceived { data: bob_received })
         .expect("alice processes bob payload");
     bob_session
-        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived {
+        .apply_hardware_event(Event::DirectPayloadReceived {
             data: alice_received,
         })
         .expect("bob processes alice payload");
@@ -462,12 +460,11 @@ fn usb_direct_payload_on_qr_session_is_rejected() {
 
     bob_session.emit_initial_commands();
     let bob_payload = match &bob_session.drain_commands()[0] {
-        ExchangeCommand::DirectSend { payload, .. } => payload.clone(),
+        Command::DirectSend { payload, .. } => payload.clone(),
         other => panic!("expected DirectSend, got {:?}", other),
     };
 
-    let result = session
-        .apply_hardware_event(ExchangeHardwareEvent::DirectPayloadReceived { data: bob_payload });
+    let result = session.apply_hardware_event(Event::DirectPayloadReceived { data: bob_payload });
     assert!(
         result.is_err(),
         "DirectPayloadReceived should be rejected on QR session"

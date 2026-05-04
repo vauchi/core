@@ -92,8 +92,8 @@ pub use domain_command::{DomainCommand, DomainCommandResult};
 use error::lock_or;
 pub use error::{KeychainError, MobileError};
 pub use exchange::{
-    MobileBleExchangeStatus, MobileExchangeCommand, MobileExchangeHardwareEvent,
-    MobileExchangeSession, MobileExchangeState, MobileProximityHandler, create_qr_exchange_manual,
+    MobileBleExchangeStatus, MobileCommand, MobileEvent, MobileExchangeSession,
+    MobileExchangeState, MobileProximityHandler, create_qr_exchange_manual,
     create_qr_exchange_proximity,
 };
 pub use link_responder_session::{

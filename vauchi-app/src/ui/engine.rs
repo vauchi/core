@@ -6,7 +6,7 @@ use std::any::Any;
 
 use super::{ActionResult, ScreenModel, UserAction};
 use crate::notification_types::PendingNotification;
-use vauchi_core::Event;
+use vauchi_core::{Command, Event};
 
 /// Trait that all core-driven workflows implement.
 ///
@@ -69,6 +69,34 @@ pub trait WorkflowEngine: Send {
     /// to cycle the V6 frames for reliable 240p-camera decode.
     fn advance_qr_frame(&mut self) -> Option<ScreenModel> {
         None
+    }
+
+    /// Screen-presentation [`Command`]s emitted when this engine becomes
+    /// the active one (ADR-031 §Hardware, Phase 2b of
+    /// `2026-05-04-exchange-command-screen-presentation`).
+    ///
+    /// `AppEngine` calls this immediately after switching to the engine in
+    /// `navigate_to_internal` / `navigate_back`. The returned commands
+    /// reach the frontend via the same dispatch path as
+    /// `ActionResult::Commands`. Engines whose screen is content with the
+    /// platform default (no brightness override, normal idle behaviour,
+    /// no orientation lock) inherit the empty default. Engines that need
+    /// specific presentation (e.g. exchange flows that dim the screen
+    /// and disable the idle timer) override this to declare the entry
+    /// preferences.
+    ///
+    /// Symmetric counterpart: [`Self::screen_exited`] runs when the
+    /// engine ceases to be active and typically restores defaults
+    /// (`Command::SetScreenBrightness { level: None }`,
+    /// `Command::SetIdleTimerDisabled { disabled: false }`).
+    fn screen_entered(&mut self) -> Vec<Command> {
+        Vec::new()
+    }
+
+    /// Screen-presentation [`Command`]s emitted when this engine stops
+    /// being active. Pair with [`Self::screen_entered`].
+    fn screen_exited(&mut self) -> Vec<Command> {
+        Vec::new()
     }
 
     /// Downcast to concrete type for AppEngine-level interception.

@@ -579,6 +579,32 @@ impl WorkflowEngine for MultiStageExchangeEngine {
     fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
         Some(self)
     }
+
+    /// 65% brightness keeps the front camera from over-exposing while
+    /// scanning the peer's QR (mirror of the prior frontend-side
+    /// `UIScreen.main.brightness = 0.65` / Android
+    /// `Window.attributes.screenBrightness = 0.65f`). The idle timer
+    /// is disabled so a longer-than-30s handshake does not auto-lock.
+    /// Phase 2b of `2026-05-04-exchange-command-screen-presentation`.
+    fn screen_entered(&mut self) -> Vec<vauchi_core::Command> {
+        vec![
+            vauchi_core::Command::SetScreenBrightness { level: Some(0.65) },
+            vauchi_core::Command::SetIdleTimerDisabled { disabled: true },
+        ]
+    }
+
+    /// Symmetric counterpart to [`Self::screen_entered`]: restore the
+    /// platform-default brightness (`level: None`) and re-enable the
+    /// idle timer. The frontend's `Command` handler is responsible for
+    /// snapshotting the prior brightness on the first `Some(level)` so
+    /// the subsequent `None` correctly restores it (see
+    /// `ios/Vauchi/Services/CommandHandler.swift::savedBrightness`).
+    fn screen_exited(&mut self) -> Vec<vauchi_core::Command> {
+        vec![
+            vauchi_core::Command::SetScreenBrightness { level: None },
+            vauchi_core::Command::SetIdleTimerDisabled { disabled: false },
+        ]
+    }
 }
 
 // INLINE_TEST_REQUIRED: covers private build_screen branches per
@@ -1147,5 +1173,39 @@ mod tests {
             }
             _ => unreachable!(),
         }
+    }
+
+    // ── Screen-presentation lifecycle (Phase 2b) ─────────────────────
+
+    // @scenario: exchange.feature :: Multi-stage exchange dims screen and disables idle timer on entry
+    #[test]
+    fn screen_entered_emits_brightness_065_and_idle_timer_disabled() {
+        use vauchi_core::Command;
+        let mut engine = MultiStageExchangeEngine::new();
+        let commands = engine.screen_entered();
+        assert_eq!(
+            commands,
+            vec![
+                Command::SetScreenBrightness { level: Some(0.65) },
+                Command::SetIdleTimerDisabled { disabled: true },
+            ],
+            "screen_entered must dim brightness to 65% and disable idle timer for QR contrast"
+        );
+    }
+
+    // @scenario: exchange.feature :: Multi-stage exchange restores presentation defaults on exit
+    #[test]
+    fn screen_exited_emits_brightness_none_and_idle_timer_enabled() {
+        use vauchi_core::Command;
+        let mut engine = MultiStageExchangeEngine::new();
+        let commands = engine.screen_exited();
+        assert_eq!(
+            commands,
+            vec![
+                Command::SetScreenBrightness { level: None },
+                Command::SetIdleTimerDisabled { disabled: false },
+            ],
+            "screen_exited must restore platform-default brightness and re-enable idle timer"
+        );
     }
 }

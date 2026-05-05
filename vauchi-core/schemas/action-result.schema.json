@@ -658,6 +658,572 @@
         }
       }
     },
+    "Command": {
+      "description": "A command from core to the frontend requesting a hardware action.\n\nFrontends match on these and dispatch to platform-specific APIs (camera, BLE stack, NFC reader, audio subsystem). Commands that the platform cannot fulfil should be answered with [`Event::HardwareUnavailable`].",
+      "oneOf": [
+        {
+          "description": "Display a QR code containing `data`.",
+          "type": "object",
+          "required": [
+            "QrDisplay"
+          ],
+          "properties": {
+            "QrDisplay": {
+              "type": "object",
+              "required": [
+                "data"
+              ],
+              "properties": {
+                "data": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Request the frontend to open a QR scanner (camera).",
+          "type": "string",
+          "enum": [
+            "QrRequestScan"
+          ]
+        },
+        {
+          "description": "Start advertising the vauchi BLE service with the given payload.",
+          "type": "object",
+          "required": [
+            "BleStartAdvertising"
+          ],
+          "properties": {
+            "BleStartAdvertising": {
+              "type": "object",
+              "required": [
+                "payload",
+                "service_uuid"
+              ],
+              "properties": {
+                "payload": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "service_uuid": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Start scanning for vauchi BLE peripherals.",
+          "type": "object",
+          "required": [
+            "BleStartScanning"
+          ],
+          "properties": {
+            "BleStartScanning": {
+              "type": "object",
+              "required": [
+                "service_uuid"
+              ],
+              "properties": {
+                "service_uuid": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Connect to a discovered BLE device.",
+          "type": "object",
+          "required": [
+            "BleConnect"
+          ],
+          "properties": {
+            "BleConnect": {
+              "type": "object",
+              "required": [
+                "device_id"
+              ],
+              "properties": {
+                "device_id": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Write data to a BLE characteristic.",
+          "type": "object",
+          "required": [
+            "BleWriteCharacteristic"
+          ],
+          "properties": {
+            "BleWriteCharacteristic": {
+              "type": "object",
+              "required": [
+                "data",
+                "uuid"
+              ],
+              "properties": {
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Read data from a BLE characteristic.",
+          "type": "object",
+          "required": [
+            "BleReadCharacteristic"
+          ],
+          "properties": {
+            "BleReadCharacteristic": {
+              "type": "object",
+              "required": [
+                "uuid"
+              ],
+              "properties": {
+                "uuid": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Disconnect from the current BLE peer.",
+          "type": "string",
+          "enum": [
+            "BleDisconnect"
+          ]
+        },
+        {
+          "description": "Activate the NFC interface and prepare to exchange `payload`.",
+          "type": "object",
+          "required": [
+            "NfcActivate"
+          ],
+          "properties": {
+            "NfcActivate": {
+              "type": "object",
+              "required": [
+                "payload"
+              ],
+              "properties": {
+                "payload": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Deactivate the NFC interface.",
+          "type": "string",
+          "enum": [
+            "NfcDeactivate"
+          ]
+        },
+        {
+          "description": "Emit ultrasonic PCM samples encoding a challenge.\n\nCore has already FSK-encoded the challenge bytes; the frontend just plays the samples through the device speaker. Mono float PCM at `sample_rate`.",
+          "type": "object",
+          "required": [
+            "AudioEmitChallenge"
+          ],
+          "properties": {
+            "AudioEmitChallenge": {
+              "type": "object",
+              "required": [
+                "sample_rate",
+                "samples"
+              ],
+              "properties": {
+                "sample_rate": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                },
+                "samples": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "format": "float"
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Listen for an ultrasonic response within `timeout_ms`.\n\n`sample_rate` is the suggested capture rate; if the device's preferred rate differs, the frontend reports its actual rate in [`Event::AudioSamplesRecorded`].",
+          "type": "object",
+          "required": [
+            "AudioListenForResponse"
+          ],
+          "properties": {
+            "AudioListenForResponse": {
+              "type": "object",
+              "required": [
+                "sample_rate",
+                "timeout_ms"
+              ],
+              "properties": {
+                "sample_rate": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Stop all audio operations.",
+          "type": "string",
+          "enum": [
+            "AudioStop"
+          ]
+        },
+        {
+          "description": "Start accelerometer sampling for proximity verification.",
+          "type": "string",
+          "enum": [
+            "AccelerometerStart"
+          ]
+        },
+        {
+          "description": "Stop accelerometer sampling.",
+          "type": "string",
+          "enum": [
+            "AccelerometerStop"
+          ]
+        },
+        {
+          "description": "Deposit encrypted card into relay escrow gate.",
+          "type": "object",
+          "required": [
+            "RelayEscrowDeposit"
+          ],
+          "properties": {
+            "RelayEscrowDeposit": {
+              "type": "object",
+              "required": [
+                "encrypted_card",
+                "gate_hash",
+                "slot_hash",
+                "ttl_seconds"
+              ],
+              "properties": {
+                "encrypted_card": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "gate_hash": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "slot_hash": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "ttl_seconds": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Check relay escrow gate readiness (poll until ready).\n\nFrontends should poll at `suggested_interval_ms` with exponential backoff (cap at 5 min). Report `RelayEscrowReady` when gate has ≥2 deposits, or `RelayEscrowFailed` on error/timeout.",
+          "type": "object",
+          "required": [
+            "RelayEscrowCheck"
+          ],
+          "properties": {
+            "RelayEscrowCheck": {
+              "type": "object",
+              "required": [
+                "gate_hash",
+                "suggested_interval_ms"
+              ],
+              "properties": {
+                "gate_hash": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "suggested_interval_ms": {
+                  "description": "Suggested initial polling interval in milliseconds.",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Retrieve blob from relay escrow gate.",
+          "type": "object",
+          "required": [
+            "RelayEscrowRetrieve"
+          ],
+          "properties": {
+            "RelayEscrowRetrieve": {
+              "type": "object",
+              "required": [
+                "gate_hash",
+                "slot_hash"
+              ],
+              "properties": {
+                "gate_hash": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                },
+                "slot_hash": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Show system share sheet with a URL.",
+          "type": "object",
+          "required": [
+            "ShowShareSheet"
+          ],
+          "properties": {
+            "ShowShareSheet": {
+              "type": "object",
+              "required": [
+                "url"
+              ],
+              "properties": {
+                "url": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Stop BLE scanning (saves battery after discovery completes).",
+          "type": "string",
+          "enum": [
+            "BleStopScanning"
+          ]
+        },
+        {
+          "description": "Send an exchange payload over a direct transport (USB cable / local TCP).\n\nThe frontend should: 1. Send `payload` to the peer over the established TCP connection 2. Receive the peer's payload from the same connection 3. Report the peer's data via [`Event::DirectPayloadReceived`]\n\nThe `is_initiator` flag determines send/recv ordering to avoid deadlock (initiator sends first, responder receives first).",
+          "type": "object",
+          "required": [
+            "DirectSend"
+          ],
+          "properties": {
+            "DirectSend": {
+              "type": "object",
+              "required": [
+                "is_initiator",
+                "payload"
+              ],
+              "properties": {
+                "is_initiator": {
+                  "type": "boolean"
+                },
+                "payload": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8",
+                    "minimum": 0.0
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Request the frontend to open the device photo library / gallery.\n\nFrontend should return [`Event::ImageReceived`] with the selected image bytes, or [`Event::ImagePickCancelled`] if the user dismisses the picker.",
+          "type": "string",
+          "enum": [
+            "ImagePickFromLibrary"
+          ]
+        },
+        {
+          "description": "Request the frontend to capture an image from the device camera.\n\nFrontend should return [`Event::ImageReceived`] with the captured image bytes, or [`Event::ImagePickCancelled`] if the user cancels.",
+          "type": "string",
+          "enum": [
+            "ImageCaptureFromCamera"
+          ]
+        },
+        {
+          "description": "Request the frontend to open a file picker for image files.\n\nUsed on desktop platforms where a photo library may not exist. Frontend should return [`Event::ImageReceived`] with the selected image bytes, or [`Event::ImagePickCancelled`] if the user cancels.",
+          "type": "string",
+          "enum": [
+            "ImagePickFromFile"
+          ]
+        },
+        {
+          "description": "Switch the active camera between front- and rear-facing.\n\nUsed by the multi-stage face-to-face exchange screen so the user can flip the scanner orientation without the frontend owning the preference. `use_front == true` selects the front camera.",
+          "type": "object",
+          "required": [
+            "SwitchCamera"
+          ],
+          "properties": {
+            "SwitchCamera": {
+              "type": "object",
+              "required": [
+                "use_front"
+              ],
+              "properties": {
+                "use_front": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Request the frontend to open a file picker.\n\n`accepted_mime_types` is advisory — frontends may default to a coarser superset on platforms where the OS picker doesn't filter by MIME (e.g., older Android versions). `purpose` lets the frontend label the picker dialog without hardcoding strings; label text comes from core's locale store via `t(key)`.\n\nFrontend should return [`Event::FilePickedFromUser`] with the selected file's bytes, or [`Event::FilePickCancelledByUser`] if the user dismisses the picker.\n\nDistinct from [`Command::ImagePickFromFile`]: that variant returns [`Event::ImageReceived`] which is shaped for avatar normalization. File picking returns raw bytes plus filename for arbitrary payloads (vCard, encrypted backup blob, future key bundles, etc.).",
+          "type": "object",
+          "required": [
+            "FilePickFromUser"
+          ],
+          "properties": {
+            "FilePickFromUser": {
+              "type": "object",
+              "required": [
+                "accepted_mime_types",
+                "purpose"
+              ],
+              "properties": {
+                "accepted_mime_types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "purpose": {
+                  "$ref": "#/definitions/FilePickPurpose"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Set the device screen brightness, optionally restoring the platform default when `level` is `None`.\n\nUsed by screens that need a specific brightness for their hardware to function (e.g., the multi-stage face-to-face exchange uses 65% brightness so the front camera is not over-exposed when scanning a peer's QR). The frontend is responsible for snapshotting the prior value on the *first* `Some(level)` after a `None` (or app start) so the subsequent `None` correctly restores it.\n\nFrontends that have no programmatic brightness control (e.g., desktop, where the OS owns it) answer with [`Event::HardwareUnavailable { transport: \"screen_brightness\" }`] — core should treat that as \"request honoured at platform default\" and not retry.\n\nPer `2026-05-01-screen-id-metadata-in-core` cousin `2026-05-04-exchange-command-screen-presentation`, ADR-031 §Hardware. Phase 1 of the FaceToFaceExchangeView retirement.",
+          "type": "object",
+          "required": [
+            "SetScreenBrightness"
+          ],
+          "properties": {
+            "SetScreenBrightness": {
+              "type": "object",
+              "properties": {
+                "level": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "format": "float"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Disable or re-enable the platform's idle / auto-lock timer.\n\n`disabled = true` keeps the screen awake (used by the multi-stage exchange so a longer-than-30s handshake doesn't trigger the device's auto-lock). `disabled = false` restores the platform default on screen exit. Idempotent — frontends MAY ignore a redundant set/clear.\n\nFrontends that have no programmatic idle-timer control answer with [`Event::HardwareUnavailable { transport: \"idle_timer\" }`].\n\nPhase 1 of the FaceToFaceExchangeView retirement (companion to [`Command::SetScreenBrightness`]).",
+          "type": "object",
+          "required": [
+            "SetIdleTimerDisabled"
+          ],
+          "properties": {
+            "SetIdleTimerDisabled": {
+              "type": "object",
+              "required": [
+                "disabled"
+              ],
+              "properties": {
+                "disabled": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
     "Component": {
       "description": "A UI component that core tells frontends to render.",
       "oneOf": [
@@ -1643,572 +2209,6 @@
           "type": "string"
         }
       }
-    },
-    "Command": {
-      "description": "A command from core to the frontend requesting a hardware action.\n\nFrontends match on these and dispatch to platform-specific APIs (camera, BLE stack, NFC reader, audio subsystem). Commands that the platform cannot fulfil should be answered with [`Event::HardwareUnavailable`].",
-      "oneOf": [
-        {
-          "description": "Display a QR code containing `data`.",
-          "type": "object",
-          "required": [
-            "QrDisplay"
-          ],
-          "properties": {
-            "QrDisplay": {
-              "type": "object",
-              "required": [
-                "data"
-              ],
-              "properties": {
-                "data": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Request the frontend to open a QR scanner (camera).",
-          "type": "string",
-          "enum": [
-            "QrRequestScan"
-          ]
-        },
-        {
-          "description": "Start advertising the vauchi BLE service with the given payload.",
-          "type": "object",
-          "required": [
-            "BleStartAdvertising"
-          ],
-          "properties": {
-            "BleStartAdvertising": {
-              "type": "object",
-              "required": [
-                "payload",
-                "service_uuid"
-              ],
-              "properties": {
-                "payload": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "format": "uint8",
-                    "minimum": 0.0
-                  }
-                },
-                "service_uuid": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Start scanning for vauchi BLE peripherals.",
-          "type": "object",
-          "required": [
-            "BleStartScanning"
-          ],
-          "properties": {
-            "BleStartScanning": {
-              "type": "object",
-              "required": [
-                "service_uuid"
-              ],
-              "properties": {
-                "service_uuid": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Connect to a discovered BLE device.",
-          "type": "object",
-          "required": [
-            "BleConnect"
-          ],
-          "properties": {
-            "BleConnect": {
-              "type": "object",
-              "required": [
-                "device_id"
-              ],
-              "properties": {
-                "device_id": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Write data to a BLE characteristic.",
-          "type": "object",
-          "required": [
-            "BleWriteCharacteristic"
-          ],
-          "properties": {
-            "BleWriteCharacteristic": {
-              "type": "object",
-              "required": [
-                "data",
-                "uuid"
-              ],
-              "properties": {
-                "data": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "format": "uint8",
-                    "minimum": 0.0
-                  }
-                },
-                "uuid": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Read data from a BLE characteristic.",
-          "type": "object",
-          "required": [
-            "BleReadCharacteristic"
-          ],
-          "properties": {
-            "BleReadCharacteristic": {
-              "type": "object",
-              "required": [
-                "uuid"
-              ],
-              "properties": {
-                "uuid": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Disconnect from the current BLE peer.",
-          "type": "string",
-          "enum": [
-            "BleDisconnect"
-          ]
-        },
-        {
-          "description": "Activate the NFC interface and prepare to exchange `payload`.",
-          "type": "object",
-          "required": [
-            "NfcActivate"
-          ],
-          "properties": {
-            "NfcActivate": {
-              "type": "object",
-              "required": [
-                "payload"
-              ],
-              "properties": {
-                "payload": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "format": "uint8",
-                    "minimum": 0.0
-                  }
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Deactivate the NFC interface.",
-          "type": "string",
-          "enum": [
-            "NfcDeactivate"
-          ]
-        },
-        {
-          "description": "Emit ultrasonic PCM samples encoding a challenge.\n\nCore has already FSK-encoded the challenge bytes; the frontend just plays the samples through the device speaker. Mono float PCM at `sample_rate`.",
-          "type": "object",
-          "required": [
-            "AudioEmitChallenge"
-          ],
-          "properties": {
-            "AudioEmitChallenge": {
-              "type": "object",
-              "required": [
-                "sample_rate",
-                "samples"
-              ],
-              "properties": {
-                "sample_rate": {
-                  "type": "integer",
-                  "format": "uint32",
-                  "minimum": 0.0
-                },
-                "samples": {
-                  "type": "array",
-                  "items": {
-                    "type": "number",
-                    "format": "float"
-                  }
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Listen for an ultrasonic response within `timeout_ms`.\n\n`sample_rate` is the suggested capture rate; if the device's preferred rate differs, the frontend reports its actual rate in [`Event::AudioSamplesRecorded`].",
-          "type": "object",
-          "required": [
-            "AudioListenForResponse"
-          ],
-          "properties": {
-            "AudioListenForResponse": {
-              "type": "object",
-              "required": [
-                "sample_rate",
-                "timeout_ms"
-              ],
-              "properties": {
-                "sample_rate": {
-                  "type": "integer",
-                  "format": "uint32",
-                  "minimum": 0.0
-                },
-                "timeout_ms": {
-                  "type": "integer",
-                  "format": "uint64",
-                  "minimum": 0.0
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Stop all audio operations.",
-          "type": "string",
-          "enum": [
-            "AudioStop"
-          ]
-        },
-        {
-          "description": "Start accelerometer sampling for proximity verification.",
-          "type": "string",
-          "enum": [
-            "AccelerometerStart"
-          ]
-        },
-        {
-          "description": "Stop accelerometer sampling.",
-          "type": "string",
-          "enum": [
-            "AccelerometerStop"
-          ]
-        },
-        {
-          "description": "Deposit encrypted card into relay escrow gate.",
-          "type": "object",
-          "required": [
-            "RelayEscrowDeposit"
-          ],
-          "properties": {
-            "RelayEscrowDeposit": {
-              "type": "object",
-              "required": [
-                "encrypted_card",
-                "gate_hash",
-                "slot_hash",
-                "ttl_seconds"
-              ],
-              "properties": {
-                "encrypted_card": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "format": "uint8",
-                    "minimum": 0.0
-                  }
-                },
-                "gate_hash": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "format": "uint8",
-                    "minimum": 0.0
-                  }
-                },
-                "slot_hash": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "format": "uint8",
-                    "minimum": 0.0
-                  }
-                },
-                "ttl_seconds": {
-                  "type": "integer",
-                  "format": "uint32",
-                  "minimum": 0.0
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Check relay escrow gate readiness (poll until ready).\n\nFrontends should poll at `suggested_interval_ms` with exponential backoff (cap at 5 min). Report `RelayEscrowReady` when gate has ≥2 deposits, or `RelayEscrowFailed` on error/timeout.",
-          "type": "object",
-          "required": [
-            "RelayEscrowCheck"
-          ],
-          "properties": {
-            "RelayEscrowCheck": {
-              "type": "object",
-              "required": [
-                "gate_hash",
-                "suggested_interval_ms"
-              ],
-              "properties": {
-                "gate_hash": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "format": "uint8",
-                    "minimum": 0.0
-                  }
-                },
-                "suggested_interval_ms": {
-                  "description": "Suggested initial polling interval in milliseconds.",
-                  "type": "integer",
-                  "format": "uint32",
-                  "minimum": 0.0
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Retrieve blob from relay escrow gate.",
-          "type": "object",
-          "required": [
-            "RelayEscrowRetrieve"
-          ],
-          "properties": {
-            "RelayEscrowRetrieve": {
-              "type": "object",
-              "required": [
-                "gate_hash",
-                "slot_hash"
-              ],
-              "properties": {
-                "gate_hash": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "format": "uint8",
-                    "minimum": 0.0
-                  }
-                },
-                "slot_hash": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "format": "uint8",
-                    "minimum": 0.0
-                  }
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Show system share sheet with a URL.",
-          "type": "object",
-          "required": [
-            "ShowShareSheet"
-          ],
-          "properties": {
-            "ShowShareSheet": {
-              "type": "object",
-              "required": [
-                "url"
-              ],
-              "properties": {
-                "url": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Stop BLE scanning (saves battery after discovery completes).",
-          "type": "string",
-          "enum": [
-            "BleStopScanning"
-          ]
-        },
-        {
-          "description": "Send an exchange payload over a direct transport (USB cable / local TCP).\n\nThe frontend should: 1. Send `payload` to the peer over the established TCP connection 2. Receive the peer's payload from the same connection 3. Report the peer's data via [`Event::DirectPayloadReceived`]\n\nThe `is_initiator` flag determines send/recv ordering to avoid deadlock (initiator sends first, responder receives first).",
-          "type": "object",
-          "required": [
-            "DirectSend"
-          ],
-          "properties": {
-            "DirectSend": {
-              "type": "object",
-              "required": [
-                "is_initiator",
-                "payload"
-              ],
-              "properties": {
-                "is_initiator": {
-                  "type": "boolean"
-                },
-                "payload": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "format": "uint8",
-                    "minimum": 0.0
-                  }
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Request the frontend to open the device photo library / gallery.\n\nFrontend should return [`Event::ImageReceived`] with the selected image bytes, or [`Event::ImagePickCancelled`] if the user dismisses the picker.",
-          "type": "string",
-          "enum": [
-            "ImagePickFromLibrary"
-          ]
-        },
-        {
-          "description": "Request the frontend to capture an image from the device camera.\n\nFrontend should return [`Event::ImageReceived`] with the captured image bytes, or [`Event::ImagePickCancelled`] if the user cancels.",
-          "type": "string",
-          "enum": [
-            "ImageCaptureFromCamera"
-          ]
-        },
-        {
-          "description": "Request the frontend to open a file picker for image files.\n\nUsed on desktop platforms where a photo library may not exist. Frontend should return [`Event::ImageReceived`] with the selected image bytes, or [`Event::ImagePickCancelled`] if the user cancels.",
-          "type": "string",
-          "enum": [
-            "ImagePickFromFile"
-          ]
-        },
-        {
-          "description": "Switch the active camera between front- and rear-facing.\n\nUsed by the multi-stage face-to-face exchange screen so the user can flip the scanner orientation without the frontend owning the preference. `use_front == true` selects the front camera.",
-          "type": "object",
-          "required": [
-            "SwitchCamera"
-          ],
-          "properties": {
-            "SwitchCamera": {
-              "type": "object",
-              "required": [
-                "use_front"
-              ],
-              "properties": {
-                "use_front": {
-                  "type": "boolean"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Request the frontend to open a file picker.\n\n`accepted_mime_types` is advisory — frontends may default to a coarser superset on platforms where the OS picker doesn't filter by MIME (e.g., older Android versions). `purpose` lets the frontend label the picker dialog without hardcoding strings; label text comes from core's locale store via `t(key)`.\n\nFrontend should return [`Event::FilePickedFromUser`] with the selected file's bytes, or [`Event::FilePickCancelledByUser`] if the user dismisses the picker.\n\nDistinct from [`Command::ImagePickFromFile`]: that variant returns [`Event::ImageReceived`] which is shaped for avatar normalization. File picking returns raw bytes plus filename for arbitrary payloads (vCard, encrypted backup blob, future key bundles, etc.).",
-          "type": "object",
-          "required": [
-            "FilePickFromUser"
-          ],
-          "properties": {
-            "FilePickFromUser": {
-              "type": "object",
-              "required": [
-                "accepted_mime_types",
-                "purpose"
-              ],
-              "properties": {
-                "accepted_mime_types": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "purpose": {
-                  "$ref": "#/definitions/FilePickPurpose"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Set the device screen brightness, optionally restoring the platform default when `level` is `None`.\n\nUsed by screens that need a specific brightness for their hardware to function (e.g., the multi-stage face-to-face exchange uses 65% brightness so the front camera is not over-exposed when scanning a peer's QR). The frontend is responsible for snapshotting the prior value on the *first* `Some(level)` after a `None` (or app start) so the subsequent `None` correctly restores it.\n\nFrontends that have no programmatic brightness control (e.g., desktop, where the OS owns it) answer with [`Event::HardwareUnavailable { transport: \"screen_brightness\" }`] — core should treat that as \"request honoured at platform default\" and not retry.\n\nPer `2026-05-01-screen-id-metadata-in-core` cousin `2026-05-04-exchange-command-screen-presentation`, ADR-031 §Hardware. Phase 1 of the FaceToFaceExchangeView retirement.",
-          "type": "object",
-          "required": [
-            "SetScreenBrightness"
-          ],
-          "properties": {
-            "SetScreenBrightness": {
-              "type": "object",
-              "properties": {
-                "level": {
-                  "type": [
-                    "number",
-                    "null"
-                  ],
-                  "format": "float"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "Disable or re-enable the platform's idle / auto-lock timer.\n\n`disabled = true` keeps the screen awake (used by the multi-stage exchange so a longer-than-30s handshake doesn't trigger the device's auto-lock). `disabled = false` restores the platform default on screen exit. Idempotent — frontends MAY ignore a redundant set/clear.\n\nFrontends that have no programmatic idle-timer control answer with [`Event::HardwareUnavailable { transport: \"idle_timer\" }`].\n\nPhase 1 of the FaceToFaceExchangeView retirement (companion to [`Command::SetScreenBrightness`]).",
-          "type": "object",
-          "required": [
-            "SetIdleTimerDisabled"
-          ],
-          "properties": {
-            "SetIdleTimerDisabled": {
-              "type": "object",
-              "required": [
-                "disabled"
-              ],
-              "properties": {
-                "disabled": {
-                  "type": "boolean"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        }
-      ]
     },
     "Field": {
       "description": "A contact field as displayed in the UI.",

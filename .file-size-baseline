@@ -92,7 +92,7 @@ vauchi-core/src/storage/mod.rs 1079
 #   problem 2026-05-01-android-humble-ui-deep-retirement Phase 2a/A3a)
 # (+10 on screens.rs for AppScreen::DecoyContacts engine factory,
 #   problem 2026-05-01-android-humble-ui-deep-retirement Phase 2c)
-vauchi-app/src/ui/app_engine/mod.rs 1182
+vauchi-app/src/ui/app_engine/mod.rs 1200
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -139,7 +139,7 @@ vauchi-app/src/ui/exchange_ble.rs 1057
 # (+7 for pub PEER_SCAN_COMPONENT_ID re-export + doc comment so the
 #  platform layer can route TextChanged from the QR scanner Component
 #  into the cycle-thread session — Pair 4 frontend wiring 2026-04-28)
-vauchi-app/src/ui/multi_stage_exchange.rs 1158
+vauchi-app/src/ui/multi_stage_exchange.rs 1211
 
 # EXEMPT — UniFFI facade growth: PlatformAppEngine wraps the full
 # AppEngine surface JSON-side and now also owns the Pair 4
@@ -284,7 +284,7 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1158
 # (+20 lines for cancel-session-first guard in `apply_multi_stage_*_for_test`
 #  bridges — fixes flaky `apply_multi_stage_state_finalized_with_session_ended`
 #  caused by cycle-thread racing the test's manual state pushes.)
-vauchi-platform/src/platform_app_engine.rs 4965
+vauchi-platform/src/platform_app_engine.rs 4979
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding

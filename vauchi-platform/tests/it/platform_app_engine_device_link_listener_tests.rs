@@ -201,7 +201,8 @@ fn confirm_manual_action_emits_typed_action_result_json() {
     let parsed: serde_json::Value =
         serde_json::from_str(&result_json).expect("parse action result");
     let confirm = parsed
-        .get("DeviceLinkConfirmManual")
+        .get("action_result")
+        .and_then(|r| r.get("DeviceLinkConfirmManual"))
         .expect("DeviceLinkConfirmManual variant");
     assert_eq!(confirm.get("code").and_then(|c| c.as_str()), Some("654321"));
     // Engine has advanced to Completing.
@@ -223,7 +224,8 @@ fn deny_action_emits_device_link_deny_json() {
     let result_json = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "deny"}}"#.into())
         .expect("deny");
-    assert_eq!(result_json.trim(), "\"DeviceLinkDeny\"");
+    let parsed: serde_json::Value = serde_json::from_str(&result_json).expect("parse envelope");
+    assert_eq!(parsed["action_result"], serde_json::json!("DeviceLinkDeny"));
 }
 
 // @scenario: pair5_device_link_listener :: retry from QrExpired emits DeviceLinkRetry and rotates session
@@ -239,7 +241,11 @@ fn retry_from_expired_emits_device_link_retry_and_rotates_session() {
     let result_json = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "retry"}}"#.into())
         .expect("retry");
-    assert_eq!(result_json.trim(), "\"DeviceLinkRetry\"");
+    let parsed: serde_json::Value = serde_json::from_str(&result_json).expect("parse envelope");
+    assert_eq!(
+        parsed["action_result"],
+        serde_json::json!("DeviceLinkRetry")
+    );
     // Session rotated — a fresh one is held.
     assert!(engine.device_link_session_is_active_for_test());
 }

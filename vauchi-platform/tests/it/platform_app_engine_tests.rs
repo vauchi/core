@@ -31,12 +31,19 @@ fn create_engine() -> (std::sync::Arc<PlatformAppEngine>, tempfile::TempDir) {
 /// 5. continue -> what_next
 /// 6. start_app -> CompleteWith (AppEngine routes to Home)
 fn drive_onboarding(engine: &PlatformAppEngine) {
+    // Phase 2b: handle_action_json now returns
+    // `{"action_result": <ActionResult>, "commands": [<Command>, ...]}`.
+    // Helper indexes through `action_result` to reach the variant.
+    fn act(envelope: &serde_json::Value) -> &serde_json::Value {
+        &envelope["action_result"]
+    }
+
     // Step 1: create_new -> default_name
     let r = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "create_new"}}"#.into())
         .expect("step 1: create_new");
     let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 1");
-    assert_eq!(v["NavigateTo"]["screen_id"], "default_name", "step 1");
+    assert_eq!(act(&v)["NavigateTo"]["screen_id"], "default_name", "step 1");
 
     // Step 2: enter display name
     let r = engine
@@ -45,28 +52,32 @@ fn drive_onboarding(engine: &PlatformAppEngine) {
         )
         .expect("step 2: text changed");
     let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 2");
-    assert_eq!(v["UpdateScreen"]["screen_id"], "default_name", "step 2");
+    assert_eq!(
+        act(&v)["UpdateScreen"]["screen_id"],
+        "default_name",
+        "step 2"
+    );
 
     // Step 3: continue -> groups_setup
     let r = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
         .expect("step 3: continue");
     let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 3");
-    assert_eq!(v["NavigateTo"]["screen_id"], "groups_setup", "step 3");
+    assert_eq!(act(&v)["NavigateTo"]["screen_id"], "groups_setup", "step 3");
 
     // Step 4: continue -> contact_info
     let r = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
         .expect("step 4: continue");
     let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 4");
-    assert_eq!(v["NavigateTo"]["screen_id"], "contact_info", "step 4");
+    assert_eq!(act(&v)["NavigateTo"]["screen_id"], "contact_info", "step 4");
 
     // Step 5: continue -> what_next
     let r = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
         .expect("step 5: continue");
     let v: serde_json::Value = serde_json::from_str(&r).expect("parse step 5");
-    assert_eq!(v["NavigateTo"]["screen_id"], "what_next", "step 5");
+    assert_eq!(act(&v)["NavigateTo"]["screen_id"], "what_next", "step 5");
 
     // Step 6: start_app -> CompleteWith (AppEngine transitions to Home)
     engine
@@ -251,8 +262,58 @@ fn navigate_to_json_simple_variant() {
     let result = engine
         .navigate_to_json(r#""Exchange""#.into())
         .expect("navigate");
-    let screen: serde_json::Value = serde_json::from_str(&result).expect("parse");
-    assert_eq!(screen["screen_id"], "exchange_mode_selection");
+    let envelope: serde_json::Value = serde_json::from_str(&result).expect("parse");
+    assert_eq!(envelope["screen"]["screen_id"], "exchange_mode_selection");
+}
+
+// @scenario: exchange.feature :: Multi-stage exchange entry surfaces brightness commands in envelope
+#[test]
+fn navigate_to_json_envelope_carries_lifecycle_commands() {
+    let (engine, _dir) = create_engine();
+    drive_onboarding(&engine);
+    // First nav lands on MultiStageExchange — its `screen_entered`
+    // hook emits two commands. The previous engine's `screen_exited`
+    // is the default empty.
+    let result = engine
+        .navigate_to_json(r#""MultiStageExchange""#.into())
+        .expect("navigate to multi-stage");
+    let envelope: serde_json::Value = serde_json::from_str(&result).expect("parse");
+    assert_eq!(envelope["screen"]["screen_id"], "multi_stage_exchange");
+    let commands = envelope["commands"]
+        .as_array()
+        .expect("envelope.commands array");
+    assert_eq!(
+        commands.len(),
+        2,
+        "expected 2 lifecycle commands; got {commands:?}"
+    );
+    assert_eq!(
+        commands[0]["SetScreenBrightness"]["level"], 0.65,
+        "first command must dim brightness; got {commands:?}",
+    );
+    assert_eq!(
+        commands[1]["SetIdleTimerDisabled"]["disabled"], true,
+        "second command must disable idle timer; got {commands:?}",
+    );
+}
+
+// @scenario: exchange.feature :: handle_action_json envelope shape
+#[test]
+fn handle_action_json_envelope_shape() {
+    let (engine, _dir) = create_engine();
+    let r = engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "create_new"}}"#.into())
+        .expect("create_new");
+    let envelope: serde_json::Value = serde_json::from_str(&r).expect("parse");
+    assert!(envelope.is_object(), "envelope must be object: {envelope}");
+    assert!(
+        envelope.get("action_result").is_some(),
+        "envelope must have action_result: {envelope}",
+    );
+    assert!(
+        envelope.get("commands").is_some(),
+        "envelope must have commands: {envelope}",
+    );
 }
 
 // @internal
@@ -264,8 +325,8 @@ fn navigate_back_returns_previous_screen() {
         .navigate_to_json(r#""Exchange""#.into())
         .expect("navigate to exchange");
     let result = engine.navigate_back_json().expect("navigate back");
-    let screen: serde_json::Value = serde_json::from_str(&result).expect("parse");
-    assert_eq!(screen["screen_id"], "my_info");
+    let envelope: serde_json::Value = serde_json::from_str(&result).expect("parse");
+    assert_eq!(envelope["screen"]["screen_id"], "my_info");
 }
 
 // @internal
@@ -477,7 +538,7 @@ fn event_listener_receives_invalidation_on_card_update() {
         .expect("open add field dialog");
     let v: serde_json::Value = serde_json::from_str(&r).expect("parse");
     assert_eq!(
-        v["NavigateTo"]["screen_id"], "form_add_field",
+        v["action_result"]["NavigateTo"]["screen_id"], "form_add_field",
         "should open add-field form, got: {v}"
     );
 
@@ -918,7 +979,7 @@ fn text_changed_from_peer_scan_routes_to_multi_stage_session() {
         .expect("text changed action accepted");
     let v: serde_json::Value = serde_json::from_str(&result_json).expect("parse action result");
     assert_eq!(
-        v["UpdateScreen"]["screen_id"], "multi_stage_exchange",
+        v["action_result"]["UpdateScreen"]["screen_id"], "multi_stage_exchange",
         "TextChanged from peer_scan must update the multi-stage screen, got {v:?}",
     );
     assert_eq!(
@@ -946,7 +1007,7 @@ fn text_changed_from_unknown_component_does_not_panic_on_multi_stage() {
         .expect("text changed action accepted");
     let v: serde_json::Value = serde_json::from_str(&result_json).expect("parse action result");
     assert_eq!(
-        v["UpdateScreen"]["screen_id"], "multi_stage_exchange",
+        v["action_result"]["UpdateScreen"]["screen_id"], "multi_stage_exchange",
         "TextChanged from a non-peer-scan component must update the multi-stage screen, got {v:?}",
     );
 }

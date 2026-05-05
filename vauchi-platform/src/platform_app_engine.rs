@@ -37,7 +37,8 @@ use vauchi_core::exchange::ProtocolState;
 
 use crate::error::MobileError;
 use crate::json_helpers::{
-    action_result_to_json, app_screen_from_json, screen_to_json, user_action_from_json,
+    action_result_envelope_to_json, action_result_to_json, app_screen_from_json,
+    screen_envelope_to_json, screen_to_json, user_action_from_json,
 };
 
 // ── PlatformEventListener ──────────────────────────────────────────
@@ -396,11 +397,19 @@ impl PlatformAppEngine {
             }
         }
 
-        let result = {
+        let (result, pending_commands) = {
             let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),
             })?;
-            engine.handle_action(action)
+            let result = engine.handle_action(action);
+            // Phase 2b: drain the screen-presentation lifecycle commands
+            // that any navigation triggered by this action accumulated.
+            // Frontends process them via the same dispatch path as
+            // `ActionResult::Commands` — they're surfaced separately in
+            // the envelope so the action result and the lifecycle hooks
+            // stay independently typed.
+            let cmds = engine.drain_pending_commands();
+            (result, cmds)
         };
         // Pair 5 — translate device-link typed ActionResults into
         // `MobileDeviceLinkSession` calls. The engine has already
@@ -409,7 +418,7 @@ impl PlatformAppEngine {
         // state via the bridge.
         self.dispatch_device_link_side_effects(&result)?;
         self.after_screen_transition(pre_screen)?;
-        action_result_to_json(&result)
+        action_result_envelope_to_json(&result, &pending_commands)
     }
 
     /// Handle a hardware event from the frontend during an exchange (ADR-031).
@@ -516,19 +525,24 @@ impl PlatformAppEngine {
             })?
             .current_app_screen()
             .clone();
-        let model = {
+        let (model, pending_commands) = {
             let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),
             })?;
-            engine.navigate_to(screen)
+            let model = engine.navigate_to(screen);
+            let cmds = engine.drain_pending_commands();
+            (model, cmds)
         };
         self.after_screen_transition(pre_screen)?;
-        screen_to_json(&model)
+        screen_envelope_to_json(&model, &pending_commands)
     }
 
     /// Navigate back in the history stack.
     ///
-    /// Returns the previous screen model as JSON.
+    /// Returns the previous screen model as JSON envelope:
+    /// `{"screen": <ScreenModel>, "commands": [<Command>, ...]}`.
+    /// `commands` carries any screen-presentation `Command`s emitted by
+    /// the lifecycle hooks of the outgoing + incoming engines (Phase 2b).
     pub fn navigate_back_json(&self) -> Result<String, MobileError> {
         let pre_screen = self
             .engine
@@ -538,14 +552,16 @@ impl PlatformAppEngine {
             })?
             .current_app_screen()
             .clone();
-        let model = {
+        let (model, pending_commands) = {
             let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                 detail: format!("Lock failed: {e}"),
             })?;
-            engine.navigate_back()
+            let model = engine.navigate_back();
+            let cmds = engine.drain_pending_commands();
+            (model, cmds)
         };
         self.after_screen_transition(pre_screen)?;
-        screen_to_json(&model)
+        screen_envelope_to_json(&model, &pending_commands)
     }
 
     /// Handle an incoming `vauchi://exchange?...` deep link URI.

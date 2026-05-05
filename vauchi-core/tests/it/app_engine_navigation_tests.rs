@@ -924,3 +924,85 @@ fn go_exchange_from_my_info_navigates_to_exchange() {
         other => panic!("Expected NavigateTo, got {other:?}"),
     }
 }
+
+// ── Screen-presentation lifecycle hooks (Phase 2b) ────────────────────
+
+// @scenario: exchange.feature :: Multi-stage exchange dims screen on entry
+#[test]
+fn navigate_to_multi_stage_exchange_drains_brightness_and_idle_timer_commands() {
+    use vauchi_core::Command;
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MyInfo);
+    let _ = engine.drain_pending_commands();
+
+    engine.navigate_to(AppScreen::MultiStageExchange);
+    let commands = engine.drain_pending_commands();
+
+    assert_eq!(
+        commands,
+        vec![
+            Command::SetScreenBrightness { level: Some(0.65) },
+            Command::SetIdleTimerDisabled { disabled: true },
+        ],
+        "navigate_to(MultiStageExchange) must drive its screen_entered hook"
+    );
+}
+
+// @scenario: exchange.feature :: Multi-stage exchange restores defaults on exit
+#[test]
+fn navigate_back_from_multi_stage_exchange_drains_restore_commands() {
+    use vauchi_core::Command;
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MyInfo);
+    engine.navigate_to(AppScreen::MultiStageExchange);
+    let _ = engine.drain_pending_commands();
+
+    engine.navigate_back();
+    let commands = engine.drain_pending_commands();
+
+    assert!(
+        commands.starts_with(&[
+            Command::SetScreenBrightness { level: None },
+            Command::SetIdleTimerDisabled { disabled: false },
+        ]),
+        "navigate_back from MultiStageExchange must emit screen_exited commands first; got {commands:?}"
+    );
+}
+
+// @internal
+#[test]
+fn navigate_to_non_presentation_screen_drains_no_commands() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MyInfo);
+    let _ = engine.drain_pending_commands();
+
+    engine.navigate_to(AppScreen::Settings);
+    let commands = engine.drain_pending_commands();
+
+    assert!(
+        commands.is_empty(),
+        "screens with the empty-default lifecycle hooks must not emit commands; got {commands:?}"
+    );
+}
+
+// @internal
+#[test]
+fn drain_pending_commands_returns_empty_after_drain() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MultiStageExchange);
+    let _first = engine.drain_pending_commands();
+
+    let second = engine.drain_pending_commands();
+    assert!(
+        second.is_empty(),
+        "drain consumes the queue; got {second:?}"
+    );
+}

@@ -335,6 +335,14 @@ pub struct AppEngine {
     /// Defaults to `true` so installs without a network monitor (CLI,
     /// tests, embedded) behave as if always-online.
     network_online: bool,
+    /// Screen-presentation [`Command`]s accumulated from
+    /// `WorkflowEngine::screen_entered` / `screen_exited` callbacks
+    /// during navigation. Frontends drain via
+    /// [`Self::drain_pending_commands`] after each `navigate_to` /
+    /// `navigate_back` / `handle_action` to apply hardware-side state
+    /// (brightness, idle timer, future orientation lock, haptics).
+    /// Phase 2b of `2026-05-04-exchange-command-screen-presentation`.
+    pending_commands: std::collections::VecDeque<vauchi_core::Command>,
 }
 
 impl AppEngine {
@@ -436,7 +444,17 @@ impl AppEngine {
             pending_merge: None,
             pending_backup_reminder,
             network_online: true,
+            pending_commands: std::collections::VecDeque::new(),
         }
+    }
+
+    /// Drain and return all `Command`s accumulated from `WorkflowEngine`
+    /// lifecycle hooks (`screen_entered` / `screen_exited`) during recent
+    /// navigation. Frontends call this after every action / navigate to
+    /// pick up brightness, idle-timer, and (Phase 2c) orientation-lock
+    /// commands that core has emitted in response to screen transitions.
+    pub fn drain_pending_commands(&mut self) -> Vec<vauchi_core::Command> {
+        self.pending_commands.drain(..).collect()
     }
 
     /// Check and drain a pending backup reminder.

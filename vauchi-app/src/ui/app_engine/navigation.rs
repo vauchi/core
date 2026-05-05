@@ -171,7 +171,21 @@ impl AppEngine {
         });
 
         // Swap in the new engine, get the old one back
-        let old_engine = std::mem::replace(&mut self.engine, new_engine);
+        let mut old_engine = std::mem::replace(&mut self.engine, new_engine);
+
+        // Phase 2b: drive screen-presentation lifecycle hooks. The
+        // outgoing engine emits its exit `Command`s (e.g. restore
+        // brightness), then the incoming engine emits its entry
+        // `Command`s (e.g. dim brightness for QR contrast). Both
+        // accumulate in the AppEngine's `pending_commands` queue
+        // which the frontend drains via `drain_pending_commands()`.
+        // Same-screen swaps (which happen e.g. when an engine cache
+        // miss rebuilds the same screen) skip both hooks — the
+        // platform state should not flap.
+        if old_screen != screen {
+            self.pending_commands.extend(old_engine.screen_exited());
+            self.pending_commands.extend(self.engine.screen_entered());
+        }
 
         // Cache the old engine if its screen is cacheable
         if Self::is_cacheable(&old_screen) {

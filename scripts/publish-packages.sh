@@ -113,6 +113,18 @@ upload_file() {
     elif [[ "$http_code" == "409" ]]; then
         echo -e "${YELLOW}  ⚠ Already exists: $filename${NC}"
         return 0
+    elif [[ "$http_code" == "400" && "$body" == *"Duplicate package is not allowed"* ]]; then
+        # GitLab returns 400 (not 409) when the *generic-package*
+        # `duplicates_allowed` toggle is off and the file already
+        # exists at this path. Treat as the idempotent case so a
+        # retried `publish:packages` job (e.g. after a partial failure
+        # in another artifact group) doesn't fail on already-uploaded
+        # files. Body match is required — bare 400 is a real "Bad
+        # Request" we still want to fail loudly on. Recurrence note:
+        # this is what skipped `update:swift-bindings` for core
+        # v0.49.0 — see _private/docs/problems/2026-04-28-platform-swift-v0.28.1-tag-mismatch/.
+        echo -e "${YELLOW}  ⚠ Already exists (400 dup): $filename${NC}"
+        return 0
     else
         echo -e "${RED}  ✗ Failed ($http_code): $filename${NC}"
         echo "  Response: $body"

@@ -4,6 +4,16 @@
 
 //! Social graph engine — contacts grouped by trust level (ADR-034).
 //!
+//! Note (2026-05-08, ADR-040 follow-up): "social graph" here means a
+//! trust-level-grouped view of the user's OWN contacts — not the
+//! community-scoring system ADR-040 retired. No cross-user
+//! relationships are stored, no validator records, no Principle 1
+//! violation. The naming is a tripwire post ADR-040; the substance
+//! is compliant. Renaming the file would touch all engine
+//! registrations — left as future maintenance work, this comment
+//! documents the distinction inline so a future reader greps once
+//! and stops.
+//!
 //! Renders a network summary (totals, trusted %, cautions, group count)
 //! plus per-trust-level contact lists. The user can filter to a single
 //! trust level via a `ToggleList` chip row. Tapping a contact emits

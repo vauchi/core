@@ -10,6 +10,7 @@
 //! (plan Task 1.4).
 
 mod contact_detail;
+mod contact_list;
 mod decoy_contacts;
 mod deep_link_consent;
 mod delivery_status;

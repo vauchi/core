@@ -69,6 +69,20 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
                     component_id: "contacts".into(),
                     item_id: item.id.clone(),
                 });
+                // Per-row actions (archive, hide, delete, undo, …)
+                // are surfaced via swipe / long-press / context-menu
+                // affordances. Without enumerating them the
+                // reachability harness misses every row-action arm
+                // an engine declares — silently passing green even
+                // when affordances and handlers diverge. See
+                // `2026-05-08` audit finding P-11.
+                for action in &item.actions {
+                    out.push(UserAction::ListItemAction {
+                        component_id: "contacts".into(),
+                        item_id: item.id.clone(),
+                        action_id: action.id.clone(),
+                    });
+                }
             }
         }
         Component::ActionList { id, items } => {
@@ -249,7 +263,8 @@ fn is_terminal(result: &ActionResult) -> bool {
 mod tests {
     use super::*;
     use crate::ui::component::{
-        ActionListItem, Component, DropdownOption, InputType, Item, ToggleItem,
+        ActionListItem, Component, DropdownOption, InputType, Item, ListItemAction,
+        ListItemActionKind, ToggleItem,
     };
     use crate::ui::screen::{ActionStyle, ScreenAction, ScreenModel};
 
@@ -449,6 +464,58 @@ mod tests {
                 component_id: "contacts".into(),
                 item_id: "c-1".into(),
             }]
+        );
+    }
+
+    // @internal
+    #[test]
+    fn contact_list_items_emit_list_item_action_per_row_action() {
+        let component = Component::List {
+            id: "contacts_list".into(),
+            items: vec![Item {
+                id: "c-1".into(),
+                name: "Alice".into(),
+                subtitle: None,
+                avatar_initials: "A".into(),
+                status: None,
+                actions: vec![
+                    ListItemAction {
+                        id: "archive".into(),
+                        label: "Archive".into(),
+                        kind: ListItemActionKind::Archive,
+                        destructive: false,
+                    },
+                    ListItemAction {
+                        id: "delete".into(),
+                        label: "Delete".into(),
+                        kind: ListItemActionKind::Delete,
+                        destructive: true,
+                    },
+                ],
+                a11y: None,
+            }],
+            searchable: false,
+        };
+        let screen = screen_with(vec![component], vec![]);
+        let actions = walk_actions(&screen);
+        assert_eq!(
+            actions,
+            vec![
+                UserAction::ListItemSelected {
+                    component_id: "contacts".into(),
+                    item_id: "c-1".into(),
+                },
+                UserAction::ListItemAction {
+                    component_id: "contacts".into(),
+                    item_id: "c-1".into(),
+                    action_id: "archive".into(),
+                },
+                UserAction::ListItemAction {
+                    component_id: "contacts".into(),
+                    item_id: "c-1".into(),
+                    action_id: "delete".into(),
+                },
+            ]
         );
     }
 

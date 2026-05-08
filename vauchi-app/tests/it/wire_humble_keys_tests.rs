@@ -16,8 +16,8 @@
 //! when retiring more, never to silence a regression.
 
 use vauchi_app::ui::{
-    Component, DropdownOption, Field, Item, ListItemAction, ListItemActionKind, PreviewVariant,
-    Status, TextStyle, UiFieldVisibility, VisibilityMode,
+    Component, DropdownOption, Field, InputType, Item, ListItemAction, ListItemActionKind,
+    PreviewVariant, QrMode, Status, TextStyle, UiFieldVisibility, VisibilityMode,
 };
 
 /// Domain-shaped JSON keys retired during Wire Humble Tier 0.
@@ -109,14 +109,38 @@ fn sample_preview_variant() -> PreviewVariant {
     }
 }
 
+/// Number of `Component` variants in
+/// `core/vauchi-app/src/ui/component/mod.rs`. Asserted below by
+/// [`all_components_covers_every_variant`] so a new variant added
+/// without a matching sample fails the build, not just review.
+///
+/// `Component` is `#[non_exhaustive]`, so an exhaustive `match` from
+/// this integration-test crate (an *external* crate to `vauchi_app`)
+/// is rejected. Counting unique variant tags via the serialized form
+/// is the next-best mechanical check.
+const COMPONENT_VARIANT_COUNT: usize = 19;
+
 /// Curated set of `Component` variants. Adding a new variant?
-/// Append a sample here so the test exercises its serialized shape.
+/// **Append a sample here AND bump [`COMPONENT_VARIANT_COUNT`].**
+/// `all_components_covers_every_variant` will fail the build until
+/// you do.
 fn all_components() -> Vec<Component> {
     vec![
         Component::Text {
             id: "t".to_string(),
             content: "hello".to_string(),
             style: TextStyle::Body,
+        },
+        Component::TextInput {
+            id: "ti".to_string(),
+            label: "Name".to_string(),
+            value: String::new(),
+            placeholder: Some("Enter name".to_string()),
+            max_length: Some(64),
+            validation_error: None,
+            input_type: InputType::Text,
+            a11y: None,
+            info_key: None,
         },
         Component::List {
             id: "l".to_string(),
@@ -169,6 +193,46 @@ fn all_components() -> Vec<Component> {
             status: Status::Success,
             a11y: None,
         },
+        Component::PinInput {
+            id: "pi".to_string(),
+            label: "PIN".to_string(),
+            length: 6,
+            filled: 2,
+            masked: true,
+            validation_error: None,
+            a11y: None,
+        },
+        Component::QrCode {
+            id: "qr".to_string(),
+            data: "vchi:abc".to_string(),
+            mode: QrMode::Display,
+            label: Some("Scan me".to_string()),
+            scan_quality: None,
+            a11y: None,
+        },
+        Component::InlineConfirm {
+            id: "ic".to_string(),
+            warning: "This cannot be undone.".to_string(),
+            confirm_text: "Delete".to_string(),
+            cancel_text: "Cancel".to_string(),
+            destructive: true,
+            a11y: None,
+        },
+        Component::EditableText {
+            id: "et".to_string(),
+            label: "Display name".to_string(),
+            value: "Alice".to_string(),
+            editing: false,
+            validation_error: None,
+            a11y: None,
+            info_key: None,
+        },
+        Component::Banner {
+            text: "Preview mode".to_string(),
+            action_label: "Dismiss".to_string(),
+            action_id: "dismiss".to_string(),
+            a11y: None,
+        },
         Component::Dropdown {
             id: "dd".to_string(),
             label: "Pick".to_string(),
@@ -177,6 +241,26 @@ fn all_components() -> Vec<Component> {
                 id: "a".to_string(),
                 label: "A".to_string(),
             }],
+            a11y: None,
+        },
+        Component::AvatarPreview {
+            id: "ap".to_string(),
+            image_data: None,
+            initials: "AB".to_string(),
+            bg_color: Some([100, 150, 200]),
+            brightness: 0.0,
+            editable: false,
+            a11y: None,
+        },
+        Component::Slider {
+            id: "sl".to_string(),
+            label: "Brightness".to_string(),
+            value: 0.0,
+            min: -0.3,
+            max: 0.3,
+            step: 0.05,
+            min_icon: Some("sun.min".to_string()),
+            max_icon: Some("sun.max".to_string()),
             a11y: None,
         },
         Component::Divider,
@@ -228,6 +312,42 @@ fn deny_list_self_check() {
     for key in FORBIDDEN_KEYS {
         assert!(!key.is_empty(), "FORBIDDEN_KEYS contains empty entry");
     }
+}
+
+/// Variant-coverage gate: forces `all_components()` to keep up with
+/// new `Component` variants. The counting strategy uses serialized
+/// variant tags rather than an exhaustive `match` because `Component`
+/// is `#[non_exhaustive]` and this test crate is external to
+/// `vauchi_app`, which forbids exhaustive matching.
+///
+/// @internal
+#[test]
+fn all_components_covers_every_variant() {
+    use std::collections::HashSet;
+    let tags: HashSet<String> = all_components()
+        .iter()
+        .map(|c| {
+            let v = serde_json::to_value(c).expect("serialize component");
+            match &v {
+                serde_json::Value::Object(map) => map.keys().next().cloned().unwrap_or_default(),
+                serde_json::Value::String(s) => s.clone(),
+                _ => "<unknown>".to_string(),
+            }
+        })
+        .collect();
+
+    assert_eq!(
+        tags.len(),
+        COMPONENT_VARIANT_COUNT,
+        "all_components() exposes {} unique variant tags but \
+         COMPONENT_VARIANT_COUNT = {}. If you added a Component \
+         variant, append a sample AND bump the constant. If you \
+         retired one, remove the sample AND drop the constant. \
+         Tags currently exercised: {:?}",
+        tags.len(),
+        COMPONENT_VARIANT_COUNT,
+        tags
+    );
 }
 
 /// Sanity check: the test actually catches violations.

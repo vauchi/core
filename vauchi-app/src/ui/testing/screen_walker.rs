@@ -63,10 +63,10 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
                 });
             }
         }
-        Component::List { items, .. } => {
+        Component::List { id, items, .. } => {
             for item in items {
                 out.push(UserAction::ListItemSelected {
-                    component_id: "contacts".into(),
+                    component_id: id.clone(),
                     item_id: item.id.clone(),
                 });
                 // Per-row actions (archive, hide, delete, undo, …)
@@ -78,7 +78,7 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
                 // `2026-05-08` audit finding P-11.
                 for action in &item.actions {
                     out.push(UserAction::ListItemAction {
-                        component_id: "contacts".into(),
+                        component_id: id.clone(),
                         item_id: item.id.clone(),
                         action_id: action.id.clone(),
                     });
@@ -461,7 +461,7 @@ mod tests {
         assert_eq!(
             actions,
             vec![UserAction::ListItemSelected {
-                component_id: "contacts".into(),
+                component_id: "contacts_list".into(),
                 item_id: "c-1".into(),
             }]
         );
@@ -502,16 +502,16 @@ mod tests {
             actions,
             vec![
                 UserAction::ListItemSelected {
-                    component_id: "contacts".into(),
+                    component_id: "contacts_list".into(),
                     item_id: "c-1".into(),
                 },
                 UserAction::ListItemAction {
-                    component_id: "contacts".into(),
+                    component_id: "contacts_list".into(),
                     item_id: "c-1".into(),
                     action_id: "archive".into(),
                 },
                 UserAction::ListItemAction {
-                    component_id: "contacts".into(),
+                    component_id: "contacts_list".into(),
                     item_id: "c-1".into(),
                     action_id: "delete".into(),
                 },

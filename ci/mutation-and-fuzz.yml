@@ -67,9 +67,14 @@ fuzz:nightly:
   allow_failure: true
   script:
     - |
-      # cargo-fuzz requires nightly for -Zsanitizer=address
+      # cargo-fuzz requires nightly for -Zsanitizer=address.
+      # Note: do NOT pass --locked. cargo-fuzz 0.13.1's bundled
+      # Cargo.lock transitively pins rustix 0.36.5 (2022), which uses
+      # unstable `rustc_attrs` that current nightly rejects with
+      # "attributes starting with `rustc` are reserved." Without
+      # --locked the resolver picks a current rustix that builds.
       rustup toolchain install nightly --profile minimal --component llvm-tools-preview 2>/dev/null || true
-      command -v cargo-fuzz >/dev/null 2>&1 || cargo +nightly install cargo-fuzz --locked --force
+      command -v cargo-fuzz >/dev/null 2>&1 || cargo +nightly install cargo-fuzz --force
 
       cd vauchi-core/fuzz
       FUZZ_DURATION="${FUZZ_DURATION_SECS:-300}"

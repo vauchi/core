@@ -18,6 +18,7 @@ mod contact_list_intercepts_tests;
 mod contact_merge_engine_tests;
 mod deep_link_consent_engine_tests;
 mod device_link_bridge_tests;
+mod display_hint_tests;
 mod drain_notifications_tests;
 mod exchange_ble_invariants_proptest;
 mod file_picker_wiring_tests;

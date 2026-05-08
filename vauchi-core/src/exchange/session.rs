@@ -12,7 +12,6 @@ use std::time::{Duration, Instant};
 
 use super::ble_handshake::BleHandshakeSession;
 use super::ble_payload::BleCardPayload;
-use crate::{Command, Event};
 use super::direct_transport::UsbRole;
 use super::nfc_handshake::NfcHandshakeSession;
 use super::trust_metrics::TrustMetrics;
@@ -22,6 +21,7 @@ use crate::contact_card::ContactCard;
 use crate::crypto::kdf::HKDF;
 use crate::diagnostic::exchange_debug::{ExchangeDebugEvent, ExchangeDebugLog};
 use crate::identity::Identity;
+use crate::{Command, Event};
 
 /// Session timeout duration (60 seconds for resumption).
 const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
@@ -786,10 +786,7 @@ impl ExchangeSession {
     /// 3. Emits response commands based on the new state
     ///
     /// After calling this, use `drain_commands()` to get outgoing commands.
-    pub fn apply_hardware_event(
-        &mut self,
-        event: Event,
-    ) -> Result<(), ExchangeError> {
+    pub fn apply_hardware_event(&mut self, event: Event) -> Result<(), ExchangeError> {
         match event {
             Event::QrScanned { data } => {
                 let qr = ExchangeQR::from_data_string(&data)?;
@@ -1182,8 +1179,20 @@ impl ExchangeSession {
                 value,
             ));
         }
-        if let Some(ref avatar) = remote.avatar {
-            let _ = their_card.set_avatar(avatar.clone());
+        if let Some(ref avatar) = remote.avatar
+            && let Err(e) = their_card.set_avatar(avatar.clone())
+        {
+            // ADR-042: peer-supplied avatar bytes go through the same
+            // WebP normalization as local avatars. A failure here means
+            // the peer's payload didn't decode or didn't fit within the
+            // size cap. Lenient: keep the contact, drop only the avatar
+            // — but log so we see corrupt-payload rates from peers.
+            // PII-safe: ContactCardError variants do not include the
+            // avatar bytes or any peer identifier.
+            tracing::warn!(
+                error = %e,
+                "ble exchange: dropping peer avatar that failed normalization (ADR-042)"
+            );
         }
 
         // Derive a relay-use shared key from both parties' identity keys.

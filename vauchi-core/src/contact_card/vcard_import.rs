@@ -311,8 +311,19 @@ fn parse_single_vcard(block: &str) -> Option<(ContactCard, Option<String>)> {
         card.set_nickname(&nick);
     }
 
-    if let Some(avatar) = avatar_data {
-        let _ = card.set_avatar(avatar);
+    if let Some(avatar) = avatar_data
+        && let Err(e) = card.set_avatar(avatar)
+    {
+        // ADR-042: set_avatar normalizes any input image to WebP <= 32 KB.
+        // A failure here means the source image was unrecognized or too
+        // large to fit within the size cap after resizing. Lenient
+        // import: keep the contact, drop only the avatar — but surface
+        // the kind of failure so operators can see corrupt-payload rates.
+        // PII-safe: ContactCardError variants do not include image bytes.
+        tracing::warn!(
+            error = %e,
+            "vcard import: dropping avatar that failed normalization (ADR-042)"
+        );
     }
 
     for (field_type, label, value) in fields {

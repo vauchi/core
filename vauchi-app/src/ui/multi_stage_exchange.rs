@@ -585,24 +585,32 @@ impl WorkflowEngine for MultiStageExchangeEngine {
     /// `UIScreen.main.brightness = 0.65` / Android
     /// `Window.attributes.screenBrightness = 0.65f`). The idle timer
     /// is disabled so a longer-than-30s handshake does not auto-lock.
-    /// Phase 2b of `2026-05-04-exchange-command-screen-presentation`.
+    /// Orientation locks to portrait so the QR / camera layout stays
+    /// stable while the user moves the device — mirrors the prior
+    /// `SCREEN_ORIENTATION_PORTRAIT` `DisposableEffect` in
+    /// `android/app/src/main/kotlin/app/vauchi/ui/FaceToFaceExchangeScreen.kt`.
+    /// Phase 2b + Phase 2c of `2026-05-04-exchange-command-screen-presentation`.
     fn screen_entered(&mut self) -> Vec<vauchi_core::Command> {
         vec![
             vauchi_core::Command::SetScreenBrightness { level: Some(0.65) },
             vauchi_core::Command::SetIdleTimerDisabled { disabled: true },
+            vauchi_core::Command::SetOrientationLock {
+                orientation: Some(vauchi_core::Orientation::Portrait),
+            },
         ]
     }
 
     /// Symmetric counterpart to [`Self::screen_entered`]: restore the
-    /// platform-default brightness (`level: None`) and re-enable the
-    /// idle timer. The frontend's `Command` handler is responsible for
-    /// snapshotting the prior brightness on the first `Some(level)` so
-    /// the subsequent `None` correctly restores it (see
-    /// `ios/Vauchi/Services/CommandHandler.swift::savedBrightness`).
+    /// platform-default brightness (`level: None`), re-enable the
+    /// idle timer, and unlock orientation. The frontend's `Command`
+    /// handler is responsible for snapshotting the prior brightness on
+    /// the first `Some(level)` so the subsequent `None` correctly
+    /// restores it (see iOS `AppViewModel::savedBrightness`).
     fn screen_exited(&mut self) -> Vec<vauchi_core::Command> {
         vec![
             vauchi_core::Command::SetScreenBrightness { level: None },
             vauchi_core::Command::SetIdleTimerDisabled { disabled: false },
+            vauchi_core::Command::SetOrientationLock { orientation: None },
         ]
     }
 }
@@ -1177,10 +1185,10 @@ mod tests {
 
     // ── Screen-presentation lifecycle (Phase 2b) ─────────────────────
 
-    // @scenario: exchange.feature :: Multi-stage exchange dims screen and disables idle timer on entry
+    // @scenario: exchange.feature :: Multi-stage exchange dims screen, disables idle timer, and locks portrait on entry
     #[test]
-    fn screen_entered_emits_brightness_065_and_idle_timer_disabled() {
-        use vauchi_core::Command;
+    fn screen_entered_emits_brightness_idle_timer_and_portrait_lock() {
+        use vauchi_core::{Command, Orientation};
         let mut engine = MultiStageExchangeEngine::new();
         let commands = engine.screen_entered();
         assert_eq!(
@@ -1188,14 +1196,17 @@ mod tests {
             vec![
                 Command::SetScreenBrightness { level: Some(0.65) },
                 Command::SetIdleTimerDisabled { disabled: true },
+                Command::SetOrientationLock {
+                    orientation: Some(Orientation::Portrait)
+                },
             ],
-            "screen_entered must dim brightness to 65% and disable idle timer for QR contrast"
+            "screen_entered must dim brightness, disable idle timer, and lock portrait"
         );
     }
 
     // @scenario: exchange.feature :: Multi-stage exchange restores presentation defaults on exit
     #[test]
-    fn screen_exited_emits_brightness_none_and_idle_timer_enabled() {
+    fn screen_exited_emits_brightness_idle_timer_and_orientation_unlock() {
         use vauchi_core::Command;
         let mut engine = MultiStageExchangeEngine::new();
         let commands = engine.screen_exited();
@@ -1204,8 +1215,9 @@ mod tests {
             vec![
                 Command::SetScreenBrightness { level: None },
                 Command::SetIdleTimerDisabled { disabled: false },
+                Command::SetOrientationLock { orientation: None },
             ],
-            "screen_exited must restore platform-default brightness and re-enable idle timer"
+            "screen_exited must restore brightness, idle timer, and orientation defaults"
         );
     }
 }

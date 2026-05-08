@@ -1221,6 +1221,31 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "description": "Lock or unlock the device's screen orientation.\n\n`Some(orientation)` pins the screen to the requested orientation (e.g., `Portrait` so the multi-stage face-to-face exchange QR / camera layout stays stable while the user is moving the device); `None` restores the platform default (typically follows the device's physical rotation).\n\nFrontends that don't programmatically own orientation (`linux-gtk`, `linux-qt`, `windows`, desktop `macos` — windowed apps don't lock device rotation) answer with [`Event::HardwareUnavailable { transport: \"orientation_lock\" }`].\n\nPhase 2c of `2026-05-04-exchange-command-screen-presentation` — retires the orientation `DisposableEffect` in `android/app/src/main/kotlin/app/vauchi/ui/FaceToFaceExchangeScreen.kt`.",
+          "type": "object",
+          "required": [
+            "SetOrientationLock"
+          ],
+          "properties": {
+            "SetOrientationLock": {
+              "type": "object",
+              "properties": {
+                "orientation": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/Orientation"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -2486,6 +2511,25 @@
           "type": "string",
           "enum": [
             "ContactAdded"
+          ]
+        }
+      ]
+    },
+    "Orientation": {
+      "description": "Screen orientation a frontend should pin to via [`Command::SetOrientationLock`]. Values mirror the platform-native vocabulary (`Activity.requestedOrientation` on Android, `UIInterfaceOrientationMask` on iOS) but are platform-neutral — each frontend maps to its OS API.",
+      "oneOf": [
+        {
+          "description": "Portrait, top of the device pointing up.",
+          "type": "string",
+          "enum": [
+            "Portrait"
+          ]
+        },
+        {
+          "description": "Landscape, with no preference for left or right rotation. Most platforms map this to \"user-rotatable landscape\" (the device can rotate between left and right freely while staying landscape-locked).",
+          "type": "string",
+          "enum": [
+            "Landscape"
           ]
         }
       ]

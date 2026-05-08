@@ -236,6 +236,42 @@ pub enum Command {
     /// Phase 1 of the FaceToFaceExchangeView retirement (companion
     /// to [`Command::SetScreenBrightness`]).
     SetIdleTimerDisabled { disabled: bool },
+
+    /// Lock or unlock the device's screen orientation.
+    ///
+    /// `Some(orientation)` pins the screen to the requested orientation
+    /// (e.g., `Portrait` so the multi-stage face-to-face exchange QR /
+    /// camera layout stays stable while the user is moving the device);
+    /// `None` restores the platform default (typically follows the
+    /// device's physical rotation).
+    ///
+    /// Frontends that don't programmatically own orientation
+    /// (`linux-gtk`, `linux-qt`, `windows`, desktop `macos` — windowed
+    /// apps don't lock device rotation) answer with
+    /// [`Event::HardwareUnavailable { transport: "orientation_lock" }`].
+    ///
+    /// Phase 2c of `2026-05-04-exchange-command-screen-presentation` —
+    /// retires the orientation `DisposableEffect` in
+    /// `android/app/src/main/kotlin/app/vauchi/ui/FaceToFaceExchangeScreen.kt`.
+    SetOrientationLock { orientation: Option<Orientation> },
+}
+
+/// Screen orientation a frontend should pin to via
+/// [`Command::SetOrientationLock`]. Values mirror the platform-native
+/// vocabulary (`Activity.requestedOrientation` on Android,
+/// `UIInterfaceOrientationMask` on iOS) but are platform-neutral —
+/// each frontend maps to its OS API.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum Orientation {
+    /// Portrait, top of the device pointing up.
+    Portrait,
+    /// Landscape, with no preference for left or right rotation. Most
+    /// platforms map this to "user-rotatable landscape" (the device
+    /// can rotate between left and right freely while staying
+    /// landscape-locked).
+    Landscape,
 }
 
 /// Why a file picker is being opened — lets frontends label the dialog
@@ -289,6 +325,7 @@ impl Command {
             Self::FilePickFromUser { .. } => "FilePickFromUser",
             Self::SetScreenBrightness { .. } => "SetScreenBrightness",
             Self::SetIdleTimerDisabled { .. } => "SetIdleTimerDisabled",
+            Self::SetOrientationLock { .. } => "SetOrientationLock",
         }
     }
 }

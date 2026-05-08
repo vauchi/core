@@ -73,7 +73,7 @@ pub use exchange::{
 };
 
 pub mod platform;
-pub use platform::{Command, Event, FilePickPurpose};
+pub use platform::{Command, Event, FilePickPurpose, Orientation};
 
 pub mod recovery;
 pub use recovery::{

@@ -266,14 +266,15 @@ fn navigate_to_json_simple_variant() {
     assert_eq!(envelope["screen"]["screen_id"], "exchange_mode_selection");
 }
 
-// @scenario: exchange.feature :: Multi-stage exchange entry surfaces brightness commands in envelope
+// @scenario: exchange.feature :: Multi-stage exchange entry surfaces lifecycle commands in envelope
 #[test]
 fn navigate_to_json_envelope_carries_lifecycle_commands() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     // First nav lands on MultiStageExchange — its `screen_entered`
-    // hook emits two commands. The previous engine's `screen_exited`
-    // is the default empty.
+    // hook emits three commands (brightness, idle timer, orientation
+    // lock). The previous engine's `screen_exited` is the default
+    // empty.
     let result = engine
         .navigate_to_json(r#""MultiStageExchange""#.into())
         .expect("navigate to multi-stage");
@@ -284,8 +285,8 @@ fn navigate_to_json_envelope_carries_lifecycle_commands() {
         .expect("envelope.commands array");
     assert_eq!(
         commands.len(),
-        2,
-        "expected 2 lifecycle commands; got {commands:?}"
+        3,
+        "expected 3 lifecycle commands; got {commands:?}"
     );
     assert_eq!(
         commands[0]["SetScreenBrightness"]["level"], 0.65,
@@ -294,6 +295,10 @@ fn navigate_to_json_envelope_carries_lifecycle_commands() {
     assert_eq!(
         commands[1]["SetIdleTimerDisabled"]["disabled"], true,
         "second command must disable idle timer; got {commands:?}",
+    );
+    assert_eq!(
+        commands[2]["SetOrientationLock"]["orientation"], "Portrait",
+        "third command must lock portrait; got {commands:?}",
     );
 }
 

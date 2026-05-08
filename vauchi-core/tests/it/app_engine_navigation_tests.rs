@@ -927,10 +927,10 @@ fn go_exchange_from_my_info_navigates_to_exchange() {
 
 // ── Screen-presentation lifecycle hooks (Phase 2b) ────────────────────
 
-// @scenario: exchange.feature :: Multi-stage exchange dims screen on entry
+// @scenario: exchange.feature :: Multi-stage exchange dims screen, disables idle timer, and locks portrait on entry
 #[test]
-fn navigate_to_multi_stage_exchange_drains_brightness_and_idle_timer_commands() {
-    use vauchi_core::Command;
+fn navigate_to_multi_stage_exchange_drains_brightness_idle_timer_and_orientation_commands() {
+    use vauchi_core::{Command, Orientation};
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
@@ -945,6 +945,9 @@ fn navigate_to_multi_stage_exchange_drains_brightness_and_idle_timer_commands() 
         vec![
             Command::SetScreenBrightness { level: Some(0.65) },
             Command::SetIdleTimerDisabled { disabled: true },
+            Command::SetOrientationLock {
+                orientation: Some(Orientation::Portrait)
+            },
         ],
         "navigate_to(MultiStageExchange) must drive its screen_entered hook"
     );
@@ -968,6 +971,7 @@ fn navigate_back_from_multi_stage_exchange_drains_restore_commands() {
         commands.starts_with(&[
             Command::SetScreenBrightness { level: None },
             Command::SetIdleTimerDisabled { disabled: false },
+            Command::SetOrientationLock { orientation: None },
         ]),
         "navigate_back from MultiStageExchange must emit screen_exited commands first; got {commands:?}"
     );

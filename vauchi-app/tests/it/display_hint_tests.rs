@@ -26,3 +26,13 @@ fn each_variant_is_distinct() {
     assert_ne!(DisplayHint::Phone, DisplayHint::Desktop);
     assert_ne!(DisplayHint::Watch, DisplayHint::Desktop);
 }
+
+// @internal
+#[test]
+fn serde_roundtrip_each_variant() {
+    for h in [DisplayHint::Phone, DisplayHint::Watch, DisplayHint::Desktop] {
+        let json = serde_json::to_string(&h).expect("serialize DisplayHint");
+        let back: DisplayHint = serde_json::from_str(&json).expect("deserialize DisplayHint");
+        assert_eq!(h, back, "roundtrip failed for {h:?}");
+    }
+}

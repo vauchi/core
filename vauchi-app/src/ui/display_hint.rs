@@ -5,10 +5,11 @@
 //! Form-factor hint passed at engine construction (ADR-023).
 //!
 //! Engines that compose screens differently for phones, watches, or
-//! desktops take a [`DisplayHint`] at `new()`. The hint is internal
-//! to core's screen composition — it never appears on `ScreenModel`
-//! and never crosses the serde / UniFFI / CABI boundary, so
-//! frontends never branch on form factor.
+//! desktops take a [`DisplayHint`] at `new()`. The hint may cross
+//! engine-construction binding boundaries (UniFFI / CABI / serde
+//! configs); what it must NOT do is appear on `ScreenModel`. Per
+//! ADR-021/043, frontends never branch on form factor — they pass
+//! the hint at construction once, then forget it.
 //!
 //! Engines that don't branch on form factor can ignore the hint and
 //! omit the parameter entirely. The
@@ -18,12 +19,14 @@
 //! `ScreenModel` for [`DisplayHint::Phone`], [`DisplayHint::Watch`],
 //! and [`DisplayHint::Desktop`].
 
+use serde::{Deserialize, Serialize};
+
 /// Form factor of the rendering frontend, per `ADR-023`.
 ///
-/// Deliberately *not* `Serialize`/`Deserialize` — this type must
-/// not cross the wire. Frontends learn the form factor from the OS,
-/// not from a `ScreenModel` field.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// Marked `#[non_exhaustive]` so additional variants (e.g. `Tv`,
+/// `CarPlay`) can be added without breaking out-of-tree consumers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum DisplayHint {
     Phone,
     Watch,

@@ -1124,7 +1124,7 @@ impl AppEngine {
                      Both parties must be present — Vauchi never exchanges contacts remotely."
                         .into(),
                 ),
-                answer_url: Some("https://docs.vauchi.app/faq/add-contact".into()),
+                answer_url: Some("https://docs.vauchi.app/users/faq#contacts--exchange".into()),
                 category: "Getting Started".into(),
             },
             HelpItem {
@@ -1137,7 +1137,7 @@ impl AppEngine {
                      in person and never leave your device."
                         .into(),
                 ),
-                answer_url: Some("https://docs.vauchi.app/faq/e2e".into()),
+                answer_url: Some("https://docs.vauchi.app/users/faq#privacy--security".into()),
                 category: "Security".into(),
             },
             HelpItem {
@@ -1150,7 +1150,7 @@ impl AppEngine {
                      and all field data."
                         .into(),
                 ),
-                answer_url: Some("https://docs.vauchi.app/faq/backup".into()),
+                answer_url: Some("https://docs.vauchi.app/users/faq#backup--restore".into()),
                 category: "Getting Started".into(),
             },
             HelpItem {
@@ -1163,7 +1163,7 @@ impl AppEngine {
                      identity in person."
                         .into(),
                 ),
-                answer_url: Some("https://docs.vauchi.app/faq/recovery".into()),
+                answer_url: Some("https://docs.vauchi.app/users/faq#identity--account".into()),
                 category: "Security".into(),
             },
             HelpItem {
@@ -1176,7 +1176,7 @@ impl AppEngine {
                      Both parties must be physically present."
                         .into(),
                 ),
-                answer_url: Some("https://docs.vauchi.app/faq/exchange".into()),
+                answer_url: Some("https://docs.vauchi.app/users/faq#contacts--exchange".into()),
                 category: "Getting Started".into(),
             },
             HelpItem {
@@ -1189,7 +1189,7 @@ impl AppEngine {
                      Timing obfuscation further prevents traffic correlation."
                         .into(),
                 ),
-                answer_url: Some("https://docs.vauchi.app/faq/privacy".into()),
+                answer_url: Some("https://docs.vauchi.app/users/faq#privacy--security".into()),
                 category: "Privacy".into(),
             },
             HelpItem {
@@ -1210,7 +1210,7 @@ impl AppEngine {
                 id: "known-issues".into(),
                 question: "Known Issues".into(),
                 answer: None,
-                answer_url: Some("https://docs.vauchi.app/users/known-issues/".into()),
+                answer_url: Some("https://docs.vauchi.app/users/known-issues".into()),
                 category: "Support".into(),
             },
         ]

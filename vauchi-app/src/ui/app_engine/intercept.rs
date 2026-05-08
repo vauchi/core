@@ -160,12 +160,12 @@ impl AppEngine {
                 }
                 "funding" => {
                     return Some(ActionResult::OpenUrl {
-                        url: "https://vauchi.app/donate".into(),
+                        url: "https://docs.vauchi.app/about/supporters".into(),
                     });
                 }
                 "privacy_policy" => {
                     return Some(ActionResult::OpenUrl {
-                        url: "https://vauchi.app/privacy".into(),
+                        url: "https://docs.vauchi.app/legal/privacy-policy".into(),
                     });
                 }
                 // change_password: not yet implemented

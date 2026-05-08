@@ -226,6 +226,45 @@ lint:cabi-header:
     - cargo build -p vauchi-cabi
     - git diff --exit-code vauchi-cabi/include/vauchi.h || { echo "CABI header is stale — rebuild with 'cargo build -p vauchi-cabi' and commit the updated include/vauchi.h"; exit 1; }
 
+# Locale key coverage — extract i18n keys referenced in source and verify
+# each one exists in `en.json`. Catches typos and stale call sites before
+# they ship as the runtime fallback `format!("Missing: {}", key)` at
+# vauchi-app/src/i18n.rs.
+#
+# Pattern mirrors workspace-root `lint:claude-md`: alpine + apk add the
+# tools, then run a shared script from a sibling repo. Script is fetched
+# via the existing `.clone-locales` template (already used by lint:clippy
+# and test:* jobs above).
+#
+# Script lives at locales/scripts/check-locale-key-coverage.sh
+# (vauchi/locales). Uses positional args for forward+backward compat
+# while `vauchi/locales!58` (script fix-and-tighten) is in-flight; once
+# merged, the new flag-based API also works through the positional form.
+#
+# Variable-key call sites (`get_string(locale, &computed_key)`) are
+# statically unreachable and not validated here — that's by design,
+# covered by test discipline + runtime fallback.
+#
+# Wired 2026-05-08 as Phase 2 of `_private!1180` problem record.
+lint:locale-key-coverage:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  before_script:
+    - apk add --no-cache bash ripgrep jq git findutils
+    - !reference [.clone-locales, before_script]
+  script:
+    - bash ../locales/scripts/check-locale-key-coverage.sh
+        vauchi-app/src ../locales '*.rs'
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "vauchi-app/src/**/*.rs"
+          - ".gitlab-ci.yml"
+
 # REUSE compliance provided by vauchi/scripts ci-templates/reuse.yml
 
 # ============================================================

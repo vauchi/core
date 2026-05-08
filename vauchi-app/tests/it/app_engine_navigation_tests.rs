@@ -5,7 +5,7 @@
 //! Integration tests for `AppEngine` navigation: `navigate_to`,
 //! `navigate_back`, and the bootstrap-only `set_initial_screen`.
 
-use vauchi_app::ui::{AppEngine, AppScreen};
+use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 
 fn engine_with_identity() -> AppEngine {
@@ -123,4 +123,47 @@ fn navigate_to_after_set_initial_pushes_initial() {
 
     engine.navigate_back();
     assert_eq!(*engine.current_app_screen(), AppScreen::MyInfo);
+}
+
+// Regression: the Settings "Version" row was rendering with an empty
+// value because `SettingsConfig::version` was hardcoded to `String::new()`
+// at the engine-construction site. Captured 2026-05-08 during the device
+// test campaign — every frontend (Pixel/Samsung/iOS) showed a labelled
+// row with no value. Source: `_private/docs/investigations/2026-05-08-device-test-campaign-findings.md`
+// F-MED-2.
+// @internal
+#[test]
+fn settings_screen_version_row_has_non_empty_value() {
+    use vauchi_app::ui::{Component, SettingsItemKind};
+
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Settings);
+    let screen = engine.current_screen();
+
+    let version_item = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::SettingsGroup { items, .. } => items.iter().find(|i| i.id == "version"),
+            _ => None,
+        })
+        .expect("Settings screen must contain a `version` SettingsItem");
+
+    match &version_item.kind {
+        SettingsItemKind::Value { value } => {
+            assert!(
+                !value.is_empty(),
+                "Settings → Version value must not be empty (would render as a labelled row with no value to the user)",
+            );
+            // We don't pin the exact format because the value is a
+            // semver and the workspace bumps regularly; just assert it
+            // *looks* like a version (digit somewhere) rather than
+            // matching a specific build.
+            assert!(
+                value.chars().any(|c| c.is_ascii_digit()),
+                "Settings → Version value should contain at least one digit, got: {value:?}",
+            );
+        }
+        other => panic!("Settings → Version must be SettingsItemKind::Value, got {other:?}"),
+    }
 }

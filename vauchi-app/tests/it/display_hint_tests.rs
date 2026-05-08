@@ -10,6 +10,7 @@
 
 use vauchi_app::ui::DisplayHint;
 
+// @internal
 #[test]
 fn copy_and_eq_semantics() {
     let h = DisplayHint::Phone;
@@ -18,6 +19,7 @@ fn copy_and_eq_semantics() {
     assert_ne!(DisplayHint::Phone, DisplayHint::Watch);
 }
 
+// @internal
 #[test]
 fn each_variant_is_distinct() {
     assert_ne!(DisplayHint::Phone, DisplayHint::Watch);

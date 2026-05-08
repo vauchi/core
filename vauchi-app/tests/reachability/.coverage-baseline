@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Reachability coverage baseline (CC-22 ratcheting list).
+#
+# Each line is the name of a `WorkflowEngine` impl that has NO matching
+# `tests/reachability/<snake_case>.rs` file. Today's gap was 28 engines
+# with tests vs 14 covered (audit P-11/R-4, 2026-05-08); the gate can
+# only ratchet down, never up. New `WorkflowEngine` impls must ship
+# with a test (rejected if the engine name is missing from the
+# baseline AND no test file exists). When a test for a baseline entry
+# lands, REMOVE that entry — the gate fails if a baseline entry has a
+# corresponding test, forcing shrinkage to track real coverage.
+#
+# Mapping rule: engine name has the trailing `Engine` stripped, then
+# CamelCase boundaries become underscores, then lower-cased.
+# `ContactListEngine` → `contact_list.rs`. Edge cases (consecutive
+# capitals, etc.) — when they appear, prefer renaming the engine over
+# special-casing the gate.
+#
+# Lines starting with `#` and blank lines are ignored.
+ActivityLogEngine
+AppEngine
+ArchivedContactsEngine
+AvatarEditorEngine
+BackupRecoveryEngine
+ContactEditEngine
+ContactLimitEngine
+ContactMergeEngine
+ContactNotFoundEngine
+ContactVisibilityEngine
+DeviceManagementEngine
+DeviceReplacementEngine
+DuplicateDetectionEngine
+DuressPinEngine
+EmergencyShredEngine
+FingerprintVerifyEngine
+GdprEngine
+GroupsEngine
+HelpEngine
+LockScreenEngine
+MoreEngine
+MyInfoEngine
+MyInfoEntryDetailEngine
+RecoveryClaimReviewEngine
+RecoveryHelpEngine
+SettingsEngine
+SocialGraphEngine
+SupportEngine

@@ -306,9 +306,29 @@ mod tests {
     fn test_faq_content_not_empty() {
         let _lock = lock_and_init();
         for faq in get_faqs() {
+            // `faq.id` is a static literal from the FaqDef; an empty
+            // id would be a source-side typo visible at definition.
+            // The interesting tautology check is on question/answer,
+            // which come from `get_string()` — when the locale store
+            // is missing the key, get_string returns the literal
+            // "Missing: faq.{id}.{question|answer}". That string is
+            // non-empty, so `!is_empty()` would silently pass even
+            // when the locale loader is broken or the FAQ key is
+            // mistyped. Asserting `!starts_with("Missing:")` catches
+            // both cases. Mirror of the CC-03 fix in
+            // info_content.rs::tests (audit follow-up commit
+            // bde54107).
             assert!(!faq.id.is_empty(), "FAQ should have ID");
-            assert!(!faq.question.is_empty(), "FAQ should have question");
-            assert!(!faq.answer.is_empty(), "FAQ should have answer");
+            assert!(
+                !faq.question.starts_with("Missing:"),
+                "FAQ {} question is the missing-key placeholder                  (locale loader failed or key typo'd)",
+                faq.id,
+            );
+            assert!(
+                !faq.answer.starts_with("Missing:"),
+                "FAQ {} answer is the missing-key placeholder                  (locale loader failed or key typo'd)",
+                faq.id,
+            );
         }
     }
 

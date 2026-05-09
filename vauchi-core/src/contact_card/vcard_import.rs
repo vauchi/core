@@ -327,9 +327,21 @@ fn parse_single_vcard(block: &str) -> Option<(ContactCard, Option<String>)> {
     }
 
     for (field_type, label, value) in fields {
-        let field = ContactField::new(field_type, &label, &value);
-        // Silently skip fields that fail validation (lenient)
-        let _ = card.add_field(field);
+        let field = ContactField::new(field_type.clone(), &label, &value);
+        if let Err(e) = card.add_field(field) {
+            // ADR-042-shape lenient import: keep the contact, drop only
+            // the failing field — but surface the failure so operators
+            // see corrupt-payload rates from imports. PII-safe:
+            // ContactCardError variants (MaxFieldsReached,
+            // Validation(InvalidPhone|InvalidEmail|InvalidUrl|
+            // ValueTooLong|EmptyValue)) carry no field value or label;
+            // field_type is metadata (Phone/Email/Social/...).
+            tracing::warn!(
+                error = %e,
+                field_type = ?field_type,
+                "vcard import: dropping field that failed validation"
+            );
+        }
     }
 
     Some((card, uid))

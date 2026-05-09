@@ -21,6 +21,7 @@ mod device_link_bridge_tests;
 mod display_hint_tests;
 mod drain_notifications_tests;
 mod exchange_ble_invariants_proptest;
+mod f2_new_4_settings_nav_tests;
 mod file_picker_wiring_tests;
 mod fingerprint_verify_engine_tests;
 mod group_delete_tests;

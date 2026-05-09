@@ -466,8 +466,22 @@ mod tests {
         ) {
             let samples = vec![0.0f32; len];
             let out = resample(&samples, from_rate, to_rate);
+            // Implementation uses integer arithmetic (truncating
+            // division). The "expected" formula in f32 can round up
+            // at ratios near a sample boundary (counterexample:
+            // len=807, from=44931, to=91755 → f32 rounds up to 1648,
+            // integer truncates to 1647). Allow ±1 tolerance — the
+            // property under test is "length scales with ratio", not
+            // exact sample-count agreement with float arithmetic.
             let expected = (len as f32 * to_rate as f32 / from_rate as f32) as usize;
-            proptest::prop_assert_eq!(out.len(), expected);
+            let diff = (out.len() as i64 - expected as i64).abs();
+            proptest::prop_assert!(
+                diff <= 1,
+                "out.len()={}, expected={} (|diff|={}) — len-scaling tolerance is ±1",
+                out.len(),
+                expected,
+                diff
+            );
         }
     }
 }

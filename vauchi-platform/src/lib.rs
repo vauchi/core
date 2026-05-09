@@ -981,12 +981,31 @@ impl VauchiPlatform {
     /// `allow_direct` path — functionality preserved, privacy degraded.
     pub(crate) fn open_vauchi_for_relay(&self) -> Result<Vauchi, MobileError> {
         let mut vauchi = self.open_vauchi()?;
-        let identity = self.get_identity()?;
-        vauchi
-            .set_identity(identity)
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
+        // `Vauchi::new` (in `init`) auto-loads identity from storage via
+        // `Identity::from_storage_bytes` — the same raw format
+        // `vauchi-core::Vauchi::create_identity` writes. When that
+        // succeeds we don't need (or want) to call `set_identity`
+        // again: it errors with `AlreadyInitialized`. F2-MED-2: pre-fix
+        // (encrypted-backup-only `get_identity`) hid this because
+        // get_identity returned `Identity not found` first; post-fix
+        // (raw-format-aware `get_identity`) both load paths succeed
+        // and the redundant `set_identity` surfaced as
+        // `Sync failed: detail=already initialized`.
+        if vauchi.identity().is_none() {
+            let identity = self.get_identity()?;
+            vauchi
+                .set_identity(identity)
+                .map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+        } else {
+            // Identity already loaded by Vauchi::new — but still
+            // require it to exist on disk to satisfy the
+            // "Identity not found" precondition every relay-bound
+            // flow expects. The check is cheap (in-memory cache hit
+            // after Vauchi::new's load).
+            let _ = self.get_identity()?;
+        }
         let _ = vauchi.connect();
         Ok(vauchi)
     }
@@ -1077,17 +1096,78 @@ impl VauchiPlatform {
     }
 
     /// Gets the identity from stored data.
+    ///
+    /// Falls back to disk when the in-memory cache is empty — same shape
+    /// as [`has_identity`]. F2-MED-2 (2026-05-09 device-test campaign)
+    /// repro'd a "Sync failed: detail=Identity not found" toast on
+    /// freshly-onboarded Pixel installs because onboarding writes via
+    /// the sibling `PlatformAppEngine` (which shares the data dir but
+    /// not this struct's `identity_data` mutex). Without the storage
+    /// fallback, the first `sync()` after onboarding hit
+    /// `data.as_ref()` → `None` → "Identity not found", even though
+    /// the identity was on disk.
+    ///
+    /// Two on-disk formats coexist today and both are accepted:
+    ///
+    ///   1. `IdentityBackup` encrypted with `__internal_storage_key__`
+    ///      — the format `VauchiPlatform::create_identity` writes
+    ///      directly. Tests construct identities this way.
+    ///   2. Raw `Identity::to_storage_bytes()` — the format
+    ///      `Vauchi::create_identity` (vauchi-core) writes when
+    ///      `PlatformAppEngine`'s `CreateIdentity` runs through it.
+    ///      This is the production layout used by every Pixel/iOS
+    ///      onboarding (the F2-MED-2 trigger).
+    ///
+    /// Both formats are tried in order; whichever decodes wins. Long-term
+    /// cleanup is to consolidate on a single format and retire the
+    /// duplicate caching in this struct entirely — but that is an
+    /// architectural sweep outside the scope of F2-MED-2.
     pub(crate) fn get_identity(&self) -> Result<Identity, MobileError> {
-        let data = lock_or(&self.identity_data)?;
-        let identity_data = data.as_ref().ok_or(MobileError::Other {
-            detail: "Identity not found".to_string(),
-        })?;
-
-        let backup = IdentityBackup::new(identity_data.backup_data.clone());
-        Identity::import_backup(&backup, "__internal_storage_key__").map_err(|e| {
-            MobileError::Other {
-                detail: e.to_string(),
+        // 1. Hot path — in-memory cache hit.
+        {
+            let data = lock_or(&self.identity_data)?;
+            if let Some(identity_data) = data.as_ref() {
+                return Self::decode_identity_blob(&identity_data.backup_data);
             }
+        }
+
+        // 2. Storage fallback — a sibling instance (`PlatformAppEngine`)
+        //    may have written the identity after this struct was
+        //    constructed. Mirrors `has_identity`'s pattern; populates
+        //    the cache so subsequent calls take the hot path.
+        let storage = self.open_storage()?;
+        let (backup_data, display_name) = storage
+            .load_identity()
+            .map_err(|e| MobileError::Other {
+                detail: format!("Identity load failed: {e}"),
+            })?
+            .ok_or(MobileError::Other {
+                detail: "Identity not found".to_string(),
+            })?;
+
+        let cached = IdentityData {
+            backup_data: backup_data.clone(),
+            display_name,
+        };
+        *lock_or(&self.identity_data)? = Some(cached);
+
+        Self::decode_identity_blob(&backup_data)
+    }
+
+    /// Decode a stored identity blob, accepting both formats currently
+    /// in use (see [`get_identity`] doc-comment). Tries the encrypted
+    /// `IdentityBackup` form first because it's what
+    /// `VauchiPlatform`'s own `create_identity` writes; falls through
+    /// to raw `Identity::to_storage_bytes()` when the blob comes from
+    /// `vauchi-core`'s `save_identity` (the production path on
+    /// Android via `PlatformAppEngine`).
+    fn decode_identity_blob(blob: &[u8]) -> Result<Identity, MobileError> {
+        let backup = IdentityBackup::new(blob.to_vec());
+        if let Ok(identity) = Identity::import_backup(&backup, "__internal_storage_key__") {
+            return Ok(identity);
+        }
+        Identity::from_storage_bytes(blob).map_err(|e| MobileError::Other {
+            detail: format!("Identity decode failed: {e}"),
         })
     }
 
@@ -2496,6 +2576,90 @@ mod tests {
                 Err(MobileError::Other { detail }) if detail == "Identity not found"
             ),
             "open_vauchi_for_relay should fail with Other(Identity not found) when no identity exists"
+        );
+    }
+
+    // F2-MED-2 regression: ensures `get_identity` falls back to disk
+    // when the in-memory cache is empty. The two `VauchiPlatform`
+    // instances simulate the production layout where a sibling
+    // `PlatformAppEngine` (constructed in the same process at the same
+    // data dir) writes the identity via storage but does NOT populate
+    // this struct's `identity_data` mutex. Pre-fix, `get_identity` on
+    // the second instance returned `Other("Identity not found")` and
+    // the first `sync()` call after onboarding surfaced as a
+    // user-visible "Sync failed" toast. Post-fix, the storage fallback
+    // mirrors `has_identity`'s pattern and the cache is populated
+    // lazily on first read.
+    //
+    // @internal
+    #[test]
+    fn test_get_identity_storage_fallback_after_sibling_write() {
+        let dir = TempDir::new().unwrap();
+        let dir_path = dir.path().to_string_lossy().to_string();
+
+        // First instance writes the identity to disk.
+        let wb1 =
+            VauchiPlatform::new(dir_path.clone(), "http://localhost:8080".to_string()).unwrap();
+        wb1.create_identity("Alice".to_string()).unwrap();
+        let public_id_1 = wb1.get_public_id().unwrap();
+
+        // Second instance at the same dir starts with an empty
+        // `identity_data` cache — the production case where the sibling
+        // is `PlatformAppEngine`, not another `VauchiPlatform`.
+        let wb2 = VauchiPlatform::new(dir_path, "http://localhost:8080".to_string()).unwrap();
+
+        // get_identity must fall back to storage and return the
+        // identity that the sibling persisted.
+        let identity = wb2
+            .get_identity()
+            .expect("get_identity should fall back to storage when cache is empty");
+        assert_eq!(
+            identity.public_id(),
+            public_id_1,
+            "storage fallback should return the same identity the sibling wrote"
+        );
+
+        // Calling again should hit the now-populated cache (not visible
+        // from the API surface, but verified by no error path firing).
+        let identity_again = wb2.get_identity().unwrap();
+        assert_eq!(identity_again.public_id(), public_id_1);
+    }
+
+    // F2-MED-2 regression part 2: ensures `get_identity` decodes the
+    // raw `Identity::to_storage_bytes()` format that `vauchi-core`'s
+    // `Vauchi::create_identity` writes (the production path on
+    // Android via `PlatformAppEngine`). Pre-fix this branch surfaced
+    // as `Other("Invalid backup or wrong password")` because the
+    // decoder only knew the encrypted-`IdentityBackup` format that
+    // `VauchiPlatform`'s own `create_identity` writes.
+    //
+    // @internal
+    #[test]
+    fn test_get_identity_decodes_vauchi_core_raw_storage_bytes_format() {
+        use vauchi_core::Identity;
+
+        let dir = TempDir::new().unwrap();
+        let dir_path = dir.path().to_string_lossy().to_string();
+        let wb = VauchiPlatform::new(dir_path, "http://localhost:8080".to_string()).unwrap();
+
+        // Bypass create_identity and write raw `to_storage_bytes` directly
+        // through the storage layer the platform uses — same shape as
+        // what `Vauchi::create_identity` (vauchi-core) produces when
+        // `PlatformAppEngine` orchestrates onboarding.
+        let identity = Identity::create("Carol");
+        let raw_bytes = identity.to_storage_bytes();
+        let display_name = identity.display_name().to_string();
+        let storage = wb.open_storage().unwrap();
+        storage.save_identity(&raw_bytes, &display_name).unwrap();
+        drop(storage);
+
+        let recovered = wb
+            .get_identity()
+            .expect("get_identity must accept Vauchi::to_storage_bytes blobs");
+        assert_eq!(
+            recovered.public_id(),
+            identity.public_id(),
+            "raw-format decoder must return the same identity the sibling wrote"
         );
     }
 

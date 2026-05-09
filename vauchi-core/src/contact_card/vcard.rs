@@ -110,7 +110,18 @@ pub fn import_vcard(vcard: &str) -> Result<ContactCard, VCardError> {
 
     let mut card = ContactCard::new(&display_name);
     for (field_type, label, value) in fields {
-        let _ = card.add_field(ContactField::new(field_type, &label, &value));
+        let field_type_owned = field_type.clone();
+        if let Err(e) = card.add_field(ContactField::new(field_type, &label, &value)) {
+            // ADR-042-shape lenient import: keep the contact, drop only
+            // the failing field — surface validation failures so operators
+            // see corrupt-payload rates from imports. PII-safe:
+            // ContactCardError variants carry no field value or label.
+            tracing::warn!(
+                error = %e,
+                field_type = ?field_type_owned,
+                "vcard4 import: dropping field that failed validation"
+            );
+        }
     }
 
     Ok(card)

@@ -1172,12 +1172,22 @@ impl ExchangeSession {
         let remote = &result.remote_card;
         let mut their_card = ContactCard::new(&remote.display_name);
         for (label, value) in &remote.fields {
-            // Ignore field-count errors — BLE payload is already validated
-            let _ = their_card.add_field(crate::contact_card::ContactField::new(
+            // BLE payload is parser-validated for length; add_field can
+            // still fail on MAX_FIELDS / Validation. ADR-042-shape lenient:
+            // keep the peer card, drop the failing field — but surface
+            // for operators (corrupt-payload rates from peers).
+            // PII-safe: ContactCardError variants carry no field value
+            // or label.
+            if let Err(e) = their_card.add_field(crate::contact_card::ContactField::new(
                 crate::contact_card::FieldType::Custom,
                 label,
                 value,
-            ));
+            )) {
+                tracing::warn!(
+                    error = %e,
+                    "ble exchange: dropping peer field that failed validation"
+                );
+            }
         }
         if let Some(ref avatar) = remote.avatar
             && let Err(e) = their_card.set_avatar(avatar.clone())

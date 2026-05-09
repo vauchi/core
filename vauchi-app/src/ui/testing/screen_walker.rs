@@ -109,9 +109,28 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
                 action_id: format!("cancel_{id}"),
             });
         }
+        Component::Banner {
+            action_id,
+            action_label,
+            ..
+        } => {
+            // A Banner renders an action button only when both
+            // action_label and action_id are non-empty. Empty
+            // action_label is the convention for a passive
+            // informational banner (e.g. ACTION_OFFLINE_BANNER) —
+            // emitting an ActionPressed for those would create a
+            // phantom affordance the renderer never shows.
+            if !action_label.is_empty() && !action_id.is_empty() {
+                out.push(UserAction::ActionPressed {
+                    action_id: action_id.clone(),
+                });
+            }
+        }
         // Components that carry no user affordance at the walker's
-        // current scope. Phase 1 extends coverage as new reachability
-        // invariants are added.
+        // current scope. Phase 2 extensions (PinInput digit entry,
+        // EditableText edit-toggle, Slider value change) require
+        // teaching  to diff non-ActionPressed
+        // shapes — see contact_list.rs reachability test docstring.
         Component::Text { .. }
         | Component::FieldList { .. }
         | Component::Preview { .. }
@@ -121,7 +140,6 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
         | Component::PinInput { .. }
         | Component::QrCode { .. }
         | Component::Divider
-        | Component::Banner { .. }
         | Component::AvatarPreview { .. }
         | Component::Slider { .. } => {}
     }
@@ -397,6 +415,47 @@ mod tests {
                 },
             ]
         );
+    }
+
+    fn banner(action_id: &str, action_label: &str) -> Component {
+        Component::Banner {
+            text: "banner text".into(),
+            action_label: action_label.into(),
+            action_id: action_id.into(),
+            a11y: None,
+        }
+    }
+
+    // @internal
+    #[test]
+    fn banner_with_action_emits_action_pressed() {
+        let screen = screen_with(vec![banner("open_update_link", "Update")], vec![]);
+        let actions = walk_actions(&screen);
+        assert_eq!(
+            actions,
+            vec![UserAction::ActionPressed {
+                action_id: "open_update_link".into(),
+            }]
+        );
+    }
+
+    // @internal
+    #[test]
+    fn banner_with_empty_action_label_emits_nothing() {
+        // ACTION_OFFLINE_BANNER ships with empty action_label so the
+        // renderer shows no button — the walker must not emit a
+        // phantom affordance.
+        let screen = screen_with(vec![banner("offline_banner", "")], vec![]);
+        let actions = walk_actions(&screen);
+        assert_eq!(actions, Vec::<UserAction>::new());
+    }
+
+    // @internal
+    #[test]
+    fn banner_with_empty_action_id_emits_nothing() {
+        let screen = screen_with(vec![banner("", "Dismiss")], vec![]);
+        let actions = walk_actions(&screen);
+        assert_eq!(actions, Vec::<UserAction>::new());
     }
 
     // @internal

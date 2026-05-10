@@ -119,6 +119,33 @@ impl AppPasswordConfig {
         }
     }
 
+    /// Rotates the normal password.
+    ///
+    /// Generates a fresh salt and Argon2id hash for `new_password`,
+    /// preserving any configured duress PIN byte-for-byte. Errors if
+    /// the new password collides with an existing duress PIN — that
+    /// would silently disable the duress branch since `verify` returns
+    /// `Normal` before checking duress, so we keep the same invariant
+    /// `setup_duress` enforces (normal != duress).
+    ///
+    /// On error the config state is unchanged.
+    pub fn change_password(&mut self, new_password: &str) -> VauchiResult<()> {
+        if let (Some(duress_salt), Some(duress_hash)) = (&self.duress_salt, &self.duress_hash) {
+            let candidate = hash_password(new_password, duress_salt)?;
+            if bool::from(candidate.ct_eq(duress_hash)) {
+                return Err(VauchiError::InvalidState(
+                    "new password must differ from duress PIN".into(),
+                ));
+            }
+        }
+
+        let new_salt = generate_salt()?;
+        let new_hash = hash_password(new_password, &new_salt)?;
+        self.password_salt = new_salt;
+        self.password_hash = new_hash;
+        Ok(())
+    }
+
     /// Constructs an `AppPasswordConfig` from raw stored values.
     ///
     /// Used by the storage layer when loading persisted password config.

@@ -181,6 +181,48 @@ impl Vauchi {
         Ok(())
     }
 
+    /// Rotates the app password.
+    ///
+    /// Verifies `current_password` against the stored config — must
+    /// match the **normal** password, not the duress PIN: a duress
+    /// unlock is read-only decoy access and must never escalate to
+    /// credential management. On a successful verify, generates a new
+    /// salt + Argon2id hash for `new_password` (preserving any
+    /// configured duress PIN byte-for-byte) and persists the rotated
+    /// values to the identity table.
+    ///
+    /// On any failure (no identity, no existing config, wrong current,
+    /// or new=duress collision) storage is **not** mutated, so the
+    /// caller can retry with corrected input.
+    pub fn change_app_password(
+        &mut self,
+        current_password: &str,
+        new_password: &str,
+    ) -> VauchiResult<()> {
+        if self.identity.is_none() {
+            return Err(VauchiError::IdentityNotInitialized);
+        }
+
+        let mut config = self
+            .storage
+            .load_password_config()?
+            .ok_or_else(|| VauchiError::InvalidState("no password configured".into()))?;
+
+        match config.verify(current_password) {
+            AuthResult::Normal => {}
+            AuthResult::Duress | AuthResult::Invalid => {
+                return Err(VauchiError::InvalidState("invalid password".into()));
+            }
+        }
+
+        config.change_password(new_password)?;
+
+        self.storage
+            .save_app_password(config.password_hash(), config.password_salt())?;
+
+        Ok(())
+    }
+
     /// Sets up a duress PIN.
     ///
     /// Requires an app password to be configured first.

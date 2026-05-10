@@ -134,6 +134,110 @@ fn test_setup_duress_same_as_normal_rejected() {
 }
 
 // =============================================================================
+// Change Password — KDF-level (AppPasswordConfig)
+// =============================================================================
+
+// @internal
+#[test]
+fn test_change_password_rotates_salt_and_hash() {
+    let mut config = AppPasswordConfig::create("old-password").expect("create");
+    let old_hash = *config.password_hash();
+    let old_salt = *config.password_salt();
+
+    config.change_password("new-password").expect("rotate");
+
+    assert_ne!(
+        config.password_hash(),
+        &old_hash,
+        "password_hash must change after rotation"
+    );
+    assert_ne!(
+        config.password_salt(),
+        &old_salt,
+        "password_salt must change after rotation (random regenerate)"
+    );
+}
+
+// @internal
+#[test]
+fn test_change_password_old_no_longer_verifies() {
+    let mut config = AppPasswordConfig::create("old-password").expect("create");
+    config.change_password("new-password").expect("rotate");
+
+    assert!(
+        matches!(config.verify("old-password"), AuthResult::Invalid),
+        "old password must no longer verify after rotation"
+    );
+    assert!(
+        matches!(config.verify("new-password"), AuthResult::Normal),
+        "new password must verify as Normal after rotation"
+    );
+}
+
+// @internal
+#[test]
+fn test_change_password_preserves_duress_pin() {
+    let mut config = AppPasswordConfig::create("old-password").expect("create");
+    config.setup_duress("duress-pin").expect("setup duress");
+    let duress_hash_before = *config.duress_hash().expect("duress configured");
+    let duress_salt_before = *config.duress_salt().expect("duress configured");
+
+    config.change_password("new-password").expect("rotate");
+
+    // Duress hash and salt are byte-for-byte preserved
+    assert_eq!(
+        config.duress_hash().expect("still configured"),
+        &duress_hash_before,
+        "duress_hash must not change when only normal password rotates"
+    );
+    assert_eq!(
+        config.duress_salt().expect("still configured"),
+        &duress_salt_before,
+        "duress_salt must not change when only normal password rotates"
+    );
+    assert!(config.duress_enabled());
+
+    // Duress PIN still verifies as Duress
+    assert!(
+        matches!(config.verify("duress-pin"), AuthResult::Duress),
+        "duress PIN must still authenticate after rotation"
+    );
+}
+
+// @internal
+#[test]
+fn test_change_password_collision_with_duress_rejected() {
+    // Maintains the setup_duress invariant: normal != duress.
+    let mut config = AppPasswordConfig::create("old-password").expect("create");
+    config.setup_duress("duress-pin").expect("setup duress");
+
+    let result = config.change_password("duress-pin");
+    assert!(
+        result.is_err(),
+        "rotating to a password equal to the configured duress PIN must be rejected"
+    );
+
+    // Config state is untouched on rejection
+    assert!(
+        matches!(config.verify("old-password"), AuthResult::Normal),
+        "old password must still verify after a rejected rotation"
+    );
+}
+
+// @internal
+#[test]
+fn test_change_password_no_duress_configured_works() {
+    let mut config = AppPasswordConfig::create("old-password").expect("create");
+    assert!(!config.duress_enabled());
+
+    config.change_password("new-password").expect("rotate");
+    assert!(
+        matches!(config.verify("new-password"), AuthResult::Normal),
+        "rotation works without duress configured"
+    );
+}
+
+// =============================================================================
 // Password Storage Tests
 // =============================================================================
 
@@ -467,6 +571,121 @@ fn test_disable_duress() {
     wb.disable_duress().expect("disable should succeed");
 
     assert!(!wb.is_duress_enabled().expect("check should succeed"));
+}
+
+// =============================================================================
+// Change App Password — Vauchi integration (round-trips through storage)
+// =============================================================================
+
+// @internal
+#[test]
+fn test_change_app_password_round_trip() {
+    let mut wb = create_vauchi_with_identity("Alice");
+    wb.setup_app_password("old-pin-1234").expect("setup");
+
+    wb.change_app_password("old-pin-1234", "new-pin-9876")
+        .expect("rotate");
+
+    // Old no longer authenticates
+    let old_result = wb.authenticate("old-pin-1234");
+    assert!(
+        old_result.is_err(),
+        "old password must not authenticate after change_app_password"
+    );
+
+    // New authenticates as Normal
+    let new_mode = wb
+        .authenticate("new-pin-9876")
+        .expect("new password authenticates");
+    assert_eq!(new_mode, AuthMode::Normal);
+}
+
+// @internal
+#[test]
+fn test_change_app_password_wrong_current_rejected_no_storage_change() {
+    let mut wb = create_vauchi_with_identity("Alice");
+    wb.setup_app_password("old-pin-1234").expect("setup");
+
+    let err = wb
+        .change_app_password("WRONG", "new-pin-9876")
+        .expect_err("wrong current password must error");
+    let _ = err; // Not asserting variant — InvalidState is the contract.
+
+    // Old still authenticates — storage was not mutated on rejection
+    let mode = wb
+        .authenticate("old-pin-1234")
+        .expect("old still authenticates after rejected rotation");
+    assert_eq!(mode, AuthMode::Normal);
+
+    // New does NOT authenticate
+    let new_result = wb.authenticate("new-pin-9876");
+    assert!(
+        new_result.is_err(),
+        "new password must not authenticate after rejected rotation"
+    );
+}
+
+// @internal
+#[test]
+fn test_change_app_password_no_existing_config_errors() {
+    // Identity exists but no password has ever been configured.
+    let mut wb = create_vauchi_with_identity("Alice");
+
+    let err = wb
+        .change_app_password("anything", "new-pin")
+        .expect_err("change without existing config must error");
+    let _ = err;
+}
+
+// @internal
+#[test]
+fn test_change_app_password_duress_unlock_cannot_change_password() {
+    // Security invariant: if the user (under duress) enters the duress
+    // PIN as the "current" password, change_app_password must NOT allow
+    // the rotation to succeed. The duress unlock is for read-only decoy
+    // access; it must never escalate to credential management.
+    let mut wb = create_vauchi_with_identity("Alice");
+    wb.setup_app_password("real-pin-1234").expect("setup");
+    wb.setup_duress_password("duress-9999")
+        .expect("setup duress");
+
+    let err = wb
+        .change_app_password("duress-9999", "attacker-pin")
+        .expect_err("duress PIN must not authorize a password change");
+    let _ = err;
+
+    // Real password still works; attacker pin does not
+    let real_mode = wb
+        .authenticate("real-pin-1234")
+        .expect("real password still works");
+    assert_eq!(real_mode, AuthMode::Normal);
+    assert!(wb.authenticate("attacker-pin").is_err());
+}
+
+// @internal
+#[test]
+fn test_change_app_password_persists_across_storage_reload() {
+    // The new hash + salt must be persisted to storage, not just the
+    // in-memory AppPasswordConfig.
+    let mut wb = create_vauchi_with_identity("Alice");
+    wb.setup_app_password("old-pin-1234").expect("setup");
+    wb.change_app_password("old-pin-1234", "new-pin-9876")
+        .expect("rotate");
+
+    // Reload via load_password_config — same path Vauchi::authenticate uses
+    let reloaded = wb
+        .storage()
+        .load_password_config()
+        .expect("load")
+        .expect("config exists");
+    assert!(matches!(
+        reloaded.verify("new-pin-9876"),
+        AuthResult::Normal
+    ));
+    assert!(matches!(
+        reloaded.verify("old-pin-1234"),
+        AuthResult::Invalid
+    ));
 }
 
 // =============================================================================

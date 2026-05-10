@@ -95,7 +95,9 @@ vauchi-core/src/storage/mod.rs 1079
 #   problem 2026-05-01-android-humble-ui-deep-retirement Phase 2a/A3a)
 # (+10 on screens.rs for AppScreen::DecoyContacts engine factory,
 #   problem 2026-05-01-android-humble-ui-deep-retirement Phase 2c)
-vauchi-app/src/ui/app_engine/mod.rs 1200
+# (+4 on mod.rs for AppScreen::ChangePassword variant + screen_id arms,
+#   feat/2026-05-10-change-app-password)
+vauchi-app/src/ui/app_engine/mod.rs 1204
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -105,7 +107,10 @@ vauchi-app/src/ui/app_engine/mod.rs 1200
 #  handle_file_picked, BackupPasswordEntry detection in handle_completion,
 #  execute_backup_restore helper that calls Vauchi::import_full_backup
 #  and routes to MainScreen on success / LinkChoice with alert on failure.)
-vauchi-app/src/ui/app_engine/routing.rs 1238
+# (+19 on routing.rs for AppScreen::ChangePassword arm in handle_completion
+#   — calls vauchi.change_app_password and surfaces ShowAlert on failure,
+#   feat/2026-05-10-change-app-password)
+vauchi-app/src/ui/app_engine/routing.rs 1257
 vauchi-app/src/ui/app_engine/screens.rs 1344
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files

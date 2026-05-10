@@ -20,8 +20,10 @@
 //! through review diffs rather than through user reports.
 
 use vauchi_app::ui::{
-    Component, DropdownOption, MoreEngine, SettingsConfig, SettingsEngine, WorkflowEngine,
+    AppEngine, AppScreen, Component, DropdownOption, MoreEngine, SettingsConfig, SettingsEngine,
+    WorkflowEngine,
 };
+use vauchi_core::api::Vauchi;
 
 /// The canonical SettingsGroup ids emitted by `SettingsEngine`,
 /// in the order they appear on every Humble UI renderer.
@@ -166,6 +168,55 @@ fn settings_screen_appearance_and_danger_groups_present() {
              on 2026-05-08."
         );
     }
+}
+
+// @internal
+#[test]
+fn settings_screen_about_version_renders_non_empty_semver() {
+    // Regression for 2026-05-10 device-test campaign F-005:
+    // `61b01b2b` (chore: bump core 0.50.0 → 0.51.0) landed at
+    // 10:05 on 2026-05-08, and `5645efa2` (fix: render Settings
+    // "Version" row with binding semver) landed 5h46m later at
+    // 15:51. The published vauchi-platform 0.51.0 binding therefore
+    // does not contain the fix, and every clean install of the
+    // shipped app renders an empty Version row — re-verified
+    // 2026-05-10 on Pixel 3a + Samsung S7 + iPhone SE clean
+    // installs.
+    //
+    // The fix is now on core/main; this test guards against any
+    // future refactor of `app_engine/screens.rs:238` silently
+    // re-emptying `SettingsConfig.version`. We don't use
+    // `sample_settings_config()` (which seeds a fake "0.0.0-test")
+    // — the production construction site sets `env!("CARGO_PKG_VERSION")`
+    // and we assert the rendered screen reflects that.
+    // Drive the **production construction site** at
+    // `app_engine/screens.rs:238`, not a synthetic SettingsConfig.
+    // A test that builds its own SettingsConfig with a populated
+    // `version` field would silently pass even if `screens.rs:238`
+    // regressed back to `version: String::new()` — exactly the
+    // regression shape we want to prevent.
+    let mut vauchi = Vauchi::in_memory().expect("Vauchi::in_memory must succeed");
+    vauchi.create_identity("Alice").expect("create_identity");
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Settings);
+    let screen = engine.current_screen();
+    let json = serde_json::to_string(&screen).expect("settings screen must serialize");
+
+    let pkg_version = env!("CARGO_PKG_VERSION");
+    assert!(
+        !pkg_version.is_empty(),
+        "CARGO_PKG_VERSION must be non-empty at compile time — \
+         vauchi-app's Cargo.toml is malformed."
+    );
+    assert!(
+        json.contains(pkg_version),
+        "AppEngine-rendered Settings screen must include the binding semver \
+         `{pkg_version}`. If this fails, `app_engine/screens.rs:238` \
+         `version: env!(\"CARGO_PKG_VERSION\").into()` was either dropped \
+         (regressing to the F-005 empty-Version-row state) or the SettingsEngine \
+         no longer renders the value. Fix at the construction site, not here. \
+         Source: 2026-05-10 device-test campaign F-005."
+    );
 }
 
 // @internal

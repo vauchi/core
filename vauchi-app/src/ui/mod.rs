@@ -15,6 +15,7 @@ mod app_engine;
 mod archived_contacts;
 pub mod avatar_editor;
 mod backup_recovery;
+mod change_password;
 mod component;
 mod contact_detail;
 mod contact_edit;
@@ -72,6 +73,7 @@ pub use app_engine::{AppEngine, AppScreen, TabLayout};
 pub use archived_contacts::ArchivedContactsEngine;
 pub use avatar_editor::AvatarEditorEngine;
 pub use backup_recovery::{BackupLevel, BackupMode, BackupRecoveryEngine};
+pub use change_password::ChangePasswordEngine;
 pub use component::{
     A11y, AccessibilityRole, ActionListItem, Component, DropdownOption, Field, InfoItem, InputType,
     Item, ListItemAction, ListItemActionKind, PreviewVariant, QrMode, ScanQuality, SettingsItem,

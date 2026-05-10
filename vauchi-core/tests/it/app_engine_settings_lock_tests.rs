@@ -214,6 +214,170 @@ fn duress_pin_disable_persists_via_handle_completion() {
     );
 }
 
+// ── change password flow tests ───────────────────────────────────────
+
+// @internal
+#[test]
+fn settings_change_password_navigates_to_change_password_screen() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    vauchi.setup_app_password("old-pin-1234").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::Settings);
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "security".into(),
+        item_id: "change_password".into(),
+    });
+    let ActionResult::NavigateTo(screen) = result else {
+        panic!("expected NavigateTo, got {result:?}");
+    };
+    assert_eq!(screen.screen_id, "change_password");
+    assert_eq!(engine.current_app_screen(), &AppScreen::ChangePassword);
+}
+
+// @internal
+#[test]
+fn change_password_screen_renders_three_password_fields() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    vauchi.setup_app_password("old-pin-1234").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    let screen = engine.navigate_to(AppScreen::ChangePassword);
+    let component_ids: Vec<&str> = screen
+        .components
+        .iter()
+        .filter_map(|c| match c {
+            vauchi_app::ui::Component::TextInput { id, input_type, .. } => {
+                assert_eq!(
+                    *input_type,
+                    vauchi_app::ui::InputType::Password,
+                    "every input on ChangePassword must be InputType::Password"
+                );
+                Some(id.as_str())
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(component_ids.contains(&"current_password"));
+    assert!(component_ids.contains(&"new_password"));
+    assert!(component_ids.contains(&"confirm_password"));
+}
+
+// @internal
+#[test]
+fn change_password_submit_persists_via_handle_completion() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    vauchi.setup_app_password("old-pin-1234").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::ChangePassword);
+
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "current_password".into(),
+        value: "old-pin-1234".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "new_password".into(),
+        value: "new-pin-9876".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "confirm_password".into(),
+        value: "new-pin-9876".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+
+    assert!(
+        matches!(result, ActionResult::NavigateTo(_)),
+        "submit should navigate back on success, got {result:?}"
+    );
+
+    // Storage was rotated — old fails, new succeeds.
+    let vauchi = engine.vauchi_mut();
+    assert!(vauchi.authenticate("old-pin-1234").is_err());
+    assert!(vauchi.authenticate("new-pin-9876").is_ok());
+}
+
+// @internal
+#[test]
+fn change_password_wrong_current_shows_alert_storage_unchanged() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    vauchi.setup_app_password("old-pin-1234").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::ChangePassword);
+
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "current_password".into(),
+        value: "WRONG-current".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "new_password".into(),
+        value: "new-pin-9876".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "confirm_password".into(),
+        value: "new-pin-9876".into(),
+    });
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit".into(),
+    });
+
+    assert!(
+        matches!(result, ActionResult::ShowAlert { .. }),
+        "wrong current password should ShowAlert, got {result:?}"
+    );
+
+    // Storage unchanged — old still authenticates.
+    let vauchi = engine.vauchi_mut();
+    assert!(vauchi.authenticate("old-pin-1234").is_ok());
+    assert!(vauchi.authenticate("new-pin-9876").is_err());
+}
+
+// @internal
+#[test]
+fn change_password_mismatch_disables_submit() {
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    vauchi.setup_app_password("old-pin-1234").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    engine.navigate_to(AppScreen::ChangePassword);
+
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "current_password".into(),
+        value: "old-pin-1234".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "new_password".into(),
+        value: "new-pin-9876".into(),
+    });
+    // Confirm differs from new
+    let result = engine.handle_action(UserAction::TextChanged {
+        component_id: "confirm_password".into(),
+        value: "different".into(),
+    });
+    let ActionResult::UpdateScreen(screen) = result else {
+        panic!("expected UpdateScreen, got {result:?}");
+    };
+    let submit = screen
+        .actions
+        .iter()
+        .find(|a| a.id == "submit")
+        .expect("submit action present");
+    assert!(
+        !submit.enabled,
+        "submit must be disabled while new != confirm"
+    );
+}
+
 // ── lock screen password verification tests (CRIT-3) ─────────────────
 
 // @internal

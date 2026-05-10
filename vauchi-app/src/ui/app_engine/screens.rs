@@ -12,6 +12,7 @@ use super::initials;
 use crate::ui::activity_log::{ActivityLogEngine, ActivityLogItem};
 use crate::ui::archived_contacts::ArchivedContactsEngine;
 use crate::ui::backup_recovery::BackupRecoveryEngine;
+use crate::ui::change_password::ChangePasswordEngine;
 use crate::ui::component::{
     A11y, Field, Item, ListItemAction, ListItemActionKind, Status, UiFieldVisibility,
 };
@@ -369,6 +370,7 @@ impl AppEngine {
                     .collect();
                 Box::new(DecoyContactsEngine::new(decoys))
             }
+            AppScreen::ChangePassword => Box::new(ChangePasswordEngine::new()),
             AppScreen::EmergencyShred => Box::new(EmergencyShredEngine::new()),
             AppScreen::DeliveryStatus => {
                 let items = Self::load_delivery_items(vauchi);

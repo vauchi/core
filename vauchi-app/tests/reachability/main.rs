@@ -9,6 +9,7 @@
 //! `Cargo.toml` and wired into the `just reachability` recipe
 //! (plan Task 1.4).
 
+mod change_password;
 mod contact_detail;
 mod contact_list;
 mod decoy_contacts;

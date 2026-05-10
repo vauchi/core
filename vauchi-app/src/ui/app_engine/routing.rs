@@ -642,6 +642,31 @@ impl AppEngine {
                     }
                 }
             }
+            AppScreen::ChangePassword => {
+                let cp_engine = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::ChangePasswordEngine>());
+                if let Some(engine) = cp_engine {
+                    let current = engine.current_password().to_string();
+                    let new = engine.new_password().to_string();
+                    // An empty current_password reaches here only on Cancel
+                    // (the Save button stays disabled until both fields are
+                    // populated and matching).  Treat empty current as a
+                    // cancel — navigate back without touching storage.
+                    if !current.is_empty()
+                        && !new.is_empty()
+                        && let Err(e) = self.vauchi.change_app_password(&current, &new)
+                    {
+                        return ActionResult::ShowAlert {
+                            title: "Error".into(),
+                            message: format!("Could not change password: {e}"),
+                        };
+                    }
+                }
+                let screen = self.navigate_back();
+                ActionResult::NavigateTo(screen)
+            }
             AppScreen::DuressPin => {
                 let dp_engine = self
                     .engine

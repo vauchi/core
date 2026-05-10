@@ -168,7 +168,10 @@ impl AppEngine {
                         url: "https://docs.vauchi.app/legal/privacy-policy".into(),
                     });
                 }
-                // change_password: not yet implemented
+                "change_password" => {
+                    let screen = self.navigate_to(AppScreen::ChangePassword);
+                    return Some(ActionResult::NavigateTo(screen));
+                }
                 _ => {}
             }
         }

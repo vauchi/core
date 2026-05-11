@@ -26,6 +26,7 @@ mod file_picker_wiring_tests;
 mod fingerprint_verify_engine_tests;
 mod group_delete_tests;
 mod help_engine_wiring_tests;
+mod humble_surface_contract_tests;
 mod notification_contract_tests;
 mod notification_emitter_tests;
 mod notification_proptest;

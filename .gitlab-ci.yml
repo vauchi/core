@@ -299,6 +299,112 @@ lint:adr-046:
           - "**/*.rs"
           - ".gitlab-ci.yml"
 
+# Legacy-surface ratchet metric (Phase 0 / Task 0.1 / Step 2 of
+# `_private/docs/planning/todo/2026-05-11-pure-functional-core-program-plan.md`).
+#
+# Counts the legacy domain-typed binding surface (mobile_*.rs UniFFI
+# exports, non-Humble PlatformAppEngine methods, ambient nondeterminism
+# in vauchi-core, etc.) on HEAD and on origin/main, then prints the
+# delta. Any counter that GREW vs main is flagged in red and exits
+# non-zero — but the job is `allow_failure: true` until Phase 6 /
+# Task 6.3 flips it to a hard gate.
+#
+# The audit script lives in the scripts repo and is cloned the same
+# way as `lint:adr-046`. If the script is not yet on scripts/main
+# (e.g. pre-merge of the introducing MR), the job no-ops cleanly.
+metric:audit-mobile-surface:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  allow_failure: true
+  before_script:
+    - apk add --no-cache bash git python3
+    - |
+      if [ ! -d ../scripts ]; then
+        git clone --depth=1 https://gitlab.com/vauchi/scripts.git ../scripts
+      else
+        git -C ../scripts pull --ff-only 2>/dev/null || true
+      fi
+  script:
+    - |
+      set -euo pipefail
+      SCRIPT=../scripts/scripts/audit-mobile-surface.sh
+      if [ ! -f "$SCRIPT" ]; then
+        echo "audit-mobile-surface.sh not yet on scripts/main — skipping."
+        echo "(Will activate automatically once the introducing MR merges.)"
+        exit 0
+      fi
+
+      # The audit script expects a workspace root containing a `core/`
+      # sub-directory. We are inside core, so symlink to mimic the
+      # layout. Frontend counters (ios_, android_, tui_) come out as 0
+      # in core CI by design — those repos are audited from their own
+      # pipelines or from the workspace-root snapshot in `_private/`.
+      WS_HEAD=$(mktemp -d)
+      ln -sfn "$CI_PROJECT_DIR" "$WS_HEAD/core"
+      bash "$SCRIPT" "$WS_HEAD" >"$WS_HEAD/head.json"
+      echo "── HEAD ──"
+      cat "$WS_HEAD/head.json"
+
+      # Run the same script against origin/main via a worktree.
+      # GitLab CI's default clone is shallow — fetch main explicitly
+      # before the worktree add, matching `lint:semver`'s pattern.
+      # A missing origin/main (first-push edge case) skips the diff
+      # and leaves only the absolute HEAD counters in the log.
+      git fetch --depth=1 origin main 2>/dev/null || true
+      if ! git rev-parse origin/main >/dev/null 2>&1; then
+        echo "origin/main not available — skipping delta."
+        exit 0
+      fi
+      WS_MAIN=$(mktemp -d)
+      git worktree add -f --detach "$WS_MAIN/core" origin/main >/dev/null
+      bash "$SCRIPT" "$WS_MAIN" >"$WS_MAIN/main.json"
+      echo "── origin/main ──"
+      cat "$WS_MAIN/main.json"
+
+      python3 - "$WS_MAIN/main.json" "$WS_HEAD/head.json" <<'PY'
+      import json, sys
+      main = json.load(open(sys.argv[1]))["totals"]
+      head = json.load(open(sys.argv[2]))["totals"]
+      width = max(len(k) for k in head)
+      grew, shrank, same = [], [], []
+      for k in sorted(head):
+          m, h = main.get(k, 0), head[k]
+          d = h - m
+          (grew if d > 0 else shrank if d < 0 else same).append((k, m, h, d))
+      print()
+      print("=" * 72)
+      print("Legacy-surface ratchet — HEAD vs origin/main")
+      print("=" * 72)
+      if shrank:
+          print("\n[OK] Counters that shrank:")
+          for k, m, h, d in shrank:
+              print(f"  {k:<{width}}  {m:>4} -> {h:>4}  (Δ {d:+d})")
+      if same:
+          print("\n[--] Counters unchanged:")
+          for k, m, h, d in same:
+              print(f"  {k:<{width}}  {m:>4}")
+      if grew:
+          print("\n[FAIL] Counters that GREW (ratchet violation):")
+          for k, m, h, d in grew:
+              print(f"  {k:<{width}}  {m:>4} -> {h:>4}  (Δ +{d})")
+          print("\nThis MR added legacy surface. Audit the diff for new")
+          print("`Mobile*` types, new PlatformAppEngine pub fns outside the")
+          print("Humble allow-list, or new SystemTime::now / thread_rng /")
+          print("thread::sleep callsites under vauchi-core. Plan:")
+          print("  _private/docs/planning/todo/2026-05-11-pure-functional-core-program-plan.md")
+          sys.exit(1)
+      print()
+      PY
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "**/*.rs"
+          - ".gitlab-ci.yml"
+
 # REUSE compliance provided by vauchi/scripts ci-templates/reuse.yml
 
 # ============================================================

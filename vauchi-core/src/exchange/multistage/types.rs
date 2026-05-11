@@ -44,6 +44,29 @@ pub enum ProtocolState {
     Failed(String),
 }
 
+/// Audio-proximity verification state used by `MultiStageSession` when
+/// the active exchange mode is `Hover`. The ultrasonic handshake fires
+/// after both peers reach the QR-scanning phase; `Pending` is the
+/// pre-handshake state, `Listening` covers the chirp-and-listen window,
+/// `Confirmed` is the success path, and `Failed` triggers the
+/// proximity-specific Failed-state ScreenModel chrome (distinct from
+/// generic protocol failure).
+///
+/// Glance ignores this state — its engine and session never transition
+/// the field, because the mode never emits `AudioEmitChallenge` /
+/// `AudioListenForResponse`. Lives in `vauchi-core` so the session (the
+/// protocol producer) and the engine (the renderer consumer) share a
+/// single source of truth — see the design pass at
+/// `_private/docs/problems/2026-04-28-multi-stage-engine-hover-ultrasonic/investigation.md`
+/// Option B.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AudioProximityState {
+    Pending,
+    Listening,
+    Confirmed,
+    Failed,
+}
+
 /// Bitmap tracking which chunks have been received.
 #[derive(Debug, Clone)]
 pub struct ChunkBitmap {

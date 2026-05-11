@@ -32,7 +32,7 @@
 //! the corresponding chrome.
 
 use vauchi_core::Event;
-use vauchi_core::exchange::{ProtocolState, QrPayload};
+use vauchi_core::exchange::{AudioProximityState, ProtocolState, QrPayload};
 
 use crate::ui::exchange_qr::ScanQualityTracker;
 use crate::ui::*;
@@ -138,25 +138,6 @@ mod camera_gate_tests {
         let g = CameraGate::PermissionDenied.promote(CameraGate::Available);
         assert_eq!(g, CameraGate::PermissionDenied);
     }
-}
-
-/// Audio-proximity verification state owned by the engine when the
-/// active exchange mode is `Hover`. The ultrasonic handshake fires
-/// after both peers reach the QR-scanning phase; `Pending` is the
-/// pre-handshake state, `Listening` covers the chirp-and-listen
-/// window, `Confirmed` is the success path, and `Failed` triggers
-/// the proximity-specific Failed-state ScreenModel chrome
-/// (distinct from generic protocol failure).
-///
-/// Glance ignores this state — its engine constructor leaves the
-/// field at `Pending` and the value never transitions because the
-/// mode never emits `AudioEmitChallenge` / `AudioListenForResponse`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AudioProximityState {
-    Pending,
-    Listening,
-    Confirmed,
-    Failed,
 }
 
 /// Engine for the multi-stage face-to-face exchange screen.

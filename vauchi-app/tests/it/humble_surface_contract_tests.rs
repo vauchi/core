@@ -175,6 +175,7 @@ fn classify(names: &BTreeSet<String>) -> (Vec<String>, Vec<String>) {
     (humble, surplus)
 }
 
+// @internal
 #[test]
 fn humble_allowlist_is_sorted_and_unique() {
     // Compile-time-ish self-check: the allow-list itself stays sorted
@@ -196,6 +197,7 @@ fn humble_allowlist_is_sorted_and_unique() {
     );
 }
 
+// @internal
 #[test]
 fn humble_allowlist_size_matches_plan() {
     // The plan's Task 0.2 names exactly 25 methods as the genuine
@@ -210,6 +212,7 @@ fn humble_allowlist_size_matches_plan() {
     );
 }
 
+// @internal
 #[test]
 fn platform_app_engine_surface_respects_ratchet() {
     let dir = platform_src_dir();
@@ -272,6 +275,7 @@ fn platform_app_engine_surface_respects_ratchet() {
     }
 }
 
+// @internal
 #[test]
 #[ignore = "intentionally red: lists the Phase-3 retirement queue. \
             Run with `cargo test -- --ignored \

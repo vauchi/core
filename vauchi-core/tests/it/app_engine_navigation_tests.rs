@@ -948,6 +948,13 @@ fn navigate_to_multi_stage_exchange_drains_brightness_idle_timer_and_orientation
             Command::SetOrientationLock {
                 orientation: Some(Orientation::Portrait)
             },
+            // Phase 1.B of `2026-05-11-hover-graduation-plan.md` —
+            // `screen_entered` now announces the engine's chosen camera
+            // selector. AppEngine routes `MultiStageExchange` to
+            // `MultiStageExchangeEngine::new_glance()` today (Phase 1.E
+            // adds the Hover→`new_hover()` mode-dispatch branch), so
+            // the announced default is back camera.
+            Command::SwitchCamera { use_front: false },
         ],
         "navigate_to(MultiStageExchange) must drive its screen_entered hook"
     );

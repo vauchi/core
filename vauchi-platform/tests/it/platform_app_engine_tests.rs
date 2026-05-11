@@ -285,8 +285,8 @@ fn navigate_to_json_envelope_carries_lifecycle_commands() {
         .expect("envelope.commands array");
     assert_eq!(
         commands.len(),
-        3,
-        "expected 3 lifecycle commands; got {commands:?}"
+        4,
+        "expected 4 lifecycle commands; got {commands:?}"
     );
     assert_eq!(
         commands[0]["SetScreenBrightness"]["level"], 0.65,
@@ -299,6 +299,14 @@ fn navigate_to_json_envelope_carries_lifecycle_commands() {
     assert_eq!(
         commands[2]["SetOrientationLock"]["orientation"], "Portrait",
         "third command must lock portrait; got {commands:?}",
+    );
+    // Phase 1.B of `2026-05-11-hover-graduation-plan.md` — engine announces
+    // the camera selector explicitly. Default routing today is
+    // `new_glance()` (back camera); Phase 1.E adds the Hover→front
+    // mode-dispatch.
+    assert_eq!(
+        commands[3]["SwitchCamera"]["use_front"], false,
+        "fourth command must announce camera selector; got {commands:?}",
     );
 }
 

@@ -157,7 +157,13 @@ vauchi-app/src/ui/exchange_ble.rs 1057
 #  constructor invariants. Engine state-machine surface; per
 #  file-size.md structural exemption — scattered transitions
 #  create protocol bugs.)
-vauchi-app/src/ui/multi_stage_exchange.rs 1325
+# (+30 for Phase 1.B of 2026-05-11-hover-graduation-plan.md:
+#  screen_entered appends Command::SwitchCamera + matching
+#  glance/hover inline test pair replacing the prior single
+#  screen_entered_emits_brightness… test. Defensive: removes
+#  the implicit-coincidence dependency where engine and
+#  consumer both default to back-camera.)
+vauchi-app/src/ui/multi_stage_exchange.rs 1355
 
 # EXEMPT — UniFFI facade growth: PlatformAppEngine wraps the full
 # AppEngine surface JSON-side and now also owns the Pair 4

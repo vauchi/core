@@ -666,6 +666,15 @@ impl WorkflowEngine for MultiStageExchangeEngine {
             vauchi_core::Command::SetOrientationLock {
                 orientation: Some(vauchi_core::Orientation::Portrait),
             },
+            // Announce the engine's chosen camera selector explicitly so
+            // the consumer aligns with engine state on entry rather than
+            // coincidentally matching its own back-default. Hover ships
+            // `use_front: true` here (face-to-face screen-to-screen UX);
+            // Glance keeps `use_front: false`. Phase 1.B of
+            // `2026-05-11-hover-graduation-plan.md`.
+            vauchi_core::Command::SwitchCamera {
+                use_front: self.use_front_camera,
+            },
         ]
     }
 
@@ -1287,11 +1296,11 @@ mod tests {
 
     // ── Screen-presentation lifecycle (Phase 2b) ─────────────────────
 
-    // @scenario: exchange.feature :: Multi-stage exchange dims screen, disables idle timer, and locks portrait on entry
+    // @scenario: exchange.feature :: Multi-stage exchange (Glance) dims screen, disables idle timer, locks portrait, and announces back camera on entry
     #[test]
-    fn screen_entered_emits_brightness_idle_timer_and_portrait_lock() {
+    fn screen_entered_glance_emits_presentation_commands_and_back_camera() {
         use vauchi_core::{Command, Orientation};
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         let commands = engine.screen_entered();
         assert_eq!(
             commands,
@@ -1301,8 +1310,29 @@ mod tests {
                 Command::SetOrientationLock {
                     orientation: Some(Orientation::Portrait)
                 },
+                Command::SwitchCamera { use_front: false },
             ],
-            "screen_entered must dim brightness, disable idle timer, and lock portrait"
+            "Glance screen_entered must dim brightness, disable idle timer, lock portrait, and announce back camera"
+        );
+    }
+
+    // @scenario: exchange.feature :: Multi-stage exchange (Hover) dims screen, disables idle timer, locks portrait, and announces front camera on entry
+    #[test]
+    fn screen_entered_hover_emits_presentation_commands_and_front_camera() {
+        use vauchi_core::{Command, Orientation};
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        let commands = engine.screen_entered();
+        assert_eq!(
+            commands,
+            vec![
+                Command::SetScreenBrightness { level: Some(0.65) },
+                Command::SetIdleTimerDisabled { disabled: true },
+                Command::SetOrientationLock {
+                    orientation: Some(Orientation::Portrait)
+                },
+                Command::SwitchCamera { use_front: true },
+            ],
+            "Hover screen_entered must dim brightness, disable idle timer, lock portrait, and announce front camera"
         );
     }
 

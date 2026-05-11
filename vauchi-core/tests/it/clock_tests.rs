@@ -65,11 +65,22 @@ fn fake_clock_set_overwrites() {
 // @internal
 #[test]
 fn shared_constructors_return_dyn_clock_handles() {
-    // Compile-time check that both constructors fit the `Arc<dyn Clock>`
-    // shape that `Vauchi` and `AppEngine` will hold once Task 1.1
-    // Step 3 threads this through their constructors.
-    let _: Arc<dyn Clock> = SystemClock::shared();
-    let _: Arc<dyn Clock> = FakeClock::new(SystemTime::UNIX_EPOCH).shared();
+    // Two things matter here: the constructors fit the `Arc<dyn Clock>`
+    // shape (a compile-time check) AND trait dispatch reaches the
+    // correct impl through the dyn pointer (runtime). The FakeClock
+    // arm gives a deterministic value we can pin.
+    let sys: Arc<dyn Clock> = SystemClock::shared();
+    assert!(
+        sys.now() >= SystemTime::UNIX_EPOCH,
+        "SystemClock via Arc<dyn Clock> returned pre-epoch time"
+    );
+
+    let fake: Arc<dyn Clock> = FakeClock::new(SystemTime::UNIX_EPOCH).shared();
+    assert_eq!(
+        fake.now(),
+        SystemTime::UNIX_EPOCH,
+        "FakeClock dispatch through Arc<dyn Clock> did not reach the fake impl"
+    );
 }
 
 // @internal

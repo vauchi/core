@@ -37,7 +37,12 @@ vauchi-core/src/exchange/session.rs 1788
 #  Lives in core per the design-pass Option B so the session
 #  (protocol producer) and the engine (renderer consumer)
 #  share one enum.)
-vauchi-core/src/exchange/multistage/session.rs 1218
+# (+83 for Phase 1.C.3b state machine: AudioStateError enum,
+#  set_audio_proximity setter with transition validation,
+#  audio_transition_allowed helper. Security gate — Confirmed
+#  is reachable only from Listening. Retry path Failed→Listening
+#  per G1.3.)
+vauchi-core/src/exchange/multistage/session.rs 1301
 
 # EXEMPT — protocol command/event enum: variants + variant_name match
 # + From impls + serde-discriminant ordering must be co-located, splitting

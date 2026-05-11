@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use vauchi_core::exchange::multistage::session::AudioStateError;
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::{AudioProximityState, ProtocolState};
 
@@ -252,4 +253,123 @@ fn test_exchange_with_large_payload() {
     let bob_received = bob.get_received_data().unwrap();
     assert_eq!(alice_received, bob_card);
     assert_eq!(bob_received, alice_card);
+}
+
+// ── Audio proximity state machine (Phase 1.C.3b) ──────────────────
+
+// @internal
+#[test]
+fn test_audio_proximity_pending_to_listening_allowed() {
+    let mut s = MultiStageSession::new(b"card".to_vec());
+    assert_eq!(s.audio_proximity(), AudioProximityState::Pending);
+    s.set_audio_proximity(AudioProximityState::Listening)
+        .expect("Pending → Listening must be allowed");
+    assert_eq!(s.audio_proximity(), AudioProximityState::Listening);
+}
+
+// @internal
+#[test]
+fn test_audio_proximity_listening_to_confirmed_allowed() {
+    let mut s = MultiStageSession::new(b"card".to_vec());
+    s.set_audio_proximity(AudioProximityState::Listening)
+        .unwrap();
+    s.set_audio_proximity(AudioProximityState::Confirmed)
+        .expect("Listening → Confirmed must be allowed");
+    assert_eq!(s.audio_proximity(), AudioProximityState::Confirmed);
+}
+
+// @internal
+#[test]
+fn test_audio_proximity_listening_to_failed_allowed() {
+    let mut s = MultiStageSession::new(b"card".to_vec());
+    s.set_audio_proximity(AudioProximityState::Listening)
+        .unwrap();
+    s.set_audio_proximity(AudioProximityState::Failed)
+        .expect("Listening → Failed must be allowed");
+    assert_eq!(s.audio_proximity(), AudioProximityState::Failed);
+}
+
+// @internal
+#[test]
+fn test_audio_proximity_failed_to_listening_allowed_for_retry() {
+    // G1.3 of the Hover graduation problem record: retry restarts the
+    // audio verifier without restarting the QR cycle. The session
+    // permits Failed → Listening so the wrapper's retry handler can
+    // re-arm the handshake.
+    let mut s = MultiStageSession::new(b"card".to_vec());
+    s.set_audio_proximity(AudioProximityState::Listening)
+        .unwrap();
+    s.set_audio_proximity(AudioProximityState::Failed).unwrap();
+    s.set_audio_proximity(AudioProximityState::Listening)
+        .expect("Failed → Listening (retry) must be allowed");
+    assert_eq!(s.audio_proximity(), AudioProximityState::Listening);
+}
+
+// @internal
+#[test]
+fn test_audio_proximity_pending_to_confirmed_rejected_as_security_gate() {
+    // Security gate: Confirmed claims the devices are physically
+    // close. That claim is only valid after a verified ultrasonic
+    // exchange. Skipping the Listening window must be rejected.
+    let mut s = MultiStageSession::new(b"card".to_vec());
+    let err = s
+        .set_audio_proximity(AudioProximityState::Confirmed)
+        .expect_err("Pending → Confirmed must be rejected");
+    assert_eq!(
+        err,
+        AudioStateError::InvalidTransition {
+            from: AudioProximityState::Pending,
+            to: AudioProximityState::Confirmed,
+        }
+    );
+    assert_eq!(s.audio_proximity(), AudioProximityState::Pending);
+}
+
+// @internal
+#[test]
+fn test_audio_proximity_pending_to_failed_rejected() {
+    // Failed without having tried Listening makes no sense — the
+    // wrapper must have entered the chirp/listen window before it
+    // can report a failure on it. Reject as a caller bug.
+    let mut s = MultiStageSession::new(b"card".to_vec());
+    let err = s
+        .set_audio_proximity(AudioProximityState::Failed)
+        .expect_err("Pending → Failed must be rejected");
+    assert!(matches!(err, AudioStateError::InvalidTransition { .. }));
+    assert_eq!(s.audio_proximity(), AudioProximityState::Pending);
+}
+
+// @internal
+#[test]
+fn test_audio_proximity_confirmed_is_terminal_success() {
+    // Confirmed is the security claim; the orchestrator should not
+    // transition out of it within a session. (A new session resets
+    // to Pending via construction.)
+    let mut s = MultiStageSession::new(b"card".to_vec());
+    s.set_audio_proximity(AudioProximityState::Listening)
+        .unwrap();
+    s.set_audio_proximity(AudioProximityState::Confirmed)
+        .unwrap();
+    assert!(
+        s.set_audio_proximity(AudioProximityState::Listening)
+            .is_err()
+    );
+    assert!(s.set_audio_proximity(AudioProximityState::Failed).is_err());
+    assert!(s.set_audio_proximity(AudioProximityState::Pending).is_err());
+    assert_eq!(s.audio_proximity(), AudioProximityState::Confirmed);
+}
+
+// @internal
+#[test]
+fn test_audio_proximity_listening_self_transition_rejected() {
+    // No-op self-transitions are surfaced as errors so the wrapper
+    // can detect a duplicate state-change attempt rather than
+    // silently ignoring it.
+    let mut s = MultiStageSession::new(b"card".to_vec());
+    s.set_audio_proximity(AudioProximityState::Listening)
+        .unwrap();
+    assert!(
+        s.set_audio_proximity(AudioProximityState::Listening)
+            .is_err()
+    );
 }

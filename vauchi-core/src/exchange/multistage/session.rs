@@ -88,6 +88,34 @@ fn jittered(base_ms: u32) -> u32 {
     base_ms - jitter_range + jitter
 }
 
+/// Audio-proximity state transition error.
+///
+/// The session enforces a strict transition graph to prevent the
+/// caller (the platform wrapper that orchestrates the audio
+/// handshake) from skipping the verification gate. In particular,
+/// `Confirmed` is only reachable from `Listening` — never directly
+/// from `Pending` or `Failed` — because `Confirmed` is the
+/// security claim that the two devices are physically close, and
+/// that claim is only valid after an actual ultrasonic response
+/// verified successfully (the `Listening` window is the
+/// chirp-and-verify cycle).
+///
+/// Retry semantics (G1.3 of the Hover graduation problem record):
+/// `Failed → Listening` is allowed so the user can re-attempt the
+/// handshake without restarting the QR cycle.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AudioStateError {
+    /// The requested transition is not part of the state graph.
+    /// Carries the from-state and to-state so the caller can log a
+    /// diagnostic. Indicates a programming error in the orchestrator;
+    /// in production the wrapper should surface this to the user as
+    /// a generic proximity failure rather than panic.
+    InvalidTransition {
+        from: AudioProximityState,
+        to: AudioProximityState,
+    },
+}
+
 /// Multi-stage exchange session managing the full 5-stage protocol.
 ///
 /// The session progresses through states:
@@ -298,11 +326,66 @@ impl MultiStageSession {
 
     /// Returns the current audio-proximity state. Hover-only — Glance
     /// callers see `Pending` for the lifetime of the session because
-    /// Glance never runs the ultrasonic handshake. Phase 1.C.3b will
-    /// add the state-machine transitions that move Hover through
-    /// `Listening → Confirmed / Failed`.
+    /// Glance never runs the ultrasonic handshake. Phase 1.C.3b
+    /// added the state machine driven by [`Self::set_audio_proximity`].
     pub fn audio_proximity(&self) -> AudioProximityState {
         self.audio_proximity
+    }
+
+    /// Drive the audio-proximity state machine.
+    ///
+    /// Called by the platform wrapper (Phase 1.C.3c) after each
+    /// transition the orchestrator decides: `Listening` when the
+    /// chirp emit + listen window opens, `Confirmed` when the peer's
+    /// response verified, `Failed` on timeout or verification
+    /// mismatch.
+    ///
+    /// **Transition graph (security gate)**:
+    ///
+    /// ```text
+    ///   Pending ──► Listening ──► Confirmed   (success)
+    ///                       └──► Failed      (timeout / mismatch)
+    ///                                ↑
+    ///                              Listening (retry per G1.3)
+    /// ```
+    ///
+    /// `Confirmed` is reachable **only** from `Listening` so that
+    /// the security claim ("devices are physically close") cannot
+    /// be set without an actual verified ultrasonic exchange.
+    /// `Failed → Listening` is allowed so the user can re-run the
+    /// handshake without restarting the QR cycle (Hover problem
+    /// record G1.3).
+    ///
+    /// Returns `Err(InvalidTransition { … })` for any transition
+    /// not in the graph. The caller is expected to log + surface
+    /// a generic proximity-failure UX rather than panic.
+    pub fn set_audio_proximity(
+        &mut self,
+        new_state: AudioProximityState,
+    ) -> Result<(), AudioStateError> {
+        if !Self::audio_transition_allowed(self.audio_proximity, new_state) {
+            return Err(AudioStateError::InvalidTransition {
+                from: self.audio_proximity,
+                to: new_state,
+            });
+        }
+        self.audio_proximity = new_state;
+        Ok(())
+    }
+
+    /// Returns `true` iff the transition is permitted by the audio
+    /// state graph. Pure function — exposed for tests and so the
+    /// orchestrator can preflight before invoking
+    /// [`Self::set_audio_proximity`].
+    pub(crate) fn audio_transition_allowed(
+        from: AudioProximityState,
+        to: AudioProximityState,
+    ) -> bool {
+        use AudioProximityState::{Confirmed, Failed, Listening, Pending};
+        matches!(
+            (from, to),
+            (Pending, Listening) | (Listening, Confirmed) | (Listening, Failed) | (Failed, Listening)
+        )
     }
 
     /// Cancel the session, transitioning to Failed and clearing sensitive data.

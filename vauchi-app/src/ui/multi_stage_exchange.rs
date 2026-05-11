@@ -664,6 +664,37 @@ mod tests {
         screen.actions.iter().map(|a| a.id.as_str()).collect()
     }
 
+    // ── Mode-aware construction (Phase 1.A) ─────────────────────
+
+    // RED for Phase 1.A.2 of `2026-05-11-hover-graduation-plan.md`.
+    // Hover defaults the camera selector to `front` (face-to-face
+    // screen-to-screen) and starts with audio proximity `Pending`
+    // because the ultrasonic handshake hasn't run yet. The Glance
+    // path (`new_glance`) ignores `audio_proximity` and stays
+    // back-camera-default.
+    #[test]
+    fn new_hover_initialises_state() {
+        let engine = MultiStageExchangeEngine::new_hover();
+        assert!(
+            engine.use_front_camera(),
+            "Hover engine must default to the front camera",
+        );
+        assert_eq!(
+            engine.audio_proximity(),
+            AudioProximityState::Pending,
+            "Hover engine must start with audio proximity Pending",
+        );
+    }
+
+    #[test]
+    fn new_glance_is_back_camera_default() {
+        let engine = MultiStageExchangeEngine::new_glance();
+        assert!(
+            !engine.use_front_camera(),
+            "Glance engine must default to the back camera",
+        );
+    }
+
     // ── Per-ProtocolState rendering ──────────────────────────────
 
     // @internal

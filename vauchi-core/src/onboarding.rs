@@ -10,7 +10,6 @@
 //! Feature file: features/onboarding.feature
 
 use std::collections::HashSet;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::text::normalize_text;
 use crate::types::{OnboardingProgress, OnboardingStep};
@@ -69,19 +68,22 @@ impl OnboardingStep {
 }
 
 impl Default for OnboardingProgress {
+    /// `Default` stamps `started_at` as 0 (Unix epoch). Production
+    /// constructors call `OnboardingProgress::new(now)` directly; the
+    /// `Default` impl is retained for serde and test ergonomics.
     fn default() -> Self {
-        Self::new()
+        Self::new(0)
     }
 }
 
 impl OnboardingProgress {
     /// Creates a new onboarding progress starting at `IdentityCheck`.
-    pub fn new() -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or(Duration::ZERO)
-            .as_secs();
-
+    /// Creates a new onboarding progress starting at `IdentityCheck`.
+    ///
+    /// `now` is the Unix-epoch timestamp to stamp into
+    /// `started_at`. Vauchi reads this from `self.clock.unix_seconds()`;
+    /// tests pass any fixed value.
+    pub fn new(now: u64) -> Self {
         Self {
             current_step: OnboardingStep::IdentityCheck,
             completed_steps: HashSet::new(),
@@ -98,21 +100,14 @@ impl OnboardingProgress {
     /// marks the onboarding as complete.
     ///
     /// Returns the new current step.
-    pub fn advance(&mut self) -> OnboardingStep {
+    pub fn advance(&mut self, now: u64) -> OnboardingStep {
         self.completed_steps.insert(self.current_step);
 
         if let Some(next) = self.current_step.next() {
             self.current_step = next;
-        } else {
-            // Already at Ready — mark as complete
-            if self.completed_at.is_none() {
-                self.completed_at = Some(
-                    SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap_or(Duration::ZERO)
-                        .as_secs(),
-                );
-            }
+        } else if self.completed_at.is_none() {
+            // Already at the final step — stamp completion.
+            self.completed_at = Some(now);
         }
 
         self.current_step
@@ -123,19 +118,12 @@ impl OnboardingProgress {
     /// Moves to the next step. If already at the final step, this is idempotent.
     ///
     /// Returns the new current step.
-    pub fn skip_step(&mut self) -> OnboardingStep {
+    pub fn skip_step(&mut self, now: u64) -> OnboardingStep {
         if let Some(next) = self.current_step.next() {
             self.current_step = next;
-        } else {
-            // Already at WhatNext — mark as complete
-            if self.completed_at.is_none() {
-                self.completed_at = Some(
-                    SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap_or(Duration::ZERO)
-                        .as_secs(),
-                );
-            }
+        } else if self.completed_at.is_none() {
+            // Already at the final step — stamp completion.
+            self.completed_at = Some(now);
         }
 
         self.current_step
@@ -153,26 +141,16 @@ impl OnboardingProgress {
     /// `create_identity` and `set_onboarding_completed` that the
     /// audit `2026-04-28-app-launch-and-identity-orchestration-in-core`
     /// §2.5 calls out).
-    pub fn mark_complete(&mut self) {
+    pub fn mark_complete(&mut self, now: u64) {
         if self.completed_at.is_none() {
-            self.completed_at = Some(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap_or(Duration::ZERO)
-                    .as_secs(),
-            );
+            self.completed_at = Some(now);
         }
     }
 
     /// Resets onboarding to the beginning.
     ///
     /// Clears all progress, timestamps, and flags.
-    pub fn reset(&mut self) {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or(Duration::ZERO)
-            .as_secs();
-
+    pub fn reset(&mut self, now: u64) {
         self.current_step = OnboardingStep::IdentityCheck;
         self.completed_steps.clear();
         self.started_at = Some(now);

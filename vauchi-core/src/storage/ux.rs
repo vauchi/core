@@ -215,10 +215,19 @@ impl Storage {
     }
 
     /// Loads onboarding progress or creates a new one if none exists.
-    pub fn load_or_create_onboarding_progress(&self) -> Result<OnboardingProgress, StorageError> {
+    ///
+    /// `now` is the Unix-epoch timestamp to stamp into a freshly-
+    /// created progress's `started_at`. Storage does not yet hold a
+    /// [`Clock`](crate::clock::Clock) — the storage cluster of
+    /// Phase 1 / Task 1.1 / Step 3b will fix that. Until then the
+    /// caller (Vauchi or test) passes the timestamp.
+    pub fn load_or_create_onboarding_progress(
+        &self,
+        now: u64,
+    ) -> Result<OnboardingProgress, StorageError> {
         match self.load_onboarding_progress()? {
             Some(progress) => Ok(progress),
-            None => Ok(OnboardingProgress::new()),
+            None => Ok(OnboardingProgress::new(now)),
         }
     }
 

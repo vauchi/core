@@ -47,6 +47,7 @@ pub use sync_http::{PERIODIC_SYNC_INTERVAL_SECONDS, PERIODIC_SYNC_MAX_RETRIES};
 
 use std::sync::{Arc, Mutex};
 
+use crate::clock::{Clock, SystemClock};
 use crate::crypto::{ShreddingMasterKey, SymmetricKey};
 use crate::identity::Identity;
 use crate::storage::{SecureStorage, Storage};
@@ -193,6 +194,12 @@ pub struct Vauchi {
     secure_storage: Option<Arc<dyn SecureStorage>>,
     replay_detector: Mutex<ReplayDetector>,
     auth_mode: AuthMode,
+    /// Explicit-time seam (Phase 1 / Task 1.1 of the pure-functional-core
+    /// program). Every `SystemTime::now()` callsite under `vauchi-core`
+    /// migrates to `self.clock.now()` cluster by cluster — Step 3 follow-up
+    /// MRs. Default is `SystemClock::shared()`; tests pass a `FakeClock`
+    /// via `Vauchi::new_with`.
+    clock: Arc<dyn Clock>,
     /// In-memory queue of duress alerts waiting to be sent.
     ///
     /// Populated when `authenticate()` detects a duress PIN. Alerts are
@@ -214,7 +221,7 @@ pub struct Vauchi {
 impl Vauchi {
     /// Creates a new Vauchi instance with mock transport (for testing).
     pub fn new(config: VauchiConfig) -> VauchiResult<Self> {
-        Self::init(config, None)
+        Self::init(config, None, None)
     }
 
     /// Creates a new Vauchi instance using SMK from SecureStorage for encryption.
@@ -225,7 +232,24 @@ impl Vauchi {
         config: VauchiConfig,
         secure_storage: Arc<dyn SecureStorage>,
     ) -> VauchiResult<Self> {
-        Self::init(config, Some(secure_storage))
+        Self::init(config, Some(secure_storage), None)
+    }
+
+    /// Creates a new Vauchi instance with an explicit [`Clock`] and
+    /// optional [`SecureStorage`].
+    ///
+    /// Phase 1 / Task 1.1 of the pure-functional-core program plan —
+    /// the test seam for the wall-clock. Production code keeps using
+    /// [`Vauchi::new`] / [`Vauchi::with_secure_storage`], which wrap
+    /// [`SystemClock::shared`] internally. Tests pass a `FakeClock` so
+    /// the state machine becomes a deterministic function of
+    /// `(state, input)` — the headline goal of the program.
+    pub fn new_with(
+        config: VauchiConfig,
+        clock: Arc<dyn Clock>,
+        secure_storage: Option<Arc<dyn SecureStorage>>,
+    ) -> VauchiResult<Self> {
+        Self::init(config, secure_storage, Some(clock))
     }
 
     /// Creates a new Vauchi instance (transport factory accepted but not invoked).
@@ -244,7 +268,7 @@ impl Vauchi {
     where
         F: FnOnce() -> T,
     {
-        Self::init(config, None)
+        Self::init(config, None, None)
     }
 
     /// Creates a new Vauchi instance with optional SecureStorage (transport factory not invoked).
@@ -263,14 +287,17 @@ impl Vauchi {
     where
         F: FnOnce() -> T,
     {
-        Self::init(config, secure_storage)
+        Self::init(config, secure_storage, None)
     }
 
     /// Internal initializer shared by all constructors.
     fn init(
         config: VauchiConfig,
         secure_storage: Option<Arc<dyn SecureStorage>>,
+        clock: Option<Arc<dyn Clock>>,
     ) -> VauchiResult<Self> {
+        let clock = clock.unwrap_or_else(SystemClock::shared);
+
         // Determine the storage encryption key
         let storage_key = Self::resolve_storage_key(&config, secure_storage.as_deref())?;
 
@@ -303,6 +330,7 @@ impl Vauchi {
             replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
             auth_mode: AuthMode::Unauthenticated,
             duress_alerts: Vec::new(),
+            clock,
             #[cfg(feature = "network-http")]
             ohttp_key: None,
             #[cfg(feature = "network-http")]
@@ -344,12 +372,21 @@ impl Vauchi {
             .unwrap_or_else(SymmetricKey::generate))
     }
 
+    /// Borrow the explicit-time seam. Tests pass a `FakeClock`;
+    /// production wraps [`SystemClock::shared`]. See `Vauchi::new_with`.
+    pub fn clock(&self) -> &Arc<dyn Clock> {
+        &self.clock
+    }
+
     /// Returns the current Unix timestamp in seconds.
-    fn now_timestamp() -> u64 {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("System clock before UNIX epoch")
-            .as_secs()
+    ///
+    /// First callsite migrated from `SystemTime::now()` to
+    /// `self.clock.unix_seconds()` — Phase 1 / Task 1.1 / Step 3
+    /// of the pure-functional-core program plan. The remaining
+    /// callsites under `vauchi-core/src/` migrate in follow-up MRs
+    /// cluster by cluster.
+    fn now_timestamp(&self) -> u64 {
+        self.clock.unix_seconds()
     }
 
     /// Records a sync item for inter-device synchronization.
@@ -392,6 +429,7 @@ impl Vauchi {
 
     /// Creates a new Vauchi instance with in-memory storage (for testing).
     pub fn in_memory() -> VauchiResult<Self> {
+        let clock: Arc<dyn Clock> = SystemClock::shared();
         let storage_key = SymmetricKey::generate();
         let storage = Storage::in_memory(storage_key)?;
         let events = Arc::new(EventDispatcher::new());
@@ -405,6 +443,7 @@ impl Vauchi {
             replay_detector: Mutex::new(ReplayDetector::default_tolerance()),
             auth_mode: AuthMode::Unauthenticated,
             duress_alerts: Vec::new(),
+            clock,
             #[cfg(feature = "network-http")]
             ohttp_key: None,
             #[cfg(feature = "network-http")]

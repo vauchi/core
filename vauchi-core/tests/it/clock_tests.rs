@@ -93,3 +93,59 @@ fn unix_seconds_default_impl_clamps_pre_epoch() {
     let c = FakeClock::new(pre_epoch);
     assert_eq!(c.unix_seconds(), 0);
 }
+
+// @internal
+#[test]
+fn vauchi_new_with_injects_caller_clock() {
+    // Phase 1 / Task 1.1 / Step 3 wiring test: `Vauchi::new_with` must
+    // store the caller-provided clock and expose it via `Vauchi::clock`.
+    // This is the contract every subsequent callsite-migration MR
+    // depends on — without it, `self.clock` would silently fall back
+    // to SystemClock and tests would observe wall-clock time.
+    use vauchi_core::{Vauchi, VauchiConfig};
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let config = VauchiConfig::with_storage_path(tmp.path().join("vauchi.db"));
+    let injected: Arc<dyn Clock> = Arc::new(FakeClock::new(
+        SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+    ));
+    let vauchi = Vauchi::new_with(config, Arc::clone(&injected), None)
+        .expect("Vauchi::new_with should accept the injected clock");
+
+    // Pointer-equality: the Arc the caller passed in is *the same* Arc
+    // Vauchi now holds. Catches a future regression where someone
+    // mid-MR clones-and-replaces the clock during construction (e.g.
+    // wraps it in a counter-clock decorator) — a different Arc would
+    // silently break testability.
+    assert!(
+        Arc::ptr_eq(vauchi.clock(), &injected),
+        "Vauchi::new_with cloned the clock instead of storing the original Arc"
+    );
+
+    // Behavioural check: `clock().now()` returns the fixed time.
+    assert_eq!(
+        vauchi.clock().unix_seconds(),
+        1_700_000_000,
+        "Vauchi::clock() does not dispatch to the injected FakeClock"
+    );
+}
+
+// @internal
+#[test]
+fn vauchi_default_ctor_uses_system_clock() {
+    // The public default constructor must keep working with no clock
+    // argument and must hand out a clock that returns a sane present-
+    // day timestamp (sandwich check, mirrors `system_clock_returns_current_time`).
+    use vauchi_core::{Vauchi, VauchiConfig};
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let config = VauchiConfig::with_storage_path(tmp.path().join("vauchi.db"));
+    let before = SystemTime::now();
+    let vauchi = Vauchi::new(config).expect("Vauchi::new default ctor");
+    let observed = vauchi.clock().now();
+    let after = SystemTime::now();
+    assert!(
+        observed >= before && observed <= after,
+        "default Vauchi clock returned {observed:?} outside [{before:?}, {after:?}]"
+    );
+}

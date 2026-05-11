@@ -448,7 +448,7 @@ impl Vauchi {
     pub fn update_own_card(&self, card: &ContactCard) -> VauchiResult<Vec<String>> {
         let manager = ContactManager::new(&self.storage, self.events.clone());
         let changed_labels = manager.update_own_card(card)?;
-        let ts = Self::now_timestamp();
+        let ts = self.now_timestamp();
         for label in &changed_labels {
             // Look up the current value for the changed field
             let value = card
@@ -475,7 +475,7 @@ impl Vauchi {
         self.record_sync_item(crate::sync::SyncItem::CardUpdated {
             field_label: label,
             new_value: value,
-            timestamp: Self::now_timestamp(),
+            timestamp: self.now_timestamp(),
         });
         Ok(())
     }
@@ -488,7 +488,7 @@ impl Vauchi {
             self.record_sync_item(crate::sync::SyncItem::CardUpdated {
                 field_label: label.to_string(),
                 new_value: String::new(), // empty = removal
-                timestamp: Self::now_timestamp(),
+                timestamp: self.now_timestamp(),
             });
         }
         Ok(removed)

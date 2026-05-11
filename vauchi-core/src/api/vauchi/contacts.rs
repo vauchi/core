@@ -258,7 +258,7 @@ impl Vauchi {
             let sync_data = crate::sync::ContactSyncData::from_contact(&contact);
             self.record_sync_item(crate::sync::SyncItem::ContactAdded {
                 contact_data: sync_data,
-                timestamp: Self::now_timestamp(),
+                timestamp: self.now_timestamp(),
             });
         }
         let manager = ContactManager::new(&self.storage, self.events.clone());
@@ -272,7 +272,7 @@ impl Vauchi {
         if removed {
             self.record_sync_item(crate::sync::SyncItem::ContactRemoved {
                 contact_id: id.to_string(),
-                timestamp: Self::now_timestamp(),
+                timestamp: self.now_timestamp(),
             });
         }
         Ok(removed)
@@ -370,7 +370,7 @@ impl Vauchi {
         manager.hard_delete_imported_contact(id)?;
         self.record_sync_item(crate::sync::SyncItem::ContactRemoved {
             contact_id: id.to_string(),
-            timestamp: Self::now_timestamp(),
+            timestamp: self.now_timestamp(),
         });
         Ok(())
     }
@@ -381,7 +381,7 @@ impl Vauchi {
         manager.archive_contact(id)?;
         self.record_sync_item(crate::sync::SyncItem::ContactArchived {
             contact_id: id.to_string(),
-            timestamp: Self::now_timestamp(),
+            timestamp: self.now_timestamp(),
         });
         Ok(())
     }
@@ -392,7 +392,7 @@ impl Vauchi {
         manager.unarchive_contact(id)?;
         self.record_sync_item(crate::sync::SyncItem::ContactUnarchived {
             contact_id: id.to_string(),
-            timestamp: Self::now_timestamp(),
+            timestamp: self.now_timestamp(),
         });
         Ok(())
     }

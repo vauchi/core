@@ -246,7 +246,7 @@ impl Vauchi {
             contact_id: contact_id.to_string(),
             field_label: field_label.to_string(),
             is_visible: new_visible,
-            timestamp: Self::now_timestamp(),
+            timestamp: self.now_timestamp(),
         });
         Ok(new_visible)
     }

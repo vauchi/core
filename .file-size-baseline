@@ -163,7 +163,17 @@ vauchi-app/src/ui/exchange_ble.rs 1057
 #  screen_entered_emits_brightness… test. Defensive: removes
 #  the implicit-coincidence dependency where engine and
 #  consumer both default to back-camera.)
-vauchi-app/src/ui/multi_stage_exchange.rs 1355
+# (+245 for Phase 1.C.2 + 1.D engine-side rendering
+#  (2026-05-11-hover-graduation-plan.md):
+#  set_audio_proximity setter, build_screen audio-Failed
+#  priority dispatch, build_audio_failed_screen with
+#  distinct chrome (G1.3), build_status_indicator audio
+#  narration layering (Listening/Confirmed), 7 inline tests
+#  covering setter / cancelled-respect / status narration /
+#  audio-failed precedence. Option-agnostic — engine-side
+#  surface common to A/B/C; session-side 1.C.3+ commits to
+#  Option B per the design pass.)
+vauchi-app/src/ui/multi_stage_exchange.rs 1600
 
 # EXEMPT — UniFFI facade growth: PlatformAppEngine wraps the full
 # AppEngine surface JSON-side and now also owns the Pair 4

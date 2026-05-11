@@ -272,6 +272,25 @@ impl MultiStageExchangeEngine {
         self.current_qr_data = Some(payload.data.clone());
     }
 
+    /// Update the audio-proximity state. Called by the AppEngine
+    /// bridge after the session-side audio handshake reports a
+    /// transition (Phase 1.C.3 wires the listener under Option B
+    /// from `2026-04-28-multi-stage-engine-hover-ultrasonic`'s
+    /// `investigation.md`). No-op while cancelled.
+    ///
+    /// Glance never invokes this — `audio_proximity` stays
+    /// `Pending` for the lifetime of a Glance exchange so the
+    /// status indicator and `build_screen` Failed branch remain
+    /// unchanged for that mode. Hover transitions through
+    /// `Pending → Listening → Confirmed` on success or
+    /// `Pending → Listening → Failed` on the proximity timeout.
+    pub fn set_audio_proximity(&mut self, state: AudioProximityState) {
+        if self.cancelled {
+            return;
+        }
+        self.audio_proximity = state;
+    }
+
     /// Mark the exchange finalized with the peer's display name.
     /// Called after `MultiStageSessionListener::on_finalized`. The
     /// `Finalized` state will already have been pushed via
@@ -366,6 +385,15 @@ impl MultiStageExchangeEngine {
             );
         }
 
+        // Audio-proximity failure takes precedence over protocol-state
+        // narration because it surfaces a *user-facing physical-setup*
+        // problem ("devices aren't actually close") that a generic
+        // "Exchange Failed" panel would hide. G1.3 of the Hover
+        // graduation problem record. Glance never reaches this branch
+        // because Glance's audio_proximity stays Pending forever.
+        if matches!(self.audio_proximity, AudioProximityState::Failed) {
+            return self.build_audio_failed_screen(title);
+        }
         match &self.state {
             ProtocolState::Failed(reason) => self.build_failed_screen(title, reason),
             ProtocolState::Finalized | ProtocolState::Complete | ProtocolState::RetryReady
@@ -411,8 +439,10 @@ impl MultiStageExchangeEngine {
             a11y: None,
         });
 
-        // Status narration — derived from ProtocolState.
-        let status = build_status_indicator(&self.state);
+        // Status narration — derived from ProtocolState plus the
+        // active audio-proximity layer (Hover only; Glance stays at
+        // Pending so the narration is unchanged for that mode).
+        let status = build_status_indicator(&self.state, self.audio_proximity);
         components.push(status);
 
         let mut actions = vec![ScreenAction {
@@ -502,13 +532,62 @@ impl MultiStageExchangeEngine {
             ],
         )
     }
+
+    /// G1.3 of the Hover graduation problem record. Distinct chrome
+    /// from generic protocol-Failed: "Couldn't confirm devices are
+    /// close" tells the user the audio-proximity handshake timed out,
+    /// which is a *physical-setup* problem — they should move the
+    /// devices closer and retry rather than wonder what "Exchange
+    /// Failed" means.
+    ///
+    /// Retry semantics differ between protocol-Failed and audio-Failed:
+    /// the audio-failed retry should restart only the audio verifier
+    /// (no QR-cycle restart). That's a session-side concern (Phase
+    /// 1.C.3 under Option B), so the action surface remains the same
+    /// as the generic Failed screen for now — the handler in
+    /// `handle_action` distinguishes by inspecting
+    /// `self.audio_proximity` at retry time and emits the appropriate
+    /// command set when the session-side work lands.
+    fn build_audio_failed_screen(&self, title: String) -> ScreenModel {
+        ScreenModel::new(
+            SCREEN_ID,
+            title,
+            vec![Component::StatusIndicator {
+                id: COMPONENT_ID_STATUS.into(),
+                icon: Some("dot.radiowaves.left.and.right".into()),
+                title: "Couldn't confirm devices are close".into(),
+                detail: Some("Hold the phones closer together and try again.".to_string()),
+                status: Status::Failed,
+                a11y: None,
+            }],
+            vec![
+                ScreenAction {
+                    id: RETRY_ACTION_ID.into(),
+                    label: "Retry".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: CANCEL_ACTION_ID.into(),
+                    label: "Cancel".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+        )
+    }
 }
 
 /// Build the per-state status narration row (active rendering).
 ///
 /// Pure helper so frontend tests assert on the same shape the engine
 /// emits and so the per-state mapping stays in one place.
-pub(crate) fn build_status_indicator(state: &ProtocolState) -> Component {
+pub(crate) fn build_status_indicator(
+    state: &ProtocolState,
+    audio: AudioProximityState,
+) -> Component {
     let (title, detail, status) = match state {
         ProtocolState::Idle | ProtocolState::Advertising => {
             ("Waiting for peer…", None, Status::Pending)
@@ -552,6 +631,23 @@ pub(crate) fn build_status_indicator(state: &ProtocolState) -> Component {
         _ => ("Exchange in progress…", None, Status::InProgress),
     };
 
+    // Layer the audio-proximity narration into the detail when the
+    // engine is past Pending. Pending (Glance + Hover pre-handshake)
+    // leaves the detail untouched; Listening and Confirmed append a
+    // user-facing hint about the ongoing ultrasonic handshake. Failed
+    // never reaches this helper — `build_screen` routes Audio-Failed
+    // to `build_audio_failed_screen` upstream.
+    let detail = match audio {
+        AudioProximityState::Pending | AudioProximityState::Failed => detail,
+        AudioProximityState::Listening => Some(match detail {
+            Some(base) => format!("{base} · Listening for proximity chirp"),
+            None => "Listening for proximity chirp".to_string(),
+        }),
+        AudioProximityState::Confirmed => Some(match detail {
+            Some(base) => format!("{base} · Devices confirmed close"),
+            None => "Devices confirmed close".to_string(),
+        }),
+    };
     Component::StatusIndicator {
         id: COMPONENT_ID_STATUS.into(),
         icon: None,
@@ -760,6 +856,155 @@ mod tests {
         assert!(
             !engine.use_front_camera(),
             "Glance engine must default to the back camera",
+        );
+    }
+
+    // ── Audio-proximity setter + rendering (Phase 1.C.2 + 1.D) ────
+
+    // @internal
+    #[test]
+    fn set_audio_proximity_transitions_state() {
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        assert_eq!(engine.audio_proximity(), AudioProximityState::Pending);
+        engine.set_audio_proximity(AudioProximityState::Listening);
+        assert_eq!(engine.audio_proximity(), AudioProximityState::Listening);
+        engine.set_audio_proximity(AudioProximityState::Confirmed);
+        assert_eq!(engine.audio_proximity(), AudioProximityState::Confirmed);
+    }
+
+    // @internal
+    #[test]
+    fn set_audio_proximity_is_noop_when_cancelled() {
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        // Drive into the cancelled state via the same path the engine's
+        // user-action handler uses — pressing CANCEL flips the flag.
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: CANCEL_ACTION_ID.into(),
+        });
+        // Subsequent setter calls must not update the field; the
+        // engine ignores late callbacks after the user cancelled.
+        engine.set_audio_proximity(AudioProximityState::Confirmed);
+        assert_eq!(
+            engine.audio_proximity(),
+            AudioProximityState::Pending,
+            "cancelled engine must reject set_audio_proximity",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn audio_proximity_listening_appends_to_status_detail() {
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        engine.set_state(ProtocolState::Discovered);
+        engine.set_audio_proximity(AudioProximityState::Listening);
+        let screen = engine.current_screen();
+        let status = first_status_indicator(&screen).expect("status indicator");
+        let Component::StatusIndicator { detail, .. } = status else {
+            panic!("expected StatusIndicator");
+        };
+        assert!(
+            detail
+                .as_ref()
+                .is_some_and(|d| d.contains("Listening for proximity chirp")),
+            "Listening must surface in status detail; got {detail:?}",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn audio_proximity_confirmed_appends_to_status_detail() {
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        engine.set_state(ProtocolState::Discovered);
+        engine.set_audio_proximity(AudioProximityState::Confirmed);
+        let screen = engine.current_screen();
+        let status = first_status_indicator(&screen).expect("status indicator");
+        let Component::StatusIndicator { detail, .. } = status else {
+            panic!("expected StatusIndicator");
+        };
+        assert!(
+            detail
+                .as_ref()
+                .is_some_and(|d| d.contains("Devices confirmed close")),
+            "Confirmed must surface in status detail; got {detail:?}",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn audio_proximity_pending_leaves_status_detail_unchanged() {
+        // Glance regression gate: with audio_proximity Pending, the
+        // status indicator detail must match the pre-1.C.2 narration
+        // for the same protocol state. The "Peer found / Starting
+        // exchange…" detail is the ProtocolState::Discovered shape.
+        let mut engine = MultiStageExchangeEngine::new_glance();
+        engine.set_state(ProtocolState::Discovered);
+        let screen = engine.current_screen();
+        let status = first_status_indicator(&screen).expect("status indicator");
+        let Component::StatusIndicator { detail, .. } = status else {
+            panic!("expected StatusIndicator");
+        };
+        let detail_str = detail.as_deref().unwrap_or("");
+        assert!(
+            !detail_str.contains("Listening") && !detail_str.contains("Devices confirmed close"),
+            "Pending must not surface audio narration; got {detail_str:?}",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn audio_proximity_failed_renders_audio_failed_screen() {
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        engine.set_audio_proximity(AudioProximityState::Failed);
+        let screen = engine.current_screen();
+        let status = first_status_indicator(&screen).expect("status indicator");
+        let Component::StatusIndicator {
+            title: status_title,
+            ..
+        } = status
+        else {
+            panic!("expected StatusIndicator");
+        };
+        assert_eq!(
+            status_title, "Couldn't confirm devices are close",
+            "audio-Failed must render the proximity-specific chrome, not the generic Exchange Failed panel",
+        );
+        // Retry + Cancel actions are present on the audio-failed
+        // screen so the user can attempt the handshake again.
+        let ids: Vec<&str> = action_ids(&screen);
+        assert!(
+            ids.contains(&RETRY_ACTION_ID),
+            "audio-failed screen must offer Retry; got {ids:?}",
+        );
+        assert!(
+            ids.contains(&CANCEL_ACTION_ID),
+            "audio-failed screen must offer Cancel; got {ids:?}",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn audio_failed_takes_precedence_over_protocol_failed() {
+        // Both failure modes co-exist on a single engine after a
+        // failed handshake: protocol may have failed for an
+        // unrelated reason while audio_proximity also went Failed.
+        // The user-facing chrome should narrate the audio failure
+        // (the actionable physical-setup hint) rather than a
+        // generic "Exchange failed" panel.
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        engine.set_state(ProtocolState::Failed("generic-reason".to_string()));
+        engine.set_audio_proximity(AudioProximityState::Failed);
+        let screen = engine.current_screen();
+        let status = first_status_indicator(&screen).expect("status indicator");
+        let Component::StatusIndicator {
+            title: status_title,
+            ..
+        } = status
+        else {
+            panic!("expected StatusIndicator");
+        };
+        assert_eq!(
+            status_title, "Couldn't confirm devices are close",
+            "audio_proximity:Failed must take precedence over ProtocolState::Failed",
         );
     }
 

@@ -12,6 +12,17 @@ use super::types::{
 };
 use super::{IdentityData, VauchiPlatform};
 
+/// Legacy `mobile_identity.rs` surface (Phase 3 retirement target).
+/// `VauchiPlatform` does not hold a [`Clock`]; ambient time stays
+/// here until the file is retired.
+fn now_secs() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
 #[uniffi::export]
 impl VauchiPlatform {
     // === Identity Operations ===
@@ -204,7 +215,7 @@ impl VauchiPlatform {
         }
 
         if !state.is_active {
-            state = vauchi_core::DemoContactState::new_active();
+            state = vauchi_core::DemoContactState::new_active(now_secs());
             self.save_demo_state(&state)?;
         }
 
@@ -245,7 +256,7 @@ impl VauchiPlatform {
     /// Check if a demo update is available.
     pub fn is_demo_update_available(&self) -> bool {
         let state = self.load_demo_state();
-        state.is_update_due()
+        state.is_update_due(now_secs())
     }
 
     /// Trigger a demo update and get the new content.
@@ -255,7 +266,7 @@ impl VauchiPlatform {
             return Ok(None);
         }
 
-        if let Some(tip) = state.advance_to_next_tip() {
+        if let Some(tip) = state.advance_to_next_tip(now_secs()) {
             self.save_demo_state(&state)?;
             let card = vauchi_core::generate_demo_contact_card(&tip);
             Ok(Some(card.into()))

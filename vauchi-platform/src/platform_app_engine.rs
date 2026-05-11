@@ -1717,7 +1717,9 @@ impl PlatformAppEngine {
                     return Ok(DomainCommandResult::DemoContactOpt { contact: None });
                 }
                 if !state.is_active {
-                    state = vauchi_core::DemoContactState::new_active();
+                    state = vauchi_core::DemoContactState::new_active(
+                        engine.vauchi().clock().unix_seconds(),
+                    );
                     self.save_demo_state_engine(&state)?;
                 }
                 let contact = state.current_tip().map(|tip| {
@@ -1752,7 +1754,7 @@ impl PlatformAppEngine {
             DomainCommand::IsDemoUpdateAvailable => {
                 let state = self.load_demo_state_engine();
                 Ok(DomainCommandResult::Bool {
-                    value: state.is_update_due(),
+                    value: state.is_update_due(engine.vauchi().clock().unix_seconds()),
                 })
             }
             DomainCommand::TriggerDemoUpdate => {
@@ -1760,7 +1762,9 @@ impl PlatformAppEngine {
                 if !state.is_active {
                     return Ok(DomainCommandResult::DemoContactOpt { contact: None });
                 }
-                let contact = if let Some(tip) = state.advance_to_next_tip() {
+                let contact = if let Some(tip) =
+                    state.advance_to_next_tip(engine.vauchi().clock().unix_seconds())
+                {
                     self.save_demo_state_engine(&state)?;
                     let card = vauchi_core::generate_demo_contact_card(&tip);
                     Some(card.into())

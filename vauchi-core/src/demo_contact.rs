@@ -10,7 +10,6 @@
 //! Feature file: features/demo_contact.feature
 
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::types::DemoContactState;
 
@@ -117,13 +116,12 @@ pub fn get_demo_tips() -> Vec<DemoTip> {
 }
 
 impl DemoContactState {
-    /// Create new demo contact state (active)
-    pub fn new_active() -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or(Duration::ZERO)
-            .as_secs();
-
+    /// Create new demo contact state (active).
+    ///
+    /// `now` is the Unix-epoch timestamp to stamp into
+    /// `last_update_timestamp`. Vauchi passes
+    /// `self.clock.unix_seconds()`; tests pass any fixed value.
+    pub fn new_active(now: u64) -> Self {
         Self {
             is_active: true,
             was_dismissed: false,
@@ -135,17 +133,14 @@ impl DemoContactState {
         }
     }
 
-    /// Check if a demo update is due
-    pub fn is_update_due(&self) -> bool {
+    /// Check if a demo update is due.
+    ///
+    /// `now` is the Unix-epoch timestamp the caller compares
+    /// against `last_update_timestamp + DEMO_UPDATE_INTERVAL_SECS`.
+    pub fn is_update_due(&self, now: u64) -> bool {
         if !self.is_active {
             return false;
         }
-
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or(Duration::ZERO)
-            .as_secs();
-
         now >= self.last_update_timestamp + DEMO_UPDATE_INTERVAL_SECS
     }
 
@@ -159,8 +154,10 @@ impl DemoContactState {
         Some(tips[index].clone())
     }
 
-    /// Get the next tip and advance the index
-    pub fn advance_to_next_tip(&mut self) -> Option<DemoTip> {
+    /// Get the next tip and advance the index.
+    ///
+    /// `now` is stamped into `last_update_timestamp`.
+    pub fn advance_to_next_tip(&mut self, now: u64) -> Option<DemoTip> {
         let tips = get_demo_tips();
         if tips.is_empty() {
             return None;
@@ -168,11 +165,6 @@ impl DemoContactState {
 
         self.current_tip_index = (self.current_tip_index + 1) % tips.len();
         let tip = tips[self.current_tip_index].clone();
-
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or(Duration::ZERO)
-            .as_secs();
 
         self.last_update_timestamp = now;
         self.update_count += 1;
@@ -306,20 +298,23 @@ mod tests {
     // @internal
     #[test]
     fn test_demo_state_new_active() {
-        let state = DemoContactState::new_active();
+        let state = DemoContactState::new_active(1_700_000_000);
         assert!(state.is_active);
         assert!(!state.was_dismissed);
         assert!(!state.auto_removed);
         assert_eq!(state.current_tip_index, 0);
         assert_eq!(state.update_count, 0);
         assert_eq!(state.shown_tip_ids, vec!["tip-share".to_string()]);
-        assert!(state.last_update_timestamp > 0);
+        // Caller-provided `now` is stamped into `last_update_timestamp`
+        // verbatim. Previously this assertion read `> 0` and relied on
+        // `SystemTime::now()` being non-zero.
+        assert_eq!(state.last_update_timestamp, 1_700_000_000);
     }
 
     // @internal
     #[test]
     fn test_demo_state_current_tip_returns_first_for_index_zero() {
-        let state = DemoContactState::new_active();
+        let state = DemoContactState::new_active(0);
         let tip = state.current_tip().expect("expected Some");
         assert_eq!(tip.id, "tip-share");
         assert_eq!(tip.category, DemoTipCategory::GettingStarted);
@@ -328,7 +323,7 @@ mod tests {
     // @internal
     #[test]
     fn test_demo_state_current_tip_wraps_modulo_len() {
-        let mut state = DemoContactState::new_active();
+        let mut state = DemoContactState::new_active(0);
         let len = get_demo_tips().len();
         // Equivalent index by modulus must yield the same tip.
         state.current_tip_index = len * 3 + 2;
@@ -339,10 +334,10 @@ mod tests {
     // @internal
     #[test]
     fn test_demo_state_advance_tip_index_is_one_after_first_advance() {
-        let mut state = DemoContactState::new_active();
+        let mut state = DemoContactState::new_active(0);
         assert_eq!(state.current_tip_index, 0);
 
-        let tip = state.advance_to_next_tip().expect("expected Some");
+        let tip = state.advance_to_next_tip(0).expect("expected Some");
         assert_eq!(
             state.current_tip_index, 1,
             "first advance must land on index 1"
@@ -356,11 +351,11 @@ mod tests {
     // @internal
     #[test]
     fn test_demo_state_advance_tip_wraps_at_end() {
-        let mut state = DemoContactState::new_active();
+        let mut state = DemoContactState::new_active(0);
         let len = get_demo_tips().len();
         state.current_tip_index = len - 1;
 
-        state.advance_to_next_tip().expect("expected Some");
+        state.advance_to_next_tip(0).expect("expected Some");
         assert_eq!(
             state.current_tip_index, 0,
             "advancing from last must wrap to 0"
@@ -370,9 +365,9 @@ mod tests {
     // @internal
     #[test]
     fn test_demo_state_advance_increments_update_count_each_call() {
-        let mut state = DemoContactState::new_active();
+        let mut state = DemoContactState::new_active(0);
         for expected in 1..=3u32 {
-            state.advance_to_next_tip();
+            state.advance_to_next_tip(0);
             assert_eq!(state.update_count, expected);
         }
     }
@@ -380,11 +375,11 @@ mod tests {
     // @internal
     #[test]
     fn test_demo_state_advance_does_not_duplicate_shown_ids() {
-        let mut state = DemoContactState::new_active();
+        let mut state = DemoContactState::new_active(0);
         let len = get_demo_tips().len();
         // Advance twice through the full catalog — every tip is now shown.
         for _ in 0..(len * 2) {
-            state.advance_to_next_tip();
+            state.advance_to_next_tip(0);
         }
         // shown_tip_ids must contain each id exactly once.
         let mut sorted = state.shown_tip_ids.clone();
@@ -398,7 +393,7 @@ mod tests {
     // @internal
     #[test]
     fn test_demo_state_dismiss_sets_flags() {
-        let mut state = DemoContactState::new_active();
+        let mut state = DemoContactState::new_active(0);
         state.dismiss();
         assert!(!state.is_active);
         assert!(state.was_dismissed);
@@ -408,7 +403,7 @@ mod tests {
     // @internal
     #[test]
     fn test_demo_state_auto_remove_sets_flags() {
-        let mut state = DemoContactState::new_active();
+        let mut state = DemoContactState::new_active(0);
         state.auto_remove();
         assert!(!state.is_active);
         assert!(state.auto_removed);
@@ -422,7 +417,7 @@ mod tests {
     #[test]
     fn test_demo_state_restore_clears_both_flags() {
         // Restore must reset BOTH dismissed and auto_removed.
-        let mut state = DemoContactState::new_active();
+        let mut state = DemoContactState::new_active(0);
         state.dismiss();
         state.auto_remove();
         assert!(state.was_dismissed);
@@ -437,9 +432,9 @@ mod tests {
     // @internal
     #[test]
     fn test_demo_state_serialization_roundtrip_preserves_all_fields() {
-        let mut state = DemoContactState::new_active();
-        state.advance_to_next_tip();
-        state.advance_to_next_tip();
+        let mut state = DemoContactState::new_active(0);
+        state.advance_to_next_tip(0);
+        state.advance_to_next_tip(0);
         state.was_dismissed = true; // exercise non-default values
 
         let json = state.to_json().unwrap();
@@ -476,32 +471,31 @@ mod tests {
     // @internal
     #[test]
     fn test_update_due_just_created_is_false() {
-        let state = DemoContactState::new_active();
-        assert!(!state.is_update_due(), "fresh state cannot be due");
+        let state = DemoContactState::new_active(0);
+        assert!(!state.is_update_due(0), "fresh state cannot be due");
     }
 
     // @internal
     #[test]
     fn test_update_not_due_when_inactive() {
-        let mut state = DemoContactState::new_active();
+        let mut state = DemoContactState::new_active(0);
         state.dismiss();
-        assert!(!state.is_update_due());
+        assert!(!state.is_update_due(0));
     }
 
     // @internal
     #[test]
     fn test_update_due_when_interval_elapsed() {
-        // Pretend the last update was longer than INTERVAL ago. The
-        // function takes `now` from the wall clock, so a `last` of 0
-        // guarantees `now >= 0 + INTERVAL` is true (now is a unix
-        // timestamp far above 7200). Kills mutations that flip the
-        // `>=` comparison or mutate the `+ INTERVAL` arithmetic into
-        // multiplication (which would push the threshold to ~1e13).
-        let mut state = DemoContactState::new_active();
+        // Caller-controlled time: pretend `now` is exactly one
+        // INTERVAL past the last update — the boundary should fire
+        // (`>=`). Kills the `>` ↔ `>=` mutation and the `+ INTERVAL`
+        // → `* INTERVAL` arithmetic mutation in one shot.
+        let mut state = DemoContactState::new_active(0);
         state.last_update_timestamp = 1; // ~1970
+        let now = 1 + DEMO_UPDATE_INTERVAL_SECS;
         assert!(
-            state.is_update_due(),
-            "interval should have elapsed for a 1970 timestamp"
+            state.is_update_due(now),
+            "interval should have elapsed when now == last + INTERVAL"
         );
     }
 
@@ -510,32 +504,31 @@ mod tests {
     fn test_update_due_boundary_off_by_one() {
         // last_update_timestamp = now − INTERVAL: due (>= boundary).
         // last_update_timestamp = now − INTERVAL + 1: not due.
-        // Kills the `>=` ↔ `>` mutation.
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let mut state = DemoContactState::new_active();
+        // Kills the `>=` ↔ `>` mutation. With the `now` parameter we
+        // can pin a deterministic value rather than reading the wall
+        // clock — same coverage, no flakiness window.
+        let now = 1_700_000_000_u64;
+        let mut state = DemoContactState::new_active(0);
         state.last_update_timestamp = now - DEMO_UPDATE_INTERVAL_SECS;
-        assert!(state.is_update_due());
+        assert!(state.is_update_due(now));
 
         state.last_update_timestamp = now - DEMO_UPDATE_INTERVAL_SECS + 1;
-        assert!(!state.is_update_due());
+        assert!(!state.is_update_due(now));
     }
 
     // @internal
     #[test]
     fn test_tip_rotation_wraps_to_specific_index() {
-        let mut state = DemoContactState::new_active();
+        let mut state = DemoContactState::new_active(0);
         let tip_count = get_demo_tips().len();
         // Start at 0. After tip_count advances, we are back at 0.
         for _ in 0..tip_count {
-            state.advance_to_next_tip();
+            state.advance_to_next_tip(0);
         }
         assert_eq!(state.current_tip_index, 0);
         // After tip_count + 3 total advances, we are at index 3.
         for _ in 0..3 {
-            state.advance_to_next_tip();
+            state.advance_to_next_tip(0);
         }
         assert_eq!(state.current_tip_index, 3);
     }

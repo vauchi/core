@@ -39,7 +39,7 @@ fn test_demo_contact_constants() {
 // @internal
 #[test]
 fn test_demo_contact_appears_for_new_users() {
-    let state = DemoContactState::new_active();
+    let state = DemoContactState::new_active(0);
 
     assert!(state.is_active, "Should be active for new users");
     assert!(!state.was_dismissed, "Should not be dismissed initially");
@@ -52,7 +52,7 @@ fn test_demo_contact_appears_for_new_users() {
 // @internal
 #[test]
 fn test_demo_contact_visually_distinct() {
-    let state = DemoContactState::new_active();
+    let state = DemoContactState::new_active(0);
     let tip = state.current_tip().unwrap();
     let card = generate_demo_contact_card(&tip);
 
@@ -91,7 +91,7 @@ fn test_demo_tips_exist() {
 // @internal
 #[test]
 fn test_demo_state_tracks_tip() {
-    let state = DemoContactState::new_active();
+    let state = DemoContactState::new_active(0);
 
     let tip = state.current_tip();
     assert!(tip.is_some(), "Should have a current tip");
@@ -104,10 +104,10 @@ fn test_demo_state_tracks_tip() {
 // @internal
 #[test]
 fn test_demo_tips_advance() {
-    let mut state = DemoContactState::new_active();
+    let mut state = DemoContactState::new_active(0);
     let initial_index = state.current_tip_index;
 
-    let next_tip = state.advance_to_next_tip();
+    let next_tip = state.advance_to_next_tip(0);
     assert!(next_tip.is_some(), "expected Some value");
     assert_ne!(
         state.current_tip_index, initial_index,
@@ -122,11 +122,11 @@ fn test_demo_tips_advance() {
 // @internal
 #[test]
 fn test_demo_update_due_check() {
-    let state = DemoContactState::new_active();
+    let state = DemoContactState::new_active(0);
 
     // Just created, update not due yet
     assert!(
-        !state.is_update_due(),
+        !state.is_update_due(0),
         "Update should not be due immediately"
     );
 }
@@ -189,12 +189,12 @@ fn test_all_tip_categories_exist() {
 // @internal
 #[test]
 fn test_demo_tips_rotate() {
-    let mut state = DemoContactState::new_active();
+    let mut state = DemoContactState::new_active(0);
     let tip_count = get_demo_tips().len();
 
     // Advance through all tips plus 2 extra to test wrap
     for _ in 0..tip_count + 2 {
-        state.advance_to_next_tip();
+        state.advance_to_next_tip(0);
     }
 
     // Index should wrap
@@ -215,7 +215,7 @@ fn test_demo_tips_rotate() {
 // @internal
 #[test]
 fn test_demo_contact_manual_dismiss() {
-    let mut state = DemoContactState::new_active();
+    let mut state = DemoContactState::new_active(0);
     assert!(state.is_active);
 
     state.dismiss();
@@ -232,7 +232,7 @@ fn test_demo_contact_manual_dismiss() {
 // @internal
 #[test]
 fn test_demo_contact_auto_remove() {
-    let mut state = DemoContactState::new_active();
+    let mut state = DemoContactState::new_active(0);
 
     state.auto_remove();
 
@@ -247,7 +247,7 @@ fn test_demo_contact_auto_remove() {
 // @internal
 #[test]
 fn test_demo_contact_restore() {
-    let mut state = DemoContactState::new_active();
+    let mut state = DemoContactState::new_active(0);
 
     // Dismiss
     state.dismiss();
@@ -267,7 +267,7 @@ fn test_demo_contact_restore() {
 // @internal
 #[test]
 fn test_demo_contact_restore_after_auto_remove() {
-    let mut state = DemoContactState::new_active();
+    let mut state = DemoContactState::new_active(0);
 
     state.auto_remove();
     assert!(state.auto_removed);
@@ -288,7 +288,7 @@ fn test_demo_contact_restore_after_auto_remove() {
 // @internal
 #[test]
 fn test_demo_contact_local_only() {
-    let state = DemoContactState::new_active();
+    let state = DemoContactState::new_active(0);
     let tip = state.current_tip().unwrap();
     let card = generate_demo_contact_card(&tip);
 
@@ -311,11 +311,11 @@ fn test_demo_contact_local_only() {
 // @internal
 #[test]
 fn test_demo_state_persists() {
-    let mut state = DemoContactState::new_active();
+    let mut state = DemoContactState::new_active(0);
 
     // Make some changes
-    state.advance_to_next_tip();
-    state.advance_to_next_tip();
+    state.advance_to_next_tip(0);
+    state.advance_to_next_tip(0);
 
     // Serialize (simulate app quit)
     let json = state.to_json().expect("Should serialize");
@@ -334,7 +334,7 @@ fn test_demo_state_persists() {
 // @internal
 #[test]
 fn test_dismissal_persists() {
-    let mut state = DemoContactState::new_active();
+    let mut state = DemoContactState::new_active(0);
     state.dismiss();
 
     let json = state.to_json().unwrap();
@@ -350,11 +350,11 @@ fn test_dismissal_persists() {
 // @internal
 #[test]
 fn test_update_history_persists() {
-    let mut state = DemoContactState::new_active();
+    let mut state = DemoContactState::new_active(0);
 
     // Generate some updates
     for _ in 0..3 {
-        state.advance_to_next_tip();
+        state.advance_to_next_tip(0);
     }
 
     let json = state.to_json().unwrap();
@@ -379,13 +379,13 @@ fn test_update_history_persists() {
 #[test]
 fn test_demo_works_offline() {
     // Demo contact is entirely local, no network calls
-    let mut state = DemoContactState::new_active();
+    let mut state = DemoContactState::new_active(0);
 
     // All operations are local
     let tip = state.current_tip();
     assert!(tip.is_some(), "expected Some value");
 
-    let next = state.advance_to_next_tip();
+    let next = state.advance_to_next_tip(0);
     assert!(next.is_some(), "expected Some value");
 
     // Card generation is local
@@ -399,10 +399,10 @@ fn test_demo_works_offline() {
 // @internal
 #[test]
 fn test_update_not_due_when_inactive() {
-    let mut state = DemoContactState::new_active();
+    let mut state = DemoContactState::new_active(0);
     state.dismiss();
 
-    assert!(!state.is_update_due(), "No updates when inactive");
+    assert!(!state.is_update_due(0), "No updates when inactive");
 }
 
 // ============================================================
@@ -414,7 +414,7 @@ fn test_update_not_due_when_inactive() {
 #[test]
 fn test_demo_contact_full_lifecycle() {
     // Step 1: New user gets demo contact
-    let mut state = DemoContactState::new_active();
+    let mut state = DemoContactState::new_active(0);
     assert!(state.is_active);
     assert_eq!(state.current_tip_index, 0);
 
@@ -423,8 +423,8 @@ fn test_demo_contact_full_lifecycle() {
     assert!(!initial_tip.title.is_empty());
 
     // Step 3: Time passes, updates come
-    state.advance_to_next_tip();
-    state.advance_to_next_tip();
+    state.advance_to_next_tip(0);
+    state.advance_to_next_tip(0);
     assert_eq!(state.update_count, 2);
 
     // Step 4: App restart
@@ -468,7 +468,7 @@ fn test_demo_card_generation_all_tips() {
 // @internal
 #[test]
 fn test_shown_tip_tracking() {
-    let mut state = DemoContactState::new_active();
+    let mut state = DemoContactState::new_active(0);
 
     // Initially has first tip shown
     assert!(!state.shown_tip_ids.is_empty());
@@ -476,8 +476,8 @@ fn test_shown_tip_tracking() {
     let initial_count = state.shown_tip_ids.len();
 
     // Advance through tips
-    state.advance_to_next_tip();
-    state.advance_to_next_tip();
+    state.advance_to_next_tip(0);
+    state.advance_to_next_tip(0);
 
     // Should have tracked more shown tips
     assert!(state.shown_tip_ids.len() >= initial_count);

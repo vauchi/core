@@ -139,9 +139,9 @@ fn test_aha_tracker_roundtrip_encrypted() {
 fn test_demo_contact_state_roundtrip_encrypted() {
     let (_dir, storage) = open_storage();
 
-    let mut state = DemoContactState::new_active();
-    state.advance_to_next_tip();
-    state.advance_to_next_tip();
+    let mut state = DemoContactState::new_active(0);
+    state.advance_to_next_tip(0);
+    state.advance_to_next_tip(0);
 
     storage.save_demo_contact_state(&state).unwrap();
     let loaded = storage.load_demo_contact_state().unwrap().unwrap();
@@ -158,12 +158,12 @@ fn test_ux_state_combined_roundtrip_encrypted() {
     let mut tracker = AhaMomentTracker::new();
     tracker.mark_seen(AhaMomentType::CardCreationComplete);
 
-    let mut demo_state = DemoContactState::new_active();
-    demo_state.advance_to_next_tip();
+    let mut demo_state = DemoContactState::new_active(0);
+    demo_state.advance_to_next_tip(0);
 
     storage.save_ux_state(&tracker, &demo_state).unwrap();
 
-    let (loaded_tracker, loaded_demo) = storage.load_ux_state().unwrap();
+    let (loaded_tracker, loaded_demo) = storage.load_ux_state(0).unwrap();
     assert!(loaded_tracker.has_seen(AhaMomentType::CardCreationComplete));
     assert!(loaded_demo.is_active);
     assert_eq!(loaded_demo.update_count, 1);
@@ -177,7 +177,7 @@ fn test_ux_state_encrypted_in_db() {
     let mut tracker = AhaMomentTracker::new();
     tracker.mark_seen(AhaMomentType::FirstEdit);
 
-    let demo_state = DemoContactState::new_active();
+    let demo_state = DemoContactState::new_active(0);
     storage.save_ux_state(&tracker, &demo_state).unwrap();
     drop(storage);
 
@@ -298,14 +298,14 @@ fn test_rekey_preserves_ux_state() {
 
     let mut tracker = AhaMomentTracker::new();
     tracker.mark_seen(AhaMomentType::FirstContactAdded);
-    let demo_state = DemoContactState::new_active();
+    let demo_state = DemoContactState::new_active(0);
     storage.save_ux_state(&tracker, &demo_state).unwrap();
 
     // Rekey
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    let (loaded_tracker, loaded_demo) = storage.load_ux_state().unwrap();
+    let (loaded_tracker, loaded_demo) = storage.load_ux_state(0).unwrap();
     assert!(loaded_tracker.has_seen(AhaMomentType::FirstContactAdded));
     assert!(loaded_demo.is_active);
 }

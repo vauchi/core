@@ -77,7 +77,9 @@ impl Vauchi {
 
     /// Gets the current demo contact state.
     pub fn demo_contact_state(&self) -> VauchiResult<DemoContactState> {
-        Ok(self.storage.load_or_create_demo_contact_state()?)
+        Ok(self
+            .storage
+            .load_or_create_demo_contact_state(self.clock.unix_seconds())?)
     }
 
     /// Checks if the demo contact is active.
@@ -87,7 +89,9 @@ impl Vauchi {
 
     /// Gets the current demo contact card (if active).
     pub fn demo_contact_card(&self) -> VauchiResult<Option<DemoContactCard>> {
-        let state = self.storage.load_or_create_demo_contact_state()?;
+        let state = self
+            .storage
+            .load_or_create_demo_contact_state(self.clock.unix_seconds())?;
         if !state.is_active {
             return Ok(None);
         }
@@ -101,18 +105,22 @@ impl Vauchi {
     ///
     /// Returns the new tip if successful.
     pub fn advance_demo_contact(&self) -> VauchiResult<Option<DemoTip>> {
-        let mut state = self.storage.load_or_create_demo_contact_state()?;
+        let mut state = self
+            .storage
+            .load_or_create_demo_contact_state(self.clock.unix_seconds())?;
         if !state.is_active {
             return Ok(None);
         }
-        let tip = state.advance_to_next_tip();
+        let tip = state.advance_to_next_tip(self.clock.unix_seconds());
         self.storage.save_demo_contact_state(&state)?;
         Ok(tip)
     }
 
     /// Dismisses the demo contact (user-initiated).
     pub fn dismiss_demo_contact(&self) -> VauchiResult<()> {
-        let mut state = self.storage.load_or_create_demo_contact_state()?;
+        let mut state = self
+            .storage
+            .load_or_create_demo_contact_state(self.clock.unix_seconds())?;
         state.dismiss();
         self.storage.save_demo_contact_state(&state)?;
         Ok(())
@@ -120,7 +128,9 @@ impl Vauchi {
 
     /// Auto-removes the demo contact (after first real exchange).
     pub fn auto_remove_demo_contact(&self) -> VauchiResult<()> {
-        let mut state = self.storage.load_or_create_demo_contact_state()?;
+        let mut state = self
+            .storage
+            .load_or_create_demo_contact_state(self.clock.unix_seconds())?;
         state.auto_remove();
         self.storage.save_demo_contact_state(&state)?;
         Ok(())
@@ -128,7 +138,9 @@ impl Vauchi {
 
     /// Restores the demo contact from settings.
     pub fn restore_demo_contact(&self) -> VauchiResult<()> {
-        let mut state = self.storage.load_or_create_demo_contact_state()?;
+        let mut state = self
+            .storage
+            .load_or_create_demo_contact_state(self.clock.unix_seconds())?;
         state.restore();
         self.storage.save_demo_contact_state(&state)?;
         Ok(())
@@ -143,7 +155,7 @@ impl Vauchi {
             return Ok(());
         }
 
-        let state = DemoContactState::new_active();
+        let state = DemoContactState::new_active(self.clock.unix_seconds());
         self.storage.save_demo_contact_state(&state)?;
         Ok(())
     }

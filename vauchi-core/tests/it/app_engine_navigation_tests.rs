@@ -1017,3 +1017,96 @@ fn drain_pending_commands_returns_empty_after_drain() {
         "drain consumes the queue; got {second:?}"
     );
 }
+
+// ── Audio bridge (Phase 1.C.3d) ───────────────────────────────────
+
+// @internal
+#[test]
+fn apply_multi_stage_audio_proximity_routes_to_engine_setter() {
+    // The bridge AppEngine::apply_multi_stage_audio_proximity must
+    // downcast to MultiStageExchangeEngine and forward the state to
+    // its set_audio_proximity. Phase 1.C.3d of
+    // 2026-05-11-hover-graduation-plan.md.
+    use vauchi_core::exchange::AudioProximityState;
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MultiStageExchange);
+    let _ = engine.drain_pending_commands();
+
+    let applied = engine.apply_multi_stage_audio_proximity(AudioProximityState::Listening);
+    assert!(
+        applied,
+        "apply_multi_stage_audio_proximity must succeed when the active engine is MultiStageExchange",
+    );
+
+    // The Listening state must surface in the active screen's status
+    // indicator narration (engine renders "Listening for proximity
+    // chirp" via build_status_indicator's audio layering).
+    let screen = engine.current_screen();
+    let narration = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            vauchi_app::ui::Component::StatusIndicator { detail, .. } => detail.clone(),
+            _ => None,
+        })
+        .unwrap_or_default();
+    assert!(
+        narration.contains("Listening for proximity chirp"),
+        "Listening must appear in the status indicator detail; got: {narration:?}",
+    );
+}
+
+// @internal
+#[test]
+fn apply_multi_stage_audio_proximity_failed_renders_audio_failed_screen() {
+    // Audio-Failed routes build_screen to build_audio_failed_screen
+    // (distinct chrome "Couldn't confirm devices are close") instead
+    // of the generic Exchange-Failed panel. G1.3 of the Hover
+    // graduation problem record; verified end-to-end through the
+    // AppEngine bridge.
+    use vauchi_core::exchange::AudioProximityState;
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MultiStageExchange);
+    let _ = engine.drain_pending_commands();
+
+    let applied = engine.apply_multi_stage_audio_proximity(AudioProximityState::Failed);
+    assert!(applied);
+
+    let screen = engine.current_screen();
+    let title = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            vauchi_app::ui::Component::StatusIndicator { title, .. } => Some(title.clone()),
+            _ => None,
+        })
+        .unwrap_or_default();
+    assert_eq!(
+        title, "Couldn't confirm devices are close",
+        "audio-Failed must render the proximity-specific chrome",
+    );
+}
+
+// @internal
+#[test]
+fn apply_multi_stage_audio_proximity_returns_false_on_wrong_engine() {
+    // The bridge gracefully reports false when the active engine
+    // isn't the multi-stage one — the user navigated away mid-
+    // handshake. Phase 1.C.3d's bridge handler drops the callback
+    // (no panic, no engine corruption).
+    use vauchi_core::exchange::AudioProximityState;
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    // Don't navigate to MultiStageExchange — leave engine on the
+    // default screen.
+    let applied = engine.apply_multi_stage_audio_proximity(AudioProximityState::Listening);
+    assert!(
+        !applied,
+        "apply_multi_stage_audio_proximity must return false when MultiStageExchange isn't active",
+    );
+}

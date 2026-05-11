@@ -22,7 +22,8 @@ use std::sync::{Arc, Mutex};
 use crate::MobileDeviceLinkSession;
 use crate::mobile_exchange::serialize_exchange_payload;
 use crate::multistage_exchange::{
-    MobileMultiStageSession, MobileProtocolState, MobileQrPayload, MultiStageSessionListener,
+    MobileAudioProximityState, MobileMultiStageSession, MobileProtocolState, MobileQrPayload,
+    MultiStageAudioListener, MultiStageSessionListener,
 };
 use crate::types::{
     MobileLocale, MobileNotificationCategory, MobilePendingNotification, MobileTabInfo,
@@ -4564,6 +4565,11 @@ impl PlatformAppEngine {
             direct_listener: Arc::clone(&self.direct_listener),
         };
         session.set_listener(Box::new(bridge));
+        let audio_bridge = MultiStageAudioEngineBridge {
+            engine: Arc::clone(&self.engine),
+            direct_listener: Arc::clone(&self.direct_listener),
+        };
+        session.set_audio_listener(Box::new(audio_bridge));
         session.start();
         *slot = Some(session);
         Ok(())
@@ -4849,6 +4855,67 @@ impl MultiStageSessionListener for MultiStageEngineBridge {
         if applied {
             self.notify();
         }
+    }
+}
+
+/// Core-supplied audio-proximity listener that bridges
+/// platform-side orchestrator transitions into the active
+/// `MultiStageExchangeEngine` view-state.
+///
+/// Sibling of [`MultiStageEngineBridge`] — Phase 1.C.3d of
+/// `_private/docs/planning/todo/2026-05-11-hover-graduation-plan.md`.
+/// The orchestrator that *fires* `on_audio_state_changed` (the
+/// `ProximityVerifier` invocation + `Command::AudioEmitChallenge` /
+/// `AudioListenForResponse` emission) lands in 1.C.3e; this bridge
+/// is dormant plumbing until then — the listener is registered but
+/// no callbacks fire.
+struct MultiStageAudioEngineBridge {
+    engine: Arc<Mutex<AppEngine>>,
+    direct_listener: DirectListenerSlot,
+}
+
+impl MultiStageAudioEngineBridge {
+    fn notify(&self) {
+        // Same `clone-arc-out-of-lock` discipline as
+        // `MultiStageEngineBridge::notify` so a frontend
+        // implementation that re-enters Rust on the callback (typical:
+        // read current_screen_json) won't deadlock.
+        let listener = self
+            .direct_listener
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone());
+        if let Some(listener) = listener {
+            listener.on_screens_invalidated(vec!["multi_stage_exchange".into()]);
+        }
+    }
+}
+
+impl MultiStageAudioListener for MultiStageAudioEngineBridge {
+    fn on_audio_state_changed(&self, state: MobileAudioProximityState) {
+        let core_state = mobile_audio_to_core(state);
+        let applied = match self.engine.lock() {
+            Ok(mut e) => e.apply_multi_stage_audio_proximity(core_state),
+            Err(_) => false,
+        };
+        if applied {
+            self.notify();
+        }
+    }
+}
+
+/// Translate [`MobileAudioProximityState`] (uniffi::Enum) to
+/// [`vauchi_core::exchange::AudioProximityState`] (the AppEngine's
+/// wire type). Mirrors [`mobile_state_to_core`].
+fn mobile_audio_to_core(
+    state: MobileAudioProximityState,
+) -> vauchi_core::exchange::AudioProximityState {
+    use vauchi_core::exchange::AudioProximityState;
+    match state {
+        MobileAudioProximityState::Pending => AudioProximityState::Pending,
+        MobileAudioProximityState::Listening => AudioProximityState::Listening,
+        MobileAudioProximityState::Confirmed => AudioProximityState::Confirmed,
+        MobileAudioProximityState::Failed => AudioProximityState::Failed,
     }
 }
 

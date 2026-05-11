@@ -629,6 +629,32 @@ impl AppEngine {
         false
     }
 
+    /// Bridge from the multi-stage cycle thread — push an
+    /// audio-proximity state transition from the platform-side
+    /// orchestrator into the active `MultiStageExchangeEngine`'s
+    /// view-state. Phase 1.C.3d of
+    /// `_private/docs/planning/todo/2026-05-11-hover-graduation-plan.md`
+    /// — sibling of `apply_multi_stage_state` mirroring the existing
+    /// bridge pattern.
+    ///
+    /// Returns `true` if the active engine is the multi-stage one
+    /// and the state was applied; `false` otherwise (caller is the
+    /// audio-listener bridge in vauchi-platform; a `false` return
+    /// indicates the user navigated away mid-handshake, which the
+    /// bridge handles by dropping the callback).
+    pub fn apply_multi_stage_audio_proximity(
+        &mut self,
+        state: vauchi_core::exchange::AudioProximityState,
+    ) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_audio_proximity(state);
+            return true;
+        }
+        false
+    }
+
     /// Set the frontend-reported network reachability.
     ///
     /// Frontends call this from their `NWPathMonitor` (iOS) or

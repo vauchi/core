@@ -176,7 +176,12 @@ impl Default for MultiStageExchangeEngine {
 }
 
 impl MultiStageExchangeEngine {
-    pub fn new() -> Self {
+    /// Construct an engine wired for the Glance flow (bilateral QR
+    /// scan, no audio proximity). Replaces the prior `new()` body
+    /// verbatim; the renamed entry point preserves call-site
+    /// behaviour while making room for mode-aware variants
+    /// (`new_hover` etc.) in subsequent Phase 1 sub-steps.
+    pub fn new_glance() -> Self {
         Self {
             state: ProtocolState::Idle,
             current_qr_data: None,
@@ -187,6 +192,13 @@ impl MultiStageExchangeEngine {
             scan_quality_tracker: ScanQualityTracker::new(),
             cancelled: false,
         }
+    }
+
+    /// Backward-compatible shim so existing callers stay green
+    /// during the Phase 1.A → Phase 1.B → Phase 1.C tidy / red /
+    /// green migration. Delegates to [`Self::new_glance`].
+    pub fn new() -> Self {
+        Self::new_glance()
     }
 
     // ── Bridge setters (called by AppEngine from listener callbacks) ─

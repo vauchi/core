@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use vauchi_core::exchange::multistage::session::MultiStageSession;
-use vauchi_core::exchange::multistage::types::ProtocolState;
+use vauchi_core::exchange::multistage::types::{AudioProximityState, ProtocolState};
 
 // @internal
 #[test]
@@ -11,6 +11,34 @@ fn test_new_session_is_idle() {
     let card = b"Alice's contact card".to_vec();
     let session = MultiStageSession::new(card);
     assert!(matches!(session.get_state(), ProtocolState::Idle));
+}
+
+// @internal
+#[test]
+fn test_new_session_audio_proximity_starts_pending() {
+    // Phase 1.C.3a foothold — every freshly-constructed session
+    // begins with audio_proximity=Pending. Glance never transitions
+    // it; Hover drives it through the ultrasonic handshake states
+    // (Phase 1.C.3b).
+    let card = b"Alice's contact card".to_vec();
+    let session = MultiStageSession::new(card);
+    assert_eq!(session.audio_proximity(), AudioProximityState::Pending);
+}
+
+// @internal
+#[test]
+fn test_new_with_relay_session_audio_proximity_starts_pending() {
+    // The relay constructor takes a different path through
+    // new_with_relay; assert the field is initialised on this path
+    // too so a future refactor that drops the second initialiser
+    // doesn't silently regress to a stale Default.
+    let card = b"Alice's contact card".to_vec();
+    let session = MultiStageSession::new_with_relay(
+        card,
+        Some("https://relay.example/route".to_string()),
+        Some([0u8; 32]),
+    );
+    assert_eq!(session.audio_proximity(), AudioProximityState::Pending);
 }
 
 // @internal

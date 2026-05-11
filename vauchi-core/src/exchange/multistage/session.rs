@@ -32,7 +32,7 @@ use zeroize::Zeroize;
 use super::chunker::{Chunker, ReassemblyBuffer};
 use super::commitment::Commitment;
 use super::qr_codec::{self, StageQr};
-use super::types::{ChunkBitmap, ProtocolState, QrPayload};
+use super::types::{AudioProximityState, ChunkBitmap, ProtocolState, QrPayload};
 
 /// Maximum raw payload bytes per chunk (before transport encryption overhead).
 /// Transport encryption adds 12 (nonce) + 16 (Poly1305 tag) = 28 bytes overhead.
@@ -165,6 +165,25 @@ pub struct MultiStageSession {
     // Peer's relay metadata (extracted from their INIT QR)
     peer_relay_url: Option<String>,
     peer_relay_noise_pubkey: Option<[u8; 32]>,
+
+    // Audio-proximity verification state (Hover-only).
+    //
+    // Glance never transitions this — the mode doesn't run an
+    // ultrasonic handshake. Hover sub-flow drives it through
+    // `Pending → Listening → Confirmed` on success or
+    // `Pending → Listening → Failed` on timeout. Phase 1.C.3a
+    // foothold: the field + getter land first so the engine-side
+    // setter shipped in Phase 1.C.2 (vauchi/core!794) has a
+    // session-side counterpart to bridge into via the listener
+    // callback (1.C.3c) once the state machine (1.C.3b) emits
+    // transitions.
+    //
+    // Lives in vauchi-core per the design pass
+    // (_private/docs/problems/2026-04-28-multi-stage-engine-hover-ultrasonic/investigation.md
+    // Option B) so the session (protocol producer) and the
+    // MultiStageExchangeEngine (renderer consumer) share one
+    // enum definition.
+    audio_proximity: AudioProximityState,
 }
 
 impl MultiStageSession {
@@ -236,6 +255,7 @@ impl MultiStageSession {
             our_relay_noise_pubkey: relay_noise_pubkey,
             peer_relay_url: None,
             peer_relay_noise_pubkey: None,
+            audio_proximity: AudioProximityState::Pending,
         }
     }
 
@@ -274,6 +294,15 @@ impl MultiStageSession {
     /// Returns the peer's relay Noise NK public key (available after INIT exchange).
     pub fn peer_relay_noise_pubkey(&self) -> Option<[u8; 32]> {
         self.peer_relay_noise_pubkey
+    }
+
+    /// Returns the current audio-proximity state. Hover-only — Glance
+    /// callers see `Pending` for the lifetime of the session because
+    /// Glance never runs the ultrasonic handshake. Phase 1.C.3b will
+    /// add the state-machine transitions that move Hover through
+    /// `Listening → Confirmed / Failed`.
+    pub fn audio_proximity(&self) -> AudioProximityState {
+        self.audio_proximity
     }
 
     /// Cancel the session, transitioning to Failed and clearing sensitive data.

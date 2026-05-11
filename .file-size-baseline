@@ -31,7 +31,13 @@ vauchi-platform/src/exchange.rs 1027
 #  ImagePickCancelled — exchange session ignores them, vauchi-app
 #  drives import 2026-05-03 Phase 1 of 2026-05-03-core-file-picker-command)
 vauchi-core/src/exchange/session.rs 1788
-vauchi-core/src/exchange/multistage/session.rs 1189
+# (+29 for Phase 1.C.3a foothold of
+#  2026-05-11-hover-graduation-plan.md: audio_proximity field
+#  + getter on MultiStageSession, AudioProximityState import.
+#  Lives in core per the design-pass Option B so the session
+#  (protocol producer) and the engine (renderer consumer)
+#  share one enum.)
+vauchi-core/src/exchange/multistage/session.rs 1218
 
 # EXEMPT — protocol command/event enum: variants + variant_name match
 # + From impls + serde-discriminant ordering must be co-located, splitting

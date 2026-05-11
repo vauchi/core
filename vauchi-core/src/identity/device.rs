@@ -33,6 +33,23 @@ pub enum DeviceType {
 ///
 /// Case-insensitive substring matching on common device name patterns.
 /// Returns [DeviceType::Unknown] if no pattern matches.
+/// Returns the current Unix-epoch seconds via the OS wall clock.
+///
+/// Stepping-stone helper for Phase 1 / Task 1.1 / Step 3b. The 5
+/// previous in-line `now_secs()` blocks in this
+/// file all routed through identical 4-line expressions; this
+/// helper consolidates them while the wider caller graph
+/// (`identity/mod.rs`, `exchange/device_link/*`, `RegistryBroadcast`
+/// builders, …) still lacks a `Clock` to propagate. When the
+/// storage-cluster MR threads `Clock` deeper, this helper grows a
+/// `now: u64` parameter and the OS read drops out entirely.
+fn now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
 pub fn classify_device_type(name: &str) -> DeviceType {
     let lower = name.to_lowercase();
     if lower.contains("iphone") || lower.contains("pixel") || lower.contains("galaxy s") {
@@ -110,10 +127,7 @@ impl DeviceInfo {
         let exchange_seed = HKDF::derive_key(None, master_seed, &exchange_info);
         let device_exchange_keypair = X3DHKeyPair::from_bytes(*exchange_seed);
 
-        let created_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let created_at = now_secs();
 
         Self {
             device_id: *device_id,
@@ -342,12 +356,7 @@ impl DeviceRegistry {
         }
 
         device.revoked = true;
-        device.revoked_at = Some(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-        );
+        device.revoked_at = Some(now_secs());
 
         self.version += 1;
         self.sign(signing_key);
@@ -531,10 +540,7 @@ pub struct DeviceRevocationCertificate {
 impl DeviceRevocationCertificate {
     /// Creates a new revocation certificate.
     pub fn create(device_id: &[u8; 32], reason: String, signing_key: &SigningKeyPair) -> Self {
-        let revoked_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let revoked_at = now_secs();
 
         let mut certificate = Self {
             device_id: *device_id,
@@ -575,10 +581,7 @@ impl DeviceRevocationCertificate {
         if self.expires_at == 0 {
             return false; // Legacy cert without expiry
         }
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = now_secs();
         now > self.expires_at
     }
 
@@ -656,10 +659,7 @@ impl RegistryBroadcast {
             })
             .collect();
 
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let timestamp = now_secs();
 
         let mut broadcast = Self {
             version: registry.version(),

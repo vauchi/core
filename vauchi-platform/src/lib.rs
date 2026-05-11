@@ -125,7 +125,8 @@ pub use mobile_verifier_event::{
 pub use mobile_wifi_aware::{MobileWifiAwareStatus, wifi_aware_check_availability};
 pub use multipart_qr::{MobileMultipartDecoder, MultipartDecoder, encode_multipart};
 pub use multistage_exchange::{
-    MobileMultiStageSession, MobileProtocolState, MobileQrPayload, MultiStageSessionListener,
+    MobileAudioProximityState, MobileMultiStageSession, MobileProtocolState, MobileQrPayload,
+    MultiStageAudioListener, MultiStageSessionListener,
 };
 pub use platform_app_engine::{PlatformAppEngine, PlatformEventListener};
 pub use policies::{

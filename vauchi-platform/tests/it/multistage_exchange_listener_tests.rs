@@ -16,7 +16,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use vauchi_platform::{
-    MobileMultiStageSession, MobileProtocolState, MobileQrPayload, MultiStageSessionListener,
+    MobileAudioProximityState, MobileMultiStageSession, MobileProtocolState, MobileQrPayload,
+    MultiStageAudioListener, MultiStageSessionListener,
 };
 
 // ── Mock listener ───────────────────────────────────────────────────
@@ -493,4 +494,103 @@ fn process_scanned_qr_is_safe_concurrent_with_cycle_thread() {
 
     session.cancel();
     assert_eq!(listener.session_ended_count(), 1);
+}
+
+// ── Audio listener plumbing (Phase 1.C.3c) ────────────────────────
+
+/// Audio-listener mock that records every callback the wrapper fires.
+#[derive(Default)]
+struct RecordingAudioListener {
+    states: Mutex<Vec<MobileAudioProximityState>>,
+}
+
+impl RecordingAudioListener {
+    fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    fn states(&self) -> Vec<MobileAudioProximityState> {
+        self.states.lock().expect("states").clone()
+    }
+}
+
+impl MultiStageAudioListener for RecordingAudioListener {
+    fn on_audio_state_changed(&self, state: MobileAudioProximityState) {
+        self.states.lock().expect("states").push(state);
+    }
+}
+
+// @internal
+#[test]
+fn fresh_session_audio_proximity_is_pending() {
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+    assert_eq!(
+        session.audio_proximity(),
+        MobileAudioProximityState::Pending,
+        "every freshly-constructed session starts Pending — Hover handshake hasn't run yet",
+    );
+}
+
+// @internal
+#[test]
+fn set_audio_listener_accepts_and_replaces() {
+    // The wrapper exposes a sibling slot for the audio listener; the
+    // existing base listener slot is untouched (composition, not
+    // extension, per the 1.C.1 investigation refinement). Registering
+    // an audio listener has no side effects today — Phase 1.C.3d
+    // adds the orchestrator that fires the callback.
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+    let first = RecordingAudioListener::new();
+    let second = RecordingAudioListener::new();
+    session.set_audio_listener(Box::new(SharedAudio(first.clone())));
+    session.set_audio_listener(Box::new(SharedAudio(second.clone())));
+    // Neither listener has received callbacks because the orchestrator
+    // (1.C.3d) isn't wired yet; assert the dormant state.
+    assert!(first.states().is_empty());
+    assert!(second.states().is_empty());
+}
+
+// @internal
+#[test]
+fn base_listener_and_audio_listener_coexist() {
+    // Registering both kinds of listener at once must succeed — the
+    // wrapper owns one slot per listener kind so Hover consumers can
+    // pair the two without one overriding the other.
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+    let base = RecordingListener::new();
+    let audio = RecordingAudioListener::new();
+    session.set_listener(Box::new(SharedBase(base.clone())));
+    session.set_audio_listener(Box::new(SharedAudio(audio.clone())));
+    // Listener wiring is async — calling set_* is enough; no callbacks
+    // fire until something happens to drive them.
+    assert!(audio.states().is_empty());
+    assert!(base.state_changes().is_empty());
+}
+
+// `Box<dyn Trait>` wrappers around `Arc<RecordingListener>` so the
+// test can both hand the listener to the wrapper and continue to
+// observe it via the original Arc. UniFFI's callback-interface
+// shape requires `Box<dyn …>`, but we need shared ownership for
+// post-call assertions.
+struct SharedBase(Arc<RecordingListener>);
+impl MultiStageSessionListener for SharedBase {
+    fn on_qr_payload(&self, p: MobileQrPayload) {
+        self.0.on_qr_payload(p);
+    }
+    fn on_state_changed(&self, s: MobileProtocolState) {
+        self.0.on_state_changed(s);
+    }
+    fn on_finalized(&self, n: String) {
+        self.0.on_finalized(n);
+    }
+    fn on_session_ended(&self) {
+        self.0.on_session_ended();
+    }
+}
+
+struct SharedAudio(Arc<RecordingAudioListener>);
+impl MultiStageAudioListener for SharedAudio {
+    fn on_audio_state_changed(&self, s: MobileAudioProximityState) {
+        self.0.on_audio_state_changed(s);
+    }
 }

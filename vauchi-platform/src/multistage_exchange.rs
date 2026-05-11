@@ -153,6 +153,63 @@ pub trait MultiStageSessionListener: Send + Sync {
     fn on_session_ended(&self);
 }
 
+/// Mobile-facing audio proximity state. UniFFI-exposed mirror of
+/// [`vauchi_core::exchange::AudioProximityState`] (kept as a sibling
+/// enum so the wire shape is independent of the core internal type,
+/// matching the [`MobileProtocolState`] / [`ProtocolState`] pattern).
+///
+/// Glance never transitions out of `Pending`; Hover walks
+/// `Pending → Listening → Confirmed` on success or
+/// `Pending → Listening → Failed` on the proximity timeout. Phase
+/// 1.C.3c plumbing — the wrapper-side orchestrator (Phase 1.C.3d)
+/// drives transitions via `MultiStageSession::set_audio_proximity`
+/// and surfaces them via [`MultiStageAudioListener::on_audio_state_changed`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileAudioProximityState {
+    Pending,
+    Listening,
+    Confirmed,
+    Failed,
+}
+
+impl From<vauchi_core::exchange::AudioProximityState> for MobileAudioProximityState {
+    fn from(state: vauchi_core::exchange::AudioProximityState) -> Self {
+        use vauchi_core::exchange::AudioProximityState::*;
+        match state {
+            Pending => Self::Pending,
+            Listening => Self::Listening,
+            Confirmed => Self::Confirmed,
+            Failed => Self::Failed,
+        }
+    }
+}
+
+/// Audio-proximity-only listener for Hover ultrasonic handshake state
+/// updates.
+///
+/// Sibling of [`MultiStageSessionListener`] rather than an extension,
+/// so adding the audio callback does not break existing Swift / Kotlin
+/// consumers of the base listener. Mobile clients that don't care about
+/// audio (Glance-only flows, headless tooling) simply don't register
+/// one and the audio path stays inert.
+///
+/// Phase 1.C.3d wires the wrapper-side orchestrator (ProximityVerifier
+/// invocation + `Command::AudioEmitChallenge` / `AudioListenForResponse`
+/// emission) that calls
+/// [`on_audio_state_changed`](Self::on_audio_state_changed) whenever
+/// the inner [`MultiStageSession::set_audio_proximity`] transition
+/// succeeds. Until then, this trait + the slot below are dormant
+/// plumbing — register a listener, but no callbacks fire yet.
+#[uniffi::export(callback_interface)]
+pub trait MultiStageAudioListener: Send + Sync {
+    /// The session's audio-proximity state changed. Fires once per
+    /// real transition (the wrapper preflights the state graph so
+    /// rejected transitions never reach this callback).
+    fn on_audio_state_changed(&self, state: MobileAudioProximityState);
+}
+
+type AudioListenerSlot = Arc<Mutex<Option<Arc<dyn MultiStageAudioListener>>>>;
+
 /// Fallback sleep duration (ms) when a QR payload does not carry a hint.
 ///
 /// Matches the protocol's minimum `DISPLAY_MS_INIT` so the cycle thread
@@ -184,6 +241,10 @@ pub(crate) struct PersistenceContext {
 pub struct MobileMultiStageSession {
     inner: Arc<Mutex<MultiStageSession>>,
     listener: ListenerSlot,
+    /// Phase 1.C.3c plumbing — sibling listener for audio-proximity
+    /// state changes. `None` for sessions that don't care about audio
+    /// (Glance-only flows, headless tooling).
+    audio_listener: AudioListenerSlot,
     cancel_flag: Arc<AtomicBool>,
     thread_handle: Mutex<Option<JoinHandle<()>>>,
     /// Test-only sleep override (ms). `0` means "use the payload's
@@ -225,6 +286,29 @@ impl MobileMultiStageSession {
         if let Ok(mut slot) = self.listener.lock() {
             *slot = Some(Arc::from(listener));
         }
+    }
+
+    /// Register (or replace) the audio-proximity listener. Optional —
+    /// sessions that don't register one simply never receive audio
+    /// callbacks (Glance flows, harness tests). Phase 1.C.3d wires
+    /// the wrapper-side orchestrator that fires this callback;
+    /// until then, registering a listener is harmless dormant
+    /// plumbing.
+    pub fn set_audio_listener(&self, listener: Box<dyn MultiStageAudioListener>) {
+        if let Ok(mut slot) = self.audio_listener.lock() {
+            *slot = Some(Arc::from(listener));
+        }
+    }
+
+    /// Returns the current audio-proximity state of the inner session.
+    /// Hover sessions transition through the state machine driven by
+    /// `MultiStageSession::set_audio_proximity`; Glance sessions stay
+    /// at `Pending` for their lifetime.
+    pub fn audio_proximity(&self) -> MobileAudioProximityState {
+        self.inner
+            .lock()
+            .map(|s| s.audio_proximity().into())
+            .unwrap_or(MobileAudioProximityState::Pending)
     }
 
     /// Spawn the cycle thread. Idempotent — a second call while the thread
@@ -329,6 +413,7 @@ impl MobileMultiStageSession {
         MobileMultiStageSession {
             inner: Arc::new(Mutex::new(MultiStageSession::new(local_card))),
             listener: Arc::new(Mutex::new(None)),
+            audio_listener: Arc::new(Mutex::new(None)),
             cancel_flag: Arc::new(AtomicBool::new(false)),
             thread_handle: Mutex::new(None),
             cycle_sleep_override_ms: Arc::new(AtomicU32::new(0)),

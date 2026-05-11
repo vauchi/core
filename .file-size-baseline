@@ -150,7 +150,14 @@ vauchi-app/src/ui/exchange_ble.rs 1057
 # (+12 for Command::SetOrientationLock dispatch in screen_entered/exited
 #  + updated inline tests, Phase 2c of
 #  2026-05-04-exchange-command-screen-presentation)
-vauchi-app/src/ui/multi_stage_exchange.rs 1223
+# (+100 for Phase 1.A of 2026-05-11-hover-graduation-plan.md:
+#  AudioProximityState enum + audio_proximity engine field +
+#  new_glance/new_hover mode-aware constructors + new() shim +
+#  audio_proximity() getter + 2 inline tests pinning the
+#  constructor invariants. Engine state-machine surface; per
+#  file-size.md structural exemption — scattered transitions
+#  create protocol bugs.)
+vauchi-app/src/ui/multi_stage_exchange.rs 1325
 
 # EXEMPT — UniFFI facade growth: PlatformAppEngine wraps the full
 # AppEngine surface JSON-side and now also owns the Pair 4

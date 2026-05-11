@@ -140,6 +140,25 @@ mod camera_gate_tests {
     }
 }
 
+/// Audio-proximity verification state owned by the engine when the
+/// active exchange mode is `Hover`. The ultrasonic handshake fires
+/// after both peers reach the QR-scanning phase; `Pending` is the
+/// pre-handshake state, `Listening` covers the chirp-and-listen
+/// window, `Confirmed` is the success path, and `Failed` triggers
+/// the proximity-specific Failed-state ScreenModel chrome
+/// (distinct from generic protocol failure).
+///
+/// Glance ignores this state — its engine constructor leaves the
+/// field at `Pending` and the value never transitions because the
+/// mode never emits `AudioEmitChallenge` / `AudioListenForResponse`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AudioProximityState {
+    Pending,
+    Listening,
+    Confirmed,
+    Failed,
+}
+
 /// Engine for the multi-stage face-to-face exchange screen.
 ///
 /// Pure state container — does not own the
@@ -167,6 +186,10 @@ pub struct MultiStageExchangeEngine {
     /// `true` once `cancel` was pressed — disables further state
     /// pushes so a late callback cannot un-cancel the screen.
     cancelled: bool,
+    /// Audio-proximity verification state — Hover-only. Default
+    /// `Pending` for both Glance and Hover; Glance never transitions
+    /// because it doesn't emit the audio commands.
+    audio_proximity: AudioProximityState,
 }
 
 impl Default for MultiStageExchangeEngine {
@@ -191,6 +214,32 @@ impl MultiStageExchangeEngine {
             use_front_camera: false,
             scan_quality_tracker: ScanQualityTracker::new(),
             cancelled: false,
+            audio_proximity: AudioProximityState::Pending,
+        }
+    }
+
+    /// Construct an engine wired for the Hover flow (bilateral QR
+    /// scan + ultrasonic audio-proximity verification). Differs
+    /// from [`Self::new_glance`] in two ways: the front camera is
+    /// the default (face-to-face screen-to-screen UX), and
+    /// `audio_proximity` starts at `Pending` ready for the chirp
+    /// handshake the engine triggers when it reaches the active
+    /// scanning state.
+    ///
+    /// Phase 1 of the legacy `ExchangeMode::Hover` graduation — the
+    /// dispatcher in `core/vauchi-app/src/ui/exchange.rs` flips to
+    /// call this constructor in Phase 1.E (mode-dispatch step).
+    pub fn new_hover() -> Self {
+        Self {
+            state: ProtocolState::Idle,
+            current_qr_data: None,
+            peer_name: None,
+            session_ended: false,
+            camera_gate: CameraGate::Available,
+            use_front_camera: true,
+            scan_quality_tracker: ScanQualityTracker::new(),
+            cancelled: false,
+            audio_proximity: AudioProximityState::Pending,
         }
     }
 
@@ -246,6 +295,14 @@ impl MultiStageExchangeEngine {
     /// Currently-selected camera (front == true).
     pub fn use_front_camera(&self) -> bool {
         self.use_front_camera
+    }
+
+    /// Current audio-proximity state — `Pending` for Glance throughout
+    /// the exchange (the mode never transitions the field). For Hover,
+    /// transitions through `Listening → Confirmed` on success or
+    /// → `Failed` on the proximity timeout.
+    pub fn audio_proximity(&self) -> AudioProximityState {
+        self.audio_proximity
     }
 
     // ── Internal helpers ───────────────────────────────────────────
@@ -672,6 +729,7 @@ mod tests {
     // because the ultrasonic handshake hasn't run yet. The Glance
     // path (`new_glance`) ignores `audio_proximity` and stays
     // back-camera-default.
+    // @internal
     #[test]
     fn new_hover_initialises_state() {
         let engine = MultiStageExchangeEngine::new_hover();
@@ -686,6 +744,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn new_glance_is_back_camera_default() {
         let engine = MultiStageExchangeEngine::new_glance();

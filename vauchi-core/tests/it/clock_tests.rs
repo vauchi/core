@@ -1,0 +1,84 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Integration tests for `vauchi_core::clock` — the explicit-time
+//! seam introduced in Phase 1 / Task 1.1 of
+//! `_private/docs/planning/todo/2026-05-11-pure-functional-core-program-plan.md`.
+//!
+//! All assertions exercise public API only (`Clock`, `SystemClock`,
+//! `FakeClock`). FakeClock is gated behind `feature = "testing"`,
+//! which is enabled in the workspace test profile.
+
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+
+use vauchi_core::clock::{Clock, FakeClock, SystemClock};
+
+// @internal
+#[test]
+fn system_clock_returns_current_time() {
+    let c = SystemClock::new();
+    let before = SystemTime::now();
+    let observed = c.now();
+    let after = SystemTime::now();
+    // Sandwich: the observed time must fall between two real reads of
+    // the underlying OS clock.
+    assert!(
+        observed >= before,
+        "clock went backwards: {observed:?} < {before:?}"
+    );
+    assert!(
+        observed <= after,
+        "clock raced ahead: {observed:?} > {after:?}"
+    );
+}
+
+// @internal
+#[test]
+fn fake_clock_returns_initial_value() {
+    let c = FakeClock::new(SystemTime::UNIX_EPOCH);
+    assert_eq!(c.now(), SystemTime::UNIX_EPOCH);
+    assert_eq!(c.unix_seconds(), 0);
+}
+
+// @internal
+#[test]
+fn fake_clock_advances_monotonically() {
+    let c = FakeClock::new(SystemTime::UNIX_EPOCH);
+    c.advance(Duration::from_secs(42));
+    assert_eq!(c.unix_seconds(), 42);
+    c.advance(Duration::from_secs(58));
+    assert_eq!(c.unix_seconds(), 100);
+}
+
+// @internal
+#[test]
+fn fake_clock_set_overwrites() {
+    let c = FakeClock::new(SystemTime::UNIX_EPOCH);
+    let target = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+    c.set(target);
+    assert_eq!(c.now(), target);
+    assert_eq!(c.unix_seconds(), 1_700_000_000);
+}
+
+// @internal
+#[test]
+fn shared_constructors_return_dyn_clock_handles() {
+    // Compile-time check that both constructors fit the `Arc<dyn Clock>`
+    // shape that `Vauchi` and `AppEngine` will hold once Task 1.1
+    // Step 3 threads this through their constructors.
+    let _: Arc<dyn Clock> = SystemClock::shared();
+    let _: Arc<dyn Clock> = FakeClock::new(SystemTime::UNIX_EPOCH).shared();
+}
+
+// @internal
+#[test]
+fn unix_seconds_default_impl_clamps_pre_epoch() {
+    // SystemTime::UNIX_EPOCH - 1s → duration_since() returns Err.
+    // The default `unix_seconds` impl swallows that and returns 0,
+    // which is the documented contract; this test pins it.
+    let pre_epoch = SystemTime::UNIX_EPOCH - Duration::from_secs(1);
+    let c = FakeClock::new(pre_epoch);
+    assert_eq!(c.unix_seconds(), 0);
+}

@@ -10,6 +10,8 @@
 //!
 //! App-layer modules (i18n, help, theme, ui, content) live in the `vauchi-app` crate.
 
+pub mod clock;
+
 pub mod crypto;
 pub use crypto::{DhError, PublicKey, Signature, SigningKeyPair, SymmetricKey, decrypt, encrypt};
 

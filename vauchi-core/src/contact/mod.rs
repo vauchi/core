@@ -98,6 +98,23 @@ pub struct Contact {
     archived_at: Option<u64>,
 }
 
+/// Returns the current Unix-epoch seconds via the OS wall clock.
+///
+/// Stepping-stone helper for Phase 1 / Task 1.1 / Step 3b. The
+/// 5 SystemTime callsites in this file all routed through
+/// identical `SystemTime::now()....as_secs()` blocks; this helper
+/// consolidates them while the wider Contact caller graph (sync,
+/// backup, contact-merge, exchange-session, …) still lacks a
+/// `Clock` to propagate. When the storage-cluster pass threads
+/// `Clock` deeper, this helper grows a `now: u64` parameter and
+/// the OS read drops out entirely.
+fn now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
 impl Contact {
     /// Creates a new contact from exchange data.
     pub fn from_exchange(
@@ -107,10 +124,7 @@ impl Contact {
     ) -> Self {
         let id = hex::encode(public_key);
         let display_name = card.display_name().to_string();
-        let exchange_timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let exchange_timestamp = now_secs();
 
         Contact {
             id,
@@ -253,10 +267,7 @@ impl Contact {
     ) -> Self {
         let id = uuid::Uuid::new_v4().to_string();
         let display_name = card.display_name().to_string();
-        let imported_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let imported_at = now_secs();
 
         Contact {
             id,
@@ -479,10 +490,7 @@ impl Contact {
     pub fn reciprocity(&self) -> Reciprocity {
         match self.kind.exchanged_data().and_then(|d| d.reciprocity) {
             Some(Reciprocity::Pending) => {
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs();
+                let now = now_secs();
                 let exchange_ts = self
                     .kind
                     .exchanged_data()
@@ -567,12 +575,7 @@ impl Contact {
     pub fn update_card(&mut self, card: ContactCard) {
         self.display_name = card.display_name().to_string();
         self.card = card;
-        self.card_updated_at = Some(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_secs(),
-        );
+        self.card_updated_at = Some(now_secs());
     }
 
     /// Accepts a recovery, updating the contact's public key and shared secret.
@@ -594,10 +597,7 @@ impl Contact {
         data.shared_key = new_shared_key;
         data.fingerprint_verified = false;
         data.has_recovered = true;
-        data.exchange_timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        data.exchange_timestamp = now_secs();
         self.id = hex::encode(new_public_key);
         Ok(())
     }

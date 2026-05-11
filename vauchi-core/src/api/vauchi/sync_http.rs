@@ -21,7 +21,7 @@
 //! 5. Send phase: delegates to `SyncController` for outbound updates + ACKs.
 //! 6. Returns combined `VauchiSyncOutcome`.
 
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 /// Recommended interval (seconds) between scheduled sync ticks.
 ///
@@ -554,10 +554,7 @@ impl Vauchi {
 
     /// Check whether a cached OHTTP key is still within its TTL.
     fn is_ohttp_key_fresh(&self, fetched_at_epoch_secs: u64) -> bool {
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = self.clock.unix_seconds();
         let age = now.saturating_sub(fetched_at_epoch_secs);
         age < self.config.ohttp.key_ttl_secs
     }
@@ -608,10 +605,7 @@ impl Vauchi {
 
     /// Check whether cached pins are still within their TTL.
     fn is_pin_cache_fresh(&self, fetched_at_epoch_secs: u64) -> bool {
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = self.clock.unix_seconds();
         let age = now.saturating_sub(fetched_at_epoch_secs);
         age < self.config.relay.pin_ttl_secs
     }

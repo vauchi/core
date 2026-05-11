@@ -41,10 +41,7 @@ impl Vauchi {
                     Err(e) => return Err(e),
                 };
 
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
+            let now = self.clock.unix_seconds();
 
             let update = PendingUpdate {
                 id: uuid::Uuid::new_v4().to_string(),
@@ -92,10 +89,7 @@ impl Vauchi {
             .load_contact(contact_id)?
             .and_then(|c| c.relay_url().map(String::from));
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = self.clock.unix_seconds();
 
         let update = PendingUpdate {
             id: uuid::Uuid::new_v4().to_string(),
@@ -478,10 +472,7 @@ impl Vauchi {
             self.storage.save_contact(&contact)?;
 
             // Queue for delivery
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
+            let now = self.clock.unix_seconds();
 
             let update = PendingUpdate {
                 id: uuid::Uuid::new_v4().to_string(),

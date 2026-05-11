@@ -320,10 +320,7 @@ impl Vauchi {
     pub(super) fn queue_duress_alert(&mut self) -> VauchiResult<()> {
         let settings = self.storage.load_duress_settings()?;
         if let Some(_settings) = settings {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
+            let now = self.clock.unix_seconds();
 
             let device_id = self.device_id_string();
 

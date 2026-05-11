@@ -295,10 +295,7 @@ impl Vauchi {
         for label in &envelope.sections.labels {
             let contacts: std::collections::HashSet<String> =
                 label.contacts.iter().cloned().collect();
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_secs();
+            let now = self.clock.unix_seconds();
             let group = crate::contact::Group::from_storage(
                 label.label_id.clone(),
                 label.name.clone(),

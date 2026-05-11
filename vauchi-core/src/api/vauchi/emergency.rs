@@ -84,10 +84,7 @@ impl Vauchi {
         let total = config.trusted_contact_ids.len();
         let mut sent = 0;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = self.clock.unix_seconds();
 
         for contact_id in &config.trusted_contact_ids {
             // Skip contacts that don't exist locally
@@ -236,10 +233,7 @@ impl Vauchi {
         let _ = self.storage.delete_duress_settings();
 
         // Mark deletion as executed
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = self.clock.unix_seconds();
         self.storage
             .save_deletion_state(&crate::storage::DeletionState::Executed { executed_at: now })?;
 

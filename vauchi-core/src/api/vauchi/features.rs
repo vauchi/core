@@ -521,10 +521,7 @@ impl Vauchi {
             .save_ratchet_state(contact_id, &ratchet, is_initiator)?;
 
         // Queue for delivery
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = self.clock.unix_seconds();
 
         let update = PendingUpdate {
             id: uuid::Uuid::new_v4().to_string(),

@@ -909,10 +909,7 @@ impl Vauchi {
     /// Should be called on startup to hard-delete contacts whose undo window
     /// expired while the app was not running (e.g., crash during undo window).
     pub fn cleanup_stale_soft_deletes(&self) -> VauchiResult<usize> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = self.clock.unix_seconds();
         let threshold = now.saturating_sub(30);
         let stale_ids = self.storage.find_stale_soft_deletes(threshold)?;
         let count = stale_ids.len();
@@ -931,10 +928,7 @@ impl Vauchi {
         use crate::exchange::reciprocity::Reciprocity;
 
         let pending = self.storage.list_contacts_by_reciprocity("pending")?;
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = self.clock.unix_seconds();
         let mut count = 0;
         for mut contact in pending {
             let ts = contact.exchange_timestamp().unwrap_or(0);

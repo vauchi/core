@@ -153,7 +153,7 @@ impl VauchiPlatform {
             .id()
             .to_string();
 
-        card.update_field_value(&field_id, &new_value)
+        card.update_field_value(&field_id, &new_value, storage.clock().unix_seconds())
             .map_err(|e| MobileError::InvalidInput {
                 field: String::new(),
                 detail: e.to_string(),

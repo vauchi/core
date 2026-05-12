@@ -64,15 +64,18 @@ fn test_update_field_value() {
     card.add_field(field).unwrap();
 
     let field_id = card.fields()[0].id().to_string();
-    card.update_field_value(&field_id, "new@test.com").unwrap();
+    let stamp: u64 = 1_700_000_000;
+    card.update_field_value(&field_id, "new@test.com", stamp)
+        .unwrap();
     assert_eq!(card.fields()[0].value(), "new@test.com");
+    assert_eq!(card.fields()[0].updated_at(), stamp);
 }
 
 // @internal
 #[test]
 fn test_update_field_value_not_found() {
     let mut card = ContactCard::new("Test");
-    let result = card.update_field_value("nonexistent", "value");
+    let result = card.update_field_value("nonexistent", "value", 0);
     result.expect_err("expected error");
 }
 

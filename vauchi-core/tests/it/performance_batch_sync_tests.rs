@@ -50,7 +50,7 @@ fn test_rapid_edits_coalesce_into_single_sync_payload() {
     for i in 0..20 {
         let mut new_card = current_card.clone();
         new_card
-            .update_field_value(&field_id, &format!("updated{}@example.com", i))
+            .update_field_value(&field_id, &format!("updated{}@example.com", i), 0)
             .unwrap();
 
         let _ = sync_manager.queue_card_update(contact_id, &current_card, &new_card);
@@ -97,7 +97,7 @@ fn test_coalesce_preserves_final_state() {
     // Edit 1: change email
     let mut card_v1 = original_card.clone();
     card_v1
-        .update_field_value(&field_id, "v1@example.com")
+        .update_field_value(&field_id, "v1@example.com", 0)
         .unwrap();
     sync_manager
         .queue_card_update(contact_id, &original_card, &card_v1)
@@ -106,7 +106,7 @@ fn test_coalesce_preserves_final_state() {
     // Edit 2: change email again
     let mut card_v2 = card_v1.clone();
     card_v2
-        .update_field_value(&field_id, "final@example.com")
+        .update_field_value(&field_id, "final@example.com", 0)
         .unwrap();
     sync_manager
         .queue_card_update(contact_id, &card_v1, &card_v2)
@@ -143,7 +143,7 @@ fn test_coalesce_skips_when_single_update() {
 
     let mut new_card = original_card.clone();
     new_card
-        .update_field_value(&field_id, "single@example.com")
+        .update_field_value(&field_id, "single@example.com", 0)
         .unwrap();
 
     sync_manager
@@ -195,7 +195,7 @@ fn test_batch_sync_multiple_contacts_pending() {
 
     let mut new_card = original_card.clone();
     new_card
-        .update_field_value(&field_id, "updated@example.com")
+        .update_field_value(&field_id, "updated@example.com", 0)
         .unwrap();
 
     // Queue updates for 20 different contacts
@@ -227,7 +227,7 @@ fn test_coalesce_does_not_affect_other_update_types() {
     // Queue 2 card updates
     let mut card_v1 = original_card.clone();
     card_v1
-        .update_field_value(&field_id, "v1@example.com")
+        .update_field_value(&field_id, "v1@example.com", 0)
         .unwrap();
     sync_manager
         .queue_card_update(contact_id, &original_card, &card_v1)
@@ -235,7 +235,7 @@ fn test_coalesce_does_not_affect_other_update_types() {
 
     let mut card_v2 = card_v1.clone();
     card_v2
-        .update_field_value(&field_id, "v2@example.com")
+        .update_field_value(&field_id, "v2@example.com", 0)
         .unwrap();
     sync_manager
         .queue_card_update(contact_id, &card_v1, &card_v2)

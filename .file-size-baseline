@@ -138,7 +138,10 @@ vauchi-app/src/ui/app_engine/mod.rs 1268
 # (+19 on routing.rs for AppScreen::ChangePassword arm in handle_completion
 #   — calls vauchi.change_app_password and surfaces ShowAlert on failure,
 #   feat/2026-05-10-change-app-password)
-vauchi-app/src/ui/app_engine/routing.rs 1261
+# (+1 on routing.rs for slice 5 hoist of `let now = self.vauchi.clock().unix_seconds()`
+#   before the FormDialog EditField match, threaded into the new
+#   ContactCard::update_field_value(field_id, value, now) signature.)
+vauchi-app/src/ui/app_engine/routing.rs 1262
 vauchi-app/src/ui/app_engine/screens.rs 1344
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files

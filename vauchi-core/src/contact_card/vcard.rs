@@ -64,7 +64,12 @@ pub fn export_vcard(card: &ContactCard) -> String {
 }
 
 /// Imports a vCard string into a ContactCard.
-pub fn import_vcard(vcard: &str) -> Result<ContactCard, VCardError> {
+///
+/// `now` is the Unix-seconds timestamp stamped on every freshly
+/// constructed `ContactField`. Production callers route `now`
+/// through `Vauchi::clock.unix_seconds()` (ADR-021 functional core);
+/// tests pin a deterministic value.
+pub fn import_vcard(vcard: &str, now: u64) -> Result<ContactCard, VCardError> {
     let lines: Vec<&str> = vcard.lines().collect();
 
     if lines.is_empty() || !lines[0].trim().eq_ignore_ascii_case("BEGIN:VCARD") {
@@ -111,12 +116,7 @@ pub fn import_vcard(vcard: &str) -> Result<ContactCard, VCardError> {
     let mut card = ContactCard::new(&display_name);
     for (field_type, label, value) in fields {
         let field_type_owned = field_type.clone();
-        if let Err(e) = card.add_field(ContactField::new(
-            field_type,
-            &label,
-            &value,
-            crate::clock::ambient_now_secs(),
-        )) {
+        if let Err(e) = card.add_field(ContactField::new(field_type, &label, &value, now)) {
             // ADR-042-shape lenient import: keep the contact, drop only
             // the failing field — surface validation failures so operators
             // see corrupt-payload rates from imports. PII-safe:

@@ -75,7 +75,7 @@ fn test_full_path_exchange_to_card_update() {
         .to_string();
     let mut new_card = old_card.clone();
     new_card
-        .update_field_value(&email_field_id, "alice@new-company.com")
+        .update_field_value(&email_field_id, "alice@new-company.com", 0)
         .unwrap();
     alice.update_own_card(&new_card).unwrap();
 

@@ -24,7 +24,7 @@ fn test_split_multi_contact_vcf() {
     let vcf = b"BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Alice\r\nEND:VCARD\r\n\
                  BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Bob\r\nEND:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     assert_eq!(results.len(), 2);
     assert_eq!(results[0].0.display_name(), "Alice");
     assert_eq!(results[1].0.display_name(), "Bob");
@@ -41,7 +41,8 @@ fn test_import_vcard_40_basic() {
                  UID:urn:uuid:12345\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let stamp: u64 = 1_700_000_000;
+    let results = import_vcf(vcf, stamp).unwrap();
     assert_eq!(results.len(), 1);
 
     let (card, uid) = &results[0];
@@ -56,6 +57,10 @@ fn test_import_vcard_40_basic() {
     assert_eq!(emails.len(), 1);
     assert_eq!(emails[0].0, "Work");
     assert_eq!(emails[0].1, "john@example.com");
+
+    for f in card.fields() {
+        assert_eq!(f.updated_at(), stamp);
+    }
 }
 
 // @internal
@@ -71,7 +76,7 @@ fn test_import_vcard_30_google() {
                  TITLE:Engineer\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     assert_eq!(results.len(), 1);
 
     let (card, _) = &results[0];
@@ -103,7 +108,7 @@ fn test_import_vcard_21_outlook() {
                  EMAIL;INTERNET:hans@outlook.com\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     assert_eq!(results.len(), 1);
 
     let (card, _) = &results[0];
@@ -129,7 +134,7 @@ fn test_vcard_21_quoted_printable_utf8() {
                 N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:M=C3=BCller;Hans;;;\r\n\
                 END:VCARD\r\n";
 
-    let results = import_vcf(vcf.as_bytes()).unwrap();
+    let results = import_vcf(vcf.as_bytes(), 0).unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].0.display_name(), "Müller");
 }
@@ -147,7 +152,7 @@ fn test_parse_tel_with_types() {
                  TEL;TYPE=cell:+1-555-0003\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     let phones = fields_of_type(&results[0].0, FieldType::Phone);
     assert_eq!(phones.len(), 3);
     assert_eq!(phones[0].0, "Home");
@@ -165,7 +170,7 @@ fn test_parse_email_with_types() {
                  EMAIL;TYPE=work:work@test.com\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     let emails = fields_of_type(&results[0].0, FieldType::Email);
     assert_eq!(emails.len(), 2);
     assert_eq!(emails[0].0, "Home");
@@ -181,7 +186,7 @@ fn test_parse_adr_structured() {
                  ADR;TYPE=home:;;123 Main St;Springfield;IL;62701;USA\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     let addrs = fields_of_type(&results[0].0, FieldType::Address);
     assert_eq!(addrs.len(), 1);
     assert_eq!(addrs[0].0, "Home");
@@ -201,7 +206,7 @@ fn test_parse_org_title_nickname() {
                  NICKNAME:Testy\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     let (card, _) = &results[0];
 
     assert_eq!(card.nickname(), Some("Testy"));
@@ -225,7 +230,7 @@ fn test_parse_bday() {
                  BDAY:1990-05-15\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     let bdays = fields_of_type(&results[0].0, FieldType::Birthday);
     assert_eq!(bdays.len(), 1);
     assert_eq!(bdays[0].1, "1990-05-15");
@@ -240,7 +245,7 @@ fn test_parse_uid_returned() {
                  UID:abc-123-def\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     assert_eq!(results[0].1.as_deref(), Some("abc-123-def"));
 }
 
@@ -254,7 +259,7 @@ fn test_fn_fallback_to_n() {
                  N:Doe;John;;;\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].0.display_name(), "John Doe");
 }
@@ -273,7 +278,7 @@ fn test_apple_group_prefix_with_ablabel() {
                  item2.X-ABLabel:Homepage\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     let (card, _) = &results[0];
 
     let phones = fields_of_type(card, FieldType::Phone);
@@ -291,7 +296,7 @@ fn test_apple_group_prefix_with_ablabel() {
 #[test]
 fn test_oversized_file_rejected() {
     let big = vec![b'x'; 10 * 1024 * 1024 + 1];
-    let err = import_vcf(&big).unwrap_err();
+    let err = import_vcf(&big, 0).unwrap_err();
     let VCardImportError::FileTooLarge { size, max } = err else {
         panic!("expected FileTooLarge, got {:?}", err);
     };
@@ -305,7 +310,7 @@ fn test_oversized_field_truncated() {
     let long_name = "A".repeat(200);
     let vcf = format!("BEGIN:VCARD\r\nVERSION:4.0\r\nFN:{long_name}\r\nEND:VCARD\r\n");
 
-    let results = import_vcf(vcf.as_bytes()).unwrap();
+    let results = import_vcf(vcf.as_bytes(), 0).unwrap();
     assert_eq!(results.len(), 1);
     // Display name truncated to 100 chars
     assert_eq!(results[0].0.display_name().len(), 100);
@@ -318,7 +323,7 @@ fn test_malformed_contact_skipped() {
     let vcf = b"BEGIN:VCARD\r\nVERSION:4.0\r\nTEL:+1234\r\nEND:VCARD\r\n\
                  BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Valid\r\nEND:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].0.display_name(), "Valid");
 }
@@ -328,7 +333,7 @@ fn test_malformed_contact_skipped() {
 // @internal
 #[test]
 fn test_empty_file_returns_empty() {
-    let results = import_vcf(b"").unwrap();
+    let results = import_vcf(b"", 0).unwrap();
     assert!(results.is_empty());
 }
 
@@ -340,7 +345,7 @@ fn test_missing_version_defaults_to_30() {
                  TEL;TYPE=CELL:+1234567890\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].0.display_name(), "No Version");
 }
@@ -357,7 +362,7 @@ fn test_bare_params_vcard_21() {
                  TEL;FAX:+1-555-0004\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     let phones = fields_of_type(&results[0].0, FieldType::Phone);
     assert_eq!(phones.len(), 4);
     assert_eq!(phones[0].0, "Mobile");
@@ -378,7 +383,7 @@ fn test_line_unfolding() {
                  NOTE:This is a long\r\n  note value\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     let notes = fields_of_type(&results[0].0, FieldType::Custom);
     assert_eq!(notes.len(), 1);
     assert!(notes[0].1.contains("long"));
@@ -397,7 +402,7 @@ fn test_social_profile() {
                  IMPP;TYPE=xmpp:xmpp:user@example.com\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     let social = fields_of_type(&results[0].0, FieldType::Social);
     assert_eq!(social.len(), 2);
 }
@@ -414,7 +419,7 @@ fn test_unescape_backslash_sequences_via_note() {
                  NOTE:hello\\nworld\\,and\\;more\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     let notes = fields_of_type(&results[0].0, FieldType::Custom);
     assert_eq!(notes.len(), 1);
     assert!(notes[0].1.contains('\n'), "newline not unescaped");
@@ -431,7 +436,7 @@ fn test_compact_bday_format() {
                  BDAY:19900515\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     let bdays = fields_of_type(&results[0].0, FieldType::Birthday);
     assert_eq!(bdays.len(), 1);
     assert_eq!(bdays[0].1, "1990-05-15");
@@ -445,7 +450,7 @@ fn test_n_only_family_name() {
                  N:Smith;;;;\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     assert_eq!(results[0].0.display_name(), "Smith");
 }
 
@@ -457,7 +462,7 @@ fn test_n_only_given_name() {
                  N:;Jane;;;\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     assert_eq!(results[0].0.display_name(), "Jane");
 }
 
@@ -470,7 +475,7 @@ fn test_adr_full_structured() {
                  ADR;TYPE=home:;;123 Main St;Springfield;IL;62701;USA\r\n\
                  END:VCARD\r\n";
 
-    let results = import_vcf(vcf).unwrap();
+    let results = import_vcf(vcf, 0).unwrap();
     let addrs = fields_of_type(&results[0].0, FieldType::Address);
     assert_eq!(addrs[0].1, "123 Main St, Springfield, IL, 62701, USA");
 }
@@ -487,7 +492,7 @@ mod proptests {
             fn vcard_parser_never_panics(data in proptest::collection::vec(any::<u8>(), 0..4096)) {
                 // The parser must never panic, regardless of input.
                 // It may return Ok or Err, but must not panic.
-                let result = import_vcf(&data);
+                let result = import_vcf(&data, 0);
                 // Every successful parse must return valid ContactCards
                 if let Ok(cards) = result {
                     for (card, _uid) in &cards {
@@ -505,7 +510,7 @@ mod proptests {
                 let vcf = format!(
                     "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:{name}\r\nNOTE:{value}\r\nEND:VCARD\r\n"
                 );
-                let results = import_vcf(vcf.as_bytes()).unwrap();
+                let results = import_vcf(vcf.as_bytes(), 0).unwrap();
                 if let Some((card, _)) = results.first() {
                     // Display name max 100 chars
                     assert!(card.display_name().chars().count() <= 100);
@@ -528,7 +533,7 @@ fn import_latin1_contact() {
     raw.extend_from_slice(&[0x4A, 0x6F, 0x73, 0xE9]); // "José" in Latin-1
     raw.extend_from_slice(b"\r\nEND:VCARD\r\n");
 
-    let cards = import_vcf(&raw).unwrap();
+    let cards = import_vcf(&raw, 0).unwrap();
     assert_eq!(cards.len(), 1);
     assert_eq!(cards[0].0.display_name(), "Jos\u{e9}"); // "José"
 }
@@ -538,7 +543,7 @@ fn import_latin1_contact() {
 fn import_utf8_bom_stripped() {
     let mut raw = vec![0xEF, 0xBB, 0xBF]; // UTF-8 BOM
     raw.extend_from_slice(b"BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Alice\r\nEND:VCARD\r\n");
-    let cards = import_vcf(&raw).unwrap();
+    let cards = import_vcf(&raw, 0).unwrap();
     assert_eq!(cards.len(), 1);
     assert_eq!(cards[0].0.display_name(), "Alice");
 }
@@ -548,7 +553,7 @@ fn import_utf8_bom_stripped() {
 fn import_plain_utf8_still_works() {
     // "José" in UTF-8: J(4A) o(6F) s(73) é(C3 A9)
     let vcf = "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:José\r\nEND:VCARD\r\n";
-    let cards = import_vcf(vcf.as_bytes()).unwrap();
+    let cards = import_vcf(vcf.as_bytes(), 0).unwrap();
     assert_eq!(cards.len(), 1);
     assert_eq!(cards[0].0.display_name(), "José");
 }

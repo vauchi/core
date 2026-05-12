@@ -63,7 +63,15 @@ fn decode_to_string(data: &[u8]) -> String {
 ///
 /// Returns a list of `(ContactCard, Option<uid>)` tuples.
 /// The uid is the vCard UID property, used for re-import dedup.
-pub fn import_vcf(data: &[u8]) -> Result<Vec<(ContactCard, Option<String>)>, VCardImportError> {
+///
+/// `now` is the Unix-seconds timestamp stamped on every freshly
+/// constructed `ContactField`. Production callers route it through
+/// `Vauchi::clock.unix_seconds()` (ADR-021 functional core); tests
+/// pin a deterministic value.
+pub fn import_vcf(
+    data: &[u8],
+    now: u64,
+) -> Result<Vec<(ContactCard, Option<String>)>, VCardImportError> {
     if data.len() > MAX_FILE_SIZE {
         return Err(VCardImportError::FileTooLarge {
             size: data.len(),
@@ -76,7 +84,7 @@ pub fn import_vcf(data: &[u8]) -> Result<Vec<(ContactCard, Option<String>)>, VCa
 
     let mut results = Vec::new();
     for block in blocks {
-        if let Some(result) = parse_single_vcard(&block) {
+        if let Some(result) = parse_single_vcard(&block, now) {
             results.push(result);
         }
     }
@@ -106,7 +114,7 @@ fn split_vcard_blocks(text: &str) -> Vec<String> {
 }
 
 /// Parse a single vCard block (content between BEGIN/END, exclusive).
-fn parse_single_vcard(block: &str) -> Option<(ContactCard, Option<String>)> {
+fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<String>)> {
     let version = detect_version(block);
     let lines = unfold_lines(block, version);
 
@@ -327,12 +335,7 @@ fn parse_single_vcard(block: &str) -> Option<(ContactCard, Option<String>)> {
     }
 
     for (field_type, label, value) in fields {
-        let field = ContactField::new(
-            field_type.clone(),
-            &label,
-            &value,
-            crate::clock::ambient_now_secs(),
-        );
+        let field = ContactField::new(field_type.clone(), &label, &value, now);
         if let Err(e) = card.add_field(field) {
             // ADR-042-shape lenient import: keep the contact, drop only
             // the failing field — but surface the failure so operators

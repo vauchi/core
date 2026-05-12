@@ -567,7 +567,11 @@ impl Vauchi {
                                 .map(|f| f.id().to_string());
 
                             if let Some(id) = field_id {
-                                let _ = card.update_field_value(&id, new_value);
+                                let _ = card.update_field_value(
+                                    &id,
+                                    new_value,
+                                    self.clock.unix_seconds(),
+                                );
                             } else {
                                 // Field not found — add as new
                                 let field = ContactField::new(

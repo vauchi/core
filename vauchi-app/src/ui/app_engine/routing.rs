@@ -466,9 +466,10 @@ impl AppEngine {
                         let mut parts = raw.splitn(2, '\n');
                         let value = parts.next().unwrap_or("").to_string();
                         let note = parts.next().unwrap_or("").trim().to_string();
+                        let now = self.vauchi.clock().unix_seconds();
                         match self.vauchi.own_card() {
                             Ok(Some(mut card)) => {
-                                if let Err(e) = card.update_field_value(field_id, &value) {
+                                if let Err(e) = card.update_field_value(field_id, &value, now) {
                                     return ActionResult::ShowAlert {
                                         title: "Error".into(),
                                         message: format!("Failed to update field: {e}"),

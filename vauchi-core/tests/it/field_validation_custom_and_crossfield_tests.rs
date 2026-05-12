@@ -220,7 +220,7 @@ fn test_cross_field_dependencies_update_isolation() {
     card.add_field(email).unwrap();
 
     // Update phone to invalid - should fail
-    let result = card.update_field_value(&phone_id, "invalid");
+    let result = card.update_field_value(&phone_id, "invalid", 0);
     assert!(result.is_err(), "Invalid phone update should fail");
 
     // Email should be unaffected
@@ -376,7 +376,7 @@ fn test_max_field_length_update_rejects_overlong() {
 
     // Try to update to over-length value
     let over_max = "a".repeat(MAX_VALUE_LENGTH + 1);
-    let result = card.update_field_value(&field_id, &over_max);
+    let result = card.update_field_value(&field_id, &over_max, 0);
 
     // Validation should fail
     assert!(

@@ -101,7 +101,7 @@ fn test_card_delta_workflow() {
     // Modify the email value (same field ID)
     let email_field_id = updated_card.fields()[0].id().to_string();
     updated_card
-        .update_field_value(&email_field_id, "new@work.com")
+        .update_field_value(&email_field_id, "new@work.com", 0)
         .unwrap();
     // Remove mobile field
     let mobile_field_id = updated_card.fields()[1].id().to_string();

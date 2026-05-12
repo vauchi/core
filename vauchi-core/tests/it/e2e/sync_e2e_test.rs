@@ -69,7 +69,7 @@ fn test_sync_update_propagation_happy_path() {
     let email_field_id = old_card.fields()[0].id().to_string();
     let mut modified_card = old_card.clone();
     modified_card
-        .update_field_value(&email_field_id, "alice@new-company.com")
+        .update_field_value(&email_field_id, "alice@new-company.com", 0)
         .unwrap();
     alice_wb.update_own_card(&modified_card).unwrap();
 
@@ -311,7 +311,7 @@ fn test_full_three_user_workflow() {
 
     let mut modified_card = old_card.clone();
     modified_card
-        .update_field_value(&work_email_id, "alice@new-company.com")
+        .update_field_value(&work_email_id, "alice@new-company.com", 0)
         .unwrap();
     alice_wb.update_own_card(&modified_card).unwrap();
 

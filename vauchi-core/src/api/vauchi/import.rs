@@ -87,7 +87,9 @@ impl Vauchi {
     ///
     /// Returns an [`ImportResult`] with counts and any per-contact warnings.
     pub fn import_contacts_from_vcf(&self, data: &[u8]) -> VauchiResult<ImportResult> {
-        let entries = import_vcf(data).map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        let now = self.clock.unix_seconds();
+        let entries =
+            import_vcf(data, now).map_err(|e| VauchiError::InvalidState(e.to_string()))?;
 
         let mut imported = 0;
         let mut skipped = 0;

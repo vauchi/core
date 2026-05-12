@@ -64,7 +64,7 @@ fn test_card_at_max_fields_allows_modification() {
 
     // Modify existing field - should succeed
     let field_id = card.fields()[0].id().to_string();
-    let result = card.update_field_value(&field_id, "new_value");
+    let result = card.update_field_value(&field_id, "new_value", 0);
     assert!(result.is_ok(), "Should allow modifying existing field");
 }
 
@@ -557,7 +557,7 @@ fn test_saving_contact_twice_updates() {
     let mut contact = wb.get_contact(&contact_id).unwrap().unwrap();
     let field_id = contact.card().fields()[0].id().to_string();
     let mut card = contact.card().clone();
-    card.update_field_value(&field_id, "updated@test.com")
+    card.update_field_value(&field_id, "updated@test.com", 0)
         .unwrap();
     contact.update_card(card);
     wb.storage().save_contact(&contact).unwrap();

@@ -108,7 +108,8 @@ fn test_export_escaping() {
 fn test_import_basic_vcard() {
     let vcard = "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Alice Smith\r\nTEL;TYPE=mobile:+15551234567\r\nEMAIL;TYPE=work:alice@example.com\r\nEND:VCARD";
 
-    let card = import_vcard(vcard).unwrap();
+    let stamp: u64 = 1_700_000_000;
+    let card = import_vcard(vcard, stamp).unwrap();
     assert_eq!(card.display_name(), "Alice Smith");
     assert_eq!(card.fields().len(), 2);
 
@@ -119,6 +120,7 @@ fn test_import_basic_vcard() {
         .unwrap();
     assert_eq!(phone.value(), "+15551234567");
     assert_eq!(phone.label(), "mobile");
+    assert_eq!(phone.updated_at(), stamp);
 
     let email = card
         .fields()
@@ -127,6 +129,7 @@ fn test_import_basic_vcard() {
         .unwrap();
     assert_eq!(email.value(), "alice@example.com");
     assert_eq!(email.label(), "work");
+    assert_eq!(email.updated_at(), stamp);
 }
 
 // @scenario: contacts_management :: Export contact to vCard
@@ -134,7 +137,7 @@ fn test_import_basic_vcard() {
 fn test_import_url_field() {
     let vcard = "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Bob\r\nURL:https://bob.dev\r\nEND:VCARD";
 
-    let card = import_vcard(vcard).unwrap();
+    let card = import_vcard(vcard, 0).unwrap();
     assert_eq!(card.fields().len(), 1);
     let url_field = &card.fields()[0];
     assert_eq!(url_field.field_type(), FieldType::Website);
@@ -147,7 +150,7 @@ fn test_import_address_field() {
     let vcard =
         "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Bob\r\nADR;TYPE=home:;;123 Main St;;;;\r\nEND:VCARD";
 
-    let card = import_vcard(vcard).unwrap();
+    let card = import_vcard(vcard, 0).unwrap();
     assert_eq!(card.fields().len(), 1);
     let addr = &card.fields()[0];
     assert_eq!(addr.field_type(), FieldType::Address);
@@ -158,7 +161,7 @@ fn test_import_address_field() {
 #[test]
 fn test_import_missing_begin() {
     let vcard = "VERSION:4.0\r\nFN:Alice\r\nEND:VCARD";
-    let result = import_vcard(vcard);
+    let result = import_vcard(vcard, 0);
     result.expect_err("expected error");
 }
 
@@ -166,14 +169,14 @@ fn test_import_missing_begin() {
 #[test]
 fn test_import_missing_fn() {
     let vcard = "BEGIN:VCARD\r\nVERSION:4.0\r\nTEL:+1234\r\nEND:VCARD";
-    let result = import_vcard(vcard);
+    let result = import_vcard(vcard, 0);
     result.expect_err("expected error");
 }
 
 // @scenario: contacts_management :: Export contact to vCard
 #[test]
 fn test_import_empty_string() {
-    let result = import_vcard("");
+    let result = import_vcard("", 0);
     result.expect_err("expected error");
 }
 
@@ -204,7 +207,7 @@ fn test_roundtrip_export_import() {
     .unwrap();
 
     let vcard = export_vcard(&card);
-    let reimported = import_vcard(&vcard).unwrap();
+    let reimported = import_vcard(&vcard, 0).unwrap();
 
     assert_eq!(reimported.display_name(), "Roundtrip Test");
     assert_eq!(reimported.fields().len(), 3);
@@ -214,7 +217,7 @@ fn test_roundtrip_export_import() {
 #[test]
 fn test_import_tel_without_type() {
     let vcard = "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:NoType\r\nTEL:+15551234567\r\nEND:VCARD";
-    let card = import_vcard(vcard).unwrap();
+    let card = import_vcard(vcard, 0).unwrap();
     assert_eq!(card.fields().len(), 1);
     let phone = &card.fields()[0];
     assert_eq!(phone.field_type(), FieldType::Phone);
@@ -234,6 +237,6 @@ fn test_export_empty_card() {
 #[test]
 fn test_import_with_escaped_chars() {
     let vcard = "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Smith\\, John\r\nEND:VCARD";
-    let card = import_vcard(vcard).unwrap();
+    let card = import_vcard(vcard, 0).unwrap();
     assert_eq!(card.display_name(), "Smith, John");
 }

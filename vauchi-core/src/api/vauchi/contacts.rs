@@ -815,7 +815,7 @@ impl Vauchi {
             ));
         }
         let mut card = contact.card().clone();
-        card.update_field_value(field_id, new_value)
+        card.update_field_value(field_id, new_value, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         contact.update_card(card);
         self.storage.save_contact(&contact)?;

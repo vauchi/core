@@ -260,6 +260,7 @@ impl ContactCard {
         &mut self,
         field_id: &str,
         value: &str,
+        now: u64,
     ) -> Result<(), ContactCardError> {
         let field = self
             .fields
@@ -267,7 +268,7 @@ impl ContactCard {
             .find(|f| f.id() == field_id)
             .ok_or(ContactCardError::FieldNotFound)?;
 
-        field.set_value(value, crate::clock::ambient_now_secs());
+        field.set_value(value, now);
         field.validate()?;
         Ok(())
     }

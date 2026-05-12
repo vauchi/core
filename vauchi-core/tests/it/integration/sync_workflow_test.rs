@@ -164,7 +164,7 @@ fn test_field_modification_and_removal_propagation() {
 
         // Get field ID and modify
         let field_id = card.fields()[0].id().to_string();
-        card.update_field_value(&field_id, "alice.smith@newcompany.com")
+        card.update_field_value(&field_id, "alice.smith@newcompany.com", 0)
             .unwrap();
         let new = card;
 

@@ -352,7 +352,7 @@ impl Vauchi {
         // Apply delta to contact's card
         let mut new_card = contact.card().clone();
         delta
-            .apply(&mut new_card)
+            .apply(&mut new_card, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
 
         // Update contact card and CEK atomically

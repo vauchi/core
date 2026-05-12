@@ -119,7 +119,7 @@ fn test_delta_apply_display_name() {
         validation_summary: None,
     };
 
-    delta.apply(&mut card).unwrap();
+    delta.apply(&mut card, 0).unwrap();
 
     assert_eq!(card.display_name(), "Alice Smith");
 }
@@ -140,7 +140,7 @@ fn test_delta_apply_add_field() {
         validation_summary: None,
     };
 
-    delta.apply(&mut card).unwrap();
+    delta.apply(&mut card, 0).unwrap();
 
     assert_eq!(card.fields().len(), 1);
     assert_eq!(card.fields()[0].value(), "alice@example.com");
@@ -164,7 +164,7 @@ fn test_delta_apply_remove_field() {
         validation_summary: None,
     };
 
-    delta.apply(&mut card).unwrap();
+    delta.apply(&mut card, 0).unwrap();
 
     assert!(card.fields().is_empty());
 }
@@ -198,7 +198,7 @@ fn test_delta_roundtrip() {
 
     // Apply to a copy of old
     let mut result = old.clone();
-    delta.apply(&mut result).unwrap();
+    delta.apply(&mut result, 0).unwrap();
 
     assert_eq!(result.display_name(), "Alice Smith");
     assert_eq!(result.fields().len(), 2);

@@ -134,7 +134,7 @@ fn test_multi_device_linking_happy_path() {
 
     // Step 7: Apply delta on Device B
     let mut device_b_card = device_a_card.clone();
-    delta.apply(&mut device_b_card).unwrap();
+    delta.apply(&mut device_b_card, 0).unwrap();
     assert_eq!(device_b_card.fields().len(), 2);
     assert!(device_b_card.fields().iter().any(|f| f.label() == "mobile"));
 }

@@ -215,7 +215,10 @@ impl CardDelta {
     /// Applies this delta to a contact card.
     ///
     /// Modifies the card in place to reflect all changes in the delta.
-    pub fn apply(&self, card: &mut ContactCard) -> Result<(), DeltaError> {
+    /// `now` stamps the `updated_at` of any field whose value changes.
+    /// Production callers source `now` from `Vauchi::clock()` /
+    /// `Storage::clock()`; tests pin a deterministic value.
+    pub fn apply(&self, card: &mut ContactCard, now: u64) -> Result<(), DeltaError> {
         for change in &self.changes {
             match change {
                 FieldChange::DisplayNameChanged { new_name } => {
@@ -234,7 +237,7 @@ impl CardDelta {
 
                     match found {
                         Some(field) => {
-                            field.set_value(new_value, crate::clock::ambient_now_secs());
+                            field.set_value(new_value, now);
                         }
                         None => {
                             return Err(DeltaError::FieldNotFound(field_id.clone()));

@@ -99,7 +99,7 @@ fn test_sync_update_propagation_happy_path() {
     // Step 6: Bob applies delta to Alice's card
     let mut alice_card_at_bob = bob_wb.get_contact(&alice_contact_id).unwrap().unwrap();
     let mut card_copy = alice_card_at_bob.card().clone();
-    received_delta.apply(&mut card_copy).unwrap();
+    received_delta.apply(&mut card_copy, 0).unwrap();
     alice_card_at_bob.update_card(card_copy);
     bob_wb.storage().save_contact(&alice_card_at_bob).unwrap();
 
@@ -326,7 +326,7 @@ fn test_full_three_user_workflow() {
         .unwrap()
         .card()
         .clone();
-    delta.apply(&mut bob_alice_card).unwrap();
+    delta.apply(&mut bob_alice_card, 0).unwrap();
 
     let mut carol_alice_card = carol_wb
         .get_contact(&alice_id_carol)
@@ -334,7 +334,7 @@ fn test_full_three_user_workflow() {
         .unwrap()
         .card()
         .clone();
-    delta.apply(&mut carol_alice_card).unwrap();
+    delta.apply(&mut carol_alice_card, 0).unwrap();
 
     // Verify both have updated work email
     let bob_work_email = bob_alice_card

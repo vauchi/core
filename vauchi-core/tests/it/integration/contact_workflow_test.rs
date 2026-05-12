@@ -156,7 +156,7 @@ fn test_card_delta_workflow() {
 
     // Apply delta to a copy of old card
     let mut result_card = old_card.clone();
-    delta.apply(&mut result_card).unwrap();
+    delta.apply(&mut result_card, 0).unwrap();
 
     // Verify result matches updated card
     assert_eq!(result_card.display_name(), updated_card.display_name());

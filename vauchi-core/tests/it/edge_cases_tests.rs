@@ -297,7 +297,7 @@ fn test_delta_apply_preserves_display_name() {
     let delta = CardDelta::compute(&old, &new);
 
     // Apply should not change display name
-    let _ = delta.apply(&mut target);
+    let _ = delta.apply(&mut target, 0);
     assert_eq!(target.display_name(), "Preserved Name");
 }
 

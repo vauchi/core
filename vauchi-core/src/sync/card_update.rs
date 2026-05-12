@@ -183,7 +183,7 @@ pub fn process_single_card_update(
     // 8. Apply delta to contact card
     let mut card = contact.card().clone();
     delta
-        .apply(&mut card)
+        .apply(&mut card, storage.clock().unix_seconds())
         .map_err(|_| CardUpdateError::DeltaApplicationFailed)?;
     contact.update_card(card);
 

@@ -560,7 +560,7 @@ mod extended_property_tests {
                     // Apply delta to a fresh copy
                     let mut verification_card = old_card.clone();
                     if !delta.is_empty() {
-                        delta.apply(&mut verification_card).unwrap();
+                        delta.apply(&mut verification_card, 0).unwrap();
                     }
 
                     // Cards should match after applying delta

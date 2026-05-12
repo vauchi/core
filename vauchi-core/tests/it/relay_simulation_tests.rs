@@ -360,7 +360,7 @@ fn test_full_update_propagation() {
     // Apply to Bob's view of Alice
     let bob_alice_contact = bob_wb.get_contact(&alice_id).unwrap().unwrap();
     let mut alice_card_at_bob = bob_alice_contact.card().clone();
-    delta.apply(&mut alice_card_at_bob).unwrap();
+    delta.apply(&mut alice_card_at_bob, 0).unwrap();
 
     // Verify Bob has the new field
     assert_eq!(alice_card_at_bob.fields().len(), 1);

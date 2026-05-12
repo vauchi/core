@@ -125,7 +125,11 @@ vauchi-core/src/storage/mod.rs 1079
 #   problem 2026-05-01-android-humble-ui-deep-retirement Phase 2c)
 # (+4 on mod.rs for AppScreen::ChangePassword variant + screen_id arms,
 #   feat/2026-05-10-change-app-password)
-vauchi-app/src/ui/app_engine/mod.rs 1268
+# (+16 on mod.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
+#   AppScreen::MultiStageExchange gains `{ mode: ExchangeMode }` payload —
+#   variant docstring expanded, screen_id arm widened to `{ .. }`,
+#   from_screen_id arm dropped with parameterized-screen comment.)
+vauchi-app/src/ui/app_engine/mod.rs 1284
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -141,8 +145,14 @@ vauchi-app/src/ui/app_engine/mod.rs 1268
 # (+1 on routing.rs for slice 5 hoist of `let now = self.vauchi.clock().unix_seconds()`
 #   before the FormDialog EditField match, threaded into the new
 #   ContactCard::update_field_value(field_id, value, now) signature.)
-vauchi-app/src/ui/app_engine/routing.rs 1262
-vauchi-app/src/ui/app_engine/screens.rs 1344
+# (+5 on routing.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
+#   destructure `mode` from StartMultiStageExchange and pass through to
+#   AppScreen::MultiStageExchange { mode } + expanded comment block.)
+vauchi-app/src/ui/app_engine/routing.rs 1267
+# (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
+#   AppScreen::MultiStageExchange { mode } match arm dispatches to
+#   new_hover() / new_glance() with explanatory comment block.)
+vauchi-app/src/ui/app_engine/screens.rs 1357
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081
@@ -157,7 +167,11 @@ vauchi-core/tests/it/field_validation_tests.rs 2256
 # (+17 lines for is_active_engine_multi_stage_hover regression-gate
 #  pair, Phase 1.C polish of 2026-05-11-hover-graduation-plan: pins the
 #  helper that PAE consults to decide audio-listener registration.)
-vauchi-core/tests/it/app_engine_navigation_tests.rs 1217
+# (+19 for Phase 1.E.3 of 2026-05-11-hover-graduation-plan: 8 inline
+#  `AppScreen::MultiStageExchange { mode: ExchangeMode::Glance }`
+#  conversions + expanded comment in the navigate-away-and-back test
+#  swapping its mode pick from Hover to Broadcast.)
+vauchi-core/tests/it/app_engine_navigation_tests.rs 1236
 vauchi-core/tests/it/onboarding_tests.rs 1301
 vauchi-core/tests/it/sync_device_orchestrator_tests.rs 1286
 vauchi-core/tests/it/visibility_label_tests.rs 1220

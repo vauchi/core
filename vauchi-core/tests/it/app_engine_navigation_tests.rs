@@ -1145,12 +1145,16 @@ fn is_active_engine_multi_stage_hover_returns_false_for_non_multistage_active() 
 // @internal
 #[test]
 fn is_active_engine_multi_stage_hover_returns_false_for_glance_multistage() {
-    // The current `AppScreen::MultiStageExchange` factory in
-    // screens.rs always constructs `new()` (= `new_glance()`)
-    // pending the Phase 1.E mode-dispatcher. Verify the helper
-    // returns false for that case — the Phase 1.C polish gate
-    // depends on this so PAE skips audio-listener registration
-    // until the dispatcher is wired.
+    // Post-1.E.3 (`core!825`) the screen factory at
+    // `app_engine/screens.rs:872` matches on
+    // `AppScreen::MultiStageExchange { mode }` and dispatches
+    // to `new_hover()` / `new_glance()` directly. Glance flows
+    // construct `new_glance()`; the Phase 1.C polish gate
+    // (`039effe3`) depends on this helper returning `false` for
+    // those engines so `PlatformAppEngine` skips audio-listener
+    // registration. The Hover-positive leg of the same gate is
+    // covered by `hover_mode_routes_through_multi_stage_handoff`
+    // in `vauchi-app/src/ui/exchange.rs` tests.
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);

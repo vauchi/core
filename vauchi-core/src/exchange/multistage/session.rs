@@ -292,6 +292,23 @@ impl MultiStageSession {
         self.state.clone()
     }
 
+    /// Returns the locally-generated 16-byte session ID. Included in
+    /// our INIT QR so the peer learns it during Stage 1; serves as the
+    /// audio-handshake challenge in Phase 1.C.3e (Hover graduation).
+    ///
+    /// Not a secret — the session_id is broadcast in the INIT QR. The
+    /// audio handshake's security primitive is that the audio channel
+    /// itself requires physical proximity to receive; the bytes being
+    /// broadcast in QR don't reduce that.
+    ///
+    /// Phase 1.C.4 may introduce a dedicated `audio_challenge` field
+    /// on the QR payload (orthogonal to session_id) so the session_id
+    /// stays inert and a per-handshake nonce drives the FSK challenge.
+    /// Today the two coincide.
+    pub fn session_id(&self) -> [u8; 16] {
+        self.session_id
+    }
+
     /// Returns the received peer data if the exchange is finalized.
     ///
     /// Data is only available in the `Finalized` state — both sides must
@@ -384,7 +401,10 @@ impl MultiStageSession {
         use AudioProximityState::{Confirmed, Failed, Listening, Pending};
         matches!(
             (from, to),
-            (Pending, Listening) | (Listening, Confirmed) | (Listening, Failed) | (Failed, Listening)
+            (Pending, Listening)
+                | (Listening, Confirmed)
+                | (Listening, Failed)
+                | (Failed, Listening)
         )
     }
 

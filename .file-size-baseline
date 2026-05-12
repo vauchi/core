@@ -42,7 +42,9 @@ vauchi-core/src/exchange/session.rs 1788
 #  audio_transition_allowed helper. Security gate — Confirmed
 #  is reachable only from Listening. Retry path Failed→Listening
 #  per G1.3.)
-vauchi-core/src/exchange/multistage/session.rs 1301
+# (+20 for Phase 1.C.3e-iii: session_id() getter + doc explaining
+#  the temporary use as audio-handshake challenge stand-in.)
+vauchi-core/src/exchange/multistage/session.rs 1321
 
 # EXEMPT — protocol command/event enum: variants + variant_name match
 # + From impls + serde-discriminant ordering must be co-located, splitting

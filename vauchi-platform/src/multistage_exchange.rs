@@ -475,6 +475,39 @@ impl MobileMultiStageSession {
         result
     }
 
+    /// Convenience wrapper around [`Self::start_audio_handshake`] that
+    /// derives the challenge bytes from the inner session's
+    /// [`MultiStageSession::session_id`]. The orchestrator calls this
+    /// when the multi-stage protocol reaches the right moment (likely
+    /// the `Discovered → Transferring` boundary — Phase 1.C.3e-v
+    /// wires the PlatformAppEngine trigger). Tests + the future
+    /// autonomous trigger inside the cycle thread are the only other
+    /// callers.
+    ///
+    /// **Challenge derivation** (Phase 1.C.3e-iii temporary): emits
+    /// our own `session_id` as the FSK payload. Both peers know each
+    /// other's session_id after Stage 1, so each side's mic decode
+    /// can compare against `peer_session_id` and verify the audio
+    /// channel really carried it from the right peer. Phase 1.C.4
+    /// may swap this for a dedicated `audio_challenge` field on the
+    /// INIT QR payload — see the doc on
+    /// [`MultiStageSession::session_id`].
+    pub fn start_audio_handshake_for_session(
+        &self,
+    ) -> Result<(), vauchi_core::exchange::AudioStateError> {
+        let challenge = self
+            .inner
+            .lock()
+            .map_err(
+                |_| vauchi_core::exchange::AudioStateError::InvalidTransition {
+                    from: vauchi_core::exchange::AudioProximityState::Pending,
+                    to: vauchi_core::exchange::AudioProximityState::Listening,
+                },
+            )?
+            .session_id();
+        self.start_audio_handshake(&challenge)
+    }
+
     /// Drain the queue of audio commands produced by
     /// [`Self::start_audio_handshake`] (and future orchestrator
     /// transitions). Returns the commands in emission order and

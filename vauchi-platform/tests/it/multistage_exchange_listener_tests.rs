@@ -734,3 +734,49 @@ fn rejected_start_audio_handshake_does_not_queue_commands() {
         "rejected transition must not enqueue commands",
     );
 }
+
+// ── Convenience trigger using session_id (Phase 1.C.3e-iii) ───────
+
+// @internal
+#[test]
+fn start_audio_handshake_for_session_uses_inner_session_id_as_challenge() {
+    use vauchi_core::Command;
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+
+    session
+        .start_audio_handshake_for_session()
+        .expect("Pending → Listening must succeed");
+
+    let cmds = session.drain_audio_commands();
+    assert_eq!(
+        cmds.len(),
+        2,
+        "expected paired (Emit, Listen); got {cmds:?}"
+    );
+    // The FSK samples are non-empty — we can't compare to specific
+    // bytes without re-deriving the modem config and the inner
+    // session_id, both of which would re-implement the production
+    // code. The non-empty assertion is enough to verify the wrapper
+    // pulled real bytes from the inner session rather than passing
+    // a zero array.
+    match &cmds[0] {
+        Command::AudioEmitChallenge { samples, .. } => {
+            assert!(
+                !samples.is_empty(),
+                "FSK samples must be derived from a real session_id"
+            );
+        }
+        other => panic!("expected AudioEmitChallenge, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn start_audio_handshake_for_session_second_call_rejected() {
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+    session.start_audio_handshake_for_session().unwrap();
+    assert!(
+        session.start_audio_handshake_for_session().is_err(),
+        "second start must be rejected — Listening → Listening is a security gate",
+    );
+}

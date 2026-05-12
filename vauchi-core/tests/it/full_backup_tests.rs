@@ -52,7 +52,7 @@ fn make_imported(name: &str, source: ImportSource) -> Contact {
 #[test]
 fn v3_roundtrip_identity_only() {
     let id_data = test_identity_data();
-    let blob = export_full_backup(&id_data, &[], None, &[], PASSWORD).unwrap();
+    let blob = export_full_backup(&id_data, &[], None, &[], PASSWORD, 0).unwrap();
 
     assert!(!blob.is_empty());
     assert_eq!(blob[0], 0x03, "version byte must be 0x03");
@@ -86,6 +86,7 @@ fn v3_roundtrip_with_contacts() {
         None,
         &[],
         PASSWORD,
+        0,
     )
     .unwrap();
 
@@ -115,7 +116,7 @@ fn v3_roundtrip_with_own_card() {
     let id_data = test_identity_data();
     let own_card = ContactCard::new("My Own Card");
 
-    let blob = export_full_backup(&id_data, &[], Some(&own_card), &[], PASSWORD).unwrap();
+    let blob = export_full_backup(&id_data, &[], Some(&own_card), &[], PASSWORD, 0).unwrap();
     let envelope = import_full_backup(&blob, PASSWORD).unwrap();
 
     let restored_card = envelope
@@ -148,7 +149,7 @@ fn v3_roundtrip_with_labels() {
         ),
     ];
 
-    let blob = export_full_backup(&id_data, &[], None, &labels, PASSWORD).unwrap();
+    let blob = export_full_backup(&id_data, &[], None, &labels, PASSWORD, 0).unwrap();
     let envelope = import_full_backup(&blob, PASSWORD).unwrap();
 
     assert_eq!(envelope.sections.labels.len(), 2);
@@ -165,7 +166,7 @@ fn v3_roundtrip_with_labels() {
 #[test]
 fn v3_wrong_password_fails() {
     let id_data = test_identity_data();
-    let blob = export_full_backup(&id_data, &[], None, &[], PASSWORD).unwrap();
+    let blob = export_full_backup(&id_data, &[], None, &[], PASSWORD, 0).unwrap();
 
     let result = import_full_backup(&blob, "wrong-password-here!");
     assert!(
@@ -179,7 +180,7 @@ fn v3_wrong_password_fails() {
 #[test]
 fn v3_corrupted_data_fails() {
     let id_data = test_identity_data();
-    let mut blob = export_full_backup(&id_data, &[], None, &[], PASSWORD).unwrap();
+    let mut blob = export_full_backup(&id_data, &[], None, &[], PASSWORD, 0).unwrap();
 
     let tamper_index = 1 + 16 + 4; // inside the ciphertext
     assert!(blob.len() > tamper_index);
@@ -199,8 +200,8 @@ fn v3_corrupted_data_fails() {
 fn v3_different_salt_different_ciphertext() {
     let id_data1 = test_identity_data();
     let id_data2 = test_identity_data();
-    let blob1 = export_full_backup(&id_data1, &[], None, &[], PASSWORD).unwrap();
-    let blob2 = export_full_backup(&id_data2, &[], None, &[], PASSWORD).unwrap();
+    let blob1 = export_full_backup(&id_data1, &[], None, &[], PASSWORD, 0).unwrap();
+    let blob2 = export_full_backup(&id_data2, &[], None, &[], PASSWORD, 0).unwrap();
 
     // Salts (bytes 1..17) should differ
     assert_ne!(

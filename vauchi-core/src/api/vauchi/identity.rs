@@ -236,6 +236,7 @@ impl Vauchi {
             own_card.as_ref(),
             &labels,
             password,
+            self.clock.unix_seconds(),
         )
         .map_err(|e| VauchiError::Configuration(format!("Full backup export failed: {e}")))?;
 

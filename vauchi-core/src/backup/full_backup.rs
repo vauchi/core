@@ -119,6 +119,7 @@ pub fn export_full_backup(
     own_card: Option<&ContactCard>,
     labels: &[(String, String, Vec<String>)],
     password: &str,
+    now: u64,
 ) -> Result<Vec<u8>, BackupError> {
     // Build identity section
     let identity = IdentitySection {
@@ -148,11 +149,9 @@ pub fn export_full_backup(
         .collect();
 
     // Assemble envelope
-    let created_at = crate::clock::ambient_now_secs();
-
     let envelope = FullBackupEnvelope {
         version: 3,
-        created_at,
+        created_at: now,
         sections: BackupSections {
             identity,
             contacts: contact_values,

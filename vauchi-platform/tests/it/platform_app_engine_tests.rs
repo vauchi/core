@@ -276,7 +276,7 @@ fn navigate_to_json_envelope_carries_lifecycle_commands() {
     // lock). The previous engine's `screen_exited` is the default
     // empty.
     let result = engine
-        .navigate_to_json(r#""MultiStageExchange""#.into())
+        .navigate_to_json(r#"{"MultiStageExchange":{"mode":"glance"}}"#.into())
         .expect("navigate to multi-stage");
     let envelope: serde_json::Value = serde_json::from_str(&result).expect("parse");
     assert_eq!(envelope["screen"]["screen_id"], "multi_stage_exchange");
@@ -665,19 +665,25 @@ fn qr_data_from_screen_json(screen_json: &str) -> String {
     panic!("no QrCode Display in screen: {screen_json}");
 }
 
-/// Drive onboarding → Exchange → QR (Hover mode) so the engine is parked on
+/// Drive onboarding → Exchange → QR (Broadcast mode) so the engine is parked on
 /// `exchange_show_qr` with an animated-QR session ready to cycle frames.
+///
+/// Glance + Hover both graduated to `MultiStageExchange`
+/// (Pair 4 + Phase 1.E of the hover graduation plan); Broadcast is
+/// the next QR-legacy mode in line for graduation — until then it
+/// drives the same `exchange_show_qr` chrome the legacy frame-cycling
+/// path needs.
 fn drive_to_show_qr(engine: &PlatformAppEngine) {
     drive_onboarding(engine);
     engine
         .navigate_to_json(r#""Exchange""#.into())
         .expect("navigate to Exchange");
-    // Pick Hover mode (standard category) to drop into ShowQr.
+    // Pick Broadcast mode (group category) to drop into ShowQr.
     engine
         .handle_action_json(
-            r#"{"ListItemSelected": {"component_id": "category:standard", "item_id": "mode:hover"}}"#.into(),
+            r#"{"ListItemSelected": {"component_id": "category:group", "item_id": "mode:broadcast"}}"#.into(),
         )
-        .expect("select hover mode");
+        .expect("select broadcast mode");
     // Regardless of which ActionResult shape mode-selection returns, the
     // current screen must now be exchange_show_qr.
     let id = engine
@@ -685,7 +691,7 @@ fn drive_to_show_qr(engine: &PlatformAppEngine) {
         .expect("screen id after mode select");
     assert_eq!(
         id, "exchange_show_qr",
-        "expected show_qr after selecting Hover, got {id}"
+        "expected show_qr after selecting Broadcast, got {id}"
     );
 }
 
@@ -732,7 +738,7 @@ fn advance_qr_frame_json_returns_none_off_exchange_screen() {
 fn drive_to_multi_stage(engine: &PlatformAppEngine) {
     drive_onboarding(engine);
     engine
-        .navigate_to_json(r#""MultiStageExchange""#.into())
+        .navigate_to_json(r#"{"MultiStageExchange":{"mode":"glance"}}"#.into())
         .expect("navigate to MultiStageExchange");
     let id = engine
         .current_screen_id()
@@ -905,7 +911,7 @@ fn navigate_to_multi_stage_auto_creates_session_no_frontend_call_needed() {
         .expect("set listener");
 
     engine
-        .navigate_to_json(r#""MultiStageExchange""#.into())
+        .navigate_to_json(r#"{"MultiStageExchange":{"mode":"glance"}}"#.into())
         .expect("navigate");
     // Engine is now on multi_stage_exchange. The frontend never asked
     // for a session — core created one.

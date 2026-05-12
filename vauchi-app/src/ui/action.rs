@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::notification_types::PendingNotification;
 use crate::ui::screen::ScreenModel;
 use vauchi_core::Command;
+use vauchi_core::exchange::mode::ExchangeMode;
 
 /// An action the user performed in the UI.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -227,12 +228,23 @@ pub enum ActionResult {
     /// exchange screen (`AppScreen::MultiStageExchange`).
     ///
     /// Emitted by `ExchangeEngine` when the user picks a mode whose
-    /// implementation is the new core-driven multi-stage protocol
-    /// (Pair 4 of `2026-04-28-pure-humble-ui-retire-native-screens`).
+    /// implementation is the new core-driven multi-stage protocol.
+    /// Pair 4 of `2026-04-28-pure-humble-ui-retire-native-screens`
+    /// graduated `ExchangeMode::Glance`; Phase 1.E of
+    /// `2026-05-11-hover-graduation-plan.md` extended the handoff
+    /// to `ExchangeMode::Hover`. The `mode` payload tells AppEngine
+    /// which engine constructor to use
+    /// (`MultiStageExchangeEngine::new_hover()` vs
+    /// `::new_glance()`) — Hover defaults to the front camera and
+    /// runs the autonomous audio-handshake trigger; Glance stays
+    /// back-camera + audio-quiet.
+    ///
     /// Frontends never see this — `PlatformAppEngine` routes it to the
     /// dedicated screen which then auto-creates the
     /// `MobileMultiStageSession` and binds the bridge listener.
-    StartMultiStageExchange,
+    StartMultiStageExchange {
+        mode: ExchangeMode,
+    },
     /// App layer should call `MobileDeviceLinkSession::confirm_manual`
     /// with the given confirmation code and the current unix timestamp.
     ///

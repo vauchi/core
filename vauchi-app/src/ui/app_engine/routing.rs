@@ -102,7 +102,7 @@ impl AppEngine {
             AppScreen::Exchange
                 | AppScreen::AvatarEditor
                 | AppScreen::Recovery
-                | AppScreen::MultiStageExchange
+                | AppScreen::MultiStageExchange { .. }
         ) {
             return None;
         }
@@ -925,12 +925,17 @@ impl AppEngine {
             }
             // Pair 4 — `ExchangeEngine` emits StartMultiStageExchange when
             // the user picks `ExchangeMode::Glance` from the mode list.
-            // Route to the dedicated screen so `PlatformAppEngine` can
-            // auto-create the `MobileMultiStageSession` on entry. The
-            // frontend never decides this — picking a mode is a
-            // user-action, the rest is core's responsibility.
-            ActionResult::StartMultiStageExchange => {
-                let screen = self.navigate_to(AppScreen::MultiStageExchange);
+            // Phase 1.E of `2026-05-11-hover-graduation-plan.md` extended
+            // the handoff to `ExchangeMode::Hover`. Route to the
+            // dedicated screen so `PlatformAppEngine` can auto-create
+            // the `MobileMultiStageSession` on entry. The `mode`
+            // payload threads down to the screen-factory at
+            // `screens.rs:872` so it can pick `new_hover()` vs
+            // `new_glance()`. The frontend never decides any of this
+            // — picking a mode is a user-action, the rest is core's
+            // responsibility.
+            ActionResult::StartMultiStageExchange { mode } => {
+                let screen = self.navigate_to(AppScreen::MultiStageExchange { mode });
                 ActionResult::NavigateTo(screen)
             }
             ActionResult::OpenEntryDetail { field_id } => {

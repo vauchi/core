@@ -10,6 +10,7 @@ use vauchi_core::api::{Vauchi, VauchiConfig};
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::exchange::mode::ExchangeMode;
 
 // @internal
 #[test]
@@ -231,14 +232,18 @@ fn navigate_away_and_back_preserves_engine_state() {
     let first_visit = engine.navigate_to(AppScreen::Exchange);
     assert_eq!(first_visit.screen_id, "exchange_mode_selection");
 
-    // Pick Hover mode (still routes through legacy ExchangeStep::Qr —
-    // Glance now hands off to MultiStageExchange and so leaves the
-    // Exchange engine entirely; using Hover keeps this regression test
-    // exercising the cache-preserves-state behavior on a single
-    // engine).
+    // Pick Broadcast mode (still routes through the legacy
+    // `ExchangeStep::Qr` sub-flow). Glance and Hover now both hand
+    // off to `MultiStageExchange` and so leave the Exchange engine
+    // entirely (Pair 4 graduated Glance; Phase 1.E of the hover
+    // graduation plan graduated Hover). Broadcast is the next QR-
+    // legacy mode in line for Phase 2/3 graduation — until then it's
+    // the only QR-legacy mode left, which is exactly what this
+    // regression test needs to exercise the cache-preserves-state
+    // behavior on a single engine.
     let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:standard".into(),
-        item_id: "mode:hover".into(),
+        component_id: "category:group".into(),
+        item_id: "mode:broadcast".into(),
     });
     let qr_screen = engine.current_screen();
     assert_eq!(
@@ -937,7 +942,9 @@ fn navigate_to_multi_stage_exchange_drains_brightness_idle_timer_and_orientation
     engine.navigate_to(AppScreen::MyInfo);
     let _ = engine.drain_pending_commands();
 
-    engine.navigate_to(AppScreen::MultiStageExchange);
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Glance,
+    });
     let commands = engine.drain_pending_commands();
 
     assert_eq!(
@@ -968,7 +975,9 @@ fn navigate_back_from_multi_stage_exchange_drains_restore_commands() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::MyInfo);
-    engine.navigate_to(AppScreen::MultiStageExchange);
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Glance,
+    });
     let _ = engine.drain_pending_commands();
 
     engine.navigate_back();
@@ -1008,7 +1017,9 @@ fn drain_pending_commands_returns_empty_after_drain() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
-    engine.navigate_to(AppScreen::MultiStageExchange);
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Glance,
+    });
     let _first = engine.drain_pending_commands();
 
     let second = engine.drain_pending_commands();
@@ -1031,7 +1042,9 @@ fn apply_multi_stage_audio_proximity_routes_to_engine_setter() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
-    engine.navigate_to(AppScreen::MultiStageExchange);
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Glance,
+    });
     let _ = engine.drain_pending_commands();
 
     let applied = engine.apply_multi_stage_audio_proximity(AudioProximityState::Listening);
@@ -1070,7 +1083,9 @@ fn apply_multi_stage_audio_proximity_failed_renders_audio_failed_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
-    engine.navigate_to(AppScreen::MultiStageExchange);
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Glance,
+    });
     let _ = engine.drain_pending_commands();
 
     let applied = engine.apply_multi_stage_audio_proximity(AudioProximityState::Failed);
@@ -1139,7 +1154,9 @@ fn is_active_engine_multi_stage_hover_returns_false_for_glance_multistage() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
-    engine.navigate_to(AppScreen::MultiStageExchange);
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Glance,
+    });
     let _ = engine.drain_pending_commands();
     assert!(
         !engine.is_active_engine_multi_stage_hover(),
@@ -1187,7 +1204,9 @@ fn extend_pending_commands_preserves_existing_queue() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
-    engine.navigate_to(AppScreen::MultiStageExchange);
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Glance,
+    });
     // navigate_to leaves screen_entered commands in the queue —
     // brightness, idle-timer, orientation, plus the 1.B-added
     // SwitchCamera announcement. Bridge-emitted audio commands

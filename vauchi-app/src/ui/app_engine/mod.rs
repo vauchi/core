@@ -120,14 +120,28 @@ pub enum AppScreen {
     DeepLinkResponder {
         payload: vauchi_core::exchange::link_mode::DeepLinkPayload,
     },
-    /// Multi-stage face-to-face exchange (Pair 4 of pure-humble-ui-retire-native-screens).
+    /// Multi-stage face-to-face exchange.
     ///
     /// Renders the simultaneous bilateral QR + camera flow that
     /// `MobileMultiStageSession` drives via cycle-thread callbacks. The
     /// screen state mirrors `vauchi_core::exchange::ProtocolState`; the
     /// AppEngine bridge converts session listener callbacks into engine
     /// state mutations (see `multi_stage_exchange.rs` for the contract).
-    MultiStageExchange,
+    ///
+    /// `mode` carries the user's exchange-mode selection so the screen
+    /// factory picks the right `MultiStageExchangeEngine` constructor
+    /// (`new_hover` for `ExchangeMode::Hover`, `new_glance` for
+    /// `ExchangeMode::Glance`). Pair 4 of
+    /// `2026-04-28-pure-humble-ui-retire-native-screens` introduced
+    /// the screen for Glance; Phase 1.E of
+    /// `2026-05-11-hover-graduation-plan.md` added Hover and made the
+    /// constructor mode-aware. Other modes (`Magic`, `Bump`, `Shake`,
+    /// `Broadcast`, `TapHoverShake`, `Link`) continue to use the
+    /// legacy `ExchangeStep::Qr`/`Ble`/`Link` sub-flows until their
+    /// per-mode graduations land.
+    MultiStageExchange {
+        mode: vauchi_core::exchange::mode::ExchangeMode,
+    },
 }
 
 impl AppScreen {
@@ -178,7 +192,7 @@ impl AppScreen {
             Self::RecoveryClaimReview => "recovery_claim_review",
             Self::DeepLinkConsent { .. } => "deep_link_consent",
             Self::DeepLinkResponder { .. } => "deep_link_responder",
-            Self::MultiStageExchange => "multi_stage_exchange",
+            Self::MultiStageExchange { .. } => "multi_stage_exchange",
         }
     }
 
@@ -218,7 +232,9 @@ impl AppScreen {
             "device_replacement" => Self::DeviceReplacement,
             "avatar_editor" => Self::AvatarEditor,
             "recovery_claim_review" => Self::RecoveryClaimReview,
-            "multi_stage_exchange" => Self::MultiStageExchange,
+            // MultiStageExchange is parameterized ({ mode }) so it cannot
+            // be constructed from the screen-id alone — falls through to
+            // None like other parameterized screens (ContactDetail, etc.).
             _ => return None,
         })
     }

@@ -869,15 +869,31 @@ impl AppEngine {
                     is_verified,
                 ))
             }
-            AppScreen::MultiStageExchange => {
+            AppScreen::MultiStageExchange { mode } => {
                 // The cycle-thread session lives in vauchi-platform —
                 // the bridge from MultiStageSessionListener callbacks
                 // into this engine's `set_state` / `set_qr_payload` /
                 // `set_finalized` / `set_session_ended` setters is
-                // wired at the platform-binding layer (Phase 4b).
-                // The engine itself starts in `Idle` so the screen
-                // renders the "Waiting for peer…" chrome immediately.
-                Box::new(crate::ui::MultiStageExchangeEngine::new())
+                // wired at the platform-binding layer.
+                //
+                // Phase 1.E of `2026-05-11-hover-graduation-plan.md`
+                // made the constructor mode-aware. Hover gets
+                // `new_hover()` (front camera + audio-handshake
+                // trigger registered); other supported modes (Glance
+                // today; Broadcast / TapHoverShake on future
+                // graduations) get `new_glance()` (back camera +
+                // audio-quiet). The autonomous audio-handshake
+                // trigger in `MobileMultiStageSession` is gated on
+                // `is_active_engine_multi_stage_hover()` per the
+                // 1.C polish commit, so Glance flows never fire
+                // spurious audio chrome.
+                let engine = match mode {
+                    vauchi_core::exchange::mode::ExchangeMode::Hover => {
+                        crate::ui::MultiStageExchangeEngine::new_hover()
+                    }
+                    _ => crate::ui::MultiStageExchangeEngine::new_glance(),
+                };
+                Box::new(engine)
             }
         }
     }

@@ -358,7 +358,7 @@ impl PlatformAppEngine {
             })?
             .current_app_screen()
             .clone();
-        let on_multi_stage = matches!(pre_screen, AppScreen::MultiStageExchange);
+        let on_multi_stage = matches!(pre_screen, AppScreen::MultiStageExchange { .. });
         let is_retry = matches!(
             &action,
             vauchi_app::ui::UserAction::ActionPressed { action_id }
@@ -455,7 +455,7 @@ impl PlatformAppEngine {
                     detail: format!("Lock failed: {e}"),
                 })?
                 .current_app_screen(),
-            AppScreen::MultiStageExchange
+            AppScreen::MultiStageExchange { .. }
         );
         if on_multi_stage && let vauchi_core::Event::QrScanned { data } = &hw_event {
             let session_clone = self
@@ -4490,8 +4490,8 @@ impl PlatformAppEngine {
             })?
             .current_app_screen()
             .clone();
-        let was_multi = matches!(pre, AppScreen::MultiStageExchange);
-        let is_multi = matches!(post, AppScreen::MultiStageExchange);
+        let was_multi = matches!(pre, AppScreen::MultiStageExchange { .. });
+        let is_multi = matches!(post, AppScreen::MultiStageExchange { .. });
         match (was_multi, is_multi) {
             (true, false) => self.cancel_multi_stage_session(),
             (false, true) => self.ensure_multi_stage_session()?,

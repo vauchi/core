@@ -11,6 +11,7 @@ use vauchi_app::ui::{
 };
 use vauchi_core::api::Vauchi;
 use vauchi_core::contact_card::{ContactField, FieldType};
+use vauchi_core::exchange::mode::ExchangeMode;
 
 // ── AppScreen / FormDialogType serde roundtrip tests ─────────────────
 
@@ -37,7 +38,9 @@ fn app_screen_serde_roundtrip_simple_variants() {
         AppScreen::Support,
         AppScreen::ContactDuplicates,
         AppScreen::ContactLimit,
-        AppScreen::MultiStageExchange,
+        AppScreen::MultiStageExchange {
+            mode: ExchangeMode::Glance,
+        },
     ];
     for screen in &screens {
         let json = serde_json::to_string(screen).expect("serialize");
@@ -231,12 +234,16 @@ fn exchange_screen_with_identity_has_session() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_mode_selection");
 
-    // Pick Hover to advance to the legacy QR sub-flow. Glance now
-    // hands off to MultiStageExchange (Pair 4) — Hover still drives
-    // the legacy ExchangeStep::Qr session that this test asserts on.
+    // Pick Broadcast to advance to the legacy QR sub-flow.
+    // Glance + Hover now both hand off to MultiStageExchange
+    // (Pair 4 + Phase 1.E of the hover graduation plan) and so
+    // leave the Exchange engine entirely. Broadcast is the next
+    // QR-legacy mode in line for graduation — until then it's
+    // what this test needs to exercise ADR-031 session wiring
+    // on the legacy QR screen.
     let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:standard".into(),
-        item_id: "mode:hover".into(),
+        component_id: "category:group".into(),
+        item_id: "mode:broadcast".into(),
     });
 
     let screen = engine.current_screen();
@@ -310,7 +317,9 @@ fn multi_stage_exchange_navigates_to_engine_idle_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
-    engine.navigate_to(AppScreen::MultiStageExchange);
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Glance,
+    });
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "multi_stage_exchange");
     // Initial screen must show the active chrome with cancel + switch
@@ -329,7 +338,9 @@ fn multi_stage_exchange_camera_permission_denied_event_swaps_chrome() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
-    engine.navigate_to(AppScreen::MultiStageExchange);
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Glance,
+    });
     let result = engine.handle_hardware_event(Event::PermissionDenied {
         transport: "camera".into(),
     });
@@ -356,7 +367,9 @@ fn multi_stage_exchange_cancel_action_completes() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
-    engine.navigate_to(AppScreen::MultiStageExchange);
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Glance,
+    });
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });

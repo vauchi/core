@@ -94,18 +94,26 @@ fn glance_full_flow_mode_to_qr_to_result() {
 }
 
 // ================================================================
-// Hover: routes same as Glance (proximity is session-level)
+// Broadcast: full flow on the legacy QR sub-flow
 // ================================================================
+//
+// Glance + Hover now both hand off to `MultiStageExchange`
+// (Pair 4 + Phase 1.E of `2026-05-11-hover-graduation-plan.md`)
+// and so leave the Exchange engine entirely; the Hover handoff is
+// pinned by `exchange.rs::tests::hover_mode_routes_through_multi_stage_handoff`.
+// Broadcast (one-to-many QR) is the next QR-legacy mode in line for
+// graduation — until then it's what this test needs to exercise
+// the full legacy ExchangeEngine flow end-to-end.
 
 // @internal
 #[test]
-fn hover_full_flow_mode_to_qr_to_result() {
+fn broadcast_full_flow_mode_to_qr_to_result() {
     let mut engine = ExchangeEngine::new(config_with_mode_selection());
 
-    // Select Hover
+    // Select Broadcast
     let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:quick".to_string(),
-        item_id: "mode:hover".to_string(),
+        component_id: "category:group".to_string(),
+        item_id: "mode:broadcast".to_string(),
     });
 
     // Skip groups
@@ -115,7 +123,7 @@ fn hover_full_flow_mode_to_qr_to_result() {
     let screen = engine.current_screen();
     assert_eq!(
         screen.screen_id, "exchange_show_qr",
-        "Hover skip-groups goes straight to QR"
+        "Broadcast skip-groups goes straight to QR"
     );
 
     // Complete the QR flow

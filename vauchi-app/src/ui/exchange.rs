@@ -1144,12 +1144,23 @@ impl WorkflowEngine for ExchangeEngine {
                             // `MultiStageExchange` screen so the multi-stage
                             // protocol drives both QR display and scan from a
                             // pure ScreenModel rather than the legacy bespoke
-                            // step state machine. Hover (QR + ultrasonic) and
-                            // Broadcast (one-to-many) keep the legacy path until
-                            // their proximity / fan-out semantics are also
-                            // captured in the new engine.
-                            if mode == ExchangeMode::Glance {
-                                return ActionResult::StartMultiStageExchange;
+                            // step state machine.
+                            //
+                            // Phase 1.E of `2026-05-11-hover-graduation-plan.md`
+                            // extended the handoff to `Hover` (QR + ultrasonic).
+                            // The `mode` payload tells AppEngine which engine
+                            // constructor to use (`new_hover` vs `new_glance`)
+                            // — Hover defaults to the front camera and runs
+                            // the autonomous audio-handshake trigger; Glance
+                            // stays back-camera + audio-quiet (the
+                            // `is_active_engine_multi_stage_hover()` gate in
+                            // PlatformAppEngine pinned by the 1.C polish
+                            // regression tests). Broadcast (one-to-many) +
+                            // TapHoverShake (Phase 2/3) keep the legacy
+                            // `ExchangeStep::Qr` path until their per-mode
+                            // graduations land.
+                            if matches!(mode, ExchangeMode::Glance | ExchangeMode::Hover) {
+                                return ActionResult::StartMultiStageExchange { mode };
                             }
                             self.step = ExchangeStep::Qr(QrStep::ShowQr);
                             return self.start_session_if_needed();
@@ -1964,7 +1975,7 @@ mod tests {
         assert_eq!(engine.config.mode, Some(ExchangeMode::Glance));
         assert_eq!(engine.step, ExchangeStep::ModeSelection);
         assert!(
-            matches!(result, ActionResult::StartMultiStageExchange),
+            matches!(result, ActionResult::StartMultiStageExchange { .. }),
             "Expected StartMultiStageExchange handoff, got {:?}",
             result
         );

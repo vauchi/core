@@ -87,7 +87,7 @@ impl AppScreen {
                 // Multi-stage face-to-face exchange — collapses under
                 // Exchange on every layout (it's an active sub-flow,
                 // not a top-level destination).
-                Self::MultiStageExchange => Self::Exchange,
+                Self::MultiStageExchange { .. } => Self::Exchange,
                 // Defensive default — should never trip thanks to the
                 // canonical reduction above; kept so the match stays
                 // total even if AppScreen grows.
@@ -116,7 +116,7 @@ impl AppScreen {
                 | Self::ChangePassword
                 | Self::EmergencyShred => Self::More,
                 Self::DeliveryStatus => Self::Exchange,
-                Self::MultiStageExchange => Self::Exchange,
+                Self::MultiStageExchange { .. } => Self::Exchange,
                 _ => return None,
             },
         })

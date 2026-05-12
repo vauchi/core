@@ -508,6 +508,94 @@ impl MobileMultiStageSession {
         self.start_audio_handshake(&challenge)
     }
 
+    /// Process audio samples recorded by the platform audio backend
+    /// in response to a `Command::AudioListenForResponse`. Decodes
+    /// the FSK waveform via [`audio_modem::decode_fsk_samples`],
+    /// compares the decoded bytes against the inner session's
+    /// `peer_session_id` using constant-time equality, and
+    /// transitions the audio-proximity state.
+    ///
+    /// Outcome:
+    /// - Decode succeeds AND decoded bytes match the peer's
+    ///   session_id → transition Listening → Confirmed. The audio
+    ///   channel verifiably carried the peer's identifier to our
+    ///   mic, satisfying the Hover physical-proximity claim.
+    /// - Decode succeeds but bytes mismatch → Listening → Failed.
+    ///   Some other audio source was emitting in the ultrasonic
+    ///   band; we didn't hear the peer.
+    /// - Decode fails (malformed samples, preamble not found,
+    ///   resampling error) → Listening → Failed. Mic didn't pick up
+    ///   the chirp clearly enough.
+    /// - peer_session_id is None (Stage 1 not yet complete) →
+    ///   Listening → Failed. Caller raced; orchestrator should have
+    ///   waited for Discovered before triggering the handshake.
+    ///
+    /// Returns the inner [`AudioStateError`] if the state-machine
+    /// rejected the transition (e.g. called outside the Listening
+    /// window). Notifies the audio listener with the new state on
+    /// success.
+    ///
+    /// **Security**: constant-time comparison via
+    /// [`subtle::ConstantTimeEq`] so the verification doesn't leak
+    /// timing about which byte differed. The mismatch class
+    /// (Failed) is the same regardless of WHERE the mismatch is,
+    /// preventing a near-peer attacker from probing the decoded
+    /// bytes via timing.
+    pub fn process_audio_samples_recorded(
+        &self,
+        samples: Vec<f32>,
+        sample_rate: u32,
+    ) -> Result<(), vauchi_core::exchange::AudioStateError> {
+        use vauchi_core::exchange::{AudioConfig, AudioProximityState, audio_modem};
+
+        // Decode is CPU-bound; do it without holding the inner lock
+        // so concurrent state callbacks (e.g. on_state_changed during
+        // the listen window) aren't blocked.
+        let config = AudioConfig::default();
+        let decoded = audio_modem::decode_fsk_samples(&samples, sample_rate, &config);
+
+        let new_state = match decoded {
+            Ok(decoded_bytes) => {
+                // Constant-time verification lives in vauchi-core
+                // (subtle is a core dep). `None` from
+                // verify_audio_response means peer_session_id wasn't
+                // set yet (Stage 1 incomplete) — user-facing UX is
+                // the same Failed; orchestrator distinguishes via
+                // logs if needed.
+                let verified = self
+                    .inner
+                    .lock()
+                    .ok()
+                    .and_then(|g| g.verify_audio_response(&decoded_bytes));
+                if verified == Some(true) {
+                    AudioProximityState::Confirmed
+                } else {
+                    AudioProximityState::Failed
+                }
+            }
+            // Decode error (preamble not found, malformed samples,
+            // resampling failure) → Failed. User-facing UX same as
+            // verification failure ("couldn't confirm devices are
+            // close").
+            Err(_) => AudioProximityState::Failed,
+        };
+
+        let result = self
+            .inner
+            .lock()
+            .map_err(
+                |_| vauchi_core::exchange::AudioStateError::InvalidTransition {
+                    from: AudioProximityState::Listening,
+                    to: new_state,
+                },
+            )?
+            .set_audio_proximity(new_state);
+        if result.is_ok() {
+            self.notify_audio_listener(new_state.into());
+        }
+        result
+    }
+
     /// Drain the queue of audio commands produced by
     /// [`Self::start_audio_handshake`] (and future orchestrator
     /// transitions). Returns the commands in emission order and

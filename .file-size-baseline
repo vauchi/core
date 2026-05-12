@@ -44,7 +44,11 @@ vauchi-core/src/exchange/session.rs 1788
 #  per G1.3.)
 # (+20 for Phase 1.C.3e-iii: session_id() getter + doc explaining
 #  the temporary use as audio-handshake challenge stand-in.)
-vauchi-core/src/exchange/multistage/session.rs 1321
+# (+31 for Phase 1.C.3e-iv: peer_session_id() getter +
+#  verify_audio_response with constant-time eq via subtle.
+#  Crypto-adjacent comparison kept in core where subtle is a
+#  dep, called from vauchi-platform's process_audio_samples_recorded.)
+vauchi-core/src/exchange/multistage/session.rs 1352
 
 # EXEMPT — protocol command/event enum: variants + variant_name match
 # + From impls + serde-discriminant ordering must be co-located, splitting

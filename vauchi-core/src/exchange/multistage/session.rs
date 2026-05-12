@@ -309,6 +309,37 @@ impl MultiStageSession {
         self.session_id
     }
 
+    /// Returns the peer's session ID, populated during Stage 1 from
+    /// the peer's INIT QR. `None` before the peer has been
+    /// discovered. Used by the Phase 1.C.3e Hover audio handshake to
+    /// verify the decoded FSK response: a valid Confirmed transition
+    /// requires the received samples to decode to these exact bytes
+    /// (the peer is broadcasting their own session_id via ultrasonic;
+    /// if the audio channel carried it intact to our mic, the peer is
+    /// physically close).
+    pub fn peer_session_id(&self) -> Option<[u8; 16]> {
+        self.peer_session_id
+    }
+
+    /// Verify a decoded FSK audio response against the peer's
+    /// session_id using constant-time equality. Returns `Some(true)`
+    /// on match, `Some(false)` on mismatch or wrong length, and
+    /// `None` if `peer_session_id` is not yet set (Stage 1 incomplete).
+    ///
+    /// Security primitive for Phase 1.C.3e-iv Hover handshake
+    /// verification: keeps the timing-side-channel resistance inside
+    /// vauchi-core (which already depends on `subtle`) rather than
+    /// pushing that crypto-adjacent code into vauchi-platform.
+    pub fn verify_audio_response(&self, decoded: &[u8]) -> Option<bool> {
+        use subtle::ConstantTimeEq;
+        let peer = self.peer_session_id?;
+        if decoded.len() != 16 {
+            return Some(false);
+        }
+        let arr: [u8; 16] = decoded.try_into().ok()?;
+        Some(bool::from(arr.ct_eq(&peer)))
+    }
+
     /// Returns the received peer data if the exchange is finalized.
     ///
     /// Data is only available in the `Finalized` state — both sides must

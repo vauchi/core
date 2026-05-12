@@ -780,3 +780,66 @@ fn start_audio_handshake_for_session_second_call_rejected() {
         "second start must be rejected — Listening → Listening is a security gate",
     );
 }
+
+// ── Audio response verification (Phase 1.C.3e-iv) ─────────────────
+
+// @internal
+#[test]
+fn process_audio_samples_recorded_decode_error_transitions_to_failed() {
+    // Decode failure (no preamble, malformed samples) collapses to
+    // Failed — user-facing story is "couldn't confirm devices are
+    // close".
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+    session.start_audio_handshake(&[0u8; 16]).unwrap();
+    // Garbage samples that decode_fsk_samples can't make sense of.
+    let garbage = vec![0.0f32; 100];
+    session
+        .process_audio_samples_recorded(garbage, 44100)
+        .expect("transition to Failed must succeed via the state machine");
+    assert_eq!(
+        session.audio_proximity(),
+        MobileAudioProximityState::Failed,
+        "decode error must transition to Failed",
+    );
+}
+
+// @internal
+#[test]
+fn process_audio_samples_recorded_without_peer_session_id_transitions_to_failed() {
+    // peer_session_id is None until Stage 1 (Discovered) completes.
+    // A samples-recorded callback that arrives before then races
+    // the orchestrator. Verify it doesn't crash and surfaces a
+    // Failed state — the orchestrator should not have triggered
+    // the handshake before Discovered, but if it did, the
+    // verification has nothing to compare against.
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+    session.start_audio_handshake(&[0u8; 16]).unwrap();
+    // Even a perfectly-encoded set of samples can't verify without
+    // peer_session_id — None branch in verify_audio_response.
+    use vauchi_core::exchange::{AudioConfig, audio_modem};
+    let config = AudioConfig::default();
+    let samples = audio_modem::generate_fsk_samples(&[0xAB; 16], &config);
+    session
+        .process_audio_samples_recorded(samples, 44100)
+        .expect("transition must succeed");
+    assert_eq!(session.audio_proximity(), MobileAudioProximityState::Failed);
+}
+
+// @internal
+#[test]
+fn process_audio_samples_recorded_outside_listening_window_rejected() {
+    // The state-machine gate from 1.C.3b enforces that transitions
+    // come from Listening. Calling process_audio_samples_recorded
+    // before start_audio_handshake (still Pending) must return
+    // AudioStateError::InvalidTransition.
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+    let result = session.process_audio_samples_recorded(vec![0.0; 10], 44100);
+    assert!(
+        result.is_err(),
+        "can't process audio response before entering Listening; got Ok(())",
+    );
+    assert_eq!(
+        session.audio_proximity(),
+        MobileAudioProximityState::Pending
+    );
+}

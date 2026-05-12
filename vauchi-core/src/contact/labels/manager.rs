@@ -70,7 +70,10 @@ impl GroupManager {
     }
 
     /// Creates a new group.
-    pub fn create_group(&mut self, name: &str) -> Result<&Group, GroupError> {
+    /// Creates a new group. `now` is stamped into `created_at` /
+    /// `modified_at`; production callers pass
+    /// `vauchi.clock().unix_seconds()`, tests pass any fixed value.
+    pub fn create_group(&mut self, name: &str, now: u64) -> Result<&Group, GroupError> {
         // Validate name
         let name = name.trim();
         if name.is_empty() {
@@ -93,7 +96,7 @@ impl GroupManager {
         }
 
         // Create group
-        let group = Group::new(name);
+        let group = Group::new(name, now);
         let id = group.id().to_string();
         self.groups.insert(id.clone(), group);
 
@@ -355,7 +358,7 @@ mod tests {
     #[test]
     fn test_create_label() {
         let mut manager = GroupManager::new();
-        let label = manager.create_group("Family").unwrap();
+        let label = manager.create_group("Family", 0).unwrap();
 
         assert_eq!(label.name(), "Family");
         assert_eq!(label.contact_count(), 0);
@@ -365,16 +368,16 @@ mod tests {
     #[test]
     fn test_create_duplicate_label() {
         let mut manager = GroupManager::new();
-        manager.create_group("Friends").unwrap();
+        manager.create_group("Friends", 0).unwrap();
 
-        let result = manager.create_group("Friends");
+        let result = manager.create_group("Friends", 0);
         assert!(matches!(result, Err(GroupError::DuplicateName(_))));
     }
 
     #[test]
     fn test_add_contact_to_label() {
         let mut manager = GroupManager::new();
-        let label = manager.create_group("Family").unwrap();
+        let label = manager.create_group("Family", 0).unwrap();
         let label_id = label.id().to_string();
 
         manager.add_contact_to_group(&label_id, "bob-id").unwrap();
@@ -387,7 +390,7 @@ mod tests {
     #[test]
     fn test_remove_contact_from_label() {
         let mut manager = GroupManager::new();
-        let label = manager.create_group("Family").unwrap();
+        let label = manager.create_group("Family", 0).unwrap();
         let label_id = label.id().to_string();
 
         manager.add_contact_to_group(&label_id, "bob-id").unwrap();
@@ -402,7 +405,7 @@ mod tests {
     #[test]
     fn test_label_field_visibility() {
         let mut manager = GroupManager::new();
-        let label = manager.create_group("Family").unwrap();
+        let label = manager.create_group("Family", 0).unwrap();
         let label_id = label.id().to_string();
 
         // Add contact and field
@@ -426,7 +429,7 @@ mod tests {
     #[test]
     fn test_per_contact_override() {
         let mut manager = GroupManager::new();
-        let label = manager.create_group("Friends").unwrap();
+        let label = manager.create_group("Friends", 0).unwrap();
         let label_id = label.id().to_string();
 
         // Add Bob to Friends and set personal-phone as visible
@@ -454,10 +457,10 @@ mod tests {
     fn test_contact_in_multiple_labels() {
         let mut manager = GroupManager::new();
 
-        let family = manager.create_group("Family").unwrap();
+        let family = manager.create_group("Family", 0).unwrap();
         let family_id = family.id().to_string();
 
-        let friends = manager.create_group("Friends").unwrap();
+        let friends = manager.create_group("Friends", 0).unwrap();
         let friends_id = friends.id().to_string();
 
         // Add Carol to both labels
@@ -484,7 +487,7 @@ mod tests {
     #[test]
     fn test_rename_label() {
         let mut manager = GroupManager::new();
-        let label = manager.create_group("Work").unwrap();
+        let label = manager.create_group("Work", 0).unwrap();
         let label_id = label.id().to_string();
 
         manager.rename_group(&label_id, "Colleagues").unwrap();
@@ -496,7 +499,7 @@ mod tests {
     #[test]
     fn test_delete_label() {
         let mut manager = GroupManager::new();
-        let label = manager.create_group("Temporary").unwrap();
+        let label = manager.create_group("Temporary", 0).unwrap();
         let label_id = label.id().to_string();
 
         manager.add_contact_to_group(&label_id, "bob-id").unwrap();
@@ -513,10 +516,10 @@ mod tests {
         let mut manager = GroupManager::new();
 
         for i in 0..MAX_LABELS {
-            manager.create_group(&format!("Label{}", i)).unwrap();
+            manager.create_group(&format!("Label{}", i), 0).unwrap();
         }
 
-        let result = manager.create_group("OneMore");
+        let result = manager.create_group("OneMore", 0);
         assert!(matches!(result, Err(GroupError::MaxLabelsReached)));
     }
 
@@ -531,9 +534,9 @@ mod tests {
     #[test]
     fn test_merge_groups_union_members_and_fields() {
         let mut manager = GroupManager::new();
-        let target = manager.create_group("Family").unwrap().id().to_string();
+        let target = manager.create_group("Family", 0).unwrap().id().to_string();
         let source = manager
-            .create_group("Close Friends")
+            .create_group("Close Friends", 0)
             .unwrap()
             .id()
             .to_string();
@@ -576,7 +579,7 @@ mod tests {
     #[test]
     fn test_merge_groups_source_not_found() {
         let mut manager = GroupManager::new();
-        let target = manager.create_group("Family").unwrap().id().to_string();
+        let target = manager.create_group("Family", 0).unwrap().id().to_string();
 
         let result = manager.merge_groups(&target, "nonexistent");
         assert!(matches!(result, Err(GroupError::NotFound(_))));
@@ -585,7 +588,7 @@ mod tests {
     #[test]
     fn test_merge_groups_target_not_found() {
         let mut manager = GroupManager::new();
-        let source = manager.create_group("Friends").unwrap().id().to_string();
+        let source = manager.create_group("Friends", 0).unwrap().id().to_string();
 
         let result = manager.merge_groups("nonexistent", &source);
         assert!(matches!(result, Err(GroupError::NotFound(_))));
@@ -598,7 +601,7 @@ mod tests {
     #[test]
     fn test_merge_groups_same_group() {
         let mut manager = GroupManager::new();
-        let group = manager.create_group("Family").unwrap().id().to_string();
+        let group = manager.create_group("Family", 0).unwrap().id().to_string();
 
         let result = manager.merge_groups(&group, &group);
         assert!(matches!(result, Err(GroupError::InvalidName(_))));
@@ -607,9 +610,9 @@ mod tests {
     #[test]
     fn test_merge_groups_preserves_display_name_override() {
         let mut manager = GroupManager::new();
-        let target = manager.create_group("Family").unwrap().id().to_string();
+        let target = manager.create_group("Family", 0).unwrap().id().to_string();
         let source = manager
-            .create_group("Close Friends")
+            .create_group("Close Friends", 0)
             .unwrap()
             .id()
             .to_string();
@@ -629,8 +632,8 @@ mod tests {
     #[test]
     fn test_merge_groups_source_overrides_transferred() {
         let mut manager = GroupManager::new();
-        let target = manager.create_group("Family").unwrap().id().to_string();
-        let source = manager.create_group("Friends").unwrap().id().to_string();
+        let target = manager.create_group("Family", 0).unwrap().id().to_string();
+        let source = manager.create_group("Friends", 0).unwrap().id().to_string();
 
         // Bob is only in source, has an override
         manager.add_contact_to_group(&source, "bob").unwrap();

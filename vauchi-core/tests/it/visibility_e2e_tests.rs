@@ -17,9 +17,13 @@ mod visibility_e2e_tests {
         vauchi.create_identity("Test User").unwrap();
 
         let mut label_manager = GroupManager::new();
-        let work_id = label_manager.create_group("Work").unwrap().id().to_string();
+        let work_id = label_manager
+            .create_group("Work", 0)
+            .unwrap()
+            .id()
+            .to_string();
         let personal_id = label_manager
-            .create_group("Personal")
+            .create_group("Personal", 0)
             .unwrap()
             .id()
             .to_string();
@@ -36,8 +40,8 @@ mod visibility_e2e_tests {
     fn test_visibility_logic_e2e() {
         let (_vauchi, _work_id, _personal_id) = setup_vauchi_with_labels();
         let mut label_manager = GroupManager::new();
-        label_manager.create_group("Work").unwrap();
-        label_manager.create_group("Personal").unwrap();
+        label_manager.create_group("Work", 0).unwrap();
+        label_manager.create_group("Personal", 0).unwrap();
 
         let work_label_id = label_manager
             .get_group_by_name("Work")

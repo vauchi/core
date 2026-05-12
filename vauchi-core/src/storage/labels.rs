@@ -429,7 +429,7 @@ impl Storage {
         }
 
         // Create and save
-        let label = Group::new(name);
+        let label = Group::new(name, self.clock().unix_seconds());
         self.save_group(&label)?;
 
         Ok(label)
@@ -587,7 +587,7 @@ mod tests {
     fn test_save_and_load_label() {
         let storage = test_storage();
 
-        let mut label = Group::new("Family");
+        let mut label = Group::new("Family", 0);
         label.add_contact("alice-id");
         label.add_contact("bob-id");
         label.add_visible_field("phone");
@@ -608,9 +608,9 @@ mod tests {
     fn test_load_all_labels() {
         let storage = test_storage();
 
-        let label1 = Group::new("Family");
-        let label2 = Group::new("Friends");
-        let label3 = Group::new("Work");
+        let label1 = Group::new("Family", 0);
+        let label2 = Group::new("Friends", 0);
+        let label3 = Group::new("Work", 0);
 
         storage.save_group(&label1).unwrap();
         storage.save_group(&label2).unwrap();
@@ -629,7 +629,7 @@ mod tests {
     fn test_delete_label() {
         let storage = test_storage();
 
-        let label = Group::new("Temporary");
+        let label = Group::new("Temporary", 0);
         storage.save_group(&label).unwrap();
 
         storage.delete_group(label.id()).unwrap();
@@ -805,7 +805,7 @@ mod tests {
     fn test_save_and_load_label_with_display_name_override() {
         let storage = test_storage();
 
-        let mut label = Group::new("Professional");
+        let mut label = Group::new("Professional", 0);
         label.add_contact("alice-id");
         label.add_visible_field("work-email");
         label.set_display_name_override(Some("Dr. Egloff")).unwrap();
@@ -824,7 +824,7 @@ mod tests {
     fn test_save_and_load_label_without_display_name_override() {
         let storage = test_storage();
 
-        let label = Group::new("Friends");
+        let label = Group::new("Friends", 0);
         storage.save_group(&label).unwrap();
 
         let loaded = storage.load_group(label.id()).unwrap();
@@ -835,10 +835,10 @@ mod tests {
     fn test_load_all_labels_preserves_display_name_override() {
         let storage = test_storage();
 
-        let mut label1 = Group::new("Family");
+        let mut label1 = Group::new("Family", 0);
         label1.set_display_name_override(Some("Matt")).unwrap();
 
-        let label2 = Group::new("Work");
+        let label2 = Group::new("Work", 0);
         // label2 has no override
 
         storage.save_group(&label1).unwrap();
@@ -859,7 +859,7 @@ mod tests {
         let storage = test_storage();
 
         // Create label with override
-        let mut label = Group::new("Colleagues");
+        let mut label = Group::new("Colleagues", 0);
         label.set_display_name_override(Some("Dr. Egloff")).unwrap();
         storage.save_group(&label).unwrap();
 

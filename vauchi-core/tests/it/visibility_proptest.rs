@@ -142,7 +142,7 @@ proptest! {
         let mut label_manager = GroupManager::new();
         let mut label_ids = Vec::new();
         for i in 0..num_groups {
-            let label = label_manager.create_group(&format!("Group_{}", i)).unwrap();
+            let label = label_manager.create_group(&format!("Group_{}", i), 0).unwrap();
             let label_id = label.id().to_string();
 
             // Add some fields as visible to make labels non-trivial
@@ -173,7 +173,7 @@ proptest! {
         let (card, field_ids) = card_with_fields(num_fields);
 
         let mut label_manager = GroupManager::new();
-        let label = label_manager.create_group("TestLabel").unwrap();
+        let label = label_manager.create_group("TestLabel", 0).unwrap();
         let label_id = label.id().to_string();
 
         // Add contact to label
@@ -211,7 +211,7 @@ proptest! {
         let mut expected_visible: HashSet<String> = HashSet::new();
 
         for i in 0..num_labels {
-            let label = label_manager.create_group(&format!("Label_{}", i)).unwrap();
+            let label = label_manager.create_group(&format!("Label_{}", i), 0).unwrap();
             let label_id = label.id().to_string();
 
             // Add contact to each label
@@ -263,7 +263,7 @@ proptest! {
         let override_index = override_index % num_fields;
 
         let mut label_manager = GroupManager::new();
-        let label = label_manager.create_group("AllVisible").unwrap();
+        let label = label_manager.create_group("AllVisible", 0).unwrap();
         let label_id = label.id().to_string();
 
         label_manager.add_contact_to_group(&label_id, "dave").unwrap();
@@ -311,7 +311,7 @@ proptest! {
 
         let mut label_manager = GroupManager::new();
         // Create a label but don't add any visible fields
-        let label = label_manager.create_group("EmptyLabel").unwrap();
+        let label = label_manager.create_group("EmptyLabel", 0).unwrap();
         let label_id = label.id().to_string();
 
         label_manager.add_contact_to_group(&label_id, "eve").unwrap();
@@ -376,7 +376,7 @@ proptest! {
         let (card, field_ids) = card_with_fields(num_fields);
 
         let mut label_manager = GroupManager::new();
-        let label = label_manager.create_group("Group1").unwrap();
+        let label = label_manager.create_group("Group1", 0).unwrap();
         let label_id = label.id().to_string();
 
         label_manager.add_contact_to_group(&label_id, &contact_id).unwrap();
@@ -423,7 +423,7 @@ proptest! {
 
         // Switch to groups mode by creating a label (without adding the contact)
         let mut label_manager = GroupManager::new();
-        label_manager.create_group("SomeGroup").unwrap();
+        label_manager.create_group("SomeGroup", 0).unwrap();
 
         let visible_groups = resolve_visible_fields(&card, &label_manager, "contact-1");
         prop_assert!(

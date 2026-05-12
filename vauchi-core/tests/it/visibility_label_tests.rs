@@ -27,7 +27,7 @@ fn create_manager_with_labels(names: &[&str]) -> (GroupManager, Vec<String>) {
     let mut label_ids = Vec::new();
 
     for name in names {
-        let label = manager.create_group(name).unwrap();
+        let label = manager.create_group(name, 0).unwrap();
         label_ids.push(label.id().to_string());
     }
 
@@ -71,7 +71,7 @@ fn test_label_crud_operations() {
     // =========================================================================
 
     // Create a new label
-    let family = manager.create_group("Family").unwrap();
+    let family = manager.create_group("Family", 0).unwrap();
     assert_eq!(family.name(), "Family");
     assert_eq!(family.contact_count(), 0);
     assert!(family.visible_fields().is_empty());
@@ -83,10 +83,10 @@ fn test_label_crud_operations() {
     manager.get_group_by_name("Family").expect("expected Some");
 
     // Create additional labels
-    let friends = manager.create_group("Friends").unwrap();
+    let friends = manager.create_group("Friends", 0).unwrap();
     let friends_id = friends.id().to_string();
 
-    let professional = manager.create_group("Professional").unwrap();
+    let professional = manager.create_group("Professional", 0).unwrap();
     let professional_id = professional.id().to_string();
 
     assert_eq!(manager.group_count(), 3);
@@ -96,23 +96,23 @@ fn test_label_crud_operations() {
     // =========================================================================
 
     // Cannot create duplicate label name
-    let duplicate_result = manager.create_group("Family");
+    let duplicate_result = manager.create_group("Family", 0);
     assert!(matches!(
         duplicate_result,
         Err(GroupError::DuplicateName(_))
     ));
 
     // Cannot create label with empty name
-    let empty_result = manager.create_group("");
+    let empty_result = manager.create_group("", 0);
     assert!(matches!(empty_result, Err(GroupError::InvalidName(_))));
 
     // Cannot create label with only whitespace
-    let whitespace_result = manager.create_group("   ");
+    let whitespace_result = manager.create_group("   ", 0);
     assert!(matches!(whitespace_result, Err(GroupError::InvalidName(_))));
 
     // Cannot create label with name exceeding 50 characters
     let long_name = "A".repeat(51);
-    let long_result = manager.create_group(&long_name);
+    let long_result = manager.create_group(&long_name, 0);
     assert!(matches!(long_result, Err(GroupError::InvalidName(_))));
 
     // =========================================================================
@@ -219,13 +219,13 @@ fn test_label_max_limit() {
 
     // Create maximum number of labels
     for i in 0..MAX_LABELS {
-        manager.create_group(&format!("Label{}", i)).unwrap();
+        manager.create_group(&format!("Label{}", i), 0).unwrap();
     }
 
     assert_eq!(manager.group_count(), MAX_LABELS);
 
     // Cannot create one more
-    let result = manager.create_group("OneMore");
+    let result = manager.create_group("OneMore", 0);
     assert!(matches!(result, Err(GroupError::MaxLabelsReached)));
 
     // Delete one label
@@ -237,7 +237,7 @@ fn test_label_max_limit() {
     manager.delete_group(&label_ids[0]).unwrap();
 
     // Now we can create one more
-    manager.create_group("NewLabel").unwrap();
+    manager.create_group("NewLabel", 0).unwrap();
     assert_eq!(manager.group_count(), MAX_LABELS);
 }
 
@@ -409,10 +409,10 @@ fn test_cascading_visibility_changes() {
     let mut manager = GroupManager::new();
 
     // Create labels with different field visibility
-    let family = manager.create_group("Family").unwrap();
+    let family = manager.create_group("Family", 0).unwrap();
     let family_id = family.id().to_string();
 
-    let friends = manager.create_group("Friends").unwrap();
+    let friends = manager.create_group("Friends", 0).unwrap();
     let friends_id = friends.id().to_string();
 
     // Setup field visibility for Family: home-address, personal-phone
@@ -588,13 +588,13 @@ fn test_label_based_field_visibility() {
     let mut manager = GroupManager::new();
 
     // Create labels
-    let family = manager.create_group("Family").unwrap();
+    let family = manager.create_group("Family", 0).unwrap();
     let family_id = family.id().to_string();
 
-    let close_friends = manager.create_group("Close Friends").unwrap();
+    let close_friends = manager.create_group("Close Friends", 0).unwrap();
     let close_friends_id = close_friends.id().to_string();
 
-    let colleagues = manager.create_group("Colleagues").unwrap();
+    let colleagues = manager.create_group("Colleagues", 0).unwrap();
     let colleagues_id = colleagues.id().to_string();
 
     // Contact IDs

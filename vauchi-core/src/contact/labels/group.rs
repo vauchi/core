@@ -38,9 +38,13 @@ pub struct Group {
 
 impl Group {
     /// Creates a new label with the given name.
-    pub fn new(name: &str) -> Self {
-        let now = crate::clock::ambient_now_secs();
-
+    ///
+    /// `now` is the Unix-epoch timestamp stamped into both
+    /// `created_at` and `modified_at`. Production callers source
+    /// it from `storage.clock().unix_seconds()` (via
+    /// `Storage::create_group`) or `self.clock.unix_seconds()`
+    /// (via `Vauchi::create_group`); tests pass any fixed value.
+    pub fn new(name: &str, now: u64) -> Self {
         Group {
             id: uuid::Uuid::new_v4().to_string(),
             name: name.to_string(),
@@ -235,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_label_display_name_override() {
-        let mut label = Group::new("Family");
+        let mut label = Group::new("Family", 0);
 
         // Initially None
         assert_eq!(label.display_name_override(), None);
@@ -255,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_label_display_name_override_validation() {
-        let mut label = Group::new("Friends");
+        let mut label = Group::new("Friends", 0);
 
         // Empty string should fail
         let result = label.set_display_name_override(Some(""));
@@ -286,7 +290,7 @@ mod tests {
 
     #[test]
     fn test_label_resolve_display_name() {
-        let mut label = Group::new("Business");
+        let mut label = Group::new("Business", 0);
 
         // Without override, returns default
         assert_eq!(label.resolve_display_name("Mattia Egloff"), "Mattia Egloff");
@@ -308,7 +312,7 @@ mod tests {
     fn test_labels_are_local() {
         // Labels exist only in GroupManager, not in Contact
         // This test verifies the design doesn't leak labels to contacts
-        let label = Group::new("Secret Name");
+        let label = Group::new("Secret Name", 0);
 
         // The label name is never serialized in a way that would be sent to contacts
         // Label data should only be synced to the user's own devices

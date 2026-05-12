@@ -71,10 +71,10 @@ fn test_visibility_group_add_remove() {
     let mut manager = GroupManager::new();
 
     // Create visibility groups
-    let work_label = manager.create_group("Work Contacts").unwrap();
+    let work_label = manager.create_group("Work Contacts", 0).unwrap();
     let work_id = work_label.id().to_string();
 
-    let friends_label = manager.create_group("Close Friends").unwrap();
+    let friends_label = manager.create_group("Close Friends", 0).unwrap();
     let friends_id = friends_label.id().to_string();
 
     // Add visible fields to each group
@@ -166,7 +166,7 @@ fn test_visibility_group_grants_all_fields() {
     let mut manager = GroupManager::new();
 
     // Create a group with multiple fields
-    let family_label = manager.create_group("Family").unwrap();
+    let family_label = manager.create_group("Family", 0).unwrap();
     let family_id = family_label.id().to_string();
 
     let family_label = manager.get_group_mut(&family_id).unwrap();
@@ -212,7 +212,7 @@ fn test_visibility_group_with_per_contact_override() {
     let mut manager = GroupManager::new();
 
     // Create group
-    let label = manager.create_group("Friends").unwrap();
+    let label = manager.create_group("Friends", 0).unwrap();
     let label_id = label.id().to_string();
 
     // Add field to group
@@ -711,7 +711,7 @@ fn test_visibility_bulk_label_operations() {
     let mut manager = GroupManager::new();
 
     // Create a label
-    let label = manager.create_group("Work").unwrap();
+    let label = manager.create_group("Work", 0).unwrap();
     let label_id = label.id().to_string();
 
     // Bulk add multiple fields to the label
@@ -820,9 +820,9 @@ fn test_visibility_bulk_remove_contact_from_all_labels() {
     let mut manager = GroupManager::new();
 
     // Create multiple labels
-    let family = manager.create_group("Family").unwrap().id().to_string();
-    let friends = manager.create_group("Friends").unwrap().id().to_string();
-    let work = manager.create_group("Work").unwrap().id().to_string();
+    let family = manager.create_group("Family", 0).unwrap().id().to_string();
+    let friends = manager.create_group("Friends", 0).unwrap().id().to_string();
+    let work = manager.create_group("Work", 0).unwrap().id().to_string();
 
     let contact_id = "departing-contact";
 

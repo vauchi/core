@@ -32,7 +32,7 @@ mod visibility_integration_tests {
     #[test]
     fn test_label_creation() {
         let mut manager = create_test_label_manager();
-        let label = manager.create_group("Work Contacts").unwrap();
+        let label = manager.create_group("Work Contacts", 0).unwrap();
         assert_eq!(label.name(), "Work Contacts");
         assert_eq!(manager.group_count(), 1);
     }
@@ -44,7 +44,7 @@ mod visibility_integration_tests {
 
         // Create a label
         let label_id = manager
-            .create_group("Work Contacts")
+            .create_group("Work Contacts", 0)
             .unwrap()
             .id()
             .to_string();
@@ -68,8 +68,8 @@ mod visibility_integration_tests {
         let mut manager = create_test_label_manager();
 
         // Create multiple labels
-        let work_id = manager.create_group("Work").unwrap().id().to_string();
-        let friends_id = manager.create_group("Friends").unwrap().id().to_string();
+        let work_id = manager.create_group("Work", 0).unwrap().id().to_string();
+        let friends_id = manager.create_group("Friends", 0).unwrap().id().to_string();
 
         // Create field and associate with both labels
         let card = create_test_contact_card();
@@ -105,7 +105,7 @@ mod visibility_integration_tests {
         let mut manager = create_test_label_manager();
 
         // Create labels
-        let label_id = manager.create_group("Family").unwrap().id().to_string();
+        let label_id = manager.create_group("Family", 0).unwrap().id().to_string();
 
         // Create contact ID
         let contact_id = "family-member-id";
@@ -125,7 +125,11 @@ mod visibility_integration_tests {
         let mut manager = create_test_label_manager();
 
         // Create label and contact
-        let label_id = manager.create_group("Restricted").unwrap().id().to_string();
+        let label_id = manager
+            .create_group("Restricted", 0)
+            .unwrap()
+            .id()
+            .to_string();
 
         let field_id = "secret-field";
         let contact_id = "some-contact";
@@ -154,7 +158,7 @@ mod visibility_integration_tests {
         let mut manager = create_test_label_manager();
 
         // Create label and field
-        let label_id = manager.create_group("Group").unwrap().id().to_string();
+        let label_id = manager.create_group("Group", 0).unwrap().id().to_string();
 
         let field_id = "shared-field";
         let contact_id = "override-contact";

@@ -50,10 +50,10 @@ fn test_label_sync_across_devices() {
 
     let mut device_a_manager = GroupManager::new();
 
-    let family = device_a_manager.create_group("Family").unwrap();
+    let family = device_a_manager.create_group("Family", 0).unwrap();
     let family_id = family.id().to_string();
 
-    let friends = device_a_manager.create_group("Close Friends").unwrap();
+    let friends = device_a_manager.create_group("Close Friends", 0).unwrap();
     let friends_id = friends.id().to_string();
 
     // Add contacts and fields
@@ -280,8 +280,8 @@ fn test_delete_contact_clears_overrides() {
     let mut manager = GroupManager::new();
 
     // Create labels
-    let family_id = manager.create_group("Family").unwrap().id().to_string();
-    let friends_id = manager.create_group("Friends").unwrap().id().to_string();
+    let family_id = manager.create_group("Family", 0).unwrap().id().to_string();
+    let friends_id = manager.create_group("Friends", 0).unwrap().id().to_string();
 
     let bob = "bob-id";
 
@@ -322,7 +322,7 @@ fn test_set_visible_fields_bulk() {
     let mut manager = GroupManager::new();
 
     let label_id = manager
-        .create_group("Professional")
+        .create_group("Professional", 0)
         .unwrap()
         .id()
         .to_string();
@@ -371,7 +371,7 @@ fn test_set_visible_fields_bulk() {
 fn test_label_timestamps() {
     let mut manager = GroupManager::new();
 
-    let label = manager.create_group("Test Label").unwrap();
+    let label = manager.create_group("Test Label", 0).unwrap();
     let label_id = label.id().to_string();
 
     let created_at = label.created_at();
@@ -415,8 +415,8 @@ fn test_label_manager_serialization() {
     let mut manager = GroupManager::new();
 
     // Create labels with data
-    let family_id = manager.create_group("Family").unwrap().id().to_string();
-    let friends_id = manager.create_group("Friends").unwrap().id().to_string();
+    let family_id = manager.create_group("Family", 0).unwrap().id().to_string();
+    let friends_id = manager.create_group("Friends", 0).unwrap().id().to_string();
 
     manager.add_contact_to_group(&family_id, "bob").unwrap();
     manager.add_contact_to_group(&family_id, "carol").unwrap();

@@ -138,7 +138,7 @@ pub use verifier_harness::{PeerCapabilities, Scenario, SimulatedPeer, Verificati
 pub use x3dh::{X3DH, X3DHKeyPair};
 
 // Multi-stage exchange re-exports
-pub use multistage::session::MultiStageSession;
+pub use multistage::session::{AudioStateError, MultiStageSession};
 pub use multistage::types::{AudioProximityState, ProtocolState, QrPayload};
 
 // Exchange mode foundation re-exports

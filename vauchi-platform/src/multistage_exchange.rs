@@ -392,6 +392,64 @@ impl MobileMultiStageSession {
 }
 
 impl MobileMultiStageSession {
+    /// Drive the inner session's audio-proximity state machine
+    /// through the `Listening` transition and notify the audio
+    /// listener.
+    ///
+    /// `pub(crate)` because this is an internal trigger called by
+    /// the wrapper-side orchestrator (Phase 1.C.3e-ii) when the
+    /// multi-stage session reaches the appropriate protocol moment.
+    /// UniFFI consumers (iOS / Android) do not call this directly —
+    /// the orchestrator decides timing. Exposed for tests so the
+    /// trigger pattern is verifiable independently of the future
+    /// orchestrator wiring.
+    ///
+    /// Returns `Ok(())` if the transition is allowed by the inner
+    /// state graph (Pending → Listening, or Failed → Listening for
+    /// the retry path per G1.3 of the Hover graduation problem
+    /// record). Returns [`AudioStateError`] otherwise.
+    ///
+    /// Phase 1.C.3e-ii will extend this method to also generate the
+    /// FSK challenge waveform via
+    /// `vauchi_core::exchange::audio_modem` and push
+    /// `Command::AudioEmitChallenge` /
+    /// `Command::AudioListenForResponse` into the orchestrator's
+    /// command queue. Today the method only flips state + notifies;
+    /// the frontend won't hear or play a chirp until 1.C.3e-ii.
+    pub fn start_audio_handshake(&self) -> Result<(), vauchi_core::exchange::AudioStateError> {
+        let result = self
+            .inner
+            .lock()
+            .map_err(
+                |_| vauchi_core::exchange::AudioStateError::InvalidTransition {
+                    from: vauchi_core::exchange::AudioProximityState::Pending,
+                    to: vauchi_core::exchange::AudioProximityState::Listening,
+                },
+            )?
+            .set_audio_proximity(vauchi_core::exchange::AudioProximityState::Listening);
+        if result.is_ok() {
+            self.notify_audio_listener(MobileAudioProximityState::Listening);
+        }
+        result
+    }
+
+    /// Pop the audio listener slot, clone the Arc out of the lock,
+    /// fire the callback unlocked. Matches the lock-free callback
+    /// discipline used by [`MultiStageEngineBridge::notify`] in
+    /// `platform_app_engine.rs` so a frontend implementation that
+    /// re-enters Rust on the callback (typical: read
+    /// `current_screen_json`) cannot deadlock.
+    pub fn notify_audio_listener(&self, state: MobileAudioProximityState) {
+        let listener = self
+            .audio_listener
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone());
+        if let Some(listener) = listener {
+            listener.on_audio_state_changed(state);
+        }
+    }
+
     /// Internal constructor used by `VauchiPlatform::create_multistage_session`
     /// to attach the persistence context the cycle thread needs to land the
     /// peer contact in storage at the `Finalized` transition.

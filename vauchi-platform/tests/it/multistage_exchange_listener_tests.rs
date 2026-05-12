@@ -594,3 +594,60 @@ impl MultiStageAudioListener for SharedAudio {
         self.0.on_audio_state_changed(s);
     }
 }
+
+// ── Audio handshake trigger (Phase 1.C.3e-i) ──────────────────────
+
+// @internal
+#[test]
+fn start_audio_handshake_transitions_to_listening_and_notifies_listener() {
+    // Phase 1.C.3e-i: externally-driven trigger. Caller invokes
+    // start_audio_handshake; the wrapper drives the inner session
+    // through Pending → Listening and fires on_audio_state_changed.
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+    let audio = RecordingAudioListener::new();
+    session.set_audio_listener(Box::new(SharedAudio(audio.clone())));
+
+    session
+        .start_audio_handshake()
+        .expect("Pending → Listening must succeed");
+
+    assert_eq!(
+        session.audio_proximity(),
+        MobileAudioProximityState::Listening
+    );
+    assert_eq!(
+        audio.states(),
+        vec![MobileAudioProximityState::Listening],
+        "listener must receive exactly one Listening callback",
+    );
+}
+
+// @internal
+#[test]
+fn start_audio_handshake_idempotent_call_is_rejected() {
+    // Listening → Listening is a no-op transition rejected by the
+    // inner state machine (security gate via AudioStateError). The
+    // wrapper surfaces the rejection rather than silently no-op'ing.
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+    session.start_audio_handshake().unwrap();
+    assert!(
+        session.start_audio_handshake().is_err(),
+        "second start_audio_handshake call must error — Listening → Listening is rejected",
+    );
+}
+
+// @internal
+#[test]
+fn start_audio_handshake_without_listener_succeeds_silently() {
+    // The audio listener is optional; sessions without one (e.g.
+    // headless harness tests) can still drive the inner state
+    // machine via start_audio_handshake without panicking.
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+    session
+        .start_audio_handshake()
+        .expect("no listener registered, but inner transition still works");
+    assert_eq!(
+        session.audio_proximity(),
+        MobileAudioProximityState::Listening
+    );
+}

@@ -608,7 +608,7 @@ fn start_audio_handshake_transitions_to_listening_and_notifies_listener() {
     session.set_audio_listener(Box::new(SharedAudio(audio.clone())));
 
     session
-        .start_audio_handshake()
+        .start_audio_handshake(&[0u8; 16])
         .expect("Pending → Listening must succeed");
 
     assert_eq!(
@@ -629,9 +629,9 @@ fn start_audio_handshake_idempotent_call_is_rejected() {
     // inner state machine (security gate via AudioStateError). The
     // wrapper surfaces the rejection rather than silently no-op'ing.
     let session = MobileMultiStageSession::new(b"card".to_vec());
-    session.start_audio_handshake().unwrap();
+    session.start_audio_handshake(&[0u8; 16]).unwrap();
     assert!(
-        session.start_audio_handshake().is_err(),
+        session.start_audio_handshake(&[0u8; 16]).is_err(),
         "second start_audio_handshake call must error — Listening → Listening is rejected",
     );
 }
@@ -644,10 +644,93 @@ fn start_audio_handshake_without_listener_succeeds_silently() {
     // machine via start_audio_handshake without panicking.
     let session = MobileMultiStageSession::new(b"card".to_vec());
     session
-        .start_audio_handshake()
+        .start_audio_handshake(&[0u8; 16])
         .expect("no listener registered, but inner transition still works");
     assert_eq!(
         session.audio_proximity(),
         MobileAudioProximityState::Listening
+    );
+}
+
+// ── FSK challenge emission + command queue (Phase 1.C.3e-ii) ──────
+
+// @internal
+#[test]
+fn start_audio_handshake_pushes_emit_and_listen_commands_to_queue() {
+    use vauchi_core::Command;
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+    assert!(session.drain_audio_commands().is_empty());
+
+    let challenge = [
+        0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0x07, 0x18, 0x29, 0x3A, 0x4B, 0x5C, 0x6D, 0x7E, 0x8F,
+        0x90,
+    ];
+    session
+        .start_audio_handshake(&challenge)
+        .expect("Pending → Listening must succeed");
+
+    let cmds = session.drain_audio_commands();
+    assert_eq!(
+        cmds.len(),
+        2,
+        "expected paired (AudioEmitChallenge, AudioListenForResponse); got {cmds:?}",
+    );
+    match &cmds[0] {
+        Command::AudioEmitChallenge {
+            samples,
+            sample_rate,
+        } => {
+            assert_eq!(*sample_rate, 44100, "default modem sample rate");
+            assert!(
+                !samples.is_empty(),
+                "FSK waveform must be non-empty for a 16-byte challenge"
+            );
+        }
+        other => panic!("expected AudioEmitChallenge, got {other:?}"),
+    }
+    match &cmds[1] {
+        Command::AudioListenForResponse {
+            timeout_ms,
+            sample_rate,
+        } => {
+            assert_eq!(
+                *timeout_ms, 5000,
+                "default listen window mirrors legacy ExchangeSession"
+            );
+            assert_eq!(*sample_rate, 44100);
+        }
+        other => panic!("expected AudioListenForResponse, got {other:?}"),
+    }
+}
+
+// @internal
+#[test]
+fn drain_audio_commands_empties_the_queue() {
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+    session.start_audio_handshake(&[0u8; 16]).unwrap();
+    assert_eq!(
+        session.drain_audio_commands().len(),
+        2,
+        "first drain returns the queued commands"
+    );
+    assert!(
+        session.drain_audio_commands().is_empty(),
+        "second drain must be empty — queue was taken, not cloned"
+    );
+}
+
+// @internal
+#[test]
+fn rejected_start_audio_handshake_does_not_queue_commands() {
+    // Security invariant: a rejected transition (Listening →
+    // Listening) must NOT enqueue commands. A stray chirp would
+    // mislead the peer or trigger false-negative timeouts.
+    let session = MobileMultiStageSession::new(b"card".to_vec());
+    session.start_audio_handshake(&[0u8; 16]).unwrap();
+    let _ = session.drain_audio_commands();
+    assert!(session.start_audio_handshake(&[1u8; 16]).is_err());
+    assert!(
+        session.drain_audio_commands().is_empty(),
+        "rejected transition must not enqueue commands",
     );
 }

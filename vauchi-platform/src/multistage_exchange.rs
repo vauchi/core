@@ -36,10 +36,13 @@ use std::time::Duration;
 use crate::error::{LOCK_POISON_MSG, MobileError};
 use crate::mobile_exchange::deserialize_exchange_payload;
 
+use vauchi_core::Command;
 use vauchi_core::contact::Contact;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::crypto::ratchet::DoubleRatchetState;
-use vauchi_core::exchange::{MultiStageSession, ProtocolState, QrPayload};
+use vauchi_core::exchange::{
+    AudioConfig, MultiStageSession, ProtocolState, QrPayload, audio_modem,
+};
 use vauchi_core::storage::Storage;
 
 /// Mobile-friendly protocol state enum (UniFFI-compatible).
@@ -257,6 +260,14 @@ pub struct MobileMultiStageSession {
     /// path. `Some` for sessions created from a `VauchiPlatform`, `None`
     /// for the harness constructor used by listener-only unit tests.
     persistence: Option<PersistenceContext>,
+    /// Phase 1.C.3e-ii — commands the orchestrator emits as a side
+    /// effect of audio-handshake state transitions. The consumer
+    /// (PlatformAppEngine) drains this queue right after each audio
+    /// state-change callback and forwards into AppEngine's
+    /// pending-command stream so the frontend sees
+    /// `Command::AudioEmitChallenge` / `AudioListenForResponse` in
+    /// the next `screen_envelope_to_json` drain.
+    pending_audio_commands: Mutex<Vec<Command>>,
 }
 
 #[uniffi::export]
@@ -416,7 +427,16 @@ impl MobileMultiStageSession {
     /// `Command::AudioListenForResponse` into the orchestrator's
     /// command queue. Today the method only flips state + notifies;
     /// the frontend won't hear or play a chirp until 1.C.3e-ii.
-    pub fn start_audio_handshake(&self) -> Result<(), vauchi_core::exchange::AudioStateError> {
+    /// Audio-listen window default — mirrors the legacy
+    /// `ExchangeSession::Qr` Hover path (`vauchi-core/src/exchange/session.rs:500`).
+    /// Phase 1.C.4 will move this behind the Clock seam so tests can
+    /// drive it deterministically.
+    const AUDIO_LISTEN_TIMEOUT_MS: u64 = 5000;
+
+    pub fn start_audio_handshake(
+        &self,
+        challenge: &[u8; 16],
+    ) -> Result<(), vauchi_core::exchange::AudioStateError> {
         let result = self
             .inner
             .lock()
@@ -428,9 +448,44 @@ impl MobileMultiStageSession {
             )?
             .set_audio_proximity(vauchi_core::exchange::AudioProximityState::Listening);
         if result.is_ok() {
+            // Generate the FSK challenge waveform from the peer's
+            // shared challenge bytes (extracted from the multi-stage
+            // INIT QR by the orchestrator — Phase 1.C.3e-iii). The
+            // mobile audio backend plays the samples + records the
+            // response; core verifies via `audio_modem::decode_fsk_samples`
+            // (Phase 1.C.3e-iv).
+            let config = AudioConfig::default();
+            let samples = audio_modem::generate_fsk_samples(challenge, &config);
+            let sample_rate = config.sample_rate;
+            let cmds = vec![
+                Command::AudioEmitChallenge {
+                    samples,
+                    sample_rate,
+                },
+                Command::AudioListenForResponse {
+                    timeout_ms: Self::AUDIO_LISTEN_TIMEOUT_MS,
+                    sample_rate,
+                },
+            ];
+            if let Ok(mut queue) = self.pending_audio_commands.lock() {
+                queue.extend(cmds);
+            }
             self.notify_audio_listener(MobileAudioProximityState::Listening);
         }
         result
+    }
+
+    /// Drain the queue of audio commands produced by
+    /// [`Self::start_audio_handshake`] (and future orchestrator
+    /// transitions). Returns the commands in emission order and
+    /// empties the queue. `PlatformAppEngine` calls this after
+    /// processing each audio state-change callback so the commands
+    /// reach AppEngine's pending-command stream.
+    pub fn drain_audio_commands(&self) -> Vec<Command> {
+        self.pending_audio_commands
+            .lock()
+            .map(|mut q| std::mem::take(&mut *q))
+            .unwrap_or_default()
     }
 
     /// Pop the audio listener slot, clone the Arc out of the lock,
@@ -472,6 +527,7 @@ impl MobileMultiStageSession {
             inner: Arc::new(Mutex::new(MultiStageSession::new(local_card))),
             listener: Arc::new(Mutex::new(None)),
             audio_listener: Arc::new(Mutex::new(None)),
+            pending_audio_commands: Mutex::new(Vec::new()),
             cancel_flag: Arc::new(AtomicBool::new(false)),
             thread_handle: Mutex::new(None),
             cycle_sleep_override_ms: Arc::new(AtomicU32::new(0)),

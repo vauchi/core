@@ -1179,6 +1179,7 @@ impl ExchangeSession {
                 crate::contact_card::FieldType::Custom,
                 label,
                 value,
+                crate::clock::ambient_now_secs(),
             )) {
                 tracing::warn!(
                     error = %e,

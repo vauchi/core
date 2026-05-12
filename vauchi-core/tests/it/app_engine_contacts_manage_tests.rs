@@ -25,6 +25,7 @@ fn my_info_shows_own_fields_via_app_engine() {
             FieldType::Phone,
             "Mobile",
             "+41 79 123 45 67",
+            0,
         ))
         .unwrap();
 

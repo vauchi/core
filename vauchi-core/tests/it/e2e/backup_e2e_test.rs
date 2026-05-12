@@ -27,18 +27,21 @@ fn test_backup_recovery_happy_path() {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Phone,
         "mobile",
         "+15559876543",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Website,
         "blog",
         "https://alice.dev",
+        0,
     ))
     .unwrap();
 
@@ -88,6 +91,7 @@ fn test_multi_device_linking_happy_path() {
             FieldType::Email,
             "work",
             "alice@company.com",
+            0,
         ))
         .unwrap();
 
@@ -118,6 +122,7 @@ fn test_multi_device_linking_happy_path() {
             FieldType::Phone,
             "mobile",
             "+15551234567",
+            0,
         ))
         .unwrap();
     let updated_card_a = device_a.own_card().unwrap().unwrap();

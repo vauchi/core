@@ -843,7 +843,10 @@ impl Vauchi {
         }
         let mut card = contact.card().clone();
         card.add_field(crate::contact_card::ContactField::new(
-            field_type, label, value,
+            field_type,
+            label,
+            value,
+            self.clock.unix_seconds(),
         ))
         .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         contact.update_card(card);

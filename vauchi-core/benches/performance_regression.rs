@@ -53,18 +53,21 @@ fn create_test_contact(index: usize) -> Contact {
         FieldType::Email,
         "Work",
         &format!("contact{}@example.com", index),
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Phone,
         "Mobile",
         &format!("+1-555-{:03}-{:04}", index / 10000, index % 10000),
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Social,
         "Twitter",
         &format!("@user{}", index),
+        0,
     ))
     .unwrap();
 
@@ -96,12 +99,14 @@ fn create_own_card() -> ContactCard {
         FieldType::Email,
         "Personal",
         "user@example.com",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Phone,
         "Mobile",
         "+1-555-000-0000",
+        0,
     ))
     .unwrap();
     card

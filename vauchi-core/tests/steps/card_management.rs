@@ -83,7 +83,7 @@ fn save_field(world: &mut VauchiWorld) {
         other => panic!("Unknown field type: {other}"),
     };
 
-    let field = ContactField::new(field_type, &label, &value);
+    let field = ContactField::new(field_type, &label, &value, 0);
     world.last_result = match world.vauchi.add_own_field(field) {
         Ok(()) => Ok(()),
         Err(e) => Err(format!("{e}")),

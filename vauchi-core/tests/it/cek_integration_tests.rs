@@ -94,6 +94,7 @@ fn test_propagate_with_cek_rotates_cek() {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ));
 
     // Propagate
@@ -139,6 +140,7 @@ fn test_propagate_without_cek_generates_one() {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ));
 
     let queued = alice.propagate_card_update(&old_card, &new_card).unwrap();
@@ -220,6 +222,7 @@ fn test_process_cek_wrapped_update() {
         FieldType::Email,
         "work",
         "bob@company.com",
+        0,
     ));
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
@@ -303,6 +306,7 @@ fn test_process_cek_wrapped_update_applies_delta() {
         FieldType::Email,
         "personal",
         "bob@email.com",
+        0,
     ));
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
@@ -526,6 +530,7 @@ fn test_cek_wrapped_end_to_end_flow() {
         FieldType::Email,
         "work",
         "alice@corp.com",
+        0,
     ));
 
     let queued = alice.propagate_card_update(&old_card, &new_card).unwrap();

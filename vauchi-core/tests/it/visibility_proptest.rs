@@ -39,6 +39,7 @@ fn card_with_fields(num_fields: usize) -> (ContactCard, Vec<String>) {
             FieldType::Email,
             &format!("email_{}", i),
             &format!("user{}@example.com", i),
+            0,
         );
         let fid = field.id().to_string();
         card.add_field(field).unwrap();

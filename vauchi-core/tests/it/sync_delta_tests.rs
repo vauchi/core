@@ -46,6 +46,7 @@ fn test_delta_compute_field_added() {
         FieldType::Email,
         "email",
         "alice@example.com",
+        0,
     ));
 
     let delta = CardDelta::compute(&old, &new);
@@ -62,6 +63,7 @@ fn test_delta_compute_field_modified() {
         FieldType::Email,
         "email",
         "old@example.com",
+        0,
     ));
 
     let mut new = ContactCard::new("Alice");
@@ -69,6 +71,7 @@ fn test_delta_compute_field_modified() {
         FieldType::Email,
         "email",
         "new@example.com",
+        0,
     ));
 
     let delta = CardDelta::compute(&old, &new);
@@ -84,7 +87,7 @@ fn test_delta_compute_field_modified() {
 #[test]
 fn test_delta_compute_field_removed() {
     let mut old = ContactCard::new("Alice");
-    let field = ContactField::new(FieldType::Email, "email", "alice@example.com");
+    let field = ContactField::new(FieldType::Email, "email", "alice@example.com", 0);
     let field_id = field.id().to_string();
     let _ = old.add_field(field);
 
@@ -126,7 +129,7 @@ fn test_delta_apply_display_name() {
 #[test]
 fn test_delta_apply_add_field() {
     let mut card = ContactCard::new("Alice");
-    let new_field = ContactField::new(FieldType::Email, "email", "alice@example.com");
+    let new_field = ContactField::new(FieldType::Email, "email", "alice@example.com", 0);
 
     let delta = CardDelta {
         version: 1,
@@ -148,7 +151,7 @@ fn test_delta_apply_add_field() {
 #[test]
 fn test_delta_apply_remove_field() {
     let mut card = ContactCard::new("Alice");
-    let field = ContactField::new(FieldType::Email, "email", "alice@example.com");
+    let field = ContactField::new(FieldType::Email, "email", "alice@example.com", 0);
     let field_id = field.id().to_string();
     let _ = card.add_field(field);
 
@@ -170,14 +173,25 @@ fn test_delta_apply_remove_field() {
 #[test]
 fn test_delta_roundtrip() {
     let mut old = ContactCard::new("Alice");
-    let _ = old.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"));
+    let _ = old.add_field(ContactField::new(
+        FieldType::Phone,
+        "phone",
+        "+1234567890",
+        0,
+    ));
 
     let mut new = ContactCard::new("Alice Smith");
-    let _ = new.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"));
+    let _ = new.add_field(ContactField::new(
+        FieldType::Phone,
+        "phone",
+        "+1234567890",
+        0,
+    ));
     let _ = new.add_field(ContactField::new(
         FieldType::Email,
         "email",
         "alice@example.com",
+        0,
     ));
 
     let delta = CardDelta::compute(&old, &new);
@@ -254,6 +268,7 @@ fn test_delta_serialization_roundtrip() {
         FieldType::Email,
         "email",
         "old@example.com",
+        0,
     ));
 
     let mut new = ContactCard::new("Alice");
@@ -261,6 +276,7 @@ fn test_delta_serialization_roundtrip() {
         FieldType::Email,
         "email",
         "new@example.com",
+        0,
     ));
 
     let delta = CardDelta::compute(&old, &new);
@@ -277,13 +293,18 @@ fn test_delta_serialization_roundtrip() {
 #[test]
 fn test_delta_multiple_changes() {
     let mut old = ContactCard::new("Alice");
-    let field1 = ContactField::new(FieldType::Email, "email", "alice@example.com");
+    let field1 = ContactField::new(FieldType::Email, "email", "alice@example.com", 0);
     let field1_id = field1.id().to_string();
     let _ = old.add_field(field1);
 
     let mut new = ContactCard::new("Alice Smith");
     // email field is removed, phone is added
-    let _ = new.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"));
+    let _ = new.add_field(ContactField::new(
+        FieldType::Phone,
+        "phone",
+        "+1234567890",
+        0,
+    ));
 
     let delta = CardDelta::compute(&old, &new);
 
@@ -320,8 +341,14 @@ fn test_delta_filter_for_contact_all_visible() {
         FieldType::Email,
         "email",
         "alice@example.com",
+        0,
     ));
-    let _ = new.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"));
+    let _ = new.add_field(ContactField::new(
+        FieldType::Phone,
+        "phone",
+        "+1234567890",
+        0,
+    ));
 
     let delta = CardDelta::compute(&old, &new);
     let rules = VisibilityRules::new(); // Default: everyone can see all
@@ -340,10 +367,15 @@ fn test_delta_filter_for_contact_some_hidden() {
 
     let old = ContactCard::new("Alice");
     let mut new = ContactCard::new("Alice");
-    let email_field = ContactField::new(FieldType::Email, "email", "alice@example.com");
+    let email_field = ContactField::new(FieldType::Email, "email", "alice@example.com", 0);
     let email_id = email_field.id().to_string();
     let _ = new.add_field(email_field);
-    let _ = new.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"));
+    let _ = new.add_field(ContactField::new(
+        FieldType::Phone,
+        "phone",
+        "+1234567890",
+        0,
+    ));
 
     let delta = CardDelta::compute(&old, &new);
 
@@ -369,7 +401,7 @@ fn test_delta_filter_for_contact_restricted_access() {
 
     let old = ContactCard::new("Alice");
     let mut new = ContactCard::new("Alice");
-    let email_field = ContactField::new(FieldType::Email, "email", "alice@example.com");
+    let email_field = ContactField::new(FieldType::Email, "email", "alice@example.com", 0);
     let email_id = email_field.id().to_string();
     let _ = new.add_field(email_field);
 
@@ -420,9 +452,9 @@ fn test_delta_filter_display_name_always_visible() {
 #[test]
 fn test_filter_with_allows_matching_fields() {
     // Create old card with two fields
-    let work_field = ContactField::new(FieldType::Email, "work", "old@co.com");
+    let work_field = ContactField::new(FieldType::Email, "work", "old@co.com", 0);
     let work_id = work_field.id().to_string();
-    let mobile_field = ContactField::new(FieldType::Phone, "mobile", "+1234567890");
+    let mobile_field = ContactField::new(FieldType::Phone, "mobile", "+1234567890", 0);
     let mobile_id = mobile_field.id().to_string();
 
     let mut old = ContactCard::new("Alice");
@@ -432,11 +464,14 @@ fn test_filter_with_allows_matching_fields() {
     // Create new card by cloning and modifying both fields
     let mut new = old.clone();
     for field in new.fields_mut() {
-        field.set_value(if field.id() == work_id {
-            "new@co.com"
-        } else {
-            "+9876543210"
-        });
+        field.set_value(
+            if field.id() == work_id {
+                "new@co.com"
+            } else {
+                "+9876543210"
+            },
+            0,
+        );
     }
 
     let delta = CardDelta::compute(&old, &new);
@@ -498,9 +533,9 @@ fn test_filter_with_always_includes_display_name() {
 #[test]
 fn test_filter_with_handles_added_and_removed() {
     // Start with a card containing work+mobile
-    let work_field = ContactField::new(FieldType::Email, "work", "a@co.com");
+    let work_field = ContactField::new(FieldType::Email, "work", "a@co.com", 0);
     let work_id = work_field.id().to_string();
-    let mobile_field = ContactField::new(FieldType::Phone, "mobile", "+1234567890");
+    let mobile_field = ContactField::new(FieldType::Phone, "mobile", "+1234567890", 0);
     let mobile_id = mobile_field.id().to_string();
 
     let mut old = ContactCard::new("Alice");
@@ -584,6 +619,7 @@ fn test_card_delta_with_validation_summary_roundtrip() {
         FieldType::Email,
         "email",
         "bob@example.com",
+        0,
     ));
 
     let mut delta = CardDelta::compute(&old, &new);
@@ -671,7 +707,7 @@ fn test_card_delta_filter_preserves_validation_summary() {
 
     let old = ContactCard::new("Alice");
     let mut new = ContactCard::new("Alice");
-    let email_field = ContactField::new(FieldType::Email, "email", "alice@example.com");
+    let email_field = ContactField::new(FieldType::Email, "email", "alice@example.com", 0);
     let email_id = email_field.id().to_string();
     let _ = new.add_field(email_field);
 

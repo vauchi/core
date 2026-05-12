@@ -84,6 +84,7 @@ fn test_full_path_exchange_to_card_update() {
             FieldType::Website,
             "blog",
             "https://alice.example",
+            0,
         ))
         .unwrap();
     let new_card = alice.own_card().unwrap().unwrap();

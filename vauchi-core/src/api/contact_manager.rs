@@ -534,7 +534,7 @@ mod tests {
         manager.update_own_card(&card).unwrap();
 
         // Add field
-        let field = ContactField::new(FieldType::Email, "email", "test@example.com");
+        let field = ContactField::new(FieldType::Email, "email", "test@example.com", 0);
         manager.add_field_to_own_card(field).unwrap();
 
         let loaded = manager.get_own_card().unwrap().unwrap();
@@ -554,6 +554,7 @@ mod tests {
             FieldType::Email,
             "email",
             "test@example.com",
+            0,
         ))
         .unwrap();
         manager.update_own_card(&card).unwrap();
@@ -747,6 +748,7 @@ mod tests {
                 FieldType::Email,
                 "email",
                 "old@example.com",
+                0,
             ))
             .unwrap();
 
@@ -756,10 +758,16 @@ mod tests {
                 FieldType::Email,
                 "email",
                 "new@example.com",
+                0,
             ))
             .unwrap();
         card2
-            .add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"))
+            .add_field(ContactField::new(
+                FieldType::Phone,
+                "phone",
+                "+1234567890",
+                0,
+            ))
             .unwrap();
 
         let changed = ContactManager::<'_>::compute_changed_fields(&card1, &card2);

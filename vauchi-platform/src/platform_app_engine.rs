@@ -1838,7 +1838,12 @@ impl PlatformAppEngine {
                     .ok_or(MobileError::Other {
                         detail: "Identity not found".into(),
                     })?;
-                let field = vauchi_core::ContactField::new(field_type.into(), &label, &value);
+                let field = vauchi_core::ContactField::new(
+                    field_type.into(),
+                    &label,
+                    &value,
+                    engine.vauchi().clock().unix_seconds(),
+                );
                 card.add_field(field)
                     .map_err(|e| MobileError::InvalidInput {
                         field: String::new(),

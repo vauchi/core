@@ -48,6 +48,7 @@ fn test_own_card_encrypted_roundtrip() {
         vauchi_core::contact_card::FieldType::Email,
         "email",
         "alice@example.com",
+        0,
     ));
 
     storage.save_own_card(&card).unwrap();

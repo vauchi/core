@@ -111,7 +111,12 @@ pub fn import_vcard(vcard: &str) -> Result<ContactCard, VCardError> {
     let mut card = ContactCard::new(&display_name);
     for (field_type, label, value) in fields {
         let field_type_owned = field_type.clone();
-        if let Err(e) = card.add_field(ContactField::new(field_type, &label, &value)) {
+        if let Err(e) = card.add_field(ContactField::new(
+            field_type,
+            &label,
+            &value,
+            crate::clock::ambient_now_secs(),
+        )) {
             // ADR-042-shape lenient import: keep the contact, drop only
             // the failing field — surface validation failures so operators
             // see corrupt-payload rates from imports. PII-safe:

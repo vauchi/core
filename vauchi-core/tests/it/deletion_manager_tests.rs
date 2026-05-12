@@ -27,6 +27,7 @@ fn make_contact_with_cek(pk: [u8; 32], name: &str) -> Contact {
         FieldType::Email,
         "email",
         "test@example.com",
+        0,
     ))
     .unwrap();
     let shared_key = SymmetricKey::generate();
@@ -41,6 +42,7 @@ fn make_legacy_contact(pk: [u8; 32], name: &str) -> Contact {
         FieldType::Email,
         "email",
         "test@example.com",
+        0,
     ))
     .unwrap();
     let shared_key = SymmetricKey::generate();

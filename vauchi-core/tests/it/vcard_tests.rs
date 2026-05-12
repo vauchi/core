@@ -15,12 +15,14 @@ fn test_export_basic_card() {
         FieldType::Phone,
         "mobile",
         "+15551234567",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Email,
         "work",
         "alice@example.com",
+        0,
     ))
     .unwrap();
 
@@ -37,26 +39,43 @@ fn test_export_basic_card() {
 #[test]
 fn test_export_all_field_types() {
     let mut card = ContactCard::new("Bob");
-    card.add_field(ContactField::new(FieldType::Phone, "home", "+15559876543"))
-        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Phone,
+        "home",
+        "+15559876543",
+        0,
+    ))
+    .unwrap();
     card.add_field(ContactField::new(
         FieldType::Email,
         "personal",
         "bob@mail.com",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Website,
         "blog",
         "https://bob.dev",
+        0,
     ))
     .unwrap();
-    card.add_field(ContactField::new(FieldType::Address, "home", "123 Main St"))
+    card.add_field(ContactField::new(
+        FieldType::Address,
+        "home",
+        "123 Main St",
+        0,
+    ))
+    .unwrap();
+    card.add_field(ContactField::new(FieldType::Social, "twitter", "@bob", 0))
         .unwrap();
-    card.add_field(ContactField::new(FieldType::Social, "twitter", "@bob"))
-        .unwrap();
-    card.add_field(ContactField::new(FieldType::Custom, "notes", "Some note"))
-        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Custom,
+        "notes",
+        "Some note",
+        0,
+    ))
+    .unwrap();
 
     let vcard = export_vcard(&card);
     assert!(vcard.contains("TEL;TYPE=home:+15559876543"));
@@ -71,8 +90,13 @@ fn test_export_all_field_types() {
 #[test]
 fn test_export_escaping() {
     let mut card = ContactCard::new("O'Brien, John");
-    card.add_field(ContactField::new(FieldType::Custom, "note", "line1\nline2"))
-        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Custom,
+        "note",
+        "line1\nline2",
+        0,
+    ))
+    .unwrap();
 
     let vcard = export_vcard(&card);
     assert!(vcard.contains("FN:O'Brien\\, John"));
@@ -161,18 +185,21 @@ fn test_roundtrip_export_import() {
         FieldType::Phone,
         "mobile",
         "+15551234567",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Email,
         "work",
         "test@example.com",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Website,
         "blog",
         "https://test.dev",
+        0,
     ))
     .unwrap();
 

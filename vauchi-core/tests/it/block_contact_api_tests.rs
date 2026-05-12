@@ -186,7 +186,12 @@ fn test_blocked_contact_update_rejected() {
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new("Bob Updated");
     new_card
-        .add_field(ContactField::new(FieldType::Email, "work", "bob@work.com"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "bob@work.com",
+            0,
+        ))
         .unwrap();
     let mut delta = CardDelta::compute(&old_card, &new_card);
     let alice_pk = alice.identity().unwrap().signing_public_key();
@@ -256,6 +261,7 @@ fn test_propagate_skips_blocked_contacts() {
             FieldType::Email,
             "work",
             "alice@company.com",
+            0,
         ))
         .unwrap();
     let new_card = alice.own_card().unwrap().unwrap();

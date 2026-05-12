@@ -31,6 +31,7 @@ fn test_sync_manager_workflow() {
             FieldType::Email,
             "email",
             "old@example.com",
+            0,
         ))
         .unwrap();
 
@@ -40,6 +41,7 @@ fn test_sync_manager_workflow() {
             FieldType::Email,
             "email",
             "new@example.com",
+            0,
         ))
         .unwrap();
 
@@ -132,6 +134,7 @@ fn test_field_modification_and_removal_propagation() {
             FieldType::Email,
             "work",
             "alice@company.com",
+            0,
         ))
         .unwrap();
 
@@ -154,6 +157,7 @@ fn test_field_modification_and_removal_propagation() {
             FieldType::Email,
             "work",
             "alice@company.com",
+            0,
         ))
         .unwrap();
         let old = card.clone();
@@ -179,7 +183,7 @@ fn test_field_modification_and_removal_propagation() {
     // Test 3: Field removal produces Removed delta
     {
         let mut old = ContactCard::new("Alice");
-        let field = ContactField::new(FieldType::Email, "work", "alice@company.com");
+        let field = ContactField::new(FieldType::Email, "work", "alice@company.com", 0);
         let field_id = field.id().to_string();
         old.add_field(field).unwrap();
 
@@ -241,6 +245,7 @@ fn test_field_modification_and_removal_propagation() {
                 FieldType::Email,
                 "work",
                 "alice@company.com",
+                0,
             ))
             .unwrap();
         let new_card = alice_wb.own_card().unwrap().unwrap();

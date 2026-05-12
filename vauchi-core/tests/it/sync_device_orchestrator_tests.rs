@@ -140,6 +140,7 @@ fn test_orchestrator_create_full_sync_payload() {
         FieldType::Email,
         "email",
         "alice@example.com",
+        0,
     ));
     storage.save_own_card(&own_card).unwrap();
 

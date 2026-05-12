@@ -21,9 +21,9 @@ use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 #[test]
 fn test_visible_fields_no_groups_mode() {
     let mut card = ContactCard::new("Alice");
-    let field1 = ContactField::new(FieldType::Email, "Work", "alice@example.com");
+    let field1 = ContactField::new(FieldType::Email, "Work", "alice@example.com", 0);
     let field1_id = field1.id().to_string();
-    let field2 = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
+    let field2 = ContactField::new(FieldType::Phone, "Mobile", "+1234567890", 0);
     let field2_id = field2.id().to_string();
     card.add_field(field1).unwrap();
     card.add_field(field2).unwrap();
@@ -43,7 +43,7 @@ fn test_visible_fields_no_groups_mode() {
 #[test]
 fn test_visible_fields_no_groups_mode_empty() {
     let mut card = ContactCard::new("Alice");
-    let field1 = ContactField::new(FieldType::Email, "Work", "alice@example.com");
+    let field1 = ContactField::new(FieldType::Email, "Work", "alice@example.com", 0);
     card.add_field(field1).unwrap();
 
     // No fields marked as shown
@@ -57,7 +57,7 @@ fn test_visible_fields_no_groups_mode_empty() {
 #[test]
 fn test_visible_fields_groups_mode() {
     let mut card = ContactCard::new("Alice");
-    let field1 = ContactField::new(FieldType::Email, "Work", "alice@example.com");
+    let field1 = ContactField::new(FieldType::Email, "Work", "alice@example.com", 0);
     let field1_id = field1.id().to_string();
     card.add_field(field1).unwrap();
     card.set_field_shown(&field1_id, true); // shown in no-group mode
@@ -81,7 +81,7 @@ fn test_visible_fields_groups_mode() {
 #[test]
 fn test_visible_fields_ungrouped_contact_in_groups_mode() {
     let mut card = ContactCard::new("Alice");
-    let field1 = ContactField::new(FieldType::Email, "Work", "alice@example.com");
+    let field1 = ContactField::new(FieldType::Email, "Work", "alice@example.com", 0);
     let field1_id = field1.id().to_string();
     card.add_field(field1).unwrap();
     card.set_field_shown(&field1_id, true);
@@ -101,9 +101,9 @@ fn test_visible_fields_ungrouped_contact_in_groups_mode() {
 #[test]
 fn test_visible_fields_groups_mode_ignores_field_visibility() {
     let mut card = ContactCard::new("Alice");
-    let field1 = ContactField::new(FieldType::Email, "Work", "alice@example.com");
+    let field1 = ContactField::new(FieldType::Email, "Work", "alice@example.com", 0);
     let field1_id = field1.id().to_string();
-    let field2 = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
+    let field2 = ContactField::new(FieldType::Phone, "Mobile", "+1234567890", 0);
     let field2_id = field2.id().to_string();
     card.add_field(field1).unwrap();
     card.add_field(field2).unwrap();
@@ -137,9 +137,9 @@ fn test_visible_fields_groups_mode_ignores_field_visibility() {
 #[test]
 fn test_visible_fields_groups_mode_with_per_contact_override() {
     let mut card = ContactCard::new("Alice");
-    let field1 = ContactField::new(FieldType::Email, "Work", "alice@example.com");
+    let field1 = ContactField::new(FieldType::Email, "Work", "alice@example.com", 0);
     let field1_id = field1.id().to_string();
-    let field2 = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
+    let field2 = ContactField::new(FieldType::Phone, "Mobile", "+1234567890", 0);
     let field2_id = field2.id().to_string();
     card.add_field(field1).unwrap();
     card.add_field(field2).unwrap();

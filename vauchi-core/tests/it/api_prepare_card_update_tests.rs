@@ -19,6 +19,7 @@ fn setup_with_card(name: &str) -> Vauchi {
         FieldType::Email,
         "Work",
         "alice@example.com",
+        0,
     ))
     .unwrap();
     wb

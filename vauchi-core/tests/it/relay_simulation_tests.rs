@@ -171,12 +171,22 @@ fn test_sync_manager_queue_for_relay() {
 
     let mut old_card = ContactCard::new("Alice");
     old_card
-        .add_field(ContactField::new(FieldType::Email, "work", "old@test.com"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "old@test.com",
+            0,
+        ))
         .unwrap();
 
     let mut new_card = ContactCard::new("Alice");
     new_card
-        .add_field(ContactField::new(FieldType::Email, "work", "new@test.com"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "new@test.com",
+            0,
+        ))
         .unwrap();
 
     // Queue for multiple contacts
@@ -311,6 +321,7 @@ fn test_full_update_propagation() {
             FieldType::Email,
             "work",
             "alice@company.com",
+            0,
         ))
         .unwrap();
     let new_card = alice_wb.own_card().unwrap().unwrap();

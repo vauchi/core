@@ -34,7 +34,7 @@ fn test_custom_field_special_characters_unicode() {
     ];
 
     for value in unicode_values {
-        let field = ContactField::new(FieldType::Custom, "Custom", value);
+        let field = ContactField::new(FieldType::Custom, "Custom", value, 0);
         let result = field.validate();
         assert!(
             result.is_ok(),
@@ -62,7 +62,7 @@ fn test_custom_field_special_characters_emoji() {
     ];
 
     for value in emoji_values {
-        let field = ContactField::new(FieldType::Custom, "Custom", value);
+        let field = ContactField::new(FieldType::Custom, "Custom", value, 0);
         let result = field.validate();
         assert!(
             result.is_ok(),
@@ -101,7 +101,7 @@ fn test_custom_field_special_characters_symbols() {
     ];
 
     for value in symbol_values {
-        let field = ContactField::new(FieldType::Custom, "Custom", value);
+        let field = ContactField::new(FieldType::Custom, "Custom", value, 0);
         let result = field.validate();
         assert!(
             result.is_ok(),
@@ -124,7 +124,7 @@ fn test_custom_field_mixed_scripts() {
     ];
 
     for value in mixed_values {
-        let field = ContactField::new(FieldType::Custom, "Custom", value);
+        let field = ContactField::new(FieldType::Custom, "Custom", value, 0);
         let result = field.validate();
         assert!(
             result.is_ok(),
@@ -141,12 +141,12 @@ fn test_custom_field_control_characters() {
 
     // Values with newlines and tabs (should be preserved)
     let multiline = "Line 1\nLine 2\nLine 3";
-    let field = ContactField::new(FieldType::Custom, "Custom", multiline);
+    let field = ContactField::new(FieldType::Custom, "Custom", multiline, 0);
     assert!(field.validate().is_ok(), "Multiline values should be valid");
     assert_eq!(field.value(), multiline, "Newlines should be preserved");
 
     let tabbed = "Col1\tCol2\tCol3";
-    let field = ContactField::new(FieldType::Custom, "Custom", tabbed);
+    let field = ContactField::new(FieldType::Custom, "Custom", tabbed, 0);
     assert!(field.validate().is_ok(), "Tabbed values should be valid");
 }
 
@@ -165,12 +165,12 @@ fn test_cross_field_dependencies_independent_validation() {
     let mut card = ContactCard::new("Test User");
 
     // Add multiple fields of different types
-    let phone = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
-    let email = ContactField::new(FieldType::Email, "Work", "test@example.com");
-    let social = ContactField::new(FieldType::Social, "Twitter", "@testuser");
-    let website = ContactField::new(FieldType::Website, "Blog", "https://example.com");
-    let address = ContactField::new(FieldType::Address, "Home", "123 Main St");
-    let custom = ContactField::new(FieldType::Custom, "Signal", "test.123");
+    let phone = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567", 0);
+    let email = ContactField::new(FieldType::Email, "Work", "test@example.com", 0);
+    let social = ContactField::new(FieldType::Social, "Twitter", "@testuser", 0);
+    let website = ContactField::new(FieldType::Website, "Blog", "https://example.com", 0);
+    let address = ContactField::new(FieldType::Address, "Home", "123 Main St", 0);
+    let custom = ContactField::new(FieldType::Custom, "Signal", "test.123", 0);
 
     // All should add successfully
     card.add_field(phone).expect("expected success");
@@ -191,11 +191,11 @@ fn test_cross_field_dependencies_validation_isolation() {
     let mut card = ContactCard::new("Test User");
 
     // Add a valid phone
-    let valid_phone = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
+    let valid_phone = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567", 0);
     card.add_field(valid_phone).expect("expected success");
 
     // Try to add an invalid email - should fail
-    let invalid_email = ContactField::new(FieldType::Email, "Work", "not-an-email");
+    let invalid_email = ContactField::new(FieldType::Email, "Work", "not-an-email", 0);
     let result = card.add_field(invalid_email);
     assert!(result.is_err(), "Invalid email should be rejected");
 
@@ -211,11 +211,11 @@ fn test_cross_field_dependencies_update_isolation() {
 
     let mut card = ContactCard::new("Test User");
 
-    let phone = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567");
+    let phone = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567", 0);
     let phone_id = phone.id().to_string();
     card.add_field(phone).unwrap();
 
-    let email = ContactField::new(FieldType::Email, "Work", "test@example.com");
+    let email = ContactField::new(FieldType::Email, "Work", "test@example.com", 0);
     let email_id = email.id().to_string();
     card.add_field(email).unwrap();
 
@@ -244,7 +244,7 @@ fn test_max_field_length_enforcement_at_limit() {
 
     // Value exactly at max length should be valid
     let max_value = "a".repeat(MAX_VALUE_LENGTH);
-    let field = ContactField::new(FieldType::Custom, "Custom", &max_value);
+    let field = ContactField::new(FieldType::Custom, "Custom", &max_value, 0);
     assert!(
         field.validate().is_ok(),
         "Value at max length ({}) should be valid",
@@ -259,7 +259,7 @@ fn test_max_field_length_enforcement_over_limit() {
 
     // Value over max length should be rejected
     let over_max = "a".repeat(MAX_VALUE_LENGTH + 1);
-    let field = ContactField::new(FieldType::Custom, "Custom", &over_max);
+    let field = ContactField::new(FieldType::Custom, "Custom", &over_max, 0);
     let result = field.validate();
 
     assert!(result.is_err(), "Value over max length should be rejected");
@@ -281,7 +281,7 @@ fn test_max_field_length_enforcement_unicode_chars() {
     let char_count = MAX_VALUE_LENGTH / 3;
     let max_unicode = unicode_char.repeat(char_count);
 
-    let field = ContactField::new(FieldType::Custom, "Custom", &max_unicode);
+    let field = ContactField::new(FieldType::Custom, "Custom", &max_unicode, 0);
     let result = field.validate();
     // Should be valid since byte length is at or under limit
     assert!(
@@ -300,7 +300,7 @@ fn test_max_field_length_enforcement_emoji() {
     let emoji_count = MAX_VALUE_LENGTH / 4;
     let emoji_value = emoji.repeat(emoji_count);
 
-    let field = ContactField::new(FieldType::Custom, "Custom", &emoji_value);
+    let field = ContactField::new(FieldType::Custom, "Custom", &emoji_value, 0);
     let result = field.validate();
     assert!(
         result.is_ok(),
@@ -326,7 +326,7 @@ fn test_max_field_length_enforcement_per_field_type() {
     ];
 
     for (field_type, label) in field_types {
-        let field = ContactField::new(field_type.clone(), label, &over_max);
+        let field = ContactField::new(field_type.clone(), label, &over_max, 0);
         let result = field.validate();
         assert!(
             result.is_err(),
@@ -353,7 +353,7 @@ fn test_max_field_length_card_rejects_overlong() {
 
     // Try to add a field with over-length value
     let over_max = "a".repeat(MAX_VALUE_LENGTH + 1);
-    let field = ContactField::new(FieldType::Custom, "Custom", &over_max);
+    let field = ContactField::new(FieldType::Custom, "Custom", &over_max, 0);
 
     let result = card.add_field(field);
     assert!(
@@ -370,7 +370,7 @@ fn test_max_field_length_update_rejects_overlong() {
     let mut card = ContactCard::new("Test User");
 
     // Add a valid field
-    let field = ContactField::new(FieldType::Custom, "Custom", "valid value");
+    let field = ContactField::new(FieldType::Custom, "Custom", "valid value", 0);
     let field_id = field.id().to_string();
     card.add_field(field).unwrap();
 

@@ -21,6 +21,7 @@ fn create_numbered_contact(n: usize) -> Contact {
         FieldType::Email,
         "Work",
         &format!("contact{}@example.com", n),
+        0,
     ))
     .unwrap();
     // Use a deterministic "public key" derived from the number

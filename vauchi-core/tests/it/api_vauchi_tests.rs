@@ -58,6 +58,7 @@ fn test_vauchi_update_own_card() {
         FieldType::Email,
         "email",
         "alice@example.com",
+        0,
     ));
 
     let changed = wb.update_own_card(&card).unwrap();
@@ -73,7 +74,7 @@ fn test_vauchi_add_own_field() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    let field = ContactField::new(FieldType::Phone, "phone", "+1234567890");
+    let field = ContactField::new(FieldType::Phone, "phone", "+1234567890", 0);
     wb.add_own_field(field).unwrap();
 
     let card = wb.own_card().unwrap().unwrap();
@@ -87,7 +88,7 @@ fn test_vauchi_remove_own_field() {
     wb.create_identity("Alice").unwrap();
 
     // Add field
-    let field = ContactField::new(FieldType::Phone, "phone", "+1234567890");
+    let field = ContactField::new(FieldType::Phone, "phone", "+1234567890", 0);
     wb.add_own_field(field).unwrap();
 
     // Remove field
@@ -287,6 +288,7 @@ fn test_propagate_card_update_to_contacts() {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ));
 
     // Propagate update
@@ -317,6 +319,7 @@ fn test_propagate_skips_contacts_without_ratchet() {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ));
 
     // Propagate - should skip Bob (no ratchet)
@@ -363,7 +366,7 @@ fn test_propagate_respects_visibility_rules() {
     wb.create_identity("Alice").unwrap();
 
     // Create the email field first to get its ID
-    let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com");
+    let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com", 0);
     let email_field_id = email_field.id().to_string();
 
     // Create a contact with ratchet
@@ -408,9 +411,9 @@ fn test_propagate_partial_visibility() {
     wb.create_identity("Alice").unwrap();
 
     // Create fields first to get their IDs
-    let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com");
+    let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com", 0);
     let email_field_id = email_field.id().to_string();
-    let phone_field = ContactField::new(FieldType::Phone, "phone", "+1234567890");
+    let phone_field = ContactField::new(FieldType::Phone, "phone", "+1234567890", 0);
 
     // Create a contact with ratchet
     let mut contact =
@@ -493,6 +496,7 @@ fn test_process_incoming_card_update() {
         FieldType::Email,
         "work",
         "bob@company.com",
+        0,
     ));
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
@@ -692,6 +696,7 @@ fn test_process_update_rejects_invalid_signature() {
         FieldType::Email,
         "work",
         "bob@company.com",
+        0,
     ));
 
     let mut delta = CardDelta::compute(&old_card, &new_card);

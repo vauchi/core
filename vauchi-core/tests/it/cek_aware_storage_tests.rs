@@ -25,6 +25,7 @@ fn make_contact(name: &str) -> Contact {
         FieldType::Email,
         "email",
         "test@example.com",
+        0,
     ))
     .unwrap();
     let pk = [0x42u8; 32];

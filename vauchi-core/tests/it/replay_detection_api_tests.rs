@@ -60,7 +60,7 @@ fn create_encrypted_update(
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new(display_name);
     new_card
-        .add_field(ContactField::new(FieldType::Email, "work", email))
+        .add_field(ContactField::new(FieldType::Email, "work", email, 0))
         .unwrap();
 
     let mut delta = CardDelta::compute(&old_card, &new_card);
@@ -114,7 +114,7 @@ fn test_replay_rejects_reused_nonce_different_encryption() {
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new("Bob V2");
     new_card
-        .add_field(ContactField::new(FieldType::Email, "work", "bob@v2.com"))
+        .add_field(ContactField::new(FieldType::Email, "work", "bob@v2.com", 0))
         .unwrap();
     let mut delta = CardDelta::compute(&old_card, &new_card);
     delta.sign(&bob_identity, alice_pk);
@@ -139,7 +139,7 @@ fn test_replay_rejects_reused_nonce_different_encryption() {
     // Create a second delta with the SAME nonce (simulating replay with fresh ratchet encryption)
     let mut new_card2 = ContactCard::new("Bob V3");
     new_card2
-        .add_field(ContactField::new(FieldType::Email, "work", "bob@v3.com"))
+        .add_field(ContactField::new(FieldType::Email, "work", "bob@v3.com", 0))
         .unwrap();
     let mut delta2 = CardDelta::compute(&old_card, &new_card2);
     delta2.sign(&bob_identity, alice_pk);

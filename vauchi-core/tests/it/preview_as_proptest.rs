@@ -35,6 +35,7 @@ fn add_own_fields(vauchi: &Vauchi, field_count: usize) -> Vec<String> {
             FieldType::Email,
             &format!("field_{}", i),
             &format!("user{}@example.com", i),
+            0,
         );
         let fid = field.id().to_string();
         vauchi.add_own_field(field).unwrap();

@@ -20,7 +20,7 @@ fn make_contact(name: &str, fields: &[(FieldType, &str, &str)]) -> Contact {
         .as_bytes();
     let mut card = ContactCard::new(name);
     for (ft, label, value) in fields {
-        card.add_field(ContactField::new(ft.clone(), label, value))
+        card.add_field(ContactField::new(ft.clone(), label, value, 0))
             .unwrap();
     }
     Contact::from_exchange(pk, card, SymmetricKey::generate())

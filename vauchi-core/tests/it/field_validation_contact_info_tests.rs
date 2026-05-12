@@ -29,7 +29,7 @@ fn test_phone_international_format_e164_valid() {
     ];
 
     for number in valid_e164_numbers {
-        let field = ContactField::new(FieldType::Phone, "Mobile", number);
+        let field = ContactField::new(FieldType::Phone, "Mobile", number, 0);
         let result = field.validate();
         // E.164 numbers with + and digits should pass current validation
         if number.chars().filter(|c| c.is_ascii_digit()).count() >= 7 {
@@ -54,7 +54,7 @@ fn test_phone_international_format_with_formatting() {
     ];
 
     for (number, expected_valid) in formatted_numbers {
-        let field = ContactField::new(FieldType::Phone, "Mobile", number);
+        let field = ContactField::new(FieldType::Phone, "Mobile", number, 0);
         let result = field.validate();
         assert_eq!(
             result.is_ok(),
@@ -80,7 +80,7 @@ fn test_phone_international_format_invalid() {
     ];
 
     for (number, reason) in invalid_numbers {
-        let field = ContactField::new(FieldType::Phone, "Mobile", number);
+        let field = ContactField::new(FieldType::Phone, "Mobile", number, 0);
         let result = field.validate();
         assert!(
             result.is_err(),
@@ -107,12 +107,12 @@ fn test_phone_e164_max_length() {
 
     // E.164 allows max 15 digits (not counting +)
     let max_length = "+123456789012345"; // 15 digits
-    let field = ContactField::new(FieldType::Phone, "Mobile", max_length);
+    let field = ContactField::new(FieldType::Phone, "Mobile", max_length, 0);
     assert!(field.validate().is_ok(), "Max E.164 length should be valid");
 
     // Over 15 digits is technically invalid E.164, but current impl allows it
     let over_max = "+1234567890123456"; // 16 digits
-    let field = ContactField::new(FieldType::Phone, "Mobile", over_max);
+    let field = ContactField::new(FieldType::Phone, "Mobile", over_max, 0);
     // Current implementation allows this - testing current behavior
     assert!(
         field.validate().is_ok(),
@@ -147,7 +147,7 @@ fn test_email_rfc5322_basic_valid() {
     ];
 
     for email in valid_emails {
-        let field = ContactField::new(FieldType::Email, "Work", email);
+        let field = ContactField::new(FieldType::Email, "Work", email, 0);
         let result = field.validate();
         // Some edge cases may fail with basic validation
         if result.is_err() && email.contains('[') {
@@ -187,7 +187,7 @@ fn test_email_rfc5322_invalid() {
     ];
 
     for (email, reason) in invalid_emails {
-        let field = ContactField::new(FieldType::Email, "Work", email);
+        let field = ContactField::new(FieldType::Email, "Work", email, 0);
         let result = field.validate();
         // Most of these should fail, but some edge cases may pass basic validation
         if email.is_empty() || email == "@" || !email.contains('@') {
@@ -208,7 +208,7 @@ fn test_email_local_part_length() {
 
     // RFC5322 allows up to 64 characters in local part
     let max_local = format!("{}@example.com", "a".repeat(64));
-    let field = ContactField::new(FieldType::Email, "Work", &max_local);
+    let field = ContactField::new(FieldType::Email, "Work", &max_local, 0);
     assert!(
         field.validate().is_ok(),
         "64-char local part should be valid"
@@ -216,7 +216,7 @@ fn test_email_local_part_length() {
 
     // Over 64 characters in local part - testing current behavior
     let over_max_local = format!("{}@example.com", "a".repeat(65));
-    let field = ContactField::new(FieldType::Email, "Work", &over_max_local);
+    let field = ContactField::new(FieldType::Email, "Work", &over_max_local, 0);
     // Current implementation may allow this
     let _ = field.validate(); // Just exercising the code path
 }
@@ -228,7 +228,7 @@ fn test_email_domain_part_length() {
 
     // RFC5322 allows up to 255 characters in domain
     let max_domain = format!("user@{}.com", "a".repeat(250));
-    let field = ContactField::new(FieldType::Email, "Work", &max_domain);
+    let field = ContactField::new(FieldType::Email, "Work", &max_domain, 0);
     assert!(field.validate().is_ok(), "Long domain should be valid");
 }
 
@@ -245,7 +245,7 @@ fn test_email_internationalized_domain() {
     ];
 
     for email in idn_emails {
-        let field = ContactField::new(FieldType::Email, "Work", email);
+        let field = ContactField::new(FieldType::Email, "Work", email, 0);
         let result = field.validate();
         let _ = result;
     }

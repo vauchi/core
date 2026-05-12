@@ -132,7 +132,7 @@ fn entry_detail_delete_returns_show_toast_with_undo() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
     // Add a field to delete
-    let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
+    let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890", 0);
     let field_id = field.id().to_string();
     let mut card = vauchi
         .own_card()
@@ -172,7 +172,7 @@ fn entry_detail_delete_returns_show_toast_with_undo() {
 fn entry_detail_delete_undo_restores_field() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-    let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
+    let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890", 0);
     let field_id = field.id().to_string();
     let mut card = vauchi
         .own_card()

@@ -128,7 +128,12 @@ fn test_receive_routes_via_mailbox_token_fast_path() {
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new("Bob");
     new_card
-        .add_field(ContactField::new(FieldType::Email, "Email", "bob@a.test"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "bob@a.test",
+            0,
+        ))
         .unwrap();
     let ciphertext = encrypt_update(
         &bob,
@@ -182,7 +187,12 @@ fn test_receive_drops_blob_when_token_missing() {
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new("Bob");
     new_card
-        .add_field(ContactField::new(FieldType::Email, "Email", "bob@b.test"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "bob@b.test",
+            0,
+        ))
         .unwrap();
     let ciphertext = encrypt_update(
         &bob,
@@ -259,7 +269,12 @@ fn test_receive_drops_blob_when_token_unknown() {
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new("Bob");
     new_card
-        .add_field(ContactField::new(FieldType::Email, "Email", "bob@c.test"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "bob@c.test",
+            0,
+        ))
         .unwrap();
     let ciphertext = encrypt_update(
         &bob,
@@ -374,6 +389,7 @@ fn test_receive_fast_path_handles_all_in_spec_input() {
                 FieldType::Email,
                 "Email",
                 &format!("{}@bulk.test", labels[i].to_lowercase()),
+                0,
             ))
             .unwrap();
         let ciphertext =
@@ -442,6 +458,7 @@ fn test_receive_rejects_replayed_blob() {
             FieldType::Email,
             "Email",
             "bob@replay.test",
+            0,
         ))
         .unwrap();
     let ciphertext = encrypt_update(
@@ -550,6 +567,7 @@ fn test_receive_mixed_batch_preserves_order() {
             FieldType::Email,
             "Email",
             "bob@mixed.test",
+            0,
         ))
         .unwrap();
     let bob_ct = encrypt_update(
@@ -571,6 +589,7 @@ fn test_receive_mixed_batch_preserves_order() {
             FieldType::Email,
             "Email",
             "charlie@mixed.test",
+            0,
         ))
         .unwrap();
     let charlie_ct = encrypt_update(

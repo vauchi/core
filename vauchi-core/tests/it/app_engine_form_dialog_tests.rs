@@ -295,6 +295,7 @@ fn form_dialog_edit_field_saves_value() {
         vauchi_core::contact_card::FieldType::Phone,
         "Phone",
         "+41 79 000 00 00",
+        0,
     );
     let field_id = field.id().to_string();
     vauchi.add_own_field(field).unwrap();
@@ -680,6 +681,7 @@ fn form_dialog_edit_field_with_note_persists_note() {
         FieldType::Phone,
         "Mobile",
         "+41 79 000 00 00",
+        0,
     );
     let field_id = field.id().to_string();
     vauchi.add_own_field(field).unwrap();

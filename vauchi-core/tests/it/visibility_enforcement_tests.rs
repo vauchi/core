@@ -97,6 +97,7 @@ fn test_new_field_propagated_to_all_contacts_by_default() {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ));
 
     let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
@@ -118,7 +119,7 @@ fn test_contacts_variant_enforced_at_propagation() {
     let wb = create_test_vauchi();
 
     // Create the field first to get its ID
-    let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com");
+    let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com", 0);
     let email_id = email_field.id().to_string();
 
     // Add Bob (will be in the allowed set) and Carol (will not be)
@@ -192,7 +193,7 @@ fn test_display_name_change_passes_through_nobody_rules() {
 fn test_display_name_propagated_alongside_hidden_field() {
     let wb = create_test_vauchi();
 
-    let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com");
+    let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com", 0);
     let email_id = email_field.id().to_string();
 
     // Bob's visibility rules: email hidden (Nobody)
@@ -221,7 +222,7 @@ fn test_display_name_propagated_alongside_hidden_field() {
 // @scenario: visibility_control :: New fields default to visible to all contacts
 #[test]
 fn test_remove_rule_reverts_to_everyone_at_delta_level() {
-    let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com");
+    let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com", 0);
     let email_id = email_field.id().to_string();
 
     let old = ContactCard::new("Alice");
@@ -262,7 +263,7 @@ fn test_remove_rule_reverts_to_everyone_at_delta_level() {
 // @scenario: visibility_control :: Make a field private (visible to none)
 #[test]
 fn test_nobody_excludes_from_all_contacts() {
-    let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com");
+    let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com", 0);
     let email_id = email_field.id().to_string();
 
     let old = ContactCard::new("Alice");
@@ -294,9 +295,9 @@ fn test_nobody_excludes_from_all_contacts() {
 fn test_mixed_visibility_propagation() {
     let wb = create_test_vauchi();
 
-    let email_field = ContactField::new(FieldType::Email, "work", "alice@company.com");
+    let email_field = ContactField::new(FieldType::Email, "work", "alice@company.com", 0);
     let email_id = email_field.id().to_string();
-    let phone_field = ContactField::new(FieldType::Phone, "personal", "+1234567890");
+    let phone_field = ContactField::new(FieldType::Phone, "personal", "+1234567890", 0);
     let phone_id = phone_field.id().to_string();
 
     // Bob: email hidden, phone visible (default)

@@ -25,12 +25,14 @@ fn setup_vauchi_with_data() -> Vauchi {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ))
     .unwrap();
     v.add_own_field(ContactField::new(
         FieldType::Phone,
         "mobile",
         "+15559876543",
+        0,
     ))
     .unwrap();
 

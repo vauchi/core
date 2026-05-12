@@ -21,10 +21,16 @@ mod visibility_integration_tests {
             FieldType::Email,
             "Email",
             "test@example.com",
+            0,
         ))
         .unwrap();
-        card.add_field(ContactField::new(FieldType::Phone, "Phone", "+1234567890"))
-            .unwrap();
+        card.add_field(ContactField::new(
+            FieldType::Phone,
+            "Phone",
+            "+1234567890",
+            0,
+        ))
+        .unwrap();
         card
     }
 

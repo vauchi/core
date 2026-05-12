@@ -64,7 +64,7 @@ fn test_birthday_field_iso8601_valid_date() {
     // RED: Can't create Birthday field with ISO 8601 date yet
     use vauchi_core::contact_card::ContactField;
 
-    let field = ContactField::new(FieldType::Birthday, "Birthday", "1995-03-15");
+    let field = ContactField::new(FieldType::Birthday, "Birthday", "1995-03-15", 0);
     field.validate().expect("Valid ISO 8601 date should pass");
 }
 
@@ -74,7 +74,7 @@ fn test_birthday_field_iso8601_invalid_date_format() {
     // RED: Birthday validation should reject non-ISO 8601 formats
     use vauchi_core::contact_card::ContactField;
 
-    let field = ContactField::new(FieldType::Birthday, "Birthday", "03/15/1995");
+    let field = ContactField::new(FieldType::Birthday, "Birthday", "03/15/1995", 0);
 
     // Should reject non-ISO 8601 format
     field.validate().expect_err("expected error");
@@ -86,7 +86,7 @@ fn test_birthday_field_iso8601_invalid_date_value() {
     // RED: Birthday validation should reject impossible dates
     use vauchi_core::contact_card::ContactField;
 
-    let field = ContactField::new(FieldType::Birthday, "Birthday", "2025-13-45");
+    let field = ContactField::new(FieldType::Birthday, "Birthday", "2025-13-45", 0);
 
     // Should reject invalid date components
     field.validate().expect_err("expected error");
@@ -100,12 +100,12 @@ fn test_contact_card_single_birthday_constraint() {
 
     // Add first birthday
     use vauchi_core::contact_card::ContactField;
-    let birthday1 = ContactField::new(FieldType::Birthday, "Birthday", "1995-03-15");
+    let birthday1 = ContactField::new(FieldType::Birthday, "Birthday", "1995-03-15", 0);
     card.add_field(birthday1)
         .expect("Should add first birthday");
 
     // Try to add second birthday — should fail
-    let birthday2 = ContactField::new(FieldType::Birthday, "Birthday", "1990-01-01");
+    let birthday2 = ContactField::new(FieldType::Birthday, "Birthday", "1990-01-01", 0);
     let result = card.add_field(birthday2);
 
     // Should reject second birthday
@@ -119,7 +119,7 @@ fn test_birthday_field_leap_year_valid() {
     // RED: Birthday should validate leap year dates
     use vauchi_core::contact_card::ContactField;
 
-    let field = ContactField::new(FieldType::Birthday, "Birthday", "2000-02-29");
+    let field = ContactField::new(FieldType::Birthday, "Birthday", "2000-02-29", 0);
     field.validate().expect("Leap year date should be valid");
 }
 
@@ -129,7 +129,7 @@ fn test_birthday_field_leap_year_invalid() {
     // RED: Birthday should reject invalid leap year dates
     use vauchi_core::contact_card::ContactField;
 
-    let field = ContactField::new(FieldType::Birthday, "Birthday", "1900-02-29");
+    let field = ContactField::new(FieldType::Birthday, "Birthday", "1900-02-29", 0);
 
     // 1900 is not a leap year
     field.validate().expect_err("expected error");

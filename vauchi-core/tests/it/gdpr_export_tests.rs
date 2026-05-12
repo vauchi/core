@@ -24,6 +24,7 @@ fn setup_storage_with_contacts() -> Storage {
         FieldType::Email,
         "Work",
         "test@example.com",
+        0,
     ))
     .unwrap();
     let shared_key = SymmetricKey::generate();
@@ -33,7 +34,12 @@ fn setup_storage_with_contacts() -> Storage {
     // Save own card
     let mut own_card = ContactCard::new("My Name");
     own_card
-        .add_field(ContactField::new(FieldType::Phone, "Mobile", "+1-555-0100"))
+        .add_field(ContactField::new(
+            FieldType::Phone,
+            "Mobile",
+            "+1-555-0100",
+            0,
+        ))
         .unwrap();
     storage.save_own_card(&own_card).unwrap();
 

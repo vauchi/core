@@ -34,6 +34,7 @@ fn test_sync_update_propagation_happy_path() {
             FieldType::Email,
             "work",
             "alice@old-company.com",
+            0,
         ))
         .unwrap();
 
@@ -77,6 +78,7 @@ fn test_sync_update_propagation_happy_path() {
             FieldType::Phone,
             "mobile",
             "+15559999999",
+            0,
         ))
         .unwrap();
 
@@ -133,12 +135,22 @@ fn test_sync_manager_queue_happy_path() {
 
     let mut old_card = ContactCard::new("Alice");
     old_card
-        .add_field(ContactField::new(FieldType::Email, "work", "alice@old.com"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "alice@old.com",
+            0,
+        ))
         .unwrap();
 
     let mut new_card = ContactCard::new("Alice");
     new_card
-        .add_field(ContactField::new(FieldType::Email, "work", "alice@new.com"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "alice@new.com",
+            0,
+        ))
         .unwrap();
 
     // Queue update for offline contact
@@ -192,6 +204,7 @@ fn test_full_three_user_workflow() {
             FieldType::Email,
             "work",
             "alice@company.com",
+            0,
         ))
         .unwrap();
     alice_wb
@@ -199,16 +212,23 @@ fn test_full_three_user_workflow() {
             FieldType::Email,
             "personal",
             "alice@home.com",
+            0,
         ))
         .unwrap();
     alice_wb
-        .add_own_field(ContactField::new(FieldType::Phone, "work", "+15551111111"))
+        .add_own_field(ContactField::new(
+            FieldType::Phone,
+            "work",
+            "+15551111111",
+            0,
+        ))
         .unwrap();
     alice_wb
         .add_own_field(ContactField::new(
             FieldType::Phone,
             "personal",
             "+15552222222",
+            0,
         ))
         .unwrap();
 

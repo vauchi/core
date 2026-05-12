@@ -33,6 +33,7 @@ fn test_card_at_max_fields_rejects_addition() {
             FieldType::Custom,
             &format!("field{}", i),
             &format!("value{}", i),
+            0,
         ));
         assert!(result.is_ok(), "Should allow adding field {}", i);
     }
@@ -40,7 +41,7 @@ fn test_card_at_max_fields_rejects_addition() {
     assert_eq!(card.fields().len(), MAX_FIELDS);
 
     // Try to add one more - should fail
-    let result = card.add_field(ContactField::new(FieldType::Custom, "extra", "value"));
+    let result = card.add_field(ContactField::new(FieldType::Custom, "extra", "value", 0));
     assert!(result.is_err(), "Should reject field beyond limit");
 }
 
@@ -56,6 +57,7 @@ fn test_card_at_max_fields_allows_modification() {
             FieldType::Custom,
             &format!("field{}", i),
             &format!("value{}", i),
+            0,
         ))
         .unwrap();
     }
@@ -78,6 +80,7 @@ fn test_card_at_max_fields_allows_removal() {
             FieldType::Custom,
             &format!("field{}", i),
             &format!("value{}", i),
+            0,
         ))
         .unwrap();
     }
@@ -89,7 +92,7 @@ fn test_card_at_max_fields_allows_removal() {
     assert_eq!(card.fields().len(), MAX_FIELDS - 1);
 
     // Now can add another field
-    let result = card.add_field(ContactField::new(FieldType::Custom, "new", "value"));
+    let result = card.add_field(ContactField::new(FieldType::Custom, "new", "value", 0));
     assert!(result.is_ok(), "Should allow adding after removal");
 }
 
@@ -122,6 +125,7 @@ fn test_field_with_emoji_roundtrip() {
         FieldType::Custom,
         "emoji",
         "Hello 👋 World 🌍",
+        0,
     ))
     .unwrap();
 
@@ -152,6 +156,7 @@ fn test_field_with_rtl_text() {
         FieldType::Custom,
         "greeting",
         "שלום עולם", // Hebrew "Hello World"
+        0,
     ))
     .unwrap();
 
@@ -182,18 +187,21 @@ fn test_field_with_various_unicode() {
         FieldType::Custom,
         "chinese",
         "你好世界", // Chinese
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Custom,
         "japanese",
         "こんにちは世界", // Japanese
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Custom,
         "korean",
         "안녕하세요 세계", // Korean
+        0,
     ))
     .unwrap();
 
@@ -211,7 +219,7 @@ fn test_field_with_various_unicode() {
 fn test_empty_string_field_value() {
     // allow(zero_assertions): Both Ok and Err are valid — testing no-panic only
     let mut card = ContactCard::new("Test");
-    let result = card.add_field(ContactField::new(FieldType::Custom, "empty", ""));
+    let result = card.add_field(ContactField::new(FieldType::Custom, "empty", "", 0));
     let _ = result;
 }
 
@@ -244,12 +252,14 @@ fn test_delta_with_many_fields() {
             FieldType::Custom,
             &format!("field{}", i),
             &format!("old_value{}", i),
+            0,
         ))
         .unwrap();
         new.add_field(ContactField::new(
             FieldType::Custom,
             &format!("field{}", i),
             &format!("new_value{}", i),
+            0,
         ))
         .unwrap();
     }
@@ -265,12 +275,22 @@ fn test_delta_with_many_fields() {
 #[test]
 fn test_delta_apply_preserves_display_name() {
     let mut old = ContactCard::new("Preserved Name");
-    old.add_field(ContactField::new(FieldType::Email, "work", "old@test.com"))
-        .unwrap();
+    old.add_field(ContactField::new(
+        FieldType::Email,
+        "work",
+        "old@test.com",
+        0,
+    ))
+    .unwrap();
 
     let mut new = ContactCard::new("Preserved Name");
-    new.add_field(ContactField::new(FieldType::Email, "work", "new@test.com"))
-        .unwrap();
+    new.add_field(ContactField::new(
+        FieldType::Email,
+        "work",
+        "new@test.com",
+        0,
+    ))
+    .unwrap();
 
     // Need to use same field ID for modification detection
     let mut target = old.clone();
@@ -524,6 +544,7 @@ fn test_saving_contact_twice_updates() {
         FieldType::Email,
         "work",
         "original@test.com",
+        0,
     ))
     .unwrap();
 

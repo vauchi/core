@@ -21,6 +21,7 @@ fn create_test_contact(name: &str) -> Contact {
         FieldType::Email,
         "email",
         &format!("{}@example.com", name.to_lowercase()),
+        0,
     ));
     let shared_key = SymmetricKey::generate();
     Contact::from_exchange(public_key, card, shared_key)
@@ -99,7 +100,12 @@ fn test_storage_save_load_own_card() {
     let storage = create_test_storage();
 
     let mut card = ContactCard::new("My Card");
-    let _ = card.add_field(ContactField::new(FieldType::Phone, "mobile", "+1234567890"));
+    let _ = card.add_field(ContactField::new(
+        FieldType::Phone,
+        "mobile",
+        "+1234567890",
+        0,
+    ));
 
     storage.save_own_card(&card).unwrap();
 

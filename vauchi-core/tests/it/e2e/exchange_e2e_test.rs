@@ -36,6 +36,7 @@ fn test_contact_exchange_happy_path() {
             FieldType::Email,
             "work",
             "alice@company.com",
+            0,
         ))
         .unwrap();
     alice_wb
@@ -43,6 +44,7 @@ fn test_contact_exchange_happy_path() {
             FieldType::Phone,
             "mobile",
             "+15551234567",
+            0,
         ))
         .unwrap();
 
@@ -52,6 +54,7 @@ fn test_contact_exchange_happy_path() {
             FieldType::Email,
             "personal",
             "bob@email.com",
+            0,
         ))
         .unwrap();
 

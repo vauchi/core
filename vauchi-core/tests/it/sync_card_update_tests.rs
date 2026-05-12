@@ -147,7 +147,12 @@ fn test_process_single_valid_update() {
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new("Bob");
     new_card
-        .add_field(ContactField::new(FieldType::Email, "Email", "bob@test.com"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "bob@test.com",
+            0,
+        ))
         .unwrap();
 
     let ciphertext = create_valid_update(
@@ -370,7 +375,12 @@ fn test_signature_invalid_rejected() {
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new("Bob");
     new_card
-        .add_field(ContactField::new(FieldType::Email, "Work", "bob@work.com"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Work",
+            "bob@work.com",
+            0,
+        ))
         .unwrap();
 
     let bob_identity = bob_wb.identity().unwrap();
@@ -429,7 +439,12 @@ fn test_replay_detected() {
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new("Bob");
     new_card
-        .add_field(ContactField::new(FieldType::Phone, "Phone", "+1234567890"))
+        .add_field(ContactField::new(
+            FieldType::Phone,
+            "Phone",
+            "+1234567890",
+            0,
+        ))
         .unwrap();
 
     // Create and process the first update
@@ -468,6 +483,7 @@ fn test_replay_detected() {
             FieldType::Email,
             "Email2",
             "bob2@test.com",
+            0,
         ))
         .unwrap();
 
@@ -528,6 +544,7 @@ fn test_batch_partial_failure() {
             FieldType::Email,
             "Email",
             "bob@batch.com",
+            0,
         ))
         .unwrap();
 
@@ -667,6 +684,7 @@ fn test_process_card_update_resolves_anonymous_sender_id() {
             FieldType::Email,
             "Email",
             "bob@anon.test",
+            0,
         ))
         .unwrap();
 
@@ -745,10 +763,20 @@ fn test_field_note_cleaned_on_inbound_field_removed() {
     // Alice has a private note on both fields.
     let mut old_card = ContactCard::new("Bob");
     old_card
-        .add_field(ContactField::new(FieldType::Email, "Email", "bob@test.com"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "bob@test.com",
+            0,
+        ))
         .unwrap();
     old_card
-        .add_field(ContactField::new(FieldType::Phone, "Phone", "+41791234567"))
+        .add_field(ContactField::new(
+            FieldType::Phone,
+            "Phone",
+            "+41791234567",
+            0,
+        ))
         .unwrap();
     let removed_field_id = old_card.fields()[0].id().to_string();
     let retained_field_id = old_card.fields()[1].id().to_string();
@@ -790,7 +818,12 @@ fn test_field_note_cleaned_on_inbound_field_removed() {
     // Bob sends an update that removes only the email field; phone stays.
     let mut new_card = ContactCard::new("Bob");
     new_card
-        .add_field(ContactField::new(FieldType::Phone, "Phone", "+41791234567"))
+        .add_field(ContactField::new(
+            FieldType::Phone,
+            "Phone",
+            "+41791234567",
+            0,
+        ))
         .unwrap();
     // Give new_card the same field_id for Phone so the delta only shows Email removed.
     // Since field_id is random, we must copy the retained field from old_card directly.

@@ -102,6 +102,7 @@ mod tests {
             FieldType::Email,
             "email",
             "alice@example.com",
+            crate::clock::ambient_now_secs(),
         ))
         .expect("add field");
 
@@ -120,6 +121,7 @@ mod tests {
             FieldType::Email,
             "email",
             "bob@example.com",
+            crate::clock::ambient_now_secs(),
         ))
         .expect("add field");
 

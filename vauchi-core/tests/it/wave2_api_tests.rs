@@ -40,7 +40,8 @@ fn create_test_contact_with_fields(
 ) -> Contact {
     let mut card = ContactCard::new(name);
     for (ft, label, value) in fields {
-        card.add_field(ContactField::new(ft, label, value)).unwrap();
+        card.add_field(ContactField::new(ft, label, value, 0))
+            .unwrap();
     }
     let shared_key = SymmetricKey::generate();
     Contact::from_exchange(pk, card, shared_key)
@@ -281,6 +282,7 @@ fn test_setup_progress_after_adding_field() {
         FieldType::Email,
         "email",
         "alice@example.com",
+        0,
     ))
     .unwrap();
 
@@ -319,6 +321,7 @@ fn test_setup_progress_completion_fraction() {
         FieldType::Email,
         "email",
         "alice@example.com",
+        0,
     ))
     .unwrap();
 
@@ -441,6 +444,7 @@ fn test_perform_emergency_wipe_clears_own_card() {
         FieldType::Email,
         "email",
         "alice@example.com",
+        0,
     ))
     .unwrap();
 

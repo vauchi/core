@@ -327,7 +327,12 @@ fn parse_single_vcard(block: &str) -> Option<(ContactCard, Option<String>)> {
     }
 
     for (field_type, label, value) in fields {
-        let field = ContactField::new(field_type.clone(), &label, &value);
+        let field = ContactField::new(
+            field_type.clone(),
+            &label,
+            &value,
+            crate::clock::ambient_now_secs(),
+        );
         if let Err(e) = card.add_field(field) {
             // ADR-042-shape lenient import: keep the contact, drop only
             // the failing field — but surface the failure so operators

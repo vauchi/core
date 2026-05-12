@@ -22,7 +22,7 @@ fn test_transition_to_no_group_mode() {
     let wb = create_vauchi_with_identity("Alice");
 
     // Add a field to own card
-    let field = ContactField::new(FieldType::Email, "Email", "alice@example.com");
+    let field = ContactField::new(FieldType::Email, "Email", "alice@example.com", 0);
     wb.add_own_field(field).unwrap();
 
     let card = wb.own_card().unwrap().unwrap();
@@ -69,7 +69,7 @@ fn test_transition_preserves_field_visibility_when_adding_first_group() {
     let wb = create_vauchi_with_identity("Alice");
 
     // Add a field to own card
-    let field = ContactField::new(FieldType::Email, "Email", "alice@example.com");
+    let field = ContactField::new(FieldType::Email, "Email", "alice@example.com", 0);
     wb.add_own_field(field).unwrap();
 
     let card = wb.own_card().unwrap().unwrap();
@@ -102,7 +102,7 @@ fn test_delete_non_last_label_no_migration() {
     let wb = create_vauchi_with_identity("Alice");
 
     // Add a field to own card
-    let field = ContactField::new(FieldType::Email, "Email", "alice@example.com");
+    let field = ContactField::new(FieldType::Email, "Email", "alice@example.com", 0);
     wb.add_own_field(field).unwrap();
 
     let card = wb.own_card().unwrap().unwrap();
@@ -145,7 +145,7 @@ fn test_set_field_shown_api() {
     let wb = create_vauchi_with_identity("Alice");
 
     // Add a field to own card
-    let field = ContactField::new(FieldType::Email, "Email", "alice@example.com");
+    let field = ContactField::new(FieldType::Email, "Email", "alice@example.com", 0);
     wb.add_own_field(field).unwrap();
 
     let card = wb.own_card().unwrap().unwrap();
@@ -188,10 +188,16 @@ fn test_transition_migrates_all_visible_fields() {
         FieldType::Email,
         "Email",
         "alice@example.com",
+        0,
     ))
     .unwrap();
-    wb.add_own_field(ContactField::new(FieldType::Phone, "Phone", "+1234567890"))
-        .unwrap();
+    wb.add_own_field(ContactField::new(
+        FieldType::Phone,
+        "Phone",
+        "+1234567890",
+        0,
+    ))
+    .unwrap();
 
     let card = wb.own_card().unwrap().unwrap();
     let email_id = card.fields()[0].id().to_string();
@@ -230,10 +236,16 @@ fn test_transition_does_not_migrate_hidden_fields() {
         FieldType::Email,
         "Email",
         "alice@example.com",
+        0,
     ))
     .unwrap();
-    wb.add_own_field(ContactField::new(FieldType::Phone, "Phone", "+1234567890"))
-        .unwrap();
+    wb.add_own_field(ContactField::new(
+        FieldType::Phone,
+        "Phone",
+        "+1234567890",
+        0,
+    ))
+    .unwrap();
 
     let card = wb.own_card().unwrap().unwrap();
     let email_id = card.fields()[0].id().to_string();

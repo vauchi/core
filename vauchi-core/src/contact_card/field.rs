@@ -85,11 +85,6 @@ impl FieldType {
     }
 }
 
-/// Returns the current Unix timestamp in seconds.
-fn now_timestamp() -> u64 {
-    crate::clock::ambient_now_secs()
-}
-
 /// A single contact field (phone, email, etc.).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContactField {
@@ -111,7 +106,14 @@ pub struct ContactField {
 
 impl ContactField {
     /// Creates a new contact field with a generated ID.
-    pub fn new(field_type: FieldType, label: &str, value: &str) -> Self {
+    ///
+    /// `now` is the Unix-epoch timestamp stamped into
+    /// `updated_at`. Production callers source it from
+    /// `storage.clock().unix_seconds()` (Storage-side),
+    /// `self.clock.unix_seconds()` (Vauchi-side), or
+    /// `engine.vauchi().clock().unix_seconds()`
+    /// (platform-side). Tests pass any fixed value.
+    pub fn new(field_type: FieldType, label: &str, value: &str, now: u64) -> Self {
         let rand_id: [u8; 8] = crate::crypto::random_bytes();
         let id = hex::encode(rand_id);
 
@@ -120,7 +122,7 @@ impl ContactField {
             field_type,
             label: normalize_text(label),
             value: normalize_text(value),
-            updated_at: now_timestamp(),
+            updated_at: now,
             note: None,
         }
     }
@@ -160,10 +162,10 @@ impl ContactField {
         self.updated_at
     }
 
-    /// Sets the field value and updates the timestamp.
-    pub fn set_value(&mut self, value: &str) {
+    /// Sets the field value and stamps `updated_at`.
+    pub fn set_value(&mut self, value: &str, now: u64) {
         self.value = normalize_text(value);
-        self.updated_at = now_timestamp();
+        self.updated_at = now;
     }
 
     /// Returns the private note, if any.

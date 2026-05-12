@@ -529,8 +529,12 @@ impl AppEngine {
                                 .map(|c| c.to_uppercase().to_string() + &entry_type[1..])
                                 .unwrap_or_else(|| "Custom".into())
                         };
-                        let mut field =
-                            vauchi_core::contact_card::ContactField::new(field_type, &label, value);
+                        let mut field = vauchi_core::contact_card::ContactField::new(
+                            field_type,
+                            &label,
+                            value,
+                            self.vauchi.clock().unix_seconds(),
+                        );
                         if !note.is_empty() {
                             field = field.with_note(note.to_string());
                         }

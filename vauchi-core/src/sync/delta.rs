@@ -234,7 +234,7 @@ impl CardDelta {
 
                     match found {
                         Some(field) => {
-                            field.set_value(new_value);
+                            field.set_value(new_value, crate::clock::ambient_now_secs());
                         }
                         None => {
                             return Err(DeltaError::FieldNotFound(field_id.clone()));

@@ -20,7 +20,7 @@ fn test_card_delta_never_contains_field_notes() {
     let old_card = ContactCard::new("Alice");
     let mut new_card = old_card.clone();
 
-    let field = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67")
+    let field = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67", 0)
         .with_note(SECRET_NOTE.to_string());
     new_card.add_field(field).unwrap();
 
@@ -58,7 +58,7 @@ fn test_filtered_delta_preserves_privacy() {
     let old_card = ContactCard::new("Alice");
     let mut new_card = old_card.clone();
 
-    let field = ContactField::new(FieldType::Email, "Personal", "alice@example.com")
+    let field = ContactField::new(FieldType::Email, "Personal", "alice@example.com", 0)
         .with_note(SECRET_NOTE.to_string());
     new_card.add_field(field).unwrap();
 

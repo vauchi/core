@@ -59,10 +59,15 @@ fn provider_contract_storage_save_load_own_card_with_fields() {
     let storage = Storage::open(dir.path().join("p.db").to_str().unwrap(), key).unwrap();
 
     let mut card = ContactCard::new("ProviderCard");
-    card.add_field(ContactField::new(FieldType::Email, "Work", "p@test.com"))
+    card.add_field(ContactField::new(FieldType::Email, "Work", "p@test.com", 0))
         .unwrap();
-    card.add_field(ContactField::new(FieldType::Phone, "Mobile", "+1111111111"))
-        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Phone,
+        "Mobile",
+        "+1111111111",
+        0,
+    ))
+    .unwrap();
     storage.save_own_card(&card).unwrap();
 
     let loaded = storage.load_own_card().unwrap().unwrap();
@@ -132,7 +137,7 @@ fn provider_contract_identity_x3dh_keypair() {
 #[test]
 fn provider_contract_contact_card_remove_field() {
     let mut card = ContactCard::new("Mut");
-    card.add_field(ContactField::new(FieldType::Custom, "Del", "removeme"))
+    card.add_field(ContactField::new(FieldType::Custom, "Del", "removeme", 0))
         .unwrap();
     let fid = card.fields()[0].id().to_string();
     card.remove_field(&fid).unwrap();
@@ -143,7 +148,7 @@ fn provider_contract_contact_card_remove_field() {
 #[test]
 fn provider_contract_contact_field_id_is_nonempty() {
     let mut card = ContactCard::new("Id");
-    card.add_field(ContactField::new(FieldType::Custom, "Test", "val"))
+    card.add_field(ContactField::new(FieldType::Custom, "Test", "val", 0))
         .unwrap();
     assert!(!card.fields()[0].id().is_empty());
 }

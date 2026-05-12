@@ -21,6 +21,7 @@ fn base_card() -> ContactCard {
         FieldType::Email,
         "Work",
         "test@example.com",
+        0,
     ))
     .unwrap();
     card

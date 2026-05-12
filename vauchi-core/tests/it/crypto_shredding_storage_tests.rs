@@ -25,6 +25,7 @@ fn test_contact(id: &str) -> Contact {
         FieldType::Email,
         "email",
         "test@example.com",
+        0,
     ))
     .unwrap();
     let pk = [0x42u8; 32];
@@ -240,14 +241,24 @@ fn test_multi_contact_cek_isolation() {
     // Need different public keys to get different contact IDs
     let alice = {
         let mut card = ContactCard::new("Alice");
-        card.add_field(ContactField::new(FieldType::Email, "email", "a@test.com"))
-            .unwrap();
+        card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "a@test.com",
+            0,
+        ))
+        .unwrap();
         Contact::from_exchange([0x01; 32], card, SymmetricKey::generate())
     };
     let bob = {
         let mut card = ContactCard::new("Bob");
-        card.add_field(ContactField::new(FieldType::Email, "email", "b@test.com"))
-            .unwrap();
+        card.add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "b@test.com",
+            0,
+        ))
+        .unwrap();
         Contact::from_exchange([0x02; 32], card, SymmetricKey::generate())
     };
     storage.save_contact(&alice).unwrap();

@@ -29,12 +29,14 @@ fn test_full_identity_workflow() {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ))
     .unwrap();
     wb.add_own_field(ContactField::new(
         FieldType::Phone,
         "mobile",
         "+15551234567",
+        0,
     ))
     .unwrap();
 

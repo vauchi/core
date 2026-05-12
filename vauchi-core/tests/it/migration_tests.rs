@@ -384,6 +384,7 @@ fn test_own_card_persistence() {
         vauchi_core::FieldType::Email,
         "Work",
         "test@example.com",
+        0,
     ))
     .unwrap();
 
@@ -448,6 +449,7 @@ fn test_contact_persistence_roundtrip() {
         FieldType::Email,
         "Personal",
         "alice@example.com",
+        0,
     ))
     .unwrap();
 

@@ -60,12 +60,14 @@ fn test_v1_roundtrip_preserves_all_fields() {
         FieldType::Phone,
         "Home",
         "+41-44-111-2233",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Email,
         "Personal",
         "bob@test.ch",
+        0,
     ))
     .unwrap();
     card.set_nickname("Bobby");
@@ -147,7 +149,7 @@ mod proptest_compat {
             "[a-zA-Z ]{1,20}",
             "[a-zA-Z0-9@.+\\- ]{1,50}",
         )
-            .prop_map(|(ft, label, value)| ContactField::new(ft, &label, &value))
+            .prop_map(|(ft, label, value)| ContactField::new(ft, &label, &value, 0))
     }
 
     fn arb_contact_card() -> impl Strategy<Value = ContactCard> {

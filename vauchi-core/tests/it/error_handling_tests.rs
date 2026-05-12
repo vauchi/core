@@ -28,12 +28,22 @@ fn test_sync_state_pending_on_undelivered() {
 
     let mut old_card = ContactCard::new("Test");
     old_card
-        .add_field(ContactField::new(FieldType::Email, "work", "old@test.com"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "old@test.com",
+            0,
+        ))
         .unwrap();
 
     let mut new_card = ContactCard::new("Test");
     new_card
-        .add_field(ContactField::new(FieldType::Email, "work", "new@test.com"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "new@test.com",
+            0,
+        ))
         .unwrap();
 
     // Queue update but don't mark as delivered
@@ -194,6 +204,7 @@ fn test_delta_signature_rejects_wrong_signer() {
             FieldType::Email,
             "work",
             "alice@test.com",
+            0,
         ))
         .unwrap();
 
@@ -232,6 +243,7 @@ fn test_delta_signature_rejects_tampered_delta() {
             FieldType::Email,
             "work",
             "alice@test.com",
+            0,
         ))
         .unwrap();
 
@@ -291,12 +303,14 @@ fn test_contact_roundtrip_preserves_data() {
         FieldType::Email,
         "work",
         "test@example.com",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Phone,
         "mobile",
         "+15551234567",
+        0,
     ))
     .unwrap();
 

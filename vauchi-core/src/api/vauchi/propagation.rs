@@ -574,6 +574,7 @@ impl Vauchi {
                                     crate::contact_card::FieldType::Custom,
                                     field_label,
                                     new_value,
+                                    self.clock.unix_seconds(),
                                 );
                                 let _ = card.add_field(field);
                             }

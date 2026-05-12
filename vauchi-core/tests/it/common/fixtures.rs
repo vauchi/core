@@ -24,12 +24,14 @@ pub fn sample_contact_card(name: &str) -> ContactCard {
         FieldType::Email,
         "work",
         &format!("{}@example.com", name.to_lowercase()),
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Phone,
         "mobile",
         "+15551234567",
+        0,
     ))
     .unwrap();
     card
@@ -43,6 +45,7 @@ pub fn max_fields_card(name: &str) -> ContactCard {
             FieldType::Custom,
             &format!("field_{}", i),
             &format!("value_{}", i),
+            0,
         ))
         .unwrap();
     }
@@ -56,34 +59,49 @@ pub fn diverse_fields_card(name: &str) -> ContactCard {
         FieldType::Email,
         "personal",
         "user@personal.com",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Email,
         "work",
         "user@company.com",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Phone,
         "mobile",
         "+15551234567",
+        0,
     ))
     .unwrap();
-    card.add_field(ContactField::new(FieldType::Phone, "home", "+15559876543"))
-        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Phone,
+        "home",
+        "+15559876543",
+        0,
+    ))
+    .unwrap();
     card.add_field(ContactField::new(
         FieldType::Website,
         "blog",
         "https://example.com",
+        0,
     ))
     .unwrap();
-    card.add_field(ContactField::new(FieldType::Social, "twitter", "@username"))
-        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Social,
+        "twitter",
+        "@username",
+        0,
+    ))
+    .unwrap();
     card.add_field(ContactField::new(
         FieldType::Address,
         "home",
         "123 Main St, City, ST 12345",
+        0,
     ))
     .unwrap();
     card

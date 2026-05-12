@@ -80,6 +80,7 @@ fn test_query_under_50ms_with_1000_contacts() {
             vauchi_core::contact_card::FieldType::Email,
             "Email",
             &format!("user{}@example.com", i),
+            0,
         ))
         .unwrap();
         let shared = SymmetricKey::generate();

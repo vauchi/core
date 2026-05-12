@@ -74,7 +74,7 @@ proptest! {
         value in "[a-zA-Z0-9@.+]{1,50}"
     ) {
         let mut card = ContactCard::new(&name);
-        let field = ContactField::new(FieldType::Custom, &label, &value);
+        let field = ContactField::new(FieldType::Custom, &label, &value, 0);
         let _ = card.add_field(field);
 
         let json = serde_json::to_string(&card).unwrap();
@@ -547,7 +547,8 @@ mod extended_property_tests {
                         FieldType::Custom,
                         &format!("field_{}", i),
                         &format!("value_{}", i),
-                    );
+                    0,
+                );
 
                     // Only add if under limit
                     if card.fields().len() < 25 {
@@ -579,7 +580,7 @@ mod extended_property_tests {
 
                 // Create a field with a very long value (1000 chars)
                 let long_value: String = (0..1000).map(|i| char::from(b'A' + (i % 26) as u8)).collect();
-                let field = ContactField::new(FieldType::Custom, &label, &long_value);
+                let field = ContactField::new(FieldType::Custom, &label, &long_value, 0);
 
                 let result = card.add_field(field);
                 prop_assert!(result.is_ok(), "add_field failed: {:?}", result);
@@ -608,7 +609,8 @@ mod extended_property_tests {
                         FieldType::Custom,
                         &format!("field_{}", i),
                         &format!("value_{}", i),
-                    );
+                    0,
+                );
                     let result = card.add_field(field);
                     prop_assert!(result.is_ok(), "Should allow field {} of {}", i + 1, max);
                 }
@@ -616,7 +618,7 @@ mod extended_property_tests {
                 prop_assert_eq!(card.fields().len(), max);
 
                 // 26th field should fail
-                let extra_field = ContactField::new(FieldType::Custom, "extra", "value");
+                let extra_field = ContactField::new(FieldType::Custom, "extra", "value", 0);
                 let result = card.add_field(extra_field);
                 prop_assert!(result.is_err(), "Should reject field 26");
             }
@@ -686,10 +688,10 @@ mod extended_property_tests {
                 value2 in "[a-zA-Z0-9]{1,20}"
             ) {
                 let mut card1 = ContactCard::new(&name);
-                card1.add_field(ContactField::new(FieldType::Custom, &label, &value1)).unwrap();
+                card1.add_field(ContactField::new(FieldType::Custom, &label, &value1, 0)).unwrap();
 
                 let mut card2 = ContactCard::new(&name);
-                card2.add_field(ContactField::new(FieldType::Custom, &label, &value2)).unwrap();
+                card2.add_field(ContactField::new(FieldType::Custom, &label, &value2, 0)).unwrap();
 
                 // Compute delta twice
                 let delta1 = CardDelta::compute(&card1, &card2);

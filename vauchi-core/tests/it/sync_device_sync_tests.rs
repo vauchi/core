@@ -84,7 +84,12 @@ fn test_sync_item_card_updated() {
     use vauchi_core::contact_card::{ContactField, FieldType};
 
     let mut card = ContactCard::new("Alice");
-    let _ = card.add_field(ContactField::new(FieldType::Phone, "mobile", "+1234567890"));
+    let _ = card.add_field(ContactField::new(
+        FieldType::Phone,
+        "mobile",
+        "+1234567890",
+        0,
+    ));
 
     // Create a SyncItem representing a card field update
     let item = SyncItem::CardUpdated {

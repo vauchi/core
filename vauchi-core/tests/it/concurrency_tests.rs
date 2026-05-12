@@ -48,6 +48,7 @@ fn create_test_contact(name: &str) -> Contact {
         FieldType::Email,
         "Work",
         &format!("{}@example.com", name.to_lowercase().replace(' ', ".")),
+        0,
     ))
     .unwrap();
 
@@ -437,6 +438,7 @@ fn test_double_save_overwrites() {
         FieldType::Email,
         "Work",
         "original@example.com",
+        0,
     ))
     .unwrap();
     let shared_key = SymmetricKey::generate();
@@ -456,6 +458,7 @@ fn test_double_save_overwrites() {
             FieldType::Email,
             "Work",
             "updated@example.com",
+            0,
         ))
         .unwrap();
     let shared_key2 = SymmetricKey::generate();

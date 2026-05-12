@@ -147,7 +147,7 @@ fn test_skin_tone_modifier_roundtrip() {
 fn test_emoji_in_field_value_roundtrip() {
     let emoji_value = "Call me \u{1F4DE} or \u{1F4E7}";
     let mut card = ContactCard::new("Test");
-    let field = ContactField::new(FieldType::Custom, "note", emoji_value);
+    let field = ContactField::new(FieldType::Custom, "note", emoji_value, 0);
     card.add_field(field).unwrap();
 
     let json = serde_json::to_string(&card).unwrap();
@@ -329,7 +329,7 @@ fn test_lro_survives_roundtrip() {
 fn test_bidi_in_field_value() {
     let value = "\u{202E}reversed text\u{202C}"; // RLO + PDF (Pop Directional Format)
     let mut card = ContactCard::new("Test");
-    let field = ContactField::new(FieldType::Custom, "bidi", value);
+    let field = ContactField::new(FieldType::Custom, "bidi", value, 0);
     card.add_field(field).unwrap();
 
     let json = serde_json::to_string(&card).unwrap();
@@ -359,7 +359,7 @@ fn test_null_byte_in_display_name() {
 fn test_null_byte_in_field_value() {
     let value = "before\0after";
     let mut card = ContactCard::new("Test");
-    let field = ContactField::new(FieldType::Custom, "nulltest", value);
+    let field = ContactField::new(FieldType::Custom, "nulltest", value, 0);
     card.add_field(field).unwrap();
 
     let json = serde_json::to_string(&card).unwrap();
@@ -391,7 +391,7 @@ fn test_max_length_multibyte_field_value() {
     assert_eq!(cjk_value.len(), 999); // byte length
 
     let mut card = ContactCard::new("Test");
-    let field = ContactField::new(FieldType::Custom, "cjk", &cjk_value);
+    let field = ContactField::new(FieldType::Custom, "cjk", &cjk_value, 0);
     let result = card.add_field(field);
     assert!(
         result.is_ok(),
@@ -407,7 +407,7 @@ fn test_max_length_multibyte_over_limit() {
     assert_eq!(cjk_value.len(), 1002); // byte length
 
     let mut card = ContactCard::new("Test");
-    let field = ContactField::new(FieldType::Custom, "cjk", &cjk_value);
+    let field = ContactField::new(FieldType::Custom, "cjk", &cjk_value, 0);
     let result = card.add_field(field);
     assert!(
         result.is_err(),
@@ -424,7 +424,7 @@ fn test_max_length_4byte_chars() {
     assert_eq!(emoji_value.len(), 1000); // exactly at byte limit
 
     let mut card = ContactCard::new("Test");
-    let field = ContactField::new(FieldType::Custom, "emoji", &emoji_value);
+    let field = ContactField::new(FieldType::Custom, "emoji", &emoji_value, 0);
     let result = card.add_field(field);
     assert!(
         result.is_ok(),
@@ -440,7 +440,7 @@ fn test_max_length_4byte_chars_over() {
     assert_eq!(emoji_value.len(), 1004);
 
     let mut card = ContactCard::new("Test");
-    let field = ContactField::new(FieldType::Custom, "emoji", &emoji_value);
+    let field = ContactField::new(FieldType::Custom, "emoji", &emoji_value, 0);
     let result = card.add_field(field);
     assert!(
         result.is_err(),
@@ -467,7 +467,7 @@ proptest! {
         let mut card = ContactCard::new(&name);
         let normalized_value = normalize_text(&value);
         prop_assume!(normalized_value.len() <= 1000);
-        let field = ContactField::new(FieldType::Custom, &label, &value);
+        let field = ContactField::new(FieldType::Custom, &label, &value, 0);
         card.add_field(field).unwrap();
 
         let json = serde_json::to_string(&card).unwrap();
@@ -503,7 +503,7 @@ proptest! {
         prop_assume!(normalized.len() <= 1000);
 
         let mut card = ContactCard::new("Test");
-        let field = ContactField::new(FieldType::Custom, "cjk", &value);
+        let field = ContactField::new(FieldType::Custom, "cjk", &value, 0);
         card.add_field(field).unwrap();
 
         let json = serde_json::to_string(&card).unwrap();
@@ -519,7 +519,7 @@ proptest! {
         prop_assume!(normalized.len() <= 1000);
 
         let mut card = ContactCard::new("Test");
-        let field = ContactField::new(FieldType::Custom, "arabic", &value);
+        let field = ContactField::new(FieldType::Custom, "arabic", &value, 0);
         card.add_field(field).unwrap();
 
         let json = serde_json::to_string(&card).unwrap();

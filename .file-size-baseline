@@ -12,7 +12,7 @@ vauchi-cabi/src/lib.rs 1842
 vauchi-platform/src/types.rs 1547
 
 # EXEMPT — UniFFI facade: splitting breaks binding generation (trust/notes/preview/import/diagnostic-scanner exports added; +9 for Phase 1-3 re-export split + scan_qr alias 2026-04-19; +57 for ADR-044 MobileError struct-variant migration 2026-04-20; +1 for G6 MobileImportWarning export 2026-04-20; +7 for device-link orchestrator re-export + 2x #[deprecated] on legacy structs 2026-04-26; +17 for save_test_delivery_record helper supporting G3 ScreenModel API gaps 2026-04-27; +1 for G2 MobileLabelContactRow + MobileLabelContactStatus re-exports 2026-04-27; +5 for G4 mobile_contact_detail mod + re-exports 2026-04-27; +1 for Pair 5 platform_app_engine_device_link mod 2026-04-29; +2 for mobile_app_preferences mod + MobileAppPreferences re-export 2026-05-03)
-vauchi-platform/src/lib.rs     2698    2678
+vauchi-platform/src/lib.rs 2712    2678
 
 # EXEMPT — UniFFI facade for exchange protocol: command/event enums and
 # their From impls must be co-located so binding generation produces
@@ -123,7 +123,7 @@ vauchi-app/src/ui/app_engine/mod.rs 1230
 # (+19 on routing.rs for AppScreen::ChangePassword arm in handle_completion
 #   — calls vauchi.change_app_password and surfaces ShowAlert on failure,
 #   feat/2026-05-10-change-app-password)
-vauchi-app/src/ui/app_engine/routing.rs 1257
+vauchi-app/src/ui/app_engine/routing.rs 1261
 vauchi-app/src/ui/app_engine/screens.rs 1344
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
@@ -139,7 +139,7 @@ vauchi-core/tests/it/field_validation_tests.rs 2256
 vauchi-core/tests/it/onboarding_tests.rs 1301
 vauchi-core/tests/it/sync_device_orchestrator_tests.rs 1286
 vauchi-core/tests/it/visibility_label_tests.rs 1220
-vauchi-core/tests/it/migration_tests.rs 1224
+vauchi-core/tests/it/migration_tests.rs 1226
 
 # vauchi-app — extracted from vauchi-core, inherits exemption
 # (+150 for G4 visibility helpers + ReciprocityBannerKind + inline tests
@@ -331,7 +331,7 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1600
 # (+20 lines for cancel-session-first guard in `apply_multi_stage_*_for_test`
 #  bridges — fixes flaky `apply_multi_stage_state_finalized_with_session_ended`
 #  caused by cycle-thread racing the test's manual state pushes.)
-vauchi-platform/src/platform_app_engine.rs 5050
+vauchi-platform/src/platform_app_engine.rs 5055
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding

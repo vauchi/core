@@ -11,7 +11,7 @@ use vauchi_core::contact_card::*;
 // @internal
 #[test]
 fn test_create_field() {
-    let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-1234");
+    let field = ContactField::new(FieldType::Phone, "Mobile", "+1-555-1234", 0);
     assert_eq!(field.field_type(), FieldType::Phone);
     assert_eq!(field.label(), "Mobile");
     assert_eq!(field.value(), "+1-555-1234");
@@ -21,7 +21,7 @@ fn test_create_field() {
 // @internal
 #[test]
 fn test_validate_valid_phone() {
-    let field = ContactField::new(FieldType::Phone, "Test", "+1-555-123-4567");
+    let field = ContactField::new(FieldType::Phone, "Test", "+1-555-123-4567", 0);
     field.validate().expect("expected success");
 }
 
@@ -29,7 +29,7 @@ fn test_validate_valid_phone() {
 // @internal
 #[test]
 fn test_validate_valid_email() {
-    let field = ContactField::new(FieldType::Email, "Test", "test@example.com");
+    let field = ContactField::new(FieldType::Email, "Test", "test@example.com", 0);
     field.validate().expect("expected success");
 }
 
@@ -37,7 +37,7 @@ fn test_validate_valid_email() {
 // @internal
 #[test]
 fn test_field_label_normalized_nfc() {
-    let field = ContactField::new(FieldType::Phone, "Te\u{0301}le\u{0301}phone", "+41");
+    let field = ContactField::new(FieldType::Phone, "Te\u{0301}le\u{0301}phone", "+41", 0);
     assert_eq!(field.label(), "T\u{00E9}l\u{00E9}phone");
 }
 
@@ -45,9 +45,9 @@ fn test_field_label_normalized_nfc() {
 // @internal
 #[test]
 fn test_field_value_normalized_nfc() {
-    let mut field = ContactField::new(FieldType::Custom, "Note", "cafe\u{0301}");
+    let mut field = ContactField::new(FieldType::Custom, "Note", "cafe\u{0301}", 0);
     assert_eq!(field.value(), "caf\u{00E9}");
-    field.set_value("n\u{0303}");
+    field.set_value("n\u{0303}", 0);
     assert_eq!(field.value(), "\u{00F1}");
 }
 
@@ -56,14 +56,14 @@ fn test_field_value_normalized_nfc() {
 // @internal
 #[test]
 fn test_field_note_default_none() {
-    let f = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67");
+    let f = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67", 0);
     assert_eq!(f.note(), None);
 }
 
 // @internal
 #[test]
 fn test_field_with_note() {
-    let f = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67")
+    let f = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67", 0)
         .with_note("check spam".to_string());
     assert_eq!(f.note(), Some("check spam"));
 }
@@ -72,21 +72,21 @@ fn test_field_with_note() {
 #[test]
 fn test_field_note_truncated_at_500_chars() {
     let long_note = "x".repeat(600);
-    let f = ContactField::new(FieldType::Phone, "Work", "+41...").with_note(long_note);
+    let f = ContactField::new(FieldType::Phone, "Work", "+41...", 0).with_note(long_note);
     assert_eq!(f.note().unwrap().chars().count(), 500);
 }
 
 // @internal
 #[test]
 fn test_field_empty_note_is_none() {
-    let f = ContactField::new(FieldType::Phone, "Work", "+41...").with_note("".to_string());
+    let f = ContactField::new(FieldType::Phone, "Work", "+41...", 0).with_note("".to_string());
     assert_eq!(f.note(), None);
 }
 
 // @internal
 #[test]
 fn test_strip_private_removes_note() {
-    let f = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67")
+    let f = ContactField::new(FieldType::Phone, "Work", "+41 79 123 45 67", 0)
         .with_note("secret".to_string());
     let stripped = f.strip_private();
     assert_eq!(stripped.note(), None);
@@ -98,7 +98,7 @@ fn test_strip_private_removes_note() {
 // @internal
 #[test]
 fn test_strip_private_on_field_without_note() {
-    let f = ContactField::new(FieldType::Phone, "Work", "+41...");
+    let f = ContactField::new(FieldType::Phone, "Work", "+41...", 0);
     let stripped = f.strip_private();
     assert_eq!(stripped.note(), None);
     assert_eq!(stripped.value(), f.value());
@@ -107,7 +107,8 @@ fn test_strip_private_on_field_without_note() {
 // @internal
 #[test]
 fn test_note_serde_roundtrip() {
-    let f = ContactField::new(FieldType::Phone, "Work", "+41...").with_note("my note".to_string());
+    let f =
+        ContactField::new(FieldType::Phone, "Work", "+41...", 0).with_note("my note".to_string());
     let json = serde_json::to_string(&f).unwrap();
     let restored: ContactField = serde_json::from_str(&json).unwrap();
     assert_eq!(restored.note(), Some("my note"));
@@ -129,7 +130,7 @@ fn test_field_note_truncated_multibyte_utf8() {
     // 600 CJK characters (3 bytes each = 1800 bytes) should truncate to 500 characters
     let cjk_note: String = "\u{4e16}".repeat(600); // 世
     assert_eq!(cjk_note.chars().count(), 600);
-    let f = ContactField::new(FieldType::Custom, "Note", "val").with_note(cjk_note);
+    let f = ContactField::new(FieldType::Custom, "Note", "val", 0).with_note(cjk_note);
     let note = f.note().unwrap();
     assert_eq!(note.chars().count(), 500);
     // All characters should be the same CJK character
@@ -234,7 +235,7 @@ use rstest::rstest;
 #[case::extra_chars("1990-05-15Z", false)]
 #[case::empty("", false)]
 fn test_validate_birthday_per_input(#[case] input: &str, #[case] expected_valid: bool) {
-    let field = ContactField::new(FieldType::Birthday, "DOB", input);
+    let field = ContactField::new(FieldType::Birthday, "DOB", input, 0);
     let actual = field.validate().is_ok();
     assert_eq!(actual, expected_valid, "for {}", input);
 }
@@ -268,7 +269,7 @@ fn test_validate_birthday_month_max_day_table(
     #[case] expected: bool,
 ) {
     let s = format!("1990-{:02}-{:02}", month, day);
-    let field = ContactField::new(FieldType::Birthday, "DOB", &s);
+    let field = ContactField::new(FieldType::Birthday, "DOB", &s, 0);
     assert_eq!(field.validate().is_ok(), expected, "for {}", s);
 }
 
@@ -276,7 +277,7 @@ fn test_validate_birthday_month_max_day_table(
 #[test]
 fn test_set_label_truncates_at_max_length() {
     use vauchi_core::contact_card::field::MAX_LABEL_LENGTH;
-    let mut f = ContactField::new(FieldType::Custom, "x", "v");
+    let mut f = ContactField::new(FieldType::Custom, "x", "v", 0);
     let long_label = "a".repeat(MAX_LABEL_LENGTH + 17);
     f.set_label(&long_label);
     // Truncation pins the exact boundary: longer-than-MAX is cut, shorter
@@ -298,7 +299,7 @@ fn test_set_label_truncates_at_max_length() {
 #[test]
 fn test_set_note_truncation_boundary() {
     use vauchi_core::contact_card::field::MAX_FIELD_NOTE_LEN;
-    let f = ContactField::new(FieldType::Custom, "x", "v");
+    let f = ContactField::new(FieldType::Custom, "x", "v", 0);
 
     // Exactly MAX must survive intact.
     let exact = "y".repeat(MAX_FIELD_NOTE_LEN);
@@ -319,21 +320,18 @@ fn test_set_note_truncation_boundary() {
 // @scenario: field_validation :: set_value updates timestamp
 #[test]
 fn test_set_value_updates_timestamp() {
-    let mut f = ContactField::new(FieldType::Custom, "x", "old");
-    let t0 = f.updated_at();
-    // updated_at must be a real Unix timestamp, not a stub like 0 or 1.
-    // 1_700_000_000 is 2023-11; any healthy clock is well past this.
-    // Catches `updated_at -> u64 with 0` and `with 1` mutations.
-    assert!(
-        t0 > 1_700_000_000,
-        "expected real Unix timestamp, got {}",
-        t0
-    );
+    // Caller-controlled timestamps are stamped verbatim. The prior test
+    // relied on `SystemTime::now()` being "real" (` > 1_700_000_000`);
+    // with the seam, we assert the exact values instead.
+    let mut f = ContactField::new(FieldType::Custom, "x", "old", 1_700_000_000);
+    assert_eq!(f.updated_at(), 1_700_000_000);
 
-    // After set_value the timestamp must be at least t0 (monotonic).
-    f.set_value("new");
-    assert!(f.updated_at() >= t0);
-    assert!(f.updated_at() > 1_700_000_000);
+    f.set_value("new", 1_700_000_100);
+    assert_eq!(
+        f.updated_at(),
+        1_700_000_100,
+        "set_value must stamp the passed now"
+    );
     assert_eq!(f.value(), "new");
 }
 
@@ -394,7 +392,7 @@ fn test_validate_value_too_long_returns_specific_error() {
     use vauchi_core::contact_card::ValidationError;
     use vauchi_core::contact_card::field::MAX_VALUE_LENGTH;
     // Build a value that exceeds MAX_VALUE_LENGTH bytes.
-    let f = ContactField::new(FieldType::Custom, "k", &"x".repeat(MAX_VALUE_LENGTH + 1));
+    let f = ContactField::new(FieldType::Custom, "k", &"x".repeat(MAX_VALUE_LENGTH + 1), 0);
     let err = f.validate().unwrap_err();
     // Pin the exact variant — kills mutations that swap which error is
     // returned for the length-overflow path.
@@ -415,7 +413,12 @@ fn test_validate_value_too_long_returns_specific_error() {
 // @internal
 #[test]
 fn test_validate_dispatches_to_website_validator() {
-    let f = ContactField::new(FieldType::Website, "site", "no protocol no dot has space");
+    let f = ContactField::new(
+        FieldType::Website,
+        "site",
+        "no protocol no dot has space",
+        0,
+    );
     assert!(
         f.validate().is_err(),
         "Website dispatch must call validate_website (catches deletion of the Website match arm)"
@@ -430,7 +433,7 @@ fn test_validate_dispatches_to_website_validator() {
 fn test_validate_phone_exactly_seven_digits_is_valid() {
     // The check is `if digit_count < 7 { Err }`. A `< with <=` mutation
     // would reject 7-digit numbers; pinning a 7-digit-valid case kills it.
-    let f = ContactField::new(FieldType::Phone, "p", "1234567");
+    let f = ContactField::new(FieldType::Phone, "p", "1234567", 0);
     f.validate().expect("7-digit phone must validate");
 }
 
@@ -438,7 +441,7 @@ fn test_validate_phone_exactly_seven_digits_is_valid() {
 #[test]
 fn test_validate_phone_six_digits_is_invalid() {
     // Mirror of the above to keep the < boundary tight on both sides.
-    let f = ContactField::new(FieldType::Phone, "p", "123456");
+    let f = ContactField::new(FieldType::Phone, "p", "123456", 0);
     assert!(f.validate().is_err());
 }
 
@@ -451,7 +454,7 @@ fn test_validate_phone_exactly_thirty_chars_is_valid() {
     // dash, parens, plus — no '.').
     let exactly_30 = "+1 (555) 123-4567 0000 1234567";
     assert_eq!(exactly_30.len(), 30);
-    let f = ContactField::new(FieldType::Phone, "p", exactly_30);
+    let f = ContactField::new(FieldType::Phone, "p", exactly_30, 0);
     f.validate().expect("30-char phone must validate");
 }
 
@@ -460,7 +463,7 @@ fn test_validate_phone_exactly_thirty_chars_is_valid() {
 fn test_validate_phone_thirty_one_chars_is_invalid() {
     let v = "+1 (555) 123-4567 0000 12345678"; // 31 chars
     assert_eq!(v.len(), 31);
-    let f = ContactField::new(FieldType::Phone, "p", v);
+    let f = ContactField::new(FieldType::Phone, "p", v, 0);
     assert!(f.validate().is_err());
 }
 
@@ -476,7 +479,7 @@ fn test_validate_website_http_without_dot_is_valid() {
     //     (a string cannot start with both); falls through to `contains('.')`
     //     which is false → Err. Different from orig (Ok).
     //   - 288:9 `-> Ok(())`: trivially caught by the no-dot/has-space test below.
-    let f = ContactField::new(FieldType::Website, "w", "http://localhost");
+    let f = ContactField::new(FieldType::Website, "w", "http://localhost", 0);
     f.validate().expect("http://localhost must validate");
 }
 
@@ -487,7 +490,7 @@ fn test_validate_website_plain_domain_is_valid() {
     // plain domain without protocol. Catches `delete !` (293:35): with
     // `contains('.') && contains(' ')` the test fails because there's
     // no space in "example.com".
-    let f = ContactField::new(FieldType::Website, "w", "example.com");
+    let f = ContactField::new(FieldType::Website, "w", "example.com", 0);
     f.validate().expect("plain domain must validate");
 }
 
@@ -497,7 +500,7 @@ fn test_validate_website_dotted_with_space_is_invalid() {
     // Pins `value.contains('.') && !value.contains(' ')` by using a
     // value that contains both a dot AND a space. Catches `&& with ||`
     // (293:32): with ||, dot OR no-space is true → returns Ok.
-    let f = ContactField::new(FieldType::Website, "w", "abc.de f");
+    let f = ContactField::new(FieldType::Website, "w", "abc.de f", 0);
     assert!(f.validate().is_err());
 }
 
@@ -508,7 +511,7 @@ fn test_validate_website_no_protocol_no_dot_is_invalid() {
     // returns Ok unconditionally would pass this, but the real
     // implementation rejects values without protocol AND without
     // a dot.
-    let f = ContactField::new(FieldType::Website, "w", "noproto");
+    let f = ContactField::new(FieldType::Website, "w", "noproto", 0);
     assert!(f.validate().is_err());
 }
 
@@ -525,6 +528,6 @@ fn test_validate_birthday_wrong_seventh_byte_is_invalid() {
     // For "1990-05/15": len=10, bytes[4]='-', bytes[7]='/'. Orig
     // returns Err (third clause). Mutation: false || (false && true)
     // → false → falls through to parsing, eventually returns Ok.
-    let f = ContactField::new(FieldType::Birthday, "b", "1990-05/15");
+    let f = ContactField::new(FieldType::Birthday, "b", "1990-05/15", 0);
     assert!(f.validate().is_err());
 }

@@ -56,7 +56,8 @@ proptest! {
                 vauchi_core::FieldType::Email,
                 "Work",
                 &email,
-            ));
+            0,
+        ));
         }
 
         if !phone.is_empty() {
@@ -64,7 +65,8 @@ proptest! {
                 vauchi_core::FieldType::Phone,
                 "Mobile",
                 &phone,
-            ));
+            0,
+        ));
         }
 
         // Serialize and deserialize

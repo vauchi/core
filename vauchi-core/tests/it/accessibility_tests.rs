@@ -65,7 +65,7 @@ fn test_field_type_has_accessibility_label() {
 // @scenario: accessibility :: Contact details are fully announced
 #[test]
 fn test_contact_field_accessibility_description() {
-    let field = ContactField::new(FieldType::Email, "Work", "alice@example.com");
+    let field = ContactField::new(FieldType::Email, "Work", "alice@example.com", 0);
 
     let description = get_field_accessibility_description(&field);
 
@@ -95,10 +95,16 @@ fn test_contact_card_accessibility_summary() {
         FieldType::Email,
         "Work",
         "alice@example.com",
+        0,
     ))
     .unwrap();
-    card.add_field(ContactField::new(FieldType::Phone, "Mobile", "+1234567890"))
-        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Phone,
+        "Mobile",
+        "+1234567890",
+        0,
+    ))
+    .unwrap();
 
     let summary = get_card_accessibility_summary(&card);
 
@@ -158,18 +164,25 @@ fn test_keyboard_navigation_order() {
     let mut card = ContactCard::new("Test User");
 
     // Add fields in intended display order
-    card.add_field(ContactField::new(FieldType::Phone, "Mobile", "+1234567890"))
-        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Phone,
+        "Mobile",
+        "+1234567890",
+        0,
+    ))
+    .unwrap();
     card.add_field(ContactField::new(
         FieldType::Email,
         "Work",
         "test@example.com",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Website,
         "Portfolio",
         "https://example.com",
+        0,
     ))
     .unwrap();
 
@@ -199,9 +212,9 @@ fn test_keyboard_navigation_order() {
 fn test_reordered_fields_update_tab_order() {
     let mut card = ContactCard::new("Test User");
 
-    let field1 = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
-    let field2 = ContactField::new(FieldType::Email, "Work", "test@example.com");
-    let field3 = ContactField::new(FieldType::Website, "Portfolio", "https://example.com");
+    let field1 = ContactField::new(FieldType::Phone, "Mobile", "+1234567890", 0);
+    let field2 = ContactField::new(FieldType::Email, "Work", "test@example.com", 0);
+    let field3 = ContactField::new(FieldType::Website, "Portfolio", "https://example.com", 0);
 
     let id1 = field1.id().to_string();
     let id2 = field2.id().to_string();
@@ -240,7 +253,7 @@ fn test_reordered_fields_update_tab_order() {
 // @scenario: accessibility :: Focus management during navigation
 #[test]
 fn test_focusable_elements_order() {
-    let field = ContactField::new(FieldType::Email, "Work", "test@example.com");
+    let field = ContactField::new(FieldType::Email, "Work", "test@example.com", 0);
 
     // Email field should have focusable actions
     let focusable_actions = get_focusable_actions(&field);

@@ -73,6 +73,7 @@ fn test_contact_with_visibility_rules_roundtrip() {
         FieldType::Email,
         "Work",
         "alice@example.com",
+        0,
     ))
     .unwrap();
 
@@ -158,6 +159,7 @@ fn test_visibility_rules_stored_encrypted_not_plaintext() {
         FieldType::Email,
         "Work",
         "secret@example.com",
+        0,
     ))
     .unwrap();
 

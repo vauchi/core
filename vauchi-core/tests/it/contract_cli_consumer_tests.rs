@@ -124,6 +124,7 @@ fn contract_contact_card_json_roundtrip() {
         FieldType::Email,
         "Work",
         "user@example.com",
+        0,
     ))
     .unwrap();
 
@@ -166,7 +167,7 @@ fn contract_cli_field_type_variants() {
 // @internal
 #[test]
 fn contract_cli_contact_field_accessors() {
-    let field = ContactField::new(FieldType::Phone, "Mobile", "+41791234567");
+    let field = ContactField::new(FieldType::Phone, "Mobile", "+41791234567", 0);
     assert_eq!(field.field_type(), FieldType::Phone);
     assert_eq!(field.label(), "Mobile");
     assert_eq!(field.value(), "+41791234567");
@@ -213,7 +214,7 @@ fn contract_cli_card_field_management() {
     assert_eq!(card.fields().len(), 0, "new card has no fields");
 
     // add_field_to_own_card accepts ContactField
-    let field = ContactField::new(FieldType::Email, "Personal", "me@example.com");
+    let field = ContactField::new(FieldType::Email, "Personal", "me@example.com", 0);
     wb.add_own_field(field).unwrap();
 
     let card = wb.own_card().unwrap().unwrap();

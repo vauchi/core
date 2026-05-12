@@ -267,7 +267,7 @@ impl ContactCard {
             .find(|f| f.id() == field_id)
             .ok_or(ContactCardError::FieldNotFound)?;
 
-        field.set_value(value);
+        field.set_value(value, crate::clock::ambient_now_secs());
         field.validate()?;
         Ok(())
     }

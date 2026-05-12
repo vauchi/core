@@ -162,6 +162,18 @@ pub use validation::{
 
 uniffi::setup_scaffolding!();
 
+/// Legacy `lib.rs` ambient-time helper for VauchiPlatform
+/// surfaces (Phase 3 retirement target). Same shape as the
+/// helpers in `mobile_*.rs`; goes away with that retirement.
+#[allow(dead_code)]
+fn now_secs() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
 /// Return the Rust core library version (compile-time constant).
 ///
 /// Mobile apps log this at startup to detect mismatched builds.
@@ -2437,6 +2449,7 @@ mod tests {
             vauchi_core::FieldType::Email,
             "work",
             "bob@example.com",
+            now_secs(),
         )
         .with_note("Bob's work email".to_string());
 
@@ -2479,6 +2492,7 @@ mod tests {
             vauchi_core::FieldType::Email,
             "personal",
             "bob@personal.com",
+            now_secs(),
         );
         let mut card = vauchi_core::contact_card::ContactCard::new("Bob");
         card.add_field(email_field).unwrap();

@@ -48,7 +48,7 @@ pub fn create_vauchi_with_identity(name: &str) -> Vauchi {
 pub fn create_vauchi_with_card(name: &str, fields: Vec<(FieldType, &str, &str)>) -> Vauchi {
     let wb = create_vauchi_with_identity(name);
     for (field_type, label, value) in fields {
-        wb.add_own_field(ContactField::new(field_type, label, value))
+        wb.add_own_field(ContactField::new(field_type, label, value, 0))
             .unwrap();
     }
     wb

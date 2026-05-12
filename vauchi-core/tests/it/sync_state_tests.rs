@@ -26,6 +26,7 @@ fn test_sync_queue_card_update() {
         FieldType::Email,
         "email",
         "old@example.com",
+        0,
     ));
 
     let mut new_card = ContactCard::new("Alice");
@@ -33,6 +34,7 @@ fn test_sync_queue_card_update() {
         FieldType::Email,
         "email",
         "new@example.com",
+        0,
     ));
 
     let update_id = manager
@@ -85,6 +87,7 @@ fn test_sync_mark_delivered() {
         FieldType::Email,
         "email",
         "old@example.com",
+        0,
     ));
 
     let mut new_card = ContactCard::new("Alice");
@@ -92,6 +95,7 @@ fn test_sync_mark_delivered() {
         FieldType::Email,
         "email",
         "new@example.com",
+        0,
     ));
 
     let update_id = manager
@@ -116,6 +120,7 @@ fn test_sync_mark_failed_with_backoff() {
         FieldType::Email,
         "email",
         "old@example.com",
+        0,
     ));
 
     let mut new_card = ContactCard::new("Alice");
@@ -123,6 +128,7 @@ fn test_sync_mark_failed_with_backoff() {
         FieldType::Email,
         "email",
         "new@example.com",
+        0,
     ));
 
     let update_id = manager
@@ -148,6 +154,7 @@ fn test_sync_state_pending() {
         FieldType::Email,
         "email",
         "old@example.com",
+        0,
     ));
 
     let mut new_card = ContactCard::new("Alice");
@@ -155,6 +162,7 @@ fn test_sync_state_pending() {
         FieldType::Email,
         "email",
         "new@example.com",
+        0,
     ));
 
     manager
@@ -192,6 +200,7 @@ fn test_sync_state_failed() {
         FieldType::Email,
         "email",
         "old@example.com",
+        0,
     ));
 
     let mut new_card = ContactCard::new("Alice");
@@ -199,6 +208,7 @@ fn test_sync_state_failed() {
         FieldType::Email,
         "email",
         "new@example.com",
+        0,
     ));
 
     let update_id = manager
@@ -223,14 +233,21 @@ fn test_sync_coalesce_updates() {
         FieldType::Email,
         "email",
         "alice@example.com",
+        0,
     ));
     let mut card3 = ContactCard::new("Alice");
     let _ = card3.add_field(ContactField::new(
         FieldType::Email,
         "email",
         "alice@example.com",
+        0,
     ));
-    let _ = card3.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"));
+    let _ = card3.add_field(ContactField::new(
+        FieldType::Phone,
+        "phone",
+        "+1234567890",
+        0,
+    ));
 
     manager
         .queue_card_update("contact-1", &card1, &card2)
@@ -261,6 +278,7 @@ fn test_sync_status_multiple_contacts() {
         FieldType::Email,
         "email",
         "alice@example.com",
+        0,
     ));
 
     manager
@@ -289,6 +307,7 @@ fn test_sync_state_tracks_last_sync_timestamp() {
         FieldType::Email,
         "email",
         "old@example.com",
+        0,
     ));
 
     let mut new_card = ContactCard::new("Alice");
@@ -296,6 +315,7 @@ fn test_sync_state_tracks_last_sync_timestamp() {
         FieldType::Email,
         "email",
         "new@example.com",
+        0,
     ));
 
     // Get current timestamp before the update

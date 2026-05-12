@@ -20,10 +20,16 @@ fn setup_with_fields() -> (Vauchi, String) {
         FieldType::Email,
         "Work Email",
         "alice@example.com",
+        0,
     ))
     .unwrap();
-    wb.add_own_field(ContactField::new(FieldType::Phone, "Mobile", "+1-555-0000"))
-        .unwrap();
+    wb.add_own_field(ContactField::new(
+        FieldType::Phone,
+        "Mobile",
+        "+1-555-0000",
+        0,
+    ))
+    .unwrap();
 
     // Create exchanged contact (has visibility rules)
     let mut pk = [0u8; 32];

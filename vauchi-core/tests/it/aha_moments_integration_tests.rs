@@ -442,6 +442,7 @@ fn test_edit_triggers_first_edit_moment() {
         FieldType::Email,
         "work",
         "test@example.com",
+        0,
     ))
     .unwrap();
 

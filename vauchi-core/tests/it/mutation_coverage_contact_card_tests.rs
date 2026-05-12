@@ -114,7 +114,7 @@ fn validate_size_oversized_card_fails() {
     // Add many large fields to push serialized size over 64 KB
     for i in 0..200 {
         let value = "X".repeat(350);
-        let field = ContactField::new(FieldType::Custom, &format!("note-{i}"), &value);
+        let field = ContactField::new(FieldType::Custom, &format!("note-{i}"), &value, 0);
         card.add_field(field).unwrap();
     }
     card.validate_size()
@@ -129,7 +129,7 @@ fn validate_size_oversized_card_fails() {
 #[test]
 fn field_visibility_mut_allows_modification() {
     let mut card = ContactCard::new("Alice");
-    let field = ContactField::new(FieldType::Email, "work", "a@b.com");
+    let field = ContactField::new(FieldType::Email, "work", "a@b.com", 0);
     card.add_field(field).unwrap();
     let field_id = card.fields()[0].id().to_string();
 

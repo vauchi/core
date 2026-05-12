@@ -254,6 +254,7 @@ fn bench_storage(c: &mut Criterion) {
             FieldType::Email,
             "Work",
             "bench@example.com",
+            0,
         ))
         .unwrap();
         let shared_key = SymmetricKey::generate();
@@ -347,24 +348,28 @@ fn bench_serialization(c: &mut Criterion) {
         FieldType::Email,
         "Work",
         "work@example.com",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Email,
         "Personal",
         "personal@example.com",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Phone,
         "Mobile",
         "+1-555-123-4567",
+        0,
     ))
     .unwrap();
     card.add_field(ContactField::new(
         FieldType::Social,
         "Twitter",
         "@benchuser",
+        0,
     ))
     .unwrap();
 
@@ -397,6 +402,7 @@ fn bench_pagination(c: &mut Criterion) {
             FieldType::Email,
             "Work",
             &format!("c{}@example.com", n),
+            0,
         ))
         .unwrap();
         let mut pk = [0u8; 32];

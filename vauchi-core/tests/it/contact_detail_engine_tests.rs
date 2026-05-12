@@ -208,6 +208,7 @@ fn contact_detail_shows_field_notes() {
         vauchi_core::contact_card::FieldType::Phone,
         "Mobile",
         "+41 79 111 22 33",
+        0,
     );
     let field_id = field.id().to_string();
     card.add_field(field).unwrap();
@@ -276,6 +277,7 @@ fn contact_detail_shows_empty_field_note_when_none_saved() {
         vauchi_core::contact_card::FieldType::Email,
         "Work",
         "carol@example.com",
+        0,
     );
     let field_id = field.id().to_string();
     card.add_field(field).unwrap();
@@ -318,6 +320,7 @@ fn contact_detail_text_changed_saves_field_note() {
         vauchi_core::contact_card::FieldType::Phone,
         "Home",
         "+41 79 222 33 44",
+        0,
     );
     let field_id = field.id().to_string();
     card.add_field(field).unwrap();

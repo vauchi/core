@@ -79,13 +79,19 @@ fn test_card_delta_workflow() {
     // Create initial card
     let mut old_card = ContactCard::new("Test User");
     old_card
-        .add_field(ContactField::new(FieldType::Email, "work", "old@work.com"))
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "work",
+            "old@work.com",
+            0,
+        ))
         .unwrap();
     old_card
         .add_field(ContactField::new(
             FieldType::Phone,
             "mobile",
             "+15551234567",
+            0,
         ))
         .unwrap();
 
@@ -106,6 +112,7 @@ fn test_card_delta_workflow() {
             FieldType::Website,
             "blog",
             "https://blog.test.com",
+            0,
         ))
         .unwrap();
 

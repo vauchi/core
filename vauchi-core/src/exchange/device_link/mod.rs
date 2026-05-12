@@ -456,6 +456,7 @@ mod tests {
             crate::contact_card::FieldType::Email,
             "email",
             "alice@example.com",
+            crate::clock::ambient_now_secs(),
         ));
         storage.save_own_card(&own_card).unwrap();
 

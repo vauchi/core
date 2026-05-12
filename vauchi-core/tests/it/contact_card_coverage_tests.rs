@@ -60,7 +60,7 @@ fn test_set_display_name_max_length() {
 #[test]
 fn test_update_field_value() {
     let mut card = ContactCard::new("Test");
-    let field = ContactField::new(FieldType::Email, "work", "old@test.com");
+    let field = ContactField::new(FieldType::Email, "work", "old@test.com", 0);
     card.add_field(field).unwrap();
 
     let field_id = card.fields()[0].id().to_string();
@@ -81,7 +81,7 @@ fn test_update_field_value_not_found() {
 #[test]
 fn test_update_field_label() {
     let mut card = ContactCard::new("Test");
-    let field = ContactField::new(FieldType::Email, "work", "test@test.com");
+    let field = ContactField::new(FieldType::Email, "work", "test@test.com", 0);
     card.add_field(field).unwrap();
 
     let field_id = card.fields()[0].id().to_string();
@@ -116,10 +116,11 @@ fn test_max_fields_reached() {
             FieldType::Custom,
             &format!("field_{}", i),
             &format!("value_{}", i),
+            0,
         ))
         .unwrap();
     }
-    let result = card.add_field(ContactField::new(FieldType::Custom, "extra", "value"));
+    let result = card.add_field(ContactField::new(FieldType::Custom, "extra", "value", 0));
     result.expect_err("expected error");
 }
 
@@ -139,15 +140,16 @@ fn test_validate_size_ok() {
 #[test]
 fn test_reorder_fields() {
     let mut card = ContactCard::new("Test");
-    card.add_field(ContactField::new(FieldType::Email, "first", "a@a.com"))
+    card.add_field(ContactField::new(FieldType::Email, "first", "a@a.com", 0))
         .unwrap();
     card.add_field(ContactField::new(
         FieldType::Phone,
         "second",
         "+15551234567",
+        0,
     ))
     .unwrap();
-    card.add_field(ContactField::new(FieldType::Custom, "third", "val"))
+    card.add_field(ContactField::new(FieldType::Custom, "third", "val", 0))
         .unwrap();
 
     let id0 = card.fields()[0].id().to_string();
@@ -165,7 +167,7 @@ fn test_reorder_fields() {
 #[test]
 fn test_reorder_fields_invalid_id() {
     let mut card = ContactCard::new("Test");
-    card.add_field(ContactField::new(FieldType::Email, "a", "a@a.com"))
+    card.add_field(ContactField::new(FieldType::Email, "a", "a@a.com", 0))
         .unwrap();
     let result = card.reorder_fields(&["nonexistent"]);
     result.expect_err("expected error");
@@ -230,7 +232,7 @@ fn test_clear_avatar() {
 #[test]
 fn test_fields_mut() {
     let mut card = ContactCard::new("Test");
-    card.add_field(ContactField::new(FieldType::Email, "work", "a@a.com"))
+    card.add_field(ContactField::new(FieldType::Email, "work", "a@a.com", 0))
         .unwrap();
 
     let fields = card.fields_mut();

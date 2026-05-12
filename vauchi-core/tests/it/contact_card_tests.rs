@@ -20,7 +20,7 @@ fn test_create_card() {
 #[test]
 fn test_add_and_remove_field() {
     let mut card = ContactCard::new("Test");
-    let field = ContactField::new(FieldType::Email, "Work", "test@test.com");
+    let field = ContactField::new(FieldType::Email, "Work", "test@test.com", 0);
     card.add_field(field).unwrap();
     assert_eq!(card.fields().len(), 1);
 
@@ -40,7 +40,7 @@ fn test_contact_card_field_visibility_default_empty() {
 #[test]
 fn test_contact_card_show_hide_field() {
     let mut card = ContactCard::new("Alice");
-    let field = ContactField::new(FieldType::Email, "Work", "alice@example.com");
+    let field = ContactField::new(FieldType::Email, "Work", "alice@example.com", 0);
     let field_id = field.id().to_string();
     card.add_field(field).unwrap();
 
@@ -60,7 +60,7 @@ fn test_contact_card_show_hide_field() {
 #[test]
 fn test_remove_field_cleans_up_field_visibility() {
     let mut card = ContactCard::new("Alice");
-    let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890");
+    let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890", 0);
     let field_id = field.id().to_string();
     card.add_field(field).unwrap();
     card.set_field_shown(&field_id, true);

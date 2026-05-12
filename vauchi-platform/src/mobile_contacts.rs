@@ -86,6 +86,17 @@ pub(crate) fn enrich_contacts_batch(
         .collect()
 }
 
+/// Legacy `mobile_contacts.rs` surface (Phase 3 retirement
+/// target). `VauchiPlatform` does not hold a [`Clock`];
+/// ambient time stays here until the file is retired.
+fn now_secs() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
 #[uniffi::export]
 impl VauchiPlatform {
     // === Contact Card Operations ===
@@ -112,7 +123,7 @@ impl VauchiPlatform {
             detail: "Identity not found".to_string(),
         })?;
 
-        let field = ContactField::new(field_type.into(), &label, &value);
+        let field = ContactField::new(field_type.into(), &label, &value, now_secs());
         card.add_field(field)
             .map_err(|e| MobileError::InvalidInput {
                 field: String::new(),

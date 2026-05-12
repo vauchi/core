@@ -21,13 +21,19 @@ fn test_visibility_control_happy_path() {
 
     // Add fields to Alice's card
     alice_wb
-        .add_own_field(ContactField::new(FieldType::Phone, "work", "+15551111111"))
+        .add_own_field(ContactField::new(
+            FieldType::Phone,
+            "work",
+            "+15551111111",
+            0,
+        ))
         .unwrap();
     alice_wb
         .add_own_field(ContactField::new(
             FieldType::Phone,
             "personal",
             "+15552222222",
+            0,
         ))
         .unwrap();
     alice_wb
@@ -35,6 +41,7 @@ fn test_visibility_control_happy_path() {
             FieldType::Email,
             "work",
             "alice@company.com",
+            0,
         ))
         .unwrap();
 

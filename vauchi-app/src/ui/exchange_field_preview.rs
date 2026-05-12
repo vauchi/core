@@ -137,10 +137,16 @@ mod tests {
             FieldType::Email,
             "email",
             "alice@example.com",
+            0,
         ))
         .unwrap();
-        card.add_field(ContactField::new(FieldType::Phone, "phone", "+1234567890"))
-            .unwrap();
+        card.add_field(ContactField::new(
+            FieldType::Phone,
+            "phone",
+            "+1234567890",
+            0,
+        ))
+        .unwrap();
         card
     }
 

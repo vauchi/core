@@ -47,6 +47,7 @@ fn test_set_field_private_queues_update() {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ))
     .unwrap();
 
@@ -77,8 +78,13 @@ fn test_set_field_private_queues_update() {
 fn test_set_field_public_queues_update() {
     let wb = create_test_vauchi();
 
-    wb.add_own_field(ContactField::new(FieldType::Phone, "mobile", "+1234567890"))
-        .unwrap();
+    wb.add_own_field(ContactField::new(
+        FieldType::Phone,
+        "mobile",
+        "+1234567890",
+        0,
+    ))
+    .unwrap();
 
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
 
@@ -102,6 +108,7 @@ fn test_repropagate_skips_no_ratchet() {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ))
     .unwrap();
 
@@ -151,6 +158,7 @@ fn test_set_field_restricted_queues_update() {
         FieldType::Email,
         "personal",
         "alice@personal.com",
+        0,
     ))
     .unwrap();
 
@@ -183,6 +191,7 @@ fn test_add_contact_to_label_triggers_repropagate() {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ))
     .unwrap();
 
@@ -216,6 +225,7 @@ fn test_remove_contact_from_label_triggers_repropagate() {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ))
     .unwrap();
 
@@ -245,6 +255,7 @@ fn test_set_label_field_visibility_repropagates_to_all_members() {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ))
     .unwrap();
 
@@ -281,6 +292,7 @@ fn test_set_contact_override_triggers_repropagate() {
         FieldType::Email,
         "personal",
         "alice@personal.com",
+        0,
     ))
     .unwrap();
 
@@ -311,12 +323,14 @@ fn test_repropagate_uses_effective_visibility() {
         FieldType::Email,
         "work",
         "alice@company.com",
+        0,
     ))
     .unwrap();
     wb.add_own_field(ContactField::new(
         FieldType::Phone,
         "personal-phone",
         "+1234567890",
+        0,
     ))
     .unwrap();
 

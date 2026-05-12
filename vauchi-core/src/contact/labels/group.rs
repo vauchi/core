@@ -88,9 +88,9 @@ impl Group {
     }
 
     /// Sets the label name.
-    pub fn set_name(&mut self, name: &str) {
+    pub fn set_name(&mut self, name: &str, now: u64) {
         self.name = name.to_string();
-        self.touch();
+        self.touch(now);
     }
 
     /// Returns the display name override, if set.
@@ -105,11 +105,15 @@ impl Group {
     ///
     /// Validates that the name is non-empty, not whitespace-only, and
     /// at most 100 characters (after trimming).
-    pub fn set_display_name_override(&mut self, name: Option<&str>) -> Result<(), GroupError> {
+    pub fn set_display_name_override(
+        &mut self,
+        name: Option<&str>,
+        now: u64,
+    ) -> Result<(), GroupError> {
         match name {
             None => {
                 self.display_name_override = None;
-                self.touch();
+                self.touch(now);
                 Ok(())
             }
             Some(raw) => {
@@ -125,7 +129,7 @@ impl Group {
                     ));
                 }
                 self.display_name_override = Some(trimmed.to_string());
-                self.touch();
+                self.touch(now);
                 Ok(())
             }
         }
@@ -159,10 +163,10 @@ impl Group {
     /// Adds a contact to this label.
     ///
     /// Returns true if the contact was added (wasn't already present).
-    pub fn add_contact(&mut self, contact_id: &str) -> bool {
+    pub fn add_contact(&mut self, contact_id: &str, now: u64) -> bool {
         let added = self.contacts.insert(contact_id.to_string());
         if added {
-            self.touch();
+            self.touch(now);
         }
         added
     }
@@ -170,10 +174,10 @@ impl Group {
     /// Removes a contact from this label.
     ///
     /// Returns true if the contact was removed (was present).
-    pub fn remove_contact(&mut self, contact_id: &str) -> bool {
+    pub fn remove_contact(&mut self, contact_id: &str, now: u64) -> bool {
         let removed = self.contacts.remove(contact_id);
         if removed {
-            self.touch();
+            self.touch(now);
         }
         removed
     }
@@ -191,10 +195,10 @@ impl Group {
     /// Adds a field to the visible fields for this label.
     ///
     /// Returns true if the field was added (wasn't already present).
-    pub fn add_visible_field(&mut self, field_id: &str) -> bool {
+    pub fn add_visible_field(&mut self, field_id: &str, now: u64) -> bool {
         let added = self.visible_fields.insert(field_id.to_string());
         if added {
-            self.touch();
+            self.touch(now);
         }
         added
     }
@@ -202,18 +206,18 @@ impl Group {
     /// Removes a field from the visible fields for this label.
     ///
     /// Returns true if the field was removed (was present).
-    pub fn remove_visible_field(&mut self, field_id: &str) -> bool {
+    pub fn remove_visible_field(&mut self, field_id: &str, now: u64) -> bool {
         let removed = self.visible_fields.remove(field_id);
         if removed {
-            self.touch();
+            self.touch(now);
         }
         removed
     }
 
     /// Sets all visible fields at once.
-    pub fn set_visible_fields(&mut self, field_ids: HashSet<String>) {
+    pub fn set_visible_fields(&mut self, field_ids: HashSet<String>, now: u64) {
         self.visible_fields = field_ids;
-        self.touch();
+        self.touch(now);
     }
 
     /// Returns the creation timestamp.
@@ -227,8 +231,8 @@ impl Group {
     }
 
     /// Updates the modification timestamp.
-    fn touch(&mut self) {
-        self.modified_at = crate::clock::ambient_now_secs();
+    fn touch(&mut self, now: u64) {
+        self.modified_at = now;
     }
 }
 
@@ -246,13 +250,13 @@ mod tests {
 
         // Set override
         label
-            .set_display_name_override(Some("Matt"))
+            .set_display_name_override(Some("Matt"), 0)
             .expect("valid name should succeed");
         assert_eq!(label.display_name_override(), Some("Matt"));
 
         // Clear override
         label
-            .set_display_name_override(None)
+            .set_display_name_override(None, 0)
             .expect("clearing should succeed");
         assert_eq!(label.display_name_override(), None);
     }
@@ -262,28 +266,28 @@ mod tests {
         let mut label = Group::new("Friends", 0);
 
         // Empty string should fail
-        let result = label.set_display_name_override(Some(""));
+        let result = label.set_display_name_override(Some(""), 0);
         assert!(matches!(result, Err(GroupError::InvalidName(_))));
 
         // Whitespace-only should fail
-        let result = label.set_display_name_override(Some("   "));
+        let result = label.set_display_name_override(Some("   "), 0);
         assert!(matches!(result, Err(GroupError::InvalidName(_))));
 
         // Too long (>100 chars) should fail
         let long_name = "a".repeat(101);
-        let result = label.set_display_name_override(Some(&long_name));
+        let result = label.set_display_name_override(Some(&long_name), 0);
         assert!(matches!(result, Err(GroupError::InvalidName(_))));
 
         // Exactly 100 chars should succeed
         let max_name = "b".repeat(100);
         label
-            .set_display_name_override(Some(&max_name))
+            .set_display_name_override(Some(&max_name), 0)
             .expect("100 chars should succeed");
         assert_eq!(label.display_name_override(), Some(max_name.as_str()));
 
         // Whitespace trimming
         label
-            .set_display_name_override(Some("  Dr. Egloff  "))
+            .set_display_name_override(Some("  Dr. Egloff  "), 0)
             .expect("trimmed name should succeed");
         assert_eq!(label.display_name_override(), Some("Dr. Egloff"));
     }
@@ -297,13 +301,13 @@ mod tests {
 
         // With override, returns override
         label
-            .set_display_name_override(Some("Dr. Egloff"))
+            .set_display_name_override(Some("Dr. Egloff"), 0)
             .expect("valid name");
         assert_eq!(label.resolve_display_name("Mattia Egloff"), "Dr. Egloff");
 
         // After clearing, returns default again
         label
-            .set_display_name_override(None)
+            .set_display_name_override(None, 0)
             .expect("clearing should succeed");
         assert_eq!(label.resolve_display_name("Mattia Egloff"), "Mattia Egloff");
     }

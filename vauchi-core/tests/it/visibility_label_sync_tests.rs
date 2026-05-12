@@ -58,21 +58,21 @@ fn test_label_sync_across_devices() {
 
     // Add contacts and fields
     device_a_manager
-        .add_contact_to_group(&family_id, "bob-id")
+        .add_contact_to_group(&family_id, "bob-id", 0)
         .unwrap();
     device_a_manager
-        .add_contact_to_group(&family_id, "carol-id")
+        .add_contact_to_group(&family_id, "carol-id", 0)
         .unwrap();
     device_a_manager
-        .add_contact_to_group(&friends_id, "dave-id")
+        .add_contact_to_group(&friends_id, "dave-id", 0)
         .unwrap();
 
     let family = device_a_manager.get_group_mut(&family_id).unwrap();
-    family.add_visible_field("home-address");
-    family.add_visible_field("personal-phone");
+    family.add_visible_field("home-address", 0);
+    family.add_visible_field("personal-phone", 0);
 
     let friends = device_a_manager.get_group_mut(&friends_id).unwrap();
-    friends.add_visible_field("personal-email");
+    friends.add_visible_field("personal-email", 0);
 
     // =========================================================================
     // Create SyncItem::LabelChange for syncing to Device B
@@ -286,8 +286,8 @@ fn test_delete_contact_clears_overrides() {
     let bob = "bob-id";
 
     // Add Bob to both labels
-    manager.add_contact_to_group(&family_id, bob).unwrap();
-    manager.add_contact_to_group(&friends_id, bob).unwrap();
+    manager.add_contact_to_group(&family_id, bob, 0).unwrap();
+    manager.add_contact_to_group(&friends_id, bob, 0).unwrap();
 
     // Set some per-contact overrides
     manager.set_contact_override(bob, "field-1", true);
@@ -300,7 +300,7 @@ fn test_delete_contact_clears_overrides() {
         .expect("expected Some");
 
     // Remove Bob from all labels (simulates contact deletion)
-    manager.remove_contact_from_all_groups(bob);
+    manager.remove_contact_from_all_groups(bob, 0);
 
     // Bob should be in no labels
     assert_eq!(manager.groups_for_contact(bob).len(), 0);
@@ -338,7 +338,7 @@ fn test_set_visible_fields_bulk() {
     .collect();
 
     let label = manager.get_group_mut(&label_id).unwrap();
-    label.set_visible_fields(work_fields);
+    label.set_visible_fields(work_fields, 0);
 
     // Verify all fields are set
     let label = manager.get_group(&label_id).unwrap();
@@ -353,7 +353,7 @@ fn test_set_visible_fields_bulk() {
     let minimal_fields: HashSet<String> = ["work-email".to_string()].into_iter().collect();
 
     let label = manager.get_group_mut(&label_id).unwrap();
-    label.set_visible_fields(minimal_fields);
+    label.set_visible_fields(minimal_fields, 0);
 
     // Verify replacement
     let label = manager.get_group(&label_id).unwrap();
@@ -369,43 +369,47 @@ fn test_set_visible_fields_bulk() {
 // @internal
 #[test]
 fn test_label_timestamps() {
+    // Caller-controlled `now` lets us pin each mutation's
+    // timestamp deterministically. The original assertions
+    // (`modified_at >= initial_modified`) trivially held under
+    // ambient `SystemTime::now()` because real wall-clock time
+    // advances monotonically; here we use distinct values to
+    // assert that the mutator-stamping mechanism actually runs.
     let mut manager = GroupManager::new();
 
-    let label = manager.create_group("Test Label", 0).unwrap();
+    let label = manager.create_group("Test Label", 1000).unwrap();
     let label_id = label.id().to_string();
 
-    let created_at = label.created_at();
-    let initial_modified = label.modified_at();
+    // new() stamps both created_at and modified_at from the same `now`.
+    assert_eq!(label.created_at(), 1000);
+    assert_eq!(label.modified_at(), 1000);
 
-    // Initially, created_at and modified_at should be equal
-    assert_eq!(created_at, initial_modified);
-
-    // Modify the label
+    // set_name updates modified_at, leaves created_at.
     let label = manager.get_group_mut(&label_id).unwrap();
-    label.set_name("Updated Label");
-
+    label.set_name("Updated Label", 1100);
     let label = manager.get_group(&label_id).unwrap();
+    assert_eq!(
+        label.created_at(),
+        1000,
+        "created_at must be immutable after construction"
+    );
+    assert_eq!(
+        label.modified_at(),
+        1100,
+        "set_name must update modified_at"
+    );
 
-    // created_at should be unchanged
-    assert_eq!(label.created_at(), created_at);
-
-    // modified_at should be updated (or equal if within same second)
-    assert!(label.modified_at() >= initial_modified);
-
-    // Modify again by adding a field
+    // add_visible_field updates modified_at.
     let label = manager.get_group_mut(&label_id).unwrap();
-    label.add_visible_field("test-field");
-
+    label.add_visible_field("test-field", 1200);
     let label = manager.get_group(&label_id).unwrap();
-    assert!(label.modified_at() >= initial_modified);
+    assert_eq!(label.modified_at(), 1200);
 
-    // Modify by adding a contact
-    let prev_modified = label.modified_at();
+    // add_contact updates modified_at.
     let label = manager.get_group_mut(&label_id).unwrap();
-    label.add_contact("test-contact");
-
+    label.add_contact("test-contact", 1300);
     let label = manager.get_group(&label_id).unwrap();
-    assert!(label.modified_at() >= prev_modified);
+    assert_eq!(label.modified_at(), 1300);
 }
 
 /// Tests serialization and deserialization of GroupManager.
@@ -418,13 +422,17 @@ fn test_label_manager_serialization() {
     let family_id = manager.create_group("Family", 0).unwrap().id().to_string();
     let friends_id = manager.create_group("Friends", 0).unwrap().id().to_string();
 
-    manager.add_contact_to_group(&family_id, "bob").unwrap();
-    manager.add_contact_to_group(&family_id, "carol").unwrap();
-    manager.add_contact_to_group(&friends_id, "dave").unwrap();
+    manager.add_contact_to_group(&family_id, "bob", 0).unwrap();
+    manager
+        .add_contact_to_group(&family_id, "carol", 0)
+        .unwrap();
+    manager
+        .add_contact_to_group(&friends_id, "dave", 0)
+        .unwrap();
 
     let family = manager.get_group_mut(&family_id).unwrap();
-    family.add_visible_field("home-address");
-    family.add_visible_field("personal-phone");
+    family.add_visible_field("home-address", 0);
+    family.add_visible_field("personal-phone", 0);
 
     manager.set_contact_override("bob", "special-field", true);
 

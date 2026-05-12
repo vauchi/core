@@ -37,7 +37,7 @@ impl Vauchi {
     ) -> VauchiResult<()> {
         let mut label = self.storage.load_group(label_id)?;
         label
-            .set_display_name_override(name_override)
+            .set_display_name_override(name_override, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         self.storage.save_group(&label)?;
         Ok(())

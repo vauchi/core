@@ -55,7 +55,7 @@ mod visibility_integration_tests {
 
         // Associate field with label
         let label = manager.get_group_mut(&label_id).unwrap();
-        label.add_visible_field(field_id);
+        label.add_visible_field(field_id, 0);
 
         // Verify association
         let label = manager.get_group(&label_id).unwrap();
@@ -78,11 +78,11 @@ mod visibility_integration_tests {
         manager
             .get_group_mut(&work_id)
             .unwrap()
-            .add_visible_field(field_id);
+            .add_visible_field(field_id, 0);
         manager
             .get_group_mut(&friends_id)
             .unwrap()
-            .add_visible_field(field_id);
+            .add_visible_field(field_id, 0);
 
         // Verify field is visible to both labels
         assert!(
@@ -111,7 +111,9 @@ mod visibility_integration_tests {
         let contact_id = "family-member-id";
 
         // Assign contact to label
-        manager.add_contact_to_group(&label_id, contact_id).unwrap();
+        manager
+            .add_contact_to_group(&label_id, contact_id, 0)
+            .unwrap();
 
         // Verify assignment
         let contact_labels = manager.groups_for_contact(contact_id);
@@ -138,14 +140,16 @@ mod visibility_integration_tests {
         manager
             .get_group_mut(&label_id)
             .unwrap()
-            .add_visible_field(field_id);
+            .add_visible_field(field_id, 0);
 
         // Test visibility: non-member cannot see field
         let can_see = manager.can_see_via_labels(contact_id, field_id);
         assert_eq!(can_see, None);
 
         // Add contact to label
-        manager.add_contact_to_group(&label_id, contact_id).unwrap();
+        manager
+            .add_contact_to_group(&label_id, contact_id, 0)
+            .unwrap();
 
         // Test visibility: member can see field
         let can_see = manager.can_see_via_labels(contact_id, field_id);
@@ -167,7 +171,7 @@ mod visibility_integration_tests {
         manager
             .get_group_mut(&label_id)
             .unwrap()
-            .add_visible_field(field_id);
+            .add_visible_field(field_id, 0);
 
         // Grant override to specific contact
         manager.set_contact_override(contact_id, field_id, true);

@@ -148,7 +148,7 @@ proptest! {
             // Add some fields as visible to make labels non-trivial
             if !field_ids.is_empty() {
                 let label_mut = label_manager.get_group_mut(&label_id).unwrap();
-                label_mut.add_visible_field(&field_ids[0]);
+                label_mut.add_visible_field(&field_ids[0], 0);
             }
             label_ids.push(label_id);
         }
@@ -177,14 +177,14 @@ proptest! {
         let label_id = label.id().to_string();
 
         // Add contact to label
-        label_manager.add_contact_to_group(&label_id, "bob").unwrap();
+        label_manager.add_contact_to_group(&label_id, "bob", 0).unwrap();
 
         // Set field visibility according to the mask
         let mut expected_visible: HashSet<String> = HashSet::new();
         let label_mut = label_manager.get_group_mut(&label_id).unwrap();
         for (i, fid) in field_ids.iter().enumerate() {
             if i < visible_mask.len() && visible_mask[i] {
-                label_mut.add_visible_field(fid);
+                label_mut.add_visible_field(fid, 0);
                 expected_visible.insert(fid.clone());
             }
         }
@@ -215,12 +215,12 @@ proptest! {
             let label_id = label.id().to_string();
 
             // Add contact to each label
-            label_manager.add_contact_to_group(&label_id, "carol").unwrap();
+            label_manager.add_contact_to_group(&label_id, "carol", 0).unwrap();
 
             // Each label shows one distinct field (if available)
             if i < field_ids.len() {
                 let label_mut = label_manager.get_group_mut(&label_id).unwrap();
-                label_mut.add_visible_field(&field_ids[i]);
+                label_mut.add_visible_field(&field_ids[i], 0);
                 expected_visible.insert(field_ids[i].clone());
             }
         }
@@ -266,12 +266,12 @@ proptest! {
         let label = label_manager.create_group("AllVisible", 0).unwrap();
         let label_id = label.id().to_string();
 
-        label_manager.add_contact_to_group(&label_id, "dave").unwrap();
+        label_manager.add_contact_to_group(&label_id, "dave", 0).unwrap();
 
         // Make all fields visible in the label
         let label_mut = label_manager.get_group_mut(&label_id).unwrap();
         for fid in &field_ids {
-            label_mut.add_visible_field(fid);
+            label_mut.add_visible_field(fid, 0);
         }
 
         // Override: hide one specific field from dave
@@ -314,7 +314,7 @@ proptest! {
         let label = label_manager.create_group("EmptyLabel", 0).unwrap();
         let label_id = label.id().to_string();
 
-        label_manager.add_contact_to_group(&label_id, "eve").unwrap();
+        label_manager.add_contact_to_group(&label_id, "eve", 0).unwrap();
 
         // Override: grant visibility to one field
         let granted_field = &field_ids[grant_index];
@@ -379,11 +379,11 @@ proptest! {
         let label = label_manager.create_group("Group1", 0).unwrap();
         let label_id = label.id().to_string();
 
-        label_manager.add_contact_to_group(&label_id, &contact_id).unwrap();
+        label_manager.add_contact_to_group(&label_id, &contact_id, 0).unwrap();
 
         if !field_ids.is_empty() {
             let label_mut = label_manager.get_group_mut(&label_id).unwrap();
-            label_mut.add_visible_field(&field_ids[0]);
+            label_mut.add_visible_field(&field_ids[0], 0);
         }
 
         let result1 = resolve_visible_fields(&card, &label_manager, &contact_id);

@@ -103,8 +103,13 @@ impl GroupManager {
         Ok(self.groups.get(&id).expect("just inserted"))
     }
 
-    /// Renames a group.
-    pub fn rename_group(&mut self, group_id: &str, new_name: &str) -> Result<(), GroupError> {
+    /// Renames a group. `now` stamps `modified_at`.
+    pub fn rename_group(
+        &mut self,
+        group_id: &str,
+        new_name: &str,
+        now: u64,
+    ) -> Result<(), GroupError> {
         let new_name = new_name.trim();
 
         // Validate new name
@@ -130,7 +135,7 @@ impl GroupManager {
             .get_mut(group_id)
             .ok_or_else(|| GroupError::NotFound(group_id.to_string()))?;
 
-        group.set_name(new_name);
+        group.set_name(new_name, now);
         Ok(())
     }
 
@@ -161,38 +166,41 @@ impl GroupManager {
             .collect()
     }
 
-    /// Adds a contact to a group.
+    /// Adds a contact to a group. `now` stamps `modified_at`.
     pub fn add_contact_to_group(
         &mut self,
         group_id: &str,
         contact_id: &str,
+        now: u64,
     ) -> Result<bool, GroupError> {
         let group = self
             .groups
             .get_mut(group_id)
             .ok_or_else(|| GroupError::NotFound(group_id.to_string()))?;
 
-        Ok(group.add_contact(contact_id))
+        Ok(group.add_contact(contact_id, now))
     }
 
-    /// Removes a contact from a group.
+    /// Removes a contact from a group. `now` stamps `modified_at`.
     pub fn remove_contact_from_group(
         &mut self,
         group_id: &str,
         contact_id: &str,
+        now: u64,
     ) -> Result<bool, GroupError> {
         let group = self
             .groups
             .get_mut(group_id)
             .ok_or_else(|| GroupError::NotFound(group_id.to_string()))?;
 
-        Ok(group.remove_contact(contact_id))
+        Ok(group.remove_contact(contact_id, now))
     }
 
-    /// Removes a contact from all groups (e.g., when deleting the contact).
-    pub fn remove_contact_from_all_groups(&mut self, contact_id: &str) {
+    /// Removes a contact from all groups (e.g., when deleting the
+    /// contact). `now` stamps `modified_at` on each touched group.
+    pub fn remove_contact_from_all_groups(&mut self, contact_id: &str, now: u64) {
         for group in self.groups.values_mut() {
-            group.remove_contact(contact_id);
+            group.remove_contact(contact_id, now);
         }
         self.per_contact_overrides.remove(contact_id);
     }
@@ -267,7 +275,13 @@ impl GroupManager {
     /// Union of members and visible fields. The source group is deleted.
     /// Per-contact overrides are preserved (they're contact-scoped, not group-scoped).
     /// The target group keeps its name and display_name_override.
-    pub fn merge_groups(&mut self, target_id: &str, source_id: &str) -> Result<(), GroupError> {
+    /// `now` stamps `modified_at` on the target as members merge in.
+    pub fn merge_groups(
+        &mut self,
+        target_id: &str,
+        source_id: &str,
+        now: u64,
+    ) -> Result<(), GroupError> {
         if target_id == source_id {
             return Err(GroupError::InvalidName(
                 "Cannot merge a group with itself".to_string(),
@@ -292,12 +306,12 @@ impl GroupManager {
 
         // Union of contacts
         for contact_id in source.contacts() {
-            target.add_contact(contact_id);
+            target.add_contact(contact_id, now);
         }
 
         // Union of visible fields
         for field_id in source.visible_fields() {
-            target.add_visible_field(field_id);
+            target.add_visible_field(field_id, now);
         }
 
         Ok(())
@@ -380,7 +394,9 @@ mod tests {
         let label = manager.create_group("Family", 0).unwrap();
         let label_id = label.id().to_string();
 
-        manager.add_contact_to_group(&label_id, "bob-id").unwrap();
+        manager
+            .add_contact_to_group(&label_id, "bob-id", 0)
+            .unwrap();
 
         let label = manager.get_group(&label_id).unwrap();
         assert!(label.contains_contact("bob-id"));
@@ -393,9 +409,11 @@ mod tests {
         let label = manager.create_group("Family", 0).unwrap();
         let label_id = label.id().to_string();
 
-        manager.add_contact_to_group(&label_id, "bob-id").unwrap();
         manager
-            .remove_contact_from_group(&label_id, "bob-id")
+            .add_contact_to_group(&label_id, "bob-id", 0)
+            .unwrap();
+        manager
+            .remove_contact_from_group(&label_id, "bob-id", 0)
             .unwrap();
 
         let label = manager.get_group(&label_id).unwrap();
@@ -409,9 +427,11 @@ mod tests {
         let label_id = label.id().to_string();
 
         // Add contact and field
-        manager.add_contact_to_group(&label_id, "bob-id").unwrap();
+        manager
+            .add_contact_to_group(&label_id, "bob-id", 0)
+            .unwrap();
         let label = manager.get_group_mut(&label_id).unwrap();
-        label.add_visible_field("personal-phone");
+        label.add_visible_field("personal-phone", 0);
 
         // Bob should see the field
         assert_eq!(
@@ -433,9 +453,11 @@ mod tests {
         let label_id = label.id().to_string();
 
         // Add Bob to Friends and set personal-phone as visible
-        manager.add_contact_to_group(&label_id, "bob-id").unwrap();
+        manager
+            .add_contact_to_group(&label_id, "bob-id", 0)
+            .unwrap();
         let label = manager.get_group_mut(&label_id).unwrap();
-        label.add_visible_field("personal-phone");
+        label.add_visible_field("personal-phone", 0);
 
         // Bob should see personal-phone via label
         assert_eq!(
@@ -465,18 +487,18 @@ mod tests {
 
         // Add Carol to both labels
         manager
-            .add_contact_to_group(&family_id, "carol-id")
+            .add_contact_to_group(&family_id, "carol-id", 0)
             .unwrap();
         manager
-            .add_contact_to_group(&friends_id, "carol-id")
+            .add_contact_to_group(&friends_id, "carol-id", 0)
             .unwrap();
 
         // Set different fields for each label
         let family = manager.get_group_mut(&family_id).unwrap();
-        family.add_visible_field("home-address");
+        family.add_visible_field("home-address", 0);
 
         let friends = manager.get_group_mut(&friends_id).unwrap();
-        friends.add_visible_field("phone");
+        friends.add_visible_field("phone", 0);
 
         // Carol should see both fields (union of labels)
         let visible = manager.visible_fields_via_labels("carol-id");
@@ -490,7 +512,7 @@ mod tests {
         let label = manager.create_group("Work", 0).unwrap();
         let label_id = label.id().to_string();
 
-        manager.rename_group(&label_id, "Colleagues").unwrap();
+        manager.rename_group(&label_id, "Colleagues", 0).unwrap();
 
         let label = manager.get_group(&label_id).unwrap();
         assert_eq!(label.name(), "Colleagues");
@@ -502,7 +524,9 @@ mod tests {
         let label = manager.create_group("Temporary", 0).unwrap();
         let label_id = label.id().to_string();
 
-        manager.add_contact_to_group(&label_id, "bob-id").unwrap();
+        manager
+            .add_contact_to_group(&label_id, "bob-id", 0)
+            .unwrap();
 
         let deleted = manager.delete_group(&label_id).unwrap();
         assert_eq!(deleted.name(), "Temporary");
@@ -542,24 +566,24 @@ mod tests {
             .to_string();
 
         // Add different contacts and fields to each
-        manager.add_contact_to_group(&target, "alice").unwrap();
-        manager.add_contact_to_group(&source, "bob").unwrap();
-        manager.add_contact_to_group(&source, "alice").unwrap(); // overlap
+        manager.add_contact_to_group(&target, "alice", 0).unwrap();
+        manager.add_contact_to_group(&source, "bob", 0).unwrap();
+        manager.add_contact_to_group(&source, "alice", 0).unwrap(); // overlap
 
         manager
             .get_group_mut(&target)
             .unwrap()
-            .add_visible_field("phone");
+            .add_visible_field("phone", 0);
         manager
             .get_group_mut(&source)
             .unwrap()
-            .add_visible_field("email");
+            .add_visible_field("email", 0);
         manager
             .get_group_mut(&source)
             .unwrap()
-            .add_visible_field("phone"); // overlap
+            .add_visible_field("phone", 0); // overlap
 
-        manager.merge_groups(&target, &source).unwrap();
+        manager.merge_groups(&target, &source, 0).unwrap();
 
         // Target has union of members
         let merged = manager.get_group(&target).unwrap();
@@ -581,7 +605,7 @@ mod tests {
         let mut manager = GroupManager::new();
         let target = manager.create_group("Family", 0).unwrap().id().to_string();
 
-        let result = manager.merge_groups(&target, "nonexistent");
+        let result = manager.merge_groups(&target, "nonexistent", 0);
         assert!(matches!(result, Err(GroupError::NotFound(_))));
     }
 
@@ -590,7 +614,7 @@ mod tests {
         let mut manager = GroupManager::new();
         let source = manager.create_group("Friends", 0).unwrap().id().to_string();
 
-        let result = manager.merge_groups("nonexistent", &source);
+        let result = manager.merge_groups("nonexistent", &source, 0);
         assert!(matches!(result, Err(GroupError::NotFound(_))));
         assert!(
             manager.get_group(&source).is_some(),
@@ -603,7 +627,7 @@ mod tests {
         let mut manager = GroupManager::new();
         let group = manager.create_group("Family", 0).unwrap().id().to_string();
 
-        let result = manager.merge_groups(&group, &group);
+        let result = manager.merge_groups(&group, &group, 0);
         assert!(matches!(result, Err(GroupError::InvalidName(_))));
     }
 
@@ -620,10 +644,10 @@ mod tests {
         manager
             .get_group_mut(&target)
             .unwrap()
-            .set_display_name_override(Some("Mom's Son"))
+            .set_display_name_override(Some("Mom's Son"), 0)
             .unwrap();
 
-        manager.merge_groups(&target, &source).unwrap();
+        manager.merge_groups(&target, &source, 0).unwrap();
 
         let merged = manager.get_group(&target).unwrap();
         assert_eq!(merged.resolve_display_name("Default"), "Mom's Son");
@@ -636,10 +660,10 @@ mod tests {
         let source = manager.create_group("Friends", 0).unwrap().id().to_string();
 
         // Bob is only in source, has an override
-        manager.add_contact_to_group(&source, "bob").unwrap();
+        manager.add_contact_to_group(&source, "bob", 0).unwrap();
         manager.set_contact_override("bob", "phone", false);
 
-        manager.merge_groups(&target, &source).unwrap();
+        manager.merge_groups(&target, &source, 0).unwrap();
 
         // Bob's override is preserved
         assert_eq!(manager.get_contact_override("bob", "phone"), Some(false));

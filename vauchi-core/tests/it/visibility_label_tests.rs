@@ -136,7 +136,9 @@ fn test_label_crud_operations() {
     // =========================================================================
 
     // Rename a label
-    manager.rename_group(&friends_id, "Close Friends").unwrap();
+    manager
+        .rename_group(&friends_id, "Close Friends", 0)
+        .unwrap();
     let renamed = manager.get_group(&friends_id).unwrap();
     assert_eq!(renamed.name(), "Close Friends");
 
@@ -149,28 +151,28 @@ fn test_label_crud_operations() {
         .expect("expected Some");
 
     // Cannot rename to existing label name
-    let rename_dup_result = manager.rename_group(&friends_id, "Family");
+    let rename_dup_result = manager.rename_group(&friends_id, "Family", 0);
     assert!(matches!(
         rename_dup_result,
         Err(GroupError::DuplicateName(_))
     ));
 
     // Cannot rename to empty name
-    let rename_empty_result = manager.rename_group(&friends_id, "");
+    let rename_empty_result = manager.rename_group(&friends_id, "", 0);
     assert!(matches!(
         rename_empty_result,
         Err(GroupError::InvalidName(_))
     ));
 
     // Cannot rename non-existent label
-    let rename_missing_result = manager.rename_group("non-existent-id", "New Name");
+    let rename_missing_result = manager.rename_group("non-existent-id", "New Name", 0);
     assert!(matches!(
         rename_missing_result,
         Err(GroupError::NotFound(_))
     ));
 
     // Renaming to same name is allowed (no-op)
-    manager.rename_group(&family_id, "Family").unwrap();
+    manager.rename_group(&family_id, "Family", 0).unwrap();
     assert_eq!(manager.get_group(&family_id).unwrap().name(), "Family");
 
     // =========================================================================
@@ -179,7 +181,7 @@ fn test_label_crud_operations() {
 
     // Add a contact to a label before deletion
     manager
-        .add_contact_to_group(&professional_id, "bob-id")
+        .add_contact_to_group(&professional_id, "bob-id", 0)
         .unwrap();
 
     // Delete the label
@@ -284,7 +286,7 @@ fn test_contact_assignment_to_label() {
     // =========================================================================
 
     // Add Bob to Family
-    let added = manager.add_contact_to_group(family_id, bob).unwrap();
+    let added = manager.add_contact_to_group(family_id, bob, 0).unwrap();
     assert!(added, "Bob should be newly added");
 
     // Verify Bob is in Family
@@ -293,7 +295,7 @@ fn test_contact_assignment_to_label() {
     assert_eq!(family.contact_count(), 1);
 
     // Adding again returns false (already present)
-    let added_again = manager.add_contact_to_group(family_id, bob).unwrap();
+    let added_again = manager.add_contact_to_group(family_id, bob, 0).unwrap();
     assert!(!added_again, "Bob is already in Family");
 
     // =========================================================================
@@ -301,9 +303,9 @@ fn test_contact_assignment_to_label() {
     // =========================================================================
 
     // Add Bob, Carol, and Dave to Friends
-    manager.add_contact_to_group(friends_id, bob).unwrap();
-    manager.add_contact_to_group(friends_id, carol).unwrap();
-    manager.add_contact_to_group(friends_id, dave).unwrap();
+    manager.add_contact_to_group(friends_id, bob, 0).unwrap();
+    manager.add_contact_to_group(friends_id, carol, 0).unwrap();
+    manager.add_contact_to_group(friends_id, dave, 0).unwrap();
 
     let friends = manager.get_group(friends_id).unwrap();
     assert_eq!(friends.contact_count(), 3);
@@ -316,7 +318,9 @@ fn test_contact_assignment_to_label() {
     // =========================================================================
 
     // Carol is also a colleague
-    manager.add_contact_to_group(colleagues_id, carol).unwrap();
+    manager
+        .add_contact_to_group(colleagues_id, carol, 0)
+        .unwrap();
 
     // Carol should be in both Friends and Colleagues
     let carol_labels = manager.groups_for_contact(carol);
@@ -335,7 +339,9 @@ fn test_contact_assignment_to_label() {
     // =========================================================================
 
     // Remove Dave from Friends
-    let removed = manager.remove_contact_from_group(friends_id, dave).unwrap();
+    let removed = manager
+        .remove_contact_from_group(friends_id, dave, 0)
+        .unwrap();
     assert!(removed, "Dave should be removed");
 
     let friends = manager.get_group(friends_id).unwrap();
@@ -343,7 +349,9 @@ fn test_contact_assignment_to_label() {
     assert_eq!(friends.contact_count(), 2);
 
     // Removing again returns false (not present)
-    let removed_again = manager.remove_contact_from_group(friends_id, dave).unwrap();
+    let removed_again = manager
+        .remove_contact_from_group(friends_id, dave, 0)
+        .unwrap();
     assert!(!removed_again, "Dave is already not in Friends");
 
     // =========================================================================
@@ -366,7 +374,7 @@ fn test_contact_assignment_to_label() {
     assert_eq!(manager.groups_for_contact(bob).len(), 2);
 
     // Remove Bob from all labels
-    manager.remove_contact_from_all_groups(bob);
+    manager.remove_contact_from_all_groups(bob, 0);
 
     // Bob should be in no labels
     assert_eq!(manager.groups_for_contact(bob).len(), 0);
@@ -376,11 +384,11 @@ fn test_contact_assignment_to_label() {
     // =========================================================================
 
     // Cannot add to non-existent label
-    let add_missing_result = manager.add_contact_to_group("non-existent", bob);
+    let add_missing_result = manager.add_contact_to_group("non-existent", bob, 0);
     assert!(matches!(add_missing_result, Err(GroupError::NotFound(_))));
 
     // Cannot remove from non-existent label
-    let remove_missing_result = manager.remove_contact_from_group("non-existent", bob);
+    let remove_missing_result = manager.remove_contact_from_group("non-existent", bob, 0);
     assert!(matches!(
         remove_missing_result,
         Err(GroupError::NotFound(_))
@@ -417,14 +425,14 @@ fn test_cascading_visibility_changes() {
 
     // Setup field visibility for Family: home-address, personal-phone
     let family = manager.get_group_mut(&family_id).unwrap();
-    family.add_visible_field("home-address");
-    family.add_visible_field("personal-phone");
-    family.add_visible_field("birthday");
+    family.add_visible_field("home-address", 0);
+    family.add_visible_field("personal-phone", 0);
+    family.add_visible_field("birthday", 0);
 
     // Setup field visibility for Friends: personal-phone, personal-email
     let friends = manager.get_group_mut(&friends_id).unwrap();
-    friends.add_visible_field("personal-phone");
-    friends.add_visible_field("personal-email");
+    friends.add_visible_field("personal-phone", 0);
+    friends.add_visible_field("personal-email", 0);
 
     // Contact IDs
     let bob = "bob-id";
@@ -443,7 +451,7 @@ fn test_cascading_visibility_changes() {
     // Adding Bob to Family grants visibility to Family fields
     // =========================================================================
 
-    manager.add_contact_to_group(&family_id, bob).unwrap();
+    manager.add_contact_to_group(&family_id, bob, 0).unwrap();
 
     // Bob should now see Family fields
     assert_eq!(
@@ -480,8 +488,8 @@ fn test_cascading_visibility_changes() {
     // Adding Carol to both labels grants union of visibility
     // =========================================================================
 
-    manager.add_contact_to_group(&family_id, carol).unwrap();
-    manager.add_contact_to_group(&friends_id, carol).unwrap();
+    manager.add_contact_to_group(&family_id, carol, 0).unwrap();
+    manager.add_contact_to_group(&friends_id, carol, 0).unwrap();
 
     // Carol should see all fields from both labels
     let carol_visible = manager.visible_fields_via_labels(carol);
@@ -496,7 +504,7 @@ fn test_cascading_visibility_changes() {
     // Dave is only in Friends
     // =========================================================================
 
-    manager.add_contact_to_group(&friends_id, dave).unwrap();
+    manager.add_contact_to_group(&friends_id, dave, 0).unwrap();
 
     let dave_visible = manager.visible_fields_via_labels(dave);
     assert_eq!(dave_visible.len(), 2); // personal-phone, personal-email
@@ -507,7 +515,9 @@ fn test_cascading_visibility_changes() {
     // Removing Bob from Family revokes visibility
     // =========================================================================
 
-    manager.remove_contact_from_group(&family_id, bob).unwrap();
+    manager
+        .remove_contact_from_group(&family_id, bob, 0)
+        .unwrap();
 
     // Bob should no longer see Family fields
     assert_eq!(
@@ -529,7 +539,7 @@ fn test_cascading_visibility_changes() {
     // =========================================================================
 
     manager
-        .remove_contact_from_group(&friends_id, carol)
+        .remove_contact_from_group(&friends_id, carol, 0)
         .unwrap();
 
     // Carol should still see Family fields but not Friends-only fields
@@ -545,7 +555,7 @@ fn test_cascading_visibility_changes() {
     // =========================================================================
 
     let family = manager.get_group_mut(&family_id).unwrap();
-    family.add_visible_field("emergency-contact");
+    family.add_visible_field("emergency-contact", 0);
 
     // Carol (still in Family) should now see this field
     let carol_visible = manager.visible_fields_via_labels(carol);
@@ -556,7 +566,7 @@ fn test_cascading_visibility_changes() {
     // =========================================================================
 
     let family = manager.get_group_mut(&family_id).unwrap();
-    family.remove_visible_field("home-address");
+    family.remove_visible_field("home-address", 0);
 
     // Carol should no longer see home-address
     let carol_visible = manager.visible_fields_via_labels(carol);
@@ -609,34 +619,38 @@ fn test_label_based_field_visibility() {
 
     // Family sees: home-address, personal-phone
     let family = manager.get_group_mut(&family_id).unwrap();
-    family.add_visible_field("home-address");
-    family.add_visible_field("personal-phone");
+    family.add_visible_field("home-address", 0);
+    family.add_visible_field("personal-phone", 0);
 
     // Close Friends sees: personal-phone, personal-email
     let close_friends = manager.get_group_mut(&close_friends_id).unwrap();
-    close_friends.add_visible_field("personal-phone");
-    close_friends.add_visible_field("personal-email");
+    close_friends.add_visible_field("personal-phone", 0);
+    close_friends.add_visible_field("personal-email", 0);
 
     // Colleagues sees: work-email, work-phone
     let colleagues = manager.get_group_mut(&colleagues_id).unwrap();
-    colleagues.add_visible_field("work-email");
-    colleagues.add_visible_field("work-phone");
+    colleagues.add_visible_field("work-email", 0);
+    colleagues.add_visible_field("work-phone", 0);
 
     // =========================================================================
     // Assign contacts to labels
     // =========================================================================
 
     // Bob is Family
-    manager.add_contact_to_group(&family_id, bob).unwrap();
+    manager.add_contact_to_group(&family_id, bob, 0).unwrap();
 
     // Carol is Close Friend and Colleague
     manager
-        .add_contact_to_group(&close_friends_id, carol)
+        .add_contact_to_group(&close_friends_id, carol, 0)
         .unwrap();
-    manager.add_contact_to_group(&colleagues_id, carol).unwrap();
+    manager
+        .add_contact_to_group(&colleagues_id, carol, 0)
+        .unwrap();
 
     // Dave is Colleague only
-    manager.add_contact_to_group(&colleagues_id, dave).unwrap();
+    manager
+        .add_contact_to_group(&colleagues_id, dave, 0)
+        .unwrap();
 
     // Eve is not in any label
 

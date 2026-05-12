@@ -493,7 +493,7 @@ impl Storage {
         let mut label = self.load_group(label_id)?;
 
         // Add the contact
-        label.add_contact(contact_id);
+        label.add_contact(contact_id, self.clock().unix_seconds());
 
         // Save back
         self.save_group(&label)?;
@@ -511,7 +511,7 @@ impl Storage {
         let mut label = self.load_group(label_id)?;
 
         // Remove the contact
-        label.remove_contact(contact_id);
+        label.remove_contact(contact_id, self.clock().unix_seconds());
 
         // Save back
         self.save_group(&label)?;
@@ -527,7 +527,7 @@ impl Storage {
 
         for mut label in labels {
             if label.contains_contact(contact_id) {
-                label.remove_contact(contact_id);
+                label.remove_contact(contact_id, self.clock().unix_seconds());
                 self.save_group(&label)?;
             }
         }
@@ -550,9 +550,9 @@ impl Storage {
 
         // Update visibility
         if is_visible {
-            label.add_visible_field(field_id);
+            label.add_visible_field(field_id, self.clock().unix_seconds());
         } else {
-            label.remove_visible_field(field_id);
+            label.remove_visible_field(field_id, self.clock().unix_seconds());
         }
 
         // Save back
@@ -588,10 +588,10 @@ mod tests {
         let storage = test_storage();
 
         let mut label = Group::new("Family", 0);
-        label.add_contact("alice-id");
-        label.add_contact("bob-id");
-        label.add_visible_field("phone");
-        label.add_visible_field("address");
+        label.add_contact("alice-id", 0);
+        label.add_contact("bob-id", 0);
+        label.add_visible_field("phone", 0);
+        label.add_visible_field("address", 0);
 
         storage.save_group(&label).unwrap();
 
@@ -806,9 +806,11 @@ mod tests {
         let storage = test_storage();
 
         let mut label = Group::new("Professional", 0);
-        label.add_contact("alice-id");
-        label.add_visible_field("work-email");
-        label.set_display_name_override(Some("Dr. Egloff")).unwrap();
+        label.add_contact("alice-id", 0);
+        label.add_visible_field("work-email", 0);
+        label
+            .set_display_name_override(Some("Dr. Egloff"), 0)
+            .unwrap();
 
         storage.save_group(&label).unwrap();
 
@@ -836,7 +838,7 @@ mod tests {
         let storage = test_storage();
 
         let mut label1 = Group::new("Family", 0);
-        label1.set_display_name_override(Some("Matt")).unwrap();
+        label1.set_display_name_override(Some("Matt"), 0).unwrap();
 
         let label2 = Group::new("Work", 0);
         // label2 has no override
@@ -860,7 +862,9 @@ mod tests {
 
         // Create label with override
         let mut label = Group::new("Colleagues", 0);
-        label.set_display_name_override(Some("Dr. Egloff")).unwrap();
+        label
+            .set_display_name_override(Some("Dr. Egloff"), 0)
+            .unwrap();
         storage.save_group(&label).unwrap();
 
         // Verify override persists
@@ -869,7 +873,7 @@ mod tests {
 
         // Clear override and re-save
         let mut updated = loaded;
-        updated.set_display_name_override(None).unwrap();
+        updated.set_display_name_override(None, 0).unwrap();
         storage.save_group(&updated).unwrap();
 
         // Verify override is cleared

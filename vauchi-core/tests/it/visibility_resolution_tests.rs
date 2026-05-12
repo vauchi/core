@@ -68,10 +68,10 @@ fn test_visible_fields_groups_mode() {
 
     // Add contact to Friends and make field1 visible via label
     label_manager
-        .add_contact_to_group(&label_id, "contact-123")
+        .add_contact_to_group(&label_id, "contact-123", 0)
         .unwrap();
     let label = label_manager.get_group_mut(&label_id).unwrap();
-    label.add_visible_field(&field1_id);
+    label.add_visible_field(&field1_id, 0);
 
     let visible = resolve_visible_fields(&card, &label_manager, "contact-123");
     assert!(visible.contains(&field1_id));
@@ -119,10 +119,10 @@ fn test_visible_fields_groups_mode_ignores_field_visibility() {
     // Only make field1 visible via label — field2 should NOT be visible
     // even though it's marked as shown in field_visibility
     label_manager
-        .add_contact_to_group(&label_id, "contact-123")
+        .add_contact_to_group(&label_id, "contact-123", 0)
         .unwrap();
     let label = label_manager.get_group_mut(&label_id).unwrap();
-    label.add_visible_field(&field1_id);
+    label.add_visible_field(&field1_id, 0);
 
     let visible = resolve_visible_fields(&card, &label_manager, "contact-123");
     assert!(visible.contains(&field1_id));
@@ -149,10 +149,10 @@ fn test_visible_fields_groups_mode_with_per_contact_override() {
     let label_id = label.id().to_string();
 
     label_manager
-        .add_contact_to_group(&label_id, "contact-123")
+        .add_contact_to_group(&label_id, "contact-123", 0)
         .unwrap();
     let label = label_manager.get_group_mut(&label_id).unwrap();
-    label.add_visible_field(&field1_id);
+    label.add_visible_field(&field1_id, 0);
 
     // Per-contact override: hide field1, show field2
     label_manager.set_contact_override("contact-123", &field1_id, false);

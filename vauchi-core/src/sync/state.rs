@@ -15,12 +15,6 @@ use super::delta::CardDelta;
 use crate::contact_card::ContactCard;
 use crate::storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 
-/// Returns the current Unix timestamp in seconds.
-/// Falls back to 0 if the system clock is before UNIX_EPOCH (should never happen).
-fn current_timestamp() -> u64 {
-    crate::clock::ambient_now_secs()
-}
-
 /// Sync error types.
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -154,7 +148,7 @@ impl<'a> SyncManager<'a> {
         let payload =
             serde_json::to_vec(&delta).map_err(|e| SyncError::Serialization(e.to_string()))?;
 
-        let now = current_timestamp();
+        let now = self.storage.clock().unix_seconds();
 
         let update_id = Uuid::new_v4().to_string();
 
@@ -183,7 +177,7 @@ impl<'a> SyncManager<'a> {
         let payload = serde_json::to_vec(&visible_fields)
             .map_err(|e| SyncError::Serialization(e.to_string()))?;
 
-        let now = current_timestamp();
+        let now = self.storage.clock().unix_seconds();
 
         let update_id = Uuid::new_v4().to_string();
 
@@ -226,7 +220,7 @@ impl<'a> SyncManager<'a> {
 
             if deleted {
                 // Update the contact's last sync timestamp
-                let now = current_timestamp();
+                let now = self.storage.clock().unix_seconds();
                 self.storage.set_contact_last_sync(&contact_id, now)?;
             }
 
@@ -247,7 +241,7 @@ impl<'a> SyncManager<'a> {
         let base_delay_secs = 2u64;
         let delay = (base_delay_secs * (1 << retry_count.min(10))).min(300);
 
-        let now = current_timestamp();
+        let now = self.storage.clock().unix_seconds();
 
         let retry_at = now + delay;
 
@@ -365,7 +359,7 @@ impl<'a> SyncManager<'a> {
         }
 
         // Create merged delta
-        let now = current_timestamp();
+        let now = self.storage.clock().unix_seconds();
 
         // Generate random nonce for replay detection
         let nonce: [u8; 32] = crate::crypto::random_bytes();
@@ -425,7 +419,7 @@ impl<'a> SyncManager<'a> {
 
     /// Gets updates that are ready for retry (past their retry_at time).
     pub fn get_ready_for_retry(&self) -> Result<Vec<PendingUpdate>, SyncError> {
-        let now = current_timestamp();
+        let now = self.storage.clock().unix_seconds();
 
         let all_pending = self.storage.get_all_pending_updates()?;
 

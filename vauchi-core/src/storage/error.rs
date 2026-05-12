@@ -30,16 +30,16 @@ pub enum DeletionState {
 impl DeletionState {
     /// Returns the time remaining before scheduled deletion executes.
     ///
+    /// `now` is the current Unix-epoch seconds — production callers route
+    /// it through `Storage::clock().unix_seconds()`.
+    ///
     /// Returns `None` for `None` or `Executed` states.
     /// Returns `Duration::ZERO` if the execution time has already passed.
-    pub fn time_remaining(&self) -> Option<std::time::Duration> {
+    pub fn time_remaining(&self, now: u64) -> Option<std::time::Duration> {
         match self {
-            DeletionState::Scheduled { execute_at, .. } => {
-                let now = crate::clock::ambient_now_secs();
-                Some(std::time::Duration::from_secs(
-                    execute_at.saturating_sub(now),
-                ))
-            }
+            DeletionState::Scheduled { execute_at, .. } => Some(std::time::Duration::from_secs(
+                execute_at.saturating_sub(now),
+            )),
             _ => None,
         }
     }

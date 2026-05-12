@@ -115,6 +115,7 @@ impl Storage {
             &self.encryption_key,
             &migrations,
             self.db_path.as_deref(),
+            self.clock.unix_seconds(),
         )
     }
 

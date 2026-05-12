@@ -550,7 +550,7 @@ fn run_migrations_up_to(conn: &Connection, key: &SymmetricKey, up_to_version: u3
         .into_iter()
         .filter(|m| m.version <= up_to_version)
         .collect();
-    MigrationRunner::run(conn, key, &subset, None).unwrap();
+    MigrationRunner::run(conn, key, &subset, None, 0).unwrap();
 }
 
 // @internal
@@ -745,7 +745,7 @@ fn test_schema_version_after_all_migrations() {
 
     // Run ALL migrations
     let migrations = all_migrations();
-    MigrationRunner::run(&conn, &key, &migrations, None).unwrap();
+    MigrationRunner::run(&conn, &key, &migrations, None, 0).unwrap();
 
     // Verify final schema version
     let version = MigrationRunner::current_version(&conn).unwrap();
@@ -916,7 +916,7 @@ fn test_add_column_idempotent_via_double_migration() {
 
     // Run all migrations once (creates all columns)
     let migrations = all_migrations();
-    MigrationRunner::run(&conn, &key, &migrations, None).unwrap();
+    MigrationRunner::run(&conn, &key, &migrations, None, 0).unwrap();
 
     // Verify v14 columns exist
     let has_card_encrypted: bool = conn
@@ -931,7 +931,7 @@ fn test_add_column_idempotent_via_double_migration() {
     );
 
     // Running migrations again should be a no-op (version guard)
-    MigrationRunner::run(&conn, &key, &migrations, None).unwrap();
+    MigrationRunner::run(&conn, &key, &migrations, None, 0).unwrap();
 
     // Verify the column still exists and nothing broke
     let still_has: bool = conn
@@ -984,7 +984,7 @@ fn test_migration_rejects_newer_schema_version() {
 
     // Run all migrations to establish full schema
     let migrations = all_migrations();
-    MigrationRunner::run(&conn, &key, &migrations, None).unwrap();
+    MigrationRunner::run(&conn, &key, &migrations, None, 0).unwrap();
 
     // Manually bump schema_version to simulate a DB created by a newer app
     let future_version = 999;
@@ -995,7 +995,7 @@ fn test_migration_rejects_newer_schema_version() {
     .unwrap();
 
     // Running migrations again should fail with a downgrade error
-    let result = MigrationRunner::run(&conn, &key, &migrations, None);
+    let result = MigrationRunner::run(&conn, &key, &migrations, None, 0);
     assert!(
         result.is_err(),
         "Should reject database from a newer app version"
@@ -1032,7 +1032,7 @@ fn test_migration_empty_list_is_noop() {
     let key = SymmetricKey::generate();
     let empty: Vec<Migration> = vec![];
 
-    let result = MigrationRunner::run(&conn, &key, &empty, None);
+    let result = MigrationRunner::run(&conn, &key, &empty, None, 0);
     assert!(result.is_ok(), "Empty migration list should succeed");
 
     let version = MigrationRunner::current_version(&conn).unwrap();
@@ -1062,7 +1062,7 @@ fn test_migration_out_of_order_rejected() {
         },
     ];
 
-    let result = MigrationRunner::run(&conn, &key, &migrations, None);
+    let result = MigrationRunner::run(&conn, &key, &migrations, None, 0);
     assert!(
         result.is_err(),
         "Out-of-order migrations should be rejected"
@@ -1096,7 +1096,7 @@ fn test_migration_duplicate_version_rejected() {
         },
     ];
 
-    let result = MigrationRunner::run(&conn, &key, &migrations, None);
+    let result = MigrationRunner::run(&conn, &key, &migrations, None, 0);
     assert!(
         result.is_err(),
         "Duplicate version migrations should be rejected"
@@ -1123,7 +1123,7 @@ fn test_migration_sql_failure_rolls_back() {
         },
     ];
 
-    let result = MigrationRunner::run(&conn, &key, &migrations, None);
+    let result = MigrationRunner::run(&conn, &key, &migrations, None, 0);
     assert!(result.is_err(), "Bad SQL should fail");
 
     let err_msg = format!("{}", result.unwrap_err());
@@ -1177,7 +1177,7 @@ fn test_migration_callback_failure_rolls_back() {
         },
     ];
 
-    let result = MigrationRunner::run(&conn, &key, &migrations, None);
+    let result = MigrationRunner::run(&conn, &key, &migrations, None, 0);
     assert!(result.is_err(), "Failing callback should fail");
 
     let err_msg = format!("{}", result.unwrap_err());

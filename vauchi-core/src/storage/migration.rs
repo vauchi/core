@@ -65,11 +65,17 @@ impl MigrationRunner {
     ///
     /// If `db_path` is provided and there are pending migrations, a backup is
     /// created at `<db_path>.pre-migration-v<current>.bak` before applying (#17).
+    /// `now` is the Unix-epoch-seconds timestamp stamped into the
+    /// `schema_version` table when a migration completes. Production
+    /// callers (`Storage::open` / `Storage::in_memory`) route it
+    /// through `self.clock.unix_seconds()`; tests pin a deterministic
+    /// value.
     pub fn run(
         conn: &Connection,
         key: &SymmetricKey,
         migrations: &[Migration],
         db_path: Option<&Path>,
+        now: u64,
     ) -> Result<(), StorageError> {
         // Create the schema_version table if it doesn't exist (outside transaction,
         // since we need to read it before starting the migration transaction).
@@ -150,8 +156,6 @@ impl MigrationRunner {
             }
 
             // Record this migration
-            let now = crate::clock::ambient_now_secs();
-
             if let Err(e) = conn.execute(
                 "INSERT INTO schema_version (version, applied_at) VALUES (?1, ?2)",
                 rusqlite::params![migration.version, now as i64],

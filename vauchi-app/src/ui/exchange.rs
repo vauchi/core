@@ -1987,8 +1987,22 @@ mod tests {
 
     // ── Hover / Glance mode tests ──────────────────────────────────
 
+    // RED for Phase 1.E.2 of `2026-05-11-hover-graduation-plan.md`.
+    //
+    // After 1.E.3 GREEN, Hover stops routing through the legacy
+    // `ExchangeStep::Qr` sub-flow — it joins Glance on the
+    // `ActionResult::StartMultiStageExchange` handoff path, with
+    // the engine staying on `ModeSelection` while AppEngine
+    // navigates to `AppScreen::MultiStageExchange`. The legacy
+    // `exchange_show_qr` screen is reached only by modes that
+    // have *not* graduated to the new engine (Broadcast,
+    // TapHoverShake — Phases 2/3 of the umbrella retirement).
+    //
+    // This test pins the unreachability of the legacy path for
+    // Hover — a regression gate so a future refactor can't
+    // silently re-route Hover back through `ExchangeStep::Qr`.
     #[test]
-    fn hover_mode_routes_through_qr_flow() {
+    fn hover_mode_does_not_advance_to_legacy_qr_step() {
         let mut engine = ExchangeEngine::new(config_mode_selection());
 
         // Pick Hover
@@ -1997,11 +2011,10 @@ mod tests {
             item_id: "mode:hover".into(),
         });
         assert_eq!(engine.config.mode, Some(ExchangeMode::Hover));
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
-
-        // Verify QR screen renders
-        let screen = engine.current_screen();
-        assert_eq!(screen.screen_id, "exchange_show_qr");
+        // Engine stays on ModeSelection — the flow leaves
+        // Exchange entirely once AppEngine routes the
+        // StartMultiStageExchange result.
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
     }
 
     #[test]
@@ -2025,9 +2038,50 @@ mod tests {
         // result. Step is never advanced into Qr/Ble/Link sub-flows
         // for Glance.
         assert_eq!(engine.step, ExchangeStep::ModeSelection);
+        // RED for Phase 1.E.2 — the unit variant becomes tagged
+        // with the mode payload so AppEngine can pick the right
+        // engine constructor (`new_glance` vs `new_hover`).
         assert!(
-            matches!(result, ActionResult::StartMultiStageExchange),
-            "Glance must hand off to multi-stage; got {result:?}",
+            matches!(
+                result,
+                ActionResult::StartMultiStageExchange {
+                    mode: ExchangeMode::Glance,
+                },
+            ),
+            "Glance must hand off to multi-stage with mode payload; got {result:?}",
+        );
+    }
+
+    // RED for Phase 1.E.2 of `2026-05-11-hover-graduation-plan.md`.
+    //
+    // Mirror of `glance_mode_routes_through_multi_stage_handoff`.
+    // Hover graduates from the legacy `ExchangeStep::Qr` sub-flow
+    // (pinned-unreachable in `hover_mode_does_not_advance_to_legacy_qr_step`)
+    // onto the same `StartMultiStageExchange` path Pair 4
+    // introduced for Glance. The mode payload carries
+    // `ExchangeMode::Hover` so AppEngine constructs the engine via
+    // `MultiStageExchangeEngine::new_hover()` — front-camera
+    // default + autonomous audio-handshake trigger wired (the
+    // 1.C polish commit gates the trigger on Hover-only via
+    // `is_active_engine_multi_stage_hover()`).
+    #[test]
+    fn hover_mode_routes_through_multi_stage_handoff() {
+        let mut engine = ExchangeEngine::new(config_mode_selection());
+
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:standard".into(),
+            item_id: "mode:hover".into(),
+        });
+        assert_eq!(engine.config.mode, Some(ExchangeMode::Hover));
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
+        assert!(
+            matches!(
+                result,
+                ActionResult::StartMultiStageExchange {
+                    mode: ExchangeMode::Hover,
+                },
+            ),
+            "Hover must hand off to multi-stage with mode=Hover; got {result:?}",
         );
     }
 

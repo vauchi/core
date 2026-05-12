@@ -108,6 +108,23 @@ pub enum RecoveryResponse {
     },
 }
 
+/// Returns the current Unix-epoch seconds via the OS wall clock.
+///
+/// Stepping-stone helper for Phase 1 / Task 1.1 / Step 3b. The
+/// 11 callsites in this file (rate-limit windows, recovery-claim
+/// timestamps, voucher signing, reminders) all routed through
+/// identical wall-clock expressions; this helper consolidates
+/// them while recovery still needs a deeper `Clock` plumb. When
+/// the storage-cluster pass threads `Clock` through `Storage` and
+/// the recovery state machine, this helper grows a `now: u64`
+/// parameter and the OS read drops out entirely.
+fn now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
 impl RecoveryResponse {
     /// Returns a string representation suitable for storage.
     pub fn as_str(&self) -> &'static str {
@@ -167,10 +184,7 @@ impl RecoveryRateLimiter {
     /// * `claim_count` - Number of claims already made in the current window
     /// * `window_start` - Unix timestamp when the current window started
     pub fn check_rate_limit(&self, claim_count: u32, window_start: u64) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let now = now_secs();
 
         // If the window has expired (older than 1 hour), reset
         let window_expired = now.saturating_sub(window_start) >= 3600;
@@ -203,10 +217,7 @@ impl RecoveryClaim {
 
     /// Creates a new recovery claim.
     pub fn new(old_pk: &[u8; 32], new_pk: &[u8; 32]) -> Self {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let timestamp = now_secs();
 
         Self {
             claim_type: "recovery_claim".to_string(),
@@ -230,10 +241,7 @@ impl RecoveryClaim {
 
     /// Checks if this claim has expired (older than 48 hours).
     pub fn is_expired(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let now = now_secs();
 
         now.saturating_sub(self.timestamp) > Self::MAX_AGE_SECS
     }
@@ -354,10 +362,7 @@ impl RecoveryVoucher {
         voucher_keypair: &SigningKeyPair,
         guardian_token: Option<guardian::GuardianToken>,
     ) -> Self {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let timestamp = now_secs();
 
         let voucher_pk = *voucher_keypair.public_key().as_bytes();
 
@@ -564,10 +569,7 @@ impl RecoveryProof {
 
     /// Creates a new recovery proof.
     pub fn new(old_pk: &[u8; 32], new_pk: &[u8; 32], threshold: u32) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let now = now_secs();
 
         let expires_at = now + Self::DEFAULT_EXPIRY_DAYS * 24 * 60 * 60;
 
@@ -907,10 +909,7 @@ impl RecoveryReminder {
 
     /// Creates a new reminder with the default 7-day period.
     pub fn new(old_pk: [u8; 32]) -> Self {
-        let created_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let created_at = now_secs();
 
         Self {
             old_pk,
@@ -921,10 +920,7 @@ impl RecoveryReminder {
 
     /// Creates a new reminder with a custom period.
     pub fn with_days(old_pk: [u8; 32], days: u32) -> Self {
-        let created_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let created_at = now_secs();
 
         Self {
             old_pk,
@@ -955,10 +951,7 @@ impl RecoveryReminder {
 
     /// Checks if the reminder is due (enough time has passed).
     pub fn is_due(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let now = now_secs();
 
         let elapsed_secs = now.saturating_sub(self.created_at);
         let reminder_secs = u64::from(self.reminder_days) * 24 * 60 * 60;
@@ -970,10 +963,7 @@ impl RecoveryReminder {
     ///
     /// Resets the created_at timestamp to now.
     pub fn snooze(&mut self, days: u32) {
-        self.created_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        self.created_at = now_secs();
         self.reminder_days = days;
     }
 }
@@ -1091,10 +1081,7 @@ pub struct RecoveryProgress {
 impl RecoveryProgress {
     /// Creates a new recovery progress tracker.
     pub fn new(claim: RecoveryClaim, threshold: u32) -> Self {
-        let started_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let started_at = now_secs();
         Self {
             claim,
             vouchers: Vec::new(),
@@ -1179,10 +1166,7 @@ impl RecoveryRevocation {
     ///
     /// Must be signed with the old private key to prove ownership.
     pub fn create(old_pk: &[u8; 32], new_pk: &[u8; 32], old_keypair: &SigningKeyPair) -> Self {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let timestamp = now_secs();
 
         let revocation_type = "recovery_revocation".to_string();
 

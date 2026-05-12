@@ -184,12 +184,6 @@ pub struct MultiStageExchangeEngine {
     is_hover_mode: bool,
 }
 
-impl Default for MultiStageExchangeEngine {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl MultiStageExchangeEngine {
     /// Construct an engine wired for the Glance flow (bilateral QR
     /// scan, no audio proximity). Replaces the prior `new()` body
@@ -235,13 +229,6 @@ impl MultiStageExchangeEngine {
             audio_proximity: AudioProximityState::Pending,
             is_hover_mode: true,
         }
-    }
-
-    /// Backward-compatible shim so existing callers stay green
-    /// during the Phase 1.A → Phase 1.B → Phase 1.C tidy / red /
-    /// green migration. Delegates to [`Self::new_glance`].
-    pub fn new() -> Self {
-        Self::new_glance()
     }
 
     // ── Bridge setters (called by AppEngine from listener callbacks) ─
@@ -809,13 +796,13 @@ mod tests {
     use super::*;
 
     fn engine_with_state(state: ProtocolState) -> MultiStageExchangeEngine {
-        let mut e = MultiStageExchangeEngine::new();
+        let mut e = MultiStageExchangeEngine::new_glance();
         e.set_state(state);
         e
     }
 
     fn engine_with_qr(state: ProtocolState, data: &str) -> MultiStageExchangeEngine {
-        let mut e = MultiStageExchangeEngine::new();
+        let mut e = MultiStageExchangeEngine::new_glance();
         e.set_state(state);
         e.set_qr_payload(&QrPayload {
             data: data.into(),
@@ -876,8 +863,7 @@ mod tests {
         // `is_hover_mode()` through `AppEngine::
         // is_active_engine_multi_stage_hover` to decide whether to
         // register the cycle-thread audio listener. Both
-        // constructors and the `new()` shim must carry an honest
-        // mode marker.
+        // constructors must carry an honest mode marker.
         assert!(
             MultiStageExchangeEngine::new_hover().is_hover_mode(),
             "new_hover must mark the engine as Hover-mode",
@@ -885,10 +871,6 @@ mod tests {
         assert!(
             !MultiStageExchangeEngine::new_glance().is_hover_mode(),
             "new_glance must NOT be Hover-mode (the legacy Glance flow has no audio handshake)",
-        );
-        assert!(
-            !MultiStageExchangeEngine::new().is_hover_mode(),
-            "the new() shim delegates to new_glance — its mode marker must match",
         );
     }
 
@@ -1046,7 +1028,7 @@ mod tests {
     // @internal
     #[test]
     fn idle_emits_waiting_status_with_peer_scanner() {
-        let engine = MultiStageExchangeEngine::new();
+        let engine = MultiStageExchangeEngine::new_glance();
         let screen = engine.current_screen();
         assert_eq!(screen.screen_id, SCREEN_ID);
         // Idle without a QR payload yet — no own_qr component.
@@ -1271,7 +1253,7 @@ mod tests {
     // @internal
     #[test]
     fn permission_denied_event_swaps_to_permission_screen() {
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         let result = engine.handle_hardware_event(Event::PermissionDenied {
             transport: "Camera".into(),
         });
@@ -1300,7 +1282,7 @@ mod tests {
     // @internal
     #[test]
     fn hardware_unavailable_event_swaps_to_hardware_screen() {
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         engine.handle_hardware_event(Event::HardwareUnavailable {
             transport: "camera".into(),
         });
@@ -1319,7 +1301,7 @@ mod tests {
     // @internal
     #[test]
     fn unrelated_transport_does_not_engage_gate() {
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         engine.handle_hardware_event(Event::PermissionDenied {
             transport: "BLE".into(),
         });
@@ -1343,7 +1325,7 @@ mod tests {
     // @internal
     #[test]
     fn cancel_action_returns_complete_and_blocks_further_state_pushes() {
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: CANCEL_ACTION_ID.into(),
         });
@@ -1394,7 +1376,7 @@ mod tests {
     // @internal
     #[test]
     fn switch_camera_toggles_state_and_emits_command() {
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         assert!(!engine.use_front_camera());
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: SWITCH_CAMERA_ACTION_ID.into(),
@@ -1419,7 +1401,7 @@ mod tests {
     // @internal
     #[test]
     fn switch_camera_label_reflects_current_orientation() {
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         let label_rear = engine
             .current_screen()
             .actions
@@ -1444,7 +1426,7 @@ mod tests {
     // @internal
     #[test]
     fn grant_permission_action_clears_gate_and_re_requests_scan() {
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         engine.handle_hardware_event(Event::PermissionDenied {
             transport: "camera".into(),
         });
@@ -1464,7 +1446,7 @@ mod tests {
     // @internal
     #[test]
     fn unavailable_gate_cannot_be_recovered_by_grant_permission() {
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         engine.handle_hardware_event(Event::HardwareUnavailable {
             transport: "camera".into(),
         });
@@ -1484,7 +1466,7 @@ mod tests {
     // @internal
     #[test]
     fn qr_scan_progress_drives_quality_tracker() {
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         for _ in 0..10 {
             engine.handle_hardware_event(Event::QrScanProgress {
                 detected: true,
@@ -1507,7 +1489,7 @@ mod tests {
     // @internal
     #[test]
     fn skipped_frames_do_not_reach_tracker() {
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         // 10 detected frames — Good.
         for _ in 0..10 {
             engine.handle_hardware_event(Event::QrScanProgress {
@@ -1541,7 +1523,7 @@ mod tests {
     // @internal
     #[test]
     fn unknown_action_id_falls_through_to_update_screen() {
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "🦀;DROP TABLE".into(),
         });
@@ -1551,7 +1533,7 @@ mod tests {
     // @internal
     #[test]
     fn non_action_pressed_user_action_falls_through() {
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         let result = engine.handle_action(UserAction::ListItemSelected {
             component_id: "x".into(),
             item_id: "y".into(),
@@ -1618,7 +1600,7 @@ mod tests {
     #[test]
     fn screen_exited_emits_brightness_idle_timer_and_orientation_unlock() {
         use vauchi_core::Command;
-        let mut engine = MultiStageExchangeEngine::new();
+        let mut engine = MultiStageExchangeEngine::new_glance();
         let commands = engine.screen_exited();
         assert_eq!(
             commands,

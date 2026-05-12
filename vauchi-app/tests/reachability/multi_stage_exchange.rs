@@ -35,17 +35,17 @@ const SUCCESS_HANDLED: &[&str] = &["done"];
 const PERMISSION_HANDLED: &[&str] = &["grant_camera_permission", "cancel"];
 
 fn idle_factory() -> MultiStageExchangeEngine {
-    MultiStageExchangeEngine::new()
+    MultiStageExchangeEngine::new_glance()
 }
 
 fn failed_factory() -> MultiStageExchangeEngine {
-    let mut e = MultiStageExchangeEngine::new();
+    let mut e = MultiStageExchangeEngine::new_glance();
     e.set_state(ProtocolState::Failed("timeout".into()));
     e
 }
 
 fn success_factory() -> MultiStageExchangeEngine {
-    let mut e = MultiStageExchangeEngine::new();
+    let mut e = MultiStageExchangeEngine::new_glance();
     e.set_state(ProtocolState::Finalized);
     e.set_finalized("Alice".into());
     e.set_session_ended();
@@ -53,7 +53,7 @@ fn success_factory() -> MultiStageExchangeEngine {
 }
 
 fn permission_denied_factory() -> MultiStageExchangeEngine {
-    let mut e = MultiStageExchangeEngine::new();
+    let mut e = MultiStageExchangeEngine::new_glance();
     e.handle_hardware_event(Event::PermissionDenied {
         transport: "camera".into(),
     });

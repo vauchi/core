@@ -85,7 +85,7 @@ impl<'a> ConsentManager<'a> {
     /// Grants consent for a specific type.
     pub fn grant(&self, consent_type: ConsentType) -> Result<(), crate::storage::StorageError> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = crate::clock::ambient_now_secs();
+        let now = self.storage.clock().unix_seconds();
 
         self.storage
             .execute_consent_upsert(&id, consent_type.as_str(), true, now)
@@ -94,7 +94,7 @@ impl<'a> ConsentManager<'a> {
     /// Revokes consent for a specific type.
     pub fn revoke(&self, consent_type: ConsentType) -> Result<(), crate::storage::StorageError> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = crate::clock::ambient_now_secs();
+        let now = self.storage.clock().unix_seconds();
 
         self.storage
             .execute_consent_upsert(&id, consent_type.as_str(), false, now)
@@ -112,7 +112,7 @@ impl<'a> ConsentManager<'a> {
         policy_version: &str,
     ) -> Result<(), crate::storage::StorageError> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = crate::clock::ambient_now_secs();
+        let now = self.storage.clock().unix_seconds();
 
         self.storage.execute_consent_upsert_with_version(
             &id,

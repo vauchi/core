@@ -372,7 +372,7 @@ impl<'a> ContactManager<'a> {
                 "Cannot soft-delete an exchanged contact; use archive instead".into(),
             ));
         }
-        let now = crate::clock::ambient_now_secs();
+        let now = self.storage.clock().unix_seconds();
         contact.soft_delete(now);
         self.storage.save_contact(&contact)?;
         self.events.dispatch(VauchiEvent::ContactSoftDeleted {
@@ -422,7 +422,7 @@ impl<'a> ContactManager<'a> {
                 "Cannot archive an imported contact; use soft-delete instead".into(),
             ));
         }
-        let now = crate::clock::ambient_now_secs();
+        let now = self.storage.clock().unix_seconds();
         contact.archive(now);
         self.storage.save_contact(&contact)?;
         self.events.dispatch(VauchiEvent::ContactArchived {

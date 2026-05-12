@@ -175,7 +175,7 @@ impl<'a> ShredManager<'a> {
 
         // Sign fresh revocations for each contact (keys still available)
         let revocations = {
-            let now = crate::clock::ambient_now_secs();
+            let now = self.storage.clock().unix_seconds();
             let contacts = self.storage.list_contacts().unwrap_or_default();
             contacts
                 .iter()

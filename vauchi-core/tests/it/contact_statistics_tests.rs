@@ -102,3 +102,40 @@ fn test_statistics_card_freshness_unknown_when_no_updates() {
     assert_eq!(stats.card_freshness.fresh, 0);
     assert_eq!(stats.card_freshness.stale, 0);
 }
+
+// Pin the `<=` boundary of card_freshness.
+//
+// Kills any mutation that swaps `<=` for `<` (a one-second
+// window slip on the boundary) or that swaps `+` for `*` /
+// `-` on `FRESHNESS_THRESHOLD_SECS` (which would push the
+// threshold to ~10^11 or negative). Caller-controlled `now`
+// is what makes this assertion possible — was previously
+// blocked by ambient `SystemTime::now()`.
+// @internal
+#[test]
+fn test_statistics_card_freshness_boundary_is_inclusive() {
+    use vauchi_core::contact::statistics::compute_statistics;
+    const FRESHNESS_THRESHOLD_SECS: u64 = 90 * 24 * 60 * 60;
+
+    let mut at_boundary = make_contact("AtBoundary", ExchangeTransport::Qr);
+    at_boundary.set_card_updated_at(Some(0));
+
+    let mut over_boundary = make_contact("OverBoundary", ExchangeTransport::Nfc);
+    over_boundary.set_card_updated_at(Some(0));
+
+    // Exactly at threshold: now - 0 == THRESHOLD → fresh (<=).
+    let stats = compute_statistics(&[at_boundary.clone()], FRESHNESS_THRESHOLD_SECS);
+    assert_eq!(
+        stats.card_freshness.fresh, 1,
+        "boundary should be fresh (<=)"
+    );
+    assert_eq!(stats.card_freshness.stale, 0);
+
+    // One second past threshold: now - 0 == THRESHOLD + 1 → stale.
+    let stats = compute_statistics(&[over_boundary], FRESHNESS_THRESHOLD_SECS + 1);
+    assert_eq!(stats.card_freshness.fresh, 0);
+    assert_eq!(
+        stats.card_freshness.stale, 1,
+        "+1s past boundary should be stale"
+    );
+}

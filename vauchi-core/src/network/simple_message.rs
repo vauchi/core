@@ -191,10 +191,7 @@ pub fn create_simple_envelope(payload: SimplePayload) -> SimpleEnvelope {
     SimpleEnvelope {
         version: SIMPLE_PROTOCOL_VERSION,
         message_id: uuid::Uuid::new_v4().to_string(),
-        timestamp: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs(),
+        timestamp: crate::clock::ambient_now_secs(),
         payload,
     }
 }
@@ -233,10 +230,7 @@ pub fn create_signed_handshake(
     // Generate random 32-byte nonce
     let nonce_bytes: [u8; 32] = crate::crypto::random_bytes();
 
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("system time before UNIX epoch")
-        .as_secs();
+    let timestamp = crate::clock::ambient_now_secs();
 
     // Sign: nonce || timestamp.to_be_bytes()
     let mut signed_data = Vec::with_capacity(40);

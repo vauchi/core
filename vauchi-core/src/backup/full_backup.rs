@@ -148,10 +148,7 @@ pub fn export_full_backup(
         .collect();
 
     // Assemble envelope
-    let created_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs();
+    let created_at = crate::clock::ambient_now_secs();
 
     let envelope = FullBackupEnvelope {
         version: 3,

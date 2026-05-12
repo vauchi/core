@@ -372,10 +372,7 @@ impl<'a> ContactManager<'a> {
                 "Cannot soft-delete an exchanged contact; use archive instead".into(),
             ));
         }
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = crate::clock::ambient_now_secs();
         contact.soft_delete(now);
         self.storage.save_contact(&contact)?;
         self.events.dispatch(VauchiEvent::ContactSoftDeleted {
@@ -425,10 +422,7 @@ impl<'a> ContactManager<'a> {
                 "Cannot archive an imported contact; use soft-delete instead".into(),
             ));
         }
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = crate::clock::ambient_now_secs();
         contact.archive(now);
         self.storage.save_contact(&contact)?;
         self.events.dispatch(VauchiEvent::ContactArchived {

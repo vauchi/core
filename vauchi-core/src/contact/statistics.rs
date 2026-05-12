@@ -8,7 +8,6 @@
 //! All computation is local — no network or storage access.
 
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::contact::Contact;
 use crate::contact_card::FieldType;
@@ -52,10 +51,7 @@ pub struct ContactStatistics {
 /// Pure function — takes an immutable slice, returns computed data.
 /// No storage access, no side effects.
 pub fn compute_statistics(contacts: &[Contact]) -> ContactStatistics {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs();
+    let now = crate::clock::ambient_now_secs();
 
     let mut field_distribution: HashMap<FieldType, usize> = HashMap::new();
     let mut exchange_method_breakdown: HashMap<ExchangeTransport, usize> = HashMap::new();

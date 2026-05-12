@@ -326,12 +326,7 @@ impl BackupReminderState {
 
     /// Record that a backup completed successfully.
     pub fn record_backup(&mut self) {
-        self.last_backup_timestamp = Some(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-        );
+        self.last_backup_timestamp = Some(crate::clock::ambient_now_secs());
         self.reminder_count = 0;
     }
 

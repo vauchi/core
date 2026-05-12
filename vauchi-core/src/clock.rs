@@ -133,3 +133,24 @@ impl Clock for FakeClock {
         *self.inner.lock().expect("FakeClock mutex poisoned")
     }
 }
+/// **Transitional helper, do not use in new code.**
+///
+/// Returns Unix-epoch seconds via `SystemTime::now()`. This is
+/// the stepping-stone that lets non-`Clock`-owning modules
+/// (network, sync, api/{consent, gdpr, deletion, contact_manager,
+/// pre_signed, shred}, contact/{labels, local_group, statistics},
+/// contact_card/field, types, recovery/guardian, backup/full_backup,
+/// flame, …) drop their inline `SystemTime::now()....as_secs()`
+/// blocks without yet propagating a `Clock` through their caller
+/// graphs.
+///
+/// Every callsite of this function is a TODO marker for the
+/// structural pass that threads `Clock` deeper. Greps for
+/// `ambient_now_secs` enumerate the remaining work.
+#[doc(hidden)]
+pub(crate) fn ambient_now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}

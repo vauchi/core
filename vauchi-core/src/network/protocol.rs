@@ -75,10 +75,7 @@ pub fn create_envelope(payload: MessagePayload) -> MessageEnvelope {
     MessageEnvelope {
         version: PROTOCOL_VERSION,
         message_id: uuid::Uuid::new_v4().to_string(),
-        timestamp: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs(),
+        timestamp: crate::clock::ambient_now_secs(),
         payload,
     }
 }

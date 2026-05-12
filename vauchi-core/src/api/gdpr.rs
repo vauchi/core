@@ -86,10 +86,7 @@ pub struct GdprRecoveryConfig {
 /// Returns a structured export containing all personal data stored locally.
 /// Raw cryptographic keys are excluded — only public identifiers are included.
 pub fn export_all_data(storage: &Storage) -> Result<GdprExport, crate::storage::StorageError> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+    let now = crate::clock::ambient_now_secs();
 
     // Export contacts
     let contacts = storage.list_contacts()?;

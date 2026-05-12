@@ -14,7 +14,6 @@
 //! wire.
 
 use std::collections::HashSet;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// A local organization group for imported contacts.
 ///
@@ -39,10 +38,7 @@ impl LocalGroup {
     /// The ID is a freshly generated UUID v4. `contact_ids` starts empty.
     pub fn new(name: &str) -> Self {
         let id = uuid::Uuid::new_v4().to_string();
-        let created_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let created_at = crate::clock::ambient_now_secs();
 
         Self {
             id,

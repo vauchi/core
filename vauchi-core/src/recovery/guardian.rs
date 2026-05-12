@@ -8,8 +8,6 @@
 //! a creation timestamp, and an Ed25519 signature with domain separation
 //! (ADR-007: `"vauchi-recovery-guardian-v1"`).
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
@@ -59,10 +57,7 @@ impl GuardianToken {
         claimed_designator_pk: PublicKey,
         guardian_pk: PublicKey,
     ) -> Self {
-        let created_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time must be after UNIX_EPOCH")
-            .as_secs();
+        let created_at = crate::clock::ambient_now_secs();
 
         let msg = build_signed_message(
             claimed_designator_pk.as_bytes(),

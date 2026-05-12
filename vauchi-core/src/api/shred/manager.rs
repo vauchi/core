@@ -13,7 +13,6 @@
 //! tracking and adds cryptographic key destruction and network notification.
 
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::api::deletion::{DeletionError, DeletionManager};
 use crate::api::pre_signed::PreSignedShredMessages;
@@ -176,10 +175,7 @@ impl<'a> ShredManager<'a> {
 
         // Sign fresh revocations for each contact (keys still available)
         let revocations = {
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
+            let now = crate::clock::ambient_now_secs();
             let contacts = self.storage.list_contacts().unwrap_or_default();
             contacts
                 .iter()

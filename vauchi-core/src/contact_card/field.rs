@@ -87,10 +87,7 @@ impl FieldType {
 
 /// Returns the current Unix timestamp in seconds.
 fn now_timestamp() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("System clock before UNIX epoch")
-        .as_secs()
+    crate::clock::ambient_now_secs()
 }
 
 /// A single contact field (phone, email, etc.).

@@ -58,10 +58,7 @@ pub fn compute_anonymous_id(shared_key: &[u8; 32], epoch: u64) -> [u8; 32] {
 
 /// Returns the current epoch (unix_timestamp / 3600).
 pub fn current_epoch() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() / EPOCH_DURATION_SECS)
-        .unwrap_or(0)
+    crate::clock::ambient_now_secs() / EPOCH_DURATION_SECS
 }
 
 /// Resolves an anonymous sender ID to a contact by trying each contact's shared key.

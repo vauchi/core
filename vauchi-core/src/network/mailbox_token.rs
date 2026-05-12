@@ -54,11 +54,7 @@ pub fn compute_self_token(master_seed: &[u8; 32], day_epoch: u64) -> [u8; 32] {
 
 /// Returns the current day epoch (UTC seconds / 86400).
 pub fn current_day_epoch() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
-        / 86400
+    crate::clock::ambient_now_secs() / 86400
 }
 
 /// Encode a 32-byte token as a lowercase hex string for wire transmission.

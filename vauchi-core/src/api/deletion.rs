@@ -193,8 +193,5 @@ impl<'a> DeletionManager<'a> {
 }
 
 fn current_timestamp() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
+    crate::clock::ambient_now_secs()
 }

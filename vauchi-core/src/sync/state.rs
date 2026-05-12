@@ -18,10 +18,7 @@ use crate::storage::{PendingUpdate, Storage, StorageError, UpdateStatus};
 /// Returns the current Unix timestamp in seconds.
 /// Falls back to 0 if the system clock is before UNIX_EPOCH (should never happen).
 fn current_timestamp() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
+    crate::clock::ambient_now_secs()
 }
 
 /// Sync error types.

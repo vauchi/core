@@ -57,10 +57,7 @@ fn output_path() -> PathBuf {
     if let Ok(p) = std::env::var("VAUCHI_FLAME_OUT") {
         return PathBuf::from(p);
     }
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+    let ts = crate::clock::ambient_now_secs();
     let base = std::env::var("CARGO_MANIFEST_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("."));

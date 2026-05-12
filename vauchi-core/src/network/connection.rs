@@ -185,10 +185,7 @@ impl<T: Transport> ConnectionManager<T> {
 
         let nonce: [u8; 32] = crate::crypto::random_bytes();
 
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let timestamp = crate::clock::ambient_now_secs();
 
         // Sign (nonce || timestamp)
         let mut sign_data = Vec::with_capacity(40);

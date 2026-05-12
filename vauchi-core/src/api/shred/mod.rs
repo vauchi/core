@@ -10,8 +10,6 @@
 mod manager;
 mod storage;
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use crate::api::pre_signed::PreSignedPurgeRequest;
 
 pub use manager::ShredManager;
@@ -58,10 +56,7 @@ pub struct ShredToken {
 
 impl ShredToken {
     pub(super) fn new() -> Self {
-        let created_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let created_at = crate::clock::ambient_now_secs();
         Self { created_at }
     }
 

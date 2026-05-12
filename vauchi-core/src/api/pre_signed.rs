@@ -12,7 +12,6 @@
 //! File location: `{data_dir}/pre_signed_shred.bin`
 
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
@@ -63,10 +62,7 @@ impl PreSignedShredMessages {
     /// 1. An IdentityDeletionNotice(Confirmed) signed by the identity
     /// 2. A relay PurgeRequest with a random purge_token signed by the identity
     pub fn generate(identity: &Identity) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = crate::clock::ambient_now_secs();
 
         let public_key = *identity.signing_public_key();
 

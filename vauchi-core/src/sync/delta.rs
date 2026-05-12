@@ -166,10 +166,7 @@ impl CardDelta {
             }
         }
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = crate::clock::ambient_now_secs();
 
         // Generate random nonce for replay detection
         let nonce: [u8; 32] = crate::crypto::random_bytes();

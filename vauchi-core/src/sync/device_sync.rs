@@ -690,10 +690,7 @@ pub fn validate_timestamp(timestamp: u64) -> bool {
         return false;
     }
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+    let now = crate::clock::ambient_now_secs();
 
     // Reject timestamps more than MAX_FUTURE_DRIFT_SECS in the future
     timestamp <= now + MAX_FUTURE_DRIFT_SECS

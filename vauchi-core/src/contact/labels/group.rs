@@ -39,10 +39,7 @@ pub struct Group {
 impl Group {
     /// Creates a new label with the given name.
     pub fn new(name: &str) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let now = crate::clock::ambient_now_secs();
 
         Group {
             id: uuid::Uuid::new_v4().to_string(),
@@ -227,10 +224,7 @@ impl Group {
 
     /// Updates the modification timestamp.
     fn touch(&mut self) {
-        self.modified_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        self.modified_at = crate::clock::ambient_now_secs();
     }
 }
 

@@ -3268,11 +3268,11 @@ impl PlatformAppEngine {
             }
             DomainCommand::ResetOnboarding => {
                 let storage = engine.vauchi().storage();
-                let mut progress = storage
-                    .load_or_create_onboarding_progress(engine.vauchi().clock().unix_seconds())
-                    .map_err(|e| MobileError::StorageError {
+                let mut progress = storage.load_or_create_onboarding_progress().map_err(|e| {
+                    MobileError::StorageError {
                         detail: e.to_string(),
-                    })?;
+                    }
+                })?;
                 progress.reset(engine.vauchi().clock().unix_seconds());
                 storage.save_onboarding_progress(&progress).map_err(|e| {
                     MobileError::StorageError {
@@ -3732,7 +3732,7 @@ impl PlatformAppEngine {
                 let progress = engine
                     .vauchi()
                     .storage()
-                    .load_or_create_onboarding_progress(engine.vauchi().clock().unix_seconds())
+                    .load_or_create_onboarding_progress()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
                     })?;
@@ -3744,7 +3744,7 @@ impl PlatformAppEngine {
                 let progress = engine
                     .vauchi()
                     .storage()
-                    .load_or_create_onboarding_progress(engine.vauchi().clock().unix_seconds())
+                    .load_or_create_onboarding_progress()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
                     })?;
@@ -3756,7 +3756,7 @@ impl PlatformAppEngine {
                 let progress = engine
                     .vauchi()
                     .storage()
-                    .load_or_create_onboarding_progress(engine.vauchi().clock().unix_seconds())
+                    .load_or_create_onboarding_progress()
                     .map_err(|e| MobileError::StorageError {
                         detail: e.to_string(),
                     })?;
@@ -3766,11 +3766,11 @@ impl PlatformAppEngine {
             }
             DomainCommand::AdvanceOnboarding => {
                 let storage = engine.vauchi().storage();
-                let mut progress = storage
-                    .load_or_create_onboarding_progress(engine.vauchi().clock().unix_seconds())
-                    .map_err(|e| MobileError::StorageError {
+                let mut progress = storage.load_or_create_onboarding_progress().map_err(|e| {
+                    MobileError::StorageError {
                         detail: e.to_string(),
-                    })?;
+                    }
+                })?;
                 progress.advance(engine.vauchi().clock().unix_seconds());
                 storage.save_onboarding_progress(&progress).map_err(|e| {
                     MobileError::StorageError {
@@ -3783,11 +3783,11 @@ impl PlatformAppEngine {
             }
             DomainCommand::SkipOnboardingStep => {
                 let storage = engine.vauchi().storage();
-                let mut progress = storage
-                    .load_or_create_onboarding_progress(engine.vauchi().clock().unix_seconds())
-                    .map_err(|e| MobileError::StorageError {
+                let mut progress = storage.load_or_create_onboarding_progress().map_err(|e| {
+                    MobileError::StorageError {
                         detail: e.to_string(),
-                    })?;
+                    }
+                })?;
                 progress.skip_step(engine.vauchi().clock().unix_seconds());
                 storage.save_onboarding_progress(&progress).map_err(|e| {
                     MobileError::StorageError {

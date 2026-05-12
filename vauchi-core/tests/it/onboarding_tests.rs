@@ -433,7 +433,7 @@ fn test_storage_load_or_create() {
     let storage = vauchi_core::Storage::in_memory(vauchi_core::SymmetricKey::generate()).unwrap();
 
     // First call creates new
-    let progress = storage.load_or_create_onboarding_progress(0).unwrap();
+    let progress = storage.load_or_create_onboarding_progress().unwrap();
     assert_eq!(progress.current_step(), OnboardingStep::IdentityCheck);
 
     // Save and reload
@@ -441,7 +441,7 @@ fn test_storage_load_or_create() {
     progress.advance(0);
     storage.save_onboarding_progress(&progress).unwrap();
 
-    let loaded = storage.load_or_create_onboarding_progress(0).unwrap();
+    let loaded = storage.load_or_create_onboarding_progress().unwrap();
     assert_eq!(loaded.current_step(), OnboardingStep::LinkChoice);
 }
 

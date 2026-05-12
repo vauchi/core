@@ -18,7 +18,7 @@ impl Storage {
     /// Records the current Unix-epoch time as `fetched_at`. If a cached
     /// key already exists for this relay, it is overwritten (upsert).
     pub fn save_ohttp_key(&self, relay_url: &str, key_bytes: &[u8]) -> Result<(), StorageError> {
-        let now = super::now_secs();
+        let now = self.now_secs();
         self.conn.execute(
             "INSERT OR REPLACE INTO ohttp_key_cache (relay_url, key_bytes, fetched_at) \
              VALUES (?1, ?2, ?3)",

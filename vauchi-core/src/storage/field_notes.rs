@@ -26,7 +26,7 @@ impl Storage {
     ) -> Result<(), StorageError> {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, note)
             .map_err(|e| StorageError::Migration(format!("Encrypt field note: {}", e)))?;
-        let now = super::now_secs();
+        let now = self.now_secs();
         self.conn.execute(
             "INSERT OR REPLACE INTO contact_field_notes
              (contact_id, field_id, note_encrypted, updated_at)

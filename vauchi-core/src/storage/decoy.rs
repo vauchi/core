@@ -42,7 +42,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, &card_json)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
         let (created_at, updated_at) = decoy_timestamps(id, now);
 
         self.conn.execute(

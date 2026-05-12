@@ -27,7 +27,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO ux_state (id, aha_tracker_json, aha_tracker_json_encrypted, updated_at)
@@ -91,7 +91,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO ux_state (id, demo_contact_json, demo_contact_json_encrypted, updated_at)
@@ -138,15 +138,12 @@ impl Storage {
 
     /// Loads demo contact state or creates a new active one if
     /// none exists. `now` is the Unix-epoch timestamp stamped into
-    /// a fresh state's `last_update_timestamp` (Phase 1 / Task 1.1
-    /// / Step 3b — Storage will hold its own clock in a later MR).
-    pub fn load_or_create_demo_contact_state(
-        &self,
-        now: u64,
-    ) -> Result<DemoContactState, StorageError> {
+    /// a fresh state's `last_update_timestamp` via the
+    /// `Storage`-owned [`Clock`](crate::clock::Clock).
+    pub fn load_or_create_demo_contact_state(&self) -> Result<DemoContactState, StorageError> {
         match self.load_demo_contact_state()? {
             Some(state) => Ok(state),
-            None => Ok(DemoContactState::new_active(now)),
+            None => Ok(DemoContactState::new_active(self.now_secs())),
         }
     }
 
@@ -172,7 +169,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO ux_state (id, onboarding_progress_encrypted, updated_at)
@@ -215,16 +212,12 @@ impl Storage {
     ///
     /// `now` is the Unix-epoch timestamp to stamp into a freshly-
     /// created progress's `started_at`. Storage does not yet hold a
-    /// [`Clock`](crate::clock::Clock) — the storage cluster of
-    /// Phase 1 / Task 1.1 / Step 3b will fix that. Until then the
-    /// caller (Vauchi or test) passes the timestamp.
-    pub fn load_or_create_onboarding_progress(
-        &self,
-        now: u64,
-    ) -> Result<OnboardingProgress, StorageError> {
+    /// [`Clock`](crate::clock::Clock) — the `Storage`-owned
+    /// clock stamps `started_at` for freshly-created records.
+    pub fn load_or_create_onboarding_progress(&self) -> Result<OnboardingProgress, StorageError> {
         match self.load_onboarding_progress()? {
             Some(progress) => Ok(progress),
-            None => Ok(OnboardingProgress::new(now)),
+            None => Ok(OnboardingProgress::new(self.now_secs())),
         }
     }
 
@@ -242,7 +235,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO ux_state (id, backup_reminder_encrypted, updated_at)
@@ -301,7 +294,7 @@ impl Storage {
         let demo_encrypted = crate::crypto::encrypt(&self.encryption_key, demo_json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         // Use INSERT ... ON CONFLICT UPDATE to preserve other columns
         // (e.g. onboarding_progress_encrypted) that are not part of this save.
@@ -319,15 +312,12 @@ impl Storage {
     }
 
     /// Loads both aha tracker and demo contact state. `now` is
-    /// the Unix-epoch timestamp passed through to the demo-state
-    /// freshly-create path; see
-    /// [`load_or_create_demo_contact_state`] for the rationale.
-    pub fn load_ux_state(
-        &self,
-        now: u64,
-    ) -> Result<(AhaMomentTracker, DemoContactState), StorageError> {
+    /// Loads both aha tracker and demo contact state. Freshly-
+    /// created records take their `last_update_timestamp` from
+    /// the `Storage`-owned [`Clock`](crate::clock::Clock).
+    pub fn load_ux_state(&self) -> Result<(AhaMomentTracker, DemoContactState), StorageError> {
         let aha_tracker = self.load_or_create_aha_tracker()?;
-        let demo_state = self.load_or_create_demo_contact_state(now)?;
+        let demo_state = self.load_or_create_demo_contact_state()?;
         Ok((aha_tracker, demo_state))
     }
 }
@@ -416,7 +406,7 @@ mod tests {
         let storage = test_storage();
 
         // First call creates active state
-        let state = storage.load_or_create_demo_contact_state(0).unwrap();
+        let state = storage.load_or_create_demo_contact_state().unwrap();
         assert!(state.is_active);
     }
 
@@ -451,7 +441,7 @@ mod tests {
 
         storage.save_ux_state(&tracker, &demo_state).unwrap();
 
-        let (loaded_tracker, loaded_demo) = storage.load_ux_state(0).unwrap();
+        let (loaded_tracker, loaded_demo) = storage.load_ux_state().unwrap();
 
         assert!(loaded_tracker.has_seen(AhaMomentType::CardCreationComplete));
         assert!(loaded_demo.is_active);

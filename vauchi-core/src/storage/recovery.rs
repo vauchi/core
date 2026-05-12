@@ -29,7 +29,7 @@ impl Storage {
         let response_encrypted = crate::crypto::encrypt(&self.encryption_key, response.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO recovery_responses
@@ -150,7 +150,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, &json)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO recovery_settings (id, settings_encrypted, updated_at)
@@ -199,7 +199,7 @@ impl Storage {
         self.conn.execute(
             "INSERT OR REPLACE INTO recovery_progress (id, progress_encrypted, updated_at)
              VALUES (1, ?1, ?2)",
-            params![encrypted, super::now_secs() as i64,],
+            params![encrypted, self.now_secs() as i64,],
         )?;
         Ok(())
     }

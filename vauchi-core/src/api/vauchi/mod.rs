@@ -303,14 +303,14 @@ impl Vauchi {
 
         // Open or create storage
         let storage = if config.storage_path.exists() {
-            Storage::open(&config.storage_path, storage_key)?
+            Storage::open(&config.storage_path, storage_key)?.with_clock(clock.clone())
         } else {
             // Create parent directories if needed
             if let Some(parent) = config.storage_path.parent() {
                 std::fs::create_dir_all(parent)
                     .map_err(|e| VauchiError::Configuration(e.to_string()))?;
             }
-            Storage::open(&config.storage_path, storage_key)?
+            Storage::open(&config.storage_path, storage_key)?.with_clock(clock.clone())
         };
 
         let events = Arc::new(EventDispatcher::new());
@@ -431,7 +431,7 @@ impl Vauchi {
     pub fn in_memory() -> VauchiResult<Self> {
         let clock: Arc<dyn Clock> = SystemClock::shared();
         let storage_key = SymmetricKey::generate();
-        let storage = Storage::in_memory(storage_key)?;
+        let storage = Storage::in_memory(storage_key)?.with_clock(clock.clone());
         let events = Arc::new(EventDispatcher::new());
 
         Ok(Vauchi {

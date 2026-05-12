@@ -469,7 +469,7 @@ impl Storage {
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
         // Update
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         let changes = self.conn.execute(
             "UPDATE visibility_labels SET name_encrypted = ?1, name_hmac = ?2, modified_at = ?3 WHERE id = ?4",

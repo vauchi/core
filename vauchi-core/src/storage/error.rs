@@ -35,7 +35,7 @@ impl DeletionState {
     pub fn time_remaining(&self) -> Option<std::time::Duration> {
         match self {
             DeletionState::Scheduled { execute_at, .. } => {
-                let now = super::now_secs();
+                let now = crate::clock::ambient_now_secs();
                 Some(std::time::Duration::from_secs(
                     execute_at.saturating_sub(now),
                 ))

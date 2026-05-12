@@ -22,9 +22,7 @@ impl Vauchi {
     ///
     /// Loads from storage if available, otherwise returns a fresh instance.
     pub fn get_onboarding_progress(&self) -> VauchiResult<OnboardingProgress> {
-        Ok(self
-            .storage
-            .load_or_create_onboarding_progress(self.clock.unix_seconds())?)
+        Ok(self.storage.load_or_create_onboarding_progress()?)
     }
 
     /// Advances onboarding to the next step.
@@ -33,9 +31,7 @@ impl Vauchi {
     /// Persists the updated progress to storage.
     /// Returns the updated progress.
     pub fn advance_onboarding(&self) -> VauchiResult<OnboardingProgress> {
-        let mut progress = self
-            .storage
-            .load_or_create_onboarding_progress(self.clock.unix_seconds())?;
+        let mut progress = self.storage.load_or_create_onboarding_progress()?;
         progress.advance(self.clock.unix_seconds());
         self.storage.save_onboarding_progress(&progress)?;
         Ok(progress)
@@ -46,9 +42,7 @@ impl Vauchi {
     /// Persists the updated progress to storage.
     /// Returns the updated progress.
     pub fn skip_onboarding_step(&self) -> VauchiResult<OnboardingProgress> {
-        let mut progress = self
-            .storage
-            .load_or_create_onboarding_progress(self.clock.unix_seconds())?;
+        let mut progress = self.storage.load_or_create_onboarding_progress()?;
         progress.skip_step(self.clock.unix_seconds());
         self.storage.save_onboarding_progress(&progress)?;
         Ok(progress)
@@ -59,9 +53,7 @@ impl Vauchi {
     /// Clears all progress and starts fresh. Useful for "replay onboarding"
     /// from settings.
     pub fn reset_onboarding(&self) -> VauchiResult<()> {
-        let mut progress = self
-            .storage
-            .load_or_create_onboarding_progress(self.clock.unix_seconds())?;
+        let mut progress = self.storage.load_or_create_onboarding_progress()?;
         progress.reset(self.clock.unix_seconds());
         self.storage.save_onboarding_progress(&progress)?;
         Ok(())
@@ -69,9 +61,7 @@ impl Vauchi {
 
     /// Returns whether onboarding has been completed.
     pub fn is_onboarding_complete(&self) -> VauchiResult<bool> {
-        let progress = self
-            .storage
-            .load_or_create_onboarding_progress(self.clock.unix_seconds())?;
+        let progress = self.storage.load_or_create_onboarding_progress()?;
         Ok(progress.is_complete())
     }
 
@@ -85,9 +75,7 @@ impl Vauchi {
     /// `2026-04-28-app-launch-and-identity-orchestration-in-core`
     /// §2.5 calls out.
     pub fn mark_onboarding_complete(&self) -> VauchiResult<()> {
-        let mut progress = self
-            .storage
-            .load_or_create_onboarding_progress(self.clock.unix_seconds())?;
+        let mut progress = self.storage.load_or_create_onboarding_progress()?;
         if progress.is_complete() {
             return Ok(());
         }
@@ -98,17 +86,13 @@ impl Vauchi {
 
     /// Returns the current onboarding step.
     pub fn current_onboarding_step(&self) -> VauchiResult<OnboardingStep> {
-        let progress = self
-            .storage
-            .load_or_create_onboarding_progress(self.clock.unix_seconds())?;
+        let progress = self.storage.load_or_create_onboarding_progress()?;
         Ok(progress.current_step())
     }
 
     /// Returns the onboarding completion percentage (0-100).
     pub fn onboarding_completion_percentage(&self) -> VauchiResult<u8> {
-        let progress = self
-            .storage
-            .load_or_create_onboarding_progress(self.clock.unix_seconds())?;
+        let progress = self.storage.load_or_create_onboarding_progress()?;
         Ok(progress.completion_percentage())
     }
 

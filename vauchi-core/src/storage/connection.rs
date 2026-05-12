@@ -40,6 +40,7 @@ impl Storage {
             conn,
             encryption_key,
             db_path: Some(path_buf),
+            clock: crate::clock::SystemClock::shared(),
         };
         storage.run_migrations()?;
         // T2-12: Clean up old terminal delivery records on startup
@@ -59,6 +60,7 @@ impl Storage {
             conn,
             encryption_key,
             db_path: None,
+            clock: crate::clock::SystemClock::shared(),
         };
         storage.run_migrations()?;
         Ok(storage)

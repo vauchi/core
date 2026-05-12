@@ -150,7 +150,7 @@ impl MigrationRunner {
             }
 
             // Record this migration
-            let now = super::now_secs();
+            let now = crate::clock::ambient_now_secs();
 
             if let Err(e) = conn.execute(
                 "INSERT INTO schema_version (version, applied_at) VALUES (?1, ?2)",

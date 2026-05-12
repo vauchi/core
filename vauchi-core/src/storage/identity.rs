@@ -21,7 +21,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, backup_data)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO identity (id, backup_data_encrypted, display_name, created_at) VALUES (1, ?1, ?2, ?3)",

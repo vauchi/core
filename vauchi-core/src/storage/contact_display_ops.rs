@@ -161,7 +161,7 @@ impl Storage {
         name: &str,
         is_primary: bool,
     ) -> Result<(), StorageError> {
-        let now = super::now_secs();
+        let now = self.now_secs();
         if is_primary {
             self.conn.execute(
                 "UPDATE contact_shared_names SET is_primary = 0 WHERE contact_id = ?1 AND is_primary = 1",
@@ -226,7 +226,7 @@ impl Storage {
         avatar_data: &[u8],
         is_primary: bool,
     ) -> Result<(), StorageError> {
-        let now = super::now_secs();
+        let now = self.now_secs();
         if is_primary {
             self.conn.execute(
                 "UPDATE contact_shared_avatars SET is_primary = 0 WHERE contact_id = ?1 AND is_primary = 1",

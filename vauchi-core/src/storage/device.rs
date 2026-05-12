@@ -118,7 +118,7 @@ impl Storage {
             crate::crypto::encrypt(&self.encryption_key, registry_json.as_bytes())
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO device_registry (id, registry_json, registry_json_encrypted, version, updated_at)
@@ -209,7 +209,7 @@ impl Storage {
         let state_encrypted = crate::crypto::encrypt(&self.encryption_key, state_json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO device_sync_state (device_id, state_json, state_json_encrypted, last_sync_version, updated_at)
@@ -313,7 +313,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, vector_json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO version_vector (id, vector_json, vector_json_encrypted, updated_at)
@@ -388,7 +388,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, items_json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO device_sync_checkpoints (target_device_id, items_json, items_json_encrypted, sent_count, updated_at)
@@ -466,7 +466,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, state_json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         let checkpoint_id = uuid::Uuid::new_v4().to_string();
 
@@ -535,7 +535,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, state_json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "UPDATE sync_checkpoints SET processed_items = ?1, state_json = '', state_json_encrypted = ?2, updated_at = ?3

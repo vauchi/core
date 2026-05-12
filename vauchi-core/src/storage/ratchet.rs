@@ -43,7 +43,7 @@ impl Storage {
         let state_encrypted = crate::crypto::encrypt(&ratchet_key, &state_json)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO contact_ratchets

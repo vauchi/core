@@ -157,23 +157,44 @@ use rusqlite::Connection;
 /// thread. For async contexts, wrap in `tokio::task::spawn_blocking` or use
 /// a dedicated storage thread with a channel. The UniFFI mobile bindings
 /// open a fresh storage per call via `open_vauchi()`.
-/// Returns the current Unix-epoch seconds via the OS wall clock.
-///
-/// Stepping-stone helper for Phase 1 / Task 1.1 / Step 3b. Used
-/// by storage submodules that stamp `updated_at` / TTL
-/// timestamps on rows. The structural pass that gives `Storage`
-/// an `Arc<dyn Clock>` field will retire this helper.
-pub(super) fn now_secs() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
-
 pub struct Storage {
     conn: Connection,
     /// Encryption key derived from user's master key
     pub(super) encryption_key: SymmetricKey,
     /// Database file path (None for in-memory databases).
     db_path: Option<std::path::PathBuf>,
+    /// Explicit-time seam for the storage subsystem (Phase 1 /
+    /// Task 1.1 of the pure-functional-core program). Each
+    /// `save_*` / TTL-checking submodule uses `self.now_secs()`
+    /// instead of reading ambient `SystemTime::now()`. Defaults
+    /// to `SystemClock::shared()`; tests inject a `FakeClock`
+    /// via `with_clock(...)`.
+    pub(super) clock: std::sync::Arc<dyn crate::clock::Clock>,
+}
+impl Storage {
+    /// Borrow the storage subsystem's [`Clock`](crate::clock::Clock).
+    /// Default is `SystemClock::shared()`; tests inject via
+    /// [`with_clock`](Self::with_clock).
+    pub fn clock(&self) -> &std::sync::Arc<dyn crate::clock::Clock> {
+        &self.clock
+    }
+
+    /// Replace the explicit-time seam. Used by `Vauchi` to wire its
+    /// own clock into the storage subsystem so timestamps stamped
+    /// inside `Storage::save_*` come from the same source as
+    /// `Vauchi::clock().unix_seconds()`. Tests pass a `FakeClock`
+    /// here.
+    pub fn with_clock(mut self, clock: std::sync::Arc<dyn crate::clock::Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    /// Current Unix-epoch seconds via the subsystem-owned [`Clock`].
+    ///
+    /// Used by submodules in `super::now_secs` (now retired) and by
+    /// any `save_*` method that stamps `updated_at`. Equivalent to
+    /// `self.clock.unix_seconds()`.
+    pub(super) fn now_secs(&self) -> u64 {
+        self.clock.unix_seconds()
+    }
 }

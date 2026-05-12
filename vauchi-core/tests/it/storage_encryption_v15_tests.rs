@@ -163,7 +163,7 @@ fn test_ux_state_combined_roundtrip_encrypted() {
 
     storage.save_ux_state(&tracker, &demo_state).unwrap();
 
-    let (loaded_tracker, loaded_demo) = storage.load_ux_state(0).unwrap();
+    let (loaded_tracker, loaded_demo) = storage.load_ux_state().unwrap();
     assert!(loaded_tracker.has_seen(AhaMomentType::CardCreationComplete));
     assert!(loaded_demo.is_active);
     assert_eq!(loaded_demo.update_count, 1);
@@ -305,7 +305,7 @@ fn test_rekey_preserves_ux_state() {
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    let (loaded_tracker, loaded_demo) = storage.load_ux_state(0).unwrap();
+    let (loaded_tracker, loaded_demo) = storage.load_ux_state().unwrap();
     assert!(loaded_tracker.has_seen(AhaMomentType::FirstContactAdded));
     assert!(loaded_demo.is_active);
 }

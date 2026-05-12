@@ -24,7 +24,7 @@ impl Storage {
         relay_url: &str,
         pins: &[PinnedCertificate],
     ) -> Result<(), StorageError> {
-        let now = super::now_secs();
+        let now = self.now_secs();
         let pin_bytes: Vec<u8> = pins.iter().flat_map(|p| p.sha256_fingerprint).collect();
         self.conn.execute(
             "INSERT OR REPLACE INTO pin_cache (relay_url, pin_bytes, fetched_at) \

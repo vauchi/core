@@ -28,7 +28,7 @@ impl Storage {
             crate::crypto::encrypt(&self.encryption_key, settings.alert_message.as_bytes())
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = super::now_secs();
+        let now = self.now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO duress_settings (id, alert_contact_ids_encrypted, alert_message_encrypted, include_location, created_at, updated_at) VALUES (1, ?1, ?2, ?3, ?4, ?5)",

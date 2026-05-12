@@ -674,6 +674,25 @@ impl AppEngine {
         false
     }
 
+    /// `true` when the active engine is a `MultiStageExchangeEngine`
+    /// constructed via [`MultiStageExchangeEngine::new_hover`].
+    /// Phase 1.C polish — the platform-binding wire-up
+    /// (`PlatformAppEngine::ensure_multi_stage_session`) reads this
+    /// to decide whether to register the cycle-thread audio listener
+    /// (see `try_autonomous_audio_trigger` mode gate). Returns
+    /// `false` for Glance engines and for every non-multi-stage
+    /// active engine. Until the Phase 1.E mode-dispatcher in
+    /// `screens.rs` flips to per-mode constructors, this always
+    /// returns `false`.
+    pub fn is_active_engine_multi_stage_hover(&self) -> bool {
+        if let Some(any) = self.engine.as_any()
+            && let Some(active) = any.downcast_ref::<crate::ui::MultiStageExchangeEngine>()
+        {
+            return active.is_hover_mode();
+        }
+        false
+    }
+
     /// Set the frontend-reported network reachability.
     ///
     /// Frontends call this from their `NWPathMonitor` (iOS) or

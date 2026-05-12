@@ -23,6 +23,17 @@ vauchi-platform/src/lib.rs 2712    2678
 #  2026-05-03-core-file-picker-command)
 vauchi-platform/src/exchange.rs 1027
 
+# EXEMPT — UniFFI facade + cycle-thread orchestrator: the audio-handshake
+# protocol straddles `MobileMultiStageSession` (the UniFFI surface,
+# can't split without breaking generated bindings) and the cycle-loop
+# free functions (`try_autonomous_audio_trigger`, `cycle_loop`) that
+# the surface dispatches into. Splitting would force a cross-module
+# private API for the cycle-thread free fns the orchestrator + state
+# machine share. (+15 for Phase 1.C polish: listener-presence gate in
+# `try_autonomous_audio_trigger` so Glance flows never advance the
+# inner state machine — 2026-05-11-hover-graduation-plan.)
+vauchi-platform/src/multistage_exchange.rs 1015
+
 # EXEMPT — state machine: scattered transitions create protocol bugs
 # (+8 for ADR-031 audio-as-samples migration — encode at emit, accept
 #  AudioSamplesRecorded at receive 2026-05-01)
@@ -114,7 +125,7 @@ vauchi-core/src/storage/mod.rs 1079
 #   problem 2026-05-01-android-humble-ui-deep-retirement Phase 2c)
 # (+4 on mod.rs for AppScreen::ChangePassword variant + screen_id arms,
 #   feat/2026-05-10-change-app-password)
-vauchi-app/src/ui/app_engine/mod.rs 1249
+vauchi-app/src/ui/app_engine/mod.rs 1268
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -140,6 +151,10 @@ vauchi-core/tests/it/app_engine_tests.rs 2275
 vauchi-core/tests/it/field_validation_tests.rs 2256
 
 # Grandfathered — below split threshold, monitor
+# (+17 lines for is_active_engine_multi_stage_hover regression-gate
+#  pair, Phase 1.C polish of 2026-05-11-hover-graduation-plan: pins the
+#  helper that PAE consults to decide audio-listener registration.)
+vauchi-core/tests/it/app_engine_navigation_tests.rs 1217
 vauchi-core/tests/it/onboarding_tests.rs 1301
 vauchi-core/tests/it/sync_device_orchestrator_tests.rs 1286
 vauchi-core/tests/it/visibility_label_tests.rs 1220
@@ -190,7 +205,7 @@ vauchi-app/src/ui/exchange_ble.rs 1057
 #  audio-failed precedence. Option-agnostic — engine-side
 #  surface common to A/B/C; session-side 1.C.3+ commits to
 #  Option B per the design pass.)
-vauchi-app/src/ui/multi_stage_exchange.rs 1600
+vauchi-app/src/ui/multi_stage_exchange.rs 1633
 
 # EXEMPT — UniFFI facade growth: PlatformAppEngine wraps the full
 # AppEngine surface JSON-side and now also owns the Pair 4
@@ -335,7 +350,7 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1600
 # (+20 lines for cancel-session-first guard in `apply_multi_stage_*_for_test`
 #  bridges — fixes flaky `apply_multi_stage_state_finalized_with_session_ended`
 #  caused by cycle-thread racing the test's manual state pushes.)
-vauchi-platform/src/platform_app_engine.rs 5080
+vauchi-platform/src/platform_app_engine.rs 5099
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding

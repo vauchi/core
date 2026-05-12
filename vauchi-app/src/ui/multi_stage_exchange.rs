@@ -171,6 +171,17 @@ pub struct MultiStageExchangeEngine {
     /// `Pending` for both Glance and Hover; Glance never transitions
     /// because it doesn't emit the audio commands.
     audio_proximity: AudioProximityState,
+    /// Mode marker — `true` for engines constructed via
+    /// [`Self::new_hover`], `false` for [`Self::new_glance`].
+    /// Consumed by the platform-binding wire-up to decide whether
+    /// to register the audio-proximity listener on the cycle-thread
+    /// session: without that listener, the autonomous audio trigger
+    /// stays a silent no-op, so a Glance flow never surfaces the
+    /// audio chrome (Phase 1.C polish — keeps the spurious trigger
+    /// in `try_autonomous_audio_trigger` from advancing the inner
+    /// state machine for non-Hover sessions even before the Phase
+    /// 1.E mode-dispatcher flips to per-mode constructors).
+    is_hover_mode: bool,
 }
 
 impl Default for MultiStageExchangeEngine {
@@ -196,6 +207,7 @@ impl MultiStageExchangeEngine {
             scan_quality_tracker: ScanQualityTracker::new(),
             cancelled: false,
             audio_proximity: AudioProximityState::Pending,
+            is_hover_mode: false,
         }
     }
 
@@ -221,6 +233,7 @@ impl MultiStageExchangeEngine {
             scan_quality_tracker: ScanQualityTracker::new(),
             cancelled: false,
             audio_proximity: AudioProximityState::Pending,
+            is_hover_mode: true,
         }
     }
 
@@ -295,6 +308,18 @@ impl MultiStageExchangeEngine {
     /// Currently-selected camera (front == true).
     pub fn use_front_camera(&self) -> bool {
         self.use_front_camera
+    }
+
+    /// Returns `true` for engines constructed via
+    /// [`Self::new_hover`], `false` for [`Self::new_glance`].
+    /// The platform-binding layer reads this to decide whether to
+    /// register the cycle-thread audio listener — without that
+    /// listener registration, the autonomous audio trigger in
+    /// `vauchi-platform::multistage_exchange::try_autonomous_audio_trigger`
+    /// short-circuits before advancing the session state machine,
+    /// so Glance flows never surface the audio chrome.
+    pub fn is_hover_mode(&self) -> bool {
+        self.is_hover_mode
     }
 
     /// Current audio-proximity state — `Pending` for Glance throughout
@@ -726,6 +751,10 @@ impl WorkflowEngine for MultiStageExchangeEngine {
         Some(self)
     }
 
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
     /// 65% brightness keeps the front camera from over-exposing while
     /// scanning the peer's QR (mirror of the prior frontend-side
     /// `UIScreen.main.brightness = 0.65` / Android
@@ -837,6 +866,29 @@ mod tests {
         assert!(
             !engine.use_front_camera(),
             "Glance engine must default to the back camera",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn is_hover_mode_reflects_constructor() {
+        // Phase 1.C polish — the platform-binding wire-up reads
+        // `is_hover_mode()` through `AppEngine::
+        // is_active_engine_multi_stage_hover` to decide whether to
+        // register the cycle-thread audio listener. Both
+        // constructors and the `new()` shim must carry an honest
+        // mode marker.
+        assert!(
+            MultiStageExchangeEngine::new_hover().is_hover_mode(),
+            "new_hover must mark the engine as Hover-mode",
+        );
+        assert!(
+            !MultiStageExchangeEngine::new_glance().is_hover_mode(),
+            "new_glance must NOT be Hover-mode (the legacy Glance flow has no audio handshake)",
+        );
+        assert!(
+            !MultiStageExchangeEngine::new().is_hover_mode(),
+            "the new() shim delegates to new_glance — its mode marker must match",
         );
     }
 

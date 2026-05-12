@@ -4570,12 +4570,31 @@ impl PlatformAppEngine {
             direct_listener: Arc::clone(&self.direct_listener),
         };
         session.set_listener(Box::new(bridge));
-        let audio_bridge = MultiStageAudioEngineBridge {
-            engine: Arc::clone(&self.engine),
-            direct_listener: Arc::clone(&self.direct_listener),
-            audio_commands: session.pending_audio_commands_handle(),
-        };
-        session.set_audio_listener(Box::new(audio_bridge));
+        // Hover-only wire-up: the cycle-thread autonomous trigger
+        // (`try_autonomous_audio_trigger` in `multistage_exchange.rs`)
+        // gates on the audio-listener slot — empty slot means no
+        // state-machine advance into `Listening` and no audio
+        // commands surface to the renderer. Glance flows (and every
+        // non-multi-stage active engine) leave the slot empty so the
+        // trigger stays a silent no-op. Until the Phase 1.E
+        // mode-dispatcher in `screens.rs` flips to per-mode
+        // constructors, `is_active_engine_multi_stage_hover` always
+        // returns `false`, which is the desired Phase 1.C-polish
+        // behaviour: no spurious audio chrome until the dispatcher
+        // is wired.
+        let is_hover = self
+            .engine
+            .lock()
+            .map(|guard| guard.is_active_engine_multi_stage_hover())
+            .unwrap_or(false);
+        if is_hover {
+            let audio_bridge = MultiStageAudioEngineBridge {
+                engine: Arc::clone(&self.engine),
+                direct_listener: Arc::clone(&self.direct_listener),
+                audio_commands: session.pending_audio_commands_handle(),
+            };
+            session.set_audio_listener(Box::new(audio_bridge));
+        }
         session.start();
         *slot = Some(session);
         Ok(())

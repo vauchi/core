@@ -1113,6 +1113,42 @@ fn apply_multi_stage_audio_proximity_returns_false_on_wrong_engine() {
 
 // @internal
 #[test]
+fn is_active_engine_multi_stage_hover_returns_false_for_non_multistage_active() {
+    // Phase 1.C polish — `PlatformAppEngine::ensure_multi_stage_session`
+    // reads this to decide whether to register the cycle-thread
+    // audio listener. False for every non-multi-stage engine
+    // (including the default landing screen).
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let engine = AppEngine::new(vauchi);
+    assert!(
+        !engine.is_active_engine_multi_stage_hover(),
+        "default landing engine is never multi-stage / Hover",
+    );
+}
+
+// @internal
+#[test]
+fn is_active_engine_multi_stage_hover_returns_false_for_glance_multistage() {
+    // The current `AppScreen::MultiStageExchange` factory in
+    // screens.rs always constructs `new()` (= `new_glance()`)
+    // pending the Phase 1.E mode-dispatcher. Verify the helper
+    // returns false for that case — the Phase 1.C polish gate
+    // depends on this so PAE skips audio-listener registration
+    // until the dispatcher is wired.
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MultiStageExchange);
+    let _ = engine.drain_pending_commands();
+    assert!(
+        !engine.is_active_engine_multi_stage_hover(),
+        "screens.rs:880 currently constructs Glance via new() — helper must report false until Phase 1.E flips it",
+    );
+}
+
+// @internal
+#[test]
 fn extend_pending_commands_appends_to_drain_queue() {
     // Phase 1.C.3e-v of 2026-05-11-hover-graduation-plan.md —
     // PlatformAppEngine's audio-listener bridge forwards

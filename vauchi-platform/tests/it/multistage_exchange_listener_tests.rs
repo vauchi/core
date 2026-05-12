@@ -931,3 +931,85 @@ fn autonomous_trigger_fires_audio_handshake_on_discovered() {
     assert_eq!(alice_cmds.len(), 2);
     assert_eq!(bob_cmds.len(), 2);
 }
+
+// @internal
+#[test]
+fn autonomous_trigger_skipped_when_no_audio_listener_registered() {
+    // Phase 1.C polish — the autonomous trigger gates on the
+    // audio-listener slot. PAE's `ensure_multi_stage_session`
+    // only registers the audio listener when the active engine
+    // is a Hover `MultiStageExchangeEngine`; Glance flows leave
+    // the slot empty so the trigger must be a silent no-op:
+    // - inner audio_proximity stays at Pending (no state-machine
+    //   advance — important because Pending → Listening is the
+    //   only transition the gate allows, and burning it on a
+    //   Glance session would leave the state machine wedged for
+    //   a Hover follow-up on the same session)
+    // - the pending_audio_commands queue stays empty (no chirp
+    //   surfaces to the renderer, which is the user-visible
+    //   spurious-chrome regression this gate prevents).
+    //
+    // Two sessions reach Discovered as in the trigger-fires test
+    // above, but neither registers an audio listener. The
+    // assertion is the *absence* of state advance + command-queue
+    // entries within a wall-clock window comfortably exceeding the
+    // observed Discovered window in the trigger-fires test.
+    let alice = Arc::new(MobileMultiStageSession::new(exchange_payload_for("Alice")));
+    let bob = Arc::new(MobileMultiStageSession::new(exchange_payload_for("Bob")));
+
+    let alice_recorder = RecordingListener::new();
+    let bob_recorder = RecordingListener::new();
+
+    alice.set_listener(Box::new(PeerBridge {
+        peer: Arc::clone(&bob),
+        recorder: Arc::clone(&alice_recorder),
+    }));
+    bob.set_listener(Box::new(PeerBridge {
+        peer: Arc::clone(&alice),
+        recorder: Arc::clone(&bob_recorder),
+    }));
+    // Deliberately NO set_audio_listener for either session — that
+    // is the gate the trigger consults.
+
+    alice.set_cycle_sleep_override_ms_for_test(5);
+    bob.set_cycle_sleep_override_ms_for_test(5);
+    alice.start();
+    bob.start();
+
+    // Wait until both protocol listeners report at least one
+    // post-Idle state — i.e. both cycle threads have observed the
+    // QR-exchange progression past Discovered, which in the
+    // trigger-fires test is sufficient to fire the audio trigger.
+    let observed = wait_for(Duration::from_secs(10), || {
+        !alice_recorder.state_changes().is_empty() && !bob_recorder.state_changes().is_empty()
+    });
+
+    alice.cancel();
+    bob.cancel();
+
+    assert!(
+        observed,
+        "cycle threads never reported a non-Idle state — peer bridge wiring is broken, not the gate"
+    );
+
+    assert_eq!(
+        alice.audio_proximity(),
+        MobileAudioProximityState::Pending,
+        "no listener → trigger must not advance the state machine; got {:?}",
+        alice.audio_proximity(),
+    );
+    assert_eq!(
+        bob.audio_proximity(),
+        MobileAudioProximityState::Pending,
+        "no listener → trigger must not advance the state machine; got {:?}",
+        bob.audio_proximity(),
+    );
+    assert!(
+        alice.drain_audio_commands().is_empty(),
+        "no listener → no audio commands must queue (spurious-chrome regression gate)"
+    );
+    assert!(
+        bob.drain_audio_commands().is_empty(),
+        "no listener → no audio commands must queue (spurious-chrome regression gate)"
+    );
+}

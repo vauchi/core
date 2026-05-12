@@ -865,6 +865,11 @@ fn cycle_loop(
 /// thread already holds).
 ///
 /// Silent no-op when:
+/// - no audio listener has been registered (the canonical "not a
+///   Hover session" signal — Glance flows and headless tooling
+///   never call `set_audio_listener`, so the slot is empty and
+///   the cycle thread must not advance the state machine into
+///   `Listening` or surface audio commands to the renderer)
 /// - the inner mutex is poisoned (don't crash the cycle thread)
 /// - the inner state machine rejects the transition (handshake already
 ///   started, or audio_proximity isn't Pending — Glance retry races,
@@ -881,6 +886,21 @@ fn try_autonomous_audio_trigger(
     audio_commands: &Arc<Mutex<Vec<Command>>>,
 ) {
     use vauchi_core::exchange::{AudioConfig, AudioProximityState, audio_modem};
+
+    // Mode gate: callers that don't register an audio listener
+    // (Glance flows, headless tooling) must not see audio
+    // commands surface to the renderer or have the inner state
+    // machine advance to Listening. The PAE wire-up registers
+    // this listener only for Hover-mode engines (Phase 1.C polish),
+    // so an empty slot is the canonical "not a Hover session"
+    // signal at the cycle-thread layer.
+    let listener_registered = audio_listener_slot
+        .lock()
+        .map(|guard| guard.is_some())
+        .unwrap_or(false);
+    if !listener_registered {
+        return;
+    }
 
     // Acquire inner, check Pending, capture session_id, transition
     // to Listening. Drop lock before queuing / notifying so a

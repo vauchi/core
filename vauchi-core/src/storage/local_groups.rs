@@ -20,7 +20,7 @@ use super::{Storage, StorageError};
 impl Storage {
     /// Creates and persists a new local group with the given name.
     pub fn create_local_group(&self, name: &str) -> Result<LocalGroup, StorageError> {
-        let group = LocalGroup::new(name);
+        let group = LocalGroup::new(name, self.clock().unix_seconds());
         let contact_ids_json = serde_json::to_string(&Vec::<String>::new())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 

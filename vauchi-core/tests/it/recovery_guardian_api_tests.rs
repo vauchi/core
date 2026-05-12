@@ -40,7 +40,7 @@ fn test_guardian_token_seal_unseal_verify_lifecycle() {
     let bob_signing = SigningKeyPair::generate();
 
     // Alice creates a guardian token for Bob
-    let token = GuardianToken::create(&alice_signing, bob_signing.public_key());
+    let token = GuardianToken::create(&alice_signing, bob_signing.public_key(), 0);
     assert!(token.verify(), "freshly created token must verify");
 
     // Alice encrypts the token to Bob's X25519 key
@@ -79,7 +79,7 @@ fn test_non_guardian_cannot_decrypt_sealed_entry() {
     // Eve is not a guardian
     let eve_x25519_secret = StaticSecret::random_from_rng(OsRng);
 
-    let token = GuardianToken::create(&alice_signing, bob_signing.public_key());
+    let token = GuardianToken::create(&alice_signing, bob_signing.public_key(), 0);
     let sealed = sealed_box::seal(&token.to_bytes(), &bob_x25519_public);
 
     // Eve tries to decrypt Bob's entry
@@ -163,7 +163,7 @@ fn test_multiple_guardians_isolation() {
     ]
     .iter()
     .map(|(guardian_pk, x25519_pk)| {
-        let token = GuardianToken::create(&alice, guardian_pk.clone());
+        let token = GuardianToken::create(&alice, guardian_pk.clone(), 0);
         sealed_box::seal(&token.to_bytes(), x25519_pk)
     })
     .collect();

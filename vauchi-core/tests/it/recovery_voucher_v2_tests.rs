@@ -28,7 +28,7 @@ fn test_voucher_v2_with_guardian_token_roundtrip() {
     let new_pk = *new_keypair.public_key().as_bytes();
 
     // designator = old identity; guardian = voucher signer
-    let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key());
+    let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key(), 0);
 
     let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token.clone()));
     let bytes = voucher.to_bytes();
@@ -90,7 +90,7 @@ fn test_voucher_v2_from_bytes_preserves_token() {
     let old_pk = *old_keypair.public_key().as_bytes();
     let new_pk = *new_keypair.public_key().as_bytes();
 
-    let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key());
+    let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key(), 0);
     let original_designator_pk = *token.designator_pk();
     let original_guardian_pk = *token.guardian_pk();
 
@@ -130,7 +130,7 @@ fn test_voucher_v2_version_byte() {
     let new_pk = *new_keypair.public_key().as_bytes();
 
     // v2: with guardian token
-    let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key());
+    let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key(), 0);
     let v2 = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token));
     let v2_bytes = v2.to_bytes();
     assert_eq!(
@@ -162,7 +162,7 @@ fn test_create_from_claim_with_token() {
     let new_pk = *new_keypair.public_key().as_bytes();
 
     let claim = RecoveryClaim::new(&old_pk, &new_pk);
-    let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key());
+    let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key(), 0);
     let original_guardian_pk = *token.guardian_pk();
 
     let voucher =
@@ -198,7 +198,7 @@ fn test_proof_add_voucher_with_valid_token() {
     let new_pk = *new_keypair.public_key().as_bytes();
 
     // Token: designator = old identity, guardian = voucher signer
-    let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key());
+    let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key(), 0);
 
     let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token));
 
@@ -229,7 +229,7 @@ fn test_proof_rejects_voucher_with_invalid_token_signature() {
     let new_pk = *new_keypair.public_key().as_bytes();
 
     // Create a valid token, then tamper with guardian_pk to break the signature
-    let mut token = GuardianToken::create(&old_keypair, voucher_keypair.public_key());
+    let mut token = GuardianToken::create(&old_keypair, voucher_keypair.public_key(), 0);
     token.set_guardian_pk_for_testing(impostor_keypair.public_key().as_bytes());
 
     // The tampered token should not verify
@@ -262,7 +262,7 @@ fn test_proof_rejects_voucher_with_wrong_designator_pk() {
     let new_pk = *new_keypair.public_key().as_bytes();
 
     // Token signed by wrong_designator (not the recovering identity old_keypair)
-    let token = GuardianToken::create(&wrong_designator, voucher_keypair.public_key());
+    let token = GuardianToken::create(&wrong_designator, voucher_keypair.public_key(), 0);
 
     // Token itself is valid (self-consistent), but designator doesn't match proof.old_pk
     assert!(
@@ -294,7 +294,7 @@ fn test_proof_rejects_voucher_with_wrong_guardian_pk() {
     let new_pk = *new_keypair.public_key().as_bytes();
 
     // Token names different_guardian as guardian, but the voucher is signed by voucher_keypair
-    let token = GuardianToken::create(&old_keypair, different_guardian.public_key());
+    let token = GuardianToken::create(&old_keypair, different_guardian.public_key(), 0);
 
     // Token is self-consistent but guardian_pk != voucher_pk
     assert!(

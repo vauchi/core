@@ -21,7 +21,7 @@ proptest! {
         let designator = SigningKeyPair::from_seed(&seed1);
         let guardian = SigningKeyPair::from_seed(&seed2);
 
-        let token = GuardianToken::create(&designator, guardian.public_key());
+        let token = GuardianToken::create(&designator, guardian.public_key(), 0);
 
         prop_assert!(token.verify());
     }
@@ -43,6 +43,7 @@ proptest! {
             &fake_signer,
             real_designator.public_key(),
             guardian.public_key(),
+            0,
         );
 
         prop_assert!(!token.verify());

@@ -543,7 +543,7 @@ impl Vauchi {
     /// Records that a backup completed successfully (resets reminder count).
     pub fn record_backup_completed(&self) -> VauchiResult<()> {
         let mut state = self.load_backup_reminder_state()?;
-        state.record_backup();
+        state.record_backup(self.clock.unix_seconds());
         self.save_backup_reminder_state(&state)
     }
 

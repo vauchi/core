@@ -48,11 +48,11 @@ pub struct ContactStatistics {
 
 /// Computes aggregate statistics from a list of contacts.
 ///
-/// Pure function — takes an immutable slice, returns computed data.
-/// No storage access, no side effects.
-pub fn compute_statistics(contacts: &[Contact]) -> ContactStatistics {
-    let now = crate::clock::ambient_now_secs();
-
+/// Pure function — takes an immutable slice + a wall-clock
+/// timestamp, returns computed data. No storage access, no side
+/// effects. `now` is the Unix-epoch second used for the card-
+/// freshness bucket boundary (`FRESHNESS_THRESHOLD_SECS`).
+pub fn compute_statistics(contacts: &[Contact], now: u64) -> ContactStatistics {
     let mut field_distribution: HashMap<FieldType, usize> = HashMap::new();
     let mut exchange_method_breakdown: HashMap<ExchangeTransport, usize> = HashMap::new();
     let mut freshness = FreshnessDistribution::default();

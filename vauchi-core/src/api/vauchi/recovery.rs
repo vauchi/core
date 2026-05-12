@@ -61,7 +61,11 @@ impl Vauchi {
 
             // Create guardian token (signed by designator)
             let guardian_crypto_pk = crate::crypto::PublicKey::from_bytes(*guardian_ed25519_pk);
-            let token = GuardianToken::create(identity.signing_keypair(), guardian_crypto_pk);
+            let token = GuardianToken::create(
+                identity.signing_keypair(),
+                guardian_crypto_pk,
+                self.clock.unix_seconds(),
+            );
             let token_bytes = token.to_bytes();
 
             // Convert guardian's Ed25519 public key to X25519 for sealed-box

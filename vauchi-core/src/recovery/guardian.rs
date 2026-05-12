@@ -42,8 +42,11 @@ impl GuardianToken {
     /// Creates a guardian token signed by `signer`.
     ///
     /// The `designator_pk` is derived from `signer.public_key()`.
-    pub fn create(signer: &SigningKeyPair, guardian_pk: PublicKey) -> Self {
-        Self::create_with_claimed_pk(signer, signer.public_key(), guardian_pk)
+    /// `now` is the Unix-epoch timestamp embedded in the signed
+    /// message — production callers pass
+    /// `vauchi.clock().unix_seconds()`.
+    pub fn create(signer: &SigningKeyPair, guardian_pk: PublicKey, now: u64) -> Self {
+        Self::create_with_claimed_pk(signer, signer.public_key(), guardian_pk, now)
     }
 
     /// Creates a guardian token where the claimed `designator_pk` may differ
@@ -56,8 +59,9 @@ impl GuardianToken {
         signer: &SigningKeyPair,
         claimed_designator_pk: PublicKey,
         guardian_pk: PublicKey,
+        now: u64,
     ) -> Self {
-        let created_at = crate::clock::ambient_now_secs();
+        let created_at = now;
 
         let msg = build_signed_message(
             claimed_designator_pk.as_bytes(),

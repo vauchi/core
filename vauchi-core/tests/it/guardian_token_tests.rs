@@ -17,14 +17,13 @@ fn test_create_guardian_token() {
     let designator = SigningKeyPair::generate();
     let guardian = SigningKeyPair::generate();
 
-    let token = GuardianToken::create(&designator, guardian.public_key());
+    let token = GuardianToken::create(&designator, guardian.public_key(), 1_700_000_000);
 
     assert_eq!(token.designator_pk(), designator.public_key().as_bytes());
     assert_eq!(token.guardian_pk(), guardian.public_key().as_bytes());
-    assert!(
-        token.created_at() > 0,
-        "created_at must be a non-zero timestamp"
-    );
+    // Caller-controlled now is stamped verbatim — was `> 0` previously,
+    // when SystemTime::now() guaranteed non-zero.
+    assert_eq!(token.created_at(), 1_700_000_000);
 }
 
 // @scenario: contact_recovery :: Verify a freshly created guardian token
@@ -33,7 +32,7 @@ fn test_verify_guardian_token() {
     let designator = SigningKeyPair::generate();
     let guardian = SigningKeyPair::generate();
 
-    let token = GuardianToken::create(&designator, guardian.public_key());
+    let token = GuardianToken::create(&designator, guardian.public_key(), 0);
 
     assert!(
         token.verify(),
@@ -48,7 +47,7 @@ fn test_tampered_guardian_token_fails_verification() {
     let guardian = SigningKeyPair::generate();
     let impostor = SigningKeyPair::generate();
 
-    let mut token = GuardianToken::create(&designator, guardian.public_key());
+    let mut token = GuardianToken::create(&designator, guardian.public_key(), 0);
     token.set_guardian_pk_for_testing(impostor.public_key().as_bytes());
 
     assert!(
@@ -63,7 +62,7 @@ fn test_guardian_token_serialization_roundtrip() {
     let designator = SigningKeyPair::generate();
     let guardian = SigningKeyPair::generate();
 
-    let token = GuardianToken::create(&designator, guardian.public_key());
+    let token = GuardianToken::create(&designator, guardian.public_key(), 0);
     let bytes = token.to_bytes();
     let restored = GuardianToken::from_bytes(&bytes).expect("deserialization must succeed");
 
@@ -85,6 +84,7 @@ fn test_wrong_designator_cannot_forge_token() {
         &fake_signer,
         real_designator.public_key(),
         guardian.public_key(),
+        0,
     );
 
     assert!(
@@ -99,7 +99,7 @@ fn test_domain_separation() {
     let designator = SigningKeyPair::generate();
     let guardian = SigningKeyPair::generate();
 
-    let token = GuardianToken::create(&designator, guardian.public_key());
+    let token = GuardianToken::create(&designator, guardian.public_key(), 0);
 
     // Token must verify through the proper API.
     assert!(token.verify());

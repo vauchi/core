@@ -4,7 +4,7 @@
 
 //! Contact Statistics Tests
 //!
-//! Tests for compute_statistics(): total contacts, exchange method breakdown,
+//! Tests for compute_statistics(, 0): total contacts, exchange method breakdown,
 //! field distribution, card freshness, and recovery count.
 //!
 //! Feature: contacts_management.feature @contacts
@@ -32,7 +32,7 @@ fn make_contact(name: &str, transport: ExchangeTransport) -> Contact {
 // @internal
 #[test]
 fn test_statistics_empty_contacts() {
-    let stats = compute_statistics(&[]);
+    let stats = compute_statistics(&[], 0);
     assert_eq!(stats.total_contacts, 0);
     assert!(stats.field_distribution.is_empty());
     assert!(stats.exchange_method_breakdown.is_empty());
@@ -46,7 +46,7 @@ fn test_statistics_total_contacts() {
         make_contact("Bob", ExchangeTransport::Nfc),
         make_contact("Carol", ExchangeTransport::Qr),
     ];
-    let stats = compute_statistics(&contacts);
+    let stats = compute_statistics(&contacts, 0);
     assert_eq!(stats.total_contacts, 3);
 }
 
@@ -58,7 +58,7 @@ fn test_statistics_exchange_method_breakdown() {
         make_contact("Bob", ExchangeTransport::Nfc),
         make_contact("Carol", ExchangeTransport::Qr),
     ];
-    let stats = compute_statistics(&contacts);
+    let stats = compute_statistics(&contacts, 0);
     assert_eq!(
         *stats
             .exchange_method_breakdown
@@ -89,7 +89,7 @@ fn test_statistics_recovery_count() {
     alice.accept_recovery([99u8; 32], test_key()).unwrap();
     let bob = make_contact("Bob", ExchangeTransport::Nfc);
 
-    let stats = compute_statistics(&[alice, bob]);
+    let stats = compute_statistics(&[alice, bob], 0);
     assert_eq!(stats.recovery_count, 1);
 }
 
@@ -97,7 +97,7 @@ fn test_statistics_recovery_count() {
 #[test]
 fn test_statistics_card_freshness_unknown_when_no_updates() {
     let contacts = vec![make_contact("Alice", ExchangeTransport::Qr)];
-    let stats = compute_statistics(&contacts);
+    let stats = compute_statistics(&contacts, 0);
     assert_eq!(stats.card_freshness.unknown, 1);
     assert_eq!(stats.card_freshness.fresh, 0);
     assert_eq!(stats.card_freshness.stale, 0);

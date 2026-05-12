@@ -324,9 +324,11 @@ impl BackupReminderState {
         serde_json::from_str(json)
     }
 
-    /// Record that a backup completed successfully.
-    pub fn record_backup(&mut self) {
-        self.last_backup_timestamp = Some(crate::clock::ambient_now_secs());
+    /// Record that a backup completed successfully. `now` is the
+    /// Unix-epoch timestamp stamped into `last_backup_timestamp`;
+    /// production callers pass `vauchi.clock().unix_seconds()`.
+    pub fn record_backup(&mut self, now: u64) {
+        self.last_backup_timestamp = Some(now);
         self.reminder_count = 0;
     }
 

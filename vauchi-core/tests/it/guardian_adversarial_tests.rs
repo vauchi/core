@@ -109,7 +109,7 @@ fn test_guardian_token_from_bytes_one_megabyte_zeros() {
 fn test_guardian_token_from_bytes_last_byte_flipped_fails_verification() {
     let designator = SigningKeyPair::generate();
     let guardian = SigningKeyPair::generate();
-    let token = GuardianToken::create(&designator, guardian.public_key());
+    let token = GuardianToken::create(&designator, guardian.public_key(), 0);
     let mut bytes = token.to_bytes();
 
     // Flip the last byte — corrupts the signature
@@ -157,7 +157,7 @@ fn test_guardian_token_from_bytes_all_0xff_200_bytes() {
 fn test_guardian_token_from_bytes_half_length_truncated() {
     let designator = SigningKeyPair::generate();
     let guardian = SigningKeyPair::generate();
-    let token = GuardianToken::create(&designator, guardian.public_key());
+    let token = GuardianToken::create(&designator, guardian.public_key(), 0);
     let bytes = token.to_bytes();
 
     let truncated = &bytes[..bytes.len() / 2];
@@ -329,7 +329,8 @@ fn test_guardian_token_verify_all_zero_designator_pk_returns_false() {
     let fake_signer = SigningKeyPair::generate();
     let zero_pk = vauchi_core::crypto::PublicKey::from_bytes([0u8; 32]);
 
-    let token = GuardianToken::create_with_claimed_pk(&fake_signer, zero_pk, guardian.public_key());
+    let token =
+        GuardianToken::create_with_claimed_pk(&fake_signer, zero_pk, guardian.public_key(), 0);
 
     assert!(
         !token.verify(),
@@ -343,7 +344,7 @@ fn test_guardian_token_verify_all_zero_guardian_pk_returns_false() {
     let designator = SigningKeyPair::generate();
     let guardian = SigningKeyPair::generate();
 
-    let mut token = GuardianToken::create(&designator, guardian.public_key());
+    let mut token = GuardianToken::create(&designator, guardian.public_key(), 0);
     token.set_guardian_pk_for_testing(&[0u8; 32]);
 
     assert!(
@@ -359,7 +360,7 @@ fn test_guardian_token_verify_all_zero_signature_returns_false() {
     let guardian = SigningKeyPair::generate();
 
     // Serialize, zero the signature bytes, and deserialize.
-    let token = GuardianToken::create(&designator, guardian.public_key());
+    let token = GuardianToken::create(&designator, guardian.public_key(), 0);
     let mut bytes = token.to_bytes();
 
     // The token serialises as: designator_pk (32) + guardian_pk (32) + created_at (varint)

@@ -175,7 +175,7 @@ fn group_has_no_visibility_fields() {
     // LocalGroup must only have organizational fields (id, name, contact_ids,
     // created_at). If someone adds `visible_fields`, this test forces a review
     // of the HR-5 privacy boundary.
-    let group = LocalGroup::new("Check");
+    let group = LocalGroup::new("Check", 1_700_000_000);
     // Assert the struct has exactly 4 fields by exhaustive destructuring.
     // Adding a field to LocalGroup will cause a compile error here.
     let LocalGroup {
@@ -187,7 +187,9 @@ fn group_has_no_visibility_fields() {
     assert!(!id.is_empty());
     assert_eq!(name, "Check");
     assert!(contact_ids.is_empty());
-    assert!(created_at > 0);
+    // Caller-controlled now is stamped verbatim — was `> 0` previously,
+    // when SystemTime::now() guaranteed non-zero.
+    assert_eq!(created_at, 1_700_000_000);
 }
 
 /// `add_to_local_group` on a non-existent group returns NotFound.

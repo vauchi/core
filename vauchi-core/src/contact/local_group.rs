@@ -35,16 +35,16 @@ pub struct LocalGroup {
 impl LocalGroup {
     /// Creates a new local group with the given name.
     ///
-    /// The ID is a freshly generated UUID v4. `contact_ids` starts empty.
-    pub fn new(name: &str) -> Self {
-        let id = uuid::Uuid::new_v4().to_string();
-        let created_at = crate::clock::ambient_now_secs();
-
+    /// The ID is a freshly generated UUID v4. `contact_ids` starts
+    /// empty. `now` is the Unix-epoch timestamp stamped into
+    /// `created_at`; production callers pass
+    /// `storage.clock().unix_seconds()`.
+    pub fn new(name: &str, now: u64) -> Self {
         Self {
-            id,
+            id: uuid::Uuid::new_v4().to_string(),
             name: name.to_string(),
             contact_ids: HashSet::new(),
-            created_at,
+            created_at: now,
         }
     }
 

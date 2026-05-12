@@ -48,21 +48,10 @@ fn backup_reminder_state_record_backup_resets() {
     let mut state = BackupReminderState::new();
     state.reminder_count = 3;
 
-    state.record_backup();
+    state.record_backup(1_700_000_000);
 
-    assert!(state.last_backup_timestamp.is_some());
+    assert_eq!(state.last_backup_timestamp, Some(1_700_000_000));
     assert_eq!(state.reminder_count, 0);
-    // Timestamp should be within the last few seconds
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    let ts = state.last_backup_timestamp.unwrap();
-    assert!(
-        now - ts < 5,
-        "timestamp should be recent, got delta {}",
-        now - ts
-    );
 }
 
 // @internal

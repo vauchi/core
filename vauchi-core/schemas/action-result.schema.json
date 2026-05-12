@@ -484,11 +484,25 @@
       "additionalProperties": false
     },
     {
-      "description": "App layer should navigate to the multi-stage face-to-face exchange screen (`AppScreen::MultiStageExchange`).\n\nEmitted by `ExchangeEngine` when the user picks a mode whose implementation is the new core-driven multi-stage protocol (Pair 4 of `2026-04-28-pure-humble-ui-retire-native-screens`). Frontends never see this — `PlatformAppEngine` routes it to the dedicated screen which then auto-creates the `MobileMultiStageSession` and binds the bridge listener.",
-      "type": "string",
-      "enum": [
+      "description": "App layer should navigate to the multi-stage face-to-face exchange screen (`AppScreen::MultiStageExchange`).\n\nEmitted by `ExchangeEngine` when the user picks a mode whose implementation is the new core-driven multi-stage protocol. Pair 4 of `2026-04-28-pure-humble-ui-retire-native-screens` graduated `ExchangeMode::Glance`; Phase 1.E of `2026-05-11-hover-graduation-plan.md` extended the handoff to `ExchangeMode::Hover`. The `mode` payload tells AppEngine which engine constructor to use (`MultiStageExchangeEngine::new_hover()` vs `::new_glance()`) — Hover defaults to the front camera and runs the autonomous audio-handshake trigger; Glance stays back-camera + audio-quiet.\n\nFrontends never see this — `PlatformAppEngine` routes it to the dedicated screen which then auto-creates the `MobileMultiStageSession` and binds the bridge listener.",
+      "type": "object",
+      "required": [
         "StartMultiStageExchange"
-      ]
+      ],
+      "properties": {
+        "StartMultiStageExchange": {
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "$ref": "#/definitions/ExchangeMode"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     },
     {
       "description": "App layer should call `MobileDeviceLinkSession::confirm_manual` with the given confirmation code and the current unix timestamp.\n\nEmitted by `DeviceLinkingEngine` from the `VerifyingProximity` step when the user taps the manual-confirm action. Pair 5 of `2026-04-28-pure-humble-ui-retire-native-screens`. Ultrasonic confirmation flows through ADR-031 hardware events instead.",
@@ -2234,6 +2248,88 @@
           "type": "string"
         }
       }
+    },
+    "ExchangeMode": {
+      "description": "All supported contact-exchange modes.",
+      "oneOf": [
+        {
+          "description": "Quick visual scan — both devices display and scan QR codes simultaneously.",
+          "type": "string",
+          "enum": [
+            "glance"
+          ]
+        },
+        {
+          "description": "QR + ultrasonic audio proximity confirmation.",
+          "type": "string",
+          "enum": [
+            "hover"
+          ]
+        },
+        {
+          "description": "BLE + physical impact detection.",
+          "type": "string",
+          "enum": [
+            "bump"
+          ]
+        },
+        {
+          "description": "BLE + accelerometer shake gesture.",
+          "type": "string",
+          "enum": [
+            "shake"
+          ]
+        },
+        {
+          "description": "BLE + ambient audio fingerprint match.",
+          "type": "string",
+          "enum": [
+            "magic"
+          ]
+        },
+        {
+          "description": "BLE bootstrapped via NFC tap.",
+          "type": "string",
+          "enum": [
+            "tap_tap"
+          ]
+        },
+        {
+          "description": "NFC + BLE + audio + accelerometer multi-factor in-person exchange.",
+          "type": "string",
+          "enum": [
+            "tap_hover_shake"
+          ]
+        },
+        {
+          "description": "One-to-many QR broadcast for group exchanges.",
+          "type": "string",
+          "enum": [
+            "broadcast"
+          ]
+        },
+        {
+          "description": "Remote exchange via QR scanned through a browser camera.",
+          "type": "string",
+          "enum": [
+            "web"
+          ]
+        },
+        {
+          "description": "Async remote exchange via a shareable URL.",
+          "type": "string",
+          "enum": [
+            "link"
+          ]
+        },
+        {
+          "description": "USB cable exchange between a desktop and a phone.",
+          "type": "string",
+          "enum": [
+            "cable"
+          ]
+        }
+      ]
     },
     "Field": {
       "description": "A contact field as displayed in the UI.",

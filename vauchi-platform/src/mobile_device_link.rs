@@ -351,7 +351,11 @@ impl VauchiPlatform {
         }
 
         // Try to revoke the device
-        match registry.revoke_device(&device_id, identity.signing_keypair()) {
+        match registry.revoke_device(
+            &device_id,
+            identity.signing_keypair(),
+            storage.clock().unix_seconds(),
+        ) {
             Ok(()) => {
                 storage.save_device_registry(&registry)?;
                 Ok(true)

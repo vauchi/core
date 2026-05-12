@@ -22,8 +22,8 @@ fn test_signing_keypair() -> SigningKeyPair {
 fn test_device_key_derivation_is_deterministic() {
     let seed = test_master_seed();
 
-    let device1 = DeviceInfo::derive(&seed, 0, "Device 1".to_string());
-    let device2 = DeviceInfo::derive(&seed, 0, "Device 1".to_string());
+    let device1 = DeviceInfo::derive(&seed, 0, "Device 1".to_string(), 0);
+    let device2 = DeviceInfo::derive(&seed, 0, "Device 1".to_string(), 0);
 
     assert_eq!(device1.device_id(), device2.device_id());
     assert_eq!(device1.exchange_public_key(), device2.exchange_public_key());
@@ -35,8 +35,8 @@ fn test_device_key_derivation_is_deterministic() {
 fn test_different_index_different_keys() {
     let seed = test_master_seed();
 
-    let device0 = DeviceInfo::derive(&seed, 0, "Device 0".to_string());
-    let device1 = DeviceInfo::derive(&seed, 1, "Device 1".to_string());
+    let device0 = DeviceInfo::derive(&seed, 0, "Device 0".to_string(), 0);
+    let device1 = DeviceInfo::derive(&seed, 1, "Device 1".to_string(), 0);
 
     assert_ne!(device0.device_id(), device1.device_id());
     assert_ne!(device0.exchange_public_key(), device1.exchange_public_key());
@@ -49,8 +49,8 @@ fn test_different_seed_different_keys() {
     let seed1 = [0x42u8; 32];
     let seed2 = [0x43u8; 32];
 
-    let device1 = DeviceInfo::derive(&seed1, 0, "Device".to_string());
-    let device2 = DeviceInfo::derive(&seed2, 0, "Device".to_string());
+    let device1 = DeviceInfo::derive(&seed1, 0, "Device".to_string(), 0);
+    let device2 = DeviceInfo::derive(&seed2, 0, "Device".to_string(), 0);
 
     assert_ne!(device1.device_id(), device2.device_id());
     assert_ne!(device1.exchange_public_key(), device2.exchange_public_key());
@@ -62,7 +62,7 @@ fn test_different_seed_different_keys() {
 fn test_device_registry_creation() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
 
     let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
 
@@ -78,8 +78,8 @@ fn test_device_registry_creation() {
 fn test_add_device_to_registry() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
-    let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string());
+    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
+    let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string(), 0);
 
     let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
     registry
@@ -97,13 +97,13 @@ fn test_add_device_to_registry() {
 fn test_max_devices_limit() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device0 = DeviceInfo::derive(&seed, 0, "Device 0".to_string());
+    let device0 = DeviceInfo::derive(&seed, 0, "Device 0".to_string(), 0);
 
     let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
 
     // Add devices up to limit
     for i in 1..MAX_DEVICES {
-        let device = DeviceInfo::derive(&seed, i as u32, format!("Device {}", i));
+        let device = DeviceInfo::derive(&seed, i as u32, format!("Device {}", i), 0);
         registry
             .add_device(device.to_registered(&seed), &signing_key)
             .unwrap();
@@ -112,7 +112,7 @@ fn test_max_devices_limit() {
     assert_eq!(registry.active_count(), MAX_DEVICES);
 
     // Adding one more should fail
-    let extra = DeviceInfo::derive(&seed, MAX_DEVICES as u32, "Extra".to_string());
+    let extra = DeviceInfo::derive(&seed, MAX_DEVICES as u32, "Extra".to_string(), 0);
     let result = registry.add_device(extra.to_registered(&seed), &signing_key);
     assert!(matches!(result, Err(DeviceError::MaxDevicesReached)));
 }
@@ -123,8 +123,8 @@ fn test_max_devices_limit() {
 fn test_revoke_device() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
-    let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string());
+    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
+    let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string(), 0);
 
     let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
     registry
@@ -134,7 +134,7 @@ fn test_revoke_device() {
     assert_eq!(registry.active_count(), 2);
 
     registry
-        .revoke_device(device1.device_id(), &signing_key)
+        .revoke_device(device1.device_id(), &signing_key, 0)
         .unwrap();
 
     assert_eq!(registry.active_count(), 1);
@@ -148,11 +148,11 @@ fn test_revoke_device() {
 fn test_cannot_revoke_last_device() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 0, "Only Device".to_string());
+    let device = DeviceInfo::derive(&seed, 0, "Only Device".to_string(), 0);
 
     let mut registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
 
-    let result = registry.revoke_device(device.device_id(), &signing_key);
+    let result = registry.revoke_device(device.device_id(), &signing_key, 0);
     assert!(matches!(result, Err(DeviceError::CannotRemoveLastDevice)));
 }
 
@@ -162,7 +162,7 @@ fn test_cannot_revoke_last_device() {
 fn test_find_device() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
     let device_id = *device.device_id();
 
     let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
@@ -181,7 +181,7 @@ fn test_find_device() {
 fn test_duplicate_device_rejected() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
 
     let mut registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
 
@@ -194,7 +194,7 @@ fn test_duplicate_device_rejected() {
 fn test_registry_serialization() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
 
     let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
 
@@ -211,7 +211,7 @@ fn test_registry_serialization() {
 #[test]
 fn test_empty_device_name_rejected() {
     let seed = test_master_seed();
-    let mut device = DeviceInfo::derive(&seed, 0, "Valid".to_string());
+    let mut device = DeviceInfo::derive(&seed, 0, "Valid".to_string(), 0);
 
     let result = device.set_device_name("".to_string());
     assert!(matches!(result, Err(DeviceError::EmptyDeviceName)));
@@ -231,13 +231,14 @@ fn test_empty_device_name_rejected() {
 fn test_device_revocation_certificate_creation() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 1, "Lost Device".to_string());
+    let device = DeviceInfo::derive(&seed, 1, "Lost Device".to_string(), 0);
 
     // Create a revocation certificate
     let certificate = DeviceRevocationCertificate::create(
         device.device_id(),
         "Lost device - reported stolen".to_string(),
         &signing_key,
+        0,
     );
 
     assert_eq!(certificate.device_id(), device.device_id());
@@ -252,13 +253,18 @@ fn test_device_revocation_certificate_creation() {
 fn test_device_revocation_certificate_has_timestamp() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 1, "Lost Device".to_string());
+    let device = DeviceInfo::derive(&seed, 1, "Lost Device".to_string(), 0);
 
-    let certificate =
-        DeviceRevocationCertificate::create(device.device_id(), "Lost".to_string(), &signing_key);
+    let now = 1_700_000_000_u64;
+    let certificate = DeviceRevocationCertificate::create(
+        device.device_id(),
+        "Lost".to_string(),
+        &signing_key,
+        now,
+    );
 
-    // Certificate should have valid timestamp
-    assert!(certificate.revoked_at() > 0);
+    // `revoked_at` is stamped from the `now` argument, verbatim.
+    assert_eq!(certificate.revoked_at(), now);
 }
 
 /// Test certificate serialization for transmission
@@ -267,10 +273,14 @@ fn test_device_revocation_certificate_has_timestamp() {
 fn test_device_revocation_certificate_serialization() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 1, "Lost Device".to_string());
+    let device = DeviceInfo::derive(&seed, 1, "Lost Device".to_string(), 0);
 
-    let certificate =
-        DeviceRevocationCertificate::create(device.device_id(), "Lost".to_string(), &signing_key);
+    let certificate = DeviceRevocationCertificate::create(
+        device.device_id(),
+        "Lost".to_string(),
+        &signing_key,
+        0,
+    );
 
     let json = certificate.to_json();
     let restored = DeviceRevocationCertificate::from_json(&json).unwrap();
@@ -286,12 +296,12 @@ fn test_device_revocation_certificate_serialization() {
 fn test_registry_broadcast_message_creation() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
 
     let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
 
     // Create broadcast message for contacts
-    let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+    let broadcast = RegistryBroadcast::new(&registry, &signing_key, 0);
 
     assert_eq!(broadcast.version(), registry.version());
     assert!(broadcast.verify(&signing_key.public_key()));
@@ -304,15 +314,15 @@ fn test_registry_broadcast_message_creation() {
 fn test_registry_broadcast_contains_active_devices() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
-    let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string());
+    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
+    let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string(), 0);
 
     let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
     registry
         .add_device(device1.to_registered(&seed), &signing_key)
         .unwrap();
 
-    let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+    let broadcast = RegistryBroadcast::new(&registry, &signing_key, 0);
 
     assert_eq!(broadcast.active_device_count(), 2);
     assert!(broadcast.contains_device(device0.device_id()));
@@ -326,18 +336,18 @@ fn test_registry_broadcast_contains_active_devices() {
 fn test_registry_broadcast_excludes_revoked() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
-    let device1 = DeviceInfo::derive(&seed, 1, "Revoked".to_string());
+    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
+    let device1 = DeviceInfo::derive(&seed, 1, "Revoked".to_string(), 0);
 
     let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
     registry
         .add_device(device1.to_registered(&seed), &signing_key)
         .unwrap();
     registry
-        .revoke_device(device1.device_id(), &signing_key)
+        .revoke_device(device1.device_id(), &signing_key, 0)
         .unwrap();
 
-    let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+    let broadcast = RegistryBroadcast::new(&registry, &signing_key, 0);
 
     assert_eq!(broadcast.active_device_count(), 1);
     assert!(broadcast.contains_device(device0.device_id()));
@@ -350,10 +360,10 @@ fn test_registry_broadcast_excludes_revoked() {
 fn test_registry_broadcast_serialization() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
 
     let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
-    let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+    let broadcast = RegistryBroadcast::new(&registry, &signing_key, 0);
 
     let json = broadcast.to_json();
     let restored = RegistryBroadcast::from_json(&json).unwrap();
@@ -370,8 +380,8 @@ fn test_registry_broadcast_serialization() {
 fn test_apply_revocation_to_contact_registry() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
-    let device1 = DeviceInfo::derive(&seed, 1, "ToRevoke".to_string());
+    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
+    let device1 = DeviceInfo::derive(&seed, 1, "ToRevoke".to_string(), 0);
 
     let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
     registry
@@ -383,6 +393,7 @@ fn test_apply_revocation_to_contact_registry() {
         device1.device_id(),
         "Revoked".to_string(),
         &signing_key,
+        0,
     );
 
     // Apply certificate to registry (as if received from contact)
@@ -412,10 +423,10 @@ fn test_apply_revocation_to_contact_registry() {
 fn test_broadcast_rejects_old_version() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
 
     let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
-    let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+    let broadcast = RegistryBroadcast::new(&registry, &signing_key, 0);
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -442,15 +453,11 @@ fn test_broadcast_rejects_old_version() {
 fn test_broadcast_accepts_fresh() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
 
     let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
-    let broadcast = RegistryBroadcast::new(&registry, &signing_key);
-
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = 1_700_000_000_u64;
+    let broadcast = RegistryBroadcast::new(&registry, &signing_key, now);
 
     // Broadcast version is 1, last accepted is 0 → should accept
     let result = broadcast.verify_with_freshness(
@@ -472,10 +479,10 @@ fn test_broadcast_accepts_fresh() {
 fn test_broadcast_rejects_stale_timestamp() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
 
     let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
-    let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+    let broadcast = RegistryBroadcast::new(&registry, &signing_key, 0);
 
     let far_future = broadcast.timestamp() + 7200; // 2 hours later
 
@@ -496,10 +503,11 @@ fn test_broadcast_rejects_stale_timestamp() {
 fn test_broadcast_rejects_future_timestamp() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
 
     let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
-    let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+    let now = 1_700_000_000_u64;
+    let broadcast = RegistryBroadcast::new(&registry, &signing_key, now);
 
     let past = broadcast.timestamp().saturating_sub(120); // 2 minutes before broadcast
 
@@ -519,7 +527,7 @@ fn test_broadcast_rejects_future_timestamp() {
 fn test_find_device_by_prefix_matches_hex_start() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
     let registered0 = device0.to_registered(&seed);
     let expected_hex = registered0.device_id_hex();
 
@@ -541,7 +549,7 @@ fn test_find_device_by_prefix_matches_hex_start() {
 fn test_find_device_by_prefix_returns_none_for_no_match() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
 
     let registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
 
@@ -559,8 +567,8 @@ fn test_find_device_by_prefix_returns_none_for_no_match() {
 fn test_find_device_by_prefix_only_matches_active_devices() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
-    let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string());
+    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
+    let device1 = DeviceInfo::derive(&seed, 1, "Secondary".to_string(), 0);
     let device1_hex = device1.to_registered(&seed).device_id_hex();
 
     let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
@@ -578,6 +586,7 @@ fn test_find_device_by_prefix_only_matches_active_devices() {
                 .try_into()
                 .unwrap(),
             &signing_key,
+            0,
         )
         .unwrap();
 
@@ -592,7 +601,7 @@ fn test_find_device_by_prefix_only_matches_active_devices() {
 fn test_find_device_by_prefix_empty_prefix_returns_first_active() {
     let seed = test_master_seed();
     let signing_key = test_signing_keypair();
-    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string());
+    let device0 = DeviceInfo::derive(&seed, 0, "Primary".to_string(), 0);
 
     let registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
 

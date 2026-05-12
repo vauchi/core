@@ -461,7 +461,7 @@ mod tests {
         storage.save_own_card(&own_card).unwrap();
 
         // Create orchestrator to generate sync payload
-        let device_a = DeviceInfo::derive(&master_seed, 0, "Device A".to_string());
+        let device_a = DeviceInfo::derive(&master_seed, 0, "Device A".to_string(), 0);
         let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry.clone());
         let sync_payload = orchestrator.create_full_sync_payload().unwrap();
         let sync_json = serde_json::to_string(&sync_payload).unwrap();
@@ -654,7 +654,7 @@ mod tests {
         let contact = create_test_contact("Bob");
         storage.save_contact(&contact).unwrap();
 
-        let device_a = DeviceInfo::derive(&master_seed, 0, "Device A".to_string());
+        let device_a = DeviceInfo::derive(&master_seed, 0, "Device A".to_string(), 0);
         let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry.clone());
         let sync_payload = orchestrator.create_full_sync_payload().unwrap();
         let sync_json = serde_json::to_string(&sync_payload).unwrap();

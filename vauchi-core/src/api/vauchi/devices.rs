@@ -139,7 +139,11 @@ impl Vauchi {
 
         let device_name = device.device_name.clone();
         registry
-            .revoke_device(&device.device_id, identity.signing_keypair())
+            .revoke_device(
+                &device.device_id,
+                identity.signing_keypair(),
+                self.storage.now_secs(),
+            )
             .map_err(|e| VauchiError::InvalidState(format!("Revoke failed: {:?}", e)))?;
         self.storage.save_device_registry(&registry)?;
 

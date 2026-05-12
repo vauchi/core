@@ -402,7 +402,7 @@ use vauchi_core::identity::device::{DeviceInfo, DeviceRegistry};
 use vauchi_core::sync::{DeviceSyncOrchestrator, SyncItem};
 
 fn create_test_device(master_seed: &[u8; 32], index: u32, name: &str) -> DeviceInfo {
-    DeviceInfo::derive(master_seed, index, name.to_string())
+    DeviceInfo::derive(master_seed, index, name.to_string(), 0)
 }
 
 fn create_test_registry(master_seed: &[u8; 32], device: &DeviceInfo) -> DeviceRegistry {

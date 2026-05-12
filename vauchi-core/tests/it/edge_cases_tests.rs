@@ -312,12 +312,12 @@ fn test_device_registry_at_max_devices() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
     // Add up to max
     for i in 1..MAX_DEVICES {
-        let device = DeviceInfo::derive(&master_seed, i as u32, format!("Device {}", i));
+        let device = DeviceInfo::derive(&master_seed, i as u32, format!("Device {}", i), 0);
         registry
             .add_device(device.to_registered(&master_seed), &signing_key)
             .unwrap();
@@ -333,8 +333,8 @@ fn test_device_revocation_when_at_two() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string());
-    let device1 = DeviceInfo::derive(&master_seed, 1, "Device 1".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
+    let device1 = DeviceInfo::derive(&master_seed, 1, "Device 1".to_string(), 0);
 
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
     registry
@@ -345,7 +345,7 @@ fn test_device_revocation_when_at_two() {
 
     // Should allow revocation since we have 2 devices
     registry
-        .revoke_device(device1.device_id(), &signing_key)
+        .revoke_device(device1.device_id(), &signing_key, 0)
         .unwrap();
 
     assert_eq!(registry.active_count(), 1);

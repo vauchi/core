@@ -24,7 +24,7 @@ fn test_concurrent_device_linking_thread_safety() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let registry = Arc::new(Mutex::new(DeviceRegistry::new(
         device0.to_registered(&master_seed),
         &signing_key,
@@ -38,7 +38,7 @@ fn test_concurrent_device_linking_thread_safety() {
             let key = SigningKeyPair::from_seed(&seed);
 
             thread::spawn(move || {
-                let device = DeviceInfo::derive(&seed, i as u32, format!("Device {}", i));
+                let device = DeviceInfo::derive(&seed, i as u32, format!("Device {}", i), 0);
                 let mut reg = registry.lock().unwrap();
                 reg.add_device(device.to_registered(&seed), &key)
             })
@@ -64,7 +64,7 @@ fn test_concurrent_same_device_index() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let registry = Arc::new(Mutex::new(DeviceRegistry::new(
         device0.to_registered(&master_seed),
         &signing_key,
@@ -78,7 +78,7 @@ fn test_concurrent_same_device_index() {
             let key = SigningKeyPair::from_seed(&seed);
 
             thread::spawn(move || {
-                let device = DeviceInfo::derive(&seed, 1, "Device 1".to_string());
+                let device = DeviceInfo::derive(&seed, 1, "Device 1".to_string(), 0);
                 let mut reg = registry.lock().unwrap();
                 reg.add_device(device.to_registered(&seed), &key)
             })
@@ -102,8 +102,8 @@ fn test_concurrent_revoke_and_add() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string());
-    let device1 = DeviceInfo::derive(&master_seed, 1, "Device 1".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
+    let device1 = DeviceInfo::derive(&master_seed, 1, "Device 1".to_string(), 0);
     let device1_id: [u8; 32] = *device1.device_id();
 
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
@@ -118,14 +118,14 @@ fn test_concurrent_revoke_and_add() {
     let key1 = SigningKeyPair::from_seed(&master_seed);
     let handle1 = thread::spawn(move || {
         let mut reg = registry1.lock().unwrap();
-        reg.revoke_device(&device1_id, &key1)
+        reg.revoke_device(&device1_id, &key1, 0)
     });
 
     // Thread 2: Add device 2
     let registry2 = Arc::clone(&registry);
     let key2 = SigningKeyPair::from_seed(&master_seed);
     let handle2 = thread::spawn(move || {
-        let device2 = DeviceInfo::derive(&master_seed, 2, "Device 2".to_string());
+        let device2 = DeviceInfo::derive(&master_seed, 2, "Device 2".to_string(), 0);
         let mut reg = registry2.lock().unwrap();
         reg.add_device(device2.to_registered(&master_seed), &key2)
     });
@@ -152,12 +152,12 @@ fn test_max_devices_enforced() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
     // Add devices up to max
     for i in 1..MAX_DEVICES {
-        let device = DeviceInfo::derive(&master_seed, i as u32, format!("Device {}", i));
+        let device = DeviceInfo::derive(&master_seed, i as u32, format!("Device {}", i), 0);
         registry
             .add_device(device.to_registered(&master_seed), &signing_key)
             .unwrap();
@@ -166,7 +166,7 @@ fn test_max_devices_enforced() {
     assert_eq!(registry.active_count(), MAX_DEVICES);
 
     // Try to add one more
-    let extra_device = DeviceInfo::derive(&master_seed, MAX_DEVICES as u32, "Extra".to_string());
+    let extra_device = DeviceInfo::derive(&master_seed, MAX_DEVICES as u32, "Extra".to_string(), 0);
     let result = registry.add_device(extra_device.to_registered(&master_seed), &signing_key);
 
     assert!(result.is_err(), "expected error");
@@ -180,13 +180,13 @@ fn test_add_after_revoke_at_max() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
     // Add devices up to max, track the last device_id
     let mut last_device_id: [u8; 32] = *device0.device_id();
     for i in 1..MAX_DEVICES {
-        let device = DeviceInfo::derive(&master_seed, i as u32, format!("Device {}", i));
+        let device = DeviceInfo::derive(&master_seed, i as u32, format!("Device {}", i), 0);
         last_device_id = *device.device_id();
         registry
             .add_device(device.to_registered(&master_seed), &signing_key)
@@ -197,13 +197,18 @@ fn test_add_after_revoke_at_max() {
 
     // Revoke last device
     registry
-        .revoke_device(&last_device_id, &signing_key)
+        .revoke_device(&last_device_id, &signing_key, 0)
         .unwrap();
 
     assert_eq!(registry.active_count(), MAX_DEVICES - 1);
 
     // Now can add another
-    let new_device = DeviceInfo::derive(&master_seed, MAX_DEVICES as u32, "New Device".to_string());
+    let new_device = DeviceInfo::derive(
+        &master_seed,
+        MAX_DEVICES as u32,
+        "New Device".to_string(),
+        0,
+    );
     let result = registry.add_device(new_device.to_registered(&master_seed), &signing_key);
 
     assert!(result.is_ok(), "expected success");
@@ -221,7 +226,7 @@ fn test_link_already_linked_device_same_identity() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
     // Try to add the same device again
@@ -242,13 +247,13 @@ fn test_version_increments_on_changes() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
     let initial_version = registry.version();
 
     // Add a device
-    let device1 = DeviceInfo::derive(&master_seed, 1, "Device 1".to_string());
+    let device1 = DeviceInfo::derive(&master_seed, 1, "Device 1".to_string(), 0);
     registry
         .add_device(device1.to_registered(&master_seed), &signing_key)
         .unwrap();
@@ -259,7 +264,7 @@ fn test_version_increments_on_changes() {
 
     // Revoke a device
     registry
-        .revoke_device(device1.device_id(), &signing_key)
+        .revoke_device(device1.device_id(), &signing_key, 0)
         .unwrap();
 
     assert!(registry.version() > after_add_version);
@@ -276,11 +281,11 @@ fn test_cannot_unlink_last_device() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
     // Try to revoke the only device
-    let result = registry.revoke_device(device0.device_id(), &signing_key);
+    let result = registry.revoke_device(device0.device_id(), &signing_key, 0);
 
     // Should fail - cannot unlink last device
     assert!(result.is_err(), "expected error");

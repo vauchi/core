@@ -130,7 +130,7 @@ fn test_device_registry_integration() {
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
     // Create device 0 (primary)
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Phone".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Phone".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
     assert_eq!(registry.active_count(), 1);
@@ -138,7 +138,7 @@ fn test_device_registry_integration() {
     assert!(registry.verify(&signing_key.public_key()));
 
     // Add device 1 (tablet)
-    let device1 = DeviceInfo::derive(&master_seed, 1, "Tablet".to_string());
+    let device1 = DeviceInfo::derive(&master_seed, 1, "Tablet".to_string(), 0);
     registry
         .add_device(device1.to_registered(&master_seed), &signing_key)
         .unwrap();
@@ -148,7 +148,7 @@ fn test_device_registry_integration() {
     assert!(registry.verify(&signing_key.public_key()));
 
     // Add device 2 (laptop)
-    let device2 = DeviceInfo::derive(&master_seed, 2, "Laptop".to_string());
+    let device2 = DeviceInfo::derive(&master_seed, 2, "Laptop".to_string(), 0);
     registry
         .add_device(device2.to_registered(&master_seed), &signing_key)
         .unwrap();
@@ -158,7 +158,7 @@ fn test_device_registry_integration() {
 
     // Revoke device 1 (tablet)
     registry
-        .revoke_device(device1.device_id(), &signing_key)
+        .revoke_device(device1.device_id(), &signing_key, 0)
         .unwrap();
 
     assert_eq!(registry.active_count(), 2);
@@ -191,9 +191,9 @@ fn test_three_device_key_derivation() {
 
     let master_seed = [0x42u8; 32];
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Phone".to_string());
-    let device1 = DeviceInfo::derive(&master_seed, 1, "Tablet".to_string());
-    let device2 = DeviceInfo::derive(&master_seed, 2, "Laptop".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Phone".to_string(), 0);
+    let device1 = DeviceInfo::derive(&master_seed, 1, "Tablet".to_string(), 0);
+    let device2 = DeviceInfo::derive(&master_seed, 2, "Laptop".to_string(), 0);
 
     // All device IDs should be unique
     assert_ne!(device0.device_id(), device1.device_id());
@@ -225,8 +225,8 @@ fn test_device_revocation_certificate_workflow() {
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
     // Create registry with 2 devices
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Phone".to_string());
-    let device1 = DeviceInfo::derive(&master_seed, 1, "Lost Device".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Phone".to_string(), 0);
+    let device1 = DeviceInfo::derive(&master_seed, 1, "Lost Device".to_string(), 0);
 
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
     registry
@@ -236,10 +236,12 @@ fn test_device_revocation_certificate_workflow() {
     assert_eq!(registry.active_count(), 2);
 
     // Create revocation certificate for device1
+    let now = 1_700_000_000_u64;
     let certificate = DeviceRevocationCertificate::create(
         device1.device_id(),
         "Device was lost".to_string(),
         &signing_key,
+        now,
     );
 
     // Certificate should be valid
@@ -247,8 +249,8 @@ fn test_device_revocation_certificate_workflow() {
     assert_eq!(certificate.device_id(), device1.device_id());
     assert_eq!(certificate.reason(), "Device was lost");
 
-    // Certificate should have reasonable timestamp
-    assert!(certificate.revoked_at() > 0);
+    // `revoked_at` is stamped verbatim from the `now` argument.
+    assert_eq!(certificate.revoked_at(), now);
 
     // Serialize and deserialize certificate
     let json = certificate.to_json();
@@ -280,9 +282,9 @@ fn test_registry_broadcast_for_contacts() {
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
     // Create registry with 3 devices
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Phone".to_string());
-    let device1 = DeviceInfo::derive(&master_seed, 1, "Tablet".to_string());
-    let device2 = DeviceInfo::derive(&master_seed, 2, "Laptop".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Phone".to_string(), 0);
+    let device1 = DeviceInfo::derive(&master_seed, 1, "Tablet".to_string(), 0);
+    let device2 = DeviceInfo::derive(&master_seed, 2, "Laptop".to_string(), 0);
 
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
     registry
@@ -294,11 +296,11 @@ fn test_registry_broadcast_for_contacts() {
 
     // Revoke tablet
     registry
-        .revoke_device(device1.device_id(), &signing_key)
+        .revoke_device(device1.device_id(), &signing_key, 0)
         .unwrap();
 
     // Create broadcast
-    let broadcast = RegistryBroadcast::new(&registry, &signing_key);
+    let broadcast = RegistryBroadcast::new(&registry, &signing_key, 0);
 
     // Broadcast should be valid
     assert!(broadcast.verify(&signing_key.public_key()));
@@ -331,12 +333,12 @@ fn test_max_devices_limit_enforced() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
     // Add devices up to the limit
     for i in 1..MAX_DEVICES {
-        let device = DeviceInfo::derive(&master_seed, i as u32, format!("Device {}", i));
+        let device = DeviceInfo::derive(&master_seed, i as u32, format!("Device {}", i), 0);
         registry
             .add_device(device.to_registered(&master_seed), &signing_key)
             .unwrap();
@@ -345,8 +347,12 @@ fn test_max_devices_limit_enforced() {
     assert_eq!(registry.active_count(), MAX_DEVICES);
 
     // Try to add one more - should fail
-    let extra_device =
-        DeviceInfo::derive(&master_seed, MAX_DEVICES as u32, "Extra Device".to_string());
+    let extra_device = DeviceInfo::derive(
+        &master_seed,
+        MAX_DEVICES as u32,
+        "Extra Device".to_string(),
+        0,
+    );
     let result = registry.add_device(extra_device.to_registered(&master_seed), &signing_key);
 
     assert!(matches!(result, Err(DeviceError::MaxDevicesReached)));
@@ -364,13 +370,13 @@ fn test_cannot_revoke_last_device() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Only Device".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Only Device".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
     assert_eq!(registry.active_count(), 1);
 
     // Try to revoke the only device - should fail
-    let result = registry.revoke_device(device0.device_id(), &signing_key);
+    let result = registry.revoke_device(device0.device_id(), &signing_key, 0);
 
     assert!(matches!(result, Err(DeviceError::CannotRemoveLastDevice)));
     assert_eq!(registry.active_count(), 1); // Still 1 active

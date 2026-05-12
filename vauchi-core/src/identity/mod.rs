@@ -128,7 +128,12 @@ impl Identity {
         let exchange_public_key = *x3dh.public_key();
 
         // Create device info for this device
-        let device_info = DeviceInfo::derive(&master_seed, device_index, device_name);
+        let device_info = DeviceInfo::derive(
+            &master_seed,
+            device_index,
+            device_name,
+            crate::clock::ambient_now_secs(),
+        );
 
         Identity {
             master_seed,
@@ -229,6 +234,7 @@ impl Identity {
             &self.master_seed,
             self.device_info.device_index(),
             self.device_info.device_name().to_string(),
+            crate::clock::ambient_now_secs(),
         )
     }
 

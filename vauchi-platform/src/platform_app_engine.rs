@@ -4181,7 +4181,11 @@ impl PlatformAppEngine {
             });
         }
 
-        let result = match registry.revoke_device(&device_id, identity.signing_keypair()) {
+        let result = match registry.revoke_device(
+            &device_id,
+            identity.signing_keypair(),
+            storage.clock().unix_seconds(),
+        ) {
             Ok(()) => {
                 storage
                     .save_device_registry(&registry)

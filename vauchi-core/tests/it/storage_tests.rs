@@ -424,7 +424,7 @@ fn test_storage_save_load_device_registry() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device = DeviceInfo::derive(&master_seed, 0, "Primary".to_string());
+    let device = DeviceInfo::derive(&master_seed, 0, "Primary".to_string(), 0);
     let registry = DeviceRegistry::new(device.to_registered(&master_seed), &signing_key);
 
     // Initially no registry
@@ -453,8 +453,8 @@ fn test_storage_device_registry_roundtrip() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    let device0 = DeviceInfo::derive(&master_seed, 0, "Primary".to_string());
-    let device1 = DeviceInfo::derive(&master_seed, 1, "Secondary".to_string());
+    let device0 = DeviceInfo::derive(&master_seed, 0, "Primary".to_string(), 0);
+    let device1 = DeviceInfo::derive(&master_seed, 1, "Secondary".to_string(), 0);
 
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
     registry
@@ -771,7 +771,7 @@ fn test_load_device_registry_json() {
     // Create and save a registry
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
-    let device = DeviceInfo::derive(&master_seed, 0, "Test".to_string());
+    let device = DeviceInfo::derive(&master_seed, 0, "Test".to_string(), 0);
     let registry = DeviceRegistry::new(device.to_registered(&master_seed), &signing_key);
     storage.save_device_registry(&registry).unwrap();
 

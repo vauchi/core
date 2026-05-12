@@ -367,7 +367,9 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1633
 # (+20 lines for cancel-session-first guard in `apply_multi_stage_*_for_test`
 #  bridges — fixes flaky `apply_multi_stage_state_finalized_with_session_ended`
 #  caused by cycle-thread racing the test's manual state pushes.)
-vauchi-platform/src/platform_app_engine.rs 5099
+# (+4 on top of main's 5099 baseline for the unlink_device cascade
+#   from slice 4: revoke_device call now needs `now`.)
+vauchi-platform/src/platform_app_engine.rs 5103
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding

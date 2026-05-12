@@ -188,8 +188,12 @@ impl DeviceLinkInitiator {
 
         let device_index = self.registry.next_device_index();
 
-        let new_device_info =
-            DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
+        let new_device_info = DeviceInfo::derive(
+            &self.master_seed,
+            device_index,
+            request.device_name.clone(),
+            crate::exchange::now_secs(),
+        );
 
         let mut updated_registry = self.registry.clone();
         updated_registry
@@ -213,8 +217,12 @@ impl DeviceLinkInitiator {
         };
 
         let encrypted_response = response.encrypt(self.qr.link_key())?;
-        let new_device =
-            DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
+        let new_device = DeviceInfo::derive(
+            &self.master_seed,
+            device_index,
+            request.device_name.clone(),
+            crate::exchange::now_secs(),
+        );
 
         Ok((encrypted_response, updated_registry, new_device))
     }
@@ -419,8 +427,12 @@ impl DeviceLinkInitiatorRestored {
 
         let device_index = self.registry.next_device_index();
 
-        let new_device_info =
-            DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
+        let new_device_info = DeviceInfo::derive(
+            &self.master_seed,
+            device_index,
+            request.device_name.clone(),
+            crate::exchange::now_secs(),
+        );
 
         let mut updated_registry = self.registry.clone();
         updated_registry
@@ -444,8 +456,12 @@ impl DeviceLinkInitiatorRestored {
         };
 
         let encrypted_response = response.encrypt(self.qr.link_key())?;
-        let new_device =
-            DeviceInfo::derive(&self.master_seed, device_index, request.device_name.clone());
+        let new_device = DeviceInfo::derive(
+            &self.master_seed,
+            device_index,
+            request.device_name.clone(),
+            crate::exchange::now_secs(),
+        );
 
         Ok((encrypted_response, updated_registry, new_device))
     }

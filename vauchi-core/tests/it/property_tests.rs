@@ -369,8 +369,8 @@ proptest! {
         device_index in 0u32..100u32,
         name in display_name_strategy()
     ) {
-        let device1 = DeviceInfo::derive(&seed, device_index, name.clone());
-        let device2 = DeviceInfo::derive(&seed, device_index, name);
+        let device1 = DeviceInfo::derive(&seed, device_index, name.clone(), 0);
+        let device2 = DeviceInfo::derive(&seed, device_index, name, 0);
 
         prop_assert_eq!(device1.device_id(), device2.device_id());
         prop_assert_eq!(device1.exchange_public_key(), device2.exchange_public_key());
@@ -386,8 +386,8 @@ proptest! {
     ) {
         prop_assume!(index_a != index_b);
 
-        let device_a = DeviceInfo::derive(&seed, index_a, "Device A".to_string());
-        let device_b = DeviceInfo::derive(&seed, index_b, "Device B".to_string());
+        let device_a = DeviceInfo::derive(&seed, index_a, "Device A".to_string(), 0);
+        let device_b = DeviceInfo::derive(&seed, index_b, "Device B".to_string(), 0);
 
         prop_assert_ne!(device_a.device_id(), device_b.device_id());
         prop_assert_ne!(device_a.exchange_public_key(), device_b.exchange_public_key());

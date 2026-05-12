@@ -10,7 +10,6 @@
 use crate::crypto::X3DHKeyPair;
 use crate::crypto::{HKDF, Signature, SigningKeyPair};
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
 /// Device type classification based on device name.
@@ -33,23 +32,6 @@ pub enum DeviceType {
 ///
 /// Case-insensitive substring matching on common device name patterns.
 /// Returns [DeviceType::Unknown] if no pattern matches.
-/// Returns the current Unix-epoch seconds via the OS wall clock.
-///
-/// Stepping-stone helper for Phase 1 / Task 1.1 / Step 3b. The 5
-/// previous in-line `now_secs()` blocks in this
-/// file all routed through identical 4-line expressions; this
-/// helper consolidates them while the wider caller graph
-/// (`identity/mod.rs`, `exchange/device_link/*`, `RegistryBroadcast`
-/// builders, …) still lacks a `Clock` to propagate. When the
-/// storage-cluster MR threads `Clock` deeper, this helper grows a
-/// `now: u64` parameter and the OS read drops out entirely.
-fn now_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
-
 pub fn classify_device_type(name: &str) -> DeviceType {
     let lower = name.to_lowercase();
     if lower.contains("iphone") || lower.contains("pixel") || lower.contains("galaxy s") {
@@ -113,7 +95,16 @@ pub struct DeviceInfo {
 
 impl DeviceInfo {
     /// Derives device keys from master seed and device index.
-    pub fn derive(master_seed: &[u8; 32], device_index: u32, device_name: String) -> Self {
+    ///
+    /// `now` is the Unix-epoch second stamped into `created_at`. Production
+    /// callers source it from a [`Clock`](crate::clock::Clock) on the next
+    /// architectural layer (e.g. `Vauchi::clock().unix_seconds()`).
+    pub fn derive(
+        master_seed: &[u8; 32],
+        device_index: u32,
+        device_name: String,
+        now: u64,
+    ) -> Self {
         let index_bytes = device_index.to_le_bytes();
 
         // Derive device ID: master_seed as IKM, index embedded in info
@@ -127,14 +118,12 @@ impl DeviceInfo {
         let exchange_seed = HKDF::derive_key(None, master_seed, &exchange_info);
         let device_exchange_keypair = X3DHKeyPair::from_bytes(*exchange_seed);
 
-        let created_at = now_secs();
-
         Self {
             device_id: *device_id,
             device_index,
             device_exchange_keypair,
             device_name,
-            created_at,
+            created_at: now,
         }
     }
 
@@ -331,10 +320,14 @@ impl DeviceRegistry {
     }
 
     /// Revokes a device by ID.
+    ///
+    /// `now` is stamped into the revoked device's `revoked_at`. Sourced
+    /// from the caller's [`Clock`](crate::clock::Clock).
     pub fn revoke_device(
         &mut self,
         device_id: &[u8; 32],
         signing_key: &SigningKeyPair,
+        now: u64,
     ) -> Result<(), DeviceError> {
         if self.active_count() <= 1 {
             // Check if we're trying to revoke the last active device
@@ -356,7 +349,7 @@ impl DeviceRegistry {
         }
 
         device.revoked = true;
-        device.revoked_at = Some(now_secs());
+        device.revoked_at = Some(now);
 
         self.version += 1;
         self.sign(signing_key);
@@ -539,14 +532,21 @@ pub struct DeviceRevocationCertificate {
 
 impl DeviceRevocationCertificate {
     /// Creates a new revocation certificate.
-    pub fn create(device_id: &[u8; 32], reason: String, signing_key: &SigningKeyPair) -> Self {
-        let revoked_at = now_secs();
-
+    ///
+    /// `now` is stamped into `revoked_at`; `expires_at` is `now +
+    /// REVOCATION_CERT_VALIDITY_SECS`. Sourced from the caller's
+    /// [`Clock`](crate::clock::Clock).
+    pub fn create(
+        device_id: &[u8; 32],
+        reason: String,
+        signing_key: &SigningKeyPair,
+        now: u64,
+    ) -> Self {
         let mut certificate = Self {
             device_id: *device_id,
             reason,
-            revoked_at,
-            expires_at: revoked_at + REVOCATION_CERT_VALIDITY_SECS,
+            revoked_at: now,
+            expires_at: now + REVOCATION_CERT_VALIDITY_SECS,
             signature: [0u8; 64],
         };
 
@@ -577,11 +577,13 @@ impl DeviceRevocationCertificate {
 
     /// Returns true if this certificate has expired (#82).
     /// Legacy certificates (expires_at == 0) are treated as non-expiring.
-    pub fn is_expired(&self) -> bool {
+    ///
+    /// `now` is the comparison instant in Unix-epoch seconds, sourced from
+    /// the caller's [`Clock`](crate::clock::Clock).
+    pub fn is_expired(&self, now: u64) -> bool {
         if self.expires_at == 0 {
             return false; // Legacy cert without expiry
         }
-        let now = now_secs();
         now > self.expires_at
     }
 
@@ -649,7 +651,10 @@ pub struct BroadcastDevice {
 
 impl RegistryBroadcast {
     /// Creates a new broadcast from a registry.
-    pub fn new(registry: &DeviceRegistry, signing_key: &SigningKeyPair) -> Self {
+    ///
+    /// `now` is stamped into `timestamp`. Sourced from the caller's
+    /// [`Clock`](crate::clock::Clock).
+    pub fn new(registry: &DeviceRegistry, signing_key: &SigningKeyPair, now: u64) -> Self {
         let active_devices: Vec<BroadcastDevice> = registry
             .active_devices()
             .iter()
@@ -659,12 +664,10 @@ impl RegistryBroadcast {
             })
             .collect();
 
-        let timestamp = now_secs();
-
         let mut broadcast = Self {
             version: registry.version(),
             active_devices,
-            timestamp,
+            timestamp: now,
             signature: [0u8; 64],
         };
 

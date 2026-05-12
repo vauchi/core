@@ -82,7 +82,7 @@ impl DeliveryService {
             StorageError::NotFound(format!("Delivery record not found: {}", message_id))
         })?;
 
-        let now = current_timestamp();
+        let now = storage.clock().unix_seconds();
 
         match status {
             DeliveryAckStatus::Stored => {
@@ -138,7 +138,7 @@ impl DeliveryService {
             StorageError::NotFound(format!("Delivery record not found: {}", message_id))
         })?;
 
-        let now = current_timestamp();
+        let now = storage.clock().unix_seconds();
 
         // Update the individual device status
         storage.update_device_delivery_status(message_id, device_id, status, now)?;
@@ -160,7 +160,7 @@ impl DeliveryService {
     ///
     /// Returns a `CleanupResult` with counts of affected records.
     pub fn run_cleanup(&self, storage: &Storage) -> Result<CleanupResult, StorageError> {
-        let now = current_timestamp();
+        let now = storage.clock().unix_seconds();
 
         let expired = storage.expire_old_deliveries(now)?;
         let cleaned_up = storage.run_startup_maintenance()?;
@@ -185,8 +185,4 @@ impl Default for DeliveryService {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn current_timestamp() -> u64 {
-    crate::clock::ambient_now_secs()
 }

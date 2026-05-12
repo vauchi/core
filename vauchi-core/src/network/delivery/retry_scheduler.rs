@@ -48,7 +48,7 @@ impl RetryScheduler {
     ///
     /// Returns a `RetryTickResult` with counts and ready message IDs.
     pub fn tick(&self, storage: &Storage) -> Result<RetryTickResult, StorageError> {
-        let now = current_timestamp();
+        let now = storage.clock().unix_seconds();
         let due_entries = storage.get_due_retries(now)?;
 
         let mut result = RetryTickResult {
@@ -88,8 +88,4 @@ impl Default for RetryScheduler {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn current_timestamp() -> u64 {
-    crate::clock::ambient_now_secs()
 }

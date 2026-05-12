@@ -94,7 +94,7 @@ impl<'a> DeletionManager<'a> {
             return Err(DeletionError::AlreadyScheduled);
         }
 
-        let now = current_timestamp();
+        let now = self.storage.clock().unix_seconds();
         let execute_at = now + DELETION_GRACE_PERIOD_SECS;
         let state = DeletionState::Scheduled {
             scheduled_at: now,
@@ -142,7 +142,7 @@ impl<'a> DeletionManager<'a> {
         let current = self.storage.load_deletion_state()?;
         match current {
             DeletionState::Scheduled { execute_at, .. } => {
-                let now = current_timestamp();
+                let now = self.storage.clock().unix_seconds();
                 if now < execute_at {
                     return Err(DeletionError::GracePeriodNotElapsed);
                 }
@@ -190,8 +190,4 @@ impl<'a> DeletionManager<'a> {
             )),
         }
     }
-}
-
-fn current_timestamp() -> u64 {
-    crate::clock::ambient_now_secs()
 }

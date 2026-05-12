@@ -2012,6 +2012,7 @@ mod tests {
     // This test pins the unreachability of the legacy path for
     // Hover — a regression gate so a future refactor can't
     // silently re-route Hover back through `ExchangeStep::Qr`.
+    // @internal
     #[test]
     fn hover_mode_does_not_advance_to_legacy_qr_step() {
         let mut engine = ExchangeEngine::new(config_mode_selection());
@@ -2075,6 +2076,7 @@ mod tests {
     // default + autonomous audio-handshake trigger wired (the
     // 1.C polish commit gates the trigger on Hover-only via
     // `is_active_engine_multi_stage_hover()`).
+    // @internal
     #[test]
     fn hover_mode_routes_through_multi_stage_handoff() {
         let mut engine = ExchangeEngine::new(config_mode_selection());

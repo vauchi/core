@@ -504,21 +504,25 @@ fn test_checkpoint_overwrite() {
 // @scenario: sync_updates :: Extreme clock skew detection
 #[test]
 fn test_validate_timestamp_rejects_zero() {
-    assert!(!validate_timestamp(0), "Zero timestamp should be rejected");
+    let now: u64 = 1_700_000_000;
+    assert!(
+        !validate_timestamp(0, now),
+        "Zero timestamp should be rejected"
+    );
 }
 
 // @scenario: sync_updates :: Sync handles clock skew between devices
 // @scenario: sync_updates :: Timezone change during sync
 #[test]
 fn test_validate_timestamp_accepts_recent() {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now: u64 = 1_700_000_000;
 
-    assert!(validate_timestamp(now), "Current timestamp should be valid");
     assert!(
-        validate_timestamp(now - 3600),
+        validate_timestamp(now, now),
+        "Current timestamp should be valid"
+    );
+    assert!(
+        validate_timestamp(now - 3600, now),
         "Timestamp 1 hour ago should be valid"
     );
 }
@@ -526,13 +530,10 @@ fn test_validate_timestamp_accepts_recent() {
 // @scenario: sync_updates :: Extreme clock skew detection
 #[test]
 fn test_validate_timestamp_rejects_far_future() {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now: u64 = 1_700_000_000;
 
     assert!(
-        !validate_timestamp(now + 301),
+        !validate_timestamp(now + 301, now),
         "Timestamp >300s in future should be rejected"
     );
 }

@@ -685,12 +685,10 @@ const MAX_FUTURE_DRIFT_SECS: u64 = 300;
 ///
 /// This prevents accepting sync items with clearly bogus timestamps
 /// that could arise from clock skew, replay attacks, or data corruption.
-pub fn validate_timestamp(timestamp: u64) -> bool {
+pub fn validate_timestamp(timestamp: u64, now: u64) -> bool {
     if timestamp == 0 {
         return false;
     }
-
-    let now = crate::clock::ambient_now_secs();
 
     // Reject timestamps more than MAX_FUTURE_DRIFT_SECS in the future
     timestamp <= now + MAX_FUTURE_DRIFT_SECS

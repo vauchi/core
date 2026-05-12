@@ -145,7 +145,7 @@ fn test_receive_routes_via_mailbox_token_fast_path() {
 
     let bob_token = token_hex(&compute_mailbox_token(
         bob_link.shared_secret.as_bytes(),
-        current_day_epoch(),
+        current_day_epoch(alice.storage().clock().unix_seconds()),
     ));
 
     let blobs = vec![("blob-1".to_string(), bob_token, ciphertext)];
@@ -328,7 +328,7 @@ fn test_receive_reports_undecryptable_blob() {
         "blob-bad".to_string(),
         token_hex(&compute_mailbox_token(
             bob_link.shared_secret.as_bytes(),
-            current_day_epoch(),
+            current_day_epoch(alice.storage().clock().unix_seconds()),
         )),
         b"not a real ratchet message".to_vec(),
     )];
@@ -377,7 +377,7 @@ fn test_receive_fast_path_handles_all_in_spec_input() {
         .map(|(peer, label)| link_contacts(&alice, peer, label))
         .collect();
 
-    let day = current_day_epoch();
+    let day = current_day_epoch(alice.storage().clock().unix_seconds());
     assert!(day > 0, "test requires non-zero day epoch");
 
     let mut blobs: Vec<(String, String, Vec<u8>)> = Vec::new();
@@ -470,7 +470,7 @@ fn test_receive_rejects_replayed_blob() {
     );
     let token = token_hex(&compute_mailbox_token(
         bob_link.shared_secret.as_bytes(),
-        current_day_epoch(),
+        current_day_epoch(alice.storage().clock().unix_seconds()),
     ));
 
     let contacts = alice.storage().list_contacts().unwrap();
@@ -579,7 +579,7 @@ fn test_receive_mixed_batch_preserves_order() {
     );
     let bob_token = token_hex(&compute_mailbox_token(
         bob_link.shared_secret.as_bytes(),
-        current_day_epoch(),
+        current_day_epoch(alice.storage().clock().unix_seconds()),
     ));
 
     // Charlie update for index 3 — also success.
@@ -601,7 +601,7 @@ fn test_receive_mixed_batch_preserves_order() {
     );
     let charlie_token = token_hex(&compute_mailbox_token(
         charlie_link.shared_secret.as_bytes(),
-        current_day_epoch(),
+        current_day_epoch(alice.storage().clock().unix_seconds()),
     ));
 
     let blobs = vec![
@@ -616,7 +616,7 @@ fn test_receive_mixed_batch_preserves_order() {
             // Use Bob's token but garbage payload — token resolves, payload rejected.
             token_hex(&compute_mailbox_token(
                 bob_link.shared_secret.as_bytes(),
-                current_day_epoch(),
+                current_day_epoch(alice.storage().clock().unix_seconds()),
             )),
             b"not a ratchet message".to_vec(),
         ),

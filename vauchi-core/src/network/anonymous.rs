@@ -38,8 +38,12 @@ impl AnonymousSender {
     }
 
     /// Computes an anonymous sender ID for the current epoch.
-    pub fn for_current_epoch(shared_key: &[u8; 32]) -> Self {
-        let epoch = current_epoch();
+    ///
+    /// `now` is the current Unix-epoch seconds — production callers
+    /// route it from `Vauchi::clock` / `Storage::clock`; tests pin
+    /// a deterministic value.
+    pub fn for_current_epoch(shared_key: &[u8; 32], now: u64) -> Self {
+        let epoch = current_epoch(now);
         Self::compute(shared_key, epoch)
     }
 }
@@ -57,8 +61,12 @@ pub fn compute_anonymous_id(shared_key: &[u8; 32], epoch: u64) -> [u8; 32] {
 }
 
 /// Returns the current epoch (unix_timestamp / 3600).
-pub fn current_epoch() -> u64 {
-    crate::clock::ambient_now_secs() / EPOCH_DURATION_SECS
+///
+/// `now` is the current Unix-epoch seconds — production callers route
+/// it from `Vauchi::clock` / `Storage::clock`; tests pin a deterministic
+/// value.
+pub fn current_epoch(now: u64) -> u64 {
+    now / EPOCH_DURATION_SECS
 }
 
 /// Resolves an anonymous sender ID to a contact by trying each contact's shared key.
@@ -97,14 +105,14 @@ pub fn resolve_sender<'a>(
 /// ID lookup across all contacts for the current and previous epoch.
 ///
 /// Returns the contact's ID string if resolved, or None.
-pub fn resolve_sender_id(contacts: &[Contact], sender_id_hex: &str) -> Option<String> {
+pub fn resolve_sender_id(contacts: &[Contact], sender_id_hex: &str, now: u64) -> Option<String> {
     // Decode hex → resolve via shared keys (current + previous epoch)
     if let Ok(anonymous_id_bytes) = hex::decode(sender_id_hex)
         && anonymous_id_bytes.len() == 32
     {
         let mut arr = [0u8; 32];
         arr.copy_from_slice(&anonymous_id_bytes);
-        let epoch = current_epoch();
+        let epoch = current_epoch(now);
         if let Some(contact) = resolve_sender(contacts, &arr, epoch) {
             return Some(contact.id().to_string());
         }
@@ -152,8 +160,8 @@ impl SenderIndex {
     }
 
     /// Returns true if this index is stale (built for a different epoch).
-    pub fn is_stale(&self) -> bool {
-        self.epoch != current_epoch()
+    pub fn is_stale(&self, now: u64) -> bool {
+        self.epoch != current_epoch(now)
     }
 
     /// The epoch this index was built for.

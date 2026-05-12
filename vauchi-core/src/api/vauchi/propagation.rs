@@ -249,8 +249,8 @@ impl Vauchi {
         // Old-format messages with real identity fingerprints pass through
         // unchanged via the fallback path in resolve_sender_id.
         let contacts = self.storage.list_contacts().unwrap_or_default();
-        let resolved =
-            resolve_sender_id(&contacts, sender_id).unwrap_or_else(|| sender_id.to_string());
+        let resolved = resolve_sender_id(&contacts, sender_id, self.clock.unix_seconds())
+            .unwrap_or_else(|| sender_id.to_string());
         let contact_id = resolved.as_str();
 
         // Check revoked_senders tombstone

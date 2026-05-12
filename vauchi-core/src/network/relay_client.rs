@@ -24,9 +24,9 @@ use crate::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
 
 /// Generates a hex-encoded anonymous sender ID from an optional shared key.
 /// Returns `None` if no shared key is provided (backward compat — uses real identity).
-fn anonymous_sender_hex(shared_key: Option<&[u8; 32]>) -> Option<String> {
+fn anonymous_sender_hex(shared_key: Option<&[u8; 32]>, now: u64) -> Option<String> {
     shared_key.map(|key| {
-        let anon = super::anonymous::AnonymousSender::for_current_epoch(key);
+        let anon = super::anonymous::AnonymousSender::for_current_epoch(key, now);
         hex::encode(anon.anonymous_id)
     })
 }
@@ -137,6 +137,7 @@ impl<T: Transport> RelayClient<T> {
     /// Returns the message ID for tracking acknowledgments.
     pub fn send_update(
         &mut self,
+        now: u64,
         recipient_id: &str,
         ratchet: &mut DoubleRatchetState,
         payload: &[u8],
@@ -154,7 +155,7 @@ impl<T: Transport> RelayClient<T> {
             .map_err(|e| NetworkError::Encryption(e.to_string()))?;
 
         // Convert to wire format
-        let anon_id_hex = anonymous_sender_hex(shared_key);
+        let anon_id_hex = anonymous_sender_hex(shared_key, now);
         let envelope =
             self.create_update_envelope(recipient_id, &ratchet_msg, anon_id_hex.as_deref());
         let message_id = envelope.message_id.clone();
@@ -182,6 +183,7 @@ impl<T: Transport> RelayClient<T> {
     /// to send it through the relay. Pass `shared_key` for anonymous sending.
     pub fn send_raw_update(
         &mut self,
+        now: u64,
         recipient_id: &str,
         ratchet_msg: &RatchetMessage,
         update_id: &str,
@@ -191,7 +193,7 @@ impl<T: Transport> RelayClient<T> {
             return Err(NetworkError::SendFailed("Too many pending messages".into()));
         }
 
-        let anon_id_hex = anonymous_sender_hex(shared_key);
+        let anon_id_hex = anonymous_sender_hex(shared_key, now);
         let envelope =
             self.create_update_envelope(recipient_id, ratchet_msg, anon_id_hex.as_deref());
         let message_id = envelope.message_id.clone();
@@ -225,8 +227,9 @@ impl<T: Transport> RelayClient<T> {
         contact_keys: &[[u8; 32]],
         master_seed: &[u8; 32],
         days_offline: u64,
+        now: u64,
     ) -> Result<MessageId, NetworkError> {
-        let day = current_day_epoch();
+        let day = current_day_epoch(now);
         let batches = batch_register_tokens(contact_keys, master_seed, day, days_offline);
 
         let mut last_message_id = String::new();
@@ -253,8 +256,9 @@ impl<T: Transport> RelayClient<T> {
         master_seed: &[u8; 32],
         ciphertext: Vec<u8>,
         ratchet_msg: &RatchetMessage,
+        now: u64,
     ) -> Result<MessageId, NetworkError> {
-        let self_token = compute_self_token(master_seed, current_day_epoch());
+        let self_token = compute_self_token(master_seed, current_day_epoch(now));
 
         let encrypted_update = EncryptedUpdate {
             recipient_id: token_hex(&self_token),

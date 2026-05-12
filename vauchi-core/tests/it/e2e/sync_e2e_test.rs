@@ -389,6 +389,7 @@ fn test_relay_update_delivery_happy_path() {
     let update_payload = b"Card update data";
     let msg_id = client
         .send_update(
+            0,
             "bob-recipient-id",
             &mut alice_ratchet,
             update_payload,

@@ -105,7 +105,8 @@ pub fn process_card_updates(
     let contacts = storage.list_contacts().unwrap_or_default();
 
     for (sender_id, ciphertext) in updates {
-        let resolved_id = resolve_sender_id(&contacts, &sender_id).unwrap_or(sender_id);
+        let resolved_id = resolve_sender_id(&contacts, &sender_id, storage.clock().unix_seconds())
+            .unwrap_or(sender_id);
         match process_single_card_update(identity, storage, &resolved_id, &ciphertext) {
             Ok(()) => {
                 result.processed += 1;

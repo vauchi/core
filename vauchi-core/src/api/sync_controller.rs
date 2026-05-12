@@ -231,7 +231,10 @@ impl<'a, T: Transport> SyncController<'a, T> {
             // Compute mailbox token as recipient_id (SP-33 Task 4.1)
             let recipient_id = match &shared_key {
                 Some(key) => {
-                    let token = compute_mailbox_token(key, current_day_epoch());
+                    let token = compute_mailbox_token(
+                        key,
+                        current_day_epoch(self.storage.clock().unix_seconds()),
+                    );
                     token_hex(&token)
                 }
                 None => update.contact_id.clone(),
@@ -239,6 +242,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
 
             // Send the update (anonymous sender ID if shared key available)
             match self.relay.send_update(
+                self.storage.clock().unix_seconds(),
                 &recipient_id,
                 ratchet,
                 &update.payload,
@@ -311,7 +315,10 @@ impl<'a, T: Transport> SyncController<'a, T> {
         // Compute mailbox token as recipient_id (SP-33 Task 4.1)
         let recipient_id = match &shared_key {
             Some(key) => {
-                let token = compute_mailbox_token(key, current_day_epoch());
+                let token = compute_mailbox_token(
+                    key,
+                    current_day_epoch(self.storage.clock().unix_seconds()),
+                );
                 token_hex(&token)
             }
             None => contact_id.to_string(),
@@ -322,6 +329,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
 
         for update in updates {
             match self.relay.send_update(
+                self.storage.clock().unix_seconds(),
                 &recipient_id,
                 ratchet,
                 &update.payload,
@@ -500,8 +508,12 @@ impl<'a, T: Transport> SyncController<'a, T> {
             .encrypt(&ciphertext)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
 
-        self.relay
-            .send_device_sync_message(master_seed, ciphertext, &ratchet_msg)?;
+        self.relay.send_device_sync_message(
+            master_seed,
+            ciphertext,
+            &ratchet_msg,
+            self.storage.clock().unix_seconds(),
+        )?;
 
         Ok(())
     }

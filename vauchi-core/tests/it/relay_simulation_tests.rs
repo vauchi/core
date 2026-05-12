@@ -104,6 +104,7 @@ fn test_relay_send_update() {
     // Send update
     let msg_id = client
         .send_update(
+            0,
             "recipient-id",
             &mut ratchet,
             b"card update data",
@@ -140,13 +141,13 @@ fn test_relay_multiple_in_flight() {
 
     // Send multiple updates
     client
-        .send_update("recipient1", &mut ratchet, b"data1", "update-001", None)
+        .send_update(0, "recipient1", &mut ratchet, b"data1", "update-001", None)
         .unwrap();
     client
-        .send_update("recipient2", &mut ratchet, b"data2", "update-002", None)
+        .send_update(0, "recipient2", &mut ratchet, b"data2", "update-002", None)
         .unwrap();
     client
-        .send_update("recipient3", &mut ratchet, b"data3", "update-003", None)
+        .send_update(0, "recipient3", &mut ratchet, b"data3", "update-003", None)
         .unwrap();
 
     assert_eq!(client.in_flight_count(), 3);
@@ -436,7 +437,7 @@ fn test_relay_empty_payload() {
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
     // Empty payload should still work
-    let result = client.send_update("recipient-id", &mut ratchet, b"", "update-empty", None);
+    let result = client.send_update(0, "recipient-id", &mut ratchet, b"", "update-empty", None);
     result.expect("expected success");
 }
 
@@ -465,6 +466,7 @@ fn test_relay_large_payload() {
     // Large payload (100KB)
     let large_payload = vec![0xABu8; 100 * 1024];
     let result = client.send_update(
+        0,
         "recipient-id",
         &mut ratchet,
         &large_payload,

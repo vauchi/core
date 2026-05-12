@@ -59,6 +59,7 @@ fn test_relay_client_send_update() {
 
     let msg_id = client
         .send_update(
+            0,
             "recipient-id",
             &mut alice_ratchet,
             payload,
@@ -96,6 +97,7 @@ fn test_relay_client_acknowledgment_tracking() {
     // Send a message
     let _msg_id = client
         .send_update(
+            0,
             "recipient-id",
             &mut alice_ratchet,
             b"test",
@@ -131,6 +133,7 @@ fn test_process_incoming_captures_failed_ack_events() {
     // Send a message
     let msg_id = client
         .send_update(
+            0,
             "recipient-id",
             &mut alice_ratchet,
             b"test",
@@ -188,6 +191,7 @@ fn test_relay_client_timeout_detection() {
     // Send a message
     client
         .send_update(
+            0,
             "recipient-id",
             &mut alice_ratchet,
             b"test",
@@ -219,14 +223,14 @@ fn test_relay_client_max_pending_limit() {
 
     // Send up to limit
     client
-        .send_update("r1", &mut alice_ratchet, b"1", "u1", None)
+        .send_update(0, "r1", &mut alice_ratchet, b"1", "u1", None)
         .unwrap();
     client
-        .send_update("r2", &mut alice_ratchet, b"2", "u2", None)
+        .send_update(0, "r2", &mut alice_ratchet, b"2", "u2", None)
         .unwrap();
 
     // Third should fail
-    let result = client.send_update("r3", &mut alice_ratchet, b"3", "u3", None);
+    let result = client.send_update(0, "r3", &mut alice_ratchet, b"3", "u3", None);
     assert!(result.is_err(), "expected error");
     assert!(result.unwrap_err().to_string().contains("Too many pending"));
 }
@@ -241,10 +245,10 @@ fn test_relay_client_in_flight_update_ids() {
     let (mut alice_ratchet, _) = create_test_ratchet();
 
     client
-        .send_update("r1", &mut alice_ratchet, b"1", "update-a", None)
+        .send_update(0, "r1", &mut alice_ratchet, b"1", "update-a", None)
         .unwrap();
     client
-        .send_update("r2", &mut alice_ratchet, b"2", "update-b", None)
+        .send_update(0, "r2", &mut alice_ratchet, b"2", "update-b", None)
         .unwrap();
 
     let ids = client.in_flight_update_ids();
@@ -264,7 +268,7 @@ fn test_relay_client_has_in_flight() {
 
     let (mut alice_ratchet, _) = create_test_ratchet();
     client
-        .send_update("r1", &mut alice_ratchet, b"1", "u1", None)
+        .send_update(0, "r1", &mut alice_ratchet, b"1", "u1", None)
         .unwrap();
 
     assert!(client.has_in_flight());
@@ -284,7 +288,7 @@ fn test_relay_client_send_raw_update() {
 
     // Send raw
     let msg_id = client
-        .send_raw_update("recipient-id", &ratchet_msg, "raw-update-1", None)
+        .send_raw_update(0, "recipient-id", &ratchet_msg, "raw-update-1", None)
         .unwrap();
 
     assert!(!msg_id.is_empty());

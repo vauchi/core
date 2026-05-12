@@ -98,6 +98,7 @@ fn test_relay_client_workflow() {
     // Send an update
     let msg_id = client
         .send_update(
+            0,
             "recipient-id",
             &mut ratchet,
             b"test payload",

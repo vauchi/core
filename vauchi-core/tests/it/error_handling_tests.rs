@@ -85,6 +85,7 @@ fn test_relay_disconnect_clears_state() {
 
     client
         .send_update(
+            0,
             "recipient-id",
             &mut ratchet,
             b"test payload",

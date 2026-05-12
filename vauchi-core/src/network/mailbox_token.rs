@@ -53,8 +53,12 @@ pub fn compute_self_token(master_seed: &[u8; 32], day_epoch: u64) -> [u8; 32] {
 }
 
 /// Returns the current day epoch (UTC seconds / 86400).
-pub fn current_day_epoch() -> u64 {
-    crate::clock::ambient_now_secs() / 86400
+///
+/// `now` is the current Unix-epoch seconds — production callers route
+/// it from `Vauchi::clock` / `Storage::clock`; tests pin a deterministic
+/// value.
+pub fn current_day_epoch(now: u64) -> u64 {
+    now / 86400
 }
 
 /// Encode a 32-byte token as a lowercase hex string for wire transmission.

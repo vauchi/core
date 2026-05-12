@@ -83,7 +83,7 @@ pub fn process_received_blobs(
     contacts: &[Contact],
     blobs: Vec<(String, String, Vec<u8>)>,
 ) -> Vec<BlobOutcome> {
-    let day = current_day_epoch();
+    let day = current_day_epoch(storage.clock().unix_seconds());
     let token_to_contact = build_token_to_contact_map(contacts, day);
 
     let mut outcomes = Vec::with_capacity(blobs.len());

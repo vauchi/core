@@ -65,15 +65,18 @@ fn test_anonymous_sender_compute() {
 #[test]
 fn test_anonymous_sender_for_current_epoch() {
     let key = [0x42u8; 32];
-    let sender = AnonymousSender::for_current_epoch(&key);
-    assert_eq!(sender.epoch, current_epoch());
+    let sender = AnonymousSender::for_current_epoch(&key, 0);
+    assert_eq!(sender.epoch, current_epoch(0));
 }
 
 // @scenario: anonymous_sender :: Epoch boundary handling
 // @internal
 #[test]
 fn test_current_epoch_is_reasonable() {
-    let epoch = current_epoch();
+    // 2026 wall-clock value pinned so the assertion is deterministic
+    // post-Clock-seam (slice 14).
+    let now: u64 = 1_770_000_000;
+    let epoch = current_epoch(now);
     // Should be > 0 (we're well past UNIX epoch)
     assert!(epoch > 0);
     // In 2026, epoch ~= 1768000000 / 3600 ~= 491111
@@ -533,7 +536,7 @@ fn test_sender_index_stale_detection() {
     // Build for a past epoch
     let past_epoch = 1;
     let index = SenderIndex::build(&contacts, past_epoch);
-    assert!(index.is_stale(), "Index built for epoch 1 should be stale");
+    assert!(index.is_stale(0), "Index built for epoch 1 should be stale");
     assert_eq!(index.epoch(), past_epoch);
 }
 
@@ -579,9 +582,10 @@ fn test_sender_index_future_epoch_not_resolved() {
 #[test]
 fn test_epoch_calculation_formula() {
     // Verify epoch = unix_timestamp / 3600
-    // We can't control system time, but we can verify the formula
-    // by checking current_epoch is in the right range for 2026
-    let epoch = current_epoch();
+    // Slice 14 made `now` explicit; pin a 2026 wall-clock value so
+    // the range assertion is deterministic.
+    let now: u64 = 1_770_000_000;
+    let epoch = current_epoch(now);
     // 2026-01-01 00:00:00 UTC = 1767225600 seconds
     // 1767225600 / 3600 = 490896
     // 2026-12-31 23:59:59 UTC = 1798761599 seconds
@@ -894,10 +898,10 @@ fn test_resolve_sender_id_anonymous_mode() {
     let contacts = vec![contact.clone()];
 
     // Generate anonymous ID and hex-encode (as it would appear in EncryptedUpdate.sender_id)
-    let anon = AnonymousSender::for_current_epoch(contact.shared_key().unwrap().as_bytes());
+    let anon = AnonymousSender::for_current_epoch(contact.shared_key().unwrap().as_bytes(), 0);
     let sender_id_hex = hex::encode(anon.anonymous_id);
 
-    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, &sender_id_hex);
+    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, &sender_id_hex, 0);
     assert!(result.is_some(), "Should resolve anonymous sender ID");
     assert_eq!(result.unwrap(), contact.id());
 }
@@ -912,7 +916,7 @@ fn test_resolve_sender_id_unknown_returns_none() {
 
     // Unknown hex-encoded 32-byte value
     let unknown_hex = hex::encode([0xFFu8; 32]);
-    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, &unknown_hex);
+    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, &unknown_hex, 0);
     assert!(result.is_none(), "Unknown anonymous ID should return None");
 }
 
@@ -924,15 +928,15 @@ fn test_resolve_sender_id_malformed_hex() {
     let contacts = vec![make_contact_with_key("Alice", key)];
 
     // Non-hex string
-    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, "not-valid-hex!");
+    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, "not-valid-hex!", 0);
     assert!(result.is_none(), "Malformed hex should return None");
 
     // Valid hex but wrong length (not 32 bytes)
-    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, "abcdef");
+    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, "abcdef", 0);
     assert!(result.is_none(), "Short hex should return None");
 
     // Empty string
-    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, "");
+    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, "", 0);
     assert!(result.is_none(), "Empty string should return None");
 }
 
@@ -944,13 +948,17 @@ fn test_resolve_sender_id_epoch_boundary() {
     let contact = make_contact_with_key("Carol", key.clone());
     let contacts = vec![contact.clone()];
 
+    // Pin a 2026 wall-clock value so prev_epoch arithmetic is
+    // deterministic post-Clock-seam (slice 14).
+    let now: u64 = 1_770_000_000;
+
     // Generate anonymous ID for previous epoch
-    let prev_epoch = current_epoch() - 1;
+    let prev_epoch = current_epoch(now) - 1;
     let anon = AnonymousSender::compute(contact.shared_key().unwrap().as_bytes(), prev_epoch);
     let sender_id_hex = hex::encode(anon.anonymous_id);
 
     // Should still resolve (±1 epoch tolerance)
-    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, &sender_id_hex);
+    let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, &sender_id_hex, now);
     assert!(
         result.is_some(),
         "Previous epoch anonymous ID should resolve via tolerance"
@@ -987,6 +995,7 @@ fn test_send_update_with_shared_key_uses_anonymous_id() {
     let shared_key = [0x42u8; 32];
     let _msg_id = client
         .send_update(
+            0,
             "recipient-id",
             &mut ratchet,
             b"payload",
@@ -1008,7 +1017,7 @@ fn test_send_update_with_shared_key_uses_anonymous_id() {
         let decoded = hex::decode(&update.sender_id).expect("sender_id should be valid hex");
         assert_eq!(decoded.len(), 32, "Anonymous sender ID should be 32 bytes");
         // Verify it matches the expected anonymous ID
-        let expected = AnonymousSender::for_current_epoch(&shared_key);
+        let expected = AnonymousSender::for_current_epoch(&shared_key, 0);
         assert_eq!(
             decoded,
             expected.anonymous_id.to_vec(),
@@ -1046,7 +1055,7 @@ fn test_send_update_without_shared_key_uses_real_identity() {
 
     // Send without shared_key → real identity
     let _msg_id = client
-        .send_update("recipient-id", &mut ratchet, b"payload", "u1", None)
+        .send_update(0, "recipient-id", &mut ratchet, b"payload", "u1", None)
         .unwrap();
 
     let sent = client.connection().transport().sent_messages();
@@ -1092,14 +1101,14 @@ fn test_send_update_anonymous_id_differs_per_contact() {
     let key_bob = [0xBBu8; 32];
 
     client
-        .send_update("alice", &mut ratchet, b"hi", "u1", Some(&key_alice))
+        .send_update(0, "alice", &mut ratchet, b"hi", "u1", Some(&key_alice))
         .unwrap();
 
     let bob_dh2 = X3DHKeyPair::generate();
     let mut ratchet2 =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh2.public_key()).unwrap();
     client
-        .send_update("bob", &mut ratchet2, b"hi", "u2", Some(&key_bob))
+        .send_update(0, "bob", &mut ratchet2, b"hi", "u2", Some(&key_bob))
         .unwrap();
 
     let sent = client.connection().transport().sent_messages();

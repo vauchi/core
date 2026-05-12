@@ -702,7 +702,14 @@ fn test_process_card_update_resolves_anonymous_sender_id() {
         .load_contact(&bob_contact_id)
         .unwrap()
         .unwrap();
-    let anon = AnonymousSender::for_current_epoch(bob_contact.shared_key().unwrap().as_bytes());
+    // Slice 14 made `now` explicit; mirror the storage clock that
+    // `process_card_updates` will use, so both sides compute the
+    // same epoch and the anonymous-ID resolution succeeds.
+    let now_for_epoch = alice_wb.storage().clock().unix_seconds();
+    let anon = AnonymousSender::for_current_epoch(
+        bob_contact.shared_key().unwrap().as_bytes(),
+        now_for_epoch,
+    );
     let anonymous_id_hex = hex::encode(anon.anonymous_id);
 
     // Process using anonymous sender ID instead of real contact ID

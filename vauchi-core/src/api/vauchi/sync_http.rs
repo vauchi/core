@@ -363,7 +363,7 @@ impl Vauchi {
             .filter_map(|c| c.shared_key().map(|k| *k.as_bytes()))
             .collect();
 
-        let day = current_day_epoch();
+        let day = current_day_epoch(self.clock.unix_seconds());
         let master_seed = identity.master_seed();
 
         // Build padded token batches (256 per batch, shuffled)
@@ -441,6 +441,7 @@ impl Vauchi {
             &contact_keys,
             identity.master_seed(),
             0, // days_offline — Task 10 will compute this from last_connected_epoch
+            self.clock.unix_seconds(),
         );
 
         // Run the sync cycle (sends pending updates, processes ACKs)

@@ -520,7 +520,7 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             return Ok(Vec::new());
         }
 
-        let day = current_day_epoch();
+        let day = current_day_epoch(self.storage.clock().unix_seconds());
         let self_token = compute_self_token(identity.master_seed(), day);
         let recipient_id = token_hex(&self_token);
 

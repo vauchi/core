@@ -48,7 +48,7 @@ fn create_test_ratchet() -> (DoubleRatchetState, DoubleRatchetState) {
 #[test]
 fn test_send_update_recipient_id_is_64_char_hex_token() {
     let shared_key = [0x42u8; 32];
-    let token = compute_mailbox_token(&shared_key, current_day_epoch());
+    let token = compute_mailbox_token(&shared_key, current_day_epoch(0));
     let recipient_id = token_hex(&token);
 
     assert_eq!(recipient_id.len(), 64, "Mailbox token must be 64 hex chars");
@@ -60,6 +60,7 @@ fn test_send_update_recipient_id_is_64_char_hex_token() {
     let (mut ratchet, _) = create_test_ratchet();
     let _msg_id = client
         .send_update(
+            0,
             &recipient_id,
             &mut ratchet,
             b"hello",
@@ -101,7 +102,14 @@ fn test_send_update_without_shared_key_uses_provided_recipient() {
 
     let (mut ratchet, _) = create_test_ratchet();
     let _msg_id = client
-        .send_update("plain-contact-id", &mut ratchet, b"hello", "update-1", None)
+        .send_update(
+            0,
+            "plain-contact-id",
+            &mut ratchet,
+            b"hello",
+            "update-1",
+            None,
+        )
         .unwrap();
 
     let sent = client.connection().transport().sent_messages();
@@ -127,7 +135,7 @@ fn test_register_mailbox_tokens_sends_256_tokens() {
     let contact_keys = [[0xBB; 32], [0xCC; 32]];
 
     let msg_id = client
-        .register_mailbox_tokens(&contact_keys, &master_seed, 0)
+        .register_mailbox_tokens(&contact_keys, &master_seed, 0, 0)
         .unwrap();
     assert!(!msg_id.is_empty());
 
@@ -138,7 +146,7 @@ fn test_register_mailbox_tokens_sends_256_tokens() {
         assert_eq!(rm.tokens.len(), 256, "Must send exactly 256 padded tokens");
 
         // Self-token for today must be present
-        let day = current_day_epoch();
+        let day = current_day_epoch(0);
         let self_token = token_hex(&compute_self_token(&master_seed, day));
         assert!(
             rm.tokens.contains(&self_token),
@@ -167,7 +175,7 @@ fn test_register_mailbox_tokens_with_no_contacts() {
 
     let master_seed = [0xDD; 32];
     let msg_id = client
-        .register_mailbox_tokens(&[], &master_seed, 0)
+        .register_mailbox_tokens(&[], &master_seed, 0, 0)
         .unwrap();
     assert!(!msg_id.is_empty());
 
@@ -200,7 +208,7 @@ fn test_device_sync_uses_self_token_as_recipient_id() {
     let ratchet_msg = ratchet.encrypt(&ciphertext).unwrap();
 
     let msg_id = client
-        .send_device_sync_message(&master_seed, ciphertext.clone(), &ratchet_msg)
+        .send_device_sync_message(&master_seed, ciphertext.clone(), &ratchet_msg, 0)
         .unwrap();
     assert!(!msg_id.is_empty());
 
@@ -208,7 +216,7 @@ fn test_device_sync_uses_self_token_as_recipient_id() {
     assert_eq!(sent.len(), 1);
 
     if let MessagePayload::EncryptedUpdate(update) = &sent[0].payload {
-        let expected_token = token_hex(&compute_self_token(&master_seed, current_day_epoch()));
+        let expected_token = token_hex(&compute_self_token(&master_seed, current_day_epoch(0)));
         assert_eq!(
             update.recipient_id, expected_token,
             "Device sync recipient_id must be the self-token"

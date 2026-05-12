@@ -793,6 +793,16 @@ fn cycle_loop(
             try_autonomous_audio_trigger(&inner, &audio_listener_slot, &audio_commands);
         }
 
+        // Phase 1.C.7: enforce the audio listen-window budget. After
+        // Listening opens (via the autonomous trigger above), the
+        // cycle thread polls the inner session for budget expiry —
+        // if AUDIO_LISTEN_TIMEOUT passes without a verified response,
+        // transition to Failed and surface the state to the audio
+        // listener. The check is a cheap no-op when the inner state
+        // isn't Listening, so it's safe to run unconditionally on
+        // every cycle tick.
+        try_audio_timeout(&inner, &audio_listener_slot);
+
         if !finalized_fired
             && matches!(step.new_state, MobileProtocolState::Finalized)
             && let Some(ref payload) = step.finalize_payload
@@ -1011,5 +1021,60 @@ fn responsive_sleep(total: Duration, cancel_flag: &AtomicBool) {
         let chunk = remaining.min(CHUNK);
         thread::sleep(chunk);
         remaining = remaining.saturating_sub(chunk);
+    }
+}
+
+/// Phase 1.C.7 helper: enforce the `AUDIO_LISTEN_TIMEOUT` budget on
+/// the inner session from the cycle thread. Called once per loop
+/// tick; cheap no-op unless `audio_proximity == Listening` and the
+/// budget has elapsed.
+///
+/// Defensive backstop per ADR-031. The frontend audio adapter
+/// receives `Command::AudioListenForResponse { timeout_ms }` and is
+/// expected to honour the budget — but if the adapter is silent on
+/// timeout (no "no audio detected" event in the hardware-event
+/// vocabulary), core must still close the listen window or the
+/// inner state machine wedges on Listening.
+///
+/// Listener-registered gate mirrors
+/// [`try_autonomous_audio_trigger`]: without a Hover audio
+/// listener the inner state never entered Listening, so the budget
+/// timer is always None and the check is structurally a no-op.
+/// The early return saves the inner lock on Glance flows where
+/// every cycle tick would otherwise grab + drop it.
+///
+/// Same lock-free callback discipline as
+/// [`MobileMultiStageSession::notify_audio_listener`] — clone the
+/// listener Arc out of its slot before invoking so a frontend that
+/// re-enters Rust on the callback cannot deadlock with the inner
+/// session lock.
+fn try_audio_timeout(
+    inner: &Arc<Mutex<MultiStageSession>>,
+    audio_listener_slot: &AudioListenerSlot,
+) {
+    let listener_registered = audio_listener_slot
+        .lock()
+        .map(|guard| guard.is_some())
+        .unwrap_or(false);
+    if !listener_registered {
+        return;
+    }
+
+    let fired = match inner.lock() {
+        Ok(mut session) => session
+            .check_and_apply_audio_timeout(std::time::Instant::now())
+            .ok()
+            .unwrap_or(false),
+        Err(_) => return,
+    };
+
+    if fired {
+        let listener = audio_listener_slot
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone());
+        if let Some(listener) = listener {
+            listener.on_audio_state_changed(MobileAudioProximityState::Failed);
+        }
     }
 }

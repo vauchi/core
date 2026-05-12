@@ -32,7 +32,11 @@ vauchi-platform/src/exchange.rs 1027
 # machine share. (+15 for Phase 1.C polish: listener-presence gate in
 # `try_autonomous_audio_trigger` so Glance flows never advance the
 # inner state machine — 2026-05-11-hover-graduation-plan.)
-vauchi-platform/src/multistage_exchange.rs 1015
+# (+65 for Phase 1.C.7 wire-up of 2026-05-11-hover-graduation-plan:
+#  `try_audio_timeout` helper fn + cycle-loop call site that polls
+#  `MultiStageSession::check_and_apply_audio_timeout` to enforce
+#  the audio listen-window budget when Listening wedges.)
+vauchi-platform/src/multistage_exchange.rs 1080
 
 # EXEMPT — state machine: scattered transitions create protocol bugs
 # (+8 for ADR-031 audio-as-samples migration — encode at emit, accept
@@ -59,7 +63,12 @@ vauchi-core/src/exchange/session.rs 1788
 #  verify_audio_response with constant-time eq via subtle.
 #  Crypto-adjacent comparison kept in core where subtle is a
 #  dep, called from vauchi-platform's process_audio_samples_recorded.)
-vauchi-core/src/exchange/multistage/session.rs 1352
+# (+79 for Phase 1.C.7 GREEN of 2026-05-11-hover-graduation-plan:
+#  `audio_listening_started_at` field + `AUDIO_LISTEN_TIMEOUT` const
+#  + `check_and_apply_audio_timeout` method enforcing the listen-
+#  window budget. Defensive backstop per ADR-031 in case the audio
+#  adapter is silent on timeout.)
+vauchi-core/src/exchange/multistage/session.rs 1431
 
 # EXEMPT — protocol command/event enum: variants + variant_name match
 # + From impls + serde-discriminant ordering must be co-located, splitting

@@ -49,7 +49,7 @@ fn setup_widget_test_env() -> (tempfile::TempDir, MemoryKeyStorage) {
     std::fs::write(keys_dir.join("key3"), b"secret key material 3").unwrap();
 
     // Create pre-signed messages
-    let msgs = PreSignedShredMessages::generate(&identity);
+    let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
     msgs.save(dir.path()).unwrap();
 
     // Store SMK in secure storage

@@ -10,7 +10,6 @@
 //!   - (revocation of pre-signed operations — DP-2 compliance)
 //!   - "Pre-signed messages stored unencrypted" (offline storage)
 
-use std::time::{SystemTime, UNIX_EPOCH};
 use vauchi_core::api::PreSignedShredMessages;
 use vauchi_core::crypto::signing::{PublicKey as CryptoPublicKey, Signature as CryptoSignature};
 use vauchi_core::identity::Identity;
@@ -36,11 +35,11 @@ fn verify_ed25519(public_key: &[u8; 32], message: &[u8], signature: &[u8]) -> bo
 fn test_pre_signed_message_refresh() {
     // Given pre-signed messages were generated
     let identity = Identity::create("Alice");
-    let original = PreSignedShredMessages::generate(&identity);
+    let original = PreSignedShredMessages::generate(&identity, 1_700_000_000);
     let original_refreshed_at = original.refreshed_at;
 
     // When the refresh mechanism runs (before expiration)
-    let refreshed = PreSignedShredMessages::refresh(&identity);
+    let refreshed = PreSignedShredMessages::refresh(&identity, 1_700_000_000);
 
     // Then new pre-signed messages should be generated
     assert!(
@@ -82,11 +81,11 @@ fn test_pre_signed_message_refresh() {
 fn test_pre_signed_refresh_generates_new_purge_token() {
     // Given I have existing pre-signed messages with purge token A
     let identity = Identity::create("Bob");
-    let msgs_a = PreSignedShredMessages::generate(&identity);
+    let msgs_a = PreSignedShredMessages::generate(&identity, 1_700_000_000);
     let token_a = msgs_a.purge_request.purge_token;
 
     // When I refresh the pre-signed messages
-    let msgs_b = PreSignedShredMessages::refresh(&identity);
+    let msgs_b = PreSignedShredMessages::refresh(&identity, 1_700_000_000);
     let token_b = msgs_b.purge_request.purge_token;
 
     // Then the new purge token should differ from token A
@@ -113,9 +112,9 @@ fn test_purge_token_rotation() {
     let identity = Identity::create("Charlie");
 
     // Generate multiple pre-signed messages
-    let msgs1 = PreSignedShredMessages::generate(&identity);
-    let msgs2 = PreSignedShredMessages::generate(&identity);
-    let msgs3 = PreSignedShredMessages::generate(&identity);
+    let msgs1 = PreSignedShredMessages::generate(&identity, 1_700_000_000);
+    let msgs2 = PreSignedShredMessages::generate(&identity, 1_700_000_000);
+    let msgs3 = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
     // Each purge token should be unique (random)
     assert_ne!(
@@ -152,7 +151,7 @@ fn test_purge_token_rotation_maintains_signature_validity() {
 
     // Generate pre-signed messages and store multiple versions
     let versions: Vec<PreSignedShredMessages> = (0..5)
-        .map(|_| PreSignedShredMessages::generate(&identity))
+        .map(|_| PreSignedShredMessages::generate(&identity, 1_700_000_000))
         .collect();
 
     // Each version should have a valid signature for its own token
@@ -206,7 +205,7 @@ fn test_purge_token_rotation_maintains_signature_validity() {
 fn test_pre_signed_revocation() {
     // Given I have pre-signed messages
     let identity = Identity::create("Eve");
-    let msgs = PreSignedShredMessages::generate(&identity);
+    let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
     // Store the public key for later verification
     let public_key = *identity.signing_public_key();
@@ -247,7 +246,7 @@ fn test_pre_signed_revocation() {
 #[test]
 fn test_pre_signed_revocation_includes_public_key() {
     let identity = Identity::create("Frank");
-    let msgs = PreSignedShredMessages::generate(&identity);
+    let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
     // Both messages should include the identity's public key
     assert_eq!(
@@ -276,7 +275,7 @@ fn test_pre_signed_offline_storage() {
 
     // Given I create pre-signed messages offline
     let identity = Identity::create("Grace");
-    let msgs = PreSignedShredMessages::generate(&identity);
+    let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
     // When I save them to disk
     msgs.save(dir.path()).unwrap();
@@ -320,7 +319,7 @@ fn test_pre_signed_offline_storage_survives_restart() {
     // Create and save pre-signed messages (simulating first app run)
     let public_key = {
         let identity = Identity::create("Henry");
-        let msgs = PreSignedShredMessages::generate(&identity);
+        let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
         msgs.save(dir.path()).unwrap();
         *identity.signing_public_key()
     };
@@ -352,7 +351,7 @@ fn test_pre_signed_offline_storage_survives_restart() {
 fn test_pre_signed_offline_storage_unencrypted() {
     let dir = tempfile::tempdir().unwrap();
     let identity = Identity::create("Ivy");
-    let msgs = PreSignedShredMessages::generate(&identity);
+    let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
     msgs.save(dir.path()).unwrap();
 
     // Read raw bytes from disk
@@ -378,7 +377,7 @@ fn test_pre_signed_offline_airplane_mode() {
 
     // Step 1: User generates pre-signed messages while online
     let identity = Identity::create("Jake");
-    let original_msgs = PreSignedShredMessages::generate(&identity);
+    let original_msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
     original_msgs.save(dir.path()).unwrap();
 
     // Step 2: User goes offline (simulated by not having network)
@@ -413,8 +412,8 @@ fn test_pre_signed_refresh_isolation() {
     let alice = Identity::create("Alice");
     let bob = Identity::create("Bob");
 
-    let alice_msgs = PreSignedShredMessages::generate(&alice);
-    let bob_msgs = PreSignedShredMessages::generate(&bob);
+    let alice_msgs = PreSignedShredMessages::generate(&alice, 1_700_000_000);
+    let bob_msgs = PreSignedShredMessages::generate(&bob, 1_700_000_000);
 
     // Alice's messages should use Alice's key
     assert_eq!(
@@ -445,30 +444,13 @@ fn test_pre_signed_refresh_isolation() {
 #[test]
 fn test_pre_signed_timestamp_sanity() {
     let identity = Identity::create("Kate");
-    let msgs = PreSignedShredMessages::generate(&identity);
+    // Caller-controlled timestamp is stamped verbatim — the old
+    // `SystemTime::now()` ± 60s sanity check has been replaced with a
+    // direct equality assertion against the input now.
+    let now = 1_700_000_000;
+    let msgs = PreSignedShredMessages::generate(&identity, now);
 
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-
-    // Timestamps should be within 60 seconds of now (allowing for test execution time)
-    let epsilon = 60;
-    assert!(
-        msgs.refreshed_at >= now.saturating_sub(epsilon),
-        "refreshed_at should not be in the past"
-    );
-    assert!(
-        msgs.refreshed_at <= now + epsilon,
-        "refreshed_at should not be in the future"
-    );
-
-    assert!(
-        msgs.purge_request.timestamp >= now.saturating_sub(epsilon),
-        "Purge timestamp should not be in the past"
-    );
-    assert!(
-        msgs.deletion_notice.timestamp >= now.saturating_sub(epsilon),
-        "Deletion notice timestamp should not be in the past"
-    );
+    assert_eq!(msgs.refreshed_at, now);
+    assert_eq!(msgs.purge_request.timestamp, now);
+    assert_eq!(msgs.deletion_notice.timestamp, now);
 }

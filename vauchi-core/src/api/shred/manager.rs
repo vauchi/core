@@ -65,7 +65,7 @@ impl<'a> ShredManager<'a> {
         // 2. Refresh pre-signed messages file
         let _ = self.refresh_pre_signed_messages();
 
-        Ok(ShredToken::new())
+        Ok(ShredToken::new(self.storage.clock().unix_seconds()))
     }
 
     /// Cancel a scheduled shred during the grace period.
@@ -117,8 +117,12 @@ impl<'a> ShredManager<'a> {
 
         // Send relay purge if sender provided (before point-of-no-return)
         if let Some(sender) = purge_sender {
-            let pre_signed = PreSignedShredMessages::load(&self.data_dir)
-                .or_else(|_| Ok::<_, ShredError>(PreSignedShredMessages::generate(self.identity)));
+            let pre_signed = PreSignedShredMessages::load(&self.data_dir).or_else(|_| {
+                Ok::<_, ShredError>(PreSignedShredMessages::generate(
+                    self.identity,
+                    self.storage.clock().unix_seconds(),
+                ))
+            });
             if let Ok(msgs) = pre_signed {
                 report.relay_purge_sent = sender.send_purge(&msgs.purge_request).unwrap_or(false);
             }
@@ -168,7 +172,10 @@ impl<'a> ShredManager<'a> {
             Ok(msgs) => Some(msgs),
             Err(_) => {
                 // 2. Fallback: sign fresh messages now (keys still available)
-                let msgs = PreSignedShredMessages::generate(self.identity);
+                let msgs = PreSignedShredMessages::generate(
+                    self.identity,
+                    self.storage.clock().unix_seconds(),
+                );
                 Some(msgs)
             }
         };
@@ -332,7 +339,8 @@ impl<'a> ShredManager<'a> {
     }
 
     fn refresh_pre_signed_messages(&self) -> bool {
-        let msgs = PreSignedShredMessages::refresh(self.identity);
+        let msgs =
+            PreSignedShredMessages::refresh(self.identity, self.storage.clock().unix_seconds());
         msgs.save(&self.data_dir).is_ok()
     }
 }

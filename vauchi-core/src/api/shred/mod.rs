@@ -55,9 +55,8 @@ pub struct ShredToken {
 }
 
 impl ShredToken {
-    pub(super) fn new() -> Self {
-        let created_at = crate::clock::ambient_now_secs();
-        Self { created_at }
+    pub(super) fn new(now: u64) -> Self {
+        Self { created_at: now }
     }
 
     /// Returns when this token was created (unix seconds).
@@ -242,7 +241,7 @@ mod tests {
         dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let token = ShredToken::new();
+        let token = ShredToken::new(1_700_000_000);
 
         let report = manager.hard_shred(token, None, None).unwrap();
 
@@ -266,7 +265,7 @@ mod tests {
         dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let token = ShredToken::new();
+        let token = ShredToken::new(1_700_000_000);
         let report = manager.hard_shred(token, None, None).unwrap();
 
         assert!(report.smk_destroyed);
@@ -298,7 +297,7 @@ mod tests {
         let (dir, storage, secure_storage, identity) = setup_test_env();
 
         // Create pre-signed messages file
-        let msgs = PreSignedShredMessages::generate(&identity);
+        let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
         msgs.save(dir.path()).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
@@ -360,7 +359,7 @@ mod tests {
         dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let token = ShredToken::new();
+        let token = ShredToken::new(1_700_000_000);
         let report = manager.hard_shred(token, None, None).unwrap();
 
         assert!(report.identity_file_destroyed);
@@ -382,7 +381,7 @@ mod tests {
         dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let token = ShredToken::new();
+        let token = ShredToken::new(1_700_000_000);
         let report = manager.hard_shred(token, None, None).unwrap();
 
         assert_eq!(report.key_files_destroyed, 2);
@@ -429,7 +428,7 @@ mod tests {
         dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let token = ShredToken::new();
+        let token = ShredToken::new(1_700_000_000);
 
         let mut sender = MockPurgeSender::new();
         let report = manager.hard_shred(token, Some(&mut sender), None).unwrap();
@@ -446,7 +445,7 @@ mod tests {
         dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let token = ShredToken::new();
+        let token = ShredToken::new(1_700_000_000);
 
         let mut sender = MockPurgeSender::failing();
         let report = manager.hard_shred(token, Some(&mut sender), None).unwrap();
@@ -463,7 +462,7 @@ mod tests {
         let (dir, storage, secure_storage, identity) = setup_test_env();
 
         // Create pre-signed messages file
-        let msgs = PreSignedShredMessages::generate(&identity);
+        let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
         msgs.save(dir.path()).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
@@ -484,7 +483,7 @@ mod tests {
         dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let token = ShredToken::new();
+        let token = ShredToken::new(1_700_000_000);
 
         // Pass None — backward compat
         let report = manager.hard_shred(token, None, None).unwrap();
@@ -564,7 +563,7 @@ mod tests {
         dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let token = ShredToken::new();
+        let token = ShredToken::new(1_700_000_000);
 
         let mut sender = MockRevocationSender::new();
         let report = manager.hard_shred(token, None, Some(&mut sender)).unwrap();
@@ -583,7 +582,7 @@ mod tests {
         dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let token = ShredToken::new();
+        let token = ShredToken::new(1_700_000_000);
 
         let mut sender = MockRevocationSender::failing();
         let report = manager.hard_shred(token, None, Some(&mut sender)).unwrap();
@@ -636,7 +635,7 @@ mod tests {
         dm.schedule_deletion_with_execute_at(1000, 1001).unwrap();
 
         let manager = ShredManager::new(&storage, &secure_storage, &identity, dir.path());
-        let token = ShredToken::new();
+        let token = ShredToken::new(1_700_000_000);
 
         // Pass None for revocation_sender — backward compat
         let report = manager.hard_shred(token, None, None).unwrap();

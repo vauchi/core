@@ -141,10 +141,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = super::now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO deletion_state (id, state_json, state_json_encrypted, updated_at) VALUES (1, '', ?1, ?2)",
@@ -245,10 +242,7 @@ impl Storage {
         event_type: &str,
         details: Option<&str>,
     ) -> Result<(), StorageError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = super::now_secs();
 
         let details_encrypted = if let Some(d) = details {
             Some(

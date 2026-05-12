@@ -31,10 +31,7 @@ impl Storage {
             crate::crypto::encrypt(&self.encryption_key, config.message.as_bytes())
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let now = super::now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO emergency_config (id, trusted_contact_ids_encrypted, message_encrypted, include_location, created_at, updated_at) VALUES (1, ?1, ?2, ?3, ?4, ?5)",

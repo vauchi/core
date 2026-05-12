@@ -18,10 +18,7 @@ impl Storage {
     ///
     /// Idempotent — uses INSERT OR REPLACE on the singleton row.
     pub fn save_app_preferences(&self, prefs: &AppPreferences) -> Result<(), StorageError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs() as i64;
+        let now = super::now_secs() as i64;
 
         self.conn.execute(
             "INSERT OR REPLACE INTO app_preferences \

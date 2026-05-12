@@ -27,10 +27,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let now = super::now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO ux_state (id, aha_tracker_json, aha_tracker_json_encrypted, updated_at)
@@ -94,10 +91,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let now = super::now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO ux_state (id, demo_contact_json, demo_contact_json_encrypted, updated_at)
@@ -178,10 +172,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let now = super::now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO ux_state (id, onboarding_progress_encrypted, updated_at)
@@ -251,10 +242,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let now = super::now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO ux_state (id, backup_reminder_encrypted, updated_at)
@@ -313,10 +301,7 @@ impl Storage {
         let demo_encrypted = crate::crypto::encrypt(&self.encryption_key, demo_json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let now = super::now_secs();
 
         // Use INSERT ... ON CONFLICT UPDATE to preserve other columns
         // (e.g. onboarding_progress_encrypted) that are not part of this save.

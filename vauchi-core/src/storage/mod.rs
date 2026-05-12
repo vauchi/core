@@ -157,6 +157,19 @@ use rusqlite::Connection;
 /// thread. For async contexts, wrap in `tokio::task::spawn_blocking` or use
 /// a dedicated storage thread with a channel. The UniFFI mobile bindings
 /// open a fresh storage per call via `open_vauchi()`.
+/// Returns the current Unix-epoch seconds via the OS wall clock.
+///
+/// Stepping-stone helper for Phase 1 / Task 1.1 / Step 3b. Used
+/// by storage submodules that stamp `updated_at` / TTL
+/// timestamps on rows. The structural pass that gives `Storage`
+/// an `Arc<dyn Clock>` field will retire this helper.
+pub(super) fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
 pub struct Storage {
     conn: Connection,
     /// Encryption key derived from user's master key

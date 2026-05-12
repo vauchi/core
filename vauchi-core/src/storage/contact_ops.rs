@@ -129,10 +129,7 @@ impl Storage {
         let card_encrypted = crate::crypto::encrypt(&self.encryption_key, card_json.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let now = super::now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO own_card (id, card_json, card_json_encrypted, updated_at) VALUES (1, '', ?1, ?2)",
@@ -405,10 +402,7 @@ impl Storage {
     /// (A, B) and (B, A) are stored identically.
     pub fn dismiss_duplicate(&self, id1: &str, id2: &str) -> Result<(), StorageError> {
         let (norm_id1, norm_id2) = crate::contact::merge::normalize_pair_key(id1, id2);
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let now = super::now_secs();
         self.conn.execute(
             "INSERT OR IGNORE INTO dismissed_duplicates (id1, id2, dismissed_at) VALUES (?1, ?2, ?3)",
             params![norm_id1, norm_id2, now as i64],

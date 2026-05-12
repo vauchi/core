@@ -35,10 +35,7 @@ impl DeletionState {
     pub fn time_remaining(&self) -> Option<std::time::Duration> {
         match self {
             DeletionState::Scheduled { execute_at, .. } => {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .expect("System clock before UNIX epoch")
-                    .as_secs();
+                let now = super::now_secs();
                 Some(std::time::Duration::from_secs(
                     execute_at.saturating_sub(now),
                 ))

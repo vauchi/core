@@ -157,10 +157,7 @@ impl Storage {
     /// 'delivered', 'expired', or 'failed' whose `updated_at` is more than
     /// 30 days in the past. Returns the number of rows deleted.
     pub fn run_startup_maintenance(&self) -> Result<usize, StorageError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = super::now_secs();
         let thirty_days_ago = now.saturating_sub(30 * 86400);
         self.cleanup_old_deliveries(thirty_days_ago)
     }

@@ -24,10 +24,7 @@ impl Storage {
         relay_url: &str,
         pins: &[PinnedCertificate],
     ) -> Result<(), StorageError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = super::now_secs();
         let pin_bytes: Vec<u8> = pins.iter().flat_map(|p| p.sha256_fingerprint).collect();
         self.conn.execute(
             "INSERT OR REPLACE INTO pin_cache (relay_url, pin_bytes, fetched_at) \

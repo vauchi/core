@@ -150,10 +150,7 @@ impl MigrationRunner {
             }
 
             // Record this migration
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .expect("system time before UNIX epoch")
-                .as_secs();
+            let now = super::now_secs();
 
             if let Err(e) = conn.execute(
                 "INSERT INTO schema_version (version, applied_at) VALUES (?1, ?2)",

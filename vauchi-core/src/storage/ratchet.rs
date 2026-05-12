@@ -43,10 +43,7 @@ impl Storage {
         let state_encrypted = crate::crypto::encrypt(&ratchet_key, &state_json)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let now = super::now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO contact_ratchets

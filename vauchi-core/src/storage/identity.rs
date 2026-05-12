@@ -21,10 +21,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, backup_data)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let now = super::now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO identity (id, backup_data_encrypted, display_name, created_at) VALUES (1, ?1, ?2, ?3)",

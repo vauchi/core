@@ -29,10 +29,7 @@ impl Storage {
         let response_encrypted = crate::crypto::encrypt(&self.encryption_key, response.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let now = super::now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO recovery_responses
@@ -153,10 +150,7 @@ impl Storage {
         let encrypted = crate::crypto::encrypt(&self.encryption_key, &json)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX epoch")
-            .as_secs();
+        let now = super::now_secs();
 
         self.conn.execute(
             "INSERT OR REPLACE INTO recovery_settings (id, settings_encrypted, updated_at)
@@ -205,13 +199,7 @@ impl Storage {
         self.conn.execute(
             "INSERT OR REPLACE INTO recovery_progress (id, progress_encrypted, updated_at)
              VALUES (1, ?1, ?2)",
-            params![
-                encrypted,
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs() as i64,
-            ],
+            params![encrypted, super::now_secs() as i64,],
         )?;
         Ok(())
     }

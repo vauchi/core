@@ -1110,3 +1110,72 @@ fn apply_multi_stage_audio_proximity_returns_false_on_wrong_engine() {
         "apply_multi_stage_audio_proximity must return false when MultiStageExchange isn't active",
     );
 }
+
+// @internal
+#[test]
+fn extend_pending_commands_appends_to_drain_queue() {
+    // Phase 1.C.3e-v of 2026-05-11-hover-graduation-plan.md —
+    // PlatformAppEngine's audio-listener bridge forwards
+    // session-side audio commands into AppEngine via this method.
+    // Verify the queue accepts pushes + drain returns them in order.
+    use vauchi_core::{Command, Orientation};
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+
+    // Push two arbitrary commands the bridge would normally forward.
+    let pushed = vec![
+        Command::SetScreenBrightness { level: Some(0.5) },
+        Command::SetOrientationLock {
+            orientation: Some(Orientation::Portrait),
+        },
+    ];
+    engine.extend_pending_commands(pushed.clone());
+
+    let drained = engine.drain_pending_commands();
+    assert_eq!(
+        drained, pushed,
+        "extend_pending_commands must push verbatim; drain returns FIFO",
+    );
+    // Second drain is empty — drain takes-and-clears.
+    assert!(engine.drain_pending_commands().is_empty());
+}
+
+// @internal
+#[test]
+fn extend_pending_commands_preserves_existing_queue() {
+    // Bridge may extend while AppEngine already has engine-emitted
+    // commands buffered (from a prior screen_entered or ActionResult).
+    // Both classes should drain together.
+    use vauchi_core::Command;
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MultiStageExchange);
+    // navigate_to leaves screen_entered commands in the queue —
+    // brightness, idle-timer, orientation, plus the 1.B-added
+    // SwitchCamera announcement. Bridge-emitted audio commands
+    // append AFTER these.
+    let prior_len = {
+        // Peek by draining + re-pushing (since AppEngine has no
+        // peek API).
+        let cmds = engine.drain_pending_commands();
+        let len = cmds.len();
+        engine.extend_pending_commands(cmds);
+        len
+    };
+    assert!(prior_len >= 1, "screen_entered must have queued commands");
+
+    engine.extend_pending_commands(vec![Command::AudioStop]);
+
+    let drained = engine.drain_pending_commands();
+    assert_eq!(
+        drained.len(),
+        prior_len + 1,
+        "extend_pending_commands must preserve prior queue + append new",
+    );
+    assert!(
+        matches!(drained.last(), Some(Command::AudioStop)),
+        "newly-extended command must land at queue tail (FIFO)",
+    );
+}

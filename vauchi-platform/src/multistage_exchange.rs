@@ -267,7 +267,7 @@ pub struct MobileMultiStageSession {
     /// pending-command stream so the frontend sees
     /// `Command::AudioEmitChallenge` / `AudioListenForResponse` in
     /// the next `screen_envelope_to_json` drain.
-    pending_audio_commands: Mutex<Vec<Command>>,
+    pending_audio_commands: Arc<Mutex<Vec<Command>>>,
 }
 
 #[uniffi::export]
@@ -609,6 +609,18 @@ impl MobileMultiStageSession {
             .unwrap_or_default()
     }
 
+    /// Returns an `Arc` handle to the pending audio commands queue
+    /// so PlatformAppEngine's audio-listener bridge can drain
+    /// commands from inside its `on_audio_state_changed` callback
+    /// (Phase 1.C.3e-v). The bridge cannot reach `self` directly
+    /// without creating an Arc cycle through the listener slot;
+    /// holding the queue Arc separately avoids the cycle.
+    ///
+    /// Internal — non-UniFFI. Frontends never call this.
+    pub fn pending_audio_commands_handle(&self) -> Arc<Mutex<Vec<Command>>> {
+        Arc::clone(&self.pending_audio_commands)
+    }
+
     /// Pop the audio listener slot, clone the Arc out of the lock,
     /// fire the callback unlocked. Matches the lock-free callback
     /// discipline used by [`MultiStageEngineBridge::notify`] in
@@ -648,7 +660,7 @@ impl MobileMultiStageSession {
             inner: Arc::new(Mutex::new(MultiStageSession::new(local_card))),
             listener: Arc::new(Mutex::new(None)),
             audio_listener: Arc::new(Mutex::new(None)),
-            pending_audio_commands: Mutex::new(Vec::new()),
+            pending_audio_commands: Arc::new(Mutex::new(Vec::new())),
             cancel_flag: Arc::new(AtomicBool::new(false)),
             thread_handle: Mutex::new(None),
             cycle_sleep_override_ms: Arc::new(AtomicU32::new(0)),

@@ -4573,6 +4573,7 @@ impl PlatformAppEngine {
         let audio_bridge = MultiStageAudioEngineBridge {
             engine: Arc::clone(&self.engine),
             direct_listener: Arc::clone(&self.direct_listener),
+            audio_commands: session.pending_audio_commands_handle(),
         };
         session.set_audio_listener(Box::new(audio_bridge));
         session.start();
@@ -4877,6 +4878,12 @@ impl MultiStageSessionListener for MultiStageEngineBridge {
 struct MultiStageAudioEngineBridge {
     engine: Arc<Mutex<AppEngine>>,
     direct_listener: DirectListenerSlot,
+    /// Arc-shared handle to the session's pending audio commands
+    /// queue. Drained from `on_audio_state_changed` after the
+    /// engine-side state apply so the AudioEmit/Listen commands
+    /// flow into AppEngine's pending stream in the same callback
+    /// tick. Phase 1.C.3e-v.
+    audio_commands: std::sync::Arc<std::sync::Mutex<Vec<vauchi_core::Command>>>,
 }
 
 impl MultiStageAudioEngineBridge {
@@ -4900,7 +4907,25 @@ impl MultiStageAudioListener for MultiStageAudioEngineBridge {
     fn on_audio_state_changed(&self, state: MobileAudioProximityState) {
         let core_state = mobile_audio_to_core(state);
         let applied = match self.engine.lock() {
-            Ok(mut e) => e.apply_multi_stage_audio_proximity(core_state),
+            Ok(mut e) => {
+                let ok = e.apply_multi_stage_audio_proximity(core_state);
+                if ok {
+                    // Phase 1.C.3e-v: drain the session's audio
+                    // commands and forward into AppEngine's pending
+                    // stream so the next screen_envelope_to_json
+                    // drain surfaces AudioEmitChallenge /
+                    // AudioListenForResponse to the frontend.
+                    let cmds = self
+                        .audio_commands
+                        .lock()
+                        .map(|mut q| std::mem::take(&mut *q))
+                        .unwrap_or_default();
+                    if !cmds.is_empty() {
+                        e.extend_pending_commands(cmds);
+                    }
+                }
+                ok
+            }
             Err(_) => false,
         };
         if applied {

@@ -341,6 +341,8 @@ impl MobileMultiStageSession {
 
         let inner = Arc::clone(&self.inner);
         let listener = Arc::clone(&self.listener);
+        let audio_listener = Arc::clone(&self.audio_listener);
+        let audio_commands = Arc::clone(&self.pending_audio_commands);
         let cancel_flag = Arc::clone(&self.cancel_flag);
         let sleep_override = Arc::clone(&self.cycle_sleep_override_ms);
         let persistence = self.persistence.clone();
@@ -348,7 +350,15 @@ impl MobileMultiStageSession {
         let spawn_result = thread::Builder::new()
             .name("vauchi-exchange-cycle".into())
             .spawn(move || {
-                cycle_loop(inner, listener, cancel_flag, sleep_override, persistence);
+                cycle_loop(
+                    inner,
+                    listener,
+                    audio_listener,
+                    audio_commands,
+                    cancel_flag,
+                    sleep_override,
+                    persistence,
+                );
             });
         if let Ok(handle) = spawn_result {
             *handle_slot = Some(handle);
@@ -431,7 +441,7 @@ impl MobileMultiStageSession {
     /// `ExchangeSession::Qr` Hover path (`vauchi-core/src/exchange/session.rs:500`).
     /// Phase 1.C.4 will move this behind the Clock seam so tests can
     /// drive it deterministically.
-    const AUDIO_LISTEN_TIMEOUT_MS: u64 = 5000;
+    pub(crate) const AUDIO_LISTEN_TIMEOUT_MS: u64 = 5000;
 
     pub fn start_audio_handshake(
         &self,
@@ -698,6 +708,8 @@ impl MobileMultiStageSession {
 fn cycle_loop(
     inner: Arc<Mutex<MultiStageSession>>,
     listener_slot: ListenerSlot,
+    audio_listener_slot: AudioListenerSlot,
+    audio_commands: Arc<Mutex<Vec<Command>>>,
     cancel_flag: Arc<AtomicBool>,
     sleep_override_ms: Arc<AtomicU32>,
     persistence: Option<PersistenceContext>,
@@ -746,6 +758,39 @@ fn cycle_loop(
 
         if let (Some(listener), Some(state)) = (listener.as_ref(), transitioned_to.as_ref()) {
             listener.on_state_changed(state.clone());
+        }
+
+        // Phase 1.C.3e-vi: autonomous audio-handshake trigger. When
+        // the multi-stage protocol transitions into `Discovered`
+        // (peer scanned our INIT QR + we scanned theirs, transport
+        // key derived), fire the ultrasonic handshake without
+        // requiring an external orchestrator. The handshake is
+        // idempotent — if audio_proximity is already past Pending
+        // (Listening / Confirmed / Failed) the inner state machine
+        // rejects the transition and we skip the queue / listener
+        // notification silently.
+        //
+        // Glance flows reach Discovered too, but the inner
+        // `set_audio_proximity(Listening)` call goes through the
+        // state-machine gate regardless of mode — Glance just never
+        // *uses* the resulting Listening state because no consumer
+        // wires the audio listener. For now the Listening transition
+        // fires for all multi-stage flows; Phase 1.E's mode-dispatch
+        // flip will route Glance to a different engine entirely
+        // (no audio listener path) so the spurious transition is
+        // structurally inert.
+        if matches!(
+            transitioned_to.as_ref(),
+            Some(
+                MobileProtocolState::Discovered
+                    | MobileProtocolState::Transferring { .. }
+                    | MobileProtocolState::Verifying
+                    | MobileProtocolState::Confirming
+                    | MobileProtocolState::Complete
+                    | MobileProtocolState::Finalized
+            )
+        ) {
+            try_autonomous_audio_trigger(&inner, &audio_listener_slot, &audio_commands);
         }
 
         if !finalized_fired
@@ -810,6 +855,77 @@ fn cycle_loop(
     // complete" signal.
     if let Some(listener) = listener_slot.lock().ok().and_then(|g| g.clone()) {
         listener.on_session_ended();
+    }
+}
+/// Phase 1.C.3e-vi helper: fire the Hover audio handshake autonomously
+/// when the cycle thread observes a transition into `Discovered`. Reads
+/// the inner session's `session_id` to use as the FSK challenge
+/// (mirrors [`MobileMultiStageSession::start_audio_handshake_for_session`]
+/// but doesn't require `&self` — operates on the Arc clones the cycle
+/// thread already holds).
+///
+/// Silent no-op when:
+/// - the inner mutex is poisoned (don't crash the cycle thread)
+/// - the inner state machine rejects the transition (handshake already
+///   started, or audio_proximity isn't Pending — Glance retry races,
+///   Failed→Listening retry without the orchestrator firing yet, etc.)
+///
+/// Same lock-free callback discipline as
+/// [`MobileMultiStageSession::notify_audio_listener`] — clone the
+/// listener Arc out of its slot before invoking so a frontend that
+/// re-enters Rust on the callback cannot deadlock with the inner
+/// session lock.
+fn try_autonomous_audio_trigger(
+    inner: &Arc<Mutex<MultiStageSession>>,
+    audio_listener_slot: &AudioListenerSlot,
+    audio_commands: &Arc<Mutex<Vec<Command>>>,
+) {
+    use vauchi_core::exchange::{AudioConfig, AudioProximityState, audio_modem};
+
+    // Acquire inner, check Pending, capture session_id, transition
+    // to Listening. Drop lock before queuing / notifying so a
+    // listener callback cannot deadlock with later inner locks.
+    let (challenge, transitioned) = {
+        let Ok(mut session) = inner.lock() else {
+            return;
+        };
+        if session.audio_proximity() != AudioProximityState::Pending {
+            return;
+        }
+        let challenge = session.session_id();
+        let result = session.set_audio_proximity(AudioProximityState::Listening);
+        (challenge, result.is_ok())
+    };
+    if !transitioned {
+        return;
+    }
+
+    // Generate FSK + push paired commands. Mirrors the body of
+    // start_audio_handshake from 1.C.3e-ii.
+    let config = AudioConfig::default();
+    let samples = audio_modem::generate_fsk_samples(&challenge, &config);
+    let sample_rate = config.sample_rate;
+    let cmds = vec![
+        Command::AudioEmitChallenge {
+            samples,
+            sample_rate,
+        },
+        Command::AudioListenForResponse {
+            timeout_ms: MobileMultiStageSession::AUDIO_LISTEN_TIMEOUT_MS,
+            sample_rate,
+        },
+    ];
+    if let Ok(mut queue) = audio_commands.lock() {
+        queue.extend(cmds);
+    }
+
+    // Lock-free audio listener notification.
+    let listener = audio_listener_slot
+        .lock()
+        .ok()
+        .and_then(|guard| guard.clone());
+    if let Some(listener) = listener {
+        listener.on_audio_state_changed(MobileAudioProximityState::Listening);
     }
 }
 

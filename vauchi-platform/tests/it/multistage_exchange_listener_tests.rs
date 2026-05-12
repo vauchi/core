@@ -843,3 +843,91 @@ fn process_audio_samples_recorded_outside_listening_window_rejected() {
         MobileAudioProximityState::Pending
     );
 }
+
+// ── Autonomous trigger from cycle thread (Phase 1.C.3e-vi) ────────
+
+// @internal
+#[test]
+fn autonomous_trigger_fires_audio_handshake_on_discovered() {
+    // Two sessions exchange INIT QRs via PeerBridge. The cycle
+    // thread observes the Discovered transition and autonomously
+    // fires the audio handshake: state → Listening, queue gets
+    // AudioEmitChallenge + AudioListenForResponse, audio listener
+    // receives the Listening callback. No external trigger call —
+    // the orchestrator does not invoke start_audio_handshake_for_session.
+    let alice = Arc::new(MobileMultiStageSession::new(exchange_payload_for("Alice")));
+    let bob = Arc::new(MobileMultiStageSession::new(exchange_payload_for("Bob")));
+
+    let alice_recorder = RecordingListener::new();
+    let bob_recorder = RecordingListener::new();
+    let alice_audio = RecordingAudioListener::new();
+    let bob_audio = RecordingAudioListener::new();
+
+    alice.set_listener(Box::new(PeerBridge {
+        peer: Arc::clone(&bob),
+        recorder: Arc::clone(&alice_recorder),
+    }));
+    bob.set_listener(Box::new(PeerBridge {
+        peer: Arc::clone(&alice),
+        recorder: Arc::clone(&bob_recorder),
+    }));
+    alice.set_audio_listener(Box::new(SharedAudio(Arc::clone(&alice_audio))));
+    bob.set_audio_listener(Box::new(SharedAudio(Arc::clone(&bob_audio))));
+
+    alice.set_cycle_sleep_override_ms_for_test(5);
+    bob.set_cycle_sleep_override_ms_for_test(5);
+    alice.start();
+    bob.start();
+
+    // Wait until both sides see Discovered (or pass through to a
+    // later state — Discovered is brief). Audio handshake fires
+    // synchronously with the state transition so the audio listener
+    // having received any Listening callback proves the trigger ran.
+    let observed = wait_for(Duration::from_secs(10), || {
+        let alice_audio_states = alice_audio.states();
+        let bob_audio_states = bob_audio.states();
+        alice_audio_states.contains(&MobileAudioProximityState::Listening)
+            && bob_audio_states.contains(&MobileAudioProximityState::Listening)
+    });
+
+    alice.cancel();
+    bob.cancel();
+
+    assert!(
+        observed,
+        "autonomous trigger did not fire within 10 s; alice audio states={:?}, bob audio states={:?}",
+        alice_audio.states(),
+        bob_audio.states()
+    );
+
+    // Listening must appear exactly once per side — the autonomous
+    // trigger is idempotent (state-machine gate rejects the second
+    // Pending → Listening transition).
+    assert_eq!(
+        alice_audio
+            .states()
+            .iter()
+            .filter(|s| **s == MobileAudioProximityState::Listening)
+            .count(),
+        1,
+        "alice should see Listening exactly once; got {:?}",
+        alice_audio.states(),
+    );
+    assert_eq!(
+        bob_audio
+            .states()
+            .iter()
+            .filter(|s| **s == MobileAudioProximityState::Listening)
+            .count(),
+        1,
+        "bob should see Listening exactly once; got {:?}",
+        bob_audio.states(),
+    );
+
+    // Each session should have queued the paired (AudioEmitChallenge,
+    // AudioListenForResponse) commands — verified by draining.
+    let alice_cmds = alice.drain_audio_commands();
+    let bob_cmds = bob.drain_audio_commands();
+    assert_eq!(alice_cmds.len(), 2);
+    assert_eq!(bob_cmds.len(), 2);
+}

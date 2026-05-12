@@ -65,6 +65,17 @@ const FAIL_BROADCAST_DURATION: Duration = Duration::from_secs(5);
 /// (save on Finalized) while QRs continue in the background.
 const FINALIZED_GRACE_DURATION: Duration = Duration::from_secs(60);
 
+/// How long after `set_audio_proximity(Listening)` to wait for an
+/// audio response before the cycle thread transitions the inner
+/// state to Failed (Phase 1.C.7 of the Hover graduation plan). Mirror
+/// of `MobileMultiStageSession::AUDIO_LISTEN_TIMEOUT_MS` — the
+/// platform-layer constant scopes the adapter-side listen window;
+/// this core-side budget is the defensive backstop in case the
+/// adapter is silent (ADR-031: core does not trust hardware to
+/// honour its `timeout_ms` honestly). The check is invoked by the
+/// cycle thread via [`MultiStageSession::check_and_apply_audio_timeout`].
+const AUDIO_LISTEN_TIMEOUT: Duration = Duration::from_secs(5);
+
 /// Base display durations per QR type (jitter added at runtime).
 /// Tuned for <5s total exchange on typical hardware.
 /// Shorter = more scan opportunities per second = faster convergence.
@@ -212,6 +223,18 @@ pub struct MultiStageSession {
     // MultiStageExchangeEngine (renderer consumer) share one
     // enum definition.
     audio_proximity: AudioProximityState,
+
+    /// `Some(t)` while `audio_proximity == Listening` — `t` is the
+    /// monotonic `Instant` at which the listen window opened.
+    /// `None` outside Listening. Read by
+    /// [`Self::check_and_apply_audio_timeout`] to enforce the
+    /// `AUDIO_LISTEN_TIMEOUT` budget on the cycle thread. The
+    /// timestamp source is `Instant::now()` inside
+    /// [`Self::set_audio_proximity`]; tests inject by offsetting
+    /// against `Instant::now()` rather than mocking the clock
+    /// (matches the existing `phase_entered_at` style in this
+    /// session for ProtocolState transitions).
+    audio_listening_started_at: Option<Instant>,
 }
 
 impl MultiStageSession {
@@ -284,6 +307,7 @@ impl MultiStageSession {
             peer_relay_url: None,
             peer_relay_noise_pubkey: None,
             audio_proximity: AudioProximityState::Pending,
+            audio_listening_started_at: None,
         }
     }
 
@@ -418,7 +442,62 @@ impl MultiStageSession {
             });
         }
         self.audio_proximity = new_state;
+        // Track the listen-window entry for
+        // `check_and_apply_audio_timeout` (Phase 1.C.7). The window
+        // is open exactly while `audio_proximity == Listening` —
+        // record on entry, clear on exit. `Instant::now()` is the
+        // monotonic source; the platform wrapper passes through its
+        // own `Instant::now()` to the cycle-thread timeout check so
+        // both timestamps share a clock domain.
+        self.audio_listening_started_at = match new_state {
+            AudioProximityState::Listening => Some(Instant::now()),
+            _ => None,
+        };
         Ok(())
+    }
+
+    /// Enforce the audio-listen timeout budget.
+    ///
+    /// Invoked by the cycle thread (and by tests) with the current
+    /// `Instant`. Returns:
+    ///
+    /// - `Ok(false)` and leaves state untouched when not in Listening
+    ///   or when the budget hasn't elapsed yet.
+    /// - `Ok(true)` and transitions Listening → Failed when the
+    ///   budget has elapsed.
+    /// - `Err(AudioStateError::InvalidTransition)` is structurally
+    ///   unreachable — Listening → Failed is in the allowed graph —
+    ///   but the result type matches `set_audio_proximity` for
+    ///   caller symmetry.
+    ///
+    /// Defensive backstop per ADR-031: the platform-layer
+    /// `Command::AudioListenForResponse { timeout_ms }` tells the
+    /// audio adapter how long to listen, but the adapter may be
+    /// silent on timeout (no "no peer audio detected" event in the
+    /// hardware-event vocabulary). Core enforces its own budget so
+    /// the Listening state cannot wedge.
+    ///
+    /// The matching test scenarios are in
+    /// `vauchi-core/tests/it/multistage_session_tests.rs`
+    /// (`audio_timeout_*` block — Phase 1.C.6 RED).
+    pub fn check_and_apply_audio_timeout(
+        &mut self,
+        now: Instant,
+    ) -> Result<bool, AudioStateError> {
+        let started = match (self.audio_proximity, self.audio_listening_started_at) {
+            (AudioProximityState::Listening, Some(t)) => t,
+            // Not in Listening, or in Listening but tracker missing
+            // (shouldn't happen via `set_audio_proximity`; defensive
+            // no-op so a future refactor that forgets to set the
+            // timestamp fails loud via the test suite, not at
+            // runtime).
+            _ => return Ok(false),
+        };
+        if now.saturating_duration_since(started) < AUDIO_LISTEN_TIMEOUT {
+            return Ok(false);
+        }
+        self.set_audio_proximity(AudioProximityState::Failed)?;
+        Ok(true)
     }
 
     /// Returns `true` iff the transition is permitted by the audio

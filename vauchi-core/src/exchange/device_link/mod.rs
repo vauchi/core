@@ -30,7 +30,6 @@ mod tests {
     use super::*;
 
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::types::{DEVICE_LINK_MAGIC, DEVICE_LINK_VERSION};
     use crate::crypto::SymmetricKey;
@@ -55,10 +54,7 @@ mod tests {
     fn create_valid_proof(initiator_challenge: [u8; 16]) -> ProximityProof {
         ProximityProof::Ultrasonic {
             challenge_response: initiator_challenge,
-            verified_at: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            verified_at: crate::exchange::now_secs(),
         }
     }
 
@@ -97,11 +93,7 @@ mod tests {
     fn test_device_link_qr_expired() {
         let identity = create_test_identity();
         // Create QR with timestamp 20 minutes ago
-        let old_timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            - 1200;
+        let old_timestamp = crate::exchange::now_secs() - 1200;
 
         let qr = DeviceLinkQR::generate_with_timestamp(&identity, old_timestamp);
         assert!(qr.is_expired());
@@ -278,11 +270,7 @@ mod tests {
     fn test_device_link_responder_expired_qr() {
         let identity = create_test_identity();
         // Create QR with timestamp 20 minutes ago (expired)
-        let old_timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            - 1200;
+        let old_timestamp = crate::exchange::now_secs() - 1200;
 
         let qr = DeviceLinkQR::generate_with_timestamp(&identity, old_timestamp);
         let result = DeviceLinkResponder::from_qr(qr, "My Phone".to_string());
@@ -355,10 +343,7 @@ mod tests {
         let request = DeviceLinkRequest {
             device_name: "".to_string(),
             nonce: [0u8; 32],
-            timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: crate::exchange::now_secs(),
         };
         let encrypted = request.encrypt(initiator.qr().link_key()).unwrap();
 

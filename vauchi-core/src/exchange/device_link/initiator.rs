@@ -4,7 +4,6 @@
 
 //! Device link initiator state machines (existing device side).
 
-use std::time::{SystemTime, UNIX_EPOCH};
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
@@ -230,10 +229,7 @@ impl DeviceLinkInitiator {
         proof: &ProximityProof,
         confirmation_code: &str,
     ) -> Result<(), ExchangeError> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| ExchangeError::CryptoError)?
-            .as_secs();
+        let now = crate::exchange::now_secs();
 
         match proof {
             ProximityProof::Ultrasonic {
@@ -464,10 +460,7 @@ impl DeviceLinkInitiatorRestored {
         proof: &ProximityProof,
         confirmation_code: &str,
     ) -> Result<(), ExchangeError> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| ExchangeError::CryptoError)?
-            .as_secs();
+        let now = crate::exchange::now_secs();
 
         match proof {
             ProximityProof::Ultrasonic {

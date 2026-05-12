@@ -594,10 +594,7 @@ impl ExchangeSession {
     fn build_trust_metrics(&self) -> TrustMetrics {
         let log = self.proximity_event_log().unwrap_or_default();
         let method = log.final_method();
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let timestamp = super::now_secs();
         TrustMetrics::new(
             self.transport,
             self.proximity_confidence,

@@ -11,8 +11,6 @@
 //!   Magic (4) | Version (1) | Flags (1) | Identity Key (32) |
 //!   Exchange Key (32) | Token (32) | Timestamp (8) | Signature (64)
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use super::ExchangeError;
 use crate::crypto::{PublicKey, Signature};
 use crate::identity::Identity;
@@ -128,10 +126,7 @@ pub fn parse_exchange_payload(
 
 /// Checks if a payload timestamp has expired given the expiry duration.
 pub fn is_payload_expired(timestamp: u64, expiry_secs: u64) -> bool {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs();
+    let now = super::now_secs();
 
     now > timestamp + expiry_secs
 }

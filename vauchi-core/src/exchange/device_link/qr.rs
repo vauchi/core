@@ -5,7 +5,7 @@
 //! Device link QR code generation and parsing.
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use std::time::{SystemTime, UNIX_EPOCH};
+
 use zeroize::Zeroize;
 
 use super::types::{DEVICE_LINK_MAGIC, DEVICE_LINK_VERSION, LINK_QR_EXPIRY_SECONDS};
@@ -38,10 +38,7 @@ pub struct DeviceLinkQR {
 impl DeviceLinkQR {
     /// Generates a new device link QR code for the given identity.
     pub fn generate(identity: &Identity) -> Self {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let timestamp = crate::exchange::now_secs();
 
         Self::generate_with_timestamp(identity, timestamp)
     }
@@ -94,10 +91,7 @@ impl DeviceLinkQR {
 
     /// Checks if the QR code has expired.
     pub fn is_expired(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let now = crate::exchange::now_secs();
 
         now > self.timestamp + LINK_QR_EXPIRY_SECONDS
     }

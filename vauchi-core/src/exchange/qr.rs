@@ -22,7 +22,6 @@
 //! - Bits 2-7: reserved (must be zero)
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::ExchangeError;
 use super::x3dh::X3DHKeyPair;
@@ -107,10 +106,7 @@ impl ExchangeQR {
         relay_url: Option<String>,
         relay_noise_pubkey: Option<[u8; 32]>,
     ) -> Self {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let timestamp = super::now_secs();
 
         Self::generate_with_relay_and_timestamp(
             identity,
@@ -218,10 +214,7 @@ impl ExchangeQR {
 
     /// Checks if the QR code has expired.
     pub fn is_expired(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let now = super::now_secs();
 
         now > self.timestamp + QR_EXPIRY_SECONDS
     }
@@ -501,10 +494,7 @@ const MAX_CLOCK_DRIFT_SECONDS: u64 = 30;
 /// `MAX_CLOCK_DRIFT_SECONDS` (30 seconds). Otherwise returns
 /// `ExchangeError::ClockDrift` with the signed delta.
 pub fn check_clock_drift(qr_timestamp: u64) -> Result<(), ExchangeError> {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs();
+    let now = super::now_secs();
 
     let drift = (now as i64) - (qr_timestamp as i64);
 

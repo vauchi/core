@@ -67,10 +67,7 @@ impl ProximityProof {
     /// This replaces manual construction in frontends.
     pub fn manual_confirmation(link_key: &[u8; 32], confirmation_code: &str) -> Self {
         let mac = compute_confirmation_mac(link_key, confirmation_code);
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("System clock before UNIX epoch")
-            .as_secs();
+        let now = crate::exchange::now_secs();
         ProximityProof::ManualConfirmation {
             confirmation_code_mac: mac,
             confirmed_at: now,

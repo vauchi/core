@@ -55,7 +55,6 @@
 //!   attempts to exchange with yourself.
 
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
@@ -230,10 +229,7 @@ impl BleHandshakeSession {
     ) -> Self {
         let nonce: [u8; NONCE_SIZE] = crate::crypto::random_bytes();
 
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system clock is before UNIX epoch")
-            .as_secs();
+        let timestamp = super::now_secs();
 
         Self {
             state: BleHandshakeState::Idle,
@@ -341,10 +337,7 @@ impl BleHandshakeSession {
         }
 
         // Expiry check
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system clock is before UNIX epoch")
-            .as_secs();
+        let now = super::now_secs();
         if now.saturating_sub(their_timestamp) > BLE_HANDSHAKE_EXPIRY_SECS {
             return Err(ExchangeError::BleExpired);
         }

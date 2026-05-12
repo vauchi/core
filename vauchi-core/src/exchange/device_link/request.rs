@@ -4,8 +4,6 @@
 
 //! Device link request (from new device).
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use crate::crypto::{SymmetricKey, decrypt, encrypt};
 
 use super::super::ExchangeError;
@@ -26,10 +24,7 @@ impl DeviceLinkRequest {
     pub fn new(device_name: String) -> Self {
         let nonce: [u8; 32] = crate::crypto::random_bytes();
 
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let timestamp = crate::exchange::now_secs();
 
         DeviceLinkRequest {
             device_name,

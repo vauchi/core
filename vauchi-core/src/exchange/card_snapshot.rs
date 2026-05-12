@@ -83,10 +83,7 @@ impl CardSnapshot {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 fn now_secs() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("System clock before UNIX epoch")
-        .as_secs()
+    super::now_secs()
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

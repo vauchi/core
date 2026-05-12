@@ -105,10 +105,7 @@ impl ExchangeProtocol {
         let identity_pub = PublicKey::from(&self.identity_secret);
         let ephemeral_pub = PublicKey::from(&self.ephemeral_secret);
 
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|_| ExchangeError::CryptoError)?
-            .as_secs();
+        let timestamp = crate::exchange::now_secs();
 
         let mut offer = Vec::with_capacity(OFFER_SIZE);
         offer.extend_from_slice(identity_pub.as_bytes());

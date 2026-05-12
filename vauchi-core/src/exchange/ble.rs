@@ -17,7 +17,7 @@ use super::{ExchangeError, ProximityError, ProximityVerifier};
 use crate::crypto::{PublicKey, SigningKeyPair};
 use crate::identity::Identity;
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 mod hex_array_32 {
     use serde::{Deserialize, Deserializer, Serializer};
@@ -551,10 +551,7 @@ impl ExchangeBle {
 
         let token: [u8; 32] = random_bytes();
 
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let timestamp = super::now_secs();
 
         Self::generate_with_timestamp(identity, ephemeral, token, timestamp)
     }

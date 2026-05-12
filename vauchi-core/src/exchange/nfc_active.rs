@@ -11,8 +11,6 @@
 //! Magic bytes: "VNFC"
 //! Payload size: 174 bytes
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use super::ExchangeError;
 use super::exchange_payload::{
     EXCHANGE_PAYLOAD_SIZE, ParsedPayload, build_exchange_payload, is_payload_expired,
@@ -54,10 +52,7 @@ impl ExchangeNfc {
 
         let token: [u8; 32] = random_bytes();
 
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let timestamp = super::now_secs();
 
         Self::generate_with_timestamp(identity, ephemeral, token, timestamp)
     }

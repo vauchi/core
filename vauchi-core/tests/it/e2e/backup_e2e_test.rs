@@ -129,7 +129,7 @@ fn test_multi_device_linking_happy_path() {
     assert_eq!(updated_card_a.fields().len(), 2);
 
     // Step 6: Compute delta for sync to Device B
-    let delta = CardDelta::compute(&device_a_card, &updated_card_a);
+    let delta = CardDelta::compute(&device_a_card, &updated_card_a, 0);
     assert!(!delta.changes.is_empty());
 
     // Step 7: Apply delta on Device B

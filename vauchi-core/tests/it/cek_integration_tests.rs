@@ -168,7 +168,7 @@ fn test_process_cek_wrapped_update_saves_cek() {
     let old_card = ContactCard::new("Bob");
     let new_card = ContactCard::new("Bob Updated");
 
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     delta.sign(&bob_identity, alice_pk);
 
     // Wrap delta in CEK
@@ -225,7 +225,7 @@ fn test_process_cek_wrapped_update() {
         0,
     ));
 
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     delta.sign(&bob_identity, alice_pk);
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
@@ -266,7 +266,7 @@ fn test_process_update_from_revoked_sender_rejected() {
     let old_card = ContactCard::new("Bob");
     let new_card = ContactCard::new("Bob Evil");
 
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     delta.sign(&bob_identity, alice_pk);
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
@@ -309,7 +309,7 @@ fn test_process_cek_wrapped_update_applies_delta() {
         0,
     ));
 
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     delta.sign(&bob_identity, alice_pk);
 
     // CEK-wrap the delta
@@ -359,7 +359,7 @@ fn test_cek_wrapped_forged_signature_rejected() {
     let old_card = ContactCard::new("Bob");
     let new_card = ContactCard::new("Bob Tampered");
 
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     delta.sign(&bob_identity, alice_pk);
 
     // Tamper with the signature: flip bytes

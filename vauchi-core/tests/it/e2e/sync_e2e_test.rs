@@ -85,7 +85,7 @@ fn test_sync_update_propagation_happy_path() {
     let new_card = alice_wb.own_card().unwrap().unwrap();
 
     // Step 3: Compute delta for the update
-    let delta = CardDelta::compute(&old_card, &new_card);
+    let delta = CardDelta::compute(&old_card, &new_card, 0);
     assert!(!delta.changes.is_empty());
 
     // Step 4: Serialize and encrypt delta for Bob
@@ -316,7 +316,7 @@ fn test_full_three_user_workflow() {
     alice_wb.update_own_card(&modified_card).unwrap();
 
     let new_card = alice_wb.own_card().unwrap().unwrap();
-    let delta = CardDelta::compute(&old_card, &new_card);
+    let delta = CardDelta::compute(&old_card, &new_card, 0);
     assert!(!delta.changes.is_empty());
 
     // Apply updates to Bob and Carol

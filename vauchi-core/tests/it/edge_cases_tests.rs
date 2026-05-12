@@ -103,7 +103,7 @@ fn test_empty_card_delta_computation() {
     let old = ContactCard::new("Empty");
     let new = ContactCard::new("Empty");
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
     assert!(
         delta.is_empty(),
         "Identical empty cards should produce empty delta"
@@ -234,7 +234,7 @@ fn test_delta_only_display_name_change() {
     let old = ContactCard::new("Old Name");
     let new = ContactCard::new("New Name");
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
     assert!(!delta.is_empty());
     assert_eq!(delta.changes.len(), 1);
 }
@@ -264,7 +264,7 @@ fn test_delta_with_many_fields() {
         .unwrap();
     }
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     // All fields should be different (new IDs)
     assert!(!delta.is_empty());
@@ -294,7 +294,7 @@ fn test_delta_apply_preserves_display_name() {
 
     // Need to use same field ID for modification detection
     let mut target = old.clone();
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     // Apply should not change display name
     let _ = delta.apply(&mut target, 0);

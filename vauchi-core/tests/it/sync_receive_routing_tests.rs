@@ -84,7 +84,7 @@ fn encrypt_update(
     new_card: &ContactCard,
 ) -> Vec<u8> {
     let sender_identity = sender.identity().unwrap();
-    let mut delta = CardDelta::compute(old_card, new_card);
+    let mut delta = CardDelta::compute(old_card, new_card, 0);
     delta.sign(sender_identity, recipient_signing_pk);
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();

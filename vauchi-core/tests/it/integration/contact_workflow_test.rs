@@ -117,7 +117,7 @@ fn test_card_delta_workflow() {
         .unwrap();
 
     // Compute delta
-    let delta = CardDelta::compute(&old_card, &updated_card);
+    let delta = CardDelta::compute(&old_card, &updated_card, 0);
 
     // Should have multiple changes
     assert!(!delta.changes.is_empty());

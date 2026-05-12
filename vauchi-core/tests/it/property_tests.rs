@@ -555,7 +555,7 @@ mod extended_property_tests {
                         let _ = card.add_field(field);
                     }
 
-                    let delta = CardDelta::compute(&old_card, &card);
+                    let delta = CardDelta::compute(&old_card, &card, 0);
 
                     // Apply delta to a fresh copy
                     let mut verification_card = old_card.clone();
@@ -694,8 +694,8 @@ mod extended_property_tests {
                 card2.add_field(ContactField::new(FieldType::Custom, &label, &value2, 0)).unwrap();
 
                 // Compute delta twice
-                let delta1 = CardDelta::compute(&card1, &card2);
-                let delta2 = CardDelta::compute(&card1, &card2);
+                let delta1 = CardDelta::compute(&card1, &card2, 0);
+                let delta2 = CardDelta::compute(&card1, &card2, 0);
 
                 // Should be identical
                 prop_assert_eq!(delta1.changes.len(), delta2.changes.len());

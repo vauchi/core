@@ -173,7 +173,7 @@ fn test_display_name_change_passes_through_nobody_rules() {
     let old = ContactCard::new("Alice");
     let new = ContactCard::new("Alice Smith");
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
     let filtered = delta.filter_for_contact("bob", &rules);
 
     // Display name change should survive filtering
@@ -229,7 +229,7 @@ fn test_remove_rule_reverts_to_everyone_at_delta_level() {
     let mut new = ContactCard::new("Alice");
     let _ = new.add_field(email_field);
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     // Initially hidden
     let mut rules = VisibilityRules::new();
@@ -270,7 +270,7 @@ fn test_nobody_excludes_from_all_contacts() {
     let mut new = ContactCard::new("Alice");
     let _ = new.add_field(email_field);
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     let mut rules = VisibilityRules::new();
     rules.set_nobody(&email_id);

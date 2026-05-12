@@ -12,7 +12,7 @@ use vauchi_core::*;
 
 const SECRET_NOTE: &str = "SECRET NOTE DO NOT LEAK 7f3a9b2c";
 
-/// SECURITY: Proves that `CardDelta::compute()` strips private annotations
+/// SECURITY: Proves that `CardDelta::compute` strips private annotations
 /// from ContactField before placing them in `FieldChange::Added`.
 // @internal
 #[test]
@@ -24,7 +24,7 @@ fn test_card_delta_never_contains_field_notes() {
         .with_note(SECRET_NOTE.to_string());
     new_card.add_field(field).unwrap();
 
-    let delta = CardDelta::compute(&old_card, &new_card);
+    let delta = CardDelta::compute(&old_card, &new_card, 0);
 
     // Structural check: Added fields must have note stripped
     for change in &delta.changes {
@@ -32,7 +32,7 @@ fn test_card_delta_never_contains_field_notes() {
             assert!(
                 field.note().is_none(),
                 "SECURITY: Field note leaked in FieldChange::Added — \
-                 CardDelta::compute() must call strip_private()"
+                 CardDelta::compute must call strip_private()"
             );
         }
     }
@@ -62,7 +62,7 @@ fn test_filtered_delta_preserves_privacy() {
         .with_note(SECRET_NOTE.to_string());
     new_card.add_field(field).unwrap();
 
-    let delta = CardDelta::compute(&old_card, &new_card);
+    let delta = CardDelta::compute(&old_card, &new_card, 0);
 
     // filter_with that allows everything — notes must still be absent
     let filtered = delta.filter_with(|_field_id| true);

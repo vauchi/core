@@ -138,7 +138,7 @@ fn test_field_modification_and_removal_propagation() {
         ))
         .unwrap();
 
-        let delta = CardDelta::compute(&old, &new);
+        let delta = CardDelta::compute(&old, &new, 0);
 
         assert!(!delta.is_empty());
         assert!(
@@ -168,7 +168,7 @@ fn test_field_modification_and_removal_propagation() {
             .unwrap();
         let new = card;
 
-        let delta = CardDelta::compute(&old, &new);
+        let delta = CardDelta::compute(&old, &new, 0);
 
         assert!(!delta.is_empty());
         assert!(
@@ -189,7 +189,7 @@ fn test_field_modification_and_removal_propagation() {
 
         let new = ContactCard::new("Alice");
 
-        let delta = CardDelta::compute(&old, &new);
+        let delta = CardDelta::compute(&old, &new, 0);
 
         assert!(!delta.is_empty());
         assert!(

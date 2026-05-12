@@ -117,8 +117,10 @@ impl CardDelta {
     /// Computes the delta between two card states.
     ///
     /// Returns a delta containing all changes needed to transform
-    /// `old` into `new`.
-    pub fn compute(old: &ContactCard, new: &ContactCard) -> Self {
+    /// `old` into `new`. `now` stamps the delta's `timestamp` field —
+    /// production callers source it from `Vauchi::clock` /
+    /// `Storage::clock`; tests pin a deterministic value.
+    pub fn compute(old: &ContactCard, new: &ContactCard, now: u64) -> Self {
         let mut changes = Vec::new();
 
         // Check display name change
@@ -165,8 +167,6 @@ impl CardDelta {
                 });
             }
         }
-
-        let now = crate::clock::ambient_now_secs();
 
         // Generate random nonce for replay detection
         let nonce: [u8; 32] = crate::crypto::random_bytes();

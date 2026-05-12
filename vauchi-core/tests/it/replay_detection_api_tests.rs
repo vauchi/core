@@ -63,7 +63,7 @@ fn create_encrypted_update(
         .add_field(ContactField::new(FieldType::Email, "work", email, 0))
         .unwrap();
 
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     delta.sign(bob_identity, recipient_pk);
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
@@ -116,7 +116,7 @@ fn test_replay_rejects_reused_nonce_different_encryption() {
     new_card
         .add_field(ContactField::new(FieldType::Email, "work", "bob@v2.com", 0))
         .unwrap();
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     delta.sign(&bob_identity, alice_pk);
     let saved_nonce = delta.nonce;
     let saved_timestamp = delta.timestamp;
@@ -141,7 +141,7 @@ fn test_replay_rejects_reused_nonce_different_encryption() {
     new_card2
         .add_field(ContactField::new(FieldType::Email, "work", "bob@v3.com", 0))
         .unwrap();
-    let mut delta2 = CardDelta::compute(&old_card, &new_card2);
+    let mut delta2 = CardDelta::compute(&old_card, &new_card2, 0);
     delta2.sign(&bob_identity, alice_pk);
     // Overwrite nonce and timestamp to match the first delta (replay attack)
     delta2.nonce = saved_nonce;

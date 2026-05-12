@@ -499,7 +499,7 @@ fn test_process_incoming_card_update() {
         0,
     ));
 
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     let alice_pk = alice_wb.identity().unwrap().signing_public_key();
     delta.sign(&bob_identity, alice_pk);
 
@@ -699,7 +699,7 @@ fn test_process_update_rejects_invalid_signature() {
         0,
     ));
 
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     let alice_pk = alice_wb.identity().unwrap().signing_public_key();
     delta.sign(&wrong_identity, alice_pk); // WRONG signature!
 

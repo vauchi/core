@@ -463,7 +463,7 @@ impl Vauchi {
 
         // Compute a "full card" delta from an empty card
         let empty_card = ContactCard::new(own_card.display_name());
-        let delta = CardDelta::compute(&empty_card, &own_card);
+        let delta = CardDelta::compute(&empty_card, &own_card, self.clock.unix_seconds());
         if delta.is_empty() {
             return Ok(());
         }

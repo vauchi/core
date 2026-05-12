@@ -128,7 +128,7 @@ impl<'a> SyncManager<'a> {
         new_card: &ContactCard,
     ) -> Result<String, SyncError> {
         // Compute delta
-        let mut delta = CardDelta::compute(old_card, new_card);
+        let mut delta = CardDelta::compute(old_card, new_card, self.storage.clock().unix_seconds());
 
         if delta.changes.is_empty() {
             return Err(SyncError::NoChanges);

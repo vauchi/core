@@ -141,7 +141,7 @@ impl Vauchi {
         }
 
         // Compute delta
-        let delta = CardDelta::compute(old_card, new_card);
+        let delta = CardDelta::compute(old_card, new_card, self.clock.unix_seconds());
         if delta.is_empty() {
             return Err(VauchiError::InvalidState("empty delta".into()));
         }
@@ -434,7 +434,7 @@ impl Vauchi {
             let cek = ContentEncryptionKey::generate();
 
             // Create a no-op delta (empty changes — just carries the CEK)
-            let mut delta = CardDelta::compute(&own_card, &own_card);
+            let mut delta = CardDelta::compute(&own_card, &own_card, self.clock.unix_seconds());
             // Force a nonce so the delta is processable even with no changes
             let Some(recipient_pk) = contact.public_key() else {
                 continue; // Skip imported contacts

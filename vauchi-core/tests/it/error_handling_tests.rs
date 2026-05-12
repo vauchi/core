@@ -208,7 +208,7 @@ fn test_delta_signature_rejects_wrong_signer() {
         ))
         .unwrap();
 
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     let recipient_pk = &[0u8; 32];
 
     // Alice signs the delta
@@ -247,7 +247,7 @@ fn test_delta_signature_rejects_tampered_delta() {
         ))
         .unwrap();
 
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     let recipient_pk = &[0u8; 32];
 
     // Alice signs the delta
@@ -334,7 +334,7 @@ fn test_contact_roundtrip_preserves_data() {
 fn test_empty_delta_when_cards_identical() {
     let card = ContactCard::new("Test");
 
-    let delta = CardDelta::compute(&card, &card.clone());
+    let delta = CardDelta::compute(&card, &card.clone(), 0);
 
     assert!(
         delta.is_empty(),

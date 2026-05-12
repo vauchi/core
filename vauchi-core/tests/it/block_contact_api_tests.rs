@@ -193,7 +193,7 @@ fn test_blocked_contact_update_rejected() {
             0,
         ))
         .unwrap();
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     let alice_pk = alice.identity().unwrap().signing_public_key();
     delta.sign(&bob_identity, alice_pk);
     let delta_bytes = serde_json::to_vec(&delta).unwrap();

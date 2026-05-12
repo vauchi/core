@@ -94,7 +94,7 @@ fn create_valid_update(
 ) -> Vec<u8> {
     let bob_identity = bob_wb.identity().unwrap();
 
-    let mut delta = CardDelta::compute(old_card, new_card);
+    let mut delta = CardDelta::compute(old_card, new_card, 0);
     delta.sign(bob_identity, alice_signing_pk);
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
@@ -384,7 +384,7 @@ fn test_signature_invalid_rejected() {
         .unwrap();
 
     let bob_identity = bob_wb.identity().unwrap();
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
 
     // Sign with wrong recipient pk (random bytes)
     let wrong_recipient_pk = [0xABu8; 32];
@@ -487,7 +487,7 @@ fn test_replay_detected() {
         ))
         .unwrap();
 
-    let mut delta2 = CardDelta::compute(&old_card, &new_card2);
+    let mut delta2 = CardDelta::compute(&old_card, &new_card2, 0);
     delta2.nonce = test_nonce;
     delta2.sign(bob_identity, &alice_signing_pk);
 
@@ -615,7 +615,7 @@ fn test_decode_versioned_payload_cek_wrapped() {
     let old_card = ContactCard::new("Bob");
     let new_card = ContactCard::new("Bob CEK");
 
-    let mut delta = CardDelta::compute(&old_card, &new_card);
+    let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     delta.sign(bob_identity, &alice_signing_pk);
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();

@@ -14,7 +14,7 @@ use vauchi_core::*;
 #[test]
 fn test_delta_compute_no_changes() {
     let card = ContactCard::new("Alice");
-    let delta = CardDelta::compute(&card, &card);
+    let delta = CardDelta::compute(&card, &card, 0);
 
     assert!(delta.is_empty());
 }
@@ -26,7 +26,7 @@ fn test_delta_compute_display_name_change() {
     let old = ContactCard::new("Alice");
     let new = ContactCard::new("Alice Smith");
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     assert_eq!(delta.changes.len(), 1);
     assert!(matches!(
@@ -49,7 +49,7 @@ fn test_delta_compute_field_added() {
         0,
     ));
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     assert_eq!(delta.changes.len(), 1);
     assert!(matches!(&delta.changes[0], FieldChange::Added { .. }));
@@ -74,7 +74,7 @@ fn test_delta_compute_field_modified() {
         0,
     ));
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     // The field IDs are generated, so both have different IDs
     // This will show as added + removed rather than modified
@@ -93,7 +93,7 @@ fn test_delta_compute_field_removed() {
 
     let new = ContactCard::new("Alice");
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     assert_eq!(delta.changes.len(), 1);
     assert!(matches!(
@@ -194,7 +194,7 @@ fn test_delta_roundtrip() {
         0,
     ));
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     // Apply to a copy of old
     let mut result = old.clone();
@@ -213,7 +213,7 @@ fn test_delta_sign_and_verify() {
     let old = ContactCard::new("Alice");
     let new = ContactCard::new("Alice Smith");
 
-    let mut delta = CardDelta::compute(&old, &new);
+    let mut delta = CardDelta::compute(&old, &new, 0);
     let recipient_pk = &[0u8; 32];
     delta.sign(&identity, recipient_pk);
 
@@ -244,7 +244,7 @@ fn test_delta_signature_binds_sender_and_recipient() {
     let new = ContactCard::new("Alice Updated");
 
     // Alice signs delta for Bob
-    let mut delta = CardDelta::compute(&old, &new);
+    let mut delta = CardDelta::compute(&old, &new, 0);
     delta.sign(&alice, bob.signing_public_key());
 
     // Verifies correctly for Alice → Bob
@@ -279,7 +279,7 @@ fn test_delta_serialization_roundtrip() {
         0,
     ));
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     let json = serde_json::to_string(&delta).unwrap();
     let restored: CardDelta = serde_json::from_str(&json).unwrap();
@@ -306,7 +306,7 @@ fn test_delta_multiple_changes() {
         0,
     ));
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     // Should have: DisplayNameChanged, Removed (email), Added (phone)
     assert_eq!(delta.changes.len(), 3);
@@ -350,7 +350,7 @@ fn test_delta_filter_for_contact_all_visible() {
         0,
     ));
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
     let rules = VisibilityRules::new(); // Default: everyone can see all
 
     let filtered = delta.filter_for_contact("bob", &rules);
@@ -377,7 +377,7 @@ fn test_delta_filter_for_contact_some_hidden() {
         0,
     ));
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     // Hide email from Bob
     let mut rules = VisibilityRules::new();
@@ -405,7 +405,7 @@ fn test_delta_filter_for_contact_restricted_access() {
     let email_id = email_field.id().to_string();
     let _ = new.add_field(email_field);
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     // Email only visible to specific contacts
     let mut rules = VisibilityRules::new();
@@ -431,7 +431,7 @@ fn test_delta_filter_display_name_always_visible() {
     let old = ContactCard::new("Alice");
     let new = ContactCard::new("Alice Smith");
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
     let rules = VisibilityRules::new();
 
     let filtered = delta.filter_for_contact("bob", &rules);
@@ -474,7 +474,7 @@ fn test_filter_with_allows_matching_fields() {
         );
     }
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
     // Both fields should be detected as modified
     let change_count = delta.changes.len();
     assert!(
@@ -517,7 +517,7 @@ fn test_filter_with_always_includes_display_name() {
     let old = ContactCard::new("Alice");
     let new = ContactCard::new("Alice Smith");
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
     assert_eq!(delta.changes.len(), 1);
 
     // Filter that rejects everything — display name should still pass
@@ -554,7 +554,7 @@ fn test_filter_with_handles_added_and_removed() {
         "new should have 1 field after removal"
     );
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
     eprintln!("Delta changes: {:?}", delta.changes);
     assert_eq!(
         delta.changes.len(),
@@ -591,7 +591,7 @@ fn test_unsigned_delta_rejected_by_verify() {
     let new = ContactCard::new("Alice Updated");
 
     // Create delta but do NOT sign it — signature is [0u8; 64]
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
     assert_eq!(
         delta.signature, [0u8; 64],
         "Unsigned delta should have zero signature"
@@ -622,7 +622,7 @@ fn test_card_delta_with_validation_summary_roundtrip() {
         0,
     ));
 
-    let mut delta = CardDelta::compute(&old, &new);
+    let mut delta = CardDelta::compute(&old, &new, 0);
 
     // Attach validation summary
     let mut summary = HashMap::new();
@@ -681,7 +681,7 @@ fn test_card_delta_none_summary_not_serialized() {
     let old = ContactCard::new("Alice");
     let new = ContactCard::new("Alice Updated");
 
-    let delta = CardDelta::compute(&old, &new);
+    let delta = CardDelta::compute(&old, &new, 0);
 
     // By default, validation_summary should be None
     assert!(
@@ -711,7 +711,7 @@ fn test_card_delta_filter_preserves_validation_summary() {
     let email_id = email_field.id().to_string();
     let _ = new.add_field(email_field);
 
-    let mut delta = CardDelta::compute(&old, &new);
+    let mut delta = CardDelta::compute(&old, &new, 0);
 
     // Attach validation summary
     let mut summary = HashMap::new();
@@ -770,7 +770,7 @@ fn test_card_delta_validation_summary_multiple_fields() {
     let old = ContactCard::new("Carol");
     let new = ContactCard::new("Carol Updated");
 
-    let mut delta = CardDelta::compute(&old, &new);
+    let mut delta = CardDelta::compute(&old, &new, 0);
     delta.validation_summary = Some(summary);
 
     let json = serde_json::to_string(&delta).expect("serialize");

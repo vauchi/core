@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use std::time::{Duration, Instant};
 use vauchi_core::exchange::multistage::session::AudioStateError;
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::{AudioProximityState, ProtocolState};
@@ -372,4 +373,84 @@ fn test_audio_proximity_listening_self_transition_rejected() {
         s.set_audio_proximity(AudioProximityState::Listening)
             .is_err()
     );
+}
+
+// ── Audio-listen timeout (Phase 1.C.6/7) ───────────────────────────
+//
+// RED tests for Phase 1.C.6 of
+// `_private/docs/planning/todo/2026-05-11-hover-graduation-plan.md`.
+// `set_audio_proximity(Listening)` opens a listen window with a
+// fixed budget (`Self::AUDIO_LISTEN_TIMEOUT`). If no audio response
+// arrives within that budget the session must transition to
+// `Failed` so the renderer can surface "Couldn't confirm devices
+// are close" (Hover problem record G1.3) instead of leaving the
+// user staring at a Listening spinner forever.
+//
+// The check runs against an injected `Instant` per the project's
+// CC-06 "no real-time waits" rule — tests offset against
+// `Instant::now()` rather than sleeping.
+//
+// All three tests are compile-RED: `check_and_apply_audio_timeout`
+// doesn't exist yet (Phase 1.C.7 GREEN adds it).
+
+// @internal
+#[test]
+fn audio_timeout_transitions_listening_to_failed_after_budget() {
+    let mut s = MultiStageSession::new(b"card".to_vec());
+    let entered = Instant::now();
+    s.set_audio_proximity(AudioProximityState::Listening)
+        .unwrap();
+
+    // Listen budget is 5s (mirror of the platform-layer
+    // AUDIO_LISTEN_TIMEOUT_MS constant). Past the deadline → Failed.
+    let after = entered + Duration::from_secs(6);
+    let fired = s
+        .check_and_apply_audio_timeout(after)
+        .expect("timeout check must succeed on a Listening session");
+    assert!(fired, "timeout past 5s budget must fire Listening → Failed");
+    assert_eq!(s.audio_proximity(), AudioProximityState::Failed);
+}
+
+// @internal
+#[test]
+fn audio_timeout_no_op_before_budget() {
+    let mut s = MultiStageSession::new(b"card".to_vec());
+    let entered = Instant::now();
+    s.set_audio_proximity(AudioProximityState::Listening)
+        .unwrap();
+
+    // Before deadline → no transition, still Listening.
+    let early = entered + Duration::from_secs(3);
+    let fired = s
+        .check_and_apply_audio_timeout(early)
+        .expect("timeout check must succeed on a Listening session");
+    assert!(!fired, "timeout check before 5s must NOT fire");
+    assert_eq!(s.audio_proximity(), AudioProximityState::Listening);
+}
+
+// @internal
+#[test]
+fn audio_timeout_no_op_when_not_listening() {
+    // Pending → check is a no-op (no listen window open).
+    let mut s = MultiStageSession::new(b"card".to_vec());
+    let after = Instant::now() + Duration::from_secs(60);
+    let fired = s
+        .check_and_apply_audio_timeout(after)
+        .expect("timeout check on non-Listening session must succeed");
+    assert!(!fired, "Pending must not transition to Failed via timeout");
+    assert_eq!(s.audio_proximity(), AudioProximityState::Pending);
+
+    // Confirmed → also a no-op (handshake already verified, no
+    // window to close).
+    let mut s2 = MultiStageSession::new(b"card".to_vec());
+    s2.set_audio_proximity(AudioProximityState::Listening)
+        .unwrap();
+    s2.set_audio_proximity(AudioProximityState::Confirmed)
+        .unwrap();
+    let later = Instant::now() + Duration::from_secs(60);
+    let fired = s2
+        .check_and_apply_audio_timeout(later)
+        .expect("timeout check on Confirmed must succeed");
+    assert!(!fired, "Confirmed must not regress via timeout");
+    assert_eq!(s2.audio_proximity(), AudioProximityState::Confirmed);
 }

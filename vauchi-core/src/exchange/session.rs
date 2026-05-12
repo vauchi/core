@@ -8,6 +8,7 @@
 //! key agreement and card exchange.
 
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use super::ble_handshake::BleHandshakeSession;
@@ -185,6 +186,13 @@ pub struct ExchangeSession {
     confirmation_our_slot: Option<String>,
     /// Their confirmation escrow slot hash.
     confirmation_their_slot: Option<String>,
+    /// Clock for stamping timestamps on peer-card field constructions
+    /// during BLE phase 4 (and future migrations of the remaining
+    /// session-internal `ambient_now_secs` reads). Defaults to
+    /// `crate::clock::SystemClock::shared()` in every `new_*` constructor;
+    /// tests can override via `with_clock(...)` after construction.
+    /// Phase 1 / Task 1.1 / Step 3b structural pass.
+    clock: Arc<dyn crate::clock::Clock>,
 }
 
 // Compile-time assertion: ExchangeSession must be Send + Sync because
@@ -246,6 +254,7 @@ impl ExchangeSession {
             confirmation_gate_hash: None,
             confirmation_our_slot: None,
             confirmation_their_slot: None,
+            clock: crate::clock::SystemClock::shared(),
         }
     }
 
@@ -289,6 +298,7 @@ impl ExchangeSession {
             confirmation_gate_hash: None,
             confirmation_our_slot: None,
             confirmation_their_slot: None,
+            clock: crate::clock::SystemClock::shared(),
         }
     }
 
@@ -337,6 +347,7 @@ impl ExchangeSession {
             confirmation_gate_hash: None,
             confirmation_our_slot: None,
             confirmation_their_slot: None,
+            clock: crate::clock::SystemClock::shared(),
         }
     }
 
@@ -395,6 +406,7 @@ impl ExchangeSession {
             confirmation_gate_hash: None,
             confirmation_our_slot: None,
             confirmation_their_slot: None,
+            clock: crate::clock::SystemClock::shared(),
         }
     }
 
@@ -449,6 +461,7 @@ impl ExchangeSession {
             confirmation_gate_hash: None,
             confirmation_our_slot: None,
             confirmation_their_slot: None,
+            clock: crate::clock::SystemClock::shared(),
         }
     }
 
@@ -511,6 +524,16 @@ impl ExchangeSession {
     }
 
     /// Returns the transport mechanism.
+    /// Replaces the session's clock — for deterministic tests.
+    ///
+    /// Defaults to `crate::clock::SystemClock::shared()` from every
+    /// `new_*` constructor; tests can override post-construction.
+    /// Phase 1 / Task 1.1 / Step 3b structural pass (initial seam).
+    pub fn with_clock(mut self, clock: Arc<dyn crate::clock::Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
     pub fn transport(&self) -> ExchangeTransport {
         self.transport
     }
@@ -1179,7 +1202,7 @@ impl ExchangeSession {
                 crate::contact_card::FieldType::Custom,
                 label,
                 value,
-                crate::clock::ambient_now_secs(),
+                self.clock.unix_seconds(),
             )) {
                 tracing::warn!(
                     error = %e,

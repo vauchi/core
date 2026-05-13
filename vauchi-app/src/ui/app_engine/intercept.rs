@@ -871,7 +871,9 @@ impl AppEngine {
                 // (rapid double-tap) overwrite — acceptable for a fake list.
                 let id = format!(
                     "decoy-{}",
-                    std::time::SystemTime::now()
+                    self.vauchi
+                        .clock()
+                        .now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .map(|d| d.as_millis())
                         .unwrap_or(0)

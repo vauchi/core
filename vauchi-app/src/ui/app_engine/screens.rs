@@ -245,12 +245,15 @@ impl AppEngine {
                         .load_backup_reminder_state()
                         .map(|s| s.frequency.label().to_string())
                         .unwrap_or_else(|_| "Weekly".to_string()),
-                    last_backup_display: vauchi
-                        .load_backup_reminder_state()
-                        .ok()
-                        .and_then(|s| s.last_backup_timestamp)
-                        .map(format_relative_time)
-                        .unwrap_or_else(|| "Never".to_string()),
+                    last_backup_display: {
+                        let now = vauchi.clock().unix_seconds();
+                        vauchi
+                            .load_backup_reminder_state()
+                            .ok()
+                            .and_then(|s| s.last_backup_timestamp)
+                            .map(|t| format_relative_time(now, t))
+                            .unwrap_or_else(|| "Never".to_string())
+                    },
                 };
                 Box::new(SettingsEngine::new(config))
             }
@@ -525,10 +528,7 @@ impl AppEngine {
             AppScreen::More => Box::new(MoreEngine::new()),
             AppScreen::ActivityLog => {
                 use crate::notification_types::ActivityLogEntry;
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
+                let now = vauchi.clock().unix_seconds();
                 let rows = vauchi
                     .storage()
                     .activity_log_query_recent(now, 7 * 86400)
@@ -1331,11 +1331,7 @@ fn contact_row_actions(is_imported: bool, is_hidden: bool) -> Vec<ListItemAction
 }
 
 /// Format a Unix timestamp as a human-readable relative time string.
-fn format_relative_time(timestamp: u64) -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+fn format_relative_time(now: u64, timestamp: u64) -> String {
     let delta = now.saturating_sub(timestamp);
     let days = delta / (24 * 60 * 60);
     if days == 0 {

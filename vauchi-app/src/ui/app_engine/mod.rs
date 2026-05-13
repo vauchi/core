@@ -18,7 +18,6 @@ pub use navigation::TabLayout;
 
 use std::collections::HashMap;
 use std::sync::mpsc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
@@ -412,10 +411,7 @@ impl AppEngine {
         let registry = vauchi_core::social::SocialNetworkRegistry::with_defaults();
         let field_catalog = vauchi_core::contact_card::FieldTypeCatalog::new(&registry);
 
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = vauchi.clock().unix_seconds();
 
         // Register a permanent event handler that sends VauchiEvents to a channel
         // for deferred persistence to the activity log (ADR-031).
@@ -589,16 +585,9 @@ impl AppEngine {
     ///
     /// Evaluates the policy against the current `APP_COMPAT_VERSION` and
     /// resets the dismissed flag if an update becomes required.
-    /// Current time as unix seconds — factored out for testability.
-    fn now_secs() -> u64 {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs()
-    }
-
     pub fn set_version_policy(&mut self, policy: &VersionPolicy) {
-        self.update_status = policy.evaluate(APP_COMPAT_VERSION, Self::now_secs());
+        self.update_status =
+            policy.evaluate(APP_COMPAT_VERSION, self.vauchi.clock().unix_seconds());
         if matches!(self.update_status, AppUpdateStatus::UpdateRequired { .. }) {
             self.update_dismissed = false;
         }
@@ -1168,10 +1157,7 @@ impl AppEngine {
     pub fn poll_notifications(&mut self) -> Vec<PendingNotification> {
         self.drain_events_to_log();
 
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = self.vauchi.clock().unix_seconds();
 
         // Fetch raw rows from the activity log since the last poll.
         let rows = match self.vauchi.activity_log_poll(self.last_poll_time, now) {
@@ -1268,10 +1254,7 @@ impl AppEngine {
             return Vec::new();
         }
 
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = self.vauchi.clock().unix_seconds();
 
         match ActivityLogWriter::write(self.vauchi.storage(), &events, now) {
             Ok(entries) => entries,

@@ -644,7 +644,7 @@ fn test_bundled_themes_always_available() {
         ..Default::default()
     };
 
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     // When the user views available themes
     let bundled = all_themes();

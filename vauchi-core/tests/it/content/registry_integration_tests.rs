@@ -37,7 +37,7 @@ fn test_config(temp: &TempDir) -> ContentConfig {
 fn test_registry_from_content_manager_bundled() {
     let temp = TempDir::new().unwrap();
     let config = test_config(&temp);
-    let content = ContentManager::new(config).unwrap();
+    let content = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     let registry = registry_from_content_manager(&content);
 
@@ -69,7 +69,7 @@ fn test_registry_from_content_manager_cached() {
         .unwrap();
 
     let config = test_config(&temp);
-    let content = ContentManager::new(config).unwrap();
+    let content = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     let registry = registry_from_content_manager(&content);
 
@@ -85,7 +85,7 @@ fn test_registry_from_content_manager_cached() {
 fn test_registry_generates_urls() {
     let temp = TempDir::new().unwrap();
     let config = test_config(&temp);
-    let content = ContentManager::new(config).unwrap();
+    let content = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     let registry = registry_from_content_manager(&content);
 
@@ -102,7 +102,8 @@ fn test_new_network_after_cache_update() {
 
     // Initially use bundled (no cache)
     let config = test_config(&temp);
-    let content1 = ContentManager::new(config.clone()).unwrap();
+    let content1 =
+        ContentManager::new(config.clone(), vauchi_core::clock::SystemClock::shared()).unwrap();
     let registry1 = registry_from_content_manager(&content1);
 
     // "newnetwork" should not exist in bundled
@@ -125,7 +126,7 @@ fn test_new_network_after_cache_update() {
         .unwrap();
 
     // Create new manager to pick up cache
-    let content2 = ContentManager::new(config).unwrap();
+    let content2 = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
     let registry2 = registry_from_content_manager(&content2);
 
     // Now "newnetwork" should exist
@@ -157,7 +158,7 @@ fn test_updated_url_template() {
         .unwrap();
 
     let config = test_config(&temp);
-    let content = ContentManager::new(config).unwrap();
+    let content = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
     let registry = registry_from_content_manager(&content);
 
     // Should use updated URL

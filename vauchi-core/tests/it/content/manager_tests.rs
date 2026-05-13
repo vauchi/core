@@ -29,7 +29,7 @@ fn test_config(temp: &TempDir) -> ContentConfig {
 fn test_manager_new_creates_cache() {
     let temp = TempDir::new().unwrap();
     let config = test_config(&temp);
-    let _manager = ContentManager::new(config).unwrap();
+    let _manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     assert!(temp.path().join("content").exists());
 }
@@ -39,7 +39,7 @@ fn test_manager_new_creates_cache() {
 fn test_manager_returns_bundled_networks_when_cache_empty() {
     let temp = TempDir::new().unwrap();
     let config = test_config(&temp);
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     let networks = manager.networks();
     // Should return bundled networks (not empty)
@@ -67,7 +67,7 @@ fn test_manager_returns_cached_networks_over_bundled() {
         )
         .unwrap();
 
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
     let networks = manager.networks();
 
     // Should return cached networks (1 custom network)
@@ -84,7 +84,7 @@ fn test_manager_update_check_disabled() {
         remote_updates_enabled: false,
         ..Default::default()
     };
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     let status = manager.check_for_updates_sync();
     assert!(matches!(status, UpdateStatus::Disabled));
@@ -107,7 +107,7 @@ fn test_manager_should_check_respects_interval() {
         .set_last_check_time(std::time::SystemTime::now())
         .unwrap();
 
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     // Should not check (interval not elapsed)
     assert!(!manager.should_check_now());
@@ -123,7 +123,7 @@ fn test_manager_should_check_when_never_checked() {
         check_interval: Duration::from_secs(3600),
         ..Default::default()
     };
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     // Should check (never checked before)
     assert!(manager.should_check_now());
@@ -145,7 +145,7 @@ fn test_manager_should_check_when_interval_elapsed() {
     let two_secs_ago = std::time::SystemTime::now() - Duration::from_secs(2);
     cache.set_last_check_time(two_secs_ago).unwrap();
 
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     // Should check (interval elapsed)
     assert!(manager.should_check_now());
@@ -156,7 +156,7 @@ fn test_manager_should_check_when_interval_elapsed() {
 fn test_manager_get_locale_returns_bundled_english() {
     let temp = TempDir::new().unwrap();
     let config = test_config(&temp);
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     let locale = manager.locale("en");
     // English should always be available as bundled
@@ -168,7 +168,7 @@ fn test_manager_get_locale_returns_bundled_english() {
 fn test_manager_get_locale_unknown_returns_none() {
     let temp = TempDir::new().unwrap();
     let config = test_config(&temp);
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     let locale = manager.locale("xx"); // Unknown language
     assert!(locale.is_none());
@@ -179,7 +179,7 @@ fn test_manager_get_locale_unknown_returns_none() {
 fn test_manager_help_returns_none_when_cache_empty() {
     let temp = TempDir::new().unwrap();
     let config = test_config(&temp);
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     // No bundled help content; should return None
     let help = manager.help("en");
@@ -201,7 +201,7 @@ fn test_manager_help_returns_cached_content() {
         .save_content(ContentType::Help, "en.json", help_data, &checksum)
         .unwrap();
 
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
     let help = manager.help("en");
 
     assert!(help.is_some(), "expected Some value");
@@ -215,7 +215,7 @@ fn test_manager_help_returns_cached_content() {
 fn test_manager_help_unknown_language_returns_none() {
     let temp = TempDir::new().unwrap();
     let config = test_config(&temp);
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     let help = manager.help("zz");
     assert!(help.is_none());
@@ -226,7 +226,7 @@ fn test_manager_help_unknown_language_returns_none() {
 fn test_manager_themes_returns_default_when_cache_empty() {
     let temp = TempDir::new().unwrap();
     let config = test_config(&temp);
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     let themes = manager.themes();
     assert_eq!(themes.len(), 1, "Should return single default theme");
@@ -238,7 +238,7 @@ fn test_manager_themes_returns_default_when_cache_empty() {
 fn test_manager_themes_returns_cached_themes() {
     let temp = TempDir::new().unwrap();
     let config = test_config(&temp);
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     // Populate cache with themes.json
     let themes_json = r##"[
@@ -267,7 +267,7 @@ fn test_manager_themes_returns_cached_themes() {
 fn test_manager_record_check_time() {
     let temp = TempDir::new().unwrap();
     let config = test_config(&temp);
-    let manager = ContentManager::new(config).unwrap();
+    let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     // Record check time
     manager.record_check_time().unwrap();

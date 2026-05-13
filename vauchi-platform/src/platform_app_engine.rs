@@ -5020,7 +5020,7 @@ impl PlatformAppEngine {
             ..Default::default()
         };
 
-        let manager = match ContentManager::new(config) {
+        let manager = match ContentManager::new(config, vauchi_core::clock::SystemClock::shared()) {
             Ok(m) => m,
             Err(e) => {
                 return MobileUpdateStatus::CheckFailed {
@@ -5055,7 +5055,7 @@ impl PlatformAppEngine {
             ..Default::default()
         };
 
-        let manager = match ContentManager::new(config) {
+        let manager = match ContentManager::new(config, vauchi_core::clock::SystemClock::shared()) {
             Ok(m) => m,
             Err(e) => {
                 return MobileApplyResult::Error {

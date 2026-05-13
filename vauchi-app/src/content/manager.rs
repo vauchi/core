@@ -11,8 +11,9 @@
 //! - Remote content (fetched on demand)
 
 use std::collections::HashMap;
-use std::time::SystemTime;
+use std::sync::Arc;
 use thiserror::Error;
+use vauchi_core::clock::Clock;
 
 use super::cache::{CacheError, ContentCache};
 use super::config::ContentConfig;
@@ -57,13 +58,18 @@ pub enum ApplyResult {
 pub struct ContentManager {
     config: ContentConfig,
     cache: ContentCache,
+    clock: Arc<dyn Clock>,
 }
 
 impl ContentManager {
     /// Create a new ContentManager
-    pub fn new(config: ContentConfig) -> Result<Self, ContentError> {
+    pub fn new(config: ContentConfig, clock: Arc<dyn Clock>) -> Result<Self, ContentError> {
         let cache = ContentCache::new(&config.storage_path)?;
-        Ok(Self { config, cache })
+        Ok(Self {
+            config,
+            cache,
+            clock,
+        })
     }
 
     /// Get social networks (cached → bundled)
@@ -136,7 +142,9 @@ impl ContentManager {
             return true;
         };
 
-        let elapsed = SystemTime::now()
+        let elapsed = self
+            .clock
+            .now()
             .duration_since(last_check)
             .unwrap_or_default();
 
@@ -145,7 +153,7 @@ impl ContentManager {
 
     /// Record that an update check was performed
     pub fn record_check_time(&self) -> Result<(), ContentError> {
-        self.cache.set_last_check_time(SystemTime::now())?;
+        self.cache.set_last_check_time(self.clock.now())?;
         Ok(())
     }
 

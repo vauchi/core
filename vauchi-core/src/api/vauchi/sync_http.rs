@@ -331,15 +331,18 @@ impl Vauchi {
         // 4. Send ACK envelopes — best-effort, transport failures don't fail
         //    the receive cycle.
         for outcome in &outcomes {
-            let ack_envelope = create_envelope(MessagePayload::Acknowledgment(Acknowledgment {
-                message_id: outcome.message_id.clone(),
-                status: if outcome.decrypted {
-                    AckStatus::ReceivedByRecipient
-                } else {
-                    AckStatus::Stored // best-effort ACK for undecryptable
-                },
-                error: None,
-            }));
+            let ack_envelope = create_envelope(
+                MessagePayload::Acknowledgment(Acknowledgment {
+                    message_id: outcome.message_id.clone(),
+                    status: if outcome.decrypted {
+                        AckStatus::ReceivedByRecipient
+                    } else {
+                        AckStatus::Stored // best-effort ACK for undecryptable
+                    },
+                    error: None,
+                }),
+                self.clock.unix_seconds(),
+            );
             let _ = adapter.send(&ack_envelope);
         }
 
@@ -371,8 +374,10 @@ impl Vauchi {
 
         // Register each batch with the adapter
         for tokens in batches {
-            let envelope =
-                create_envelope(MessagePayload::RegisterMailbox(RegisterMailbox { tokens }));
+            let envelope = create_envelope(
+                MessagePayload::RegisterMailbox(RegisterMailbox { tokens }),
+                self.clock.unix_seconds(),
+            );
             adapter.send(&envelope).map_err(VauchiError::Network)?;
         }
 

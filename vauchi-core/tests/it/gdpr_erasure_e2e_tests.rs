@@ -285,7 +285,11 @@ impl MockPurgeSender {
 }
 
 impl PurgeSender for MockPurgeSender {
-    fn send_purge(&mut self, _purge: &PreSignedPurgeRequest) -> Result<bool, ShredError> {
+    fn send_purge(
+        &mut self,
+        _purge: &PreSignedPurgeRequest,
+        _now: u64,
+    ) -> Result<bool, ShredError> {
         self.purge_sent = true;
         Ok(true)
     }
@@ -308,7 +312,11 @@ impl MockRevocationSender {
 }
 
 impl RevocationSender for MockRevocationSender {
-    fn send_revocation(&mut self, revocation: &IdentityRevoked) -> Result<bool, ShredError> {
+    fn send_revocation(
+        &mut self,
+        revocation: &IdentityRevoked,
+        _now: u64,
+    ) -> Result<bool, ShredError> {
         self.recipient_ids.push(revocation.recipient_id.clone());
         Ok(true)
     }

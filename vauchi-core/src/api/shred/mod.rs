@@ -29,7 +29,7 @@ pub trait PurgeSender {
     /// Returns `Ok(true)` if the relay acknowledged the purge,
     /// `Ok(false)` if the request was sent but not confirmed,
     /// or `Err` if sending failed entirely.
-    fn send_purge(&mut self, purge: &PreSignedPurgeRequest) -> Result<bool, ShredError>;
+    fn send_purge(&mut self, purge: &PreSignedPurgeRequest, now: u64) -> Result<bool, ShredError>;
 }
 
 /// Trait for sending identity revocation messages to contacts during shred.
@@ -45,6 +45,7 @@ pub trait RevocationSender {
     fn send_revocation(
         &mut self,
         revocation: &crate::network::IdentityRevoked,
+        now: u64,
     ) -> Result<bool, ShredError>;
 }
 
@@ -411,7 +412,11 @@ mod tests {
     }
 
     impl PurgeSender for MockPurgeSender {
-        fn send_purge(&mut self, _purge: &PreSignedPurgeRequest) -> Result<bool, ShredError> {
+        fn send_purge(
+            &mut self,
+            _purge: &PreSignedPurgeRequest,
+            _now: u64,
+        ) -> Result<bool, ShredError> {
             if self.should_fail {
                 return Err(ShredError::FileError("mock purge failure".into()));
             }
@@ -523,6 +528,7 @@ mod tests {
         fn send_revocation(
             &mut self,
             revocation: &crate::network::IdentityRevoked,
+            _now: u64,
         ) -> Result<bool, ShredError> {
             if self.should_fail {
                 return Err(ShredError::FileError("mock revocation failure".into()));

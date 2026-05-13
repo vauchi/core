@@ -187,21 +187,24 @@ impl LegacyExchangeMessage {
 }
 
 /// Create a new simple envelope with fresh ID and timestamp.
-pub fn create_simple_envelope(payload: SimplePayload) -> SimpleEnvelope {
+pub fn create_simple_envelope(payload: SimplePayload, now: u64) -> SimpleEnvelope {
     SimpleEnvelope {
         version: SIMPLE_PROTOCOL_VERSION,
         message_id: uuid::Uuid::new_v4().to_string(),
-        timestamp: crate::clock::ambient_now_secs(),
+        timestamp: now,
         payload,
     }
 }
 
 /// Create an acknowledgment envelope.
-pub fn create_simple_ack(message_id: &str, status: SimpleAckStatus) -> SimpleEnvelope {
-    create_simple_envelope(SimplePayload::Acknowledgment(SimpleAcknowledgment {
-        message_id: message_id.to_string(),
-        status,
-    }))
+pub fn create_simple_ack(message_id: &str, status: SimpleAckStatus, now: u64) -> SimpleEnvelope {
+    create_simple_envelope(
+        SimplePayload::Acknowledgment(SimpleAcknowledgment {
+            message_id: message_id.to_string(),
+            status,
+        }),
+        now,
+    )
 }
 
 /// Encode a simple envelope to bytes with length prefix.
@@ -224,13 +227,14 @@ pub fn encode_simple_message(envelope: &SimpleEnvelope) -> Result<Vec<u8>, Simpl
 pub fn create_signed_handshake(
     identity: &crate::Identity,
     device_id: Option<String>,
+    now: u64,
 ) -> SimpleHandshake {
     let client_id = identity.public_id();
 
     // Generate random 32-byte nonce
     let nonce_bytes: [u8; 32] = crate::crypto::random_bytes();
 
-    let timestamp = crate::clock::ambient_now_secs();
+    let timestamp = now;
 
     // Sign: nonce || timestamp.to_be_bytes()
     let mut signed_data = Vec::with_capacity(40);
@@ -286,7 +290,7 @@ mod tests {
     #[test]
     fn test_signed_handshake_has_auth_fields() {
         let identity = crate::Identity::create("Test User");
-        let handshake = create_signed_handshake(&identity, None);
+        let handshake = create_signed_handshake(&identity, None, 0);
 
         assert!(!handshake.client_id.is_empty());
         assert!(
@@ -308,7 +312,7 @@ mod tests {
     #[test]
     fn test_signed_handshake_signature_verifiable() {
         let identity = crate::Identity::create("Test User");
-        let handshake = create_signed_handshake(&identity, None);
+        let handshake = create_signed_handshake(&identity, None, 0);
 
         // Reconstruct the signed data as the relay would
         let nonce_hex = handshake.nonce.as_ref().unwrap();
@@ -350,7 +354,7 @@ mod tests {
     fn test_signed_handshake_with_device_id() {
         let identity = crate::Identity::create("Test User");
         let device_id = Some("abcd1234".to_string());
-        let handshake = create_signed_handshake(&identity, device_id.clone());
+        let handshake = create_signed_handshake(&identity, device_id.clone(), 0);
 
         assert_eq!(handshake.device_id, device_id);
         assert!(handshake.signature.is_some(), "expected Some value");
@@ -359,9 +363,9 @@ mod tests {
     #[test]
     fn test_signed_handshake_serialization_includes_auth() {
         let identity = crate::Identity::create("Test User");
-        let handshake = create_signed_handshake(&identity, None);
+        let handshake = create_signed_handshake(&identity, None, 0);
 
-        let envelope = create_simple_envelope(SimplePayload::Handshake(handshake));
+        let envelope = create_simple_envelope(SimplePayload::Handshake(handshake), 0);
         let encoded = encode_simple_message(&envelope).unwrap();
         let decoded = decode_simple_message(&encoded).unwrap();
 
@@ -383,7 +387,7 @@ mod tests {
             timestamp: 1700000000,
             signature: vec![0xAB; 64],
         };
-        let envelope = create_simple_envelope(SimplePayload::IdentityRevoked(revoked));
+        let envelope = create_simple_envelope(SimplePayload::IdentityRevoked(revoked), 0);
         let encoded = encode_simple_message(&envelope).unwrap();
         let decoded = decode_simple_message(&encoded).unwrap();
         match decoded.payload {
@@ -426,7 +430,7 @@ mod tests {
             timestamp: None,
         };
 
-        let envelope = create_simple_envelope(SimplePayload::Handshake(handshake));
+        let envelope = create_simple_envelope(SimplePayload::Handshake(handshake), 0);
         let encoded = encode_simple_message(&envelope).unwrap();
         let decoded = decode_simple_message(&encoded).unwrap();
 

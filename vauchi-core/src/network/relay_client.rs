@@ -157,7 +157,7 @@ impl<T: Transport> RelayClient<T> {
         // Convert to wire format
         let anon_id_hex = anonymous_sender_hex(shared_key, now);
         let envelope =
-            self.create_update_envelope(recipient_id, &ratchet_msg, anon_id_hex.as_deref());
+            self.create_update_envelope(recipient_id, &ratchet_msg, anon_id_hex.as_deref(), now);
         let message_id = envelope.message_id.clone();
 
         // Send
@@ -195,7 +195,7 @@ impl<T: Transport> RelayClient<T> {
 
         let anon_id_hex = anonymous_sender_hex(shared_key, now);
         let envelope =
-            self.create_update_envelope(recipient_id, ratchet_msg, anon_id_hex.as_deref());
+            self.create_update_envelope(recipient_id, ratchet_msg, anon_id_hex.as_deref(), now);
         let message_id = envelope.message_id.clone();
 
         self.connection.send(&envelope)?;
@@ -234,9 +234,10 @@ impl<T: Transport> RelayClient<T> {
 
         let mut last_message_id = String::new();
         for tokens in batches {
-            let envelope = create_envelope(MessagePayload::RegisterMailbox(
-                super::message::RegisterMailbox { tokens },
-            ));
+            let envelope = create_envelope(
+                MessagePayload::RegisterMailbox(super::message::RegisterMailbox { tokens }),
+                now,
+            );
             last_message_id = envelope.message_id.clone();
             self.connection.send(&envelope)?;
         }
@@ -272,7 +273,7 @@ impl<T: Transport> RelayClient<T> {
             ciphertext,
         };
 
-        let envelope = create_envelope(MessagePayload::EncryptedUpdate(encrypted_update));
+        let envelope = create_envelope(MessagePayload::EncryptedUpdate(encrypted_update), now);
         let message_id = envelope.message_id.clone();
 
         self.connection.send(&envelope)?;
@@ -287,8 +288,9 @@ impl<T: Transport> RelayClient<T> {
     pub fn send_purge_request(
         &mut self,
         request: &PurgeRequest,
+        now: u64,
     ) -> Result<MessageId, NetworkError> {
-        let envelope = create_envelope(MessagePayload::PurgeRequest(request.clone()));
+        let envelope = create_envelope(MessagePayload::PurgeRequest(request.clone()), now);
         let message_id = envelope.message_id.clone();
 
         self.connection.send(&envelope)?;
@@ -304,8 +306,9 @@ impl<T: Transport> RelayClient<T> {
     pub fn send_identity_revoked(
         &mut self,
         revoked: &super::message::IdentityRevoked,
+        now: u64,
     ) -> Result<MessageId, NetworkError> {
-        let envelope = create_envelope(MessagePayload::IdentityRevoked(revoked.clone()));
+        let envelope = create_envelope(MessagePayload::IdentityRevoked(revoked.clone()), now);
         let message_id = envelope.message_id.clone();
 
         self.connection.send(&envelope)?;
@@ -424,6 +427,7 @@ impl<T: Transport> RelayClient<T> {
         recipient_id: &str,
         ratchet_msg: &RatchetMessage,
         anonymous_sender_id: Option<&str>,
+        now: u64,
     ) -> MessageEnvelope {
         let encrypted_update = EncryptedUpdate {
             recipient_id: recipient_id.to_string(),
@@ -439,7 +443,7 @@ impl<T: Transport> RelayClient<T> {
             ciphertext: ratchet_msg.ciphertext.clone(),
         };
 
-        create_envelope(MessagePayload::EncryptedUpdate(encrypted_update))
+        create_envelope(MessagePayload::EncryptedUpdate(encrypted_update), now)
     }
 }
 
@@ -447,6 +451,7 @@ impl<T: Transport> crate::api::PurgeSender for RelayClient<T> {
     fn send_purge(
         &mut self,
         purge: &crate::api::PreSignedPurgeRequest,
+        now: u64,
     ) -> Result<bool, crate::api::ShredError> {
         let request = PurgeRequest {
             public_key: purge.public_key,
@@ -455,7 +460,7 @@ impl<T: Transport> crate::api::PurgeSender for RelayClient<T> {
             timestamp: purge.timestamp,
         };
 
-        match self.send_purge_request(&request) {
+        match self.send_purge_request(&request, now) {
             Ok(_) => Ok(true),
             Err(e) => Err(crate::api::ShredError::FileError(format!(
                 "Relay purge failed: {}",
@@ -469,8 +474,9 @@ impl<T: Transport> crate::api::RevocationSender for RelayClient<T> {
     fn send_revocation(
         &mut self,
         revocation: &crate::network::IdentityRevoked,
+        now: u64,
     ) -> Result<bool, crate::api::ShredError> {
-        match self.send_identity_revoked(revocation) {
+        match self.send_identity_revoked(revocation, now) {
             Ok(_) => Ok(true),
             Err(e) => Err(crate::api::ShredError::FileError(format!(
                 "Relay revocation failed: {}",

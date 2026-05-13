@@ -39,7 +39,7 @@ mod tests {
             signature: None,
             timestamp: None,
         };
-        let envelope = create_envelope(MessagePayload::Handshake(handshake));
+        let envelope = create_envelope(MessagePayload::Handshake(handshake), 0);
 
         let encoded = encode_message(&envelope).unwrap();
         let decoded = decode_message(&encoded).unwrap();

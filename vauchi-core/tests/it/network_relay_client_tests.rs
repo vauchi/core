@@ -324,7 +324,7 @@ fn test_send_purge_request() {
         timestamp: 1700000000,
     };
 
-    let msg_id = client.send_purge_request(&request).unwrap();
+    let msg_id = client.send_purge_request(&request, 0).unwrap();
     assert!(!msg_id.is_empty());
 
     let sent = client.connection().transport().sent_messages();
@@ -359,7 +359,7 @@ fn test_send_purge_request_send_error() {
         timestamp: 1700000000,
     };
 
-    let result = client.send_purge_request(&request);
+    let result = client.send_purge_request(&request, 0);
     assert!(result.is_err(), "expected error");
 }
 

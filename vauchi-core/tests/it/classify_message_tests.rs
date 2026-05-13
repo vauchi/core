@@ -11,11 +11,14 @@ use vauchi_core::network::simple_message::*;
 // @internal
 #[test]
 fn test_classify_message_returns_encrypted_update_for_encrypted_update_payload() {
-    let envelope = create_simple_envelope(SimplePayload::EncryptedUpdate(SimpleEncryptedUpdate {
-        recipient_id: "recipient-1".to_string(),
-        sender_id: "sender-1".to_string(),
-        ciphertext: vec![0xDE, 0xAD],
-    }));
+    let envelope = create_simple_envelope(
+        SimplePayload::EncryptedUpdate(SimpleEncryptedUpdate {
+            recipient_id: "recipient-1".to_string(),
+            sender_id: "sender-1".to_string(),
+            ciphertext: vec![0xDE, 0xAD],
+        }),
+        0,
+    );
     let bytes = encode_simple_message(&envelope).unwrap();
 
     let result = vauchi_core::network::classify_message(&bytes);
@@ -26,10 +29,13 @@ fn test_classify_message_returns_encrypted_update_for_encrypted_update_payload()
 // @internal
 #[test]
 fn test_classify_message_returns_acknowledgment_for_ack_payload() {
-    let envelope = create_simple_envelope(SimplePayload::Acknowledgment(SimpleAcknowledgment {
-        message_id: "msg-123".to_string(),
-        status: SimpleAckStatus::Stored,
-    }));
+    let envelope = create_simple_envelope(
+        SimplePayload::Acknowledgment(SimpleAcknowledgment {
+            message_id: "msg-123".to_string(),
+            status: SimpleAckStatus::Stored,
+        }),
+        0,
+    );
     let bytes = encode_simple_message(&envelope).unwrap();
 
     let result = vauchi_core::network::classify_message(&bytes);
@@ -40,14 +46,17 @@ fn test_classify_message_returns_acknowledgment_for_ack_payload() {
 // @internal
 #[test]
 fn test_classify_message_returns_handshake_for_handshake_payload() {
-    let envelope = create_simple_envelope(SimplePayload::Handshake(SimpleHandshake {
-        client_id: "client-1".to_string(),
-        device_id: None,
-        identity_public_key: None,
-        nonce: None,
-        signature: None,
-        timestamp: None,
-    }));
+    let envelope = create_simple_envelope(
+        SimplePayload::Handshake(SimpleHandshake {
+            client_id: "client-1".to_string(),
+            device_id: None,
+            identity_public_key: None,
+            nonce: None,
+            signature: None,
+            timestamp: None,
+        }),
+        0,
+    );
     let bytes = encode_simple_message(&envelope).unwrap();
 
     let result = vauchi_core::network::classify_message(&bytes);
@@ -60,12 +69,15 @@ fn test_classify_message_returns_handshake_for_handshake_payload() {
 // @internal
 #[test]
 fn test_classify_message_returns_identity_revoked_for_revoked_payload() {
-    let envelope = create_simple_envelope(SimplePayload::IdentityRevoked(SimpleIdentityRevoked {
-        sender_id: "sender-1".to_string(),
-        recipient_id: "recipient-1".to_string(),
-        timestamp: 1700000000,
-        signature: vec![0xAB; 64],
-    }));
+    let envelope = create_simple_envelope(
+        SimplePayload::IdentityRevoked(SimpleIdentityRevoked {
+            sender_id: "sender-1".to_string(),
+            recipient_id: "recipient-1".to_string(),
+            timestamp: 1700000000,
+            signature: vec![0xAB; 64],
+        }),
+        0,
+    );
     let bytes = encode_simple_message(&envelope).unwrap();
 
     let result = vauchi_core::network::classify_message(&bytes);

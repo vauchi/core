@@ -44,6 +44,11 @@ pub struct ConnectionManager<T: Transport> {
     identity: Option<Identity>,
     reconnect_attempt: u32,
     suppress_presence: bool,
+    /// Clock used to stamp the handshake timestamp. Defaults to
+    /// `crate::clock::SystemClock::shared()`; tests can override via
+    /// `with_clock(...)` after construction.
+    /// Phase 1 / Task 1.1 / Step 3b structural pass.
+    clock: std::sync::Arc<dyn crate::clock::Clock>,
 }
 
 impl<T: Transport> ConnectionManager<T> {
@@ -55,7 +60,18 @@ impl<T: Transport> ConnectionManager<T> {
             identity: None,
             reconnect_attempt: 0,
             suppress_presence: false,
+            clock: crate::clock::SystemClock::shared(),
         }
+    }
+
+    /// Replaces the manager's clock — for deterministic tests.
+    ///
+    /// Defaults to `SystemClock::shared()` from `new()`; tests can
+    /// override post-construction. Phase 1 / Task 1.1 / Step 3b
+    /// structural pass.
+    pub fn with_clock(mut self, clock: std::sync::Arc<dyn crate::clock::Clock>) -> Self {
+        self.clock = clock;
+        self
     }
 
     /// Sets whether to suppress presence notifications at the relay.
@@ -185,7 +201,7 @@ impl<T: Transport> ConnectionManager<T> {
 
         let nonce: [u8; 32] = crate::crypto::random_bytes();
 
-        let timestamp = crate::clock::ambient_now_secs();
+        let timestamp = self.clock.unix_seconds();
 
         // Sign (nonce || timestamp)
         let mut sign_data = Vec::with_capacity(40);
@@ -269,12 +285,13 @@ mod tests {
             .set_state(ConnectionState::Disconnected);
 
         // Send should trigger reconnect
-        let msg = create_envelope(MessagePayload::Presence(
-            crate::network::message::PresenceUpdate {
+        let msg = create_envelope(
+            MessagePayload::Presence(crate::network::message::PresenceUpdate {
                 status: crate::network::message::PresenceStatus::Online,
                 message: None,
-            },
-        ));
+            }),
+            0,
+        );
 
         conn.send(&msg).unwrap();
         assert!(conn.is_connected());
@@ -338,12 +355,13 @@ mod tests {
         let mut transport = MockTransport::new();
 
         // Queue a message to receive
-        let incoming = create_envelope(MessagePayload::Presence(
-            crate::network::message::PresenceUpdate {
+        let incoming = create_envelope(
+            MessagePayload::Presence(crate::network::message::PresenceUpdate {
                 status: crate::network::message::PresenceStatus::Away,
                 message: Some("BRB".into()),
-            },
-        ));
+            }),
+            0,
+        );
         transport.queue_receive(incoming.clone());
 
         let mut conn = ConnectionManager::new(transport, create_test_config());
@@ -369,12 +387,13 @@ mod tests {
     #[test]
     fn test_connection_manager_has_pending() {
         let mut transport = MockTransport::new();
-        transport.queue_receive(create_envelope(MessagePayload::Presence(
-            crate::network::message::PresenceUpdate {
+        transport.queue_receive(create_envelope(
+            MessagePayload::Presence(crate::network::message::PresenceUpdate {
                 status: crate::network::message::PresenceStatus::Online,
                 message: None,
-            },
-        )));
+            }),
+            0,
+        ));
 
         let mut conn = ConnectionManager::new(transport, create_test_config());
         conn.connect().unwrap();

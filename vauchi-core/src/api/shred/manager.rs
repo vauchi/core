@@ -108,7 +108,10 @@ impl<'a> ShredManager<'a> {
         // 2. Send revocation notifications to contacts (best-effort, while keys alive)
         if let Some(sender) = revocation_sender {
             for revocation in &deletion_result.revocations {
-                if sender.send_revocation(revocation).unwrap_or(false) {
+                if sender
+                    .send_revocation(revocation, self.storage.clock().unix_seconds())
+                    .unwrap_or(false)
+                {
                     report.contacts_notified += 1;
                 }
             }
@@ -124,7 +127,9 @@ impl<'a> ShredManager<'a> {
                 ))
             });
             if let Ok(msgs) = pre_signed {
-                report.relay_purge_sent = sender.send_purge(&msgs.purge_request).unwrap_or(false);
+                report.relay_purge_sent = sender
+                    .send_purge(&msgs.purge_request, self.storage.clock().unix_seconds())
+                    .unwrap_or(false);
             }
         }
 
@@ -204,13 +209,18 @@ impl<'a> ShredManager<'a> {
         // ── Phase C: Best-effort network and cleanup ──
         // Send pre-signed purge after key destruction (best-effort)
         if let (Some(sender), Some(msgs)) = (purge_sender, &pre_signed) {
-            report.relay_purge_sent = sender.send_purge(&msgs.purge_request).unwrap_or(false);
+            report.relay_purge_sent = sender
+                .send_purge(&msgs.purge_request, self.storage.clock().unix_seconds())
+                .unwrap_or(false);
         }
 
         // Send revocations to contacts (best-effort, keys already destroyed)
         if let Some(sender) = revocation_sender {
             for revocation in &revocations {
-                if sender.send_revocation(revocation).unwrap_or(false) {
+                if sender
+                    .send_revocation(revocation, self.storage.clock().unix_seconds())
+                    .unwrap_or(false)
+                {
                     report.contacts_notified += 1;
                 }
             }

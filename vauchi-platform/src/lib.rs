@@ -907,11 +907,12 @@ impl vauchi_core::api::RevocationSender for MobileRelaySender {
     fn send_revocation(
         &mut self,
         revocation: &vauchi_core::network::IdentityRevoked,
+        now: u64,
     ) -> Result<bool, vauchi_core::api::ShredError> {
         self.client
             .connect()
             .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Connect: {e}")))?;
-        self.client.send_revocation(revocation)
+        self.client.send_revocation(revocation, now)
     }
 }
 
@@ -919,11 +920,12 @@ impl vauchi_core::api::PurgeSender for MobileRelaySender {
     fn send_purge(
         &mut self,
         purge: &vauchi_core::api::PreSignedPurgeRequest,
+        now: u64,
     ) -> Result<bool, vauchi_core::api::ShredError> {
         self.client
             .connect()
             .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Connect: {e}")))?;
-        self.client.send_purge(purge)
+        self.client.send_purge(purge, now)
     }
 }
 

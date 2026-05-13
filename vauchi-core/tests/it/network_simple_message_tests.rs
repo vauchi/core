@@ -18,7 +18,7 @@ fn test_encode_decode_roundtrip() {
         signature: None,
         timestamp: None,
     };
-    let envelope = create_simple_envelope(SimplePayload::Handshake(handshake));
+    let envelope = create_simple_envelope(SimplePayload::Handshake(handshake), 0);
 
     let encoded = encode_simple_message(&envelope).unwrap();
     let decoded = decode_simple_message(&encoded).unwrap();
@@ -56,7 +56,7 @@ fn test_legacy_exchange_response() {
 // @scenario: message_delivery :: Receive acknowledgment when update is delivered
 #[test]
 fn test_simple_ack() {
-    let ack = create_simple_ack("msg-123", SimpleAckStatus::Delivered);
+    let ack = create_simple_ack("msg-123", SimpleAckStatus::Delivered, 0);
 
     match ack.payload {
         SimplePayload::Acknowledgment(a) => {
@@ -69,14 +69,17 @@ fn test_simple_ack() {
 // @scenario: security :: Protocol rejects unsupported versions
 #[test]
 fn test_decode_rejects_unsupported_simple_protocol_version() {
-    let mut envelope = create_simple_envelope(SimplePayload::Handshake(SimpleHandshake {
-        client_id: "test".to_string(),
-        device_id: None,
-        identity_public_key: None,
-        nonce: None,
-        signature: None,
-        timestamp: None,
-    }));
+    let mut envelope = create_simple_envelope(
+        SimplePayload::Handshake(SimpleHandshake {
+            client_id: "test".to_string(),
+            device_id: None,
+            identity_public_key: None,
+            nonce: None,
+            signature: None,
+            timestamp: None,
+        }),
+        0,
+    );
     envelope.version = SIMPLE_PROTOCOL_VERSION + 1;
 
     let encoded = encode_simple_message(&envelope).unwrap();
@@ -96,14 +99,17 @@ fn test_decode_rejects_unsupported_simple_protocol_version() {
 // @scenario: security :: Protocol rejects version zero
 #[test]
 fn test_decode_rejects_simple_version_zero() {
-    let mut envelope = create_simple_envelope(SimplePayload::Handshake(SimpleHandshake {
-        client_id: "test".to_string(),
-        device_id: None,
-        identity_public_key: None,
-        nonce: None,
-        signature: None,
-        timestamp: None,
-    }));
+    let mut envelope = create_simple_envelope(
+        SimplePayload::Handshake(SimpleHandshake {
+            client_id: "test".to_string(),
+            device_id: None,
+            identity_public_key: None,
+            nonce: None,
+            signature: None,
+            timestamp: None,
+        }),
+        0,
+    );
     envelope.version = 0;
 
     let encoded = encode_simple_message(&envelope).unwrap();
@@ -120,7 +126,7 @@ fn test_encrypted_update() {
         ciphertext: vec![1, 2, 3, 4, 5],
     };
 
-    let envelope = create_simple_envelope(SimplePayload::EncryptedUpdate(update));
+    let envelope = create_simple_envelope(SimplePayload::EncryptedUpdate(update), 0);
     let encoded = encode_simple_message(&envelope).unwrap();
     let decoded = decode_simple_message(&encoded).unwrap();
 

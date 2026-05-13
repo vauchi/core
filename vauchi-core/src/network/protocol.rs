@@ -71,11 +71,11 @@ pub fn read_frame_length(header: &[u8; FRAME_HEADER_SIZE]) -> usize {
 }
 
 /// Creates a new message envelope with a fresh ID and timestamp.
-pub fn create_envelope(payload: MessagePayload) -> MessageEnvelope {
+pub fn create_envelope(payload: MessagePayload, now: u64) -> MessageEnvelope {
     MessageEnvelope {
         version: PROTOCOL_VERSION,
         message_id: uuid::Uuid::new_v4().to_string(),
-        timestamp: crate::clock::ambient_now_secs(),
+        timestamp: now,
         payload,
     }
 }
@@ -157,8 +157,8 @@ mod tests {
             message: None,
         });
 
-        let env1 = create_envelope(payload.clone());
-        let env2 = create_envelope(payload);
+        let env1 = create_envelope(payload.clone(), 0);
+        let env2 = create_envelope(payload, 0);
 
         assert_ne!(env1.message_id, env2.message_id);
     }

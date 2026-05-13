@@ -319,12 +319,16 @@ fn test_ratchet_state_serialization() {
     let alice_pk = *alice_wb.identity().unwrap().signing_public_key();
 
     let bob_contact =
-        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
+        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone(), 0);
     let bob_contact_id = bob_contact.id().to_string();
     alice_wb.add_contact(bob_contact).unwrap();
 
-    let alice_contact =
-        Contact::from_exchange(alice_pk, ContactCard::new("Alice"), shared_secret.clone());
+    let alice_contact = Contact::from_exchange(
+        alice_pk,
+        ContactCard::new("Alice"),
+        shared_secret.clone(),
+        0,
+    );
     let alice_contact_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
 

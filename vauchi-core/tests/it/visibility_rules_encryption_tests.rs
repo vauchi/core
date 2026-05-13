@@ -134,7 +134,7 @@ fn test_contact_with_empty_visibility_rules_roundtrip() {
     let shared_key = SymmetricKey::generate();
     let public_key = [0u8; 32];
 
-    let contact = Contact::from_exchange(public_key, card, shared_key);
+    let contact = Contact::from_exchange(public_key, card, shared_key, 0);
 
     storage.save_contact(&contact).unwrap();
     let loaded = storage.load_contact(contact.id()).unwrap().unwrap();

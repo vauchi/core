@@ -30,7 +30,7 @@ fn make_contact(name: &str) -> Contact {
     .unwrap();
     let pk = [0x42u8; 32];
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(pk, card, shared_key)
+    Contact::from_exchange(pk, card, shared_key, 0)
 }
 
 fn make_contact_with_cek(name: &str) -> Contact {
@@ -225,7 +225,7 @@ fn test_search_contacts_finds_cek_protected_name() {
     // Legacy contact with different public key to avoid ID collision
     let pk2 = [0x43u8; 32];
     let card2 = ContactCard::new("Bob Plaintext");
-    let legacy = Contact::from_exchange(pk2, card2, SymmetricKey::generate());
+    let legacy = Contact::from_exchange(pk2, card2, SymmetricKey::generate(), 0);
     storage.save_contact(&legacy).unwrap();
 
     // Search should find Alice even though display_name is NULL in DB

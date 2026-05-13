@@ -39,17 +39,22 @@ fn setup_vauchi_with_data() -> Vauchi {
     // Add exchanged contacts via storage
     let card_bob = ContactCard::new("Bob");
     let key_bob = SymmetricKey::generate();
-    let bob = Contact::from_exchange([0xBB; 32], card_bob, key_bob);
+    let bob = Contact::from_exchange([0xBB; 32], card_bob, key_bob, 0);
     v.update_contact(&bob).unwrap();
 
     let card_carol = ContactCard::new("Carol");
     let key_carol = SymmetricKey::generate();
-    let carol = Contact::from_exchange([0xCC; 32], card_carol, key_carol);
+    let carol = Contact::from_exchange([0xCC; 32], card_carol, key_carol, 0);
     v.update_contact(&carol).unwrap();
 
     // Add an imported contact
     let card_dave = ContactCard::new("Dave");
-    let dave = Contact::from_import(card_dave, ImportSource::VcardFile, Some("uid-dave".into()));
+    let dave = Contact::from_import(
+        card_dave,
+        ImportSource::VcardFile,
+        Some("uid-dave".into()),
+        0,
+    );
     v.update_contact(&dave).unwrap();
 
     v

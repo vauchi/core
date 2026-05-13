@@ -27,6 +27,7 @@ fn make_exchanged_contact(name: &str) -> Contact {
         *identity.signing_public_key(),
         ContactCard::new(name),
         SymmetricKey::generate(),
+        0,
     )
 }
 
@@ -111,6 +112,7 @@ fn apply_sync_imported_contact_removed_deletes_contact() {
         imported_card,
         vauchi_core::contact::ImportSource::Manual,
         None,
+        0,
     );
     let imported_id = imported_contact.id().to_string();
     wb.add_contact(imported_contact).unwrap();
@@ -340,7 +342,7 @@ fn apply_sync_imported_contact_add_update_remove_roundtrip() {
     let wb = make_vauchi();
     let card = ContactCard::new("Dora");
     let imported_contact =
-        Contact::from_import(card, vauchi_core::contact::ImportSource::Manual, None);
+        Contact::from_import(card, vauchi_core::contact::ImportSource::Manual, None, 0);
     let imported_id = imported_contact.id().to_string();
     let sync_data = ImportedContactSyncData::from_contact(&imported_contact).unwrap();
 

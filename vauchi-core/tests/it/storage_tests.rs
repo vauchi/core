@@ -24,7 +24,7 @@ fn create_test_contact(name: &str) -> Contact {
         0,
     ));
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(public_key, card, shared_key)
+    Contact::from_exchange(public_key, card, shared_key, 0)
 }
 
 // @internal
@@ -57,8 +57,8 @@ fn test_storage_list_contacts() {
     // Give them different IDs by using different public keys
     let pk1 = [1u8; 32];
     let pk2 = [2u8; 32];
-    contact1 = Contact::from_exchange(pk1, contact1.card().clone(), SymmetricKey::generate());
-    contact2 = Contact::from_exchange(pk2, contact2.card().clone(), SymmetricKey::generate());
+    contact1 = Contact::from_exchange(pk1, contact1.card().clone(), SymmetricKey::generate(), 0);
+    contact2 = Contact::from_exchange(pk2, contact2.card().clone(), SymmetricKey::generate(), 0);
 
     storage.save_contact(&contact1).unwrap();
     storage.save_contact(&contact2).unwrap();
@@ -329,8 +329,14 @@ fn test_storage_ratchet_per_contact_key_isolation() {
         [1u8; 32],
         ContactCard::new("Alice"),
         SymmetricKey::generate(),
+        0,
     );
-    let bob = Contact::from_exchange([2u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+    let bob = Contact::from_exchange(
+        [2u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
     storage.save_contact(&alice).unwrap();
     storage.save_contact(&bob).unwrap();
 

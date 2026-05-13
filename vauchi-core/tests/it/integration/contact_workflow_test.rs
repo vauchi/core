@@ -22,12 +22,19 @@ fn test_contact_management_workflow() {
         [1u8; 32],
         ContactCard::new("Alice"),
         SymmetricKey::generate(),
+        0,
     );
-    let bob = Contact::from_exchange([2u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+    let bob = Contact::from_exchange(
+        [2u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
     let carol = Contact::from_exchange(
         [3u8; 32],
         ContactCard::new("Carol"),
         SymmetricKey::generate(),
+        0,
     );
 
     let alice_id = alice.id().to_string();

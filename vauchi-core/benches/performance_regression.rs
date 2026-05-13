@@ -76,7 +76,7 @@ fn create_test_contact(index: usize) -> Contact {
     pk[..8].copy_from_slice(&(index as u64).to_be_bytes());
 
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(pk, card, shared_key)
+    Contact::from_exchange(pk, card, shared_key, 0)
 }
 
 /// Creates a storage instance pre-populated with the given number of contacts.

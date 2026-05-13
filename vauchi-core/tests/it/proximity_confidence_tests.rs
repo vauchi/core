@@ -97,7 +97,7 @@ fn test_proximity_confidence_stored_on_contact() {
     let card = ContactCard::new("Alice");
     let shared_key = crypto::SymmetricKey::generate();
 
-    let contact = Contact::from_exchange(*identity.signing_public_key(), card, shared_key);
+    let contact = Contact::from_exchange(*identity.signing_public_key(), card, shared_key, 0);
 
     assert_eq!(
         *contact.proximity_confidence(),
@@ -117,6 +117,7 @@ fn test_contact_with_proximity_confidence() {
         card,
         shared_key,
         ProximityConfidence::High,
+        0,
     );
 
     assert_eq!(*contact.proximity_confidence(), ProximityConfidence::High);
@@ -152,7 +153,7 @@ fn test_contact_set_proximity_confidence() {
     let card = ContactCard::new("Alice");
     let shared_key = crypto::SymmetricKey::generate();
 
-    let mut contact = Contact::from_exchange(*identity.signing_public_key(), card, shared_key);
+    let mut contact = Contact::from_exchange(*identity.signing_public_key(), card, shared_key, 0);
 
     assert_eq!(
         *contact.proximity_confidence(),
@@ -646,6 +647,7 @@ fn test_complete_exchange_stores_proximity_confidence() {
         card.clone(),
         shared_key,
         ProximityConfidence::High,
+        0,
     );
 
     assert_eq!(*contact.proximity_confidence(), ProximityConfidence::High);

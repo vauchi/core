@@ -25,6 +25,7 @@ fn make_guardian(name: &str, transport: ExchangeTransport) -> Contact {
         test_key(),
         ProximityConfidence::Unknown,
         transport,
+        0,
     );
     contact.set_recovery_trusted(true).unwrap();
     contact
@@ -82,6 +83,7 @@ fn test_revocation_reminder_no_recovered_contacts() {
         test_key(),
         ProximityConfidence::Unknown,
         ExchangeTransport::Qr,
+        0,
     )];
     let reminders = check_revocation_reminders(&contacts);
     assert!(reminders.is_empty());
@@ -96,8 +98,9 @@ fn test_revocation_reminder_recovered_unverified() {
         test_key(),
         ProximityConfidence::Unknown,
         ExchangeTransport::Qr,
+        0,
     );
-    contact.accept_recovery([99u8; 32], test_key()).unwrap();
+    contact.accept_recovery([99u8; 32], test_key(), 0).unwrap();
 
     let reminders = check_revocation_reminders(&[contact]);
     assert_eq!(reminders.len(), 1);
@@ -113,8 +116,9 @@ fn test_revocation_reminder_recovered_but_verified_is_ok() {
         test_key(),
         ProximityConfidence::Unknown,
         ExchangeTransport::Qr,
+        0,
     );
-    contact.accept_recovery([99u8; 32], test_key()).unwrap();
+    contact.accept_recovery([99u8; 32], test_key(), 0).unwrap();
     contact.mark_fingerprint_verified().unwrap();
 
     let reminders = check_revocation_reminders(&[contact]);

@@ -1901,6 +1901,7 @@ mod tests {
             [0xAB; 32],
             vauchi_core::contact_card::ContactCard::new("Bob"),
             vauchi_core::crypto::SymmetricKey::generate(),
+            0,
         );
         let storage = wb.open_storage().unwrap();
         storage.save_contact(&contact).unwrap();
@@ -2235,6 +2236,7 @@ mod tests {
             [0xAB; 32],
             vauchi_core::contact_card::ContactCard::new("Bob"),
             vauchi_core::crypto::SymmetricKey::generate(),
+            0,
         )
     }
 
@@ -2470,6 +2472,7 @@ mod tests {
             [0xBC; 32],
             card,
             vauchi_core::crypto::SymmetricKey::generate(),
+            0,
         );
 
         let storage = wb.open_storage().unwrap();
@@ -2511,6 +2514,7 @@ mod tests {
             [0xCD; 32],
             card,
             vauchi_core::crypto::SymmetricKey::generate(),
+            0,
         );
         let storage = wb.open_storage().unwrap();
         storage.save_contact(&contact_with_field).unwrap();

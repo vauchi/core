@@ -37,12 +37,12 @@ fn make_exchanged(name: &str) -> Contact {
     pk[31] ^= 0xAB;
     let card = ContactCard::new(name);
     let key = SymmetricKey::generate();
-    Contact::from_exchange(pk, card, key)
+    Contact::from_exchange(pk, card, key, 0)
 }
 
 fn make_imported(name: &str, source: ImportSource) -> Contact {
     let card = ContactCard::new(name);
-    Contact::from_import(card, source, Some(format!("uid-{name}")))
+    Contact::from_import(card, source, Some(format!("uid-{name}")), 0)
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────

@@ -35,7 +35,10 @@ fn make_contact_with_pk(pk: [u8; 32], name: &str) -> Contact {
     ))
     .unwrap();
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(pk, card, shared_key)
+    // Pinned non-zero exchange timestamp — the stale-revocation test
+    // depends on `exchange_timestamp > revocation_timestamp` for the
+    // replay check, so 0 would defeat that comparison.
+    Contact::from_exchange(pk, card, shared_key, 1_700_000_000)
 }
 
 // === Domain Separator ===

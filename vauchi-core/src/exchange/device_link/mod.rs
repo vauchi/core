@@ -435,7 +435,7 @@ mod tests {
         let public_key = [0x42u8; 32];
         let card = ContactCard::new(name);
         let shared_key = SymmetricKey::generate();
-        Contact::from_exchange(public_key, card, shared_key)
+        Contact::from_exchange(public_key, card, shared_key, 0)
     }
 
     #[test]

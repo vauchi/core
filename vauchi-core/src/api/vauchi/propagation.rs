@@ -356,7 +356,7 @@ impl Vauchi {
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
 
         // Update contact card and CEK atomically
-        contact.update_card(new_card);
+        contact.update_card(new_card, 0);
         if let Some(cek) = new_cek {
             contact.set_cek(cek);
         }

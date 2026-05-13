@@ -42,7 +42,8 @@ fn exchange_as_initiator(wb: &Vauchi) -> String {
 
     // Create contact
     let card = ContactCard::new("Bob");
-    let contact = Contact::from_exchange(*bob_identity.public_key(), card, shared_secret.clone());
+    let contact =
+        Contact::from_exchange(*bob_identity.public_key(), card, shared_secret.clone(), 0);
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
@@ -99,8 +100,12 @@ fn test_prepare_card_update_requires_ratchet() {
     wb.create_identity("Alice").unwrap();
 
     // Add contact without exchange (no ratchet)
-    let contact =
-        Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+    let contact = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 

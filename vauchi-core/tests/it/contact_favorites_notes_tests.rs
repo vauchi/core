@@ -22,7 +22,7 @@ fn create_test_contact_with_name(name: &str, key_byte: u8) -> Contact {
     let public_key = [key_byte; 32];
     let card = ContactCard::new(name);
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(public_key, card, shared_key)
+    Contact::from_exchange(public_key, card, shared_key, 0)
 }
 
 fn create_test_storage() -> Storage {

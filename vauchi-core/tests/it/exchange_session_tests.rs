@@ -270,6 +270,7 @@ fn test_detect_duplicate_contact() {
         *alice_identity.signing_public_key(),
         alice_card.clone(),
         SymmetricKey::generate(),
+        0,
     );
 
     let contacts = vec![existing_alice];
@@ -313,6 +314,7 @@ fn test_no_duplicate_for_new_contact() {
         *charlie_identity.signing_public_key(),
         charlie_card,
         SymmetricKey::generate(),
+        0,
     );
 
     let contacts = vec![existing_charlie];

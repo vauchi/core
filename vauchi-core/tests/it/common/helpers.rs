@@ -67,7 +67,7 @@ pub fn setup_alice_bob_exchange() -> (Vauchi, Vauchi, SymmetricKey, String, Stri
 
     // Alice adds Bob as contact
     let bob_contact =
-        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
+        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone(), 0);
     let bob_contact_id = bob_contact.id().to_string();
     alice_wb.add_contact(bob_contact).unwrap();
 
@@ -76,7 +76,7 @@ pub fn setup_alice_bob_exchange() -> (Vauchi, Vauchi, SymmetricKey, String, Stri
         .own_card()
         .unwrap()
         .unwrap_or_else(|| ContactCard::new("Alice"));
-    let alice_contact = Contact::from_exchange(alice_pk, alice_card, shared_secret.clone());
+    let alice_contact = Contact::from_exchange(alice_pk, alice_card, shared_secret.clone(), 0);
     let alice_contact_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
 
@@ -126,12 +126,14 @@ pub fn setup_three_users() -> (
             bob_pk,
             ContactCard::new("Bob"),
             ab_secret.clone(),
+            0,
         ))
         .unwrap();
     bob.add_contact(Contact::from_exchange(
         alice_pk,
         ContactCard::new("Alice"),
         ab_secret,
+        0,
     ))
     .unwrap();
 
@@ -146,6 +148,7 @@ pub fn setup_three_users() -> (
             carol_pk,
             ContactCard::new("Carol"),
             ac_secret.clone(),
+            0,
         ))
         .unwrap();
     carol
@@ -153,6 +156,7 @@ pub fn setup_three_users() -> (
             alice_pk,
             ContactCard::new("Alice"),
             ac_secret,
+            0,
         ))
         .unwrap();
 
@@ -163,6 +167,7 @@ pub fn setup_three_users() -> (
         carol_pk,
         ContactCard::new("Carol"),
         bc_secret.clone(),
+        0,
     ))
     .unwrap();
     carol
@@ -170,6 +175,7 @@ pub fn setup_three_users() -> (
             bob_pk,
             ContactCard::new("Bob"),
             bc_secret,
+            0,
         ))
         .unwrap();
 

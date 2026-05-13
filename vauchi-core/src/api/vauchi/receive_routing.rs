@@ -149,7 +149,7 @@ mod tests {
     fn exchanged_contact(label: &str) -> Contact {
         let pk = [label.as_bytes()[0]; 32];
         let shared = SymmetricKey::generate();
-        Contact::from_exchange(pk, ContactCard::new(label), shared)
+        Contact::from_exchange(pk, ContactCard::new(label), shared, 0)
     }
 
     // @scenario: receive_phase :: token map resolves contact mailbox tokens

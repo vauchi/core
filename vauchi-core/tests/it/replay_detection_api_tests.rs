@@ -29,6 +29,7 @@ fn setup_alice_receiving_from_bob() -> (Vauchi, String, Identity, DoubleRatchetS
         *bob_identity.signing_public_key(),
         ContactCard::new("Bob"),
         shared_secret.clone(),
+        0,
     );
     let bob_id = bob_contact.id().to_string();
     alice.add_contact(bob_contact).unwrap();

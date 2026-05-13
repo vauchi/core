@@ -1254,7 +1254,8 @@ impl ExchangeSession {
             relay_key,
             self.proximity_confidence,
             self.transport,
-        );
+            0,
+);
         contact.set_relay_url(self.their_relay_url.take());
         contact.set_relay_noise_pubkey(self.their_relay_noise_pubkey.take());
 
@@ -1417,7 +1418,8 @@ impl ExchangeSession {
             shared_key,
             self.proximity_confidence,
             self.transport,
-        );
+            0,
+);
 
         // Set relay metadata learned from their QR code
         contact.set_relay_url(self.their_relay_url.take());

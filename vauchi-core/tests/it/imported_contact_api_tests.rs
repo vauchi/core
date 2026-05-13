@@ -23,7 +23,7 @@ fn new_vauchi() -> Vauchi {
 /// Creates an imported contact, saves it via the API, and returns its ID.
 fn add_imported(wb: &Vauchi, name: &str) -> String {
     let card = ContactCard::new(name);
-    let contact = Contact::from_import(card, ImportSource::VcardFile, None);
+    let contact = Contact::from_import(card, ImportSource::VcardFile, None, 0);
     let id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
     id
@@ -32,7 +32,7 @@ fn add_imported(wb: &Vauchi, name: &str) -> String {
 /// Creates an exchanged contact, saves it via the API, and returns its ID.
 fn add_exchanged(wb: &Vauchi, name: &str) -> String {
     let card = ContactCard::new(name);
-    let contact = Contact::from_exchange([42u8; 32], card, SymmetricKey::generate());
+    let contact = Contact::from_exchange([42u8; 32], card, SymmetricKey::generate(), 0);
     let id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
     id

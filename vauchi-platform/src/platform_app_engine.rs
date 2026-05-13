@@ -3961,7 +3961,7 @@ impl PlatformAppEngine {
                 }
 
                 let mut banners = Vec::new();
-                if let Some(kind) = reciprocity_banner(contact.reciprocity()) {
+                if let Some(kind) = reciprocity_banner(contact.reciprocity(0)) {
                     banners.push(match kind {
                         ReciprocityBannerKind::Pending => {
                             crate::mobile_contact_detail::MobileContactDetailBanner::ReciprocityPending {

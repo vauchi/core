@@ -29,7 +29,7 @@ fn setup() -> (Arc<VauchiPlatform>, TempDir) {
 fn add_imported_contact(wb: &VauchiPlatform, name: &str) -> String {
     let card = vauchi_core::contact_card::ContactCard::new(name);
     let contact =
-        vauchi_core::Contact::from_import(card, vauchi_core::ImportSource::VcardFile, None);
+        vauchi_core::Contact::from_import(card, vauchi_core::ImportSource::VcardFile, None, 0);
     let id = contact.id().to_string();
     wb.save_test_contact(&contact).unwrap();
     id
@@ -42,6 +42,7 @@ fn add_exchanged_contact(wb: &VauchiPlatform, name: &str) -> String {
         [0xAB; 32],
         card,
         vauchi_core::crypto::SymmetricKey::generate(),
+        0,
     );
     let id = contact.id().to_string();
     wb.save_test_contact(&contact).unwrap();

@@ -18,7 +18,7 @@ fn setup_with_contact() -> (Vauchi, String) {
     let mut pk = [0u8; 32];
     pk[0] = 1;
     let card = ContactCard::new("Bob");
-    let contact = Contact::from_exchange(pk, card, SymmetricKey::generate());
+    let contact = Contact::from_exchange(pk, card, SymmetricKey::generate(), 0);
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 

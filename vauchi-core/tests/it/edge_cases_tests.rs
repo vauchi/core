@@ -129,7 +129,7 @@ fn test_field_with_emoji_roundtrip() {
     ))
     .unwrap();
 
-    let contact = Contact::from_exchange([1u8; 32], card, SymmetricKey::generate());
+    let contact = Contact::from_exchange([1u8; 32], card, SymmetricKey::generate(), 0);
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
@@ -160,7 +160,7 @@ fn test_field_with_rtl_text() {
     ))
     .unwrap();
 
-    let contact = Contact::from_exchange([1u8; 32], card, SymmetricKey::generate());
+    let contact = Contact::from_exchange([1u8; 32], card, SymmetricKey::generate(), 0);
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
@@ -205,7 +205,7 @@ fn test_field_with_various_unicode() {
     ))
     .unwrap();
 
-    let contact = Contact::from_exchange([1u8; 32], card, SymmetricKey::generate());
+    let contact = Contact::from_exchange([1u8; 32], card, SymmetricKey::generate(), 0);
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
@@ -365,6 +365,7 @@ fn test_visibility_all_fields_hidden() {
         [1u8; 32],
         ContactCard::new("Test"),
         SymmetricKey::generate(),
+        0,
     );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
@@ -405,6 +406,7 @@ fn test_visibility_default_is_everyone() {
         [1u8; 32],
         ContactCard::new("Test"),
         SymmetricKey::generate(),
+        0,
     );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
@@ -464,7 +466,7 @@ fn test_backup_with_complex_password() {
 fn test_contact_long_display_name() {
     let long_name = "X".repeat(200);
     let card = ContactCard::new(&long_name);
-    let contact = Contact::from_exchange([1u8; 32], card, SymmetricKey::generate());
+    let contact = Contact::from_exchange([1u8; 32], card, SymmetricKey::generate(), 0);
     assert_eq!(contact.display_name(), long_name);
 }
 
@@ -478,16 +480,19 @@ fn test_contact_search_case_insensitive() {
         [1u8; 32],
         ContactCard::new("Alice"),
         SymmetricKey::generate(),
+        0,
     );
     let contact2 = Contact::from_exchange(
         [2u8; 32],
         ContactCard::new("ALICE"),
         SymmetricKey::generate(),
+        0,
     );
     let contact3 = Contact::from_exchange(
         [3u8; 32],
         ContactCard::new("alice"),
         SymmetricKey::generate(),
+        0,
     );
 
     wb.add_contact(contact1).unwrap();
@@ -512,14 +517,20 @@ fn test_contact_search_partial_match() {
         [1u8; 32],
         ContactCard::new("Alexander"),
         SymmetricKey::generate(),
+        0,
     );
     let contact2 = Contact::from_exchange(
         [2u8; 32],
         ContactCard::new("Alexandra"),
         SymmetricKey::generate(),
+        0,
     );
-    let contact3 =
-        Contact::from_exchange([3u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+    let contact3 = Contact::from_exchange(
+        [3u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
 
     wb.add_contact(contact1).unwrap();
     wb.add_contact(contact2).unwrap();
@@ -548,7 +559,7 @@ fn test_saving_contact_twice_updates() {
     ))
     .unwrap();
 
-    let contact = Contact::from_exchange([1u8; 32], card, SymmetricKey::generate());
+    let contact = Contact::from_exchange([1u8; 32], card, SymmetricKey::generate(), 0);
     let contact_id = contact.id().to_string();
 
     wb.add_contact(contact).unwrap();
@@ -559,7 +570,7 @@ fn test_saving_contact_twice_updates() {
     let mut card = contact.card().clone();
     card.update_field_value(&field_id, "updated@test.com", 0)
         .unwrap();
-    contact.update_card(card);
+    contact.update_card(card, 0);
     wb.storage().save_contact(&contact).unwrap();
 
     // Verify update persisted
@@ -587,6 +598,7 @@ fn test_contact_count_accuracy() {
             [i as u8; 32],
             ContactCard::new(&format!("Contact {}", i)),
             SymmetricKey::generate(),
+            0,
         );
         wb.add_contact(contact).unwrap();
     }
@@ -602,6 +614,7 @@ fn test_contact_count_accuracy() {
         [99u8; 32],
         ContactCard::new("New"),
         SymmetricKey::generate(),
+        0,
     );
     wb.add_contact(contact).unwrap();
     assert_eq!(wb.contact_count().unwrap(), 3);

@@ -32,7 +32,7 @@ fn test_contact(id: &str) -> Contact {
     let shared_key = SymmetricKey::generate();
     // Use a deterministic public key that matches the expected id
     let _ = id; // id is derived from public key in real code
-    Contact::from_exchange(pk, card, shared_key)
+    Contact::from_exchange(pk, card, shared_key, 0)
 }
 
 // === Migration V13 ===
@@ -248,7 +248,7 @@ fn test_multi_contact_cek_isolation() {
             0,
         ))
         .unwrap();
-        Contact::from_exchange([0x01; 32], card, SymmetricKey::generate())
+        Contact::from_exchange([0x01; 32], card, SymmetricKey::generate(), 0)
     };
     let bob = {
         let mut card = ContactCard::new("Bob");
@@ -259,7 +259,7 @@ fn test_multi_contact_cek_isolation() {
             0,
         ))
         .unwrap();
-        Contact::from_exchange([0x02; 32], card, SymmetricKey::generate())
+        Contact::from_exchange([0x02; 32], card, SymmetricKey::generate(), 0)
     };
     storage.save_contact(&alice).unwrap();
     storage.save_contact(&bob).unwrap();

@@ -31,7 +31,7 @@ fn make_contact_with_cek(pk: [u8; 32], name: &str) -> Contact {
     ))
     .unwrap();
     let shared_key = SymmetricKey::generate();
-    let mut contact = Contact::from_exchange(pk, card, shared_key);
+    let mut contact = Contact::from_exchange(pk, card, shared_key, 0);
     contact.set_cek(ContentEncryptionKey::generate());
     contact
 }
@@ -46,7 +46,7 @@ fn make_legacy_contact(pk: [u8; 32], name: &str) -> Contact {
     ))
     .unwrap();
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(pk, card, shared_key)
+    Contact::from_exchange(pk, card, shared_key, 0)
 }
 
 // === Revocation Generation ===

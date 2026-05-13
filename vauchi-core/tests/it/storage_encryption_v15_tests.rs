@@ -26,7 +26,12 @@ fn open_storage() -> (tempfile::TempDir, Storage) {
 }
 
 fn make_contact(name: &str) -> Contact {
-    Contact::from_exchange([1u8; 32], ContactCard::new(name), SymmetricKey::generate())
+    Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new(name),
+        SymmetricKey::generate(),
+        0,
+    )
 }
 
 // === Migration Tests ===

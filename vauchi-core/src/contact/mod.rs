@@ -29,8 +29,6 @@ pub use local_group::LocalGroup;
 pub use trust::TrustLevel;
 pub use visibility::{FieldVisibility, VisibilityRules};
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
 use crate::crypto::cek::ContentEncryptionKey;
@@ -98,33 +96,17 @@ pub struct Contact {
     archived_at: Option<u64>,
 }
 
-/// Returns the current Unix-epoch seconds via the OS wall clock.
-///
-/// Stepping-stone helper for Phase 1 / Task 1.1 / Step 3b. The
-/// 5 SystemTime callsites in this file all routed through
-/// identical `SystemTime::now....as_secs()` blocks; this helper
-/// consolidates them while the wider Contact caller graph (sync,
-/// backup, contact-merge, exchange-session, …) still lacks a
-/// `Clock` to propagate. When the storage-cluster pass threads
-/// `Clock` deeper, this helper grows a `now: u64` parameter and
-/// the OS read drops out entirely.
-fn now_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
-
 impl Contact {
     /// Creates a new contact from exchange data.
     pub fn from_exchange(
         public_key: [u8; 32],
         card: ContactCard,
         shared_key: SymmetricKey,
+        now: u64,
     ) -> Self {
         let id = hex::encode(public_key);
         let display_name = card.display_name().to_string();
-        let exchange_timestamp = now_secs();
+        let exchange_timestamp = now;
 
         Contact {
             id,
@@ -164,8 +146,9 @@ impl Contact {
         card: ContactCard,
         shared_key: SymmetricKey,
         proximity_confidence: ProximityConfidence,
+        now: u64,
     ) -> Self {
-        let mut contact = Self::from_exchange(public_key, card, shared_key);
+        let mut contact = Self::from_exchange(public_key, card, shared_key, now);
         contact.set_proximity_confidence(proximity_confidence);
         contact
     }
@@ -177,8 +160,9 @@ impl Contact {
         shared_key: SymmetricKey,
         proximity_confidence: ProximityConfidence,
         exchange_transport: ExchangeTransport,
+        now: u64,
     ) -> Self {
-        let mut contact = Self::from_exchange(public_key, card, shared_key);
+        let mut contact = Self::from_exchange(public_key, card, shared_key, now);
         contact.set_proximity_confidence(proximity_confidence);
         contact.set_exchange_transport(exchange_transport);
         contact
@@ -264,10 +248,11 @@ impl Contact {
         card: ContactCard,
         source: ImportSource,
         original_uid: Option<String>,
+        now: u64,
     ) -> Self {
         let id = uuid::Uuid::new_v4().to_string();
         let display_name = card.display_name().to_string();
-        let imported_at = now_secs();
+        let imported_at = now;
 
         Contact {
             id,
@@ -487,10 +472,9 @@ impl Contact {
     /// is older than 7 days are reported as `Unreciprocated` (design spec §6.3).
     /// This is a read-time check — the stored value stays `Pending` until explicitly
     /// written by the relaunch recovery scan.
-    pub fn reciprocity(&self) -> Reciprocity {
+    pub fn reciprocity(&self, now: u64) -> Reciprocity {
         match self.kind.exchanged_data().and_then(|d| d.reciprocity) {
             Some(Reciprocity::Pending) => {
-                let now = now_secs();
                 let exchange_ts = self
                     .kind
                     .exchanged_data()
@@ -572,10 +556,10 @@ impl Contact {
     }
 
     /// Updates this contact's card (from a sync update).
-    pub fn update_card(&mut self, card: ContactCard) {
+    pub fn update_card(&mut self, card: ContactCard, now: u64) {
         self.display_name = card.display_name().to_string();
         self.card = card;
-        self.card_updated_at = Some(now_secs());
+        self.card_updated_at = Some(now);
     }
 
     /// Accepts a recovery, updating the contact's public key and shared secret.
@@ -588,6 +572,7 @@ impl Contact {
         &mut self,
         new_public_key: [u8; 32],
         new_shared_key: SymmetricKey,
+        now: u64,
     ) -> Result<(), ContactError> {
         let data = self
             .kind
@@ -597,7 +582,7 @@ impl Contact {
         data.shared_key = new_shared_key;
         data.fingerprint_verified = false;
         data.has_recovered = true;
-        data.exchange_timestamp = now_secs();
+        data.exchange_timestamp = now;
         self.id = hex::encode(new_public_key);
         Ok(())
     }
@@ -610,9 +595,10 @@ impl Contact {
         new_public_key: [u8; 32],
         new_shared_key: SymmetricKey,
         new_card: ContactCard,
+        now: u64,
     ) -> Result<(), ContactError> {
-        self.accept_recovery(new_public_key, new_shared_key)?;
-        self.update_card(new_card);
+        self.accept_recovery(new_public_key, new_shared_key, now)?;
+        self.update_card(new_card, now);
         Ok(())
     }
 

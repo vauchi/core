@@ -122,7 +122,7 @@ impl Vauchi {
                 continue;
             }
 
-            let contact = Contact::from_import(card, ImportSource::VcardFile, uid);
+            let contact = Contact::from_import(card, ImportSource::VcardFile, uid, 0);
             match self.storage.save_contact(&contact) {
                 Ok(_) => {
                     imported += 1;

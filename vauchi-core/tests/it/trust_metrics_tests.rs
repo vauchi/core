@@ -116,6 +116,7 @@ fn test_contact_from_exchange_full_preserves_transport() {
         test_key(),
         ProximityConfidence::High,
         ExchangeTransport::Nfc,
+        0,
     );
     assert_eq!(contact.exchange_transport(), Some(ExchangeTransport::Nfc));
 }
@@ -129,6 +130,7 @@ fn test_contact_from_exchange_full_preserves_proximity() {
         test_key(),
         ProximityConfidence::High,
         ExchangeTransport::Qr,
+        0,
     );
     assert_eq!(*contact.proximity_confidence(), ProximityConfidence::High);
 }
@@ -142,6 +144,7 @@ fn test_contact_default_has_recovered_is_false() {
         test_key(),
         ProximityConfidence::Unknown,
         ExchangeTransport::Qr,
+        0,
     );
     assert!(!contact.has_recovered());
 }
@@ -155,6 +158,7 @@ fn test_contact_default_card_updated_at_is_none() {
         test_key(),
         ProximityConfidence::Unknown,
         ExchangeTransport::Qr,
+        0,
     );
     assert_eq!(contact.card_updated_at(), None);
 }
@@ -162,7 +166,7 @@ fn test_contact_default_card_updated_at_is_none() {
 // @internal
 #[test]
 fn test_contact_from_exchange_defaults_to_qr_transport() {
-    let contact = Contact::from_exchange(test_public_key(), test_card(), test_key());
+    let contact = Contact::from_exchange(test_public_key(), test_card(), test_key(), 0);
     assert_eq!(contact.exchange_transport(), Some(ExchangeTransport::Qr));
 }
 
@@ -179,11 +183,12 @@ fn test_accept_recovery_sets_has_recovered_flag() {
         test_key(),
         ProximityConfidence::Unknown,
         ExchangeTransport::Qr,
+        0,
     );
     assert!(!contact.has_recovered());
 
     let new_key = [99u8; 32];
-    contact.accept_recovery(new_key, test_key()).unwrap();
+    contact.accept_recovery(new_key, test_key(), 0).unwrap();
 
     assert!(
         contact.has_recovered(),
@@ -204,9 +209,10 @@ fn test_has_recovered_is_permanent() {
         test_key(),
         ProximityConfidence::Unknown,
         ExchangeTransport::Qr,
+        0,
     );
 
-    contact.accept_recovery([99u8; 32], test_key()).unwrap();
+    contact.accept_recovery([99u8; 32], test_key(), 0).unwrap();
     assert!(contact.has_recovered());
 
     // Fingerprint re-verification clears recovery flag — in-person
@@ -232,11 +238,12 @@ fn test_update_card_sets_card_updated_at() {
         test_key(),
         ProximityConfidence::Unknown,
         ExchangeTransport::Qr,
+        0,
     );
     assert_eq!(contact.card_updated_at(), None);
 
     let new_card = ContactCard::new("Updated Name");
-    contact.update_card(new_card);
+    contact.update_card(new_card, 0);
 
     assert!(
         contact.card_updated_at().is_some(),
@@ -254,12 +261,13 @@ fn test_update_card_timestamp_increases() {
         test_key(),
         ProximityConfidence::Unknown,
         ExchangeTransport::Qr,
+        0,
     );
 
-    contact.update_card(ContactCard::new("First Update"));
+    contact.update_card(ContactCard::new("First Update"), 0);
     let first_ts = contact.card_updated_at().unwrap();
 
-    contact.update_card(ContactCard::new("Second Update"));
+    contact.update_card(ContactCard::new("Second Update"), 0);
     let second_ts = contact.card_updated_at().unwrap();
 
     assert!(
@@ -356,6 +364,7 @@ fn test_storage_roundtrip_preserves_exchange_transport() {
         test_key(),
         ProximityConfidence::High,
         ExchangeTransport::Nfc,
+        0,
     );
     let id = contact.id().to_string();
 
@@ -379,8 +388,9 @@ fn test_storage_roundtrip_preserves_has_recovered() {
         test_key(),
         ProximityConfidence::Unknown,
         ExchangeTransport::Qr,
+        0,
     );
-    contact.accept_recovery([99u8; 32], test_key()).unwrap();
+    contact.accept_recovery([99u8; 32], test_key(), 0).unwrap();
     let id = contact.id().to_string();
 
     storage.save_contact(&contact).unwrap();
@@ -402,8 +412,9 @@ fn test_storage_roundtrip_preserves_card_updated_at() {
         test_key(),
         ProximityConfidence::Unknown,
         ExchangeTransport::Qr,
+        0,
     );
-    contact.update_card(ContactCard::new("Updated"));
+    contact.update_card(ContactCard::new("Updated"), 0);
     let id = contact.id().to_string();
     let expected_ts = contact.card_updated_at().unwrap();
 
@@ -421,7 +432,7 @@ fn test_storage_roundtrip_preserves_card_updated_at() {
 #[test]
 fn test_storage_roundtrip_default_trust_fields() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
-    let contact = Contact::from_exchange(test_public_key(), test_card(), test_key());
+    let contact = Contact::from_exchange(test_public_key(), test_card(), test_key(), 0);
     let id = contact.id().to_string();
 
     storage.save_contact(&contact).unwrap();
@@ -512,7 +523,7 @@ fn verifier_event_log_serde_roundtrip() {
 
 /// Helper: create a test contact with optional mutation.
 fn make_contact(mutate: impl FnOnce(&mut Contact)) -> Contact {
-    let mut c = Contact::from_exchange(test_public_key(), test_card(), test_key());
+    let mut c = Contact::from_exchange(test_public_key(), test_card(), test_key(), 0);
     mutate(&mut c);
     c
 }

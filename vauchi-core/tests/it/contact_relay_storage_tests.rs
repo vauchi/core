@@ -16,7 +16,7 @@ fn make_contact(name: &str) -> Contact {
     let public_key = [name.as_bytes()[0]; 32];
     let card = ContactCard::new(name);
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(public_key, card, shared_key)
+    Contact::from_exchange(public_key, card, shared_key, 0)
 }
 
 fn open_storage() -> Storage {

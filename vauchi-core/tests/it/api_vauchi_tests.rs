@@ -109,8 +109,12 @@ fn test_vauchi_contact_operations() {
     assert!(wb.list_contacts().unwrap().is_empty());
 
     // Add contact
-    let contact =
-        Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+    let contact = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
@@ -133,8 +137,12 @@ fn test_vauchi_contact_operations() {
 fn test_vauchi_verify_fingerprint() {
     let wb = create_test_vauchi();
 
-    let contact =
-        Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+    let contact = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
@@ -156,6 +164,7 @@ fn test_contact_fingerprint_format() {
         [0xABu8; 32],
         ContactCard::new("Bob"),
         SymmetricKey::generate(),
+        0,
     );
 
     let fp = contact.fingerprint();
@@ -270,8 +279,12 @@ fn test_propagate_card_update_to_contacts() {
 
     // Create a contact with ratchet
     let bob_key = [1u8; 32];
-    let contact =
-        Contact::from_exchange(bob_key, ContactCard::new("Bob"), SymmetricKey::generate());
+    let contact = Contact::from_exchange(
+        bob_key,
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
@@ -308,8 +321,12 @@ fn test_propagate_skips_contacts_without_ratchet() {
     wb.create_identity("Alice").unwrap();
 
     // Create a contact WITHOUT ratchet
-    let contact =
-        Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+    let contact = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
     wb.add_contact(contact).unwrap();
 
     // Get old card, update it
@@ -336,8 +353,12 @@ fn test_propagate_empty_delta_not_queued() {
     wb.create_identity("Alice").unwrap();
 
     // Create a contact with ratchet
-    let contact =
-        Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+    let contact = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
@@ -370,8 +391,12 @@ fn test_propagate_respects_visibility_rules() {
     let email_field_id = email_field.id().to_string();
 
     // Create a contact with ratchet
-    let mut contact =
-        Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+    let mut contact = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
     let contact_id = contact.id().to_string();
 
     // Set visibility: hide the email field (by its ID) from Bob
@@ -416,8 +441,12 @@ fn test_propagate_partial_visibility() {
     let phone_field = ContactField::new(FieldType::Phone, "phone", "+1234567890", 0);
 
     // Create a contact with ratchet
-    let mut contact =
-        Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+    let mut contact = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
     let contact_id = contact.id().to_string();
 
     // Set visibility: hide only email field (by ID) from Bob
@@ -472,6 +501,7 @@ fn test_process_incoming_card_update() {
         *bob_identity.signing_public_key(),
         ContactCard::new("Bob"),
         shared_secret.clone(),
+        0,
     );
     let bob_id = contact.id().to_string();
     alice_wb.add_contact(contact).unwrap();
@@ -672,6 +702,7 @@ fn test_process_update_rejects_invalid_signature() {
         *bob_identity.signing_public_key(),
         ContactCard::new("Bob"),
         shared_secret.clone(),
+        0,
     );
     let bob_id = contact.id().to_string();
     alice_wb.add_contact(contact).unwrap();
@@ -738,6 +769,7 @@ fn test_process_card_update_truncated_message() {
         *bob_identity.signing_public_key(),
         ContactCard::new("Bob"),
         shared_secret.clone(),
+        0,
     );
     let bob_id = contact.id().to_string();
     alice_wb.add_contact(contact).unwrap();
@@ -768,6 +800,7 @@ fn test_process_card_update_empty_payload() {
         *bob_identity.signing_public_key(),
         ContactCard::new("Bob"),
         shared_secret.clone(),
+        0,
     );
     let bob_id = contact.id().to_string();
     alice_wb.add_contact(contact).unwrap();
@@ -800,6 +833,7 @@ fn test_process_card_update_malformed_json_in_ratchet() {
         *bob_identity.signing_public_key(),
         ContactCard::new("Bob"),
         shared_secret.clone(),
+        0,
     );
     let bob_id = contact.id().to_string();
     alice_wb.add_contact(contact).unwrap();

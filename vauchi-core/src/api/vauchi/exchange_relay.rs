@@ -273,7 +273,7 @@ impl Vauchi {
 
         // 7. Create contact
         let card = ContactCard::new(&offer.display_name);
-        let contact = Contact::from_exchange(their_identity_key, card, shared_secret.clone());
+        let contact = Contact::from_exchange(their_identity_key, card, shared_secret.clone(), 0);
         let contact_id = contact.id().to_string();
 
         let manager = ContactManager::new(&self.storage, self.events.clone());
@@ -350,7 +350,7 @@ impl Vauchi {
 
         // Create contact
         let card = ContactCard::new(&response.display_name);
-        let contact = Contact::from_exchange(their_identity_key, card, shared_secret.clone());
+        let contact = Contact::from_exchange(their_identity_key, card, shared_secret.clone(), 0);
         let contact_id = contact.id().to_string();
 
         let manager = ContactManager::new(&self.storage, self.events.clone());

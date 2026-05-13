@@ -35,6 +35,7 @@ fn setup_alice_with_bob_ratchet() -> (Vauchi, String, Identity, X3DHKeyPair, Sym
         *bob_identity.signing_public_key(),
         ContactCard::new("Bob"),
         shared_secret.clone(),
+        0,
     );
     let bob_id = contact.id().to_string();
     alice.add_contact(contact).unwrap();
@@ -57,8 +58,12 @@ fn setup_alice_as_sender_to_bob() -> (Vauchi, String) {
     alice.create_identity("Alice").unwrap();
 
     let bob_key = [1u8; 32];
-    let contact =
-        Contact::from_exchange(bob_key, ContactCard::new("Bob"), SymmetricKey::generate());
+    let contact = Contact::from_exchange(
+        bob_key,
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
     let contact_id = contact.id().to_string();
     alice.add_contact(contact).unwrap();
 
@@ -460,8 +465,12 @@ fn test_migrate_contacts_skips_no_ratchet() {
     alice.create_identity("Alice").unwrap();
 
     // Add a contact WITHOUT ratchet (can't send updates)
-    let contact =
-        Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+    let contact = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
     alice.add_contact(contact).unwrap();
 
     // Migration should skip contacts without ratchet
@@ -491,8 +500,12 @@ fn test_cek_wrapped_end_to_end_flow() {
     let bob_pub_key = *bob.identity().unwrap().signing_public_key();
 
     // Alice adds Bob using Bob's actual public key
-    let bob_contact =
-        Contact::from_exchange(bob_pub_key, ContactCard::new("Bob"), shared_secret.clone());
+    let bob_contact = Contact::from_exchange(
+        bob_pub_key,
+        ContactCard::new("Bob"),
+        shared_secret.clone(),
+        0,
+    );
     let bob_id = bob_contact.id().to_string();
     alice.add_contact(bob_contact).unwrap();
     alice
@@ -513,6 +526,7 @@ fn test_cek_wrapped_end_to_end_flow() {
         alice_pub_key,
         ContactCard::new("Alice"),
         shared_secret.clone(),
+        0,
     );
     let alice_id = alice_contact.id().to_string();
     bob.add_contact(alice_contact).unwrap();

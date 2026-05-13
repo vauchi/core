@@ -503,7 +503,7 @@ mod tests {
     fn create_test_contact(name: &str, pk: [u8; 32]) -> Contact {
         let card = ContactCard::new(name);
         let shared_key = SymmetricKey::generate();
-        Contact::from_exchange(pk, card, shared_key)
+        Contact::from_exchange(pk, card, shared_key, 0)
     }
 
     #[test]

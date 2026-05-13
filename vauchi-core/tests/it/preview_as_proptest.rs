@@ -51,6 +51,7 @@ fn add_contact(vauchi: &Vauchi, name: &str) -> String {
         *identity.signing_public_key(),
         ContactCard::new(name),
         SymmetricKey::generate(),
+        0,
     );
     let id = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();

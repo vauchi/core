@@ -492,11 +492,13 @@ fn test_verify_with_mutual_contacts_high() {
             *keypair1.public_key().as_bytes(),
             ContactCard::new("Bob"),
             SymmetricKey::generate(),
+            0,
         ),
         Contact::from_exchange(
             *keypair2.public_key().as_bytes(),
             ContactCard::new("Carol"),
             SymmetricKey::generate(),
+            0,
         ),
     ];
 
@@ -551,6 +553,7 @@ fn test_verify_with_partial_mutual_contacts() {
         *keypair1.public_key().as_bytes(),
         ContactCard::new("Bob"),
         SymmetricKey::generate(),
+        0,
     )];
 
     let settings = RecoverySettings::new(3, 2).unwrap();

@@ -19,7 +19,7 @@ fn create_test_contact(name: &str, key_byte: u8) -> Contact {
     let public_key = [key_byte; 32];
     let card = ContactCard::new(name);
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(public_key, card, shared_key)
+    Contact::from_exchange(public_key, card, shared_key, 0)
 }
 
 fn create_test_storage() -> Storage {
@@ -37,12 +37,13 @@ fn create_exchanged_contact(name: &str) -> Contact {
         *identity.signing_public_key(),
         ContactCard::new(name),
         SymmetricKey::generate(),
+        0,
     )
 }
 
 fn create_imported_contact(name: &str) -> Contact {
     let card = ContactCard::new(name);
-    Contact::from_import(card, ImportSource::Manual, None)
+    Contact::from_import(card, ImportSource::Manual, None, 0)
 }
 
 // ============================================================
@@ -156,7 +157,7 @@ fn unarchive_clears_flag_and_timestamp() {
 #[test]
 fn imported_contact_defaults_not_deleted_not_archived() {
     let card = ContactCard::new("Grace");
-    let contact = Contact::from_import(card, vauchi_core::contact::ImportSource::Manual, None);
+    let contact = Contact::from_import(card, vauchi_core::contact::ImportSource::Manual, None, 0);
     assert!(!contact.is_soft_deleted());
     assert!(!contact.is_archived());
     assert_eq!(contact.deleted_at(), None);

@@ -23,7 +23,7 @@ fn make_contact(name: &str, fields: &[(FieldType, &str, &str)]) -> Contact {
         card.add_field(ContactField::new(ft.clone(), label, value, 0))
             .unwrap();
     }
-    Contact::from_exchange(pk, card, SymmetricKey::generate())
+    Contact::from_exchange(pk, card, SymmetricKey::generate(), 0)
 }
 
 // ============================================================

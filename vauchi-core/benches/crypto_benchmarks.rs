@@ -258,7 +258,7 @@ fn bench_storage(c: &mut Criterion) {
         ))
         .unwrap();
         let shared_key = SymmetricKey::generate();
-        Contact::from_exchange([0u8; 32], card, shared_key)
+        Contact::from_exchange([0u8; 32], card, shared_key, 0)
     }
 
     group.bench_function("save_contact", |b| {
@@ -407,7 +407,7 @@ fn bench_pagination(c: &mut Criterion) {
         .unwrap();
         let mut pk = [0u8; 32];
         pk[..8].copy_from_slice(&(n as u64).to_be_bytes());
-        Contact::from_exchange(pk, card, SymmetricKey::generate())
+        Contact::from_exchange(pk, card, SymmetricKey::generate(), 0)
     }
 
     let mut group = c.benchmark_group("pagination");

@@ -32,6 +32,7 @@ fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
         *identity.signing_public_key(),
         ContactCard::new(name),
         shared.clone(),
+        0,
     );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
@@ -54,6 +55,7 @@ fn add_contact_with_ratchet_and_visibility(
         *identity.signing_public_key(),
         ContactCard::new(name),
         shared.clone(),
+        0,
     );
     let contact_id = contact.id().to_string();
 

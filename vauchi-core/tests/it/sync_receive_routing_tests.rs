@@ -40,12 +40,12 @@ fn link_contacts(
     let shared_secret = SymmetricKey::generate();
 
     let peer_at_host =
-        Contact::from_exchange(peer_pk, ContactCard::new(label), shared_secret.clone());
+        Contact::from_exchange(peer_pk, ContactCard::new(label), shared_secret.clone(), 0);
     let peer_contact_id = peer_at_host.id().to_string();
     host.add_contact(peer_at_host).unwrap();
 
     let host_at_peer =
-        Contact::from_exchange(host_pk, ContactCard::new("host"), shared_secret.clone());
+        Contact::from_exchange(host_pk, ContactCard::new("host"), shared_secret.clone(), 0);
     let host_contact_id = host_at_peer.id().to_string();
     peer.add_contact(host_at_peer).unwrap();
 

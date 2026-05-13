@@ -19,7 +19,12 @@ use vauchi_core::sync::{ImportedContactSyncData, SyncItem};
 
 fn make_imported(name: &str) -> Contact {
     let card = ContactCard::new(name);
-    Contact::from_import(card, ImportSource::VcardFile, Some(format!("uid-{}", name)))
+    Contact::from_import(
+        card,
+        ImportSource::VcardFile,
+        Some(format!("uid-{}", name)),
+        1_700_000_000, // Pinned non-zero stamp; test asserts `imported_at > 0`.
+    )
 }
 
 fn make_exchanged(name: &str) -> Contact {
@@ -29,7 +34,7 @@ fn make_exchanged(name: &str) -> Contact {
     }
     let card = ContactCard::new(name);
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(public_key, card, shared_key)
+    Contact::from_exchange(public_key, card, shared_key, 0)
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────

@@ -56,6 +56,7 @@ fn make_test_contact() -> Contact {
         [1u8; 32],
         ContactCard::new("Alice"),
         SymmetricKey::generate(),
+        0,
     )
 }
 
@@ -63,7 +64,7 @@ fn make_test_contact() -> Contact {
 #[test]
 fn contact_reciprocity_defaults_to_unknown() {
     let contact = make_test_contact();
-    assert_eq!(contact.reciprocity(), Reciprocity::Unknown);
+    assert_eq!(contact.reciprocity(0), Reciprocity::Unknown);
 }
 
 // @internal
@@ -71,7 +72,7 @@ fn contact_reciprocity_defaults_to_unknown() {
 fn contact_set_reciprocity() {
     let mut contact = make_test_contact();
     contact.set_reciprocity(Reciprocity::Confirmed);
-    assert_eq!(contact.reciprocity(), Reciprocity::Confirmed);
+    assert_eq!(contact.reciprocity(0), Reciprocity::Confirmed);
 }
 
 // @internal
@@ -97,7 +98,7 @@ fn reciprocity_storage_roundtrip() {
     storage.save_contact(&contact).unwrap();
 
     let loaded = storage.load_contact(&id).unwrap().unwrap();
-    assert_eq!(loaded.reciprocity(), Reciprocity::Pending);
+    assert_eq!(loaded.reciprocity(0), Reciprocity::Pending);
     assert_eq!(
         loaded.confirmation_channel(),
         Some(ConfirmationChannel::RelayEscrow)
@@ -115,7 +116,7 @@ fn reciprocity_storage_null_defaults_to_unknown() {
     storage.save_contact(&contact).unwrap();
 
     let loaded = storage.load_contact(&id).unwrap().unwrap();
-    assert_eq!(loaded.reciprocity(), Reciprocity::Unknown);
+    assert_eq!(loaded.reciprocity(0), Reciprocity::Unknown);
     assert_eq!(loaded.confirmation_channel(), None);
 }
 
@@ -250,25 +251,19 @@ fn make_contact_with_timestamp(ts: u64) -> Contact {
 // @internal
 #[test]
 fn reciprocity_pending_within_7_days_stays_pending() {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = 1_700_000_000;
     let mut contact = make_contact_with_timestamp(now - 3600); // 1 hour ago
     contact.set_reciprocity(Reciprocity::Pending);
-    assert_eq!(contact.reciprocity(), Reciprocity::Pending);
+    assert_eq!(contact.reciprocity(now), Reciprocity::Pending);
 }
 
 // @internal
 #[test]
 fn reciprocity_pending_expires_after_7_days() {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = 1_700_000_000;
     let mut contact = make_contact_with_timestamp(now - 8 * 86400); // 8 days ago
     contact.set_reciprocity(Reciprocity::Pending);
-    assert_eq!(contact.reciprocity(), Reciprocity::Unreciprocated);
+    assert_eq!(contact.reciprocity(now), Reciprocity::Unreciprocated);
 }
 
 // @internal
@@ -278,7 +273,7 @@ fn unreciprocated_upgrades_to_confirmed_on_late_arrival() {
     contact.set_reciprocity(Reciprocity::Unreciprocated);
     // Simulate receiving a valid ReciprocityConfirm after window
     contact.set_reciprocity(Reciprocity::Confirmed);
-    assert_eq!(contact.reciprocity(), Reciprocity::Confirmed);
+    assert_eq!(contact.reciprocity(0), Reciprocity::Confirmed);
 }
 
 // @internal
@@ -290,7 +285,7 @@ fn confirmed_not_affected_by_timer() {
         .as_secs();
     let mut contact = make_contact_with_timestamp(now - 30 * 86400); // 30 days ago
     contact.set_reciprocity(Reciprocity::Confirmed);
-    assert_eq!(contact.reciprocity(), Reciprocity::Confirmed);
+    assert_eq!(contact.reciprocity(0), Reciprocity::Confirmed);
 }
 
 // ── Task 5: Token derivation in key agreement ──

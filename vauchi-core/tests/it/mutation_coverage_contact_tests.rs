@@ -15,11 +15,16 @@ use vauchi_core::exchange::{ConfirmationChannel, Reciprocity, TrustMetrics, Veri
 use vauchi_core::{ExchangeTransport, ProximityConfidence};
 
 fn exchanged_contact(name: &str) -> Contact {
-    Contact::from_exchange([0xAA; 32], ContactCard::new(name), SymmetricKey::generate())
+    Contact::from_exchange(
+        [0xAA; 32],
+        ContactCard::new(name),
+        SymmetricKey::generate(),
+        0,
+    )
 }
 
 fn imported_contact(name: &str) -> Contact {
-    Contact::from_import(ContactCard::new(name), ImportSource::Manual, None)
+    Contact::from_import(ContactCard::new(name), ImportSource::Manual, None, 0)
 }
 
 // ============================================================
@@ -126,7 +131,7 @@ fn reciprocity_pending_within_7_days_stays_pending() {
 
     // The exchange_timestamp is set to now by from_exchange,
     // so the 7-day window has NOT elapsed.
-    assert_eq!(c.reciprocity(), Reciprocity::Pending);
+    assert_eq!(c.reciprocity(0), Reciprocity::Pending);
 }
 
 // @internal
@@ -134,7 +139,7 @@ fn reciprocity_pending_within_7_days_stays_pending() {
 fn reciprocity_confirmed_stays_confirmed() {
     let mut c = exchanged_contact("Alice");
     c.set_reciprocity(Reciprocity::Confirmed);
-    assert_eq!(c.reciprocity(), Reciprocity::Confirmed);
+    assert_eq!(c.reciprocity(0), Reciprocity::Confirmed);
 }
 
 // @internal
@@ -142,14 +147,14 @@ fn reciprocity_confirmed_stays_confirmed() {
 fn reciprocity_none_returns_unknown() {
     // A freshly exchanged contact has reciprocity = None (legacy)
     let c = exchanged_contact("Alice");
-    assert_eq!(c.reciprocity(), Reciprocity::Unknown);
+    assert_eq!(c.reciprocity(0), Reciprocity::Unknown);
 }
 
 // @internal
 #[test]
 fn reciprocity_imported_returns_unknown() {
     let c = imported_contact("Bob");
-    assert_eq!(c.reciprocity(), Reciprocity::Unknown);
+    assert_eq!(c.reciprocity(0), Reciprocity::Unknown);
 }
 
 // ============================================================
@@ -180,7 +185,7 @@ fn set_confirmation_channel_stores_value() {
 fn set_reciprocity_stores_value() {
     let mut c = exchanged_contact("Alice");
     c.set_reciprocity(Reciprocity::Unreciprocated);
-    assert_eq!(c.reciprocity(), Reciprocity::Unreciprocated);
+    assert_eq!(c.reciprocity(0), Reciprocity::Unreciprocated);
 }
 
 // ============================================================
@@ -223,7 +228,7 @@ fn accept_recovery_with_card_updates_key_and_card() {
     let new_key = SymmetricKey::generate();
     let new_card = ContactCard::new("Alice Updated");
 
-    c.accept_recovery_with_card(new_pk, new_key, new_card)
+    c.accept_recovery_with_card(new_pk, new_key, new_card, 0)
         .unwrap();
 
     assert_ne!(c.id(), old_id, "ID should change after recovery");
@@ -240,6 +245,7 @@ fn accept_recovery_with_card_fails_on_imported() {
         [0xCC; 32],
         SymmetricKey::generate(),
         ContactCard::new("Bob"),
+        0,
     );
     result.expect_err("should fail on imported contact");
 }

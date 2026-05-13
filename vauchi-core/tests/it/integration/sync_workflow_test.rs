@@ -215,12 +215,16 @@ fn test_field_modification_and_removal_propagation() {
         let shared_secret = SymmetricKey::generate();
 
         let bob_contact =
-            Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
+            Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone(), 0);
         let bob_id = bob_contact.id().to_string();
         alice_wb.add_contact(bob_contact).unwrap();
 
-        let alice_contact =
-            Contact::from_exchange(alice_pk, ContactCard::new("Alice"), shared_secret.clone());
+        let alice_contact = Contact::from_exchange(
+            alice_pk,
+            ContactCard::new("Alice"),
+            shared_secret.clone(),
+            0,
+        );
         let alice_id = alice_contact.id().to_string();
         bob_wb.add_contact(alice_contact).unwrap();
 

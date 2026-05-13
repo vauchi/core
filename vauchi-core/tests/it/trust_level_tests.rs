@@ -20,7 +20,7 @@ fn make_contact(mutate: impl FnOnce(&mut Contact)) -> Contact {
     let public_key = [42u8; 32];
     let card = ContactCard::new("Test User");
     let shared_key = SymmetricKey::generate();
-    let mut c = Contact::from_exchange(public_key, card, shared_key);
+    let mut c = Contact::from_exchange(public_key, card, shared_key, 0);
     mutate(&mut c);
     c
 }

@@ -28,7 +28,7 @@ fn create_numbered_contact(n: usize) -> Contact {
     let mut pk = [0u8; 32];
     pk[..8].copy_from_slice(&(n as u64).to_be_bytes());
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(pk, card, shared_key)
+    Contact::from_exchange(pk, card, shared_key, 0)
 }
 
 /// Helper: populate storage with N contacts.

@@ -24,7 +24,7 @@ impl Vauchi {
         Ok(decoys
             .into_iter()
             .map(|(id, _display_name, card)| {
-                Contact::from_exchange(decoy_id_to_fake_pk(&id), card, SymmetricKey::generate())
+                Contact::from_exchange(decoy_id_to_fake_pk(&id), card, SymmetricKey::generate(), 0)
             })
             .collect())
     }
@@ -172,7 +172,7 @@ impl Vauchi {
 
         // Create contact
         let card = crate::ContactCard::new(display_name);
-        let contact = Contact::from_exchange(*identity_key, card, shared_secret.clone());
+        let contact = Contact::from_exchange(*identity_key, card, shared_secret.clone(), 0);
         let contact_id = contact.id().to_string();
 
         let manager = ContactManager::new(&self.storage, self.events.clone());
@@ -817,7 +817,7 @@ impl Vauchi {
         let mut card = contact.card().clone();
         card.update_field_value(field_id, new_value, self.clock.unix_seconds())
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        contact.update_card(card);
+        contact.update_card(card, 0);
         self.storage.save_contact(&contact)?;
         Ok(())
     }
@@ -849,7 +849,7 @@ impl Vauchi {
             self.clock.unix_seconds(),
         ))
         .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        contact.update_card(card);
+        contact.update_card(card, 0);
         self.storage.save_contact(&contact)?;
         Ok(())
     }
@@ -870,7 +870,7 @@ impl Vauchi {
         let mut card = contact.card().clone();
         card.remove_field(field_id)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-        contact.update_card(card);
+        contact.update_card(card, 0);
         self.storage.save_contact(&contact)?;
         Ok(())
     }

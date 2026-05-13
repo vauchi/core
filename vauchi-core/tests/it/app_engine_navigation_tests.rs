@@ -639,7 +639,7 @@ fn default_screen_is_contacts_when_has_contacts() {
     vauchi.create_identity("Alice").unwrap();
     let card = ContactCard::new("Bob");
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange([2u8; 32], card, shared_key);
+    let contact = Contact::from_exchange([2u8; 32], card, shared_key, 0);
     vauchi.add_contact(contact).unwrap();
 
     let engine = AppEngine::new(vauchi);

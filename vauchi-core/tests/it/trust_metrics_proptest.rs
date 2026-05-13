@@ -14,6 +14,7 @@ fn make_contact(mutate: impl FnOnce(&mut Contact)) -> Contact {
         [42u8; 32],
         ContactCard::new("Prop"),
         SymmetricKey::generate(),
+        0,
     );
     mutate(&mut c);
     c

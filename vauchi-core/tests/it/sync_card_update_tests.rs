@@ -40,13 +40,17 @@ fn setup_exchange_with_ratchets() -> (
 
     // Alice adds Bob as contact
     let bob_contact =
-        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
+        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone(), 0);
     let bob_contact_id = bob_contact.id().to_string();
     alice_wb.add_contact(bob_contact).unwrap();
 
     // Bob adds Alice as contact
-    let alice_contact =
-        Contact::from_exchange(alice_pk, ContactCard::new("Alice"), shared_secret.clone());
+    let alice_contact = Contact::from_exchange(
+        alice_pk,
+        ContactCard::new("Alice"),
+        shared_secret.clone(),
+        0,
+    );
     let alice_contact_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
 
@@ -290,7 +294,7 @@ fn test_no_ratchet_state_rejected() {
     let bob_pk = *bob_wb.identity().unwrap().signing_public_key();
     let shared_secret = SymmetricKey::generate();
     let bob_contact =
-        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone());
+        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone(), 0);
     let bob_contact_id = bob_contact.id().to_string();
     alice_wb.add_contact(bob_contact).unwrap();
 
@@ -794,7 +798,7 @@ fn test_field_note_cleaned_on_inbound_field_removed() {
         .load_contact(&bob_contact_id)
         .unwrap()
         .unwrap();
-    alice_bob_contact.update_card(old_card.clone());
+    alice_bob_contact.update_card(old_card.clone(), 0);
     alice_wb.storage().save_contact(&alice_bob_contact).unwrap();
 
     // Alice writes private notes on both of Bob's fields.

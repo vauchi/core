@@ -631,7 +631,7 @@ impl AppEngine {
 
                     // Reciprocity status (design spec §6.3)
                     use vauchi_core::exchange::reciprocity::Reciprocity;
-                    let reciprocity_status = match contact.reciprocity() {
+                    let reciprocity_status = match contact.reciprocity(0) {
                         Reciprocity::Pending => "Awaiting confirmation".to_string(),
                         Reciprocity::Unreciprocated => "May not have your card".to_string(),
                         _ => String::new(),

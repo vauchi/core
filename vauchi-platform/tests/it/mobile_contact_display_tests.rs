@@ -17,7 +17,7 @@ fn make_contact(name: &str) -> Contact {
     let mut pk = [0u8; 32];
     pk[0] = 0x42;
     let card = ContactCard::new(name);
-    Contact::from_exchange(pk, card, SymmetricKey::generate())
+    Contact::from_exchange(pk, card, SymmetricKey::generate(), 0)
 }
 
 // @scenario: contacts_management.feature :: Display name resolution in platform bindings

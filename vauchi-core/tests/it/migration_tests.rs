@@ -456,7 +456,7 @@ fn test_contact_persistence_roundtrip() {
     let shared_key = CryptoKey::generate();
     let public_key = [42u8; 32];
 
-    let contact = Contact::from_exchange(public_key, card, shared_key);
+    let contact = Contact::from_exchange(public_key, card, shared_key, 0);
 
     // Save
     storage.save_contact(&contact).unwrap();
@@ -504,7 +504,7 @@ fn test_nullable_columns_work() {
     let shared_key = CryptoKey::generate();
     let public_key = [0u8; 32];
 
-    let contact = Contact::from_exchange(public_key, card, shared_key);
+    let contact = Contact::from_exchange(public_key, card, shared_key, 0);
     storage.save_contact(&contact).unwrap();
 
     // Should load successfully even with null visibility_rules_json

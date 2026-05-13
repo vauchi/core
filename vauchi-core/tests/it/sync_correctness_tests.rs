@@ -402,6 +402,7 @@ fn test_checkpoint_save_load_roundtrip() {
                 [0x42u8; 32],
                 ContactCard::new("Bob"),
                 SymmetricKey::generate(),
+                0,
             )),
             timestamp: 300,
         },

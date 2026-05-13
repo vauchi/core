@@ -315,7 +315,7 @@ fn test_contact_roundtrip_preserves_data() {
     ))
     .unwrap();
 
-    let contact = Contact::from_exchange([1u8; 32], card, SymmetricKey::generate());
+    let contact = Contact::from_exchange([1u8; 32], card, SymmetricKey::generate(), 0);
     let contact_id = contact.id().to_string();
 
     wb.add_contact(contact).unwrap();
@@ -365,11 +365,13 @@ fn test_cannot_add_duplicate_contact() {
         [1u8; 32],
         ContactCard::new("Test"),
         SymmetricKey::generate(),
+        0,
     );
     let contact_clone = Contact::from_exchange(
         [1u8; 32],
         ContactCard::new("Test"),
         SymmetricKey::generate(),
+        0,
     );
 
     wb.add_contact(contact).unwrap();
@@ -461,6 +463,7 @@ fn test_visibility_on_nonexistent_field() {
         [1u8; 32],
         ContactCard::new("Test"),
         SymmetricKey::generate(),
+        0,
     );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();

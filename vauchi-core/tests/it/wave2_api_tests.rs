@@ -30,7 +30,7 @@ fn create_vauchi_with_identity(name: &str) -> Vauchi {
 fn create_test_contact(name: &str, pk: [u8; 32]) -> Contact {
     let card = ContactCard::new(name);
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(pk, card, shared_key)
+    Contact::from_exchange(pk, card, shared_key, 0)
 }
 
 fn create_test_contact_with_fields(
@@ -44,7 +44,7 @@ fn create_test_contact_with_fields(
             .unwrap();
     }
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(pk, card, shared_key)
+    Contact::from_exchange(pk, card, shared_key, 0)
 }
 
 // ================================================================

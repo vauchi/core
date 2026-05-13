@@ -26,6 +26,7 @@ fn make_contact(name: &str, transport: ExchangeTransport) -> Contact {
         test_key(),
         ProximityConfidence::Unknown,
         transport,
+        0,
     )
 }
 
@@ -86,7 +87,7 @@ fn test_statistics_exchange_method_breakdown() {
 #[test]
 fn test_statistics_recovery_count() {
     let mut alice = make_contact("Alice", ExchangeTransport::Qr);
-    alice.accept_recovery([99u8; 32], test_key()).unwrap();
+    alice.accept_recovery([99u8; 32], test_key(), 0).unwrap();
     let bob = make_contact("Bob", ExchangeTransport::Nfc);
 
     let stats = compute_statistics(&[alice, bob], 0);

@@ -19,7 +19,7 @@ fn vauchi_with_contact() -> (Vauchi, String) {
     vauchi.create_identity("Alice").unwrap();
     let card = ContactCard::new("Bob");
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange([3u8; 32], card, shared_key);
+    let contact = Contact::from_exchange([3u8; 32], card, shared_key, 0);
     let id = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();
     (vauchi, id)

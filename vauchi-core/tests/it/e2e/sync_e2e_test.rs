@@ -47,6 +47,7 @@ fn test_sync_update_propagation_happy_path() {
         bob_public_key,
         ContactCard::new("Bob"),
         shared_secret.clone(),
+        0,
     );
     alice_wb.add_contact(bob_contact).unwrap();
 
@@ -54,6 +55,7 @@ fn test_sync_update_propagation_happy_path() {
         alice_public_key,
         alice_wb.own_card().unwrap().unwrap(),
         shared_secret.clone(),
+        0,
     );
     let alice_contact_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
@@ -100,7 +102,7 @@ fn test_sync_update_propagation_happy_path() {
     let mut alice_card_at_bob = bob_wb.get_contact(&alice_contact_id).unwrap().unwrap();
     let mut card_copy = alice_card_at_bob.card().clone();
     received_delta.apply(&mut card_copy, 0).unwrap();
-    alice_card_at_bob.update_card(card_copy);
+    alice_card_at_bob.update_card(card_copy, 0);
     bob_wb.storage().save_contact(&alice_card_at_bob).unwrap();
 
     // Step 7: Verify Bob has updated card
@@ -239,12 +241,12 @@ fn test_full_three_user_workflow() {
 
     let alice_bob_secret = SymmetricKey::generate();
     let bob_contact =
-        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), alice_bob_secret.clone());
+        Contact::from_exchange(bob_pk, ContactCard::new("Bob"), alice_bob_secret.clone(), 0);
     let bob_id = bob_contact.id().to_string();
     alice_wb.add_contact(bob_contact).unwrap();
 
     let alice_card = alice_wb.own_card().unwrap().unwrap();
-    let alice_for_bob = Contact::from_exchange(alice_pk, alice_card.clone(), alice_bob_secret);
+    let alice_for_bob = Contact::from_exchange(alice_pk, alice_card.clone(), alice_bob_secret, 0);
     let alice_id_bob = alice_for_bob.id().to_string();
     bob_wb.add_contact(alice_for_bob).unwrap();
 
@@ -254,11 +256,13 @@ fn test_full_three_user_workflow() {
         carol_pk,
         ContactCard::new("Carol"),
         alice_carol_secret.clone(),
+        0,
     );
     let carol_id = carol_contact.id().to_string();
     alice_wb.add_contact(carol_contact).unwrap();
 
-    let alice_for_carol = Contact::from_exchange(alice_pk, alice_card.clone(), alice_carol_secret);
+    let alice_for_carol =
+        Contact::from_exchange(alice_pk, alice_card.clone(), alice_carol_secret, 0);
     let alice_id_carol = alice_for_carol.id().to_string();
     carol_wb.add_contact(alice_for_carol).unwrap();
 

@@ -23,6 +23,7 @@ fn create_contact(name: &str) -> Contact {
         *identity.signing_public_key(),
         ContactCard::new(name),
         SymmetricKey::generate(),
+        0,
     )
 }
 
@@ -166,6 +167,7 @@ fn test_blocked_contact_update_rejected() {
         *bob_identity.signing_public_key(),
         ContactCard::new("Bob"),
         shared_secret.clone(),
+        0,
     );
     let bob_id = bob_contact.id().to_string();
     alice.add_contact(bob_contact).unwrap();
@@ -227,6 +229,7 @@ fn test_propagate_skips_blocked_contacts() {
         *bob_identity.signing_public_key(),
         ContactCard::new("Bob"),
         shared.clone(),
+        0,
     );
     let bob_id = bob.id().to_string();
     alice.add_contact(bob).unwrap();
@@ -235,6 +238,7 @@ fn test_propagate_skips_blocked_contacts() {
         *carol_identity.signing_public_key(),
         ContactCard::new("Carol"),
         SymmetricKey::generate(),
+        0,
     );
     let carol_id = carol.id().to_string();
     alice.add_contact(carol).unwrap();

@@ -121,7 +121,7 @@ pub fn merge_contacts(primary: &Contact, secondary: &Contact) -> Contact {
         }
     }
 
-    merged.update_card(merged_card);
+    merged.update_card(merged_card, 0);
     merged
 }
 

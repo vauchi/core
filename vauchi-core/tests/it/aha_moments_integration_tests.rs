@@ -462,7 +462,12 @@ fn test_add_contact_triggers_first_contact_moment() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
 
     // Add first contact
-    let bob = Contact::from_exchange([1u8; 32], ContactCard::new("Bob"), SymmetricKey::generate());
+    let bob = Contact::from_exchange(
+        [1u8; 32],
+        ContactCard::new("Bob"),
+        SymmetricKey::generate(),
+        0,
+    );
     let bob_name = bob.display_name().to_string();
     wb.add_contact(bob).unwrap();
 
@@ -530,6 +535,7 @@ fn test_demo_contact_skipped_with_contacts() {
         [1u8; 32],
         ContactCard::new("Alice"),
         SymmetricKey::generate(),
+        0,
     );
     wb.add_contact(alice).unwrap();
 

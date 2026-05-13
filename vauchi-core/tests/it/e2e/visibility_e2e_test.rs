@@ -53,6 +53,7 @@ fn test_visibility_control_happy_path() {
         bob_public_key,
         ContactCard::new("Bob"),
         SymmetricKey::generate(),
+        0,
     );
     let bob_id = bob_contact.id().to_string();
 
@@ -60,6 +61,7 @@ fn test_visibility_control_happy_path() {
         carol_public_key,
         ContactCard::new("Carol"),
         SymmetricKey::generate(),
+        0,
     );
     let carol_id = carol_contact.id().to_string();
 

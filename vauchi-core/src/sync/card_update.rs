@@ -186,7 +186,7 @@ pub fn process_single_card_update(
     delta
         .apply(&mut card, storage.clock().unix_seconds())
         .map_err(|_| CardUpdateError::DeltaApplicationFailed)?;
-    contact.update_card(card);
+    contact.update_card(card, 0);
 
     if let Some(cek) = new_cek {
         contact.set_cek(cek);

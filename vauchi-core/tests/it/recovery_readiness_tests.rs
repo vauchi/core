@@ -17,7 +17,7 @@ fn create_test_vauchi() -> Vauchi {
 fn add_contact_with_recovery_trust(wb: &Vauchi, pk: [u8; 32], trusted: bool) {
     let card = ContactCard::new("Contact");
     let shared_key = SymmetricKey::generate();
-    let mut contact = Contact::from_exchange(pk, card, shared_key);
+    let mut contact = Contact::from_exchange(pk, card, shared_key, 0);
     if trusted {
         contact.mark_fingerprint_verified().unwrap();
         contact.trust_for_recovery().unwrap();

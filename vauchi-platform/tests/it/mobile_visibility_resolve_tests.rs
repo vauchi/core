@@ -36,6 +36,7 @@ fn add_exchanged_contact(wb: &VauchiPlatform, name: &str, pk_seed: u8) -> String
         [pk_seed; 32],
         card,
         vauchi_core::crypto::SymmetricKey::generate(),
+        0,
     );
     let id = contact.id().to_string();
     wb.save_test_contact(&contact).unwrap();
@@ -51,6 +52,7 @@ fn add_verified_contact(wb: &VauchiPlatform, name: &str, pk_seed: u8) -> String 
         [pk_seed; 32],
         card,
         vauchi_core::crypto::SymmetricKey::generate(),
+        0,
     );
     contact
         .mark_fingerprint_verified()

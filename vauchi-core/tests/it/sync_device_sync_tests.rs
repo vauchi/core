@@ -13,7 +13,7 @@ fn create_test_contact() -> Contact {
     let public_key = [0x42u8; 32];
     let card = ContactCard::new("Alice");
     let shared_key = SymmetricKey::from_bytes([0x55u8; 32]);
-    Contact::from_exchange(public_key, card, shared_key)
+    Contact::from_exchange(public_key, card, shared_key, 0)
 }
 
 // @scenario: device_management :: New device receives full state
@@ -375,7 +375,7 @@ fn test_new_sync_item_timestamps() {
 
 fn create_imported_test_contact() -> Contact {
     let card = ContactCard::new("Imported José");
-    Contact::from_import(card, vauchi_core::contact::ImportSource::VcardFile, None)
+    Contact::from_import(card, vauchi_core::contact::ImportSource::VcardFile, None, 0)
 }
 
 /// DeviceSyncPayload::new() with a mix of exchanged and imported contacts

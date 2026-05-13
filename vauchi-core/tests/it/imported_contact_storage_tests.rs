@@ -26,12 +26,12 @@ fn make_exchanged(name: &str) -> Contact {
     }
     let card = ContactCard::new(name);
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(public_key, card, shared_key)
+    Contact::from_exchange(public_key, card, shared_key, 0)
 }
 
 fn make_imported(name: &str, source: ImportSource) -> Contact {
     let card = ContactCard::new(name);
-    Contact::from_import(card, source, Some(format!("uid-{}", name)))
+    Contact::from_import(card, source, Some(format!("uid-{}", name)), 0)
 }
 
 // ── Save and load roundtrip ──────────────────────────────────────

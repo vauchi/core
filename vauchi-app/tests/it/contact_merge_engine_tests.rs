@@ -25,7 +25,7 @@ fn new_vauchi_with_identity() -> Vauchi {
 
 fn add_imported(vauchi: &Vauchi, name: &str) -> String {
     let card = ContactCard::new(name);
-    let contact = Contact::from_import(card, ImportSource::VcardFile, None);
+    let contact = Contact::from_import(card, ImportSource::VcardFile, None, 0);
     let id = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();
     id

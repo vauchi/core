@@ -25,6 +25,7 @@ fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
         *identity.signing_public_key(),
         ContactCard::new(name),
         shared.clone(),
+        0,
     );
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
@@ -118,6 +119,7 @@ fn test_repropagate_skips_no_ratchet() {
         *identity.signing_public_key(),
         ContactCard::new("Carol"),
         SymmetricKey::generate(),
+        0,
     );
     let carol_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();

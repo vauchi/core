@@ -218,7 +218,7 @@ impl From<&Contact> for MobileContact {
             has_trust_metrics,
             reciprocity: {
                 use vauchi_core::exchange::reciprocity::Reciprocity;
-                match contact.reciprocity() {
+                match contact.reciprocity(0) {
                     Reciprocity::Confirmed => MobileReciprocity::Confirmed,
                     Reciprocity::Pending => MobileReciprocity::Pending,
                     Reciprocity::Unreciprocated => MobileReciprocity::Unreciprocated,

@@ -46,11 +46,12 @@ fn test_full_path_exchange_to_card_update() {
     // Step 2: Exchange contacts (simulating completed ExchangeSession output)
     let shared_secret = vauchi_core::SymmetricKey::generate();
 
-    let bob_contact = Contact::from_exchange(bob_pk, bob_card, shared_secret.clone());
+    let bob_contact = Contact::from_exchange(bob_pk, bob_card, shared_secret.clone(), 0);
     let bob_contact_id = bob_contact.id().to_string();
     alice.add_contact(bob_contact).unwrap();
 
-    let alice_contact = Contact::from_exchange(alice_pk, alice_card.clone(), shared_secret.clone());
+    let alice_contact =
+        Contact::from_exchange(alice_pk, alice_card.clone(), shared_secret.clone(), 0);
     let alice_contact_id = alice_contact.id().to_string();
     bob.add_contact(alice_contact).unwrap();
 

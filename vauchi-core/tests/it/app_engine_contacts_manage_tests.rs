@@ -99,7 +99,7 @@ fn contact_detail_edit_navigates_to_edit_screen() {
     // Add a contact
     let card = ContactCard::new("Bob");
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange([2u8; 32], card, shared_key);
+    let contact = Contact::from_exchange([2u8; 32], card, shared_key, 0);
     let bob_id = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();
 

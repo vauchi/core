@@ -982,7 +982,7 @@ fn persist_finalized_contact(
 ) -> Result<(), MobileError> {
     let (public_key, card) = deserialize_exchange_payload(received_data)?;
     let shared_key = SymmetricKey::from_bytes(transport_key);
-    let contact = Contact::from_exchange(public_key, card, shared_key.clone());
+    let contact = Contact::from_exchange(public_key, card, shared_key.clone(), 0);
 
     let storage =
         Storage::open(&ctx.storage_path, ctx.storage_key.clone()).map_err(MobileError::from)?;

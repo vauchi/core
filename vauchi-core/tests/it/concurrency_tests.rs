@@ -57,7 +57,7 @@ fn create_test_contact(name: &str) -> Contact {
     rand::thread_rng().fill(&mut public_key);
 
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(public_key, card, shared_key)
+    Contact::from_exchange(public_key, card, shared_key, 0)
 }
 
 // =============================================================================
@@ -442,7 +442,7 @@ fn test_double_save_overwrites() {
     ))
     .unwrap();
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange([1u8; 32], card, shared_key);
+    let contact = Contact::from_exchange([1u8; 32], card, shared_key, 0);
     let id = contact.id().to_string();
 
     storage.save_contact(&contact).unwrap();
@@ -462,7 +462,7 @@ fn test_double_save_overwrites() {
         ))
         .unwrap();
     let shared_key2 = SymmetricKey::generate();
-    let contact2 = Contact::from_exchange([1u8; 32], card2, shared_key2);
+    let contact2 = Contact::from_exchange([1u8; 32], card2, shared_key2, 0);
 
     // Save should overwrite (upsert behavior)
     storage.save_contact(&contact2).unwrap();

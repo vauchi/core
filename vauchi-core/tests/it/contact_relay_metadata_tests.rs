@@ -15,7 +15,7 @@ fn make_test_contact() -> Contact {
     let public_key = [1u8; 32];
     let card = ContactCard::new("Bob");
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange(public_key, card, shared_key)
+    Contact::from_exchange(public_key, card, shared_key, 0)
 }
 
 // ── Default state ──────────────────────────────────────────────────
@@ -79,6 +79,7 @@ fn from_exchange_has_no_relay_fields() {
         [2u8; 32],
         ContactCard::new("Alice"),
         SymmetricKey::generate(),
+        0,
     );
     assert!(contact.relay_url().is_none());
     assert!(contact.relay_noise_pubkey().is_none());
@@ -109,7 +110,7 @@ fn relay_metadata_preserved_after_card_update() {
     contact.set_relay_noise_pubkey(Some([77u8; 32]));
 
     let new_card = ContactCard::new("Bob Updated");
-    contact.update_card(new_card);
+    contact.update_card(new_card, 0);
 
     assert_eq!(contact.relay_url().unwrap(), "https://relay.example.com");
     assert_eq!(contact.relay_noise_pubkey().unwrap(), &[77u8; 32]);
@@ -125,7 +126,7 @@ fn relay_metadata_preserved_after_recovery() {
     contact.set_relay_noise_pubkey(Some([88u8; 32]));
 
     contact
-        .accept_recovery([5u8; 32], SymmetricKey::generate())
+        .accept_recovery([5u8; 32], SymmetricKey::generate(), 0)
         .unwrap();
 
     // Relay metadata should persist through recovery — the contact

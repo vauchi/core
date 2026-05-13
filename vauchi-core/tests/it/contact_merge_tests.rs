@@ -16,7 +16,7 @@ fn make_contact(name: &str, fields: &[(FieldType, &str, &str)]) -> Contact {
         card.add_field(ContactField::new(ft.clone(), label, value, 0))
             .unwrap();
     }
-    Contact::from_exchange(pk, card, SymmetricKey::generate())
+    Contact::from_exchange(pk, card, SymmetricKey::generate(), 0)
 }
 
 fn make_imported_contact(name: &str, fields: &[(FieldType, &str, &str)]) -> Contact {
@@ -25,7 +25,7 @@ fn make_imported_contact(name: &str, fields: &[(FieldType, &str, &str)]) -> Cont
         card.add_field(ContactField::new(ft.clone(), label, value, 0))
             .unwrap();
     }
-    Contact::from_import(card, ImportSource::VcardFile, None)
+    Contact::from_import(card, ImportSource::VcardFile, None, 0)
 }
 
 // @internal

@@ -16,7 +16,7 @@ fn make_contact(name: &str, relay_url: Option<&str>, noise_pubkey: Option<[u8; 3
     let public_key = [name.as_bytes()[0]; 32];
     let card = ContactCard::new(name);
     let shared_key = SymmetricKey::generate();
-    let mut contact = Contact::from_exchange(public_key, card, shared_key);
+    let mut contact = Contact::from_exchange(public_key, card, shared_key, 0);
     contact.set_relay_url(relay_url.map(String::from));
     contact.set_relay_noise_pubkey(noise_pubkey);
     contact

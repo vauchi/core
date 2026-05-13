@@ -84,7 +84,7 @@ fn test_query_under_50ms_with_1000_contacts() {
         ))
         .unwrap();
         let shared = SymmetricKey::generate();
-        let contact = Contact::from_exchange(pk, card, shared);
+        let contact = Contact::from_exchange(pk, card, shared, 0);
         storage.save_contact(&contact).unwrap();
     }
 
@@ -124,7 +124,7 @@ fn test_pagination_under_100ms_per_page() {
         };
         let card = ContactCard::new(&format!("Contact {:04}", i));
         let shared = SymmetricKey::generate();
-        let contact = Contact::from_exchange(pk, card, shared);
+        let contact = Contact::from_exchange(pk, card, shared, 0);
         storage.save_contact(&contact).unwrap();
     }
 
@@ -188,7 +188,7 @@ fn test_list_1000_contacts_under_500ms() {
         };
         let card = ContactCard::new(&format!("Contact {:04}", i));
         let shared = SymmetricKey::generate();
-        let contact = Contact::from_exchange(pk, card, shared);
+        let contact = Contact::from_exchange(pk, card, shared, 0);
         storage.save_contact(&contact).unwrap();
     }
 
@@ -221,7 +221,7 @@ fn test_list_100_contacts_under_100ms() {
         };
         let card = ContactCard::new(&format!("Person {:04}", i));
         let shared = SymmetricKey::generate();
-        let contact = Contact::from_exchange(pk, card, shared);
+        let contact = Contact::from_exchange(pk, card, shared, 0);
         storage.save_contact(&contact).unwrap();
     }
 

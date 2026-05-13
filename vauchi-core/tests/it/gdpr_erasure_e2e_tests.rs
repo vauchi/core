@@ -40,7 +40,7 @@ fn add_test_contact(storage: &Storage, contact_id: &str) {
     public_key[..len].copy_from_slice(&id_bytes[..len]);
 
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange(public_key, card, shared_key);
+    let contact = Contact::from_exchange(public_key, card, shared_key, 0);
     storage.save_contact(&contact).unwrap();
 }
 

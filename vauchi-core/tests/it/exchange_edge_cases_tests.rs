@@ -222,6 +222,7 @@ fn test_duplicate_contact_detection() {
         *alice_qr.public_key(),
         ContactCard::new("Alice"),
         vauchi_core::SymmetricKey::generate(),
+        0,
     );
 
     // Bob starts his session, displays QR, then scans Alice's QR
@@ -257,6 +258,7 @@ fn test_no_duplicate_for_new_contact() {
         *charlie.signing_public_key(),
         ContactCard::new("Charlie"),
         vauchi_core::SymmetricKey::generate(),
+        0,
     );
 
     // Alice generates QR

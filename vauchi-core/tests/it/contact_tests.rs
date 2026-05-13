@@ -15,7 +15,7 @@ fn create_test_contact() -> Contact {
     let card = ContactCard::new("Test User");
     let shared_key = SymmetricKey::generate();
 
-    Contact::from_exchange(public_key, card, shared_key)
+    Contact::from_exchange(public_key, card, shared_key, 0)
 }
 
 // @scenario: contacts_management :: View contact details
@@ -124,7 +124,7 @@ fn test_contact_update_card() {
 
     // Update with new card
     let new_card = ContactCard::new("Updated User");
-    contact.update_card(new_card);
+    contact.update_card(new_card, 0);
 
     assert_eq!(contact.display_name(), "Updated User");
     assert_eq!(contact.card().display_name(), "Updated User");
@@ -159,20 +159,18 @@ fn test_contact_accessors() {
     let card = ContactCard::new("Alice");
     let shared_key = SymmetricKey::generate();
 
-    let contact = Contact::from_exchange(public_key, card, shared_key.clone());
+    // Pinned timestamp — slice 28 made `from_exchange` take an explicit
+    // `now: u64`, so the test now asserts byte-stable equality on the
+    // stamped value instead of the prior wall-clock-recent heuristic.
+    let stamp = 1_700_000_000;
+    let contact = Contact::from_exchange(public_key, card, shared_key.clone(), stamp);
 
     // Test all accessors return correct values
     assert_eq!(contact.public_key().unwrap(), &public_key);
     assert_eq!(contact.card().display_name(), "Alice");
     // shared_key returns reference, just verify it's accessible
     let _ = contact.shared_key();
-    // exchange_timestamp should be recent (within last minute)
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    assert!(contact.exchange_timestamp().unwrap() <= now);
-    assert!(contact.exchange_timestamp().unwrap() > now - 60);
+    assert_eq!(contact.exchange_timestamp().unwrap(), stamp);
 }
 
 // @scenario: contacts_management :: View contact details
@@ -183,7 +181,7 @@ fn test_contact_id_is_hex_encoded_public_key() {
     let card = ContactCard::new("Test");
     let shared_key = SymmetricKey::generate();
 
-    let contact = Contact::from_exchange(public_key, card, shared_key);
+    let contact = Contact::from_exchange(public_key, card, shared_key, 0);
 
     // ID should be hex-encoded public key
     assert_eq!(contact.id(), hex::encode(public_key));
@@ -202,7 +200,7 @@ fn test_fingerprint_readability() {
 
     let card = ContactCard::new("Test");
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange(public_key, card, shared_key);
+    let contact = Contact::from_exchange(public_key, card, shared_key, 0);
 
     let fp = contact.fingerprint();
 
@@ -432,7 +430,7 @@ fn test_recovered_contact_trust_lifecycle() {
     // Simulate recovery: trust drops to Cautious
     contact.untrust_for_recovery().unwrap();
     let new_key = SymmetricKey::generate();
-    contact.accept_recovery([99u8; 32], new_key).unwrap();
+    contact.accept_recovery([99u8; 32], new_key, 0).unwrap();
     assert_eq!(contact.trust_level(), TrustLevel::Cautious);
 
     // Cautious blocks recovery trust

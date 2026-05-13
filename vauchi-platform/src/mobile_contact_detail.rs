@@ -140,7 +140,7 @@ impl VauchiPlatform {
         }
 
         let mut banners = Vec::new();
-        if let Some(kind) = reciprocity_banner(contact.reciprocity()) {
+        if let Some(kind) = reciprocity_banner(contact.reciprocity(0)) {
             banners.push(match kind {
                 // Plain English today; G4b is the i18n follow-up.
                 // See plan §3 / T4.0.3.

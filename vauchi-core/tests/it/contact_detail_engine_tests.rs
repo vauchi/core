@@ -53,7 +53,7 @@ fn contact_detail_shows_personal_note() {
     // Add a contact
     let card = ContactCard::new("Bob");
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange([2u8; 32], card, shared_key);
+    let contact = Contact::from_exchange([2u8; 32], card, shared_key, 0);
     let bob_id = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();
 
@@ -111,7 +111,7 @@ fn contact_detail_shows_empty_note_when_no_note_saved() {
 
     let card = ContactCard::new("Carol");
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange([3u8; 32], card, shared_key);
+    let contact = Contact::from_exchange([3u8; 32], card, shared_key, 0);
     let carol_id = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();
 
@@ -148,7 +148,7 @@ fn contact_detail_text_changed_saves_personal_note() {
 
     let card = ContactCard::new("Dave");
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange([4u8; 32], card, shared_key);
+    let contact = Contact::from_exchange([4u8; 32], card, shared_key, 0);
     let dave_id = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();
 
@@ -213,7 +213,7 @@ fn contact_detail_shows_field_notes() {
     let field_id = field.id().to_string();
     card.add_field(field).unwrap();
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange([10u8; 32], card, shared_key);
+    let contact = Contact::from_exchange([10u8; 32], card, shared_key, 0);
     let bob_id = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();
 
@@ -282,7 +282,7 @@ fn contact_detail_shows_empty_field_note_when_none_saved() {
     let field_id = field.id().to_string();
     card.add_field(field).unwrap();
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange([11u8; 32], card, shared_key);
+    let contact = Contact::from_exchange([11u8; 32], card, shared_key, 0);
     let carol_id = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();
 
@@ -325,7 +325,7 @@ fn contact_detail_text_changed_saves_field_note() {
     let field_id = field.id().to_string();
     card.add_field(field).unwrap();
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange([12u8; 32], card, shared_key);
+    let contact = Contact::from_exchange([12u8; 32], card, shared_key, 0);
     let dave_id = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();
 

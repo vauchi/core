@@ -13,7 +13,7 @@ fn make_contact_with_key(name: &str, key: SymmetricKey) -> Contact {
     let pk = *vauchi_core::SigningKeyPair::generate()
         .public_key()
         .as_bytes();
-    Contact::from_exchange(pk, ContactCard::new(name), key)
+    Contact::from_exchange(pk, ContactCard::new(name), key, 0)
 }
 
 // @scenario: anonymous_sender :: Sender ID derived from shared key and epoch

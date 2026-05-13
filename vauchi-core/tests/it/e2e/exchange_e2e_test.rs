@@ -72,12 +72,16 @@ fn test_contact_exchange_happy_path() {
 
     // Step 4: Create contacts from exchange
     let bob_contact =
-        Contact::from_exchange(bob_public_key, bob_card.clone(), shared_secret.clone());
+        Contact::from_exchange(bob_public_key, bob_card.clone(), shared_secret.clone(), 0);
     let bob_contact_id = bob_contact.id().to_string();
     alice_wb.add_contact(bob_contact).unwrap();
 
-    let alice_contact =
-        Contact::from_exchange(alice_public_key, alice_card.clone(), shared_secret.clone());
+    let alice_contact = Contact::from_exchange(
+        alice_public_key,
+        alice_card.clone(),
+        shared_secret.clone(),
+        0,
+    );
     let alice_contact_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
 

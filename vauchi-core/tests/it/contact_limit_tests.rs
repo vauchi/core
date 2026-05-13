@@ -16,7 +16,7 @@ fn make_contact(name: &str) -> Contact {
         .public_key()
         .as_bytes();
     let card = ContactCard::new(name);
-    Contact::from_exchange(pk, card, SymmetricKey::generate())
+    Contact::from_exchange(pk, card, SymmetricKey::generate(), 0)
 }
 
 // @scenario: contacts_management :: Maximum contacts reached

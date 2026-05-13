@@ -17,7 +17,7 @@ fn create_test_vauchi() -> Vauchi {
 fn add_named_contact(wb: &Vauchi, name: &str, pk: [u8; 32]) -> String {
     let card = ContactCard::new(name);
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange(pk, card, shared_key);
+    let contact = Contact::from_exchange(pk, card, shared_key, 0);
     let id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
     id

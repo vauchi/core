@@ -16,7 +16,7 @@ use vauchi_core::*;
 fn create_contact_with_name(name: &str, pk_byte: u8) -> Contact {
     let card = ContactCard::new(name);
     let shared_key = SymmetricKey::generate();
-    Contact::from_exchange([pk_byte; 32], card, shared_key)
+    Contact::from_exchange([pk_byte; 32], card, shared_key, 0)
 }
 
 // ============================================================

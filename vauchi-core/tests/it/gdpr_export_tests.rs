@@ -28,7 +28,7 @@ fn setup_storage_with_contacts() -> Storage {
     ))
     .unwrap();
     let shared_key = SymmetricKey::generate();
-    let contact = Contact::from_exchange([1u8; 32], card, shared_key);
+    let contact = Contact::from_exchange([1u8; 32], card, shared_key, 0);
     storage.save_contact(&contact).unwrap();
 
     // Save own card

@@ -20,16 +20,23 @@
 //! 4. Any emitted `ActionResult` round-trips through serde JSON —
 //!    the result is well-typed all the way down.
 //!
-//! Storage is in-memory; the clock is `SystemClock`. Once the
-//! `Vauchi::in_memory_with_clock` helper lands, the test will switch
-//! to a `FakeClock` so a property failure can be reproduced byte-
-//! for-byte (see plan §Task 1.4). For now the proptest is
-//! reproducibility-via-seed at the proptest layer alone, which is
-//! sufficient for the crash-hunting role.
+//! Storage is in-memory. The clock is a `FakeClock` anchored at a
+//! fixed epoch; the rng is a `DeterministicRng` seeded from a
+//! `proptest`-generated `u64`. Together with `proptest`'s own
+//! per-case input seed, this gives byte-stable shrinking: a failure
+//! recorded under `proptest-regressions/` re-runs identically on
+//! every machine (closes Phase 1 / Task 1.4's "core is a function"
+//! claim; see slice 25 in
+//! `_private/docs/planning/todo/2026-05-11-pure-functional-core-program-plan.md`).
+
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use proptest::prelude::*;
 use vauchi_app::ui::{ActionResult, AppEngine, ScreenModel, UserAction, WorkflowEngine};
 use vauchi_core::Vauchi;
+use vauchi_core::clock::{Clock, FakeClock};
+use vauchi_core::rng::{DeterministicRng, SecureRng};
 
 // ── Strategies ────────────────────────────────────────────────────────────────
 
@@ -148,10 +155,26 @@ proptest! {
     /// the first proof that the *core is a function* — given the same
     /// `(state, input)` pair it returns the same `(state, output)`,
     /// without ambient side-channels leaking in.
+    ///
+    /// `rng_seed` parametrises the `DeterministicRng` so a shrunk
+    /// counter-example re-runs byte-stably across machines and CI
+    /// re-attempts.
     // @internal
     #[test]
-    fn app_engine_tolerates_random_user_actions(actions in actions_strategy()) {
-        let vauchi = Vauchi::in_memory().expect("in-memory Vauchi");
+    fn app_engine_tolerates_random_user_actions(
+        rng_seed in any::<u64>(),
+        actions in actions_strategy(),
+    ) {
+        // FakeClock anchored at 2023-11-14 22:13:20 UTC (epoch
+        // 1_700_000_000). Not the unix epoch — using a non-zero base
+        // lets duration-since-epoch math run without saturation and
+        // catches state machines that incorrectly assume `now > 0`.
+        let clock: Arc<dyn Clock> = Arc::new(FakeClock::new(
+            SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+        ));
+        let rng: Arc<dyn SecureRng> = Arc::new(DeterministicRng::from_seed(rng_seed));
+        let vauchi =
+            Vauchi::in_memory_with_clock_and_rng(clock.clone(), rng).expect("in-memory Vauchi");
         let mut engine = AppEngine::new(vauchi);
 
         // Pre-state must already be well-formed.

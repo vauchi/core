@@ -53,6 +53,11 @@ schema-gen = ["schemars", "vauchi-core/schema-gen"]
 # Downstream crates add this to dev-dependencies to drive Layer 1
 # reachability property tests against WorkflowEngine impls.
 test-support = []
+# Forwards `vauchi-core/testing` so the integration test binary can
+# reach `FakeClock` + `DeterministicRng`. Mirrors vauchi-core's
+# `it` test target wiring. Enable via `--features testing` (or via
+# the workspace `just check` recipe which forwards it).
+testing = ["vauchi-core/testing"]
 
 [package.metadata.cargo-machete]
 ignored = ["tokio"]  # Optional dep behind content-updates feature

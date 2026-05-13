@@ -50,6 +50,7 @@ use std::sync::{Arc, Mutex};
 use crate::clock::{Clock, SystemClock};
 use crate::crypto::{ShreddingMasterKey, SymmetricKey};
 use crate::identity::Identity;
+use crate::rng::{OsSecureRng, SecureRng};
 use crate::storage::{SecureStorage, Storage};
 use crate::sync::state::ReplayDetector;
 
@@ -200,6 +201,15 @@ pub struct Vauchi {
     /// MRs. Default is `SystemClock::shared()`; tests pass a `FakeClock`
     /// via `Vauchi::new_with`.
     clock: Arc<dyn Clock>,
+    /// Explicit-randomness seam (Phase 1 / Task 1.2 of the pure-
+    /// functional-core program). Non-crypto random draws inside
+    /// `vauchi-core` will migrate to `self.rng.*` cluster by cluster
+    /// — replacing the transitional `crate::rng::non_crypto_rng()`
+    /// helper. Default is `OsSecureRng::shared()`; tests pass a
+    /// `DeterministicRng` via `Vauchi::new_with` /
+    /// `Vauchi::in_memory_with_clock_and_rng` so the engine becomes
+    /// a deterministic function of `(state, input)`.
+    rng: Arc<dyn SecureRng>,
     /// In-memory queue of duress alerts waiting to be sent.
     ///
     /// Populated when `authenticate()` detects a duress PIN. Alerts are
@@ -221,7 +231,7 @@ pub struct Vauchi {
 impl Vauchi {
     /// Creates a new Vauchi instance with mock transport (for testing).
     pub fn new(config: VauchiConfig) -> VauchiResult<Self> {
-        Self::init(config, None, None)
+        Self::init(config, None, None, None)
     }
 
     /// Creates a new Vauchi instance using SMK from SecureStorage for encryption.
@@ -232,7 +242,7 @@ impl Vauchi {
         config: VauchiConfig,
         secure_storage: Arc<dyn SecureStorage>,
     ) -> VauchiResult<Self> {
-        Self::init(config, Some(secure_storage), None)
+        Self::init(config, Some(secure_storage), None, None)
     }
 
     /// Creates a new Vauchi instance with an explicit [`Clock`] and
@@ -247,9 +257,10 @@ impl Vauchi {
     pub fn new_with(
         config: VauchiConfig,
         clock: Arc<dyn Clock>,
+        rng: Arc<dyn SecureRng>,
         secure_storage: Option<Arc<dyn SecureStorage>>,
     ) -> VauchiResult<Self> {
-        Self::init(config, secure_storage, Some(clock))
+        Self::init(config, secure_storage, Some(clock), Some(rng))
     }
 
     /// Creates a new Vauchi instance (transport factory accepted but not invoked).
@@ -268,7 +279,7 @@ impl Vauchi {
     where
         F: FnOnce() -> T,
     {
-        Self::init(config, None, None)
+        Self::init(config, None, None, None)
     }
 
     /// Creates a new Vauchi instance with optional SecureStorage (transport factory not invoked).
@@ -287,7 +298,7 @@ impl Vauchi {
     where
         F: FnOnce() -> T,
     {
-        Self::init(config, secure_storage, None)
+        Self::init(config, secure_storage, None, None)
     }
 
     /// Internal initializer shared by all constructors.
@@ -295,8 +306,10 @@ impl Vauchi {
         config: VauchiConfig,
         secure_storage: Option<Arc<dyn SecureStorage>>,
         clock: Option<Arc<dyn Clock>>,
+        rng: Option<Arc<dyn SecureRng>>,
     ) -> VauchiResult<Self> {
         let clock = clock.unwrap_or_else(SystemClock::shared);
+        let rng = rng.unwrap_or_else(OsSecureRng::shared);
 
         // Determine the storage encryption key
         let storage_key = Self::resolve_storage_key(&config, secure_storage.as_deref())?;
@@ -333,6 +346,7 @@ impl Vauchi {
             auth_mode: AuthMode::Unauthenticated,
             duress_alerts: Vec::new(),
             clock,
+            rng,
             #[cfg(feature = "network-http")]
             ohttp_key: None,
             #[cfg(feature = "network-http")]
@@ -378,6 +392,13 @@ impl Vauchi {
     /// production wraps [`SystemClock::shared`]. See `Vauchi::new_with`.
     pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
+    }
+
+    /// Borrow the explicit-randomness seam. Tests pass a
+    /// `DeterministicRng`; production wraps [`OsSecureRng::shared`].
+    /// See `Vauchi::new_with` / `Vauchi::in_memory_with_clock_and_rng`.
+    pub fn rng(&self) -> &Arc<dyn SecureRng> {
+        &self.rng
     }
 
     /// Returns the current Unix timestamp in seconds.
@@ -431,7 +452,25 @@ impl Vauchi {
 
     /// Creates a new Vauchi instance with in-memory storage (for testing).
     pub fn in_memory() -> VauchiResult<Self> {
-        let clock: Arc<dyn Clock> = SystemClock::shared();
+        Self::in_memory_with_clock_and_rng(SystemClock::shared(), OsSecureRng::shared())
+    }
+
+    /// In-memory Vauchi with an injected [`Clock`] (production
+    /// [`SecureRng`]). Use for tests that need `FakeClock` but
+    /// keep ambient OS entropy.
+    pub fn in_memory_with_clock(clock: Arc<dyn Clock>) -> VauchiResult<Self> {
+        Self::in_memory_with_clock_and_rng(clock, OsSecureRng::shared())
+    }
+
+    /// In-memory Vauchi with both seams injected — the deterministic
+    /// triple referenced by Task 1.4 of the pure-functional-core
+    /// program. Pass `FakeClock` + `DeterministicRng` for a fully
+    /// deterministic `(state, input) -> (state, output)` test
+    /// fixture.
+    pub fn in_memory_with_clock_and_rng(
+        clock: Arc<dyn Clock>,
+        rng: Arc<dyn SecureRng>,
+    ) -> VauchiResult<Self> {
         let storage_key = SymmetricKey::generate();
         let storage = Storage::in_memory(storage_key)?.with_clock(clock.clone());
         let events = Arc::new(EventDispatcher::new());
@@ -446,6 +485,7 @@ impl Vauchi {
             auth_mode: AuthMode::Unauthenticated,
             duress_alerts: Vec::new(),
             clock,
+            rng,
             #[cfg(feature = "network-http")]
             ohttp_key: None,
             #[cfg(feature = "network-http")]

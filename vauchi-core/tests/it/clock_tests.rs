@@ -109,8 +109,13 @@ fn vauchi_new_with_injects_caller_clock() {
     let injected: Arc<dyn Clock> = Arc::new(FakeClock::new(
         SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
     ));
-    let vauchi = Vauchi::new_with(config, Arc::clone(&injected), None)
-        .expect("Vauchi::new_with should accept the injected clock");
+    let vauchi = Vauchi::new_with(
+        config,
+        Arc::clone(&injected),
+        vauchi_core::rng::OsSecureRng::shared(),
+        None,
+    )
+    .expect("Vauchi::new_with should accept the injected clock");
 
     // Pointer-equality: the Arc the caller passed in is *the same* Arc
     // Vauchi now holds. Catches a future regression where someone

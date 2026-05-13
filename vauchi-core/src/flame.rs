@@ -57,7 +57,13 @@ fn output_path() -> PathBuf {
     if let Ok(p) = std::env::var("VAUCHI_FLAME_OUT") {
         return PathBuf::from(p);
     }
-    let ts = crate::clock::ambient_now_secs();
+    // Flame is a dev-only profiling helper; it has no caller-supplied
+    // Clock context (the `#[ctor]` install runs before main). Read
+    // ambient time via the `SystemClock` impl directly so the Clock
+    // abstraction is the only path to wall-clock reads in the
+    // workspace — when `ambient_now_secs` is retired, this site is
+    // already structurally correct.
+    let ts = crate::clock::SystemClock::shared().unix_seconds();
     let base = std::env::var("CARGO_MANIFEST_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("."));

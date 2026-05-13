@@ -101,11 +101,13 @@ fn d5_exchange_latency_algorithmic_core_under_budget() {
         alice_identity,
         alice_card.clone(),
         MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
     );
     let mut bob_session = ExchangeSession::new_qr(
         bob_identity,
         bob_card.clone(),
         MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
     );
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session.apply(ExchangeEvent::StartQR).unwrap();

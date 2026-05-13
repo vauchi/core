@@ -37,9 +37,18 @@ fn advance_to_card_exchange() -> (ExchangeSession, ExchangeSession) {
     let alice_identity = Identity::create("Alice");
     let bob_identity = Identity::create("Bob");
 
-    let mut alice =
-        ExchangeSession::new_qr(alice_identity, ContactCard::new("Alice"), mock_proximity());
-    let mut bob = ExchangeSession::new_qr(bob_identity, ContactCard::new("Bob"), mock_proximity());
+    let mut alice = ExchangeSession::new_qr(
+        alice_identity,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
+    let mut bob = ExchangeSession::new_qr(
+        bob_identity,
+        ContactCard::new("Bob"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Both display their QR codes
     alice.apply(ExchangeEvent::StartQR).unwrap();
@@ -78,7 +87,12 @@ fn advance_to_card_exchange() -> (ExchangeSession, ExchangeSession) {
 fn test_self_exchange_rejected() {
     let alice = Identity::create("Alice");
 
-    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Display our QR
     session.apply(ExchangeEvent::StartQR).unwrap();
@@ -101,13 +115,22 @@ fn test_different_identity_exchange_succeeds() {
     let bob = Identity::create("Bob");
 
     // Alice generates QR
-    let mut alice_session =
-        ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut alice_session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     let alice_qr = alice_session.qr().unwrap().clone();
 
     // Bob displays his QR first, then scans Alice's
-    let mut bob_session = ExchangeSession::new_qr(bob, ContactCard::new("Bob"), mock_proximity());
+    let mut bob_session = ExchangeSession::new_qr(
+        bob,
+        ContactCard::new("Bob"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
     let result = bob_session.apply(ExchangeEvent::ProcessQR(alice_qr));
@@ -154,7 +177,12 @@ fn test_expired_qr_rejected_on_process() {
     assert!(expired_qr.is_expired());
 
     // Bob starts his session and displays QR
-    let mut bob_session = ExchangeSession::new_qr(bob, ContactCard::new("Bob"), mock_proximity());
+    let mut bob_session = ExchangeSession::new_qr(
+        bob,
+        ContactCard::new("Bob"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
     // Attempt to process expired QR should fail
@@ -180,8 +208,12 @@ fn test_duplicate_contact_detection() {
     let bob = Identity::create("Bob");
 
     // Alice generates QR
-    let mut alice_session =
-        ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut alice_session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     let alice_qr = alice_session.qr().unwrap().clone();
 
@@ -193,7 +225,12 @@ fn test_duplicate_contact_detection() {
     );
 
     // Bob starts his session, displays QR, then scans Alice's QR
-    let mut bob_session = ExchangeSession::new_qr(bob, ContactCard::new("Bob"), mock_proximity());
+    let mut bob_session = ExchangeSession::new_qr(
+        bob,
+        ContactCard::new("Bob"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
         .apply(ExchangeEvent::ProcessQR(alice_qr))
@@ -223,13 +260,22 @@ fn test_no_duplicate_for_new_contact() {
     );
 
     // Alice generates QR
-    let mut alice_session =
-        ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut alice_session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     let alice_qr = alice_session.qr().unwrap().clone();
 
     // Bob displays QR, scans Alice's
-    let mut bob_session = ExchangeSession::new_qr(bob, ContactCard::new("Bob"), mock_proximity());
+    let mut bob_session = ExchangeSession::new_qr(
+        bob,
+        ContactCard::new("Bob"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
         .apply(ExchangeEvent::ProcessQR(alice_qr))
@@ -253,7 +299,12 @@ fn test_no_duplicate_for_new_contact() {
 #[test]
 fn test_session_timeout_detection() {
     let alice = Identity::create("Alice");
-    let session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Fresh session should not be timed out
     assert!(!session.is_timed_out());
@@ -266,7 +317,12 @@ fn test_session_timeout_detection() {
 #[test]
 fn test_interrupted_session_resumable() {
     let alice = Identity::create("Alice");
-    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Fresh session cannot be resumed (not interrupted)
     assert!(!session.can_resume());
@@ -294,8 +350,12 @@ fn test_cannot_process_qr_from_idle() {
     let bob_qr = ExchangeQR::generate(&bob, &ephemeral);
 
     // Alice is in Idle state — never called StartQR
-    let mut alice_session =
-        ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut alice_session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let result = alice_session.apply(ExchangeEvent::ProcessQR(bob_qr));
     assert!(
@@ -309,7 +369,12 @@ fn test_cannot_process_qr_from_idle() {
 #[test]
 fn test_cannot_start_qr_twice() {
     let alice = Identity::create("Alice");
-    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     session.apply(ExchangeEvent::StartQR).unwrap();
 
@@ -326,7 +391,12 @@ fn test_cannot_start_qr_twice() {
 #[test]
 fn test_cannot_key_agreement_from_idle() {
     let alice = Identity::create("Alice");
-    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let result = session.apply(ExchangeEvent::PerformKeyAgreement);
     assert!(
@@ -340,7 +410,12 @@ fn test_cannot_key_agreement_from_idle() {
 #[test]
 fn test_cannot_complete_exchange_from_idle() {
     let alice = Identity::create("Alice");
-    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let result = session.apply(ExchangeEvent::CompleteExchange(ContactCard::new("Bob")));
     assert!(
@@ -354,7 +429,12 @@ fn test_cannot_complete_exchange_from_idle() {
 #[test]
 fn test_cannot_they_scanned_from_displaying_qr() {
     let alice = Identity::create("Alice");
-    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     session.apply(ExchangeEvent::StartQR).unwrap();
 
     let result = session.apply(ExchangeEvent::TheyScannedOurQR);
@@ -371,12 +451,21 @@ fn test_cannot_process_qr_from_peer_scanned() {
     let alice = Identity::create("Alice");
     let bob = Identity::create("Bob");
 
-    let mut alice_session =
-        ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut alice_session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     let alice_qr = alice_session.qr().unwrap().clone();
 
-    let mut bob_session = ExchangeSession::new_qr(bob, ContactCard::new("Bob"), mock_proximity());
+    let mut bob_session = ExchangeSession::new_qr(
+        bob,
+        ContactCard::new("Bob"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
     // Bob scans Alice's QR -> PeerScanned
@@ -406,7 +495,12 @@ fn test_cannot_process_qr_from_peer_scanned() {
 fn test_our_card_accessible() {
     let alice = Identity::create("Alice");
     let card = ContactCard::new("Alice Card");
-    let session = ExchangeSession::new_qr(alice, card, mock_proximity());
+    let session = ExchangeSession::new_qr(
+        alice,
+        card,
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     assert_eq!(session.our_card().display_name(), "Alice Card");
 }
@@ -420,7 +514,12 @@ fn test_our_card_accessible() {
 #[test]
 fn test_qr_signature_valid() {
     let alice = Identity::create("Alice");
-    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     session.apply(ExchangeEvent::StartQR).unwrap();
 
     let qr = session.qr().unwrap();
@@ -443,8 +542,12 @@ fn test_valid_signature_accepted() {
     let alice = Identity::create("Alice");
     let bob = Identity::create("Bob");
 
-    let mut alice_session =
-        ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut alice_session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     let alice_qr = alice_session.qr().unwrap().clone();
 
@@ -452,7 +555,12 @@ fn test_valid_signature_accepted() {
     assert!(alice_qr.verify_signature());
 
     // Bob should accept it
-    let mut bob_session = ExchangeSession::new_qr(bob, ContactCard::new("Bob"), mock_proximity());
+    let mut bob_session = ExchangeSession::new_qr(
+        bob,
+        ContactCard::new("Bob"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
     let result = bob_session.apply(ExchangeEvent::ProcessQR(alice_qr));
@@ -472,7 +580,12 @@ fn test_valid_signature_accepted() {
 #[test]
 fn test_qr_reuse_detected() {
     let alice = Identity::create("Alice");
-    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let qr_hash = [42u8; 32];
 
@@ -492,7 +605,12 @@ fn test_qr_reuse_detected() {
 #[test]
 fn test_different_qr_hashes_independent() {
     let alice = Identity::create("Alice");
-    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let hash_a = [1u8; 32];
     let hash_b = [2u8; 32];
@@ -550,7 +668,12 @@ fn test_complete_exchange_flow() {
 #[test]
 fn test_explicit_fail_from_idle() {
     let alice = Identity::create("Alice");
-    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     session
         .apply(ExchangeEvent::Fail(ExchangeError::SessionTimeout))
@@ -564,7 +687,12 @@ fn test_explicit_fail_from_idle() {
 #[test]
 fn test_explicit_fail_from_displaying_qr() {
     let alice = Identity::create("Alice");
-    let mut session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     session.apply(ExchangeEvent::StartQR).unwrap();
 
     session
@@ -583,8 +711,12 @@ fn test_explicit_fail_from_displaying_qr() {
 #[test]
 fn test_qr_events_rejected_on_nfc_transport() {
     let alice = Identity::create("Alice");
-    let mut nfc_session =
-        ExchangeSession::new_nfc(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut nfc_session = ExchangeSession::new_nfc(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // StartQR should fail on NFC transport
     let result = nfc_session.apply(ExchangeEvent::StartQR);
@@ -599,8 +731,12 @@ fn test_qr_events_rejected_on_nfc_transport() {
 #[test]
 fn test_qr_events_rejected_on_ble_transport() {
     let alice = Identity::create("Alice");
-    let mut ble_session =
-        ExchangeSession::new_ble(alice, ContactCard::new("Alice"), mock_proximity());
+    let mut ble_session = ExchangeSession::new_ble(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // StartQR should fail on BLE transport
     let result = ble_session.apply(ExchangeEvent::StartQR);
@@ -619,7 +755,12 @@ fn test_qr_events_rejected_on_ble_transport() {
 #[test]
 fn test_our_exchange_public_key_accessible() {
     let alice = Identity::create("Alice");
-    let session = ExchangeSession::new_qr(alice, ContactCard::new("Alice"), mock_proximity());
+    let session = ExchangeSession::new_qr(
+        alice,
+        ContactCard::new("Alice"),
+        mock_proximity(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Should return a non-zero 32-byte key
     let key = session.our_exchange_public_key();

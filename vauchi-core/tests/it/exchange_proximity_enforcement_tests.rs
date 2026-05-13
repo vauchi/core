@@ -32,8 +32,18 @@ fn test_qr_exchange_key_agreement_succeeds() {
     let alice_proximity = MockProximityVerifier::success();
     let bob_proximity = MockProximityVerifier::success();
 
-    let mut alice_session = ExchangeSession::new_qr(alice, alice_card, alice_proximity);
-    let mut bob_session = ExchangeSession::new_qr(bob, bob_card, bob_proximity);
+    let mut alice_session = ExchangeSession::new_qr(
+        alice,
+        alice_card,
+        alice_proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
+    let mut bob_session = ExchangeSession::new_qr(
+        bob,
+        bob_card,
+        bob_proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Both start QR
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
@@ -87,7 +97,12 @@ fn test_qr_key_agreement_from_wrong_state_fails() {
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut session = ExchangeSession::new_qr(alice, alice_card, proximity);
+    let mut session = ExchangeSession::new_qr(
+        alice,
+        alice_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Try key agreement from Idle — should fail
     let result = session.apply(ExchangeEvent::PerformKeyAgreement);
@@ -111,7 +126,12 @@ fn test_nfc_skips_proximity() {
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
-    let mut session = ExchangeSession::new_nfc(alice, alice_card, proximity);
+    let mut session = ExchangeSession::new_nfc(
+        alice,
+        alice_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // NFC tap with mock payload
     let their_payload = vec![0u8; 64]; // Minimal valid-ish payload

@@ -31,7 +31,12 @@ fn run_full_qr_exchange_with_mock() -> Contact {
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
@@ -68,7 +73,12 @@ fn run_full_qr_exchange_with_verifier_chain() -> Contact {
         VerifierMethod::ManualConfirmation,
         Box::new(ManualConfirmationVerifier::pre_confirmed()),
     );
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, chain);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        chain,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
@@ -249,9 +259,14 @@ fn test_mutual_qr_exchange_both_sides_have_trust_metrics() {
         alice_id,
         alice_card.clone(),
         MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
     );
-    let mut bob_session =
-        ExchangeSession::new_qr(bob_id, bob_card.clone(), MockProximityVerifier::success());
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_id,
+        bob_card.clone(),
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Both start QR display
     alice_session.apply(ExchangeEvent::StartQR).unwrap();

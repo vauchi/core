@@ -1499,7 +1499,12 @@ mod tests {
         let identity = vauchi_core::identity::Identity::create("TestUser");
         let card = vauchi_core::contact_card::ContactCard::new("TestUser");
         let proximity = vauchi_core::exchange::ManualConfirmationVerifier::new();
-        vauchi_core::exchange::ExchangeSession::new_qr(identity, card, proximity)
+        vauchi_core::exchange::ExchangeSession::new_qr(
+            identity,
+            card,
+            proximity,
+            vauchi_core::clock::SystemClock::shared(),
+        )
     }
 
     #[test]
@@ -1671,13 +1676,18 @@ mod tests {
             alice_identity,
             alice_card,
             alice_proximity,
+            vauchi_core::clock::SystemClock::shared(),
         );
 
         let bob_identity = vauchi_core::identity::Identity::create("Bob");
         let bob_card = vauchi_core::contact_card::ContactCard::new("Bob");
         let bob_proximity = vauchi_core::exchange::ManualConfirmationVerifier::new();
-        let mut bob_session =
-            vauchi_core::exchange::ExchangeSession::new_qr(bob_identity, bob_card, bob_proximity);
+        let mut bob_session = vauchi_core::exchange::ExchangeSession::new_qr(
+            bob_identity,
+            bob_card,
+            bob_proximity,
+            vauchi_core::clock::SystemClock::shared(),
+        );
         // Start Bob's QR so we can get his data string
         bob_session
             .apply(vauchi_core::exchange::ExchangeEvent::StartQR)
@@ -2912,7 +2922,13 @@ mod tests {
         let identity = Identity::create("Test");
         let card = ContactCard::new("Test");
         let verifier = ManualConfirmationVerifier::new();
-        let session = ExchangeSession::new_usb(identity, card, verifier, UsbRole::Initiator);
+        let session = ExchangeSession::new_usb(
+            identity,
+            card,
+            verifier,
+            UsbRole::Initiator,
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let engine = ExchangeEngine::with_session(config, session);
 
         // start_session_if_needed is called via handle_action in the USB path;

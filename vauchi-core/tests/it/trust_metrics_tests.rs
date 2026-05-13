@@ -282,7 +282,12 @@ fn run_full_qr_exchange() -> Contact {
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session

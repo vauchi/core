@@ -234,7 +234,12 @@ fn test_ble_session_starts_awaiting_connection() {
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let session = ExchangeSession::new_ble(identity, card, proximity);
+    let session = ExchangeSession::new_ble(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     assert!(
         matches!(session.state(), ExchangeState::AwaitingBleConnection),
@@ -252,7 +257,12 @@ fn test_ble_payload_exchanged_transitions() {
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut alice_session = ExchangeSession::new_ble(alice_identity, alice_card, proximity);
+    let mut alice_session = ExchangeSession::new_ble(
+        alice_identity,
+        alice_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Bob generates his BLE payload
     let bob_eph = X3DHKeyPair::generate();
@@ -284,7 +294,12 @@ fn test_ble_proximity_verified_transitions() {
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut alice_session = ExchangeSession::new_ble(alice_identity, alice_card, proximity);
+    let mut alice_session = ExchangeSession::new_ble(
+        alice_identity,
+        alice_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Payload exchange
     let bob_eph = X3DHKeyPair::generate();
@@ -321,11 +336,13 @@ fn test_ble_full_lifecycle() {
         alice_identity,
         alice_card.clone(),
         MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
     );
     let mut bob_session = ExchangeSession::new_ble(
         bob_identity,
         bob_card.clone(),
         MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     // Generate payloads (in real life, built from session's identity+ephemeral)
@@ -408,7 +425,12 @@ fn test_ble_expired_rejection() {
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut alice_session = ExchangeSession::new_ble(alice_identity, alice_card, proximity);
+    let mut alice_session = ExchangeSession::new_ble(
+        alice_identity,
+        alice_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let bob_eph = X3DHKeyPair::generate();
     let now = std::time::SystemTime::now()
@@ -440,7 +462,12 @@ fn test_ble_self_exchange() {
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut session = ExchangeSession::new_ble(alice_identity, card, proximity);
+    let mut session = ExchangeSession::new_ble(
+        alice_identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let result = session.apply(ExchangeEvent::BlePayloadExchanged {
         their_payload: self_bytes,
@@ -459,7 +486,12 @@ fn test_ble_invalid_payload() {
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut session = ExchangeSession::new_ble(identity, card, proximity);
+    let mut session = ExchangeSession::new_ble(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let result = session.apply(ExchangeEvent::BlePayloadExchanged {
         their_payload: vec![0u8; 174],
@@ -479,7 +511,12 @@ fn test_ble_rejects_wrong_transport() {
     let proximity = MockProximityVerifier::success();
 
     // QR session
-    let mut session = ExchangeSession::new_qr(identity, card, proximity);
+    let mut session = ExchangeSession::new_qr(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let result = session.apply(ExchangeEvent::BlePayloadExchanged {
         their_payload: vec![],
@@ -502,7 +539,12 @@ fn test_ble_proximity_requires_verification_state() {
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut session = ExchangeSession::new_ble(identity, card, proximity);
+    let mut session = ExchangeSession::new_ble(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Try to verify proximity without payload exchange
     let result = session.apply(ExchangeEvent::BleProximityVerified);
@@ -524,7 +566,12 @@ fn test_ble_challenge_response_blocks_on_failure() {
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut session = ExchangeSession::new_ble(alice_identity, alice_card, proximity);
+    let mut session = ExchangeSession::new_ble(
+        alice_identity,
+        alice_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let bob_eph = X3DHKeyPair::generate();
     let bob_payload = ExchangeBle::generate(&bob_identity, &bob_eph);

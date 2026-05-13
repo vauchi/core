@@ -95,7 +95,12 @@ pub unsafe extern "C" fn vauchi_exchange_create(app: *mut VauchiApp) -> *mut Vau
                 Box::new(SharedManualVerifier(manual.clone())),
             );
 
-            let session = ExchangeSession::new_qr(identity, card, chain);
+            let session = ExchangeSession::new_qr(
+                identity,
+                card,
+                chain,
+                vauchi_core::clock::SystemClock::shared(),
+            );
 
             Box::into_raw(Box::new(VauchiExchange {
                 session: Mutex::new(session),

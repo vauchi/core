@@ -303,13 +303,21 @@ use vauchi_core::identity::Identity;
 fn key_agreement_derives_confirmation_tokens() {
     let identity_a = Identity::create("Alice");
     let card_a = ContactCard::new("Alice");
-    let mut session_a =
-        ExchangeSession::new_qr(identity_a, card_a, MockProximityVerifier::success());
+    let mut session_a = ExchangeSession::new_qr(
+        identity_a,
+        card_a,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let identity_b = Identity::create("Bob");
     let card_b = ContactCard::new("Bob");
-    let mut session_b =
-        ExchangeSession::new_qr(identity_b, card_b, MockProximityVerifier::success());
+    let mut session_b = ExchangeSession::new_qr(
+        identity_b,
+        card_b,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Both start QR
     session_a.apply(ExchangeEvent::StartQR).unwrap();

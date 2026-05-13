@@ -17,7 +17,12 @@ fn ble_session_with_caps(name: &str, caps: DeviceCapabilities) -> ExchangeSessio
     let identity = Identity::create(name);
     let card = ContactCard::new(name);
     let proximity = ManualConfirmationVerifier::new();
-    let mut session = ExchangeSession::new_ble(identity, card, proximity);
+    let mut session = ExchangeSession::new_ble(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
     session.set_device_capabilities(caps);
     session
 }
@@ -91,7 +96,12 @@ fn set_device_capabilities_is_accessible() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
     let proximity = ManualConfirmationVerifier::new();
-    let mut session = ExchangeSession::new_ble(identity, card, proximity);
+    let mut session = ExchangeSession::new_ble(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let caps = DeviceCapabilities {
         has_ble: true,

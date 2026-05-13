@@ -207,7 +207,12 @@ use vauchi_core::*;
 fn session_emits_command_dispatched_on_initial_commands() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
-    let mut session = ExchangeSession::new_qr(identity, card, MockProximityVerifier::success());
+    let mut session = ExchangeSession::new_qr(
+        identity,
+        card,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     session.enable_debug_log();
 
     session.apply(ExchangeEvent::StartQR).unwrap();
@@ -243,6 +248,7 @@ fn full_qr_session_produces_latency_summary() {
         bob_identity,
         bob_card.clone(),
         MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
     );
     bob_session.enable_debug_log();
 

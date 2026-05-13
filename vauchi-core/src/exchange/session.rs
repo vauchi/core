@@ -219,6 +219,7 @@ impl ExchangeSession {
         identity: Identity,
         our_card: ContactCard,
         proximity: impl ProximityVerifier + 'static,
+        clock: Arc<dyn crate::clock::Clock>,
     ) -> Self {
         // Fresh ephemeral keypair — NOT derived from identity
         let our_x3dh = X3DHKeyPair::generate();
@@ -254,7 +255,7 @@ impl ExchangeSession {
             confirmation_gate_hash: None,
             confirmation_our_slot: None,
             confirmation_their_slot: None,
-            clock: crate::clock::SystemClock::shared(),
+            clock,
         }
     }
 
@@ -265,6 +266,7 @@ impl ExchangeSession {
         our_card: ContactCard,
         proximity: impl ProximityVerifier + 'static,
         our_x3dh: X3DHKeyPair,
+        clock: Arc<dyn crate::clock::Clock>,
     ) -> Self {
         ExchangeSession {
             state: ExchangeState::Idle,
@@ -298,7 +300,7 @@ impl ExchangeSession {
             confirmation_gate_hash: None,
             confirmation_our_slot: None,
             confirmation_their_slot: None,
-            clock: crate::clock::SystemClock::shared(),
+            clock,
         }
     }
 
@@ -311,6 +313,7 @@ impl ExchangeSession {
         identity: Identity,
         our_card: ContactCard,
         proximity: impl ProximityVerifier + 'static,
+        clock: Arc<dyn crate::clock::Clock>,
     ) -> Self {
         let our_x3dh = X3DHKeyPair::generate();
         let display_name = our_card.display_name().to_string();
@@ -347,7 +350,7 @@ impl ExchangeSession {
             confirmation_gate_hash: None,
             confirmation_our_slot: None,
             confirmation_their_slot: None,
-            clock: crate::clock::SystemClock::shared(),
+            clock,
         }
     }
 
@@ -360,6 +363,7 @@ impl ExchangeSession {
         identity: Identity,
         our_card: ContactCard,
         proximity: impl ProximityVerifier + 'static,
+        clock: Arc<dyn crate::clock::Clock>,
     ) -> Self {
         let our_x3dh = X3DHKeyPair::generate();
         let card = our_card.clone();
@@ -406,7 +410,7 @@ impl ExchangeSession {
             confirmation_gate_hash: None,
             confirmation_our_slot: None,
             confirmation_their_slot: None,
-            clock: crate::clock::SystemClock::shared(),
+            clock,
         }
     }
 
@@ -424,6 +428,7 @@ impl ExchangeSession {
         our_card: ContactCard,
         proximity: impl ProximityVerifier + 'static,
         role: UsbRole,
+        clock: Arc<dyn crate::clock::Clock>,
     ) -> Self {
         let our_x3dh = X3DHKeyPair::generate();
         let our_qr = ExchangeQR::generate(&identity, &our_x3dh);
@@ -461,7 +466,7 @@ impl ExchangeSession {
             confirmation_gate_hash: None,
             confirmation_our_slot: None,
             confirmation_their_slot: None,
-            clock: crate::clock::SystemClock::shared(),
+            clock,
         }
     }
 

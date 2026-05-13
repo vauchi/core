@@ -140,7 +140,12 @@ fn nfc_exchange_sets_high_confidence_without_running_verifier() {
     // Pass a FAILING proximity verifier — if NFC runs it, the test will
     // detect wrong confidence. NFC must skip the verifier entirely.
     let failing_verifier = MockProximityVerifier::failure();
-    let mut session = ExchangeSession::new_nfc(alice, alice_card, failing_verifier);
+    let mut session = ExchangeSession::new_nfc(
+        alice,
+        alice_card,
+        failing_verifier,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Generate a valid NFC payload from Bob's side
     let bob_ephemeral = vauchi_core::exchange::X3DHKeyPair::generate();

@@ -292,7 +292,12 @@ impl AppEngine {
                         card.map(|c| {
                             let proximity =
                                 vauchi_core::exchange::ManualConfirmationVerifier::new();
-                            vauchi_core::exchange::ExchangeSession::new_qr(identity, c, proximity)
+                            vauchi_core::exchange::ExchangeSession::new_qr(
+                                identity,
+                                c,
+                                proximity,
+                                vauchi_core::clock::SystemClock::shared(),
+                            )
                         })
                     });
 

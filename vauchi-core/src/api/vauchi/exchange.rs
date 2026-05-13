@@ -63,7 +63,8 @@ impl Vauchi {
 
         // Create exchange session for mutual QR exchange
         let verifier = ManualConfirmationVerifier::new();
-        let mut session = ExchangeSession::new_qr(identity_owned, our_card, verifier);
+        let mut session =
+            ExchangeSession::new_qr(identity_owned, our_card, verifier, self.clock.clone());
 
         // Generate QR via state machine
         session

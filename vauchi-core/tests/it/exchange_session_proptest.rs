@@ -24,13 +24,22 @@ fn make_session_and_peer() -> (ExchangeSession, ExchangeQR, ContactCard) {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
-    let mut session = ExchangeSession::new_qr(identity, card, proximity);
+    let mut session = ExchangeSession::new_qr(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let peer_identity = Identity::create("Bob");
     let peer_card = ContactCard::new("Bob");
     let peer_proximity = MockProximityVerifier::success();
-    let mut peer_session =
-        ExchangeSession::new_qr(peer_identity, peer_card.clone(), peer_proximity);
+    let mut peer_session = ExchangeSession::new_qr(
+        peer_identity,
+        peer_card.clone(),
+        peer_proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Generate peer's QR by starting their session
     peer_session.apply(ExchangeEvent::StartQR).unwrap();
@@ -163,8 +172,18 @@ fn happy_path_qr_exchange_always_completes() {
     let alice_proximity = MockProximityVerifier::success();
     let bob_proximity = MockProximityVerifier::success();
 
-    let mut alice = ExchangeSession::new_qr(alice_identity, alice_card.clone(), alice_proximity);
-    let mut bob = ExchangeSession::new_qr(bob_identity, bob_card.clone(), bob_proximity);
+    let mut alice = ExchangeSession::new_qr(
+        alice_identity,
+        alice_card.clone(),
+        alice_proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
+    let mut bob = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card.clone(),
+        bob_proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Both start QR
     alice.apply(ExchangeEvent::StartQR).unwrap();

@@ -32,11 +32,20 @@ fn test_qr_ceremony_shared_keys_match_and_encrypt() {
     let bob_card = ContactCard::new("Bob");
 
     let alice_proximity = MockProximityVerifier::success();
-    let mut alice_session =
-        ExchangeSession::new_qr(alice_identity, alice_card.clone(), alice_proximity);
+    let mut alice_session = ExchangeSession::new_qr(
+        alice_identity,
+        alice_card.clone(),
+        alice_proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let bob_proximity = MockProximityVerifier::success();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card.clone(), bob_proximity);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card.clone(),
+        bob_proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
@@ -239,10 +248,19 @@ fn test_independent_sessions_produce_different_secrets() {
     let bob_identity = Identity::create("Bob");
 
     let qr_alice_proximity = MockProximityVerifier::success();
-    let mut qr_alice =
-        ExchangeSession::new_qr(alice_identity, alice_card.clone(), qr_alice_proximity);
+    let mut qr_alice = ExchangeSession::new_qr(
+        alice_identity,
+        alice_card.clone(),
+        qr_alice_proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
     let qr_bob_proximity = MockProximityVerifier::success();
-    let mut qr_bob = ExchangeSession::new_qr(bob_identity, bob_card.clone(), qr_bob_proximity);
+    let mut qr_bob = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card.clone(),
+        qr_bob_proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     qr_alice.apply(ExchangeEvent::StartQR).unwrap();
     qr_bob.apply(ExchangeEvent::StartQR).unwrap();
@@ -271,10 +289,19 @@ fn test_independent_sessions_produce_different_secrets() {
     let bob_identity2 = Identity::create("Bob");
 
     let qr2_alice_proximity = MockProximityVerifier::success();
-    let mut qr2_alice =
-        ExchangeSession::new_qr(alice_identity2, alice_card.clone(), qr2_alice_proximity);
+    let mut qr2_alice = ExchangeSession::new_qr(
+        alice_identity2,
+        alice_card.clone(),
+        qr2_alice_proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
     let qr2_bob_proximity = MockProximityVerifier::success();
-    let mut qr2_bob = ExchangeSession::new_qr(bob_identity2, bob_card.clone(), qr2_bob_proximity);
+    let mut qr2_bob = ExchangeSession::new_qr(
+        bob_identity2,
+        bob_card.clone(),
+        qr2_bob_proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     qr2_alice.apply(ExchangeEvent::StartQR).unwrap();
     qr2_bob.apply(ExchangeEvent::StartQR).unwrap();
@@ -372,13 +399,24 @@ fn test_transcript_binding_includes_identity_keys() {
 
     // Create Bob's session to generate a valid QR
     let bob_proximity = MockProximityVerifier::success();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, bob_proximity);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        bob_proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     let bob_qr = bob_session.qr().unwrap().clone();
 
     // Session A: identity_a + fixed ephemeral
     let prox_a = MockProximityVerifier::success();
-    let mut session_a = ExchangeSession::new_qr_with_x3dh(identity_a, card_a, prox_a, fixed_x3dh_a);
+    let mut session_a = ExchangeSession::new_qr_with_x3dh(
+        identity_a,
+        card_a,
+        prox_a,
+        fixed_x3dh_a,
+        vauchi_core::clock::SystemClock::shared(),
+    );
     session_a.apply(ExchangeEvent::StartQR).unwrap();
     session_a
         .apply(ExchangeEvent::ProcessQR(bob_qr.clone()))
@@ -388,7 +426,13 @@ fn test_transcript_binding_includes_identity_keys() {
 
     // Session B: identity_b + same fixed ephemeral
     let prox_b = MockProximityVerifier::success();
-    let mut session_b = ExchangeSession::new_qr_with_x3dh(identity_b, card_b, prox_b, fixed_x3dh_b);
+    let mut session_b = ExchangeSession::new_qr_with_x3dh(
+        identity_b,
+        card_b,
+        prox_b,
+        fixed_x3dh_b,
+        vauchi_core::clock::SystemClock::shared(),
+    );
     session_b.apply(ExchangeEvent::StartQR).unwrap();
     session_b
         .apply(ExchangeEvent::ProcessQR(bob_qr.clone()))
@@ -432,13 +476,24 @@ fn test_transcript_binding_includes_ephemeral_keys() {
     let bob_card = ContactCard::new("Bob");
 
     let bob_prox = MockProximityVerifier::success();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, bob_prox);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        bob_prox,
+        vauchi_core::clock::SystemClock::shared(),
+    );
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     let bob_qr = bob_session.qr().unwrap().clone();
 
     // Session 1
     let prox_1 = MockProximityVerifier::success();
-    let mut session_1 = ExchangeSession::new_qr_with_x3dh(alice_identity_1, card_1, prox_1, x3dh_1);
+    let mut session_1 = ExchangeSession::new_qr_with_x3dh(
+        alice_identity_1,
+        card_1,
+        prox_1,
+        x3dh_1,
+        vauchi_core::clock::SystemClock::shared(),
+    );
     session_1.apply(ExchangeEvent::StartQR).unwrap();
     session_1
         .apply(ExchangeEvent::ProcessQR(bob_qr.clone()))
@@ -448,7 +503,13 @@ fn test_transcript_binding_includes_ephemeral_keys() {
 
     // Session 2
     let prox_2 = MockProximityVerifier::success();
-    let mut session_2 = ExchangeSession::new_qr_with_x3dh(alice_identity_2, card_2, prox_2, x3dh_2);
+    let mut session_2 = ExchangeSession::new_qr_with_x3dh(
+        alice_identity_2,
+        card_2,
+        prox_2,
+        x3dh_2,
+        vauchi_core::clock::SystemClock::shared(),
+    );
     session_2.apply(ExchangeEvent::StartQR).unwrap();
     session_2
         .apply(ExchangeEvent::ProcessQR(bob_qr.clone()))

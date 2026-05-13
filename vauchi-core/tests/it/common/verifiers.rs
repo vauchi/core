@@ -19,7 +19,7 @@ use vauchi_core::exchange::{ProximityConfidence, ProximityError, ProximityVerifi
 /// # Usage
 /// ```ignore
 /// let (verifier, challenges) = ChallengeCapturingVerifier::success();
-/// let mut session = ExchangeSession::new_qr(identity, card, verifier);
+/// let mut session = ExchangeSession::new_qr(identity, card, verifier, vauchi_core::clock::SystemClock::shared());
 /// // ... drive session through exchange ...
 /// let emitted = challenges.lock().unwrap();
 /// assert_eq!(emitted[0], expected_challenge);

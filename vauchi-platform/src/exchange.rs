@@ -824,7 +824,12 @@ pub fn create_qr_exchange_proximity(
     // may actually use BLE or another mechanism. Revisit when the handler interface
     // reports its actual method.
     chain.add(VerifierMethod::Ultrasonic, Box::new(bridge));
-    let session = ExchangeSession::new_qr(identity, our_card, chain);
+    let session = ExchangeSession::new_qr(
+        identity,
+        our_card,
+        chain,
+        vauchi_core::clock::SystemClock::shared(),
+    );
     Arc::new(MobileExchangeSession::new(session, None))
 }
 
@@ -839,7 +844,12 @@ pub fn create_qr_exchange_manual(
     let (bridge, verifier) = ManualConfirmationBridge::new();
     let mut chain = VerifierChain::new();
     chain.add(VerifierMethod::ManualConfirmation, Box::new(bridge));
-    let session = ExchangeSession::new_qr(identity, our_card, chain);
+    let session = ExchangeSession::new_qr(
+        identity,
+        our_card,
+        chain,
+        vauchi_core::clock::SystemClock::shared(),
+    );
     Arc::new(MobileExchangeSession::new(session, Some(verifier)))
 }
 

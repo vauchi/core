@@ -197,7 +197,12 @@ fn test_verification_events_populated_after_key_agreement() {
         verifier.confirm();
         let mut chain = VerifierChain::new();
         chain.add(VerifierMethod::ManualConfirmation, Box::new(verifier));
-        let session = ExchangeSession::new_qr(alice, alice_card, chain);
+        let session = ExchangeSession::new_qr(
+            alice,
+            alice_card,
+            chain,
+            vauchi_core::clock::SystemClock::shared(),
+        );
         Arc::new(MobileExchangeSession::new(session, None))
     };
     let bob_session = {
@@ -205,7 +210,12 @@ fn test_verification_events_populated_after_key_agreement() {
         verifier.confirm();
         let mut chain = VerifierChain::new();
         chain.add(VerifierMethod::ManualConfirmation, Box::new(verifier));
-        let session = ExchangeSession::new_qr(bob, bob_card, chain);
+        let session = ExchangeSession::new_qr(
+            bob,
+            bob_card,
+            chain,
+            vauchi_core::clock::SystemClock::shared(),
+        );
         Arc::new(MobileExchangeSession::new(session, None))
     };
 

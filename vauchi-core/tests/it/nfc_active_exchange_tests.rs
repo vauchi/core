@@ -282,7 +282,12 @@ fn test_nfc_session_starts_awaiting_tap() {
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let session = ExchangeSession::new_nfc(identity, card, proximity);
+    let session = ExchangeSession::new_nfc(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     assert!(
         matches!(session.state(), ExchangeState::AwaitingNfcTap),
@@ -300,7 +305,12 @@ fn test_nfc_tap_transitions_to_key_agreement() {
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut alice_session = ExchangeSession::new_nfc(alice_identity, alice_card, proximity);
+    let mut alice_session = ExchangeSession::new_nfc(
+        alice_identity,
+        alice_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Bob generates his NFC payload
     let bob_eph = X3DHKeyPair::generate();
@@ -330,7 +340,12 @@ fn test_nfc_invalid_payload_rejected() {
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut session = ExchangeSession::new_nfc(identity, card, proximity);
+    let mut session = ExchangeSession::new_nfc(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Try with garbage payload — should fail (invalid NFC format)
     let result = session.apply(ExchangeEvent::NfcTapComplete {
@@ -351,7 +366,12 @@ fn test_nfc_expired_payload_rejected_by_session() {
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut alice_session = ExchangeSession::new_nfc(alice_identity, alice_card, proximity);
+    let mut alice_session = ExchangeSession::new_nfc(
+        alice_identity,
+        alice_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Bob's expired payload
     let bob_eph = X3DHKeyPair::generate();
@@ -379,7 +399,12 @@ fn test_nfc_rejects_wrong_transport() {
     let proximity = MockProximityVerifier::success();
 
     // QR session
-    let mut session = ExchangeSession::new_qr(identity, card, proximity);
+    let mut session = ExchangeSession::new_qr(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let result = session.apply(ExchangeEvent::NfcTapComplete {
         their_payload: vec![],
@@ -404,7 +429,12 @@ fn test_nfc_self_exchange_rejected() {
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    let mut session = ExchangeSession::new_nfc(alice_identity, card, proximity);
+    let mut session = ExchangeSession::new_nfc(
+        alice_identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let result = session.apply(ExchangeEvent::NfcTapComplete {
         their_payload: self_bytes,
@@ -435,11 +465,13 @@ fn test_nfc_full_exchange_via_session() {
         alice_identity,
         alice_card.clone(),
         MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
     );
     let mut bob_session = ExchangeSession::new_nfc(
         bob_identity,
         bob_card.clone(),
         MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     // In real flow, each side generates an ExchangeNfc from its session's

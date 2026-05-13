@@ -20,7 +20,12 @@ use vauchi_core::*;
 fn debug_log_disabled_by_default() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
-    let session = ExchangeSession::new_qr(identity, card, MockProximityVerifier::success());
+    let session = ExchangeSession::new_qr(
+        identity,
+        card,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     assert!(session.exchange_debug_log().is_none());
 }
@@ -30,7 +35,12 @@ fn debug_log_disabled_by_default() {
 fn enable_debug_log_creates_log_with_session_started() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
-    let mut session = ExchangeSession::new_qr(identity, card, MockProximityVerifier::success());
+    let mut session = ExchangeSession::new_qr(
+        identity,
+        card,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     session.enable_debug_log();
 
@@ -47,7 +57,12 @@ fn enable_debug_log_creates_log_with_session_started() {
 fn enable_debug_log_nfc_records_transport() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
-    let mut session = ExchangeSession::new_nfc(identity, card, MockProximityVerifier::success());
+    let mut session = ExchangeSession::new_nfc(
+        identity,
+        card,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     session.enable_debug_log();
 
@@ -63,7 +78,12 @@ fn enable_debug_log_nfc_records_transport() {
 fn enable_debug_log_ble_records_transport() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
-    let mut session = ExchangeSession::new_ble(identity, card, MockProximityVerifier::success());
+    let mut session = ExchangeSession::new_ble(
+        identity,
+        card,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     session.enable_debug_log();
 
@@ -81,7 +101,12 @@ fn enable_debug_log_ble_records_transport() {
 fn start_qr_logs_qr_generated() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
-    let mut session = ExchangeSession::new_qr(identity, card, MockProximityVerifier::success());
+    let mut session = ExchangeSession::new_qr(
+        identity,
+        card,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     session.enable_debug_log();
 
     session.apply(ExchangeEvent::StartQR).unwrap();
@@ -104,8 +129,12 @@ fn process_qr_logs_qr_scanned() {
 
     let bob_identity = Identity::create("Bob");
     let bob_card = ContactCard::new("Bob");
-    let mut bob_session =
-        ExchangeSession::new_qr(bob_identity, bob_card, MockProximityVerifier::success());
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     bob_session.enable_debug_log();
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
@@ -134,8 +163,12 @@ fn key_agreement_logs_completion_and_proximity() {
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
     let bob_card = ContactCard::new("Bob");
-    let mut bob_session =
-        ExchangeSession::new_qr(bob_identity, bob_card, MockProximityVerifier::success());
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     bob_session.enable_debug_log();
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
@@ -191,6 +224,7 @@ fn complete_exchange_logs_completed() {
         bob_identity,
         bob_card.clone(),
         MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
     );
     bob_session.enable_debug_log();
 
@@ -221,7 +255,12 @@ fn complete_exchange_logs_completed() {
 fn fail_event_logs_exchange_failed() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
-    let mut session = ExchangeSession::new_qr(identity, card, MockProximityVerifier::success());
+    let mut session = ExchangeSession::new_qr(
+        identity,
+        card,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     session.enable_debug_log();
 
     session
@@ -242,7 +281,12 @@ fn fail_event_logs_exchange_failed() {
 fn enable_debug_log_twice_is_idempotent() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
-    let mut session = ExchangeSession::new_qr(identity, card, MockProximityVerifier::success());
+    let mut session = ExchangeSession::new_qr(
+        identity,
+        card,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     session.enable_debug_log();
     session.enable_debug_log(); // second call must be a no-op
@@ -262,7 +306,12 @@ fn enable_debug_log_twice_is_idempotent() {
 fn no_debug_events_when_log_disabled() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
-    let mut session = ExchangeSession::new_qr(identity, card, MockProximityVerifier::success());
+    let mut session = ExchangeSession::new_qr(
+        identity,
+        card,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     // Do NOT call enable_debug_log
 
     session.apply(ExchangeEvent::StartQR).unwrap();
@@ -277,7 +326,12 @@ fn no_debug_events_when_log_disabled() {
 fn debug_log_exports_to_jsonl() {
     let identity = Identity::create("Alice");
     let card = ContactCard::new("Alice");
-    let mut session = ExchangeSession::new_qr(identity, card, MockProximityVerifier::success());
+    let mut session = ExchangeSession::new_qr(
+        identity,
+        card,
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     session.enable_debug_log();
 
     session.apply(ExchangeEvent::StartQR).unwrap();

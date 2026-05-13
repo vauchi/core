@@ -88,6 +88,7 @@ fn adversarial_empty_direct_payload_rejected() {
         card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     let result = session.apply_hardware_event(Event::DirectPayloadReceived { data: Vec::new() });
@@ -104,6 +105,7 @@ fn adversarial_null_bytes_in_payload_rejected() {
         card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     let result = session.apply_hardware_event(Event::DirectPayloadReceived {
@@ -122,6 +124,7 @@ fn adversarial_non_utf8_payload_rejected() {
         card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     // Invalid UTF-8 sequence
@@ -141,6 +144,7 @@ fn adversarial_max_length_payload_rejected() {
         card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     let result = session.apply_hardware_event(Event::DirectPayloadReceived {
@@ -159,6 +163,7 @@ fn adversarial_truncated_valid_payload() {
         bob_card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     bob_session.emit_initial_commands();
@@ -175,6 +180,7 @@ fn adversarial_truncated_valid_payload() {
             card,
             ManualConfirmationVerifier::new(),
             UsbRole::Initiator,
+            vauchi_core::clock::SystemClock::shared(),
         );
 
         let truncated = valid_payload[..truncate_at].to_vec();
@@ -197,6 +203,7 @@ fn adversarial_corrupted_valid_payload() {
         bob_card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     bob_session.emit_initial_commands();
@@ -219,6 +226,7 @@ fn adversarial_corrupted_valid_payload() {
         card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     let result = session.apply_hardware_event(Event::DirectPayloadReceived { data: corrupted });
@@ -238,6 +246,7 @@ fn adversarial_replay_same_payload_twice() {
         bob_card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
     bob_session.emit_initial_commands();
     let bob_payload = match &bob_session.drain_commands()[0] {
@@ -250,6 +259,7 @@ fn adversarial_replay_same_payload_twice() {
         alice_card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     // First apply succeeds

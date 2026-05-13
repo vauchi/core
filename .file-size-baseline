@@ -45,7 +45,7 @@ vauchi-platform/src/multistage_exchange.rs 1080
 #  FilePickCancelledByUser handled identically to ImageReceived /
 #  ImagePickCancelled — exchange session ignores them, vauchi-app
 #  drives import 2026-05-03 Phase 1 of 2026-05-03-core-file-picker-command)
-vauchi-core/src/exchange/session.rs 1809
+vauchi-core/src/exchange/session.rs 1814
 # (+29 for Phase 1.C.3a foothold of
 #  2026-05-11-hover-graduation-plan.md: audio_proximity field
 #  + getter on MultiStageSession, AudioProximityState import.
@@ -161,7 +161,7 @@ vauchi-app/src/ui/app_engine/routing.rs 1267
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)
-vauchi-app/src/ui/app_engine/screens.rs 1357
+vauchi-app/src/ui/app_engine/screens.rs 1362
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

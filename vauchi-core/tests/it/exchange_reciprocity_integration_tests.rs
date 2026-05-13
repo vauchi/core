@@ -19,11 +19,13 @@ fn drive_mutual_qr_exchange() -> (ExchangeSession, ExchangeSession) {
         identity_a,
         ContactCard::new("Alice"),
         MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
     );
     let mut session_b = ExchangeSession::new_qr(
         identity_b,
         ContactCard::new("Bob"),
         MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     // Both start QR display

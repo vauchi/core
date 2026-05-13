@@ -40,6 +40,7 @@ fn new_usb_session_starts_in_awaiting_direct_payload() {
         card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     assert!(matches!(
@@ -59,6 +60,7 @@ fn new_usb_session_emits_direct_send_command() {
         card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     session.emit_initial_commands();
@@ -87,12 +89,14 @@ fn full_usb_exchange_ceremony_via_commands() {
         alice_card.clone(),
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
     let mut bob_session = ExchangeSession::new_usb(
         bob_id,
         bob_card.clone(),
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     // Step 1: Both sessions emit DirectSend commands
@@ -192,12 +196,14 @@ fn usb_self_exchange_is_rejected() {
         card.clone(),
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
     let mut session2 = ExchangeSession::new_usb(
         identity2,
         card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     session2.emit_initial_commands();
@@ -222,6 +228,7 @@ fn usb_invalid_payload_is_rejected() {
         card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     let result = session.apply_hardware_event(Event::DirectPayloadReceived {
@@ -243,12 +250,14 @@ fn usb_direct_payload_in_wrong_state_is_rejected() {
         card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
     let mut bob_session = ExchangeSession::new_usb(
         bob_id,
         bob_card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     bob_session.emit_initial_commands();
@@ -284,6 +293,7 @@ fn usb_initiator_emits_is_initiator_true() {
         card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     session.emit_initial_commands();
@@ -308,6 +318,7 @@ fn usb_responder_emits_is_initiator_false() {
         card,
         ManualConfirmationVerifier::new(),
         UsbRole::Responder,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     session.emit_initial_commands();
@@ -339,12 +350,14 @@ fn full_usb_exchange_over_tcp_loopback() {
         alice_card.clone(),
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
     let mut bob_session = ExchangeSession::new_usb(
         bob_id,
         bob_card.clone(),
         ManualConfirmationVerifier::new(),
         UsbRole::Responder,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     // Emit initial commands from both sessions
@@ -450,12 +463,18 @@ fn usb_direct_payload_on_qr_session_is_rejected() {
     let bob_card = create_card(&bob_id);
 
     // Create a QR session, not USB
-    let mut session = ExchangeSession::new_qr(identity, card, ManualConfirmationVerifier::new());
+    let mut session = ExchangeSession::new_qr(
+        identity,
+        card,
+        ManualConfirmationVerifier::new(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     let mut bob_session = ExchangeSession::new_usb(
         bob_id,
         bob_card,
         ManualConfirmationVerifier::new(),
         UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
     );
 
     bob_session.emit_initial_commands();

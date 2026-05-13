@@ -309,7 +309,12 @@ fn with_session_auto_enables_debug_log() {
     let identity = vauchi_core::identity::Identity::create("Alice");
     let card = vauchi_core::contact_card::ContactCard::new("Alice");
     let proximity = vauchi_core::exchange::MockProximityVerifier::success();
-    let session = vauchi_core::exchange::ExchangeSession::new_qr(identity, card, proximity);
+    let session = vauchi_core::exchange::ExchangeSession::new_qr(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     let config = ExchangeConfig {
         own_name: "Alice".to_string(),

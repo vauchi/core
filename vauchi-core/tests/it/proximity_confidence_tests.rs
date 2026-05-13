@@ -193,7 +193,12 @@ fn test_exchange_with_proximity_sets_high_confidence() {
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
@@ -231,7 +236,12 @@ fn test_exchange_without_proximity_sets_low_confidence() {
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::failure();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
@@ -269,7 +279,12 @@ fn test_exchange_proximity_timeout_sets_low_confidence() {
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::timeout();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
@@ -308,7 +323,12 @@ fn test_manual_confirmation_sets_medium_confidence() {
     let bob_card = ContactCard::new("Bob");
     let manual_verifier = ManualConfirmationVerifier::new();
     manual_verifier.confirm();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, manual_verifier);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        manual_verifier,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
@@ -349,7 +369,12 @@ fn test_session_stores_audio_challenge_from_qr() {
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Before QR processing, no challenge stored
     assert_eq!(bob_session.their_audio_challenge(), None);
@@ -377,7 +402,12 @@ fn test_stored_audio_challenge_is_not_zeros() {
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
@@ -405,7 +435,12 @@ fn test_proximity_check_uses_qr_challenge_not_zeros() {
 
     let bob_card = ContactCard::new("Bob");
     let (verifier, challenges) = common::verifiers::ChallengeCapturingVerifier::success();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, verifier);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        verifier,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
@@ -445,7 +480,12 @@ fn test_key_agreement_auto_runs_proximity_check_high() {
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
@@ -488,7 +528,12 @@ fn test_key_agreement_auto_runs_proximity_check_medium() {
     let bob_card = ContactCard::new("Bob");
     let manual_verifier = ManualConfirmationVerifier::new();
     manual_verifier.confirm();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, manual_verifier);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        manual_verifier,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
@@ -529,7 +574,12 @@ fn test_key_agreement_auto_runs_proximity_check_low_on_failure() {
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::failure();
-    let mut bob_session = ExchangeSession::new_qr(bob_identity, bob_card, proximity);
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_identity,
+        bob_card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session

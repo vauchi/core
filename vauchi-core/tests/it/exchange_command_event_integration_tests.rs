@@ -22,21 +22,36 @@ fn qr_session(name: &str) -> ExchangeSession {
     let identity = Identity::create(name);
     let card = ContactCard::new(name);
     let proximity = ManualConfirmationVerifier::new();
-    ExchangeSession::new_qr(identity, card, proximity)
+    ExchangeSession::new_qr(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    )
 }
 
 fn nfc_session(name: &str) -> ExchangeSession {
     let identity = Identity::create(name);
     let card = ContactCard::new(name);
     let proximity = ManualConfirmationVerifier::new();
-    ExchangeSession::new_nfc(identity, card, proximity)
+    ExchangeSession::new_nfc(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    )
 }
 
 fn ble_session(name: &str) -> ExchangeSession {
     let identity = Identity::create(name);
     let card = ContactCard::new(name);
     let proximity = ManualConfirmationVerifier::new();
-    ExchangeSession::new_ble(identity, card, proximity)
+    ExchangeSession::new_ble(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    )
 }
 
 // −− QR full round-trip −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−

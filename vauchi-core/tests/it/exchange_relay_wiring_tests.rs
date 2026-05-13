@@ -28,9 +28,14 @@ fn run_qr_exchange(
         alice_id,
         alice_card.clone(),
         MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
     );
-    let mut bob_session =
-        ExchangeSession::new_qr(bob_id, bob_card.clone(), MockProximityVerifier::success());
+    let mut bob_session = ExchangeSession::new_qr(
+        bob_id,
+        bob_card.clone(),
+        MockProximityVerifier::success(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Set relay metadata on sessions
     alice_session.set_our_relay_url(alice_relay_url);

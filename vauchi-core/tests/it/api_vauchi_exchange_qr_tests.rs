@@ -77,7 +77,7 @@ fn remaining_secs_decreases_as_time_passes() {
         generated_at: now_secs(),
         expires_in_secs: 300,
     };
-    let remaining = qr.remaining_secs();
+    let remaining = qr.remaining_secs(now_secs());
     assert!(
         remaining > 0 && remaining <= 300,
         "fresh QR remaining must be in (0, 300]; got {remaining}"
@@ -93,7 +93,7 @@ fn remaining_secs_is_zero_after_expiry() {
         expires_in_secs: 300,
     };
     assert_eq!(
-        qr.remaining_secs(),
+        qr.remaining_secs(now_secs()),
         0,
         "QR expired 100s ago: remaining must saturate to 0"
     );
@@ -108,7 +108,7 @@ fn remaining_secs_is_zero_at_exact_expiry_boundary() {
         expires_in_secs: 300,
     };
     assert_eq!(
-        qr.remaining_secs(),
+        qr.remaining_secs(now_secs()),
         0,
         "at expiry boundary remaining must be 0"
     );
@@ -122,7 +122,7 @@ fn is_expired_true_after_window() {
         generated_at: now_secs().saturating_sub(301),
         expires_in_secs: 300,
     };
-    assert!(qr.is_expired());
+    assert!(qr.is_expired(now_secs()));
 }
 
 // @internal
@@ -133,5 +133,5 @@ fn is_expired_false_within_window() {
         generated_at: now_secs(),
         expires_in_secs: 300,
     };
-    assert!(!qr.is_expired());
+    assert!(!qr.is_expired(now_secs()));
 }

@@ -307,7 +307,7 @@ mod tests {
         assert_eq!(state.shown_tip_ids, vec!["tip-share".to_string()]);
         // Caller-provided `now` is stamped into `last_update_timestamp`
         // verbatim. Previously this assertion read `> 0` and relied on
-        // `SystemTime::now()` being non-zero.
+        // `SystemTime::now` being non-zero.
         assert_eq!(state.last_update_timestamp, 1_700_000_000);
     }
 

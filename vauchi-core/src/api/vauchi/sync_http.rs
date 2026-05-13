@@ -892,10 +892,7 @@ mod tests {
         let (v, _dir) = vauchi_with_server_url("https://relay.example.com");
         // Default pin_ttl_secs is 86400 (24h)
         assert_eq!(v.config.relay.pin_ttl_secs, 86_400);
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = v.clock().unix_seconds();
         assert!(
             v.is_pin_cache_fresh(now - 100),
             "cache fetched 100s ago must be fresh (TTL=86400)"
@@ -907,10 +904,7 @@ mod tests {
     fn test_is_pin_cache_stale_beyond_ttl() {
         let (v, _dir) = vauchi_with_server_url("https://relay.example.com");
         assert_eq!(v.config.relay.pin_ttl_secs, 86_400);
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = v.clock().unix_seconds();
         assert!(
             !v.is_pin_cache_fresh(now - 90_000),
             "cache fetched 90000s ago must be stale (TTL=86400)"

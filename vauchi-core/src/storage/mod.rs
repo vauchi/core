@@ -166,7 +166,7 @@ pub struct Storage {
     /// Explicit-time seam for the storage subsystem (Phase 1 /
     /// Task 1.1 of the pure-functional-core program). Each
     /// `save_*` / TTL-checking submodule uses `self.now_secs()`
-    /// instead of reading ambient `SystemTime::now()`. Defaults
+    /// instead of reading ambient `SystemTime::now`. Defaults
     /// to `SystemClock::shared()`; tests inject a `FakeClock`
     /// via `with_clock(...)`.
     pub(super) clock: std::sync::Arc<dyn crate::clock::Clock>,

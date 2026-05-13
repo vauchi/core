@@ -196,7 +196,7 @@ pub struct Vauchi {
     replay_detector: Mutex<ReplayDetector>,
     auth_mode: AuthMode,
     /// Explicit-time seam (Phase 1 / Task 1.1 of the pure-functional-core
-    /// program). Every `SystemTime::now()` callsite under `vauchi-core`
+    /// program). Every `SystemTime::now` callsite under `vauchi-core`
     /// migrates to `self.clock.now()` cluster by cluster — Step 3 follow-up
     /// MRs. Default is `SystemClock::shared()`; tests pass a `FakeClock`
     /// via `Vauchi::new_with`.
@@ -403,7 +403,7 @@ impl Vauchi {
 
     /// Returns the current Unix timestamp in seconds.
     ///
-    /// First callsite migrated from `SystemTime::now()` to
+    /// First callsite migrated from `SystemTime::now` to
     /// `self.clock.unix_seconds()` — Phase 1 / Task 1.1 / Step 3
     /// of the pure-functional-core program plan. The remaining
     /// callsites under `vauchi-core/src/` migrate in follow-up MRs

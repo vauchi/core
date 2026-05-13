@@ -102,7 +102,7 @@ pub struct Contact {
 ///
 /// Stepping-stone helper for Phase 1 / Task 1.1 / Step 3b. The
 /// 5 SystemTime callsites in this file all routed through
-/// identical `SystemTime::now()....as_secs()` blocks; this helper
+/// identical `SystemTime::now....as_secs()` blocks; this helper
 /// consolidates them while the wider Contact caller graph (sync,
 /// backup, contact-merge, exchange-session, …) still lacks a
 /// `Clock` to propagate. When the storage-cluster pass threads

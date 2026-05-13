@@ -22,20 +22,20 @@ pub struct ExchangeQrData {
 }
 
 impl ExchangeQrData {
-    /// Calculate remaining seconds until expiration.
-    pub fn remaining_secs(&self) -> u64 {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+    /// Calculate remaining seconds until expiration relative to `now`.
+    ///
+    /// `now` is an explicit unix-seconds parameter — callers pass
+    /// `vauchi.clock().unix_seconds()` in production and a fixed
+    /// value in tests. Phase 1 / Task 1.1 / F3 mop-up: retires the
+    /// ambient `SystemTime::now` read this method used to do.
+    pub fn remaining_secs(&self, now: u64) -> u64 {
         let expires_at = self.generated_at + self.expires_in_secs;
         expires_at.saturating_sub(now)
     }
 
-    /// Check if the QR code has expired.
-    pub fn is_expired(&self) -> bool {
-        self.remaining_secs() == 0
+    /// Check if the QR code has expired relative to `now`.
+    pub fn is_expired(&self, now: u64) -> bool {
+        self.remaining_secs(now) == 0
     }
 }
 

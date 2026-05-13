@@ -164,14 +164,17 @@ fn validate_result(
 // ── Engine constructors ─────────────────────────────────────────────
 
 fn make_exchange() -> ExchangeEngine {
-    ExchangeEngine::new(ExchangeConfig {
-        own_name: "Test User".to_string(),
-        own_qr_data: "test-qr-data-12345".to_string(),
-        available_groups: vec![],
-        device_capabilities: Default::default(),
-        mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
-        card_snapshot: None,
-    })
+    ExchangeEngine::new(
+        ExchangeConfig {
+            own_name: "Test User".to_string(),
+            own_qr_data: "test-qr-data-12345".to_string(),
+            available_groups: vec![],
+            device_capabilities: Default::default(),
+            mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
+            card_snapshot: None,
+        },
+        vauchi_core::clock::SystemClock::shared(),
+    )
 }
 
 fn make_device_linking() -> DeviceLinkingEngine {
@@ -500,7 +503,7 @@ proptest! {
             device_capabilities: Default::default(),
             mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
             card_snapshot: None,
-        });
+        }, vauchi_core::clock::SystemClock::shared());
 
         // ShowQr → ScanQr
         let _ = engine.handle_action(UserAction::ActionPressed {

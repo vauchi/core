@@ -91,7 +91,10 @@ fn config_for_mode(mode: ExchangeMode) -> ExchangeConfig {
 /// `ExchangeStep::Success`. Mirrors the deterministic path in
 /// `ui::exchange::tests::magic_full_flow_discovery_to_success`.
 fn drive_magic_to_success() -> ExchangeEngine {
-    let mut e = ExchangeEngine::new(config_for_mode(ExchangeMode::Magic));
+    let mut e = ExchangeEngine::new(
+        config_for_mode(ExchangeMode::Magic),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
         rssi: -45,

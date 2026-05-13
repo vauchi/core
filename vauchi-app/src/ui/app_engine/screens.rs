@@ -308,9 +308,10 @@ impl AppEngine {
                         })
                     });
 
+                let clock = vauchi.clock().clone();
                 match session {
-                    Some(s) => Box::new(ExchangeEngine::with_session(config, s)),
-                    None => Box::new(ExchangeEngine::new(config)),
+                    Some(s) => Box::new(ExchangeEngine::with_session(config, s, clock)),
+                    None => Box::new(ExchangeEngine::new(config, clock)),
                 }
             }
             AppScreen::Help => Box::new(HelpEngine::new(Self::default_help_items())),

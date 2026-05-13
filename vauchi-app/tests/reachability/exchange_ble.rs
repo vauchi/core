@@ -60,7 +60,10 @@ fn config_for_mode(mode: ExchangeMode) -> ExchangeConfig {
 }
 
 fn discovering_factory(mode: ExchangeMode) -> ExchangeEngine {
-    ExchangeEngine::new(config_for_mode(mode))
+    ExchangeEngine::new(
+        config_for_mode(mode),
+        vauchi_core::clock::SystemClock::shared(),
+    )
 }
 
 fn handshaking_factory(mode: ExchangeMode) -> ExchangeEngine {

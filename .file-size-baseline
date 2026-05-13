@@ -161,7 +161,8 @@ vauchi-app/src/ui/app_engine/routing.rs 1267
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)
-vauchi-app/src/ui/app_engine/screens.rs 1366
+# (+1 for `let clock = vauchi.clock().clone()` in ExchangeEngine ctor 2026-05-13 slice 21)
+vauchi-app/src/ui/app_engine/screens.rs 1363
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081
@@ -196,7 +197,8 @@ vauchi-core/tests/it/migration_tests.rs 1226
 # (+105 for is_verified/fingerprint/is_recovery_trusted fields + recovery
 # permissions SettingsGroup + verify_button gating 2026-04-28 Pair 3)
 # (+7 for Glance → MultiStageExchange handoff branch + test rewrite 2026-04-28 Pair 4 L8)
-vauchi-app/src/ui/exchange.rs 3221
+# (+204 for ExchangeEngine clock field + 117 test callsites threading SystemClock 2026-05-13 slice 21)
+vauchi-app/src/ui/exchange.rs 3425
 vauchi-app/src/ui/contact_detail.rs 1423
 
 # EXEMPT — BLE exchange sub-flow: inline tests access private state (proximity_runner, shake_envelope_sent)

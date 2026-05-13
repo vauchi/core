@@ -29,14 +29,17 @@ use vauchi_app::ui::{ExchangeConfig, ExchangeEngine, WorkflowEngine};
 const MODE_SELECTION_HANDLED: &[&str] = &[];
 
 fn factory() -> ExchangeEngine {
-    ExchangeEngine::new(ExchangeConfig {
-        own_name: "Test".into(),
-        own_qr_data: "v1:test".into(),
-        available_groups: Vec::new(),
-        device_capabilities: Default::default(),
-        mode: None,
-        card_snapshot: None,
-    })
+    ExchangeEngine::new(
+        ExchangeConfig {
+            own_name: "Test".into(),
+            own_qr_data: "v1:test".into(),
+            available_groups: Vec::new(),
+            device_capabilities: Default::default(),
+            mode: None,
+            card_snapshot: None,
+        },
+        vauchi_core::clock::SystemClock::shared(),
+    )
 }
 
 // @internal

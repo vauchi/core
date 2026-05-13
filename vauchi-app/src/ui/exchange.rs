@@ -9,6 +9,8 @@
 //! session is provided, transitions emit `Command`s that frontends
 //! dispatch to platform hardware (camera, BLE, NFC, audio).
 
+use std::sync::Arc;
+
 use crate::ui::exchange_ble::{
     self, BleActionOutcome, BleExchangeFlow, BleHardwareOutcome, BleStep,
 };
@@ -18,6 +20,7 @@ use crate::ui::exchange_mode_selection::{ModeSelectionEngine, ModeSelectionResul
 use crate::ui::exchange_qr::{self, QrActionOutcome, QrStep, ScanQualityTracker};
 use crate::ui::*;
 use vauchi_core::Command;
+use vauchi_core::clock::Clock;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
 use vauchi_core::exchange::escrow::EscrowKeys;
 use vauchi_core::exchange::link_mode::{self, LinkInitiation};
@@ -95,6 +98,11 @@ pub struct ExchangeEngine {
     qr_frame_index: usize,
     /// Rolling window tracker for QR scan quality (viewfinder frame color).
     scan_quality_tracker: ScanQualityTracker,
+    /// Wall-clock source for time-stamped sub-engines
+    /// (`ReciprocityConfirmer`). Threaded through both constructors;
+    /// production callers pass `vauchi.clock()`, tests use
+    /// `SystemClock::shared()` or a `FakeClock`.
+    clock: Arc<dyn Clock>,
 }
 
 /// Sub-steps for the USB cable / direct TCP exchange flow.
@@ -191,7 +199,7 @@ impl ExchangeEngine {
         }
     }
 
-    pub fn new(config: ExchangeConfig) -> Self {
+    pub fn new(config: ExchangeConfig, clock: Arc<dyn Clock>) -> Self {
         let step = Self::initial_step(&config);
         let mode_selection = if step == ExchangeStep::ModeSelection {
             Some(ModeSelectionEngine::new(config.device_capabilities.clone()))
@@ -235,6 +243,7 @@ impl ExchangeEngine {
             qr_frames: Vec::new(),
             qr_frame_index: 0,
             scan_quality_tracker: ScanQualityTracker::new(),
+            clock,
         }
     }
 
@@ -247,7 +256,11 @@ impl ExchangeEngine {
     /// If no group selection is needed, the session is started immediately
     /// (StartQR applied). Use `drain_commands()` to get the initial
     /// `QrDisplay` command after construction.
-    pub fn with_session(config: ExchangeConfig, mut session: ExchangeSession) -> Self {
+    pub fn with_session(
+        config: ExchangeConfig,
+        mut session: ExchangeSession,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
         // Always enable debug logging — negligible overhead, data only
         // consumed when explicitly requested via exchange_debug_log().
         session.enable_debug_log();
@@ -289,6 +302,7 @@ impl ExchangeEngine {
                     qr_frames: Vec::new(),
                     qr_frame_index: 0,
                     scan_quality_tracker: ScanQualityTracker::new(),
+                    clock,
                 };
             }
             session.emit_initial_commands();
@@ -317,6 +331,7 @@ impl ExchangeEngine {
             qr_frames,
             qr_frame_index: 0,
             scan_quality_tracker: ScanQualityTracker::new(),
+            clock,
         }
     }
 
@@ -1061,10 +1076,7 @@ impl WorkflowEngine for ExchangeEngine {
                         gate.to_string(),
                         our_slot.to_string(),
                         their_slot.to_string(),
-                        std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_secs(),
+                        self.clock.unix_seconds(),
                         true,
                     );
                     commands.extend(confirmer.start());
@@ -1442,7 +1454,10 @@ mod tests {
 
     #[test]
     fn test_no_groups_skips_selection() {
-        let engine = ExchangeEngine::new(config_no_groups());
+        let engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         // Should start directly at ShowQr when no groups available
         assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
         let screen = engine.current_screen();
@@ -1451,7 +1466,10 @@ mod tests {
 
     #[test]
     fn test_with_groups_starts_at_selection() {
-        let engine = ExchangeEngine::new(config_with_groups());
+        let engine = ExchangeEngine::new(
+            config_with_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         // Should start at GroupSelection when groups exist
         assert_eq!(engine.step, ExchangeStep::GroupSelection);
         let screen = engine.current_screen();
@@ -1460,7 +1478,10 @@ mod tests {
 
     #[test]
     fn test_group_selection_toggle_and_continue() {
-        let mut engine = ExchangeEngine::new(config_with_groups());
+        let mut engine = ExchangeEngine::new(
+            config_with_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
 
         // Toggle first group on
         let result = engine.handle_action(UserAction::ItemToggled {
@@ -1482,7 +1503,10 @@ mod tests {
 
     #[test]
     fn test_group_selection_skip() {
-        let mut engine = ExchangeEngine::new(config_with_groups());
+        let mut engine = ExchangeEngine::new(
+            config_with_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
 
         // Skip without selecting any groups
         let result = engine.handle_action(UserAction::ActionPressed {
@@ -1513,7 +1537,11 @@ mod tests {
     #[test]
     fn test_with_session_starts_qr_and_emits_display_command() {
         let session = create_test_session();
-        let mut engine = ExchangeEngine::with_session(config_no_groups(), session);
+        let mut engine = ExchangeEngine::with_session(
+            config_no_groups(),
+            session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
 
         // Session should be present
         assert!(engine.session().is_some(), "expected Some value");
@@ -1534,7 +1562,11 @@ mod tests {
     #[test]
     fn test_with_session_group_selection_defers_qr_start() {
         let session = create_test_session();
-        let engine = ExchangeEngine::with_session(config_with_groups(), session);
+        let engine = ExchangeEngine::with_session(
+            config_with_groups(),
+            session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
 
         // Should be at GroupSelection step — session not started yet
         assert_eq!(engine.step, ExchangeStep::GroupSelection);
@@ -1547,7 +1579,11 @@ mod tests {
     #[test]
     fn test_with_session_group_continue_shows_field_preview() {
         let session = create_test_session();
-        let mut engine = ExchangeEngine::with_session(config_with_groups(), session);
+        let mut engine = ExchangeEngine::with_session(
+            config_with_groups(),
+            session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
 
         // Continue from group selection → FieldPreview (not QR directly)
         let result = engine.handle_action(UserAction::ActionPressed {
@@ -1582,7 +1618,11 @@ mod tests {
     #[test]
     fn test_with_session_show_qr_continue_emits_scan_request() {
         let session = create_test_session();
-        let mut engine = ExchangeEngine::with_session(config_no_groups(), session);
+        let mut engine = ExchangeEngine::with_session(
+            config_no_groups(),
+            session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.drain_commands(); // drain initial QrDisplay
 
         // Press continue → ScanQr
@@ -1604,7 +1644,11 @@ mod tests {
     #[test]
     fn test_handle_hardware_event_ble_discovery_emits_connect() {
         let session = create_test_session();
-        let mut engine = ExchangeEngine::with_session(config_no_groups(), session);
+        let mut engine = ExchangeEngine::with_session(
+            config_no_groups(),
+            session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.drain_commands();
 
         // Simulate BLE discovery
@@ -1629,7 +1673,10 @@ mod tests {
 
     #[test]
     fn test_without_session_emits_qr_request_scan_command() {
-        let mut engine = ExchangeEngine::new(config_no_groups());
+        let mut engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
 
         // No session
         assert!(engine.session().is_none());
@@ -1704,7 +1751,11 @@ mod tests {
         let bob_qr = bob_session.qr().unwrap();
         let bob_qr_data = bob_qr.to_data_string();
 
-        let engine = ExchangeEngine::with_session(config_no_groups(), alice_session);
+        let engine = ExchangeEngine::with_session(
+            config_no_groups(),
+            alice_session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
         (engine, bob_qr_data)
     }
 
@@ -1748,7 +1799,11 @@ mod tests {
     #[test]
     fn test_show_qr_screen_uses_session_qr_data_when_active() {
         let session = create_test_session();
-        let mut engine = ExchangeEngine::with_session(config_no_groups(), session);
+        let mut engine = ExchangeEngine::with_session(
+            config_no_groups(),
+            session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.drain_commands();
 
         // The ShowQr screen should use the session's QR data, not config.own_qr_data
@@ -1837,7 +1892,10 @@ mod tests {
 
     #[test]
     fn test_selected_groups_persists_through_exchange() {
-        let mut engine = ExchangeEngine::new(config_with_groups());
+        let mut engine = ExchangeEngine::new(
+            config_with_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
 
         // Select a group
         let _ = engine.handle_action(UserAction::ItemToggled {
@@ -1876,7 +1934,10 @@ mod tests {
 
     #[test]
     fn failed_screen_shows_error_detail_after_mark_failed_with_error() {
-        let mut engine = ExchangeEngine::new(config_no_groups());
+        let mut engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         engine.mark_failed_with_error(&vauchi_core::exchange::ExchangeError::SessionTimeout);
         let screen = engine.current_screen();
         assert_eq!(screen.screen_id, "exchange_failed");
@@ -1893,7 +1954,10 @@ mod tests {
 
     #[test]
     fn failed_screen_has_no_detail_after_plain_mark_failed() {
-        let mut engine = ExchangeEngine::new(config_no_groups());
+        let mut engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         engine.mark_failed();
         let screen = engine.current_screen();
         let detail = screen.components.iter().find_map(|c| match c {
@@ -1908,7 +1972,10 @@ mod tests {
 
     #[test]
     fn retry_clears_failure_detail() {
-        let mut engine = ExchangeEngine::new(config_no_groups());
+        let mut engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         engine.mark_failed_with_error(&vauchi_core::exchange::ExchangeError::BleOutOfRange);
         assert!(engine.failure_detail.is_some());
 
@@ -1964,7 +2031,10 @@ mod tests {
 
     #[test]
     fn mode_none_starts_at_mode_selection() {
-        let engine = ExchangeEngine::new(config_mode_selection());
+        let engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         assert_eq!(engine.step, ExchangeStep::ModeSelection);
         let screen = engine.current_screen();
         assert_eq!(screen.screen_id, "exchange_mode_selection");
@@ -1972,14 +2042,20 @@ mod tests {
 
     #[test]
     fn mode_preset_skips_mode_selection() {
-        let engine = ExchangeEngine::new(config_no_groups());
+        let engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         // config_no_groups() sets mode = Some(Glance)
         assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
     }
 
     #[test]
     fn mode_selection_pick_advances_past_selection_via_multi_stage_handoff() {
-        let mut engine = ExchangeEngine::new(config_mode_selection());
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         assert_eq!(engine.step, ExchangeStep::ModeSelection);
 
         // Pick Glance mode — Pair 4 hands this off to MultiStageExchange.
@@ -2004,7 +2080,7 @@ mod tests {
     fn mode_selection_pick_with_groups_goes_to_group_selection() {
         let mut config = config_mode_selection();
         config.available_groups = vec![("g1".into(), "Work".into())];
-        let mut engine = ExchangeEngine::new(config);
+        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
         assert_eq!(engine.step, ExchangeStep::ModeSelection);
 
         let _ = engine.handle_action(UserAction::ListItemSelected {
@@ -2034,7 +2110,10 @@ mod tests {
     // @internal
     #[test]
     fn hover_mode_does_not_advance_to_legacy_qr_step() {
-        let mut engine = ExchangeEngine::new(config_mode_selection());
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
 
         // Pick Hover
         let _ = engine.handle_action(UserAction::ListItemSelected {
@@ -2057,7 +2136,10 @@ mod tests {
         // `StartMultiStageExchange`; AppEngine routing translates it
         // into navigation, and PlatformAppEngine auto-creates the
         // session.
-        let mut engine = ExchangeEngine::new(config_mode_selection());
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
 
         let result = engine.handle_action(UserAction::ListItemSelected {
             component_id: "category:quick".into(),
@@ -2098,7 +2180,10 @@ mod tests {
     // @internal
     #[test]
     fn hover_mode_routes_through_multi_stage_handoff() {
-        let mut engine = ExchangeEngine::new(config_mode_selection());
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
 
         let result = engine.handle_action(UserAction::ListItemSelected {
             component_id: "category:standard".into(),
@@ -2121,7 +2206,7 @@ mod tests {
     fn field_preview_change_groups_returns_to_group_selection() {
         let mut config = config_mode_selection();
         config.available_groups = vec![("g1".into(), "Work".into())];
-        let mut engine = ExchangeEngine::new(config);
+        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
 
         // Mode selection → GroupSelection
         let _ = engine.handle_action(UserAction::ListItemSelected {
@@ -2148,10 +2233,13 @@ mod tests {
     // @internal
     #[test]
     fn test_link_mode_starts_at_share_url() {
-        let engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            ..config_no_groups()
-        });
+        let engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Link),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         assert_eq!(engine.step, ExchangeStep::Link(LinkStep::ShareUrl));
         let screen = engine.current_screen();
         assert_eq!(screen.screen_id, "exchange_share_url");
@@ -2160,10 +2248,13 @@ mod tests {
     // @internal
     #[test]
     fn test_link_mode_share_advances_to_waiting() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            ..config_no_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Link),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "share".into(),
         });
@@ -2178,10 +2269,13 @@ mod tests {
     // @internal
     #[test]
     fn test_link_mode_cancel_completes() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            ..config_no_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Link),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "cancel".into(),
         });
@@ -2191,10 +2285,13 @@ mod tests {
     // @internal
     #[test]
     fn test_link_mode_with_groups_goes_through_preview() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            ..config_with_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Link),
+                ..config_with_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         assert_eq!(engine.step, ExchangeStep::GroupSelection);
 
         // Continue → FieldPreview
@@ -2213,10 +2310,13 @@ mod tests {
     // @internal
     #[test]
     fn test_link_mode_retry_stays_in_link() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            ..config_no_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Link),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         engine.mark_failed();
         assert_eq!(engine.step, ExchangeStep::Failed);
 
@@ -2233,10 +2333,13 @@ mod tests {
     // @internal
     #[test]
     fn test_link_mode_generates_initiation_on_construction() {
-        let engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            ..config_no_groups()
-        });
+        let engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Link),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         assert!(
             engine.link_initiation.is_some(),
             "link_initiation must be populated at construction"
@@ -2248,10 +2351,13 @@ mod tests {
     // @internal
     #[test]
     fn test_link_mode_drain_commands_returns_presence_deposit() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            ..config_no_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Link),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let commands = engine.drain_commands();
         assert_eq!(commands.len(), 1, "must emit 1 presence deposit command");
         assert!(matches!(&commands[0], Command::RelayEscrowDeposit { .. }));
@@ -2262,10 +2368,13 @@ mod tests {
     // @internal
     #[test]
     fn test_link_mode_share_url_screen_shows_generated_url() {
-        let engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            ..config_no_groups()
-        });
+        let engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Link),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let screen = engine.current_screen();
         let url_text = screen
             .components
@@ -2284,10 +2393,13 @@ mod tests {
     // @internal
     #[test]
     fn test_link_mode_share_emits_show_share_sheet() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            ..config_no_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Link),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.drain_commands(); // drain presence deposit
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "share".into(),
@@ -2307,10 +2419,13 @@ mod tests {
     // @internal
     #[test]
     fn test_link_shared_event_emits_escrow_check() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            ..config_no_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Link),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.drain_commands(); // drain presence deposit
         // Move to WaitingForResponse
         let _ = engine.handle_action(UserAction::ActionPressed {
@@ -2337,10 +2452,13 @@ mod tests {
     // @internal
     #[test]
     fn test_link_escrow_ready_emits_retrieve_and_transitions_to_retrieving() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            ..config_no_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Link),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.drain_commands();
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "share".into(),
@@ -2382,10 +2500,13 @@ mod tests {
     // @internal
     #[test]
     fn test_link_escrow_failed_shows_error() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            ..config_no_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Link),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.drain_commands();
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "share".into(),
@@ -2406,10 +2527,13 @@ mod tests {
     // @internal
     #[test]
     fn test_link_unknown_gate_hash_ignored() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            ..config_no_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Link),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.drain_commands();
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "share".into(),
@@ -2431,10 +2555,13 @@ mod tests {
     // @internal
     #[test]
     fn ble_failure_shows_relay_fallback_action() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Magic),
-            ..config_no_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Magic),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         // Simulate BLE failure via apply_ble_outcome
         let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
             reason: "BLE timeout".into(),
@@ -2452,7 +2579,10 @@ mod tests {
     // @internal
     #[test]
     fn non_ble_failure_does_not_show_relay_fallback() {
-        let mut engine = ExchangeEngine::new(config_no_groups());
+        let mut engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         engine.mark_failed();
         assert!(!engine.ble_fallback_available);
 
@@ -2466,10 +2596,13 @@ mod tests {
     // @internal
     #[test]
     fn fallback_relay_action_switches_to_link_mode() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Magic),
-            ..config_no_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Magic),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
             reason: "timeout".into(),
         });
@@ -2496,10 +2629,13 @@ mod tests {
     // @internal
     #[test]
     fn retry_clears_ble_fallback_flag() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Bump),
-            ..config_no_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Bump),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
             reason: "disconnect".into(),
         });
@@ -2521,10 +2657,13 @@ mod tests {
 
     /// Helper: create a BLE mode engine and advance through discovery + connection.
     fn ble_engine_to_exchanging(mode: ExchangeMode) -> ExchangeEngine {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(mode),
-            ..config_no_groups()
-        });
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(mode),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         assert_eq!(engine.step, ExchangeStep::Ble(BleStep::Discovering));
 
         // Discovery
@@ -2652,7 +2791,10 @@ mod tests {
     // @internal
     #[test]
     fn camera_unavailable_during_qr_scan_switches_to_manual_entry() {
-        let mut engine = ExchangeEngine::new(config_with_camera());
+        let mut engine = ExchangeEngine::new(
+            config_with_camera(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         engine.step = ExchangeStep::Qr(QrStep::ScanQr);
 
         let result = engine.handle_hardware_event(vauchi_core::Event::HardwareUnavailable {
@@ -2673,7 +2815,10 @@ mod tests {
     // @internal
     #[test]
     fn camera_permission_denied_during_qr_scan_switches_to_manual_entry() {
-        let mut engine = ExchangeEngine::new(config_with_camera());
+        let mut engine = ExchangeEngine::new(
+            config_with_camera(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         engine.step = ExchangeStep::Qr(QrStep::ScanQr);
 
         let result = engine.handle_hardware_event(vauchi_core::Event::PermissionDenied {
@@ -2721,7 +2866,10 @@ mod tests {
     // @internal
     #[test]
     fn manual_code_entry_advances_to_verifying() {
-        let mut engine = ExchangeEngine::new(config_with_camera());
+        let mut engine = ExchangeEngine::new(
+            config_with_camera(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         engine.step = ExchangeStep::Qr(QrStep::ManualEntry);
 
         let _ = engine.handle_action(UserAction::TextChanged {
@@ -2744,7 +2892,10 @@ mod tests {
     // @internal
     #[test]
     fn manual_entry_back_returns_to_show_qr() {
-        let mut engine = ExchangeEngine::new(config_with_camera());
+        let mut engine = ExchangeEngine::new(
+            config_with_camera(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         engine.step = ExchangeStep::Qr(QrStep::ManualEntry);
 
         let _ = engine.handle_action(UserAction::ActionPressed {
@@ -2761,15 +2912,18 @@ mod tests {
     // @internal
     #[test]
     fn ble_failure_with_camera_shows_qr_fallback() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Magic),
-            device_capabilities: DeviceCapabilities {
-                has_camera: true,
-                has_ble: true,
-                ..Default::default()
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Magic),
+                device_capabilities: DeviceCapabilities {
+                    has_camera: true,
+                    has_ble: true,
+                    ..Default::default()
+                },
+                ..config_no_groups()
             },
-            ..config_no_groups()
-        });
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
             reason: "BLE timeout".into(),
         });
@@ -2789,15 +2943,18 @@ mod tests {
     // @internal
     #[test]
     fn ble_failure_without_camera_has_no_qr_fallback() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Magic),
-            device_capabilities: DeviceCapabilities {
-                has_camera: false,
-                has_ble: true,
-                ..Default::default()
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Magic),
+                device_capabilities: DeviceCapabilities {
+                    has_camera: false,
+                    has_ble: true,
+                    ..Default::default()
+                },
+                ..config_no_groups()
             },
-            ..config_no_groups()
-        });
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
             reason: "BLE timeout".into(),
         });
@@ -2813,15 +2970,18 @@ mod tests {
     // @internal
     #[test]
     fn fallback_qr_action_switches_to_qr_flow() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Magic),
-            device_capabilities: DeviceCapabilities {
-                has_camera: true,
-                has_ble: true,
-                ..Default::default()
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Magic),
+                device_capabilities: DeviceCapabilities {
+                    has_camera: true,
+                    has_ble: true,
+                    ..Default::default()
+                },
+                ..config_no_groups()
             },
-            ..config_no_groups()
-        });
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
             reason: "timeout".into(),
         });
@@ -2843,15 +3003,18 @@ mod tests {
     // @internal
     #[test]
     fn ble_permission_denied_shows_fallback() {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Magic),
-            device_capabilities: DeviceCapabilities {
-                has_camera: true,
-                has_ble: true,
-                ..Default::default()
+        let mut engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Magic),
+                device_capabilities: DeviceCapabilities {
+                    has_camera: true,
+                    has_ble: true,
+                    ..Default::default()
+                },
+                ..config_no_groups()
             },
-            ..config_no_groups()
-        });
+            vauchi_core::clock::SystemClock::shared(),
+        );
 
         let result = engine.handle_hardware_event(vauchi_core::Event::PermissionDenied {
             transport: "BLE".into(),
@@ -2868,7 +3031,10 @@ mod tests {
     // @internal
     #[test]
     fn camera_unavailable_outside_scan_step_is_ignored() {
-        let mut engine = ExchangeEngine::new(config_with_camera());
+        let mut engine = ExchangeEngine::new(
+            config_with_camera(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         // In ShowQr step — camera unavailable should not trigger manual entry
         assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
 
@@ -2890,10 +3056,13 @@ mod tests {
     // @internal
     #[test]
     fn cable_mode_creates_direct_transport_step() {
-        let engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Cable),
-            ..config_no_groups()
-        });
+        let engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Cable),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         assert_eq!(
             engine.step,
             ExchangeStep::DirectTransport(DirectStep::WaitingForConnection)
@@ -2905,10 +3074,13 @@ mod tests {
     // @internal
     #[test]
     fn cable_mode_screen_shows_usb_title_and_cancel_action() {
-        let engine = ExchangeEngine::new(ExchangeConfig {
-            mode: Some(ExchangeMode::Cable),
-            ..config_no_groups()
-        });
+        let engine = ExchangeEngine::new(
+            ExchangeConfig {
+                mode: Some(ExchangeMode::Cable),
+                ..config_no_groups()
+            },
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let screen = engine.current_screen();
         assert_eq!(screen.title, "USB Exchange");
         assert!(
@@ -2941,7 +3113,11 @@ mod tests {
             UsbRole::Initiator,
             vauchi_core::clock::SystemClock::shared(),
         );
-        let engine = ExchangeEngine::with_session(config, session);
+        let engine = ExchangeEngine::with_session(
+            config,
+            session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
 
         // start_session_if_needed is called via handle_action in the USB path;
         // after construction the step should be DirectTransport(WaitingForConnection).
@@ -2970,7 +3146,10 @@ mod tests {
     // @internal
     #[test]
     fn scan_quality_starts_as_no_signal() {
-        let mut engine = ExchangeEngine::new(config_no_groups());
+        let mut engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         // Advance to ScanQr
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
@@ -2989,7 +3168,10 @@ mod tests {
     // @internal
     #[test]
     fn scan_progress_updates_quality_to_good() {
-        let mut engine = ExchangeEngine::new(config_no_groups());
+        let mut engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
@@ -3019,7 +3201,10 @@ mod tests {
     // @internal
     #[test]
     fn scan_progress_degrades_to_poor_on_low_detection() {
-        let mut engine = ExchangeEngine::new(config_no_groups());
+        let mut engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
@@ -3045,7 +3230,10 @@ mod tests {
     // @internal
     #[test]
     fn scan_quality_resets_on_back_and_re_enter() {
-        let mut engine = ExchangeEngine::new(config_no_groups());
+        let mut engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
@@ -3084,7 +3272,10 @@ mod tests {
     // @internal
     #[test]
     fn scan_progress_ignored_outside_scan_step() {
-        let mut engine = ExchangeEngine::new(config_no_groups());
+        let mut engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         // Still on ShowQr step
         assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
 
@@ -3104,7 +3295,10 @@ mod tests {
     // @internal
     #[test]
     fn skipped_frames_do_not_degrade_quality() {
-        let mut engine = ExchangeEngine::new(config_no_groups());
+        let mut engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });
@@ -3157,7 +3351,11 @@ mod tests {
         use crate::ui::engine::WorkflowEngine;
 
         let session = create_test_session();
-        let mut engine = ExchangeEngine::with_session(config_no_groups(), session);
+        let mut engine = ExchangeEngine::with_session(
+            config_no_groups(),
+            session,
+            vauchi_core::clock::SystemClock::shared(),
+        );
         let _ = engine.drain_commands();
 
         let total = engine.qr_frame_count();
@@ -3196,7 +3394,10 @@ mod tests {
         use crate::ui::engine::WorkflowEngine;
 
         // Engine parked on ModeSelection (no pre-selected mode).
-        let mut engine = ExchangeEngine::new(config_mode_selection());
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         assert_ne!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
         assert!(
             WorkflowEngine::advance_qr_frame(&mut engine).is_none(),
@@ -3210,7 +3411,10 @@ mod tests {
         use crate::ui::engine::WorkflowEngine;
 
         // Force ShowQr step without a session → qr_frames is empty.
-        let mut engine = ExchangeEngine::new(config_no_groups());
+        let mut engine = ExchangeEngine::new(
+            config_no_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
         engine.step = ExchangeStep::Qr(QrStep::ShowQr);
         assert!(engine.qr_frames.is_empty());
         assert!(

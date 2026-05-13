@@ -5,14 +5,17 @@
 use vauchi_app::ui::*;
 
 fn make_engine() -> ExchangeEngine {
-    ExchangeEngine::new(ExchangeConfig {
-        own_name: "Alice".to_string(),
-        own_qr_data: "alice-qr-payload".to_string(),
-        available_groups: vec![],
-        device_capabilities: Default::default(),
-        mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
-        card_snapshot: None,
-    })
+    ExchangeEngine::new(
+        ExchangeConfig {
+            own_name: "Alice".to_string(),
+            own_qr_data: "alice-qr-payload".to_string(),
+            available_groups: vec![],
+            device_capabilities: Default::default(),
+            mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
+            card_snapshot: None,
+        },
+        vauchi_core::clock::SystemClock::shared(),
+    )
 }
 
 // @internal
@@ -325,7 +328,8 @@ fn with_session_auto_enables_debug_log() {
         card_snapshot: None,
     };
 
-    let engine = ExchangeEngine::with_session(config, session);
+    let engine =
+        ExchangeEngine::with_session(config, session, vauchi_core::clock::SystemClock::shared());
 
     // Debug log should be auto-enabled with at least SessionStarted
     let log = engine

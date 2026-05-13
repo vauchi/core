@@ -305,7 +305,10 @@ fn sample_duress_config() -> DuressConfig {
 // @internal
 #[test]
 fn exchange_show_qr_fixture_is_fresh() {
-    let engine = ExchangeEngine::new(sample_exchange_config());
+    let engine = ExchangeEngine::new(
+        sample_exchange_config(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
     assert_fixture_fresh(&engine.current_screen(), "exchange_show_qr.json");
 }
 
@@ -423,7 +426,11 @@ fn regenerate_all_engine_fixtures() {
         // Phase 3 engines
         (
             "exchange_show_qr.json",
-            ExchangeEngine::new(sample_exchange_config()).current_screen(),
+            ExchangeEngine::new(
+                sample_exchange_config(),
+                vauchi_core::clock::SystemClock::shared(),
+            )
+            .current_screen(),
         ),
         (
             "device_linking.json",

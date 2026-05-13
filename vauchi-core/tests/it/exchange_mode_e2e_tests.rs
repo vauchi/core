@@ -36,7 +36,10 @@ fn config_with_mode_selection() -> ExchangeConfig {
 // @internal
 #[test]
 fn glance_full_flow_mode_to_qr_to_result() {
-    let mut engine = ExchangeEngine::new(config_with_mode_selection());
+    let mut engine = ExchangeEngine::new(
+        config_with_mode_selection(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Step 1: Mode selection screen
     let screen = engine.current_screen();
@@ -108,7 +111,10 @@ fn glance_full_flow_mode_to_qr_to_result() {
 // @internal
 #[test]
 fn broadcast_full_flow_mode_to_qr_to_result() {
-    let mut engine = ExchangeEngine::new(config_with_mode_selection());
+    let mut engine = ExchangeEngine::new(
+        config_with_mode_selection(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Select Broadcast
     let _ = engine.handle_action(UserAction::ListItemSelected {
@@ -148,7 +154,10 @@ fn broadcast_full_flow_mode_to_qr_to_result() {
 // @internal
 #[test]
 fn link_full_flow_mode_to_share_to_waiting() {
-    let mut engine = ExchangeEngine::new(config_with_mode_selection());
+    let mut engine = ExchangeEngine::new(
+        config_with_mode_selection(),
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Select Link mode
     let _ = engine.handle_action(UserAction::ListItemSelected {
@@ -203,10 +212,13 @@ fn link_full_flow_mode_to_share_to_waiting() {
 // @internal
 #[test]
 fn failed_retry_preserves_glance_mode() {
-    let mut engine = ExchangeEngine::new(ExchangeConfig {
-        mode: Some(ExchangeMode::Glance),
-        ..config_with_mode_selection()
-    });
+    let mut engine = ExchangeEngine::new(
+        ExchangeConfig {
+            mode: Some(ExchangeMode::Glance),
+            ..config_with_mode_selection()
+        },
+        vauchi_core::clock::SystemClock::shared(),
+    );
     engine.mark_failed();
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "retry".to_string(),
@@ -218,11 +230,14 @@ fn failed_retry_preserves_glance_mode() {
 // @internal
 #[test]
 fn failed_retry_preserves_link_mode() {
-    let mut engine = ExchangeEngine::new(ExchangeConfig {
-        mode: Some(ExchangeMode::Link),
-        available_groups: vec![],
-        ..config_with_mode_selection()
-    });
+    let mut engine = ExchangeEngine::new(
+        ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            available_groups: vec![],
+            ..config_with_mode_selection()
+        },
+        vauchi_core::clock::SystemClock::shared(),
+    );
     engine.mark_failed();
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "retry".to_string(),
@@ -238,11 +253,14 @@ fn failed_retry_preserves_link_mode() {
 // @internal
 #[test]
 fn progress_advances_through_link_flow() {
-    let mut engine = ExchangeEngine::new(ExchangeConfig {
-        mode: Some(ExchangeMode::Link),
-        available_groups: vec![],
-        ..config_with_mode_selection()
-    });
+    let mut engine = ExchangeEngine::new(
+        ExchangeConfig {
+            mode: Some(ExchangeMode::Link),
+            available_groups: vec![],
+            ..config_with_mode_selection()
+        },
+        vauchi_core::clock::SystemClock::shared(),
+    );
 
     // Link starts at step 4 (after mode=1, groups=2, preview=3)
     let s1 = engine.current_screen();

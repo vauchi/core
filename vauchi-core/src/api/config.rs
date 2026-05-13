@@ -331,7 +331,7 @@ impl SyncConfig {
         if min >= max {
             return Duration::from_millis(min);
         }
-        let ms = rand::thread_rng().gen_range(min..=max);
+        let ms = crate::rng::non_crypto_rng().gen_range(min..=max);
         Duration::from_millis(ms)
     }
 
@@ -348,7 +348,7 @@ impl SyncConfig {
         let delta = base * pct / 100;
         let min = base.saturating_sub(delta);
         let max = base + delta;
-        let ms = rand::thread_rng().gen_range(min..=max);
+        let ms = crate::rng::non_crypto_rng().gen_range(min..=max);
         Duration::from_millis(ms)
     }
 }

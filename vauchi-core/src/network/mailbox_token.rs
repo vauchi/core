@@ -111,7 +111,7 @@ pub fn batch_register_tokens(
     // Split into 256-token batches, each padded and shuffled
     use rand::Rng;
     use rand::seq::SliceRandom;
-    let mut rng = rand::thread_rng();
+    let mut rng = crate::rng::non_crypto_rng();
     let mut batches = Vec::new();
 
     for chunk in all_tokens.chunks(256) {

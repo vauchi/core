@@ -328,6 +328,7 @@ mod replay_detection_api_tests;
 mod replay_detection_tests;
 mod retry_queue_tests;
 mod revocation_protocol_tests;
+mod rng_tests;
 mod schema_compat_tests;
 mod sealed_box_tests;
 mod security_hardening_tests;

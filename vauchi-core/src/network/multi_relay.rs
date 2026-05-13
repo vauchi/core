@@ -96,7 +96,7 @@ impl MultiRelayConfig {
             }
             RelaySelector::Random => {
                 // Non-crypto RNG: relay load balancing, not security-sensitive
-                let mut rng = rand::thread_rng();
+                let mut rng = crate::rng::non_crypto_rng();
                 self.relays
                     .choose(&mut rng)
                     .expect("relays list is non-empty (validated at construction)")
@@ -147,7 +147,7 @@ impl MultiRelayConfig {
                     None
                 } else {
                     // Non-crypto RNG: relay load balancing, not security-sensitive
-                    let mut rng = rand::thread_rng();
+                    let mut rng = crate::rng::non_crypto_rng();
                     Some(
                         healthy
                             .choose(&mut rng)
@@ -347,7 +347,7 @@ impl RelayHealth {
         }
         let half = max_ms / 2;
         // Non-crypto RNG: cooldown jitter for thundering herd prevention
-        let jittered = half + (rand::Rng::gen_range(&mut rand::thread_rng(), 0..=half));
+        let jittered = half + (rand::Rng::gen_range(&mut crate::rng::non_crypto_rng(), 0..=half));
         Duration::from_millis(jittered)
     }
 }

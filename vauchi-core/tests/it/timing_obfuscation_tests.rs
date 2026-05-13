@@ -19,7 +19,7 @@ fn test_post_exchange_delay_in_range() {
         ..Default::default()
     };
     for _ in 0..100 {
-        let delay = config.random_post_exchange_delay();
+        let delay = config.random_post_exchange_delay(&vauchi_core::rng::OsSecureRng::new());
         assert!(
             delay >= Duration::from_secs(30),
             "delay {delay:?} below 30s minimum"
@@ -39,7 +39,7 @@ fn test_post_exchange_delay_min_equals_max() {
         post_exchange_delay_max_ms: 60_000,
         ..Default::default()
     };
-    let delay = config.random_post_exchange_delay();
+    let delay = config.random_post_exchange_delay(&vauchi_core::rng::OsSecureRng::new());
     assert_eq!(delay, Duration::from_secs(60));
 }
 
@@ -51,7 +51,7 @@ fn test_post_exchange_delay_min_greater_than_max() {
         post_exchange_delay_max_ms: 60_000,
         ..Default::default()
     };
-    let delay = config.random_post_exchange_delay();
+    let delay = config.random_post_exchange_delay(&vauchi_core::rng::OsSecureRng::new());
     assert_eq!(
         delay,
         Duration::from_millis(120_000),
@@ -70,7 +70,7 @@ fn test_jittered_sync_interval_in_range() {
         ..Default::default()
     };
     for _ in 0..100 {
-        let interval = config.jittered_sync_interval();
+        let interval = config.jittered_sync_interval(&vauchi_core::rng::OsSecureRng::new());
         assert!(
             interval >= Duration::from_millis(51_000),
             "interval {interval:?} below 51s (60s - 15%)"
@@ -90,7 +90,7 @@ fn test_zero_jitter_returns_exact_interval() {
         sync_interval_jitter_percent: 0,
         ..Default::default()
     };
-    let interval = config.jittered_sync_interval();
+    let interval = config.jittered_sync_interval(&vauchi_core::rng::OsSecureRng::new());
     assert_eq!(interval, Duration::from_secs(60));
 }
 
@@ -103,7 +103,7 @@ fn test_jitter_capped_at_50_percent() {
         ..Default::default()
     };
     for _ in 0..100 {
-        let interval = config.jittered_sync_interval();
+        let interval = config.jittered_sync_interval(&vauchi_core::rng::OsSecureRng::new());
         assert!(
             interval >= Duration::from_millis(30_000),
             "interval {interval:?} below 30s (60s - 50%)"

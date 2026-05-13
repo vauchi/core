@@ -7,7 +7,6 @@
 //! Configuration and management for connecting to multiple relay servers.
 //! Provides failover, load balancing, and health tracking.
 
-use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -15,6 +14,7 @@ use std::time::{Duration, Instant};
 use thiserror::Error;
 
 use crate::contact::Contact;
+use crate::rng::SecureRngExt;
 
 /// Multi-relay configuration errors
 #[derive(Error, Debug)]
@@ -88,7 +88,7 @@ impl MultiRelayConfig {
     }
 
     /// Select a relay based on the configured strategy
-    pub fn select_relay(&self) -> String {
+    pub fn select_relay(&self, rng: &dyn crate::rng::SecureRng) -> String {
         match self.selector {
             RelaySelector::RoundRobin => {
                 let index = self.round_robin_index.fetch_add(1, Ordering::Relaxed);
@@ -96,9 +96,7 @@ impl MultiRelayConfig {
             }
             RelaySelector::Random => {
                 // Non-crypto RNG: relay load balancing, not security-sensitive
-                let mut rng = crate::rng::non_crypto_rng();
-                self.relays
-                    .choose(&mut rng)
+                rng.choose(&self.relays)
                     .expect("relays list is non-empty (validated at construction)")
                     .clone()
             }
@@ -113,7 +111,11 @@ impl MultiRelayConfig {
     }
 
     /// Select a relay, excluding unhealthy ones
-    pub fn select_healthy_relay(&self, health: &RelayHealth) -> Option<String> {
+    pub fn select_healthy_relay(
+        &self,
+        health: &RelayHealth,
+        rng: &dyn crate::rng::SecureRng,
+    ) -> Option<String> {
         match self.selector {
             RelaySelector::PrimaryFirst => {
                 // Try primary first
@@ -147,10 +149,8 @@ impl MultiRelayConfig {
                     None
                 } else {
                     // Non-crypto RNG: relay load balancing, not security-sensitive
-                    let mut rng = crate::rng::non_crypto_rng();
                     Some(
-                        healthy
-                            .choose(&mut rng)
+                        rng.choose(&healthy)
                             .expect("healthy is non-empty (checked above)")
                             .to_string(),
                     )
@@ -377,8 +377,8 @@ impl MultiRelayManager {
 
     /// Select the best healthy relay based on the configured strategy.
     /// Returns `None` if all relays are unhealthy.
-    pub fn select_relay(&self) -> Option<String> {
-        self.config.select_healthy_relay(&self.health)
+    pub fn select_relay(&self, rng: &dyn crate::rng::SecureRng) -> Option<String> {
+        self.config.select_healthy_relay(&self.health, rng)
     }
 
     /// Mark a relay as healthy after a successful operation.
@@ -432,7 +432,7 @@ impl MultiRelayManager {
     /// If the contact has a relay URL set and that relay is healthy,
     /// returns the contact's relay. Otherwise falls back to the home relay
     /// (primary from config).
-    pub fn relay_for_contact(&self, contact: &Contact) -> String {
+    pub fn relay_for_contact(&self, contact: &Contact, rng: &dyn crate::rng::SecureRng) -> String {
         if let Some(contact_relay) = contact.relay_url()
             && !contact_relay.is_empty()
             && self.health.is_healthy(contact_relay)
@@ -441,7 +441,7 @@ impl MultiRelayManager {
         }
         // Fall back to home relay
         self.config
-            .select_healthy_relay(&self.health)
+            .select_healthy_relay(&self.health, rng)
             .unwrap_or_else(|| {
                 // Last resort: return primary even if unhealthy
                 self.config
@@ -548,7 +548,7 @@ mod tests {
             .unwrap();
 
         let manager = MultiRelayManager::new(config);
-        let selected = manager.select_relay();
+        let selected = manager.select_relay(&crate::rng::OsSecureRng::new());
 
         assert_eq!(
             selected,
@@ -568,7 +568,7 @@ mod tests {
         let mut manager = MultiRelayManager::new(config);
         manager.mark_unhealthy("https://primary.test");
 
-        let selected = manager.select_relay();
+        let selected = manager.select_relay(&crate::rng::OsSecureRng::new());
         assert_eq!(
             selected,
             Some("https://backup.test".to_string()),
@@ -615,7 +615,7 @@ mod tests {
         manager.mark_unhealthy("https://relay1.test");
         manager.mark_unhealthy("https://relay2.test");
 
-        let selected = manager.select_relay();
+        let selected = manager.select_relay(&crate::rng::OsSecureRng::new());
         assert_eq!(
             selected, None,
             "Should return None when all relays are unhealthy"

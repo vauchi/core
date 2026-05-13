@@ -95,16 +95,16 @@ impl<'a, T: Transport> SyncController<'a, T> {
     }
 
     /// Connects to the relay server.
-    pub fn connect(&mut self) -> VauchiResult<()> {
+    pub fn connect(&mut self, rng: &dyn crate::rng::SecureRng) -> VauchiResult<()> {
         self.relay.connect()?;
-        self.update_connection_state();
+        self.update_connection_state(rng);
         Ok(())
     }
 
     /// Disconnects from the relay server.
-    pub fn disconnect(&mut self) -> VauchiResult<()> {
+    pub fn disconnect(&mut self, rng: &dyn crate::rng::SecureRng) -> VauchiResult<()> {
         self.relay.disconnect()?;
-        self.update_connection_state();
+        self.update_connection_state(rng);
         Ok(())
     }
 
@@ -139,7 +139,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
     ///
     /// This processes pending updates, sends them through the relay,
     /// and handles acknowledgments.
-    pub fn sync(&mut self) -> VauchiResult<SyncResult> {
+    pub fn sync(&mut self, rng: &dyn crate::rng::SecureRng) -> VauchiResult<SyncResult> {
         if !self.is_connected() {
             return Err(VauchiError::Network(
                 crate::network::NetworkError::NotConnected,
@@ -172,6 +172,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
                         self.storage,
                         &event.update_id,
                         ack_status,
+                        rng,
                     );
                 }
             }
@@ -411,7 +412,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
     ///
     /// When transitioning to `Connected`, triggers retry tick and
     /// offline queue flush to process pending work.
-    fn update_connection_state(&mut self) {
+    fn update_connection_state(&mut self, rng: &dyn crate::rng::SecureRng) {
         let new_state = self.relay.connection().state();
         if new_state != self.last_connection_state {
             let was_disconnected =
@@ -423,7 +424,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
 
             // On transition to Connected: flush offline queue and process retries
             if was_disconnected && new_state == ConnectionState::Connected {
-                self.on_connectivity_restored();
+                self.on_connectivity_restored(rng);
             }
         }
     }
@@ -431,9 +432,9 @@ impl<'a, T: Transport> SyncController<'a, T> {
     /// Handles connectivity restoration — flushes offline queue and processes retries.
     ///
     /// Best-effort: errors are logged via events but don't propagate.
-    fn on_connectivity_restored(&mut self) {
+    fn on_connectivity_restored(&mut self, rng: &dyn crate::rng::SecureRng) {
         // Process due retries
-        if let Ok(tick_result) = self.retry_scheduler.tick(self.storage)
+        if let Ok(tick_result) = self.retry_scheduler.tick(self.storage, rng)
             && (tick_result.rescheduled > 0 || tick_result.expired > 0)
         {
             self.events.dispatch(VauchiEvent::DeliveryStatusUpdate {

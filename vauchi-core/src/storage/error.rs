@@ -219,15 +219,18 @@ impl RetryQueue {
     /// Calculates the backoff time with jitter to prevent thundering herd.
     ///
     /// Returns base backoff + random jitter in range [0, base * 0.25].
-    pub fn backoff_seconds_with_jitter(&self, attempt: u32) -> u64 {
-        use rand::Rng;
+    pub fn backoff_seconds_with_jitter(
+        &self,
+        attempt: u32,
+        rng: &dyn crate::rng::SecureRng,
+    ) -> u64 {
         let base = self.backoff_seconds(attempt);
         let jitter_range = base / 4; // 25% of base
         if jitter_range == 0 {
             return base;
         }
         // Non-crypto RNG: jitter for backoff timing, not security-sensitive
-        let jitter = crate::rng::non_crypto_rng().gen_range(0..=jitter_range);
+        let jitter = rng.random_in_range_u64(0, jitter_range);
         base + jitter
     }
 
@@ -237,8 +240,13 @@ impl RetryQueue {
     }
 
     /// Calculates the next retry timestamp with jitter.
-    pub fn next_retry_time_with_jitter(&self, current_time: u64, attempt: u32) -> u64 {
-        current_time + self.backoff_seconds_with_jitter(attempt)
+    pub fn next_retry_time_with_jitter(
+        &self,
+        current_time: u64,
+        attempt: u32,
+        rng: &dyn crate::rng::SecureRng,
+    ) -> u64 {
+        current_time + self.backoff_seconds_with_jitter(attempt, rng)
     }
 }
 

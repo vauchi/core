@@ -77,6 +77,7 @@ impl DeliveryService {
         storage: &Storage,
         message_id: &str,
         status: DeliveryAckStatus,
+        rng: &dyn crate::rng::SecureRng,
     ) -> Result<(), StorageError> {
         let record = storage.get_delivery_record(message_id)?.ok_or_else(|| {
             StorageError::NotFound(format!("Delivery record not found: {}", message_id))
@@ -108,7 +109,7 @@ impl DeliveryService {
                     recipient_id: record.recipient_id,
                     payload: vec![],
                     attempt: 0,
-                    next_retry: self.retry_queue.next_retry_time_with_jitter(now, 0),
+                    next_retry: self.retry_queue.next_retry_time_with_jitter(now, 0, rng),
                     created_at: now,
                     max_attempts: 10,
                 };

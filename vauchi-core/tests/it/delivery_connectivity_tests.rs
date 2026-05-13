@@ -71,7 +71,9 @@ fn test_connectivity_restored_processes_retries_and_queue() {
     create_offline_update(&storage, &offline_manager, "offline-2");
 
     // Simulate "coming online": run retry tick and flush offline queue
-    let tick_result = retry_scheduler.tick(&storage).unwrap();
+    let tick_result = retry_scheduler
+        .tick(&storage, &vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
     let flushed = offline_manager.flush_queue(&storage).unwrap();
 
     // Verify retry was processed
@@ -97,7 +99,9 @@ fn test_connectivity_restored_with_nothing_pending() {
     let offline_manager = OfflineManager::new();
 
     // No retries, no offline queue — should be a no-op
-    let tick_result = retry_scheduler.tick(&storage).unwrap();
+    let tick_result = retry_scheduler
+        .tick(&storage, &vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
     let flushed = offline_manager.flush_queue(&storage).unwrap();
 
     assert_eq!(tick_result.due, 0);
@@ -132,7 +136,9 @@ fn test_combined_retry_and_offline_counts() {
     create_offline_update(&storage, &offline_manager, "q-2");
     create_offline_update(&storage, &offline_manager, "q-3");
 
-    let tick_result = retry_scheduler.tick(&storage).unwrap();
+    let tick_result = retry_scheduler
+        .tick(&storage, &vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
     let flushed = offline_manager.flush_queue(&storage).unwrap();
 
     // Retry: 2 due, 1 rescheduled, 1 expired

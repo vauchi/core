@@ -135,7 +135,13 @@ fn test_register_mailbox_tokens_sends_256_tokens() {
     let contact_keys = [[0xBB; 32], [0xCC; 32]];
 
     let msg_id = client
-        .register_mailbox_tokens(&contact_keys, &master_seed, 0, 0)
+        .register_mailbox_tokens(
+            &contact_keys,
+            &master_seed,
+            0,
+            0,
+            &vauchi_core::rng::OsSecureRng::new(),
+        )
         .unwrap();
     assert!(!msg_id.is_empty());
 
@@ -175,7 +181,13 @@ fn test_register_mailbox_tokens_with_no_contacts() {
 
     let master_seed = [0xDD; 32];
     let msg_id = client
-        .register_mailbox_tokens(&[], &master_seed, 0, 0)
+        .register_mailbox_tokens(
+            &[],
+            &master_seed,
+            0,
+            0,
+            &vauchi_core::rng::OsSecureRng::new(),
+        )
         .unwrap();
     assert!(!msg_id.is_empty());
 

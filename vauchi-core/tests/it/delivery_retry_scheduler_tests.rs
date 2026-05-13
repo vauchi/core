@@ -64,7 +64,9 @@ fn test_tick_processes_due_retries_only() {
     create_retry(&storage, "due-2", 1, ts - 5);
     create_retry(&storage, "future", 0, ts + 1000);
 
-    let result = scheduler.tick(&storage).unwrap();
+    let result = scheduler
+        .tick(&storage, &vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
 
     assert_eq!(result.due, 2, "Only 2 entries should be due");
     assert_eq!(
@@ -87,7 +89,9 @@ fn test_tick_increments_attempt_count() {
 
     create_retry(&storage, "retry-inc", 2, ts - 10);
 
-    scheduler.tick(&storage).unwrap();
+    scheduler
+        .tick(&storage, &vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
 
     let entry = storage.get_retry_entry("retry-inc").unwrap().unwrap();
     assert_eq!(
@@ -114,7 +118,9 @@ fn test_tick_removes_max_attempt_entries() {
     // Entry under max (should be rescheduled)
     create_retry(&storage, "still-ok", 2, ts - 10);
 
-    let result = scheduler.tick(&storage).unwrap();
+    let result = scheduler
+        .tick(&storage, &vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
 
     assert_eq!(result.expired, 1, "One entry should be expired");
     assert_eq!(result.rescheduled, 1, "One entry should be rescheduled");
@@ -149,7 +155,9 @@ fn test_tick_returns_ready_message_ids() {
     create_retry(&storage, "ready-2", 1, ts - 5);
     create_retry(&storage, "maxed", 5, ts - 1); // At max, should NOT be in ready_ids
 
-    let result = scheduler.tick(&storage).unwrap();
+    let result = scheduler
+        .tick(&storage, &vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
 
     assert_eq!(result.ready_ids.len(), 2, "Two entries should be ready");
     assert!(result.ready_ids.contains(&"ready-1".to_string()));

@@ -324,22 +324,20 @@ impl SyncConfig {
     ///
     /// Prevents timing correlation between an in-person exchange event
     /// and the first relay contact that follows.
-    pub fn random_post_exchange_delay(&self) -> Duration {
-        use rand::Rng;
+    pub fn random_post_exchange_delay(&self, rng: &dyn crate::rng::SecureRng) -> Duration {
         let min = self.post_exchange_delay_min_ms;
         let max = self.post_exchange_delay_max_ms;
         if min >= max {
             return Duration::from_millis(min);
         }
-        let ms = crate::rng::non_crypto_rng().gen_range(min..=max);
+        let ms = rng.random_in_range_u64(min, max);
         Duration::from_millis(ms)
     }
 
     /// Returns the sync interval with random jitter applied.
     ///
     /// Jitter is capped at 50% to prevent degenerate intervals.
-    pub fn jittered_sync_interval(&self) -> Duration {
-        use rand::Rng;
+    pub fn jittered_sync_interval(&self, rng: &dyn crate::rng::SecureRng) -> Duration {
         let base = self.sync_interval_ms;
         let pct = self.sync_interval_jitter_percent.min(50) as u64;
         if pct == 0 {
@@ -348,7 +346,7 @@ impl SyncConfig {
         let delta = base * pct / 100;
         let min = base.saturating_sub(delta);
         let max = base + delta;
-        let ms = crate::rng::non_crypto_rng().gen_range(min..=max);
+        let ms = rng.random_in_range_u64(min, max);
         Duration::from_millis(ms)
     }
 }

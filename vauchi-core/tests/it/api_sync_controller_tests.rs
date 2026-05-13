@@ -47,10 +47,14 @@ fn test_sync_controller_connect_disconnect() {
 
     assert!(!controller.is_connected());
 
-    controller.connect().unwrap();
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
     assert!(controller.is_connected());
 
-    controller.disconnect().unwrap();
+    controller
+        .disconnect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
     assert!(!controller.is_connected());
 }
 
@@ -86,7 +90,7 @@ fn test_sync_controller_sync_not_connected() {
     let mut controller = SyncController::new(relay, &storage, config, events);
 
     // Should fail when not connected
-    let result = controller.sync();
+    let result = controller.sync(&vauchi_core::rng::OsSecureRng::new());
     assert!(matches!(result, Err(VauchiError::Network(_))));
 }
 
@@ -99,10 +103,14 @@ fn test_sync_controller_sync_empty() {
     let config = SyncConfig::default();
 
     let mut controller = SyncController::new(relay, &storage, config, events);
-    controller.connect().unwrap();
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
 
     // Sync with no pending updates
-    let result = controller.sync().unwrap();
+    let result = controller
+        .sync(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
     assert_eq!(result.sent, 0);
     assert_eq!(result.acknowledged, 0);
     assert_eq!(result.failed, 0);
@@ -246,10 +254,14 @@ fn test_sync_controller_batch_size_config() {
     };
 
     let mut controller = SyncController::new(relay, &storage, config, events);
-    controller.connect().unwrap();
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
 
     // Sync with batch_size=5 and no pending updates
-    let result = controller.sync().unwrap();
+    let result = controller
+        .sync(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
     assert_eq!(result.sent, 0);
     assert_eq!(result.total(), 0);
 }
@@ -287,11 +299,15 @@ fn test_sync_controller_connection_state() {
     assert_eq!(controller.connection_state(), ConnectionState::Disconnected);
 
     // After connect
-    controller.connect().unwrap();
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
     assert_eq!(controller.connection_state(), ConnectionState::Connected);
 
     // After disconnect
-    controller.disconnect().unwrap();
+    controller
+        .disconnect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
     assert_eq!(controller.connection_state(), ConnectionState::Disconnected);
 }
 
@@ -366,7 +382,9 @@ fn test_sync_controller_sync_contact_no_ratchet() {
     let config = SyncConfig::default();
 
     let mut controller = SyncController::new(relay, &storage, config, events);
-    controller.connect().unwrap();
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
 
     // Should fail with no ratchet
     let result = controller.sync_contact("contact-1");
@@ -382,7 +400,9 @@ fn test_sync_controller_sync_contact_with_ratchet() {
     let config = SyncConfig::default();
 
     let mut controller = SyncController::new(relay, &storage, config, events);
-    controller.connect().unwrap();
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
 
     // Register ratchet
     let ratchet = create_test_ratchet();

@@ -47,7 +47,11 @@ impl RetryScheduler {
     /// - Otherwise: increments attempt, reschedules with backoff, and adds to ready_ids
     ///
     /// Returns a `RetryTickResult` with counts and ready message IDs.
-    pub fn tick(&self, storage: &Storage) -> Result<RetryTickResult, StorageError> {
+    pub fn tick(
+        &self,
+        storage: &Storage,
+        rng: &dyn crate::rng::SecureRng,
+    ) -> Result<RetryTickResult, StorageError> {
         let now = storage.clock().unix_seconds();
         let due_entries = storage.get_due_retries(now)?;
 
@@ -71,9 +75,9 @@ impl RetryScheduler {
                 result.expired += 1;
             } else {
                 // Reschedule with exponential backoff + jitter
-                let next_retry = self
-                    .retry_queue
-                    .next_retry_time_with_jitter(now, entry.attempt + 1);
+                let next_retry =
+                    self.retry_queue
+                        .next_retry_time_with_jitter(now, entry.attempt + 1, rng);
                 storage.increment_retry_attempt(&entry.message_id, next_retry)?;
                 result.ready_ids.push(entry.message_id);
                 result.rescheduled += 1;

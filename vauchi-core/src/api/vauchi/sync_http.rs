@@ -155,7 +155,10 @@ impl Vauchi {
     ///
     /// Also records `last_exchange_time` for use by `update_timing_after_sync`.
     pub fn set_post_exchange_delay(&mut self) {
-        let delay = self.config.sync.random_post_exchange_delay();
+        let delay = self
+            .config
+            .sync
+            .random_post_exchange_delay(self.rng.as_ref());
         let new_deadline = Instant::now() + delay;
         self.next_sync_allowed = Some(match self.next_sync_allowed {
             Some(existing) => existing.max(new_deadline),
@@ -370,7 +373,7 @@ impl Vauchi {
         let master_seed = identity.master_seed();
 
         // Build padded token batches (256 per batch, shuffled)
-        let batches = batch_register_tokens(&contact_keys, master_seed, day, 0);
+        let batches = batch_register_tokens(self.rng.as_ref(), &contact_keys, master_seed, day, 0);
 
         // Register each batch with the adapter
         for tokens in batches {
@@ -421,7 +424,7 @@ impl Vauchi {
         // SyncController.connect() calls relay.connect() which calls
         // adapter.connect() — but the adapter is already connected, so the
         // health check runs again. This is fine for correctness.
-        ctrl.connect()?;
+        ctrl.connect(self.rng.as_ref())?;
 
         // Load ratchet states for all contacts, preserving is_initiator for save-back
         let mut initiator_flags: std::collections::HashMap<String, bool> =
@@ -447,10 +450,11 @@ impl Vauchi {
             identity.master_seed(),
             0, // days_offline — Task 10 will compute this from last_connected_epoch
             self.clock.unix_seconds(),
+            self.rng.as_ref(),
         );
 
         // Run the sync cycle (sends pending updates, processes ACKs)
-        let result = ctrl.sync()?;
+        let result = ctrl.sync(self.rng.as_ref())?;
 
         // Persist advanced ratchet states.
         // SyncController.sync() advances ratchets via .encrypt() but
@@ -499,13 +503,18 @@ impl Vauchi {
     /// exchange was recent (within `post_exchange_delay_max_ms`), a C1 deadline
     /// is also computed and the MAX of C1 and C2 is used.
     fn update_timing_after_sync(&mut self) {
-        let c2_deadline = Instant::now() + self.config.sync.jittered_sync_interval();
+        let c2_deadline =
+            Instant::now() + self.config.sync.jittered_sync_interval(self.rng.as_ref());
 
         let deadline = if let Some(exchange_time) = self.last_exchange_time {
             let max_delay = Duration::from_millis(self.config.sync.post_exchange_delay_max_ms);
             if exchange_time.elapsed() < max_delay {
                 // Exchange was recent — enforce C1 as well
-                let c1_deadline = exchange_time + self.config.sync.random_post_exchange_delay();
+                let c1_deadline = exchange_time
+                    + self
+                        .config
+                        .sync
+                        .random_post_exchange_delay(self.rng.as_ref());
                 c1_deadline.max(c2_deadline)
             } else {
                 c2_deadline

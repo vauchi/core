@@ -49,7 +49,12 @@ fn test_handle_stored_ack_updates_delivery_record() {
     create_test_delivery(&storage, "msg-1", DeliveryStatus::Queued);
 
     service
-        .handle_ack(&storage, "msg-1", DeliveryAckStatus::Stored)
+        .handle_ack(
+            &storage,
+            "msg-1",
+            DeliveryAckStatus::Stored,
+            &vauchi_core::rng::OsSecureRng::new(),
+        )
         .unwrap();
 
     let record = storage.get_delivery_record("msg-1").unwrap().unwrap();
@@ -82,7 +87,12 @@ fn test_handle_delivered_ack_removes_retry_entry() {
     storage.create_retry_entry(&retry).unwrap();
 
     service
-        .handle_ack(&storage, "msg-1", DeliveryAckStatus::Delivered)
+        .handle_ack(
+            &storage,
+            "msg-1",
+            DeliveryAckStatus::Delivered,
+            &vauchi_core::rng::OsSecureRng::new(),
+        )
         .unwrap();
 
     let record = storage.get_delivery_record("msg-1").unwrap().unwrap();
@@ -112,6 +122,7 @@ fn test_handle_failed_ack_schedules_retry() {
             DeliveryAckStatus::Failed {
                 reason: "timeout".to_string(),
             },
+            &vauchi_core::rng::OsSecureRng::new(),
         )
         .unwrap();
 
@@ -184,7 +195,12 @@ fn test_handle_ack_for_unknown_message_returns_error() {
     let storage = test_storage();
     let service = DeliveryService::new();
 
-    let result = service.handle_ack(&storage, "nonexistent", DeliveryAckStatus::Delivered);
+    let result = service.handle_ack(
+        &storage,
+        "nonexistent",
+        DeliveryAckStatus::Delivered,
+        &vauchi_core::rng::OsSecureRng::new(),
+    );
     assert!(
         result.is_err(),
         "ACK for unknown message should return NotFound error"

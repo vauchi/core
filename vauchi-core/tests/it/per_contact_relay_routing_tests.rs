@@ -34,7 +34,7 @@ fn relay_for_contact_returns_contact_relay_when_set() {
     let manager = MultiRelayManager::new(config);
 
     let contact = make_contact("Alice", Some("https://alice.relay"), None);
-    let relay = manager.relay_for_contact(&contact);
+    let relay = manager.relay_for_contact(&contact, &vauchi_core::rng::OsSecureRng::new());
 
     assert_eq!(relay, "https://alice.relay");
 }
@@ -49,7 +49,7 @@ fn relay_for_contact_returns_home_relay_when_no_contact_relay() {
     let manager = MultiRelayManager::new(config);
 
     let contact = make_contact("Bob", None, None);
-    let relay = manager.relay_for_contact(&contact);
+    let relay = manager.relay_for_contact(&contact, &vauchi_core::rng::OsSecureRng::new());
 
     assert_eq!(relay, "https://home.relay");
 }
@@ -66,7 +66,7 @@ fn relay_for_contact_falls_back_when_contact_relay_unhealthy() {
     manager.mark_unhealthy("https://alice.relay");
 
     let contact = make_contact("Alice", Some("https://alice.relay"), None);
-    let relay = manager.relay_for_contact(&contact);
+    let relay = manager.relay_for_contact(&contact, &vauchi_core::rng::OsSecureRng::new());
 
     assert_eq!(
         relay, "https://home.relay",
@@ -150,12 +150,15 @@ fn unhealthy_contact_relay_falls_back_then_recovers() {
     let alice = make_contact("Alice", Some("https://alice.relay"), None);
 
     // Initially healthy → uses contact relay
-    assert_eq!(manager.relay_for_contact(&alice), "https://alice.relay");
+    assert_eq!(
+        manager.relay_for_contact(&alice, &vauchi_core::rng::OsSecureRng::new()),
+        "https://alice.relay"
+    );
 
     // Mark unhealthy → falls back to home
     manager.mark_unhealthy("https://alice.relay");
     assert_eq!(
-        manager.relay_for_contact(&alice),
+        manager.relay_for_contact(&alice, &vauchi_core::rng::OsSecureRng::new()),
         "https://home.relay",
         "Should fall back to home when contact relay is unhealthy"
     );
@@ -163,7 +166,7 @@ fn unhealthy_contact_relay_falls_back_then_recovers() {
     // Recovery → uses contact relay again
     manager.mark_healthy("https://alice.relay");
     assert_eq!(
-        manager.relay_for_contact(&alice),
+        manager.relay_for_contact(&alice, &vauchi_core::rng::OsSecureRng::new()),
         "https://alice.relay",
         "Should return to contact relay after recovery"
     );
@@ -182,7 +185,7 @@ fn contacts_without_relay_always_use_home_regardless_of_health() {
     let bob = make_contact("Bob", None, None);
 
     // No relay set → home relay
-    let relay = manager.relay_for_contact(&bob);
+    let relay = manager.relay_for_contact(&bob, &vauchi_core::rng::OsSecureRng::new());
     assert_eq!(relay, "https://home.relay");
 }
 
@@ -197,7 +200,7 @@ fn empty_relay_url_treated_as_no_relay() {
 
     let contact = make_contact("Eve", Some(""), None);
     assert_eq!(
-        manager.relay_for_contact(&contact),
+        manager.relay_for_contact(&contact, &vauchi_core::rng::OsSecureRng::new()),
         "https://home.relay",
         "Empty relay URL should fall back to home relay"
     );
@@ -219,14 +222,29 @@ fn mixed_relay_contacts_route_independently() {
     let carol = make_contact("Carol", Some("https://carol.relay"), None);
 
     // Each contact routes independently
-    assert_eq!(manager.relay_for_contact(&alice), "https://alice.relay");
-    assert_eq!(manager.relay_for_contact(&bob), "https://home.relay");
-    assert_eq!(manager.relay_for_contact(&carol), "https://carol.relay");
+    assert_eq!(
+        manager.relay_for_contact(&alice, &vauchi_core::rng::OsSecureRng::new()),
+        "https://alice.relay"
+    );
+    assert_eq!(
+        manager.relay_for_contact(&bob, &vauchi_core::rng::OsSecureRng::new()),
+        "https://home.relay"
+    );
+    assert_eq!(
+        manager.relay_for_contact(&carol, &vauchi_core::rng::OsSecureRng::new()),
+        "https://carol.relay"
+    );
 
     // Mark only Alice's relay unhealthy — Carol unaffected
     manager.mark_unhealthy("https://alice.relay");
-    assert_eq!(manager.relay_for_contact(&alice), "https://home.relay");
-    assert_eq!(manager.relay_for_contact(&carol), "https://carol.relay");
+    assert_eq!(
+        manager.relay_for_contact(&alice, &vauchi_core::rng::OsSecureRng::new()),
+        "https://home.relay"
+    );
+    assert_eq!(
+        manager.relay_for_contact(&carol, &vauchi_core::rng::OsSecureRng::new()),
+        "https://carol.relay"
+    );
 }
 
 // ── group_by_relay ─────────────────────────────────────────────────

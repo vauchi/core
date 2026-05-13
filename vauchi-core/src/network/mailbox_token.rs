@@ -82,7 +82,10 @@ pub fn token_hex(token: &[u8; 32]) -> String {
 /// - `master_seed`: identity master seed for self-token derivation.
 /// - `current_day`: today's day epoch.
 /// - `days_offline`: number of historical days to include for offline catchup.
+use crate::rng::SecureRngExt;
+
 pub fn batch_register_tokens(
+    rng: &dyn crate::rng::SecureRng,
     contact_keys: &[[u8; 32]],
     master_seed: &[u8; 32],
     current_day: u64,
@@ -109,9 +112,6 @@ pub fn batch_register_tokens(
     all_tokens.dedup();
 
     // Split into 256-token batches, each padded and shuffled
-    use rand::Rng;
-    use rand::seq::SliceRandom;
-    let mut rng = crate::rng::non_crypto_rng();
     let mut batches = Vec::new();
 
     for chunk in all_tokens.chunks(256) {
@@ -119,11 +119,11 @@ pub fn batch_register_tokens(
         // Pad to 256 with random tokens
         while batch.len() < 256 {
             let mut random_token = [0u8; 32];
-            rng.fill(&mut random_token);
+            rng.fill_bytes(&mut random_token);
             batch.push(token_hex(&random_token));
         }
         // Shuffle to prevent positional leakage across sessions
-        batch.shuffle(&mut rng);
+        rng.shuffle(&mut batch);
         batches.push(batch);
     }
 
@@ -132,7 +132,7 @@ pub fn batch_register_tokens(
         let mut batch = Vec::new();
         while batch.len() < 256 {
             let mut random_token = [0u8; 32];
-            rng.fill(&mut random_token);
+            rng.fill_bytes(&mut random_token);
             batch.push(token_hex(&random_token));
         }
         batches.push(batch);

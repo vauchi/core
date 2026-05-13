@@ -71,6 +71,47 @@ pub trait SecureRng: Send + Sync {
     }
 }
 
+/// Object-safety extension for [`SecureRng`].
+///
+/// Generic methods (`shuffle`, `choose`) cannot live on the trait
+/// itself without breaking `dyn SecureRng` dispatch (a generic
+/// method has no fixed vtable slot). The extension trait pattern
+/// keeps the ergonomic `rng.shuffle(...)` callsite while preserving
+/// `&dyn SecureRng` as the canonical parameter shape.
+pub trait SecureRngExt: SecureRng {
+    /// Fisher-Yates in-place shuffle. Replaces
+    /// `rand::seq::SliceRandom::shuffle` for callsites that took
+    /// `thread_rng` for permutation work.
+    fn shuffle<T>(&self, slice: &mut [T]) {
+        let n = slice.len();
+        if n < 2 {
+            return;
+        }
+        for i in (1..n).rev() {
+            // Uniform-ish j in [0, i] via modular reduction.
+            // Bias is `(u64::MAX % (i+1))` / `u64::MAX` — negligible
+            // for the slice lengths these paths see (<1024).
+            let j = (self.random_u64() as usize) % (i + 1);
+            slice.swap(i, j);
+        }
+    }
+
+    /// Borrow a random element from `slice`, or `None` if empty.
+    /// Replaces `rand::seq::SliceRandom::choose` for callsites that
+    /// took `thread_rng` for selection.
+    fn choose<'a, T>(&self, slice: &'a [T]) -> Option<&'a T> {
+        if slice.is_empty() {
+            None
+        } else {
+            slice.get(self.random_index(slice.len()))
+        }
+    }
+}
+
+// Blanket impl so any `SecureRng` (including `dyn SecureRng`) gets
+// the extension methods automatically.
+impl<R: SecureRng + ?Sized> SecureRngExt for R {}
+
 /// Production RNG. Reads from the OS CSPRNG (`rand::rngs::OsRng`).
 ///
 /// Constructed via `OsSecureRng::new()` or `OsSecureRng::shared()`.

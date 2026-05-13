@@ -99,10 +99,10 @@ fn test_round_robin_selection() {
         .build()
         .unwrap();
 
-    let first = config.select_relay();
-    let second = config.select_relay();
-    let _third = config.select_relay();
-    let fourth = config.select_relay();
+    let first = config.select_relay(&vauchi_core::rng::OsSecureRng::new());
+    let second = config.select_relay(&vauchi_core::rng::OsSecureRng::new());
+    let _third = config.select_relay(&vauchi_core::rng::OsSecureRng::new());
+    let fourth = config.select_relay(&vauchi_core::rng::OsSecureRng::new());
 
     // Should cycle through relays
     assert_eq!(first, fourth, "Should wrap around");
@@ -124,7 +124,7 @@ fn test_random_selection() {
 
     // Just verify it returns valid relays
     for _ in 0..10 {
-        let selected = config.select_relay();
+        let selected = config.select_relay(&vauchi_core::rng::OsSecureRng::new());
         assert!(
             config.relays().contains(&selected),
             "Selected relay should be in config"
@@ -146,7 +146,10 @@ fn test_primary_first_selection() {
 
     // Should always return primary when healthy
     for _ in 0..5 {
-        assert_eq!(config.select_relay(), "https://primary.vauchi.app");
+        assert_eq!(
+            config.select_relay(&vauchi_core::rng::OsSecureRng::new()),
+            "https://primary.vauchi.app"
+        );
     }
 }
 

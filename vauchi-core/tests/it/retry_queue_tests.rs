@@ -303,7 +303,7 @@ fn test_retry_backoff_with_jitter_varies() {
 
     let mut delays = Vec::new();
     for _ in 0..20 {
-        delays.push(queue.backoff_seconds_with_jitter(3)); // attempt 3 => base 8s
+        delays.push(queue.backoff_seconds_with_jitter(3, &vauchi_core::rng::OsSecureRng::new())); // attempt 3 => base 8s
     }
 
     // With jitter, not all delays should be identical
@@ -322,7 +322,7 @@ fn test_retry_backoff_with_jitter_stays_within_bounds() {
     let queue = RetryQueue::new();
 
     for _ in 0..50 {
-        let delay = queue.backoff_seconds_with_jitter(3); // base = 8
+        let delay = queue.backoff_seconds_with_jitter(3, &vauchi_core::rng::OsSecureRng::new()); // base = 8
         assert!(delay >= 8, "Jitter should not reduce below base delay");
         assert!(
             delay <= 10,
@@ -338,7 +338,7 @@ fn test_retry_backoff_with_jitter_respects_max_backoff() {
     let queue = RetryQueue::with_max_backoff(100);
 
     for _ in 0..50 {
-        let delay = queue.backoff_seconds_with_jitter(20); // base = 2^20 >> 100
+        let delay = queue.backoff_seconds_with_jitter(20, &vauchi_core::rng::OsSecureRng::new()); // base = 2^20 >> 100
         assert!(
             delay <= 125, // 100 + 25% = 125
             "Jitter-added delay {} should not exceed max_backoff + 25%",
@@ -356,7 +356,11 @@ fn test_next_retry_time_with_jitter_varies() {
 
     let mut times = Vec::new();
     for _ in 0..20 {
-        times.push(queue.next_retry_time_with_jitter(base_time, 3));
+        times.push(queue.next_retry_time_with_jitter(
+            base_time,
+            3,
+            &vauchi_core::rng::OsSecureRng::new(),
+        ));
     }
 
     let first = times[0];

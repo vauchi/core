@@ -72,7 +72,13 @@ fn test_token_hex_produces_64_char_hex() {
 fn test_batch_tokens_padded_to_256() {
     let contacts: Vec<[u8; 32]> = (0..5).map(|i| [i as u8; 32]).collect();
     let master_seed = [0xBBu8; 32];
-    let batches = batch_register_tokens(&contacts, &master_seed, 19804, 0);
+    let batches = batch_register_tokens(
+        &vauchi_core::rng::OsSecureRng::new(),
+        &contacts,
+        &master_seed,
+        19804,
+        0,
+    );
     assert!(!batches.is_empty());
     for batch in &batches {
         assert_eq!(batch.len(), 256);
@@ -84,7 +90,13 @@ fn test_batch_tokens_padded_to_256() {
 fn test_batch_tokens_no_duplicates() {
     let contacts: Vec<[u8; 32]> = (0..5).map(|i| [i as u8; 32]).collect();
     let master_seed = [0xBBu8; 32];
-    let batches = batch_register_tokens(&contacts, &master_seed, 19804, 0);
+    let batches = batch_register_tokens(
+        &vauchi_core::rng::OsSecureRng::new(),
+        &contacts,
+        &master_seed,
+        19804,
+        0,
+    );
     assert_eq!(batches.len(), 1);
     let mut sorted = batches[0].clone();
     sorted.sort();
@@ -98,7 +110,13 @@ fn test_batch_tokens_no_duplicates() {
 fn test_batch_tokens_historical_catchup() {
     let contacts: Vec<[u8; 32]> = vec![[0x01; 32]];
     let master_seed = [0xBBu8; 32];
-    let batches = batch_register_tokens(&contacts, &master_seed, 19804, 3);
+    let batches = batch_register_tokens(
+        &vauchi_core::rng::OsSecureRng::new(),
+        &contacts,
+        &master_seed,
+        19804,
+        3,
+    );
     assert!(!batches.is_empty());
     for batch in &batches {
         assert_eq!(batch.len(), 256); // Each batch padded to 256
@@ -119,7 +137,13 @@ fn test_batch_tokens_many_contacts_splits() {
         })
         .collect();
     let master_seed = [0xCCu8; 32];
-    let batches = batch_register_tokens(&contacts, &master_seed, 19804, 0);
+    let batches = batch_register_tokens(
+        &vauchi_core::rng::OsSecureRng::new(),
+        &contacts,
+        &master_seed,
+        19804,
+        0,
+    );
     assert!(
         batches.len() >= 2,
         "expected multiple batches for 200 contacts, got {}",
@@ -139,8 +163,20 @@ fn test_batch_tokens_shuffled() {
     // overwhelmingly likely (probability of collision ≈ 1/2^256 per token).
     let contacts: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
     let master_seed = [0xDDu8; 32];
-    let batches_a = batch_register_tokens(&contacts, &master_seed, 19804, 0);
-    let batches_b = batch_register_tokens(&contacts, &master_seed, 19804, 0);
+    let batches_a = batch_register_tokens(
+        &vauchi_core::rng::OsSecureRng::new(),
+        &contacts,
+        &master_seed,
+        19804,
+        0,
+    );
+    let batches_b = batch_register_tokens(
+        &vauchi_core::rng::OsSecureRng::new(),
+        &contacts,
+        &master_seed,
+        19804,
+        0,
+    );
     assert_eq!(batches_a.len(), 1);
     assert_eq!(batches_b.len(), 1);
     assert_eq!(batches_a[0].len(), 256);
@@ -156,7 +192,13 @@ fn test_batch_tokens_shuffled() {
 #[test]
 fn test_batch_tokens_no_contacts_returns_one_batch() {
     let master_seed = [0xEEu8; 32];
-    let batches = batch_register_tokens(&[], &master_seed, 19804, 0);
+    let batches = batch_register_tokens(
+        &vauchi_core::rng::OsSecureRng::new(),
+        &[],
+        &master_seed,
+        19804,
+        0,
+    );
     assert_eq!(batches.len(), 1);
     assert_eq!(batches[0].len(), 256);
 }

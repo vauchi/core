@@ -99,7 +99,7 @@ fn test_canonical_bytes_starts_with_domain_separator() {
 // @internal
 #[test]
 fn test_identity_revoked_sign_and_verify() {
-    let identity = Identity::create("Alice Test");
+    let identity = Identity::create("Alice Test", 0);
     let recipient_pk = [0xBBu8; 32];
     let recipient_id = hex::encode(recipient_pk);
     let timestamp = 1700000000u64;
@@ -114,7 +114,7 @@ fn test_identity_revoked_sign_and_verify() {
 // @internal
 #[test]
 fn test_identity_revoked_rejects_tampered_timestamp() {
-    let identity = Identity::create("Alice Test");
+    let identity = Identity::create("Alice Test", 0);
     let recipient_pk = [0xBBu8; 32];
     let recipient_id = hex::encode(recipient_pk);
 
@@ -130,8 +130,8 @@ fn test_identity_revoked_rejects_tampered_timestamp() {
 // @internal
 #[test]
 fn test_identity_revoked_rejects_wrong_key() {
-    let identity = Identity::create("Alice");
-    let other_identity = Identity::create("Mallory");
+    let identity = Identity::create("Alice", 0);
+    let other_identity = Identity::create("Mallory", 0);
     let recipient_id = hex::encode([0xBBu8; 32]);
 
     let revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
@@ -143,7 +143,7 @@ fn test_identity_revoked_rejects_wrong_key() {
 // @internal
 #[test]
 fn test_identity_revoked_serialization_roundtrip() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let recipient_id = hex::encode([0xCCu8; 32]);
 
     let revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
@@ -164,7 +164,7 @@ fn test_identity_revoked_serialization_roundtrip() {
 #[test]
 fn test_process_revocation_deletes_contact_and_records_tombstone() {
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let bob_pk = [0xBBu8; 32];
     let bob_id = hex::encode(bob_pk);
 
@@ -191,8 +191,8 @@ fn test_process_revocation_deletes_contact_and_records_tombstone() {
 #[test]
 fn test_process_revocation_rejects_invalid_signature() {
     let storage = test_storage();
-    let identity = Identity::create("Alice");
-    let mallory = Identity::create("Mallory");
+    let identity = Identity::create("Alice", 0);
+    let mallory = Identity::create("Mallory", 0);
     let bob_pk = [0xBBu8; 32];
     let bob_id = hex::encode(bob_pk);
 
@@ -220,7 +220,7 @@ fn test_process_revocation_rejects_invalid_signature() {
 #[test]
 fn test_process_revocation_stale_rejected() {
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let bob_pk = [0xBBu8; 32];
     let bob_id = hex::encode(bob_pk);
 
@@ -244,7 +244,7 @@ fn test_process_revocation_stale_rejected() {
 #[test]
 fn test_process_revocation_unknown_sender_noop() {
     let storage = test_storage();
-    let identity = Identity::create("Unknown");
+    let identity = Identity::create("Unknown", 0);
     let bob_id = hex::encode([0xBBu8; 32]);
 
     let revoked = IdentityRevoked::create(&identity, &bob_id, 1700000000);
@@ -274,8 +274,8 @@ fn test_update_after_revocation_discarded_via_tombstone() {
 #[test]
 fn test_revocation_only_deletes_matching_sender() {
     let storage = test_storage();
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
 
     let bob_pk = [0xBBu8; 32];
     let bob_id = hex::encode(bob_pk);
@@ -301,7 +301,7 @@ fn test_revocation_only_deletes_matching_sender() {
 #[test]
 fn test_revocation_with_future_timestamp() {
     let storage = test_storage();
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let bob_pk = [0xBBu8; 32];
     let bob_id = hex::encode(bob_pk);
 
@@ -325,7 +325,7 @@ fn test_revocation_with_future_timestamp() {
 #[test]
 fn test_revocation_with_minimum_valid_timestamp() {
     let storage = test_storage();
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let bob_pk = [0xBBu8; 32];
     let bob_id = hex::encode(bob_pk);
 
@@ -352,7 +352,7 @@ fn test_revocation_with_minimum_valid_timestamp() {
 // @internal
 #[test]
 fn test_identity_revoked_handles_uuid_recipient_id() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let uuid_id = "550e8400-e29b-41d4-a716-446655440000";
 
     // Must not panic — imported contacts reach this code path via

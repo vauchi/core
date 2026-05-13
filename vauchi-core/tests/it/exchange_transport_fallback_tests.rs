@@ -14,7 +14,7 @@ use vauchi_core::identity::Identity;
 use vauchi_core::{Command, Event};
 
 fn ble_session_with_caps(name: &str, caps: DeviceCapabilities) -> ExchangeSession {
-    let identity = Identity::create(name);
+    let identity = Identity::create(name, 0);
     let card = ContactCard::new(name);
     let proximity = ManualConfirmationVerifier::new();
     let mut session = ExchangeSession::new_ble(
@@ -93,7 +93,7 @@ fn ble_unavailable_without_camera_does_not_fall_back() {
 // @internal
 #[test]
 fn set_device_capabilities_is_accessible() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = ManualConfirmationVerifier::new();
     let mut session = ExchangeSession::new_ble(

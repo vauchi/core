@@ -15,7 +15,7 @@ use vauchi_core::{Command, Event};
 
 /// Helper: create an NFC exchange session.
 fn nfc_session(name: &str) -> ExchangeSession {
-    let identity = Identity::create(name);
+    let identity = Identity::create(name, 0);
     let card = ContactCard::new(name);
     let proximity = ManualConfirmationVerifier::new();
     ExchangeSession::new_nfc(

@@ -407,10 +407,10 @@ proptest! {
         name in display_name_strategy()
     ) {
         let password = "SecurePassword123!";
-        let original = Identity::create(&name);
+        let original = Identity::create(&name, 0);
 
         let backup = original.export_backup(password).unwrap();
-        let restored = Identity::import_backup(&backup, password).unwrap();
+        let restored = Identity::import_backup(&backup, password, 0).unwrap();
 
         prop_assert_eq!(original.signing_public_key(), restored.signing_public_key());
         prop_assert_eq!(original.public_id(), restored.public_id());

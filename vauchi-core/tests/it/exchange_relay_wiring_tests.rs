@@ -18,8 +18,8 @@ fn run_qr_exchange(
     bob_relay_url: Option<String>,
     bob_relay_noise_pubkey: Option<[u8; 32]>,
 ) -> (vauchi_core::contact::Contact, vauchi_core::contact::Contact) {
-    let alice_id = Identity::create("Alice");
-    let bob_id = Identity::create("Bob");
+    let alice_id = Identity::create("Alice", 0);
+    let bob_id = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");

@@ -239,7 +239,7 @@ fn test_device_sync_uses_self_token_as_recipient_id() {
 // @internal
 #[test]
 fn test_identity_revoked_valid_signature_accepted() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let recipient_id = hex::encode([0xBB; 32]);
 
     let revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
@@ -254,7 +254,7 @@ fn test_identity_revoked_valid_signature_accepted() {
 // @internal
 #[test]
 fn test_identity_revoked_forged_signature_rejected() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let recipient_id = hex::encode([0xBB; 32]);
 
     let mut revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
@@ -273,8 +273,8 @@ fn test_identity_revoked_forged_signature_rejected() {
 // @internal
 #[test]
 fn test_identity_revoked_unknown_sender_rejected() {
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
     let recipient_id = hex::encode([0xBB; 32]);
 
     let revoked = IdentityRevoked::create(&alice, &recipient_id, 1700000000);
@@ -290,7 +290,7 @@ fn test_identity_revoked_unknown_sender_rejected() {
 // @internal
 #[test]
 fn test_identity_revoked_tampered_timestamp_rejected() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let recipient_id = hex::encode([0xBB; 32]);
 
     let mut revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
@@ -308,7 +308,7 @@ fn test_identity_revoked_tampered_timestamp_rejected() {
 // @internal
 #[test]
 fn test_identity_revoked_tampered_recipient_rejected() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let recipient_id = hex::encode([0xBB; 32]);
 
     let mut revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
@@ -326,7 +326,7 @@ fn test_identity_revoked_tampered_recipient_rejected() {
 // @internal
 #[test]
 fn test_identity_revoked_zero_pubkey_rejected() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let recipient_id = hex::encode([0xBB; 32]);
 
     let revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);

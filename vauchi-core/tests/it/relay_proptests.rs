@@ -40,7 +40,7 @@ proptest! {
         relay_url in valid_relay_url_strategy(),
         noise_pk in noise_pubkey_strategy()
     ) {
-        let identity = Identity::create("PropTest");
+        let identity = Identity::create("PropTest", 0);
         let ephemeral = X3DHKeyPair::generate();
 
         // Parser enforces fail-closed: relay URL requires noise pubkey
@@ -64,7 +64,7 @@ proptest! {
     fn qr_v3_roundtrip_preserves_noise_pubkey(
         pubkey in noise_pubkey_strategy()
     ) {
-        let identity = Identity::create("PropTest");
+        let identity = Identity::create("PropTest", 0);
         let ephemeral = X3DHKeyPair::generate();
 
         let qr = ExchangeQR::generate_with_relay(
@@ -86,7 +86,7 @@ proptest! {
         relay_url in valid_relay_url_strategy(),
         pubkey in noise_pubkey_strategy()
     ) {
-        let identity = Identity::create("PropTest");
+        let identity = Identity::create("PropTest", 0);
         let ephemeral = X3DHKeyPair::generate();
 
         let qr = ExchangeQR::generate_with_relay(

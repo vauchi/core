@@ -25,7 +25,7 @@ const SMK_KEY_NAME: &str = "smk";
 // @internal
 #[test]
 fn test_smk_destruction_makes_data_irrecoverable() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let smk = identity.derive_smk();
     let sek = smk.derive_sek();
@@ -39,7 +39,7 @@ fn test_smk_destruction_makes_data_irrecoverable() {
     assert_eq!(recovered, plaintext);
 
     // Different identity → different master seed → different SMK → different SEK
-    let different_identity = Identity::create("Alice");
+    let different_identity = Identity::create("Alice", 0);
     let different_smk = different_identity.derive_smk();
     let different_sek = different_smk.derive_sek();
 
@@ -61,7 +61,7 @@ fn test_smk_destruction_makes_data_irrecoverable() {
 // @internal
 #[test]
 fn test_fkek_protects_file_keys() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let smk = identity.derive_smk();
     let fkek = smk.derive_fkek();
 
@@ -74,7 +74,7 @@ fn test_fkek_protects_file_keys() {
     assert_eq!(recovered, file_key.as_slice());
 
     // Different identity → different FKEK → irrecoverable
-    let different_identity = Identity::create("Alice");
+    let different_identity = Identity::create("Alice", 0);
     let different_fkek = different_identity.derive_smk().derive_fkek();
 
     let result = decrypt(&different_fkek, &encrypted_file_key);
@@ -92,7 +92,7 @@ fn test_fkek_protects_file_keys() {
 // @internal
 #[test]
 fn test_key_hierarchy_produces_distinct_keys() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let smk = identity.derive_smk();
     let sek = smk.derive_sek();
     let fkek = smk.derive_fkek();
@@ -122,7 +122,7 @@ fn test_key_hierarchy_produces_distinct_keys() {
 // @internal
 #[test]
 fn test_smk_secure_storage_lifecycle() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     // Phase 1: Create identity, derive and store SMK
     let smk = identity.derive_smk();
@@ -167,8 +167,8 @@ fn test_smk_secure_storage_lifecycle() {
 // @internal
 #[test]
 fn test_shredding_isolation_across_identities() {
-    let identity_a = Identity::create("Alice");
-    let identity_b = Identity::create("Bob");
+    let identity_a = Identity::create("Alice", 0);
+    let identity_b = Identity::create("Bob", 0);
 
     let smk_a = identity_a.derive_smk();
     let sek_a = smk_a.derive_sek();
@@ -186,7 +186,7 @@ fn test_shredding_isolation_across_identities() {
     assert_eq!(decrypt(&sek_b, &ct_b).unwrap(), data_b);
 
     // "Shred" A's key material by deriving from a fresh identity
-    let fresh_identity = Identity::create("Alice-reborn");
+    let fresh_identity = Identity::create("Alice-reborn", 0);
     let fresh_sek = fresh_identity.derive_smk().derive_sek();
 
     // A's data is irrecoverable with fresh keys
@@ -218,7 +218,7 @@ fn test_shredding_isolation_across_identities() {
 // @internal
 #[test]
 fn test_storage_keyed_by_sek() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let smk = identity.derive_smk();
     let sek = smk.derive_sek();
 
@@ -240,7 +240,7 @@ fn test_storage_keyed_by_sek() {
     assert_eq!(loaded_data, backup_data, "Loaded data should match saved");
 
     // Different SEK cannot read the same data correctly
-    let different_identity = Identity::create("Alice");
+    let different_identity = Identity::create("Alice", 0);
     let different_sek = different_identity.derive_smk().derive_sek();
 
     // Opening with wrong key: encrypted data cannot be decrypted

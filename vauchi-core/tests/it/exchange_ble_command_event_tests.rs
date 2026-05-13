@@ -18,7 +18,7 @@ use vauchi_core::{Command, Event};
 
 /// Helper: create a BLE exchange session with a fresh identity.
 fn ble_session(name: &str) -> ExchangeSession {
-    let identity = Identity::create(name);
+    let identity = Identity::create(name, 0);
     let card = ContactCard::new(name);
     let proximity = ManualConfirmationVerifier::new();
     ExchangeSession::new_ble(

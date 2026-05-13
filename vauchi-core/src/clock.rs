@@ -133,18 +133,10 @@ impl Clock for FakeClock {
         *self.inner.lock().expect("FakeClock mutex poisoned")
     }
 }
-/// **Transitional helper, do not use in new code.**
-///
-/// Returns Unix-epoch seconds via `SystemTime::now()`. Every
-/// callsite is a TODO marker for the structural pass that
-/// threads [`Clock`] through its owning module — grep for
-/// `ambient_now_secs` to enumerate remaining work. The list
-/// is deliberately kept out of this doc comment: an enumeration
-/// here rots on every retirement MR; the grep does not.
-#[doc(hidden)]
-pub(crate) fn ambient_now_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
+// The `ambient_now_secs` transitional helper has been retired —
+// every callsite migrated to a structural source via Slices 1–19
+// of the pure-functional-core program (Phase 1 / Task 1.1 /
+// Step 3b). Production code now routes wall-clock reads through
+// the `Clock` trait (`SystemClock` for ambient, `FakeClock` for
+// tests). Diagnostic code (`flame::output_path`) reads through
+// `SystemClock::shared()` directly.

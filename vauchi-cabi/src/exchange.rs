@@ -78,8 +78,10 @@ pub unsafe extern "C" fn vauchi_exchange_create(app: *mut VauchiApp) -> *mut Vau
             // Clone identity via storage serialization (ExchangeSession needs ownership).
             // Wrap in Zeroizing to scrub master_seed from heap on drop.
             let storage_bytes = Zeroizing::new(identity_ref.to_storage_bytes());
-            let identity = match vauchi_core::identity::Identity::from_storage_bytes(&storage_bytes)
-            {
+            let identity = match vauchi_core::identity::Identity::from_storage_bytes(
+                &storage_bytes,
+                vauchi_core::clock::SystemClock::shared().unix_seconds(),
+            ) {
                 Ok(id) => id,
                 Err(_) => return std::ptr::null_mut(),
             };

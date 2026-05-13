@@ -274,9 +274,9 @@ fn test_update_card_timestamp_increases() {
 
 /// Helper: run a full QR exchange ceremony and return the completed contact.
 fn run_full_qr_exchange() -> Contact {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 

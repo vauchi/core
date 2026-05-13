@@ -19,7 +19,7 @@ fn create_test_vauchi() -> Vauchi {
 }
 
 fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
-    let identity = Identity::create(name);
+    let identity = Identity::create(name, 0);
     let shared = SymmetricKey::generate();
     let contact = Contact::from_exchange(
         *identity.signing_public_key(),
@@ -113,7 +113,7 @@ fn test_repropagate_skips_no_ratchet() {
     .unwrap();
 
     // Add contact WITHOUT ratchet
-    let identity = Identity::create("Carol");
+    let identity = Identity::create("Carol", 0);
     let contact = Contact::from_exchange(
         *identity.signing_public_key(),
         ContactCard::new("Carol"),

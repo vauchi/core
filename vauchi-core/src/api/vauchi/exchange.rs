@@ -58,6 +58,7 @@ impl Vauchi {
         // Clone identity via storage serialization (ExchangeSession needs ownership)
         let identity_owned = crate::identity::Identity::from_storage_bytes(
             &identity.to_storage_bytes(),
+            self.clock.unix_seconds(),
         )
         .map_err(|e| VauchiError::InvalidState(format!("Failed to clone identity: {:?}", e)))?;
 

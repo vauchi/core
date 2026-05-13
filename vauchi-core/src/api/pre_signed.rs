@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_generate_pre_signed_messages() {
-        let identity = Identity::create("Alice");
+        let identity = Identity::create("Alice", 0);
         let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
         // Deletion notice should be Confirmed stage
@@ -220,7 +220,7 @@ mod tests {
 
     #[test]
     fn test_deletion_notice_signature_valid() {
-        let identity = Identity::create("Bob");
+        let identity = Identity::create("Bob", 0);
         let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
         let notice = &msgs.deletion_notice;
@@ -243,7 +243,7 @@ mod tests {
 
     #[test]
     fn test_purge_request_signature_valid() {
-        let identity = Identity::create("Charlie");
+        let identity = Identity::create("Charlie", 0);
         let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
         let purge = &msgs.purge_request;
@@ -267,7 +267,7 @@ mod tests {
 
     #[test]
     fn test_save_and_load_roundtrip() {
-        let identity = Identity::create("Dave");
+        let identity = Identity::create("Dave", 0);
         let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
         let dir = tempfile::tempdir().unwrap();
@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn test_file_readable_without_encryption() {
-        let identity = Identity::create("Eve");
+        let identity = Identity::create("Eve", 0);
         let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
         let dir = tempfile::tempdir().unwrap();
@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn test_refresh_generates_new_purge_token() {
-        let identity = Identity::create("Frank");
+        let identity = Identity::create("Frank", 0);
         let msgs1 = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
         // Small sleep to get different timestamp (if system clock is granular enough)
@@ -342,7 +342,7 @@ mod tests {
     fn test_purge_request_compatible_with_relay_signature_format() {
         // Verify the signature format matches what the relay expects:
         // verify over (public_key || purge_token || timestamp_be_bytes)
-        let identity = Identity::create("Grace");
+        let identity = Identity::create("Grace", 0);
         let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
         let purge = &msgs.purge_request;

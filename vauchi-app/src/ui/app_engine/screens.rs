@@ -289,7 +289,11 @@ impl AppEngine {
                     .identity()
                     .and_then(|id_ref| {
                         let bytes = zeroize::Zeroizing::new(id_ref.to_storage_bytes());
-                        vauchi_core::identity::Identity::from_storage_bytes(&bytes).ok()
+                        vauchi_core::identity::Identity::from_storage_bytes(
+                            &bytes,
+                            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+                        )
+                        .ok()
                     })
                     .and_then(|identity| {
                         card.map(|c| {

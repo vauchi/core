@@ -320,7 +320,7 @@ mod tests {
         let transport = MockTransport::new();
         let mut conn = ConnectionManager::new(transport, create_test_config());
 
-        let identity = Identity::create("Test User");
+        let identity = Identity::create("Test User", 0);
         let public_key_hex: String = identity
             .signing_public_key()
             .iter()

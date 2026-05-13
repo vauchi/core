@@ -1178,10 +1178,18 @@ impl VauchiPlatform {
     /// Android via `PlatformAppEngine`).
     fn decode_identity_blob(blob: &[u8]) -> Result<Identity, MobileError> {
         let backup = IdentityBackup::new(blob.to_vec());
-        if let Ok(identity) = Identity::import_backup(&backup, "__internal_storage_key__") {
+        if let Ok(identity) = Identity::import_backup(
+            &backup,
+            "__internal_storage_key__",
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        ) {
             return Ok(identity);
         }
-        Identity::from_storage_bytes(blob).map_err(|e| MobileError::Other {
+        Identity::from_storage_bytes(
+            blob,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .map_err(|e| MobileError::Other {
             detail: format!("Identity decode failed: {e}"),
         })
     }
@@ -2663,7 +2671,10 @@ mod tests {
         // through the storage layer the platform uses — same shape as
         // what `Vauchi::create_identity` (vauchi-core) produces when
         // `PlatformAppEngine` orchestrates onboarding.
-        let identity = Identity::create("Carol");
+        let identity = Identity::create(
+            "Carol",
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
         let raw_bytes = identity.to_storage_bytes();
         let display_name = identity.display_name().to_string();
         let storage = wb.open_storage().unwrap();

@@ -164,7 +164,7 @@ mod tests {
         let db_path = dir.path().join("vauchi.db");
         let storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
         let secure_storage = MemoryKeyStorage::new();
-        let identity = crate::identity::Identity::create("TestUser");
+        let identity = crate::identity::Identity::create("TestUser", 0);
 
         // Store SMK in secure storage (as would happen at identity creation)
         let smk = crate::crypto::ShreddingMasterKey::derive_from_seed(&[0x42; 32]);

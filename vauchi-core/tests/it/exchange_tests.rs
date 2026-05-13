@@ -101,7 +101,7 @@ fn test_x3dh_shared_secret_usable_for_encryption() {
 // @internal
 #[test]
 fn test_generate_qr_contains_public_key() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
     let qr = ExchangeQR::generate(&identity, &ephemeral);
 
@@ -113,7 +113,7 @@ fn test_generate_qr_contains_public_key() {
 // @internal
 #[test]
 fn test_qr_roundtrip_encode_decode() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
     let original = ExchangeQR::generate(&identity, &ephemeral);
 
@@ -129,7 +129,7 @@ fn test_qr_roundtrip_encode_decode() {
 // @internal
 #[test]
 fn test_qr_expires_after_5_minutes() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
     let qr = ExchangeQR::generate(&identity, &ephemeral);
 
@@ -155,7 +155,7 @@ fn test_qr_expires_after_5_minutes() {
 // @internal
 #[test]
 fn test_qr_signature_verification() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
     let qr = ExchangeQR::generate(&identity, &ephemeral);
 

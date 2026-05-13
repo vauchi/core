@@ -24,7 +24,7 @@ use vauchi_core::{ContactCard, Identity};
 // @scenario: ble_exchange :: BLE payload generation contains identity and exchange keys
 #[test]
 fn test_ble_payload_generate() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     let payload = ExchangeBle::generate(&identity, &ephemeral);
@@ -38,7 +38,7 @@ fn test_ble_payload_generate() {
 // @scenario: ble_exchange :: BLE payload serialization roundtrip
 #[test]
 fn test_ble_payload_roundtrip() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     let payload = ExchangeBle::generate(&identity, &ephemeral);
@@ -59,7 +59,7 @@ fn test_ble_payload_roundtrip() {
 // @scenario: security :: Tampered exchange data is rejected
 #[test]
 fn test_ble_payload_signature() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     let payload = ExchangeBle::generate(&identity, &ephemeral);
@@ -69,7 +69,7 @@ fn test_ble_payload_signature() {
 // @scenario: security :: Tampered exchange data is rejected
 #[test]
 fn test_ble_payload_tamper() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     let payload = ExchangeBle::generate(&identity, &ephemeral);
@@ -88,7 +88,7 @@ fn test_ble_payload_tamper() {
 // @scenario: ble_exchange :: BLE payload rejected with invalid magic bytes
 #[test]
 fn test_ble_payload_magic() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     let payload = ExchangeBle::generate(&identity, &ephemeral);
@@ -103,7 +103,7 @@ fn test_ble_payload_magic() {
 // @scenario: ble_exchange :: BLE payload expires after 60 seconds
 #[test]
 fn test_ble_payload_expiry() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     let now = std::time::SystemTime::now()
@@ -166,7 +166,7 @@ fn test_gatt_service_uuid_match() {
 // @scenario: ble_exchange :: BLE transport can advertise
 #[test]
 fn test_mock_ble_transport_advertise() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
     let payload = ExchangeBle::generate(&identity, &ephemeral);
 
@@ -184,7 +184,7 @@ fn test_mock_ble_transport_scan() {
 // @scenario: ble_exchange :: BLE transport connect, read, write, disconnect
 #[test]
 fn test_mock_ble_transport_connect_read_write() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
     let payload = ExchangeBle::generate(&identity, &ephemeral);
     let payload_bytes = payload.to_bytes();
@@ -230,7 +230,7 @@ fn test_mock_ble_transport_failure() {
 // @scenario: ble_exchange :: New BLE session starts in AwaitingBleConnection
 #[test]
 fn test_ble_session_starts_awaiting_connection() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -251,8 +251,8 @@ fn test_ble_session_starts_awaiting_connection() {
 // @scenario: ble_exchange :: Session transitions to AwaitingBleVerification after payload exchange
 #[test]
 fn test_ble_payload_exchanged_transitions() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
@@ -288,8 +288,8 @@ fn test_ble_payload_exchanged_transitions() {
 // @scenario: ble_exchange :: Session transitions to AwaitingKeyAgreement after proximity verification
 #[test]
 fn test_ble_proximity_verified_transitions() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
@@ -326,8 +326,8 @@ fn test_ble_proximity_verified_transitions() {
 // @scenario: ble_exchange :: Symmetric DH produces identical shared keys
 #[test]
 fn test_ble_full_lifecycle() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");
@@ -346,8 +346,8 @@ fn test_ble_full_lifecycle() {
     );
 
     // Generate payloads (in real life, built from session's identity+ephemeral)
-    let alice_id2 = Identity::create("Alice");
-    let bob_id2 = Identity::create("Bob");
+    let alice_id2 = Identity::create("Alice", 0);
+    let bob_id2 = Identity::create("Bob", 0);
     let alice_eph = X3DHKeyPair::generate();
     let bob_eph = X3DHKeyPair::generate();
 
@@ -419,8 +419,8 @@ fn test_ble_shared_keys_match() {
 // @scenario: ble_exchange :: Expired BLE payload is rejected
 #[test]
 fn test_ble_expired_rejection() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
@@ -453,7 +453,7 @@ fn test_ble_expired_rejection() {
 // @scenario: ble_exchange :: Self-exchange is rejected via BLE
 #[test]
 fn test_ble_self_exchange() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
 
     let eph = X3DHKeyPair::generate();
     let self_payload = ExchangeBle::generate(&alice_identity, &eph);
@@ -482,7 +482,7 @@ fn test_ble_self_exchange() {
 // @scenario: ble_exchange :: Invalid BLE payload is rejected
 #[test]
 fn test_ble_invalid_payload() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -506,7 +506,7 @@ fn test_ble_invalid_payload() {
 // @scenario: ble_exchange :: BLE events rejected on non-BLE transport
 #[test]
 fn test_ble_rejects_wrong_transport() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -535,7 +535,7 @@ fn test_ble_rejects_wrong_transport() {
 // @scenario: ble_exchange :: Proximity verification requires AwaitingBleVerification state
 #[test]
 fn test_ble_proximity_requires_verification_state() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -560,8 +560,8 @@ fn test_ble_challenge_response_blocks_on_failure() {
     // If proximity verification fails, the exchange should not proceed.
     // We verify this by checking state doesn't advance past AwaitingBleVerification
     // if BleProximityVerified is not sent.
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
@@ -599,8 +599,8 @@ fn test_ble_challenge_response_blocks_on_failure() {
 // @scenario: ble_exchange :: Symmetric DH produces identical shared keys
 #[test]
 fn test_ble_full_exchange_with_mock_transport() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_eph = X3DHKeyPair::generate();
     let bob_eph = X3DHKeyPair::generate();
@@ -689,7 +689,7 @@ fn test_ble_error_variants_exist() {
 fn test_ble_payload_size() {
     assert_eq!(BLE_PAYLOAD_SIZE, 174, "BLE payload should be 174 bytes");
 
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
     let payload = ExchangeBle::generate(&identity, &ephemeral);
     let bytes = payload.to_bytes();
@@ -703,7 +703,7 @@ fn test_ble_payload_size() {
 #[test]
 fn test_ble_forward_secrecy() {
     // Both sides use fresh ephemeral keys — not identity-derived
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let identity_x3dh = identity.x3dh_keypair();
     let ble_eph = X3DHKeyPair::generate();

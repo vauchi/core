@@ -25,7 +25,7 @@ const BACKUP_VERSION_V2: u8 = 0x02;
 #[test]
 fn test_non_v2_format_rejected() {
     // Create a v2 backup first to get valid identity data
-    let identity = Identity::create("Legacy User");
+    let identity = Identity::create("Legacy User", 0);
     let password = "SecureP@ssw0rd!2024";
     let v2_backup = identity.export_backup(password).unwrap();
     let v2_bytes = v2_backup.as_bytes();
@@ -40,7 +40,7 @@ fn test_non_v2_format_rejected() {
     let mock_data = vec![0x00u8; 100]; // First byte is 0x00, not 0x02
     let mock_backup = IdentityBackup::new(mock_data);
 
-    let result = Identity::import_backup(&mock_backup, password);
+    let result = Identity::import_backup(&mock_backup, password, 0);
     assert!(result.is_err(), "Non-v2 data should fail to restore");
 
     // Verify error is RestoreFailed
@@ -55,7 +55,7 @@ fn test_non_v2_format_rejected() {
         let mut test_data = vec![first_byte];
         test_data.extend_from_slice(&[0u8; 99]);
         let test_backup = IdentityBackup::new(test_data);
-        let result = Identity::import_backup(&test_backup, password);
+        let result = Identity::import_backup(&test_backup, password, 0);
         assert!(result.is_err(), "Non-v2 data should fail to restore");
     }
 }
@@ -73,7 +73,7 @@ fn test_non_v2_format_rejected() {
 fn test_v2_parameter_validation() {
     // Empty backup should be rejected
     let empty_backup = IdentityBackup::new(vec![]);
-    let result = Identity::import_backup(&empty_backup, "password");
+    let result = Identity::import_backup(&empty_backup, "password", 0);
     assert!(
         matches!(result, Err(IdentityError::RestoreFailed)),
         "Empty backup should fail"
@@ -81,7 +81,7 @@ fn test_v2_parameter_validation() {
 
     // V2 prefix but too short (missing salt + ciphertext)
     let short_v2 = IdentityBackup::new(vec![BACKUP_VERSION_V2]);
-    let result = Identity::import_backup(&short_v2, "password");
+    let result = Identity::import_backup(&short_v2, "password", 0);
     assert!(
         matches!(result, Err(IdentityError::RestoreFailed)),
         "Too-short v2 backup should fail"
@@ -91,7 +91,7 @@ fn test_v2_parameter_validation() {
     let mut partial_salt = vec![BACKUP_VERSION_V2];
     partial_salt.extend_from_slice(&[0u8; 10]); // Only 10 bytes of salt
     let partial_backup = IdentityBackup::new(partial_salt);
-    let result = Identity::import_backup(&partial_backup, "password");
+    let result = Identity::import_backup(&partial_backup, "password", 0);
     assert!(
         matches!(result, Err(IdentityError::RestoreFailed)),
         "Partial salt should fail"
@@ -101,7 +101,7 @@ fn test_v2_parameter_validation() {
     let mut salt_only = vec![BACKUP_VERSION_V2];
     salt_only.extend_from_slice(&[0u8; 16]); // Full 16-byte salt, no ciphertext
     let salt_only_backup = IdentityBackup::new(salt_only);
-    let result = Identity::import_backup(&salt_only_backup, "password");
+    let result = Identity::import_backup(&salt_only_backup, "password", 0);
     assert!(
         matches!(result, Err(IdentityError::RestoreFailed)),
         "Salt-only backup should fail"
@@ -112,7 +112,7 @@ fn test_v2_parameter_validation() {
     invalid_ciphertext.extend_from_slice(&[0u8; 16]); // Salt
     invalid_ciphertext.extend_from_slice(&[0xFFu8; 50]); // Invalid ciphertext
     let invalid_backup = IdentityBackup::new(invalid_ciphertext);
-    let result = Identity::import_backup(&invalid_backup, "password");
+    let result = Identity::import_backup(&invalid_backup, "password", 0);
     assert!(
         matches!(result, Err(IdentityError::RestoreFailed)),
         "Invalid ciphertext should fail"
@@ -132,13 +132,13 @@ fn test_v2_parameter_validation() {
 #[test]
 fn test_corrupted_backup_detection() {
     // Create a valid v2 backup
-    let identity = Identity::create("Corruption Test User");
+    let identity = Identity::create("Corruption Test User", 0);
     let password = "SecureP@ssw0rd!2024";
     let backup = identity.export_backup(password).unwrap();
     let original_bytes = backup.as_bytes().to_vec();
 
     // Verify original backup works
-    let restored = Identity::import_backup(&backup, password);
+    let restored = Identity::import_backup(&backup, password, 0);
     assert!(
         restored.is_ok(),
         "Original backup should restore successfully"
@@ -165,7 +165,7 @@ fn test_corrupted_backup_detection() {
         corrupted[pos] ^= 0xFF; // Flip all bits at position
 
         let corrupted_backup = IdentityBackup::new(corrupted);
-        let result = Identity::import_backup(&corrupted_backup, password);
+        let result = Identity::import_backup(&corrupted_backup, password, 0);
 
         assert!(
             matches!(result, Err(IdentityError::RestoreFailed)),
@@ -182,7 +182,7 @@ fn test_corrupted_backup_detection() {
 
         let truncated = original_bytes[..original_bytes.len() - truncate_by].to_vec();
         let truncated_backup = IdentityBackup::new(truncated);
-        let result = Identity::import_backup(&truncated_backup, password);
+        let result = Identity::import_backup(&truncated_backup, password, 0);
 
         assert!(
             matches!(result, Err(IdentityError::RestoreFailed)),
@@ -204,7 +204,7 @@ fn test_corrupted_backup_detection() {
 #[test]
 fn test_version_upgrade_path() {
     // Create an identity and export as v2
-    let original_identity = Identity::create("Migration Test User");
+    let original_identity = Identity::create("Migration Test User", 0);
     let original_public_id = original_identity.public_id();
     let original_display_name = original_identity.display_name().to_string();
     let original_signing_key = *original_identity.signing_public_key();
@@ -221,7 +221,7 @@ fn test_version_upgrade_path() {
     );
 
     // Restore from v2 backup
-    let restored_identity = Identity::import_backup(&v2_backup, password).unwrap();
+    let restored_identity = Identity::import_backup(&v2_backup, password, 0).unwrap();
 
     // Re-export - should still be v2
     let re_exported = restored_identity.export_backup(password).unwrap();
@@ -254,7 +254,7 @@ fn test_version_upgrade_path() {
     );
 
     // Verify the re-exported backup can be restored too
-    let final_restored = Identity::import_backup(&re_exported, password).unwrap();
+    let final_restored = Identity::import_backup(&re_exported, password, 0).unwrap();
     assert_eq!(
         final_restored.public_id(),
         original_public_id,
@@ -283,7 +283,7 @@ fn test_future_version_rejection() {
         mock_future_backup.extend_from_slice(&[0u8; 200]);
 
         let future_backup = IdentityBackup::new(mock_future_backup);
-        let result = Identity::import_backup(&future_backup, password);
+        let result = Identity::import_backup(&future_backup, password, 0);
 
         assert!(
             matches!(result, Err(IdentityError::RestoreFailed)),
@@ -296,16 +296,16 @@ fn test_future_version_rejection() {
     let mut v1_like = vec![0x01u8];
     v1_like.extend_from_slice(&[0u8; 200]);
     let v1_backup = IdentityBackup::new(v1_like);
-    let result = Identity::import_backup(&v1_backup, password);
+    let result = Identity::import_backup(&v1_backup, password, 0);
     assert!(
         matches!(result, Err(IdentityError::RestoreFailed)),
         "Version 0x01 should be rejected"
     );
 
     // Verify actual v2 still works after testing future versions
-    let identity = Identity::create("Future Version Test");
+    let identity = Identity::create("Future Version Test", 0);
     let valid_backup = identity.export_backup(password).unwrap();
-    let restored = Identity::import_backup(&valid_backup, password);
+    let restored = Identity::import_backup(&valid_backup, password, 0);
     assert!(restored.is_ok(), "Valid v2 backup should still work");
 }
 
@@ -321,18 +321,18 @@ fn test_future_version_rejection() {
 // @scenario: identity_management :: Restore with incorrect password
 #[test]
 fn test_v2_wrong_password() {
-    let identity = Identity::create("Password Test User");
+    let identity = Identity::create("Password Test User", 0);
     let correct_password = "SecureP@ssw0rd!2024";
     let wrong_password = "WrongP@ssw0rd!2024";
 
     let backup = identity.export_backup(correct_password).unwrap();
 
     // Correct password works
-    let result = Identity::import_backup(&backup, correct_password);
+    let result = Identity::import_backup(&backup, correct_password, 0);
     assert!(result.is_ok(), "Correct password should work");
 
     // Wrong password fails
-    let result = Identity::import_backup(&backup, wrong_password);
+    let result = Identity::import_backup(&backup, wrong_password, 0);
     assert!(
         matches!(result, Err(IdentityError::RestoreFailed)),
         "Wrong password should fail"
@@ -340,7 +340,7 @@ fn test_v2_wrong_password() {
 
     // Empty password fails
     // Note: Password validation happens on export, not import
-    let result = Identity::import_backup(&backup, "");
+    let result = Identity::import_backup(&backup, "", 0);
     assert!(
         matches!(result, Err(IdentityError::RestoreFailed)),
         "Empty password should fail"
@@ -355,7 +355,7 @@ fn test_v2_wrong_password() {
 // @scenario: backup_format_versioning :: New backups use v2 format
 #[test]
 fn test_v2_format_structure() {
-    let identity = Identity::create("Format Test User");
+    let identity = Identity::create("Format Test User", 0);
     let password = "SecureP@ssw0rd!2024";
 
     let backup = identity.export_backup(password).unwrap();
@@ -390,7 +390,7 @@ fn test_v2_format_structure() {
 // @scenario: identity_management :: Restore identity from backup
 #[test]
 fn test_device_info_preservation() {
-    let identity = Identity::create("Device Info Test");
+    let identity = Identity::create("Device Info Test", 0);
     let password = "SecureP@ssw0rd!2024";
 
     // Capture original device info
@@ -399,7 +399,7 @@ fn test_device_info_preservation() {
 
     // Export and restore
     let backup = identity.export_backup(password).unwrap();
-    let restored = Identity::import_backup(&backup, password).unwrap();
+    let restored = Identity::import_backup(&backup, password, 0).unwrap();
 
     // Verify device info is preserved
     assert_eq!(
@@ -426,7 +426,7 @@ fn test_device_info_preservation() {
 // @scenario: identity_management :: Create encrypted identity backup
 #[test]
 fn test_re_export_with_different_password() {
-    let identity = Identity::create("Password Change Test");
+    let identity = Identity::create("Password Change Test", 0);
     let original_public_id = identity.public_id();
 
     let password_a = "OriginalP@ssw0rd!2024";
@@ -436,20 +436,20 @@ fn test_re_export_with_different_password() {
     let backup_a = identity.export_backup(password_a).unwrap();
 
     // Restore from backup A
-    let restored = Identity::import_backup(&backup_a, password_a).unwrap();
+    let restored = Identity::import_backup(&backup_a, password_a, 0).unwrap();
 
     // Re-export with password B
     let backup_b = restored.export_backup(password_b).unwrap();
 
     // New backup should NOT decrypt with old password
-    let result = Identity::import_backup(&backup_b, password_a);
+    let result = Identity::import_backup(&backup_b, password_a, 0);
     assert!(
         result.is_err(),
         "Re-exported backup should not decrypt with old password"
     );
 
     // New backup should decrypt with new password
-    let final_restored = Identity::import_backup(&backup_b, password_b).unwrap();
+    let final_restored = Identity::import_backup(&backup_b, password_b, 0).unwrap();
     assert_eq!(
         final_restored.public_id(),
         original_public_id,
@@ -468,14 +468,14 @@ fn test_re_export_with_different_password() {
 // @scenario: identity_management :: Restore identity from backup
 #[test]
 fn test_backup_import_creates_identical_signing_keys() {
-    let identity = Identity::create("Clone Test");
+    let identity = Identity::create("Clone Test", 0);
     let password = "SecureP@ssw0rd!2024";
 
     let backup = identity.export_backup(password).unwrap();
 
     // Import the same backup twice
-    let clone_a = Identity::import_backup(&backup, password).unwrap();
-    let clone_b = Identity::import_backup(&backup, password).unwrap();
+    let clone_a = Identity::import_backup(&backup, password, 0).unwrap();
+    let clone_b = Identity::import_backup(&backup, password, 0).unwrap();
 
     // Both clones have the same signing key (this is the documented risk)
     assert_eq!(

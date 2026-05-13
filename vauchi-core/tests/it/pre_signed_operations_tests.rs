@@ -34,7 +34,7 @@ fn verify_ed25519(public_key: &[u8; 32], message: &[u8], signature: &[u8]) -> bo
 #[test]
 fn test_pre_signed_message_refresh() {
     // Given pre-signed messages were generated
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let original = PreSignedShredMessages::generate(&identity, 1_700_000_000);
     let original_refreshed_at = original.refreshed_at;
 
@@ -80,7 +80,7 @@ fn test_pre_signed_message_refresh() {
 #[test]
 fn test_pre_signed_refresh_generates_new_purge_token() {
     // Given I have existing pre-signed messages with purge token A
-    let identity = Identity::create("Bob");
+    let identity = Identity::create("Bob", 0);
     let msgs_a = PreSignedShredMessages::generate(&identity, 1_700_000_000);
     let token_a = msgs_a.purge_request.purge_token;
 
@@ -109,7 +109,7 @@ fn test_pre_signed_refresh_generates_new_purge_token() {
 // @scenario: pre_signed_operations :: Refresh generates new purge token for replay prevention
 #[test]
 fn test_purge_token_rotation() {
-    let identity = Identity::create("Charlie");
+    let identity = Identity::create("Charlie", 0);
 
     // Generate multiple pre-signed messages
     let msgs1 = PreSignedShredMessages::generate(&identity, 1_700_000_000);
@@ -147,7 +147,7 @@ fn test_purge_token_rotation() {
 // @scenario: pre_signed_operations :: Pre-signed purge request has valid Ed25519 signature
 #[test]
 fn test_purge_token_rotation_maintains_signature_validity() {
-    let identity = Identity::create("Dave");
+    let identity = Identity::create("Dave", 0);
 
     // Generate pre-signed messages and store multiple versions
     let versions: Vec<PreSignedShredMessages> = (0..5)
@@ -204,7 +204,7 @@ fn test_purge_token_rotation_maintains_signature_validity() {
 #[test]
 fn test_pre_signed_revocation() {
     // Given I have pre-signed messages
-    let identity = Identity::create("Eve");
+    let identity = Identity::create("Eve", 0);
     let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
     // Store the public key for later verification
@@ -245,7 +245,7 @@ fn test_pre_signed_revocation() {
 // @scenario: pre_signed_operations :: Pre-signed deletion notice contains required fields
 #[test]
 fn test_pre_signed_revocation_includes_public_key() {
-    let identity = Identity::create("Frank");
+    let identity = Identity::create("Frank", 0);
     let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
     // Both messages should include the identity's public key
@@ -274,7 +274,7 @@ fn test_pre_signed_offline_storage() {
     let dir = tempfile::tempdir().unwrap();
 
     // Given I create pre-signed messages offline
-    let identity = Identity::create("Grace");
+    let identity = Identity::create("Grace", 0);
     let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
     // When I save them to disk
@@ -318,7 +318,7 @@ fn test_pre_signed_offline_storage_survives_restart() {
 
     // Create and save pre-signed messages (simulating first app run)
     let public_key = {
-        let identity = Identity::create("Henry");
+        let identity = Identity::create("Henry", 0);
         let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
         msgs.save(dir.path()).unwrap();
         *identity.signing_public_key()
@@ -350,7 +350,7 @@ fn test_pre_signed_offline_storage_survives_restart() {
 #[test]
 fn test_pre_signed_offline_storage_unencrypted() {
     let dir = tempfile::tempdir().unwrap();
-    let identity = Identity::create("Ivy");
+    let identity = Identity::create("Ivy", 0);
     let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
     msgs.save(dir.path()).unwrap();
 
@@ -376,7 +376,7 @@ fn test_pre_signed_offline_airplane_mode() {
     let dir = tempfile::tempdir().unwrap();
 
     // Step 1: User generates pre-signed messages while online
-    let identity = Identity::create("Jake");
+    let identity = Identity::create("Jake", 0);
     let original_msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
     original_msgs.save(dir.path()).unwrap();
 
@@ -409,8 +409,8 @@ fn test_pre_signed_offline_airplane_mode() {
 // @scenario: pre_signed_operations :: Pre-signed purge request has valid Ed25519 signature
 #[test]
 fn test_pre_signed_refresh_isolation() {
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
 
     let alice_msgs = PreSignedShredMessages::generate(&alice, 1_700_000_000);
     let bob_msgs = PreSignedShredMessages::generate(&bob, 1_700_000_000);
@@ -443,7 +443,7 @@ fn test_pre_signed_refresh_isolation() {
 // @scenario: pre_signed_operations :: Refresh pre-signed messages periodically
 #[test]
 fn test_pre_signed_timestamp_sanity() {
-    let identity = Identity::create("Kate");
+    let identity = Identity::create("Kate", 0);
     // Caller-controlled timestamp is stamped verbatim — the old
     // `SystemTime::now()` ± 60s sanity check has been replaced with a
     // direct equality assertion against the input now.

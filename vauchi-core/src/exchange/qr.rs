@@ -517,7 +517,7 @@ mod tests {
 
     #[test]
     fn test_qr_generation() {
-        let identity = Identity::create("Alice");
+        let identity = Identity::create("Alice", 0);
         let ephemeral = X3DHKeyPair::generate();
         let qr = ExchangeQR::generate(&identity, &ephemeral);
 
@@ -531,7 +531,7 @@ mod tests {
 
     #[test]
     fn test_qr_signature_valid() {
-        let identity = Identity::create("Alice");
+        let identity = Identity::create("Alice", 0);
         let ephemeral = X3DHKeyPair::generate();
         let qr = ExchangeQR::generate(&identity, &ephemeral);
 
@@ -540,7 +540,7 @@ mod tests {
 
     #[test]
     fn test_qr_not_expired_initially() {
-        let identity = Identity::create("Alice");
+        let identity = Identity::create("Alice", 0);
         let ephemeral = X3DHKeyPair::generate();
         let qr = ExchangeQR::generate(&identity, &ephemeral);
 
@@ -549,7 +549,7 @@ mod tests {
 
     #[test]
     fn test_qr_roundtrip_with_display_name() {
-        let identity = Identity::create("Alice");
+        let identity = Identity::create("Alice", 0);
         let ephemeral = X3DHKeyPair::generate();
         let qr = ExchangeQR::generate(&identity, &ephemeral);
 
@@ -565,7 +565,7 @@ mod tests {
 
     #[test]
     fn test_qr_roundtrip_unicode_name() {
-        let identity = Identity::create("Müller 日本語");
+        let identity = Identity::create("Müller 日本語", 0);
         let ephemeral = X3DHKeyPair::generate();
         let qr = ExchangeQR::generate(&identity, &ephemeral);
 
@@ -578,7 +578,7 @@ mod tests {
 
     #[test]
     fn test_qr_roundtrip_empty_name() {
-        let identity = Identity::create("");
+        let identity = Identity::create("", 0);
         let ephemeral = X3DHKeyPair::generate();
         let qr = ExchangeQR::generate(&identity, &ephemeral);
 
@@ -615,7 +615,7 @@ mod tests {
     #[test]
     fn test_v3_relay_fields_in_signature() {
         // Verify that changing relay fields invalidates the signature
-        let identity = Identity::create("Test");
+        let identity = Identity::create("Test", 0);
         let ephemeral = X3DHKeyPair::generate();
 
         let qr_with_relay = ExchangeQR::generate_with_relay(

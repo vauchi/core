@@ -23,8 +23,8 @@ use vauchi_core::*;
 // @internal
 #[test]
 fn test_qr_exchange_key_agreement_succeeds() {
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");
@@ -93,7 +93,7 @@ fn test_qr_exchange_key_agreement_succeeds() {
 // @internal
 #[test]
 fn test_qr_key_agreement_from_wrong_state_fails() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -122,7 +122,7 @@ fn test_qr_key_agreement_from_wrong_state_fails() {
 // @internal
 #[test]
 fn test_nfc_skips_proximity() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();

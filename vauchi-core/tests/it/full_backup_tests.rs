@@ -223,7 +223,7 @@ fn v3_different_salt_different_ciphertext() {
 // @scenario: backup_format_versioning :: Restore v2 backup with correct password
 #[test]
 fn v2_backward_compat() {
-    let identity = vauchi_core::Identity::create("V2 Compat Test");
+    let identity = vauchi_core::Identity::create("V2 Compat Test", 0);
     let password = "SecureP@ssw0rd!2024";
     let backup = identity.export_backup(password).unwrap();
 
@@ -233,7 +233,7 @@ fn v2_backward_compat() {
         "identity backup must use v2 format"
     );
 
-    let restored = vauchi_core::Identity::import_backup(&backup, password).unwrap();
+    let restored = vauchi_core::Identity::import_backup(&backup, password, 0).unwrap();
     assert_eq!(restored.public_id(), identity.public_id());
     assert_eq!(restored.display_name(), identity.display_name());
 }

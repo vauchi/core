@@ -30,7 +30,7 @@ impl MobileProximityHandler for SuccessHandler {
 // @internal
 #[test]
 fn test_session_generates_qr() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
 
     let session = create_qr_exchange_manual(identity, card);
@@ -50,9 +50,9 @@ fn test_session_generates_qr() {
 // @internal
 #[test]
 fn test_session_mutual_qr_flow() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let alice_card = ContactCard::new("Alice");
-    let bob = Identity::create("Bob");
+    let bob = Identity::create("Bob", 0);
     let bob_card = ContactCard::new("Bob");
 
     let alice_session = create_qr_exchange_manual(alice, alice_card);
@@ -110,7 +110,7 @@ fn test_session_mutual_qr_flow() {
 // @internal
 #[test]
 fn test_finalize_requires_complete_state() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
 
     let session = create_qr_exchange_manual(identity, card);
@@ -122,7 +122,7 @@ fn test_finalize_requires_complete_state() {
 // @internal
 #[test]
 fn test_confirm_proximity_manual_session() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
 
     let session = create_qr_exchange_manual(identity, card);
@@ -135,7 +135,7 @@ fn test_confirm_proximity_manual_session() {
 // @internal
 #[test]
 fn test_confirm_proximity_proximity_session() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
 
     let session = create_qr_exchange_proximity(identity, card, Box::new(SuccessHandler));
@@ -148,7 +148,7 @@ fn test_confirm_proximity_proximity_session() {
 // @internal
 #[test]
 fn test_session_not_timed_out_initially() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
 
     let session = create_qr_exchange_manual(identity, card);
@@ -162,7 +162,7 @@ fn test_session_not_timed_out_initially() {
 fn test_verification_confidence_defaults_to_unknown() {
     use vauchi_platform::MobileProximityConfidence;
 
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let session = create_qr_exchange_manual(identity, card);
 
@@ -175,7 +175,7 @@ fn test_verification_confidence_defaults_to_unknown() {
 // @internal
 #[test]
 fn test_get_verification_events_empty_before_verification() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let session = create_qr_exchange_manual(identity, card);
 
@@ -187,9 +187,9 @@ fn test_get_verification_events_empty_before_verification() {
 fn test_verification_events_populated_after_key_agreement() {
     use vauchi_platform::{MobileProximityConfidence, MobileProximityVerifierEvent};
 
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let alice_card = ContactCard::new("Alice");
-    let bob = Identity::create("Bob");
+    let bob = Identity::create("Bob", 0);
     let bob_card = ContactCard::new("Bob");
 
     let alice_session = {
@@ -253,7 +253,7 @@ fn test_verification_events_populated_after_key_agreement() {
 // @internal
 #[test]
 fn test_proximity_factory_wraps_in_chain() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let session = create_qr_exchange_proximity(identity, card, Box::new(SuccessHandler));
     assert!(session.get_verification_events().is_empty());
@@ -262,7 +262,7 @@ fn test_proximity_factory_wraps_in_chain() {
 // @internal
 #[test]
 fn test_manual_factory_wraps_in_chain() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let session = create_qr_exchange_manual(identity, card);
     assert!(session.get_verification_events().is_empty());
@@ -273,7 +273,7 @@ fn test_manual_factory_wraps_in_chain() {
 // @internal
 #[test]
 fn test_debug_log_disabled_by_default() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let session = create_qr_exchange_manual(identity, card);
 
@@ -284,7 +284,7 @@ fn test_debug_log_disabled_by_default() {
 // @internal
 #[test]
 fn test_enable_debug_log_captures_events() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let session = create_qr_exchange_manual(identity, card);
 
@@ -303,7 +303,7 @@ fn test_enable_debug_log_captures_events() {
 // @internal
 #[test]
 fn test_debug_log_markdown_output() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let session = create_qr_exchange_manual(identity, card);
 
@@ -322,7 +322,7 @@ fn test_debug_log_markdown_output() {
 // @internal
 #[test]
 fn test_latency_summary_json_after_generate_qr() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let session = create_qr_exchange_manual(identity, card);
 

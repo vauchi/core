@@ -195,8 +195,8 @@ fn test_decrypt_fails_with_corrupted_ciphertext() {
 fn test_delta_signature_rejects_wrong_signer() {
     use vauchi_core::identity::Identity;
 
-    let alice = Identity::create("Alice");
-    let eve = Identity::create("Eve"); // Attacker's identity
+    let alice = Identity::create("Alice", 0);
+    let eve = Identity::create("Eve", 0); // Attacker's identity
 
     let old_card = ContactCard::new("Alice");
     let mut new_card = ContactCard::new("Alice");
@@ -235,7 +235,7 @@ fn test_delta_signature_rejects_tampered_delta() {
     use vauchi_core::identity::Identity;
     use vauchi_core::sync::FieldChange;
 
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
 
     let old_card = ContactCard::new("Alice");
     let mut new_card = ContactCard::new("Alice");
@@ -408,10 +408,10 @@ fn test_mark_nonexistent_update_delivered() {
 fn test_wrong_password_fails_backup_import() {
     use vauchi_core::identity::Identity;
 
-    let identity = Identity::create("Test");
+    let identity = Identity::create("Test", 0);
     let backup = identity.export_backup("SecureP@ssw0rd123!").unwrap();
 
-    let result = Identity::import_backup(&backup, "WrongP@ssw0rd999!");
+    let result = Identity::import_backup(&backup, "WrongP@ssw0rd999!", 0);
     assert!(result.is_err(), "Wrong password should fail import");
 }
 
@@ -421,7 +421,7 @@ fn test_wrong_password_fails_backup_import() {
 fn test_corrupted_backup_fails_import() {
     use vauchi_core::identity::Identity;
 
-    let identity = Identity::create("Test");
+    let identity = Identity::create("Test", 0);
     let password = "SecureP@ssw0rd123!";
     let mut backup = identity.export_backup(password).unwrap();
 
@@ -431,7 +431,7 @@ fn test_corrupted_backup_fails_import() {
         bytes[10] ^= 0xFF;
     }
 
-    let result = Identity::import_backup(&backup, password);
+    let result = Identity::import_backup(&backup, password, 0);
     assert!(result.is_err(), "Corrupted backup should fail import");
 }
 
@@ -441,7 +441,7 @@ fn test_corrupted_backup_fails_import() {
 fn test_empty_password_rejected_for_backup() {
     use vauchi_core::identity::Identity;
 
-    let identity = Identity::create("Test");
+    let identity = Identity::create("Test", 0);
     let result = identity.export_backup("");
 
     assert!(result.is_err(), "Empty password should be rejected");

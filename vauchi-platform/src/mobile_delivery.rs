@@ -416,10 +416,14 @@ impl VauchiPlatform {
             })?;
 
         let backup = IdentityBackup::new(bytes);
-        let identity =
-            Identity::import_backup(&backup, &password).map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
+        let identity = Identity::import_backup(
+            &backup,
+            &password,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .map_err(|e| MobileError::Other {
+            detail: e.to_string(),
+        })?;
 
         let internal_backup = identity
             .export_backup("__internal_storage_key__")

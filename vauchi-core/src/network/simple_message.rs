@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     fn test_signed_handshake_has_auth_fields() {
-        let identity = crate::Identity::create("Test User");
+        let identity = crate::Identity::create("Test User", 0);
         let handshake = create_signed_handshake(&identity, None, 0);
 
         assert!(!handshake.client_id.is_empty());
@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn test_signed_handshake_signature_verifiable() {
-        let identity = crate::Identity::create("Test User");
+        let identity = crate::Identity::create("Test User", 0);
         let handshake = create_signed_handshake(&identity, None, 0);
 
         // Reconstruct the signed data as the relay would
@@ -352,7 +352,7 @@ mod tests {
 
     #[test]
     fn test_signed_handshake_with_device_id() {
-        let identity = crate::Identity::create("Test User");
+        let identity = crate::Identity::create("Test User", 0);
         let device_id = Some("abcd1234".to_string());
         let handshake = create_signed_handshake(&identity, device_id.clone(), 0);
 
@@ -362,7 +362,7 @@ mod tests {
 
     #[test]
     fn test_signed_handshake_serialization_includes_auth() {
-        let identity = crate::Identity::create("Test User");
+        let identity = crate::Identity::create("Test User", 0);
         let handshake = create_signed_handshake(&identity, None, 0);
 
         let envelope = create_simple_envelope(SimplePayload::Handshake(handshake), 0);

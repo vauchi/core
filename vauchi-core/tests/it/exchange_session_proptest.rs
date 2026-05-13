@@ -21,7 +21,7 @@ use vauchi_core::identity::Identity;
 
 /// Create a QR exchange session pair: (session, peer_qr, peer_card).
 fn make_session_and_peer() -> (ExchangeSession, ExchangeQR, ContactCard) {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
     let mut session = ExchangeSession::new_qr(
@@ -31,7 +31,7 @@ fn make_session_and_peer() -> (ExchangeSession, ExchangeQR, ContactCard) {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    let peer_identity = Identity::create("Bob");
+    let peer_identity = Identity::create("Bob", 0);
     let peer_card = ContactCard::new("Bob");
     let peer_proximity = MockProximityVerifier::success();
     let mut peer_session = ExchangeSession::new_qr(
@@ -164,9 +164,9 @@ proptest! {
 // @internal
 #[test]
 fn happy_path_qr_exchange_always_completes() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_card = ContactCard::new("Alice");
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_card = ContactCard::new("Bob");
 
     let alice_proximity = MockProximityVerifier::success();

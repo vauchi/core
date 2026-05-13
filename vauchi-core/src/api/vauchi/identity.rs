@@ -43,7 +43,7 @@ impl Vauchi {
             return Err(VauchiError::AlreadyInitialized);
         }
 
-        let identity = Identity::create(display_name);
+        let identity = Identity::create(display_name, self.clock.unix_seconds());
 
         // Create initial contact card, or update display name on existing card.
         // During onboarding, fields may already be saved to the card before
@@ -182,7 +182,7 @@ impl Vauchi {
         let bytes = hex::decode(backup_data.trim())
             .map_err(|e| VauchiError::Configuration(format!("Invalid hex data: {}", e)))?;
         let backup = crate::identity::IdentityBackup::new(bytes.clone());
-        let identity = Identity::import_backup(&backup, password)
+        let identity = Identity::import_backup(&backup, password, self.clock.unix_seconds())
             .map_err(|e| VauchiError::Configuration(format!("Import failed: {:?}", e)))?;
 
         let name = identity.display_name().to_string();
@@ -268,6 +268,7 @@ impl Vauchi {
             envelope.sections.identity.display_name.clone(),
             envelope.sections.identity.device_index,
             envelope.sections.identity.device_name.clone(),
+            self.clock.unix_seconds(),
         );
 
         // Persist identity (v2 format for storage compatibility)
@@ -380,7 +381,7 @@ impl Vauchi {
             return;
         }
         if let Ok(Some((bytes, _display_name))) = self.storage.load_identity()
-            && let Ok(identity) = Identity::from_storage_bytes(&bytes)
+            && let Ok(identity) = Identity::from_storage_bytes(&bytes, self.clock.unix_seconds())
         {
             self.identity = Some(identity);
         }

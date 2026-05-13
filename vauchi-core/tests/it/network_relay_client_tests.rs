@@ -404,7 +404,7 @@ fn test_suppress_presence_included_in_handshake() {
     let transport = MockTransport::new();
     let mut client = RelayClient::new(transport, config, "sender-id".into());
 
-    let identity = Identity::create("Test User");
+    let identity = Identity::create("Test User", 0);
     client.connection_mut().set_identity(identity);
     client.connect().unwrap();
 

@@ -108,11 +108,11 @@ proptest! {
     fn prop_backup_roundtrip_adversarial_passwords(
         password in adversarial_password_strategy()
     ) {
-        let original = Identity::create("Adversarial Test User");
+        let original = Identity::create("Adversarial Test User", 0);
 
         let backup = original.export_backup(&password)
             .unwrap_or_else(|e| panic!("export_backup should succeed for password: {:?}: {}", password, e));
-        let restored = Identity::import_backup(&backup, &password)
+        let restored = Identity::import_backup(&backup, &password, 0)
             .unwrap_or_else(|e| panic!("import_backup should succeed for password: {:?}: {}", password, e));
 
         // Verify cryptographic identity is preserved
@@ -139,11 +139,11 @@ proptest! {
     fn prop_backup_roundtrip_random_strong_passwords(
         password in strong_password_strategy()
     ) {
-        let original = Identity::create("Random Password Test");
+        let original = Identity::create("Random Password Test", 0);
 
         let backup = original.export_backup(&password)
             .unwrap_or_else(|e| panic!("export_backup should succeed for password: {:?}: {}", password, e));
-        let restored = Identity::import_backup(&backup, &password)
+        let restored = Identity::import_backup(&backup, &password, 0)
             .unwrap_or_else(|e| panic!("import_backup should succeed for password: {:?}: {}", password, e));
 
         prop_assert_eq!(
@@ -167,10 +167,10 @@ proptest! {
     ) {
         prop_assume!(password1 != password2);
 
-        let original = Identity::create("Wrong Password Test");
+        let original = Identity::create("Wrong Password Test", 0);
         let backup = original.export_backup(&password1).expect("export should succeed");
 
-        let result = Identity::import_backup(&backup, &password2);
+        let result = Identity::import_backup(&backup, &password2, 0);
         prop_assert!(
             result.is_err(),
             "Restoring with wrong password must fail"
@@ -185,7 +185,7 @@ proptest! {
         tamper_offset in 17usize..100usize, // Skip version byte and salt
         tamper_byte in any::<u8>()
     ) {
-        let original = Identity::create("Tamper Test User");
+        let original = Identity::create("Tamper Test User", 0);
         let mut backup = original.export_backup(&password).expect("export should succeed");
 
         let data = backup.as_bytes_mut();
@@ -194,7 +194,7 @@ proptest! {
             prop_assume!(tamper_byte != original_byte);
             data[tamper_offset] = tamper_byte;
 
-            let result = Identity::import_backup(&backup, &password);
+            let result = Identity::import_backup(&backup, &password, 0);
             prop_assert!(
                 result.is_err(),
                 "Restoring tampered backup must fail"

@@ -8,7 +8,7 @@ use vauchi_core::*;
 // @scenario: contact_exchange :: QR code exchange blocked without proximity
 #[test]
 fn test_lazy_frontend_skips_they_scanned() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_card = ContactCard::new("Alice");
     let alice_proximity = MockProximityVerifier::success();
     let mut alice_session = ExchangeSession::new_qr(
@@ -21,7 +21,7 @@ fn test_lazy_frontend_skips_they_scanned() {
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     let alice_qr = alice_session.qr().unwrap().clone();
 
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_card = ContactCard::new("Bob");
     let bob_proximity = MockProximityVerifier::failure();
     let mut bob_session = ExchangeSession::new_qr(
@@ -53,7 +53,7 @@ fn test_lazy_frontend_skips_they_scanned() {
 // @scenario: contact_exchange :: QR code exchange blocked without proximity
 #[test]
 fn test_formalized_state_machine() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_card = ContactCard::new("Alice");
     let mut alice_session = ExchangeSession::new_qr(
         alice_identity,

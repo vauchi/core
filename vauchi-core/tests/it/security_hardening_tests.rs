@@ -121,7 +121,7 @@ fn test_brute_force_rate_calculation() {
 // @scenario: security :: QR code screenshot attack prevention
 #[test]
 fn test_qr_screenshot_attack_prevention() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     // Generate QR with timestamp in the past (6 minutes ago = expired)
@@ -151,7 +151,7 @@ fn test_qr_screenshot_attack_prevention() {
 // @scenario: security :: QR code screenshot attack prevention
 #[test]
 fn test_expired_qr_rejected_in_session() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
 
     // Alice generates QR (with timestamp 6 minutes ago = expired)
@@ -165,7 +165,7 @@ fn test_expired_qr_rejected_in_session() {
     let qr_data = expired_qr.to_data_string();
 
     // Bob tries to use Alice's expired QR
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_card = vauchi_core::ContactCard::new("Bob");
     let bob_proximity = MockProximityVerifier::success();
     let mut bob_session = ExchangeSession::new_qr(
@@ -265,7 +265,7 @@ fn test_ble_relay_attack_prevention() {
 // @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_exchange_requires_mutual_scan() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_card = vauchi_core::ContactCard::new("Alice");
     let alice_proximity = MockProximityVerifier::success();
     let mut alice_session = ExchangeSession::new_qr(
@@ -278,7 +278,7 @@ fn test_exchange_requires_mutual_scan() {
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     let alice_qr = alice_session.qr().unwrap().clone();
 
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_card = vauchi_core::ContactCard::new("Bob");
     let bob_proximity = MockProximityVerifier::success();
     let mut bob_session = ExchangeSession::new_qr(
@@ -308,7 +308,7 @@ fn test_exchange_requires_mutual_scan() {
 // @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_exchange_succeeds_with_mutual_scan() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_card = vauchi_core::ContactCard::new("Alice");
     let alice_proximity = MockProximityVerifier::success();
     let mut alice_session = ExchangeSession::new_qr(
@@ -321,7 +321,7 @@ fn test_exchange_succeeds_with_mutual_scan() {
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     let alice_qr = alice_session.qr().unwrap().clone();
 
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_card = vauchi_core::ContactCard::new("Bob");
     let bob_proximity = MockProximityVerifier::success();
     let mut bob_session = ExchangeSession::new_qr(
@@ -632,7 +632,7 @@ fn test_kdf_no_intermediate_leakage() {
 // @scenario: security :: Sufficient key lengths
 #[test]
 fn test_exchange_token_randomness() {
-    let identity = Identity::create("Test");
+    let identity = Identity::create("Test", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     // Generate multiple QRs and verify tokens are unique
@@ -662,7 +662,7 @@ fn test_exchange_token_randomness() {
 // @scenario: security :: Sufficient key lengths
 #[test]
 fn test_audio_challenge_randomness() {
-    let identity = Identity::create("Test");
+    let identity = Identity::create("Test", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     let qr1 = ExchangeQR::generate(&identity, &ephemeral);
@@ -680,7 +680,7 @@ fn test_audio_challenge_randomness() {
 // @scenario: security :: Contact card signatures verified
 #[test]
 fn test_qr_signature_prevents_tampering() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
     let qr = ExchangeQR::generate(&identity, &ephemeral);
     let qr_data = qr.to_data_string();

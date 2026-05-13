@@ -151,7 +151,7 @@ fn boxed(listener: &Arc<RecordingListener>) -> Box<dyn DeviceLinkSessionListener
 /// error, so tests that wait for `on_failed` get a deterministic
 /// short timeout.
 fn session_against_dead_relay() -> Arc<MobileDeviceLinkSession> {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = identity.initial_device_registry();
     let initiator = identity.create_device_link_initiator(registry);
     let identity_id = hex::encode(identity.signing_public_key());

@@ -26,7 +26,7 @@ fn create_test_vauchi() -> Vauchi {
 }
 
 fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
-    let identity = Identity::create(name);
+    let identity = Identity::create(name, 0);
     let shared = SymmetricKey::generate();
     let contact = Contact::from_exchange(
         *identity.signing_public_key(),
@@ -48,7 +48,7 @@ fn add_contact_with_ratchet_and_visibility(
     name: &str,
     setup_rules: impl FnOnce(&mut VisibilityRules),
 ) -> String {
-    let identity = Identity::create(name);
+    let identity = Identity::create(name, 0);
     let shared = SymmetricKey::generate();
     let mut contact = Contact::from_exchange(
         *identity.signing_public_key(),

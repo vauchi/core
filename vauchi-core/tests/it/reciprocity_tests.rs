@@ -301,7 +301,7 @@ use vauchi_core::identity::Identity;
 // @internal
 #[test]
 fn key_agreement_derives_confirmation_tokens() {
-    let identity_a = Identity::create("Alice");
+    let identity_a = Identity::create("Alice", 0);
     let card_a = ContactCard::new("Alice");
     let mut session_a = ExchangeSession::new_qr(
         identity_a,
@@ -310,7 +310,7 @@ fn key_agreement_derives_confirmation_tokens() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    let identity_b = Identity::create("Bob");
+    let identity_b = Identity::create("Bob", 0);
     let card_b = ContactCard::new("Bob");
     let mut session_b = ExchangeSession::new_qr(
         identity_b,

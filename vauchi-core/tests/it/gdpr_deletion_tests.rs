@@ -74,7 +74,7 @@ fn test_execute_deletion_fails_before_grace_period() {
     manager.schedule_deletion().unwrap();
 
     // Execute should fail because grace period hasn't elapsed
-    let identity = Identity::create("Test");
+    let identity = Identity::create("Test", 0);
     let result = manager.execute_deletion(&identity);
     assert!(result.is_err(), "Execution before grace period should fail");
 }
@@ -91,7 +91,7 @@ fn test_execute_deletion_succeeds_after_grace_period() {
         .unwrap();
 
     // Now execute should succeed
-    let identity = Identity::create("Test");
+    let identity = Identity::create("Test", 0);
     let result = manager.execute_deletion(&identity);
     assert!(
         result.is_ok(),

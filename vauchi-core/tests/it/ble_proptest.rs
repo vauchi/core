@@ -28,7 +28,7 @@ fn make_test_key() -> SymmetricKey {
 }
 
 fn make_test_identity() -> Identity {
-    Identity::create("PropTest")
+    Identity::create("PropTest", 0)
 }
 
 fn make_test_card(identity: &Identity, name: &str) -> BleCardPayload {

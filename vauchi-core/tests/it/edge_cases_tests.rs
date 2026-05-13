@@ -428,7 +428,7 @@ fn test_visibility_default_is_everyone() {
 #[test]
 fn test_identity_long_display_name() {
     let long_name = "A".repeat(100);
-    let identity = Identity::create(&long_name);
+    let identity = Identity::create(&long_name, 0);
     assert_eq!(identity.display_name(), long_name);
 }
 
@@ -437,7 +437,7 @@ fn test_identity_long_display_name() {
 #[test]
 fn test_identity_special_chars_in_name() {
     let special_name = "O'Brien-Smith (Jr.) & Co.";
-    let identity = Identity::create(special_name);
+    let identity = Identity::create(special_name, 0);
     assert_eq!(identity.display_name(), special_name);
 }
 
@@ -445,11 +445,11 @@ fn test_identity_special_chars_in_name() {
 // @internal
 #[test]
 fn test_backup_with_complex_password() {
-    let identity = Identity::create("Test");
+    let identity = Identity::create("Test", 0);
     let complex_password = "Aa1!Bb2@Cc3#Dd4$Ee5%Ff6^Gg7&Hh8*Ii9(Jj0)Kk_Ll+Mm=";
 
     let backup = identity.export_backup(complex_password).unwrap();
-    let restored = Identity::import_backup(&backup, complex_password).unwrap();
+    let restored = Identity::import_backup(&backup, complex_password, 0).unwrap();
 
     assert_eq!(restored.public_id(), identity.public_id());
 }

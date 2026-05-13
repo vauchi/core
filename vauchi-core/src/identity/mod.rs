@@ -75,16 +75,22 @@ impl Identity {
     /// Creates a new identity with the given display name.
     ///
     /// Generates a random master seed and derives all keypairs from it.
-    pub fn create(display_name: &str) -> Self {
+    pub fn create(display_name: &str, now: u64) -> Self {
         // Generate random master seed
         let master_seed: [u8; 32] = random_bytes();
 
-        Self::from_seed(master_seed, normalize_text(display_name))
+        Self::from_seed(master_seed, normalize_text(display_name), now)
     }
 
     /// Creates an identity from an existing seed with default device index 0.
-    fn from_seed(master_seed: [u8; 32], display_name: String) -> Self {
-        Self::from_seed_with_device(master_seed, display_name, 0, "Primary Device".to_string())
+    fn from_seed(master_seed: [u8; 32], display_name: String, now: u64) -> Self {
+        Self::from_seed_with_device(
+            master_seed,
+            display_name,
+            0,
+            "Primary Device".to_string(),
+            now,
+        )
     }
 
     /// Creates an identity from a device link response.
@@ -97,12 +103,14 @@ impl Identity {
         display_name: String,
         device_index: u32,
         device_name: String,
+        now: u64,
     ) -> Self {
         Self::from_seed_with_device(
             master_seed,
             normalize_text(&display_name),
             device_index,
             device_name,
+            now,
         )
     }
 
@@ -112,6 +120,7 @@ impl Identity {
         display_name: String,
         device_index: u32,
         device_name: String,
+        now: u64,
     ) -> Self {
         // Derive signing keypair from master seed
         let signing_keypair = SigningKeyPair::from_seed(&master_seed);
@@ -128,12 +137,7 @@ impl Identity {
         let exchange_public_key = *x3dh.public_key();
 
         // Create device info for this device
-        let device_info = DeviceInfo::derive(
-            &master_seed,
-            device_index,
-            device_name,
-            crate::clock::ambient_now_secs(),
-        );
+        let device_info = DeviceInfo::derive(&master_seed, device_index, device_name, now);
 
         Identity {
             master_seed,
@@ -229,12 +233,12 @@ impl Identity {
     /// This is useful when you need to pass DeviceInfo by value (e.g., to
     /// DeviceSyncOrchestrator) since DeviceInfo doesn't implement Clone
     /// for security reasons.
-    pub fn create_device_info(&self) -> DeviceInfo {
+    pub fn create_device_info(&self, now: u64) -> DeviceInfo {
         DeviceInfo::derive(
             &self.master_seed,
             self.device_info.device_index(),
             self.device_info.device_name().to_string(),
-            crate::clock::ambient_now_secs(),
+            now,
         )
     }
 
@@ -303,8 +307,8 @@ impl Identity {
     }
 
     /// Restores an identity from storage bytes (inverse of `to_storage_bytes`).
-    pub fn from_storage_bytes(data: &[u8]) -> Result<Self, IdentityError> {
-        Self::parse_backup_plaintext(data)
+    pub fn from_storage_bytes(data: &[u8], now: u64) -> Result<Self, IdentityError> {
+        Self::parse_backup_plaintext(data, now)
     }
 
     /// Exports identity as encrypted backup (v2: Argon2id + XChaCha20-Poly1305).
@@ -367,7 +371,11 @@ impl Identity {
     /// mechanism to detect or prevent "identity clones" operating independently.
     /// The restored device also starts with the backup's `device_index`, not a
     /// fresh one, so it can impersonate the original device.
-    pub fn import_backup(backup: &IdentityBackup, password: &str) -> Result<Self, IdentityError> {
+    pub fn import_backup(
+        backup: &IdentityBackup,
+        password: &str,
+        now: u64,
+    ) -> Result<Self, IdentityError> {
         let data = backup.as_bytes();
 
         if data.is_empty() {
@@ -375,7 +383,7 @@ impl Identity {
         }
 
         match data[0] {
-            BACKUP_VERSION_V2 => Self::import_backup_v2(&data[1..], password),
+            BACKUP_VERSION_V2 => Self::import_backup_v2(&data[1..], password, now),
             _ => Err(IdentityError::RestoreFailed),
         }
     }
@@ -383,7 +391,7 @@ impl Identity {
     /// Imports v2 backup (Argon2id + XChaCha20-Poly1305).
     ///
     /// Data format: `salt (16 bytes) || ciphertext`
-    fn import_backup_v2(data: &[u8], password: &str) -> Result<Self, IdentityError> {
+    fn import_backup_v2(data: &[u8], password: &str, now: u64) -> Result<Self, IdentityError> {
         // salt (16) + at least some ciphertext
         if data.len() < 16 + 1 + 24 + 16 + 4 + 32 {
             return Err(IdentityError::RestoreFailed);
@@ -403,11 +411,11 @@ impl Identity {
             decrypt(&decryption_key, &data[16..]).map_err(|_| IdentityError::RestoreFailed)?,
         );
 
-        Self::parse_backup_plaintext(&plaintext)
+        Self::parse_backup_plaintext(&plaintext, now)
     }
 
     /// Parses the decrypted backup plaintext into an Identity.
-    fn parse_backup_plaintext(plaintext: &[u8]) -> Result<Self, IdentityError> {
+    fn parse_backup_plaintext(plaintext: &[u8], now: u64) -> Result<Self, IdentityError> {
         if plaintext.len() < 4 + 32 {
             return Err(IdentityError::RestoreFailed);
         }
@@ -465,6 +473,7 @@ impl Identity {
             display_name,
             device_index,
             device_name,
+            now,
         ))
     }
 }

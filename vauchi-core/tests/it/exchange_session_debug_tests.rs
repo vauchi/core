@@ -18,7 +18,7 @@ use vauchi_core::*;
 // @internal
 #[test]
 fn debug_log_disabled_by_default() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let session = ExchangeSession::new_qr(
         identity,
@@ -33,7 +33,7 @@ fn debug_log_disabled_by_default() {
 // @internal
 #[test]
 fn enable_debug_log_creates_log_with_session_started() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let mut session = ExchangeSession::new_qr(
         identity,
@@ -55,7 +55,7 @@ fn enable_debug_log_creates_log_with_session_started() {
 // @internal
 #[test]
 fn enable_debug_log_nfc_records_transport() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let mut session = ExchangeSession::new_nfc(
         identity,
@@ -76,7 +76,7 @@ fn enable_debug_log_nfc_records_transport() {
 // @internal
 #[test]
 fn enable_debug_log_ble_records_transport() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let mut session = ExchangeSession::new_ble(
         identity,
@@ -99,7 +99,7 @@ fn enable_debug_log_ble_records_transport() {
 // @internal
 #[test]
 fn start_qr_logs_qr_generated() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let mut session = ExchangeSession::new_qr(
         identity,
@@ -123,11 +123,11 @@ fn start_qr_logs_qr_generated() {
 // @internal
 #[test]
 fn process_qr_logs_qr_scanned() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_card = ContactCard::new("Bob");
     let mut bob_session = ExchangeSession::new_qr(
         bob_identity,
@@ -156,8 +156,8 @@ fn process_qr_logs_qr_scanned() {
 // @internal
 #[test]
 fn key_agreement_logs_completion_and_proximity() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_ephemeral = X3DHKeyPair::generate();
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
@@ -212,8 +212,8 @@ fn key_agreement_logs_completion_and_proximity() {
 // @internal
 #[test]
 fn complete_exchange_logs_completed() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let alice_ephemeral = X3DHKeyPair::generate();
@@ -253,7 +253,7 @@ fn complete_exchange_logs_completed() {
 // @internal
 #[test]
 fn fail_event_logs_exchange_failed() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let mut session = ExchangeSession::new_qr(
         identity,
@@ -279,7 +279,7 @@ fn fail_event_logs_exchange_failed() {
 // @internal
 #[test]
 fn enable_debug_log_twice_is_idempotent() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let mut session = ExchangeSession::new_qr(
         identity,
@@ -304,7 +304,7 @@ fn enable_debug_log_twice_is_idempotent() {
 // @internal
 #[test]
 fn no_debug_events_when_log_disabled() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let mut session = ExchangeSession::new_qr(
         identity,
@@ -324,7 +324,7 @@ fn no_debug_events_when_log_disabled() {
 // @internal
 #[test]
 fn debug_log_exports_to_jsonl() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let mut session = ExchangeSession::new_qr(
         identity,

@@ -317,7 +317,9 @@ impl Vauchi {
 
         // Try to load a persisted identity from storage
         let identity = match storage.load_identity() {
-            Ok(Some((bytes, _display_name))) => Identity::from_storage_bytes(&bytes).ok(),
+            Ok(Some((bytes, _display_name))) => {
+                Identity::from_storage_bytes(&bytes, clock.unix_seconds()).ok()
+            }
             _ => None,
         };
 
@@ -412,13 +414,13 @@ impl Vauchi {
 
         let mut orchestrator = crate::sync::DeviceSyncOrchestrator::load(
             &self.storage,
-            identity.create_device_info(),
+            identity.create_device_info(self.clock.unix_seconds()),
             registry.clone(),
         )
         .unwrap_or_else(|_| {
             crate::sync::DeviceSyncOrchestrator::new(
                 &self.storage,
-                identity.create_device_info(),
+                identity.create_device_info(self.clock.unix_seconds()),
                 registry,
             )
         });

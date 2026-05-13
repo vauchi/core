@@ -21,7 +21,7 @@ fn setup_alice_receiving_from_bob() -> (Vauchi, String, Identity, DoubleRatchetS
     let mut alice = Vauchi::in_memory().unwrap();
     alice.create_identity("Alice").unwrap();
 
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_dh = X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 

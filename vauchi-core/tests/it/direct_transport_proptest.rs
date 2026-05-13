@@ -81,7 +81,7 @@ proptest! {
 // @internal
 #[test]
 fn adversarial_empty_direct_payload_rejected() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new(identity.display_name());
     let mut session = ExchangeSession::new_usb(
         identity,
@@ -98,7 +98,7 @@ fn adversarial_empty_direct_payload_rejected() {
 // @internal
 #[test]
 fn adversarial_null_bytes_in_payload_rejected() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new(identity.display_name());
     let mut session = ExchangeSession::new_usb(
         identity,
@@ -117,7 +117,7 @@ fn adversarial_null_bytes_in_payload_rejected() {
 // @internal
 #[test]
 fn adversarial_non_utf8_payload_rejected() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new(identity.display_name());
     let mut session = ExchangeSession::new_usb(
         identity,
@@ -137,7 +137,7 @@ fn adversarial_non_utf8_payload_rejected() {
 // @internal
 #[test]
 fn adversarial_max_length_payload_rejected() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new(identity.display_name());
     let mut session = ExchangeSession::new_usb(
         identity,
@@ -156,7 +156,7 @@ fn adversarial_max_length_payload_rejected() {
 // @internal
 #[test]
 fn adversarial_truncated_valid_payload() {
-    let bob = Identity::create("Bob");
+    let bob = Identity::create("Bob", 0);
     let bob_card = ContactCard::new(bob.display_name());
     let mut bob_session = ExchangeSession::new_usb(
         bob,
@@ -173,7 +173,7 @@ fn adversarial_truncated_valid_payload() {
     };
 
     for truncate_at in [1, 10, 50, valid_payload.len() / 2, valid_payload.len() - 1] {
-        let identity = Identity::create("Alice");
+        let identity = Identity::create("Alice", 0);
         let card = ContactCard::new(identity.display_name());
         let mut session = ExchangeSession::new_usb(
             identity,
@@ -196,7 +196,7 @@ fn adversarial_truncated_valid_payload() {
 // @internal
 #[test]
 fn adversarial_corrupted_valid_payload() {
-    let bob = Identity::create("Bob");
+    let bob = Identity::create("Bob", 0);
     let bob_card = ContactCard::new(bob.display_name());
     let mut bob_session = ExchangeSession::new_usb(
         bob,
@@ -219,7 +219,7 @@ fn adversarial_corrupted_valid_payload() {
         corrupted[pos] ^= 0x20;
     }
 
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new(identity.display_name());
     let mut session = ExchangeSession::new_usb(
         identity,
@@ -236,9 +236,9 @@ fn adversarial_corrupted_valid_payload() {
 // @internal
 #[test]
 fn adversarial_replay_same_payload_twice() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let alice_card = ContactCard::new(alice.display_name());
-    let bob = Identity::create("Bob");
+    let bob = Identity::create("Bob", 0);
     let bob_card = ContactCard::new(bob.display_name());
 
     let mut bob_session = ExchangeSession::new_usb(

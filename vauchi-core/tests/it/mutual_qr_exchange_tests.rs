@@ -24,7 +24,7 @@ use vauchi_core::{ContactCard, Identity};
 // @internal
 #[test]
 fn test_qr_generate_with_ephemeral() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     let qr = ExchangeQR::generate(&identity, &ephemeral);
@@ -49,7 +49,7 @@ fn test_qr_generate_with_ephemeral() {
 // @internal
 #[test]
 fn test_qr_ephemeral_changes_each_call() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let eph1 = X3DHKeyPair::generate();
     let eph2 = X3DHKeyPair::generate();
@@ -76,7 +76,7 @@ fn test_qr_ephemeral_changes_each_call() {
 // @internal
 #[test]
 fn test_qr_ephemeral_roundtrip_via_data_string() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     let qr = ExchangeQR::generate(&identity, &ephemeral);
@@ -97,7 +97,7 @@ fn test_qr_ephemeral_roundtrip_via_data_string() {
 // @internal
 #[test]
 fn test_start_qr_generates_qr() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -126,7 +126,7 @@ fn test_start_qr_generates_qr() {
 // @internal
 #[test]
 fn test_start_qr_rejects_wrong_transport() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -145,8 +145,8 @@ fn test_start_qr_rejects_wrong_transport() {
 // @internal
 #[test]
 fn test_scan_their_qr_transitions() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
@@ -183,8 +183,8 @@ fn test_scan_their_qr_transitions() {
 // @internal
 #[test]
 fn test_scan_rejects_expired() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
@@ -217,7 +217,7 @@ fn test_scan_rejects_expired() {
 // @internal
 #[test]
 fn test_scan_rejects_self_exchange() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
 
     // Generate own QR before moving identity into session
     let own_ephemeral = X3DHKeyPair::generate();
@@ -279,8 +279,8 @@ fn test_key_agreement_symmetric() {
 fn test_full_qr_exchange() {
     use vauchi_core::crypto::{decrypt, encrypt};
 
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");
@@ -409,7 +409,7 @@ fn test_full_qr_exchange() {
 // @internal
 #[test]
 fn test_qr_uses_fresh_ephemeral_not_identity() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
 
     // Capture identity exchange key before moving identity into session
     let identity_exchange: [u8; 32] = alice_identity
@@ -439,7 +439,7 @@ fn test_qr_uses_fresh_ephemeral_not_identity() {
 // @internal
 #[test]
 fn test_they_scanned_requires_peer_scanned_state() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -459,8 +459,8 @@ fn test_they_scanned_requires_peer_scanned_state() {
 // @internal
 #[test]
 fn test_qr_contact_names_correct() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");

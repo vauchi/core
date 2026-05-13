@@ -587,8 +587,11 @@ pub fn build_device_sync_envelopes(
         _ => return Ok(Vec::new()),
     };
 
-    let orchestrator =
-        DeviceSyncOrchestrator::load(storage, identity.create_device_info(), registry)?;
+    let orchestrator = DeviceSyncOrchestrator::load(
+        storage,
+        identity.create_device_info(storage.clock().unix_seconds()),
+        registry,
+    )?;
 
     orchestrator.build_outbound_envelopes(identity)
 }

@@ -49,7 +49,7 @@ fn setup_shred_env() -> (tempfile::TempDir, Storage, MemoryKeyStorage, Identity)
     let db_path = dir.path().join("vauchi.db");
     let storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
     let secure_storage = MemoryKeyStorage::new();
-    let identity = Identity::create("TestUser");
+    let identity = Identity::create("TestUser", 0);
 
     let smk = ShreddingMasterKey::derive_from_seed(&[0x42; 32]);
     secure_storage
@@ -86,7 +86,7 @@ fn test_erasure_blocked_during_grace_period() {
     manager.schedule_deletion().unwrap();
 
     // Execution must be rejected — grace period has not elapsed.
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let result = manager.execute_deletion(&identity);
     assert!(
         result.is_err(),
@@ -131,7 +131,7 @@ fn test_full_erasure_after_grace_period() {
         .schedule_deletion_with_execute_at(1000, 999)
         .unwrap();
 
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let result = manager.execute_deletion(&identity).unwrap();
 
     // One revocation must be generated per contact.

@@ -8,7 +8,7 @@ use vauchi_core::sync::delta::{ReciprocityConfirmPayload, VersionedPayload};
 // @internal
 #[test]
 fn reciprocity_confirm_encode_decode_roundtrip() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let token = [0xAB; 32];
     let recipient_pk = [0xCD; 32];
 
@@ -39,8 +39,8 @@ fn reciprocity_confirm_encode_decode_roundtrip() {
 // @internal
 #[test]
 fn reciprocity_confirm_rejects_wrong_signature() {
-    let identity_a = Identity::create("Alice");
-    let identity_b = Identity::create("Bob");
+    let identity_a = Identity::create("Alice", 0);
+    let identity_b = Identity::create("Bob", 0);
     let token = [0xAB; 32];
     let recipient_pk = [0xCD; 32];
 
@@ -62,7 +62,7 @@ fn reciprocity_confirm_rejects_wrong_signature() {
 // @internal
 #[test]
 fn reciprocity_confirm_rejects_wrong_recipient() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let token = [0xAB; 32];
     let recipient_pk = [0xCD; 32];
     let wrong_recipient = [0xEF; 32];

@@ -32,7 +32,7 @@ fn create_test_vauchi() -> Vauchi {
 }
 
 fn create_exchanged_contact(name: &str) -> Contact {
-    let identity = Identity::create(name);
+    let identity = Identity::create(name, 0);
     Contact::from_exchange(
         *identity.signing_public_key(),
         ContactCard::new(name),

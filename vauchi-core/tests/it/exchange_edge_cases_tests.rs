@@ -34,8 +34,8 @@ fn mock_proximity() -> MockProximityVerifier {
 ///
 /// Creates fresh identities internally since `Identity` is not `Clone`.
 fn advance_to_card_exchange() -> (ExchangeSession, ExchangeSession) {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let mut alice = ExchangeSession::new_qr(
         alice_identity,
@@ -85,7 +85,7 @@ fn advance_to_card_exchange() -> (ExchangeSession, ExchangeSession) {
 // @internal
 #[test]
 fn test_self_exchange_rejected() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
 
     let mut session = ExchangeSession::new_qr(
         alice,
@@ -111,8 +111,8 @@ fn test_self_exchange_rejected() {
 // @internal
 #[test]
 fn test_different_identity_exchange_succeeds() {
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
 
     // Alice generates QR
     let mut alice_session = ExchangeSession::new_qr(
@@ -150,7 +150,7 @@ fn test_different_identity_exchange_succeeds() {
 // @internal
 #[test]
 fn test_qr_expiration() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     // Fresh QR should not be expired
@@ -163,8 +163,8 @@ fn test_qr_expiration() {
 // @internal
 #[test]
 fn test_expired_qr_rejected_on_process() {
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     // Create an expired QR (6 minutes ago)
@@ -204,8 +204,8 @@ fn test_expired_qr_rejected_on_process() {
 // @internal
 #[test]
 fn test_duplicate_contact_detection() {
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
 
     // Alice generates QR
     let mut alice_session = ExchangeSession::new_qr(
@@ -248,9 +248,9 @@ fn test_duplicate_contact_detection() {
 // @internal
 #[test]
 fn test_no_duplicate_for_new_contact() {
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
-    let charlie = Identity::create("Charlie");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
+    let charlie = Identity::create("Charlie", 0);
 
     // Bob already has Charlie, not Alice
     let existing_charlie = vauchi_core::Contact::from_exchange(
@@ -298,7 +298,7 @@ fn test_no_duplicate_for_new_contact() {
 // @internal
 #[test]
 fn test_session_timeout_detection() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -316,7 +316,7 @@ fn test_session_timeout_detection() {
 // @internal
 #[test]
 fn test_interrupted_session_resumable() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let mut session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -342,8 +342,8 @@ fn test_interrupted_session_resumable() {
 // @internal
 #[test]
 fn test_cannot_process_qr_from_idle() {
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
     let ephemeral = X3DHKeyPair::generate();
 
     // Generate a QR from Bob for Alice to scan
@@ -368,7 +368,7 @@ fn test_cannot_process_qr_from_idle() {
 // @internal
 #[test]
 fn test_cannot_start_qr_twice() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let mut session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -390,7 +390,7 @@ fn test_cannot_start_qr_twice() {
 // @internal
 #[test]
 fn test_cannot_key_agreement_from_idle() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let mut session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -409,7 +409,7 @@ fn test_cannot_key_agreement_from_idle() {
 // @internal
 #[test]
 fn test_cannot_complete_exchange_from_idle() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let mut session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -428,7 +428,7 @@ fn test_cannot_complete_exchange_from_idle() {
 // @internal
 #[test]
 fn test_cannot_they_scanned_from_displaying_qr() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let mut session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -448,8 +448,8 @@ fn test_cannot_they_scanned_from_displaying_qr() {
 // @internal
 #[test]
 fn test_cannot_process_qr_from_peer_scanned() {
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
 
     let mut alice_session = ExchangeSession::new_qr(
         alice,
@@ -493,7 +493,7 @@ fn test_cannot_process_qr_from_peer_scanned() {
 // @internal
 #[test]
 fn test_our_card_accessible() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice Card");
     let session = ExchangeSession::new_qr(
         alice,
@@ -513,7 +513,7 @@ fn test_our_card_accessible() {
 // @internal
 #[test]
 fn test_qr_signature_valid() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let mut session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -539,8 +539,8 @@ fn test_qr_signature_valid() {
 // @internal
 #[test]
 fn test_valid_signature_accepted() {
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
 
     let mut alice_session = ExchangeSession::new_qr(
         alice,
@@ -579,7 +579,7 @@ fn test_valid_signature_accepted() {
 // @internal
 #[test]
 fn test_qr_reuse_detected() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let mut session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -604,7 +604,7 @@ fn test_qr_reuse_detected() {
 // @internal
 #[test]
 fn test_different_qr_hashes_independent() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let mut session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -667,7 +667,7 @@ fn test_complete_exchange_flow() {
 // @internal
 #[test]
 fn test_explicit_fail_from_idle() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let mut session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -686,7 +686,7 @@ fn test_explicit_fail_from_idle() {
 // @internal
 #[test]
 fn test_explicit_fail_from_displaying_qr() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let mut session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -710,7 +710,7 @@ fn test_explicit_fail_from_displaying_qr() {
 // @internal
 #[test]
 fn test_qr_events_rejected_on_nfc_transport() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let mut nfc_session = ExchangeSession::new_nfc(
         alice,
         ContactCard::new("Alice"),
@@ -730,7 +730,7 @@ fn test_qr_events_rejected_on_nfc_transport() {
 // @internal
 #[test]
 fn test_qr_events_rejected_on_ble_transport() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let mut ble_session = ExchangeSession::new_ble(
         alice,
         ContactCard::new("Alice"),
@@ -754,7 +754,7 @@ fn test_qr_events_rejected_on_ble_transport() {
 // @internal
 #[test]
 fn test_our_exchange_public_key_accessible() {
-    let alice = Identity::create("Alice");
+    let alice = Identity::create("Alice", 0);
     let session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),

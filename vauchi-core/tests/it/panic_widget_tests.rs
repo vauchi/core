@@ -34,7 +34,7 @@ fn setup_widget_test_env() -> (tempfile::TempDir, MemoryKeyStorage) {
     drop(storage); // Close the connection
 
     // Create identity file
-    let identity = Identity::create("WidgetTestUser");
+    let identity = Identity::create("WidgetTestUser", 0);
     std::fs::write(
         dir.path().join("identity.json"),
         b"test identity data for widget",

@@ -46,7 +46,7 @@ fn add_own_fields(vauchi: &Vauchi, field_count: usize) -> Vec<String> {
 
 /// Add a contact and return its ID.
 fn add_contact(vauchi: &Vauchi, name: &str) -> String {
-    let identity = Identity::create(name);
+    let identity = Identity::create(name, 0);
     let contact = Contact::from_exchange(
         *identity.signing_public_key(),
         ContactCard::new(name),

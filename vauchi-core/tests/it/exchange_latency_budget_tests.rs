@@ -89,8 +89,8 @@ fn render_qr_bitmap(data: &str, size: u32, margin: u32) -> (u32, Vec<u8>) {
 // @scenario: contact_exchange :: Exchange completes under MVP latency budget
 #[test]
 fn d5_exchange_latency_algorithmic_core_under_budget() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");
 

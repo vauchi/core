@@ -144,8 +144,8 @@ fn create_voucher_from_claim_b64_signs_and_returns_decodable_voucher() {
     // identity (also different).
     let helper = vauchi_with_identity("Bob");
 
-    let alice_old = Identity::create("Alice-Old");
-    let alice_new = Identity::create("Alice-New");
+    let alice_old = Identity::create("Alice-Old", 0);
+    let alice_new = Identity::create("Alice-New", 0);
     let claim = RecoveryClaim::new(
         alice_old.signing_public_key(),
         alice_new.signing_public_key(),

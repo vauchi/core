@@ -76,14 +76,14 @@ fn test_device_linking_via_backup() {
     use vauchi_core::identity::Identity;
 
     // Device A: Create identity
-    let device_a = Identity::create("Alice");
+    let device_a = Identity::create("Alice", 0);
     let password = "SecureP@ssw0rd123!";
 
     // Device A: Export backup
     let backup = device_a.export_backup(password).unwrap();
 
     // Device B: Import backup
-    let device_b = Identity::import_backup(&backup, password).unwrap();
+    let device_b = Identity::import_backup(&backup, password, 0).unwrap();
 
     // Both devices should share the same identity (same public ID)
     assert_eq!(

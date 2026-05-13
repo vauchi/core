@@ -10,7 +10,7 @@ use vauchi_core::*;
 // @scenario: identity_management :: Create new identity on first launch
 #[test]
 fn test_create_identity() {
-    let identity = Identity::create("Test User");
+    let identity = Identity::create("Test User", 0);
     assert_eq!(identity.display_name(), "Test User");
 }
 
@@ -18,17 +18,17 @@ fn test_create_identity() {
 // @scenario: identity_management :: Restore identity from backup
 #[test]
 fn test_backup_restore_roundtrip() {
-    let original = Identity::create("Alice");
+    let original = Identity::create("Alice", 0);
     let password = "correct-horse-battery-staple";
     let backup = original.export_backup(password).unwrap();
-    let restored = Identity::import_backup(&backup, password).unwrap();
+    let restored = Identity::import_backup(&backup, password, 0).unwrap();
     assert_eq!(original.public_id(), restored.public_id());
 }
 
 // @scenario: identity_management :: Create new identity on first launch
 #[test]
 fn test_identity_has_device_info() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     assert_eq!(identity.device_index(), 0);
     assert_eq!(identity.device_info().device_name(), "Primary Device");
 }
@@ -38,12 +38,17 @@ fn test_identity_has_device_info() {
 fn test_backup_restore_preserves_device_info() {
     // Create identity with custom device info using public from_device_link
     let master_seed = [0x42u8; 32];
-    let original =
-        Identity::from_device_link(master_seed, "Alice".to_string(), 3, "My Phone".to_string());
+    let original = Identity::from_device_link(
+        master_seed,
+        "Alice".to_string(),
+        3,
+        "My Phone".to_string(),
+        0,
+    );
 
     let password = "correct-horse-battery-staple";
     let backup = original.export_backup(password).unwrap();
-    let restored = Identity::import_backup(&backup, password).unwrap();
+    let restored = Identity::import_backup(&backup, password, 0).unwrap();
 
     assert_eq!(restored.device_index(), 3);
     assert_eq!(restored.device_info().device_name(), "My Phone");
@@ -53,8 +58,8 @@ fn test_backup_restore_preserves_device_info() {
 // @scenario: identity_management :: Create new identity on first launch
 #[test]
 fn test_device_id_deterministic() {
-    let identity1 = Identity::create("Alice");
-    let identity2 = Identity::create("Bob");
+    let identity1 = Identity::create("Alice", 0);
+    let identity2 = Identity::create("Bob", 0);
 
     // Different identities have different device IDs
     assert_ne!(identity1.device_id(), identity2.device_id());
@@ -62,7 +67,7 @@ fn test_device_id_deterministic() {
 
 /// Tracker #235: Master seed entropy validation — uniqueness.
 ///
-/// Verifies that `Identity::create()` produces cryptographically unique
+/// Verifies that `Identity::create(, 0)` produces cryptographically unique
 /// identities. Since the master seed is private, we verify indirectly via
 /// the derived signing public key (deterministically derived from seed via
 /// HKDF). Two identical public keys would mean identical seeds, which would
@@ -72,7 +77,7 @@ fn test_device_id_deterministic() {
 fn test_identity_create_produces_unique_keys() {
     let mut public_keys: Vec<[u8; 32]> = Vec::with_capacity(20);
     for i in 0..20 {
-        let identity = Identity::create(&format!("User{}", i));
+        let identity = Identity::create(&format!("User{}", i), 0);
         let pk = *identity.signing_public_key();
         public_keys.push(pk);
     }
@@ -97,7 +102,7 @@ fn test_identity_create_produces_unique_keys() {
 // @scenario: identity_management :: Create new identity on first launch
 #[test]
 fn test_identity_keys_not_degenerate() {
-    let identity = Identity::create("Entropy Test");
+    let identity = Identity::create("Entropy Test", 0);
 
     // Signing public key must not be all zeros
     let spk = identity.signing_public_key();

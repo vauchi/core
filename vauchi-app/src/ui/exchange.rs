@@ -1496,7 +1496,10 @@ mod tests {
     // ── ADR-031: ExchangeSession integration tests ──────────────────
 
     fn create_test_session() -> vauchi_core::exchange::ExchangeSession {
-        let identity = vauchi_core::identity::Identity::create("TestUser");
+        let identity = vauchi_core::identity::Identity::create(
+            "TestUser",
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
         let card = vauchi_core::contact_card::ContactCard::new("TestUser");
         let proximity = vauchi_core::exchange::ManualConfirmationVerifier::new();
         vauchi_core::exchange::ExchangeSession::new_qr(
@@ -1669,7 +1672,10 @@ mod tests {
     /// Helper: create two sessions (Alice and Bob) and return Alice's engine
     /// plus Bob's QR data string (what Alice would scan).
     fn create_alice_engine_and_bob_qr() -> (ExchangeEngine, String) {
-        let alice_identity = vauchi_core::identity::Identity::create("Alice");
+        let alice_identity = vauchi_core::identity::Identity::create(
+            "Alice",
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
         let alice_card = vauchi_core::contact_card::ContactCard::new("Alice");
         let alice_proximity = vauchi_core::exchange::ManualConfirmationVerifier::new();
         let alice_session = vauchi_core::exchange::ExchangeSession::new_qr(
@@ -1679,7 +1685,10 @@ mod tests {
             vauchi_core::clock::SystemClock::shared(),
         );
 
-        let bob_identity = vauchi_core::identity::Identity::create("Bob");
+        let bob_identity = vauchi_core::identity::Identity::create(
+            "Bob",
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
         let bob_card = vauchi_core::contact_card::ContactCard::new("Bob");
         let bob_proximity = vauchi_core::exchange::ManualConfirmationVerifier::new();
         let mut bob_session = vauchi_core::exchange::ExchangeSession::new_qr(
@@ -2919,7 +2928,10 @@ mod tests {
             mode: Some(ExchangeMode::Cable),
             ..config_no_groups()
         };
-        let identity = Identity::create("Test");
+        let identity = Identity::create(
+            "Test",
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
         let card = ContactCard::new("Test");
         let verifier = ManualConfirmationVerifier::new();
         let session = ExchangeSession::new_usb(

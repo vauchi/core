@@ -306,7 +306,7 @@ fn exchange_success_status_indicator_has_a11y() {
 // @internal
 #[test]
 fn with_session_auto_enables_debug_log() {
-    let identity = vauchi_core::identity::Identity::create("Alice");
+    let identity = vauchi_core::identity::Identity::create("Alice", 0);
     let card = vauchi_core::contact_card::ContactCard::new("Alice");
     let proximity = vauchi_core::exchange::MockProximityVerifier::success();
     let session = vauchi_core::exchange::ExchangeSession::new_qr(

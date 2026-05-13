@@ -27,7 +27,7 @@ fn setup_alice_with_bob_ratchet() -> (Vauchi, String, Identity, X3DHKeyPair, Sym
     let mut alice = create_test_vauchi();
     alice.create_identity("Alice").unwrap();
 
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_dh = X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 

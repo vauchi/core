@@ -19,7 +19,7 @@ use vauchi_core::{Command, Event};
 // −− Helpers −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 
 fn qr_session(name: &str) -> ExchangeSession {
-    let identity = Identity::create(name);
+    let identity = Identity::create(name, 0);
     let card = ContactCard::new(name);
     let proximity = ManualConfirmationVerifier::new();
     ExchangeSession::new_qr(
@@ -31,7 +31,7 @@ fn qr_session(name: &str) -> ExchangeSession {
 }
 
 fn nfc_session(name: &str) -> ExchangeSession {
-    let identity = Identity::create(name);
+    let identity = Identity::create(name, 0);
     let card = ContactCard::new(name);
     let proximity = ManualConfirmationVerifier::new();
     ExchangeSession::new_nfc(
@@ -43,7 +43,7 @@ fn nfc_session(name: &str) -> ExchangeSession {
 }
 
 fn ble_session(name: &str) -> ExchangeSession {
-    let identity = Identity::create(name);
+    let identity = Identity::create(name, 0);
     let card = ContactCard::new(name);
     let proximity = ManualConfirmationVerifier::new();
     ExchangeSession::new_ble(

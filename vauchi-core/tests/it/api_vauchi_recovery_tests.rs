@@ -143,7 +143,7 @@ fn add_recovery_voucher_appends_to_existing_progress() {
     let claim = wb.create_recovery_claim(&[3u8; 32]).unwrap();
 
     // Sign a real voucher with a separate helper identity.
-    let helper = Identity::create("Bob");
+    let helper = Identity::create("Bob", 0);
     let voucher = build_voucher(&claim, &helper);
     let voucher_bytes = voucher.to_bytes();
 
@@ -163,7 +163,7 @@ fn add_recovery_voucher_errors_when_no_progress_in_flight() {
     let wb = vauchi_with_identity("Alice");
 
     let claim = RecoveryClaim::new(&[4u8; 32], wb.identity().unwrap().signing_public_key());
-    let helper = Identity::create("Bob");
+    let helper = Identity::create("Bob", 0);
     let voucher = build_voucher(&claim, &helper);
 
     let err = wb.add_recovery_voucher(&voucher.to_bytes()).unwrap_err();
@@ -197,7 +197,7 @@ fn add_recovery_voucher_accumulates_across_helpers() {
     let claim = wb.create_recovery_claim(&[6u8; 32]).unwrap();
 
     for name in ["Bob", "Carol", "Dave"] {
-        let helper = Identity::create(name);
+        let helper = Identity::create(name, 0);
         let voucher = build_voucher(&claim, &helper);
         wb.add_recovery_voucher(&voucher.to_bytes()).unwrap();
     }

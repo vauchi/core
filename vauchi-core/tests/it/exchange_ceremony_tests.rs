@@ -25,8 +25,8 @@ use vauchi_core::{ContactCard, Identity};
 // @internal
 #[test]
 fn test_qr_ceremony_shared_keys_match_and_encrypt() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");
@@ -244,8 +244,8 @@ fn test_independent_sessions_produce_different_secrets() {
     let bob_card = ContactCard::new("Bob");
 
     // --- QR session 1 ---
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let qr_alice_proximity = MockProximityVerifier::success();
     let mut qr_alice = ExchangeSession::new_qr(
@@ -285,8 +285,8 @@ fn test_independent_sessions_produce_different_secrets() {
     };
 
     // --- QR session 2 (separate identities, fresh ephemerals) ---
-    let alice_identity2 = Identity::create("Alice");
-    let bob_identity2 = Identity::create("Bob");
+    let alice_identity2 = Identity::create("Alice", 0);
+    let bob_identity2 = Identity::create("Bob", 0);
 
     let qr2_alice_proximity = MockProximityVerifier::success();
     let mut qr2_alice = ExchangeSession::new_qr(
@@ -384,9 +384,9 @@ fn test_encrypted_message_secret_matches_raw_x3dh() {
 // @internal
 #[test]
 fn test_transcript_binding_includes_identity_keys() {
-    let identity_a = Identity::create("Alice-A");
-    let identity_b = Identity::create("Alice-B");
-    let bob_identity = Identity::create("Bob");
+    let identity_a = Identity::create("Alice-A", 0);
+    let identity_b = Identity::create("Alice-B", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     // Use the same ephemeral X3DH keypair for both sessions
     let fixed_x3dh_seed = [0x42u8; 32];
@@ -463,9 +463,9 @@ fn test_transcript_binding_includes_identity_keys() {
 // @internal
 #[test]
 fn test_transcript_binding_includes_ephemeral_keys() {
-    let alice_identity_1 = Identity::create("Alice");
-    let alice_identity_2 = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity_1 = Identity::create("Alice", 0);
+    let alice_identity_2 = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     // Different ephemeral keys
     let x3dh_1 = X3DHKeyPair::from_bytes([0x01u8; 32]);

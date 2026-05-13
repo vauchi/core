@@ -23,9 +23,9 @@ use vauchi_core::exchange::{
 
 /// Runs a full QR exchange ceremony and returns the contact from Bob's perspective.
 fn run_full_qr_exchange_with_mock() -> Contact {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
@@ -61,9 +61,9 @@ fn run_full_qr_exchange_with_mock() -> Contact {
 
 /// Runs a full QR exchange using a VerifierChain with ManualConfirmation.
 fn run_full_qr_exchange_with_verifier_chain() -> Contact {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
@@ -249,8 +249,8 @@ fn test_transport_proximity_strength() {
 // @scenario: contact_exchange :: Both sides of a mutual QR exchange get trust metrics
 #[test]
 fn test_mutual_qr_exchange_both_sides_have_trust_metrics() {
-    let alice_id = Identity::create("Alice");
-    let bob_id = Identity::create("Bob");
+    let alice_id = Identity::create("Alice", 0);
+    let bob_id = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");

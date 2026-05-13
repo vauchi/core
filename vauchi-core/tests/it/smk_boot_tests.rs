@@ -30,7 +30,7 @@ fn open_storage_with_key(key: SymmetricKey) -> (tempfile::TempDir, Storage) {
 // @internal
 #[test]
 fn test_identity_derive_smk_is_deterministic() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let smk1 = identity.derive_smk();
     let smk2 = identity.derive_smk();
     assert_eq!(smk1.as_bytes(), smk2.as_bytes());
@@ -39,8 +39,8 @@ fn test_identity_derive_smk_is_deterministic() {
 // @internal
 #[test]
 fn test_identity_derive_smk_differs_between_identities() {
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
     let smk_alice = alice.derive_smk();
     let smk_bob = bob.derive_smk();
     assert_ne!(smk_alice.as_bytes(), smk_bob.as_bytes());
@@ -52,7 +52,7 @@ fn test_identity_derive_smk_differs_between_identities() {
 // @internal
 #[test]
 fn test_smk_stored_and_loaded_from_secure_storage() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let smk = identity.derive_smk();
 
     // Store SMK in SecureStorage
@@ -75,7 +75,7 @@ fn test_smk_stored_and_loaded_from_secure_storage() {
 // @internal
 #[test]
 fn test_boot_with_smk_derived_sek_opens_storage() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let smk = identity.derive_smk();
     let sek = smk.derive_sek();
 
@@ -120,7 +120,7 @@ fn test_migrate_old_key_to_smk_preserves_data() {
     }
 
     // Step 2: Open with old key, migrate to SMK
-    let identity = Identity::create("MigrationUser");
+    let identity = Identity::create("MigrationUser", 0);
     let smk = identity.derive_smk();
     let sek = smk.derive_sek();
 
@@ -155,7 +155,7 @@ fn test_migrate_smk_stored_before_rekey_for_safety() {
     storage.save_own_card(&card).unwrap();
     drop(storage);
 
-    let identity = Identity::create("SafetyTest");
+    let identity = Identity::create("SafetyTest", 0);
     let smk = identity.derive_smk();
     let secure = Arc::new(MemoryKeyStorage::new());
 
@@ -213,7 +213,7 @@ fn test_after_migration_old_key_cannot_decrypt() {
 // @internal
 #[test]
 fn test_smk_destruction_makes_data_irrecoverable() {
-    let identity = Identity::create("ShredTest");
+    let identity = Identity::create("ShredTest", 0);
     let smk = identity.derive_smk();
     let sek = smk.derive_sek();
 
@@ -320,7 +320,7 @@ fn test_vauchi_migrate_existing_to_smk() {
     // Step 2: Upgrade — open with old key, load identity, trigger migration
     // In practice, the app reconstructs Identity from backup (password/biometric)
     // Here we simulate by creating an identity and using it for SMK derivation.
-    let identity = Identity::create("MigrateMe");
+    let identity = Identity::create("MigrateMe", 0);
     let secure = Arc::new(MemoryKeyStorage::new());
     {
         let config = VauchiConfig::with_storage_path(&db_path).with_storage_key(old_key);

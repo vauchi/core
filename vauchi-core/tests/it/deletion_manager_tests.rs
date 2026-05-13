@@ -55,7 +55,7 @@ fn make_legacy_contact(pk: [u8; 32], name: &str) -> Contact {
 #[test]
 fn test_execute_deletion_returns_revocations_for_all_contacts() {
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let bob = make_contact_with_cek([0xBB; 32], "Bob");
     let carol = make_contact_with_cek([0xCC; 32], "Carol");
@@ -74,7 +74,7 @@ fn test_execute_deletion_returns_revocations_for_all_contacts() {
 #[test]
 fn test_execute_deletion_revocations_have_correct_sender_id() {
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let bob = make_contact_with_cek([0xBB; 32], "Bob");
     storage.save_contact(&bob).unwrap();
@@ -94,7 +94,7 @@ fn test_execute_deletion_revocations_have_correct_sender_id() {
 #[test]
 fn test_execute_deletion_revocations_have_correct_recipient_ids() {
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let bob = make_contact_with_cek([0xBB; 32], "Bob");
     let carol = make_contact_with_cek([0xCC; 32], "Carol");
@@ -121,7 +121,7 @@ fn test_execute_deletion_revocations_have_correct_recipient_ids() {
 #[test]
 fn test_execute_deletion_revocations_verify_with_identity() {
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let bob = make_contact_with_cek([0xBB; 32], "Bob");
     storage.save_contact(&bob).unwrap();
@@ -145,7 +145,7 @@ fn test_execute_deletion_revocations_verify_with_identity() {
 #[test]
 fn test_execute_deletion_shreds_all_ceks() {
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let bob = make_contact_with_cek([0xBB; 32], "Bob");
     let carol = make_contact_with_cek([0xCC; 32], "Carol");
@@ -185,7 +185,7 @@ fn test_execute_deletion_contacts_still_exist_after_shredding() {
     // Contacts remain in DB (DB deletion is a separate step)
     // but their card data is unreadable because CEK is shredded
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let bob = make_contact_with_cek([0xBB; 32], "Bob");
     let bob_id = bob.id().to_string();
@@ -212,7 +212,7 @@ fn test_execute_deletion_contacts_still_exist_after_shredding() {
 #[test]
 fn test_execute_deletion_still_requires_grace_period() {
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let manager = DeletionManager::new(&storage);
     manager
@@ -227,7 +227,7 @@ fn test_execute_deletion_still_requires_grace_period() {
 #[test]
 fn test_execute_deletion_marks_state_as_executed() {
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let manager = DeletionManager::new(&storage);
     manager.schedule_deletion_with_execute_at(0, 0).unwrap();
@@ -241,7 +241,7 @@ fn test_execute_deletion_marks_state_as_executed() {
 #[test]
 fn test_execute_deletion_requires_scheduled_state() {
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let manager = DeletionManager::new(&storage);
     // Don't schedule deletion
@@ -257,7 +257,7 @@ fn test_execute_deletion_requires_scheduled_state() {
 #[test]
 fn test_execute_deletion_no_contacts_returns_empty_revocations() {
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let manager = DeletionManager::new(&storage);
     manager.schedule_deletion_with_execute_at(0, 0).unwrap();
@@ -271,7 +271,7 @@ fn test_execute_deletion_no_contacts_returns_empty_revocations() {
 fn test_execute_deletion_legacy_contacts_get_revocations() {
     // Legacy contacts (no CEK) should still get revocation messages
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let bob = make_legacy_contact([0xBB; 32], "Bob");
     storage.save_contact(&bob).unwrap();
@@ -287,7 +287,7 @@ fn test_execute_deletion_legacy_contacts_get_revocations() {
 #[test]
 fn test_execute_deletion_mixed_cek_and_legacy_contacts() {
     let storage = test_storage();
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let bob = make_contact_with_cek([0xBB; 32], "Bob");
     let carol = make_legacy_contact([0xCC; 32], "Carol");

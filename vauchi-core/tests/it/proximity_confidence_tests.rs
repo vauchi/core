@@ -93,7 +93,7 @@ fn test_proximity_confidence_deserialize_missing_defaults_to_unknown() {
 // @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_proximity_confidence_stored_on_contact() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let shared_key = crypto::SymmetricKey::generate();
 
@@ -108,7 +108,7 @@ fn test_proximity_confidence_stored_on_contact() {
 // @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_contact_with_proximity_confidence() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let shared_key = crypto::SymmetricKey::generate();
 
@@ -125,7 +125,7 @@ fn test_contact_with_proximity_confidence() {
 // @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_legacy_contact_has_unknown_confidence() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let shared_key = crypto::SymmetricKey::generate();
     let visibility_rules = contact::VisibilityRules::new();
@@ -148,7 +148,7 @@ fn test_legacy_contact_has_unknown_confidence() {
 // @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_contact_set_proximity_confidence() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let shared_key = crypto::SymmetricKey::generate();
 
@@ -185,9 +185,9 @@ fn test_proximity_check_completed_event_exists() {
 // @scenario: contact_exchange :: Successful QR code exchange with proximity
 #[test]
 fn test_exchange_with_proximity_sets_high_confidence() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
@@ -228,9 +228,9 @@ fn test_exchange_with_proximity_sets_high_confidence() {
 // @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_exchange_without_proximity_sets_low_confidence() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
@@ -271,9 +271,9 @@ fn test_exchange_without_proximity_sets_low_confidence() {
 // @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_exchange_proximity_timeout_sets_low_confidence() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
@@ -314,9 +314,9 @@ fn test_exchange_proximity_timeout_sets_low_confidence() {
 // @scenario: contact_exchange :: Manual proximity confirmation
 #[test]
 fn test_manual_confirmation_sets_medium_confidence() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
@@ -360,9 +360,9 @@ fn test_manual_confirmation_sets_medium_confidence() {
 // @scenario: contact_exchange :: Proximity verification session binding
 #[test]
 fn test_session_stores_audio_challenge_from_qr() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
     let expected_challenge = *alice_qr.audio_challenge();
@@ -394,9 +394,9 @@ fn test_session_stores_audio_challenge_from_qr() {
 // @scenario: contact_exchange :: Proximity verification session binding
 #[test]
 fn test_stored_audio_challenge_is_not_zeros() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
@@ -426,9 +426,9 @@ fn test_stored_audio_challenge_is_not_zeros() {
 // @scenario: contact_exchange :: Proximity verification session binding
 #[test]
 fn test_proximity_check_uses_qr_challenge_not_zeros() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
     let expected_challenge = *alice_qr.audio_challenge();
@@ -472,9 +472,9 @@ fn test_proximity_check_uses_qr_challenge_not_zeros() {
 // @scenario: contact_exchange :: Proximity auto-verification during exchange
 #[test]
 fn test_key_agreement_auto_runs_proximity_check_high() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
@@ -519,9 +519,9 @@ fn test_key_agreement_auto_runs_proximity_check_high() {
 // @scenario: contact_exchange :: Proximity auto-verification during exchange
 #[test]
 fn test_key_agreement_auto_runs_proximity_check_medium() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
@@ -566,9 +566,9 @@ fn test_key_agreement_auto_runs_proximity_check_medium() {
 // @scenario: contact_exchange :: Proximity auto-verification during exchange
 #[test]
 fn test_key_agreement_auto_runs_proximity_check_low_on_failure() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
@@ -637,7 +637,7 @@ fn test_manual_verifier_confidence_is_medium() {
 // @scenario: contact_exchange :: Proximity verification prevents remote exchange
 #[test]
 fn test_complete_exchange_stores_proximity_confidence() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let shared_key = crypto::SymmetricKey::generate();
 

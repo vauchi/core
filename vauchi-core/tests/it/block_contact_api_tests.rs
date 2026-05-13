@@ -18,7 +18,7 @@ fn create_test_vauchi() -> Vauchi {
 }
 
 fn create_contact(name: &str) -> Contact {
-    let identity = Identity::create(name);
+    let identity = Identity::create(name, 0);
     Contact::from_exchange(
         *identity.signing_public_key(),
         ContactCard::new(name),
@@ -158,7 +158,7 @@ fn test_blocked_contact_update_rejected() {
     let mut alice = create_test_vauchi();
     alice.create_identity("Alice").unwrap();
 
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_dh = X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
@@ -219,8 +219,8 @@ fn test_propagate_skips_blocked_contacts() {
     alice.create_identity("Alice").unwrap();
 
     // Add Bob (will be blocked) and Carol (will remain unblocked)
-    let bob_identity = Identity::create("Bob");
-    let carol_identity = Identity::create("Carol");
+    let bob_identity = Identity::create("Bob", 0);
+    let carol_identity = Identity::create("Carol", 0);
     let shared = SymmetricKey::generate();
 
     let bob = Contact::from_exchange(

@@ -282,7 +282,10 @@ mod tests {
     use super::*;
 
     fn make_identity() -> Identity {
-        Identity::create("Test")
+        Identity::create(
+            "Test",
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
     }
 
     #[test]
@@ -307,8 +310,20 @@ mod tests {
 
     #[test]
     fn test_full_handshake_via_mobile_api() {
-        let alice = create_nfc_initiator_test(Identity::create("Alice"), "Alice".into());
-        let bob = create_nfc_responder_test(Identity::create("Bob"), "Bob".into());
+        let alice = create_nfc_initiator_test(
+            Identity::create(
+                "Alice",
+                vauchi_core::clock::SystemClock::shared().unix_seconds(),
+            ),
+            "Alice".into(),
+        );
+        let bob = create_nfc_responder_test(
+            Identity::create(
+                "Bob",
+                vauchi_core::clock::SystemClock::shared().unix_seconds(),
+            ),
+            "Bob".into(),
+        );
 
         // Phase 1: Alice creates key offer
         let offer = alice.create_key_offer().unwrap();
@@ -338,8 +353,20 @@ mod tests {
 
     #[test]
     fn test_relay_fallback_from_mobile() {
-        let alice = create_nfc_initiator_test(Identity::create("Alice"), "Alice".into());
-        let bob = create_nfc_responder_test(Identity::create("Bob"), "Bob".into());
+        let alice = create_nfc_initiator_test(
+            Identity::create(
+                "Alice",
+                vauchi_core::clock::SystemClock::shared().unix_seconds(),
+            ),
+            "Alice".into(),
+        );
+        let bob = create_nfc_responder_test(
+            Identity::create(
+                "Bob",
+                vauchi_core::clock::SystemClock::shared().unix_seconds(),
+            ),
+            "Bob".into(),
+        );
 
         let offer = alice.create_key_offer().unwrap();
         let _ack_result = bob.process_key_offer(offer).unwrap();

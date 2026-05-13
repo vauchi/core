@@ -208,7 +208,7 @@ fn test_delta_roundtrip() {
 // @internal
 #[test]
 fn test_delta_sign_and_verify() {
-    let identity = Identity::create("Test User");
+    let identity = Identity::create("Test User", 0);
 
     let old = ContactCard::new("Alice");
     let new = ContactCard::new("Alice Smith");
@@ -221,7 +221,7 @@ fn test_delta_sign_and_verify() {
     assert!(delta.verify(identity.signing_public_key(), recipient_pk));
 
     // Verify with wrong sender key should fail
-    let other_identity = Identity::create("Other User");
+    let other_identity = Identity::create("Other User", 0);
     assert!(!delta.verify(other_identity.signing_public_key(), recipient_pk));
 
     // Verify with wrong recipient key should fail (prevents delta forwarding)
@@ -236,9 +236,9 @@ fn test_delta_sign_and_verify() {
 // @internal
 #[test]
 fn test_delta_signature_binds_sender_and_recipient() {
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
-    let carol = Identity::create("Carol");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
+    let carol = Identity::create("Carol", 0);
 
     let old = ContactCard::new("Alice");
     let new = ContactCard::new("Alice Updated");
@@ -585,7 +585,7 @@ fn test_filter_with_handles_added_and_removed() {
 // @internal
 #[test]
 fn test_unsigned_delta_rejected_by_verify() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
 
     let old = ContactCard::new("Alice");
     let new = ContactCard::new("Alice Updated");

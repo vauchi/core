@@ -12,8 +12,8 @@ use vauchi_core::identity::Identity;
 /// Drives two sessions through a full mutual QR exchange up to key agreement.
 /// Returns (session_a, session_b).
 fn drive_mutual_qr_exchange() -> (ExchangeSession, ExchangeSession) {
-    let identity_a = Identity::create("Alice");
-    let identity_b = Identity::create("Bob");
+    let identity_a = Identity::create("Alice", 0);
+    let identity_b = Identity::create("Bob", 0);
 
     let mut session_a = ExchangeSession::new_qr(
         identity_a,

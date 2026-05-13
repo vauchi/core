@@ -9,7 +9,7 @@ use vauchi_core::exchange::{
 use vauchi_core::identity::Identity;
 
 fn make_test_identity() -> Identity {
-    Identity::create("Test")
+    Identity::create("Test", 0)
 }
 
 // ============================================================

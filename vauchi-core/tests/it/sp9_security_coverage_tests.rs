@@ -27,7 +27,7 @@ use vauchi_core::exchange::*;
 // @scenario: security :: Replay attack prevention
 #[test]
 fn test_fresh_session_is_not_timed_out() {
-    let identity = vauchi_core::Identity::create("Alice");
+    let identity = vauchi_core::Identity::create("Alice", 0);
     let card = vauchi_core::contact_card::ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -51,7 +51,7 @@ fn test_session_timeout_is_60_seconds() {
     // The session uses Instant::now(), so we can't easily simulate expiry.
     // Instead, verify the property: a fresh session created at t=0 is not timed out,
     // and the `can_resume` method correctly combines interrupted + timeout.
-    let identity = vauchi_core::Identity::create("Alice");
+    let identity = vauchi_core::Identity::create("Alice", 0);
     let card = vauchi_core::contact_card::ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -84,7 +84,7 @@ fn test_session_timeout_is_60_seconds() {
 // @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_start_qr_from_non_idle_rejected() {
-    let identity = vauchi_core::Identity::create("Alice");
+    let identity = vauchi_core::Identity::create("Alice", 0);
     let card = vauchi_core::contact_card::ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -107,12 +107,12 @@ fn test_start_qr_from_non_idle_rejected() {
 // @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_process_qr_from_idle_rejected() {
-    let alice_identity = vauchi_core::Identity::create("Alice");
+    let alice_identity = vauchi_core::Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
-    let bob_identity = vauchi_core::Identity::create("Bob");
+    let bob_identity = vauchi_core::Identity::create("Bob", 0);
     let bob_card = vauchi_core::contact_card::ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
     let mut bob_session = ExchangeSession::new_qr(
@@ -134,7 +134,7 @@ fn test_process_qr_from_idle_rejected() {
 // @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_they_scanned_our_qr_from_wrong_state_rejected() {
-    let identity = vauchi_core::Identity::create("Alice");
+    let identity = vauchi_core::Identity::create("Alice", 0);
     let card = vauchi_core::contact_card::ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -165,7 +165,7 @@ fn test_they_scanned_our_qr_from_wrong_state_rejected() {
 // @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_key_agreement_from_wrong_state_rejected() {
-    let identity = vauchi_core::Identity::create("Alice");
+    let identity = vauchi_core::Identity::create("Alice", 0);
     let card = vauchi_core::contact_card::ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -188,7 +188,7 @@ fn test_key_agreement_from_wrong_state_rejected() {
 // @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_complete_exchange_from_wrong_state_rejected() {
-    let identity = vauchi_core::Identity::create("Alice");
+    let identity = vauchi_core::Identity::create("Alice", 0);
     let card = vauchi_core::contact_card::ContactCard::new("Alice");
     let their_card = vauchi_core::contact_card::ContactCard::new("Fake");
     let proximity = MockProximityVerifier::success();
@@ -214,7 +214,7 @@ fn test_complete_exchange_from_wrong_state_rejected() {
 // @scenario: security :: Man-in-the-middle detection during exchange
 #[test]
 fn test_self_exchange_detected() {
-    let alice_identity = vauchi_core::Identity::create("Alice");
+    let alice_identity = vauchi_core::Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
 
     // Generate QR with Alice's identity (using a separate ephemeral)
@@ -244,7 +244,7 @@ fn test_self_exchange_detected() {
 // @scenario: security :: Replay attack prevention
 #[test]
 fn test_qr_reuse_rejected() {
-    let identity = vauchi_core::Identity::create("Alice");
+    let identity = vauchi_core::Identity::create("Alice", 0);
     let card = vauchi_core::contact_card::ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -703,7 +703,7 @@ fn test_ratchet_forward_secrecy_across_steps() {
 // @scenario: security :: QR code screenshot attack prevention
 #[test]
 fn test_expired_qr_rejected_in_state_machine() {
-    let alice_identity = vauchi_core::Identity::create("Alice");
+    let alice_identity = vauchi_core::Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
 
     // Create a QR with a backdated timestamp (expired)
@@ -718,7 +718,7 @@ fn test_expired_qr_rejected_in_state_machine() {
             - 600,
     );
 
-    let bob_identity = vauchi_core::Identity::create("Bob");
+    let bob_identity = vauchi_core::Identity::create("Bob", 0);
     let bob_card = vauchi_core::contact_card::ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
     let mut bob_session = ExchangeSession::new_qr(
@@ -740,7 +740,7 @@ fn test_expired_qr_rejected_in_state_machine() {
 fn test_invalid_signature_qr_rejected_via_data_string() {
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
-    let alice_identity = vauchi_core::Identity::create("Alice");
+    let alice_identity = vauchi_core::Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
 
     // Generate a valid QR, encode to bytes, then tamper
@@ -766,7 +766,7 @@ fn test_invalid_signature_qr_rejected_via_data_string() {
 fn test_qr_parser_rejects_trailing_bytes() {
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
-    let alice_identity = vauchi_core::Identity::create("Alice");
+    let alice_identity = vauchi_core::Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
 
     let valid_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);

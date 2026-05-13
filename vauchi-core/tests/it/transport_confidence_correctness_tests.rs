@@ -131,8 +131,8 @@ fn nfc_priority_between_tcp_and_ble() {
 // @internal
 #[test]
 fn nfc_exchange_sets_high_confidence_without_running_verifier() {
-    let alice = Identity::create("Alice");
-    let bob = Identity::create("Bob");
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");

@@ -66,7 +66,10 @@ impl VauchiPlatform {
             }
         }
 
-        let identity = Identity::create(&display_name);
+        let identity = Identity::create(
+            &display_name,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
 
         let backup = identity
             .export_backup("__internal_storage_key__")

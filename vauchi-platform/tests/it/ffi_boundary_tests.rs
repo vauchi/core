@@ -597,7 +597,7 @@ fn test_confirmation_mac_contract_deterministic_and_accepted() {
     }
 
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let device_info = identity.device_info();
     let registry = DeviceRegistry::new(
         device_info.to_registered(&master_seed),

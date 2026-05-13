@@ -12,7 +12,7 @@ use vauchi_core::*;
 // @scenario: contact_exchange :: Default QR exchange uses mutual flow
 #[test]
 fn test_new_qr_starts_idle() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -30,7 +30,7 @@ fn test_new_qr_starts_idle() {
 // @scenario: contact_exchange :: Generate exchange QR code
 #[test]
 fn test_start_qr_transitions_to_displaying_qr() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -54,9 +54,9 @@ fn test_start_qr_transitions_to_displaying_qr() {
 // @scenario: contact_exchange :: Mutual QR exchange with bidirectional scanning
 #[test]
 fn test_process_qr_transitions_to_peer_scanned() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     // Alice generates a QR with her identity and ephemeral key
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
@@ -85,9 +85,9 @@ fn test_process_qr_transitions_to_peer_scanned() {
 // @scenario: contact_exchange :: Mutual QR exchange with bidirectional scanning
 #[test]
 fn test_process_qr_requires_displaying_qr_state() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
@@ -108,7 +108,7 @@ fn test_process_qr_requires_displaying_qr_state() {
 // @scenario: contact_exchange :: Mutual QR rejects expired peer QR code
 #[test]
 fn test_expired_qr_rejected() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
     let old_qr = ExchangeQR::generate_with_timestamp(
         &alice_identity,
@@ -120,7 +120,7 @@ fn test_expired_qr_rejected() {
             - 360, // 6 minutes ago
     );
 
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
     let mut session = ExchangeSession::new_qr(
@@ -140,9 +140,9 @@ fn test_expired_qr_rejected() {
 // @scenario: contact_exchange :: Mutual QR exchange with bidirectional scanning
 #[test]
 fn test_they_scanned_our_qr_transitions_to_awaiting_key_agreement() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
@@ -172,9 +172,9 @@ fn test_they_scanned_our_qr_transitions_to_awaiting_key_agreement() {
 // @scenario: contact_exchange :: Exchange creates mutual keys
 #[test]
 fn test_full_qr_exchange_flow() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
 
@@ -217,7 +217,7 @@ fn test_full_qr_exchange_flow() {
 // @scenario: contact_exchange :: Exchange session timeout
 #[test]
 fn test_session_timeout() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -235,7 +235,7 @@ fn test_session_timeout() {
 // @scenario: contact_exchange :: Exchange session timeout
 #[test]
 fn test_session_resume() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -260,9 +260,9 @@ fn test_session_resume() {
 fn test_detect_duplicate_contact() {
     use vauchi_core::crypto::SymmetricKey;
 
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
 
     // Create an existing contact with Alice's public key
     let alice_card = ContactCard::new("Alice");
@@ -302,10 +302,10 @@ fn test_detect_duplicate_contact() {
 fn test_no_duplicate_for_new_contact() {
     use vauchi_core::crypto::SymmetricKey;
 
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
-    let bob_identity = Identity::create("Bob");
-    let charlie_identity = Identity::create("Charlie");
+    let bob_identity = Identity::create("Bob", 0);
+    let charlie_identity = Identity::create("Charlie", 0);
 
     // Create an existing contact with Charlie's public key
     let charlie_card = ContactCard::new("Charlie");

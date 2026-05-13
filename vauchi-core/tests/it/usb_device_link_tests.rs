@@ -29,7 +29,7 @@ fn loopback_pair() -> (TcpStream, TcpStream) {
 }
 
 fn create_test_identity() -> Identity {
-    Identity::create("Test User")
+    Identity::create("Test User", 0)
 }
 
 fn create_test_registry(identity: &Identity) -> DeviceRegistry {

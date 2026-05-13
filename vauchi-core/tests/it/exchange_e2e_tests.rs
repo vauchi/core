@@ -32,8 +32,8 @@ use vauchi_core::{ContactCard, Identity};
 fn test_full_exchange_produces_matching_shared_keys() {
     use vauchi_core::crypto::{decrypt, encrypt};
 
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");
@@ -158,7 +158,7 @@ fn test_symmetric_dh_produces_matching_keys() {
 // @scenario: contact_exchange :: Mutual QR uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_qr_contains_ephemeral_exchange_key() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
     let qr = ExchangeQR::generate(&identity, &ephemeral);
 
@@ -192,7 +192,7 @@ fn test_qr_contains_ephemeral_exchange_key() {
 // @scenario: contact_exchange :: Generate exchange QR code
 #[test]
 fn test_start_qr_transitions_to_displaying() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -221,8 +221,8 @@ fn test_start_qr_transitions_to_displaying() {
 // @scenario: contact_exchange :: QR code exchange blocked without proximity
 #[test]
 fn test_process_qr_requires_displaying_qr_state() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
@@ -250,7 +250,7 @@ fn test_process_qr_requires_displaying_qr_state() {
 // @scenario: contact_exchange :: QR code exchange blocked without proximity
 #[test]
 fn test_they_scanned_requires_peer_scanned_state() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
@@ -271,8 +271,8 @@ fn test_they_scanned_requires_peer_scanned_state() {
 // @scenario: contact_exchange :: Mutual QR exchange with bidirectional scanning
 #[test]
 fn test_complete_state_transition_sequence() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");
@@ -401,7 +401,7 @@ fn test_wrong_dh_key_produces_different_secret() {
 // @scenario: contact_exchange :: Cannot exchange with yourself
 #[test]
 fn test_self_exchange_rejected() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
 
     // Generate own QR before moving identity into session
     let own_ephemeral = X3DHKeyPair::generate();
@@ -433,8 +433,8 @@ fn test_self_exchange_rejected() {
 // @scenario: contact_exchange :: Mutual QR rejects expired peer QR code
 #[test]
 fn test_expired_qr_rejected() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
@@ -466,7 +466,7 @@ fn test_expired_qr_rejected() {
 // @scenario: contact_exchange :: Mutual QR uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_session_uses_fresh_ephemeral_not_identity_key() {
-    let alice_identity = Identity::create("Alice");
+    let alice_identity = Identity::create("Alice", 0);
 
     // Capture identity exchange key before moving identity into session
     let identity_exchange: [u8; 32] = alice_identity
@@ -497,8 +497,8 @@ fn test_session_uses_fresh_ephemeral_not_identity_key() {
 // @scenario: contact_exchange :: Successful QR code exchange with proximity
 #[test]
 fn test_contact_names_correct_after_exchange() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let bob_card = ContactCard::new("Bob");
@@ -571,8 +571,8 @@ fn test_contact_names_correct_after_exchange() {
 // @scenario: contact_exchange :: Mutual QR uses fresh ephemeral keys for forward secrecy
 #[test]
 fn test_each_session_gets_unique_ephemeral() {
-    let identity1 = Identity::create("Alice");
-    let identity2 = Identity::create("Alice");
+    let identity1 = Identity::create("Alice", 0);
+    let identity2 = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
 
     let session1 = ExchangeSession::new_qr(

@@ -30,7 +30,7 @@ fn create_test_registry(identity: &Identity) -> DeviceRegistry {
 #[test]
 fn test_build_response_rejected_without_proximity() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     // Initiator with a wrong proximity proof
@@ -62,7 +62,7 @@ fn test_build_response_rejected_without_proximity() {
 #[test]
 fn test_build_response_succeeds_after_proximity_verified() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -95,7 +95,7 @@ fn test_build_response_succeeds_after_proximity_verified() {
 #[test]
 fn test_proximity_challenge_deterministic() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -111,7 +111,7 @@ fn test_proximity_challenge_deterministic() {
 #[test]
 fn test_proximity_challenge_differs_per_session() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     // Two different initiators (different link_keys) should produce different challenges
@@ -130,7 +130,7 @@ fn test_proximity_challenge_differs_per_session() {
 #[test]
 fn test_both_sides_derive_same_challenge() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -152,7 +152,7 @@ fn test_both_sides_derive_same_challenge() {
 #[test]
 fn test_restored_initiator_requires_proximity() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
@@ -190,7 +190,7 @@ fn test_restored_initiator_requires_proximity() {
 #[allow(deprecated)]
 fn test_deprecated_process_request_requires_proximity() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     // Initiator with wrong proximity proof
@@ -234,7 +234,7 @@ fn now_unix_secs() -> u64 {
 #[test]
 fn test_confirm_link_with_ultrasonic_proof_succeeds() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -269,7 +269,7 @@ fn test_confirm_link_with_ultrasonic_proof_succeeds() {
 #[test]
 fn test_confirm_link_with_manual_proof_succeeds() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -305,7 +305,7 @@ fn test_confirm_link_with_manual_proof_succeeds() {
 #[test]
 fn test_confirm_link_with_expired_ultrasonic_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -338,7 +338,7 @@ fn test_confirm_link_with_expired_ultrasonic_rejected() {
 #[test]
 fn test_confirm_link_with_expired_manual_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -372,7 +372,7 @@ fn test_confirm_link_with_expired_manual_rejected() {
 #[test]
 fn test_confirm_link_with_wrong_challenge_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -403,7 +403,7 @@ fn test_confirm_link_with_wrong_challenge_rejected() {
 #[test]
 fn test_confirm_link_with_wrong_mac_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -438,7 +438,7 @@ fn test_confirm_link_with_wrong_mac_rejected() {
 #[test]
 fn test_cross_session_replay_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     // Session A — get the valid challenge
@@ -475,7 +475,7 @@ fn test_cross_session_replay_rejected() {
 #[test]
 fn test_cross_session_manual_mac_replay_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     // Session A — compute a valid manual MAC
@@ -525,7 +525,7 @@ fn test_cross_session_manual_mac_replay_rejected() {
 #[test]
 fn test_ultrasonic_proof_at_exactly_60_seconds_accepted() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -556,7 +556,7 @@ fn test_ultrasonic_proof_at_exactly_60_seconds_accepted() {
 #[test]
 fn test_ultrasonic_proof_at_61_seconds_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -587,7 +587,7 @@ fn test_ultrasonic_proof_at_61_seconds_rejected() {
 #[test]
 fn test_manual_proof_at_exactly_60_seconds_accepted() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -619,7 +619,7 @@ fn test_manual_proof_at_exactly_60_seconds_accepted() {
 #[test]
 fn test_manual_proof_at_61_seconds_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -655,7 +655,7 @@ fn test_manual_proof_at_61_seconds_rejected() {
 #[test]
 fn test_self_linking_same_device_name_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -688,7 +688,7 @@ fn test_self_linking_same_device_name_rejected() {
 #[test]
 fn test_self_linking_restored_initiator_rejected() {
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
@@ -728,7 +728,7 @@ fn test_self_linking_restored_initiator_rejected() {
 fn test_different_device_name_allowed() {
     // Sanity check: a different device name should succeed
     let master_seed = [0x42u8; 32];
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
     let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
@@ -770,7 +770,7 @@ mod proximity_proof_proptests {
             #[test]
             fn test_expired_ultrasonic_timestamp_always_rejected(age in 61u64..=86400u64) {
                 let master_seed = [0x42u8; 32];
-                let identity = Identity::create("Alice");
+                let identity = Identity::create("Alice", 0);
                 let registry = create_test_registry(&identity);
                 let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
 
@@ -797,7 +797,7 @@ mod proximity_proof_proptests {
             #[test]
             fn test_tampered_challenge_response_always_rejected(tampered in prop::array::uniform16(any::<u8>())) {
                 let master_seed = [0x42u8; 32];
-                let identity = Identity::create("Alice");
+                let identity = Identity::create("Alice", 0);
                 let registry = create_test_registry(&identity);
                 let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
 
@@ -828,7 +828,7 @@ mod proximity_proof_proptests {
             #[test]
             fn test_tampered_confirmation_mac_always_rejected(tampered_mac in prop::array::uniform32(any::<u8>())) {
                 let master_seed = [0x42u8; 32];
-                let identity = Identity::create("Alice");
+                let identity = Identity::create("Alice", 0);
                 let registry = create_test_registry(&identity);
                 let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
 

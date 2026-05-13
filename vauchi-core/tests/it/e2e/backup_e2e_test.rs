@@ -19,7 +19,7 @@ use vauchi_core::{
 #[test]
 fn test_backup_recovery_happy_path() {
     // Step 1: Create identity and contact card
-    let identity = Identity::create("Alice Smith");
+    let identity = Identity::create("Alice Smith", 0);
     let original_public_id = identity.public_id();
 
     let mut card = ContactCard::new("Alice Smith");
@@ -53,7 +53,7 @@ fn test_backup_recovery_happy_path() {
     assert!(!backup.as_bytes().is_empty());
 
     // Step 3: Simulate new device - restore from backup
-    let restored_identity = Identity::import_backup(&backup, backup_password)
+    let restored_identity = Identity::import_backup(&backup, backup_password, 0)
         .expect("Restore should succeed with correct password");
 
     // Step 4: Verify restored identity matches original
@@ -65,7 +65,7 @@ fn test_backup_recovery_happy_path() {
     );
 
     // Step 5: Verify wrong password fails
-    let wrong_password_result = Identity::import_backup(&backup, "wrong_password");
+    let wrong_password_result = Identity::import_backup(&backup, "wrong_password", 0);
     assert!(wrong_password_result.is_err(), "expected error");
 
     // Step 6: Verify restored identity can sign and verify
@@ -106,7 +106,7 @@ fn test_multi_device_linking_happy_path() {
 
     // Step 3: Import on Device B (simulate new device)
     let _device_b: Vauchi = Vauchi::in_memory().unwrap();
-    let restored_identity = Identity::import_backup(&backup, "LinkingPassword123!").unwrap();
+    let restored_identity = Identity::import_backup(&backup, "LinkingPassword123!", 0).unwrap();
     assert_eq!(restored_identity.public_id(), device_a_public_id);
 
     // Step 4: Verify both devices share same identity

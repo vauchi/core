@@ -106,7 +106,7 @@ fn provider_contract_storage_search_contacts_returns_vec() {
 // @internal
 #[test]
 fn provider_contract_identity_create_has_all_fields() {
-    let identity = Identity::create("ProviderIdentity");
+    let identity = Identity::create("ProviderIdentity", 0);
     assert_eq!(identity.display_name(), "ProviderIdentity");
     assert!(!identity.public_id().is_empty());
     assert!(!identity.device_id().is_empty());
@@ -116,7 +116,7 @@ fn provider_contract_identity_create_has_all_fields() {
 // @internal
 #[test]
 fn provider_contract_identity_set_display_name() {
-    let mut identity = Identity::create("Before");
+    let mut identity = Identity::create("Before", 0);
     identity.set_display_name("After");
     assert_eq!(identity.display_name(), "After");
 }
@@ -124,7 +124,7 @@ fn provider_contract_identity_set_display_name() {
 // @internal
 #[test]
 fn provider_contract_identity_x3dh_keypair() {
-    let identity = Identity::create("X3dhTest");
+    let identity = Identity::create("X3dhTest", 0);
     let keypair = identity.x3dh_keypair();
     assert!(!keypair.public_key().iter().all(|&b| b == 0));
 }

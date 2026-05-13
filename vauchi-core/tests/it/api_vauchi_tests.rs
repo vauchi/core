@@ -247,7 +247,7 @@ fn test_vauchi_builder() {
 fn test_vauchi_builder_with_identity() {
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("vauchi.db");
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let public_id = identity.public_id();
 
     let wb: Vauchi = VauchiBuilder::new()
@@ -463,7 +463,7 @@ fn test_process_incoming_card_update() {
     alice_wb.create_identity("Alice").unwrap();
 
     // Create Bob's identity and keypair for ratchet
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_dh = X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
@@ -663,7 +663,7 @@ fn test_process_update_rejects_invalid_signature() {
     alice_wb.create_identity("Alice").unwrap();
 
     // Create Bob's identity
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_dh = X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
@@ -686,7 +686,7 @@ fn test_process_update_rejects_invalid_signature() {
         .unwrap();
 
     // Create update signed by WRONG identity (not Bob)
-    let wrong_identity = Identity::create("Eve");
+    let wrong_identity = Identity::create("Eve", 0);
     let mut bob_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
@@ -730,7 +730,7 @@ fn test_process_card_update_truncated_message() {
     let mut alice_wb = create_test_vauchi();
     alice_wb.create_identity("Alice").unwrap();
 
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_dh = vauchi_core::exchange::X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
@@ -760,7 +760,7 @@ fn test_process_card_update_empty_payload() {
     let mut alice_wb = create_test_vauchi();
     alice_wb.create_identity("Alice").unwrap();
 
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_dh = vauchi_core::exchange::X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
@@ -792,7 +792,7 @@ fn test_process_card_update_malformed_json_in_ratchet() {
     let mut alice_wb = create_test_vauchi();
     alice_wb.create_identity("Alice").unwrap();
 
-    let bob_identity = Identity::create("Bob");
+    let bob_identity = Identity::create("Bob", 0);
     let bob_dh = vauchi_core::exchange::X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 

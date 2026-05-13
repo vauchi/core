@@ -205,7 +205,7 @@ use vauchi_core::*;
 // @internal
 #[test]
 fn session_emits_command_dispatched_on_initial_commands() {
-    let identity = Identity::create("Alice");
+    let identity = Identity::create("Alice", 0);
     let card = ContactCard::new("Alice");
     let mut session = ExchangeSession::new_qr(
         identity,
@@ -236,8 +236,8 @@ fn session_emits_command_dispatched_on_initial_commands() {
 // @internal
 #[test]
 fn full_qr_session_produces_latency_summary() {
-    let alice_identity = Identity::create("Alice");
-    let bob_identity = Identity::create("Bob");
+    let alice_identity = Identity::create("Alice", 0);
+    let bob_identity = Identity::create("Bob", 0);
 
     let alice_card = ContactCard::new("Alice");
     let alice_ephemeral = X3DHKeyPair::generate();

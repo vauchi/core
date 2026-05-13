@@ -21,7 +21,7 @@ use vauchi_core::types::ExchangeTransport;
 use vauchi_core::{Command, Event};
 
 fn create_identity(name: &str) -> Identity {
-    Identity::create(name)
+    Identity::create(name, 0)
 }
 
 fn create_card(identity: &Identity) -> ContactCard {
@@ -189,7 +189,7 @@ fn usb_self_exchange_is_rejected() {
     let card = create_card(&identity);
 
     let bytes = identity.to_storage_bytes();
-    let identity2 = Identity::from_storage_bytes(&bytes).expect("roundtrip");
+    let identity2 = Identity::from_storage_bytes(&bytes, 0).expect("roundtrip");
 
     let mut session1 = ExchangeSession::new_usb(
         identity,

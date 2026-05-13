@@ -45,10 +45,25 @@ impl VauchiPlatform {
 
         // Create claim
         let new_pk = *identity.signing_public_key();
-        let claim = RecoveryClaim::new(&old_pk, &new_pk);
+        let claim = RecoveryClaim::new(
+            &old_pk,
+            &new_pk,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        );
 
         // Create proof to store vouchers and save to file
-        let proof = RecoveryProof::new(&old_pk, &new_pk, 3); // Default threshold of 3
+        let proof = RecoveryProof::new(
+            &old_pk,
+            &new_pk,
+            3,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        ); // Default threshold of 3
         std::fs::write(
             self.recovery_proof_path(),
             proof.to_bytes().map_err(|e| MobileError::Other {
@@ -66,7 +81,12 @@ impl VauchiPlatform {
             old_public_key: old_pk_hex,
             new_public_key: hex::encode(new_pk),
             claim_data,
-            is_expired: claim.is_expired(),
+            is_expired: claim.is_expired(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0),
+            ),
         })
     }
 
@@ -97,7 +117,12 @@ impl VauchiPlatform {
             old_public_key: hex::encode(claim.old_pk()),
             new_public_key: hex::encode(claim.new_pk()),
             claim_data: claim_b64,
-            is_expired: claim.is_expired(),
+            is_expired: claim.is_expired(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0),
+            ),
         })
     }
 
@@ -127,17 +152,23 @@ impl VauchiPlatform {
                 detail: format!("Invalid claim: {}", e),
             })?;
 
-        if claim.is_expired() {
+        if claim.is_expired(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        ) {
             return Err(MobileError::InvalidInput {
                 field: String::new(),
                 detail: "Claim has expired".to_string(),
             });
         }
 
-        let voucher = RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair(), None)
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
+        let voucher =
+            RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair(), None, 0)
+                .map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
 
         let voucher_data = base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes());
 

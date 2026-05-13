@@ -1068,13 +1068,28 @@ impl PlatformAppEngine {
             })?;
 
         let new_pk = *identity.signing_public_key();
-        let claim = RecoveryClaim::new(&old_pk, &new_pk);
+        let claim = RecoveryClaim::new(
+            &old_pk,
+            &new_pk,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        );
 
         // Persist a `RecoveryProof` shell beside the database — this
         // mirrors the legacy `VauchiPlatform` file layout so the two
         // surfaces share state during the Phase-C migration window.
         // Threshold matches the legacy default (3).
-        let proof = RecoveryProof::new(&old_pk, &new_pk, 3);
+        let proof = RecoveryProof::new(
+            &old_pk,
+            &new_pk,
+            3,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        );
         let proof_bytes = proof.to_bytes().map_err(|e| MobileError::Other {
             detail: e.to_string(),
         })?;
@@ -1089,7 +1104,12 @@ impl PlatformAppEngine {
             old_public_key: old_pk_hex,
             new_public_key: hex::encode(new_pk),
             claim_data,
-            is_expired: claim.is_expired(),
+            is_expired: claim.is_expired(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0),
+            ),
         };
 
         engine.invalidate_screen(&AppScreen::Recovery);
@@ -1122,7 +1142,12 @@ impl PlatformAppEngine {
             old_public_key: hex::encode(claim.old_pk()),
             new_public_key: hex::encode(claim.new_pk()),
             claim_data: claim_b64,
-            is_expired: claim.is_expired(),
+            is_expired: claim.is_expired(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0),
+            ),
         })
     }
 
@@ -1157,17 +1182,23 @@ impl PlatformAppEngine {
                 detail: format!("Invalid claim: {e}"),
             })?;
 
-        if claim.is_expired() {
+        if claim.is_expired(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        ) {
             return Err(MobileError::InvalidInput {
                 field: String::new(),
                 detail: "Claim has expired".into(),
             });
         }
 
-        let voucher = RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair(), None)
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
+        let voucher =
+            RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair(), None, 0)
+                .map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
         let voucher_data = base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes());
 
         Ok(crate::types::MobileRecoveryVoucher {

@@ -60,7 +60,7 @@ impl Vauchi {
             .try_into()
             .map_err(|_| VauchiError::Serialization("public key must be 32 bytes".into()))?;
 
-        let claim = RecoveryClaim::new(&old_pk, identity.signing_public_key());
+        let claim = RecoveryClaim::new(&old_pk, identity.signing_public_key(), 0);
         Ok(base64::engine::general_purpose::STANDARD.encode(claim.to_bytes()))
     }
 
@@ -79,8 +79,9 @@ impl Vauchi {
             .ok_or(VauchiError::IdentityNotInitialized)?;
 
         let claim = self.parse_recovery_claim_b64(claim_b64)?;
-        let voucher = RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair(), None)
-            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
+        let voucher =
+            RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair(), None, 0)
+                .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         Ok(base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes()))
     }
 }

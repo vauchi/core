@@ -30,7 +30,8 @@ fn test_voucher_v2_with_guardian_token_roundtrip() {
     // designator = old identity; guardian = voucher signer
     let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key(), 0);
 
-    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token.clone()));
+    let voucher =
+        RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token.clone()), 0);
     let bytes = voucher.to_bytes();
     let restored = RecoveryVoucher::from_bytes(&bytes).expect("v2 voucher must deserialize");
 
@@ -66,7 +67,7 @@ fn test_voucher_v1_without_token_roundtrip() {
     let new_pk = [0x02u8; 32];
     let voucher_keypair = SigningKeyPair::generate();
 
-    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, None);
+    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, None, 0);
     let bytes = voucher.to_bytes();
     let restored = RecoveryVoucher::from_bytes(&bytes).expect("v1 voucher must deserialize");
 
@@ -94,7 +95,7 @@ fn test_voucher_v2_from_bytes_preserves_token() {
     let original_designator_pk = *token.designator_pk();
     let original_guardian_pk = *token.guardian_pk();
 
-    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token));
+    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token), 0);
     let bytes = voucher.to_bytes();
     let restored = RecoveryVoucher::from_bytes(&bytes).expect("v2 voucher must deserialize");
 
@@ -131,7 +132,7 @@ fn test_voucher_v2_version_byte() {
 
     // v2: with guardian token
     let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key(), 0);
-    let v2 = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token));
+    let v2 = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token), 0);
     let v2_bytes = v2.to_bytes();
     assert_eq!(
         v2_bytes[0], 2,
@@ -139,7 +140,7 @@ fn test_voucher_v2_version_byte() {
     );
 
     // v1: without guardian token
-    let v1 = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, None);
+    let v1 = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, None, 0);
     let v1_bytes = v1.to_bytes();
     assert_eq!(
         v1_bytes[0], 1,
@@ -161,12 +162,12 @@ fn test_create_from_claim_with_token() {
     let old_pk = *old_keypair.public_key().as_bytes();
     let new_pk = *new_keypair.public_key().as_bytes();
 
-    let claim = RecoveryClaim::new(&old_pk, &new_pk);
+    let claim = RecoveryClaim::new(&old_pk, &new_pk, 0);
     let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key(), 0);
     let original_guardian_pk = *token.guardian_pk();
 
     let voucher =
-        RecoveryVoucher::create_from_claim(&claim, &voucher_keypair, Some(token)).unwrap();
+        RecoveryVoucher::create_from_claim(&claim, &voucher_keypair, Some(token), 0).unwrap();
 
     assert!(
         voucher.verify(),
@@ -200,9 +201,9 @@ fn test_proof_add_voucher_with_valid_token() {
     // Token: designator = old identity, guardian = voucher signer
     let token = GuardianToken::create(&old_keypair, voucher_keypair.public_key(), 0);
 
-    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token));
+    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token), 0);
 
-    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1);
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1, 0);
     let result = proof.add_voucher(voucher);
 
     assert!(
@@ -238,9 +239,9 @@ fn test_proof_rejects_voucher_with_invalid_token_signature() {
         "tampered token must fail verification before being used in test"
     );
 
-    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token));
+    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token), 0);
 
-    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1);
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1, 0);
     let result = proof.add_voucher(voucher);
 
     assert!(
@@ -270,9 +271,9 @@ fn test_proof_rejects_voucher_with_wrong_designator_pk() {
         "self-consistent token must verify on its own"
     );
 
-    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token));
+    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token), 0);
 
-    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1);
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1, 0);
     let result = proof.add_voucher(voucher);
 
     assert!(
@@ -302,9 +303,9 @@ fn test_proof_rejects_voucher_with_wrong_guardian_pk() {
         "self-consistent token must verify on its own"
     );
 
-    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token));
+    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, Some(token), 0);
 
-    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1);
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1, 0);
     let result = proof.add_voucher(voucher);
 
     assert!(
@@ -322,9 +323,9 @@ fn test_proof_accepts_voucher_without_token() {
     let voucher_keypair = SigningKeyPair::generate();
 
     // v1 voucher with no token — backward compat: no token required
-    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, None);
+    let voucher = RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, None, 0);
 
-    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1);
+    let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1, 0);
     let result = proof.add_voucher(voucher);
 
     assert!(

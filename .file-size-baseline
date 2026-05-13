@@ -384,7 +384,8 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1633
 #  caused by cycle-thread racing the test's manual state pushes.)
 # (+4 on top of main's 5099 baseline for the unlink_device cascade
 #   from slice 4: revoke_device call now needs `now`.)
-vauchi-platform/src/platform_app_engine.rs 5103
+# (+31 from cascading now: u64 through Recovery cluster + SystemTime inlines in slice 29 2026-05-13)
+vauchi-platform/src/platform_app_engine.rs 5134
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding

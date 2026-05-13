@@ -99,12 +99,13 @@ impl Vauchi {
             .as_ref()
             .ok_or(VauchiError::IdentityNotInitialized)?;
 
-        let claim = RecoveryClaim::new(old_pk, identity.signing_public_key());
+        let now = self.clock.unix_seconds();
+        let claim = RecoveryClaim::new(old_pk, identity.signing_public_key(), now);
 
         // Load recovery settings for threshold
         let settings = self.storage.load_recovery_settings()?.unwrap_or_default();
 
-        let progress = RecoveryProgress::new(claim.clone(), settings.recovery_threshold());
+        let progress = RecoveryProgress::new(claim.clone(), settings.recovery_threshold(), now);
         self.storage.save_recovery_progress(&progress)?;
 
         Ok(claim)
@@ -244,6 +245,7 @@ impl Vauchi {
             claim.new_pk(),
             identity.signing_keypair(),
             Some(token),
+            0,
         );
 
         Ok(voucher)

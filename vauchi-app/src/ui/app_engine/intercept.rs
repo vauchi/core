@@ -687,7 +687,7 @@ impl AppEngine {
             Ok(claim) => engine.set_parsed_claim(crate::ui::recovery_help::ParsedClaimSummary {
                 old_pk_hex: hex::encode::<&[u8]>(claim.old_pk().as_ref()),
                 new_pk_hex: hex::encode::<&[u8]>(claim.new_pk().as_ref()),
-                is_expired: claim.is_expired(),
+                is_expired: claim.is_expired(self.vauchi.clock().unix_seconds()),
             }),
             Err(e) => engine.set_claim_parse_error(format!("Invalid claim: {e}")),
         }

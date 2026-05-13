@@ -28,7 +28,7 @@ fn vauchi_with_identity(name: &str) -> Vauchi {
 /// `claim` is the recovering user's claim; `helper` is the guardian
 /// who is signing the voucher.
 fn build_voucher(claim: &RecoveryClaim, helper: &Identity) -> RecoveryVoucher {
-    RecoveryVoucher::create_from_claim(claim, helper.signing_keypair(), None)
+    RecoveryVoucher::create_from_claim(claim, helper.signing_keypair(), None, 0)
         .expect("fresh claim is not expired and helper != recovering identity")
 }
 
@@ -55,7 +55,7 @@ fn create_recovery_claim_returns_claim_binding_old_and_new_pk() {
         "claim's new_pk must equal current identity"
     );
     assert!(
-        !claim.is_expired(),
+        !claim.is_expired(1_700_000_000),
         "freshly minted claim must not be expired"
     );
 }
@@ -162,7 +162,7 @@ fn add_recovery_voucher_appends_to_existing_progress() {
 fn add_recovery_voucher_errors_when_no_progress_in_flight() {
     let wb = vauchi_with_identity("Alice");
 
-    let claim = RecoveryClaim::new(&[4u8; 32], wb.identity().unwrap().signing_public_key());
+    let claim = RecoveryClaim::new(&[4u8; 32], wb.identity().unwrap().signing_public_key(), 0);
     let helper = Identity::create("Bob", 0);
     let voucher = build_voucher(&claim, &helper);
 
@@ -270,7 +270,7 @@ fn upload_guardian_entries_requires_identity() {
 #[test]
 fn vouch_for_claim_requires_identity() {
     let wb = Vauchi::in_memory().unwrap();
-    let claim = RecoveryClaim::new(&[1u8; 32], &[2u8; 32]);
+    let claim = RecoveryClaim::new(&[1u8; 32], &[2u8; 32], 0);
     let result = wb.vouch_for_claim(&claim, "any-contact");
     assert!(matches!(result, Err(VauchiError::IdentityNotInitialized)));
 }

@@ -60,9 +60,7 @@ fn output_path() -> PathBuf {
     // Flame is a dev-only profiling helper; it has no caller-supplied
     // Clock context (the `#[ctor]` install runs before main). Read
     // ambient time via the `SystemClock` impl directly so the Clock
-    // abstraction is the only path to wall-clock reads in the
-    // workspace — when `ambient_now_secs` is retired, this site is
-    // already structurally correct.
+    // abstraction is the only path to wall-clock reads in the workspace.
     let ts = crate::clock::SystemClock::shared().unix_seconds();
     let base = std::env::var("CARGO_MANIFEST_DIR")
         .map(PathBuf::from)

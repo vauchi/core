@@ -187,11 +187,10 @@ pub struct ExchangeSession {
     /// Their confirmation escrow slot hash.
     confirmation_their_slot: Option<String>,
     /// Clock for stamping timestamps on peer-card field constructions
-    /// during BLE phase 4 (and future migrations of the remaining
-    /// session-internal `ambient_now_secs` reads). Defaults to
-    /// `crate::clock::SystemClock::shared()` in every `new_*` constructor;
-    /// tests can override via `with_clock(...)` after construction.
-    /// Phase 1 / Task 1.1 / Step 3b structural pass.
+    /// during BLE phase 4 and on every payload / QR / NFC generation.
+    /// Defaults to `crate::clock::SystemClock::shared()` in every
+    /// `new_*` constructor; tests can override via `with_clock(...)`
+    /// after construction. Phase 1 / Task 1.1 / Step 3b structural pass.
     clock: Arc<dyn crate::clock::Clock>,
 }
 

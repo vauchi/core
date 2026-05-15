@@ -549,8 +549,9 @@ fn run_initiator_cycle(
         Err(e) => return CycleOutcome::Failed(format!("relay offer failed: {e}")),
     };
     let deadline = Instant::now() + Duration::from_secs(relay_timeout_secs);
+    let sleeper = vauchi_core::sleeper::SystemSleeper::shared();
     let (request_payload, sender_token) =
-        match poll_for_claim(transport, &broker_code, deadline, cancel_flag) {
+        match poll_for_claim(transport, &broker_code, deadline, cancel_flag, &*sleeper) {
             Ok(pair) => pair,
             Err(DeviceLinkError::RequestTimeout) => {
                 if cancel_flag.load(Ordering::Relaxed) {

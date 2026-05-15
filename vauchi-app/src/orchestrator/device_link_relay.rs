@@ -23,8 +23,9 @@
 //! a single-round-trip flow. See problem record.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread;
 use std::time::{Duration, Instant};
+
+use vauchi_core::sleeper::Sleeper;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -121,6 +122,7 @@ pub fn poll_for_claim(
     code: &str,
     deadline: Instant,
     cancel: &AtomicBool,
+    sleeper: &dyn Sleeper,
 ) -> Result<(Vec<u8>, String), DeviceLinkError> {
     loop {
         if cancel.load(Ordering::Relaxed) || Instant::now() >= deadline {
@@ -136,7 +138,7 @@ pub fn poll_for_claim(
                 return Ok((claim.request, claim.response_code));
             }
             Ok(None) => {
-                thread::sleep(Duration::from_secs(1));
+                sleeper.sleep(Duration::from_secs(1));
             }
             Err(e) => return Err(DeviceLinkError::Network(e.to_string())),
         }
@@ -181,6 +183,7 @@ pub fn poll_for_response(
     response_code: &str,
     deadline: Instant,
     cancel: &AtomicBool,
+    sleeper: &dyn Sleeper,
 ) -> Result<Vec<u8>, DeviceLinkError> {
     loop {
         if cancel.load(Ordering::Relaxed) || Instant::now() >= deadline {
@@ -193,7 +196,7 @@ pub fn poll_for_response(
                     .map_err(|e| DeviceLinkError::Network(format!("decode: {e}")));
             }
             Ok(None) => {
-                thread::sleep(Duration::from_secs(1));
+                sleeper.sleep(Duration::from_secs(1));
             }
             Err(e) => return Err(DeviceLinkError::Network(e.to_string())),
         }
@@ -212,7 +215,14 @@ pub fn send_and_receive(
     let response_code = claim_and_send_request(transport, message, timeout_secs)?;
     let deadline = Instant::now() + Duration::from_secs(timeout_secs);
     let never_cancel = AtomicBool::new(false);
-    poll_for_response(transport, &response_code, deadline, &never_cancel)
+    let sleeper = vauchi_core::sleeper::SystemSleeper::shared();
+    poll_for_response(
+        transport,
+        &response_code,
+        deadline,
+        &never_cancel,
+        &*sleeper,
+    )
 }
 
 /// Listen for an incoming device link request via relay (initiator;
@@ -230,7 +240,9 @@ pub fn create_offer_and_listen(
     let code = create_offer(transport, identity_id, timeout_secs)?;
     let deadline = Instant::now() + Duration::from_secs(timeout_secs);
     let never_cancel = AtomicBool::new(false);
-    let (payload, sender_token) = poll_for_claim(transport, &code, deadline, &never_cancel)?;
+    let sleeper = vauchi_core::sleeper::SystemSleeper::shared();
+    let (payload, sender_token) =
+        poll_for_claim(transport, &code, deadline, &never_cancel, &*sleeper)?;
     Ok((code, payload, sender_token))
 }
 

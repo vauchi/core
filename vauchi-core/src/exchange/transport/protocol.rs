@@ -101,11 +101,11 @@ impl ExchangeProtocol {
     /// Creates an offer payload (90 bytes).
     ///
     /// Layout: identity_pub(32) + ephemeral_pub(32) + nonce(16) + timestamp(8) + caps(2)
-    pub fn create_offer(&self) -> Result<Vec<u8>, ExchangeError> {
+    pub fn create_offer(&self, now: u64) -> Result<Vec<u8>, ExchangeError> {
         let identity_pub = PublicKey::from(&self.identity_secret);
         let ephemeral_pub = PublicKey::from(&self.ephemeral_secret);
 
-        let timestamp = crate::exchange::now_secs();
+        let timestamp = now;
 
         let mut offer = Vec::with_capacity(OFFER_SIZE);
         offer.extend_from_slice(identity_pub.as_bytes());

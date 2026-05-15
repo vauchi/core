@@ -614,11 +614,12 @@ fn run_initiator_cycle(
     };
 
     // Phase 4 — confirm + persist + send response.
-    let (encrypted_response, registry, device_info) = match initiator.confirm_link(&request, &proof)
-    {
-        Ok(triple) => triple,
-        Err(e) => return CycleOutcome::Failed(format!("confirm_link: {e}")),
-    };
+    let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+    let (encrypted_response, registry, device_info) =
+        match initiator.confirm_link(&request, &proof, now) {
+            Ok(triple) => triple,
+            Err(e) => return CycleOutcome::Failed(format!("confirm_link: {e}")),
+        };
 
     if let Some(ctx) = persistence {
         let storage = match Storage::open(&ctx.storage_path, ctx.storage_key.clone()) {

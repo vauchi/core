@@ -604,13 +604,14 @@ fn test_confirmation_mac_contract_deterministic_and_accepted() {
         identity.signing_keypair(),
     );
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, 0u64);
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
+    let mut responder =
+        DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string(), 0u64).unwrap();
 
-    let encrypted_request = responder.create_request().unwrap();
+    let encrypted_request = responder.create_request(0u64).unwrap();
     let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
     let link_key = initiator.qr().link_key();
@@ -631,7 +632,7 @@ fn test_confirmation_mac_contract_deterministic_and_accepted() {
         confirmed_at: now_unix_secs(),
     };
 
-    let result = initiator.confirm_link(&request, &proof);
+    let result = initiator.confirm_link(&request, &proof, 0u64);
     assert!(
         result.is_ok(),
         "Core must accept MAC computed by compute_confirmation_mac (the same function mobile uses). Error: {:?}",

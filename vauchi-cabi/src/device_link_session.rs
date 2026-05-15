@@ -217,7 +217,8 @@ pub unsafe extern "C" fn vauchi_device_link_session_create(
             .flatten()
             .unwrap_or_else(|| identity.initial_device_registry());
 
-        let initiator = identity.create_device_link_initiator(registry);
+        let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+        let initiator = identity.create_device_link_initiator(registry, now);
         let identity_id = hex::encode(identity.signing_public_key());
 
         let relay_url = vauchi.config().relay.server_url.clone();

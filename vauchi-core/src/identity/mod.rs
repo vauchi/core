@@ -265,8 +265,9 @@ impl Identity {
     pub fn create_device_link_initiator(
         &self,
         registry: DeviceRegistry,
+        now: u64,
     ) -> crate::exchange::DeviceLinkInitiator {
-        crate::exchange::DeviceLinkInitiator::new(self.master_seed, self, registry)
+        crate::exchange::DeviceLinkInitiator::new(self.master_seed, self, registry, now)
     }
 
     /// Restores a device link initiator from a saved QR code.

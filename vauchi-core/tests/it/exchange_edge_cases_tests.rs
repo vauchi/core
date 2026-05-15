@@ -154,8 +154,12 @@ fn test_qr_expiration() {
     let ephemeral = X3DHKeyPair::generate();
 
     // Fresh QR should not be expired
-    let fresh_qr = ExchangeQR::generate(&alice, &ephemeral);
-    assert!(!fresh_qr.is_expired());
+    let fresh_qr = ExchangeQR::generate(
+        &alice,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    assert!(!fresh_qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()));
 }
 
 /// Scenario: Expired QR is rejected during ProcessQR
@@ -174,7 +178,7 @@ fn test_expired_qr_rejected_on_process() {
         .as_secs()
         - 360;
     let expired_qr = ExchangeQR::generate_with_timestamp(&alice, &ephemeral, expired_ts);
-    assert!(expired_qr.is_expired());
+    assert!(expired_qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()));
 
     // Bob starts his session and displays QR
     let mut bob_session = ExchangeSession::new_qr(
@@ -349,7 +353,11 @@ fn test_cannot_process_qr_from_idle() {
     let ephemeral = X3DHKeyPair::generate();
 
     // Generate a QR from Bob for Alice to scan
-    let bob_qr = ExchangeQR::generate(&bob, &ephemeral);
+    let bob_qr = ExchangeQR::generate(
+        &bob,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Alice is in Idle state — never called StartQR
     let mut alice_session = ExchangeSession::new_qr(

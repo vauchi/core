@@ -21,10 +21,10 @@ pub struct DeviceLinkRequest {
 
 impl DeviceLinkRequest {
     /// Creates a new device link request.
-    pub fn new(device_name: String) -> Self {
+    pub fn new(device_name: String, now: u64) -> Self {
         let nonce: [u8; 32] = crate::crypto::random_bytes();
 
-        let timestamp = crate::exchange::now_secs();
+        let timestamp = now;
 
         DeviceLinkRequest {
             device_name,

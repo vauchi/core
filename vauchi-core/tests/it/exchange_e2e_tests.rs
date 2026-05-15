@@ -160,7 +160,11 @@ fn test_symmetric_dh_produces_matching_keys() {
 fn test_qr_contains_ephemeral_exchange_key() {
     let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
-    let qr = ExchangeQR::generate(&identity, &ephemeral);
+    let qr = ExchangeQR::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // QR should have the ephemeral exchange key, not the identity's static key
     let exchange_key = qr.exchange_key();
@@ -214,7 +218,7 @@ fn test_start_qr_transitions_to_displaying() {
 
     let qr = session.qr().expect("Should have QR in DisplayingQr");
     assert!(qr.verify_signature());
-    assert!(!qr.is_expired());
+    assert!(!qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()));
 }
 
 /// Test: ProcessQR requires DisplayingQr state (must call StartQR first)
@@ -236,7 +240,11 @@ fn test_process_qr_requires_displaying_qr_state() {
 
     // Bob generates a QR
     let bob_ephemeral = X3DHKeyPair::generate();
-    let bob_qr = ExchangeQR::generate(&bob_identity, &bob_ephemeral);
+    let bob_qr = ExchangeQR::generate(
+        &bob_identity,
+        &bob_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Try to process QR from Idle (without calling StartQR first)
     let result = alice_session.apply(ExchangeEvent::ProcessQR(bob_qr));
@@ -405,7 +413,11 @@ fn test_self_exchange_rejected() {
 
     // Generate own QR before moving identity into session
     let own_ephemeral = X3DHKeyPair::generate();
-    let own_qr = ExchangeQR::generate(&alice_identity, &own_ephemeral);
+    let own_qr = ExchangeQR::generate(
+        &alice_identity,
+        &own_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();

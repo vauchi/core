@@ -327,7 +327,11 @@ impl MobileDeviceLinkInitiator {
 
         let initiator = lock_or(&self.inner)?;
         let (encrypted_response, _registry, device_info) = initiator
-            .confirm_link(&request, proof)
+            .confirm_link(
+                &request,
+                proof,
+                vauchi_core::clock::SystemClock::shared().unix_seconds(),
+            )
             .map_err(|e| MobileError::Other {
                 detail: e.to_string(),
             })?;
@@ -356,7 +360,7 @@ impl MobileDeviceLinkResponder {
     /// Creates an encrypted request to send to the existing device.
     pub fn create_request(&self) -> Result<Vec<u8>, MobileError> {
         lock_or(&self.inner)?
-            .create_request()
+            .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
             .map_err(|e| MobileError::Other {
                 detail: e.to_string(),
             })

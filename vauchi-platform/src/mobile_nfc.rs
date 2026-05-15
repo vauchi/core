@@ -118,7 +118,10 @@ impl MobileNfcHandshake {
         let mut inner = lock_or(&self.inner)?;
         let identity = lock_or(&self.identity)?;
         inner
-            .create_key_offer(&identity)
+            .create_key_offer(
+                &identity,
+                vauchi_core::clock::SystemClock::shared().unix_seconds(),
+            )
             .map_err(exchange_error_to_mobile)
     }
 
@@ -130,7 +133,11 @@ impl MobileNfcHandshake {
         let mut inner = lock_or(&self.inner)?;
         let identity = lock_or(&self.identity)?;
         let (ack_bytes, encrypted_card) = inner
-            .process_key_offer(&identity, &their_offer_bytes)
+            .process_key_offer(
+                &identity,
+                &their_offer_bytes,
+                vauchi_core::clock::SystemClock::shared().unix_seconds(),
+            )
             .map_err(exchange_error_to_mobile)?;
         Ok(MobileNfcKeyAckResult {
             key_ack_bytes: ack_bytes,
@@ -148,7 +155,11 @@ impl MobileNfcHandshake {
     ) -> Result<Vec<u8>, MobileError> {
         let mut inner = lock_or(&self.inner)?;
         inner
-            .process_key_ack(&their_ack_bytes, &their_encrypted_card)
+            .process_key_ack(
+                &their_ack_bytes,
+                &their_encrypted_card,
+                vauchi_core::clock::SystemClock::shared().unix_seconds(),
+            )
             .map_err(exchange_error_to_mobile)
     }
 

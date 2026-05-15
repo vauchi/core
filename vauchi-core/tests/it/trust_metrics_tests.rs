@@ -286,7 +286,11 @@ fn run_full_qr_exchange() -> Contact {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();

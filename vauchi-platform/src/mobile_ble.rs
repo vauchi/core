@@ -198,8 +198,12 @@ impl MobileBleExchangeSession {
         );
 
         // Default to initiator; call set_responder() before on_connected() to switch.
-        let session =
-            BleHandshakeSession::new_initiator_from_key(identity_key_arr, identity_x3dh, card);
+        let session = BleHandshakeSession::new_initiator_from_key(
+            identity_key_arr,
+            identity_x3dh,
+            card,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
 
         Ok(Self {
             inner: Mutex::new(session),
@@ -354,7 +358,10 @@ impl MobileBleExchangeSession {
             match inner.state() {
                 BleHandshakeState::Idle => {
                     // Phase 1: Process KeyOffer
-                    match inner.process_key_offer(&data) {
+                    match inner.process_key_offer(
+                        &data,
+                        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+                    ) {
                         Ok((ack_bytes, encrypted_card)) => {
                             // Store our encrypted card for chunked transfer
                             let Ok(mut guard) = self.pending_encrypted.lock() else {

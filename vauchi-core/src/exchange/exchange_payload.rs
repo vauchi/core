@@ -125,8 +125,7 @@ pub fn parse_exchange_payload(
 }
 
 /// Checks if a payload timestamp has expired given the expiry duration.
-pub fn is_payload_expired(timestamp: u64, expiry_secs: u64) -> bool {
-    let now = super::now_secs();
+pub fn is_payload_expired(timestamp: u64, expiry_secs: u64, now: u64) -> bool {
 
     now > timestamp + expiry_secs
 }

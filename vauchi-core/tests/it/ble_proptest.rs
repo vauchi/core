@@ -240,8 +240,15 @@ fn test_adversarial_truncated_handshake_packet() {
     // A valid KeyOffer is 89 bytes; feed only 50 bytes
     let truncated = vec![0u8; 50];
 
-    let mut session = BleHandshakeSession::new_responder(&identity, card);
-    let result = session.process_key_offer(&truncated);
+    let mut session = BleHandshakeSession::new_responder(
+        &identity,
+        card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let result = session.process_key_offer(
+        &truncated,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     assert!(result.is_err(), "truncated packet must fail");
     match result.unwrap_err() {

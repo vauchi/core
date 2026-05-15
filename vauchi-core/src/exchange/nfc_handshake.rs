@@ -108,14 +108,14 @@ impl NfcHandshakeSession {
     ///
     /// Generates a fresh ExchangeNfc payload containing our ephemeral X25519
     /// public key and identity key.
-    pub fn create_key_offer(&mut self, identity: &Identity) -> Result<Vec<u8>, ExchangeError> {
+    pub fn create_key_offer(&mut self, identity: &Identity, now: u64) -> Result<Vec<u8>, ExchangeError> {
         if !matches!(self.state, NfcHandshakeState::Idle) {
             return Err(ExchangeError::InvalidState(
                 "Expected Idle state for key offer".into(),
             ));
         }
 
-        let nfc_payload = ExchangeNfc::generate(identity, &self.our_x3dh);
+        let nfc_payload = ExchangeNfc::generate(identity, &self.our_x3dh, now);
         let exchange_id = *nfc_payload.token();
         let bytes = nfc_payload.to_bytes();
 
@@ -132,6 +132,7 @@ impl NfcHandshakeSession {
         &mut self,
         identity: &Identity,
         their_offer_bytes: &[u8],
+        now: u64,
     ) -> Result<(Vec<u8>, Vec<u8>), ExchangeError> {
         if !matches!(self.state, NfcHandshakeState::Idle) {
             return Err(ExchangeError::InvalidState(
@@ -140,7 +141,7 @@ impl NfcHandshakeSession {
         }
 
         let their_nfc = ExchangeNfc::from_bytes(their_offer_bytes)?;
-        if their_nfc.is_expired() {
+        if their_nfc.is_expired(now) {
             return Err(ExchangeError::NfcExpired);
         }
         if !their_nfc.verify_signature() {
@@ -161,7 +162,7 @@ impl NfcHandshakeSession {
             derive_symmetric_key(&self.our_x3dh, their_nfc.exchange_key(), &exchange_id)?;
 
         // Create our NFC payload (key ack)
-        let our_nfc = ExchangeNfc::generate(identity, &self.our_x3dh);
+        let our_nfc = ExchangeNfc::generate(identity, &self.our_x3dh, now);
         let our_nfc_bytes = our_nfc.to_bytes().to_vec();
 
         // Encrypt our card
@@ -186,6 +187,7 @@ impl NfcHandshakeSession {
         &mut self,
         their_ack_bytes: &[u8],
         their_encrypted_card: &[u8],
+        now: u64,
     ) -> Result<Vec<u8>, ExchangeError> {
         let exchange_id = match &self.state {
             NfcHandshakeState::KeyOfferSent { exchange_id } => *exchange_id,
@@ -197,7 +199,7 @@ impl NfcHandshakeSession {
         };
 
         let their_nfc = ExchangeNfc::from_bytes(their_ack_bytes)?;
-        if their_nfc.is_expired() {
+        if their_nfc.is_expired(now) {
             return Err(ExchangeError::NfcExpired);
         }
         if !their_nfc.verify_signature() {

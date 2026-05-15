@@ -34,13 +34,25 @@ fn test_build_response_rejected_without_proximity() {
     let registry = create_test_registry(&identity);
 
     // Initiator with a wrong proximity proof
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "My Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
 
-    let encrypted_request = responder.create_request().unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
 
     let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
@@ -49,7 +61,7 @@ fn test_build_response_rejected_without_proximity() {
         challenge_response: [0xFFu8; 16],
         verified_at: now_unix_secs(),
     };
-    let result = initiator.confirm_link(&request, &wrong_proof);
+    let result = initiator.confirm_link(&request, &wrong_proof, 0u64);
     assert!(
         matches!(result, Err(ExchangeError::ProximityNotVerified)),
         "Expected ProximityNotVerified, got: {:?}",
@@ -65,13 +77,25 @@ fn test_build_response_succeeds_after_proximity_verified() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "My Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
 
-    let encrypted_request = responder.create_request().unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
 
     let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
@@ -80,8 +104,9 @@ fn test_build_response_succeeds_after_proximity_verified() {
         challenge_response: initiator.proximity_challenge(),
         verified_at: now_unix_secs(),
     };
-    let (encrypted_response, updated_registry, new_device) =
-        initiator.confirm_link(&request, &proof).unwrap();
+    let (encrypted_response, updated_registry, new_device) = initiator
+        .confirm_link(&request, &proof, now_unix_secs())
+        .unwrap();
 
     let response = responder.process_response(&encrypted_response).unwrap();
 
@@ -98,7 +123,12 @@ fn test_proximity_challenge_deterministic() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Same initiator should produce the same challenge every time
     let challenge1 = initiator.proximity_challenge();
@@ -115,8 +145,18 @@ fn test_proximity_challenge_differs_per_session() {
     let registry = create_test_registry(&identity);
 
     // Two different initiators (different link_keys) should produce different challenges
-    let initiator1 = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
-    let initiator2 = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator1 = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry.clone(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let initiator2 = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let challenge1 = initiator1.proximity_challenge();
     let challenge2 = initiator2.proximity_challenge();
@@ -133,12 +173,22 @@ fn test_both_sides_derive_same_challenge() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Responder scans the same QR
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "My Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
 
     // Both sides derive the same challenge from the shared link key
     let initiator_challenge = initiator.proximity_challenge();
@@ -155,7 +205,12 @@ fn test_restored_initiator_requires_proximity() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry.clone(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let qr_string = initiator.qr().to_data_string();
 
     // Restore initiator from saved QR
@@ -165,8 +220,15 @@ fn test_restored_initiator_requires_proximity() {
 
     // Responder side
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
-    let encrypted_request = responder.create_request().unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "My Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
 
     let (_confirmation, request) = restored_initiator
         .prepare_confirmation(&encrypted_request)
@@ -177,7 +239,7 @@ fn test_restored_initiator_requires_proximity() {
         challenge_response: [0xFFu8; 16],
         verified_at: now_unix_secs(),
     };
-    let result = restored_initiator.confirm_link(&request, &wrong_proof);
+    let result = restored_initiator.confirm_link(&request, &wrong_proof, 0u64);
     assert!(
         matches!(result, Err(ExchangeError::ProximityNotVerified)),
         "Expected ProximityNotVerified on restored initiator, got: {:?}",
@@ -194,19 +256,35 @@ fn test_deprecated_process_request_requires_proximity() {
     let registry = create_test_registry(&identity);
 
     // Initiator with wrong proximity proof
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
-    let encrypted_request = responder.create_request().unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "My Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
 
     // Deprecated process_request() should also enforce proximity
     let wrong_proof = ProximityProof::Ultrasonic {
         challenge_response: [0xFFu8; 16],
         verified_at: now_unix_secs(),
     };
-    let result = initiator.process_request(&encrypted_request, &wrong_proof);
+    let result = initiator.process_request(
+        &encrypted_request,
+        &wrong_proof,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     assert!(
         matches!(result, Err(ExchangeError::ProximityNotVerified)),
         "Expected ProximityNotVerified on deprecated API, got: {:?}",
@@ -237,15 +315,27 @@ fn test_confirm_link_with_ultrasonic_proof_succeeds() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let challenge = initiator.proximity_challenge();
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "My Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
 
-    let encrypted_request = responder.create_request().unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
     let proof = ProximityProof::Ultrasonic {
@@ -253,8 +343,9 @@ fn test_confirm_link_with_ultrasonic_proof_succeeds() {
         verified_at: now_unix_secs(),
     };
 
-    let (encrypted_response, updated_registry, new_device) =
-        initiator.confirm_link(&request, &proof).unwrap();
+    let (encrypted_response, updated_registry, new_device) = initiator
+        .confirm_link(&request, &proof, now_unix_secs())
+        .unwrap();
 
     let response = responder.process_response(&encrypted_response).unwrap();
 
@@ -272,13 +363,25 @@ fn test_confirm_link_with_manual_proof_succeeds() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "My Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
 
-    let encrypted_request = responder.create_request().unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
     let proof = ProximityProof::ManualConfirmation {
@@ -289,8 +392,9 @@ fn test_confirm_link_with_manual_proof_succeeds() {
         confirmed_at: now_unix_secs(),
     };
 
-    let (encrypted_response, updated_registry, new_device) =
-        initiator.confirm_link(&request, &proof).unwrap();
+    let (encrypted_response, updated_registry, new_device) = initiator
+        .confirm_link(&request, &proof, now_unix_secs())
+        .unwrap();
 
     let response = responder.process_response(&encrypted_response).unwrap();
 
@@ -308,15 +412,27 @@ fn test_confirm_link_with_expired_ultrasonic_rejected() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let challenge = initiator.proximity_challenge();
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "My Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
 
-    let encrypted_request = responder.create_request().unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
     // Timestamp 120 seconds in the past — should be expired
@@ -325,7 +441,7 @@ fn test_confirm_link_with_expired_ultrasonic_rejected() {
         verified_at: now_unix_secs().saturating_sub(120),
     };
 
-    let result = initiator.confirm_link(&request, &proof);
+    let result = initiator.confirm_link(&request, &proof, now_unix_secs());
     assert!(
         matches!(result, Err(ExchangeError::ProximityExpired)),
         "Expected ProximityExpired for stale ultrasonic proof, got: {:?}",
@@ -341,13 +457,25 @@ fn test_confirm_link_with_expired_manual_rejected() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "My Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
 
-    let encrypted_request = responder.create_request().unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
     // Correct MAC but timestamp 120 seconds in the past — should be expired
@@ -359,7 +487,7 @@ fn test_confirm_link_with_expired_manual_rejected() {
         confirmed_at: now_unix_secs().saturating_sub(120),
     };
 
-    let result = initiator.confirm_link(&request, &proof);
+    let result = initiator.confirm_link(&request, &proof, now_unix_secs());
     assert!(
         matches!(result, Err(ExchangeError::ProximityExpired)),
         "Expected ProximityExpired for stale manual proof, got: {:?}",
@@ -375,13 +503,25 @@ fn test_confirm_link_with_wrong_challenge_rejected() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "My Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
 
-    let encrypted_request = responder.create_request().unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
     // Wrong challenge response — attacker doesn't know the correct challenge
@@ -390,7 +530,7 @@ fn test_confirm_link_with_wrong_challenge_rejected() {
         verified_at: now_unix_secs(),
     };
 
-    let result = initiator.confirm_link(&request, &proof);
+    let result = initiator.confirm_link(&request, &proof, now_unix_secs());
     assert!(
         matches!(result, Err(ExchangeError::ProximityNotVerified)),
         "Expected ProximityNotVerified for wrong challenge, got: {:?}",
@@ -406,13 +546,25 @@ fn test_confirm_link_with_wrong_mac_rejected() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string()).unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "My Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
 
-    let encrypted_request = responder.create_request().unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
     // Wrong MAC — attacker doesn't know the confirmation code
@@ -421,7 +573,7 @@ fn test_confirm_link_with_wrong_mac_rejected() {
         confirmed_at: now_unix_secs(),
     };
 
-    let result = initiator.confirm_link(&request, &proof);
+    let result = initiator.confirm_link(&request, &proof, now_unix_secs());
     assert!(
         matches!(result, Err(ExchangeError::ProximityNotVerified)),
         "Expected ProximityNotVerified for wrong MAC, got: {:?}",
@@ -442,16 +594,33 @@ fn test_cross_session_replay_rejected() {
     let registry = create_test_registry(&identity);
 
     // Session A — get the valid challenge
-    let initiator_a = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
+    let initiator_a = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry.clone(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let challenge_a = initiator_a.proximity_challenge();
 
     // Session B — different QR, different link_key
-    let initiator_b = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator_b = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let qr_string_b = initiator_b.qr().to_data_string();
     let scanned_qr_b = DeviceLinkQR::from_data_string(&qr_string_b).unwrap();
-    let mut responder_b = DeviceLinkResponder::from_qr(scanned_qr_b, "Phone".to_string()).unwrap();
-    let encrypted_request_b = responder_b.create_request().unwrap();
+    let mut responder_b = DeviceLinkResponder::from_qr(
+        scanned_qr_b,
+        "Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
+    let encrypted_request_b = responder_b
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (_confirmation_b, request_b) = initiator_b
         .prepare_confirmation(&encrypted_request_b)
         .unwrap();
@@ -462,7 +631,7 @@ fn test_cross_session_replay_rejected() {
         verified_at: now_unix_secs(),
     };
 
-    let result = initiator_b.confirm_link(&request_b, &proof_from_a);
+    let result = initiator_b.confirm_link(&request_b, &proof_from_a, 0u64);
     assert!(
         matches!(result, Err(ExchangeError::ProximityNotVerified)),
         "Replaying a proof from Session A in Session B must be rejected, got: {:?}",
@@ -479,11 +648,23 @@ fn test_cross_session_manual_mac_replay_rejected() {
     let registry = create_test_registry(&identity);
 
     // Session A — compute a valid manual MAC
-    let initiator_a = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
+    let initiator_a = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry.clone(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let qr_string_a = initiator_a.qr().to_data_string();
     let scanned_qr_a = DeviceLinkQR::from_data_string(&qr_string_a).unwrap();
-    let mut responder_a = DeviceLinkResponder::from_qr(scanned_qr_a, "Phone".to_string()).unwrap();
-    let encrypted_request_a = responder_a.create_request().unwrap();
+    let mut responder_a = DeviceLinkResponder::from_qr(
+        scanned_qr_a,
+        "Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
+    let encrypted_request_a = responder_a
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (confirmation_a, _request_a) = initiator_a
         .prepare_confirmation(&encrypted_request_a)
         .unwrap();
@@ -493,11 +674,23 @@ fn test_cross_session_manual_mac_replay_rejected() {
     );
 
     // Session B — different link_key and different confirmation code
-    let initiator_b = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator_b = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let qr_string_b = initiator_b.qr().to_data_string();
     let scanned_qr_b = DeviceLinkQR::from_data_string(&qr_string_b).unwrap();
-    let mut responder_b = DeviceLinkResponder::from_qr(scanned_qr_b, "Phone".to_string()).unwrap();
-    let encrypted_request_b = responder_b.create_request().unwrap();
+    let mut responder_b = DeviceLinkResponder::from_qr(
+        scanned_qr_b,
+        "Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
+    let encrypted_request_b = responder_b
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (_confirmation_b, request_b) = initiator_b
         .prepare_confirmation(&encrypted_request_b)
         .unwrap();
@@ -508,7 +701,7 @@ fn test_cross_session_manual_mac_replay_rejected() {
         confirmed_at: now_unix_secs(),
     };
 
-    let result = initiator_b.confirm_link(&request_b, &proof_from_a);
+    let result = initiator_b.confirm_link(&request_b, &proof_from_a, 0u64);
     assert!(
         matches!(result, Err(ExchangeError::ProximityNotVerified)),
         "Replaying a manual MAC from Session A in Session B must be rejected, got: {:?}",
@@ -528,13 +721,25 @@ fn test_ultrasonic_proof_at_exactly_60_seconds_accepted() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let challenge = initiator.proximity_challenge();
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
-    let encrypted_request = responder.create_request().unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
     // Proof exactly at the 60-second boundary
@@ -543,7 +748,7 @@ fn test_ultrasonic_proof_at_exactly_60_seconds_accepted() {
         verified_at: now_unix_secs().saturating_sub(60),
     };
 
-    let result = initiator.confirm_link(&request, &proof);
+    let result = initiator.confirm_link(&request, &proof, now_unix_secs());
     assert!(
         result.is_ok(),
         "Proof at exactly 60s should be accepted, got: {:?}",
@@ -559,13 +764,25 @@ fn test_ultrasonic_proof_at_61_seconds_rejected() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let challenge = initiator.proximity_challenge();
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
-    let encrypted_request = responder.create_request().unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
     // Proof 1 second beyond the boundary
@@ -574,7 +791,7 @@ fn test_ultrasonic_proof_at_61_seconds_rejected() {
         verified_at: now_unix_secs().saturating_sub(61),
     };
 
-    let result = initiator.confirm_link(&request, &proof);
+    let result = initiator.confirm_link(&request, &proof, now_unix_secs());
     assert!(
         matches!(result, Err(ExchangeError::ProximityExpired)),
         "Proof at 61s should be rejected, got: {:?}",
@@ -590,12 +807,24 @@ fn test_manual_proof_at_exactly_60_seconds_accepted() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
-    let encrypted_request = responder.create_request().unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
     let proof = ProximityProof::ManualConfirmation {
@@ -606,7 +835,7 @@ fn test_manual_proof_at_exactly_60_seconds_accepted() {
         confirmed_at: now_unix_secs().saturating_sub(60),
     };
 
-    let result = initiator.confirm_link(&request, &proof);
+    let result = initiator.confirm_link(&request, &proof, now_unix_secs());
     assert!(
         result.is_ok(),
         "Manual proof at exactly 60s should be accepted, got: {:?}",
@@ -622,12 +851,24 @@ fn test_manual_proof_at_61_seconds_rejected() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
-    let encrypted_request = responder.create_request().unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "Phone".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
     let proof = ProximityProof::ManualConfirmation {
@@ -638,7 +879,7 @@ fn test_manual_proof_at_61_seconds_rejected() {
         confirmed_at: now_unix_secs().saturating_sub(61),
     };
 
-    let result = initiator.confirm_link(&request, &proof);
+    let result = initiator.confirm_link(&request, &proof, now_unix_secs());
     assert!(
         matches!(result, Err(ExchangeError::ProximityExpired)),
         "Manual proof at 61s should be rejected, got: {:?}",
@@ -658,16 +899,27 @@ fn test_self_linking_same_device_name_rejected() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let challenge = initiator.proximity_challenge();
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
 
     // Responder uses the SAME device name as the primary device in the registry
-    let mut responder =
-        DeviceLinkResponder::from_qr(scanned_qr, "Primary Device".to_string()).unwrap();
-    let encrypted_request = responder.create_request().unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "Primary Device".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
     let proof = ProximityProof::Ultrasonic {
@@ -675,7 +927,7 @@ fn test_self_linking_same_device_name_rejected() {
         verified_at: now_unix_secs(),
     };
 
-    let result = initiator.confirm_link(&request, &proof);
+    let result = initiator.confirm_link(&request, &proof, now_unix_secs());
     assert!(
         matches!(result, Err(ExchangeError::SelfLinkingNotAllowed)),
         "Linking with same device name as existing device must be rejected, got err: {:?}",
@@ -691,7 +943,12 @@ fn test_self_linking_restored_initiator_rejected() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone());
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry.clone(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let qr_string = initiator.qr().to_data_string();
 
     // Restore initiator from saved QR
@@ -702,9 +959,15 @@ fn test_self_linking_restored_initiator_rejected() {
     let challenge = restored_initiator.proximity_challenge();
 
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-    let mut responder =
-        DeviceLinkResponder::from_qr(scanned_qr, "Primary Device".to_string()).unwrap();
-    let encrypted_request = responder.create_request().unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "Primary Device".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (_confirmation, request) = restored_initiator
         .prepare_confirmation(&encrypted_request)
         .unwrap();
@@ -714,7 +977,7 @@ fn test_self_linking_restored_initiator_rejected() {
         verified_at: now_unix_secs(),
     };
 
-    let result = restored_initiator.confirm_link(&request, &proof);
+    let result = restored_initiator.confirm_link(&request, &proof, now_unix_secs());
     assert!(
         matches!(result, Err(ExchangeError::SelfLinkingNotAllowed)),
         "Restored initiator must also reject self-linking, got err: {:?}",
@@ -731,15 +994,27 @@ fn test_different_device_name_allowed() {
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let challenge = initiator.proximity_challenge();
 
     let qr_string = initiator.qr().to_data_string();
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
 
     // Different device name — this should succeed
-    let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "New Tablet".to_string()).unwrap();
-    let encrypted_request = responder.create_request().unwrap();
+    let mut responder = DeviceLinkResponder::from_qr(
+        scanned_qr,
+        "New Tablet".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .unwrap();
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .unwrap();
     let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
     let proof = ProximityProof::Ultrasonic {
@@ -747,7 +1022,7 @@ fn test_different_device_name_allowed() {
         verified_at: now_unix_secs(),
     };
 
-    let result = initiator.confirm_link(&request, &proof);
+    let result = initiator.confirm_link(&request, &proof, now_unix_secs());
     assert!(
         result.is_ok(),
         "Different device name should be allowed, got: {:?}",
@@ -772,12 +1047,12 @@ mod proximity_proof_proptests {
                 let master_seed = [0x42u8; 32];
                 let identity = Identity::create("Alice", 0);
                 let registry = create_test_registry(&identity);
-                let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+                let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, vauchi_core::clock::SystemClock::shared().unix_seconds());
 
                 let qr_string = initiator.qr().to_data_string();
                 let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-                let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
-                let encrypted_request = responder.create_request().unwrap();
+                let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string(), vauchi_core::clock::SystemClock::shared().unix_seconds()).unwrap();
+                let encrypted_request = responder.create_request(vauchi_core::clock::SystemClock::shared().unix_seconds()).unwrap();
                 let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
                 let proof = ProximityProof::Ultrasonic {
@@ -785,7 +1060,7 @@ mod proximity_proof_proptests {
                     verified_at: now_unix_secs().saturating_sub(age),
                 };
 
-                let result = initiator.confirm_link(&request, &proof);
+                let result = initiator.confirm_link(&request, &proof, now_unix_secs());
                 prop_assert!(
                     matches!(result, Err(ExchangeError::ProximityExpired)),
                     "Expected ProximityExpired for age={}, got err: {:?}", age, result.err()
@@ -799,7 +1074,7 @@ mod proximity_proof_proptests {
                 let master_seed = [0x42u8; 32];
                 let identity = Identity::create("Alice", 0);
                 let registry = create_test_registry(&identity);
-                let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+                let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, vauchi_core::clock::SystemClock::shared().unix_seconds());
 
                 // Skip if tampered happens to equal the real challenge (astronomically unlikely)
                 let real_challenge = initiator.proximity_challenge();
@@ -807,8 +1082,8 @@ mod proximity_proof_proptests {
 
                 let qr_string = initiator.qr().to_data_string();
                 let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-                let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
-                let encrypted_request = responder.create_request().unwrap();
+                let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string(), vauchi_core::clock::SystemClock::shared().unix_seconds()).unwrap();
+                let encrypted_request = responder.create_request(vauchi_core::clock::SystemClock::shared().unix_seconds()).unwrap();
                 let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
                 let proof = ProximityProof::Ultrasonic {
@@ -816,7 +1091,7 @@ mod proximity_proof_proptests {
                     verified_at: now_unix_secs(),
                 };
 
-                let result = initiator.confirm_link(&request, &proof);
+                let result = initiator.confirm_link(&request, &proof, now_unix_secs());
                 prop_assert!(
                     matches!(result, Err(ExchangeError::ProximityNotVerified)),
                     "Expected ProximityNotVerified for tampered challenge, got err: {:?}", result.err()
@@ -830,12 +1105,12 @@ mod proximity_proof_proptests {
                 let master_seed = [0x42u8; 32];
                 let identity = Identity::create("Alice", 0);
                 let registry = create_test_registry(&identity);
-                let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+                let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, vauchi_core::clock::SystemClock::shared().unix_seconds());
 
                 let qr_string = initiator.qr().to_data_string();
                 let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
-                let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string()).unwrap();
-                let encrypted_request = responder.create_request().unwrap();
+                let mut responder = DeviceLinkResponder::from_qr(scanned_qr, "Phone".to_string(), vauchi_core::clock::SystemClock::shared().unix_seconds()).unwrap();
+                let encrypted_request = responder.create_request(vauchi_core::clock::SystemClock::shared().unix_seconds()).unwrap();
                 let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
                 // Skip if tampered MAC happens to equal the real MAC
@@ -847,7 +1122,7 @@ mod proximity_proof_proptests {
                     confirmed_at: now_unix_secs(),
                 };
 
-                let result = initiator.confirm_link(&request, &proof);
+                let result = initiator.confirm_link(&request, &proof, now_unix_secs());
                 prop_assert!(
                     matches!(result, Err(ExchangeError::ProximityNotVerified)),
                     "Expected ProximityNotVerified for tampered MAC, got err: {:?}", result.err()

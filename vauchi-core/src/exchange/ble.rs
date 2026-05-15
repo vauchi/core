@@ -546,12 +546,12 @@ pub struct ExchangeBle {
 
 impl ExchangeBle {
     /// Generates a new BLE exchange payload.
-    pub fn generate(identity: &Identity, ephemeral: &X3DHKeyPair) -> Self {
+    pub fn generate(identity: &Identity, ephemeral: &X3DHKeyPair, now: u64) -> Self {
         use crate::crypto::random_bytes;
 
         let token: [u8; 32] = random_bytes();
 
-        let timestamp = super::now_secs();
+        let timestamp = now;
 
         Self::generate_with_timestamp(identity, ephemeral, token, timestamp)
     }
@@ -590,8 +590,8 @@ impl ExchangeBle {
     }
 
     /// Checks if the payload has expired.
-    pub fn is_expired(&self) -> bool {
-        is_payload_expired(self.inner.timestamp, BLE_EXPIRY_SECONDS)
+    pub fn is_expired(&self, now: u64) -> bool {
+        is_payload_expired(self.inner.timestamp, BLE_EXPIRY_SECONDS, now)
     }
 
     /// Verifies the Ed25519 signature.

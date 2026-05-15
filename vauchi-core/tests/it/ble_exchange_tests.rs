@@ -27,11 +27,15 @@ fn test_ble_payload_generate() {
     let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
-    let payload = ExchangeBle::generate(&identity, &ephemeral);
+    let payload = ExchangeBle::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     assert_eq!(payload.identity_key(), identity.signing_public_key());
     assert_eq!(payload.exchange_key(), ephemeral.public_key());
-    assert!(!payload.is_expired());
+    assert!(!payload.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()));
     assert!(payload.verify_signature());
 }
 
@@ -41,7 +45,11 @@ fn test_ble_payload_roundtrip() {
     let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
-    let payload = ExchangeBle::generate(&identity, &ephemeral);
+    let payload = ExchangeBle::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let bytes = payload.to_bytes();
 
     assert_eq!(bytes.len(), BLE_PAYLOAD_SIZE);
@@ -62,7 +70,11 @@ fn test_ble_payload_signature() {
     let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
-    let payload = ExchangeBle::generate(&identity, &ephemeral);
+    let payload = ExchangeBle::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     assert!(payload.verify_signature());
 }
 
@@ -72,7 +84,11 @@ fn test_ble_payload_tamper() {
     let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
-    let payload = ExchangeBle::generate(&identity, &ephemeral);
+    let payload = ExchangeBle::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let mut bytes = payload.to_bytes();
 
     // Tamper with exchange key byte
@@ -91,7 +107,11 @@ fn test_ble_payload_magic() {
     let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
-    let payload = ExchangeBle::generate(&identity, &ephemeral);
+    let payload = ExchangeBle::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let mut bytes = payload.to_bytes();
 
     bytes[0..4].copy_from_slice(b"XXXX");
@@ -113,12 +133,15 @@ fn test_ble_payload_expiry() {
 
     // 2 minutes ago — should be expired (BLE is 60s)
     let old = ExchangeBle::generate_with_timestamp(&identity, &ephemeral, [0u8; 32], now - 120);
-    assert!(old.is_expired(), "2-min old BLE payload should be expired");
+    assert!(
+        old.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
+        "2-min old BLE payload should be expired"
+    );
 
     // Fresh
     let fresh = ExchangeBle::generate_with_timestamp(&identity, &ephemeral, [0u8; 32], now);
     assert!(
-        !fresh.is_expired(),
+        !fresh.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
         "Fresh BLE payload should not be expired"
     );
 }
@@ -168,7 +191,11 @@ fn test_gatt_service_uuid_match() {
 fn test_mock_ble_transport_advertise() {
     let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
-    let payload = ExchangeBle::generate(&identity, &ephemeral);
+    let payload = ExchangeBle::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let mock = MockBLETransport::with_peer_payload(&payload.to_bytes());
     mock.start_advertising(&payload).expect("expected success");
@@ -186,7 +213,11 @@ fn test_mock_ble_transport_scan() {
 fn test_mock_ble_transport_connect_read_write() {
     let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
-    let payload = ExchangeBle::generate(&identity, &ephemeral);
+    let payload = ExchangeBle::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let payload_bytes = payload.to_bytes();
 
     let mock = MockBLETransport::with_peer_payload(&payload_bytes);
@@ -266,7 +297,11 @@ fn test_ble_payload_exchanged_transitions() {
 
     // Bob generates his BLE payload
     let bob_eph = X3DHKeyPair::generate();
-    let bob_payload = ExchangeBle::generate(&bob_identity, &bob_eph);
+    let bob_payload = ExchangeBle::generate(
+        &bob_identity,
+        &bob_eph,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Alice receives Bob's payload via BLE
     alice_session
@@ -303,7 +338,11 @@ fn test_ble_proximity_verified_transitions() {
 
     // Payload exchange
     let bob_eph = X3DHKeyPair::generate();
-    let bob_payload = ExchangeBle::generate(&bob_identity, &bob_eph);
+    let bob_payload = ExchangeBle::generate(
+        &bob_identity,
+        &bob_eph,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     alice_session
         .apply(ExchangeEvent::BlePayloadExchanged {
             their_payload: bob_payload.to_bytes().to_vec(),
@@ -351,8 +390,16 @@ fn test_ble_full_lifecycle() {
     let alice_eph = X3DHKeyPair::generate();
     let bob_eph = X3DHKeyPair::generate();
 
-    let alice_ble = ExchangeBle::generate(&alice_id2, &alice_eph);
-    let bob_ble = ExchangeBle::generate(&bob_id2, &bob_eph);
+    let alice_ble = ExchangeBle::generate(
+        &alice_id2,
+        &alice_eph,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let bob_ble = ExchangeBle::generate(
+        &bob_id2,
+        &bob_eph,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Step 1: Payload exchange via GATT
     alice_session
@@ -456,7 +503,11 @@ fn test_ble_self_exchange() {
     let alice_identity = Identity::create("Alice", 0);
 
     let eph = X3DHKeyPair::generate();
-    let self_payload = ExchangeBle::generate(&alice_identity, &eph);
+    let self_payload = ExchangeBle::generate(
+        &alice_identity,
+        &eph,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let self_bytes = self_payload.to_bytes().to_vec();
 
     let card = ContactCard::new("Alice");
@@ -574,7 +625,11 @@ fn test_ble_challenge_response_blocks_on_failure() {
     );
 
     let bob_eph = X3DHKeyPair::generate();
-    let bob_payload = ExchangeBle::generate(&bob_identity, &bob_eph);
+    let bob_payload = ExchangeBle::generate(
+        &bob_identity,
+        &bob_eph,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     session
         .apply(ExchangeEvent::BlePayloadExchanged {
@@ -605,8 +660,16 @@ fn test_ble_full_exchange_with_mock_transport() {
     let alice_eph = X3DHKeyPair::generate();
     let bob_eph = X3DHKeyPair::generate();
 
-    let alice_ble = ExchangeBle::generate(&alice_identity, &alice_eph);
-    let bob_ble = ExchangeBle::generate(&bob_identity, &bob_eph);
+    let alice_ble = ExchangeBle::generate(
+        &alice_identity,
+        &alice_eph,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let bob_ble = ExchangeBle::generate(
+        &bob_identity,
+        &bob_eph,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Alice's mock transport has Bob's payload available to read
     let alice_transport = MockBLETransport::with_peer_payload(&bob_ble.to_bytes());
@@ -691,7 +754,11 @@ fn test_ble_payload_size() {
 
     let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
-    let payload = ExchangeBle::generate(&identity, &ephemeral);
+    let payload = ExchangeBle::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let bytes = payload.to_bytes();
 
     assert_eq!(bytes.len(), 174);

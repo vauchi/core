@@ -25,7 +25,10 @@ fn test_initiator_creates_key_offer() {
     assert!(matches!(session.state(), NfcHandshakeState::Idle));
 
     let offer_bytes = session
-        .create_key_offer(&identity)
+        .create_key_offer(
+            &identity,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
         .expect("key offer should succeed");
 
     assert!(matches!(
@@ -36,7 +39,7 @@ fn test_initiator_creates_key_offer() {
 
     let parsed = ExchangeNfc::from_bytes(&offer_bytes).expect("should parse as ExchangeNfc");
     assert!(parsed.verify_signature());
-    assert!(!parsed.is_expired());
+    assert!(!parsed.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()));
 }
 
 // @internal
@@ -45,8 +48,16 @@ fn test_double_key_offer_rejected() {
     let identity = make_test_identity();
     let mut session = NfcHandshakeSession::new_initiator(&identity, "Test".to_string());
 
-    session.create_key_offer(&identity).expect("first offer");
-    let result = session.create_key_offer(&identity);
+    session
+        .create_key_offer(
+            &identity,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("first offer");
+    let result = session.create_key_offer(
+        &identity,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     assert!(matches!(result, Err(ExchangeError::InvalidState(_))));
 }
 
@@ -64,14 +75,29 @@ fn test_full_handshake_happy_path() {
     let mut bob = NfcHandshakeSession::new_responder(&bob_id, "Bob".to_string());
 
     // Phase 1: Alice creates key offer
-    let offer = alice.create_key_offer(&alice_id).expect("key offer");
+    let offer = alice
+        .create_key_offer(
+            &alice_id,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("key offer");
 
     // Phase 2: Bob processes offer, returns ack + encrypted card
-    let (ack_bytes, bob_encrypted_card) = bob.process_key_offer(&bob_id, &offer).expect("key ack");
+    let (ack_bytes, bob_encrypted_card) = bob
+        .process_key_offer(
+            &bob_id,
+            &offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("key ack");
 
     // Phase 2 (Alice): Alice processes ack, decrypts Bob's card
     let alice_encrypted_card = alice
-        .process_key_ack(&ack_bytes, &bob_encrypted_card)
+        .process_key_ack(
+            &ack_bytes,
+            &bob_encrypted_card,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
         .expect("process ack");
 
     // Phase 3: Bob decrypts Alice's card
@@ -120,7 +146,11 @@ fn test_expired_key_offer_rejected() {
     let expired_bytes = expired_nfc.to_bytes();
 
     let mut bob = NfcHandshakeSession::new_responder(&bob_id, "Bob".to_string());
-    let result = bob.process_key_offer(&bob_id, &expired_bytes);
+    let result = bob.process_key_offer(
+        &bob_id,
+        &expired_bytes,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     assert!(matches!(result, Err(ExchangeError::NfcExpired)));
 }
 
@@ -133,16 +163,30 @@ fn test_tampered_ciphertext_rejected() {
     let mut alice = NfcHandshakeSession::new_initiator(&alice_id, "Alice".to_string());
     let mut bob = NfcHandshakeSession::new_responder(&bob_id, "Bob".to_string());
 
-    let offer = alice.create_key_offer(&alice_id).expect("key offer");
-    let (ack_bytes, mut bob_encrypted_card) =
-        bob.process_key_offer(&bob_id, &offer).expect("key ack");
+    let offer = alice
+        .create_key_offer(
+            &alice_id,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("key offer");
+    let (ack_bytes, mut bob_encrypted_card) = bob
+        .process_key_offer(
+            &bob_id,
+            &offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("key ack");
 
     // Tamper with encrypted card
     if let Some(byte) = bob_encrypted_card.last_mut() {
         *byte ^= 0xFF;
     }
 
-    let result = alice.process_key_ack(&ack_bytes, &bob_encrypted_card);
+    let result = alice.process_key_ack(
+        &ack_bytes,
+        &bob_encrypted_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     assert!(matches!(result, Err(ExchangeError::NfcDecryptionFailed)));
 }
 
@@ -155,10 +199,25 @@ fn test_tampered_phase3_ciphertext_rejected() {
     let mut alice = NfcHandshakeSession::new_initiator(&alice_id, "Alice".to_string());
     let mut bob = NfcHandshakeSession::new_responder(&bob_id, "Bob".to_string());
 
-    let offer = alice.create_key_offer(&alice_id).expect("key offer");
-    let (ack_bytes, bob_encrypted_card) = bob.process_key_offer(&bob_id, &offer).expect("key ack");
+    let offer = alice
+        .create_key_offer(
+            &alice_id,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("key offer");
+    let (ack_bytes, bob_encrypted_card) = bob
+        .process_key_offer(
+            &bob_id,
+            &offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("key ack");
     let mut alice_encrypted_card = alice
-        .process_key_ack(&ack_bytes, &bob_encrypted_card)
+        .process_key_ack(
+            &ack_bytes,
+            &bob_encrypted_card,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
         .expect("process ack");
 
     // Tamper with Alice's encrypted card
@@ -177,7 +236,7 @@ fn test_invalid_state_transitions() {
     let mut session = NfcHandshakeSession::new_initiator(&identity, "Test".to_string());
 
     // Cannot process key ack from Idle state
-    let result = session.process_key_ack(&[0; 174], &[0; 100]);
+    let result = session.process_key_ack(&[0; 174], &[0; 100], 0u64);
     assert!(matches!(result, Err(ExchangeError::InvalidState(_))));
 
     // Cannot process encrypted card from Idle state
@@ -202,9 +261,19 @@ fn test_relay_fallback_from_key_ack_received() {
     let mut alice = NfcHandshakeSession::new_initiator(&alice_id, "Alice".to_string());
     let mut bob = NfcHandshakeSession::new_responder(&bob_id, "Bob".to_string());
 
-    let offer = alice.create_key_offer(&alice_id).expect("key offer");
-    let (_ack_bytes, _bob_encrypted_card) =
-        bob.process_key_offer(&bob_id, &offer).expect("key ack");
+    let offer = alice
+        .create_key_offer(
+            &alice_id,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("key offer");
+    let (_ack_bytes, _bob_encrypted_card) = bob
+        .process_key_offer(
+            &bob_id,
+            &offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("key ack");
 
     // Bob's tap drops after key exchange — fallback to relay
     let result = bob.enter_relay_fallback();
@@ -232,7 +301,12 @@ fn test_relay_fallback_without_shared_key_fails() {
     let mut session = NfcHandshakeSession::new_initiator(&identity, "Test".to_string());
 
     // Create key offer (moves to KeyOfferSent but no shared key yet)
-    session.create_key_offer(&identity).expect("key offer");
+    session
+        .create_key_offer(
+            &identity,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("key offer");
 
     let result = session.enter_relay_fallback();
     assert!(matches!(result, Err(ExchangeError::InvalidState(_))));
@@ -251,10 +325,25 @@ fn test_exchange_preserves_identity_keys() {
     let mut alice = NfcHandshakeSession::new_initiator(&alice_id, "Alice".to_string());
     let mut bob = NfcHandshakeSession::new_responder(&bob_id, "Bob".to_string());
 
-    let offer = alice.create_key_offer(&alice_id).expect("key offer");
-    let (ack_bytes, bob_encrypted_card) = bob.process_key_offer(&bob_id, &offer).expect("key ack");
+    let offer = alice
+        .create_key_offer(
+            &alice_id,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("key offer");
+    let (ack_bytes, bob_encrypted_card) = bob
+        .process_key_offer(
+            &bob_id,
+            &offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("key ack");
     let alice_encrypted_card = alice
-        .process_key_ack(&ack_bytes, &bob_encrypted_card)
+        .process_key_ack(
+            &ack_bytes,
+            &bob_encrypted_card,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
         .expect("process ack");
     let bob_result = bob
         .process_encrypted_card(&alice_encrypted_card)
@@ -289,9 +378,9 @@ proptest! {
         let mut alice = NfcHandshakeSession::new_initiator(&alice_id, alice_name.clone());
         let mut bob = NfcHandshakeSession::new_responder(&bob_id, bob_name.clone());
 
-        let offer = alice.create_key_offer(&alice_id).unwrap();
-        let (ack, bob_card) = bob.process_key_offer(&bob_id, &offer).unwrap();
-        let alice_card = alice.process_key_ack(&ack, &bob_card).unwrap();
+        let offer = alice.create_key_offer(&alice_id, vauchi_core::clock::SystemClock::shared().unix_seconds()).unwrap();
+        let (ack, bob_card) = bob.process_key_offer(&bob_id, &offer, vauchi_core::clock::SystemClock::shared().unix_seconds()).unwrap();
+        let alice_card = alice.process_key_ack(&ack, &bob_card, vauchi_core::clock::SystemClock::shared().unix_seconds()).unwrap();
         let bob_result = bob.process_encrypted_card(&alice_card).unwrap();
         let alice_result = alice.confirm_send_success().unwrap();
 

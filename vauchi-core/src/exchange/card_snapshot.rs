@@ -28,10 +28,10 @@ pub struct CardSnapshot {
 impl CardSnapshot {
     /// Freeze `card` into an immutable snapshot, recording `now` as the
     /// creation time.
-    pub fn freeze(card: ContactCard) -> Self {
+    pub fn freeze(card: ContactCard, now: u64) -> Self {
         Self {
             card,
-            created_at: now_secs(),
+            created_at: now,
         }
     }
 
@@ -71,20 +71,16 @@ impl CardSnapshot {
     /// timestamp is not encoded in the bytes; callers that need round-trip
     /// fidelity should persist the timestamp separately.
     /// Returns a [`serde_json::Error`] if the bytes are not valid JSON.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, serde_json::Error> {
+    pub fn from_bytes(bytes: &[u8], now: u64) -> Result<Self, serde_json::Error> {
         let card: ContactCard = serde_json::from_slice(bytes)?;
         Ok(Self {
             card,
-            created_at: now_secs(),
+            created_at: now,
         })
     }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-fn now_secs() -> u64 {
-    super::now_secs()
-}
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -106,7 +102,7 @@ mod tests {
         ))
         .expect("add field");
 
-        let snapshot = CardSnapshot::freeze(card);
+        let snapshot = CardSnapshot::freeze(card, 0u64);
 
         assert_eq!(snapshot.display_name(), "Alice");
         let fields = snapshot.card().fields();
@@ -126,7 +122,7 @@ mod tests {
         .expect("add field");
 
         // Freeze a clone of the card, then mutate the original.
-        let snapshot = CardSnapshot::freeze(card.clone());
+        let snapshot = CardSnapshot::freeze(card.clone(), 0u64);
         // The original card is consumed above; use the clone for mutation.
         let mut mutated = card;
         mutated.set_display_name("Bobby").expect("set name");
@@ -138,29 +134,26 @@ mod tests {
     #[test]
     fn snapshot_serializes_to_bytes() {
         let card = ContactCard::new("Carol");
-        let snapshot = CardSnapshot::freeze(card);
+        let snapshot = CardSnapshot::freeze(card, 0u64);
 
         let bytes = snapshot.to_bytes().unwrap();
         assert!(!bytes.is_empty(), "to_bytes must produce non-empty output");
 
-        let recovered = CardSnapshot::from_bytes(&bytes).expect("from_bytes");
+        let recovered = CardSnapshot::from_bytes(&bytes, 0u64).expect("from_bytes");
         assert_eq!(recovered.display_name(), "Carol");
     }
 
     #[test]
     fn snapshot_created_at_is_populated() {
         let card = ContactCard::new("Dave");
-        let snapshot = CardSnapshot::freeze(card);
-        assert!(
-            snapshot.created_at() > 0,
-            "created_at should be a positive Unix timestamp"
-        );
+        let snapshot = CardSnapshot::freeze(card, 1_700_000_000);
+        assert_eq!(snapshot.created_at(), 1_700_000_000);
     }
 
     #[test]
     fn serde_roundtrip() {
         let card = ContactCard::new("Serde");
-        let snapshot = CardSnapshot::freeze(card);
+        let snapshot = CardSnapshot::freeze(card, 0u64);
         let json = serde_json::to_string(&snapshot).unwrap();
         let decoded: CardSnapshot = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.display_name(), "Serde");

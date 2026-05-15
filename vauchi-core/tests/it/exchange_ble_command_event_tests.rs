@@ -166,7 +166,12 @@ fn ble_full_initiator_flow_via_command_event() {
     let bob_hs = responder_hs
         .ble_handshake_mut()
         .expect("Bob should have a BLE handshake session");
-    let (key_ack, bob_encrypted_card) = bob_hs.process_key_offer(&key_offer).unwrap();
+    let (key_ack, bob_encrypted_card) = bob_hs
+        .process_key_offer(
+            &key_offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .unwrap();
 
     assert_eq!(key_ack.len(), 145, "v2 KeyAck should be 145 bytes");
 
@@ -312,7 +317,12 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
 
     // Responder processes
     let bob_hs = responder.ble_handshake_mut().unwrap();
-    let (key_ack, encrypted_card) = bob_hs.process_key_offer(&key_offer).unwrap();
+    let (key_ack, encrypted_card) = bob_hs
+        .process_key_offer(
+            &key_offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .unwrap();
 
     // Feed card data BEFORE key_ack (reversed order)
     initiator

@@ -39,8 +39,13 @@ impl DeviceLinkInitiator {
     /// In a real implementation, we'd need a way to access the master seed
     /// from the identity - this is intentionally designed to require explicit
     /// seed access for security.
-    pub fn new(master_seed: [u8; 32], identity: &Identity, registry: DeviceRegistry) -> Self {
-        let qr = DeviceLinkQR::generate(identity);
+    pub fn new(
+        master_seed: [u8; 32],
+        identity: &Identity,
+        registry: DeviceRegistry,
+        now: u64,
+    ) -> Self {
+        let qr = DeviceLinkQR::generate(identity, now);
 
         DeviceLinkInitiator {
             _identity_public_key: *identity.signing_public_key(),
@@ -103,8 +108,9 @@ impl DeviceLinkInitiator {
         &self,
         request: &DeviceLinkRequest,
         proof: &ProximityProof,
+        now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        self.build_response(request, None, proof)
+        self.build_response(request, None, proof, now)
     }
 
     /// After the user confirms the link, creates the encrypted response with the
@@ -116,8 +122,9 @@ impl DeviceLinkInitiator {
         request: &DeviceLinkRequest,
         sync_payload_json: &str,
         proof: &ProximityProof,
+        now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        self.build_response(request, Some(sync_payload_json), proof)
+        self.build_response(request, Some(sync_payload_json), proof, now)
     }
 
     /// Processes a link request and creates a response.
@@ -128,6 +135,7 @@ impl DeviceLinkInitiator {
         &self,
         encrypted_request: &[u8],
         proof: &ProximityProof,
+        now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
@@ -135,7 +143,7 @@ impl DeviceLinkInitiator {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        self.build_response(&request, None, proof)
+        self.build_response(&request, None, proof, now)
     }
 
     /// Processes a link request and creates a response with sync payload.
@@ -149,6 +157,7 @@ impl DeviceLinkInitiator {
         encrypted_request: &[u8],
         sync_payload_json: &str,
         proof: &ProximityProof,
+        now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
@@ -156,7 +165,7 @@ impl DeviceLinkInitiator {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        self.build_response(&request, Some(sync_payload_json), proof)
+        self.build_response(&request, Some(sync_payload_json), proof, now)
     }
 
     /// Internal helper to build the response from a validated request.
@@ -170,6 +179,7 @@ impl DeviceLinkInitiator {
         request: &DeviceLinkRequest,
         sync_payload_json: Option<&str>,
         proof: &ProximityProof,
+        now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         // DL-6: Reject self-linking — device name must not match any active device.
         // Note: This is a name-based heuristic. Proper enforcement requires a
@@ -184,7 +194,7 @@ impl DeviceLinkInitiator {
         }
 
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
-        self.validate_proximity_proof(proof, &confirmation_code)?;
+        self.validate_proximity_proof(proof, &confirmation_code, now)?;
 
         let device_index = self.registry.next_device_index();
 
@@ -192,7 +202,7 @@ impl DeviceLinkInitiator {
             &self.master_seed,
             device_index,
             request.device_name.clone(),
-            crate::exchange::now_secs(),
+            now,
         );
 
         let mut updated_registry = self.registry.clone();
@@ -221,7 +231,7 @@ impl DeviceLinkInitiator {
             &self.master_seed,
             device_index,
             request.device_name.clone(),
-            crate::exchange::now_secs(),
+            now,
         );
 
         Ok((encrypted_response, updated_registry, new_device))
@@ -236,9 +246,8 @@ impl DeviceLinkInitiator {
         &self,
         proof: &ProximityProof,
         confirmation_code: &str,
+        now: u64,
     ) -> Result<(), ExchangeError> {
-        let now = crate::exchange::now_secs();
-
         match proof {
             ProximityProof::Ultrasonic {
                 challenge_response,
@@ -349,8 +358,9 @@ impl DeviceLinkInitiatorRestored {
         &self,
         request: &DeviceLinkRequest,
         proof: &ProximityProof,
+        now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        self.build_response(request, None, proof)
+        self.build_response(request, None, proof, now)
     }
 
     /// After the user confirms the link, creates the encrypted response with sync payload.
@@ -359,8 +369,9 @@ impl DeviceLinkInitiatorRestored {
         request: &DeviceLinkRequest,
         sync_payload_json: &str,
         proof: &ProximityProof,
+        now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
-        self.build_response(request, Some(sync_payload_json), proof)
+        self.build_response(request, Some(sync_payload_json), proof, now)
     }
 
     /// Processes a link request and creates a response.
@@ -369,6 +380,7 @@ impl DeviceLinkInitiatorRestored {
         &self,
         encrypted_request: &[u8],
         proof: &ProximityProof,
+        now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
@@ -376,7 +388,7 @@ impl DeviceLinkInitiatorRestored {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        self.build_response(&request, None, proof)
+        self.build_response(&request, None, proof, now)
     }
 
     /// Processes a link request with sync payload and creates a response.
@@ -388,6 +400,7 @@ impl DeviceLinkInitiatorRestored {
         encrypted_request: &[u8],
         sync_payload_json: &str,
         proof: &ProximityProof,
+        now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         let request = DeviceLinkRequest::decrypt(encrypted_request, self.qr.link_key())?;
 
@@ -395,7 +408,7 @@ impl DeviceLinkInitiatorRestored {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        self.build_response(&request, Some(sync_payload_json), proof)
+        self.build_response(&request, Some(sync_payload_json), proof, now)
     }
 
     /// Internal helper to build the response from a validated request.
@@ -409,6 +422,7 @@ impl DeviceLinkInitiatorRestored {
         request: &DeviceLinkRequest,
         sync_payload_json: Option<&str>,
         proof: &ProximityProof,
+        now: u64,
     ) -> Result<(Vec<u8>, DeviceRegistry, DeviceInfo), ExchangeError> {
         // DL-6: Reject self-linking — device name must not match any active device.
         // Note: This is a name-based heuristic. Proper enforcement requires a
@@ -423,7 +437,7 @@ impl DeviceLinkInitiatorRestored {
         }
 
         let confirmation_code = derive_confirmation_code(self.qr.link_key(), &request.nonce);
-        self.validate_proximity_proof(proof, &confirmation_code)?;
+        self.validate_proximity_proof(proof, &confirmation_code, now)?;
 
         let device_index = self.registry.next_device_index();
 
@@ -431,7 +445,7 @@ impl DeviceLinkInitiatorRestored {
             &self.master_seed,
             device_index,
             request.device_name.clone(),
-            crate::exchange::now_secs(),
+            now,
         );
 
         let mut updated_registry = self.registry.clone();
@@ -460,7 +474,7 @@ impl DeviceLinkInitiatorRestored {
             &self.master_seed,
             device_index,
             request.device_name.clone(),
-            crate::exchange::now_secs(),
+            now,
         );
 
         Ok((encrypted_response, updated_registry, new_device))
@@ -475,9 +489,8 @@ impl DeviceLinkInitiatorRestored {
         &self,
         proof: &ProximityProof,
         confirmation_code: &str,
+        now: u64,
     ) -> Result<(), ExchangeError> {
-        let now = crate::exchange::now_secs();
-
         match proof {
             ProximityProof::Ultrasonic {
                 challenge_response,

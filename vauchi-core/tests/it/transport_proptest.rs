@@ -54,8 +54,8 @@ proptest! {
     fn encrypt_decrypt_roundtrip(data in proptest::collection::vec(any::<u8>(), 1..4096)) {
         let alice = ExchangeProtocol::new_random();
         let bob = ExchangeProtocol::new_random();
-        let offer_a = alice.create_offer().unwrap();
-        let offer_b = bob.create_offer().unwrap();
+        let offer_a = alice.create_offer(0u64).unwrap();
+        let offer_b = bob.create_offer(0u64).unwrap();
         let shared_a = alice.process_offer(&offer_b).unwrap();
         let shared_b = bob.process_offer(&offer_a).unwrap();
         // Both sides derive same key

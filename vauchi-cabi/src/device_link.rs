@@ -62,7 +62,8 @@ pub unsafe extern "C" fn vauchi_device_link_start(
             .flatten()
             .unwrap_or_else(|| identity.initial_device_registry());
 
-        let initiator = identity.create_device_link_initiator(registry);
+        let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+        let initiator = identity.create_device_link_initiator(registry, now);
 
         Box::into_raw(Box::new(VauchiDeviceLinkInitiator {
             inner: Mutex::new(initiator),
@@ -253,7 +254,8 @@ pub unsafe extern "C" fn vauchi_device_link_confirm_manual(
             Err(_) => return to_c_string(r#"{"error":"lock poisoned"}"#),
         };
 
-        match guard.confirm_link(&request, &proof) {
+        let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+        match guard.confirm_link(&request, &proof, now) {
             Ok((encrypted_response, _registry, device_info)) => {
                 let json = serde_json::json!({
                     "encrypted_response": BASE64.encode(&encrypted_response),

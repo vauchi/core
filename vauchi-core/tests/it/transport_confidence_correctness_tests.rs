@@ -149,7 +149,11 @@ fn nfc_exchange_sets_high_confidence_without_running_verifier() {
 
     // Generate a valid NFC payload from Bob's side
     let bob_ephemeral = vauchi_core::exchange::X3DHKeyPair::generate();
-    let bob_nfc = vauchi_core::exchange::ExchangeNfc::generate(&bob, &bob_ephemeral);
+    let bob_nfc = vauchi_core::exchange::ExchangeNfc::generate(
+        &bob,
+        &bob_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let bob_payload = bob_nfc.to_bytes().to_vec();
 
     // NFC tap delivers Bob's payload

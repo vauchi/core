@@ -91,8 +91,8 @@ impl ExchangeQR {
     ///
     /// The exchange key in the QR is the provided ephemeral key, not the
     /// identity's static X3DH key. This gives full forward secrecy.
-    pub fn generate(identity: &Identity, ephemeral: &X3DHKeyPair) -> Self {
-        Self::generate_with_relay(identity, ephemeral, None, None)
+    pub fn generate(identity: &Identity, ephemeral: &X3DHKeyPair, now: u64) -> Self {
+        Self::generate_with_relay(identity, ephemeral, None, None, now)
     }
 
     /// Generates a QR code with optional relay metadata.
@@ -105,8 +105,9 @@ impl ExchangeQR {
         ephemeral: &X3DHKeyPair,
         relay_url: Option<String>,
         relay_noise_pubkey: Option<[u8; 32]>,
+        now: u64,
     ) -> Self {
-        let timestamp = super::now_secs();
+        let timestamp = now;
 
         Self::generate_with_relay_and_timestamp(
             identity,
@@ -213,9 +214,7 @@ impl ExchangeQR {
     }
 
     /// Checks if the QR code has expired.
-    pub fn is_expired(&self) -> bool {
-        let now = super::now_secs();
-
+    pub fn is_expired(&self, now: u64) -> bool {
         now > self.timestamp + QR_EXPIRY_SECONDS
     }
 
@@ -493,9 +492,7 @@ const MAX_CLOCK_DRIFT_SECONDS: u64 = 30;
 /// Returns `Ok(())` if the absolute difference is at most
 /// `MAX_CLOCK_DRIFT_SECONDS` (30 seconds). Otherwise returns
 /// `ExchangeError::ClockDrift` with the signed delta.
-pub fn check_clock_drift(qr_timestamp: u64) -> Result<(), ExchangeError> {
-    let now = super::now_secs();
-
+pub fn check_clock_drift(qr_timestamp: u64, now: u64) -> Result<(), ExchangeError> {
     let drift = (now as i64) - (qr_timestamp as i64);
 
     if drift.unsigned_abs() > MAX_CLOCK_DRIFT_SECONDS {
@@ -519,7 +516,7 @@ mod tests {
     fn test_qr_generation() {
         let identity = Identity::create("Alice", 0);
         let ephemeral = X3DHKeyPair::generate();
-        let qr = ExchangeQR::generate(&identity, &ephemeral);
+        let qr = ExchangeQR::generate(&identity, &ephemeral, 0u64);
 
         assert_eq!(qr.version, PROTOCOL_VERSION);
         assert_eq!(qr.public_key(), identity.signing_public_key());
@@ -533,7 +530,7 @@ mod tests {
     fn test_qr_signature_valid() {
         let identity = Identity::create("Alice", 0);
         let ephemeral = X3DHKeyPair::generate();
-        let qr = ExchangeQR::generate(&identity, &ephemeral);
+        let qr = ExchangeQR::generate(&identity, &ephemeral, 0u64);
 
         assert!(qr.verify_signature());
     }
@@ -542,16 +539,16 @@ mod tests {
     fn test_qr_not_expired_initially() {
         let identity = Identity::create("Alice", 0);
         let ephemeral = X3DHKeyPair::generate();
-        let qr = ExchangeQR::generate(&identity, &ephemeral);
+        let qr = ExchangeQR::generate(&identity, &ephemeral, 0u64);
 
-        assert!(!qr.is_expired());
+        assert!(!qr.is_expired(0u64));
     }
 
     #[test]
     fn test_qr_roundtrip_with_display_name() {
         let identity = Identity::create("Alice", 0);
         let ephemeral = X3DHKeyPair::generate();
-        let qr = ExchangeQR::generate(&identity, &ephemeral);
+        let qr = ExchangeQR::generate(&identity, &ephemeral, 0u64);
 
         let data_string = qr.to_data_string();
         let parsed = ExchangeQR::from_data_string(&data_string).unwrap();
@@ -567,7 +564,7 @@ mod tests {
     fn test_qr_roundtrip_unicode_name() {
         let identity = Identity::create("Müller 日本語", 0);
         let ephemeral = X3DHKeyPair::generate();
-        let qr = ExchangeQR::generate(&identity, &ephemeral);
+        let qr = ExchangeQR::generate(&identity, &ephemeral, 0u64);
 
         let data_string = qr.to_data_string();
         let parsed = ExchangeQR::from_data_string(&data_string).unwrap();
@@ -580,7 +577,7 @@ mod tests {
     fn test_qr_roundtrip_empty_name() {
         let identity = Identity::create("", 0);
         let ephemeral = X3DHKeyPair::generate();
-        let qr = ExchangeQR::generate(&identity, &ephemeral);
+        let qr = ExchangeQR::generate(&identity, &ephemeral, 0u64);
 
         let data_string = qr.to_data_string();
         let parsed = ExchangeQR::from_data_string(&data_string).unwrap();
@@ -623,6 +620,7 @@ mod tests {
             &ephemeral,
             Some("https://relay.example.com".to_string()),
             Some([1u8; 32]),
+            0u64,
         );
 
         // Manually tamper with relay URL

@@ -65,9 +65,8 @@ impl ProximityProof {
     ///
     /// Internally computes the HMAC and captures the current timestamp.
     /// This replaces manual construction in frontends.
-    pub fn manual_confirmation(link_key: &[u8; 32], confirmation_code: &str) -> Self {
+    pub fn manual_confirmation(link_key: &[u8; 32], confirmation_code: &str, now: u64) -> Self {
         let mac = compute_confirmation_mac(link_key, confirmation_code);
-        let now = crate::exchange::now_secs();
         ProximityProof::ManualConfirmation {
             confirmation_code_mac: mac,
             confirmed_at: now,

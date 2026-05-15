@@ -170,16 +170,16 @@ impl BleHandshakeSession {
     ///
     /// The initiator sends the first KeyOffer message and drives the protocol forward.
     /// Generates a fresh ephemeral X25519 keypair and random nonce.
-    pub fn new_initiator(identity: &Identity, card: BleCardPayload) -> Self {
-        Self::new(identity, card)
+    pub fn new_initiator(identity: &Identity, card: BleCardPayload, now: u64) -> Self {
+        Self::new(identity, card, now)
     }
 
     /// Creates a new responder session.
     ///
     /// The responder waits for a KeyOffer, then responds with KeyAck + encrypted card.
     /// Generates a fresh ephemeral X25519 keypair and random nonce.
-    pub fn new_responder(identity: &Identity, card: BleCardPayload) -> Self {
-        Self::new(identity, card)
+    pub fn new_responder(identity: &Identity, card: BleCardPayload, now: u64) -> Self {
+        Self::new(identity, card, now)
     }
 
     /// Creates an initiator session from raw key bytes.
@@ -190,9 +190,10 @@ impl BleHandshakeSession {
         identity_key: [u8; 32],
         identity_x3dh: X3DHKeyPair,
         card: BleCardPayload,
+        now: u64,
     ) -> Self {
         let exchange_key = *identity_x3dh.public_key();
-        Self::new_from_keys(identity_key, identity_x3dh, exchange_key, card)
+        Self::new_from_keys(identity_key, identity_x3dh, exchange_key, card, now)
     }
 
     /// Creates a responder session from raw key bytes.
@@ -203,13 +204,14 @@ impl BleHandshakeSession {
         identity_key: [u8; 32],
         identity_x3dh: X3DHKeyPair,
         card: BleCardPayload,
+        now: u64,
     ) -> Self {
         let exchange_key = *identity_x3dh.public_key();
-        Self::new_from_keys(identity_key, identity_x3dh, exchange_key, card)
+        Self::new_from_keys(identity_key, identity_x3dh, exchange_key, card, now)
     }
 
     /// Internal constructor shared by initiator and responder.
-    fn new(identity: &Identity, card: BleCardPayload) -> Self {
+    fn new(identity: &Identity, card: BleCardPayload, now: u64) -> Self {
         let identity_x3dh = identity.x3dh_keypair();
         let exchange_key = *identity_x3dh.public_key();
         Self::new_from_keys(
@@ -217,6 +219,7 @@ impl BleHandshakeSession {
             identity_x3dh,
             exchange_key,
             card,
+            now,
         )
     }
 
@@ -226,10 +229,11 @@ impl BleHandshakeSession {
         identity_x3dh: X3DHKeyPair,
         exchange_key: [u8; 32],
         card: BleCardPayload,
+        now: u64,
     ) -> Self {
         let nonce: [u8; NONCE_SIZE] = crate::crypto::random_bytes();
 
-        let timestamp = super::now_secs();
+        let timestamp = now;
 
         Self {
             state: BleHandshakeState::Idle,
@@ -296,6 +300,7 @@ impl BleHandshakeSession {
     pub fn process_key_offer(
         &mut self,
         their_offer: &[u8],
+        now: u64,
     ) -> Result<(Vec<u8>, Vec<u8>), ExchangeError> {
         if !matches!(self.state, BleHandshakeState::Idle) {
             return Err(ExchangeError::InvalidState(
@@ -337,7 +342,6 @@ impl BleHandshakeSession {
         }
 
         // Expiry check
-        let now = super::now_secs();
         if now.saturating_sub(their_timestamp) > BLE_HANDSHAKE_EXPIRY_SECS {
             return Err(ExchangeError::BleExpired);
         }

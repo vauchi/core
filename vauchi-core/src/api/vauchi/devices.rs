@@ -85,7 +85,7 @@ impl Vauchi {
             .load_device_registry()?
             .unwrap_or_else(|| identity.initial_device_registry());
 
-        let initiator = identity.create_device_link_initiator(registry);
+        let initiator = identity.create_device_link_initiator(registry, self.clock.unix_seconds());
         let qr = initiator.qr();
 
         Ok(DeviceLinkResult {

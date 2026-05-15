@@ -241,7 +241,11 @@ fn full_qr_session_produces_latency_summary() {
 
     let alice_card = ContactCard::new("Alice");
     let alice_ephemeral = X3DHKeyPair::generate();
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let bob_card = ContactCard::new("Bob");
     let mut bob_session = ExchangeSession::new_qr(

@@ -62,7 +62,12 @@ fn full_device_link_over_tcp_transport() {
     let registry = create_test_registry(&identity);
     let master_seed = [0x42u8; 32];
 
-    let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry);
+    let initiator = DeviceLinkInitiator::new(
+        master_seed,
+        &identity,
+        registry,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let (client, server) = loopback_pair();
 
@@ -88,7 +93,7 @@ fn full_device_link_over_tcp_transport() {
         let proof = create_manual_proof(&initiator, &confirmation.confirmation_code);
 
         let (encrypted_response, updated_registry, new_device) = initiator
-            .confirm_link(&request, &proof)
+            .confirm_link(&request, &proof, 0u64)
             .expect("confirm link");
 
         // Round 3: Send encrypted response
@@ -104,15 +109,21 @@ fn full_device_link_over_tcp_transport() {
     let qr_data = responder_transport.recv().expect("recv qr");
     let qr_str = String::from_utf8(qr_data).expect("valid utf8");
     let qr = DeviceLinkQR::from_data_string(&qr_str).expect("parse qr");
-    assert!(!qr.is_expired());
+    assert!(!qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()));
     assert!(qr.verify_signature());
 
     // Create responder from received QR
-    let mut responder =
-        DeviceLinkResponder::from_qr(qr, "New Desktop".to_string()).expect("from_qr");
+    let mut responder = DeviceLinkResponder::from_qr(
+        qr,
+        "New Desktop".to_string(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    )
+    .expect("from_qr");
 
     // Round 2: Create and send encrypted request
-    let encrypted_request = responder.create_request().expect("create request");
+    let encrypted_request = responder
+        .create_request(vauchi_core::clock::SystemClock::shared().unix_seconds())
+        .expect("create request");
     responder_transport
         .send(&encrypted_request)
         .expect("send request");

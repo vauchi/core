@@ -22,8 +22,8 @@ pub struct DeviceLinkResponder {
 
 impl DeviceLinkResponder {
     /// Creates a new responder after scanning a device link QR.
-    pub fn from_qr(qr: DeviceLinkQR, device_name: String) -> Result<Self, ExchangeError> {
-        if qr.is_expired() {
+    pub fn from_qr(qr: DeviceLinkQR, device_name: String, now: u64) -> Result<Self, ExchangeError> {
+        if qr.is_expired(now) {
             return Err(ExchangeError::TokenExpired);
         }
 
@@ -43,8 +43,8 @@ impl DeviceLinkResponder {
     }
 
     /// Creates a request to send to the existing device.
-    pub fn create_request(&mut self) -> Result<Vec<u8>, ExchangeError> {
-        let request = DeviceLinkRequest::new(self.device_name.clone());
+    pub fn create_request(&mut self, now: u64) -> Result<Vec<u8>, ExchangeError> {
+        let request = DeviceLinkRequest::new(self.device_name.clone(), now);
         self.last_request_nonce = Some(request.nonce);
         request.encrypt(self.qr.link_key())
     }

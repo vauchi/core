@@ -43,7 +43,7 @@ fn test_start_qr_transitions_to_displaying_qr() {
 
     session.apply(ExchangeEvent::StartQR).unwrap();
     let qr = session.qr().expect("Expected QR code");
-    assert!(!qr.is_expired());
+    assert!(!qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()));
 
     assert!(matches!(
         session.state(),
@@ -59,7 +59,11 @@ fn test_process_qr_transitions_to_peer_scanned() {
     let bob_identity = Identity::create("Bob", 0);
 
     // Alice generates a QR with her identity and ephemeral key
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Bob creates a session, starts displaying his QR, then scans Alice's
     let bob_card = ContactCard::new("Bob");
@@ -89,7 +93,11 @@ fn test_process_qr_requires_displaying_qr_state() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Bob tries to process QR without first starting his own QR display
     let bob_card = ContactCard::new("Bob");
@@ -144,7 +152,11 @@ fn test_they_scanned_our_qr_transitions_to_awaiting_key_agreement() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
@@ -176,7 +188,11 @@ fn test_full_qr_exchange_flow() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
@@ -276,7 +292,11 @@ fn test_detect_duplicate_contact() {
     let contacts = vec![existing_alice];
 
     // Alice generates QR with her identity and ephemeral key
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
     let mut bob_session = ExchangeSession::new_qr(
@@ -320,7 +340,11 @@ fn test_no_duplicate_for_new_contact() {
     let contacts = vec![existing_charlie];
 
     // Bob scans Alice's QR (Alice is not in contacts)
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
     let mut bob_session = ExchangeSession::new_qr(

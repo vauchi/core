@@ -27,7 +27,11 @@ fn test_qr_generate_with_ephemeral() {
     let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
-    let qr = ExchangeQR::generate(&identity, &ephemeral);
+    let qr = ExchangeQR::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Identity key should match
     assert_eq!(qr.public_key(), identity.signing_public_key());
@@ -42,7 +46,7 @@ fn test_qr_generate_with_ephemeral() {
 
     // Should be valid
     assert!(qr.verify_signature());
-    assert!(!qr.is_expired());
+    assert!(!qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()));
 }
 
 // @scenario: contact_exchange :: Mutual QR uses fresh ephemeral keys for forward secrecy
@@ -54,8 +58,16 @@ fn test_qr_ephemeral_changes_each_call() {
     let eph1 = X3DHKeyPair::generate();
     let eph2 = X3DHKeyPair::generate();
 
-    let qr1 = ExchangeQR::generate(&identity, &eph1);
-    let qr2 = ExchangeQR::generate(&identity, &eph2);
+    let qr1 = ExchangeQR::generate(
+        &identity,
+        &eph1,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let qr2 = ExchangeQR::generate(
+        &identity,
+        &eph2,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Same identity key
     assert_eq!(qr1.public_key(), qr2.public_key());
@@ -79,7 +91,11 @@ fn test_qr_ephemeral_roundtrip_via_data_string() {
     let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
-    let qr = ExchangeQR::generate(&identity, &ephemeral);
+    let qr = ExchangeQR::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let data = qr.to_data_string();
     let parsed = ExchangeQR::from_data_string(&data).expect("Should parse");
 
@@ -120,7 +136,7 @@ fn test_start_qr_generates_qr() {
 
     let qr = session.qr().expect("Should have QR in DisplayingQr");
     assert!(qr.verify_signature());
-    assert!(!qr.is_expired());
+    assert!(!qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()));
 }
 
 // @internal
@@ -163,7 +179,11 @@ fn test_scan_their_qr_transitions() {
 
     // Bob also creates a QR (simulating his side)
     let bob_ephemeral = X3DHKeyPair::generate();
-    let bob_qr = ExchangeQR::generate(&bob_identity, &bob_ephemeral);
+    let bob_qr = ExchangeQR::generate(
+        &bob_identity,
+        &bob_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Alice scans Bob's QR
     alice_session
@@ -221,7 +241,11 @@ fn test_scan_rejects_self_exchange() {
 
     // Generate own QR before moving identity into session
     let own_ephemeral = X3DHKeyPair::generate();
-    let own_qr = ExchangeQR::generate(&alice_identity, &own_ephemeral);
+    let own_qr = ExchangeQR::generate(
+        &alice_identity,
+        &own_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let alice_card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();

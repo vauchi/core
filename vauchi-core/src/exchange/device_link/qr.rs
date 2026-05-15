@@ -37,8 +37,8 @@ pub struct DeviceLinkQR {
 
 impl DeviceLinkQR {
     /// Generates a new device link QR code for the given identity.
-    pub fn generate(identity: &Identity) -> Self {
-        let timestamp = crate::exchange::now_secs();
+    pub fn generate(identity: &Identity, now: u64) -> Self {
+        let timestamp = now;
 
         Self::generate_with_timestamp(identity, timestamp)
     }
@@ -90,9 +90,7 @@ impl DeviceLinkQR {
     }
 
     /// Checks if the QR code has expired.
-    pub fn is_expired(&self) -> bool {
-        let now = crate::exchange::now_secs();
-
+    pub fn is_expired(&self, now: u64) -> bool {
         now > self.timestamp + LINK_QR_EXPIRY_SECONDS
     }
 

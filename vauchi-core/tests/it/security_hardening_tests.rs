@@ -135,14 +135,18 @@ fn test_qr_screenshot_attack_prevention() {
 
     // QR should be marked as expired
     assert!(
-        qr.is_expired(),
+        qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
         "QR code from 6 minutes ago should be expired"
     );
 
     // Verify recently generated QR is not expired
-    let fresh_qr = ExchangeQR::generate(&identity, &ephemeral);
+    let fresh_qr = ExchangeQR::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     assert!(
-        !fresh_qr.is_expired(),
+        !fresh_qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
         "Freshly generated QR should not be expired"
     );
 }
@@ -184,7 +188,10 @@ fn test_expired_qr_rejected_in_session() {
 
     // But the QR is expired
     assert!(
-        parsed_qr.as_ref().unwrap().is_expired(),
+        parsed_qr
+            .as_ref()
+            .unwrap()
+            .is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
         "Parsed QR should be marked expired"
     );
 
@@ -213,7 +220,11 @@ fn test_qr_clock_drift_detection() {
         - 5;
 
     assert!(
-        check_clock_drift(five_sec_ago).is_ok(),
+        check_clock_drift(
+            five_sec_ago,
+            vauchi_core::clock::SystemClock::shared().unix_seconds()
+        )
+        .is_ok(),
         "5 second drift should be acceptable"
     );
 
@@ -224,7 +235,10 @@ fn test_qr_clock_drift_detection() {
         .as_secs()
         - 60;
 
-    let result = check_clock_drift(sixty_sec_ago);
+    let result = check_clock_drift(
+        sixty_sec_ago,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     assert!(
         matches!(result, Err(ExchangeError::ClockDrift(_))),
         "60 second drift should fail clock check"
@@ -636,9 +650,21 @@ fn test_exchange_token_randomness() {
     let ephemeral = X3DHKeyPair::generate();
 
     // Generate multiple QRs and verify tokens are unique
-    let qr1 = ExchangeQR::generate(&identity, &ephemeral);
-    let qr2 = ExchangeQR::generate(&identity, &ephemeral);
-    let qr3 = ExchangeQR::generate(&identity, &ephemeral);
+    let qr1 = ExchangeQR::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let qr2 = ExchangeQR::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let qr3 = ExchangeQR::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // All tokens should be different (collision probability is negligible)
     assert_ne!(
@@ -665,8 +691,16 @@ fn test_audio_challenge_randomness() {
     let identity = Identity::create("Test", 0);
     let ephemeral = X3DHKeyPair::generate();
 
-    let qr1 = ExchangeQR::generate(&identity, &ephemeral);
-    let qr2 = ExchangeQR::generate(&identity, &ephemeral);
+    let qr1 = ExchangeQR::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let qr2 = ExchangeQR::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Audio challenges should be different
     assert_ne!(
@@ -682,7 +716,11 @@ fn test_audio_challenge_randomness() {
 fn test_qr_signature_prevents_tampering() {
     let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
-    let qr = ExchangeQR::generate(&identity, &ephemeral);
+    let qr = ExchangeQR::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let qr_data = qr.to_data_string();
 
     // Decode, tamper, re-encode

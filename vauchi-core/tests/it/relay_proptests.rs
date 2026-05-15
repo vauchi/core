@@ -49,6 +49,7 @@ proptest! {
             &ephemeral,
             Some(relay_url.clone()),
             Some(noise_pk),
+            0u64,
         );
 
         let data = qr.to_data_string();
@@ -72,6 +73,7 @@ proptest! {
             &ephemeral,
             Some("https://relay.example.com".to_string()),
             Some(pubkey),
+            0u64,
         );
 
         let data = qr.to_data_string();
@@ -94,6 +96,7 @@ proptest! {
             &ephemeral,
             Some(relay_url.clone()),
             Some(pubkey),
+            0u64,
         );
 
         let data = qr.to_data_string();

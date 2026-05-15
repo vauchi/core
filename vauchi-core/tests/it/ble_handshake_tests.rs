@@ -147,7 +147,11 @@ fn test_zeroize_on_drop() {
 fn test_new_initiator_starts_idle() {
     let identity = make_test_identity();
     let card = make_test_card(&identity, "Alice");
-    let session = BleHandshakeSession::new_initiator(&identity, card);
+    let session = BleHandshakeSession::new_initiator(
+        &identity,
+        card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     assert!(
         matches!(session.state(), BleHandshakeState::Idle),
@@ -160,7 +164,11 @@ fn test_new_initiator_starts_idle() {
 fn test_new_responder_starts_idle() {
     let identity = make_test_identity();
     let card = make_test_card(&identity, "Bob");
-    let session = BleHandshakeSession::new_responder(&identity, card);
+    let session = BleHandshakeSession::new_responder(
+        &identity,
+        card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     assert!(
         matches!(session.state(), BleHandshakeState::Idle),
@@ -177,7 +185,11 @@ fn test_new_responder_starts_idle() {
 fn test_create_key_offer_format() {
     let identity = make_test_identity();
     let card = make_test_card(&identity, "Alice");
-    let mut session = BleHandshakeSession::new_initiator(&identity, card);
+    let mut session = BleHandshakeSession::new_initiator(
+        &identity,
+        card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let offer = session
         .create_key_offer()
@@ -201,7 +213,11 @@ fn test_create_key_offer_format() {
 fn test_double_key_offer_rejected() {
     let identity = make_test_identity();
     let card = make_test_card(&identity, "Alice");
-    let mut session = BleHandshakeSession::new_initiator(&identity, card);
+    let mut session = BleHandshakeSession::new_initiator(
+        &identity,
+        card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     session.create_key_offer().expect("first offer");
     let result = session.create_key_offer();
@@ -223,12 +239,25 @@ fn test_responder_processes_key_offer() {
     let alice_card = make_test_card(&alice_id, "Alice");
     let bob_card = make_test_card(&bob_id, "Bob");
 
-    let mut alice = BleHandshakeSession::new_initiator(&alice_id, alice_card);
-    let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card);
+    let mut alice = BleHandshakeSession::new_initiator(
+        &alice_id,
+        alice_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let mut bob = BleHandshakeSession::new_responder(
+        &bob_id,
+        bob_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let offer = alice.create_key_offer().expect("key offer");
 
-    let (ack_bytes, encrypted_card) = bob.process_key_offer(&offer).expect("process key offer");
+    let (ack_bytes, encrypted_card) = bob
+        .process_key_offer(
+            &offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("process key offer");
 
     // v2 KeyAck: version(1) + identity(32) + exchange(32) + ephemeral(32) + nonce(16) + commitment(32) = 145
     assert_eq!(ack_bytes.len(), 145, "v2 KeyAck must be exactly 145 bytes");
@@ -256,12 +285,19 @@ fn test_responder_processes_key_offer() {
 fn test_responder_rejects_invalid_version() {
     let bob_id = make_test_identity();
     let bob_card = make_test_card(&bob_id, "Bob");
-    let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card);
+    let mut bob = BleHandshakeSession::new_responder(
+        &bob_id,
+        bob_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let mut bad_offer = vec![0x99u8]; // Wrong version
     bad_offer.extend_from_slice(&[0u8; 120]); // Pad to 121 bytes (v2 size)
 
-    let result = bob.process_key_offer(&bad_offer);
+    let result = bob.process_key_offer(
+        &bad_offer,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     assert!(result.is_err(), "Invalid version must be rejected");
 }
 
@@ -270,10 +306,17 @@ fn test_responder_rejects_invalid_version() {
 fn test_responder_rejects_truncated_offer() {
     let bob_id = make_test_identity();
     let bob_card = make_test_card(&bob_id, "Bob");
-    let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card);
+    let mut bob = BleHandshakeSession::new_responder(
+        &bob_id,
+        bob_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let short_offer = vec![BLE_HANDSHAKE_VERSION; 10]; // Too short
-    let result = bob.process_key_offer(&short_offer);
+    let result = bob.process_key_offer(
+        &short_offer,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     assert!(result.is_err(), "Truncated offer must be rejected");
 }
 
@@ -289,11 +332,24 @@ fn test_initiator_processes_key_ack() {
     let alice_card = make_test_card(&alice_id, "Alice");
     let bob_card = make_test_card(&bob_id, "Bob");
 
-    let mut alice = BleHandshakeSession::new_initiator(&alice_id, alice_card);
-    let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card);
+    let mut alice = BleHandshakeSession::new_initiator(
+        &alice_id,
+        alice_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let mut bob = BleHandshakeSession::new_responder(
+        &bob_id,
+        bob_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let offer = alice.create_key_offer().expect("key offer");
-    let (ack_bytes, bob_encrypted_card) = bob.process_key_offer(&offer).expect("process offer");
+    let (ack_bytes, bob_encrypted_card) = bob
+        .process_key_offer(
+            &offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("process offer");
 
     let (commitment, alice_encrypted_card) = alice
         .process_key_ack(&ack_bytes, &bob_encrypted_card)
@@ -323,7 +379,11 @@ fn test_initiator_processes_key_ack() {
 fn test_initiator_rejects_ack_in_wrong_state() {
     let alice_id = make_test_identity();
     let alice_card = make_test_card(&alice_id, "Alice");
-    let mut alice = BleHandshakeSession::new_initiator(&alice_id, alice_card);
+    let mut alice = BleHandshakeSession::new_initiator(
+        &alice_id,
+        alice_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Haven't sent key offer yet
     let result = alice.process_key_ack(&[0u8; 113], &[0u8; 64]);
@@ -345,13 +405,26 @@ fn test_responder_processes_committed_payload() {
     let alice_card = make_test_card(&alice_id, "Alice");
     let bob_card = make_test_card(&bob_id, "Bob");
 
-    let mut alice = BleHandshakeSession::new_initiator(&alice_id, alice_card);
-    let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card);
+    let mut alice = BleHandshakeSession::new_initiator(
+        &alice_id,
+        alice_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let mut bob = BleHandshakeSession::new_responder(
+        &bob_id,
+        bob_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Phase 1
     let offer = alice.create_key_offer().expect("key offer");
     // Phase 2 (responder)
-    let (ack_bytes, bob_encrypted) = bob.process_key_offer(&offer).expect("process offer");
+    let (ack_bytes, bob_encrypted) = bob
+        .process_key_offer(
+            &offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("process offer");
     // Phase 2 (initiator)
     let (commitment, alice_encrypted) = alice
         .process_key_ack(&ack_bytes, &bob_encrypted)
@@ -377,11 +450,24 @@ fn test_commitment_mismatch_rejected() {
     let alice_card = make_test_card(&alice_id, "Alice");
     let bob_card = make_test_card(&bob_id, "Bob");
 
-    let mut alice = BleHandshakeSession::new_initiator(&alice_id, alice_card);
-    let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card);
+    let mut alice = BleHandshakeSession::new_initiator(
+        &alice_id,
+        alice_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let mut bob = BleHandshakeSession::new_responder(
+        &bob_id,
+        bob_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let offer = alice.create_key_offer().expect("key offer");
-    let (ack_bytes, bob_encrypted) = bob.process_key_offer(&offer).expect("process offer");
+    let (ack_bytes, bob_encrypted) = bob
+        .process_key_offer(
+            &offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("process offer");
     let (_commitment, alice_encrypted) = alice
         .process_key_ack(&ack_bytes, &bob_encrypted)
         .expect("process ack");
@@ -407,14 +493,27 @@ fn test_full_handshake_happy_path() {
     let alice_card = make_test_card(&alice_id, "Alice");
     let bob_card = make_test_card(&bob_id, "Bob");
 
-    let mut alice = BleHandshakeSession::new_initiator(&alice_id, alice_card.clone());
-    let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card.clone());
+    let mut alice = BleHandshakeSession::new_initiator(
+        &alice_id,
+        alice_card.clone(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let mut bob = BleHandshakeSession::new_responder(
+        &bob_id,
+        bob_card.clone(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Phase 1: Initiator creates key offer
     let offer = alice.create_key_offer().expect("key offer");
 
     // Phase 2: Responder processes offer, returns ack + encrypted card
-    let (ack_bytes, bob_encrypted) = bob.process_key_offer(&offer).expect("process offer");
+    let (ack_bytes, bob_encrypted) = bob
+        .process_key_offer(
+            &offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("process offer");
 
     // Phase 2 (Initiator): Process ack, get commitment + encrypted card
     let (alice_commitment, alice_encrypted) = alice
@@ -493,7 +592,11 @@ fn test_full_handshake_happy_path() {
 fn test_expired_key_offer_rejected() {
     let bob_id = make_test_identity();
     let bob_card = make_test_card(&bob_id, "Bob");
-    let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card);
+    let mut bob = BleHandshakeSession::new_responder(
+        &bob_id,
+        bob_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Construct a v2 offer with a timestamp far in the past
     let mut offer = vec![BLE_HANDSHAKE_VERSION];
@@ -501,10 +604,10 @@ fn test_expired_key_offer_rejected() {
     offer.extend_from_slice(&[4u8; 32]); // exchange_pub (v2)
     offer.extend_from_slice(&[2u8; 32]); // ephemeral_pub
     offer.extend_from_slice(&[3u8; 16]); // nonce
-    // Timestamp: 0 (epoch) — definitely expired
+    // Timestamp: 0 (epoch); observed from `now=1200` (20 min later)
     offer.extend_from_slice(&0u64.to_be_bytes());
 
-    let result = bob.process_key_offer(&offer);
+    let result = bob.process_key_offer(&offer, 1200);
     assert!(
         matches!(result, Err(ExchangeError::BleExpired)),
         "Expired offer must be rejected with BleExpired"
@@ -521,13 +624,24 @@ fn test_self_exchange_rejected() {
     let identity = make_test_identity();
     let card = make_test_card(&identity, "Alice");
 
-    let mut alice_init = BleHandshakeSession::new_initiator(&identity, card.clone());
-    let mut alice_resp = BleHandshakeSession::new_responder(&identity, card);
+    let mut alice_init = BleHandshakeSession::new_initiator(
+        &identity,
+        card.clone(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let mut alice_resp = BleHandshakeSession::new_responder(
+        &identity,
+        card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let offer = alice_init.create_key_offer().expect("key offer");
 
     // Responder has same identity key — should detect self-exchange
-    let result = alice_resp.process_key_offer(&offer);
+    let result = alice_resp.process_key_offer(
+        &offer,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     assert!(
         matches!(result, Err(ExchangeError::SelfExchange)),
         "Self-exchange must be rejected"
@@ -543,7 +657,11 @@ fn test_self_exchange_rejected() {
 fn test_complete_exchange_in_wrong_state() {
     let identity = make_test_identity();
     let card = make_test_card(&identity, "Alice");
-    let mut session = BleHandshakeSession::new_initiator(&identity, card);
+    let mut session = BleHandshakeSession::new_initiator(
+        &identity,
+        card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let result = session.complete_exchange(&[]);
     assert!(
@@ -557,7 +675,11 @@ fn test_complete_exchange_in_wrong_state() {
 fn test_process_committed_payload_in_wrong_state() {
     let identity = make_test_identity();
     let card = make_test_card(&identity, "Alice");
-    let mut session = BleHandshakeSession::new_initiator(&identity, card);
+    let mut session = BleHandshakeSession::new_initiator(
+        &identity,
+        card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let result = session.process_committed_payload(&[0u8; 32], &[0u8; 64]);
     assert!(
@@ -584,7 +706,11 @@ fn test_protocol_version_is_v2() {
 fn test_key_offer_includes_exchange_key() {
     let identity = make_test_identity();
     let card = make_test_card(&identity, "Alice");
-    let mut session = BleHandshakeSession::new_initiator(&identity, card);
+    let mut session = BleHandshakeSession::new_initiator(
+        &identity,
+        card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let offer = session.create_key_offer().expect("key offer");
 
@@ -622,15 +748,28 @@ fn test_tampered_exchange_key_fails() {
     let alice_card = make_test_card(&alice, "Alice");
     let bob_card = make_test_card(&bob, "Bob");
 
-    let mut init = BleHandshakeSession::new_initiator(&alice, alice_card);
-    let mut resp = BleHandshakeSession::new_responder(&bob, bob_card);
+    let mut init = BleHandshakeSession::new_initiator(
+        &alice,
+        alice_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let mut resp = BleHandshakeSession::new_responder(
+        &bob,
+        bob_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let mut offer = init.create_key_offer().unwrap();
     // Tamper with exchange_pub (bytes 33..65)
     offer[33] ^= 0xFF;
 
     // Responder derives a different DH1 → different session key
-    let (ack, enc_bob) = resp.process_key_offer(&offer).unwrap();
+    let (ack, enc_bob) = resp
+        .process_key_offer(
+            &offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .unwrap();
 
     // Initiator uses its real identity key for DH1 but the ack
     // was encrypted with a mismatched key → decryption fails
@@ -646,14 +785,21 @@ fn test_tampered_exchange_key_fails() {
 fn test_v1_offer_rejected() {
     let bob_id = make_test_identity();
     let bob_card = make_test_card(&bob_id, "Bob");
-    let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card);
+    let mut bob = BleHandshakeSession::new_responder(
+        &bob_id,
+        bob_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Construct a v1-format offer padded to v2 length so it passes
     // the size check and reaches the version check
     let mut v1_offer = vec![0x01u8]; // v1 version
     v1_offer.extend_from_slice(&[0u8; 120]); // pad to 121 bytes
 
-    let result = bob.process_key_offer(&v1_offer);
+    let result = bob.process_key_offer(
+        &v1_offer,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     assert!(
         matches!(result, Err(ExchangeError::InvalidProtocolVersion)),
         "v1 offer must be rejected by v2 responder"

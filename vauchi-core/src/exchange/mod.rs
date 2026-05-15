@@ -7,19 +7,6 @@
 //! Handles peer-to-peer contact exchange via QR codes, audio proximity,
 //! and X3DH key agreement.
 
-/// Returns the current Unix-epoch seconds via the OS wall clock.
-///
-/// Stepping-stone helper for Phase 1 / Task 1.1 / Step 3b. Used
-/// by exchange submodules (QR + BLE + device-link + NFC payloads)
-/// that stamp / read timestamps. The structural pass that gives
-/// `ExchangeSession` an explicit `Clock` will retire this helper.
-pub(super) fn now_secs() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
-
 /// Modules that are `pub` under `feature = "testing"` and private otherwise.
 /// This allows integration tests and downstream test crates to access internals
 /// while keeping them private in production builds.

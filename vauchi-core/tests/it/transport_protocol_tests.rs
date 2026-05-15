@@ -16,7 +16,7 @@ use vauchi_core::exchange::transport::protocol::ExchangeProtocol;
 fn create_offer_returns_90_bytes() {
     let protocol = ExchangeProtocol::new_random();
     let offer = protocol
-        .create_offer()
+        .create_offer(0u64)
         .expect("create_offer should succeed");
     assert_eq!(offer.len(), 90, "offer must be exactly 90 bytes");
 }
@@ -28,8 +28,8 @@ fn mutual_key_agreement_produces_identical_shared_keys() {
     let alice = ExchangeProtocol::new_random();
     let bob = ExchangeProtocol::new_random();
 
-    let alice_offer = alice.create_offer().expect("alice offer");
-    let bob_offer = bob.create_offer().expect("bob offer");
+    let alice_offer = alice.create_offer(0u64).expect("alice offer");
+    let bob_offer = bob.create_offer(0u64).expect("bob offer");
 
     let alice_shared = alice.process_offer(&bob_offer).expect("alice process");
     let bob_shared = bob.process_offer(&alice_offer).expect("bob process");
@@ -50,8 +50,8 @@ fn encrypt_then_decrypt_roundtrip() {
     let alice = ExchangeProtocol::new_random();
     let bob = ExchangeProtocol::new_random();
 
-    let alice_offer = alice.create_offer().expect("alice offer");
-    let bob_offer = bob.create_offer().expect("bob offer");
+    let alice_offer = alice.create_offer(0u64).expect("alice offer");
+    let bob_offer = bob.create_offer(0u64).expect("bob offer");
 
     let shared = alice.process_offer(&bob_offer).expect("shared key");
     let _ = bob.process_offer(&alice_offer).expect("bob shared key");
@@ -80,9 +80,9 @@ fn wrong_key_cannot_decrypt() {
     let bob = ExchangeProtocol::new_random();
     let carol = ExchangeProtocol::new_random();
 
-    let alice_offer = alice.create_offer().expect("alice offer");
-    let bob_offer = bob.create_offer().expect("bob offer");
-    let carol_offer = carol.create_offer().expect("carol offer");
+    let alice_offer = alice.create_offer(0u64).expect("alice offer");
+    let bob_offer = bob.create_offer(0u64).expect("bob offer");
+    let carol_offer = carol.create_offer(0u64).expect("carol offer");
 
     let alice_bob_shared = alice.process_offer(&bob_offer).expect("alice-bob key");
     let _bob_alice_shared = bob.process_offer(&alice_offer).expect("bob-alice key");
@@ -115,7 +115,7 @@ fn tampered_offer_produces_different_shared_secret() {
     let alice = ExchangeProtocol::new_random();
     let bob = ExchangeProtocol::new_random();
 
-    let bob_offer = bob.create_offer().expect("bob offer");
+    let bob_offer = bob.create_offer(0u64).expect("bob offer");
 
     let shared_original = alice.process_offer(&bob_offer).expect("original key");
 
@@ -157,7 +157,7 @@ fn capabilities_embedded_in_offer_bytes_88_90() {
     let caps = TransportCaps::BLE | TransportCaps::WIFI_AWARE;
     let protocol = ExchangeProtocol::new_random().with_capabilities(caps);
 
-    let offer = protocol.create_offer().expect("create_offer");
+    let offer = protocol.create_offer(0u64).expect("create_offer");
 
     let caps_bytes = [offer[88], offer[89]];
     let decoded_caps = TransportCaps::from_bytes(caps_bytes);

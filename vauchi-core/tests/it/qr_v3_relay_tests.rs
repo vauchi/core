@@ -17,7 +17,11 @@ use vauchi_core::identity::Identity;
 fn v3_roundtrip_no_relay_metadata() {
     let identity = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
-    let qr = ExchangeQR::generate(&identity, &ephemeral);
+    let qr = ExchangeQR::generate(
+        &identity,
+        &ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let data = qr.to_data_string();
     let parsed = ExchangeQR::from_data_string(&data).unwrap();
@@ -45,6 +49,7 @@ fn v3_roundtrip_with_relay_url_and_noise_pubkey() {
         &ephemeral,
         Some(relay_url.to_string()),
         Some(noise_pubkey),
+        0u64,
     );
 
     let data = qr.to_data_string();
@@ -68,6 +73,7 @@ fn v3_relay_url_without_noise_pubkey_rejected() {
         &ephemeral,
         Some("https://relay.example.com".to_string()),
         None,
+        0u64,
     );
 
     let data = qr.to_data_string();
@@ -89,6 +95,7 @@ fn v3_roundtrip_unicode_name_with_relay() {
         &ephemeral,
         Some("https://relay.example.com".to_string()),
         Some([99u8; 32]),
+        0u64,
     );
 
     let data = qr.to_data_string();
@@ -112,6 +119,7 @@ fn v3_signature_covers_relay_fields() {
         &ephemeral,
         Some("https://relay.example.com".to_string()),
         Some([55u8; 32]),
+        0u64,
     );
 
     // Signature must be valid
@@ -126,7 +134,8 @@ fn v3_empty_relay_url_rejected_on_parse() {
     let identity = Identity::create("Eve", 0);
     let ephemeral = X3DHKeyPair::generate();
 
-    let qr = ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(String::new()), None);
+    let qr =
+        ExchangeQR::generate_with_relay(&identity, &ephemeral, Some(String::new()), None, 0u64);
 
     let data = qr.to_data_string();
     let result = ExchangeQR::from_data_string(&data);
@@ -149,6 +158,7 @@ fn v3_private_host_relay_url_rejected_on_parse() {
         &ephemeral,
         Some("https://127.0.0.1/evil".to_string()),
         None,
+        0u64,
     );
 
     let data = qr.to_data_string();
@@ -172,6 +182,7 @@ fn v3_insecure_scheme_relay_url_rejected_on_parse() {
         &ephemeral,
         Some("http://relay.evil.com".to_string()),
         None,
+        0u64,
     );
 
     let data = qr.to_data_string();
@@ -197,6 +208,7 @@ fn v3_roundtrip_long_relay_url() {
         &ephemeral,
         Some(long_url.clone()),
         Some([0xBBu8; 32]),
+        0u64,
     );
 
     let data = qr.to_data_string();
@@ -220,6 +232,7 @@ fn v3_qr_image_generation_with_relay() {
         &ephemeral,
         Some("https://relay.vauchi.app".to_string()),
         Some([1u8; 32]),
+        0u64,
     );
 
     let image = qr.to_qr_image_string();

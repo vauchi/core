@@ -110,7 +110,11 @@ fn test_process_qr_from_idle_rejected() {
     let alice_identity = vauchi_core::Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let bob_identity = vauchi_core::Identity::create("Bob", 0);
     let bob_card = vauchi_core::contact_card::ContactCard::new("Bob");
@@ -218,7 +222,11 @@ fn test_self_exchange_detected() {
     let alice_ephemeral = X3DHKeyPair::generate();
 
     // Generate QR with Alice's identity (using a separate ephemeral)
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     // Alice clones identity and creates a session, then tries to scan her own QR.
     // Because `Identity::create` generates new keys each time, we need to use the
@@ -744,7 +752,11 @@ fn test_invalid_signature_qr_rejected_via_data_string() {
     let alice_ephemeral = X3DHKeyPair::generate();
 
     // Generate a valid QR, encode to bytes, then tamper
-    let valid_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let valid_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let data_str = valid_qr.to_data_string();
     let mut bytes = BASE64.decode(&data_str).unwrap();
 
@@ -769,7 +781,11 @@ fn test_qr_parser_rejects_trailing_bytes() {
     let alice_identity = vauchi_core::Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
 
-    let valid_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let valid_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let data_str = valid_qr.to_data_string();
     let mut bytes = BASE64.decode(&data_str).unwrap();
 

@@ -4251,7 +4251,10 @@ impl PlatformAppEngine {
                 detail: "Identity not initialized".into(),
             })?;
 
-        let qr = DeviceLinkQR::generate(identity);
+        let qr = DeviceLinkQR::generate(
+            identity,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
         Ok(crate::types::MobileDeviceLinkData {
             qr_data: qr.to_data_string(),
             identity_public_key: hex::encode(identity.signing_public_key()),
@@ -4277,7 +4280,7 @@ impl PlatformAppEngine {
         Ok(crate::types::MobileDeviceLinkInfo {
             identity_public_key: hex::encode(qr.identity_public_key()),
             timestamp: qr.timestamp(),
-            is_expired: qr.is_expired(),
+            is_expired: qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
         })
     }
 
@@ -4315,7 +4318,10 @@ impl PlatformAppEngine {
             })?
             .unwrap_or_else(|| identity.initial_device_registry());
 
-        let initiator = identity.create_device_link_initiator(registry);
+        let initiator = identity.create_device_link_initiator(
+            registry,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
         let identity_id = hex::encode(identity.signing_public_key());
 
         // ADR-035: device-link QR expiry is 300 s — align the

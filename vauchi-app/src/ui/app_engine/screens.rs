@@ -265,10 +265,10 @@ impl AppEngine {
                     .iter()
                     .map(|g| (g.id().to_string(), g.name().to_string()))
                     .collect();
-                let card_snapshot = card
-                    .as_ref()
-                    .cloned()
-                    .map(vauchi_core::exchange::card_snapshot::CardSnapshot::freeze);
+                let snapshot_now = vauchi.clock().unix_seconds();
+                let card_snapshot = card.as_ref().cloned().map(|c| {
+                    vauchi_core::exchange::card_snapshot::CardSnapshot::freeze(c, snapshot_now)
+                });
                 let config = ExchangeConfig {
                     own_name: card
                         .as_ref()

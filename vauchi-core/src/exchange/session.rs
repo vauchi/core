@@ -377,7 +377,8 @@ impl ExchangeSession {
                 .collect(),
             card.avatar().map(|a| a.to_vec()),
         );
-        let ble_handshake = BleHandshakeSession::new_initiator(&identity, ble_card);
+        let ble_handshake =
+            BleHandshakeSession::new_initiator(&identity, ble_card, clock.unix_seconds());
         ExchangeSession {
             state: ExchangeState::AwaitingBleConnection,
             transport: ExchangeTransport::Ble,
@@ -431,7 +432,7 @@ impl ExchangeSession {
         clock: Arc<dyn crate::clock::Clock>,
     ) -> Self {
         let our_x3dh = X3DHKeyPair::generate();
-        let our_qr = ExchangeQR::generate(&identity, &our_x3dh);
+        let our_qr = ExchangeQR::generate(&identity, &our_x3dh, clock.unix_seconds());
         ExchangeSession {
             state: ExchangeState::AwaitingDirectPayload {
                 our_qr: our_qr.clone(),
@@ -622,7 +623,7 @@ impl ExchangeSession {
     fn build_trust_metrics(&self) -> TrustMetrics {
         let log = self.proximity_event_log().unwrap_or_default();
         let method = log.final_method();
-        let timestamp = super::now_secs();
+        let timestamp = self.clock.unix_seconds();
         TrustMetrics::new(
             self.transport,
             self.proximity_confidence,
@@ -925,12 +926,16 @@ impl ExchangeSession {
                 // Generate our NFC key offer payload for the frontend to present.
                 // The frontend activates the NFC interface with this data, and when
                 // the peer taps, sends their data back as NfcDataReceived.
+                let now = self.clock.unix_seconds();
                 let payload = if let Some(ref mut hs) = self.nfc_handshake {
-                    hs.create_key_offer(&self.identity).unwrap_or_default()
+                    hs.create_key_offer(&self.identity, now).unwrap_or_default()
                 } else {
                     // Fallback: generate ExchangeNfc payload directly
-                    let nfc =
-                        super::nfc_active::ExchangeNfc::generate(&self.identity, &self.our_x3dh);
+                    let nfc = super::nfc_active::ExchangeNfc::generate(
+                        &self.identity,
+                        &self.our_x3dh,
+                        now,
+                    );
                     nfc.to_bytes().to_vec()
                 };
                 vec![Command::NfcActivate { payload }]
@@ -1255,7 +1260,7 @@ impl ExchangeSession {
             self.proximity_confidence,
             self.transport,
             0,
-);
+        );
         contact.set_relay_url(self.their_relay_url.take());
         contact.set_relay_noise_pubkey(self.their_relay_noise_pubkey.take());
 
@@ -1419,7 +1424,7 @@ impl ExchangeSession {
             self.proximity_confidence,
             self.transport,
             0,
-);
+        );
 
         // Set relay metadata learned from their QR code
         contact.set_relay_url(self.their_relay_url.take());
@@ -1455,6 +1460,7 @@ impl ExchangeSession {
             &self.our_x3dh,
             self.our_relay_url.clone(),
             self.our_relay_noise_pubkey,
+            self.clock.unix_seconds(),
         );
         self.our_audio_challenge = Some(*our_qr.audio_challenge());
         self.state = ExchangeState::DisplayingQr { our_qr };
@@ -1479,7 +1485,7 @@ impl ExchangeSession {
         };
 
         // Verify their QR
-        if qr.is_expired() {
+        if qr.is_expired(self.clock.unix_seconds()) {
             return Err(ExchangeError::QRExpired);
         }
         if !qr.verify_signature() {
@@ -1560,7 +1566,7 @@ impl ExchangeSession {
         // Parse their payload (same format as QR data string)
         let qr = ExchangeQR::from_data_string(&their_payload)?;
 
-        if qr.is_expired() {
+        if qr.is_expired(self.clock.unix_seconds()) {
             return Err(ExchangeError::QRExpired);
         }
         if !qr.verify_signature() {
@@ -1618,7 +1624,7 @@ impl ExchangeSession {
         // Parse their NFC payload to extract keys
         let parsed = super::nfc_active::ExchangeNfc::from_bytes(&their_payload)?;
 
-        if parsed.is_expired() {
+        if parsed.is_expired(self.clock.unix_seconds()) {
             return Err(ExchangeError::NfcExpired);
         }
         if !parsed.verify_signature() {
@@ -1679,7 +1685,7 @@ impl ExchangeSession {
 
         let parsed = super::ble::ExchangeBle::from_bytes(&their_payload)?;
 
-        if parsed.is_expired() {
+        if parsed.is_expired(self.clock.unix_seconds()) {
             return Err(ExchangeError::BleExpired);
         }
         if !parsed.verify_signature() {

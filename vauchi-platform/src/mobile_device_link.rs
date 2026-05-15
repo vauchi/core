@@ -79,7 +79,10 @@ impl VauchiPlatform {
     pub fn generate_device_link_qr(&self) -> Result<MobileDeviceLinkData, MobileError> {
         let identity = self.get_identity()?;
 
-        let qr = DeviceLinkQR::generate(&identity);
+        let qr = DeviceLinkQR::generate(
+            &identity,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
         let qr_data = qr.to_data_string();
 
         Ok(MobileDeviceLinkData {
@@ -110,7 +113,7 @@ impl VauchiPlatform {
         Ok(MobileDeviceLinkInfo {
             identity_public_key: hex::encode(qr.identity_public_key()),
             timestamp: qr.timestamp(),
-            is_expired: qr.is_expired(),
+            is_expired: qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
         })
     }
 
@@ -143,7 +146,10 @@ impl VauchiPlatform {
             .load_device_registry()?
             .unwrap_or_else(|| identity.initial_device_registry());
 
-        let initiator = identity.create_device_link_initiator(registry);
+        let initiator = identity.create_device_link_initiator(
+            registry,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
         let identity_id = hex::encode(identity.signing_public_key());
 
         let transport = self
@@ -181,7 +187,10 @@ impl VauchiPlatform {
             .load_device_registry()?
             .unwrap_or_else(|| identity.initial_device_registry());
 
-        let initiator = identity.create_device_link_initiator(registry);
+        let initiator = identity.create_device_link_initiator(
+            registry,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
 
         Ok(Arc::new(MobileDeviceLinkInitiator {
             inner: Mutex::new(initiator),
@@ -207,10 +216,14 @@ impl VauchiPlatform {
                 detail: "Invalid QR code".to_string(),
             })?;
 
-        let responder =
-            DeviceLinkResponder::from_qr(qr, device_name).map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
+        let responder = DeviceLinkResponder::from_qr(
+            qr,
+            device_name,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .map_err(|e| MobileError::Other {
+            detail: e.to_string(),
+        })?;
 
         Ok(Arc::new(MobileDeviceLinkResponder {
             inner: Mutex::new(responder),

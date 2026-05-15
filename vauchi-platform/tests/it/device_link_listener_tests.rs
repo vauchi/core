@@ -153,7 +153,7 @@ fn boxed(listener: &Arc<RecordingListener>) -> Box<dyn DeviceLinkSessionListener
 fn session_against_dead_relay() -> Arc<MobileDeviceLinkSession> {
     let identity = Identity::create("Alice", 0);
     let registry = identity.initial_device_registry();
-    let initiator = identity.create_device_link_initiator(registry);
+    let initiator = identity.create_device_link_initiator(registry, 0u64);
     let identity_id = hex::encode(identity.signing_public_key());
 
     let config = HttpTransportConfig::for_testing("http://127.0.0.1:1", 500);

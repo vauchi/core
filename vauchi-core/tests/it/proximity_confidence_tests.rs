@@ -190,7 +190,11 @@ fn test_exchange_with_proximity_sets_high_confidence() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
@@ -233,7 +237,11 @@ fn test_exchange_without_proximity_sets_low_confidence() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::failure();
@@ -276,7 +284,11 @@ fn test_exchange_proximity_timeout_sets_low_confidence() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::timeout();
@@ -319,7 +331,11 @@ fn test_manual_confirmation_sets_medium_confidence() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let bob_card = ContactCard::new("Bob");
     let manual_verifier = ManualConfirmationVerifier::new();
@@ -365,7 +381,11 @@ fn test_session_stores_audio_challenge_from_qr() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let expected_challenge = *alice_qr.audio_challenge();
 
     let bob_card = ContactCard::new("Bob");
@@ -399,7 +419,11 @@ fn test_stored_audio_challenge_is_not_zeros() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
@@ -431,7 +455,11 @@ fn test_proximity_check_uses_qr_challenge_not_zeros() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     let expected_challenge = *alice_qr.audio_challenge();
 
     let bob_card = ContactCard::new("Bob");
@@ -477,7 +505,11 @@ fn test_key_agreement_auto_runs_proximity_check_high() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
@@ -524,7 +556,11 @@ fn test_key_agreement_auto_runs_proximity_check_medium() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let bob_card = ContactCard::new("Bob");
     let manual_verifier = ManualConfirmationVerifier::new();
@@ -571,7 +607,11 @@ fn test_key_agreement_auto_runs_proximity_check_low_on_failure() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    let alice_qr = ExchangeQR::generate(&alice_identity, &alice_ephemeral);
+    let alice_qr = ExchangeQR::generate(
+        &alice_identity,
+        &alice_ephemeral,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
 
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::failure();

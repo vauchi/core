@@ -11,6 +11,7 @@ use super::super::duress::{DuressAlert, DuressAlertType};
 use super::super::error::{VauchiError, VauchiResult};
 use super::super::events::{EventCallback, VauchiEvent};
 use super::{AuthMode, BiometricUnlockOutcome, Vauchi};
+use crate::sleeper::Sleeper;
 use crate::storage::ActivityLogRow;
 use crate::types::DuressSettings;
 
@@ -142,7 +143,7 @@ impl Vauchi {
     pub fn biometric_unlock_check(&mut self) -> VauchiResult<BiometricUnlockOutcome> {
         let start = Instant::now();
         let outcome = self.biometric_unlock_decision()?;
-        pad_to_minimum(start, BIOMETRIC_UNLOCK_MIN_DURATION);
+        pad_to_minimum(self.sleeper.as_ref(), start, BIOMETRIC_UNLOCK_MIN_DURATION);
         Ok(outcome)
     }
 
@@ -351,9 +352,17 @@ impl Vauchi {
 /// Sleep just long enough that the elapsed time since `start` is at
 /// least `floor`. No-op when the elapsed time already meets or
 /// exceeds the floor.
-fn pad_to_minimum(start: Instant, floor: Duration) {
+///
+/// Phase 1 / Task 1.3 of the pure-functional-core program plan:
+/// routes the suspension through the [`Sleeper`] seam so tests can
+/// inject a `FakeSleeper` and avoid paying the 300 ms pad per call,
+/// while still asserting the floor was requested. Production callers
+/// pass `SystemSleeper` — the real wall-clock suspension required by
+/// the constant-time invariant in
+/// [`BIOMETRIC_UNLOCK_MIN_DURATION`]'s docs.
+fn pad_to_minimum(sleeper: &dyn Sleeper, start: Instant, floor: Duration) {
     let elapsed = start.elapsed();
     if elapsed < floor {
-        std::thread::sleep(floor - elapsed);
+        sleeper.sleep(floor - elapsed);
     }
 }

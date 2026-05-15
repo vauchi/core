@@ -51,6 +51,7 @@ use crate::clock::{Clock, SystemClock};
 use crate::crypto::{ShreddingMasterKey, SymmetricKey};
 use crate::identity::Identity;
 use crate::rng::{OsSecureRng, SecureRng};
+use crate::sleeper::{Sleeper, SystemSleeper};
 use crate::storage::{SecureStorage, Storage};
 use crate::sync::state::ReplayDetector;
 
@@ -210,6 +211,15 @@ pub struct Vauchi {
     /// `Vauchi::in_memory_with_clock_and_rng` so the engine becomes
     /// a deterministic function of `(state, input)`.
     rng: Arc<dyn SecureRng>,
+    /// Explicit-suspension seam (Phase 1 / Task 1.3 of the pure-
+    /// functional-core program). The last remaining suspension
+    /// site under `vauchi-core/src/` — the constant-time floor in
+    /// `biometric_unlock_check` — routes through `self.sleeper.sleep`.
+    /// Default is `SystemSleeper::shared()` (real wall-clock floor —
+    /// security-critical, see `BIOMETRIC_UNLOCK_MIN_DURATION`); tests
+    /// inject a `FakeSleeper` via `Vauchi::with_sleeper` to skip
+    /// the 300 ms pad while still asserting the floor was requested.
+    sleeper: Arc<dyn Sleeper>,
     /// In-memory queue of duress alerts waiting to be sent.
     ///
     /// Populated when `authenticate()` detects a duress PIN. Alerts are
@@ -310,6 +320,7 @@ impl Vauchi {
     ) -> VauchiResult<Self> {
         let clock = clock.unwrap_or_else(SystemClock::shared);
         let rng = rng.unwrap_or_else(OsSecureRng::shared);
+        let sleeper = SystemSleeper::shared();
 
         // Determine the storage encryption key
         let storage_key = Self::resolve_storage_key(&config, secure_storage.as_deref())?;
@@ -347,6 +358,7 @@ impl Vauchi {
             duress_alerts: Vec::new(),
             clock,
             rng,
+            sleeper,
             #[cfg(feature = "network-http")]
             ohttp_key: None,
             #[cfg(feature = "network-http")]
@@ -399,6 +411,30 @@ impl Vauchi {
     /// See `Vauchi::new_with` / `Vauchi::in_memory_with_clock_and_rng`.
     pub fn rng(&self) -> &Arc<dyn SecureRng> {
         &self.rng
+    }
+
+    /// Borrow the explicit-suspension seam. Tests pass a
+    /// `FakeSleeper`; production wraps [`SystemSleeper::shared`].
+    /// See [`Vauchi::with_sleeper`].
+    pub fn sleeper(&self) -> &Arc<dyn Sleeper> {
+        &self.sleeper
+    }
+
+    /// Replace the `Sleeper` used by this `Vauchi`. The default
+    /// (set in every constructor) is [`SystemSleeper::shared`] —
+    /// real wall-clock suspension, required for the
+    /// `BIOMETRIC_UNLOCK_MIN_DURATION` floor to actually defend
+    /// against the duress side-channel.
+    ///
+    /// Calling this in a production binary erases that defense
+    /// (a `FakeSleeper` returns instantly). The method is therefore
+    /// a **test-only** seam — gate construction of the substitute
+    /// behind `#[cfg(any(test, feature = "testing"))]` (the
+    /// `FakeSleeper` type itself is already gated that way).
+    #[must_use]
+    pub fn with_sleeper(mut self, sleeper: Arc<dyn Sleeper>) -> Self {
+        self.sleeper = sleeper;
+        self
     }
 
     /// Returns the current Unix timestamp in seconds.
@@ -486,6 +522,7 @@ impl Vauchi {
             duress_alerts: Vec::new(),
             clock,
             rng,
+            sleeper: SystemSleeper::shared(),
             #[cfg(feature = "network-http")]
             ohttp_key: None,
             #[cfg(feature = "network-http")]

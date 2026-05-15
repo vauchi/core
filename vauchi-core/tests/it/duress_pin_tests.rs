@@ -794,6 +794,50 @@ fn biometric_unlock_check_constant_time_across_duress_states() {
     assert!(t_with >= BIOMETRIC_UNLOCK_MIN_DURATION);
 }
 
+// Phase 1 / Task 1.3 floor invariant. The two preceding tests verify
+// the wall-clock floor end-to-end via `SystemSleeper`. This test
+// checks the *seam contract*: the pad request is issued through
+// `Sleeper::sleep` with a duration that closes the gap to
+// `BIOMETRIC_UNLOCK_MIN_DURATION`. A future refactor that bypasses
+// the seam (returns early, computes a zero gap, drops the call)
+// fails here without paying the 300 ms wall-clock cost — keeping the
+// regression net affordable as more sites migrate.
+// @internal
+#[test]
+fn biometric_unlock_check_requests_floor_via_sleeper_seam() {
+    use std::sync::Arc;
+    use vauchi_core::api::vauchi::BIOMETRIC_UNLOCK_MIN_DURATION;
+    use vauchi_core::sleeper::FakeSleeper;
+
+    let fake = Arc::new(FakeSleeper::new());
+    let mut wb = create_vauchi_with_identity("Alice").with_sleeper(fake.clone());
+    wb.setup_app_password("pw").expect("setup app pw");
+
+    let _ = wb.biometric_unlock_check().expect("check");
+
+    let calls = fake.calls();
+    assert_eq!(
+        calls.len(),
+        1,
+        "biometric_unlock_check must request exactly one sleep on the seam, got {} \
+         — bypassing the seam erases the BIOMETRIC_UNLOCK_MIN_DURATION defense",
+        calls.len()
+    );
+    let requested = calls[0];
+    assert!(
+        requested > std::time::Duration::ZERO,
+        "sleep request was zero — the floor must close a real gap (elapsed work \
+         is microseconds; pad duration is the floor minus elapsed)"
+    );
+    assert!(
+        requested <= BIOMETRIC_UNLOCK_MIN_DURATION,
+        "sleep request {:?} exceeded the floor {:?} — pad_to_minimum must not \
+         over-shoot the configured floor",
+        requested,
+        BIOMETRIC_UNLOCK_MIN_DURATION
+    );
+}
+
 // =============================================================================
 // Mode-Aware Contact Loading Tests
 // =============================================================================

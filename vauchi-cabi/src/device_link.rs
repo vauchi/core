@@ -9,7 +9,6 @@
 
 use std::os::raw::c_char;
 use std::sync::Mutex;
-use std::thread;
 use std::time::{Duration, Instant};
 
 use base64::Engine;
@@ -19,6 +18,7 @@ use super::{VauchiApp, from_c_str, to_c_string};
 use vauchi_core::exchange::{
     DeviceLinkInitiator, DeviceLinkRequest, ProximityProof, compute_confirmation_mac,
 };
+use vauchi_core::sleeper::SystemSleeper;
 
 /// Opaque handle to a device link initiator.
 pub struct VauchiDeviceLinkInitiator {
@@ -336,6 +336,7 @@ pub unsafe extern "C" fn vauchi_device_link_listen(
 
         // 2. Poll until claimed
         let deadline = Instant::now() + Duration::from_secs(timeout_secs);
+        let sleeper = SystemSleeper::shared();
         loop {
             if Instant::now() >= deadline {
                 return to_c_string(r#"{"error":"timeout"}"#);
@@ -357,7 +358,7 @@ pub unsafe extern "C" fn vauchi_device_link_listen(
                     return to_c_string(&json.to_string());
                 }
                 Ok(None) => {
-                    thread::sleep(Duration::from_secs(1));
+                    sleeper.sleep(Duration::from_secs(1));
                 }
                 Err(e) => {
                     return to_c_string(&format!(r#"{{"error":"poll: {e}"}}"#));

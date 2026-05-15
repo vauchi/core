@@ -50,7 +50,7 @@ vauchi-platform/src/exchange.rs 1027
 #  `try_audio_timeout` helper fn + cycle-loop call site that polls
 #  `MultiStageSession::check_and_apply_audio_timeout` to enforce
 #  the audio listen-window budget when Listening wedges.)
-vauchi-platform/src/multistage_exchange.rs 1080
+vauchi-platform/src/multistage_exchange.rs 1086
 
 # EXEMPT — state machine: scattered transitions create protocol bugs
 # (+8 for ADR-031 audio-as-samples migration — encode at emit, accept

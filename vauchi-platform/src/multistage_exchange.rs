@@ -43,6 +43,7 @@ use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::{
     AudioConfig, MultiStageSession, ProtocolState, QrPayload, audio_modem,
 };
+use vauchi_core::sleeper::{Sleeper, SystemSleeper};
 use vauchi_core::storage::Storage;
 
 /// Mobile-friendly protocol state enum (UniFFI-compatible).
@@ -716,6 +717,7 @@ fn cycle_loop(
 ) {
     let mut prev_state: Option<MobileProtocolState> = None;
     let mut finalized_fired = false;
+    let sleeper = SystemSleeper::shared();
 
     loop {
         if cancel_flag.load(Ordering::Relaxed) {
@@ -856,7 +858,11 @@ fn cycle_loop(
                 .unwrap_or(DEFAULT_CYCLE_SLEEP_MS),
             override_ms => override_ms,
         };
-        responsive_sleep(Duration::from_millis(sleep_ms as u64), &cancel_flag);
+        responsive_sleep(
+            Duration::from_millis(sleep_ms as u64),
+            &cancel_flag,
+            &*sleeper,
+        );
     }
 
     // Final callback — fires once per session on any exit path: cancel,
@@ -1011,7 +1017,7 @@ fn contact_name_from_payload(data: &[u8]) -> String {
 }
 
 /// Sleep for up to `total`, waking every ~25 ms to check for cancellation.
-fn responsive_sleep(total: Duration, cancel_flag: &AtomicBool) {
+fn responsive_sleep(total: Duration, cancel_flag: &AtomicBool, sleeper: &dyn Sleeper) {
     const CHUNK: Duration = Duration::from_millis(25);
     let mut remaining = total;
     while !remaining.is_zero() {
@@ -1019,7 +1025,7 @@ fn responsive_sleep(total: Duration, cancel_flag: &AtomicBool) {
             return;
         }
         let chunk = remaining.min(CHUNK);
-        thread::sleep(chunk);
+        sleeper.sleep(chunk);
         remaining = remaining.saturating_sub(chunk);
     }
 }

@@ -47,6 +47,7 @@ use vauchi_core::exchange::link_mode::{
 use vauchi_core::exchange::link_responder::{
     LinkResponderFailureReason, LinkResponderSession, LinkResponderState,
 };
+use vauchi_core::sleeper::SystemSleeper;
 
 /// UniFFI-friendly mirror of [`LinkResponderState`]. The cycle thread
 /// emits one `on_state_changed` callback per transition.
@@ -328,6 +329,7 @@ fn cycle_loop(
 ) {
     let mut prev_state: Option<MobileLinkResponderState> = None;
     let mut terminal_emitted = false;
+    let sleeper = SystemSleeper::shared();
 
     loop {
         if cancel_flag.load(Ordering::Relaxed) {
@@ -400,7 +402,7 @@ fn cycle_loop(
             session.tick(Instant::now());
         }
 
-        thread::sleep(Duration::from_millis(CYCLE_POLL_INTERVAL_MS));
+        sleeper.sleep(Duration::from_millis(CYCLE_POLL_INTERVAL_MS));
     }
 
     // If we broke out due to cancellation before the inner state

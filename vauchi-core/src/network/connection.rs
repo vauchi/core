@@ -49,6 +49,11 @@ pub struct ConnectionManager<T: Transport> {
     /// `with_clock(...)` after construction.
     /// Phase 1 / Task 1.1 / Step 3b structural pass.
     clock: std::sync::Arc<dyn crate::clock::Clock>,
+    /// Sleeper used for reconnect-backoff suspension. Defaults to
+    /// `crate::sleeper::SystemSleeper::shared()`; tests can override
+    /// via `with_sleeper(...)` to skip the real wall-clock wait.
+    /// Phase 1 / Task 1.3 of the pure-functional-core program.
+    sleeper: std::sync::Arc<dyn crate::sleeper::Sleeper>,
 }
 
 impl<T: Transport> ConnectionManager<T> {
@@ -61,6 +66,7 @@ impl<T: Transport> ConnectionManager<T> {
             reconnect_attempt: 0,
             suppress_presence: false,
             clock: crate::clock::SystemClock::shared(),
+            sleeper: crate::sleeper::SystemSleeper::shared(),
         }
     }
 
@@ -71,6 +77,18 @@ impl<T: Transport> ConnectionManager<T> {
     /// structural pass.
     pub fn with_clock(mut self, clock: std::sync::Arc<dyn crate::clock::Clock>) -> Self {
         self.clock = clock;
+        self
+    }
+
+    /// Replaces the manager's sleeper — for deterministic, fast tests.
+    ///
+    /// Defaults to `SystemSleeper::shared()` from `new()`; tests
+    /// can override post-construction (`FakeSleeper` from
+    /// `crate::sleeper` records requested durations and returns
+    /// immediately, so reconnect-backoff tests run at memory
+    /// speed). Phase 1 / Task 1.3 of the pure-functional-core program.
+    pub fn with_sleeper(mut self, sleeper: std::sync::Arc<dyn crate::sleeper::Sleeper>) -> Self {
+        self.sleeper = sleeper;
         self
     }
 
@@ -143,7 +161,8 @@ impl<T: Transport> ConnectionManager<T> {
         // Exponential backoff: base_delay * 2^attempt, capped at 2^6 = 64x
         let delay_ms =
             self.config.reconnect_base_delay_ms * (1u64 << self.reconnect_attempt.min(6));
-        std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+        self.sleeper
+            .sleep(std::time::Duration::from_millis(delay_ms));
 
         self.reconnect_attempt += 1;
 
@@ -295,6 +314,31 @@ mod tests {
 
         conn.send(&msg).unwrap();
         assert!(conn.is_connected());
+    }
+
+    #[test]
+    fn test_connection_manager_reconnect_uses_injected_sleeper() {
+        use crate::sleeper::{FakeSleeper, Sleeper};
+        use std::sync::Arc;
+        use std::time::Duration;
+
+        let transport = MockTransport::new();
+        let fake: Arc<FakeSleeper> = Arc::new(FakeSleeper::new());
+        let mut conn = ConnectionManager::new(transport, create_test_config())
+            .with_sleeper(fake.clone() as Arc<dyn Sleeper>);
+
+        conn.connect().unwrap();
+        // reconnect_attempt starts at 0 after connect() → backoff =
+        // base_delay_ms * 2^0 = base_delay_ms. Default test config does
+        // not override base_delay_ms, so the value is 1000ms (TransportConfig::default()).
+        conn.reconnect().unwrap();
+
+        // Real wall-clock impact: 0ms — FakeSleeper returns immediately.
+        // The injected seam captured the call. (reconnect_attempt is
+        // not asserted: a successful reconnect calls connect() which
+        // resets the counter back to 0 — the sleep happened before
+        // that reset, which is the property under test.)
+        assert_eq!(fake.calls(), vec![Duration::from_millis(1000)]);
     }
 
     #[test]

@@ -316,6 +316,7 @@ mod tests {
         assert!(conn.is_connected());
     }
 
+    // @internal
     #[test]
     fn test_connection_manager_reconnect_uses_injected_sleeper() {
         use crate::sleeper::{FakeSleeper, Sleeper};

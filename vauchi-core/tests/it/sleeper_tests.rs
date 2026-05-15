@@ -18,9 +18,12 @@ use vauchi_core::sleeper::{FakeSleeper, Sleeper, SystemSleeper};
 // @internal
 #[test]
 fn system_sleeper_with_zero_duration_is_noop() {
-    // Production impl must not panic on zero duration (the
-    // duress-floor calls `sleep(floor - elapsed)` which is zero
-    // when the elapsed time already exceeds the floor).
+    // allow(zero_assertions) — sentinel for the duress-floor contract:
+    // the production sleeper must not panic on zero duration, because
+    // `pad_to_minimum` in `api/vauchi/security.rs` calls
+    // `sleep(floor - elapsed)` and that subtraction is zero whenever
+    // the elapsed time already meets or exceeds the floor. Implicit
+    // assertion is "no panic"; explicit `assert!()` would be tautological.
     SystemSleeper::new().sleep(Duration::ZERO);
 }
 
@@ -61,6 +64,11 @@ fn fake_sleeper_starts_empty() {
 // @internal
 #[test]
 fn shared_returns_dyn_sleeper() {
+    // allow(zero_assertions) — sentinel for the DI surface:
+    // `SystemSleeper::shared()` must return a value typed as
+    // `Arc<dyn Sleeper>` (verified at compile time by the type
+    // ascription) and the resulting handle must be callable. Implicit
+    // assertion is "compiles + no panic"; explicit would be tautological.
     let sleeper: Arc<dyn Sleeper> = SystemSleeper::shared();
     sleeper.sleep(Duration::ZERO);
 }

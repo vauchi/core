@@ -12,6 +12,7 @@
 
 pub mod clock;
 pub mod rng;
+pub mod sleeper;
 
 pub mod crypto;
 pub use crypto::{DhError, PublicKey, Signature, SigningKeyPair, SymmetricKey, decrypt, encrypt};

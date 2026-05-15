@@ -37,6 +37,12 @@ pub struct CpalAudioBackend {
     is_active: Arc<AtomicBool>,
     /// Stop signal for streams
     stop_signal: Arc<AtomicBool>,
+    /// Sleeper used for the playback wait-loop poll interval and
+    /// the record-window block. Defaults to
+    /// `crate::sleeper::SystemSleeper::shared()`; tests override via
+    /// `with_sleeper(...)` to skip the real wall-clock wait.
+    /// Phase 1 / Task 1.3 of the pure-functional-core program.
+    sleeper: Arc<dyn crate::sleeper::Sleeper>,
 }
 
 impl CpalAudioBackend {
@@ -50,7 +56,18 @@ impl CpalAudioBackend {
             capability,
             is_active: Arc::new(AtomicBool::new(false)),
             stop_signal: Arc::new(AtomicBool::new(false)),
+            sleeper: crate::sleeper::SystemSleeper::shared(),
         })
+    }
+
+    /// Replaces the backend's sleeper — for deterministic, fast tests.
+    ///
+    /// Defaults to `SystemSleeper::shared()` from `new()`; tests can
+    /// override post-construction. Phase 1 / Task 1.3 of the
+    /// pure-functional-core program.
+    pub fn with_sleeper(mut self, sleeper: Arc<dyn crate::sleeper::Sleeper>) -> Self {
+        self.sleeper = sleeper;
+        self
     }
 
     /// Detects audio capability by checking available devices.
@@ -77,6 +94,7 @@ impl Default for CpalAudioBackend {
             capability: AudioCapability::None,
             is_active: Arc::new(AtomicBool::new(false)),
             stop_signal: Arc::new(AtomicBool::new(false)),
+            sleeper: crate::sleeper::SystemSleeper::shared(),
         })
     }
 }
@@ -163,7 +181,7 @@ impl CpalAudioBackend {
             if start.elapsed().as_millis() as u64 > duration_ms {
                 break;
             }
-            std::thread::sleep(Duration::from_millis(10));
+            self.sleeper.sleep(Duration::from_millis(10));
         }
 
         self.is_active.store(false, Ordering::SeqCst);
@@ -218,7 +236,7 @@ impl CpalAudioBackend {
             .play()
             .map_err(|e| ProximityError::HardwareError(format!("Record error: {}", e)))?;
 
-        std::thread::sleep(timeout);
+        self.sleeper.sleep(timeout);
 
         self.stop_signal.store(true, Ordering::SeqCst);
         self.is_active.store(false, Ordering::SeqCst);

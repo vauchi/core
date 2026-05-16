@@ -14,7 +14,7 @@ vauchi-platform/src/types.rs 1547
 # EXEMPT — UniFFI facade: splitting breaks binding generation (trust/notes/preview/import/diagnostic-scanner exports added; +9 for Phase 1-3 re-export split + scan_qr alias 2026-04-19; +57 for ADR-044 MobileError struct-variant migration 2026-04-20; +1 for G6 MobileImportWarning export 2026-04-20; +7 for device-link orchestrator re-export + 2x #[deprecated] on legacy structs 2026-04-26; +17 for save_test_delivery_record helper supporting G3 ScreenModel API gaps 2026-04-27; +1 for G2 MobileLabelContactRow + MobileLabelContactStatus re-exports 2026-04-27; +5 for G4 mobile_contact_detail mod + re-exports 2026-04-27; +1 for Pair 5 platform_app_engine_device_link mod 2026-04-29; +2 for mobile_app_preferences mod + MobileAppPreferences re-export 2026-05-03)
 # (+4 from cascading now: u64 args through Contact::from_exchange callers in slice 28 2026-05-13)
 # (+4 from cascading now: u64 args through DeviceLinkInitiator::confirm_link / DeviceLinkResponder::create_request / DeviceLinkInitiator::create_request callsites in slice 30 2026-05-15)
-vauchi-platform/src/lib.rs 2733
+vauchi-platform/src/lib.rs 2735
 
 # EXEMPT — UniFFI wrapper for the BLE exchange protocol: the
 # `MobileBleExchangeSession` UniFFI Object plus its `pub fn` impl
@@ -411,7 +411,13 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1633
 #   deserialises into `vauchi_app::ui::RenderContext` and calls
 #   `engine.set_render_context(ctx)`. Allowlist member 26 of 26 per
 #   ADR-047. UniFFI facade pattern; splitting breaks binding generation.)
-vauchi-platform/src/platform_app_engine.rs 5168
+# (+36 for slice 32b of 2026-05-11-pure-functional-core-program:
+#   `PlatformAppEngineTestHelpers` trait + impl carrying
+#   `save_test_contact`. Trait dispatch keeps the helper off the
+#   humble-surface ratchet — `impl … for PlatformAppEngine` blocks
+#   fall outside the contract test's `impl PlatformAppEngine {`
+#   regex. UniFFI facade pattern; splitting breaks binding generation.)
+vauchi-platform/src/platform_app_engine.rs 5204
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding

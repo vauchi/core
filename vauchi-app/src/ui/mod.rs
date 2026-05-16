@@ -58,6 +58,7 @@ pub mod reciprocity_confirmer;
 pub mod recovery_claim_review;
 mod recovery_help;
 mod recovery_status;
+pub mod render_context;
 mod screen;
 mod settings;
 mod social_graph;
@@ -126,6 +127,7 @@ pub use my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};
 pub use recovery_help::{ParsedClaimSummary, RecoveryHelpEngine};
 pub use recovery_status::RecoveryEngine;
+pub use render_context::RenderContext;
 pub use screen::{
     ActionStyle, CURRENT_SCHEMA_VERSION, Progress, ScreenAction, ScreenModel,
     ScreenPresentationKind, TabInfo,

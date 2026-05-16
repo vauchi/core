@@ -329,6 +329,12 @@ pub struct AppEngine {
     /// Device hardware capabilities reported by the frontend at startup.
     /// Used to determine exchange mode availability.
     pub(super) device_capabilities: DeviceCapabilities,
+    /// Frontend-pushed render context — Category-1 settings per ADR-047
+    /// (locale + theme_id). Owned by the frontend's OS-native sandbox;
+    /// pushed via `set_render_context_json` at boot and on Settings
+    /// dropdown changes. S2 of
+    /// `_private/docs/planning/todo/2026-05-16-settings-storage-by-sensitivity-plan.md`.
+    render_context: crate::ui::RenderContext,
     /// Current app update status from the relay/CDN version policy.
     update_status: AppUpdateStatus,
     /// Whether the user has dismissed the "update available" banner.
@@ -382,6 +388,25 @@ impl AppEngine {
     pub fn set_device_capabilities(&mut self, caps: DeviceCapabilities) {
         self.device_capabilities = caps;
         self.engine_cache.remove(&AppScreen::Exchange);
+    }
+
+    /// Returns the active render context (locale + theme_id) pushed
+    /// by the frontend. Used by `screens.rs` to render Settings
+    /// dropdown `selected` values without pulling state from the
+    /// vault. See [ADR-047](../../../../_private/docs/decisions/adr-047-settings-storage-by-sensitivity.md).
+    pub fn render_context(&self) -> &crate::ui::RenderContext {
+        &self.render_context
+    }
+
+    /// Replace the active render context. Called from PAE
+    /// `set_render_context_json` after JSON deserialization;
+    /// frontends invoke this at boot and on every Settings
+    /// locale/theme dropdown change. Invalidates the Settings
+    /// screen cache so the next render reflects the new
+    /// dropdown `selected` value.
+    pub fn set_render_context(&mut self, ctx: crate::ui::RenderContext) {
+        self.render_context = ctx;
+        self.engine_cache.remove(&AppScreen::Settings);
     }
 
     pub fn new(vauchi: Vauchi) -> Self {
@@ -452,6 +477,7 @@ impl AppEngine {
             field_catalog,
             preview_as_contact: None,
             device_capabilities: DeviceCapabilities::default(),
+            render_context: crate::ui::RenderContext::default(),
             update_status: AppUpdateStatus::UpToDate,
             update_dismissed: false,
             last_poll_time: now,

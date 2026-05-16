@@ -224,36 +224,6 @@ fn bench_storage(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark visibility label operations
-fn bench_labels(c: &mut Criterion) {
-    let mut group = c.benchmark_group("labels");
-
-    group.bench_function("list_labels", |b| {
-        let (instance, _dir) = create_instance_with_identity("Test User");
-        b.iter(|| {
-            black_box(instance.list_labels().unwrap());
-        })
-    });
-
-    group.bench_function("create_label", |b| {
-        b.iter_with_setup(
-            || create_instance_with_identity("Test User"),
-            |(instance, _dir)| {
-                black_box(instance.create_label("Test Label".to_string()).unwrap());
-            },
-        )
-    });
-
-    group.bench_function("get_suggested_labels", |b| {
-        let (instance, _dir) = create_instance_with_identity("Test User");
-        b.iter(|| {
-            black_box(instance.get_suggested_labels());
-        })
-    });
-
-    group.finish();
-}
-
 /// Benchmark social network lookup
 fn bench_social_networks(c: &mut Criterion) {
     let mut group = c.benchmark_group("social");
@@ -313,7 +283,6 @@ criterion_group!(
     bench_exchange_qr,
     bench_backup,
     bench_storage,
-    bench_labels,
     bench_social_networks,
     bench_password_check,
 );

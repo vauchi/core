@@ -14,12 +14,17 @@
 //! values today; future locale-keyed string rendering after S3 of
 //! the implementation plan).
 //!
-//! No serde here — the wire shape is JSON deserialized by the PAE
-//! shim into this struct's fields, but the struct itself is
-//! crate-internal (`pub` only so the test layer can construct it).
+//! Wire shape: the JSON the PAE shim accepts has the same field
+//! names as this struct (snake_case `locale`, `theme_id`). Serde
+//! derives live here so the PAE method can deserialize directly,
+//! matching the `DeviceCapabilities` pattern (`set_device_capabilities_json`
+//! deserialises straight into the core type). Field names are
+//! UI-shaped — no domain words — preserving the humble-allowlist
+//! invariant (`locale`, `theme_id` are not retired wire keys per
+//! `wire_humble_keys_tests.rs`).
 
 /// Active render context pushed from the frontend.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RenderContext {
     /// Active locale code (e.g. `"de"`, `"fr"`). `None` means
     /// "frontend has not pushed a value yet" — fall back to the

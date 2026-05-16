@@ -799,6 +799,34 @@ impl PlatformAppEngine {
         vauchi_core::PERIODIC_SYNC_MAX_RETRIES
     }
 
+    /// Push render-context preferences (locale + theme_id) from
+    /// frontend OS-native storage to core.
+    ///
+    /// Category-1 settings per
+    /// [ADR-047](../../../../_private/docs/decisions/adr-047-settings-storage-by-sensitivity.md):
+    /// frontends own the canonical copy in OS-native sandboxed
+    /// storage (`SharedPreferences`, `UserDefaults`, …) and push
+    /// the active values to core at app boot + on every Settings
+    /// dropdown change. Core uses them to render Settings dropdown
+    /// `selected` values (S3 of the implementation plan) and,
+    /// later, to resolve locale-keyed strings into ScreenModel.
+    ///
+    /// JSON shape: `{ "locale": "de", "theme_id": "cyber" }`.
+    /// Both fields optional — `null` / absent means "frontend has
+    /// no value yet". Field names are UI-shaped to preserve the
+    /// humble-allowlist invariant (no domain words).
+    pub fn set_render_context_json(&self, json: String) -> Result<(), MobileError> {
+        let ctx: vauchi_app::ui::RenderContext =
+            serde_json::from_str(&json).map_err(|e| MobileError::Other {
+                detail: format!("Invalid render context JSON: {e}"),
+            })?;
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        engine.set_render_context(ctx);
+        Ok(())
+    }
+
     /// Report frontend-observed network reachability to core.
     ///
     /// Frontends call this from their platform reachability monitor

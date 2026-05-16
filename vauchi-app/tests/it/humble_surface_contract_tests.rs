@@ -76,6 +76,7 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "set_device_capabilities_json",
     "set_event_listener",
     "set_network_online",
+    "set_render_context_json",
     "sidebar_items",
     "tab_info",
 ];
@@ -200,15 +201,19 @@ fn humble_allowlist_is_sorted_and_unique() {
 // @internal
 #[test]
 fn humble_allowlist_size_matches_plan() {
-    // The plan's Task 0.2 names exactly 25 methods as the genuine
-    // Humble surface. If this number changes, ADR-021 / ADR-043 must
-    // be amended first. Catching the count drift here is cheaper than
-    // discovering it during an ADR audit.
+    // The plan's Task 0.2 originally named 25 methods as the genuine
+    // Humble surface; ADR-047 (Draft) added `set_render_context_json`
+    // for the render-context tier, bringing the size to 26. If this
+    // number changes again, the next ADR amendment must precede the
+    // edit. Catching the count drift here is cheaper than discovering
+    // it during an ADR audit.
     assert_eq!(
         HUMBLE_ALLOWLIST.len(),
-        25,
-        "Humble allow-list size drifted from the 25 named in plan Task 0.2 \
-         — amend ADR-021/043 before editing the list."
+        26,
+        "Humble allow-list size drifted from the 26 expected after \
+         ADR-047 added `set_render_context_json`. Edits to this list \
+         require an ADR amendment (ADR-021/043, or ADR-047 for the \
+         render-context tier)."
     );
 }
 

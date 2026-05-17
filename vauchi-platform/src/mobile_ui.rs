@@ -4,15 +4,25 @@
 
 //! Pre-identity onboarding workflow exported to mobile via UniFFI.
 //!
-//! Every post-identity screen is driven by
-//! [`PlatformAppEngine`](crate::PlatformAppEngine), which provides unified
-//! navigation, screen rendering, and action handling through a single
-//! entry point. `PlatformAppEngine` cannot be constructed before an
-//! identity exists (it opens the encrypted DB in `new()`), so onboarding
-//! keeps its own workflow type until the primary SMK is derived and
-//! storage is available.
+//! **Slated for retirement** — `PlatformAppEngine` already drives the
+//! onboarding flow internally (`current_screen_json` returns the
+//! Onboarding screen when no identity exists; `handle_action_json`
+//! dispatches into the inner `OnboardingEngine`). Frontends that route
+//! through PAE for onboarding get the same screen sequence without
+//! this peer object. Slice 32c collapses the two paths into one.
+//! See: `_private/docs/problems/2026-05-17-slice-32c-mobile-ui-retirement/`.
 //!
-//! See: `_private/docs/problems/2026-04-04-core-gui-architecture-alignment/`
+//! Historical note: the earlier claim here said PAE "cannot be
+//! constructed before an identity exists (it opens the encrypted DB in
+//! `new()`)". That was correct at the time the file was written but
+//! became stale once PAE's `new()` learned to take `storage_key_bytes`
+//! and `AppEngine::new()` learned the no-identity boot branch via
+//! `AppScreen::Onboarding` → `OnboardingEngine`. iOS
+//! `Vauchi/Services/VauchiRepository.swift` constructs PAE
+//! unconditionally on app launch; the historical justification for
+//! keeping this peer no longer holds.
+//!
+//! See also: `_private/docs/problems/2026-04-04-core-gui-architecture-alignment/`
 //! (Phase 1, Task 1C — the deprecated per-screen `Mobile*Workflow`
 //! wrappers for post-identity screens were removed once iOS and Android
 //! finished migrating to `PlatformAppEngine`).

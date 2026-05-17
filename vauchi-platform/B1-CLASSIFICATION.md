@@ -139,7 +139,7 @@ Everything else. Per-file count:
 | `mobile_ble.rs` | 8 | session methods on `MobileBleExchangeSession` — same |
 | `mobile_onboarding.rs` | 7 | yes |
 | `mobile_animated_qr.rs` | 7 | session methods on `MobileAnimatedQrSender` — keep |
-| `mobile_ui.rs` | 4 | partially superseded by `PlatformAppEngine` (current_screen_json, handle_action_json) |
+| `mobile_ui.rs` | ~~4~~ 0 (file retired 2026-05-17) | **retired by slice 32c** — `MobileOnboardingWorkflow` collapsed into `PlatformAppEngine`. ADR-043 Amendment 2 codifies "one screen-driving UniFFI object per binding"; the new `peer_uniffi_objects_count` strict-equality test enforces. See `_private/docs/designs/2026-05-16-slice-32c-mobile-ui-retirement-design.md`. B1's earlier "partially superseded" note was the right read but didn't follow through. |
 | `mobile_exchange.rs` | 4 | yes |
 | `mobile_content.rs` | 4 | yes |
 | `mobile_wifi_aware.rs` | 1 | yes |

@@ -33,9 +33,16 @@ in the private repo.
 - *(stays on session type)* — method is on a non-`VauchiPlatform`
   type (`MobileBleExchangeSession`, `MobileNfcHandshake`,
   `MobileAnimatedQrSender`, `MobileDeviceLinkSession`,
-  `MobileMultiStageSession`, `MobileOnboardingWorkflow`). These
-  remain as their own `#[uniffi::Object]`s — they are not part of
-  the collapse.
+  `MobileMultiStageSession`, and the additional session peers
+  enumerated by `peer_uniffi_objects_count` in
+  `core/vauchi-app/tests/it/humble_surface_contract_tests.rs`).
+  These remain as their own `#[uniffi::Object]`s — they are not
+  part of the collapse. `MobileOnboardingWorkflow` was removed
+  from this set by slice 32c (2026-05-17): it was screen-shaped
+  (UserAction → ActionResult + ScreenModel), not session-shaped
+  (no `ExchangeHardwareEvent` consumption), and collapsed into
+  `PlatformAppEngine`. See ADR-043 Amendment 2 + the design pass
+  at `_private/docs/designs/2026-05-16-slice-32c-mobile-ui-retirement-design.md`.
 - *(free function)* — method becomes a top-level `#[uniffi::export]`
   function (e.g. `core_version`, `is_safe_url`, FAQ helpers, theme
   helpers). Not bound to any object.
@@ -262,7 +269,7 @@ become `PlatformAppEngine` methods. They become top-level
 | MIGRATED (typed direct method) | 20 | 9 recovery (B2) + 4 emergency broadcast (B3) + 7 device linking (B4) |
 | MIGRATED (already on engine pre-collapse) | ~10 | `has_identity`, `boot`, `current_screen_json`, navigation, lifecycle, `periodic_sync_tick`, `set_network_online`, `biometric_unlock_check`, etc. |
 | PENDING B7 (DomainCommand long-tail) | ~150 | All `mobile_contacts`, `mobile_visibility`, `mobile_gdpr`, the rest of `mobile_security`, `mobile_content`, `mobile_delivery`, parts of `mobile_recovery`, `mobile_identity`, exchange entry points |
-| NOT MIGRATED — STAYS (session types) | ~30 | `MobileBleExchangeSession`, `MobileAnimatedQrSender`, `MobileNfcHandshake`, `MobileDeviceLinkSession`, `MobileMultiStageSession`, `MobileOnboardingWorkflow` and their methods |
+| NOT MIGRATED — STAYS (session types) | ~30 | `MobileBleExchangeSession`, `MobileAnimatedQrSender`, `MobileNfcHandshake`, `MobileDeviceLinkSession`, `MobileMultiStageSession`, and the other session peers — full enumeration pinned by `peer_uniffi_objects_count` in `core/vauchi-app/tests/it/humble_surface_contract_tests.rs` (ADR-043 Am.2). `MobileOnboardingWorkflow` was retired by slice 32c (2026-05-17, screen-shaped — not a session peer). |
 | NOT MIGRATED — STAYS (free functions) | ~40 | i18n, FAQ, theme, validation, helper functions on `lib.rs` |
 | PRE-ORCHESTRATOR — KEEP UNTIL D3 | 5 | `start_device_link`, `start_device_join`, `send_device_link_request`, `listen_for_device_link_request`, `send_device_link_response` — superseded by `MobileDeviceLinkSession`, retained for the deprecation cycle |
 

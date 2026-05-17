@@ -205,6 +205,20 @@ pub enum DomainCommand {
         response: String,
         remind_at: Option<u64>,
     },
+    // ── Recovery-trust toggle + count (slice 32g-B prep — mirrors the
+    // three pub fns previously duplicated on `PlatformAppEngine`
+    // (trust_contact_for_recovery / untrust / trusted_contact_count)
+    // and on `mobile_contacts.rs::impl VauchiPlatform`. Adding them as
+    // DomainCommands lets slice 32g retire both copies atomically and
+    // gives iOS a uniform dispatch entry point.) ──
+    /// Mark a contact as recovery-trusted. Errors if the contact is
+    /// blocked. Returns `Unit`.
+    TrustContactForRecovery { contact_id: String },
+    /// Remove recovery trust from a contact. Returns `Unit`.
+    UntrustContactForRecovery { contact_id: String },
+    /// Count the contacts marked as recovery-trusted. Returns
+    /// `Count { value }`.
+    TrustedContactCount,
     // ── Visibility Labels + Field Visibility (B7 batch 6) ──
     /// List every visibility label.
     ListLabels,

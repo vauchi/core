@@ -12,7 +12,7 @@
 
 use std::sync::Arc;
 
-use vauchi_platform::PlatformAppEngine;
+use vauchi_platform::{DomainCommand, DomainCommandResult, PlatformAppEngine};
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -240,22 +240,32 @@ fn create_recovery_voucher_rejects_self_vouching() {
 }
 
 // ── trust_contact_for_recovery / untrust / count ─────────────────────
+//
+// Slice 32g-B (2026-05-17): the direct PAE pub fns retired in favour
+// of `DomainCommand::{TrustContactForRecovery, UntrustContactForRecovery,
+// TrustedContactCount}`. Same storage semantics; the dispatch envelope
+// is the only thing that changed.
 
 // @internal
 #[test]
 fn trusted_contact_count_is_zero_when_no_contacts() {
     let (engine, _dir) = create_engine_with_identity();
-    let count = engine
-        .trusted_contact_count()
-        .expect("trusted_contact_count");
-    assert_eq!(count, 0);
+    let result = engine
+        .dispatch_domain_command(DomainCommand::TrustedContactCount)
+        .expect("TrustedContactCount dispatch");
+    match result {
+        DomainCommandResult::Count { value } => assert_eq!(value, 0),
+        other => panic!("expected DomainCommandResult::Count, got {other:?}"),
+    }
 }
 
 // @internal
 #[test]
 fn trust_contact_for_recovery_errors_on_unknown_contact() {
     let (engine, _dir) = create_engine_with_identity();
-    let result = engine.trust_contact_for_recovery("nonexistent-id".into());
+    let result = engine.dispatch_domain_command(DomainCommand::TrustContactForRecovery {
+        contact_id: "nonexistent-id".into(),
+    });
     assert!(result.is_err(), "unknown contact must error");
 }
 
@@ -263,7 +273,9 @@ fn trust_contact_for_recovery_errors_on_unknown_contact() {
 #[test]
 fn untrust_contact_for_recovery_errors_on_unknown_contact() {
     let (engine, _dir) = create_engine_with_identity();
-    let result = engine.untrust_contact_for_recovery("nonexistent-id".into());
+    let result = engine.dispatch_domain_command(DomainCommand::UntrustContactForRecovery {
+        contact_id: "nonexistent-id".into(),
+    });
     assert!(result.is_err(), "unknown contact must error");
 }
 

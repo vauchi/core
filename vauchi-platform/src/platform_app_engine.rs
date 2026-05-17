@@ -1394,100 +1394,6 @@ impl PlatformAppEngine {
         }
     }
 
-    /// Mark a contact as recovery-trusted. Blocked contacts cannot be
-    /// trusted for recovery.
-    pub fn trust_contact_for_recovery(&self, contact_id: String) -> Result<(), MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let storage = engine.vauchi().storage();
-
-        let mut contact = storage
-            .load_contact(&contact_id)
-            .map_err(|e| MobileError::StorageError {
-                detail: e.to_string(),
-            })?
-            .ok_or_else(|| MobileError::Other {
-                detail: format!("Contact not found: {contact_id}"),
-            })?;
-
-        if contact.is_blocked() {
-            return Err(MobileError::InvalidInput {
-                field: String::new(),
-                detail: "Blocked contacts cannot be trusted for recovery".into(),
-            });
-        }
-
-        contact
-            .trust_for_recovery()
-            .map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: e.to_string(),
-            })?;
-        storage
-            .save_contact(&contact)
-            .map_err(|e| MobileError::StorageError {
-                detail: e.to_string(),
-            })?;
-
-        engine.invalidate_screen(&AppScreen::Recovery);
-        engine.invalidate_screen(&AppScreen::ContactDetail {
-            contact_id: contact_id.clone(),
-        });
-        Ok(())
-    }
-
-    /// Remove recovery trust from a contact.
-    pub fn untrust_contact_for_recovery(&self, contact_id: String) -> Result<(), MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let storage = engine.vauchi().storage();
-
-        let mut contact = storage
-            .load_contact(&contact_id)
-            .map_err(|e| MobileError::StorageError {
-                detail: e.to_string(),
-            })?
-            .ok_or_else(|| MobileError::Other {
-                detail: format!("Contact not found: {contact_id}"),
-            })?;
-
-        contact
-            .untrust_for_recovery()
-            .map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: e.to_string(),
-            })?;
-        storage
-            .save_contact(&contact)
-            .map_err(|e| MobileError::StorageError {
-                detail: e.to_string(),
-            })?;
-
-        engine.invalidate_screen(&AppScreen::Recovery);
-        engine.invalidate_screen(&AppScreen::ContactDetail {
-            contact_id: contact_id.clone(),
-        });
-        Ok(())
-    }
-
-    /// Count the contacts marked as recovery-trusted.
-    pub fn trusted_contact_count(&self) -> Result<u32, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let contacts =
-            engine
-                .vauchi()
-                .storage()
-                .list_contacts()
-                .map_err(|e| MobileError::StorageError {
-                    detail: e.to_string(),
-                })?;
-        Ok(contacts.iter().filter(|c| c.is_recovery_trusted()).count() as u32)
-    }
-
     // ── Emergency Broadcast (Phase B3 — collapse-vauchi-platform-into-app-engine) ──
     //
     // Wraps the four emergency-broadcast methods that previously only
@@ -2407,6 +2313,81 @@ impl PlatformAppEngine {
                 engine.invalidate_screen(&AppScreen::Recovery);
                 engine.invalidate_screen(&AppScreen::RecoveryHelp);
                 Ok(DomainCommandResult::Unit)
+            }
+
+            // ── Recovery-trust toggle + count (slice 32g-B) ──
+            DomainCommand::TrustContactForRecovery { contact_id } => {
+                let storage = engine.vauchi().storage();
+                let mut contact = storage
+                    .load_contact(&contact_id)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?
+                    .ok_or_else(|| MobileError::Other {
+                        detail: format!("Contact not found: {contact_id}"),
+                    })?;
+                if contact.is_blocked() {
+                    return Err(MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: "Blocked contacts cannot be trusted for recovery".into(),
+                    });
+                }
+                contact
+                    .trust_for_recovery()
+                    .map_err(|e| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: e.to_string(),
+                    })?;
+                storage
+                    .save_contact(&contact)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Recovery);
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: contact_id.clone(),
+                });
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::UntrustContactForRecovery { contact_id } => {
+                let storage = engine.vauchi().storage();
+                let mut contact = storage
+                    .load_contact(&contact_id)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?
+                    .ok_or_else(|| MobileError::Other {
+                        detail: format!("Contact not found: {contact_id}"),
+                    })?;
+                contact
+                    .untrust_for_recovery()
+                    .map_err(|e| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: e.to_string(),
+                    })?;
+                storage
+                    .save_contact(&contact)
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Recovery);
+                engine.invalidate_screen(&AppScreen::ContactDetail {
+                    contact_id: contact_id.clone(),
+                });
+                Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::TrustedContactCount => {
+                let count = engine
+                    .vauchi()
+                    .storage()
+                    .list_contacts()
+                    .map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?
+                    .iter()
+                    .filter(|c| c.is_recovery_trusted())
+                    .count() as u32;
+                Ok(DomainCommandResult::Count { value: count })
             }
 
             // ── Visibility Labels + Field Visibility (B7 batch 6) ──

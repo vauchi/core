@@ -48,7 +48,6 @@ mod mobile_import;
 mod mobile_nfc;
 mod mobile_onboarding;
 mod mobile_recovery;
-mod mobile_security;
 mod mobile_verifier_event;
 mod mobile_visibility;
 mod mobile_wifi_aware;
@@ -1429,7 +1428,6 @@ impl VauchiPlatform {
 // - mobile_identity.rs: Identity operations, aha moments, demo contact
 // - mobile_onboarding.rs: Onboarding progress, display name suggestions
 // - mobile_contacts.rs: Contact card/CRUD, hidden contacts, pagination, social networks, field validation
-// - mobile_security.rs: Password/duress, emergency broadcast, decoy contacts
 // - mobile_visibility.rs: Visibility operations and labels
 // - mobile_exchange.rs: Contact exchange operations
 // - mobile_delivery.rs: Sync, delivery status, retry/offline queue, multi-device, backup, async sync

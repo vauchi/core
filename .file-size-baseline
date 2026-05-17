@@ -14,7 +14,22 @@ vauchi-platform/src/types.rs 1547
 # EXEMPT — UniFFI facade: splitting breaks binding generation (trust/notes/preview/import/diagnostic-scanner exports added; +9 for Phase 1-3 re-export split + scan_qr alias 2026-04-19; +57 for ADR-044 MobileError struct-variant migration 2026-04-20; +1 for G6 MobileImportWarning export 2026-04-20; +7 for device-link orchestrator re-export + 2x #[deprecated] on legacy structs 2026-04-26; +17 for save_test_delivery_record helper supporting G3 ScreenModel API gaps 2026-04-27; +1 for G2 MobileLabelContactRow + MobileLabelContactStatus re-exports 2026-04-27; +5 for G4 mobile_contact_detail mod + re-exports 2026-04-27; +1 for Pair 5 platform_app_engine_device_link mod 2026-04-29; +2 for mobile_app_preferences mod + MobileAppPreferences re-export 2026-05-03)
 # (+4 from cascading now: u64 args through Contact::from_exchange callers in slice 28 2026-05-13)
 # (+4 from cascading now: u64 args through DeviceLinkInitiator::confirm_link / DeviceLinkResponder::create_request / DeviceLinkInitiator::create_request callsites in slice 30 2026-05-15)
-vauchi-platform/src/lib.rs 2735
+# (+251 for slice 32g-B Phase 2 of 2026-05-11-pure-functional-core-program:
+#   16 same-named `pub fn` helpers (add_field / update_field / remove_field /
+#   get_own_card / list_contacts / list_contacts_paginated / get_contact /
+#   set_proposal_trusted / set_contact_note / get_contact_note /
+#   delete_contact_note / set_contact_field_note / get_contact_field_notes /
+#   delete_contact_field_note / list_social_networks / get_profile_url)
+#   moved here from the retired `#[uniffi::export] impl VauchiPlatform`
+#   block in `mobile_contacts.rs`. The lib.rs versions are NOT
+#   UniFFI-exported (outside any `#[uniffi::export]` block) and live in
+#   lib.rs — not in any `mobile_*.rs` file — so the audit script's
+#   `mobile_pub_fns` counter does not pick them up. Preserved as a
+#   test-only escape hatch for the 18 affected unit tests in the
+#   `#[cfg(test)] mod tests` block; will retire with VauchiPlatform
+#   itself in Phase 6 / Task 6.3. See G4b in the slice 32g-B Phase 2
+#   problem record for the rationale.)
+vauchi-platform/src/lib.rs 2986
 
 # EXEMPT — UniFFI wrapper for the BLE exchange protocol: the
 # `MobileBleExchangeSession` UniFFI Object plus its `pub fn` impl

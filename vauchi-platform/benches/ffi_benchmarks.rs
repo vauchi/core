@@ -7,7 +7,7 @@
 //! Measures FFI overhead and critical path performance for mobile operations.
 //! These benchmarks help identify bottlenecks in the UniFFI bridge layer.
 
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use std::sync::Arc;
 use tempfile::TempDir;
 use vauchi_platform::VauchiPlatform;
@@ -65,97 +65,6 @@ fn bench_identity_creation(c: &mut Criterion) {
             black_box(instance.get_display_name().unwrap());
         })
     });
-
-    group.finish();
-}
-
-/// Benchmark contact card operations
-fn bench_card_operations(c: &mut Criterion) {
-    let mut group = c.benchmark_group("card");
-
-    group.bench_function("get_own_card", |b| {
-        let (instance, _dir) = create_instance_with_identity("Test User");
-        b.iter(|| {
-            black_box(instance.get_own_card().unwrap());
-        })
-    });
-
-    group.bench_function("add_field", |b| {
-        b.iter_with_setup(
-            || create_instance_with_identity("Test User"),
-            |(instance, _dir)| {
-                let _: () = instance
-                    .add_field(
-                        vauchi_platform::MobileFieldType::Email,
-                        "work".to_string(),
-                        "test@example.com".to_string(),
-                    )
-                    .unwrap();
-                black_box(());
-            },
-        )
-    });
-
-    group.bench_function("update_field", |b| {
-        b.iter_with_setup(
-            || {
-                let (instance, dir) = create_instance_with_identity("Test User");
-                instance
-                    .add_field(
-                        vauchi_platform::MobileFieldType::Email,
-                        "work".to_string(),
-                        "old@example.com".to_string(),
-                    )
-                    .unwrap();
-                (instance, dir)
-            },
-            |(instance, _dir)| {
-                let _: () = instance
-                    .update_field("work".to_string(), "new@example.com".to_string())
-                    .unwrap();
-                black_box(());
-            },
-        )
-    });
-
-    group.finish();
-}
-
-/// Benchmark contact list operations at various scales
-fn bench_contact_list_scaling(c: &mut Criterion) {
-    let mut group = c.benchmark_group("contacts_scaling");
-    group.sample_size(20); // Reduce sample size for slower benchmarks
-
-    for count in [0, 10, 50, 100].iter() {
-        group.throughput(Throughput::Elements(*count as u64));
-
-        group.bench_with_input(BenchmarkId::new("list_contacts", count), count, |b, &_| {
-            let (instance, _dir) = create_instance_with_identity("Test User");
-            // Note: We can't easily create contacts without full exchange,
-            // so this benchmarks empty/near-empty list performance
-            b.iter(|| {
-                black_box(instance.list_contacts().unwrap());
-            });
-        });
-
-        group.bench_with_input(BenchmarkId::new("contact_count", count), count, |b, &_| {
-            let (instance, _dir) = create_instance_with_identity("Test User");
-            b.iter(|| {
-                black_box(instance.contact_count().unwrap());
-            });
-        });
-
-        group.bench_with_input(
-            BenchmarkId::new("search_contacts", count),
-            count,
-            |b, &_| {
-                let (instance, _dir) = create_instance_with_identity("Test User");
-                b.iter(|| {
-                    black_box(instance.search_contacts("test".to_string()).unwrap());
-                });
-            },
-        );
-    }
 
     group.finish();
 }
@@ -224,34 +133,6 @@ fn bench_storage(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark social network lookup
-fn bench_social_networks(c: &mut Criterion) {
-    let mut group = c.benchmark_group("social");
-
-    group.bench_function("list_all", |b| {
-        let (instance, _dir) = create_test_instance();
-        b.iter(|| {
-            black_box(instance.list_social_networks());
-        })
-    });
-
-    group.bench_function("search", |b| {
-        let (instance, _dir) = create_test_instance();
-        b.iter(|| {
-            black_box(instance.search_social_networks("git".to_string()));
-        })
-    });
-
-    group.bench_function("get_profile_url", |b| {
-        let (instance, _dir) = create_test_instance();
-        b.iter(|| {
-            black_box(instance.get_profile_url("github".to_string(), "octocat".to_string()));
-        })
-    });
-
-    group.finish();
-}
-
 /// Benchmark password strength checking (utility function)
 fn bench_password_check(c: &mut Criterion) {
     let mut group = c.benchmark_group("password");
@@ -278,12 +159,9 @@ fn bench_password_check(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_identity_creation,
-    bench_card_operations,
-    bench_contact_list_scaling,
     bench_exchange_qr,
     bench_backup,
     bench_storage,
-    bench_social_networks,
     bench_password_check,
 );
 

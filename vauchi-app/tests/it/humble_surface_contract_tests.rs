@@ -314,3 +314,143 @@ fn platform_app_engine_surface_matches_allowlist_strict() {
             .join("\n"),
     );
 }
+
+// ── ADR-043 Amendment 2: one screen-driving UniFFI object per binding ──
+
+/// Permitted `#[uniffi::Object]` structs in `core/vauchi-platform/src/`.
+///
+/// ADR-043 Amendment 2 (2026-05-17) caps the set: at most one
+/// screen-driving UniFFI object (`PlatformAppEngine`) per binding;
+/// session-shaped peers per ADR-031 (hardware-event-driven, transient,
+/// single-protocol-instance) are explicitly enumerated below; the
+/// legacy `VauchiPlatform` is allowlisted with a retire-in-Phase-6
+/// comment.
+///
+/// The amendment text (clarification 2) names categories; this list
+/// is the operational enumeration the test enforces against. Adding
+/// or removing entries here is the ADR-amendment surface: any new
+/// `#[uniffi::Object]` in `vauchi-platform/src/` must either match
+/// an existing entry or land paired with an ADR amendment update.
+const PERMITTED_UNIFFI_OBJECTS: &[&str] = &[
+    // ── Screen-driving (ADR-043 Am.2 clarification 1) ──
+    "PlatformAppEngine",
+    // ── Session peers under ADR-031 (clarification 2) ──
+    // Hardware-event-driven, short-lived, single-protocol-instance.
+    "MobileAnimatedQrReceiver",
+    "MobileAnimatedQrSender",
+    "MobileBleExchangeSession",
+    "MobileDeviceLinkInitiator",
+    "MobileDeviceLinkResponder",
+    "MobileDeviceLinkSession",
+    "MobileExchangeSession",
+    "MobileLinkResponderSession",
+    "MobileMultipartDecoder",
+    "MobileMultiStageSession",
+    "MobileNfcHandshake",
+    // ── Legacy ──
+    // `VauchiPlatform` is the Phase-B legacy facade; the
+    // `2026-05-11-pure-functional-core-program-plan.md` Phase 6 /
+    // Task 6.3 retires it after the `SURPLUS_RATCHET_CEILING` hits
+    // zero. Allowlisted here until then; remove this entry when
+    // Phase 6 lands.
+    "VauchiPlatform",
+];
+
+/// Walk `core/vauchi-platform/src/**.rs` and collect every
+/// `pub struct <Name>` whose declaration is preceded (within 3
+/// preceding lines) by a `uniffi::Object` derive or attribute.
+///
+/// Rationale for the 3-line window: rustfmt-formatted source places
+/// derives directly above the struct, optionally interleaved with
+/// short attributes (`#[non_exhaustive]`, `#[serde(...)]`). Three
+/// lines covers the realistic patterns without false positives from
+/// `uniffi::Object` references inside doc comments far above.
+fn collect_uniffi_object_names(dir: &Path) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    let entries = fs::read_dir(dir).unwrap_or_else(|e| panic!("read_dir {}: {e}", dir.display()));
+    for entry in entries {
+        let entry = entry.expect("dir entry");
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("rs") {
+            continue;
+        }
+        let source =
+            fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let lines: Vec<&str> = source.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            // Only consider top-level `pub struct` declarations
+            // (column 0). Nested or indented structs (e.g. inside
+            // `#[cfg(test)] mod`) are not UniFFI-exported.
+            if !line.starts_with("pub struct ") {
+                continue;
+            }
+            // Look back up to 3 lines for the uniffi::Object marker.
+            let start = i.saturating_sub(3);
+            let window = lines[start..i].join("\n");
+            if !window.contains("uniffi::Object") {
+                continue;
+            }
+            // Extract the struct name (token after "pub struct ").
+            let after = &line["pub struct ".len()..];
+            let name: String = after
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                .collect();
+            if !name.is_empty() {
+                names.insert(name);
+            }
+        }
+    }
+    names
+}
+
+// @internal
+#[test]
+fn peer_uniffi_objects_count_matches_allowlist() {
+    // Walks `core/vauchi-platform/src/**.rs` and asserts strict-
+    // equality between the observed `#[uniffi::Object]` set and
+    // PERMITTED_UNIFFI_OBJECTS. Enforces ADR-043 Amendment 2.
+    //
+    // To add a new UniFFI Object: append to PERMITTED_UNIFFI_OBJECTS
+    // **and** update ADR-043's §Amendments section (the rule says
+    // additions to the screen-driving slot are forbidden; session
+    // peers per ADR-031 require ADR-031 reference, not a carve-out).
+    // To remove one (e.g. Phase 6 `VauchiPlatform` retirement):
+    // delete from this list when the struct is deleted from
+    // vauchi-platform/src/.
+    let dir = platform_src_dir();
+    assert!(
+        dir.is_dir(),
+        "could not locate vauchi-platform sources at {}",
+        dir.display()
+    );
+    let observed = collect_uniffi_object_names(&dir);
+    let permitted: BTreeSet<String> = PERMITTED_UNIFFI_OBJECTS
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+    let extra: Vec<&String> = observed.difference(&permitted).collect();
+    let missing: Vec<&String> = permitted.difference(&observed).collect();
+
+    assert!(
+        extra.is_empty(),
+        "Unpermitted #[uniffi::Object] structs in core/vauchi-platform/src/: \
+         {extra:?}.\n\n\
+         ADR-043 Amendment 2 caps the set to one screen-driving object \
+         (`PlatformAppEngine`) plus session peers per ADR-031. Adding a \
+         new screen-driving peer is forbidden — route through PAE's \
+         `handle_action_json` / `current_screen_json` instead. Adding a \
+         new session peer requires an ADR-031 reference and an explicit \
+         entry in PERMITTED_UNIFFI_OBJECTS in this file.\n\n\
+         Full observed set: {observed:?}"
+    );
+    assert!(
+        missing.is_empty(),
+        "PERMITTED_UNIFFI_OBJECTS lists names that no longer exist in \
+         vauchi-platform/src/: {missing:?}.\n\n\
+         A struct was deleted but the allowlist still references it. \
+         Remove the dead entry from PERMITTED_UNIFFI_OBJECTS in this \
+         file."
+    );
+}

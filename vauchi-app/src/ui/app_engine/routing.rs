@@ -283,6 +283,23 @@ impl AppEngine {
                             .collect()
                     })
                     .unwrap_or_default();
+                // Slice 32c S2: also pull the fields collected during the
+                // ContactInfo step. `OnboardingEngine::sync_quick_add_fields`
+                // (onboarding.rs:855) pushes phone/email values into
+                // `OnboardingData.fields[]` on the "continue" press;
+                // these were silently dropped before this slice. Only
+                // `shown == true` entries persist — `shown == false`
+                // marks user-skipped inputs.
+                let onboarding_fields: Vec<crate::ui::onboarding::FieldSetup> = onboarding_engine
+                    .map(|ob| {
+                        ob.onboarding_data()
+                            .fields
+                            .iter()
+                            .filter(|f| f.shown)
+                            .cloned()
+                            .collect()
+                    })
+                    .unwrap_or_default();
                 // Use the atomic helper so identity creation +
                 // onboarding-complete flag land in one call. Closes
                 // the crash window the audit
@@ -295,6 +312,33 @@ impl AppEngine {
                         // Persist onboarding groups
                         for group_name in &onboarding_groups {
                             let _ = self.vauchi.create_group(group_name);
+                        }
+                        // Slice 32c S2: persist onboarding fields
+                        // (phone, email collected during ContactInfo).
+                        // `FieldType::from_alias` resolves "phone" /
+                        // "email" / "twitter" etc. to the typed enum
+                        // with an optional label override; unknown
+                        // aliases fall back to `FieldType::Custom`
+                        // (mirrors the entry-detail pattern at
+                        // routing.rs:511-520). Errors are swallowed
+                        // per the existing groups-loop convention —
+                        // partial-fields failure is recoverable: the
+                        // user can add missing fields manually from
+                        // MyInfo. Crash-resume semantics covered in
+                        // slice 32c S3.
+                        let now = self.vauchi.clock().unix_seconds();
+                        for setup in &onboarding_fields {
+                            let (field_type, alias_label) =
+                                FieldType::from_alias(&setup.field_type)
+                                    .unwrap_or((FieldType::Custom, None));
+                            let label = alias_label.unwrap_or_else(|| setup.label.clone());
+                            let field = vauchi_core::contact_card::ContactField::new(
+                                field_type,
+                                &label,
+                                &setup.value,
+                                now,
+                            );
+                            let _ = self.vauchi.add_own_field(field);
                         }
                         let target = AppScreen::MyInfo;
                         let screen = self.navigate_to_internal(target);

@@ -177,7 +177,11 @@ vauchi-app/src/ui/app_engine/mod.rs 1293
 # (+5 on routing.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   destructure `mode` from StartMultiStageExchange and pass through to
 #   AppScreen::MultiStageExchange { mode } + expanded comment block.)
-vauchi-app/src/ui/app_engine/routing.rs 1267
+# (+41 on routing.rs for slice 32c S2: onboarding-fields persistence —
+#   FieldSetup extraction in handle_completion (Onboarding arm) plus the
+#   walk-and-add_own_field loop after the existing groups loop.
+#   `_private/docs/problems/2026-05-17-slice-32c-mobile-ui-retirement/`.)
+vauchi-app/src/ui/app_engine/routing.rs 1308
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)

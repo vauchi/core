@@ -49,7 +49,6 @@ mod mobile_nfc;
 mod mobile_onboarding;
 mod mobile_recovery;
 mod mobile_security;
-mod mobile_ui;
 mod mobile_verifier_event;
 mod mobile_visibility;
 mod mobile_wifi_aware;
@@ -119,7 +118,6 @@ pub use mobile_nfc::{
     MobileNfcExchangeResult, MobileNfcHandshake, MobileNfcKeyAckResult, MobileNfcState,
     MobileNfcTransport, MobileNfcTransportError,
 };
-pub use mobile_ui::MobileOnboardingWorkflow;
 pub use mobile_verifier_event::{
     MobileProximityConfidence, MobileProximityVerifierEvent, MobileVerifierMethod,
 };

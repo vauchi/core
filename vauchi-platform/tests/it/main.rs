@@ -16,7 +16,6 @@ mod link_responder_session_tests;
 mod mobile_contact_detail_tests;
 mod mobile_contact_display_tests;
 mod mobile_delivery_tests;
-mod mobile_ui_tests;
 mod mobile_visibility_resolve_tests;
 mod multistage_exchange_listener_tests;
 mod multistage_persistence_regression;

@@ -1690,6 +1690,156 @@ impl VauchiPlatform {
     pub fn get_profile_url(&self, network_id: String, username: String) -> Option<String> {
         self.social_registry.profile_url(&network_id, &username)
     }
+
+    // === GDPR Operations (slice 32i G4b — relocated from mobile_gdpr.rs 2026-05-17) ===
+
+    /// Export all user data for GDPR compliance.
+    pub fn export_gdpr_data(&self) -> Result<MobileGdprExport, MobileError> {
+        let storage = self.open_storage()?;
+        let export = vauchi_core::api::export_all_data(&storage)?;
+
+        let json_data = serde_json::to_string_pretty(&export).map_err(|e| MobileError::Other {
+            detail: e.to_string(),
+        })?;
+
+        Ok(MobileGdprExport {
+            json_data,
+            exported_at: export.exported_at,
+            version: export.version,
+        })
+    }
+
+    /// Schedule identity deletion with 7-day grace period.
+    pub fn schedule_identity_deletion(&self) -> Result<MobileDeletionInfo, MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::DeletionManager::new(&storage);
+        manager
+            .schedule_deletion()
+            .map_err(|e| MobileError::Other {
+                detail: e.to_string(),
+            })?;
+
+        let state = manager.deletion_state().map_err(|e| MobileError::Other {
+            detail: e.to_string(),
+        })?;
+        Ok(MobileDeletionInfo::from(&state))
+    }
+
+    /// Cancel a scheduled identity deletion.
+    pub fn cancel_identity_deletion(&self) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::DeletionManager::new(&storage);
+        manager.cancel_deletion().map_err(|e| MobileError::Other {
+            detail: e.to_string(),
+        })?;
+        Ok(())
+    }
+
+    /// Execute identity deletion (only after grace period).
+    ///
+    /// Generates revocation messages for all contacts and shreds CEKs.
+    /// Returns the number of revocation messages generated (caller should
+    /// arrange relay delivery).
+    pub fn execute_identity_deletion(&self) -> Result<u32, MobileError> {
+        let storage = self.open_storage()?;
+        let identity = self.get_identity()?;
+        let manager = vauchi_core::api::DeletionManager::new(&storage);
+        let result = manager
+            .execute_deletion(&identity)
+            .map_err(|e| MobileError::Other {
+                detail: e.to_string(),
+            })?;
+        Ok(result.revocations.len() as u32)
+    }
+
+    /// Get current deletion state.
+    pub fn get_deletion_state(&self) -> Result<MobileDeletionInfo, MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::DeletionManager::new(&storage);
+        let state = manager.deletion_state().map_err(|e| MobileError::Other {
+            detail: e.to_string(),
+        })?;
+        Ok(MobileDeletionInfo::from(&state))
+    }
+
+    /// Read-only shred-process status. Mirrors the legacy
+    /// `mobile_gdpr.rs::shred_status` — does NOT require keychain.
+    pub fn shred_status(&self) -> Result<MobileShredStatus, MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::DeletionManager::new(&storage);
+        let state = manager.deletion_state().map_err(|e| MobileError::Other {
+            detail: e.to_string(),
+        })?;
+
+        match state {
+            vauchi_core::storage::DeletionState::None => Ok(MobileShredStatus::None),
+            vauchi_core::storage::DeletionState::Scheduled { execute_at, .. } => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let remaining = execute_at.saturating_sub(now);
+                Ok(MobileShredStatus::Scheduled {
+                    remaining_secs: remaining,
+                })
+            }
+            vauchi_core::storage::DeletionState::Executed { .. } => Ok(MobileShredStatus::Executed),
+            _ => Ok(MobileShredStatus::None),
+        }
+    }
+
+    // === Consent Operations ===
+
+    /// Grant consent for a specific type.
+    pub fn grant_consent(&self, consent_type: MobileConsentType) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::ConsentManager::new(&storage);
+        manager.grant(vauchi_core::api::ConsentType::from(consent_type))?;
+        Ok(())
+    }
+
+    /// Revoke consent for a specific type.
+    pub fn revoke_consent(&self, consent_type: MobileConsentType) -> Result<(), MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::ConsentManager::new(&storage);
+        manager.revoke(vauchi_core::api::ConsentType::from(consent_type))?;
+        Ok(())
+    }
+
+    /// Check whether consent is currently granted for a type.
+    pub fn check_consent(&self, consent_type: MobileConsentType) -> Result<bool, MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::ConsentManager::new(&storage);
+        let granted = manager.check(&vauchi_core::api::ConsentType::from(consent_type))?;
+        Ok(granted)
+    }
+
+    /// Get the aggregated consent status for a specific type.
+    ///
+    /// Returns granted state, last change timestamp, and policy version
+    /// in a single call. Replaces inline consent record filtering in clients.
+    pub fn get_consent_status(
+        &self,
+        consent_type: MobileConsentType,
+    ) -> Result<MobileConsentStatus, MobileError> {
+        let vauchi = self.open_vauchi()?;
+        let status =
+            vauchi.get_consent_status(vauchi_core::api::ConsentType::from(consent_type))?;
+        Ok(MobileConsentStatus::from(status))
+    }
+
+    /// Get all consent records.
+    pub fn get_consent_records(&self) -> Result<Vec<MobileConsentRecord>, MobileError> {
+        let storage = self.open_storage()?;
+        let manager = vauchi_core::api::ConsentManager::new(&storage);
+        let records =
+            manager
+                .export_consent_log_with_version()
+                .map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+        Ok(records.iter().map(MobileConsentRecord::from).collect())
+    }
 }
 
 // INLINE_TEST_REQUIRED: Tests require tempfile for VauchiPlatform instance creation

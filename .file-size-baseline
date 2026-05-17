@@ -29,7 +29,7 @@ vauchi-platform/src/types.rs 1547
 #   `#[cfg(test)] mod tests` block; will retire with VauchiPlatform
 #   itself in Phase 6 / Task 6.3. See G4b in the slice 32g-B Phase 2
 #   problem record for the rationale.)
-vauchi-platform/src/lib.rs 2987
+vauchi-platform/src/lib.rs 3137
 
 # EXEMPT — UniFFI wrapper for the BLE exchange protocol: the
 # `MobileBleExchangeSession` UniFFI Object plus its `pub fn` impl

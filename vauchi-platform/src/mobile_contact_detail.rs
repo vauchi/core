@@ -20,15 +20,8 @@
 //! Closes G4 of the four-phase ScreenModel API gap workstream tracked in
 //! `_private/docs/problems/2026-04-27-screenmodel-api-gaps-symmetric-frontend-violations`.
 
-use super::VauchiPlatform;
-use super::error::MobileError;
-
 use vauchi_app::i18n::Locale;
 use vauchi_app::relative_time::format_relative_time;
-use vauchi_app::ui::{
-    ReciprocityBannerKind, reciprocity_banner, show_recovery_trusted_indicator,
-    show_verified_badge, verify_button_visible,
-};
 
 /// A user-actionable affordance on the contact-detail screen.
 ///
@@ -106,90 +99,6 @@ pub struct MobileContactDetailViewState {
     /// English; per-locale plumbing is the follow-up
     /// (`contact_detail_view_state_localized` overload).
     pub added_time_display: Option<String>,
-}
-
-#[uniffi::export]
-impl VauchiPlatform {
-    /// Compute the typed render state for a contact-detail screen.
-    ///
-    /// Frontends call this with a contact id, then iterate the returned
-    /// `badges`, `banners`, and `actions` — they never branch on raw
-    /// `MobileContact` flags. Closes ADR-021/043 audit V4.
-    ///
-    /// Returns `MobileError::InvalidInput` if no contact with the given
-    /// id exists.
-    pub fn contact_detail_view_state(
-        &self,
-        contact_id: String,
-    ) -> Result<MobileContactDetailViewState, MobileError> {
-        let storage = self.open_storage()?;
-        let contact =
-            storage
-                .load_contact(&contact_id)?
-                .ok_or_else(|| MobileError::InvalidInput {
-                    field: "contact_id".to_string(),
-                    detail: format!("contact not found: {contact_id}"),
-                })?;
-
-        let mut badges = Vec::new();
-        if show_verified_badge(contact.is_fingerprint_verified()) {
-            badges.push(MobileContactDetailBadge::Verified);
-        }
-        if show_recovery_trusted_indicator(contact.is_recovery_trusted()) {
-            badges.push(MobileContactDetailBadge::RecoveryTrusted);
-        }
-
-        let mut banners = Vec::new();
-        if let Some(kind) = reciprocity_banner(contact.reciprocity(0)) {
-            banners.push(match kind {
-                // Plain English today; G4b is the i18n follow-up.
-                // See plan §3 / T4.0.3.
-                ReciprocityBannerKind::Pending => MobileContactDetailBanner::ReciprocityPending {
-                    label: "Waiting for them to share their info".to_string(),
-                },
-                ReciprocityBannerKind::Unreciprocated => {
-                    MobileContactDetailBanner::ReciprocityUnreciprocated {
-                        label: "They haven't shared their info".to_string(),
-                    }
-                }
-            });
-        }
-
-        let mut actions = Vec::new();
-        if verify_button_visible(contact.is_fingerprint_verified(), contact.trust_level()) {
-            actions.push(MobileContactDetailAction::Verify);
-        }
-        actions.push(MobileContactDetailAction::ToggleRecoveryTrust {
-            currently_trusted: contact.is_recovery_trusted(),
-        });
-        actions.push(MobileContactDetailAction::ToggleHidden {
-            currently_hidden: contact.is_hidden(),
-        });
-        actions.push(MobileContactDetailAction::Edit);
-        actions.push(MobileContactDetailAction::VerifyFingerprint);
-        actions.push(MobileContactDetailAction::PreviewAs {
-            contact_id: contact_id.clone(),
-        });
-        if contact.is_imported() {
-            actions.push(MobileContactDetailAction::Delete);
-        } else {
-            actions.push(MobileContactDetailAction::Archive);
-        }
-        actions.push(MobileContactDetailAction::Back);
-
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-        let added_time_display = compute_added_time_display(&contact, now, Locale::English);
-
-        Ok(MobileContactDetailViewState {
-            badges,
-            banners,
-            actions,
-            added_time_display,
-        })
-    }
 }
 
 /// Compute the "Added X ago" display string from the contact's exchange

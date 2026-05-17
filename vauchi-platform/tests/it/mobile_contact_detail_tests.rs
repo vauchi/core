@@ -4,32 +4,60 @@
 
 //! Tests for the G4 ContactDetail typed view-state surface.
 //!
-//! Verifies that `VauchiPlatform::contact_detail_view_state()` returns
-//! the canonical `actions`/`badges`/`banners` lists for various contact
+//! Verifies that `DomainCommand::ContactDetailViewState` returns the
+//! canonical `actions`/`badges`/`banners` lists for various contact
 //! states — closes the iOS/Android Verify-button divergence (audit V4)
 //! and replaces frontend `if contact.isVerified | isRecoveryTrusted |
 //! isHidden | reciprocity == ...` branches with a typed list.
+//!
+//! Slice 32g (2026-05-17) retired the
+//! `VauchiPlatform::contact_detail_view_state` UniFFI export these
+//! tests previously called; the dispatch path is the only public
+//! entry point now.
 
 use std::sync::Arc;
 
 use tempfile::TempDir;
 
 use vauchi_platform::{
-    MobileContactDetailAction, MobileContactDetailBadge, MobileContactDetailBanner, VauchiPlatform,
+    DomainCommand, DomainCommandResult, MobileContactDetailAction, MobileContactDetailBadge,
+    MobileContactDetailBanner, MobileContactDetailViewState, MobileError, PlatformAppEngine,
+    PlatformAppEngineTestHelpers,
 };
 
-fn setup() -> (Arc<VauchiPlatform>, TempDir) {
+fn setup() -> (Arc<PlatformAppEngine>, TempDir) {
     let dir = TempDir::new().unwrap();
-    let wb = VauchiPlatform::new(
+    let key = vauchi_core::crypto::SymmetricKey::generate();
+    let engine = PlatformAppEngine::new(
         dir.path().to_string_lossy().to_string(),
         "http://localhost:8080".to_string(),
+        key.as_bytes().to_vec(),
     )
-    .unwrap();
-    wb.create_identity("Alice".to_string()).unwrap();
-    (wb, dir)
+    .expect("create PlatformAppEngine");
+    drive_onboarding(&engine);
+    (engine, dir)
 }
 
-fn add_exchanged(wb: &VauchiPlatform, name: &str, pk_seed: u8) -> String {
+fn drive_onboarding(engine: &PlatformAppEngine) {
+    engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "create_new"}}"#.into())
+        .expect("create_new");
+    engine
+        .handle_action_json(
+            r#"{"TextChanged": {"component_id": "display_name", "value": "Alice"}}"#.into(),
+        )
+        .expect("display_name");
+    for _ in 0..3 {
+        engine
+            .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
+            .expect("continue");
+    }
+    engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "start_app"}}"#.into())
+        .expect("start_app");
+}
+
+fn add_exchanged(engine: &PlatformAppEngine, name: &str, pk_seed: u8) -> String {
     let card = vauchi_core::contact_card::ContactCard::new(name);
     let contact = vauchi_core::Contact::from_exchange(
         [pk_seed; 32],
@@ -40,17 +68,29 @@ fn add_exchanged(wb: &VauchiPlatform, name: &str, pk_seed: u8) -> String {
         1_700_000_000,
     );
     let id = contact.id().to_string();
-    wb.save_test_contact(&contact).unwrap();
+    engine.save_test_contact(&contact).unwrap();
     id
 }
 
-fn add_imported(wb: &VauchiPlatform, name: &str) -> String {
+fn add_imported(engine: &PlatformAppEngine, name: &str) -> String {
     let card = vauchi_core::contact_card::ContactCard::new(name);
     let contact =
         vauchi_core::Contact::from_import(card, vauchi_core::ImportSource::VcardFile, None, 0);
     let id = contact.id().to_string();
-    wb.save_test_contact(&contact).unwrap();
+    engine.save_test_contact(&contact).unwrap();
     id
+}
+
+fn view_state(
+    engine: &PlatformAppEngine,
+    contact_id: String,
+) -> Result<MobileContactDetailViewState, MobileError> {
+    engine
+        .dispatch_domain_command(DomainCommand::ContactDetailViewState { contact_id })
+        .map(|r| match r {
+            DomainCommandResult::ContactDetailView { state } => state,
+            other => panic!("expected ContactDetailView, got {other:?}"),
+        })
 }
 
 fn has_action(actions: &[MobileContactDetailAction], target: &MobileContactDetailAction) -> bool {
@@ -60,8 +100,8 @@ fn has_action(actions: &[MobileContactDetailAction], target: &MobileContactDetai
 // @internal
 #[test]
 fn contact_detail_view_state_returns_error_when_contact_missing() {
-    let (wb, _dir) = setup();
-    let result = wb.contact_detail_view_state("nonexistent-id".to_string());
+    let (engine, _dir) = setup();
+    let result = view_state(&engine, "nonexistent-id".to_string());
     assert!(
         result.is_err(),
         "missing contact must return an error, not a default view state"
@@ -71,10 +111,10 @@ fn contact_detail_view_state_returns_error_when_contact_missing() {
 // @internal
 #[test]
 fn fresh_exchanged_contact_has_no_verified_badge_no_recovery_badge() {
-    let (wb, _dir) = setup();
-    let id = add_exchanged(&wb, "Bob", 0x01);
+    let (engine, _dir) = setup();
+    let id = add_exchanged(&engine, "Bob", 0x01);
 
-    let state = wb.contact_detail_view_state(id).unwrap();
+    let state = view_state(&engine, id).unwrap();
 
     assert!(
         !state.badges.contains(&MobileContactDetailBadge::Verified),
@@ -91,10 +131,10 @@ fn fresh_exchanged_contact_has_no_verified_badge_no_recovery_badge() {
 // @internal
 #[test]
 fn imported_contact_actions_include_delete_not_archive() {
-    let (wb, _dir) = setup();
-    let id = add_imported(&wb, "Eve");
+    let (engine, _dir) = setup();
+    let id = add_imported(&engine, "Eve");
 
-    let state = wb.contact_detail_view_state(id).unwrap();
+    let state = view_state(&engine, id).unwrap();
 
     assert!(
         has_action(&state.actions, &MobileContactDetailAction::Delete),
@@ -109,10 +149,10 @@ fn imported_contact_actions_include_delete_not_archive() {
 // @internal
 #[test]
 fn exchanged_contact_actions_include_archive_not_delete() {
-    let (wb, _dir) = setup();
-    let id = add_exchanged(&wb, "Bob", 0x01);
+    let (engine, _dir) = setup();
+    let id = add_exchanged(&engine, "Bob", 0x01);
 
-    let state = wb.contact_detail_view_state(id).unwrap();
+    let state = view_state(&engine, id).unwrap();
 
     assert!(
         has_action(&state.actions, &MobileContactDetailAction::Archive),
@@ -127,10 +167,10 @@ fn exchanged_contact_actions_include_archive_not_delete() {
 // @internal
 #[test]
 fn toggle_recovery_trust_carries_current_state_for_label_flip() {
-    let (wb, _dir) = setup();
-    let id = add_exchanged(&wb, "Bob", 0x01);
+    let (engine, _dir) = setup();
+    let id = add_exchanged(&engine, "Bob", 0x01);
 
-    let state = wb.contact_detail_view_state(id).unwrap();
+    let state = view_state(&engine, id).unwrap();
 
     let toggle = state
         .actions
@@ -151,10 +191,10 @@ fn toggle_recovery_trust_carries_current_state_for_label_flip() {
 // @internal
 #[test]
 fn toggle_hidden_carries_current_state_for_label_flip() {
-    let (wb, _dir) = setup();
-    let id = add_exchanged(&wb, "Bob", 0x01);
+    let (engine, _dir) = setup();
+    let id = add_exchanged(&engine, "Bob", 0x01);
 
-    let state = wb.contact_detail_view_state(id).unwrap();
+    let state = view_state(&engine, id).unwrap();
 
     let toggle = state
         .actions
@@ -173,10 +213,10 @@ fn toggle_hidden_carries_current_state_for_label_flip() {
 // @internal
 #[test]
 fn preview_as_action_carries_contact_id() {
-    let (wb, _dir) = setup();
-    let id = add_exchanged(&wb, "Bob", 0x01);
+    let (engine, _dir) = setup();
+    let id = add_exchanged(&engine, "Bob", 0x01);
 
-    let state = wb.contact_detail_view_state(id.clone()).unwrap();
+    let state = view_state(&engine, id.clone()).unwrap();
 
     let preview_id = state
         .actions
@@ -195,10 +235,10 @@ fn preview_as_action_carries_contact_id() {
 // @internal
 #[test]
 fn standard_actions_back_edit_verify_fingerprint_always_present() {
-    let (wb, _dir) = setup();
-    let id = add_exchanged(&wb, "Bob", 0x01);
+    let (engine, _dir) = setup();
+    let id = add_exchanged(&engine, "Bob", 0x01);
 
-    let state = wb.contact_detail_view_state(id).unwrap();
+    let state = view_state(&engine, id).unwrap();
 
     assert!(has_action(&state.actions, &MobileContactDetailAction::Back));
     assert!(has_action(&state.actions, &MobileContactDetailAction::Edit));
@@ -211,11 +251,11 @@ fn standard_actions_back_edit_verify_fingerprint_always_present() {
 // @internal
 #[test]
 fn no_banner_for_pre_feature_contact_with_unknown_reciprocity() {
-    let (wb, _dir) = setup();
+    let (engine, _dir) = setup();
     // Imported contacts have Reciprocity::Unknown by construction.
-    let id = add_imported(&wb, "Eve");
+    let id = add_imported(&engine, "Eve");
 
-    let state = wb.contact_detail_view_state(id).unwrap();
+    let state = view_state(&engine, id).unwrap();
 
     let has_reciprocity_banner = state.banners.iter().any(|b| {
         matches!(
@@ -235,10 +275,10 @@ fn no_banner_for_pre_feature_contact_with_unknown_reciprocity() {
 fn imported_contact_has_no_added_time_display() {
     // Imported contacts have no exchange_timestamp, so the field is None.
     // Frontends render nothing rather than a misleading "0 years ago".
-    let (wb, _dir) = setup();
-    let id = add_imported(&wb, "Eve");
+    let (engine, _dir) = setup();
+    let id = add_imported(&engine, "Eve");
 
-    let state = wb.contact_detail_view_state(id).unwrap();
+    let state = view_state(&engine, id).unwrap();
 
     assert!(
         state.added_time_display.is_none(),
@@ -254,10 +294,10 @@ fn exchanged_contact_surfaces_added_time_display_string() {
     // produces a string. Without mocking SystemTime we cannot pin the
     // exact bucket — assert non-None and non-"Missing:" sentinel only.
     // Bucket-level coverage lives in the formatter's inline tests.
-    let (wb, _dir) = setup();
-    let id = add_exchanged(&wb, "Bob", 0x01);
+    let (engine, _dir) = setup();
+    let id = add_exchanged(&engine, "Bob", 0x01);
 
-    let state = wb.contact_detail_view_state(id).unwrap();
+    let state = view_state(&engine, id).unwrap();
 
     let display = state
         .added_time_display

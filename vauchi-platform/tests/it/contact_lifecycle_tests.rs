@@ -2,41 +2,69 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Tests for contact lifecycle UniFFI bindings: soft-delete, undo, archive,
+//! Tests for contact-lifecycle behaviour: soft-delete, undo, archive,
 //! unarchive, and list_archived.
 //!
-//! These verify that the vauchi-platform surface correctly delegates to
-//! the core ContactManager API and maps errors to MobileError.
+//! These verify that `PlatformAppEngine`'s `DomainCommand` dispatch
+//! handlers correctly delegate to the core `ContactManager` API and
+//! map errors to `MobileError`. Slice 32g (2026-05-17) retired the
+//! `impl VauchiPlatform` surface that these tests previously
+//! exercised; the dispatch path is the only public entry point now.
 
 use std::sync::Arc;
 
 use tempfile::TempDir;
 
-use vauchi_platform::VauchiPlatform;
+use vauchi_platform::{
+    DomainCommand, DomainCommandResult, MobileContact, MobileError, PlatformAppEngine,
+    PlatformAppEngineTestHelpers,
+};
 
-fn setup() -> (Arc<VauchiPlatform>, TempDir) {
+fn setup() -> (Arc<PlatformAppEngine>, TempDir) {
     let dir = TempDir::new().unwrap();
-    let wb = VauchiPlatform::new(
+    let key = vauchi_core::crypto::SymmetricKey::generate();
+    let engine = PlatformAppEngine::new(
         dir.path().to_string_lossy().to_string(),
         "http://localhost:8080".to_string(),
+        key.as_bytes().to_vec(),
     )
-    .unwrap();
-    wb.create_identity("Alice".to_string()).unwrap();
-    (wb, dir)
+    .expect("create PlatformAppEngine");
+    drive_onboarding(&engine);
+    (engine, dir)
 }
 
-/// Save an imported contact and return its ID.
-fn add_imported_contact(wb: &VauchiPlatform, name: &str) -> String {
+/// Drive the onboarding flow to create the identity. Mirrors the
+/// pattern in `mobile_visibility_resolve_tests.rs` and
+/// `platform_app_engine_domain_command_tests.rs`.
+fn drive_onboarding(engine: &PlatformAppEngine) {
+    engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "create_new"}}"#.into())
+        .expect("create_new");
+    engine
+        .handle_action_json(
+            r#"{"TextChanged": {"component_id": "display_name", "value": "Alice"}}"#.into(),
+        )
+        .expect("display_name");
+    for _ in 0..3 {
+        engine
+            .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
+            .expect("continue");
+    }
+    engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "start_app"}}"#.into())
+        .expect("start_app");
+}
+
+fn add_imported_contact(engine: &PlatformAppEngine, name: &str) -> String {
     let card = vauchi_core::contact_card::ContactCard::new(name);
     let contact =
         vauchi_core::Contact::from_import(card, vauchi_core::ImportSource::VcardFile, None, 0);
     let id = contact.id().to_string();
-    wb.save_test_contact(&contact).unwrap();
+    engine.save_test_contact(&contact).unwrap();
     id
 }
 
-/// Save an exchanged contact and return its ID.
-fn add_exchanged_contact(wb: &VauchiPlatform, name: &str) -> String {
+fn add_exchanged_contact(engine: &PlatformAppEngine, name: &str) -> String {
     let card = vauchi_core::contact_card::ContactCard::new(name);
     let contact = vauchi_core::Contact::from_exchange(
         [0xAB; 32],
@@ -45,8 +73,77 @@ fn add_exchanged_contact(wb: &VauchiPlatform, name: &str) -> String {
         0,
     );
     let id = contact.id().to_string();
-    wb.save_test_contact(&contact).unwrap();
+    engine.save_test_contact(&contact).unwrap();
     id
+}
+
+fn list_contacts(engine: &PlatformAppEngine) -> Vec<MobileContact> {
+    match engine
+        .dispatch_domain_command(DomainCommand::ListContacts)
+        .expect("ListContacts dispatch")
+    {
+        DomainCommandResult::Contacts { contacts } => contacts,
+        other => panic!("expected Contacts, got {other:?}"),
+    }
+}
+
+fn list_archived_contacts(engine: &PlatformAppEngine) -> Vec<MobileContact> {
+    match engine
+        .dispatch_domain_command(DomainCommand::ListArchivedContacts)
+        .expect("ListArchivedContacts dispatch")
+    {
+        DomainCommandResult::Contacts { contacts } => contacts,
+        other => panic!("expected Contacts, got {other:?}"),
+    }
+}
+
+fn get_contact(engine: &PlatformAppEngine, id: String) -> Option<MobileContact> {
+    match engine
+        .dispatch_domain_command(DomainCommand::GetContact { id })
+        .expect("GetContact dispatch")
+    {
+        DomainCommandResult::ContactOpt { contact } => contact,
+        other => panic!("expected ContactOpt, got {other:?}"),
+    }
+}
+
+fn footer_action_id(engine: &PlatformAppEngine, contact_id: String) -> Result<String, MobileError> {
+    engine
+        .dispatch_domain_command(DomainCommand::ContactDetailFooterActionId { contact_id })
+        .map(|r| match r {
+            DomainCommandResult::Text { value } => value,
+            other => panic!("expected Text, got {other:?}"),
+        })
+}
+
+fn soft_delete(engine: &PlatformAppEngine, id: String) -> Result<(), MobileError> {
+    engine
+        .dispatch_domain_command(DomainCommand::SoftDeleteImportedContact { id })
+        .map(|_| ())
+}
+
+fn undo_delete(engine: &PlatformAppEngine, id: String) -> Result<(), MobileError> {
+    engine
+        .dispatch_domain_command(DomainCommand::UndoDeleteImportedContact { id })
+        .map(|_| ())
+}
+
+fn hard_delete(engine: &PlatformAppEngine, id: String) -> Result<(), MobileError> {
+    engine
+        .dispatch_domain_command(DomainCommand::HardDeleteImportedContact { id })
+        .map(|_| ())
+}
+
+fn archive(engine: &PlatformAppEngine, id: String) -> Result<(), MobileError> {
+    engine
+        .dispatch_domain_command(DomainCommand::ArchiveContact { id })
+        .map(|_| ())
+}
+
+fn unarchive(engine: &PlatformAppEngine, id: String) -> Result<(), MobileError> {
+    engine
+        .dispatch_domain_command(DomainCommand::UnarchiveContact { id })
+        .map(|_| ())
 }
 
 // === Soft-Delete (imported contacts only) ===
@@ -54,13 +151,13 @@ fn add_exchanged_contact(wb: &VauchiPlatform, name: &str) -> String {
 // @scenario: contacts_management :: Soft-delete imported contact hides from list
 #[test]
 fn test_soft_delete_imported_contact_hides_from_list() {
-    let (wb, _dir) = setup();
-    let id = add_imported_contact(&wb, "Bob");
+    let (engine, _dir) = setup();
+    let id = add_imported_contact(&engine, "Bob");
 
-    assert_eq!(wb.list_contacts().unwrap().len(), 1);
-    wb.soft_delete_imported_contact(id.clone()).unwrap();
+    assert_eq!(list_contacts(&engine).len(), 1);
+    soft_delete(&engine, id.clone()).unwrap();
     assert_eq!(
-        wb.list_contacts().unwrap().len(),
+        list_contacts(&engine).len(),
         0,
         "Soft-deleted contact must not appear in list_contacts"
     );
@@ -69,10 +166,10 @@ fn test_soft_delete_imported_contact_hides_from_list() {
 // @scenario: contacts_management :: Soft-delete exchanged contact fails
 #[test]
 fn test_soft_delete_exchanged_contact_returns_error() {
-    let (wb, _dir) = setup();
-    let id = add_exchanged_contact(&wb, "Carol");
+    let (engine, _dir) = setup();
+    let id = add_exchanged_contact(&engine, "Carol");
 
-    let result = wb.soft_delete_imported_contact(id);
+    let result = soft_delete(&engine, id);
     assert!(
         result.is_err(),
         "Soft-deleting an exchanged contact must fail"
@@ -82,15 +179,15 @@ fn test_soft_delete_exchanged_contact_returns_error() {
 // @scenario: contacts_management :: Undo soft-delete restores contact
 #[test]
 fn test_undo_soft_delete_restores_contact_to_list() {
-    let (wb, _dir) = setup();
-    let id = add_imported_contact(&wb, "Dave");
+    let (engine, _dir) = setup();
+    let id = add_imported_contact(&engine, "Dave");
 
-    wb.soft_delete_imported_contact(id.clone()).unwrap();
-    assert_eq!(wb.list_contacts().unwrap().len(), 0);
+    soft_delete(&engine, id.clone()).unwrap();
+    assert_eq!(list_contacts(&engine).len(), 0);
 
-    wb.undo_delete_imported_contact(id).unwrap();
+    undo_delete(&engine, id).unwrap();
     assert_eq!(
-        wb.list_contacts().unwrap().len(),
+        list_contacts(&engine).len(),
         1,
         "Undo must restore contact to visible list"
     );
@@ -99,14 +196,14 @@ fn test_undo_soft_delete_restores_contact_to_list() {
 // @scenario: contacts_management :: Hard-delete permanently removes contact
 #[test]
 fn test_hard_delete_permanently_removes_contact() {
-    let (wb, _dir) = setup();
-    let id = add_imported_contact(&wb, "Eve");
+    let (engine, _dir) = setup();
+    let id = add_imported_contact(&engine, "Eve");
 
-    wb.soft_delete_imported_contact(id.clone()).unwrap();
-    wb.hard_delete_imported_contact(id.clone()).unwrap();
+    soft_delete(&engine, id.clone()).unwrap();
+    hard_delete(&engine, id.clone()).unwrap();
 
     // Even direct lookup should fail
-    let contact = wb.get_contact(id).unwrap();
+    let contact = get_contact(&engine, id);
     assert!(
         contact.is_none(),
         "Hard-deleted contact must not be findable"
@@ -116,10 +213,10 @@ fn test_hard_delete_permanently_removes_contact() {
 // @scenario: contacts_management :: Hard-delete exchanged contact fails
 #[test]
 fn test_hard_delete_exchanged_contact_returns_error() {
-    let (wb, _dir) = setup();
-    let id = add_exchanged_contact(&wb, "Frank");
+    let (engine, _dir) = setup();
+    let id = add_exchanged_contact(&engine, "Frank");
 
-    let result = wb.hard_delete_imported_contact(id);
+    let result = hard_delete(&engine, id);
     assert!(
         result.is_err(),
         "Hard-deleting an exchanged contact must fail"
@@ -131,13 +228,13 @@ fn test_hard_delete_exchanged_contact_returns_error() {
 // @scenario: contacts_management :: Archive exchanged contact hides from list
 #[test]
 fn test_archive_contact_hides_from_main_list() {
-    let (wb, _dir) = setup();
-    let id = add_exchanged_contact(&wb, "Grace");
+    let (engine, _dir) = setup();
+    let id = add_exchanged_contact(&engine, "Grace");
 
-    assert_eq!(wb.list_contacts().unwrap().len(), 1);
-    wb.archive_contact(id).unwrap();
+    assert_eq!(list_contacts(&engine).len(), 1);
+    archive(&engine, id).unwrap();
     assert_eq!(
-        wb.list_contacts().unwrap().len(),
+        list_contacts(&engine).len(),
         0,
         "Archived contact must not appear in list_contacts"
     );
@@ -146,13 +243,13 @@ fn test_archive_contact_hides_from_main_list() {
 // @scenario: contacts_management :: Archived contacts appear in archive list
 #[test]
 fn test_list_archived_contacts_returns_archived() {
-    let (wb, _dir) = setup();
-    let id = add_exchanged_contact(&wb, "Heidi");
+    let (engine, _dir) = setup();
+    let id = add_exchanged_contact(&engine, "Heidi");
 
-    assert_eq!(wb.list_archived_contacts().unwrap().len(), 0);
-    wb.archive_contact(id).unwrap();
+    assert_eq!(list_archived_contacts(&engine).len(), 0);
+    archive(&engine, id).unwrap();
 
-    let archived = wb.list_archived_contacts().unwrap();
+    let archived = list_archived_contacts(&engine);
     assert_eq!(archived.len(), 1);
     assert_eq!(archived[0].display_name, "Heidi");
 }
@@ -160,42 +257,42 @@ fn test_list_archived_contacts_returns_archived() {
 // @scenario: contacts_management :: Unarchive restores contact to main list
 #[test]
 fn test_unarchive_contact_restores_to_main_list() {
-    let (wb, _dir) = setup();
-    let id = add_exchanged_contact(&wb, "Ivan");
+    let (engine, _dir) = setup();
+    let id = add_exchanged_contact(&engine, "Ivan");
 
-    wb.archive_contact(id.clone()).unwrap();
-    assert_eq!(wb.list_contacts().unwrap().len(), 0);
+    archive(&engine, id.clone()).unwrap();
+    assert_eq!(list_contacts(&engine).len(), 0);
 
-    wb.unarchive_contact(id).unwrap();
+    unarchive(&engine, id).unwrap();
     assert_eq!(
-        wb.list_contacts().unwrap().len(),
+        list_contacts(&engine).len(),
         1,
         "Unarchived contact must return to list_contacts"
     );
-    assert_eq!(wb.list_archived_contacts().unwrap().len(), 0);
+    assert_eq!(list_archived_contacts(&engine).len(), 0);
 }
 
 // @scenario: contacts_management :: Archive imported contact fails
 #[test]
 fn test_archive_imported_contact_returns_error() {
-    let (wb, _dir) = setup();
-    let id = add_imported_contact(&wb, "Judy");
+    let (engine, _dir) = setup();
+    let id = add_imported_contact(&engine, "Judy");
 
-    let result = wb.archive_contact(id);
+    let result = archive(&engine, id);
     assert!(result.is_err(), "Archiving an imported contact must fail");
 }
 
 // @scenario: contacts_management :: Nonexistent contact returns error
 #[test]
 fn test_lifecycle_operations_on_missing_contact_return_error() {
-    let (wb, _dir) = setup();
+    let (engine, _dir) = setup();
     let fake_id = "nonexistent-id".to_string();
 
-    assert!(wb.soft_delete_imported_contact(fake_id.clone()).is_err());
-    assert!(wb.undo_delete_imported_contact(fake_id.clone()).is_err());
-    assert!(wb.hard_delete_imported_contact(fake_id.clone()).is_err());
-    assert!(wb.archive_contact(fake_id.clone()).is_err());
-    assert!(wb.unarchive_contact(fake_id).is_err());
+    assert!(soft_delete(&engine, fake_id.clone()).is_err());
+    assert!(undo_delete(&engine, fake_id.clone()).is_err());
+    assert!(hard_delete(&engine, fake_id.clone()).is_err());
+    assert!(archive(&engine, fake_id.clone()).is_err());
+    assert!(unarchive(&engine, fake_id).is_err());
 }
 
 // === Contact Detail Footer Action ===
@@ -208,10 +305,10 @@ fn test_lifecycle_operations_on_missing_contact_return_error() {
 // @internal
 #[test]
 fn test_contact_detail_footer_action_id_imported_returns_delete() {
-    let (wb, _dir) = setup();
-    let id = add_imported_contact(&wb, "Karen");
+    let (engine, _dir) = setup();
+    let id = add_imported_contact(&engine, "Karen");
 
-    let action_id = wb.contact_detail_footer_action_id(id).unwrap();
+    let action_id = footer_action_id(&engine, id).unwrap();
 
     assert_eq!(action_id, "delete_contact");
 }
@@ -219,10 +316,10 @@ fn test_contact_detail_footer_action_id_imported_returns_delete() {
 // @internal
 #[test]
 fn test_contact_detail_footer_action_id_exchanged_returns_archive() {
-    let (wb, _dir) = setup();
-    let id = add_exchanged_contact(&wb, "Liam");
+    let (engine, _dir) = setup();
+    let id = add_exchanged_contact(&engine, "Liam");
 
-    let action_id = wb.contact_detail_footer_action_id(id).unwrap();
+    let action_id = footer_action_id(&engine, id).unwrap();
 
     assert_eq!(action_id, "archive_contact");
 }
@@ -230,12 +327,12 @@ fn test_contact_detail_footer_action_id_exchanged_returns_archive() {
 // @internal
 #[test]
 fn test_contact_detail_footer_action_id_unknown_returns_invalid_input() {
-    let (wb, _dir) = setup();
+    let (engine, _dir) = setup();
 
-    let result = wb.contact_detail_footer_action_id("nonexistent-id".to_string());
+    let result = footer_action_id(&engine, "nonexistent-id".to_string());
 
     match result {
-        Err(vauchi_platform::MobileError::InvalidInput { field, .. }) => {
+        Err(MobileError::InvalidInput { field, .. }) => {
             assert_eq!(
                 field, "contact_id",
                 "InvalidInput must name the offending field"

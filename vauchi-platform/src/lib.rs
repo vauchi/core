@@ -31,7 +31,6 @@ mod exchange;
 mod json_helpers;
 mod link_responder_session;
 mod mobile_animated_qr;
-mod mobile_app_preferences;
 mod mobile_ble;
 mod mobile_contact_detail;
 mod mobile_contacts;

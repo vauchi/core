@@ -14,7 +14,7 @@
 //! contract lives in `settings_render_context_intercept_tests.rs`
 //! (S3 task 2).
 
-use vauchi_app::ui::{AppEngine, AppScreen, Component, RenderContext, WorkflowEngine};
+use vauchi_app::ui::{AppEngine, AppScreen, Component, RenderContext, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 
 fn engine_with_identity() -> AppEngine {
@@ -152,5 +152,99 @@ fn render_context_overrides_legacy_vault_value() {
     assert_eq!(
         dropdown_selected(&mut engine, "language").as_deref(),
         Some("de"),
+    );
+}
+
+// @internal
+#[test]
+fn theme_dropdown_selection_dual_writes_render_context_and_vault() {
+    // Migration-window contract: when the user picks a theme via the
+    // Settings dropdown, both RenderContext and the legacy vault row
+    // must update. Without the RenderContext update, post-S4 frontends
+    // that push RenderContext at boot would mask the freshly-made
+    // selection until they navigate away and back.
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Settings);
+    assert_eq!(engine.render_context().theme_id, None);
+
+    engine.handle_action(UserAction::ListItemSelected {
+        component_id: "theme".to_string(),
+        item_id: "cyber".to_string(),
+    });
+
+    assert_eq!(
+        engine.render_context().theme_id.as_deref(),
+        Some("cyber"),
+        "intercept must update RenderContext.theme_id when the user \
+         picks a non-default theme from the Settings dropdown"
+    );
+    let prefs = engine.vauchi().app_preferences().unwrap();
+    assert_eq!(
+        prefs.theme_id.as_deref(),
+        Some("cyber"),
+        "intercept must continue writing the vault row during the \
+         migration window (S5 deprecates this, S6 retires it)"
+    );
+    assert!(
+        !prefs.follow_system_theme,
+        "picking an explicit theme must clear follow_system_theme \
+         (preserves legacy semantic)"
+    );
+}
+
+// @internal
+#[test]
+fn language_dropdown_selection_dual_writes_render_context_and_vault() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Settings);
+    assert_eq!(engine.render_context().locale, None);
+
+    engine.handle_action(UserAction::ListItemSelected {
+        component_id: "language".to_string(),
+        item_id: "de".to_string(),
+    });
+
+    assert_eq!(
+        engine.render_context().locale.as_deref(),
+        Some("de"),
+        "intercept must update RenderContext.locale when the user \
+         picks a non-default locale from the Settings dropdown"
+    );
+    let prefs = engine.vauchi().app_preferences().unwrap();
+    assert_eq!(prefs.language_code.as_deref(), Some("de"));
+    assert!(!prefs.follow_system_language);
+}
+
+// @internal
+#[test]
+fn follow_system_selection_clears_render_context_field() {
+    // The reserved "follow_system" id means "core/OS picks". In
+    // RenderContext that maps to None (the absence-is-follow-system
+    // semantic per ADR-047).
+    let mut engine = engine_with_identity();
+    engine.set_render_context(RenderContext {
+        locale: Some("de".to_string()),
+        theme_id: Some("cyber".to_string()),
+    });
+    engine.navigate_to(AppScreen::Settings);
+
+    engine.handle_action(UserAction::ListItemSelected {
+        component_id: "theme".to_string(),
+        item_id: "follow_system".to_string(),
+    });
+
+    assert_eq!(
+        engine.render_context().theme_id,
+        None,
+        "follow_system maps to None in RenderContext per ADR-047"
+    );
+    // Other field untouched.
+    assert_eq!(engine.render_context().locale.as_deref(), Some("de"));
+
+    let prefs = engine.vauchi().app_preferences().unwrap();
+    assert!(
+        prefs.follow_system_theme,
+        "follow_system selection must set follow_system_theme=true in \
+         the legacy vault row (preserves migration-window read path)"
     );
 }

@@ -414,6 +414,7 @@ impl AppEngine {
             &AppScreen::MyInfo,
             None,
             &self.device_capabilities,
+            &self.render_context,
         );
         let _ = std::mem::replace(&mut self.engine, new_engine);
         Some(ActionResult::UpdateScreen(self.engine.current_screen()))
@@ -761,6 +762,7 @@ impl AppEngine {
             &screen,
             self.preview_as_contact.as_deref(),
             &self.device_capabilities,
+            &self.render_context,
         );
 
         Some(ActionResult::ShowToast {
@@ -907,6 +909,7 @@ impl AppEngine {
             &screen,
             self.preview_as_contact.as_deref(),
             &self.device_capabilities,
+            &self.render_context,
         );
     }
 }

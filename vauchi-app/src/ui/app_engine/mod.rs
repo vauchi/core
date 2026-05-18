@@ -402,11 +402,23 @@ impl AppEngine {
     /// `set_render_context_json` after JSON deserialization;
     /// frontends invoke this at boot and on every Settings
     /// locale/theme dropdown change. Invalidates the Settings
-    /// screen cache so the next render reflects the new
-    /// dropdown `selected` value.
+    /// screen cache AND — when the active screen is Settings —
+    /// rebuilds the active engine so the next `current_screen()`
+    /// call reflects the new dropdown `selected` value without
+    /// requiring a navigate-away-and-back round trip.
     pub fn set_render_context(&mut self, ctx: crate::ui::RenderContext) {
         self.render_context = ctx;
         self.engine_cache.remove(&AppScreen::Settings);
+        if matches!(self.screen, AppScreen::Settings) {
+            let screen = self.screen.clone();
+            self.engine = Self::create_engine(
+                &self.vauchi,
+                &screen,
+                self.preview_as_contact.as_deref(),
+                &self.device_capabilities,
+                &self.render_context,
+            );
+        }
     }
 
     pub fn new(vauchi: Vauchi) -> Self {
@@ -432,7 +444,8 @@ impl AppEngine {
             AppScreen::MyInfo
         };
         let caps = DeviceCapabilities::default();
-        let engine = Self::create_engine(&vauchi, &screen, None, &caps);
+        let initial_render_context = crate::ui::RenderContext::default();
+        let engine = Self::create_engine(&vauchi, &screen, None, &caps, &initial_render_context);
         let registry = vauchi_core::social::SocialNetworkRegistry::with_defaults();
         let field_catalog = vauchi_core::contact_card::FieldTypeCatalog::new(&registry);
 
@@ -1159,6 +1172,7 @@ impl WorkflowEngine for AppEngine {
                 &screen,
                 self.preview_as_contact.as_deref(),
                 &self.device_capabilities,
+                &self.render_context,
             );
             return ActionResult::ShowToast {
                 message: "Contact unarchived".into(),

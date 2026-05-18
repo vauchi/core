@@ -59,6 +59,7 @@ impl AppEngine {
         screen: &AppScreen,
         preview_as: Option<&str>,
         device_capabilities: &vauchi_core::exchange::capability::types::DeviceCapabilities,
+        render_context: &crate::ui::RenderContext,
     ) -> Box<dyn WorkflowEngine> {
         match screen {
             AppScreen::Onboarding => Box::new(OnboardingEngine::new().with_help_icons(true)),
@@ -185,7 +186,6 @@ impl AppEngine {
                 let display_name = card
                     .map(|c| c.display_name().to_string())
                     .unwrap_or_default();
-                let prefs = vauchi.app_preferences().unwrap_or_default();
                 let bundled = crate::theme::bundled_themes();
                 let available_themes: Vec<crate::ui::component::DropdownOption> = bundled
                     .iter()
@@ -194,11 +194,18 @@ impl AppEngine {
                         label: t.name.clone(),
                     })
                     .collect();
+                // S3 of 2026-05-16-settings-storage-by-sensitivity: prefer
+                // the frontend-pushed RenderContext; fall back to the
+                // legacy vault row only when the frontend hasn't pushed a
+                // value (migration window — fallback dies in S6).
                 // "follow_system" is the reserved Dropdown option id.
-                let theme_id = (!prefs.follow_system_theme)
-                    .then(|| prefs.theme_id.clone())
-                    .flatten()
-                    .unwrap_or_else(|| "follow_system".to_string());
+                let theme_id = render_context.theme_id.clone().unwrap_or_else(|| {
+                    let prefs = vauchi.app_preferences().unwrap_or_default();
+                    (!prefs.follow_system_theme)
+                        .then(|| prefs.theme_id.clone())
+                        .flatten()
+                        .unwrap_or_else(|| "follow_system".to_string())
+                });
                 let available_languages: Vec<crate::ui::component::DropdownOption> =
                     crate::i18n::get_available_locales()
                         .into_iter()
@@ -210,10 +217,13 @@ impl AppEngine {
                             }
                         })
                         .collect();
-                let language_id = (!prefs.follow_system_language)
-                    .then(|| prefs.language_code.clone())
-                    .flatten()
-                    .unwrap_or_else(|| "follow_system".to_string());
+                let language_id = render_context.locale.clone().unwrap_or_else(|| {
+                    let prefs = vauchi.app_preferences().unwrap_or_default();
+                    (!prefs.follow_system_language)
+                        .then(|| prefs.language_code.clone())
+                        .flatten()
+                        .unwrap_or_else(|| "follow_system".to_string())
+                });
                 let config = SettingsConfig {
                     display_name,
                     delivery_receipts_enabled: vauchi.config().delivery_receipts_enabled,

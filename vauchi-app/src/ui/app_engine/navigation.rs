@@ -168,7 +168,13 @@ impl AppEngine {
         // Pass preview_as_contact so MyInfo is built in PreviewAs mode when active.
         let preview_as = self.preview_as_contact.as_deref();
         let new_engine = self.engine_cache.remove(&screen).unwrap_or_else(|| {
-            Self::create_engine(&self.vauchi, &screen, preview_as, &self.device_capabilities)
+            Self::create_engine(
+                &self.vauchi,
+                &screen,
+                preview_as,
+                &self.device_capabilities,
+                &self.render_context,
+            )
         });
 
         // Swap in the new engine, get the old one back

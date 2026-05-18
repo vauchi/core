@@ -46,7 +46,6 @@ mod mobile_gdpr;
 mod mobile_identity;
 mod mobile_import;
 mod mobile_nfc;
-mod mobile_onboarding;
 mod mobile_recovery;
 mod mobile_verifier_event;
 mod mobile_visibility;
@@ -1426,7 +1425,6 @@ impl VauchiPlatform {
 
 // Methods extracted to child modules:
 // - mobile_identity.rs: Identity operations, aha moments, demo contact
-// - mobile_onboarding.rs: Onboarding progress, display name suggestions
 // - mobile_contacts.rs: Contact card/CRUD, hidden contacts, pagination, social networks, field validation
 // - mobile_visibility.rs: Visibility operations and labels
 // - mobile_exchange.rs: Contact exchange operations

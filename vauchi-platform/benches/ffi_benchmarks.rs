@@ -84,39 +84,6 @@ fn bench_exchange_qr(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark backup/restore operations
-fn bench_backup(c: &mut Criterion) {
-    let mut group = c.benchmark_group("backup");
-    group.sample_size(20); // Backup is computationally expensive
-
-    group.bench_function("export", |b| {
-        let (instance, _dir) = create_instance_with_identity("Test User");
-        b.iter(|| {
-            black_box(
-                instance
-                    .export_backup("correct-horse-battery-staple".to_string())
-                    .unwrap(),
-            );
-        })
-    });
-
-    group.bench_function("import", |b| {
-        let (instance, _dir) = create_instance_with_identity("Test User");
-        let backup = instance
-            .export_backup("correct-horse-battery-staple".to_string())
-            .unwrap();
-
-        b.iter_with_setup(create_test_instance, |(new_instance, _dir)| {
-            let _: () = new_instance
-                .import_backup(backup.clone(), "correct-horse-battery-staple".to_string())
-                .unwrap();
-            black_box(());
-        })
-    });
-
-    group.finish();
-}
-
 /// Benchmark storage operations overhead
 fn bench_storage(c: &mut Criterion) {
     let mut group = c.benchmark_group("storage");
@@ -160,7 +127,6 @@ criterion_group!(
     benches,
     bench_identity_creation,
     bench_exchange_qr,
-    bench_backup,
     bench_storage,
     bench_password_check,
 );

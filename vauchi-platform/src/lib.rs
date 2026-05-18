@@ -1715,39 +1715,6 @@ mod tests {
         );
     }
 
-    // @scenario: identity_management:User exports and imports backup
-    #[test]
-    fn test_backup_restore() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        wb.add_field(
-            MobileFieldType::Email,
-            "work".to_string(),
-            "alice@company.com".to_string(),
-        )
-        .unwrap();
-
-        let backup = wb
-            .export_backup("correct-horse-battery-staple".to_string())
-            .unwrap();
-        assert!(!backup.is_empty());
-
-        let dir2 = TempDir::new().unwrap();
-        let wb2 = VauchiPlatform::new(
-            dir2.path().to_string_lossy().to_string(),
-            "http://localhost:8080".to_string(),
-        )
-        .unwrap();
-
-        wb2.import_backup(backup, "correct-horse-battery-staple".to_string())
-            .unwrap();
-
-        assert!(wb2.has_identity());
-        let name = wb2.get_display_name().unwrap();
-        assert_eq!(name, "Alice");
-    }
-
     // @scenario: device_management:User views linked devices
     #[test]
     fn test_get_devices_no_registry() {

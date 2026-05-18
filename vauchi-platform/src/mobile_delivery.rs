@@ -25,11 +25,9 @@
 
 use std::sync::Arc;
 
-use vauchi_core::{ContactCard, Identity, IdentityBackup};
-
+use super::VauchiPlatform;
 use super::error::{MobileError, lock_or};
 use super::types::{MobileDeliveryRecord, MobileSyncResult, MobileSyncStatus};
-use super::{IdentityData, VauchiPlatform};
 
 #[uniffi::export]
 impl VauchiPlatform {
@@ -127,79 +125,6 @@ impl VauchiPlatform {
             reason: String::new(),
         })?;
         Ok(records.iter().map(MobileDeliveryRecord::from).collect())
-    }
-
-    // === Backup Operations ===
-
-    /// Export encrypted backup.
-    pub fn export_backup(&self, password: String) -> Result<String, MobileError> {
-        let identity = self.get_identity()?;
-
-        let backup = identity
-            .export_backup(&password)
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-
-        use base64::Engine;
-        let encoded = base64::engine::general_purpose::STANDARD.encode(backup.as_bytes());
-
-        Ok(encoded)
-    }
-
-    /// Import backup.
-    pub fn import_backup(&self, backup_data: String, password: String) -> Result<(), MobileError> {
-        {
-            let data = lock_or(&self.identity_data)?;
-            if data.is_some() {
-                return Err(MobileError::Other {
-                    detail: "Already initialized".to_string(),
-                });
-            }
-        }
-
-        use base64::Engine;
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(&backup_data)
-            .map_err(|_| MobileError::InvalidInput {
-                field: String::new(),
-                detail: "Invalid base64".to_string(),
-            })?;
-
-        let backup = IdentityBackup::new(bytes);
-        let identity = Identity::import_backup(
-            &backup,
-            &password,
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        )
-        .map_err(|e| MobileError::Other {
-            detail: e.to_string(),
-        })?;
-
-        let internal_backup = identity
-            .export_backup("__internal_storage_key__")
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-
-        let internal_backup_data = internal_backup.as_bytes().to_vec();
-        let display_name = identity.display_name().to_string();
-
-        let storage = self.open_storage()?;
-        storage.save_identity(&internal_backup_data, &display_name)?;
-
-        let identity_data = IdentityData {
-            backup_data: internal_backup_data,
-            display_name: display_name.clone(),
-        };
-        *lock_or(&self.identity_data)? = Some(identity_data);
-
-        if storage.load_own_card()?.is_none() {
-            let card = ContactCard::new(&display_name);
-            storage.save_own_card(&card)?;
-        }
-
-        Ok(())
     }
 }
 

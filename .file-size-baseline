@@ -436,14 +436,14 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1633
 #   humble-surface ratchet — `impl … for PlatformAppEngine` blocks
 #   fall outside the contract test's `impl PlatformAppEngine {`
 #   regex. UniFFI facade pattern; splitting breaks binding generation.)
-vauchi-platform/src/platform_app_engine.rs 5212
+vauchi-platform/src/platform_app_engine.rs 5240
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding
 # helpers; splitting per-batch would force duplicating those helpers
 # across files and complicates the read-after-write smoke pattern.
 # Will be split into per-domain test files only after B7 phase completes.
-vauchi-platform/tests/it/platform_app_engine_domain_command_tests.rs 3251
+vauchi-platform/tests/it/platform_app_engine_domain_command_tests.rs 3372
 
 # EXEMPT — HTTP transport: relay API surface (sync, OHTTP, pinning, exchange) is cohesive
 # (moved up — guardian CRUD methods added for social recovery)

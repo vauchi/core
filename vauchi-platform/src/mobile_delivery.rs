@@ -2,17 +2,30 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Sync, delivery status, retry queue, offline queue, multi-device delivery, and backup operations.
+//! Sync, delivery-flag setters, failed-delivery reads, backup operations.
+//!
+//! After slice 32h Phase 1 (2026-05-18), the 22 storage-only delegation
+//! methods (delivery record reads, retry-queue, offline-queue helpers,
+//! `export_full_backup` / `import_full_backup`) retired — their
+//! `DomainCommand` variants are wired in PAE and they had zero binding
+//! consumers. The 10 remaining methods stay pending Phase 2:
+//!
+//! - **Phase 2a (G4b)**: 7 trapped methods that have lib.rs internal
+//!   tests / `tests/it/` / `benches/` callers — `export_backup`,
+//!   `import_backup`, `is_delivery_receipts_enabled`,
+//!   `set_delivery_receipts_enabled`, `is_suppress_presence_enabled`,
+//!   `set_suppress_presence_enabled`, `get_failed_delivery_records`.
+//! - **Phase 2b (sync orchestration design)**: 3 sync-state methods
+//!   that need engine-resident sync state — `sync`, `get_sync_status`,
+//!   `sync_async`. Documented as a separate batch at
+//!   `domain_command.rs:307-313`.
 
 use std::sync::Arc;
 
 use vauchi_core::{ContactCard, Identity, IdentityBackup};
 
 use super::error::{MobileError, lock_or};
-use super::types::{
-    MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDeviceDeliveryRecord,
-    MobileRetryEntry, MobileSyncResult, MobileSyncStatus,
-};
+use super::types::{MobileDeliveryRecord, MobileSyncResult, MobileSyncStatus};
 use super::{IdentityData, VauchiPlatform};
 
 #[uniffi::export]
@@ -96,19 +109,10 @@ impl VauchiPlatform {
         *guard
     }
 
-    /// Get pending update count.
-    pub fn pending_update_count(&self) -> Result<u32, MobileError> {
-        let storage = self.open_storage()?;
-        let contacts = storage.list_contacts()?;
-        let mut total = 0u32;
-        for contact in contacts {
-            let pending = storage.get_pending_updates(contact.id())?;
-            total += pending.len() as u32;
-        }
-        Ok(total)
-    }
-
-    // === Delivery Privacy Settings ===
+    // === Delivery-Receipt + Suppress-Presence Flags ===
+    //
+    // These four flag accessors are kept because their lib.rs internal
+    // test block still calls them directly (Phase 2a G4b).
 
     /// Returns whether delivery receipts (ReceivedByRecipient ACKs) are enabled.
     pub fn is_delivery_receipts_enabled(&self) -> bool {
@@ -142,44 +146,7 @@ impl VauchiPlatform {
         *guard = enabled;
     }
 
-    // === Delivery Status Operations ===
-
-    /// Get delivery record for a message.
-    pub fn get_delivery_record(
-        &self,
-        message_id: String,
-    ) -> Result<Option<MobileDeliveryRecord>, MobileError> {
-        let storage = self.open_storage()?;
-        let record = storage.get_delivery_record(&message_id)?;
-        Ok(record.as_ref().map(MobileDeliveryRecord::from))
-    }
-
-    /// Get all delivery records.
-    pub fn get_all_delivery_records(&self) -> Result<Vec<MobileDeliveryRecord>, MobileError> {
-        let storage = self.open_storage()?;
-        let records = storage.get_all_delivery_records()?;
-        Ok(records.iter().map(MobileDeliveryRecord::from).collect())
-    }
-
-    /// Get all delivery records for a recipient.
-    pub fn get_delivery_records_for_contact(
-        &self,
-        recipient_id: String,
-    ) -> Result<Vec<MobileDeliveryRecord>, MobileError> {
-        let storage = self.open_storage()?;
-        let records = storage.get_delivery_records_for_recipient(&recipient_id)?;
-        Ok(records.iter().map(MobileDeliveryRecord::from).collect())
-    }
-
-    /// Count failed deliveries.
-    pub fn count_failed_deliveries(&self) -> Result<u32, MobileError> {
-        use vauchi_core::storage::DeliveryStatus;
-        let storage = self.open_storage()?;
-        let count = storage.count_deliveries_by_status(&DeliveryStatus::Failed {
-            reason: String::new(),
-        })?;
-        Ok(count as u32)
-    }
+    // === Failed Delivery Reads (kept — tests/it caller) ===
 
     /// Get all failed delivery records.
     ///
@@ -194,188 +161,6 @@ impl VauchiPlatform {
             reason: String::new(),
         })?;
         Ok(records.iter().map(MobileDeliveryRecord::from).collect())
-    }
-
-    /// Manually retry a failed delivery.
-    ///
-    /// Returns true if the retry entry was found and rescheduled.
-    pub fn manual_retry(&self, message_id: String) -> Result<bool, MobileError> {
-        let storage = self.open_storage()?;
-
-        // Check if there's a retry entry for this message
-        let entry = storage.get_retry_entry(&message_id)?;
-        if entry.is_none() {
-            return Ok(false);
-        }
-
-        // Reschedule for immediate retry
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        storage.update_retry_next_time(&message_id, now)?;
-        Ok(true)
-    }
-
-    /// Get all pending (non-terminal) deliveries.
-    pub fn get_pending_deliveries(&self) -> Result<Vec<MobileDeliveryRecord>, MobileError> {
-        let storage = self.open_storage()?;
-        let records = storage.get_pending_deliveries()?;
-        Ok(records.iter().map(MobileDeliveryRecord::from).collect())
-    }
-
-    /// Get delivery count by status.
-    pub fn get_delivery_count_by_status(
-        &self,
-        status: MobileDeliveryStatus,
-    ) -> Result<u32, MobileError> {
-        use vauchi_core::storage::DeliveryStatus;
-        let core_status = match status {
-            MobileDeliveryStatus::Queued => DeliveryStatus::Queued,
-            MobileDeliveryStatus::Sent => DeliveryStatus::Sent,
-            MobileDeliveryStatus::Stored => DeliveryStatus::Stored,
-            MobileDeliveryStatus::Delivered => DeliveryStatus::Delivered,
-            MobileDeliveryStatus::Expired => DeliveryStatus::Expired,
-            MobileDeliveryStatus::Failed => DeliveryStatus::Failed {
-                reason: String::new(),
-            },
-        };
-        let storage = self.open_storage()?;
-        let count = storage.count_deliveries_by_status(&core_status)?;
-        Ok(count as u32)
-    }
-
-    // === Retry Queue Operations ===
-
-    /// Get all retry entries that are due for retry.
-    pub fn get_due_retries(&self) -> Result<Vec<MobileRetryEntry>, MobileError> {
-        let storage = self.open_storage()?;
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let entries = storage.get_due_retries(now)?;
-        Ok(entries.iter().map(MobileRetryEntry::from).collect())
-    }
-
-    /// Get all retry entries for a contact.
-    pub fn get_retries_for_contact(
-        &self,
-        contact_id: String,
-    ) -> Result<Vec<MobileRetryEntry>, MobileError> {
-        let storage = self.open_storage()?;
-        let entries = storage.get_retry_entries_for_recipient(&contact_id)?;
-        Ok(entries.iter().map(MobileRetryEntry::from).collect())
-    }
-
-    /// Get the total count of retry entries.
-    pub fn get_retry_count(&self) -> Result<u32, MobileError> {
-        let storage = self.open_storage()?;
-        let count = storage.count_retry_entries()?;
-        Ok(count as u32)
-    }
-
-    /// Delete a retry entry (after successful delivery or max attempts).
-    pub fn delete_retry(&self, message_id: String) -> Result<bool, MobileError> {
-        let storage = self.open_storage()?;
-        let deleted = storage.delete_retry_entry(&message_id)?;
-        Ok(deleted)
-    }
-
-    /// Calculate the backoff time for a given retry attempt.
-    ///
-    /// Returns seconds until next retry: 2^attempt, max 3600 (1 hour).
-    pub fn calculate_retry_backoff(&self, attempt: u32) -> u64 {
-        use vauchi_core::storage::RetryQueue;
-        let queue = RetryQueue::new();
-        queue.backoff_seconds(attempt)
-    }
-
-    // === Offline Queue Operations ===
-
-    /// Get total count of all pending updates across all contacts.
-    pub fn get_total_pending_count(&self) -> Result<u32, MobileError> {
-        let storage = self.open_storage()?;
-        let count = storage.count_all_pending_updates()?;
-        Ok(count as u32)
-    }
-
-    /// Check if the offline queue is full.
-    ///
-    /// Default max size is 1000 updates.
-    pub fn is_offline_queue_full(&self) -> Result<bool, MobileError> {
-        use vauchi_core::storage::OfflineQueue;
-        let storage = self.open_storage()?;
-        let queue = OfflineQueue::new();
-        queue
-            .is_full(&storage)
-            .map_err(|e| MobileError::StorageError {
-                detail: e.to_string(),
-            })
-    }
-
-    /// Get remaining capacity in the offline queue.
-    pub fn get_offline_queue_capacity(&self) -> Result<u32, MobileError> {
-        use vauchi_core::storage::OfflineQueue;
-        let storage = self.open_storage()?;
-        let queue = OfflineQueue::new();
-        let remaining =
-            queue
-                .remaining_capacity(&storage)
-                .map_err(|e| MobileError::StorageError {
-                    detail: e.to_string(),
-                })?;
-        Ok(remaining as u32)
-    }
-
-    /// Clear all pending updates for a contact.
-    ///
-    /// Returns the number of cleared updates.
-    pub fn clear_pending_updates_for_contact(
-        &self,
-        contact_id: String,
-    ) -> Result<u32, MobileError> {
-        let storage = self.open_storage()?;
-        let count = storage.delete_pending_updates_for_contact(&contact_id)?;
-        Ok(count as u32)
-    }
-
-    // === Multi-Device Delivery Operations ===
-
-    /// Get delivery summary for a message (X of Y devices delivered).
-    pub fn get_delivery_summary(
-        &self,
-        message_id: String,
-    ) -> Result<MobileDeliverySummary, MobileError> {
-        let storage = self.open_storage()?;
-        let summary = storage.get_delivery_summary(&message_id)?;
-        Ok(MobileDeliverySummary::from(&summary))
-    }
-
-    /// Get all device delivery records for a message.
-    pub fn get_device_deliveries(
-        &self,
-        message_id: String,
-    ) -> Result<Vec<MobileDeviceDeliveryRecord>, MobileError> {
-        let storage = self.open_storage()?;
-        let records = storage.get_device_deliveries_for_message(&message_id)?;
-        Ok(records
-            .iter()
-            .map(MobileDeviceDeliveryRecord::from)
-            .collect())
-    }
-
-    /// Get all pending device deliveries.
-    pub fn get_pending_device_deliveries(
-        &self,
-    ) -> Result<Vec<MobileDeviceDeliveryRecord>, MobileError> {
-        let storage = self.open_storage()?;
-        let records = storage.get_pending_device_deliveries()?;
-        Ok(records
-            .iter()
-            .map(MobileDeviceDeliveryRecord::from)
-            .collect())
     }
 
     // === Backup Operations ===
@@ -447,85 +232,6 @@ impl VauchiPlatform {
             let card = ContactCard::new(&display_name);
             storage.save_own_card(&card)?;
         }
-
-        Ok(())
-    }
-
-    /// Export full v3 backup (identity + contacts + own card + labels).
-    ///
-    /// Returns base64-encoded backup data.
-    pub fn export_full_backup(&self, password: String) -> Result<String, MobileError> {
-        let mut vauchi = self.open_vauchi()?;
-        let identity = self.get_identity()?;
-        vauchi
-            .set_identity(identity)
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-
-        let backup_hex = vauchi
-            .export_full_backup(&password)
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-
-        // Re-encode hex → bytes → base64 for mobile transport
-        let bytes = hex::decode(&backup_hex).map_err(|e| MobileError::Other {
-            detail: e.to_string(),
-        })?;
-        use base64::Engine;
-        Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
-    }
-
-    /// Import full v3 backup (identity + contacts + own card + labels).
-    ///
-    /// Accepts base64-encoded backup data from `export_full_backup`.
-    pub fn import_full_backup(
-        &self,
-        backup_data: String,
-        password: String,
-    ) -> Result<(), MobileError> {
-        {
-            let data = lock_or(&self.identity_data)?;
-            if data.is_some() {
-                return Err(MobileError::Other {
-                    detail: "Already initialized".to_string(),
-                });
-            }
-        }
-
-        // Decode base64 → bytes → hex for the Vauchi API
-        use base64::Engine;
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(&backup_data)
-            .map_err(|_| MobileError::InvalidInput {
-                field: String::new(),
-                detail: "Invalid base64".to_string(),
-            })?;
-        let backup_hex = hex::encode(&bytes);
-
-        let mut vauchi = self.open_vauchi()?;
-        vauchi
-            .import_full_backup(&backup_hex, &password)
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-
-        // Sync platform identity state from restored Vauchi
-        let identity = vauchi.identity().ok_or(MobileError::Other {
-            detail: "Identity not found".to_string(),
-        })?;
-        let internal_backup = identity
-            .export_backup("__internal_storage_key__")
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-
-        let identity_data_val = IdentityData {
-            backup_data: internal_backup.as_bytes().to_vec(),
-            display_name: identity.display_name().to_string(),
-        };
-        *lock_or(&self.identity_data)? = Some(identity_data_val);
 
         Ok(())
     }

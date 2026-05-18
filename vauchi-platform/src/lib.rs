@@ -18,11 +18,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use vauchi_core::{
-    ContactCard, ContactField, Identity, IdentityBackup, SocialNetworkRegistry, Storage,
-    SymmetricKey, Vauchi, VauchiConfig,
+    ContactCard, Identity, IdentityBackup, Storage, SymmetricKey, Vauchi, VauchiConfig,
 };
-
-use crate::mobile_contacts::{enrich_contact, enrich_contacts_batch};
 
 // === Modules ===
 
@@ -944,7 +941,6 @@ pub struct VauchiPlatform {
     /// Optional PEM-encoded certificate for TLS pinning.
     pinned_cert_pem: Mutex<Option<String>>,
     identity_data: Mutex<Option<IdentityData>>,
-    social_registry: SocialNetworkRegistry,
     sync_status: Mutex<MobileSyncStatus>,
     /// Platform keychain for crypto-shredding operations.
     platform_keychain: Mutex<Option<Arc<dyn MobilePlatformKeychain>>>,
@@ -952,7 +948,14 @@ pub struct VauchiPlatform {
 
 impl VauchiPlatform {
     /// Opens a storage connection.
-    pub(crate) fn open_storage(&self) -> Result<Storage, MobileError> {
+    ///
+    /// `pub` (not `pub(crate)`) so
+    /// `tests/it/multistage_persistence_regression.rs` can verify
+    /// post-exchange contact persistence after the contact-CRUD
+    /// `impl VauchiPlatform` block retires (slice 32g-B Tier 2).
+    /// Not `#[uniffi::export]`-marked, so it stays out of the FFI
+    /// surface.
+    pub fn open_storage(&self) -> Result<Storage, MobileError> {
         Storage::open(&self.storage_path, self.storage_key.clone()).map_err(|e| {
             MobileError::StorageError {
                 detail: e.to_string(),
@@ -1233,7 +1236,6 @@ impl VauchiPlatform {
             relay_url,
             pinned_cert_pem: Mutex::new(None),
             identity_data: Mutex::new(None),
-            social_registry: SocialNetworkRegistry::with_defaults(),
             sync_status: Mutex::new(MobileSyncStatus::Idle),
             platform_keychain: Mutex::new(None),
         }))
@@ -1283,7 +1285,6 @@ impl VauchiPlatform {
             relay_url,
             pinned_cert_pem: Mutex::new(None),
             identity_data: Mutex::new(None),
-            social_registry: SocialNetworkRegistry::with_defaults(),
             sync_status: Mutex::new(MobileSyncStatus::Idle),
             platform_keychain: Mutex::new(None),
         }))
@@ -1327,258 +1328,6 @@ impl VauchiPlatform {
 // - mobile_gdpr.rs: GDPR, crypto-shredding, consent
 // - mobile_device_link.rs: Device linking, relay transport, multipart QR
 // - mobile_content.rs: Content updates (feature-gated)
-
-// INLINE_TEST_REQUIRED: Tests require tempfile for VauchiPlatform instance creation
-// and access to internal Arc<VauchiPlatform> which cannot be accessed from external tests.
-
-/// Legacy contact-CRUD helpers preserved for the lib.rs internal
-/// `mod tests` after slice 32g-B Phase 2 retired the matching
-/// `#[uniffi::export] impl VauchiPlatform { … }` block in
-/// `mobile_contacts.rs`. These methods are NOT UniFFI-exported
-/// (defined outside the `#[uniffi::export]` block) and live in
-/// `lib.rs` so the audit script's `mobile_pub_fns` counter — which
-/// only walks `mobile_*.rs` files — does not pick them up.
-///
-/// The lib.rs internal `#[cfg(test)] mod tests` block keeps using
-/// these `wb.*` call sites verbatim. When `VauchiPlatform` retires
-/// entirely (Phase 6 / Task 6.3), these helpers retire with it
-/// and the tests either move to integration tests or follow the
-/// dispatch path (see `tests/it/contact_lifecycle_tests.rs` for
-/// the migration shape).
-impl VauchiPlatform {
-    /// Get own contact card.
-    pub fn get_own_card(&self) -> Result<MobileContactCard, MobileError> {
-        let storage = self.open_storage()?;
-        let card = storage.load_own_card()?.ok_or(MobileError::Other {
-            detail: "Identity not found".to_string(),
-        })?;
-        Ok(MobileContactCard::from(&card))
-    }
-
-    /// Add field to own card.
-    pub fn add_field(
-        &self,
-        field_type: MobileFieldType,
-        label: String,
-        value: String,
-    ) -> Result<(), MobileError> {
-        let storage = self.open_storage()?;
-
-        let mut card = storage.load_own_card()?.ok_or(MobileError::Other {
-            detail: "Identity not found".to_string(),
-        })?;
-
-        let field = ContactField::new(field_type.into(), &label, &value, now_secs());
-        card.add_field(field)
-            .map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: e.to_string(),
-            })?;
-
-        storage.save_own_card(&card)?;
-        Ok(())
-    }
-
-    /// Update field value.
-    pub fn update_field(&self, label: String, new_value: String) -> Result<(), MobileError> {
-        let storage = self.open_storage()?;
-
-        let mut card = storage.load_own_card()?.ok_or(MobileError::Other {
-            detail: "Identity not found".to_string(),
-        })?;
-
-        let field_id = card
-            .fields()
-            .iter()
-            .find(|f| f.label() == label)
-            .ok_or_else(|| MobileError::InvalidInput {
-                field: String::new(),
-                detail: format!("Field '{}' not found", label),
-            })?
-            .id()
-            .to_string();
-
-        card.update_field_value(&field_id, &new_value, storage.clock().unix_seconds())
-            .map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: e.to_string(),
-            })?;
-
-        storage.save_own_card(&card)?;
-        Ok(())
-    }
-
-    /// Remove field from card.
-    pub fn remove_field(&self, label: String) -> Result<bool, MobileError> {
-        let storage = self.open_storage()?;
-
-        let mut card = storage.load_own_card()?.ok_or(MobileError::Other {
-            detail: "Identity not found".to_string(),
-        })?;
-
-        let field_id = match card.fields().iter().find(|f| f.label() == label) {
-            Some(f) => f.id().to_string(),
-            None => return Ok(false),
-        };
-
-        card.remove_field(&field_id)
-            .map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: e.to_string(),
-            })?;
-        storage.save_own_card(&card)?;
-
-        Ok(true)
-    }
-
-    /// List all contacts.
-    pub fn list_contacts(&self) -> Result<Vec<MobileContact>, MobileError> {
-        let storage = self.open_storage()?;
-        let contacts = storage.list_contacts()?;
-        Ok(enrich_contacts_batch(&storage, &contacts))
-    }
-
-    /// Get single contact by ID.
-    pub fn get_contact(&self, id: String) -> Result<Option<MobileContact>, MobileError> {
-        let storage = self.open_storage()?;
-        let contact = storage.load_contact(&id)?;
-        Ok(contact.as_ref().map(|c| enrich_contact(&storage, c)))
-    }
-
-    /// Save a personal note for a contact.
-    ///
-    /// Notes are private ("your eyes only") — they are never sent to the contact.
-    /// An empty string clears the note.
-    pub fn set_contact_note(&self, contact_id: String, note: String) -> Result<(), MobileError> {
-        let storage = self.open_storage()?;
-        storage.save_personal_notes(&contact_id, note.as_bytes())?;
-        Ok(())
-    }
-
-    /// Load the personal note for a contact, if any.
-    ///
-    /// Returns `None` if no note has been saved.
-    pub fn get_contact_note(&self, contact_id: String) -> Result<Option<String>, MobileError> {
-        let storage = self.open_storage()?;
-        let bytes = storage.load_personal_notes(&contact_id)?;
-        Ok(bytes.and_then(|b| String::from_utf8(b).ok()))
-    }
-
-    /// Delete the personal note for a contact.
-    ///
-    /// No error is returned if no note existed.
-    pub fn delete_contact_note(&self, contact_id: String) -> Result<(), MobileError> {
-        let storage = self.open_storage()?;
-        storage.delete_personal_notes(&contact_id)?;
-        Ok(())
-    }
-
-    /// Save a private note on a specific field of a contact.
-    ///
-    /// Notes are private ("your eyes only") — they are never sent to the contact.
-    /// An empty string clears the note.
-    pub fn set_contact_field_note(
-        &self,
-        contact_id: String,
-        field_id: String,
-        note: String,
-    ) -> Result<(), MobileError> {
-        let storage = self.open_storage()?;
-        storage.save_contact_field_note(&contact_id, &field_id, note.as_bytes())?;
-        Ok(())
-    }
-
-    /// Load all private field notes for a contact.
-    ///
-    /// Returns a list of `(field_id, note)` pairs. Fields with no note are omitted.
-    pub fn get_contact_field_notes(
-        &self,
-        contact_id: String,
-    ) -> Result<Vec<MobileFieldNote>, MobileError> {
-        let storage = self.open_storage()?;
-        let map = storage.load_contact_field_notes(&contact_id)?;
-        let mut notes: Vec<MobileFieldNote> = map
-            .into_iter()
-            .filter_map(|(field_id, bytes)| {
-                String::from_utf8(bytes)
-                    .ok()
-                    .map(|note| MobileFieldNote { field_id, note })
-            })
-            .collect();
-        // Stable ordering for deterministic output
-        notes.sort_by(|a, b| a.field_id.cmp(&b.field_id));
-        Ok(notes)
-    }
-
-    /// Delete the private note on a specific field of a contact.
-    ///
-    /// No error is returned if no note existed.
-    pub fn delete_contact_field_note(
-        &self,
-        contact_id: String,
-        field_id: String,
-    ) -> Result<(), MobileError> {
-        let storage = self.open_storage()?;
-        storage.delete_contact_field_note(&contact_id, &field_id)?;
-        Ok(())
-    }
-
-    /// Mark a contact as trusted for simplified contact proposals.
-    ///
-    /// This is a local-only flag — the contact is never informed of their trust status.
-    pub fn set_proposal_trusted(
-        &self,
-        contact_id: String,
-        trusted: bool,
-    ) -> Result<(), MobileError> {
-        let storage = self.open_storage()?;
-
-        let mut contact = storage
-            .load_contact(&contact_id)?
-            .ok_or_else(|| MobileError::Other {
-                detail: format!("Contact not found: {}", contact_id.clone()),
-            })?;
-
-        contact
-            .set_proposal_trusted(trusted)
-            .map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: e.to_string(),
-            })?;
-        storage.save_contact(&contact)?;
-
-        Ok(())
-    }
-
-    /// List contacts with pagination.
-    pub fn list_contacts_paginated(
-        &self,
-        offset: u32,
-        limit: u32,
-    ) -> Result<Vec<MobileContact>, MobileError> {
-        let storage = self.open_storage()?;
-        let contacts = storage.list_contacts_paginated(offset as usize, limit as usize)?;
-        Ok(enrich_contacts_batch(&storage, &contacts))
-    }
-
-    /// List available social networks.
-    pub fn list_social_networks(&self) -> Vec<MobileSocialNetwork> {
-        self.social_registry
-            .all()
-            .iter()
-            .map(|sn| MobileSocialNetwork {
-                id: sn.id().to_string(),
-                display_name: sn.display_name().to_string(),
-                url_template: sn.profile_url_template().to_string(),
-            })
-            .collect()
-    }
-
-    /// Get profile URL for a social field.
-    pub fn get_profile_url(&self, network_id: String, username: String) -> Option<String> {
-        self.social_registry.profile_url(&network_id, &username)
-    }
-}
 
 // INLINE_TEST_REQUIRED: Tests require tempfile for VauchiPlatform instance creation
 #[cfg(test)]
@@ -2073,9 +1822,6 @@ mod tests {
         assert_eq!(result.imported, 2);
         assert_eq!(result.skipped, 0);
         assert!(result.warnings.is_empty());
-
-        let contacts = wb.list_contacts().unwrap();
-        assert_eq!(contacts.len(), 2);
     }
 
     // @scenario: contact_import.feature - Duplicate vCard UIDs are skipped

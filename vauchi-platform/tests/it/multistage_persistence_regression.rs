@@ -138,12 +138,21 @@ fn listener_path_persists_peer_contact_after_finalized() {
 
     // Pre-condition: neither side has any contacts yet.
     assert_eq!(
-        alice.list_contacts().expect("alice list").len(),
+        alice
+            .open_storage()
+            .expect("alice open_storage")
+            .list_contacts()
+            .expect("alice list")
+            .len(),
         0,
         "Alice must start with no contacts"
     );
     assert_eq!(
-        bob.list_contacts().expect("bob list").len(),
+        bob.open_storage()
+            .expect("bob open_storage")
+            .list_contacts()
+            .expect("bob list")
+            .len(),
         0,
         "Bob must start with no contacts"
     );
@@ -213,8 +222,16 @@ fn listener_path_persists_peer_contact_after_finalized() {
     //    semantics. We assert via `list_contacts` here and add a
     //    ratchet-specific assertion when the production path makes
     //    it accessible).
-    let alice_contacts = alice.list_contacts().expect("alice list_contacts");
-    let bob_contacts = bob.list_contacts().expect("bob list_contacts");
+    let alice_contacts = alice
+        .open_storage()
+        .expect("alice open_storage")
+        .list_contacts()
+        .expect("alice list_contacts");
+    let bob_contacts = bob
+        .open_storage()
+        .expect("bob open_storage")
+        .list_contacts()
+        .expect("bob list_contacts");
 
     assert_eq!(
         alice_contacts.len(),
@@ -227,11 +244,13 @@ fn listener_path_persists_peer_contact_after_finalized() {
         "Bob should have Alice persisted after on_finalized; found {bob_contacts:?}"
     );
     assert_eq!(
-        alice_contacts[0].display_name, "Bob",
+        alice_contacts[0].display_name(),
+        "Bob",
         "Alice's saved contact must carry Bob's display name"
     );
     assert_eq!(
-        bob_contacts[0].display_name, "Alice",
+        bob_contacts[0].display_name(),
+        "Alice",
         "Bob's saved contact must carry Alice's display name"
     );
 }

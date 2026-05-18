@@ -2,19 +2,22 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Sync, delivery-flag setters, failed-delivery reads, backup operations.
+//! Sync, failed-delivery reads, backup operations.
 //!
-//! After slice 32h Phase 1 (2026-05-18), the 22 storage-only delegation
-//! methods (delivery record reads, retry-queue, offline-queue helpers,
-//! `export_full_backup` / `import_full_backup`) retired — their
-//! `DomainCommand` variants are wired in PAE and they had zero binding
-//! consumers. The 10 remaining methods stay pending Phase 2:
+//! After slice 32h Phase 1 (2026-05-18), 22 storage-only delegation
+//! methods retired (DC wired in PAE, zero binding consumers). The 4
+//! delivery-flag accessors (`is/set_delivery_receipts_enabled`,
+//! `is/set_suppress_presence_enabled`) also retired in the 2026-05-18
+//! Phase 2a flag-vestigial cleanup — they were dead getter/setter
+//! pairs over `Mutex<bool>` fields that VauchiPlatform never read
+//! internally; the real flag state persists on `PlatformAppEngine`'s
+//! side (`load_sync_flags_engine` / `save_sync_flags_engine`).
 //!
-//! - **Phase 2a (G4b)**: 7 trapped methods that have lib.rs internal
+//! 6 methods remain pending Phase 2:
+//!
+//! - **Phase 2a (G4b)**: 3 trapped methods that have lib.rs internal
 //!   tests / `tests/it/` / `benches/` callers — `export_backup`,
-//!   `import_backup`, `is_delivery_receipts_enabled`,
-//!   `set_delivery_receipts_enabled`, `is_suppress_presence_enabled`,
-//!   `set_suppress_presence_enabled`, `get_failed_delivery_records`.
+//!   `import_backup`, `get_failed_delivery_records`.
 //! - **Phase 2b (sync orchestration design)**: 3 sync-state methods
 //!   that need engine-resident sync state — `sync`, `get_sync_status`,
 //!   `sync_async`. Documented as a separate batch at
@@ -107,43 +110,6 @@ impl VauchiPlatform {
             return MobileSyncStatus::Error;
         };
         *guard
-    }
-
-    // === Delivery-Receipt + Suppress-Presence Flags ===
-    //
-    // These four flag accessors are kept because their lib.rs internal
-    // test block still calls them directly (Phase 2a G4b).
-
-    /// Returns whether delivery receipts (ReceivedByRecipient ACKs) are enabled.
-    pub fn is_delivery_receipts_enabled(&self) -> bool {
-        let Ok(guard) = self.delivery_receipts_enabled.lock() else {
-            return false;
-        };
-        *guard
-    }
-
-    /// Sets whether delivery receipts are enabled.
-    pub fn set_delivery_receipts_enabled(&self, enabled: bool) {
-        let Ok(mut guard) = self.delivery_receipts_enabled.lock() else {
-            return;
-        };
-        *guard = enabled;
-    }
-
-    /// Returns whether presence suppression is enabled.
-    pub fn is_suppress_presence_enabled(&self) -> bool {
-        let Ok(guard) = self.suppress_presence.lock() else {
-            return false;
-        };
-        *guard
-    }
-
-    /// Sets whether presence suppression is enabled.
-    pub fn set_suppress_presence_enabled(&self, enabled: bool) {
-        let Ok(mut guard) = self.suppress_presence.lock() else {
-            return;
-        };
-        *guard = enabled;
     }
 
     // === Failed Delivery Reads (kept — tests/it caller) ===

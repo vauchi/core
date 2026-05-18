@@ -46,7 +46,6 @@ mod mobile_gdpr;
 mod mobile_identity;
 mod mobile_import;
 mod mobile_nfc;
-mod mobile_recovery;
 mod mobile_verifier_event;
 mod mobile_visibility;
 mod mobile_wifi_aware;
@@ -1210,14 +1209,6 @@ impl VauchiPlatform {
             .unwrap_or_else(|| ContactCard::new(identity.display_name())))
     }
 
-    /// Get the path to the recovery proof file.
-    pub(crate) fn recovery_proof_path(&self) -> PathBuf {
-        self.storage_path
-            .parent()
-            .unwrap_or(&self.storage_path)
-            .join(".recovery_proof")
-    }
-
     // === Aha Moments (internal helpers) ===
 
     /// Get the path to the aha moments state file.
@@ -1430,7 +1421,6 @@ impl VauchiPlatform {
 // - mobile_exchange.rs: Contact exchange operations
 // - mobile_delivery.rs: Sync, delivery status, retry/offline queue, multi-device, backup, async sync
 // - mobile_gdpr.rs: GDPR, crypto-shredding, consent
-// - mobile_recovery.rs: Recovery operations
 // - mobile_device_link.rs: Device linking, relay transport, multipart QR
 // - mobile_content.rs: Content updates (feature-gated)
 

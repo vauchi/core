@@ -2,26 +2,23 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Identity, aha moments, and demo contact operations for mobile.
+//! Identity operations for mobile.
+//!
+//! After slice 32j Phase 1 (2026-05-18), the 14 aha-moment + demo-contact
+//! methods were retired (all had `DomainCommand` variants wired in PAE
+//! and zero binding-side callers — core/vauchi-core tests hit the
+//! `vauchi_core::api::Vauchi` namesakes, not these binding wrappers).
+//! The 5 remaining methods (`has_identity`, `create_identity`,
+//! `get_public_id`, `get_own_fingerprint`, `get_display_name`) are
+//! test infrastructure with many `wb.*` callers in `lib.rs` internal
+//! tests + `tests/it/` + `benches/ffi_benchmarks.rs`; they retire in
+//! slice 32j Phase 2 via G4b relocation to `lib.rs` (consistent with
+//! slice 32g-B + 32i precedent).
 
 use vauchi_core::{ContactCard, Identity};
 
 use super::error::{MobileError, lock_or};
-use super::types::{
-    MobileAhaMoment, MobileAhaMomentType, MobileDemoContact, MobileDemoContactState,
-};
 use super::{IdentityData, VauchiPlatform};
-
-/// Legacy `mobile_identity.rs` surface (Phase 3 retirement target).
-/// `VauchiPlatform` does not hold a [`Clock`]; ambient time stays
-/// here until the file is retired.
-fn now_secs() -> u64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
 
 #[uniffi::export]
 impl VauchiPlatform {
@@ -124,191 +121,5 @@ impl VauchiPlatform {
             detail: "Identity not found".to_string(),
         })?;
         Ok(card.display_name().to_string())
-    }
-
-    // === Aha Moments (public API) ===
-
-    /// Check if an aha moment has been seen.
-    pub fn has_seen_aha_moment(&self, moment_type: MobileAhaMomentType) -> bool {
-        let tracker = self.load_aha_tracker();
-        tracker.has_seen(moment_type.into())
-    }
-
-    /// Try to trigger an aha moment. Returns the moment if not yet seen, None otherwise.
-    pub fn try_trigger_aha_moment(
-        &self,
-        moment_type: MobileAhaMomentType,
-    ) -> Result<Option<MobileAhaMoment>, MobileError> {
-        let mut tracker = self.load_aha_tracker();
-        let core_type: vauchi_core::AhaMomentType = moment_type.into();
-
-        if let Some(moment) = tracker.try_trigger(core_type) {
-            self.save_aha_tracker(&tracker)?;
-            Ok(Some(MobileAhaMoment {
-                moment_type,
-                title: moment.title().to_string(),
-                message: moment.message(),
-                has_animation: moment.has_animation(),
-            }))
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Try to trigger an aha moment with context (e.g., contact name).
-    pub fn try_trigger_aha_moment_with_context(
-        &self,
-        moment_type: MobileAhaMomentType,
-        context: String,
-    ) -> Result<Option<MobileAhaMoment>, MobileError> {
-        let mut tracker = self.load_aha_tracker();
-        let core_type: vauchi_core::AhaMomentType = moment_type.into();
-
-        if let Some(moment) = tracker.try_trigger_with_context(core_type, context) {
-            self.save_aha_tracker(&tracker)?;
-            Ok(Some(MobileAhaMoment {
-                moment_type,
-                title: moment.title().to_string(),
-                message: moment.message(),
-                has_animation: moment.has_animation(),
-            }))
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Get the count of seen aha moments.
-    pub fn aha_moments_seen_count(&self) -> u32 {
-        let tracker = self.load_aha_tracker();
-        tracker.seen_count() as u32
-    }
-
-    /// Get the total count of aha moments.
-    pub fn aha_moments_total_count(&self) -> u32 {
-        let tracker = self.load_aha_tracker();
-        tracker.total_count() as u32
-    }
-
-    /// Reset all aha moments (for testing/debugging).
-    pub fn reset_aha_moments(&self) -> Result<(), MobileError> {
-        let mut tracker = self.load_aha_tracker();
-        tracker.reset();
-        self.save_aha_tracker(&tracker)
-    }
-
-    // === Demo Contact (public API) ===
-
-    /// Initialize the demo contact if user has no real contacts.
-    /// Call this after onboarding completes.
-    pub fn init_demo_contact_if_needed(&self) -> Result<Option<MobileDemoContact>, MobileError> {
-        let storage = self.open_storage()?;
-        let contacts = storage
-            .list_contacts()
-            .map_err(|e| MobileError::StorageError {
-                detail: e.to_string(),
-            })?;
-
-        if !contacts.is_empty() {
-            return Ok(None);
-        }
-
-        let mut state = self.load_demo_state();
-        if state.was_dismissed || state.auto_removed {
-            return Ok(None);
-        }
-
-        if !state.is_active {
-            state = vauchi_core::DemoContactState::new_active(now_secs());
-            self.save_demo_state(&state)?;
-        }
-
-        if let Some(tip) = state.current_tip() {
-            let card = vauchi_core::generate_demo_contact_card(&tip);
-            Ok(Some(card.into()))
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Get the current demo contact if active.
-    pub fn get_demo_contact(&self) -> Result<Option<MobileDemoContact>, MobileError> {
-        let state = self.load_demo_state();
-        if !state.is_active {
-            return Ok(None);
-        }
-
-        if let Some(tip) = state.current_tip() {
-            let card = vauchi_core::generate_demo_contact_card(&tip);
-            Ok(Some(card.into()))
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Get the demo contact state.
-    pub fn get_demo_contact_state(&self) -> MobileDemoContactState {
-        let state = self.load_demo_state();
-        MobileDemoContactState {
-            is_active: state.is_active,
-            was_dismissed: state.was_dismissed,
-            auto_removed: state.auto_removed,
-            update_count: state.update_count,
-        }
-    }
-
-    /// Check if a demo update is available.
-    pub fn is_demo_update_available(&self) -> bool {
-        let state = self.load_demo_state();
-        state.is_update_due(now_secs())
-    }
-
-    /// Trigger a demo update and get the new content.
-    pub fn trigger_demo_update(&self) -> Result<Option<MobileDemoContact>, MobileError> {
-        let mut state = self.load_demo_state();
-        if !state.is_active {
-            return Ok(None);
-        }
-
-        if let Some(tip) = state.advance_to_next_tip(now_secs()) {
-            self.save_demo_state(&state)?;
-            let card = vauchi_core::generate_demo_contact_card(&tip);
-            Ok(Some(card.into()))
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Dismiss the demo contact.
-    pub fn dismiss_demo_contact(&self) -> Result<(), MobileError> {
-        let mut state = self.load_demo_state();
-        state.dismiss();
-        self.save_demo_state(&state)
-    }
-
-    /// Auto-remove demo contact after first real exchange.
-    /// Call this after a successful contact exchange.
-    pub fn auto_remove_demo_contact(&self) -> Result<bool, MobileError> {
-        let mut state = self.load_demo_state();
-        if state.is_active {
-            state.auto_remove();
-            self.save_demo_state(&state)?;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    /// Restore the demo contact from Settings.
-    pub fn restore_demo_contact(&self) -> Result<Option<MobileDemoContact>, MobileError> {
-        let mut state = self.load_demo_state();
-        state.restore();
-        self.save_demo_state(&state)?;
-
-        if let Some(tip) = state.current_tip() {
-            let card = vauchi_core::generate_demo_contact_card(&tip);
-            Ok(Some(card.into()))
-        } else {
-            Ok(None)
-        }
     }
 }

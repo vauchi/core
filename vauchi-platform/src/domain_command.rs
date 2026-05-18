@@ -31,13 +31,14 @@ use crate::content::{MobileApplyResult, MobileUpdateStatus};
 use crate::mobile_contact_detail::MobileContactDetailViewState;
 use crate::mobile_import::MobileImportResult;
 use crate::types::{
-    MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileConsentRecord, MobileConsentStatus,
-    MobileConsentType, MobileContact, MobileContactCard, MobileContactDisplayOptions,
-    MobileDecoyContact, MobileDeletionInfo, MobileDeliveryRecord, MobileDeliveryStatus,
-    MobileDeliverySummary, MobileDemoContact, MobileDemoContactState, MobileDeviceDeliveryRecord,
-    MobileDuplicatePair, MobileDuressSettings, MobileFieldNote, MobileFieldType, MobileGdprExport,
-    MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryVerification, MobileRetryEntry,
-    MobileShredStatus, MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileAhaMoment, MobileAhaMomentType, MobileAppPreferences, MobileAuthMode,
+    MobileConsentRecord, MobileConsentStatus, MobileConsentType, MobileContact, MobileContactCard,
+    MobileContactDisplayOptions, MobileDecoyContact, MobileDeletionInfo, MobileDeliveryRecord,
+    MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact, MobileDemoContactState,
+    MobileDeviceDeliveryRecord, MobileDuplicatePair, MobileDuressSettings, MobileFieldNote,
+    MobileFieldType, MobileGdprExport, MobileOnboardingProgress, MobileOnboardingStep,
+    MobileRecoveryVerification, MobileRetryEntry, MobileShredStatus, MobileSocialNetwork,
+    MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -541,6 +542,21 @@ pub enum DomainCommand {
     SetPinnedCertificate { cert_pem: String },
     /// Read whether certificate pinning is currently enabled.
     IsCertificatePinningEnabled,
+
+    // ── App preferences (theme + language singleton) ──
+    /// Load the singleton `app_preferences` row (theme + language).
+    /// Storage-only — no identity required. Returns
+    /// [`DomainCommandResult::AppPreferences`]. Frontends drive
+    /// Compose theme / locale resolution from the same row that
+    /// `AppEngine::persist_settings_toggle` writes through.
+    /// Retires `VauchiPlatform::app_preferences`.
+    GetAppPreferences,
+    /// Save the singleton `app_preferences` row. Storage-only —
+    /// no identity required (the Settings screen is reachable
+    /// before onboarding). Returns
+    /// [`DomainCommandResult::Unit`]. Retires
+    /// `VauchiPlatform::set_app_preferences`.
+    SetAppPreferences { prefs: MobileAppPreferences },
 }
 
 /// Sum type of every legitimate return shape from
@@ -667,4 +683,7 @@ pub enum DomainCommandResult {
     /// Pre-computed contact-detail view state (B7 batch 19 —
     /// `ContactDetailViewState`).
     ContactDetailView { state: MobileContactDetailViewState },
+    /// Singleton app-preferences snapshot (theme + language).
+    /// Returned by `GetAppPreferences`.
+    AppPreferences { prefs: MobileAppPreferences },
 }

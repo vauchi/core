@@ -4406,6 +4406,17 @@ pub trait PlatformAppEngineTestHelpers {
     /// Mirrors `VauchiPlatform::save_test_contact` (slice 32g retires
     /// the `VauchiPlatform` copy).
     fn save_test_contact(&self, contact: &vauchi_core::Contact) -> Result<(), MobileError>;
+
+    /// Save a delivery record directly to storage.
+    ///
+    /// Used by integration tests that need delivery records of specific
+    /// statuses without running the full sync/delivery pipeline.
+    /// Mirrors the legacy `VauchiPlatform::save_test_delivery_record`
+    /// (retired in the 2026-05-18 Phase 2a get-failed-delivery-relocate slice).
+    fn save_test_delivery_record(
+        &self,
+        record: &vauchi_core::storage::DeliveryRecord,
+    ) -> Result<(), MobileError>;
 }
 
 impl PlatformAppEngineTestHelpers for PlatformAppEngine {
@@ -4417,6 +4428,22 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
             .vauchi()
             .storage()
             .save_contact(contact)
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })
+    }
+
+    fn save_test_delivery_record(
+        &self,
+        record: &vauchi_core::storage::DeliveryRecord,
+    ) -> Result<(), MobileError> {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("engine lock poisoned: {e}"),
+        })?;
+        engine
+            .vauchi()
+            .storage()
+            .create_delivery_record(record)
             .map_err(|e| MobileError::StorageError {
                 detail: e.to_string(),
             })

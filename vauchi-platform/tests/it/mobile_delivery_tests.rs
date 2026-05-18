@@ -3,30 +3,62 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Tests for the delivery-status FFI surface — specifically the failed-record
-//! partition method that frontends consume in place of `.filter(\.isFailed)`.
+//! partition that frontends consume via `DomainCommand::GetFailedDeliveryRecords`
+//! in place of `.filter(\.isFailed)`.
 //!
 //! Closes the symmetric Humble-UI violation tracked in
 //! `_private/docs/problems/2026-04-27-screenmodel-api-gaps-symmetric-frontend-violations`
 //! (G3). The substantive partition logic is covered at the storage layer in
 //! `core/vauchi-core/tests/it/delivery_storage_tests.rs`; these tests verify
-//! the platform delegation, type mapping, and FFI surface stability.
+//! the platform delegation, type mapping, and FFI surface stability through
+//! the `PlatformAppEngine` dispatch path.
+//!
+//! Migrated 2026-05-18 from `VauchiPlatform.get_failed_delivery_records()`
+//! to `PlatformAppEngine.dispatch_domain_command(DomainCommand::GetFailedDeliveryRecords)`
+//! during Phase 2a slice 32h.Ph2 retirement.
 
 use std::sync::Arc;
 
 use tempfile::TempDir;
 
 use vauchi_core::storage::{DeliveryRecord, DeliveryStatus};
-use vauchi_platform::{MobileDeliveryStatus, VauchiPlatform};
+use vauchi_platform::{
+    DomainCommand, DomainCommandResult, MobileDeliveryRecord, MobileDeliveryStatus,
+    PlatformAppEngine, PlatformAppEngineTestHelpers,
+};
 
-fn setup() -> (Arc<VauchiPlatform>, TempDir) {
+fn setup() -> (Arc<PlatformAppEngine>, TempDir) {
     let dir = TempDir::new().unwrap();
-    let wb = VauchiPlatform::new(
+    let key = vauchi_core::crypto::SymmetricKey::generate();
+    let engine = PlatformAppEngine::new(
         dir.path().to_string_lossy().to_string(),
         "http://localhost:8080".to_string(),
+        key.as_bytes().to_vec(),
     )
-    .unwrap();
-    wb.create_identity("Alice".to_string()).unwrap();
-    (wb, dir)
+    .expect("create PlatformAppEngine");
+    drive_onboarding(&engine);
+    (engine, dir)
+}
+
+/// Drive the onboarding flow to create the identity. Mirrors the pattern in
+/// `contact_lifecycle_tests.rs` and `platform_app_engine_domain_command_tests.rs`.
+fn drive_onboarding(engine: &PlatformAppEngine) {
+    engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "create_new"}}"#.into())
+        .expect("create_new");
+    engine
+        .handle_action_json(
+            r#"{"TextChanged": {"component_id": "display_name", "value": "Alice"}}"#.into(),
+        )
+        .expect("display_name");
+    for _ in 0..3 {
+        engine
+            .handle_action_json(r#"{"ActionPressed": {"action_id": "continue"}}"#.into())
+            .expect("continue");
+    }
+    engine
+        .handle_action_json(r#"{"ActionPressed": {"action_id": "start_app"}}"#.into())
+        .expect("start_app");
 }
 
 fn now() -> u64 {
@@ -51,13 +83,21 @@ fn make_record(message_id: &str, status: DeliveryStatus) -> DeliveryRecord {
     }
 }
 
+fn get_failed_records(engine: &PlatformAppEngine) -> Vec<MobileDeliveryRecord> {
+    match engine
+        .dispatch_domain_command(DomainCommand::GetFailedDeliveryRecords)
+        .expect("GetFailedDeliveryRecords dispatch")
+    {
+        DomainCommandResult::DeliveryRecords { records } => records,
+        other => panic!("expected DeliveryRecords, got {other:?}"),
+    }
+}
+
 // @internal
 #[test]
 fn get_failed_delivery_records_returns_empty_when_no_records() {
-    let (wb, _dir) = setup();
-    let records = wb
-        .get_failed_delivery_records()
-        .expect("call must succeed on empty store");
+    let (engine, _dir) = setup();
+    let records = get_failed_records(&engine);
     assert!(
         records.is_empty(),
         "empty store must return zero failed records, got {}",
@@ -68,21 +108,24 @@ fn get_failed_delivery_records_returns_empty_when_no_records() {
 // @internal
 #[test]
 fn get_failed_delivery_records_returns_only_failed_records() {
-    let (wb, _dir) = setup();
+    let (engine, _dir) = setup();
 
-    wb.save_test_delivery_record(&make_record(
-        "msg-failed",
-        DeliveryStatus::Failed {
-            reason: "network".to_string(),
-        },
-    ))
-    .unwrap();
-    wb.save_test_delivery_record(&make_record("msg-delivered", DeliveryStatus::Delivered))
+    engine
+        .save_test_delivery_record(&make_record(
+            "msg-failed",
+            DeliveryStatus::Failed {
+                reason: "network".to_string(),
+            },
+        ))
         .unwrap();
-    wb.save_test_delivery_record(&make_record("msg-queued", DeliveryStatus::Queued))
+    engine
+        .save_test_delivery_record(&make_record("msg-delivered", DeliveryStatus::Delivered))
+        .unwrap();
+    engine
+        .save_test_delivery_record(&make_record("msg-queued", DeliveryStatus::Queued))
         .unwrap();
 
-    let records = wb.get_failed_delivery_records().unwrap();
+    let records = get_failed_records(&engine);
     assert_eq!(
         records.len(),
         1,
@@ -103,14 +146,16 @@ fn get_failed_delivery_records_returns_only_failed_records() {
 // @internal
 #[test]
 fn get_failed_delivery_records_excludes_other_terminal_statuses() {
-    let (wb, _dir) = setup();
+    let (engine, _dir) = setup();
 
-    wb.save_test_delivery_record(&make_record("msg-expired", DeliveryStatus::Expired))
+    engine
+        .save_test_delivery_record(&make_record("msg-expired", DeliveryStatus::Expired))
         .unwrap();
-    wb.save_test_delivery_record(&make_record("msg-delivered", DeliveryStatus::Delivered))
+    engine
+        .save_test_delivery_record(&make_record("msg-delivered", DeliveryStatus::Delivered))
         .unwrap();
 
-    let records = wb.get_failed_delivery_records().unwrap();
+    let records = get_failed_records(&engine);
     assert!(
         records.is_empty(),
         "Expired and Delivered are terminal but not Failed; expected zero, got {}",
@@ -121,19 +166,20 @@ fn get_failed_delivery_records_excludes_other_terminal_statuses() {
 // @internal
 #[test]
 fn get_failed_delivery_records_returns_multiple_when_present() {
-    let (wb, _dir) = setup();
+    let (engine, _dir) = setup();
 
     for i in 0..3 {
-        wb.save_test_delivery_record(&make_record(
-            &format!("msg-{i}"),
-            DeliveryStatus::Failed {
-                reason: "timeout".to_string(),
-            },
-        ))
-        .unwrap();
+        engine
+            .save_test_delivery_record(&make_record(
+                &format!("msg-{i}"),
+                DeliveryStatus::Failed {
+                    reason: "timeout".to_string(),
+                },
+            ))
+            .unwrap();
     }
 
-    let records = wb.get_failed_delivery_records().unwrap();
+    let records = get_failed_records(&engine);
     assert_eq!(
         records.len(),
         3,

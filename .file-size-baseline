@@ -436,7 +436,7 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1633
 #   humble-surface ratchet — `impl … for PlatformAppEngine` blocks
 #   fall outside the contract test's `impl PlatformAppEngine {`
 #   regex. UniFFI facade pattern; splitting breaks binding generation.)
-vauchi-platform/src/platform_app_engine.rs 5204
+vauchi-platform/src/platform_app_engine.rs 5212
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding

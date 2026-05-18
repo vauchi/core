@@ -259,7 +259,7 @@ become `PlatformAppEngine` methods. They become top-level
 | `get_string`, `get_string_with_args`, `get_aha_moment_localized`, `get_locale_info`, `get_available_locales`, `init_locales` | *(free function)* | NOT MIGRATED — STAYS |
 | `get_available_themes`, `get_default_theme_id`, `get_theme` | *(free function)* | NOT MIGRATED — STAYS |
 | `get_faqs`, `get_faqs_localized`, `get_faqs_by_category`, `get_faqs_by_category_localized`, `get_faq_by_id`, `get_faq_by_id_localized`, `get_help_categories`, `search_faqs`, `search_faqs_localized` | *(free function)* | NOT MIGRATED — STAYS |
-| `save_test_contact`, `save_test_delivery_record` | *(test helper)* | NOT MIGRATED — STAYS |
+| `save_test_contact`, `save_test_delivery_record` | `PlatformAppEngineTestHelpers` trait | **MIGRATED** to `#[doc(hidden)] pub trait PlatformAppEngineTestHelpers` (slice 32g 2026-05-17 + slice 32h.Ph2 2026-05-18); trait impls don't count toward audit |
 | `new`, `new_with_secure_key` | `PlatformAppEngine::new` | **MIGRATED** (covered by engine constructor) |
 
 ## Summary

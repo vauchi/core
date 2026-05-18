@@ -2,32 +2,31 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Sync, failed-delivery reads, backup operations.
+//! Sync orchestration (the last cluster — Phase 2b).
 //!
-//! After slice 32h Phase 1 (2026-05-18), 22 storage-only delegation
-//! methods retired (DC wired in PAE, zero binding consumers). The 4
-//! delivery-flag accessors (`is/set_delivery_receipts_enabled`,
-//! `is/set_suppress_presence_enabled`) also retired in the 2026-05-18
-//! Phase 2a flag-vestigial cleanup — they were dead getter/setter
-//! pairs over `Mutex<bool>` fields that VauchiPlatform never read
-//! internally; the real flag state persists on `PlatformAppEngine`'s
-//! side (`load_sync_flags_engine` / `save_sync_flags_engine`).
+//! Slice 32h Phase 1 (2026-05-18) retired 22 storage-only delegations
+//! (DC wired in PAE, zero binding consumers). Subsequent 2026-05-18
+//! Phase 2a iterations cleared all remaining wrappers from this file:
 //!
-//! 6 methods remain pending Phase 2:
+//! - Flag-vestigial cleanup: `is/set_delivery_receipts_enabled`,
+//!   `is/set_suppress_presence_enabled` (dead getter/setter pairs over
+//!   `Mutex<bool>` fields that were never read; real flag state is on
+//!   PAE side via `load_sync_flags_engine`).
+//! - Backup-cluster delete-pair: `export_backup`, `import_backup`
+//!   (redundant — covered by `full_backup_api_tests.rs` et al.).
+//! - get-failed-delivery relocate: `get_failed_delivery_records`
+//!   (Humble-UI contract test migrated to PAE+dispatch in
+//!   `tests/it/mobile_delivery_tests.rs`).
 //!
-//! - **Phase 2a (G4b)**: 3 trapped methods that have lib.rs internal
-//!   tests / `tests/it/` / `benches/` callers — `export_backup`,
-//!   `import_backup`, `get_failed_delivery_records`.
-//! - **Phase 2b (sync orchestration design)**: 3 sync-state methods
-//!   that need engine-resident sync state — `sync`, `get_sync_status`,
-//!   `sync_async`. Documented as a separate batch at
-//!   `domain_command.rs:307-313`.
+//! 3 sync-state methods remain pending Phase 2b (sync orchestration
+//! design) — `sync`, `get_sync_status`, `sync_async`. They need
+//! engine-resident sync state per `domain_command.rs:307-313`.
 
 use std::sync::Arc;
 
 use super::VauchiPlatform;
 use super::error::{MobileError, lock_or};
-use super::types::{MobileDeliveryRecord, MobileSyncResult, MobileSyncStatus};
+use super::types::{MobileSyncResult, MobileSyncStatus};
 
 #[uniffi::export]
 impl VauchiPlatform {
@@ -111,21 +110,6 @@ impl VauchiPlatform {
     }
 
     // === Failed Delivery Reads (kept — tests/it caller) ===
-
-    /// Get all failed delivery records.
-    ///
-    /// Frontends should call this instead of fetching `get_all_delivery_records()`
-    /// and filtering by `status == Failed` themselves — see ADR-021/043
-    /// (the Humble UI). The partition decision lives in core so iOS, Android,
-    /// and any future frontend render the same list without divergence.
-    pub fn get_failed_delivery_records(&self) -> Result<Vec<MobileDeliveryRecord>, MobileError> {
-        use vauchi_core::storage::DeliveryStatus;
-        let storage = self.open_storage()?;
-        let records = storage.get_delivery_records_by_status(&DeliveryStatus::Failed {
-            reason: String::new(),
-        })?;
-        Ok(records.iter().map(MobileDeliveryRecord::from).collect())
-    }
 }
 
 // Async sync method — runs sync on a blocking thread to prevent UI freeze.

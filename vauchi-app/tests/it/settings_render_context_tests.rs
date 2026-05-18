@@ -167,7 +167,7 @@ fn theme_dropdown_selection_dual_writes_render_context_and_vault() {
     engine.navigate_to(AppScreen::Settings);
     assert_eq!(engine.render_context().theme_id, None);
 
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "theme".to_string(),
         item_id: "cyber".to_string(),
     });
@@ -199,7 +199,7 @@ fn language_dropdown_selection_dual_writes_render_context_and_vault() {
     engine.navigate_to(AppScreen::Settings);
     assert_eq!(engine.render_context().locale, None);
 
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "language".to_string(),
         item_id: "de".to_string(),
     });
@@ -228,7 +228,7 @@ fn follow_system_selection_clears_render_context_field() {
     });
     engine.navigate_to(AppScreen::Settings);
 
-    engine.handle_action(UserAction::ListItemSelected {
+    let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "theme".to_string(),
         item_id: "follow_system".to_string(),
     });

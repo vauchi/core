@@ -173,7 +173,12 @@ vauchi-core/src/storage/mod.rs 1079
 #   `render_context: RenderContext` field + `render_context()` /
 #   `set_render_context()` accessors + module doc — additive humble
 #   surface for Category-1 settings push, see ADR-047.)
-vauchi-app/src/ui/app_engine/mod.rs 1293
+# (+14 on mod.rs for S3 of 2026-05-16-settings-storage-by-sensitivity:
+#   `set_render_context` rebuilds the active engine when on Settings
+#   (dual-storage cache + active engine, both must invalidate together);
+#   `initial_render_context` local + extra arg threaded through
+#   `Self::create_engine` callsites in `new` and the unarchive recreate.)
+vauchi-app/src/ui/app_engine/mod.rs 1307
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -201,7 +206,13 @@ vauchi-app/src/ui/app_engine/routing.rs 1308
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)
 # (+1 for `let clock = vauchi.clock().clone()` in ExchangeEngine ctor 2026-05-13 slice 21)
-vauchi-app/src/ui/app_engine/screens.rs 1363
+# (+10 on screens.rs for S3 of 2026-05-16-settings-storage-by-sensitivity:
+#   `render_context` parameter on `create_engine`; Settings arm derives
+#   theme/language Dropdown `selected` from RenderContext first, falls
+#   back to legacy `vauchi.app_preferences()` only when the frontend
+#   has not pushed a value for the corresponding field (fallback dies
+#   in S6). See ADR-047.)
+vauchi-app/src/ui/app_engine/screens.rs 1373
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

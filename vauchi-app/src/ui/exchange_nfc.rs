@@ -1,0 +1,495 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! NFC exchange sub-flow — drives the 3-phase encrypted handshake
+//! through the `ExchangeCommand` / `ExchangeHardwareEvent` protocol
+//! (ADR-031), removing the need for the `MobileNfcHandshake` UniFFI
+//! session Object.
+//!
+//! Design: `_private/docs/designs/2026-05-19-nfc-exchange-engine-design.md`.
+//! Parent record:
+//! `_private/docs/problems/2026-05-19-nfc-exchange-engine-graduation/`.
+//!
+//! State machine:
+//!
+//! ```text
+//! Idle ── activate() ──► AwaitingTap
+//!                            │
+//!     ┌──────────────────────┼──────────────────────┐
+//!     │ initiator            │ responder            │
+//!     ▼                      ▼                      │
+//!  PayloadSent            AckSent                   │
+//!     │                      │                      │
+//!     └──── NfcDataReceived ─┴──► Complete          │
+//! ```
+//!
+//! Cadence is per-phase, not per-APDU (iOS CoreNFC and Android HCE
+//! both reassemble extended APDUs transparently — see design doc §4).
+
+#![allow(dead_code)] // wired into ExchangeEngine in a follow-up commit
+
+use vauchi_core::clock::SystemClock;
+use vauchi_core::exchange::{NFC_PAYLOAD_SIZE, NfcHandshakeSession, NfcHandshakeState};
+use vauchi_core::identity::Identity;
+use vauchi_core::{Command, Event};
+
+// ── Step enum ──────────────────────────────────────────────────────────────
+
+/// Steps specific to the NFC exchange sub-flow.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) enum NfcStep {
+    /// Pre-activation. Waiting for parent `ExchangeEngine` to flip step.
+    Idle,
+    /// `Command::NfcActivate` emitted; awaiting `Event::NfcDataReceived`
+    /// with the peer's response.
+    AwaitingTap,
+    /// (Initiator only) Phase 2 processed; `Command::NfcSendApdu`
+    /// emitted with our encrypted card; awaiting Phase 3 confirmation.
+    PayloadSent,
+    /// (Responder only) Phase 1 processed; `Command::NfcSendApdu`
+    /// emitted with our key ack + encrypted card; awaiting Phase 3
+    /// (initiator's encrypted card).
+    AckSent,
+    /// 3-phase handshake complete on both sides.
+    Complete,
+}
+
+impl NfcStep {
+    pub(super) fn step_number(&self, base: u8) -> u8 {
+        base + match self {
+            Self::Idle | Self::AwaitingTap => 0,
+            Self::PayloadSent | Self::AckSent => 1,
+            Self::Complete => 2,
+        }
+    }
+
+    /// Matches QrStep/LinkStep/BleStep for the parent progress bar.
+    pub(super) const STEP_COUNT: u8 = 3;
+}
+
+// ── Outcome enum ───────────────────────────────────────────────────────────
+
+/// Result of handling a hardware event in the NFC sub-flow.
+#[derive(Debug)]
+pub(super) enum NfcHardwareOutcome {
+    /// Step advanced — parent should update screen. May emit commands.
+    StepAdvanced { commands: Vec<Command> },
+    /// NFC exchange completed — card bytes available.
+    Complete {
+        card_bytes: Vec<u8>,
+        commands: Vec<Command>,
+    },
+    /// NFC failed — offer relay fallback if `relay_handoff.is_some()`,
+    /// otherwise the parent should route to a QR-fallback or cancel
+    /// screen.
+    FailedWithFallback {
+        reason: String,
+        relay_handoff: Option<RelayHandoff>,
+    },
+    /// Event consumed but no step change. May emit commands.
+    Consumed { commands: Vec<Command> },
+    /// Event not handled by NFC flow.
+    Ignored,
+}
+
+/// Payload for `Command::RelayEscrowDeposit` when the NFC tap drops
+/// after the shared key has been established. Computed by the
+/// sub-flow; the parent emits the actual escrow Command.
+#[derive(Debug)]
+pub(super) struct RelayHandoff {
+    pub gate_hash: Vec<u8>,
+    pub slot_hash: Vec<u8>,
+    pub encrypted_card: Vec<u8>,
+}
+
+// ── Flow struct ────────────────────────────────────────────────────────────
+
+/// NFC exchange sub-flow. Owns the underlying `NfcHandshakeSession`
+/// (unlike `BleExchangeFlow`, which delegates to `ExchangeSession`)
+/// because NFC's 3-phase state is the *whole* protocol state — there
+/// is nothing useful for an outer container to hold separately.
+pub(super) struct NfcExchangeFlow {
+    step: NfcStep,
+    session: NfcHandshakeSession,
+    is_initiator: bool,
+    /// Cached identity reference for `process_key_offer` (responder)
+    /// and `create_key_offer` (initiator) — both need the full
+    /// `Identity` to sign their NFC payload.
+    identity: Identity,
+}
+
+impl NfcExchangeFlow {
+    pub(super) fn new_initiator(identity: Identity, display_name: String) -> Self {
+        let session = NfcHandshakeSession::new_initiator(&identity, display_name);
+        Self {
+            step: NfcStep::Idle,
+            session,
+            is_initiator: true,
+            identity,
+        }
+    }
+
+    pub(super) fn new_responder(identity: Identity, display_name: String) -> Self {
+        let session = NfcHandshakeSession::new_responder(&identity, display_name);
+        Self {
+            step: NfcStep::Idle,
+            session,
+            is_initiator: false,
+            identity,
+        }
+    }
+
+    pub(super) fn step(&self) -> &NfcStep {
+        &self.step
+    }
+
+    /// Transition from Idle to AwaitingTap and emit the initial
+    /// activation Command. Initiator sends its key offer in the
+    /// payload; responder sends empty (it waits for the peer's
+    /// key offer first).
+    pub(super) fn activate(&mut self) -> Result<Vec<Command>, NfcFlowError> {
+        if !matches!(self.step, NfcStep::Idle) {
+            return Err(NfcFlowError::WrongState);
+        }
+        let now = SystemClock::shared().unix_seconds();
+        let payload = if self.is_initiator {
+            self.session
+                .create_key_offer(&self.identity, now)
+                .map_err(|e| NfcFlowError::Protocol(e.to_string()))?
+        } else {
+            Vec::<u8>::new()
+        };
+        self.step = NfcStep::AwaitingTap;
+        Ok(vec![Command::NfcActivate { payload }])
+    }
+
+    /// Process a hardware event. Cross-transport failure events
+    /// (`HardwareError`/`HardwareUnavailable`/`PermissionDenied`
+    /// with `transport == "nfc"` and `BleDisconnected` are
+    /// short-circuited at the top — pattern mirrored from
+    /// `BleExchangeFlow::handle_event`.
+    pub(super) fn handle_event(&mut self, event: &Event) -> NfcHardwareOutcome {
+        if let Event::HardwareError { transport, error } = event
+            && transport.eq_ignore_ascii_case("nfc")
+        {
+            return self.fail_with_fallback(error.clone());
+        }
+        if let Event::HardwareUnavailable { transport } = event
+            && transport.eq_ignore_ascii_case("nfc")
+        {
+            return self.fail_with_fallback("NFC not available".into());
+        }
+        if let Event::PermissionDenied { transport } = event
+            && transport.eq_ignore_ascii_case("nfc")
+        {
+            return self.fail_with_fallback("NFC permission denied".into());
+        }
+
+        match (&self.step, event) {
+            (NfcStep::AwaitingTap, Event::NfcDataReceived { data }) => {
+                self.handle_awaiting_tap(data)
+            }
+            (NfcStep::PayloadSent, Event::NfcDataReceived { .. }) => {
+                self.handle_payload_sent_complete()
+            }
+            (NfcStep::AckSent, Event::NfcDataReceived { data }) => self.handle_ack_sent(data),
+            (NfcStep::Complete, _) => NfcHardwareOutcome::Ignored,
+            _ => NfcHardwareOutcome::Ignored,
+        }
+    }
+
+    // ── per-state handlers ─────────────────────────────────────────────────
+
+    fn handle_awaiting_tap(&mut self, data: &[u8]) -> NfcHardwareOutcome {
+        let now = SystemClock::shared().unix_seconds();
+        if self.is_initiator {
+            // Initiator: `data` is the responder's (key_ack || encrypted_card).
+            // Key ack is always exactly NFC_PAYLOAD_SIZE bytes; the rest is
+            // the encrypted card.
+            if data.len() <= NFC_PAYLOAD_SIZE {
+                return self.fail_with_fallback(format!(
+                    "NFC phase-2 response too short: {} bytes",
+                    data.len()
+                ));
+            }
+            let (key_ack, encrypted_card) = data.split_at(NFC_PAYLOAD_SIZE);
+            match self.session.process_key_ack(key_ack, encrypted_card, now) {
+                Ok(our_encrypted_card) => {
+                    self.step = NfcStep::PayloadSent;
+                    NfcHardwareOutcome::StepAdvanced {
+                        commands: vec![Command::NfcSendApdu {
+                            data: our_encrypted_card,
+                        }],
+                    }
+                }
+                Err(e) => self.fail_with_fallback(e.to_string()),
+            }
+        } else {
+            // Responder: `data` is the initiator's key offer.
+            match self.session.process_key_offer(&self.identity, data, now) {
+                Ok((our_ack, our_encrypted_card)) => {
+                    let mut framed = our_ack;
+                    framed.extend(our_encrypted_card);
+                    self.step = NfcStep::AckSent;
+                    NfcHardwareOutcome::StepAdvanced {
+                        commands: vec![Command::NfcSendApdu { data: framed }],
+                    }
+                }
+                Err(e) => self.fail_with_fallback(e.to_string()),
+            }
+        }
+    }
+
+    fn handle_payload_sent_complete(&mut self) -> NfcHardwareOutcome {
+        // Initiator: the peer ACK'd our Phase 3 encrypted-card send. The
+        // session already cached the remote card during process_key_ack.
+        match self.session.confirm_send_success() {
+            Ok(result) => {
+                self.step = NfcStep::Complete;
+                NfcHardwareOutcome::Complete {
+                    card_bytes: result
+                        .remote_card
+                        .to_bytes()
+                        .expect("NfcCardPayload re-serialization is infallible by construction"),
+                    commands: vec![Command::NfcDeactivate],
+                }
+            }
+            Err(e) => self.fail_with_fallback(e.to_string()),
+        }
+    }
+
+    fn handle_ack_sent(&mut self, data: &[u8]) -> NfcHardwareOutcome {
+        // Responder: `data` is the initiator's encrypted card.
+        match self.session.process_encrypted_card(data) {
+            Ok(result) => {
+                self.step = NfcStep::Complete;
+                NfcHardwareOutcome::Complete {
+                    card_bytes: result
+                        .remote_card
+                        .to_bytes()
+                        .expect("NfcCardPayload re-serialization is infallible by construction"),
+                    commands: vec![Command::NfcDeactivate],
+                }
+            }
+            Err(e) => self.fail_with_fallback(e.to_string()),
+        }
+    }
+
+    /// Compute a relay handoff when failure occurs after the shared
+    /// key has been established, otherwise return `None`. Phase 1
+    /// keeps this stub — full `EscrowKeys::derive` wiring lands in a
+    /// follow-up commit per design doc §5.
+    fn try_relay_handoff(&mut self) -> Option<RelayHandoff> {
+        match self.session.state() {
+            NfcHandshakeState::KeyAckReceived { .. } | NfcHandshakeState::PayloadSent { .. } => {
+                // TODO(2026-05-19, Phase 1 follow-up): call
+                // `self.session.enter_relay_fallback()`, then derive
+                // EscrowKeys + emit RelayHandoff. Mirrors link_mode.rs:95.
+                None
+            }
+            _ => None,
+        }
+    }
+
+    fn fail_with_fallback(&mut self, reason: String) -> NfcHardwareOutcome {
+        let relay_handoff = self.try_relay_handoff();
+        self.step = NfcStep::Complete; // absorbing; no further events handled
+        NfcHardwareOutcome::FailedWithFallback {
+            reason,
+            relay_handoff,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(super) enum NfcFlowError {
+    WrongState,
+    Protocol(String),
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────────
+
+// INLINE_TEST_REQUIRED: tests need pub(super) visibility of NfcStep,
+// NfcHardwareOutcome, RelayHandoff, and NfcExchangeFlow internals.
+// Integration tests with public-only surface land in
+// core/vauchi-core/tests/it/nfc_exchange_flow_tests.rs in a follow-up
+// commit.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vauchi_core::Event;
+
+    fn make_identity(name: &str) -> Identity {
+        Identity::create(name, 0)
+    }
+
+    // @internal
+    #[test]
+    fn new_initiator_starts_idle() {
+        let flow = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        assert_eq!(*flow.step(), NfcStep::Idle);
+        assert!(flow.is_initiator);
+    }
+
+    // @internal
+    #[test]
+    fn new_responder_starts_idle() {
+        let flow = NfcExchangeFlow::new_responder(make_identity("Bob"), "Bob".into());
+        assert_eq!(*flow.step(), NfcStep::Idle);
+        assert!(!flow.is_initiator);
+    }
+
+    // @internal
+    #[test]
+    fn initiator_activate_emits_nfc_activate_with_key_offer_payload() {
+        let mut flow = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        let commands = flow.activate().expect("activate");
+        assert_eq!(*flow.step(), NfcStep::AwaitingTap);
+        assert_eq!(commands.len(), 1);
+        match &commands[0] {
+            Command::NfcActivate { payload } => {
+                assert_eq!(
+                    payload.len(),
+                    NFC_PAYLOAD_SIZE,
+                    "initiator activation must carry exactly one ExchangeNfc payload"
+                );
+            }
+            other => panic!("expected NfcActivate, got {other:?}"),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn responder_activate_emits_nfc_activate_with_empty_payload() {
+        let mut flow = NfcExchangeFlow::new_responder(make_identity("Bob"), "Bob".into());
+        let commands = flow.activate().expect("activate");
+        assert_eq!(*flow.step(), NfcStep::AwaitingTap);
+        match &commands[0] {
+            Command::NfcActivate { payload } => {
+                assert!(
+                    payload.is_empty(),
+                    "responder activation payload must be empty"
+                );
+            }
+            other => panic!("expected NfcActivate, got {other:?}"),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn activate_from_non_idle_step_is_an_error() {
+        let mut flow = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        flow.activate().expect("first activate");
+        let err = flow.activate().expect_err("second activate must fail");
+        assert!(matches!(err, NfcFlowError::WrongState));
+    }
+
+    // @internal
+    #[test]
+    fn full_handshake_initiator_to_complete() {
+        // Two flows simulate a real 3-phase exchange via direct
+        // command/event plumbing (no NFC transport — events are
+        // synthesised from the peer's emitted Commands).
+        let mut alice = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        let mut bob = NfcExchangeFlow::new_responder(make_identity("Bob"), "Bob".into());
+
+        // Phase 1: Alice activates (sends key offer), Bob activates (waits).
+        let alice_cmds = alice.activate().expect("alice activate");
+        let _ = bob.activate().expect("bob activate");
+        let alice_offer = match &alice_cmds[0] {
+            Command::NfcActivate { payload } => payload.clone(),
+            other => panic!("expected NfcActivate, got {other:?}"),
+        };
+
+        // Bob receives Alice's offer.
+        let bob_outcome = bob.handle_event(&Event::NfcDataReceived { data: alice_offer });
+        let bob_response = match bob_outcome {
+            NfcHardwareOutcome::StepAdvanced { commands } => match &commands[0] {
+                Command::NfcSendApdu { data } => data.clone(),
+                other => panic!("bob expected NfcSendApdu, got {other:?}"),
+            },
+            other => panic!("bob expected StepAdvanced, got {other:?}"),
+        };
+        assert_eq!(*bob.step(), NfcStep::AckSent);
+
+        // Phase 2: Alice receives Bob's (key_ack || encrypted_card).
+        let alice_outcome = alice.handle_event(&Event::NfcDataReceived { data: bob_response });
+        let alice_card = match alice_outcome {
+            NfcHardwareOutcome::StepAdvanced { commands } => match &commands[0] {
+                Command::NfcSendApdu { data } => data.clone(),
+                other => panic!("alice expected NfcSendApdu, got {other:?}"),
+            },
+            other => panic!("alice expected StepAdvanced, got {other:?}"),
+        };
+        assert_eq!(*alice.step(), NfcStep::PayloadSent);
+
+        // Phase 3: Bob receives Alice's encrypted card → Complete.
+        let bob_final = bob.handle_event(&Event::NfcDataReceived { data: alice_card });
+        match bob_final {
+            NfcHardwareOutcome::Complete {
+                card_bytes,
+                commands,
+            } => {
+                assert!(!card_bytes.is_empty());
+                assert!(commands.iter().any(|c| matches!(c, Command::NfcDeactivate)));
+            }
+            other => panic!("bob expected Complete, got {other:?}"),
+        }
+        assert_eq!(*bob.step(), NfcStep::Complete);
+
+        // Alice's terminating event: ACK of her Phase 3 send. The
+        // payload bytes are irrelevant — confirm_send_success doesn't
+        // parse them.
+        let alice_final = alice.handle_event(&Event::NfcDataReceived {
+            data: vec![0x90, 0x00],
+        });
+        match alice_final {
+            NfcHardwareOutcome::Complete {
+                card_bytes,
+                commands,
+            } => {
+                assert!(!card_bytes.is_empty());
+                assert!(commands.iter().any(|c| matches!(c, Command::NfcDeactivate)));
+            }
+            other => panic!("alice expected Complete, got {other:?}"),
+        }
+        assert_eq!(*alice.step(), NfcStep::Complete);
+    }
+
+    // @internal
+    #[test]
+    fn permission_denied_routes_to_fail_with_fallback() {
+        let mut flow = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        flow.activate().expect("activate");
+        let outcome = flow.handle_event(&Event::PermissionDenied {
+            transport: "nfc".into(),
+        });
+        match outcome {
+            NfcHardwareOutcome::FailedWithFallback {
+                reason,
+                relay_handoff,
+            } => {
+                assert!(reason.to_lowercase().contains("permission"));
+                // Pre-shared-key failure: no relay handoff available.
+                assert!(relay_handoff.is_none());
+            }
+            other => panic!("expected FailedWithFallback, got {other:?}"),
+        }
+        // Absorbing state.
+        assert_eq!(*flow.step(), NfcStep::Complete);
+    }
+
+    // @internal
+    #[test]
+    fn hardware_error_for_other_transport_is_ignored() {
+        let mut flow = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        flow.activate().expect("activate");
+        let outcome = flow.handle_event(&Event::HardwareError {
+            transport: "ble".into(),
+            error: "ignored".into(),
+        });
+        assert!(matches!(outcome, NfcHardwareOutcome::Ignored));
+        assert_eq!(*flow.step(), NfcStep::AwaitingTap);
+    }
+}

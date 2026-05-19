@@ -118,7 +118,7 @@ vauchi-core/src/exchange/multistage/session.rs 1431
 # (+37 for Command::SetOrientationLock + Orientation enum + variant_name
 #  arm + 4 unit tests, Phase 2c of
 #  2026-05-04-exchange-command-screen-presentation)
-vauchi-core/src/platform.rs 1080
+vauchi-core/src/platform.rs 1087
 
 # EXEMPT — transport layer: all relay methods must be co-located for protocol coherence
 # (+2 for #[tracing::instrument] on send_update + fetch — profiling, no logic change)

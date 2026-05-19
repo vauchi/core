@@ -39,6 +39,7 @@ mod exchange_ble;
 mod exchange_field_preview;
 mod exchange_link;
 mod exchange_mode_selection;
+mod exchange_nfc;
 mod exchange_qr;
 mod fingerprint_verify;
 mod form_dialog;

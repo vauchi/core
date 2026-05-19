@@ -30,7 +30,10 @@
 #![allow(dead_code)] // wired into ExchangeEngine in a follow-up commit
 
 use vauchi_core::clock::SystemClock;
-use vauchi_core::exchange::{NFC_PAYLOAD_SIZE, NfcHandshakeSession, NfcHandshakeState};
+use vauchi_core::exchange::escrow::{EscrowKeys, EscrowRole};
+use vauchi_core::exchange::{
+    NFC_PAYLOAD_SIZE, NfcCardPayload, NfcHandshakeSession, NfcHandshakeState,
+};
 use vauchi_core::identity::Identity;
 use vauchi_core::{Command, Event};
 
@@ -279,19 +282,46 @@ impl NfcExchangeFlow {
     }
 
     /// Compute a relay handoff when failure occurs after the shared
-    /// key has been established, otherwise return `None`. Phase 1
-    /// keeps this stub — full `EscrowKeys::derive` wiring lands in a
-    /// follow-up commit per design doc §5.
+    /// key has been established, otherwise return `None`. Wires up
+    /// the path described in design doc §5: route the shared key
+    /// from `NfcHandshakeSession::enter_relay_fallback` through
+    /// `EscrowKeys::derive` + `encrypt_card`, mirroring the Link-mode
+    /// pattern at `link_mode.rs:95`.
     fn try_relay_handoff(&mut self) -> Option<RelayHandoff> {
+        // Only meaningful after the shared key is established.
         match self.session.state() {
-            NfcHandshakeState::KeyAckReceived { .. } | NfcHandshakeState::PayloadSent { .. } => {
-                // TODO(2026-05-19, Phase 1 follow-up): call
-                // `self.session.enter_relay_fallback()`, then derive
-                // EscrowKeys + emit RelayHandoff. Mirrors link_mode.rs:95.
-                None
-            }
-            _ => None,
+            NfcHandshakeState::KeyAckReceived { .. } | NfcHandshakeState::PayloadSent { .. } => {}
+            _ => return None,
         }
+
+        // `enter_relay_fallback` mutates the session into RelayFallback
+        // state and yields the shared_key derived during the in-band
+        // handshake.
+        let (_exchange_id, shared_key) = self.session.enter_relay_fallback().ok()?;
+
+        // Build our card payload from the same fields the in-band
+        // handshake would have encrypted, then serialize via postcard
+        // for the relay deposit blob.
+        let card_payload = NfcCardPayload::new(
+            *self.session.our_identity_key(),
+            self.identity.display_name().to_string(),
+            *self.session.our_exchange_key(),
+        );
+        let card_bytes = card_payload.to_bytes().ok()?;
+
+        let role = if self.is_initiator {
+            EscrowRole::Initiator
+        } else {
+            EscrowRole::Responder
+        };
+        let escrow_keys = EscrowKeys::derive(shared_key.as_bytes(), role);
+        let encrypted_card = escrow_keys.encrypt_card(&card_bytes).ok()?;
+
+        Some(RelayHandoff {
+            gate_hash: hex::decode(&escrow_keys.gate_hash).ok()?,
+            slot_hash: hex::decode(&escrow_keys.our_slot).ok()?,
+            encrypted_card,
+        })
     }
 
     fn fail_with_fallback(&mut self, reason: String) -> NfcHardwareOutcome {
@@ -536,5 +566,49 @@ mod tests {
         });
         assert!(matches!(outcome, NfcHardwareOutcome::Ignored));
         assert_eq!(*flow.step(), NfcStep::AwaitingTap);
+    }
+
+    // @internal
+    #[test]
+    fn responder_failure_after_key_ack_yields_relay_handoff() {
+        // Drive Bob into AckSent / KeyAckReceived by feeding Alice's
+        // key offer to him.
+        let mut alice = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        let mut bob = NfcExchangeFlow::new_responder(make_identity("Bob"), "Bob".into());
+        let alice_cmds = alice.activate().expect("alice activate");
+        let _ = bob.activate().expect("bob activate");
+        let offer = match &alice_cmds[0] {
+            Command::NfcActivate { payload } => payload.clone(),
+            other => panic!("expected NfcActivate, got {other:?}"),
+        };
+        let bob_outcome = bob.handle_event(&Event::NfcDataReceived { data: offer });
+        assert!(matches!(
+            bob_outcome,
+            NfcHardwareOutcome::StepAdvanced { .. }
+        ));
+        assert_eq!(*bob.step(), NfcStep::AckSent);
+
+        // Trigger a hardware error after the shared key exists.
+        let outcome = bob.handle_event(&Event::HardwareError {
+            transport: "nfc".into(),
+            error: "tag lost mid-exchange".into(),
+        });
+        match outcome {
+            NfcHardwareOutcome::FailedWithFallback {
+                reason,
+                relay_handoff,
+            } => {
+                assert!(reason.contains("tag lost"));
+                let handoff =
+                    relay_handoff.expect("post-shared-key failure must yield a relay handoff");
+                assert_eq!(handoff.gate_hash.len(), 32, "gate_hash is SHA-256");
+                assert_eq!(handoff.slot_hash.len(), 32, "slot_hash is SHA-256");
+                assert!(
+                    !handoff.encrypted_card.is_empty(),
+                    "encrypted_card must carry the blob"
+                );
+            }
+            other => panic!("expected FailedWithFallback, got {other:?}"),
+        }
     }
 }

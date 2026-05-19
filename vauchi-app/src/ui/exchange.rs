@@ -619,12 +619,27 @@ impl ExchangeEngine {
             }
             NfcHardwareOutcome::FailedWithFallback {
                 reason,
-                relay_handoff: _,
+                relay_handoff,
             } => {
                 self.failure_detail = Some(reason);
                 self.qr_fallback_available = self.config.device_capabilities.has_camera;
                 self.step = ExchangeStep::Failed;
-                ActionResult::UpdateScreen(self.build_screen())
+                // Mirror Link-mode TTL (link_mode.rs:26
+                // DEFAULT_TTL_SECONDS = 604_800 = 7 days). Wired inline
+                // since the const is private to link_mode.
+                const NFC_RELAY_TTL_SECONDS: u32 = 604_800;
+                if let Some(handoff) = relay_handoff {
+                    ActionResult::Commands {
+                        commands: vec![vauchi_core::Command::RelayEscrowDeposit {
+                            gate_hash: handoff.gate_hash,
+                            slot_hash: handoff.slot_hash,
+                            encrypted_card: handoff.encrypted_card,
+                            ttl_seconds: NFC_RELAY_TTL_SECONDS,
+                        }],
+                    }
+                } else {
+                    ActionResult::UpdateScreen(self.build_screen())
+                }
             }
             NfcHardwareOutcome::Ignored => ActionResult::UpdateScreen(self.build_screen()),
         }

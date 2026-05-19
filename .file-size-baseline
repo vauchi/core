@@ -248,7 +248,7 @@ vauchi-core/tests/it/migration_tests.rs 1226
 # permissions SettingsGroup + verify_button gating 2026-04-28 Pair 3)
 # (+7 for Glance → MultiStageExchange handoff branch + test rewrite 2026-04-28 Pair 4 L8)
 # (+204 for ExchangeEngine clock field + 117 test callsites threading SystemClock 2026-05-13 slice 21)
-vauchi-app/src/ui/exchange.rs 3497
+vauchi-app/src/ui/exchange.rs 3512
 vauchi-app/src/ui/contact_detail.rs 1423
 
 # EXEMPT — BLE exchange sub-flow: inline tests access private state (proximity_runner, shake_envelope_sent)

@@ -34,6 +34,8 @@ use vauchi_core::exchange::{NFC_PAYLOAD_SIZE, NfcHandshakeSession, NfcHandshakeS
 use vauchi_core::identity::Identity;
 use vauchi_core::{Command, Event};
 
+use crate::ui::*;
+
 // ── Step enum ──────────────────────────────────────────────────────────────
 
 /// Steps specific to the NFC exchange sub-flow.
@@ -306,6 +308,49 @@ impl NfcExchangeFlow {
 pub(super) enum NfcFlowError {
     WrongState,
     Protocol(String),
+}
+
+// ── Screen builders ────────────────────────────────────────────────────────
+
+/// Build a `ScreenModel` for any NFC sub-flow step. Phase 1 ships a
+/// minimal placeholder shape — the production renderer copy follows
+/// in a later phase once `NfcExchangeView` is retired. The screen-id
+/// + cancel action are stable so iOS/Android can route on them today.
+pub(super) fn build_nfc_screen(step: &NfcStep, progress: Progress) -> ScreenModel {
+    let (screen_id, title, subtitle): (&str, &str, &str) = match step {
+        NfcStep::Idle => ("exchange_nfc_idle", "Preparing NFC", "Just a moment..."),
+        NfcStep::AwaitingTap => (
+            "exchange_nfc_awaiting_tap",
+            "Tap to exchange",
+            "Hold your phones back-to-back",
+        ),
+        NfcStep::PayloadSent | NfcStep::AckSent => (
+            "exchange_nfc_in_progress",
+            "Exchanging cards",
+            "Keep your phones still",
+        ),
+        NfcStep::Complete => ("exchange_nfc_complete", "Done", "Cards exchanged"),
+    };
+
+    ScreenModel {
+        screen_id: screen_id.into(),
+        title: title.into(),
+        subtitle: Some(subtitle.into()),
+        components: vec![Component::Text {
+            id: "nfc_status".into(),
+            content: subtitle.into(),
+            style: TextStyle::Body,
+        }],
+        actions: vec![ScreenAction {
+            id: "cancel".into(),
+            label: "Cancel".into(),
+            style: ActionStyle::Secondary,
+            enabled: !matches!(step, NfcStep::Complete),
+            a11y: None,
+        }],
+        progress: Some(progress),
+        ..Default::default()
+    }
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────

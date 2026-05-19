@@ -17,6 +17,7 @@ use crate::ui::exchange_ble::{
 use crate::ui::exchange_field_preview::{self, FieldPreviewConfig, FieldPreviewResult};
 use crate::ui::exchange_link::{self, LinkActionOutcome, LinkHardwareOutcome, LinkStep};
 use crate::ui::exchange_mode_selection::{ModeSelectionEngine, ModeSelectionResult};
+use crate::ui::exchange_nfc::{self, NfcExchangeFlow, NfcHardwareOutcome, NfcStep};
 use crate::ui::exchange_qr::{self, QrActionOutcome, QrStep, ScanQualityTracker};
 use crate::ui::*;
 use vauchi_core::Command;
@@ -89,6 +90,11 @@ pub struct ExchangeEngine {
     link_received_card: Option<Vec<u8>>,
     /// BLE exchange flow state machine (Magic/Bump/Shake modes).
     ble_flow: Option<BleExchangeFlow>,
+    /// NFC exchange flow state machine (3-phase encrypted handshake).
+    /// Not yet reachable from production code paths — Phase 1 wires
+    /// the dispatch surface in place; production routing follows in
+    /// a later phase per the NFC engine-graduation record.
+    nfc_flow: Option<NfcExchangeFlow>,
     /// Reciprocity confirmation cascade driver (created on exchange completion).
     reciprocity_confirmer: Option<ReciprocityConfirmer>,
     /// Animated QR frames for the exchange QR display (V6 chunked).
@@ -139,6 +145,9 @@ enum ExchangeStep {
     Qr(QrStep),
     /// BLE exchange sub-flow (Magic/Bump/Shake modes).
     Ble(BleStep),
+    /// NFC exchange sub-flow (3-phase encrypted handshake over an
+    /// NFC tap). See exchange_nfc.rs + 2026-05-19-nfc-exchange-engine-design.md.
+    Nfc(NfcStep),
     /// Link exchange sub-flow (async relay-mediated).
     Link(LinkStep),
     /// USB cable / direct TCP exchange.
@@ -156,6 +165,7 @@ impl ExchangeStep {
             // Sub-flow steps start at 4 (after mode + group + preview)
             Self::Qr(qr) => qr.step_number(4),
             Self::Ble(ble) => ble.step_number(4),
+            Self::Nfc(nfc) => nfc.step_number(4),
             Self::Link(link) => link.step_number(4),
             Self::DirectTransport(direct) => direct.step_number(4),
             Self::Success => 4 + QrStep::STEP_COUNT,
@@ -168,6 +178,7 @@ impl ExchangeStep {
 // All sub-flows must have the same step count for consistent progress.
 const _: () = assert!(QrStep::STEP_COUNT == LinkStep::STEP_COUNT);
 const _: () = assert!(QrStep::STEP_COUNT == BleStep::STEP_COUNT);
+const _: () = assert!(QrStep::STEP_COUNT == NfcStep::STEP_COUNT);
 const _: () = assert!(DirectStep::STEP_COUNT == QrStep::STEP_COUNT);
 const TOTAL_STEPS: u8 = 3 + QrStep::STEP_COUNT + 2;
 
@@ -239,6 +250,7 @@ impl ExchangeEngine {
             escrow_keys: None,
             link_received_card: None,
             ble_flow,
+            nfc_flow: None,
             reciprocity_confirmer: None,
             qr_frames: Vec::new(),
             qr_frame_index: 0,
@@ -298,6 +310,7 @@ impl ExchangeEngine {
                     escrow_keys: None,
                     link_received_card: None,
                     ble_flow: None,
+                    nfc_flow: None,
                     reciprocity_confirmer: None,
                     qr_frames: Vec::new(),
                     qr_frame_index: 0,
@@ -327,6 +340,7 @@ impl ExchangeEngine {
             escrow_keys: None,
             link_received_card: None,
             ble_flow: None,
+            nfc_flow: None,
             reciprocity_confirmer: None,
             qr_frames,
             qr_frame_index: 0,
@@ -566,6 +580,56 @@ impl ExchangeEngine {
         }
     }
 
+    /// Handle NFC mode hardware events via NfcExchangeFlow.
+    /// Mirrors `handle_ble_hardware_event`; the sub-flow owns the
+    /// 3-phase state machine and either advances or fails.
+    fn handle_nfc_hardware_event(&mut self, event: vauchi_core::Event) -> Option<ActionResult> {
+        let flow = self.nfc_flow.as_mut()?;
+        let outcome = flow.handle_event(&event);
+        self.step = ExchangeStep::Nfc(flow.step().clone());
+        Some(self.apply_nfc_outcome(outcome))
+    }
+
+    /// Apply an `NfcHardwareOutcome` — translate to `ActionResult`.
+    /// Mirrors `apply_ble_outcome`; the `RelayHandoff` payload on a
+    /// failed outcome is intentionally not consumed yet (TODO in the
+    /// next Phase 1 commit, paired with `Command::RelayEscrowDeposit`).
+    fn apply_nfc_outcome(&mut self, outcome: NfcHardwareOutcome) -> ActionResult {
+        match outcome {
+            NfcHardwareOutcome::StepAdvanced { commands }
+            | NfcHardwareOutcome::Consumed { commands } => {
+                if commands.is_empty() {
+                    ActionResult::UpdateScreen(self.build_screen())
+                } else {
+                    ActionResult::Commands { commands }
+                }
+            }
+            NfcHardwareOutcome::Complete {
+                card_bytes: _,
+                commands,
+            } => {
+                // TODO: save card_bytes (Phase 1 follow-up — same TODO
+                // as apply_ble_outcome).
+                self.step = ExchangeStep::Success;
+                if commands.is_empty() {
+                    ActionResult::UpdateScreen(self.build_screen())
+                } else {
+                    ActionResult::Commands { commands }
+                }
+            }
+            NfcHardwareOutcome::FailedWithFallback {
+                reason,
+                relay_handoff: _,
+            } => {
+                self.failure_detail = Some(reason);
+                self.qr_fallback_available = self.config.device_capabilities.has_camera;
+                self.step = ExchangeStep::Failed;
+                ActionResult::UpdateScreen(self.build_screen())
+            }
+            NfcHardwareOutcome::Ignored => ActionResult::UpdateScreen(self.build_screen()),
+        }
+    }
+
     /// Handle Link mode hardware events (ADR-031).
     ///
     /// Routes to handshake-phase or escrow-phase handler depending on
@@ -743,6 +807,9 @@ impl ExchangeEngine {
             ExchangeStep::Ble(BleStep::Complete) => {
                 // Handled by transition to ExchangeStep::Success
                 ScreenModel::default()
+            }
+            ExchangeStep::Nfc(ref nfc_step) => {
+                exchange_nfc::build_nfc_screen(nfc_step, self.progress())
             }
             ExchangeStep::Link(LinkStep::ShareUrl) => {
                 let url = self
@@ -935,6 +1002,11 @@ impl WorkflowEngine for ExchangeEngine {
         // BLE mode events — routed through BleExchangeFlow
         if matches!(self.step, ExchangeStep::Ble(_)) {
             return self.handle_ble_hardware_event(event);
+        }
+
+        // NFC mode events — routed through NfcExchangeFlow
+        if matches!(self.step, ExchangeStep::Nfc(_)) {
+            return self.handle_nfc_hardware_event(event);
         }
 
         // Link mode events — handled without ExchangeSession

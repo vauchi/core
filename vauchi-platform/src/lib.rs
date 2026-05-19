@@ -17,9 +17,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use vauchi_core::{
-    ContactCard, Identity, IdentityBackup, Storage, SymmetricKey, Vauchi, VauchiConfig,
-};
+use vauchi_core::{ContactCard, Identity, Storage, SymmetricKey, Vauchi, VauchiConfig};
 
 // === Modules ===
 
@@ -1159,15 +1157,7 @@ impl VauchiPlatform {
     /// `vauchi-core`'s `save_identity` (the production path on
     /// Android via `PlatformAppEngine`).
     fn decode_identity_blob(blob: &[u8]) -> Result<Identity, MobileError> {
-        let backup = IdentityBackup::new(blob.to_vec());
-        if let Ok(identity) = Identity::import_backup(
-            &backup,
-            "__internal_storage_key__",
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        ) {
-            return Ok(identity);
-        }
-        Identity::from_storage_bytes(
+        Identity::from_storage_blob(
             blob,
             vauchi_core::clock::SystemClock::shared().unix_seconds(),
         )

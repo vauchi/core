@@ -312,6 +312,19 @@ impl Identity {
         Self::parse_backup_plaintext(data, now)
     }
 
+    /// Decode an identity from an on-disk storage blob, trying the
+    /// encrypted-backup format first (Argon2id + XChaCha20-Poly1305 with
+    /// the internal storage-key sentinel) and falling back to the
+    /// plaintext storage format. Used by `vauchi-platform` to load the
+    /// owned `Identity` from disk without exposing the decode plumbing.
+    pub fn from_storage_blob(blob: &[u8], now: u64) -> Result<Self, IdentityError> {
+        let backup = IdentityBackup::new(blob.to_vec());
+        if let Ok(identity) = Self::import_backup(&backup, "__internal_storage_key__", now) {
+            return Ok(identity);
+        }
+        Self::from_storage_bytes(blob, now)
+    }
+
     /// Exports identity as encrypted backup (v2: Argon2id + XChaCha20-Poly1305).
     ///
     /// The backup contains the master seed encrypted with a key derived from the password.

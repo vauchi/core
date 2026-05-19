@@ -526,6 +526,9 @@ pub enum MobileCommand {
         payload: Vec<u8>,
     },
     NfcDeactivate,
+    NfcSendApdu {
+        data: Vec<u8>,
+    },
     // Audio (PCM samples — core encodes the FSK challenge before sending)
     AudioEmitChallenge {
         samples: Vec<f32>,
@@ -587,6 +590,7 @@ impl From<Command> for MobileCommand {
             Command::BleDisconnect => Self::BleDisconnect,
             Command::NfcActivate { payload } => Self::NfcActivate { payload },
             Command::NfcDeactivate => Self::NfcDeactivate,
+            Command::NfcSendApdu { data } => Self::NfcSendApdu { data },
             Command::AudioEmitChallenge {
                 samples,
                 sample_rate,

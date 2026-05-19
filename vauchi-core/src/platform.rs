@@ -66,6 +66,12 @@ pub enum Command {
     NfcActivate { payload: Vec<u8> },
     /// Deactivate the NFC interface.
     NfcDeactivate,
+    /// Send a continuation APDU on the already-active NFC session.
+    /// Used by the multi-phase handshake after the initial
+    /// `NfcActivate`: the frontend keeps the tag connection alive and
+    /// transmits `data` opaquely, then surfaces the peer's response as
+    /// `Event::NfcDataReceived`.
+    NfcSendApdu { data: Vec<u8> },
 
     // ── Audio (ultrasonic proximity) ─────────────────────────────────
     /// Emit ultrasonic PCM samples encoding a challenge.
@@ -307,6 +313,7 @@ impl Command {
             Self::BleDisconnect => "BleDisconnect",
             Self::NfcActivate { .. } => "NfcActivate",
             Self::NfcDeactivate => "NfcDeactivate",
+            Self::NfcSendApdu { .. } => "NfcSendApdu",
             Self::AudioEmitChallenge { .. } => "AudioEmitChallenge",
             Self::AudioListenForResponse { .. } => "AudioListenForResponse",
             Self::AudioStop => "AudioStop",

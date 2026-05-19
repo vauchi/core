@@ -611,4 +611,164 @@ mod tests {
             other => panic!("expected FailedWithFallback, got {other:?}"),
         }
     }
+
+    // ── Screen-builder coverage ────────────────────────────────────────────
+
+    fn dummy_progress() -> Progress {
+        Progress {
+            current_step: 4,
+            total_steps: 8,
+            label: None,
+        }
+    }
+
+    fn action_ids(screen: &ScreenModel) -> Vec<String> {
+        screen.actions.iter().map(|a| a.id.clone()).collect()
+    }
+
+    // @internal
+    #[test]
+    fn idle_screen_has_cancel_affordance() {
+        let s = build_nfc_screen(&NfcStep::Idle, dummy_progress());
+        assert_eq!(s.screen_id, "exchange_nfc_idle");
+        assert_eq!(action_ids(&s), vec!["cancel".to_string()]);
+        assert!(s.actions.iter().any(|a| a.id == "cancel" && a.enabled));
+    }
+
+    // @internal
+    #[test]
+    fn awaiting_tap_screen_has_cancel_affordance() {
+        let s = build_nfc_screen(&NfcStep::AwaitingTap, dummy_progress());
+        assert_eq!(s.screen_id, "exchange_nfc_awaiting_tap");
+        assert_eq!(action_ids(&s), vec!["cancel".to_string()]);
+        assert!(s.actions.iter().any(|a| a.id == "cancel" && a.enabled));
+    }
+
+    // @internal
+    #[test]
+    fn in_progress_screens_share_screen_id_and_keep_cancel_enabled() {
+        let sent = build_nfc_screen(&NfcStep::PayloadSent, dummy_progress());
+        let ack = build_nfc_screen(&NfcStep::AckSent, dummy_progress());
+        assert_eq!(sent.screen_id, "exchange_nfc_in_progress");
+        assert_eq!(ack.screen_id, "exchange_nfc_in_progress");
+        assert_eq!(action_ids(&sent), vec!["cancel".to_string()]);
+        assert_eq!(action_ids(&ack), vec!["cancel".to_string()]);
+    }
+
+    // @internal
+    #[test]
+    fn complete_screen_disables_cancel() {
+        let s = build_nfc_screen(&NfcStep::Complete, dummy_progress());
+        assert_eq!(s.screen_id, "exchange_nfc_complete");
+        // Cancel is still listed (so the action surface is stable across
+        // states) but disabled — the exchange has already completed.
+        assert_eq!(action_ids(&s), vec!["cancel".to_string()]);
+        assert!(s.actions.iter().any(|a| a.id == "cancel" && !a.enabled));
+    }
+
+    // ── CC-13 proptest: Complete is absorbing ──────────────────────────────
+    //
+    // Engine-walker reachability tests (the CC-22 pattern used by
+    // `core/vauchi-app/tests/reachability/exchange_ble.rs`) are deferred
+    // to a later phase: the production entry path through ExchangeEngine
+    // — `ExchangeMode::Nfc` + `start_nfc_mode` — has not been added yet
+    // (this Phase 1 ships test-reachable wiring only, per the engine-
+    // graduation record's Phase 4). The walker can't BFS into NFC steps
+    // without that entry, so we exercise the sub-flow's invariants at the
+    // unit-test layer instead.
+
+    use proptest::prelude::*;
+
+    fn arb_post_complete_event() -> impl Strategy<Value = Event> {
+        prop_oneof![
+            // NFC data could keep arriving after Complete (stale APDUs,
+            // re-tap, etc.) — must not re-open the state.
+            (any::<Vec<u8>>()).prop_map(|data| Event::NfcDataReceived { data }),
+            // Transport-level errors scoped to NFC.
+            Just(Event::HardwareError {
+                transport: "nfc".into(),
+                error: "spurious".into(),
+            }),
+            Just(Event::PermissionDenied {
+                transport: "nfc".into(),
+            }),
+            Just(Event::HardwareUnavailable {
+                transport: "nfc".into(),
+            }),
+            // Cross-transport noise — must be Ignored.
+            Just(Event::BleDeviceDiscovered {
+                id: "stray".into(),
+                rssi: -50,
+                adv_data: vec![],
+            }),
+            Just(Event::HardwareError {
+                transport: "ble".into(),
+                error: "stray".into(),
+            }),
+        ]
+    }
+
+    fn drive_to_complete() -> NfcExchangeFlow {
+        // Use the happy-path initiator drive (mirrors
+        // `full_handshake_initiator_to_complete`).
+        let mut alice = NfcExchangeFlow::new_initiator(make_identity("Alice"), "Alice".into());
+        let mut bob = NfcExchangeFlow::new_responder(make_identity("Bob"), "Bob".into());
+        let alice_cmds = alice.activate().expect("alice activate");
+        let _ = bob.activate().expect("bob activate");
+        let offer = match &alice_cmds[0] {
+            Command::NfcActivate { payload } => payload.clone(),
+            _ => unreachable!(),
+        };
+        let bob_outcome = bob.handle_event(&Event::NfcDataReceived { data: offer });
+        let bob_response = match bob_outcome {
+            NfcHardwareOutcome::StepAdvanced { commands } => match &commands[0] {
+                Command::NfcSendApdu { data } => data.clone(),
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        };
+        let alice_outcome = alice.handle_event(&Event::NfcDataReceived { data: bob_response });
+        let alice_card = match alice_outcome {
+            NfcHardwareOutcome::StepAdvanced { commands } => match &commands[0] {
+                Command::NfcSendApdu { data } => data.clone(),
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        };
+        // Phase 3: Bob receives Alice's encrypted card → Complete.
+        let _ = bob.handle_event(&Event::NfcDataReceived { data: alice_card });
+        let _ = alice.handle_event(&Event::NfcDataReceived {
+            data: vec![0x90, 0x00],
+        });
+        // Both Alice and Bob are now Complete; return Alice so the
+        // proptest exercises an initiator that has finished its
+        // handshake (Phase 3 confirm path).
+        alice
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(64))]
+
+        /// CC-13 invariant: once `NfcExchangeFlow` is in `Complete`, no
+        /// random subsequent event transitions it away. Symptom this
+        /// would catch: a late `NfcDataReceived` after Complete
+        /// silently re-running the handshake from a partial state, or
+        /// a stray hardware error flipping the step back to a
+        /// non-terminal value.
+        // @internal
+        #[test]
+        fn complete_is_absorbing(events in prop::collection::vec(arb_post_complete_event(), 0..20)) {
+            let mut flow = drive_to_complete();
+            prop_assert_eq!(flow.step(), &NfcStep::Complete);
+            for event in &events {
+                let _ = flow.handle_event(event);
+                prop_assert_eq!(
+                    flow.step(),
+                    &NfcStep::Complete,
+                    "Complete must be absorbing; event {:?} transitioned out",
+                    event,
+                );
+            }
+        }
+    }
 }

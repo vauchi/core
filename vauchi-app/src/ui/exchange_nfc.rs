@@ -266,6 +266,18 @@ impl NfcExchangeFlow {
 
     fn handle_ack_sent(&mut self, data: &[u8]) -> NfcHardwareOutcome {
         // Responder: `data` is the initiator's encrypted card.
+        //
+        // Phase 3 terminal-ACK: emit `Command::NfcSendApdu { 0x9000 }`
+        // before `NfcDeactivate` so HCE's binder thread always returns
+        // via the same channel as Phase 1 / Phase 2 responses. Without
+        // this, Android HCE would have no APDU response for the final
+        // Phase-3 inbound APDU and the OS would treat the exchange as
+        // timed-out at the OS level (~125ms hardware deadline) even
+        // though the engine completed successfully. iOS initiator side
+        // ignores the extra `NfcSendApdu` — the legacy `NfcDeactivate`
+        // arrives immediately after and tears the session down. See
+        // `2026-05-20-nfc-hce-responder-sync-boundary/README.md`
+        // §"Terminal-phase ACK" option (a).
         match self.session.process_encrypted_card(data) {
             Ok(result) => {
                 self.step = NfcStep::Complete;
@@ -274,7 +286,12 @@ impl NfcExchangeFlow {
                         .remote_card
                         .to_bytes()
                         .expect("NfcCardPayload re-serialization is infallible by construction"),
-                    commands: vec![Command::NfcDeactivate],
+                    commands: vec![
+                        Command::NfcSendApdu {
+                            data: vec![0x90, 0x00],
+                        },
+                        Command::NfcDeactivate,
+                    ],
                 }
             }
             Err(e) => self.fail_with_fallback(e.to_string()),
@@ -500,6 +517,10 @@ mod tests {
         assert_eq!(*alice.step(), NfcStep::PayloadSent);
 
         // Phase 3: Bob receives Alice's encrypted card → Complete.
+        // Responder terminal ACK: must emit `NfcSendApdu(0x9000)` then
+        // `NfcDeactivate` in that order so HCE's binder thread returns
+        // via the same channel as Phase 1/2 (Option (a) of
+        // `2026-05-20-nfc-hce-responder-sync-boundary`).
         let bob_final = bob.handle_event(&Event::NfcDataReceived { data: alice_card });
         match bob_final {
             NfcHardwareOutcome::Complete {
@@ -507,7 +528,18 @@ mod tests {
                 commands,
             } => {
                 assert!(!card_bytes.is_empty());
-                assert!(commands.iter().any(|c| matches!(c, Command::NfcDeactivate)));
+                assert_eq!(
+                    commands.len(),
+                    2,
+                    "responder terminal must emit both ACK + deactivate"
+                );
+                match &commands[0] {
+                    Command::NfcSendApdu { data } => {
+                        assert_eq!(data, &vec![0x90, 0x00], "terminal ACK must be 0x9000");
+                    }
+                    other => panic!("bob expected NfcSendApdu(0x9000) first, got {other:?}"),
+                }
+                assert!(matches!(commands[1], Command::NfcDeactivate));
             }
             other => panic!("bob expected Complete, got {other:?}"),
         }

@@ -6,7 +6,9 @@
 
 use std::sync::{Arc, Mutex};
 
-use vauchi_platform::{MobileLocale, PlatformAppEngine, PlatformEventListener};
+use vauchi_platform::{
+    MobileLocale, PlatformAppEngine, PlatformAppEngineTestHelpers, PlatformEventListener,
+};
 
 /// Helper: create a PlatformAppEngine with a temp directory.
 fn create_engine() -> (std::sync::Arc<PlatformAppEngine>, tempfile::TempDir) {

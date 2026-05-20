@@ -447,16 +447,15 @@ vauchi-app/src/ui/multi_stage_exchange.rs 1633
 #   humble-surface ratchet — `impl … for PlatformAppEngine` blocks
 #   fall outside the contract test's `impl PlatformAppEngine {`
 #   regex. UniFFI facade pattern; splitting breaks binding generation.)
-# (+126 for 2026-05-20 PAE test-helper containment refactor: 11
-#   _for_test methods moved into PlatformAppEngineTestHelpers trait
-#   per record `2026-05-20-pae-test-helper-containment`. Net add is
-#   doc + trait declaration weight on the inbound side; the device-
-#   link methods moved IN from platform_app_engine_device_link.rs
-#   as a side effect of trait-impl colocation. Extracting the trait
-#   + impl into a sibling `platform_app_engine_test_helpers.rs`
-#   module would erase this +126 entirely; deferred to a follow-up
-#   tidy.)
-vauchi-platform/src/platform_app_engine.rs 5366
+# (-142 for 2026-05-20 follow-up tidy after PAE test-helper
+#   containment: the +126 note above (now superseded) anticipated
+#   this — the trait + impl moved to a sibling module
+#   `platform_app_engine_test_helpers.rs`, dropping
+#   platform_app_engine.rs below its prior baseline. Trait + impl
+#   live in their own file so the binding-facing PAE file stays the
+#   canonical home for production surface, and so future test-helper
+#   additions don't pressure this baseline.)
+vauchi-platform/src/platform_app_engine.rs 5098
 
 # EXEMPT — B7 dispatch test bundle: each batch ships with cohesive
 # tests that share the create_engine_with_identity / drive_onboarding

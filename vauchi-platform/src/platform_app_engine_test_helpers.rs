@@ -1,0 +1,293 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! `PlatformAppEngineTestHelpers` — integration-test scaffolding for
+//! `PlatformAppEngine`.
+//!
+//! Lives in its own module (extracted from `platform_app_engine.rs`
+//! 2026-05-20) so the binding-facing PAE file stays the canonical home
+//! for production surface, and so the file-size baseline for that file
+//! doesn't grow with test-helper additions. Trait + impl are both
+//! `#[doc(hidden)]` — invisible to the UniFFI binding generator (no
+//! per-method `#[uniffi::export]` on trait impls) and invisible to the
+//! humble-surface ratchet's source-text scanner (`impl … for
+//! PlatformAppEngine {` blocks fall outside the
+//! `^impl PlatformAppEngine {` regex).
+//!
+//! See:
+//! - `_private/docs/problems/2026-05-20-pae-test-helper-containment/`
+//! - `core/vauchi-app/tests/it/humble_surface_contract_tests.rs`
+//!   (`SURPLUS_RATCHET_CEILING` rationale)
+
+use crate::error::MobileError;
+use crate::multistage_exchange::{MobileProtocolState, MobileQrPayload};
+use crate::platform_app_engine::{PlatformAppEngine, mobile_state_to_core};
+
+/// Test-only helpers on `PlatformAppEngine`.
+///
+/// Exposed as a `#[doc(hidden)]` trait rather than `pub fn`s on
+/// `PlatformAppEngine` itself so the humble-surface contract test
+/// (`humble_surface_contract_tests::platform_app_engine_surface_respects_ratchet`)
+/// does not classify them as binding surplus. The contract test scans
+/// for `impl PlatformAppEngine {`; trait `impl … for PlatformAppEngine {`
+/// blocks fall outside that match, which matches the architectural
+/// intent: these are integration-test scaffolding, not the humble
+/// surface frontends route through.
+#[doc(hidden)]
+pub trait PlatformAppEngineTestHelpers {
+    /// Save a contact directly to storage.
+    ///
+    /// Used by integration tests that need exchanged or imported
+    /// contacts without running a full exchange flow or VCF import.
+    /// Mirrors `VauchiPlatform::save_test_contact` (slice 32g retires
+    /// the `VauchiPlatform` copy).
+    fn save_test_contact(&self, contact: &vauchi_core::Contact) -> Result<(), MobileError>;
+
+    /// Save a delivery record directly to storage.
+    ///
+    /// Used by integration tests that need delivery records of specific
+    /// statuses without running the full sync/delivery pipeline.
+    /// Mirrors the legacy `VauchiPlatform::save_test_delivery_record`
+    /// (retired in the 2026-05-18 Phase 2a get-failed-delivery-relocate slice).
+    fn save_test_delivery_record(
+        &self,
+        record: &vauchi_core::storage::DeliveryRecord,
+    ) -> Result<(), MobileError>;
+
+    // ── Multi-stage exchange test helpers ──────────────────────────
+    //
+    // Moved out of the `#[uniffi::export] impl PlatformAppEngine`
+    // block (2026-05-20) per record
+    // `2026-05-20-pae-test-helper-containment`: these methods are
+    // integration-test scaffolding, not the humble surface frontends
+    // should consume. The trait impl is invisible to both the UniFFI
+    // binding generator and the humble-surface ratchet's source-text
+    // scanner.
+
+    /// Test-only: drive the active engine's protocol state directly.
+    fn apply_multi_stage_state_for_test(
+        &self,
+        state: MobileProtocolState,
+    ) -> Result<(), MobileError>;
+
+    /// Test-only: push a QR payload into the active engine.
+    fn apply_multi_stage_qr_payload_for_test(
+        &self,
+        payload: MobileQrPayload,
+    ) -> Result<(), MobileError>;
+
+    /// Test-only: record the peer display name on Finalized.
+    fn apply_multi_stage_finalized_for_test(&self, contact_name: String)
+    -> Result<(), MobileError>;
+
+    /// Test-only: flag the cycle thread as ended.
+    fn apply_multi_stage_session_ended_for_test(&self) -> Result<(), MobileError>;
+
+    // ── Device-link test helpers ───────────────────────────────────
+    //
+    // Moved out of the bare `impl PlatformAppEngine` block in
+    // `platform_app_engine_device_link.rs` (2026-05-20) for the same
+    // ratchet-pollution reason as the multi-stage methods above.
+    // These never shipped in the UniFFI binding (the source block
+    // was not `#[uniffi::export]`-tagged) so this move is metric-
+    // hygiene only on the binding side.
+
+    /// Test-only: simulate `on_qr_ready` from the cycle thread.
+    fn apply_device_link_qr_ready_for_test(
+        &self,
+        qr_data: String,
+        expires_at: u64,
+    ) -> Result<(), MobileError>;
+
+    /// Test-only: simulate `on_confirmation_required`.
+    fn apply_device_link_request_received_for_test(
+        &self,
+        device_name: String,
+        confirmation_code: String,
+        challenge_hex: String,
+    ) -> Result<(), MobileError>;
+
+    /// Test-only: simulate `on_failed("qr_expired")`.
+    fn apply_device_link_qr_expired_for_test(&self) -> Result<(), MobileError>;
+
+    /// Test-only: simulate `on_failed` (generic message).
+    fn apply_device_link_failed_for_test(&self, reason: String) -> Result<(), MobileError>;
+
+    /// Test-only: simulate `on_completed` from the cycle thread.
+    fn apply_device_link_completed_for_test(&self) -> Result<(), MobileError>;
+
+    /// Test-only: returns `true` when a `MobileDeviceLinkSession` is
+    /// currently held. Used to assert lifecycle correctness around
+    /// navigation in/out of the device-linking screen.
+    fn device_link_session_is_active_for_test(&self) -> bool;
+
+    /// Test-only: cancel the active session without leaving the
+    /// device-linking screen. Bridge-forwarding tests use this to
+    /// stop the live cycle thread from racing the test driver
+    /// before asserting state pushed via the
+    /// `apply_device_link_*_for_test` helpers.
+    fn cancel_device_link_session_for_test(&self);
+}
+
+impl PlatformAppEngineTestHelpers for PlatformAppEngine {
+    fn save_test_contact(&self, contact: &vauchi_core::Contact) -> Result<(), MobileError> {
+        let engine = self.engine().lock().map_err(|e| MobileError::Other {
+            detail: format!("engine lock poisoned: {e}"),
+        })?;
+        engine
+            .vauchi()
+            .storage()
+            .save_contact(contact)
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })
+    }
+
+    fn save_test_delivery_record(
+        &self,
+        record: &vauchi_core::storage::DeliveryRecord,
+    ) -> Result<(), MobileError> {
+        let engine = self.engine().lock().map_err(|e| MobileError::Other {
+            detail: format!("engine lock poisoned: {e}"),
+        })?;
+        engine
+            .vauchi()
+            .storage()
+            .create_delivery_record(record)
+            .map_err(|e| MobileError::StorageError {
+                detail: e.to_string(),
+            })
+    }
+
+    fn apply_multi_stage_state_for_test(
+        &self,
+        state: MobileProtocolState,
+    ) -> Result<(), MobileError> {
+        self.cancel_multi_stage_session();
+        let core_state = mobile_state_to_core(state);
+        let applied = {
+            let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            engine.apply_multi_stage_state(core_state)
+        };
+        if applied {
+            self.fire_invalidation_for_test();
+        }
+        Ok(())
+    }
+
+    fn apply_multi_stage_qr_payload_for_test(
+        &self,
+        payload: MobileQrPayload,
+    ) -> Result<(), MobileError> {
+        self.cancel_multi_stage_session();
+        let qr = vauchi_core::exchange::QrPayload {
+            data: payload.data,
+            error_correction: payload.error_correction,
+            display_duration_ms: payload.display_duration_ms,
+        };
+        let applied = {
+            let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            engine.apply_multi_stage_qr_payload(&qr)
+        };
+        if applied {
+            self.fire_invalidation_for_test();
+        }
+        Ok(())
+    }
+
+    fn apply_multi_stage_finalized_for_test(
+        &self,
+        contact_name: String,
+    ) -> Result<(), MobileError> {
+        self.cancel_multi_stage_session();
+        let applied = {
+            let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            engine.apply_multi_stage_finalized(contact_name)
+        };
+        if applied {
+            self.fire_invalidation_for_test();
+        }
+        Ok(())
+    }
+
+    fn apply_multi_stage_session_ended_for_test(&self) -> Result<(), MobileError> {
+        self.cancel_multi_stage_session();
+        let applied = {
+            let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            engine.apply_multi_stage_session_ended()
+        };
+        if applied {
+            self.fire_invalidation_for_test();
+        }
+        Ok(())
+    }
+
+    fn apply_device_link_qr_ready_for_test(
+        &self,
+        qr_data: String,
+        expires_at: u64,
+    ) -> Result<(), MobileError> {
+        let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let _ = engine.device_link_qr_ready(qr_data, expires_at);
+        Ok(())
+    }
+
+    fn apply_device_link_request_received_for_test(
+        &self,
+        device_name: String,
+        confirmation_code: String,
+        challenge_hex: String,
+    ) -> Result<(), MobileError> {
+        let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let _ = engine.device_link_request_received(device_name, confirmation_code, challenge_hex);
+        Ok(())
+    }
+
+    fn apply_device_link_qr_expired_for_test(&self) -> Result<(), MobileError> {
+        let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let _ = engine.device_link_qr_expired();
+        Ok(())
+    }
+
+    fn apply_device_link_failed_for_test(&self, reason: String) -> Result<(), MobileError> {
+        let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let _ = engine.device_link_failed(reason);
+        Ok(())
+    }
+
+    fn apply_device_link_completed_for_test(&self) -> Result<(), MobileError> {
+        let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let _ = engine.device_link_completed();
+        Ok(())
+    }
+
+    fn device_link_session_is_active_for_test(&self) -> bool {
+        self.device_link_session()
+            .lock()
+            .map(|slot| slot.is_some())
+            .unwrap_or(false)
+    }
+
+    fn cancel_device_link_session_for_test(&self) {
+        self.cancel_device_link_session();
+    }
+}

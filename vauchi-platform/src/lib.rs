@@ -47,6 +47,7 @@ mod multipart_qr;
 mod multistage_exchange;
 mod platform_app_engine;
 mod platform_app_engine_device_link;
+mod platform_app_engine_test_helpers;
 mod policies;
 mod protocol;
 mod types;
@@ -118,9 +119,9 @@ pub use multistage_exchange::{
     MobileAudioProximityState, MobileMultiStageSession, MobileProtocolState, MobileQrPayload,
     MultiStageAudioListener, MultiStageSessionListener,
 };
-#[doc(hidden)]
-pub use platform_app_engine::PlatformAppEngineTestHelpers;
 pub use platform_app_engine::{PlatformAppEngine, PlatformEventListener};
+#[doc(hidden)]
+pub use platform_app_engine_test_helpers::PlatformAppEngineTestHelpers;
 pub use policies::{
     MobileClipboardPolicy, mobile_clipboard_policy, mobile_generate_storage_key,
     mobile_storage_key_byte_length,

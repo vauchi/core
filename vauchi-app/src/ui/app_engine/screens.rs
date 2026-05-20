@@ -312,11 +312,23 @@ impl AppEngine {
                         })
                     });
 
+                let nfc_identity = vauchi.identity().and_then(|id_ref| {
+                    let bytes = zeroize::Zeroizing::new(id_ref.to_storage_bytes());
+                    vauchi_core::identity::Identity::from_storage_bytes(
+                        &bytes,
+                        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+                    )
+                    .ok()
+                });
                 let clock = vauchi.clock().clone();
-                match session {
-                    Some(s) => Box::new(ExchangeEngine::with_session(config, s, clock)),
-                    None => Box::new(ExchangeEngine::new(config, clock)),
+                let mut engine = match session {
+                    Some(s) => ExchangeEngine::with_session(config, s, clock),
+                    None => ExchangeEngine::new(config, clock),
+                };
+                if let Some(id) = nfc_identity {
+                    engine.set_nfc_identity(id);
                 }
+                Box::new(engine)
             }
             AppScreen::Help => Box::new(HelpEngine::new(Self::default_help_items())),
             AppScreen::Backup => Box::new(BackupRecoveryEngine::new(None, vauchi.has_identity())),

@@ -91,7 +91,7 @@ impl ExchangeRecord {
             // Fell back to relay even though a local transport was configured.
             (_, true) => 0.5,
             // Direct local channels — full locality.
-            (DataTransport::QrMultiStage | DataTransport::Ble, false) => 1.0,
+            (DataTransport::QrMultiStage | DataTransport::Ble | DataTransport::Nfc, false) => 1.0,
             // Primary relay transport with in-person context (e.g. Web mode).
             (DataTransport::Relay, false) if self.context == ExchangeContext::InPerson => 0.5,
             // Primary relay transport for remote / async.
@@ -366,7 +366,7 @@ mod tests {
         let rec = ExchangeRecord {
             mode: ExchangeMode::TapTap,
             context: ExchangeContext::InPerson,
-            transport_used: DataTransport::Ble,
+            transport_used: DataTransport::Nfc,
             relay_fallback: false,
             proximity_results: vec![ProximityResult {
                 method: ProximityMethod::NfcRange,

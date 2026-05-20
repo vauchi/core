@@ -91,10 +91,17 @@ pub struct ExchangeEngine {
     /// BLE exchange flow state machine (Magic/Bump/Shake modes).
     ble_flow: Option<BleExchangeFlow>,
     /// NFC exchange flow state machine (3-phase encrypted handshake).
-    /// Not yet reachable from production code paths — Phase 1 wires
-    /// the dispatch surface in place; production routing follows in
-    /// a later phase per the NFC engine-graduation record.
+    /// Constructed at TapTap dispatch via [`Self::start_taptap_mode`];
+    /// `NfcExchangeFlow` consumes the cached [`Self::nfc_identity`].
     nfc_flow: Option<NfcExchangeFlow>,
+    /// Owned `Identity` clone reserved for `NfcExchangeFlow`
+    /// construction. Populated by the engine constructor when the
+    /// caller (AppEngine in `screens.rs`) clones identity via the
+    /// storage-bytes roundtrip; consumed by `start_taptap_mode`. None
+    /// for non-NFC flows or when no identity is available — TapTap
+    /// dispatch then routes to the Failed step with an explanatory
+    /// `failure_detail`.
+    nfc_identity: Option<vauchi_core::identity::Identity>,
     /// Reciprocity confirmation cascade driver (created on exchange completion).
     reciprocity_confirmer: Option<ReciprocityConfirmer>,
     /// Animated QR frames for the exchange QR display (V6 chunked).
@@ -210,6 +217,17 @@ impl ExchangeEngine {
         }
     }
 
+    /// Populate the identity clone reserved for TapTap (NFC) dispatch.
+    ///
+    /// Called by `AppEngine` at engine construction (see
+    /// `app_engine/screens.rs`) when an active identity is available.
+    /// `start_taptap_mode` consumes it. Identity doesn't impl `Clone`
+    /// for key-zeroize reasons; callers produce the clone via
+    /// `Identity::to_storage_bytes()` + `Identity::from_storage_bytes()`.
+    pub fn set_nfc_identity(&mut self, identity: vauchi_core::identity::Identity) {
+        self.nfc_identity = Some(identity);
+    }
+
     pub fn new(config: ExchangeConfig, clock: Arc<dyn Clock>) -> Self {
         let step = Self::initial_step(&config);
         let mode_selection = if step == ExchangeStep::ModeSelection {
@@ -251,6 +269,7 @@ impl ExchangeEngine {
             link_received_card: None,
             ble_flow,
             nfc_flow: None,
+            nfc_identity: None,
             reciprocity_confirmer: None,
             qr_frames: Vec::new(),
             qr_frame_index: 0,
@@ -311,6 +330,7 @@ impl ExchangeEngine {
                     link_received_card: None,
                     ble_flow: None,
                     nfc_flow: None,
+                    nfc_identity: None,
                     reciprocity_confirmer: None,
                     qr_frames: Vec::new(),
                     qr_frame_index: 0,
@@ -341,6 +361,7 @@ impl ExchangeEngine {
             link_received_card: None,
             ble_flow: None,
             nfc_flow: None,
+            nfc_identity: None,
             reciprocity_confirmer: None,
             qr_frames,
             qr_frame_index: 0,
@@ -533,6 +554,48 @@ impl ExchangeEngine {
                 Command::BleStartScanning { service_uuid },
             ],
         }
+    }
+
+    /// Start TapTap exchange mode (NFC).
+    ///
+    /// TapTap is the domain/user-facing name for the pure-NFC exchange —
+    /// `DataTransport::Nfc` per `MODE_TAP_TAP`. Creates an
+    /// `NfcExchangeFlow` (initiator side) and activates it, emitting the
+    /// initial `Command::NfcActivate { payload: key_offer }`. The
+    /// responder side is driven by the peer's HCE service through the
+    /// same `NfcExchangeFlow` shape — Phase 3b binding work (`android!410`)
+    /// added the binder-block pattern that lets HCE consume
+    /// `Event::NfcDataReceived` + return `Command::NfcSendApdu`
+    /// synchronously.
+    ///
+    /// Identity is consumed from `self.nfc_identity` — populated at
+    /// engine construction via [`Self::with_session_and_nfc_identity`]
+    /// or [`Self::set_nfc_identity`]. The `NfcHandshakeSession`
+    /// Phase-1 key offer needs the full `Identity` to sign the
+    /// payload (see `NfcHandshakeSession::create_key_offer` in
+    /// `vauchi_core::exchange::nfc_handshake`).
+    fn start_taptap_mode(&mut self) -> ActionResult {
+        let identity = match self.nfc_identity.take() {
+            Some(id) => id,
+            None => {
+                self.failure_detail = Some("no active identity for NFC exchange".to_string());
+                self.step = ExchangeStep::Failed;
+                return ActionResult::UpdateScreen(self.build_screen());
+            }
+        };
+        let display_name = self.config.own_name.clone();
+        let mut flow = NfcExchangeFlow::new_initiator(identity, display_name);
+        let commands = match flow.activate() {
+            Ok(cmds) => cmds,
+            Err(e) => {
+                self.failure_detail = Some(format!("NFC activation failed: {e:?}"));
+                self.step = ExchangeStep::Failed;
+                return ActionResult::UpdateScreen(self.build_screen());
+            }
+        };
+        self.nfc_flow = Some(flow);
+        self.step = ExchangeStep::Nfc(NfcStep::AwaitingTap);
+        ActionResult::Commands { commands }
     }
 
     /// Handle BLE mode hardware events via BleExchangeFlow.
@@ -1236,6 +1299,9 @@ impl WorkflowEngine for ExchangeEngine {
                             ) {
                                 self.step = ExchangeStep::Ble(BleStep::Discovering);
                                 return self.start_ble_mode();
+                            }
+                            if mode == ExchangeMode::TapTap {
+                                return self.start_taptap_mode();
                             }
                             // Pair 4 — `Glance` is the canonical face-to-face
                             // mode (bilateral simultaneous QR with no proximity
@@ -3508,5 +3574,83 @@ mod tests {
             WorkflowEngine::advance_qr_frame(&mut engine).is_none(),
             "advance must return None when qr_frames is empty"
         );
+    }
+
+    // @internal
+    #[test]
+    fn taptap_mode_selection_starts_nfc_flow_with_identity() {
+        use vauchi_core::identity::Identity;
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
+
+        // Populate the cached identity (AppEngine does this at
+        // engine construction in app_engine/screens.rs).
+        let identity = Identity::create(
+            "Alice",
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
+        engine.set_nfc_identity(identity);
+
+        // Picker emits ListItemSelected { component_id: "mode", item_id: "tap_tap" }
+        // for the TapTap option (per exchange_mode_selection.rs).
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:fun".into(),
+            item_id: "mode:tap_tap".into(),
+        });
+
+        // Engine advances to NfcStep::AwaitingTap and emits the initial
+        // Command::NfcActivate with the initiator's key-offer payload.
+        assert_eq!(engine.step, ExchangeStep::Nfc(NfcStep::AwaitingTap));
+        match result {
+            ActionResult::Commands { commands } => {
+                assert_eq!(commands.len(), 1, "exactly one initial command");
+                match &commands[0] {
+                    vauchi_core::Command::NfcActivate { payload } => {
+                        assert!(
+                            !payload.is_empty(),
+                            "initiator activate must carry a non-empty key offer payload"
+                        );
+                    }
+                    other => panic!("expected Command::NfcActivate, got {other:?}"),
+                }
+            }
+            other => panic!("expected ActionResult::Commands, got {other:?}"),
+        }
+        // nfc_identity has been consumed by start_taptap_mode.
+        assert!(
+            engine.nfc_identity.is_none(),
+            "set_nfc_identity must be consumed by start_taptap_mode"
+        );
+        // nfc_flow now exists and tracks the initiator state.
+        assert!(engine.nfc_flow.is_some(), "nfc_flow must be populated");
+    }
+
+    // @internal
+    #[test]
+    fn taptap_mode_without_identity_routes_to_failed() {
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        // No set_nfc_identity call — start_taptap_mode must fail-fast
+        // rather than panic.
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:fun".into(),
+            item_id: "mode:tap_tap".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::Failed);
+        match result {
+            ActionResult::UpdateScreen(_) => {
+                let detail = engine.failure_detail.as_deref().unwrap_or("");
+                assert!(
+                    detail.contains("identity"),
+                    "failure detail must mention identity, got: {detail}"
+                );
+            }
+            other => panic!("expected UpdateScreen, got {other:?}"),
+        }
     }
 }

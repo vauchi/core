@@ -141,6 +141,7 @@ pub enum ModeCategory {
 pub enum DataTransport {
     QrMultiStage,
     Ble,
+    Nfc,
     Relay,
 }
 
@@ -274,13 +275,13 @@ static MODE_MAGIC: ModeConfig = ModeConfig {
 };
 
 static MODE_TAP_TAP: ModeConfig = ModeConfig {
-    data_transport: DataTransport::Ble,
+    data_transport: DataTransport::Nfc,
     bootstrap: BootstrapMethod::NfcBootstrap,
     proximity: &[ProximityMethod::NfcRange],
     fallback_transport: Some(DataTransport::Relay),
     context: ExchangeContext::InPerson,
     timeout: Duration::from_secs(30),
-    requires: &[DeviceRequirement::Ble, DeviceRequirement::Nfc],
+    requires: &[DeviceRequirement::Nfc],
 };
 
 static MODE_TAP_HOVER_SHAKE: ModeConfig = ModeConfig {

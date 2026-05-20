@@ -5,17 +5,14 @@
 //! Device linking, relay transport, and multipart QR operations for mobile.
 
 use std::sync::Arc;
-use std::sync::Mutex;
 
-use vauchi_core::exchange::device_link::{DeviceLinkQR, DeviceLinkResponder};
+use vauchi_core::exchange::device_link::DeviceLinkQR;
 
 use super::error::MobileError;
 use super::types::{
     MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDeviceLinkRequest,
 };
-use super::{
-    MobileDeviceLinkInitiator, MobileDeviceLinkResponder, MobileDeviceLinkSession, VauchiPlatform,
-};
+use super::{MobileDeviceLinkSession, VauchiPlatform};
 use crate::mobile_device_link_session;
 use vauchi_app::orchestrator::device_link_relay;
 
@@ -171,63 +168,6 @@ impl VauchiPlatform {
                 self.storage_key.clone(),
             ),
         ))
-    }
-
-    /// Start a device link as the existing device (initiator).
-    ///
-    /// Returns a `MobileDeviceLinkInitiator` that holds the QR data and can
-    /// process incoming link requests from new devices.
-    #[deprecated(note = "Use create_device_link_session_initiator (orchestrator). \
-                Will be removed in Phase 3 of the device-link orchestrator rollout.")]
-    pub fn start_device_link(&self) -> Result<Arc<MobileDeviceLinkInitiator>, MobileError> {
-        let identity = self.get_identity()?;
-        let storage = self.open_storage()?;
-
-        let registry = storage
-            .load_device_registry()?
-            .unwrap_or_else(|| identity.initial_device_registry());
-
-        let initiator = identity.create_device_link_initiator(
-            registry,
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        );
-
-        Ok(Arc::new(MobileDeviceLinkInitiator {
-            inner: Mutex::new(initiator),
-            pending_request: Mutex::new(None),
-        }))
-    }
-
-    /// Start a device join as the new device (responder).
-    ///
-    /// Parses the QR data scanned from the existing device and returns a
-    /// `MobileDeviceLinkResponder` that can create requests and process responses.
-    #[deprecated(note = "Reserved for the deferred responder-side orchestrator. \
-                Will be replaced by create_device_link_session_responder \
-                in a future Phase.")]
-    pub fn start_device_join(
-        &self,
-        qr_data: String,
-        device_name: String,
-    ) -> Result<Arc<MobileDeviceLinkResponder>, MobileError> {
-        let qr =
-            DeviceLinkQR::from_data_string(&qr_data).map_err(|_| MobileError::InvalidInput {
-                field: "qr".to_string(),
-                detail: "Invalid QR code".to_string(),
-            })?;
-
-        let responder = DeviceLinkResponder::from_qr(
-            qr,
-            device_name,
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        )
-        .map_err(|e| MobileError::Other {
-            detail: e.to_string(),
-        })?;
-
-        Ok(Arc::new(MobileDeviceLinkResponder {
-            inner: Mutex::new(responder),
-        }))
     }
 
     // === Device Link Relay Transport ===

@@ -339,8 +339,6 @@ const PERMITTED_UNIFFI_OBJECTS: &[&str] = &[
     "MobileAnimatedQrReceiver",
     "MobileAnimatedQrSender",
     "MobileBleExchangeSession",
-    "MobileDeviceLinkInitiator",
-    "MobileDeviceLinkResponder",
     "MobileDeviceLinkSession",
     "MobileExchangeSession",
     "MobileLinkResponderSession",

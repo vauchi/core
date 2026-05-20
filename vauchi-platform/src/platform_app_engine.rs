@@ -4082,34 +4082,6 @@ impl PlatformAppEngine {
                     value: self.cert_pin_path_engine().exists(),
                 })
             }
-
-            // ── App preferences (theme + language singleton) ──
-            //
-            // Storage-only — no identity required. The Settings screen is
-            // reachable before onboarding, so the singleton row must be
-            // readable / writable from the moment `PlatformAppEngine` is
-            // constructed (whether or not an identity has been created).
-            DomainCommand::GetAppPreferences => {
-                let prefs =
-                    engine
-                        .vauchi()
-                        .app_preferences()
-                        .map_err(|e| MobileError::StorageError {
-                            detail: e.to_string(),
-                        })?;
-                Ok(DomainCommandResult::AppPreferences {
-                    prefs: prefs.into(),
-                })
-            }
-            DomainCommand::SetAppPreferences { prefs } => {
-                engine
-                    .vauchi()
-                    .set_app_preferences(&prefs.into())
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?;
-                Ok(DomainCommandResult::Unit)
-            }
         }
     }
 

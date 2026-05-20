@@ -54,52 +54,23 @@ impl AppEngine {
             let _ = self.vauchi.save_backup_reminder_state(&state);
         }
 
-        // Handle theme + language Dropdown selections (Phase 2a/A3a).
+        // Handle theme + language Dropdown selections.
         // Component::Dropdown emits UserAction::ListItemSelected with
         // component_id = the dropdown id ("theme" / "language") and
         // item_id = the picked option id. The reserved id "follow_system"
-        // means "let the OS decide".
+        // means "let the OS decide" — maps to None per ADR-047.
         //
-        // Dual-write per S3 of 2026-05-16-settings-storage-by-sensitivity:
-        // persist to the legacy vault row (for the S5 migration window —
-        // older frontends that haven't pushed RenderContext at boot still
-        // read this path) AND update the in-memory RenderContext so
-        // post-S4 frontends (which prefer RenderContext over the vault)
-        // see the change reflected in the next current_screen() render.
-        // S6 retires the vault write.
+        // S6 of 2026-05-16-settings-storage-by-sensitivity: vault write
+        // retired; RenderContext is the single source of truth. The
+        // frontend's setRenderContextJson push at boot + on every
+        // per-platform OS-native persist (UserDefaults / SharedPreferences)
+        // owns the durability.
         if let UserAction::ListItemSelected {
             component_id,
             item_id,
         } = action
             && (component_id == "theme" || component_id == "language")
         {
-            if let Ok(mut prefs) = self.vauchi.app_preferences() {
-                match component_id.as_str() {
-                    "theme" => {
-                        if item_id == "follow_system" {
-                            prefs.follow_system_theme = true;
-                            prefs.theme_id = None;
-                        } else {
-                            prefs.follow_system_theme = false;
-                            prefs.theme_id = Some(item_id.clone());
-                        }
-                    }
-                    "language" => {
-                        if item_id == "follow_system" {
-                            prefs.follow_system_language = true;
-                            prefs.language_code = None;
-                        } else {
-                            prefs.follow_system_language = false;
-                            prefs.language_code = Some(item_id.clone());
-                        }
-                    }
-                    _ => unreachable!(),
-                }
-                let _ = self.vauchi.set_app_preferences(&prefs);
-            }
-
-            // RenderContext mirror — "follow_system" maps to None per
-            // ADR-047 (absence-is-follow-system semantic).
             let mut ctx = self.render_context.clone();
             let new_value = (item_id != "follow_system").then(|| item_id.clone());
             match component_id.as_str() {

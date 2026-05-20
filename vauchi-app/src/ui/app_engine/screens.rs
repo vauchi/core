@@ -194,18 +194,15 @@ impl AppEngine {
                         label: t.name.clone(),
                     })
                     .collect();
-                // S3 of 2026-05-16-settings-storage-by-sensitivity: prefer
-                // the frontend-pushed RenderContext; fall back to the
-                // legacy vault row only when the frontend hasn't pushed a
-                // value (migration window — fallback dies in S6).
-                // "follow_system" is the reserved Dropdown option id.
-                let theme_id = render_context.theme_id.clone().unwrap_or_else(|| {
-                    let prefs = vauchi.app_preferences().unwrap_or_default();
-                    (!prefs.follow_system_theme)
-                        .then(|| prefs.theme_id.clone())
-                        .flatten()
-                        .unwrap_or_else(|| "follow_system".to_string())
-                });
+                // S6 of 2026-05-16-settings-storage-by-sensitivity:
+                // RenderContext is the single source of truth. When the
+                // frontend hasn't pushed a value, render the reserved
+                // "follow_system" Dropdown option — ADR-047
+                // absence-is-follow-system semantic.
+                let theme_id = render_context
+                    .theme_id
+                    .clone()
+                    .unwrap_or_else(|| "follow_system".to_string());
                 let available_languages: Vec<crate::ui::component::DropdownOption> =
                     crate::i18n::get_available_locales()
                         .into_iter()
@@ -217,13 +214,10 @@ impl AppEngine {
                             }
                         })
                         .collect();
-                let language_id = render_context.locale.clone().unwrap_or_else(|| {
-                    let prefs = vauchi.app_preferences().unwrap_or_default();
-                    (!prefs.follow_system_language)
-                        .then(|| prefs.language_code.clone())
-                        .flatten()
-                        .unwrap_or_else(|| "follow_system".to_string())
-                });
+                let language_id = render_context
+                    .locale
+                    .clone()
+                    .unwrap_or_else(|| "follow_system".to_string());
                 let config = SettingsConfig {
                     display_name,
                     delivery_receipts_enabled: vauchi.config().delivery_receipts_enabled,

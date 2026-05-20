@@ -541,57 +541,6 @@ impl From<vauchi_app::i18n::LocaleInfo> for MobileLocaleInfo {
 }
 
 // ============================================================
-// App Preferences (theme + language)
-// ============================================================
-
-/// User preferences for theme + language (mirror of
-/// [`vauchi_core::types::AppPreferences`]).
-///
-/// Singleton, device-local — preferences do not sync. Wired into the
-/// Settings screen Theme + Language `Component::Dropdown`s by the
-/// `SettingsEngine`; the `AppEngine::persist_settings_toggle` intercept
-/// writes through `Vauchi::set_app_preferences`. Frontends use these
-/// methods to drive Compose theme / locale resolution from the same
-/// singleton row, so the inline dropdown is the single source of truth.
-///
-/// Phase 2a/A3a of `2026-05-01-android-humble-ui-deep-retirement`.
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
-pub struct MobileAppPreferences {
-    /// Explicit theme id from the design tokens catalogue, or `None`
-    /// if never set. Ignored when `follow_system_theme` is `true`.
-    pub theme_id: Option<String>,
-    /// IETF language tag (e.g. `en`, `de`), or `None` if never set.
-    /// Ignored when `follow_system_language` is `true`.
-    pub language_code: Option<String>,
-    /// Whether to follow the OS theme appearance (light/dark).
-    pub follow_system_theme: bool,
-    /// Whether to follow the OS preferred language.
-    pub follow_system_language: bool,
-}
-
-impl From<vauchi_core::types::AppPreferences> for MobileAppPreferences {
-    fn from(p: vauchi_core::types::AppPreferences) -> Self {
-        MobileAppPreferences {
-            theme_id: p.theme_id,
-            language_code: p.language_code,
-            follow_system_theme: p.follow_system_theme,
-            follow_system_language: p.follow_system_language,
-        }
-    }
-}
-
-impl From<MobileAppPreferences> for vauchi_core::types::AppPreferences {
-    fn from(p: MobileAppPreferences) -> Self {
-        vauchi_core::types::AppPreferences {
-            theme_id: p.theme_id,
-            language_code: p.language_code,
-            follow_system_theme: p.follow_system_theme,
-            follow_system_language: p.follow_system_language,
-        }
-    }
-}
-
-// ============================================================
 // Help Types
 // ============================================================
 

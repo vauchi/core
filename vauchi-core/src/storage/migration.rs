@@ -495,6 +495,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "app_preferences",
             action: MigrationAction::Sql(MIGRATION_V46_APP_PREFERENCES),
         },
+        Migration {
+            version: 47,
+            name: "drop_app_preferences",
+            action: MigrationAction::Sql(MIGRATION_V47_DROP_APP_PREFERENCES),
+        },
     ]
 }
 
@@ -851,6 +856,18 @@ const MIGRATION_V46_APP_PREFERENCES: &str = "
         follow_system_language INTEGER NOT NULL DEFAULT 1,
         updated_at INTEGER NOT NULL
     );
+";
+
+/// Migration v47: drop the `app_preferences` table.
+///
+/// S6 of 2026-05-16-settings-storage-by-sensitivity: theme + locale are
+/// Category-1 render-context data per ADR-047 — they live in OS-native
+/// storage (UserDefaults / SharedPreferences) on the frontend side and
+/// are pushed to core's in-memory `RenderContext` via the humble
+/// `set_render_context_json` UniFFI entrypoint. The vault row is
+/// retired; existing dev databases drop the table on next open.
+const MIGRATION_V47_DROP_APP_PREFERENCES: &str = "
+    DROP TABLE IF EXISTS app_preferences;
 ";
 
 /// Migration v1: Baseline schema.

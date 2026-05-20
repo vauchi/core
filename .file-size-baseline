@@ -131,7 +131,10 @@ vauchi-core/src/recovery/mod.rs 1253
 # (+30 for V46 app_preferences singleton table — theme + language picks
 # moving from Android SharedPreferences into core storage, problem
 # 2026-05-01-android-humble-ui-deep-retirement Phase 2a/A3a)
-vauchi-core/src/storage/migration.rs 1842
+# (+17 for V47 drop_app_preferences — render-context migrates to OS-native
+# frontend storage; vault row + companion AppPreferences plumbing retired,
+# problem 2026-05-16-settings-storage-by-sensitivity S6)
+vauchi-core/src/storage/migration.rs 1859
 
 # EXEMPT — rekey ledger: all encrypted columns must be co-located for correctness (audit C1)
 vauchi-core/src/storage/rekey.rs 1390

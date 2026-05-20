@@ -97,44 +97,6 @@ pub struct DuressSettings {
     pub include_location: bool,
 }
 
-/// User preferences for theme + language.
-///
-/// Stored in the `app_preferences` table (migration V46). Singleton
-/// (id=1). Each device has its own row — preferences do not sync.
-///
-/// `theme_id` and `language_code` are `None` when the user has never
-/// set an explicit value. The `follow_system_*` flags are the
-/// authoritative signal: when `true`, the platform applies the system
-/// default; when `false`, the platform applies the explicit pick.
-///
-/// Wired into the Settings screen Theme + Language dropdowns by
-/// `SettingsEngine` (problem record
-/// `2026-05-01-android-humble-ui-deep-retirement`, Phase 2a/A3a).
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct AppPreferences {
-    /// Explicit theme id from the design tokens catalogue, or `None`
-    /// if never set. Ignored when `follow_system_theme` is `true`.
-    pub theme_id: Option<String>,
-    /// IETF language tag (e.g. `en`, `de`, `fr`), or `None` if never
-    /// set. Ignored when `follow_system_language` is `true`.
-    pub language_code: Option<String>,
-    /// Whether to follow the OS theme appearance (light/dark).
-    pub follow_system_theme: bool,
-    /// Whether to follow the OS preferred language.
-    pub follow_system_language: bool,
-}
-
-impl Default for AppPreferences {
-    fn default() -> Self {
-        AppPreferences {
-            theme_id: None,
-            language_code: None,
-            follow_system_theme: true,
-            follow_system_language: true,
-        }
-    }
-}
-
 /// Emergency broadcast configuration.
 ///
 /// Stored in the `emergency_config` table (migration V22).

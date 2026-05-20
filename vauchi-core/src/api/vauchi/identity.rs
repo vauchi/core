@@ -548,24 +548,4 @@ impl Vauchi {
         state.record_backup(self.clock.unix_seconds());
         self.save_backup_reminder_state(&state)
     }
-
-    // === App Preferences (theme + language) ===
-    //
-    // Singleton row in the `app_preferences` table (migration V46).
-    // Device-local — preferences do not sync. The Settings screen
-    // dropdown writes through `set_app_preferences`; the engine
-    // populates `SettingsConfig` from `app_preferences()`. See
-    // problem record `2026-05-01-android-humble-ui-deep-retirement`.
-
-    /// Loads app preferences (theme + language). Returns the default
-    /// (`follow_system_*` both `true`, both ids `None`) if no row has
-    /// been written yet.
-    pub fn app_preferences(&self) -> VauchiResult<crate::types::AppPreferences> {
-        self.storage.load_app_preferences().map_err(Into::into)
-    }
-
-    /// Saves app preferences (theme + language) to the singleton row.
-    pub fn set_app_preferences(&self, prefs: &crate::types::AppPreferences) -> VauchiResult<()> {
-        self.storage.save_app_preferences(prefs).map_err(Into::into)
-    }
 }

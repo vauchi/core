@@ -55,7 +55,6 @@ mod app_engine_onboarding_tests;
 mod app_engine_preview_as_tests;
 mod app_engine_serde_exchange_tests;
 mod app_engine_settings_lock_tests;
-mod app_preferences_storage_tests;
 mod archived_contacts_engine_tests;
 mod avatar_generate_tests;
 mod avatar_normalize_proptest;

@@ -12,8 +12,7 @@
 use std::sync::Arc;
 
 use vauchi_platform::{
-    DomainCommand, DomainCommandResult, MobileAhaMomentType, MobileAppPreferences,
-    MobileConsentType, PlatformAppEngine,
+    DomainCommand, DomainCommandResult, MobileAhaMomentType, MobileConsentType, PlatformAppEngine,
 };
 
 fn create_engine_with_identity() -> (Arc<PlatformAppEngine>, tempfile::TempDir) {
@@ -26,18 +25,6 @@ fn create_engine_with_identity() -> (Arc<PlatformAppEngine>, tempfile::TempDir) 
     )
     .expect("create engine");
     drive_onboarding(&engine);
-    (engine, dir)
-}
-
-fn create_engine_no_identity() -> (Arc<PlatformAppEngine>, tempfile::TempDir) {
-    let dir = tempfile::tempdir().expect("temp dir");
-    let key = vauchi_core::crypto::SymmetricKey::generate();
-    let engine = PlatformAppEngine::new(
-        dir.path().to_string_lossy().to_string(),
-        "https://relay.test".into(),
-        key.as_bytes().to_vec(),
-    )
-    .expect("create engine");
     (engine, dir)
 }
 

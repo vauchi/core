@@ -6,9 +6,9 @@
 //! (`_private/docs/planning/todo/2026-05-16-settings-storage-by-sensitivity-plan.md`):
 //! the Settings ScreenModel's `theme` and `language` Dropdown
 //! `selected` values derive exclusively from `engine.render_context()`.
-//! The legacy `vauchi.app_preferences()` fallback is retired; absent
-//! RenderContext fields render the reserved "follow_system" option
-//! per ADR-047 (absence-is-follow-system semantic).
+//! The vault-backed fallback path is retired; absent RenderContext
+//! fields render the reserved "follow_system" option per ADR-047
+//! (absence-is-follow-system semantic).
 //!
 //! These tests pin the read path. The intercept contract (Settings
 //! dropdown picks update RenderContext only — no vault writes) is

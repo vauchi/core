@@ -187,11 +187,10 @@ impl WorkflowEngine for SettingsEngine {
             },
             // Theme + Language dropdowns are first-class Component::Dropdown
             // so they can render inline (no separate sub-screen). The
-            // selected_id semantics mirror AppPreferences: None when
-            // following system, Some(id) for an explicit pick. The action
-            // is dispatched as `UserAction::ListItemSelected` with
-            // component_id matching the dropdown id; a special "follow_system"
-            // option id is reserved.
+            // selected_id mirrors RenderContext: the reserved "follow_system"
+            // id stands in for None (ADR-047 absence-is-follow-system).
+            // Action dispatch is `UserAction::ListItemSelected` with
+            // component_id matching the dropdown id.
             Component::Dropdown {
                 id: "theme".into(),
                 label: "Theme".into(),
@@ -664,11 +663,12 @@ impl WorkflowEngine for SettingsEngine {
                 ActionResult::UpdateScreen(self.current_screen())
             }
             // Theme + Language Dropdown selections — persistence happens
-            // in `app_engine::intercept::persist_settings_toggle`. Engine
-            // mirrors the new id locally so the screen reflects the pick
-            // on the very next render; the fresh config built on re-entry
-            // to AppScreen::Settings re-derives the id from the persisted
-            // AppPreferences (Phase 2a/A3a).
+            // in `app_engine::intercept::persist_settings_toggle`, which
+            // writes the new value into the engine's RenderContext.
+            // Engine mirrors the new id locally so the screen reflects
+            // the pick on the very next render; the fresh config built
+            // on re-entry to AppScreen::Settings re-derives the id from
+            // the engine's RenderContext (ADR-047).
             UserAction::ListItemSelected {
                 ref component_id,
                 ref item_id,

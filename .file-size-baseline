@@ -41,7 +41,7 @@ vauchi-platform/src/lib.rs 3137
 # (cascading now: u64 args into BleHandshakeSession::new_initiator_from_key
 # and BleHandshakeSession::process_key_offer, each call grew to a
 # multi-line form with `SystemClock::shared().unix_seconds()`).
-vauchi-platform/src/mobile_ble.rs 1006
+vauchi-platform/src/mobile_ble.rs 1007
 
 # EXEMPT — UniFFI facade for exchange protocol: command/event enums and
 # their From impls must be co-located so binding generation produces
@@ -76,7 +76,7 @@ vauchi-platform/src/multistage_exchange.rs 1086
 #  drives import 2026-05-03 Phase 1 of 2026-05-03-core-file-picker-command)
 # (+2 from cascading now: u64 args through Contact::from_exchange_full in slice 28 2026-05-13)
 # (+5 from threading now: u64 into BleHandshakeSession + NfcHandshakeSession + ExchangeQR::generate callsites within ExchangeSession state machine in slice 30 2026-05-15)
-vauchi-core/src/exchange/session.rs 1821
+vauchi-core/src/exchange/session.rs 1822
 # (+29 for Phase 1.C.3a foothold of
 #  2026-05-11-hover-graduation-plan.md: audio_proximity field
 #  + getter on MultiStageSession, AudioProximityState import.

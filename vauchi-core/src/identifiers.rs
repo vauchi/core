@@ -13,16 +13,19 @@
 //! (Phase 1B / 2 / 3 of the
 //! `2026-05-21-wire-identifier-newtypes` problem record).
 //!
-//! Three distinct kinds today:
+//! Five distinct kinds today:
 //! - [`IdentityKey`]: Ed25519 identity public key.
 //! - [`DhPublicKey`]: X25519 Diffie–Hellman / X3DH public key.
+//! - [`MailboxToken`]: 32-byte HMAC-derived mailbox routing token.
 //! - [`ContactId`]: hex-fingerprint / UUID wire identifier on
 //!   `sender_id` / `recipient_id` fields.
+//! - [`MessageId`]: wire message identifier (UUID-v4 string).
 //!
-//! The two byte-kinds are nominally distinct so an Ed25519 ↔ X25519
-//! mix-up at a call site fails to compile. `ContactId` tags the
-//! string-shaped identifier so a sender ↔ recipient swap at a wire
-//! construction site fails to compile.
+//! The three byte-kinds are nominally distinct so a swap at a call
+//! site (Ed25519 ↔ X25519, shared_key/master_seed ↔ token) fails to
+//! compile. `ContactId` and `MessageId` tag the two string-shaped
+//! wire identifiers so a sender ↔ recipient or envelope-id ↔ ack-id
+//! swap at a construction site fails to compile.
 //!
 //! Equality with bare `[u8; 32]` is **forward-only**: `key ==
 //! expected_bytes` compiles (for test ergonomics) but
@@ -356,5 +359,179 @@ impl PartialEq<String> for ContactId {
 impl fmt::Display for ContactId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
+    }
+}
+
+/// A wire-level message identifier, opaque at the type level.
+///
+/// Tags the `message_id` field on `MessageEnvelope`, `Acknowledgment`,
+/// and any other wire struct or in-memory map that keys off a relay
+/// message ID. Replaces the legacy `pub type MessageId = String;`
+/// alias so an accidental swap (envelope id ↔ ack target id, or
+/// message id ↔ contact id at a `HashMap<String, _>` boundary)
+/// fails to compile.
+///
+/// The underlying value is a UUID-v4 string today, generated at
+/// envelope-creation time. `#[serde(transparent)]` keeps the wire
+/// shape — a raw JSON string — byte-identical to the bare alias.
+///
+/// Equality with `&str` and `String` is **forward-only**, mirroring
+/// [`ContactId`] and the byte-key newtypes.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct MessageId(String);
+
+impl MessageId {
+    /// Wraps a `String` into a `MessageId`.
+    pub fn from_string(s: String) -> Self {
+        Self(s)
+    }
+
+    /// Borrows the underlying string slice.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Consumes the `MessageId`, returning the underlying `String`.
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+impl From<String> for MessageId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl From<&str> for MessageId {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl AsRef<str> for MessageId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for MessageId {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
+impl PartialEq<str> for MessageId {
+    fn eq(&self, other: &str) -> bool {
+        self.0 == other
+    }
+}
+
+impl PartialEq<&str> for MessageId {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialEq<String> for MessageId {
+    fn eq(&self, other: &String) -> bool {
+        &self.0 == other
+    }
+}
+
+impl fmt::Display for MessageId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+/// A 32-byte HMAC-derived mailbox routing token, opaque at the
+/// type level.
+///
+/// Returned by [`crate::network::mailbox_token::compute_mailbox_token`]
+/// (contact tokens, derived from a shared key + day epoch) and
+/// [`crate::network::mailbox_token::compute_self_token`] (self
+/// tokens, derived from the identity master seed + day epoch). The
+/// 32-byte form lives only in memory; the wire form is always the
+/// lowercase-hex string produced by
+/// [`crate::network::mailbox_token::token_hex`] (carried inside
+/// `RegisterMailbox.tokens: Vec<String>` or
+/// `EncryptedUpdate.recipient_id` per ADR-029).
+///
+/// Distinct from [`IdentityKey`] and [`DhPublicKey`] so a
+/// shared_key / master_seed ↔ token swap at a call site fails to
+/// compile. Same byte layout as the other 32-byte newtypes — the
+/// distinction is purely nominal.
+///
+/// Equality with raw `[u8; 32]` is **forward-only**, mirroring the
+/// other byte-key newtypes' audit hardening.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
+pub struct MailboxToken([u8; 32]);
+
+impl MailboxToken {
+    /// Wraps raw bytes into a `MailboxToken`.
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    /// Returns the underlying 32 bytes.
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    /// Consumes the `MailboxToken`, returning the underlying bytes.
+    /// The wrapper's `ZeroizeOnDrop` no longer runs on the returned
+    /// array — callers that take the raw form are expected to manage
+    /// zeroization themselves.
+    pub fn into_bytes(mut self) -> [u8; 32] {
+        let out = self.0;
+        // Prevent the Drop impl from zeroizing the bytes we just
+        // handed out. `take()` swaps in zeros locally, then we
+        // forget the (now-zeroed) wrapper.
+        self.0 = [0u8; 32];
+        std::mem::forget(self);
+        out
+    }
+}
+
+impl From<[u8; 32]> for MailboxToken {
+    fn from(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+}
+
+impl From<&[u8; 32]> for MailboxToken {
+    fn from(bytes: &[u8; 32]) -> Self {
+        Self(*bytes)
+    }
+}
+
+impl AsRef<[u8]> for MailboxToken {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8; 32]> for MailboxToken {
+    fn as_ref(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
+/// Forward-only cross-equality with raw bytes, mirroring
+/// [`IdentityKey`] / [`DhPublicKey`].
+impl PartialEq<[u8; 32]> for MailboxToken {
+    fn eq(&self, other: &[u8; 32]) -> bool {
+        &self.0 == other
+    }
+}
+
+impl fmt::Display for MailboxToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for byte in &self.0 {
+            write!(f, "{byte:02x}")?;
+        }
+        Ok(())
     }
 }

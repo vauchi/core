@@ -21,7 +21,7 @@
 //!   `[u8; 32]`)
 
 use std::collections::HashSet;
-use vauchi_core::identifiers::{ContactId, DhPublicKey, IdentityKey};
+use vauchi_core::identifiers::{ContactId, DhPublicKey, IdentityKey, MailboxToken, MessageId};
 
 // @internal
 #[test]
@@ -333,4 +333,133 @@ fn contact_id_serde_transparent_matches_raw_string_shape() {
     let from_raw_string: ContactId =
         serde_json::from_value(serde_json::Value::String(CONTACT_ID_HEX.to_string())).unwrap();
     assert_eq!(from_raw_string, id);
+}
+
+// Phase 3: MessageId mirrors the ContactId contract — same wire
+// shape, same forward-only equality. Tests below mirror
+// ContactId's so the two stay in lockstep.
+
+const MESSAGE_ID_UUID: &str = "8b0cba8e-6ff2-4a4b-9c84-fb74a3f93f01";
+
+// @internal
+#[test]
+fn message_id_roundtrip_through_from_and_into_string() {
+    let id = MessageId::from(MESSAGE_ID_UUID.to_string());
+    assert_eq!(id.as_str(), MESSAGE_ID_UUID);
+    assert_eq!(id.clone().into_string(), MESSAGE_ID_UUID);
+}
+
+// @internal
+#[test]
+fn message_id_from_str_matches_from_string() {
+    let from_str = MessageId::from(MESSAGE_ID_UUID);
+    let from_string = MessageId::from(MESSAGE_ID_UUID.to_string());
+    assert_eq!(from_str, from_string);
+}
+
+// @internal
+#[test]
+fn message_id_equal_underlying_strings_compare_equal() {
+    let a = MessageId::from_string(MESSAGE_ID_UUID.to_string());
+    let b = MessageId::from_string(MESSAGE_ID_UUID.to_string());
+    let c = MessageId::from_string("ffffffff-ffff-ffff-ffff-ffffffffffff".to_string());
+    assert_eq!(a, b);
+    assert_ne!(a, c);
+}
+
+// @internal
+#[test]
+fn message_id_hash_matches_when_strings_match() {
+    let a = MessageId::from_string(MESSAGE_ID_UUID.to_string());
+    let b = MessageId::from_string(MESSAGE_ID_UUID.to_string());
+    let mut set: HashSet<MessageId> = HashSet::new();
+    set.insert(a);
+    assert!(set.contains(&b));
+}
+
+// @internal
+#[test]
+fn message_id_display_is_the_underlying_string() {
+    let id = MessageId::from(MESSAGE_ID_UUID);
+    assert_eq!(format!("{id}"), MESSAGE_ID_UUID);
+}
+
+// @internal
+#[test]
+fn message_id_forward_partial_eq_with_str_and_string_works() {
+    let id = MessageId::from(MESSAGE_ID_UUID);
+    assert!(id == MESSAGE_ID_UUID);
+    assert!(id == MESSAGE_ID_UUID.to_string());
+}
+
+// @internal
+#[test]
+fn message_id_serde_transparent_matches_raw_string_shape() {
+    let id = MessageId::from(MESSAGE_ID_UUID);
+    let json = serde_json::to_value(&id).unwrap();
+    assert_eq!(json, serde_json::Value::String(MESSAGE_ID_UUID.to_string()));
+    let from_raw_string: MessageId =
+        serde_json::from_value(serde_json::Value::String(MESSAGE_ID_UUID.to_string())).unwrap();
+    assert_eq!(from_raw_string, id);
+}
+
+// Phase 3: MailboxToken mirrors the IdentityKey / DhPublicKey
+// contract but the bytes are HMAC-derived (not a public key) and
+// the wrapper carries `ZeroizeOnDrop`. Tests below mirror the
+// byte-key newtype tests so the three byte-shaped newtypes stay
+// in lockstep.
+
+// @internal
+#[test]
+fn mailbox_token_roundtrip_through_from_and_as_bytes() {
+    let bytes = [0x77u8; 32];
+    let token = MailboxToken::from(bytes);
+    assert_eq!(token.as_bytes(), &bytes);
+    assert_eq!(token.into_bytes(), bytes);
+}
+
+// @internal
+#[test]
+fn mailbox_token_equal_underlying_bytes_compare_equal() {
+    let a = MailboxToken::from_bytes([1u8; 32]);
+    let b = MailboxToken::from_bytes([1u8; 32]);
+    let c = MailboxToken::from_bytes([2u8; 32]);
+    assert_eq!(a, b);
+    assert_ne!(a, c);
+}
+
+// @internal
+#[test]
+fn mailbox_token_hash_matches_when_bytes_match() {
+    let mut set = HashSet::new();
+    set.insert(MailboxToken::from_bytes([7u8; 32]));
+    assert!(set.contains(&MailboxToken::from_bytes([7u8; 32])));
+    assert!(!set.contains(&MailboxToken::from_bytes([8u8; 32])));
+}
+
+// @internal
+#[test]
+fn mailbox_token_display_format_is_lowercase_hex() {
+    let token = MailboxToken::from_bytes([0xDE; 32]);
+    let expected: String = std::iter::repeat("de").take(32).collect();
+    assert_eq!(token.to_string(), expected);
+}
+
+// @internal
+#[test]
+fn mailbox_token_forward_partial_eq_with_bytes_works() {
+    let bytes = [0xCDu8; 32];
+    let token = MailboxToken::from_bytes(bytes);
+    assert!(token == bytes);
+}
+
+// @internal
+#[test]
+fn mailbox_token_hex_encode_compatibility_via_asref_bytes() {
+    // `token_hex(&token.as_bytes())` and `hex::encode(&token)`
+    // must agree — Phase 3 swap of `compute_*_token` return types
+    // can't accidentally change the on-wire hex.
+    let bytes = [0x42u8; 32];
+    let token = MailboxToken::from_bytes(bytes);
+    assert_eq!(hex::encode(&token), hex::encode(bytes));
 }

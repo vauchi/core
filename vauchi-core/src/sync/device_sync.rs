@@ -83,7 +83,10 @@ impl ContactSyncData {
         let visibility_rules = serde_json::from_str(&self.visibility_rules_json)
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
 
-        let shared_key = SymmetricKey::from_bytes_unchecked(self.shared_key);
+        // Peer-supplied bytes — trust boundary. `try_from_bytes` rejects the
+        // all-zeros degenerate key per the contract on encryption.rs:95-100.
+        let shared_key = SymmetricKey::try_from_bytes(self.shared_key)
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
 
         let mut contact = Contact::from_sync_data(
             self.public_key,

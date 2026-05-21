@@ -63,12 +63,16 @@ fn test_pre_signed_message_refresh() {
     let notice = &refreshed.deletion_notice;
     let stage_byte = 1u8; // Confirmed
     let mut notice_message = Vec::with_capacity(32 + 1 + 8);
-    notice_message.extend_from_slice(&notice.public_key);
+    notice_message.extend_from_slice(notice.public_key.as_bytes());
     notice_message.push(stage_byte);
     notice_message.extend_from_slice(&notice.timestamp.to_be_bytes());
 
     assert!(
-        verify_ed25519(&notice.public_key, &notice_message, &notice.signature),
+        verify_ed25519(
+            notice.public_key.as_bytes(),
+            &notice_message,
+            &notice.signature
+        ),
         "Refreshed deletion notice signature should be valid"
     );
 }
@@ -217,7 +221,7 @@ fn test_pre_signed_revocation() {
     let notice = &msgs.deletion_notice;
     let stage_byte = 1u8; // Confirmed
     let mut notice_message = Vec::with_capacity(32 + 1 + 8);
-    notice_message.extend_from_slice(&notice.public_key);
+    notice_message.extend_from_slice(notice.public_key.as_bytes());
     notice_message.push(stage_byte);
     notice_message.extend_from_slice(&notice.timestamp.to_be_bytes());
 

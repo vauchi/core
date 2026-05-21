@@ -12,34 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{ExchangeError, X3DH, X3DHKeyPair};
 use crate::crypto::{SymmetricKey, decrypt, encrypt};
-
-/// Serde helper for 32-byte arrays (base64 encoded).
-mod bytes_array_32 {
-    use base64::Engine;
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    /// Serializes a 32-byte array to a base64-encoded string for encrypted message exchange.
-    pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&base64::engine::general_purpose::STANDARD.encode(bytes))
-    }
-
-    /// Deserializes a 32-byte array from a base64-encoded string.
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(&s)
-            .map_err(serde::de::Error::custom)?;
-        bytes
-            .try_into()
-            .map_err(|_| serde::de::Error::custom("invalid length for 32-byte array"))
-    }
-}
+use crate::identifiers::{DhPublicKey, IdentityKey};
 
 /// An encrypted exchange message for secure contact card exchange.
 ///
@@ -59,13 +32,13 @@ mod bytes_array_32 {
 pub struct EncryptedExchangeMessage {
     /// Sender's X3DH exchange public key (plaintext, 32 bytes).
     /// The recipient uses this for DH1 (identity binding).
-    #[serde(with = "bytes_array_32")]
-    pub sender_exchange_key: [u8; 32],
+    #[serde(with = "crate::identifiers::wire_dh_public_key_base64")]
+    pub sender_exchange_key: DhPublicKey,
 
     /// Ephemeral public key for X3DH (plaintext, 32 bytes).
     /// The recipient uses this for DH2 (forward secrecy).
-    #[serde(with = "bytes_array_32")]
-    pub ephemeral_public_key: [u8; 32],
+    #[serde(with = "crate::identifiers::wire_dh_public_key_base64")]
+    pub ephemeral_public_key: DhPublicKey,
 
     /// Encrypted payload containing identity key and display name.
     /// Format: XChaCha20-Poly1305 tagged (0x02 || nonce\[24\] || ciphertext || tag\[16\])
@@ -76,11 +49,11 @@ pub struct EncryptedExchangeMessage {
 #[derive(Debug, Serialize, Deserialize)]
 struct ExchangePayload {
     /// Sender's signing/identity public key (32 bytes).
-    #[serde(with = "bytes_array_32")]
-    identity_key: [u8; 32],
+    #[serde(with = "crate::identifiers::wire_identity_key_base64")]
+    identity_key: IdentityKey,
     /// Sender's X3DH public key (for recipient to send encrypted responses).
-    #[serde(with = "bytes_array_32")]
-    exchange_key: [u8; 32],
+    #[serde(with = "crate::identifiers::wire_dh_public_key_base64")]
+    exchange_key: DhPublicKey,
     /// Sender's display name.
     display_name: String,
 }
@@ -122,8 +95,8 @@ impl EncryptedExchangeMessage {
 
         // Create the payload to encrypt (includes our X3DH public key for responses)
         let payload = ExchangePayload {
-            identity_key: *our_identity_key,
-            exchange_key: *our_keys.public_key(),
+            identity_key: IdentityKey::from(*our_identity_key),
+            exchange_key: DhPublicKey::from(*our_keys.public_key()),
             display_name: our_display_name.to_string(),
         };
 
@@ -137,8 +110,8 @@ impl EncryptedExchangeMessage {
 
         Ok((
             EncryptedExchangeMessage {
-                sender_exchange_key: *our_keys.public_key(),
-                ephemeral_public_key,
+                sender_exchange_key: DhPublicKey::from(*our_keys.public_key()),
+                ephemeral_public_key: DhPublicKey::from(ephemeral_public_key),
                 ciphertext,
             },
             shared_secret,
@@ -161,11 +134,13 @@ impl EncryptedExchangeMessage {
         our_keys: &X3DHKeyPair,
     ) -> Result<(DecryptedExchangePayload, SymmetricKey), ExchangeError> {
         // Derive the shared secret using X3DH::respond
-        // DH1 uses sender_exchange_key for identity binding
+        // DH1 uses sender_exchange_key for identity binding. The X3DH
+        // primitive still takes raw 32-byte references; the wire-side
+        // newtype is unwrapped here to keep core crypto untouched.
         let shared_secret = X3DH::respond(
             our_keys,
-            &self.sender_exchange_key,
-            &self.ephemeral_public_key,
+            self.sender_exchange_key.as_bytes(),
+            self.ephemeral_public_key.as_bytes(),
         )?;
 
         // Decrypt the ciphertext
@@ -178,8 +153,8 @@ impl EncryptedExchangeMessage {
 
         Ok((
             DecryptedExchangePayload {
-                identity_key: payload.identity_key,
-                exchange_key: payload.exchange_key,
+                identity_key: payload.identity_key.into_bytes(),
+                exchange_key: payload.exchange_key.into_bytes(),
                 display_name: payload.display_name,
             },
             shared_secret,

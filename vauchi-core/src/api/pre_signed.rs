@@ -135,7 +135,7 @@ impl PreSignedShredMessages {
 
         IdentityDeletionNotice {
             stage,
-            public_key,
+            public_key: crate::identifiers::IdentityKey::from(public_key),
             timestamp,
             signature: *signature.as_bytes(),
         }
@@ -228,12 +228,12 @@ mod tests {
         // Reconstruct the signed message
         let stage_byte = 1u8; // Confirmed
         let mut message = Vec::with_capacity(32 + 1 + 8);
-        message.extend_from_slice(&notice.public_key);
+        message.extend_from_slice(notice.public_key.as_bytes());
         message.push(stage_byte);
         message.extend_from_slice(&notice.timestamp.to_be_bytes());
 
         // Verify using ed25519-dalek via crypto module
-        let peer_key = CryptoPublicKey::from_bytes(notice.public_key);
+        let peer_key = CryptoPublicKey::from_bytes(notice.public_key.into_bytes());
         let sig = CryptoSignature::from_bytes(notice.signature);
         assert!(
             peer_key.verify(&message, &sig),

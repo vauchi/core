@@ -5,6 +5,7 @@
 //! Tests for network::message
 //! Extracted from message.rs
 
+use vauchi_core::identifiers::{DhPublicKey, IdentityKey};
 use vauchi_core::network::*;
 
 // @scenario: relay_network :: Relay protocol versioning
@@ -35,7 +36,7 @@ fn test_encrypted_update_serialize() {
         recipient_id: "recipient-123".to_string(),
         sender_id: "sender-456".to_string(),
         ratchet_header: RatchetHeader {
-            dh_public: [1u8; 32],
+            dh_public: DhPublicKey::from_bytes([1u8; 32]),
             dh_generation: 5,
             message_index: 10,
             previous_chain_length: 3,
@@ -75,7 +76,7 @@ fn test_acknowledgment_serialize() {
 #[test]
 fn test_handshake_signature_bytes() {
     let handshake = Handshake {
-        identity_public_key: [2u8; 32],
+        identity_public_key: IdentityKey::from_bytes([2u8; 32]),
         nonce: [3u8; 32],
         signature: [4u8; 64],
     };

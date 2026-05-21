@@ -16,6 +16,7 @@ use crate::contact::Contact;
 use crate::contact::ImportSource;
 use crate::contact_card::ContactCard;
 use crate::crypto::SymmetricKey;
+use crate::identifiers::IdentityKey;
 
 /// Serializable contact data for device sync.
 ///
@@ -25,8 +26,8 @@ pub struct ContactSyncData {
     /// Contact's unique ID (public key fingerprint).
     pub id: String,
     /// Contact's Ed25519 public key.
-    #[serde(with = "bytes_array_32")]
-    pub public_key: [u8; 32],
+    #[serde(with = "crate::identifiers::wire_identity_key_base64")]
+    pub public_key: IdentityKey,
     /// Contact's display name.
     pub display_name: String,
     /// Contact's card as JSON.
@@ -64,7 +65,7 @@ impl ContactSyncData {
 
         ContactSyncData {
             id: contact.id().to_string(),
-            public_key: ex.public_key,
+            public_key: IdentityKey::from(ex.public_key),
             display_name: contact.display_name().to_string(),
             card_json,
             shared_key: *ex.shared_key.as_bytes(),
@@ -89,7 +90,7 @@ impl ContactSyncData {
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
 
         let mut contact = Contact::from_sync_data(
-            self.public_key,
+            self.public_key.into_bytes(),
             card,
             shared_key,
             self.exchange_timestamp,

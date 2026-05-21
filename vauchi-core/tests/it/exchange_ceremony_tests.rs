@@ -131,8 +131,12 @@ fn test_tampered_ephemeral_key_causes_decrypt_failure() {
         EncryptedExchangeMessage::create(&alice, bob.public_key(), &alice_identity, "Alice")
             .unwrap();
 
-    // Tamper with the ephemeral public key (change one byte)
-    msg.ephemeral_public_key[0] ^= 0x01;
+    // Tamper with the ephemeral public key (change one byte). The
+    // newtype guards swap-arg bugs, not byte mutation — tampering
+    // tests unwrap/rewrap to flip a byte.
+    let mut tampered = msg.ephemeral_public_key.into_bytes();
+    tampered[0] ^= 0x01;
+    msg.ephemeral_public_key = vauchi_core::identifiers::DhPublicKey::from_bytes(tampered);
 
     let result = msg.decrypt(&bob);
 
@@ -153,8 +157,12 @@ fn test_tampered_sender_exchange_key_causes_decrypt_failure() {
     let (mut msg, _) =
         EncryptedExchangeMessage::create(&alice, bob.public_key(), &[0x01u8; 32], "Alice").unwrap();
 
-    // Tamper with the identity binding component
-    msg.sender_exchange_key[0] ^= 0x01;
+    // Tamper with the identity binding component (see comment on
+    // the ephemeral-key tampering test above for the unwrap/rewrap
+    // rationale).
+    let mut tampered = msg.sender_exchange_key.into_bytes();
+    tampered[0] ^= 0x01;
+    msg.sender_exchange_key = vauchi_core::identifiers::DhPublicKey::from_bytes(tampered);
 
     let result = msg.decrypt(&bob);
 
@@ -362,7 +370,9 @@ fn test_encrypted_message_secret_matches_raw_x3dh() {
     );
 
     // The secret should be HKDF-derived (not raw DH)
-    let raw_dh = bob.diffie_hellman(&msg.ephemeral_public_key).unwrap();
+    let raw_dh = bob
+        .diffie_hellman(msg.ephemeral_public_key.as_bytes())
+        .unwrap();
     assert_ne!(
         alice_secret.as_bytes(),
         raw_dh.as_ref(),

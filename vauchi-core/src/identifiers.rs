@@ -42,7 +42,7 @@ use std::fmt;
 /// `exchange::encrypted_message` in Phase 1B). Distinct from
 /// [`DhPublicKey`] so an Ed25519 ↔ X25519 mix-up at a call site
 /// fails to compile.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, zeroize::Zeroize)]
 #[serde(transparent)]
 pub struct IdentityKey([u8; 32]);
 
@@ -131,7 +131,7 @@ impl fmt::Display for IdentityKey {
 /// (32 bytes) but a different cryptographic primitive — passing an
 /// Ed25519 identity key where an X25519 DH key is expected is a
 /// real bug even though both serialize identically on the wire.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, zeroize::Zeroize)]
 #[serde(transparent)]
 pub struct DhPublicKey([u8; 32]);
 

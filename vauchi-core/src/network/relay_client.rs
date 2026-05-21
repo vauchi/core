@@ -266,7 +266,7 @@ impl<T: Transport> RelayClient<T> {
             recipient_id: token_hex(&self_token),
             sender_id: self.our_identity_id.clone(),
             ratchet_header: RatchetHeader {
-                dh_public: ratchet_msg.dh_public,
+                dh_public: crate::identifiers::DhPublicKey::from(ratchet_msg.dh_public),
                 dh_generation: ratchet_msg.dh_generation,
                 message_index: ratchet_msg.message_index,
                 previous_chain_length: ratchet_msg.previous_chain_length,
@@ -436,7 +436,7 @@ impl<T: Transport> RelayClient<T> {
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| self.our_identity_id.clone()),
             ratchet_header: RatchetHeader {
-                dh_public: ratchet_msg.dh_public,
+                dh_public: crate::identifiers::DhPublicKey::from(ratchet_msg.dh_public),
                 dh_generation: ratchet_msg.dh_generation,
                 message_index: ratchet_msg.message_index,
                 previous_chain_length: ratchet_msg.previous_chain_length,
@@ -455,7 +455,7 @@ impl<T: Transport> crate::api::PurgeSender for RelayClient<T> {
         now: u64,
     ) -> Result<bool, crate::api::ShredError> {
         let request = PurgeRequest {
-            public_key: purge.public_key,
+            public_key: crate::identifiers::IdentityKey::from(purge.public_key),
             signature: purge.signature.clone(),
             purge_token: purge.purge_token,
             timestamp: purge.timestamp,

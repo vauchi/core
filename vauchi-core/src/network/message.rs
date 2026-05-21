@@ -8,6 +8,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::identifiers::{DhPublicKey, IdentityKey};
+
 /// Unique message identifier for deduplication and acknowledgments.
 pub type MessageId = String;
 
@@ -108,8 +110,8 @@ pub struct EncryptedUpdate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RatchetHeader {
     /// Sender's current DH public key.
-    #[serde(with = "bytes_array_32")]
-    pub dh_public: [u8; 32],
+    #[serde(with = "crate::identifiers::wire_dh_public_key_base64")]
+    pub dh_public: DhPublicKey,
     /// DH ratchet generation.
     pub dh_generation: u32,
     /// Message index within the chain.
@@ -147,8 +149,8 @@ pub enum AckStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Handshake {
     /// Client's identity public key.
-    #[serde(with = "bytes_array_32")]
-    pub identity_public_key: [u8; 32],
+    #[serde(with = "crate::identifiers::wire_identity_key_base64")]
+    pub identity_public_key: IdentityKey,
     /// Nonce for this session.
     #[serde(with = "bytes_array_32")]
     pub nonce: [u8; 32],
@@ -185,8 +187,8 @@ pub struct IdentityDeletionNotice {
     /// Current deletion stage.
     pub stage: DeletionStage,
     /// Sender's public signing key (for signature verification).
-    #[serde(with = "bytes_array_32")]
-    pub public_key: [u8; 32],
+    #[serde(with = "crate::identifiers::wire_identity_key_base64")]
+    pub public_key: IdentityKey,
     /// Unix timestamp when the notice was created.
     pub timestamp: u64,
     /// Ed25519 signature over (public_key || stage || timestamp).
@@ -202,8 +204,8 @@ pub struct IdentityDeletionNotice {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PurgeRequest {
     /// Signing public key (Ed25519, 32 bytes).
-    #[serde(with = "bytes_array_32")]
-    pub public_key: [u8; 32],
+    #[serde(with = "crate::identifiers::wire_identity_key_base64")]
+    pub public_key: IdentityKey,
     /// Ed25519 signature over (public_key || purge_token || timestamp).
     pub signature: Vec<u8>,
     /// One-time token for replay prevention (32 bytes).
@@ -549,7 +551,7 @@ mod tests {
     fn test_identity_deletion_notice_serde_roundtrip() {
         let notice = IdentityDeletionNotice {
             stage: DeletionStage::Pending,
-            public_key: [0x42; 32],
+            public_key: IdentityKey::from_bytes([0x42; 32]),
             timestamp: 1700000000,
             signature: [0xAB; 64],
         };
@@ -580,7 +582,7 @@ mod tests {
     fn test_identity_deletion_notice_in_payload() {
         let notice = IdentityDeletionNotice {
             stage: DeletionStage::Confirmed,
-            public_key: [0x01; 32],
+            public_key: IdentityKey::from_bytes([0x01; 32]),
             timestamp: 1700000000,
             signature: [0x02; 64],
         };
@@ -606,7 +608,7 @@ mod tests {
             timestamp: 1700000000,
             payload: MessagePayload::IdentityDeletionNotice(IdentityDeletionNotice {
                 stage: DeletionStage::Pending,
-                public_key: [0xFF; 32],
+                public_key: IdentityKey::from_bytes([0xFF; 32]),
                 timestamp: 1700000000,
                 signature: [0xEE; 64],
             }),
@@ -628,7 +630,7 @@ mod tests {
     #[test]
     fn test_purge_request_serde_roundtrip() {
         let request = PurgeRequest {
-            public_key: [0x42; 32],
+            public_key: IdentityKey::from_bytes([0x42; 32]),
             signature: vec![0xAB; 64],
             purge_token: [0xCD; 32],
             timestamp: 1700000000,
@@ -646,7 +648,7 @@ mod tests {
     #[test]
     fn test_purge_request_in_payload() {
         let request = PurgeRequest {
-            public_key: [0x01; 32],
+            public_key: IdentityKey::from_bytes([0x01; 32]),
             signature: vec![0x02; 64],
             purge_token: [0x03; 32],
             timestamp: 1700000000,

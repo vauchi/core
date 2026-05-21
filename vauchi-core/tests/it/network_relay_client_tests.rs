@@ -318,7 +318,7 @@ fn test_send_purge_request() {
     client.connect().unwrap();
 
     let request = PurgeRequest {
-        public_key: [0x42; 32],
+        public_key: vauchi_core::identifiers::IdentityKey::from_bytes([0x42; 32]),
         signature: vec![0xAB; 64],
         purge_token: [0xCD; 32],
         timestamp: 1700000000,
@@ -353,7 +353,7 @@ fn test_send_purge_request_send_error() {
         .inject_error(NetworkError::SendFailed("connection lost".into()));
 
     let request = PurgeRequest {
-        public_key: [0x01; 32],
+        public_key: vauchi_core::identifiers::IdentityKey::from_bytes([0x01; 32]),
         signature: vec![0x02; 64],
         purge_token: [0x03; 32],
         timestamp: 1700000000,

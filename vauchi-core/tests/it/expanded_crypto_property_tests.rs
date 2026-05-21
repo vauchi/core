@@ -363,7 +363,7 @@ proptest! {
                 recipient_id: recipient_id.clone(),
                 sender_id: sender_id.clone(),
                 ratchet_header: RatchetHeader {
-                    dh_public,
+                    dh_public: vauchi_core::identifiers::DhPublicKey::from_bytes(dh_public),
                     dh_generation,
                     message_index,
                     previous_chain_length,
@@ -455,7 +455,7 @@ proptest! {
             message_id: msg_id.clone(),
             timestamp,
             payload: MessagePayload::Handshake(Handshake {
-                identity_public_key: identity_key,
+                identity_public_key: vauchi_core::identifiers::IdentityKey::from_bytes(identity_key),
                 nonce,
                 signature,
             }),
@@ -583,7 +583,7 @@ proptest! {
             timestamp: env_timestamp,
             payload: MessagePayload::IdentityDeletionNotice(IdentityDeletionNotice {
                 stage,
-                public_key,
+                public_key: vauchi_core::identifiers::IdentityKey::from_bytes(public_key),
                 timestamp,
                 signature,
             }),
@@ -619,7 +619,7 @@ proptest! {
             message_id: msg_id.clone(),
             timestamp: env_timestamp,
             payload: MessagePayload::PurgeRequest(PurgeRequest {
-                public_key,
+                public_key: vauchi_core::identifiers::IdentityKey::from_bytes(public_key),
                 signature: signature.clone(),
                 purge_token,
                 timestamp,

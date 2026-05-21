@@ -129,7 +129,7 @@ impl HttpTransportAdapter {
                 recipient_id: blob.mailbox_token.clone().unwrap_or_default(),
                 sender_id: String::new(), // opaque — relay doesn't know sender
                 ratchet_header: RatchetHeader {
-                    dh_public: [0u8; 32],
+                    dh_public: crate::identifiers::DhPublicKey::from_bytes([0u8; 32]),
                     dh_generation: 0,
                     message_index: 0,
                     previous_chain_length: 0,
@@ -550,7 +550,7 @@ mod tests {
                 recipient_id: "a".repeat(64),
                 sender_id: "b".repeat(64),
                 ratchet_header: RatchetHeader {
-                    dh_public: [0u8; 32],
+                    dh_public: crate::identifiers::DhPublicKey::from_bytes([0u8; 32]),
                     dh_generation: 0,
                     message_index: 0,
                     previous_chain_length: 0,

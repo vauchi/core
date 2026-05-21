@@ -224,7 +224,7 @@ fn make_contact_sync_data(seed_byte: u8, name: &str) -> ContactSyncData {
 
     ContactSyncData {
         id: id.clone(),
-        public_key,
+        public_key: vauchi_core::identifiers::IdentityKey::from_bytes(public_key),
         display_name: name.to_string(),
         card_json,
         shared_key: [0xBB; 32],

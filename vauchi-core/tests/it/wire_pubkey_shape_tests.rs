@@ -16,6 +16,7 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use vauchi_core::exchange::EncryptedExchangeMessage;
+use vauchi_core::identifiers::{DhPublicKey, IdentityKey};
 use vauchi_core::network::{
     DeletionStage, Handshake, IdentityDeletionNotice, MessageEnvelope, MessagePayload,
     PROTOCOL_VERSION, PurgeRequest, RatchetHeader,
@@ -36,7 +37,7 @@ fn b64(bytes: &[u8; 32]) -> String {
 #[test]
 fn ratchet_header_dh_public_is_base64_string() {
     let header = RatchetHeader {
-        dh_public: DH_BYTES,
+        dh_public: DhPublicKey::from_bytes(DH_BYTES),
         dh_generation: 5,
         message_index: 10,
         previous_chain_length: 3,
@@ -50,7 +51,7 @@ fn ratchet_header_dh_public_is_base64_string() {
 #[test]
 fn handshake_identity_public_key_is_base64_string() {
     let handshake = Handshake {
-        identity_public_key: ID_BYTES,
+        identity_public_key: IdentityKey::from_bytes(ID_BYTES),
         nonce: [0x44; 32],
         signature: [0x55; 64],
     };
@@ -74,7 +75,7 @@ fn identity_deletion_notice_public_key_is_base64_string() {
         timestamp: 0,
         payload: MessagePayload::IdentityDeletionNotice(IdentityDeletionNotice {
             stage: DeletionStage::Confirmed,
-            public_key: ID_BYTES,
+            public_key: IdentityKey::from_bytes(ID_BYTES),
             timestamp: 0,
             signature: [0xAA; 64],
         }),
@@ -93,7 +94,7 @@ fn purge_request_public_key_and_token_are_base64_strings() {
         message_id: "snapshot-002".to_string(),
         timestamp: 0,
         payload: MessagePayload::PurgeRequest(PurgeRequest {
-            public_key: ID_BYTES,
+            public_key: IdentityKey::from_bytes(ID_BYTES),
             signature: vec![0xBB; 64],
             purge_token: TOKEN_BYTES,
             timestamp: 0,
@@ -116,7 +117,7 @@ fn purge_request_public_key_and_token_are_base64_strings() {
 fn contact_sync_data_public_key_is_base64_string() {
     let data = ContactSyncData {
         id: "contact-001".to_string(),
-        public_key: ID_BYTES,
+        public_key: IdentityKey::from_bytes(ID_BYTES),
         display_name: "Snapshot".to_string(),
         card_json: "{}".to_string(),
         shared_key: [0xCC; 32],
@@ -143,8 +144,8 @@ fn contact_sync_data_public_key_is_base64_string() {
 #[test]
 fn encrypted_exchange_message_pubkeys_are_base64_strings() {
     let msg = EncryptedExchangeMessage {
-        sender_exchange_key: DH_BYTES,
-        ephemeral_public_key: [0x66; 32],
+        sender_exchange_key: DhPublicKey::from_bytes(DH_BYTES),
+        ephemeral_public_key: DhPublicKey::from_bytes([0x66; 32]),
         ciphertext: vec![0xEE; 16],
     };
     let json: serde_json::Value =

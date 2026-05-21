@@ -190,7 +190,11 @@ vauchi-core/src/storage/mod.rs 1079
 #   (dual-storage cache + active engine, both must invalidate together);
 #   `initial_render_context` local + extra arg threaded through
 #   `Self::create_engine` callsites in `new` and the unarchive recreate.)
-vauchi-app/src/ui/app_engine/mod.rs 1307
+# (+10 on mod.rs for #[allow(clippy::let_underscore_must_use)] +
+#   per-site rationale comments on 3 best-effort sites (event-channel
+#   send, backup-reminder save, ArchivedContacts swipe-unarchive),
+#   problem 2026-05-21-silent-failures-in-security-paths)
+vauchi-app/src/ui/app_engine/mod.rs 1317
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -213,7 +217,15 @@ vauchi-app/src/ui/app_engine/mod.rs 1307
 #   FieldSetup extraction in handle_completion (Onboarding arm) plus the
 #   walk-and-add_own_field loop after the existing groups loop.
 #   `_private/docs/problems/2026-05-17-slice-32c-mobile-ui-retirement/`.)
-vauchi-app/src/ui/app_engine/routing.rs 1308
+# (+95 on routing.rs for Phase B of 2026-05-21-silent-failures-in-
+#   security-paths: apply_contact_action UI-glue cluster refactored
+#   from 6 silent `let _ = vauchi.X()` + ShowToast arms into 6
+#   match-on-Result arms emitting ShowToast / ShowAlert; additional
+#   `if let Err(e) = ...` propagation on fingerprint verify/unverify,
+#   hard delete_group (two sites), avatar save flow, and
+#   set_group_field_visibility_and_repropagate. Documented-best-effort
+#   #[allow] attrs on the remaining onboarding-loop sites.)
+vauchi-app/src/ui/app_engine/routing.rs 1403
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)

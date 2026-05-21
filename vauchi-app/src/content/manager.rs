@@ -212,6 +212,9 @@ impl ContentManager {
                 && let Some(code) = path.file_stem().and_then(|s| s.to_str())
                 && let Ok(data) = std::fs::read(&path)
             {
+                // best-effort: a corrupt locale file should not block the
+                // load of other locales; bundled locales are the fallback
+                #[allow(clippy::let_underscore_must_use)]
                 let _ = crate::i18n::load_locale_from_bytes(code, &data);
             }
         }
@@ -248,7 +251,9 @@ impl ContentManager {
                         super::types::MAX_SUPPORTED_SCHEMA_VERSION,
                     ));
                 }
-                // Record check time
+                // Record check time — best-effort bookkeeping; on
+                // failure the next check_for_updates fires sooner
+                #[allow(clippy::let_underscore_must_use)]
                 let _ = self.record_check_time();
                 self.compare_versions(&remote)
             }
@@ -303,6 +308,8 @@ impl ContentManager {
 
         // Save updated manifest
         self.cache.save_manifest(&remote)?;
+        // best-effort: see check_for_updates rationale
+        #[allow(clippy::let_underscore_must_use)]
         let _ = self.record_check_time();
 
         Ok(ApplyResult::Applied { applied, failed })
@@ -434,7 +441,10 @@ impl ContentManager {
                         &file_entry.checksum,
                     )?;
 
-                    // Hot-reload into the i18n system
+                    // Hot-reload into the i18n system — best-effort:
+                    // failure here means the cached file is on disk but not
+                    // active until next start; recoverable on relaunch
+                    #[allow(clippy::let_underscore_must_use)]
                     let _ = crate::i18n::load_locale_from_bytes(lang_code, &data);
                 }
             }

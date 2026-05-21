@@ -51,6 +51,9 @@ impl AppEngine {
             let next = state.frequency.next();
             state.frequency = next;
             state.reminders_enabled = next != vauchi_core::types::ReminderFrequency::Never;
+            // best-effort: reminder cadence is a UX setting; failure leaves
+            // the previous cadence active until the next user change
+            #[allow(clippy::let_underscore_must_use)]
             let _ = self.vauchi.save_backup_reminder_state(&state);
         }
 
@@ -232,6 +235,10 @@ impl AppEngine {
                         .map(|(_, _, v)| *v)
                         .unwrap_or(false);
                     let new_visible = !is_visible;
+                    // best-effort: per-group visibility toggle; failure
+                    // leaves the storage state unchanged and the screen
+                    // rebuild below will reflect actual state
+                    #[allow(clippy::let_underscore_must_use)]
                     let _ =
                         self.vauchi
                             .set_group_field_visibility(&group_id, field_id, new_visible);
@@ -295,12 +302,25 @@ impl AppEngine {
                 }
             }
             UserAction::ActionPressed { action_id } if action_id == "delete" => {
+                // Field delete is user-visible; surface failures as ShowAlert
+                // so the user doesn't see "Field deleted" when the row is
+                // still in storage.
                 if let Ok(Some(mut card)) = self.vauchi.own_card() {
                     // Find and clone the field before removing
                     if let Some(field) = card.fields().iter().find(|f| f.id() == field_id).cloned()
                     {
-                        let _ = card.remove_field(field_id);
-                        let _ = self.vauchi.update_own_card(&card);
+                        if let Err(e) = card.remove_field(field_id) {
+                            return Some(ActionResult::ShowAlert {
+                                title: "Delete Failed".into(),
+                                message: format!("{e}"),
+                            });
+                        }
+                        if let Err(e) = self.vauchi.update_own_card(&card) {
+                            return Some(ActionResult::ShowAlert {
+                                title: "Delete Failed".into(),
+                                message: format!("{e}"),
+                            });
+                        }
                         self.pending_field_undo = Some((field_id.to_string(), field));
                     }
                 }
@@ -406,6 +426,8 @@ impl AppEngine {
             &self.device_capabilities,
             &self.render_context,
         );
+        // best-effort discard: we don't need the old engine value
+        #[allow(clippy::let_underscore_must_use)]
         let _ = std::mem::replace(&mut self.engine, new_engine);
         Some(ActionResult::UpdateScreen(self.engine.current_screen()))
     }
@@ -432,9 +454,14 @@ impl AppEngine {
         }
 
         // Load the contact, flip the flag, save it back.
+        // best-effort: the engine's optimistic flip below will revert
+        // on the next ContactDetail engine read if storage didn't change.
         if let Ok(Some(mut contact)) = self.vauchi.get_contact(contact_id) {
+            #[allow(clippy::let_underscore_must_use)]
             let _ = contact.set_proposal_trusted(!contact.is_proposal_trusted());
             if let Err(e) = self.vauchi.update_contact(&contact) {
+                // Drop the error explicitly — same best-effort rationale.
+                #[allow(clippy::let_underscore_must_use)]
                 let _ = e;
             }
         }
@@ -473,6 +500,7 @@ impl AppEngine {
         // swallowed here — the engine's optimistic flip will be reverted
         // on the next AppScreen::ContactDetail engine read if storage
         // didn't actually change.
+        #[allow(clippy::let_underscore_must_use)]
         let _ = self.vauchi.toggle_recovery_trust(contact_id);
 
         self.engine
@@ -504,9 +532,13 @@ impl AppEngine {
             .map(|e| e.is_hidden())
             .unwrap_or(false);
 
+        // best-effort: screen rebuild below reflects actual storage
+        // state; an optimistic flip that diverges is recovered on next read
         if is_hidden {
+            #[allow(clippy::let_underscore_must_use)]
             let _ = self.vauchi.unhide_contact(contact_id);
         } else {
+            #[allow(clippy::let_underscore_must_use)]
             let _ = self.vauchi.hide_contact(contact_id);
         }
 
@@ -535,6 +567,10 @@ impl AppEngine {
             // The actual deletion happens in handle_completion for ContactDetail.
             "delete_contact" | "confirm_delete_contact" | "cancel_delete_contact" => None,
             "archive_contact" => {
+                // best-effort: contact_list rebuild reflects truth on next
+                // open; the canonical archive path is `apply_contact_action`
+                // which surfaces ShowAlert on failure
+                #[allow(clippy::let_underscore_must_use)]
                 let _ = self.vauchi.archive_contact(contact_id);
                 self.pending_contact_undo = Some(super::PendingContactUndo::Archive {
                     contact_id: contact_id.to_string(),
@@ -741,6 +777,10 @@ impl AppEngine {
             .and_then(|e| e.selected_pair_index())?;
 
         let pair = pairs.get(selected_idx).cloned()?;
+        // best-effort: duplicate dismissal is idempotent; if the row was
+        // already dismissed (or storage faults), the engine recreate below
+        // will fetch the actual list
+        #[allow(clippy::let_underscore_must_use)]
         let _ = self.vauchi.dismiss_duplicate(&pair.id1, &pair.id2);
 
         // Recreate the engine so the dismissed pair drops from the list
@@ -805,6 +845,9 @@ impl AppEngine {
         // undo_delete_contact removed: delete is now irrevocable (InlineConfirm).
 
         if let Some(contact_id) = action_id.strip_prefix("undo_archive_contact:") {
+            // best-effort undo: user can retry by archiving again if this
+            // failed; the navigation below shows the actual state
+            #[allow(clippy::let_underscore_must_use)]
             let _ = self.vauchi.unarchive_contact(contact_id);
             self.pending_contact_undo = None;
             self.engine_cache.remove(&AppScreen::Contacts);
@@ -816,12 +859,16 @@ impl AppEngine {
 
         // Swipe-undo from Contacts list: restore and stay on the list.
         if let Some(contact_id) = action_id.strip_prefix("undo_hide_contact:") {
+            // best-effort undo (see undo_archive comment above)
+            #[allow(clippy::let_underscore_must_use)]
             let _ = self.vauchi.unhide_contact(contact_id);
             self.engine_cache.remove(&AppScreen::Contacts);
             return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
         }
 
         if let Some(contact_id) = action_id.strip_prefix("undo_delete_contact:") {
+            // best-effort undo (see undo_archive comment above)
+            #[allow(clippy::let_underscore_must_use)]
             let _ = self.vauchi.undo_delete_imported_contact(contact_id);
             self.engine_cache.remove(&AppScreen::Contacts);
             return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
@@ -871,6 +918,9 @@ impl AppEngine {
                         .unwrap_or(0)
                 );
                 let card = vauchi_core::contact_card::ContactCard::new(&name);
+                // best-effort: refresh_decoy_engine below re-reads storage,
+                // so a failed insert shows up as the new card not appearing
+                #[allow(clippy::let_underscore_must_use)]
                 let _ = self.vauchi.add_decoy_contact(&id, &name, &card);
                 self.refresh_decoy_engine();
                 Some(ActionResult::UpdateScreen(self.engine.current_screen()))
@@ -882,6 +932,9 @@ impl AppEngine {
                     .and_then(|a| a.downcast_ref::<crate::ui::DecoyContactsEngine>())
                     .and_then(|e| e.pending_delete_id().map(|s| s.to_string()));
                 if let Some(id) = pending {
+                    // best-effort: refresh_decoy_engine below re-reads
+                    // storage; a failed delete shows up as the row staying
+                    #[allow(clippy::let_underscore_must_use)]
                     let _ = self.vauchi.remove_decoy_contact(&id);
                 }
                 self.refresh_decoy_engine();

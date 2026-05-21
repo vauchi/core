@@ -306,6 +306,9 @@ impl DeviceLinkSession {
         confirmation_code: String,
         confirmed_at: u64,
     ) -> Result<(), DeviceLinkSessionError> {
+        // best-effort: duplicate-tap returns Ok-but-no-effect per the
+        // doc-comment above (channel already full)
+        #[allow(clippy::let_underscore_must_use)]
         let _ = self.action_tx.try_send(UserAction::ConfirmManual {
             code: confirmation_code,
             at: confirmed_at,
@@ -325,6 +328,8 @@ impl DeviceLinkSession {
                 "challenge_response must be exactly 16 bytes".into(),
             ));
         }
+        // best-effort: same rationale as confirm_manual
+        #[allow(clippy::let_underscore_must_use)]
         let _ = self.action_tx.try_send(UserAction::ConfirmUltrasonic {
             response: challenge_response,
             at: verified_at,
@@ -336,6 +341,8 @@ impl DeviceLinkSession {
     /// request). Cycle thread emits `on_failed("user_denied")` then
     /// `on_session_ended()`.
     pub fn deny(&self) {
+        // best-effort: same rationale as confirm_manual
+        #[allow(clippy::let_underscore_must_use)]
         let _ = self.action_tx.try_send(UserAction::Deny);
     }
 
@@ -346,6 +353,8 @@ impl DeviceLinkSession {
 
         // Send a Deny so a cycle thread waiting on action_rx wakes
         // up. The thread checks cancel_flag first and exits cleanly.
+        // best-effort: channel may already be closed (thread exiting)
+        #[allow(clippy::let_underscore_must_use)]
         let _ = self.action_tx.try_send(UserAction::Deny);
 
         let handle_opt = self
@@ -354,6 +363,9 @@ impl DeviceLinkSession {
             .ok()
             .and_then(|mut slot| slot.take());
         if let Some(handle) = handle_opt {
+            // best-effort: thread join; failure means the thread panicked,
+            // which we can't recover from here (already in cancel path)
+            #[allow(clippy::let_underscore_must_use)]
             let _ = handle.join();
         }
 

@@ -459,6 +459,9 @@ impl AppEngine {
         let event_tx = std::sync::Mutex::new(event_tx);
         let event_handler_id = vauchi.add_event_handler(std::sync::Arc::new(move |event| {
             if let Ok(tx) = event_tx.lock() {
+                // best-effort: channel send fails only if the receiver
+                // was dropped (AppEngine is being torn down)
+                #[allow(clippy::let_underscore_must_use)]
                 let _ = tx.send(event);
             }
         }));
@@ -542,6 +545,9 @@ impl AppEngine {
             // Record that we showed a reminder
             if let Ok(mut state) = self.vauchi.load_backup_reminder_state() {
                 state.record_reminder_shown();
+                // best-effort: reminder-shown bookkeeping; failure here
+                // means the user may see the reminder again sooner
+                #[allow(clippy::let_underscore_must_use)]
                 let _ = self.vauchi.save_backup_reminder_state(&state);
             }
             Some(ActionResult::ShowToast {
@@ -1163,6 +1169,10 @@ impl WorkflowEngine for AppEngine {
             && let UserAction::ActionPressed { ref action_id } = action
             && let Some(contact_id) = action_id.strip_prefix("unarchive_")
         {
+            // best-effort: engine recreate below reflects storage truth;
+            // the canonical archive/unarchive path is `apply_contact_action`
+            // which surfaces ShowAlert on failure
+            #[allow(clippy::let_underscore_must_use)]
             let _ = self.vauchi.unarchive_contact(contact_id);
             self.engine_cache.remove(&AppScreen::Contacts);
             self.engine_cache.remove(&AppScreen::ArchivedContacts);

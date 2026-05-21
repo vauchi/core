@@ -309,8 +309,11 @@ impl AppEngine {
                 // identity exists but onboarding is "incomplete".
                 match self.vauchi.create_identity_with_onboarding(&name) {
                     Ok(()) => {
-                        // Persist onboarding groups
+                        // Persist onboarding groups — best-effort:
+                        // partial-groups failure is recoverable; user can
+                        // create missing groups from Settings (slice 32c S2)
                         for group_name in &onboarding_groups {
+                            #[allow(clippy::let_underscore_must_use)]
                             let _ = self.vauchi.create_group(group_name);
                         }
                         // Slice 32c S2: persist onboarding fields
@@ -338,6 +341,10 @@ impl AppEngine {
                                 &setup.value,
                                 now,
                             );
+                            // best-effort: partial-fields failure is
+                            // recoverable; user can add missing fields
+                            // manually from MyInfo
+                            #[allow(clippy::let_underscore_must_use)]
                             let _ = self.vauchi.add_own_field(field);
                         }
                         let target = AppScreen::MyInfo;
@@ -415,6 +422,9 @@ impl AppEngine {
                         };
                     }
                     for group_id in &groups {
+                        // best-effort: group assignment after exchange;
+                        // failures don't block the exchange itself
+                        #[allow(clippy::let_underscore_must_use)]
                         let _ = self.vauchi.add_contact_to_group(group_id, &contact_id);
                     }
                 }
@@ -434,6 +444,10 @@ impl AppEngine {
                                 .get_effective_field_visibility(&contact_id, field_id)
                                 .unwrap_or(true);
                             if should_show != is_visible {
+                                // best-effort: visibility toggle is idempotent;
+                                // a failure leaves the row in its prior state
+                                // and the user can retry from the same screen
+                                #[allow(clippy::let_underscore_must_use)]
                                 let _ = self.vauchi.toggle_field_visibility(&contact_id, field_id);
                             }
                         }
@@ -451,10 +465,20 @@ impl AppEngine {
                 if let Some(fp_engine) = fp_engine {
                     match fp_engine.completion_action() {
                         VerifyAction::Verified => {
-                            let _ = self.vauchi.verify_contact_fingerprint(contact_id);
+                            if let Err(e) = self.vauchi.verify_contact_fingerprint(contact_id) {
+                                return ActionResult::ShowAlert {
+                                    title: "Verification Failed".into(),
+                                    message: format!("{e}"),
+                                };
+                            }
                         }
                         VerifyAction::Unverified => {
-                            let _ = self.vauchi.unverify_contact_fingerprint(contact_id);
+                            if let Err(e) = self.vauchi.unverify_contact_fingerprint(contact_id) {
+                                return ActionResult::ShowAlert {
+                                    title: "Verification Failed".into(),
+                                    message: format!("{e}"),
+                                };
+                            }
                         }
                         VerifyAction::None => {}
                     }
@@ -593,6 +617,10 @@ impl AppEngine {
                         // Apply group visibility from selected groups
                         if result.is_ok() && !group_list.is_empty() {
                             for group_id in &group_list {
+                                // best-effort: per-group visibility after
+                                // field was added successfully; failures
+                                // here are recoverable from group settings
+                                #[allow(clippy::let_underscore_must_use)]
                                 let _ = self
                                     .vauchi
                                     .set_group_field_visibility(group_id, &field_id, true);
@@ -786,7 +814,14 @@ impl AppEngine {
             }
             AppScreen::ContactDetail { contact_id } => {
                 // InlineConfirm → hard delete the imported contact and navigate back.
+                // best-effort: plain "back" also routes through this
+                // completion handler (no pending-confirm flag yet), so a
+                // "not found" / non-imported contact is expected and we
+                // navigate-back regardless. Propagating would force every
+                // plain back press to surface ShowAlert — the user-intent
+                // gate belongs in the InlineConfirm engine, not here.
                 let contact_id = contact_id.clone();
+                #[allow(clippy::let_underscore_must_use)]
                 let _ = self.vauchi.hard_delete_imported_contact(&contact_id);
                 self.engine_cache.remove(&AppScreen::Contacts);
                 let screen = self.navigate_back();
@@ -794,7 +829,12 @@ impl AppEngine {
             }
             AppScreen::GroupDetail { group_id } => {
                 let group_id = group_id.clone();
-                let _ = self.vauchi.delete_group(&group_id);
+                if let Err(e) = self.vauchi.delete_group(&group_id) {
+                    return ActionResult::ShowAlert {
+                        title: "Delete Group Failed".into(),
+                        message: format!("{e}"),
+                    };
+                }
                 self.engine_cache.remove(&AppScreen::Groups);
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)
@@ -805,8 +845,12 @@ impl AppEngine {
                     .as_any()
                     .and_then(|a| a.downcast_ref::<crate::ui::groups_list::GroupsEngine>())
                     .and_then(|e| e.pending_delete_group_id().map(|s| s.to_string()))
+                    && let Err(e) = self.vauchi.delete_group(&group_id)
                 {
-                    let _ = self.vauchi.delete_group(&group_id);
+                    return ActionResult::ShowAlert {
+                        title: "Delete Group Failed".into(),
+                        message: format!("{e}"),
+                    };
                 }
                 self.engine_cache.remove(&AppScreen::Groups);
                 let screen = self.navigate_back();
@@ -855,13 +899,28 @@ impl AppEngine {
                         // Clear avatar from own card
                         if let Ok(Some(mut card)) = self.vauchi.own_card() {
                             card.clear_avatar();
-                            let _ = self.vauchi.update_own_card(&card);
+                            if let Err(e) = self.vauchi.update_own_card(&card) {
+                                return ActionResult::ShowAlert {
+                                    title: "Avatar Update Failed".into(),
+                                    message: format!("{e}"),
+                                };
+                            }
                         }
                     } else if let Some(avatar) = editor.result_avatar() {
                         // Persist the new avatar
                         if let Ok(Some(mut card)) = self.vauchi.own_card() {
-                            let _ = card.set_avatar(avatar.to_vec());
-                            let _ = self.vauchi.update_own_card(&card);
+                            if let Err(e) = card.set_avatar(avatar.to_vec()) {
+                                return ActionResult::ShowAlert {
+                                    title: "Avatar Update Failed".into(),
+                                    message: format!("{e}"),
+                                };
+                            }
+                            if let Err(e) = self.vauchi.update_own_card(&card) {
+                                return ActionResult::ShowAlert {
+                                    title: "Avatar Update Failed".into(),
+                                    message: format!("{e}"),
+                                };
+                            }
                         }
                     }
                 }
@@ -1064,9 +1123,15 @@ impl AppEngine {
                 field_id,
                 visible,
             } => {
-                let _ = self
+                if let Err(e) = self
                     .vauchi
-                    .set_group_field_visibility_and_repropagate(&group_id, &field_id, visible);
+                    .set_group_field_visibility_and_repropagate(&group_id, &field_id, visible)
+                {
+                    return ActionResult::ShowAlert {
+                        title: "Visibility Update Failed".into(),
+                        message: format!("{e}"),
+                    };
+                }
                 self.engine_cache.remove(&self.screen);
                 ActionResult::UpdateScreen(self.engine.current_screen())
             }
@@ -1160,6 +1225,9 @@ impl AppEngine {
         {
             // Re-emitting "back" from BackupPasswordEntry clears
             // pending bytes + password and routes to LinkChoice.
+            // best-effort: navigation reset is advisory; if the
+            // engine can't transition the screen will rebuild fresh
+            #[allow(clippy::let_underscore_must_use)]
             let _ = eng.handle_action(UserAction::ActionPressed {
                 action_id: "back".into(),
             });
@@ -1235,50 +1303,77 @@ impl AppEngine {
         // still yields a fresh screen read.
         self.engine_cache.remove(&AppScreen::Contacts);
         self.engine_cache.remove(&AppScreen::ArchivedContacts);
+        // 2026-05-21 silent-failures sweep: each arm matches the
+        // mutation Result. On Ok we emit ShowToast with the documented
+        // success copy + optional undo id; on Err we surface ShowAlert
+        // so the user sees the DB/CEK failure instead of a fake success.
         match kind {
-            ContactActionKind::Archive => {
-                let _ = self.vauchi.archive_contact(contact_id);
-                self.pending_contact_undo = Some(super::PendingContactUndo::Archive {
-                    contact_id: contact_id.to_string(),
-                });
-                ActionResult::ShowToast {
-                    message: "Contact archived".into(),
-                    undo_action_id: Some(format!("undo_archive_contact:{contact_id}")),
+            ContactActionKind::Archive => match self.vauchi.archive_contact(contact_id) {
+                Ok(()) => {
+                    self.pending_contact_undo = Some(super::PendingContactUndo::Archive {
+                        contact_id: contact_id.to_string(),
+                    });
+                    ActionResult::ShowToast {
+                        message: "Contact archived".into(),
+                        undo_action_id: Some(format!("undo_archive_contact:{contact_id}")),
+                    }
                 }
-            }
-            ContactActionKind::Unarchive => {
-                let _ = self.vauchi.unarchive_contact(contact_id);
-                ActionResult::ShowToast {
+                Err(e) => ActionResult::ShowAlert {
+                    title: "Archive Failed".into(),
+                    message: format!("{e}"),
+                },
+            },
+            ContactActionKind::Unarchive => match self.vauchi.unarchive_contact(contact_id) {
+                Ok(()) => ActionResult::ShowToast {
                     message: "Contact unarchived".into(),
                     undo_action_id: None,
-                }
-            }
-            ContactActionKind::Hide => {
-                let _ = self.vauchi.hide_contact(contact_id);
-                ActionResult::ShowToast {
+                },
+                Err(e) => ActionResult::ShowAlert {
+                    title: "Unarchive Failed".into(),
+                    message: format!("{e}"),
+                },
+            },
+            ContactActionKind::Hide => match self.vauchi.hide_contact(contact_id) {
+                Ok(()) => ActionResult::ShowToast {
                     message: "Contact hidden".into(),
                     undo_action_id: Some(format!("undo_hide_contact:{contact_id}")),
-                }
-            }
-            ContactActionKind::Unhide => {
-                let _ = self.vauchi.unhide_contact(contact_id);
-                ActionResult::ShowToast {
+                },
+                Err(e) => ActionResult::ShowAlert {
+                    title: "Hide Failed".into(),
+                    message: format!("{e}"),
+                },
+            },
+            ContactActionKind::Unhide => match self.vauchi.unhide_contact(contact_id) {
+                Ok(()) => ActionResult::ShowToast {
                     message: "Contact unhidden".into(),
                     undo_action_id: None,
-                }
-            }
-            ContactActionKind::Delete => {
-                let _ = self.vauchi.soft_delete_imported_contact(contact_id);
-                ActionResult::ShowToast {
+                },
+                Err(e) => ActionResult::ShowAlert {
+                    title: "Unhide Failed".into(),
+                    message: format!("{e}"),
+                },
+            },
+            ContactActionKind::Delete => match self.vauchi.soft_delete_imported_contact(contact_id)
+            {
+                Ok(()) => ActionResult::ShowToast {
                     message: "Contact deleted".into(),
                     undo_action_id: Some(format!("undo_delete_contact:{contact_id}")),
-                }
-            }
+                },
+                Err(e) => ActionResult::ShowAlert {
+                    title: "Delete Failed".into(),
+                    message: format!("{e}"),
+                },
+            },
             ContactActionKind::Undelete => {
-                let _ = self.vauchi.undo_delete_imported_contact(contact_id);
-                ActionResult::ShowToast {
-                    message: "Contact restored".into(),
-                    undo_action_id: None,
+                match self.vauchi.undo_delete_imported_contact(contact_id) {
+                    Ok(()) => ActionResult::ShowToast {
+                        message: "Contact restored".into(),
+                        undo_action_id: None,
+                    },
+                    Err(e) => ActionResult::ShowAlert {
+                        title: "Restore Failed".into(),
+                        message: format!("{e}"),
+                    },
                 }
             }
         }

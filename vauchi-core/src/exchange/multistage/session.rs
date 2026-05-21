@@ -264,10 +264,20 @@ impl MultiStageSession {
         let ephemeral_secret = X25519Secret::random_from_rng(OsRng);
         let ephemeral_public = X25519Public::from(&ephemeral_secret);
 
-        // Create commitment from local card, binding our relay metadata (T1.7)
+        // Create commitment from local card, binding our relay metadata (T1.7).
+        //
+        // `Commitment::create_with_context` is fallible at the API level
+        // (post-2026-05-21 ADR-019 XChaCha20 migration), but the only
+        // failure path is `XChaCha20Poly1305::encrypt` returning Err —
+        // which AEAD encryption of arbitrary plaintext with a fresh
+        // random key + random 24-byte nonce cannot do in practice. The
+        // panic here asserts that invariant. Propagating up through
+        // `MultiStageSession::new` is a separate refactor tracked as a
+        // follow-up to `2026-05-21-adr-019-commitment-xchacha-consistency`.
         let commitment_context =
             Self::build_commitment_context(relay_url.as_deref(), relay_noise_pubkey.as_ref());
-        let commitment = Commitment::create_with_context(&local_card, &commitment_context);
+        let commitment = Commitment::create_with_context(&local_card, &commitment_context)
+            .expect("XChaCha20Poly1305 encryption of fresh plaintext cannot fail");
 
         // Use identity seed as a stand-in pubkey for INIT QR
         // (In a full implementation, this would be a proper Ed25519 public key)
@@ -480,10 +490,7 @@ impl MultiStageSession {
     /// The matching test scenarios are in
     /// `vauchi-core/tests/it/multistage_session_tests.rs`
     /// (`audio_timeout_*` block — Phase 1.C.6 RED).
-    pub fn check_and_apply_audio_timeout(
-        &mut self,
-        now: Instant,
-    ) -> Result<bool, AudioStateError> {
+    pub fn check_and_apply_audio_timeout(&mut self, now: Instant) -> Result<bool, AudioStateError> {
         let started = match (self.audio_proximity, self.audio_listening_started_at) {
             (AudioProximityState::Listening, Some(t)) => t,
             // Not in Listening, or in Listening but tracker missing

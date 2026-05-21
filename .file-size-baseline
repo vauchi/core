@@ -99,7 +99,10 @@ vauchi-core/src/exchange/session.rs 1822
 #  + `check_and_apply_audio_timeout` method enforcing the listen-
 #  window budget. Defensive backstop per ADR-031 in case the audio
 #  adapter is silent on timeout.)
-vauchi-core/src/exchange/multistage/session.rs 1431
+# (+7 for ADR-019 XChaCha20 migration of Commitment::create_with_context:
+#  invariant comment explaining .expect rationale at the constructor
+#  call site; problem 2026-05-21-adr-019-commitment-xchacha-consistency)
+vauchi-core/src/exchange/multistage/session.rs 1438
 
 # EXEMPT — protocol command/event enum: variants + variant_name match
 # + From impls + serde-discriminant ordering must be co-located, splitting

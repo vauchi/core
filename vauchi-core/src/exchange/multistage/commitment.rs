@@ -4,7 +4,7 @@
 
 //! Commitment scheme for the multi-stage atomic QR exchange protocol.
 //!
-//! Creates an encrypted payload (ChaCha20-Poly1305 with a random reveal key) and a
+//! Creates an encrypted payload (XChaCha20-Poly1305 with a random reveal key) and a
 //! binding hash (SHA-256(reveal_key || ciphertext [|| context])). The reveal key is
 //! withheld until Stage 3 (VERIFY), ensuring neither side can decrypt until both
 //! parties exchange reveal keys.
@@ -12,13 +12,27 @@
 //! The optional context parameter (T1.7) binds relay metadata (URL + Noise pubkey)
 //! into the commitment hash, preventing a MitM from swapping relay fields in the
 //! INIT QR without invalidating the commitment.
+//!
+//! AEAD choice: ADR-019 mandates XChaCha20-Poly1305 for all new encryption.
+//! Migrated from ChaCha20-Poly1305 (12-byte nonce) to XChaCha20-Poly1305
+//! (24-byte nonce) on 2026-05-21 per
+//! `_private/docs/problems/2026-05-21-adr-019-commitment-xchacha-consistency/`.
+//! This is a wire-incompatible change: the nonce prefix on the ciphertext
+//! blob changed from 12 to 24 bytes. Both peers must run a client with
+//! this change to exchange successfully. Mixed-version exchanges fail at
+//! Stage 3 with `CommitmentError::DecryptionFailed`.
 
-use chacha20poly1305::ChaCha20Poly1305;
+use chacha20poly1305::XChaCha20Poly1305;
 use chacha20poly1305::aead::{Aead, KeyInit};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 use zeroize::Zeroize;
+
+/// Length of the nonce prefix written to the ciphertext blob (XChaCha20).
+const NONCE_LEN: usize = 24;
+/// Length of the Poly1305 authentication tag appended to the ciphertext.
+const TAG_LEN: usize = 16;
 
 /// Errors that can occur during commitment operations.
 #[derive(Debug, Error)]
@@ -37,17 +51,17 @@ pub enum CommitmentError {
 /// The reveal key is zeroized on drop to prevent leaking key material.
 pub struct Commitment {
     reveal_key: [u8; 32],
-    ciphertext: Vec<u8>, // nonce (12 bytes) || encrypted || tag (16 bytes)
+    ciphertext: Vec<u8>, // nonce (24 bytes, XChaCha20) || encrypted || tag (16 bytes)
     hash: [u8; 32],      // SHA256(reveal_key || ciphertext [|| context])
 }
 
 impl Commitment {
     /// Create a new commitment for the given plaintext (no context binding).
     ///
-    /// Generates a random reveal key and encrypts with ChaCha20-Poly1305.
+    /// Generates a random reveal key and encrypts with XChaCha20-Poly1305.
     /// The commitment hash binds the reveal key to the ciphertext.
     #[allow(dead_code)] // used by external tests
-    pub fn create(plaintext: &[u8]) -> Self {
+    pub fn create(plaintext: &[u8]) -> Result<Self, CommitmentError> {
         Self::create_with_context(plaintext, b"")
     }
 
@@ -56,17 +70,17 @@ impl Commitment {
     /// The context (e.g., relay URL + Noise pubkey) is included in the
     /// commitment hash but NOT encrypted. This prevents a MitM from
     /// swapping context fields without invalidating the commitment.
-    pub fn create_with_context(plaintext: &[u8], context: &[u8]) -> Self {
+    pub fn create_with_context(plaintext: &[u8], context: &[u8]) -> Result<Self, CommitmentError> {
         let reveal_key: [u8; 32] = crate::crypto::random_bytes();
 
-        let ciphertext = Self::encrypt(&reveal_key, plaintext).expect("encryption failed");
+        let ciphertext = Self::encrypt(&reveal_key, plaintext)?;
         let hash = Self::compute_hash_with_context(&reveal_key, &ciphertext, context);
 
-        Commitment {
+        Ok(Commitment {
             reveal_key,
             ciphertext,
             hash,
-        }
+        })
     }
 
     /// Returns the reveal key (to be sent in Stage 3 VERIFY).
@@ -137,29 +151,29 @@ impl Commitment {
     }
 
     fn encrypt(key: &[u8; 32], plaintext: &[u8]) -> Result<Vec<u8>, CommitmentError> {
-        let nonce_bytes: [u8; 12] = crate::crypto::random_bytes();
+        let nonce_bytes: [u8; NONCE_LEN] = crate::crypto::random_bytes();
 
-        let cipher = ChaCha20Poly1305::new(key.into());
-        let nonce = chacha20poly1305::Nonce::from_slice(&nonce_bytes);
+        let cipher = XChaCha20Poly1305::new(key.into());
+        let nonce = chacha20poly1305::XNonce::from_slice(&nonce_bytes);
 
         let ciphertext = cipher
             .encrypt(nonce, plaintext)
             .map_err(|_| CommitmentError::EncryptionFailed)?;
 
-        let mut result = Vec::with_capacity(12 + ciphertext.len());
+        let mut result = Vec::with_capacity(NONCE_LEN + ciphertext.len());
         result.extend_from_slice(&nonce_bytes);
         result.extend_from_slice(&ciphertext);
         Ok(result)
     }
 
     fn decrypt(key: &[u8; 32], ciphertext: &[u8]) -> Result<Vec<u8>, CommitmentError> {
-        if ciphertext.len() < 12 + 16 {
+        if ciphertext.len() < NONCE_LEN + TAG_LEN {
             return Err(CommitmentError::DecryptionFailed);
         }
-        let (nonce_bytes, encrypted) = ciphertext.split_at(12);
+        let (nonce_bytes, encrypted) = ciphertext.split_at(NONCE_LEN);
 
-        let cipher = ChaCha20Poly1305::new(key.into());
-        let nonce = chacha20poly1305::Nonce::from_slice(nonce_bytes);
+        let cipher = XChaCha20Poly1305::new(key.into());
+        let nonce = chacha20poly1305::XNonce::from_slice(nonce_bytes);
 
         cipher
             .decrypt(nonce, encrypted)

@@ -14,7 +14,7 @@ fn form_dialog_add_field_shows_type_list_and_inputs() {
     });
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "form_add_field");
-    assert_eq!(screen.title, "Add Entry to MyInfo");
+    assert_eq!(screen.title, "Add to your card");
 
     // All components visible on single page
     let has_types = screen.components.iter().any(|c| {
@@ -72,6 +72,106 @@ fn form_dialog_add_field_select_type_updates_title() {
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
     }
+}
+
+// Regression for the "MyInfo" jargon leak — `MyInfo` is the
+// internal `CoreScreenView` screen name, not a user-facing word.
+// See problem record `2026-05-21-add-entry-form-mixes-picker-and-fields`.
+// @internal
+#[test]
+fn form_dialog_add_field_title_omits_myinfo_jargon() {
+    let engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
+    });
+    let screen = engine.current_screen();
+    assert!(
+        !screen.title.contains("MyInfo"),
+        "Initial title leaks 'MyInfo': {:?}",
+        screen.title
+    );
+
+    let mut engine = engine;
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "email".into(),
+    });
+    let screen = engine.current_screen();
+    assert!(
+        !screen.title.contains("MyInfo"),
+        "Post-selection title leaks 'MyInfo': {:?}",
+        screen.title
+    );
+}
+
+// Save must be `enabled: false` until the user has picked a type
+// AND filled in the Value field. Without these guards the user can
+// tap Save with no input and the engine accepts a `custom` entry
+// with an empty value — see problem record
+// `2026-05-21-add-entry-form-mixes-picker-and-fields` §G3.
+// @internal
+#[test]
+fn form_dialog_add_field_save_disabled_when_no_type_selected() {
+    let engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
+    });
+    let screen = engine.current_screen();
+    let submit = screen
+        .actions
+        .iter()
+        .find(|a| a.id == "submit")
+        .expect("submit action present");
+    assert!(
+        !submit.enabled,
+        "Save should be disabled before user picks a type"
+    );
+}
+
+// @internal
+#[test]
+fn form_dialog_add_field_save_disabled_when_value_empty() {
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
+    });
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "email".into(),
+    });
+    let screen = engine.current_screen();
+    let submit = screen
+        .actions
+        .iter()
+        .find(|a| a.id == "submit")
+        .expect("submit action present");
+    assert!(
+        !submit.enabled,
+        "Save should be disabled after picking a type but before typing a value"
+    );
+}
+
+// @internal
+#[test]
+fn form_dialog_add_field_save_enabled_when_complete() {
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
+    });
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "email".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "field_value".into(),
+        value: "test@example.com".into(),
+    });
+    let screen = engine.current_screen();
+    let submit = screen
+        .actions
+        .iter()
+        .find(|a| a.id == "submit")
+        .expect("submit action present");
+    assert!(
+        submit.enabled,
+        "Save should be enabled once a type is picked and a value is typed"
+    );
 }
 
 // @internal

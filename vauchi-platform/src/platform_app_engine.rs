@@ -782,6 +782,13 @@ impl PlatformAppEngine {
         vauchi_core::PERIODIC_SYNC_INTERVAL_SECONDS
     }
 
+    /// Maximum retries the platform scheduler should configure for
+    /// a failed periodic sync. Single source of truth lives in core
+    /// ([`vauchi_core::PERIODIC_SYNC_MAX_RETRIES`]).
+    pub fn periodic_sync_max_retries(&self) -> u32 {
+        vauchi_core::PERIODIC_SYNC_MAX_RETRIES
+    }
+
     /// Push render-context preferences (locale + theme_id) from
     /// frontend OS-native storage to core.
     ///

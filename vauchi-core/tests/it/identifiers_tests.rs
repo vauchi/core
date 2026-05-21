@@ -21,7 +21,7 @@
 //!   `[u8; 32]`)
 
 use std::collections::HashSet;
-use vauchi_core::identifiers::{DhPublicKey, IdentityKey};
+use vauchi_core::identifiers::{ContactId, DhPublicKey, IdentityKey};
 
 // @internal
 #[test]
@@ -253,4 +253,84 @@ fn wire_identity_key_adapter_rejects_non_string_json() {
         result.is_err(),
         "wire adapter must reject non-string JSON values"
     );
+}
+
+// Phase 2: ContactId mirrors the IdentityKey / DhPublicKey contract
+// but wraps a `String` (hex-fingerprint or UUID wire identifier on
+// `sender_id` / `recipient_id`). Tests below mirror the existing
+// newtype tests so the three stay in lockstep.
+
+const CONTACT_ID_HEX: &str = "deadbeefcafef00d0123456789abcdef0011223344556677889900aabbccddee";
+
+// @internal
+#[test]
+fn contact_id_roundtrip_through_from_and_into_string() {
+    let id = ContactId::from(CONTACT_ID_HEX.to_string());
+    assert_eq!(id.as_str(), CONTACT_ID_HEX);
+    assert_eq!(id.clone().into_string(), CONTACT_ID_HEX);
+}
+
+// @internal
+#[test]
+fn contact_id_from_str_matches_from_string() {
+    let from_str = ContactId::from(CONTACT_ID_HEX);
+    let from_string = ContactId::from(CONTACT_ID_HEX.to_string());
+    assert_eq!(from_str, from_string);
+}
+
+// @internal
+#[test]
+fn contact_id_equal_underlying_strings_compare_equal() {
+    let a = ContactId::from_string(CONTACT_ID_HEX.to_string());
+    let b = ContactId::from_string(CONTACT_ID_HEX.to_string());
+    let c = ContactId::from_string(
+        "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+    );
+    assert_eq!(a, b);
+    assert_ne!(a, c);
+}
+
+// @internal
+#[test]
+fn contact_id_hash_matches_when_strings_match() {
+    let a = ContactId::from_string(CONTACT_ID_HEX.to_string());
+    let b = ContactId::from_string(CONTACT_ID_HEX.to_string());
+    let mut set: HashSet<ContactId> = HashSet::new();
+    set.insert(a);
+    assert!(set.contains(&b));
+}
+
+// @internal
+#[test]
+fn contact_id_display_is_the_underlying_string() {
+    let id = ContactId::from(CONTACT_ID_HEX);
+    assert_eq!(format!("{id}"), CONTACT_ID_HEX);
+}
+
+// @internal
+#[test]
+fn contact_id_forward_partial_eq_with_str_works_on_str_literal() {
+    let id = ContactId::from(CONTACT_ID_HEX);
+    assert!(id == CONTACT_ID_HEX);
+}
+
+// @internal
+#[test]
+fn contact_id_as_ref_str_and_bytes_borrow_the_underlying_value() {
+    let id = ContactId::from(CONTACT_ID_HEX);
+    let s: &str = id.as_ref();
+    assert_eq!(s, CONTACT_ID_HEX);
+    let b: &[u8] = id.as_ref();
+    assert_eq!(b, CONTACT_ID_HEX.as_bytes());
+}
+
+// @internal
+#[test]
+fn contact_id_serde_transparent_matches_raw_string_shape() {
+    let id = ContactId::from(CONTACT_ID_HEX);
+    let json = serde_json::to_value(&id).unwrap();
+    assert_eq!(json, serde_json::Value::String(CONTACT_ID_HEX.to_string()));
+    let from_raw_string: ContactId =
+        serde_json::from_value(serde_json::Value::String(CONTACT_ID_HEX.to_string())).unwrap();
+    assert_eq!(from_raw_string, id);
 }

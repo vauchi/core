@@ -13,12 +13,16 @@
 //! (Phase 1B / 2 / 3 of the
 //! `2026-05-21-wire-identifier-newtypes` problem record).
 //!
-//! Two distinct kinds today:
+//! Three distinct kinds today:
 //! - [`IdentityKey`]: Ed25519 identity public key.
 //! - [`DhPublicKey`]: X25519 Diffie–Hellman / X3DH public key.
+//! - [`ContactId`]: hex-fingerprint / UUID wire identifier on
+//!   `sender_id` / `recipient_id` fields.
 //!
-//! Both are nominally distinct so an Ed25519 ↔ X25519 mix-up at a
-//! call site fails to compile.
+//! The two byte-kinds are nominally distinct so an Ed25519 ↔ X25519
+//! mix-up at a call site fails to compile. `ContactId` tags the
+//! string-shaped identifier so a sender ↔ recipient swap at a wire
+//! construction site fails to compile.
 //!
 //! Equality with bare `[u8; 32]` is **forward-only**: `key ==
 //! expected_bytes` compiles (for test ergonomics) but
@@ -26,12 +30,14 @@
 //! silently-symmetric weakness `assert_eq!(ed25519_bytes, dh_key)`
 //! flagged in the Phase 1B audit while keeping the existing
 //! `assert_eq!(key, &expected_bytes)` assertion pattern (used at
-//! ~30 sites) working.
+//! ~30 sites) working. [`ContactId`] mirrors the same asymmetry
+//! against `&str`.
 //!
 //! Wire-shape stability is preserved two ways:
 //! - The newtype's default serde is `#[serde(transparent)]`, so the
 //!   on-disk JSON shape of `RecoveryProgress` (Phase 1A) does not
-//!   change across the newtype migration.
+//!   change across the newtype migration. `ContactId` serializes as
+//!   a raw JSON string for the same reason.
 //! - Wire-active fields opt into base64 via per-field
 //!   `#[serde(with = "wire_identity_key_base64")]` (or
 //!   `wire_dh_public_key_base64`), which mirrors the existing
@@ -258,5 +264,91 @@ pub mod wire_dh_public_key_base64 {
             .try_into()
             .map_err(|_| serde::de::Error::custom("invalid length for 32-byte DhPublicKey"))?;
         Ok(DhPublicKey::from_bytes(bytes))
+    }
+}
+
+/// A wire-level contact identifier, opaque at the type level.
+///
+/// Tags `sender_id` / `recipient_id` fields on wire structs
+/// (`EncryptedUpdate`, `IdentityRevoked`, `EmergencyAlert`, and the
+/// `Simple*` variants). Distinct from a bare `String` so a
+/// sender ↔ recipient swap at a construction site fails to compile:
+/// `EncryptedUpdate { recipient_id: their_id, sender_id: my_id, ... }`
+/// cannot silently flip its arguments when both ends are typed.
+///
+/// The underlying value is the hex-encoded fingerprint of a contact's
+/// 32-byte signing public key (for exchanged contacts) or a UUID
+/// (for imported contacts) — the wire shape is a single string
+/// either way, and that shape is preserved via `#[serde(transparent)]`.
+///
+/// Equality with `&str` is **forward-only**: `id == "deadbeef…"`
+/// compiles (for test ergonomics) but `"deadbeef…" == id` does not,
+/// mirroring the asymmetry on [`IdentityKey`] and [`DhPublicKey`].
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ContactId(String);
+
+impl ContactId {
+    /// Wraps a `String` into a `ContactId`.
+    pub fn from_string(s: String) -> Self {
+        Self(s)
+    }
+
+    /// Borrows the underlying string slice.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Consumes the `ContactId`, returning the underlying `String`.
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+impl From<String> for ContactId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl From<&str> for ContactId {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl AsRef<str> for ContactId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for ContactId {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
+/// Forward-only cross-equality with `&str` — see type docs.
+/// Keeps `assert_eq!(thing.contact_id_accessor(), "deadbeef…")`
+/// working without forcing every assertion site to wrap the literal
+/// in `ContactId::from(...)`. The inverse
+/// `impl PartialEq<ContactId> for str` is deliberately absent so
+/// `assert_eq!("deadbeef…", a_contact_id)` does NOT silently compile.
+impl PartialEq<str> for ContactId {
+    fn eq(&self, other: &str) -> bool {
+        self.0 == other
+    }
+}
+
+impl PartialEq<&str> for ContactId {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
+impl fmt::Display for ContactId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
     }
 }

@@ -39,7 +39,6 @@ mod mobile_exchange;
 mod mobile_gdpr;
 mod mobile_identity;
 mod mobile_import;
-mod mobile_nfc;
 mod mobile_verifier_event;
 mod mobile_visibility;
 mod mobile_wifi_aware;
@@ -106,10 +105,6 @@ pub use mobile_contact_detail::{
 };
 pub use mobile_device_link_session::{DeviceLinkSessionListener, MobileDeviceLinkSession};
 pub use mobile_import::{MobileImportResult, MobileImportWarning};
-pub use mobile_nfc::{
-    MobileNfcExchangeResult, MobileNfcHandshake, MobileNfcKeyAckResult, MobileNfcState,
-    MobileNfcTransport, MobileNfcTransportError,
-};
 pub use mobile_verifier_event::{
     MobileProximityConfidence, MobileProximityVerifierEvent, MobileVerifierMethod,
 };

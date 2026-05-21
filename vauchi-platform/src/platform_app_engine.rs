@@ -702,6 +702,43 @@ impl PlatformAppEngine {
         Ok(engine.has_identity())
     }
 
+    /// Decide what to do after a successful platform biometric
+    /// authentication, in constant wall-clock time.
+    ///
+    /// Frontends call this immediately after the OS biometric prompt
+    /// (iOS `LAContext`, Android `BiometricPrompt`) resolves with
+    /// success. The call returns either:
+    ///
+    /// - [`MobileBiometricUnlockOutcome::Unlocked`] — biometric
+    ///   proves the real user; the frontend can transition to the
+    ///   post-auth screen. `auth_mode` is set to `Normal` in core.
+    /// - [`MobileBiometricUnlockOutcome::PromptForDuressPin`] —
+    ///   duress is configured; the frontend must show the PIN entry
+    ///   screen. The subsequent `authenticate(pin)` call decides
+    ///   `Normal` vs `Duress`.
+    ///
+    /// The call always takes at least
+    /// [`vauchi_core::api::vauchi::BIOMETRIC_UNLOCK_MIN_DURATION`]
+    /// (300 ms). Padding lives in core so iOS / Android cannot
+    /// diverge on the constant-time floor that hides whether duress
+    /// is configured (audit item P2-B,
+    /// `2026-04-28-lifecycle-session-residue-umbrella`).
+    pub fn biometric_unlock_check(
+        &self,
+    ) -> Result<crate::types::MobileBiometricUnlockOutcome, MobileError> {
+        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        let outcome =
+            engine
+                .vauchi_mut()
+                .biometric_unlock_check()
+                .map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+        Ok(outcome.into())
+    }
+
     /// Run one periodic sync tick.
     ///
     /// Frontends call this from their platform-scheduler handler
@@ -733,6 +770,16 @@ impl PlatformAppEngine {
         serde_json::to_string(&format!("{outcome:?}")).map_err(|e| MobileError::Other {
             detail: format!("serialize sync outcome: {e}"),
         })
+    }
+
+    /// Recommended interval (seconds) between periodic sync ticks.
+    ///
+    /// Frontends call this once at scheduler-registration time to
+    /// configure their `BGTaskScheduler` / `WorkManager` interval.
+    /// Single source of truth lives in core
+    /// ([`vauchi_core::PERIODIC_SYNC_INTERVAL_SECONDS`]).
+    pub fn periodic_sync_interval_seconds(&self) -> u64 {
+        vauchi_core::PERIODIC_SYNC_INTERVAL_SECONDS
     }
 
     /// Push render-context preferences (locale + theme_id) from

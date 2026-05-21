@@ -599,6 +599,56 @@ fn test_full_handshake_happy_path() {
     );
 }
 
+// Regression for problem record 2026-05-21-ble-aad-asymmetry.
+// Pre-v3 the AAD mixed sender + receiver identities with the SENDER's
+// timestamp, but the KeyAck wire format carried no timestamp slot.
+// The receiver fell back to its local `self.our_timestamp` on AAD
+// reconstruction, so any clock drift between the two peers (very
+// common in the wild — phones with off-by-a-few-seconds clocks)
+// surfaced as opaque "AEAD authentication failed" even though the
+// encryption itself was correct. v3 adds `sender_timestamp` to the
+// KeyAck wire and persists the initiator's offer-timestamp on the
+// responder session so the reciprocal-decrypt site can match.
+#[test]
+fn test_full_handshake_round_trip_under_clock_drift() {
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+    let alice_card = make_test_card(&alice_id, "Alice");
+    let bob_card = make_test_card(&bob_id, "Bob");
+
+    let alice_now: u64 = 1_700_000_000;
+    let bob_now: u64 = alice_now + 5;
+
+    let mut alice = BleHandshakeSession::new_initiator(&alice_id, alice_card, alice_now);
+    let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card, bob_now);
+
+    let offer = alice.create_key_offer().expect("key offer");
+    let (ack_bytes, bob_encrypted) = bob
+        .process_key_offer(&offer, bob_now)
+        .expect("process offer");
+    let (alice_commitment, alice_encrypted) = alice
+        .process_key_ack(&ack_bytes, &bob_encrypted, alice_now + 1)
+        .expect("process ack under drift");
+    let bob_reveal = bob
+        .process_committed_payload(&alice_commitment, &alice_encrypted)
+        .expect("process committed payload");
+    let alice_result = alice
+        .complete_exchange(&bob_reveal)
+        .expect("alice complete exchange under drift");
+    let bob_result = bob
+        .complete_exchange(&[])
+        .expect("bob complete exchange under drift");
+
+    assert_eq!(
+        alice_result.remote_card.display_name, "Bob",
+        "Alice must have Bob's card after handshake with 5s clock drift"
+    );
+    assert_eq!(
+        bob_result.remote_card.display_name, "Alice",
+        "Bob must have Alice's card after handshake with 5s clock drift"
+    );
+}
+
 // ============================================================
 // Expiry & Timestamp
 // ============================================================

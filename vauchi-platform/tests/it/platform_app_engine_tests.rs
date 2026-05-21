@@ -508,13 +508,6 @@ fn has_identity_returns_true_after_onboarding() {
     assert!(engine.has_identity().expect("has_identity"));
 }
 
-// @internal
-#[test]
-fn form_has_data_returns_false_on_non_form_screen() {
-    let (engine, _dir) = create_engine();
-    assert!(!engine.form_has_data().expect("form_has_data"));
-}
-
 // ============================================================================
 // Event listener (PlatformEventListener)
 // ============================================================================

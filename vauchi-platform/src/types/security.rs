@@ -349,34 +349,6 @@ pub enum MobileAuthMode {
     Duress,
 }
 
-/// Outcome of `PlatformAppEngine.biometric_unlock_check()`.
-///
-/// Mirror of [`vauchi_core::BiometricUnlockOutcome`] crossing the
-/// UniFFI boundary. The call wraps the duress-aware decision in a
-/// constant-time floor so the unlock animation timing cannot leak
-/// whether duress is configured (audit item P2-B in
-/// `2026-04-28-lifecycle-session-residue-umbrella`).
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
-pub enum MobileBiometricUnlockOutcome {
-    /// Biometric authentication succeeded and no duress PIN is
-    /// configured — frontends transition to the post-auth screen.
-    Unlocked,
-    /// Biometric authentication succeeded but duress is configured —
-    /// frontends must show the PIN entry screen so the user types
-    /// either the real PIN (`Normal`) or the duress PIN (`Duress`).
-    PromptForDuressPin,
-}
-
-impl From<vauchi_core::BiometricUnlockOutcome> for MobileBiometricUnlockOutcome {
-    fn from(value: vauchi_core::BiometricUnlockOutcome) -> Self {
-        match value {
-            vauchi_core::BiometricUnlockOutcome::Unlocked => Self::Unlocked,
-            vauchi_core::BiometricUnlockOutcome::PromptForDuressPin => Self::PromptForDuressPin,
-            _ => Self::Unlocked,
-        }
-    }
-}
-
 /// Duress alert settings for mobile platforms.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileDuressSettings {

@@ -28,11 +28,11 @@ pub use device::{
 };
 pub use notification::{MobileNotificationCategory, MobilePendingNotification};
 pub use security::{
-    MobileAuthMode, MobileBiometricUnlockOutcome, MobileBroadcastResult, MobileConsentRecord,
-    MobileConsentStatus, MobileConsentType, MobileDecoyContact, MobileDeletionInfo,
-    MobileDeletionState, MobileDuressSettings, MobileEmergencyConfig, MobileGdprExport,
-    MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
-    MobileShredReport, MobileShredStatus, MobileShredToken, MobileShredVerification,
+    MobileAuthMode, MobileBroadcastResult, MobileConsentRecord, MobileConsentStatus,
+    MobileConsentType, MobileDecoyContact, MobileDeletionInfo, MobileDeletionState,
+    MobileDuressSettings, MobileEmergencyConfig, MobileGdprExport, MobileRecoveryClaim,
+    MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher, MobileShredReport,
+    MobileShredStatus, MobileShredToken, MobileShredVerification,
 };
 pub use social::{
     MobileLabelContactBadge, MobileLabelContactRow, MobileLabelContactStatus, MobileSocialNetwork,

@@ -108,7 +108,11 @@ impl NfcHandshakeSession {
     ///
     /// Generates a fresh ExchangeNfc payload containing our ephemeral X25519
     /// public key and identity key.
-    pub fn create_key_offer(&mut self, identity: &Identity, now: u64) -> Result<Vec<u8>, ExchangeError> {
+    pub fn create_key_offer(
+        &mut self,
+        identity: &Identity,
+        now: u64,
+    ) -> Result<Vec<u8>, ExchangeError> {
         if !matches!(self.state, NfcHandshakeState::Idle) {
             return Err(ExchangeError::InvalidState(
                 "Expected Idle state for key offer".into(),
@@ -146,6 +150,16 @@ impl NfcHandshakeSession {
         }
         if !their_nfc.verify_signature() {
             return Err(ExchangeError::InvalidSignature);
+        }
+
+        // Self-exchange check (mirror of `ble_handshake.rs::process_key_offer:340`).
+        // Without this, a reflection attack — an attacker replaying the
+        // responder's own offer back to it — reaches `derive_symmetric_key`
+        // and only fails later at AEAD decryption, instead of being rejected
+        // at the identity layer the way BLE already does. Closes F-HIGH-3
+        // of `_private/docs/audit-review-frameworks/results/2026-05-21-02-protocol-security-review.md`.
+        if their_nfc.identity_key() == &self.our_identity_key {
+            return Err(ExchangeError::SelfExchange);
         }
 
         let exchange_id = *their_nfc.token();

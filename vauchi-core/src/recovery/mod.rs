@@ -330,8 +330,8 @@ impl RecoveryVoucher {
         }
 
         Ok(Self::create(
-            claim.old_pk(),
-            claim.new_pk(),
+            *claim.old_pk(),
+            *claim.new_pk(),
             voucher_keypair,
             guardian_token,
             now,

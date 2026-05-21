@@ -20,6 +20,14 @@
 //! Both are nominally distinct so an Ed25519 ↔ X25519 mix-up at a
 //! call site fails to compile.
 //!
+//! Equality with bare `[u8; 32]` is **forward-only**: `key ==
+//! expected_bytes` compiles (for test ergonomics) but
+//! `expected_bytes == key` does not. The asymmetry rules out the
+//! silently-symmetric weakness `assert_eq!(ed25519_bytes, dh_key)`
+//! flagged in the Phase 1B audit while keeping the existing
+//! `assert_eq!(key, &expected_bytes)` assertion pattern (used at
+//! ~30 sites) working.
+//!
 //! Wire-shape stability is preserved two ways:
 //! - The newtype's default serde is `#[serde(transparent)]`, so the
 //!   on-disk JSON shape of `RecoveryProgress` (Phase 1A) does not
@@ -75,39 +83,28 @@ impl From<&[u8; 32]> for IdentityKey {
     }
 }
 
-impl From<&IdentityKey> for IdentityKey {
-    fn from(key: &IdentityKey) -> Self {
-        *key
-    }
-}
-
 impl AsRef<[u8]> for IdentityKey {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
 
-/// Cross-equality with raw bytes so test assertions of the form
-/// `assert_eq!(thing.identity_key_accessor(), &expected_bytes)` keep
-/// working without forcing every assertion site to wrap the literal
-/// in `IdentityKey::from(...)`. The newtype guards swap-argument bugs
-/// at function-call boundaries, not equality misuse — bare `[u8; 32]`
-/// has the same equality-misuse hazard already.
-impl PartialEq<[u8; 32]> for IdentityKey {
-    fn eq(&self, other: &[u8; 32]) -> bool {
-        &self.0 == other
-    }
-}
-
-impl PartialEq<IdentityKey> for [u8; 32] {
-    fn eq(&self, other: &IdentityKey) -> bool {
-        self == &other.0
-    }
-}
-
 impl AsRef<[u8; 32]> for IdentityKey {
     fn as_ref(&self) -> &[u8; 32] {
         &self.0
+    }
+}
+
+/// Forward-only cross-equality with raw bytes — see module docs.
+/// Keeps `assert_eq!(thing.identity_key_accessor(), &expected_bytes)`
+/// working without forcing every assertion site to wrap the literal
+/// in `IdentityKey::from(...)`. The inverse
+/// `impl PartialEq<IdentityKey> for [u8; 32]` is deliberately absent
+/// so `assert_eq!(arbitrary_bytes, an_identity_key)` does NOT
+/// silently compile.
+impl PartialEq<[u8; 32]> for IdentityKey {
+    fn eq(&self, other: &[u8; 32]) -> bool {
+        &self.0 == other
     }
 }
 
@@ -164,12 +161,6 @@ impl From<&[u8; 32]> for DhPublicKey {
     }
 }
 
-impl From<&DhPublicKey> for DhPublicKey {
-    fn from(key: &DhPublicKey) -> Self {
-        *key
-    }
-}
-
 impl AsRef<[u8]> for DhPublicKey {
     fn as_ref(&self) -> &[u8] {
         &self.0
@@ -182,19 +173,13 @@ impl AsRef<[u8; 32]> for DhPublicKey {
     }
 }
 
-/// Cross-equality with raw bytes, mirroring the rationale on
-/// [`IdentityKey`]'s impl: the newtype guards swap-argument bugs at
-/// function-call boundaries, not equality misuse — bare `[u8; 32]`
-/// has the same equality-misuse hazard already.
+/// Forward-only cross-equality, mirroring [`IdentityKey`]'s impl.
+/// The inverse is deliberately absent so
+/// `assert_eq!(ed25519_bytes, a_dh_public_key)` does NOT silently
+/// compile across crypto-primitive boundaries.
 impl PartialEq<[u8; 32]> for DhPublicKey {
     fn eq(&self, other: &[u8; 32]) -> bool {
         &self.0 == other
-    }
-}
-
-impl PartialEq<DhPublicKey> for [u8; 32] {
-    fn eq(&self, other: &DhPublicKey) -> bool {
-        self == &other.0
     }
 }
 

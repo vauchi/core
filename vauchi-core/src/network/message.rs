@@ -560,7 +560,7 @@ mod tests {
         let deserialized: IdentityDeletionNotice = serde_json::from_str(&json).unwrap();
 
         assert_eq!(deserialized.stage, DeletionStage::Pending);
-        assert_eq!(deserialized.public_key, [0x42; 32]);
+        assert_eq!(deserialized.public_key.as_bytes(), &[0x42; 32]);
         assert_eq!(deserialized.timestamp, 1700000000);
         assert_eq!(deserialized.signature, [0xAB; 64]);
     }
@@ -594,7 +594,7 @@ mod tests {
         match deserialized {
             MessagePayload::IdentityDeletionNotice(n) => {
                 assert_eq!(n.stage, DeletionStage::Confirmed);
-                assert_eq!(n.public_key, [0x01; 32]);
+                assert_eq!(n.public_key.as_bytes(), &[0x01; 32]);
             }
             _ => panic!("Expected IdentityDeletionNotice variant"),
         }
@@ -639,7 +639,7 @@ mod tests {
         let json = serde_json::to_string(&request).unwrap();
         let deserialized: PurgeRequest = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(deserialized.public_key, [0x42; 32]);
+        assert_eq!(deserialized.public_key.as_bytes(), &[0x42; 32]);
         assert_eq!(deserialized.signature, vec![0xAB; 64]);
         assert_eq!(deserialized.purge_token, [0xCD; 32]);
         assert_eq!(deserialized.timestamp, 1700000000);
@@ -660,7 +660,7 @@ mod tests {
 
         match deserialized {
             MessagePayload::PurgeRequest(r) => {
-                assert_eq!(r.public_key, [0x01; 32]);
+                assert_eq!(r.public_key.as_bytes(), &[0x01; 32]);
                 assert_eq!(r.purge_token, [0x03; 32]);
             }
             _ => panic!("Expected PurgeRequest variant"),

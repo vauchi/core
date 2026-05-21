@@ -241,8 +241,8 @@ impl Vauchi {
 
         // Create voucher: signs (old_pk, new_pk) with our keypair, attaching the guardian token
         let voucher = RecoveryVoucher::create(
-            claim.old_pk(),
-            claim.new_pk(),
+            *claim.old_pk(),
+            *claim.new_pk(),
             identity.signing_keypair(),
             Some(token),
             0,

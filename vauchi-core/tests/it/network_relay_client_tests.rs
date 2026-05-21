@@ -331,7 +331,7 @@ fn test_send_purge_request() {
     assert_eq!(sent.len(), 1);
 
     if let MessagePayload::PurgeRequest(r) = &sent[0].payload {
-        assert_eq!(r.public_key, [0x42; 32]);
+        assert_eq!(r.public_key.as_bytes(), &[0x42; 32]);
         assert_eq!(r.purge_token, [0xCD; 32]);
         assert_eq!(r.timestamp, 1700000000);
     } else {

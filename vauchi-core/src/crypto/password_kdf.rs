@@ -66,3 +66,34 @@ pub enum PasswordKdfError {
     #[error("Key derivation failed: {0}")]
     DerivationFailed(String),
 }
+
+// Compile-time floor guard against silent weakening of Argon2id
+// parameters. In any build that does not opt into `test-kdf`, the
+// production constants must meet (or exceed) the OWASP floor:
+//   - memory cost ≥ 64 MiB (65536 KiB)
+//   - time cost   ≥ 3 iterations
+//   - parallelism ≥ 4
+// A weakening edit causes the crate to fail to compile in every
+// configuration the released binaries ship with, including every CI
+// job that does not pass `--features test-kdf`. Matches the existing
+// `compile_error!` pattern at the top of this module rather than a
+// runtime test, because runtime tests in this crate run *with*
+// `test-kdf` enabled and so could never observe a weakening of the
+// production values.
+//
+// Record: _private/docs/problems/2026-05-21-argon2-no-bench-no-floor-test/
+#[cfg(not(feature = "test-kdf"))]
+const _: () = {
+    assert!(
+        ARGON2_M_COST >= 65536,
+        "ARGON2_M_COST below OWASP floor (64 MiB / 65536 KiB)"
+    );
+    assert!(
+        ARGON2_T_COST >= 3,
+        "ARGON2_T_COST below OWASP floor (3 iterations)"
+    );
+    assert!(
+        ARGON2_P_COST >= 4,
+        "ARGON2_P_COST below OWASP floor (4 lanes)"
+    );
+};

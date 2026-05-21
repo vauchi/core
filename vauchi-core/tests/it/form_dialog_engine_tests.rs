@@ -7,8 +7,19 @@ use vauchi_app::ui::*;
 // --- AddField tests ---
 
 // @internal
+// AddField is a two-step flow per problem record
+// `2026-05-21-add-entry-form-mixes-picker-and-fields` §G1:
+//
+//   step 1 (picker)  → user picks a catalog type
+//   step 2 (form)    → user fills in Value / Display Name / Comment
+//
+// On the picker step the screen MUST show only the catalog list. The
+// value inputs (Value / Display Name / Comment) must be absent so the
+// user isn't asked to fill in fields whose type they haven't picked
+// yet. The previous shape rendered both on one scroll, scrolling a
+// 35-row catalog past the user every time and burying the form below.
 #[test]
-fn form_dialog_add_field_shows_type_list_and_inputs() {
+fn form_dialog_add_field_picker_step_shows_only_type_list() {
     let engine = FormDialogEngine::new(FormDialogType::AddField {
         available_groups: vec![],
     });
@@ -16,14 +27,13 @@ fn form_dialog_add_field_shows_type_list_and_inputs() {
     assert_eq!(screen.screen_id, "form_add_field");
     assert_eq!(screen.title, "Add to your card");
 
-    // All components visible on single page
     let has_types = screen.components.iter().any(|c| {
         matches!(c,
             Component::ActionList { id, ..
             } if id == "entry_types"
         )
     });
-    assert!(has_types, "Should show entry types list");
+    assert!(has_types, "Picker step should show entry types list");
 
     let has_value = screen.components.iter().any(|c| {
         matches!(c,
@@ -31,7 +41,63 @@ fn form_dialog_add_field_shows_type_list_and_inputs() {
             } if id == "field_value"
         )
     });
-    assert!(has_value, "Should show value input");
+    assert!(
+        !has_value,
+        "Picker step must NOT show the Value input — user hasn't picked a type yet"
+    );
+
+    let has_label = screen.components.iter().any(|c| {
+        matches!(c,
+            Component::TextInput { id, ..
+            } if id == "field_label"
+        )
+    });
+    assert!(
+        !has_label,
+        "Picker step must NOT show the Display Name input"
+    );
+
+    let has_note = screen.components.iter().any(|c| {
+        matches!(c,
+            Component::TextInput { id, ..
+            } if id == "field_note"
+        )
+    });
+    assert!(!has_note, "Picker step must NOT show the Comment input");
+}
+
+// After picking a type the screen flips to form mode — the catalog
+// list goes away (the user already chose) and the inputs appear.
+// @internal
+#[test]
+fn form_dialog_add_field_form_step_shows_inputs_and_hides_picker() {
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
+    });
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "email".into(),
+    });
+    let screen = engine.current_screen();
+
+    let has_types = screen.components.iter().any(|c| {
+        matches!(c,
+            Component::ActionList { id, ..
+            } if id == "entry_types"
+        )
+    });
+    assert!(
+        !has_types,
+        "Form step must NOT re-emit the catalog list — the user already chose"
+    );
+
+    let has_value = screen.components.iter().any(|c| {
+        matches!(c,
+            Component::TextInput { id, ..
+            } if id == "field_value"
+        )
+    });
+    assert!(has_value, "Form step should show the Value input");
 
     let has_label = screen.components.iter().any(|c| {
         matches!(c,
@@ -39,7 +105,7 @@ fn form_dialog_add_field_shows_type_list_and_inputs() {
             } if id == "field_label" && label.contains("Display Name")
         )
     });
-    assert!(has_label, "Should show Display Name input");
+    assert!(has_label, "Form step should show the Display Name input");
 
     let has_note = screen.components.iter().any(|c| {
         matches!(c,
@@ -47,7 +113,7 @@ fn form_dialog_add_field_shows_type_list_and_inputs() {
             } if id == "field_note" && label.contains("Comment")
         )
     });
-    assert!(has_note, "Should show Comment input");
+    assert!(has_note, "Form step should show the Comment input");
 }
 
 // @internal
@@ -103,27 +169,112 @@ fn form_dialog_add_field_title_omits_myinfo_jargon() {
     );
 }
 
-// Save must be `enabled: false` until the user has picked a type
-// AND filled in the Value field. Without these guards the user can
-// tap Save with no input and the engine accepts a `custom` entry
-// with an empty value — see problem record
-// `2026-05-21-add-entry-form-mixes-picker-and-fields` §G3.
+// G1 split: the picker step has no Save action at all — the form
+// step is where Save lives. Previously this test asserted Save was
+// present-but-disabled on the picker step (G3 from the same record);
+// G1 supersedes that with the cleaner "Save isn't shown until you've
+// picked a type" UX. See problem record
+// `2026-05-21-add-entry-form-mixes-picker-and-fields` §G1+G3.
 // @internal
 #[test]
-fn form_dialog_add_field_save_disabled_when_no_type_selected() {
+fn form_dialog_add_field_picker_step_omits_save_action() {
     let engine = FormDialogEngine::new(FormDialogType::AddField {
         available_groups: vec![],
     });
     let screen = engine.current_screen();
-    let submit = screen
-        .actions
-        .iter()
-        .find(|a| a.id == "submit")
-        .expect("submit action present");
+    let has_submit = screen.actions.iter().any(|a| a.id == "submit");
     assert!(
-        !submit.enabled,
-        "Save should be disabled before user picks a type"
+        !has_submit,
+        "Picker step must not show a Save action — the user has nothing to save yet"
     );
+    let has_cancel = screen.actions.iter().any(|a| a.id == "cancel");
+    assert!(has_cancel, "Picker step must still show Cancel");
+}
+
+// Form step must offer a back affordance distinct from Cancel so the
+// user can pick a different type without aborting the whole dialog.
+// Action id is `change_type` (not "back" — keeps the engine action
+// vocabulary verb-y and avoids overloading the platform back gesture).
+// @internal
+#[test]
+fn form_dialog_add_field_form_step_has_change_type_action() {
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
+    });
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "email".into(),
+    });
+    let screen = engine.current_screen();
+    let change_type = screen.actions.iter().find(|a| a.id == "change_type");
+    assert!(
+        change_type.is_some(),
+        "Form step must expose a `change_type` action — got actions: {:?}",
+        screen.actions.iter().map(|a| &a.id).collect::<Vec<_>>()
+    );
+    assert!(
+        change_type.unwrap().enabled,
+        "change_type action should be enabled — no preconditions"
+    );
+}
+
+// Pressing the back / change-type action returns the user to the
+// picker step. `selected_entry_type` is cleared so the next
+// `current_screen()` call rebuilds the picker. The dialog itself is
+// NOT completed — `ActionResult::UpdateScreen`, not `Complete`.
+// @internal
+#[test]
+fn form_dialog_add_field_change_type_action_returns_to_picker() {
+    let mut engine = FormDialogEngine::new(FormDialogType::AddField {
+        available_groups: vec![],
+    });
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "email".into(),
+    });
+
+    // Sanity: we're in form step
+    let screen = engine.current_screen();
+    let has_value = screen.components.iter().any(|c| {
+        matches!(c,
+            Component::TextInput { id, ..
+            } if id == "field_value"
+        )
+    });
+    assert!(has_value, "precondition: form step shows Value input");
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "change_type".into(),
+    });
+    match result {
+        ActionResult::UpdateScreen(screen) => {
+            let has_types = screen.components.iter().any(|c| {
+                matches!(c,
+                    Component::ActionList { id, ..
+                    } if id == "entry_types"
+                )
+            });
+            assert!(
+                has_types,
+                "After change_type, picker step should be visible again"
+            );
+            let has_value = screen.components.iter().any(|c| {
+                matches!(c,
+                    Component::TextInput { id, ..
+                    } if id == "field_value"
+                )
+            });
+            assert!(
+                !has_value,
+                "After change_type, form-step inputs should be hidden"
+            );
+            assert_eq!(
+                screen.title, "Add to your card",
+                "Title should revert to the picker-step copy"
+            );
+        }
+        other => panic!("change_type must return UpdateScreen (not Complete) — got {other:?}"),
+    }
 }
 
 // @internal

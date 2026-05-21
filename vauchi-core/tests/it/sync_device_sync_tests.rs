@@ -424,3 +424,23 @@ fn test_device_sync_payload_backward_compat_no_imported_field() {
     assert_eq!(payload.imported_contacts.len(), 0);
     assert_eq!(payload.contact_count(), 0);
 }
+
+// @scenario: device_management :: New device receives full state
+// @internal
+// CC-14 adversarial: peer-supplied sync data is a trust boundary; an all-zeros
+// shared_key (the only DegenerateKey case rejected by SymmetricKey::try_from_bytes)
+// must be rejected at ingestion. encryption.rs:95-100 explicitly directs trust-
+// boundary callers to use try_from_bytes, not from_bytes_unchecked.
+#[test]
+fn test_contact_sync_data_to_contact_rejects_degenerate_shared_key() {
+    let contact = create_test_contact();
+    let mut sync_data = ContactSyncData::from_contact(&contact);
+    sync_data.shared_key = [0u8; 32];
+
+    let result = sync_data.to_contact();
+    assert!(
+        matches!(result, Err(DeviceSyncError::Deserialization(_))),
+        "expected Deserialization error for all-zeros shared_key, got {:?}",
+        result
+    );
+}

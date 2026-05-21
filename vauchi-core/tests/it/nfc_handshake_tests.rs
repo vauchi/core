@@ -154,6 +154,43 @@ fn test_expired_key_offer_rejected() {
     assert!(matches!(result, Err(ExchangeError::NfcExpired)));
 }
 
+// Mirror of BLE's `test_self_exchange_rejected` for the NFC
+// `process_key_offer` path. Without this check, a reflection attack
+// (an attacker that replays the responder's own offer back as if from
+// the initiator) reaches key derivation and only fails later at AEAD
+// decryption — instead of being rejected at the identity layer the way
+// BLE already does (`ble_handshake.rs:340`). Regression for
+// `_private/docs/problems/2026-05-21-nfc-handshake-asymmetric-defenses/`
+// (closes F-HIGH-3; F-HIGH-2 KDF identity-binding still open).
+// @scenario: nfc_exchange :: Self-exchange rejected in handshake
+#[test]
+fn test_nfc_process_key_offer_rejects_self_identity() {
+    let identity = make_test_identity();
+
+    // Initiator and responder share the same identity — simulating a
+    // reflection attack on the responder side.
+    let mut alice_init = NfcHandshakeSession::new_initiator(&identity, "Alice".to_string());
+    let mut alice_resp = NfcHandshakeSession::new_responder(&identity, "Alice".to_string());
+
+    let offer = alice_init
+        .create_key_offer(
+            &identity,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("key offer");
+
+    let result = alice_resp.process_key_offer(
+        &identity,
+        &offer,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    assert!(
+        matches!(result, Err(ExchangeError::SelfExchange)),
+        "NFC responder must reject offer with their_identity == our_identity_key, got {:?}",
+        result
+    );
+}
+
 // @internal
 #[test]
 fn test_tampered_ciphertext_rejected() {

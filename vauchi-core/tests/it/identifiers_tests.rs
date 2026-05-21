@@ -23,6 +23,7 @@
 use std::collections::HashSet;
 use vauchi_core::identifiers::IdentityKey;
 
+// @internal
 #[test]
 fn roundtrip_through_from_and_as_bytes() {
     let bytes = [0xABu8; 32];
@@ -31,6 +32,7 @@ fn roundtrip_through_from_and_as_bytes() {
     assert_eq!(key.into_bytes(), bytes);
 }
 
+// @internal
 #[test]
 fn equal_underlying_bytes_compare_equal() {
     let a = IdentityKey::from_bytes([1u8; 32]);
@@ -40,6 +42,7 @@ fn equal_underlying_bytes_compare_equal() {
     assert_ne!(a, c);
 }
 
+// @internal
 #[test]
 fn hash_matches_when_bytes_match() {
     let mut set = HashSet::new();
@@ -48,6 +51,7 @@ fn hash_matches_when_bytes_match() {
     assert!(!set.contains(&IdentityKey::from_bytes([8u8; 32])));
 }
 
+// @internal
 #[test]
 fn display_format_is_lowercase_hex() {
     let key = IdentityKey::from_bytes([0xDE; 32]);
@@ -55,6 +59,7 @@ fn display_format_is_lowercase_hex() {
     assert_eq!(key.to_string(), expected);
 }
 
+// @internal
 #[test]
 fn hex_encode_compatibility_via_asref_bytes() {
     // Many call sites do `hex::encode(claim.old_pk())`. After the
@@ -66,6 +71,7 @@ fn hex_encode_compatibility_via_asref_bytes() {
     assert_eq!(hex::encode(&key), hex::encode(bytes));
 }
 
+// @internal
 #[test]
 fn serde_transparent_matches_underlying_array_shape() {
     // Phase 1A wire-shape guarantee: serializing an `IdentityKey`

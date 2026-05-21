@@ -427,12 +427,6 @@ impl BleHandshakeSession {
         their_encrypted_card: &[u8],
         now: u64,
     ) -> Result<(Vec<u8>, Vec<u8>), ExchangeError> {
-        // Suppress unused-var lint until commit 2 wires the expiry
-        // check in this same MR. Keeping the `now` parameter in
-        // commit 1 propagates the API shape through all callers in
-        // one step so commit 2 is purely the behavior change.
-        let _ = now;
-
         let exchange_id = match &self.state {
             BleHandshakeState::KeyOfferSent { exchange_id } => *exchange_id,
             _ => {
@@ -441,6 +435,21 @@ impl BleHandshakeSession {
                 ));
             }
         };
+
+        // Initiator-side session timeout: reject ack arriving after
+        // `BLE_HANDSHAKE_EXPIRY_SECS` since the offer was created.
+        // The v2 wire format doesn't carry a peer timestamp in the
+        // KeyAck, so we can't replicate the responder's
+        // peer-supplied-timestamp check (`process_key_offer:344-347`).
+        // We can — and do — refuse to accept any ack on a stuck
+        // session, which catches the dominant attack model (replayed
+        // ack delivered late) without a protocol-format change.
+        // `saturating_sub` handles clock-skew where `now < our_timestamp`
+        // (yields 0, never expires); negative drift is treated as
+        // "session still fresh" rather than "always expired".
+        if now.saturating_sub(self.our_timestamp) > BLE_HANDSHAKE_EXPIRY_SECS {
+            return Err(ExchangeError::BleExpired);
+        }
 
         // Parse v2 KeyAck
         if their_ack.len() < KEY_ACK_SIZE {

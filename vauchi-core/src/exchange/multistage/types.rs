@@ -83,11 +83,6 @@ impl ChunkBitmap {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn total(&self) -> u16 {
-        self.total
-    }
-
     pub fn mark_received(&mut self, index: u16) {
         if index < self.total {
             self.bits[index as usize / 8] |= 1 << (index % 8);
@@ -107,12 +102,6 @@ impl ChunkBitmap {
 
     pub fn is_complete(&self) -> bool {
         self.received_count() == self.total
-    }
-
-    /// Next un-received chunk index, or `None` if all received.
-    #[allow(dead_code)]
-    pub fn next_missing(&self) -> Option<u16> {
-        (0..self.total).find(|&i| !self.has(i))
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {

@@ -228,6 +228,7 @@ mod http_transport_mock_response_tests;
 mod http_transport_ohttp_key_tests;
 mod i18n_cache_tests;
 mod i18n_integration_tests;
+mod identifiers_tests;
 mod identity_device_tests;
 mod identity_password_coverage_tests;
 mod identity_password_tests;

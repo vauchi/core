@@ -41,6 +41,8 @@ fn _flame_install() {
 
 pub mod types;
 
+pub mod identifiers;
+
 pub mod text;
 
 #[cfg(feature = "storage")]

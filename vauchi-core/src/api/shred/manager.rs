@@ -291,12 +291,18 @@ impl<'a> ShredManager<'a> {
                 }
             }
         }
+        // best-effort: keys overwritten above; directory removal failure
+        // (FS busy, EACCES) leaves an empty dir but no recoverable data
+        #[allow(clippy::let_underscore_must_use)]
         let _ = std::fs::remove_dir(&keys_dir);
         count
     }
 
     fn secure_delete_database(&self) -> bool {
-        // Flush WAL into main DB before file-level overwrite (#81)
+        // Flush WAL into main DB before file-level overwrite (#81).
+        // best-effort: checkpoint failure means WAL bytes survive in
+        // -wal/-shm files, which are overwritten by the loop below.
+        #[allow(clippy::let_underscore_must_use)]
         let _ = self.storage.wal_checkpoint();
 
         let db_path = self.data_dir.join("vauchi.db");

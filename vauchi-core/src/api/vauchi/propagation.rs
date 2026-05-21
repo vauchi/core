@@ -567,11 +567,8 @@ impl Vauchi {
                                 .map(|f| f.id().to_string());
 
                             if let Some(id) = field_id {
-                                let _ = card.update_field_value(
-                                    &id,
-                                    new_value,
-                                    self.clock.unix_seconds(),
-                                );
+                                card.update_field_value(&id, new_value, self.clock.unix_seconds())
+                                    .map_err(VauchiError::from)?;
                             } else {
                                 // Field not found — add as new
                                 let field = ContactField::new(
@@ -580,7 +577,7 @@ impl Vauchi {
                                     new_value,
                                     self.clock.unix_seconds(),
                                 );
-                                let _ = card.add_field(field);
+                                card.add_field(field).map_err(VauchiError::from)?;
                             }
                             self.storage.save_own_card(&card).map_err(|e| e.into())
                         }
@@ -610,24 +607,25 @@ impl Vauchi {
                         // Create or update label
                         match self.storage.load_group(label_id) {
                             Ok(_existing) => {
-                                // Update existing: rename, re-assign contacts and fields
-                                let _ = self.storage.rename_group(label_id, label_name);
-                                // Re-apply contacts (simplified: just ensure they're assigned)
+                                // Update existing: rename, re-assign contacts and
+                                // fields. Each call propagates so divergent state
+                                // surfaces instead of being silently dropped.
+                                self.storage.rename_group(label_id, label_name)?;
                                 for cid in contacts {
-                                    let _ = self.storage.add_contact_to_group(label_id, cid);
+                                    self.storage.add_contact_to_group(label_id, cid)?;
                                 }
-                                // Re-apply field visibility
                                 for fid in visible_fields {
-                                    let _ = self
-                                        .storage
-                                        .set_group_field_visibility(label_id, fid, true);
+                                    self.storage
+                                        .set_group_field_visibility(label_id, fid, true)?;
                                 }
                                 Ok(())
                             }
                             Err(_) => {
                                 // Create new label
-                                let _ = self.storage.create_group(label_name);
-                                Ok(())
+                                self.storage
+                                    .create_group(label_name)
+                                    .map(|_| ())
+                                    .map_err(|e| e.into())
                             }
                         }
                     }
@@ -639,7 +637,9 @@ impl Vauchi {
                 } => {
                     match self.storage.load_contact(contact_id)? {
                         Some(mut contact) => {
-                            let _ = contact.set_recovery_trusted(recovery_trusted);
+                            contact
+                                .set_recovery_trusted(recovery_trusted)
+                                .map_err(VauchiError::from)?;
                             self.storage.save_contact(&contact).map_err(|e| e.into())
                         }
                         None => Ok(()), // Contact not found, skip
@@ -685,7 +685,9 @@ impl Vauchi {
                     ..
                 } => match self.storage.load_contact(contact_id)? {
                     Some(mut contact) => {
-                        let _ = contact.set_proposal_trusted(proposal_trusted);
+                        contact
+                            .set_proposal_trusted(proposal_trusted)
+                            .map_err(VauchiError::from)?;
                         self.storage.save_contact(&contact).map_err(|e| e.into())
                     }
                     None => Ok(()), // Contact not found, skip

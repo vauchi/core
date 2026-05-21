@@ -189,6 +189,8 @@ impl Scenario {
         let listen_challenge = [0x0Bu8; 16];
         let timeout = Duration::from_secs(5);
         // Use asymmetric challenges to exercise the two-way protocol path.
+        // Test asserts on `last_event_log()` below, not on this return value.
+        #[allow(clippy::let_underscore_must_use)]
         let _ = chain.verify_proximity_two_way(&emit_challenge, &listen_challenge, timeout, true);
         let log = chain
             .last_event_log()

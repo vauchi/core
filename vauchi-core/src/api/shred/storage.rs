@@ -106,6 +106,9 @@ pub fn widget_panic_shred(
                 }
             }
         }
+        // best-effort: keys overwritten by secure_overwrite_file above;
+        // directory removal failure leaves an empty dir, not data
+        #[allow(clippy::let_underscore_must_use)]
         let _ = std::fs::remove_dir(&keys_dir);
         count
     } else {

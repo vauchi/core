@@ -200,6 +200,9 @@ pub fn process_single_card_update(
     // still proceeds successfully.
     for change in &delta.changes {
         if let FieldChange::Removed { field_id } = change {
+            // best-effort orphan cleanup: note may already be absent;
+            // either way, the card update below is the source of truth
+            #[allow(clippy::let_underscore_must_use)]
             let _ = storage.delete_contact_field_note(sender_id, field_id);
         }
     }

@@ -166,8 +166,10 @@ impl<T: Transport> ConnectionManager<T> {
 
         self.reconnect_attempt += 1;
 
-        // Disconnect and reconnect
-        let _ = self.transport.disconnect(); // Ignore disconnect errors
+        // Disconnect and reconnect — disconnect errors are ignored
+        // because we're about to drop the transport state anyway
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = self.transport.disconnect();
         self.connect()
     }
 

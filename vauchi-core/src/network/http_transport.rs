@@ -942,8 +942,10 @@ mod tests {
             HttpTransport::new(HttpTransportConfig::for_testing("http://127.0.0.1:1", 1000));
         // Fails at network layer (connection refused), but the counter
         // must have ticked because post_action took the direct branch.
+        #[allow(clippy::let_underscore_must_use)]
         let _ = transport.send_update(&"a".repeat(64), "dGVzdA==");
         assert_eq!(transport.direct_fallback_count(), 1);
+        #[allow(clippy::let_underscore_must_use)]
         let _ = transport.send_update(&"b".repeat(64), "dGVzdA==");
         assert_eq!(transport.direct_fallback_count(), 2);
     }
@@ -954,6 +956,7 @@ mod tests {
         // allow_direct = false → post_action returns the fail-closed error
         // before reaching the direct branch. The counter must stay at zero.
         let transport = HttpTransport::new(HttpTransportConfig::default());
+        #[allow(clippy::let_underscore_must_use)]
         let _ = transport.send_update(&"a".repeat(64), "dGVzdA==");
         assert_eq!(transport.direct_fallback_count(), 0);
     }

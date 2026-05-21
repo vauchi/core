@@ -10,6 +10,15 @@
 //!
 //! App-layer modules (i18n, help, theme, ui, content) live in the `vauchi-app` crate.
 
+// Silent error swallowing is a real security risk in this crate
+// (storage faults conflated with absent state, AEAD decrypt failure
+// indistinguishable from network drop, etc.). The 2026-05-21 audit
+// confirmed ~11 sites with privacy/safety impact. This crate-level
+// warn forces every `let _ = fallible_call()` site to be either
+// propagated or annotated with `#[allow(...)]` + a justification.
+// See `_private/docs/problems/2026-05-21-silent-failures-in-security-paths/`.
+#![warn(clippy::let_underscore_must_use)]
+
 pub mod clock;
 pub mod rng;
 pub mod sleeper;

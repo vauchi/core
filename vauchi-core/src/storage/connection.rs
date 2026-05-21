@@ -32,7 +32,19 @@ impl Storage {
         #[cfg(unix)]
         if _is_new {
             use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(&path_buf, std::fs::Permissions::from_mode(0o600));
+            // best-effort: chmod can fail on FUSE/exotic filesystems where
+            // POSIX permissions aren't supported; refusing to open would
+            // break those users. Surface via tracing so it's visible in
+            // logs without aborting the bring-up.
+            if let Err(e) =
+                std::fs::set_permissions(&path_buf, std::fs::Permissions::from_mode(0o600))
+            {
+                tracing::warn!(
+                    target: "vauchi.storage.connection",
+                    error = %e,
+                    "set_permissions(0o600) on new database failed; file may be world-readable on shared systems"
+                );
+            }
         }
 
         Self::configure_pragmas(&conn)?;
@@ -43,7 +55,10 @@ impl Storage {
             clock: crate::clock::SystemClock::shared(),
         };
         storage.run_migrations()?;
-        // T2-12: Clean up old terminal delivery records on startup
+        // T2-12: Clean up old terminal delivery records on startup —
+        // best-effort: maintenance failure leaves stale rows that will
+        // be cleaned on the next startup; no data integrity impact
+        #[allow(clippy::let_underscore_must_use)]
         let _ = storage.run_startup_maintenance();
         // F4 audit fix: remove pre-migration .bak files after successful migration
         if let Some(ref db) = storage.db_path {
@@ -168,6 +183,10 @@ impl Storage {
 
     /// Rolls back the current transaction.
     pub fn rollback(&self) {
+        // best-effort: rollback is called in Drop / failure paths; if
+        // ROLLBACK itself fails the transaction is already gone with
+        // the connection
+        #[allow(clippy::let_underscore_must_use)]
         let _ = self.conn.execute_batch("ROLLBACK");
     }
 
@@ -184,6 +203,9 @@ impl Storage {
                 let name = entry.file_name();
                 let name_str = name.to_string_lossy();
                 if name_str.contains(".pre-migration-v") && name_str.ends_with(".bak") {
+                    // best-effort: post-migration .bak cleanup; failure
+                    // leaves a harmless backup file the user can remove
+                    #[allow(clippy::let_underscore_must_use)]
                     let _ = std::fs::remove_file(entry.path());
                 }
             }

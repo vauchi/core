@@ -64,14 +64,16 @@ impl RetryScheduler {
             if entry.is_max_attempts_exceeded() {
                 // Remove permanently failed entry
                 storage.delete_retry_entry(&entry.message_id)?;
-                // Update delivery status to permanent failure
-                let _ = storage.update_delivery_status(
+                // Update delivery status to permanent failure —
+                // propagate so the user sees "Failed" instead of "Pending"
+                // (was silently dropped before 2026-05-21).
+                storage.update_delivery_status(
                     &entry.message_id,
                     &DeliveryStatus::Failed {
                         reason: "max retries exceeded".to_string(),
                     },
                     now,
-                );
+                )?;
                 result.expired += 1;
             } else {
                 // Reschedule with exponential backoff + jitter

@@ -245,7 +245,8 @@ impl CardDelta {
                     }
                 }
                 FieldChange::Removed { field_id } => {
-                    // Ignore errors for removal - field might already be removed
+                    // Ignore errors for removal — field might already be removed
+                    #[allow(clippy::let_underscore_must_use)]
                     let _ = card.remove_field(field_id);
                 }
             }

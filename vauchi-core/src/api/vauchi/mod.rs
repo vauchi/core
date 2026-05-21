@@ -483,6 +483,7 @@ impl Vauchi {
         });
 
         // Best-effort — sync recording failures should not break mutations
+        #[allow(clippy::let_underscore_must_use)]
         let _ = orchestrator.record_local_change(item);
     }
 

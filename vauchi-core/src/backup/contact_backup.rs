@@ -180,6 +180,11 @@ impl ContactBackupEntry {
                     *fingerprint_verified,
                     visibility_rules,
                 );
+                // best-effort: restoring saved trust flag from backup;
+                // if the contact's trust level changed since save (e.g.
+                // now blocked), the set call returns Err and the flag
+                // legitimately can't be restored — falls back to default
+                #[allow(clippy::let_underscore_must_use)]
                 let _ = contact.set_recovery_trusted(*recovery_trusted);
                 Ok(contact)
             }

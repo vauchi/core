@@ -122,7 +122,10 @@ vauchi-core/src/platform.rs 1087
 
 # EXEMPT — transport layer: all relay methods must be co-located for protocol coherence
 # (+2 for #[tracing::instrument] on send_update + fetch — profiling, no logic change)
-vauchi-core/src/network/http_transport.rs 1189
+# (+3 for #[allow(clippy::let_underscore_must_use)] attrs on 3 intentional
+#  best-effort test sites — fail-closed counter tests, problem
+#  2026-05-21-silent-failures-in-security-paths)
+vauchi-core/src/network/http_transport.rs 1192
 
 # EXEMPT — security-critical: crypto + verification belong together
 vauchi-core/src/recovery/mod.rs 1253
@@ -134,10 +137,16 @@ vauchi-core/src/recovery/mod.rs 1253
 # (+17 for V47 drop_app_preferences — render-context migrates to OS-native
 # frontend storage; vault row + companion AppPreferences plumbing retired,
 # problem 2026-05-16-settings-storage-by-sensitivity S6)
-vauchi-core/src/storage/migration.rs 1859
+# (+1 for #[allow(clippy::let_underscore_must_use)] attr on intentional
+#  best-effort VACUUM INTO backup site, problem
+#  2026-05-21-silent-failures-in-security-paths)
+vauchi-core/src/storage/migration.rs 1860
 
 # EXEMPT — rekey ledger: all encrypted columns must be co-located for correctness (audit C1)
-vauchi-core/src/storage/rekey.rs 1390
+# (+4 for #[allow(clippy::let_underscore_must_use)] attr + comment on
+#  intentional best-effort ROLLBACK in error path, problem
+#  2026-05-21-silent-failures-in-security-paths)
+vauchi-core/src/storage/rekey.rs 1394
 
 # SPLIT — Phase 3: extract connection management
 vauchi-core/src/storage/mod.rs 1079

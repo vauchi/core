@@ -91,8 +91,10 @@ impl DeliveryService {
             }
             DeliveryAckStatus::Delivered => {
                 storage.update_delivery_status(message_id, &DeliveryStatus::Delivered, now)?;
-                // Clean up any existing retry entry
-                let _ = storage.delete_retry_entry(message_id);
+                // Clean up any existing retry entry —
+                // propagate so a stuck retry queue surfaces instead of
+                // growing forever (was silently dropped before 2026-05-21).
+                storage.delete_retry_entry(message_id)?;
             }
             DeliveryAckStatus::Failed { reason } => {
                 storage.update_delivery_status(

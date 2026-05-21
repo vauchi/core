@@ -85,8 +85,11 @@ impl Vauchi {
                 Ok(outcome)
             }
             Err(ref e) if is_ohttp_key_error(e) => {
-                // Key is stale — evict cache, re-resolve (bundled or direct), retry
+                // Key is stale — evict cache, re-resolve (bundled or direct), retry.
+                // best-effort: if clear fails the next sync cycle will hit the
+                // same stale-key error and retry this same path
                 let relay_url = self.http_relay_url();
+                #[allow(clippy::let_underscore_must_use)]
                 let _ = self.storage.clear_ohttp_key(&relay_url);
                 let key_bytes = self.resolve_ohttp_key(&relay_url)?;
                 let client = OhttpClient::new(key_bytes).map_err(VauchiError::Network)?;
@@ -346,6 +349,9 @@ impl Vauchi {
                 }),
                 self.clock.unix_seconds(),
             );
+            // best-effort: ACK delivery; the relay will refetch on next
+            // sync cycle if this batch's ACK is lost in flight
+            #[allow(clippy::let_underscore_must_use)]
             let _ = adapter.send(&ack_envelope);
         }
 
@@ -445,6 +451,10 @@ impl Vauchi {
             .iter()
             .filter_map(|c| c.shared_key().map(|k| *k.as_bytes()))
             .collect();
+        // best-effort: token registration is idempotent and retried on
+        // every sync cycle; a failure here means this cycle's send phase
+        // routes against the previously-registered token set
+        #[allow(clippy::let_underscore_must_use)]
         let _ = ctrl.relay_mut().register_mailbox_tokens(
             &contact_keys,
             identity.master_seed(),
@@ -461,14 +471,28 @@ impl Vauchi {
         // does not save them. Without this, ratchet state is lost on
         // drop, causing desync on next sync cycle.
         let ratchets = ctrl.into_ratchets();
+        let mut ratchet_save_errors: Vec<String> = Vec::new();
         for (contact_id, ratchet) in &ratchets {
             let is_initiator = initiator_flags
                 .get(contact_id.as_str())
                 .copied()
                 .unwrap_or(false);
-            let _ = self
+            if let Err(e) = self
                 .storage
-                .save_ratchet_state(contact_id, ratchet, is_initiator);
+                .save_ratchet_state(contact_id, ratchet, is_initiator)
+            {
+                // Ratchet save failure causes desync on next cycle —
+                // collect and surface via SyncResult instead of dropping
+                ratchet_save_errors.push(format!("{contact_id}: {e}"));
+            }
+        }
+        if !ratchet_save_errors.is_empty() {
+            tracing::error!(
+                target: "vauchi.sync.send",
+                count = ratchet_save_errors.len(),
+                "ratchet state save failed for {} contact(s); next cycle will desync",
+                ratchet_save_errors.len(),
+            );
         }
 
         Ok(result)

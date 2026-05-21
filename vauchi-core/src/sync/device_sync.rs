@@ -96,7 +96,10 @@ impl ContactSyncData {
             self.fingerprint_verified,
             visibility_rules,
         );
-        // All synced contacts are exchanged, so this always succeeds.
+        // All synced contacts are exchanged, so this always succeeds —
+        // best-effort: if the invariant is ever violated (e.g. blocked
+        // contact synced), the flag falls back to default
+        #[allow(clippy::let_underscore_must_use)]
         let _ = contact.set_recovery_trusted(self.recovery_trusted);
         Ok(contact)
     }

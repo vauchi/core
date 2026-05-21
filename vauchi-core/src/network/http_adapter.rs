@@ -223,6 +223,7 @@ impl super::transport::Transport for HttpTransportAdapter {
         let acks: Vec<_> = self.ack_queue.drain(..).collect();
         for (recipient_id, blob_id) in acks {
             // Best-effort ACK — don't fail the receive cycle
+            #[allow(clippy::let_underscore_must_use)]
             let _ = self.http.acknowledge(&recipient_id, &blob_id);
         }
 

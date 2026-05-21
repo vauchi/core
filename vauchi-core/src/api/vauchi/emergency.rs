@@ -226,11 +226,12 @@ impl Vauchi {
         // Clear decoy contacts
         self.storage.clear_all_decoy_contacts()?;
 
-        // Clear emergency config
-        let _ = self.storage.delete_emergency_config();
+        // Clear emergency config — propagate failure so callers know the
+        // wipe was incomplete (was silently dropped before 2026-05-21).
+        self.storage.delete_emergency_config()?;
 
-        // Clear duress settings
-        let _ = self.storage.delete_duress_settings();
+        // Clear duress settings — same: incomplete wipe must surface.
+        self.storage.delete_duress_settings()?;
 
         // Mark deletion as executed
         let now = self.clock.unix_seconds();

@@ -117,6 +117,7 @@ pub fn merge_contacts(primary: &Contact, secondary: &Contact) -> Contact {
         );
         if !primary_signatures.contains(&sig) {
             // Ignore errors from max fields limit — best effort merge
+            #[allow(clippy::let_underscore_must_use)]
             let _ = merged_card.add_field(field.clone());
         }
     }

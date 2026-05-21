@@ -114,6 +114,7 @@ impl MigrationRunner {
             let backup_path =
                 path.with_extension(format!("pre-migration-v{}.bak", current_version));
             // Backup failure is non-fatal — the transaction provides rollback safety.
+            #[allow(clippy::let_underscore_must_use)]
             let _ = conn.execute(
                 "VACUUM INTO ?1",
                 rusqlite::params![backup_path.to_string_lossy().as_ref()],

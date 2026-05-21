@@ -1382,6 +1382,10 @@ impl Storage {
                 Ok(())
             }
             Err(e) => {
+                // best-effort: we're already in the error path; if ROLLBACK
+                // itself fails the transaction will be rolled back when the
+                // connection drops anyway
+                #[allow(clippy::let_underscore_must_use)]
                 let _ = self.conn.execute_batch("ROLLBACK");
                 Err(e)
             }

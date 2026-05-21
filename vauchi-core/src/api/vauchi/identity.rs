@@ -50,7 +50,12 @@ impl Vauchi {
         // identity creation — preserve them by loading the existing card.
         let card = match self.storage.load_own_card()? {
             Some(mut existing) => {
-                let _ = existing.set_display_name(display_name);
+                // Propagate validation errors so the user sees why their
+                // display name was rejected instead of seeing the old name
+                // silently retained.
+                existing
+                    .set_display_name(display_name)
+                    .map_err(VauchiError::from)?;
                 existing
             }
             None => ContactCard::new(display_name),
@@ -171,6 +176,10 @@ impl Vauchi {
         let backup = identity
             .export_backup(password)
             .map_err(|e| VauchiError::Configuration(format!("Export failed: {:?}", e)))?;
+        // best-effort: backup-completed timestamp is a UX hint for the
+        // reminder system; export already succeeded above so the user-
+        // visible action is complete
+        #[allow(clippy::let_underscore_must_use)]
         let _ = self.record_backup_completed();
         Ok(hex::encode(backup.as_bytes()))
     }
@@ -240,6 +249,8 @@ impl Vauchi {
         )
         .map_err(|e| VauchiError::Configuration(format!("Full backup export failed: {e}")))?;
 
+        // best-effort: same as export_backup — timestamp is a UX hint
+        #[allow(clippy::let_underscore_must_use)]
         let _ = self.record_backup_completed();
         Ok(hex::encode(blob))
     }

@@ -168,6 +168,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
                         DeliveryAckStatus::from_network_ack(event.status, event.error.as_deref());
                     // Best-effort delivery tracking — don't fail the sync cycle
                     // if a delivery record doesn't exist yet
+                    #[allow(clippy::let_underscore_must_use)]
                     let _ = self.delivery_service.handle_ack(
                         self.storage,
                         &event.update_id,
@@ -185,6 +186,9 @@ impl<'a, T: Transport> SyncController<'a, T> {
         let timed_out = self.relay.check_timeouts();
         for update_id in &timed_out {
             if let Some(update) = self.find_update_by_id(update_id) {
+                // best-effort: timeout marking is advisory; sync_manager
+                // will re-discover the update on the next cycle if this fails
+                #[allow(clippy::let_underscore_must_use)]
                 let _ = self
                     .sync_manager
                     .mark_failed(update_id, "Timeout", update.retry_count + 1);
@@ -259,6 +263,9 @@ impl<'a, T: Transport> SyncController<'a, T> {
                 }
                 Err(e) => {
                     result.failed += 1;
+                    // best-effort: error already recorded in result.errors below;
+                    // sync_manager mark_failed is advisory for retry scheduling
+                    #[allow(clippy::let_underscore_must_use)]
                     let _ = self.sync_manager.mark_failed(
                         &update.id,
                         &e.to_string(),

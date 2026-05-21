@@ -450,6 +450,8 @@ mod tests {
         storage.save_contact(&contact).unwrap();
 
         let mut own_card = ContactCard::new("Alice");
+        // Test setup: ignore field-add result (test focuses on sync below)
+        #[allow(clippy::let_underscore_must_use)]
         let _ = own_card.add_field(crate::contact_card::ContactField::new(
             crate::contact_card::FieldType::Email,
             "email",

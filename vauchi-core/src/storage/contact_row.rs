@@ -194,8 +194,11 @@ impl Storage {
             contact.set_favorite(true);
         }
 
-        // Restore proposal_trusted flag from storage
+        // Restore proposal_trusted flag from storage. best-effort: if
+        // the contact's trust level has drifted (e.g. now blocked since
+        // save), set() returns Err and the flag falls back to default
         if row.proposal_trusted != 0 {
+            #[allow(clippy::let_underscore_must_use)]
             let _ = contact.set_proposal_trusted(true);
         }
 

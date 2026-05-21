@@ -8,7 +8,8 @@
 
 use thiserror::Error;
 
-use crate::contact_card::ValidationError;
+use crate::contact::ContactError;
+use crate::contact_card::{ContactCardError, ValidationError};
 use crate::exchange::ExchangeError;
 use crate::network::NetworkError;
 use crate::storage::StorageError;
@@ -22,6 +23,15 @@ pub enum VauchiError {
     /// Contact card validation failed.
     #[error("validation error: {0}")]
     Validation(#[from] ValidationError),
+
+    /// Contact card operation failed (max fields, avatar too large, etc.).
+    #[error("contact card error: {0}")]
+    ContactCard(#[from] ContactCardError),
+
+    /// Contact-level invariant violation (e.g. recovery-trust requires
+    /// in-person verified contact).
+    #[error("contact error: {0}")]
+    Contact(#[from] ContactError),
 
     /// Key exchange failed.
     #[error("exchange error: {0}")]

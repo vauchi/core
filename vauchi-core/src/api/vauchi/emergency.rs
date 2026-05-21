@@ -106,7 +106,7 @@ impl Vauchi {
 
             // Create the emergency alert payload
             let alert = EmergencyAlert {
-                sender_id: sender_id.clone(),
+                sender_id: crate::identifiers::ContactId::from(sender_id.clone()),
                 message: config.message.clone(),
                 timestamp: now,
                 location: None, // Location is provided by mobile layer at send time

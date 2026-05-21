@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::identifiers::{DhPublicKey, IdentityKey};
+use crate::identifiers::{ContactId, DhPublicKey, IdentityKey};
 
 /// Unique message identifier for deduplication and acknowledgments.
 pub type MessageId = String;
@@ -81,9 +81,9 @@ pub struct DeregisterMailbox {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdentityRevoked {
     /// Owner's public key fingerprint (hex-encoded signing public key).
-    pub sender_id: String,
+    pub sender_id: ContactId,
     /// Contact's public key fingerprint (hex-encoded).
-    pub recipient_id: String,
+    pub recipient_id: ContactId,
     /// Unix timestamp of revocation.
     pub timestamp: u64,
     /// Ed25519 signature over canonical revocation bytes (64 bytes).
@@ -95,9 +95,9 @@ pub struct IdentityRevoked {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncryptedUpdate {
     /// Recipient's public key fingerprint (contact ID).
-    pub recipient_id: String,
+    pub recipient_id: ContactId,
     /// Sender's public key fingerprint.
-    pub sender_id: String,
+    pub sender_id: ContactId,
     /// Double Ratchet message header.
     pub ratchet_header: RatchetHeader,
     /// The encrypted payload (CardDelta or other update).
@@ -287,7 +287,7 @@ pub enum DeletionStage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmergencyAlert {
     /// Sender's public key fingerprint (contact ID).
-    pub sender_id: String,
+    pub sender_id: ContactId,
     /// Alert message text.
     pub message: String,
     /// Unix timestamp when the alert was created.
@@ -368,8 +368,8 @@ impl IdentityRevoked {
         let signature = identity.sign(&canonical);
 
         IdentityRevoked {
-            sender_id,
-            recipient_id: recipient_id.to_string(),
+            sender_id: ContactId::from(sender_id),
+            recipient_id: ContactId::from(recipient_id),
             timestamp,
             signature: *signature.as_bytes(),
         }
@@ -378,7 +378,7 @@ impl IdentityRevoked {
     /// Verifies the revocation signature against the given public key.
     pub fn verify(&self, public_key: &[u8; 32]) -> bool {
         // Reject malformed recipient IDs instead of silently verifying against zeros.
-        let Some(recipient_bytes) = decode_hex_id(&self.recipient_id) else {
+        let Some(recipient_bytes) = decode_hex_id(self.recipient_id.as_str()) else {
             return false;
         };
 

@@ -14,6 +14,8 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::identifiers::ContactId;
+
 /// Errors from encoding/decoding simple relay messages.
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -67,8 +69,8 @@ pub enum SimplePayload {
 /// can route it to the recipient without changes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimpleIdentityRevoked {
-    pub sender_id: String,
-    pub recipient_id: String,
+    pub sender_id: ContactId,
+    pub recipient_id: ContactId,
     pub timestamp: u64,
     pub signature: Vec<u8>,
 }
@@ -76,8 +78,8 @@ pub struct SimpleIdentityRevoked {
 /// Simple encrypted update - ciphertext is opaque to relay.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimpleEncryptedUpdate {
-    pub recipient_id: String,
-    pub sender_id: String,
+    pub recipient_id: ContactId,
+    pub sender_id: ContactId,
     /// Opaque ciphertext - may contain RatchetMessage, ExchangeMessage, etc.
     pub ciphertext: Vec<u8>,
 }
@@ -382,8 +384,8 @@ mod tests {
     #[test]
     fn test_identity_revoked_simple_roundtrip() {
         let revoked = SimpleIdentityRevoked {
-            sender_id: "sender123".to_string(),
-            recipient_id: "recipient456".to_string(),
+            sender_id: "sender123".to_string().into(),
+            recipient_id: "recipient456".to_string().into(),
             timestamp: 1700000000,
             signature: vec![0xAB; 64],
         };
@@ -406,8 +408,8 @@ mod tests {
     fn test_identity_revoked_wire_compatible_with_protocol() {
         // The type tag must match vauchi-protocol's MessagePayload::IdentityRevoked
         let revoked = SimpleIdentityRevoked {
-            sender_id: "s".to_string(),
-            recipient_id: "r".to_string(),
+            sender_id: "s".to_string().into(),
+            recipient_id: "r".to_string().into(),
             timestamp: 1000,
             signature: vec![1, 2, 3],
         };

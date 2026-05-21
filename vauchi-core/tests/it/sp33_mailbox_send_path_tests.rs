@@ -78,7 +78,7 @@ fn test_send_update_recipient_id_is_64_char_hex_token() {
             "Wire recipient_id must be the mailbox token"
         );
         assert_eq!(
-            update.recipient_id.len(),
+            update.recipient_id.as_str().len(),
             64,
             "recipient_id must be 64-char hex"
         );
@@ -234,7 +234,7 @@ fn test_device_sync_uses_self_token_as_recipient_id() {
             "Device sync recipient_id must be the self-token"
         );
         assert_eq!(
-            update.recipient_id.len(),
+            update.recipient_id.as_str().len(),
             64,
             "Self-token must be 64-char hex"
         );
@@ -326,7 +326,7 @@ fn test_identity_revoked_tampered_recipient_rejected() {
     let mut revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
 
     // Tamper with recipient
-    revoked.recipient_id = hex::encode([0xCC; 32]);
+    revoked.recipient_id = hex::encode([0xCC; 32]).into();
 
     assert!(
         !revoked.verify(identity.signing_public_key()),

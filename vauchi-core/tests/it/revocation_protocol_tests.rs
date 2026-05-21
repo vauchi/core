@@ -206,7 +206,7 @@ fn test_process_revocation_rejects_invalid_signature() {
     // Create revocation signed by Mallory but claiming to be from Alice
     let future_ts = alice_contact.exchange_timestamp().unwrap() + 1;
     let mut spoofed = IdentityRevoked::create(&mallory, &bob_id, future_ts);
-    spoofed.sender_id = alice_contact.id().to_string();
+    spoofed.sender_id = alice_contact.id().to_string().into();
 
     let result = process_revocation(&spoofed, &storage);
     result.expect("expected success"); // No error, just a no-op

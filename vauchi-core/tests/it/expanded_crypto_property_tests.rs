@@ -360,8 +360,8 @@ proptest! {
             message_id: msg_id.clone(),
             timestamp,
             payload: MessagePayload::EncryptedUpdate(EncryptedUpdate {
-                recipient_id: recipient_id.clone(),
-                sender_id: sender_id.clone(),
+                recipient_id: recipient_id.clone().into(),
+                sender_id: sender_id.clone().into(),
                 ratchet_header: RatchetHeader {
                     dh_public: vauchi_core::identifiers::DhPublicKey::from_bytes(dh_public),
                     dh_generation,
@@ -534,8 +534,8 @@ proptest! {
             message_id: msg_id.clone(),
             timestamp: env_timestamp,
             payload: MessagePayload::IdentityRevoked(IdentityRevoked {
-                sender_id: sender_id.clone(),
-                recipient_id: recipient_id.clone(),
+                sender_id: sender_id.clone().into(),
+                recipient_id: recipient_id.clone().into(),
                 timestamp,
                 signature,
             }),

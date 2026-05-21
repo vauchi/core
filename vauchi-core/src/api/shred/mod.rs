@@ -535,7 +535,7 @@ mod tests {
             }
             self.revocations_sent
                 .borrow_mut()
-                .push(revocation.recipient_id.clone());
+                .push(revocation.recipient_id.clone().into_string());
             Ok(true)
         }
     }

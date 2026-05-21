@@ -33,8 +33,8 @@ fn test_message_envelope_serialize_roundtrip() {
 #[test]
 fn test_encrypted_update_serialize() {
     let update = EncryptedUpdate {
-        recipient_id: "recipient-123".to_string(),
-        sender_id: "sender-456".to_string(),
+        recipient_id: "recipient-123".to_string().into(),
+        sender_id: "sender-456".to_string().into(),
         ratchet_header: RatchetHeader {
             dh_public: DhPublicKey::from_bytes([1u8; 32]),
             dh_generation: 5,

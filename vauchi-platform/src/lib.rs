@@ -1295,8 +1295,8 @@ mod tests {
     #[test]
     fn test_identity_revoked_fields() {
         let revoked = vauchi_core::network::IdentityRevoked {
-            sender_id: "sender_hex".to_string(),
-            recipient_id: "recipient_hex".to_string(),
+            sender_id: "sender_hex".to_string().into(),
+            recipient_id: "recipient_hex".to_string().into(),
             timestamp: 1700000000,
             signature: [0xAB; 64],
         };

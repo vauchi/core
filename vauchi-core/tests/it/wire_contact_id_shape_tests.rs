@@ -39,8 +39,8 @@ fn encrypted_update_sender_and_recipient_are_raw_strings() {
         message_id: "snapshot-eu-001".to_string(),
         timestamp: 0,
         payload: MessagePayload::EncryptedUpdate(EncryptedUpdate {
-            recipient_id: RECIPIENT.to_string(),
-            sender_id: SENDER.to_string(),
+            recipient_id: RECIPIENT.to_string().into(),
+            sender_id: SENDER.to_string().into(),
             ratchet_header: RatchetHeader {
                 dh_public: DhPublicKey::from_bytes([0x33; 32]),
                 dh_generation: 0,
@@ -71,8 +71,8 @@ fn identity_revoked_sender_and_recipient_are_raw_strings() {
         message_id: "snapshot-ir-001".to_string(),
         timestamp: 0,
         payload: MessagePayload::IdentityRevoked(IdentityRevoked {
-            sender_id: SENDER.to_string(),
-            recipient_id: RECIPIENT.to_string(),
+            sender_id: SENDER.to_string().into(),
+            recipient_id: RECIPIENT.to_string().into(),
             timestamp: 42,
             signature: [0xDD; 64],
         }),
@@ -94,7 +94,7 @@ fn identity_revoked_sender_and_recipient_are_raw_strings() {
 #[test]
 fn emergency_alert_sender_is_raw_string() {
     let alert = EmergencyAlert {
-        sender_id: SENDER.to_string(),
+        sender_id: SENDER.to_string().into(),
         message: "test".to_string(),
         timestamp: 0,
         location: None,
@@ -111,8 +111,8 @@ fn emergency_alert_sender_is_raw_string() {
 #[test]
 fn simple_encrypted_update_sender_and_recipient_are_raw_strings() {
     let update = SimpleEncryptedUpdate {
-        recipient_id: RECIPIENT.to_string(),
-        sender_id: SENDER.to_string(),
+        recipient_id: RECIPIENT.to_string().into(),
+        sender_id: SENDER.to_string().into(),
         ciphertext: vec![0xCC; 8],
     };
     let json: serde_json::Value =
@@ -131,8 +131,8 @@ fn simple_encrypted_update_sender_and_recipient_are_raw_strings() {
 #[test]
 fn simple_identity_revoked_sender_and_recipient_are_raw_strings() {
     let revoked = SimpleIdentityRevoked {
-        sender_id: SENDER.to_string(),
-        recipient_id: RECIPIENT.to_string(),
+        sender_id: SENDER.to_string().into(),
+        recipient_id: RECIPIENT.to_string().into(),
         timestamp: 0,
         signature: vec![0xDD; 64],
     };

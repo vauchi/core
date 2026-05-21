@@ -299,7 +299,11 @@ impl Vauchi {
         let mut blobs: Vec<(String, String, Vec<u8>)> = Vec::new();
         while let Some(envelope) = adapter.receive().map_err(VauchiError::Network)? {
             if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
-                blobs.push((envelope.message_id, update.recipient_id, update.ciphertext));
+                blobs.push((
+                    envelope.message_id,
+                    update.recipient_id.into_string(),
+                    update.ciphertext,
+                ));
             }
         }
 

@@ -21,6 +21,7 @@ use super::message::{
 use super::protocol::create_envelope;
 use super::transport::{Transport, TransportConfig};
 use crate::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
+use crate::identifiers::ContactId;
 
 /// Generates a hex-encoded anonymous sender ID from an optional shared key.
 /// Returns `None` if no shared key is provided (backward compat — uses real identity).
@@ -263,8 +264,8 @@ impl<T: Transport> RelayClient<T> {
         let self_token = compute_self_token(master_seed, current_day_epoch(now));
 
         let encrypted_update = EncryptedUpdate {
-            recipient_id: token_hex(&self_token),
-            sender_id: self.our_identity_id.clone(),
+            recipient_id: ContactId::from(token_hex(&self_token)),
+            sender_id: ContactId::from(self.our_identity_id.clone()),
             ratchet_header: RatchetHeader {
                 dh_public: crate::identifiers::DhPublicKey::from(ratchet_msg.dh_public),
                 dh_generation: ratchet_msg.dh_generation,
@@ -431,10 +432,12 @@ impl<T: Transport> RelayClient<T> {
         now: u64,
     ) -> MessageEnvelope {
         let encrypted_update = EncryptedUpdate {
-            recipient_id: recipient_id.to_string(),
-            sender_id: anonymous_sender_id
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| self.our_identity_id.clone()),
+            recipient_id: ContactId::from(recipient_id),
+            sender_id: ContactId::from(
+                anonymous_sender_id
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| self.our_identity_id.clone()),
+            ),
             ratchet_header: RatchetHeader {
                 dh_public: crate::identifiers::DhPublicKey::from(ratchet_msg.dh_public),
                 dh_generation: ratchet_msg.dh_generation,

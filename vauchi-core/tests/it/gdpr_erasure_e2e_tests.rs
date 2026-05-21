@@ -317,7 +317,8 @@ impl RevocationSender for MockRevocationSender {
         revocation: &IdentityRevoked,
         _now: u64,
     ) -> Result<bool, ShredError> {
-        self.recipient_ids.push(revocation.recipient_id.clone());
+        self.recipient_ids
+            .push(revocation.recipient_id.clone().into_string());
         Ok(true)
     }
 }

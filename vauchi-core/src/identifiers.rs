@@ -347,6 +347,12 @@ impl PartialEq<&str> for ContactId {
     }
 }
 
+impl PartialEq<String> for ContactId {
+    fn eq(&self, other: &String) -> bool {
+        &self.0 == other
+    }
+}
+
 impl fmt::Display for ContactId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)

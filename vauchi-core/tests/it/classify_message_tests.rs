@@ -13,8 +13,8 @@ use vauchi_core::network::simple_message::*;
 fn test_classify_message_returns_encrypted_update_for_encrypted_update_payload() {
     let envelope = create_simple_envelope(
         SimplePayload::EncryptedUpdate(SimpleEncryptedUpdate {
-            recipient_id: "recipient-1".to_string(),
-            sender_id: "sender-1".to_string(),
+            recipient_id: "recipient-1".to_string().into(),
+            sender_id: "sender-1".to_string().into(),
             ciphertext: vec![0xDE, 0xAD],
         }),
         0,
@@ -71,8 +71,8 @@ fn test_classify_message_returns_handshake_for_handshake_payload() {
 fn test_classify_message_returns_identity_revoked_for_revoked_payload() {
     let envelope = create_simple_envelope(
         SimplePayload::IdentityRevoked(SimpleIdentityRevoked {
-            sender_id: "sender-1".to_string(),
-            recipient_id: "recipient-1".to_string(),
+            sender_id: "sender-1".to_string().into(),
+            recipient_id: "recipient-1".to_string().into(),
             timestamp: 1700000000,
             signature: vec![0xAB; 64],
         }),

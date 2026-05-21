@@ -36,6 +36,7 @@ use super::message::{
 };
 use super::ohttp_client::OhttpClient;
 use super::transport::{ConnectionState, TransportConfig, TransportResult};
+use crate::identifiers::ContactId;
 use vauchi_protocol::v2::FetchedBlob;
 
 /// Adapts [`HttpTransport`] to the `Transport` trait.
@@ -126,8 +127,8 @@ impl HttpTransportAdapter {
             message_id: blob.blob_id.clone(),
             timestamp: blob.created_at,
             payload: MessagePayload::EncryptedUpdate(EncryptedUpdate {
-                recipient_id: blob.mailbox_token.clone().unwrap_or_default(),
-                sender_id: String::new(), // opaque — relay doesn't know sender
+                recipient_id: ContactId::from(blob.mailbox_token.clone().unwrap_or_default()),
+                sender_id: ContactId::from(String::new()), // opaque — relay doesn't know sender
                 ratchet_header: RatchetHeader {
                     dh_public: crate::identifiers::DhPublicKey::from_bytes([0u8; 32]),
                     dh_generation: 0,
@@ -171,7 +172,7 @@ impl super::transport::Transport for HttpTransportAdapter {
                 let ciphertext_b64 =
                     base64::engine::general_purpose::STANDARD.encode(&update.ciphertext);
                 self.http
-                    .send_update(&update.recipient_id, &ciphertext_b64)?;
+                    .send_update(update.recipient_id.as_str(), &ciphertext_b64)?;
                 Ok(())
             }
             MessagePayload::RegisterMailbox(rm) => {
@@ -547,8 +548,8 @@ mod tests {
             message_id: "msg-1".to_string(),
             timestamp: 0,
             payload: MessagePayload::EncryptedUpdate(EncryptedUpdate {
-                recipient_id: "a".repeat(64),
-                sender_id: "b".repeat(64),
+                recipient_id: ContactId::from("a".repeat(64)),
+                sender_id: ContactId::from("b".repeat(64)),
                 ratchet_header: RatchetHeader {
                     dh_public: crate::identifiers::DhPublicKey::from_bytes([0u8; 32]),
                     dh_generation: 0,

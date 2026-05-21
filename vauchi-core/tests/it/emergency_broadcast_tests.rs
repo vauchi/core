@@ -90,7 +90,7 @@ fn test_delete_emergency_config() {
 #[test]
 fn test_emergency_alert_serialization() {
     let alert = EmergencyAlert {
-        sender_id: "sender-abc".to_string(),
+        sender_id: "sender-abc".to_string().into(),
         message: "I may be in danger".to_string(),
         timestamp: 1700000000,
         location: Some(GeoLocation {
@@ -118,7 +118,7 @@ fn test_emergency_alert_serialization() {
 #[test]
 fn test_geo_location_optional() {
     let alert = EmergencyAlert {
-        sender_id: "sender-xyz".to_string(),
+        sender_id: "sender-xyz".to_string().into(),
         message: "Emergency".to_string(),
         timestamp: 1700000001,
         location: None,

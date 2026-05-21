@@ -121,8 +121,8 @@ fn test_decode_rejects_simple_version_zero() {
 #[test]
 fn test_encrypted_update() {
     let update = SimpleEncryptedUpdate {
-        recipient_id: "recipient-abc".to_string(),
-        sender_id: "sender-xyz".to_string(),
+        recipient_id: "recipient-abc".to_string().into(),
+        sender_id: "sender-xyz".to_string().into(),
         ciphertext: vec![1, 2, 3, 4, 5],
     };
 

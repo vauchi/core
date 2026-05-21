@@ -213,3 +213,44 @@ fn wire_dh_public_key_adapter_rejects_wrong_length() {
         "wire adapter must reject base64 that does not decode to 32 bytes"
     );
 }
+
+// @internal
+#[test]
+fn wire_identity_key_adapter_rejects_invalid_base64_chars() {
+    // The string is 44 chars (correct length for a base64-encoded
+    // 32-byte value) but contains chars outside the base64 alphabet.
+    // The adapter must surface the decode failure rather than silently
+    // truncating or producing a malformed key.
+    let malformed = serde_json::json!({ "key": "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" });
+    let result: Result<WireIdentityKeyHarness, _> = serde_json::from_value(malformed);
+    assert!(
+        result.is_err(),
+        "wire adapter must reject non-base64 characters"
+    );
+}
+
+// @internal
+#[test]
+fn wire_dh_public_key_adapter_rejects_invalid_base64_chars() {
+    let malformed = serde_json::json!({ "key": "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" });
+    let result: Result<WireDhPublicKeyHarness, _> = serde_json::from_value(malformed);
+    assert!(
+        result.is_err(),
+        "wire adapter must reject non-base64 characters"
+    );
+}
+
+// @internal
+#[test]
+fn wire_identity_key_adapter_rejects_non_string_json() {
+    // A JSON integer-array can deserialize transparently into an
+    // IdentityKey via the type's default serde, but the wire adapter
+    // is base64-only — it must reject any non-string JSON value at
+    // the wire boundary.
+    let array_shape = serde_json::json!({ "key": vec![0u8; 32] });
+    let result: Result<WireIdentityKeyHarness, _> = serde_json::from_value(array_shape);
+    assert!(
+        result.is_err(),
+        "wire adapter must reject non-string JSON values"
+    );
+}

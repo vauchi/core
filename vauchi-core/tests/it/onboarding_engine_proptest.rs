@@ -33,8 +33,6 @@ fn arb_action_id() -> impl Strategy<Value = String> {
         Just("skip".to_string()),
         Just("exchange".to_string()),
         Just("import_contacts".to_string()),
-        Just("read_security".to_string()),
-        Just("read_backup".to_string()),
         Just("start_app".to_string()),
         Just("nonexistent_action".to_string()),
         "[a-z_]{1,20}",
@@ -189,7 +187,7 @@ proptest! {
         let real_ids = [
             "have_identity", "create_new", "link_device", "restore_backup",
             "back", "continue", "skip",
-            "exchange", "import_contacts", "read_security", "read_backup",
+            "exchange", "import_contacts",
             "start_app", "transfer_device", "submit_display_name",
             "submit_custom_group", "show_phone", "show_email", "add_social",
         ];

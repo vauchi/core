@@ -405,8 +405,6 @@ proptest! {
                 Just(UserAction::ActionPressed { action_id: "start_app".into() }),
                 Just(UserAction::ActionPressed { action_id: "exchange".into() }),
                 Just(UserAction::ActionPressed { action_id: "import_contacts".into() }),
-                Just(UserAction::ActionPressed { action_id: "read_security".into() }),
-                Just(UserAction::ActionPressed { action_id: "read_backup".into() }),
                 ".*".prop_map(|s| UserAction::TextChanged {
                     component_id: "display_name".into(),
                     value: s,

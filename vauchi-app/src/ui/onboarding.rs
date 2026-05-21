@@ -583,37 +583,37 @@ impl OnboardingEngine {
             subtitle: Some("This is what contacts will see".into()),
             components: vec![],
             actions: vec![
+                // The final onboarding step's job is to land the user
+                // in the app — "Start using the app" is the natural
+                // exit, so it owns the primary affordance. Exchange
+                // and Import remain as optional shortcuts for users
+                // who know exactly what they want to do first.
+                //
+                // "Read about security" and "Read about backup" were
+                // peers here until 2026-05-21; they came off this
+                // screen because the docs reading list belonged in
+                // Help, not on the onboarding finish line — the
+                // 5-button flat menu hid which option actually
+                // ended onboarding. See
+                // _private/docs/problems/2026-05-21-mobile-onboarding-
+                // final-step-and-skip-fold G2/G3.
+                ScreenAction {
+                    id: "start_app".into(),
+                    label: "Start using the app".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
                 ScreenAction {
                     id: "exchange".into(),
                     label: "Exchange cards".into(),
-                    style: ActionStyle::Primary,
+                    style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
                 },
                 ScreenAction {
                     id: "import_contacts".into(),
                     label: "Import existing contacts".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                },
-                ScreenAction {
-                    id: "read_security".into(),
-                    label: "Read about security".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                },
-                ScreenAction {
-                    id: "read_backup".into(),
-                    label: "Read about backup".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                },
-                ScreenAction {
-                    id: "start_app".into(),
-                    label: "Start using the app".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
@@ -880,8 +880,6 @@ impl OnboardingEngine {
                 let destination = match action_id.as_str() {
                     "exchange" => PostOnboardingDestination::Exchange,
                     "import_contacts" => PostOnboardingDestination::ImportContacts,
-                    "read_security" => PostOnboardingDestination::SecurityInfo,
-                    "read_backup" => PostOnboardingDestination::BackupSetup,
                     "start_app" => PostOnboardingDestination::MainScreen,
                     _ => return ActionResult::UpdateScreen(self.current_screen()),
                 };

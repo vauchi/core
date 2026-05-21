@@ -6,9 +6,7 @@
 
 use crate::common;
 
-use common::app_engine_helpers::{
-    drive_onboarding, drive_onboarding_with_backup, drive_onboarding_without_name,
-};
+use common::app_engine_helpers::{drive_onboarding, drive_onboarding_without_name};
 use vauchi_app::ui::{
     ActionResult, AppEngine, AppScreen, Component, FormDialogType, UserAction, WorkflowEngine,
 };
@@ -51,24 +49,6 @@ fn onboarding_complete_navigates_to_home() {
         "onboarding completion should navigate to home"
     );
     assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
-}
-
-// @internal
-#[test]
-fn onboarding_with_backup_navigates_to_backup_screen() {
-    let vauchi = Vauchi::in_memory().unwrap();
-    let mut engine = AppEngine::new(vauchi);
-
-    let result = drive_onboarding_with_backup(&mut engine);
-
-    let ActionResult::NavigateTo(screen) = result else {
-        panic!("expected NavigateTo, got {result:?}");
-    };
-    assert_eq!(
-        screen.screen_id, "backup_choose",
-        "onboarding with backup requested should navigate to backup screen"
-    );
-    assert_eq!(engine.current_app_screen(), &AppScreen::Backup);
 }
 
 // @internal

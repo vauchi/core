@@ -77,33 +77,6 @@ pub fn drive_onboarding(engine: &mut AppEngine) -> ActionResult {
     })
 }
 
-/// Drive onboarding with "read_backup" pressed on the WhatNext screen.
-/// Returns the final ActionResult which should navigate to the backup screen.
-pub fn drive_onboarding_with_backup(engine: &mut AppEngine) -> ActionResult {
-    // Steps 1-5: same as drive_onboarding (through what_next)
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "create_new".into(),
-    });
-    let _ = engine.handle_action(UserAction::TextChanged {
-        component_id: "display_name".into(),
-        value: "Alice".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-
-    // Step 6: read_backup -> CompleteWith { BackupSetup } -> AppEngine routes to backup
-    engine.handle_action(UserAction::ActionPressed {
-        action_id: "read_backup".into(),
-    })
-}
-
 /// Drive onboarding to the name step and attempt to continue without entering a name.
 /// Returns the result of pressing "continue" without a display name.
 pub fn drive_onboarding_without_name(engine: &mut AppEngine) -> ActionResult {

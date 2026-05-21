@@ -63,8 +63,6 @@ const ONBOARDING_ALL_HANDLED: &[&str] = &[
     // what_next
     "exchange",
     "import_contacts",
-    "read_security",
-    "read_backup",
     "start_app",
 ];
 

@@ -597,21 +597,27 @@ fn contact_info_continue_goes_to_what_next() {
 
 // ── Screen 4: WhatNext ─────────────────────────────────────────────
 
+/// Final onboarding step: one filled primary ("Start using the app"
+/// — the natural finish line) plus two outlined shortcuts (Exchange,
+/// Import). "Read about security" / "Read about backup" came off
+/// this screen 2026-05-21 (problem record
+/// `2026-05-21-mobile-onboarding-final-step-and-skip-fold` G2/G3):
+/// the docs belong in Help, not as peers of the finish line.
 #[test]
-fn what_next_has_five_actions() {
+fn what_next_has_three_actions_with_start_app_as_primary() {
     let mut engine = OnboardingEngine::new();
     advance_to_what_next(&mut engine);
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "what_next");
     assert_eq!(screen.progress.as_ref().unwrap().current_step, 4);
     assert_eq!(screen.progress.as_ref().unwrap().total_steps, 4);
-    assert_eq!(screen.actions.len(), 5);
-    assert_eq!(screen.actions[0].id, "exchange");
+    assert_eq!(screen.actions.len(), 3);
+    assert_eq!(screen.actions[0].id, "start_app");
     assert!(matches!(screen.actions[0].style, ActionStyle::Primary));
-    assert_eq!(screen.actions[1].id, "import_contacts");
-    assert_eq!(screen.actions[2].id, "read_security");
-    assert_eq!(screen.actions[3].id, "read_backup");
-    assert_eq!(screen.actions[4].id, "start_app");
+    assert_eq!(screen.actions[1].id, "exchange");
+    assert!(matches!(screen.actions[1].style, ActionStyle::Secondary));
+    assert_eq!(screen.actions[2].id, "import_contacts");
+    assert!(matches!(screen.actions[2].style, ActionStyle::Secondary));
 }
 
 #[test]
@@ -659,34 +665,34 @@ fn what_next_import_contacts_completes_with_import() {
     ));
 }
 
+/// "Read about security" / "Read about backup" are no longer surfaced
+/// from the final onboarding step (G3 of
+/// `2026-05-21-mobile-onboarding-final-step-and-skip-fold`). The
+/// handler no longer recognises those action_ids — pressing one is
+/// indistinguishable from any other unknown action and returns an
+/// `UpdateScreen`, leaving the user on `what_next`. Guards against a
+/// regression that adds them back without restoring the buttons.
 #[test]
-fn what_next_read_security_completes_with_security() {
-    let mut engine = OnboardingEngine::new();
-    advance_to_what_next(&mut engine);
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "read_security".into(),
-    });
-    assert!(matches!(
-        result,
-        ActionResult::CompleteWith {
-            destination: PostOnboardingDestination::SecurityInfo
+fn what_next_legacy_docs_action_ids_no_longer_complete() {
+    for legacy_id in ["read_security", "read_backup"] {
+        let mut engine = OnboardingEngine::new();
+        advance_to_what_next(&mut engine);
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: legacy_id.into(),
+        });
+        match result {
+            ActionResult::UpdateScreen(screen) => {
+                assert_eq!(
+                    screen.screen_id, "what_next",
+                    "{legacy_id} must keep the user on what_next"
+                );
+            }
+            other => panic!(
+                "{legacy_id} must no longer route to a destination — \
+                 got {other:?}"
+            ),
         }
-    ));
-}
-
-#[test]
-fn what_next_read_backup_completes_with_backup() {
-    let mut engine = OnboardingEngine::new();
-    advance_to_what_next(&mut engine);
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "read_backup".into(),
-    });
-    assert!(matches!(
-        result,
-        ActionResult::CompleteWith {
-            destination: PostOnboardingDestination::BackupSetup
-        }
-    ));
+    }
 }
 
 // ── Full flow ───────────────────────────────────────────────────────

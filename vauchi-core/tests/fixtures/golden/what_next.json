@@ -6,32 +6,20 @@
   "components": [],
   "actions": [
     {
+      "id": "start_app",
+      "label": "Start using the app",
+      "style": "Primary",
+      "enabled": true
+    },
+    {
       "id": "exchange",
       "label": "Exchange cards",
-      "style": "Primary",
+      "style": "Secondary",
       "enabled": true
     },
     {
       "id": "import_contacts",
       "label": "Import existing contacts",
-      "style": "Secondary",
-      "enabled": true
-    },
-    {
-      "id": "read_security",
-      "label": "Read about security",
-      "style": "Secondary",
-      "enabled": true
-    },
-    {
-      "id": "read_backup",
-      "label": "Read about backup",
-      "style": "Secondary",
-      "enabled": true
-    },
-    {
-      "id": "start_app",
-      "label": "Start using the app",
       "style": "Secondary",
       "enabled": true
     }

@@ -100,6 +100,38 @@ fn bench_signing(c: &mut Criterion) {
 }
 
 // =============================================================================
+// PASSWORD KDF BENCHMARKS (Argon2id)
+// =============================================================================
+
+// Baselines password-based key derivation under production parameters
+// (M=64 MiB, T=3, P=4) so a silent weakening shows up as a perf drop
+// in the bench-compare CI gate. A weakening of the *source constants*
+// is caught at compile time by `password_kdf.rs::const _`, but a
+// drift in the upstream `argon2` crate's implementation (e.g. an
+// accidental optimization that effectively reduces work) only shows
+// up here.
+//
+// Sample size reduced from Criterion's 100 default — each derivation
+// is ~80-150ms on a typical machine; 10 samples ≈ ~3-5s of bench
+// time. Sufficient for trend detection in the nightly bench job
+// while keeping wall-clock cost acceptable.
+fn bench_password_kdf(c: &mut Criterion) {
+    use vauchi_core::crypto::password_kdf::derive_key_argon2id;
+
+    let mut group = c.benchmark_group("password_kdf");
+    group.sample_size(10);
+    group.bench_function("argon2id_derive_key", |b| {
+        b.iter(|| {
+            derive_key_argon2id(
+                black_box(b"correct-horse-battery-staple"),
+                black_box(b"randomly_chosen!"),
+            )
+        })
+    });
+    group.finish();
+}
+
+// =============================================================================
 // HKDF BENCHMARKS
 // =============================================================================
 
@@ -460,6 +492,7 @@ criterion_group!(
     bench_symmetric_encryption,
     bench_key_generation,
     bench_signing,
+    bench_password_kdf,
     bench_hkdf,
     bench_double_ratchet,
     bench_x3dh,

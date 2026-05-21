@@ -423,3 +423,102 @@ fn edit_data_persists_across_steps() {
     // Also verify via accessor
     assert_eq!(engine.edited_contact().display_name, "Updated Alice");
 }
+
+// Wire-level contract: `Component::Preview.visible_fields` never includes
+// `UiFieldVisibility::Hidden` entries, even when the raw `fields` list does.
+//
+// This pins the privacy guarantee that the
+// `2026-05-21-component-preview-legacy-fields` problem record protects:
+// frontends that mistakenly render `fields` (Windows pre-Tier-1 still does,
+// TUI did until vauchi/tui!301) leak Hidden values to the rendered card.
+// Until the legacy `fields` field is removed from the wire, this test
+// guards that `visible_fields` is the safe-to-render list.
+//
+// @internal
+#[test]
+fn edit_preview_visible_fields_drop_hidden_entries() {
+    // Build a contact with one Shown field and one Hidden field.
+    let contact = EditableContact {
+        display_name: "Alice".into(),
+        fields: vec![
+            EditableField {
+                id: "phone1".into(),
+                field_type: "phone".into(),
+                label: "Phone".into(),
+                value: "+41 79 123 45 67".into(),
+                visible_to_groups: vec![], // No groups
+                shown: true,               // Shown
+            },
+            EditableField {
+                id: "secret_email".into(),
+                field_type: "email".into(),
+                label: "Personal Email".into(),
+                value: "secret@example.com".into(),
+                visible_to_groups: vec![], // No groups
+                shown: false,              // Hidden
+            },
+        ],
+    };
+    let mut engine = ContactEditEngine::new(contact, sample_groups());
+
+    // Step 1 → 2 → 3 (Preview)
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+
+    let screen = engine.current_screen();
+    let Component::Preview {
+        fields,
+        visible_fields,
+        selected_variant,
+        ..
+    } = &screen.components[0]
+    else {
+        panic!(
+            "Expected Component::Preview, got {:?}",
+            &screen.components[0]
+        );
+    };
+
+    // Both fields appear in the raw `fields` list (the legacy wire shape).
+    assert_eq!(
+        fields.len(),
+        2,
+        "raw `fields` contains both Shown and Hidden entries"
+    );
+    let has_hidden_in_fields = fields
+        .iter()
+        .any(|f| matches!(f.visibility, UiFieldVisibility::Hidden));
+    assert!(
+        has_hidden_in_fields,
+        "raw `fields` must include the Hidden entry (this test would not be meaningful otherwise)"
+    );
+
+    // No variant selected yet — preview shows the global default.
+    assert!(
+        selected_variant.is_none(),
+        "test precondition: no variant selected"
+    );
+
+    // The wire-level contract: `visible_fields` MUST NOT contain any
+    // Hidden-visibility entry. A renderer that binds on this list (linux-gtk,
+    // linux-qt, iOS, TUI post-MR-301) cannot accidentally leak hidden values.
+    assert!(
+        visible_fields
+            .iter()
+            .all(|f| !matches!(f.visibility, UiFieldVisibility::Hidden)),
+        "visible_fields leaked Hidden entry: {:?}",
+        visible_fields
+            .iter()
+            .filter(|f| matches!(f.visibility, UiFieldVisibility::Hidden))
+            .map(|f| f.id.as_str())
+            .collect::<Vec<_>>()
+    );
+
+    // And specifically: the Shown field is present, the Hidden one is gone.
+    let visible_ids: Vec<_> = visible_fields.iter().map(|f| f.id.as_str()).collect();
+    assert_eq!(visible_ids, vec!["phone1"]);
+}

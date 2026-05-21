@@ -611,6 +611,7 @@ fn test_full_handshake_happy_path() {
 // encryption itself was correct. v3 adds `sender_timestamp` to the
 // KeyAck wire and persists the initiator's offer-timestamp on the
 // responder session so the reciprocal-decrypt site can match.
+// @scenario: ble_exchange :: Round-trip handshake succeeds under clock drift
 #[test]
 fn test_full_handshake_round_trip_under_clock_drift() {
     let alice_id = make_test_identity();

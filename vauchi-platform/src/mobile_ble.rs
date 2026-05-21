@@ -537,7 +537,8 @@ impl MobileBleExchangeSession {
                 self.fail(LOCK_POISON_MSG.into());
                 return;
             };
-            match inner.process_key_ack(&ack_bytes, &encrypted_card) {
+            let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+            match inner.process_key_ack(&ack_bytes, &encrypted_card, now) {
                 Ok((commitment, our_encrypted)) => {
                     drop(inner);
 

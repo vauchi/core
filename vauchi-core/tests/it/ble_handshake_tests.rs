@@ -352,7 +352,11 @@ fn test_initiator_processes_key_ack() {
         .expect("process offer");
 
     let (commitment, alice_encrypted_card) = alice
-        .process_key_ack(&ack_bytes, &bob_encrypted_card)
+        .process_key_ack(
+            &ack_bytes,
+            &bob_encrypted_card,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
         .expect("process key ack");
 
     assert_eq!(
@@ -386,7 +390,7 @@ fn test_initiator_rejects_ack_in_wrong_state() {
     );
 
     // Haven't sent key offer yet
-    let result = alice.process_key_ack(&[0u8; 113], &[0u8; 64]);
+    let result = alice.process_key_ack(&[0u8; 113], &[0u8; 64], 0u64);
     assert!(
         matches!(result, Err(ExchangeError::InvalidState(_))),
         "process_key_ack in Idle state must fail"
@@ -427,7 +431,11 @@ fn test_responder_processes_committed_payload() {
         .expect("process offer");
     // Phase 2 (initiator)
     let (commitment, alice_encrypted) = alice
-        .process_key_ack(&ack_bytes, &bob_encrypted)
+        .process_key_ack(
+            &ack_bytes,
+            &bob_encrypted,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
         .expect("process ack");
 
     // Phase 3: Bob processes Alice's committed payload
@@ -469,7 +477,11 @@ fn test_commitment_mismatch_rejected() {
         )
         .expect("process offer");
     let (_commitment, alice_encrypted) = alice
-        .process_key_ack(&ack_bytes, &bob_encrypted)
+        .process_key_ack(
+            &ack_bytes,
+            &bob_encrypted,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
         .expect("process ack");
 
     // Send wrong commitment
@@ -517,7 +529,11 @@ fn test_full_handshake_happy_path() {
 
     // Phase 2 (Initiator): Process ack, get commitment + encrypted card
     let (alice_commitment, alice_encrypted) = alice
-        .process_key_ack(&ack_bytes, &bob_encrypted)
+        .process_key_ack(
+            &ack_bytes,
+            &bob_encrypted,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
         .expect("process ack");
 
     // Phase 3: Responder processes initiator's committed payload
@@ -703,10 +719,52 @@ fn test_initiator_process_key_ack_rejects_self_identity() {
     ack_bytes[1..33].copy_from_slice(&alice_identity);
 
     let _ = attacker; // silence unused — kept for clarity above
-    let result = alice.process_key_ack(&ack_bytes, &encrypted_card);
+    let result = alice.process_key_ack(
+        &ack_bytes,
+        &encrypted_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     assert!(
         matches!(result, Err(ExchangeError::SelfExchange)),
         "Initiator must reject ack where their_identity == our_identity_key, got {:?}",
+        result
+    );
+}
+
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// Initiator-side session timeout: if `BLE_HANDSHAKE_EXPIRY_SECS` has
+// elapsed since this session sent its offer, an ack must be rejected
+// regardless of its content. Defends against stuck handshakes and a
+// degenerate replay where an attacker holds a captured ack for later
+// delivery. Mirrors the responder-side `test_expired_key_offer_rejected`.
+// Regression for
+// _private/docs/problems/2026-05-21-ble-initiator-missing-checks/
+// (Option B: deferred timestamp half).
+// @scenario: ble_exchange :: Initiator rejects ack after session timeout
+#[test]
+fn test_initiator_process_key_ack_rejects_expired_session() {
+    let alice_id = make_test_identity();
+    let bob_id = make_test_identity();
+    let alice_card = make_test_card(&alice_id, "Alice");
+    let bob_card = make_test_card(&bob_id, "Bob");
+
+    // Alice sends offer at t=100. The session stores 100 as `our_timestamp`.
+    let mut alice = BleHandshakeSession::new_initiator(&alice_id, alice_card, 100);
+    let mut bob = BleHandshakeSession::new_responder(&bob_id, bob_card, 100);
+
+    let offer = alice.create_key_offer().expect("key offer");
+    let (ack_bytes, bob_encrypted_card) =
+        bob.process_key_offer(&offer, 100).expect("process offer");
+
+    // Ack arrives at t=100 + BLE_HANDSHAKE_EXPIRY_SECS (60) + 1 = 161s
+    // later — past the initiator's session-timeout horizon.
+    let result = alice.process_key_ack(&ack_bytes, &bob_encrypted_card, 161);
+    assert!(
+        matches!(result, Err(ExchangeError::BleExpired)),
+        "Initiator must reject ack arriving after session timeout, got {:?}",
         result
     );
 }
@@ -836,7 +894,11 @@ fn test_tampered_exchange_key_fails() {
 
     // Initiator uses its real identity key for DH1 but the ack
     // was encrypted with a mismatched key → decryption fails
-    let result = init.process_key_ack(&ack, &enc_bob);
+    let result = init.process_key_ack(
+        &ack,
+        &enc_bob,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
     assert!(
         result.is_err(),
         "Tampered exchange key must cause handshake failure"

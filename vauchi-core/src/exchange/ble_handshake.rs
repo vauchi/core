@@ -410,12 +410,29 @@ impl BleHandshakeSession {
     ///
     /// Returns `(our_commitment, our_encrypted_card)`.
     ///
+    /// `now` is the current Unix time in seconds. Used to enforce an
+    /// initiator-side session timeout: the ack is rejected if more than
+    /// `BLE_HANDSHAKE_EXPIRY_SECS` have elapsed since this session sent its
+    /// offer. This is the deferred-timestamp half of
+    /// `_private/docs/problems/2026-05-21-ble-initiator-missing-checks/`
+    /// (Option B from § Rejected Approaches): we don't trust a peer-
+    /// supplied timestamp (the v2 wire format has no timestamp slot in
+    /// the KeyAck), but we do enforce that the initiator's own session
+    /// hasn't gone stale before it accepts an ack.
+    ///
     /// Transitions: `KeyOfferSent → PayloadsExchanged`
     pub fn process_key_ack(
         &mut self,
         their_ack: &[u8],
         their_encrypted_card: &[u8],
+        now: u64,
     ) -> Result<(Vec<u8>, Vec<u8>), ExchangeError> {
+        // Suppress unused-var lint until commit 2 wires the expiry
+        // check in this same MR. Keeping the `now` parameter in
+        // commit 1 propagates the API shape through all callers in
+        // one step so commit 2 is purely the behavior change.
+        let _ = now;
+
         let exchange_id = match &self.state {
             BleHandshakeState::KeyOfferSent { exchange_id } => *exchange_id,
             _ => {

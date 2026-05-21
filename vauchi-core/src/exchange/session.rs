@@ -1144,7 +1144,9 @@ impl ExchangeSession {
             let hs = self.ble_handshake.as_mut().ok_or_else(|| {
                 ExchangeError::InvalidState("BLE handshake not initialized".into())
             })?;
-            let (our_commitment, our_encrypted_card) = hs.process_key_ack(&key_ack, &their_card)?;
+            let now = self.clock.unix_seconds();
+            let (our_commitment, our_encrypted_card) =
+                hs.process_key_ack(&key_ack, &their_card, now)?;
 
             self.emit_command(Command::BleWriteCharacteristic {
                 uuid: super::CHAR_HANDSHAKE_WRITE.to_string(),

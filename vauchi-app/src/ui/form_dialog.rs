@@ -293,15 +293,25 @@ impl FormDialogEngine {
             });
         }
 
-        let title = if let Some(entry) = catalog_entry {
-            if self.selected_entry_type.is_some() {
-                format!("Add {} to MyInfo", entry.display_name)
+        // User-facing copy — `MyInfo` is the internal CoreScreenView
+        // name and was leaking into the title verbatim. See problem
+        // record `2026-05-21-add-entry-form-mixes-picker-and-fields`.
+        let title = if self.selected_entry_type.is_some() {
+            if let Some(entry) = catalog_entry {
+                format!("Add {}", entry.display_name)
             } else {
-                "Add Entry to MyInfo".into()
+                "Add to your card".into()
             }
         } else {
-            "Add Entry to MyInfo".into()
+            "Add to your card".into()
         };
+
+        // Save is only meaningful once the user has picked a type
+        // **and** typed a value. Without these guards Save was
+        // enabled from first render and tapping it with no input
+        // silently committed an empty `custom` entry — same record §G3.
+        let save_enabled =
+            self.selected_entry_type.is_some() && !self.get_value("field_value").is_empty();
 
         ScreenModel {
             screen_id: "form_add_field".into(),
@@ -313,7 +323,7 @@ impl FormDialogEngine {
                     id: "submit".into(),
                     label: "Save".into(),
                     style: ActionStyle::Primary,
-                    enabled: true,
+                    enabled: save_enabled,
                     a11y: None,
                 },
                 ScreenAction {

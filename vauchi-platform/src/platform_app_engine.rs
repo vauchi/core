@@ -1873,23 +1873,17 @@ impl PlatformAppEngine {
                 Ok(DomainCommandResult::Bool { value: true })
             }
             DomainCommand::SetDisplayName { name } => {
-                let storage = engine.vauchi().storage();
-                let mut card = storage
-                    .load_own_card()
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?
-                    .ok_or(MobileError::Other {
-                        detail: "Identity not found".into(),
-                    })?;
-                card.set_display_name(&name)
-                    .map_err(|e| MobileError::InvalidInput {
-                        field: String::new(),
-                        detail: e.to_string(),
-                    })?;
-                storage
-                    .save_own_card(&card)
-                    .map_err(|e| MobileError::StorageError {
+                // Route through `Vauchi::update_display_name` so the
+                // identity's `display_name` column is updated in addition
+                // to the own_card. The prior implementation mutated only
+                // `own_card` and called `storage.save_own_card`, leaving
+                // the identity column stale — which surfaced as the
+                // Samsung S7 rename failure tracked by
+                // `_private/docs/problems/2026-04-06-display-name-rename-fails/`.
+                engine
+                    .vauchi_mut()
+                    .update_display_name(&name)
+                    .map_err(|e| MobileError::Other {
                         detail: e.to_string(),
                     })?;
                 engine.invalidate_screen(&AppScreen::MyInfo);

@@ -77,9 +77,6 @@ pub struct AnimatedQrSession {
     expected_total: Option<usize>,
     /// Count of unique chunks received so far.
     received_count: usize,
-    /// Session config.
-    #[allow(dead_code)]
-    config: AnimatedQrConfig,
 }
 
 impl AnimatedQrSession {
@@ -110,19 +107,17 @@ impl AnimatedQrSession {
             received_chunks: Vec::new(),
             expected_total: None,
             received_count: 0,
-            config,
         }
     }
 
     /// Create a receiver session ready to accept incoming frames.
-    pub fn new_receiver(config: AnimatedQrConfig) -> Self {
+    pub fn new_receiver(_config: AnimatedQrConfig) -> Self {
         Self {
             frames: Vec::new(),
             cursor: 0,
             received_chunks: Vec::new(),
             expected_total: None,
             received_count: 0,
-            config,
         }
     }
 

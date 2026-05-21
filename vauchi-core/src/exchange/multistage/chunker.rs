@@ -71,11 +71,6 @@ impl ReassemblyBuffer {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn has(&self, index: u16) -> bool {
-        index < self.total && self.chunks[index as usize].is_some()
-    }
-
     pub fn is_complete(&self) -> bool {
         self.received == self.total
     }

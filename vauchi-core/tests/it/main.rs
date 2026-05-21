@@ -401,4 +401,5 @@ mod visibility_repropagate_tests;
 mod visibility_resolution_tests;
 mod visibility_rules_encryption_tests;
 mod wave2_api_tests;
+mod wire_contact_id_shape_tests;
 mod wire_pubkey_shape_tests;

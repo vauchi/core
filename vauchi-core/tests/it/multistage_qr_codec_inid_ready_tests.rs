@@ -8,11 +8,10 @@
 //! not these four variants. They were 0% covered before this file.
 
 use vauchi_core::exchange::multistage::qr_codec::{
-    StageQr, format_combo_qr, format_fail_qr, format_inid_qr, format_ready_qr, parse_qr,
+    StageQr, format_combo_qr, format_fail_qr, format_in2d_qr, format_ready_qr, parse_qr,
 };
 
 const SID: [u8; 16] = [0x11; 16];
-const PK: [u8; 32] = [0x22; 32];
 const EPH: [u8; 32] = [0x33; 32];
 const COMMITMENT: [u8; 32] = [0x44; 32];
 const REVEAL_KEY: [u8; 32] = [0x55; 32];
@@ -27,20 +26,11 @@ const ACK_HASH: [u8; 32] = [0x77; 32];
 #[test]
 fn inid_qr_roundtrips_without_relay_fields() {
     let ciphertext = vec![0xAB; 64];
-    let qr = format_inid_qr(
-        &SID,
-        &PK,
-        &EPH,
-        &COMMITMENT,
-        "Alice",
-        None,
-        None,
-        &ciphertext,
-    );
+    let qr = format_in2d_qr(&SID, &EPH, &COMMITMENT, "Alice", None, None, &ciphertext);
 
     assert!(
-        qr.starts_with("INID"),
-        "QR must carry INID prefix, got: {}",
+        qr.starts_with("IN2D"),
+        "QR must carry IN2D prefix, got: {}",
         &qr[..4]
     );
 
@@ -48,7 +38,6 @@ fn inid_qr_roundtrips_without_relay_fields() {
     match parsed {
         StageQr::Inid {
             session_id,
-            pubkey,
             ephemeral,
             commitment_hash,
             display_name,
@@ -57,7 +46,6 @@ fn inid_qr_roundtrips_without_relay_fields() {
             ciphertext: parsed_ct,
         } => {
             assert_eq!(session_id, SID);
-            assert_eq!(pubkey, PK);
             assert_eq!(ephemeral, EPH);
             assert_eq!(commitment_hash, COMMITMENT);
             assert_eq!(display_name, "Alice");
@@ -75,9 +63,8 @@ fn inid_qr_roundtrips_with_relay_url_and_noise_pubkey() {
     let ciphertext = vec![0xCD; 32];
     let relay_url = "https://relay.example.com";
     let relay_npk = [0x99u8; 32];
-    let qr = format_inid_qr(
+    let qr = format_in2d_qr(
         &SID,
-        &PK,
         &EPH,
         &COMMITMENT,
         "Bob",
@@ -107,9 +94,8 @@ fn inid_qr_roundtrips_with_relay_url_and_noise_pubkey() {
 // @internal
 #[test]
 fn inid_qr_with_relay_url_but_no_noise_pubkey_is_rejected() {
-    let qr = format_inid_qr(
+    let qr = format_in2d_qr(
         &SID,
-        &PK,
         &EPH,
         &COMMITMENT,
         "Alice",
@@ -127,7 +113,7 @@ fn inid_qr_with_relay_url_but_no_noise_pubkey_is_rejected() {
 // @internal
 #[test]
 fn inid_qr_handles_empty_ciphertext() {
-    let qr = format_inid_qr(&SID, &PK, &EPH, &COMMITMENT, "Alice", None, None, &[]);
+    let qr = format_in2d_qr(&SID, &EPH, &COMMITMENT, "Alice", None, None, &[]);
     let parsed = parse_qr(&qr).unwrap();
     if let StageQr::Inid { ciphertext, .. } = parsed {
         assert!(ciphertext.is_empty());

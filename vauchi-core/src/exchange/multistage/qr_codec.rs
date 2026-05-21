@@ -48,7 +48,6 @@ pub enum QrCodecError {
 pub enum StageQr {
     Init {
         session_id: [u8; 16],
-        pubkey: [u8; 32],
         ephemeral: [u8; 32],
         commitment_hash: [u8; 32],
         display_name: String,
@@ -78,9 +77,15 @@ pub enum StageQr {
     /// INIT with embedded data: for small payloads (1 chunk), includes the
     /// raw commitment ciphertext. Eliminates the DATA phase entirely.
     /// Peer goes directly from Advertising → has all data in one scan.
+    ///
+    /// v2 (`IN2D` prefix, this variant): the redundant `pubkey: [u8; 32]`
+    /// field has been removed. The v1 `INID` prefix carried both an
+    /// `ephemeral` X25519 key and a `pubkey` (a 32-byte identity stand-in)
+    /// even though the multi-stage protocol authenticates via the
+    /// commitment hash + reveal key, not via the identity pubkey on the
+    /// wire. See `_private/docs/problems/2026-05-21-multistage-identity-pubkey-footgun/`.
     Inid {
         session_id: [u8; 16],
-        pubkey: [u8; 32],
         ephemeral: [u8; 32],
         commitment_hash: [u8; 32],
         display_name: String,
@@ -157,15 +162,20 @@ fn take_rest(s: &str, pos: usize) -> &str {
 
 /// Format an INIT stage QR string with optional relay metadata.
 ///
-/// Layout: `INIT<sid:24><pk:48><eph:48><ch:48><name_len:2><name><flags:3>[<url_len:3><url>][<pubkey:48>]`
+/// v2 layout (`INI2` prefix): `INI2<sid:24><eph:48><ch:48><name_len:2><name><flags:3>[<url_len:3><url>][<pubkey:48>]`
+///
+/// The v1 `INIT` layout carried a redundant 48-char `<pk:48>` between
+/// `<sid>` and `<eph>` — a 32-byte identity stand-in that the multi-stage
+/// protocol does not authenticate against (auth is via commitment hash +
+/// reveal key). The field was removed for v2; see
+/// `_private/docs/problems/2026-05-21-multistage-identity-pubkey-footgun/`.
 ///
 /// # Panics
 ///
 /// Panics if `display_name` exceeds 99 bytes (2-digit length field)
 /// or `relay_url` exceeds 999 bytes (3-digit length field).
-pub fn format_init_qr_with_relay(
+pub fn format_ini2_qr_with_relay(
     session_id: &[u8; 16],
-    pubkey: &[u8; 32],
     ephemeral: &[u8; 32],
     commitment_hash: &[u8; 32],
     display_name: &str,
@@ -192,9 +202,8 @@ pub fn format_init_qr_with_relay(
     }
 
     let mut result = format!(
-        "INIT{sid}{pk}{eph}{ch}{name_len:02}{name}{flags}",
+        "INI2{sid}{eph}{ch}{name_len:02}{name}{flags}",
         sid = base45::encode(session_id),
-        pk = base45::encode(pubkey),
         eph = base45::encode(ephemeral),
         ch = base45::encode(commitment_hash),
         name_len = display_name.len(),
@@ -215,17 +224,21 @@ pub fn format_init_qr_with_relay(
 #[allow(clippy::too_many_arguments)]
 /// Format an INID (INIT+Data) QR for small payloads.
 ///
-/// Layout: same as INIT but with prefix `INID` and appended ciphertext.
-/// `INID<sid:24><pk:48><eph:48><ch:48><name_len:2><name><flags:2>[relay]<ct_len:3><ct>`
+/// v2 layout (`IN2D` prefix): same as `format_ini2_qr_with_relay` but
+/// with appended ciphertext:
+/// `IN2D<sid:24><eph:48><ch:48><name_len:2><name><flags:2>[relay]<ct_len:3><ct>`
+///
+/// The v1 `INID` layout carried a redundant `<pk:48>` identity stand-in
+/// field which has been removed for v2. See
+/// `_private/docs/problems/2026-05-21-multistage-identity-pubkey-footgun/`.
 ///
 /// The ciphertext is the raw commitment ciphertext (NOT transport-encrypted).
 /// Security: the commitment scheme provides confidentiality (ChaCha20-Poly1305
 /// with random reveal key) and integrity (commitment hash). Transport encryption
 /// is redundant for single-chunk payloads bound to this session's commitment hash.
 #[allow(dead_code)]
-pub fn format_inid_qr(
+pub fn format_in2d_qr(
     session_id: &[u8; 16],
-    pubkey: &[u8; 32],
     ephemeral: &[u8; 32],
     commitment_hash: &[u8; 32],
     display_name: &str,
@@ -250,9 +263,8 @@ pub fn format_inid_qr(
 
     // Build same as INIT but with INID prefix, then append ciphertext at the end
     let mut result = format!(
-        "INID{sid}{pk}{eph}{ch}{name_len:02}{name}{flags}",
+        "IN2D{sid}{eph}{ch}{name_len:02}{name}{flags}",
         sid = base45::encode(session_id),
-        pk = base45::encode(pubkey),
         eph = base45::encode(ephemeral),
         ch = base45::encode(commitment_hash),
         name_len = display_name.len(),
@@ -369,22 +381,24 @@ pub fn parse_qr(raw: &str) -> Result<StageQr, QrCodecError> {
     let body = &raw[PREFIX_LEN..];
 
     match prefix {
-        "INIT" => parse_init(body),
-        "INID" => parse_inid(body),
+        "INI2" => parse_ini2(body),
+        "IN2D" => parse_in2d(body),
         "DATA" => parse_data(body),
         "VRFY" => parse_verify(body),
         "CONF" => parse_confirm(body),
         "RDYY" => parse_ready(body),
         "FAIL" => parse_fail(body),
         "CMBO" => parse_combo(body),
+        // v1 prefixes are explicitly rejected (the identity-pubkey footgun
+        // has been removed; see qr_codec.rs `StageQr::Init` doc comment).
+        "INIT" | "INID" => Err(QrCodecError::UnknownPrefix),
         _ => Err(QrCodecError::UnknownPrefix),
     }
 }
 
-fn parse_init(body: &str) -> Result<StageQr, QrCodecError> {
+fn parse_ini2(body: &str) -> Result<StageQr, QrCodecError> {
     let mut pos = 0;
     let sid = take(body, &mut pos, SID_LEN)?;
-    let pk = take(body, &mut pos, F32_LEN)?;
     let eph = take(body, &mut pos, F32_LEN)?;
     let ch = take(body, &mut pos, F32_LEN)?;
 
@@ -431,7 +445,6 @@ fn parse_init(body: &str) -> Result<StageQr, QrCodecError> {
 
     Ok(StageQr::Init {
         session_id: decode_fixed(sid)?,
-        pubkey: decode_fixed(pk)?,
         ephemeral: decode_fixed(eph)?,
         commitment_hash: decode_fixed(ch)?,
         display_name: name.to_string(),
@@ -440,10 +453,9 @@ fn parse_init(body: &str) -> Result<StageQr, QrCodecError> {
     })
 }
 
-fn parse_inid(body: &str) -> Result<StageQr, QrCodecError> {
+fn parse_in2d(body: &str) -> Result<StageQr, QrCodecError> {
     let mut pos = 0;
     let sid = take(body, &mut pos, SID_LEN)?;
-    let pk = take(body, &mut pos, F32_LEN)?;
     let eph = take(body, &mut pos, F32_LEN)?;
     let ch = take(body, &mut pos, F32_LEN)?;
     let name_len_str = take(body, &mut pos, NAME_LEN_LEN)?;
@@ -485,7 +497,6 @@ fn parse_inid(body: &str) -> Result<StageQr, QrCodecError> {
 
     Ok(StageQr::Inid {
         session_id: decode_fixed(sid)?,
-        pubkey: decode_fixed(pk)?,
         ephemeral: decode_fixed(eph)?,
         commitment_hash: decode_fixed(ch)?,
         display_name: name.to_string(),

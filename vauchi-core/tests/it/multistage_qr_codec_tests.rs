@@ -7,24 +7,15 @@ use vauchi_core::exchange::multistage::qr_codec::*;
 // @internal
 #[test]
 fn test_parse_init_qr() {
-    let pubkey = [1u8; 32];
+    let _pubkey = [1u8; 32];
     let ephemeral = [2u8; 32];
     let commitment = [3u8; 32];
     let session_id = [4u8; 16];
-    let qr = format_init_qr_with_relay(
-        &session_id,
-        &pubkey,
-        &ephemeral,
-        &commitment,
-        "Alice",
-        None,
-        None,
-    );
+    let qr = format_ini2_qr_with_relay(&session_id, &ephemeral, &commitment, "Alice", None, None);
     let parsed = parse_qr(&qr).unwrap();
     match parsed {
         StageQr::Init {
             session_id: sid,
-            pubkey: pk,
             ephemeral: eph,
             commitment_hash,
             display_name,
@@ -32,7 +23,6 @@ fn test_parse_init_qr() {
             relay_noise_pubkey,
         } => {
             assert_eq!(sid, session_id);
-            assert_eq!(pk, pubkey);
             assert_eq!(eph, ephemeral);
             assert_eq!(commitment_hash, commitment);
             assert_eq!(display_name, "Alice");
@@ -138,15 +128,14 @@ fn test_data_qr_crc_integrity() {
 #[test]
 fn test_init_qr_with_relay_url_but_no_noise_pubkey_is_rejected() {
     let session_id = [10u8; 16];
-    let pubkey = [11u8; 32];
+    let _pubkey = [11u8; 32];
     let ephemeral = [12u8; 32];
     let commitment = [13u8; 32];
     let relay_url = "https://relay.example.com";
 
     // Format encodes whatever is given — the fail-closed check is at parse time
-    let qr = format_init_qr_with_relay(
+    let qr = format_ini2_qr_with_relay(
         &session_id,
-        &pubkey,
         &ephemeral,
         &commitment,
         "Bob",
@@ -166,15 +155,14 @@ fn test_init_qr_with_relay_url_but_no_noise_pubkey_is_rejected() {
 #[test]
 fn test_init_qr_with_relay_url_and_noise_pubkey() {
     let session_id = [14u8; 16];
-    let pubkey = [15u8; 32];
+    let _pubkey = [15u8; 32];
     let ephemeral = [16u8; 32];
     let commitment = [17u8; 32];
     let relay_url = "https://relay.example.com";
     let noise_pubkey = [18u8; 32];
 
-    let qr = format_init_qr_with_relay(
+    let qr = format_ini2_qr_with_relay(
         &session_id,
-        &pubkey,
         &ephemeral,
         &commitment,
         "Carol",
@@ -201,19 +189,11 @@ fn test_init_qr_with_relay_url_and_noise_pubkey() {
 fn test_init_qr_without_relay_backward_compat() {
     // format_init_qr (no relay) should still parse correctly
     let session_id = [19u8; 16];
-    let pubkey = [20u8; 32];
+    let _pubkey = [20u8; 32];
     let ephemeral = [21u8; 32];
     let commitment = [22u8; 32];
 
-    let qr = format_init_qr_with_relay(
-        &session_id,
-        &pubkey,
-        &ephemeral,
-        &commitment,
-        "Dave",
-        None,
-        None,
-    );
+    let qr = format_ini2_qr_with_relay(&session_id, &ephemeral, &commitment, "Dave", None, None);
     let parsed = parse_qr(&qr).unwrap();
     match parsed {
         StageQr::Init {
@@ -234,13 +214,12 @@ fn test_init_qr_without_relay_backward_compat() {
 #[test]
 fn test_init_qr_rejects_private_host_relay_url() {
     let session_id = [30u8; 16];
-    let pubkey = [31u8; 32];
+    let _pubkey = [31u8; 32];
     let ephemeral = [32u8; 32];
     let commitment = [33u8; 32];
 
-    let qr = format_init_qr_with_relay(
+    let qr = format_ini2_qr_with_relay(
         &session_id,
-        &pubkey,
         &ephemeral,
         &commitment,
         "Evil",
@@ -257,13 +236,12 @@ fn test_init_qr_rejects_private_host_relay_url() {
 #[test]
 fn test_init_qr_rejects_insecure_scheme() {
     let session_id = [34u8; 16];
-    let pubkey = [35u8; 32];
+    let _pubkey = [35u8; 32];
     let ephemeral = [36u8; 32];
     let commitment = [37u8; 32];
 
-    let qr = format_init_qr_with_relay(
+    let qr = format_ini2_qr_with_relay(
         &session_id,
-        &pubkey,
         &ephemeral,
         &commitment,
         "Evil",
@@ -283,19 +261,11 @@ fn test_init_qr_rejects_insecure_scheme() {
 fn test_init_qr_truncated_before_flags() {
     // Build a valid prefix but truncate before flags byte
     let session_id = [38u8; 16];
-    let pubkey = [39u8; 32];
+    let _pubkey = [39u8; 32];
     let ephemeral = [40u8; 32];
     let commitment = [41u8; 32];
 
-    let full_qr = format_init_qr_with_relay(
-        &session_id,
-        &pubkey,
-        &ephemeral,
-        &commitment,
-        "X",
-        None,
-        None,
-    );
+    let full_qr = format_ini2_qr_with_relay(&session_id, &ephemeral, &commitment, "X", None, None);
 
     // Truncate 2 chars (flags field) off the end
     let truncated = &full_qr[..full_qr.len() - 2];
@@ -307,14 +277,13 @@ fn test_init_qr_truncated_before_flags() {
 #[test]
 fn test_init_qr_with_only_noise_pubkey() {
     let session_id = [23u8; 16];
-    let pubkey = [24u8; 32];
+    let _pubkey = [24u8; 32];
     let ephemeral = [25u8; 32];
     let commitment = [26u8; 32];
     let noise_pubkey = [27u8; 32];
 
-    let qr = format_init_qr_with_relay(
+    let qr = format_ini2_qr_with_relay(
         &session_id,
-        &pubkey,
         &ephemeral,
         &commitment,
         "Eve",
@@ -340,14 +309,13 @@ fn test_init_qr_with_only_noise_pubkey() {
 #[test]
 fn test_relay_url_without_noise_pubkey_rejected_tofu() {
     // TOFU fail-closed: relay URL present but Noise pubkey missing → reject
-    let pubkey = [1u8; 32];
+    let _pubkey = [1u8; 32];
     let ephemeral = [2u8; 32];
     let commitment = [3u8; 32];
     let session_id = [4u8; 16];
 
-    let qr = format_init_qr_with_relay(
+    let qr = format_ini2_qr_with_relay(
         &session_id,
-        &pubkey,
         &ephemeral,
         &commitment,
         "Test",

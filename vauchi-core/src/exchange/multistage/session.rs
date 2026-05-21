@@ -145,12 +145,10 @@ pub struct MultiStageSession {
     session_id: [u8; 16],
 
     // Our keys
-    identity_pubkey: [u8; 32],
     ephemeral_secret: Option<X25519Secret>,
     ephemeral_public: X25519Public,
 
     // Peer data (populated after Stage 1)
-    peer_pubkey: Option<[u8; 32]>,
     peer_ephemeral: Option<[u8; 32]>,
     peer_commitment_hash: Option<[u8; 32]>,
     peer_session_id: Option<[u8; 16]>,
@@ -255,11 +253,6 @@ impl MultiStageSession {
         // Generate session ID
         let session_id: [u8; 16] = crate::crypto::random_bytes();
 
-        // Generate identity keypair (Ed25519-like, but we only need 32 bytes for the INIT QR)
-        // For the multi-stage protocol, we use the X25519 public key as the "pubkey" field
-        // since that's what matters for key agreement.
-        let identity_seed: [u8; 32] = crate::crypto::random_bytes();
-
         // Generate X25519 ephemeral keypair
         let ephemeral_secret = X25519Secret::random_from_rng(OsRng);
         let ephemeral_public = X25519Public::from(&ephemeral_secret);
@@ -279,19 +272,13 @@ impl MultiStageSession {
         let commitment = Commitment::create_with_context(&local_card, &commitment_context)
             .expect("XChaCha20Poly1305 encryption of fresh plaintext cannot fail");
 
-        // Use identity seed as a stand-in pubkey for INIT QR
-        // (In a full implementation, this would be a proper Ed25519 public key)
-        let identity_pubkey = identity_seed;
-
         MultiStageSession {
             local_card,
             display_name: "Vauchi User".to_string(),
             commitment,
             session_id,
-            identity_pubkey,
             ephemeral_secret: Some(ephemeral_secret),
             ephemeral_public,
-            peer_pubkey: None,
             peer_ephemeral: None,
             peer_commitment_hash: None,
             peer_session_id: None,
@@ -726,7 +713,6 @@ impl MultiStageSession {
         match parsed {
             StageQr::Init {
                 session_id,
-                pubkey,
                 ephemeral,
                 commitment_hash,
                 display_name: _,
@@ -734,7 +720,6 @@ impl MultiStageSession {
                 relay_noise_pubkey,
             } => self.handle_init(
                 session_id,
-                pubkey,
                 ephemeral,
                 commitment_hash,
                 relay_url,
@@ -768,7 +753,6 @@ impl MultiStageSession {
             } => self.handle_combo(reveal_key, payload_hash, ack_hash),
             StageQr::Inid {
                 session_id,
-                pubkey,
                 ephemeral,
                 commitment_hash,
                 display_name: _,
@@ -777,7 +761,6 @@ impl MultiStageSession {
                 ciphertext,
             } => self.handle_inid(
                 session_id,
-                pubkey,
                 ephemeral,
                 commitment_hash,
                 relay_url,
@@ -798,11 +781,10 @@ impl MultiStageSession {
         //
         // let ciphertext = self.commitment.ciphertext();
         // if ciphertext.len() <= CHUNK_PAYLOAD_SIZE {
-        //     return qr_codec::format_inid_qr(...);
+        //     return qr_codec::format_in2d_qr(...);
         // }
-        qr_codec::format_init_qr_with_relay(
+        qr_codec::format_ini2_qr_with_relay(
             &self.session_id,
-            &self.identity_pubkey,
             self.ephemeral_public.as_bytes(),
             self.commitment.hash(),
             &self.display_name,
@@ -814,7 +796,6 @@ impl MultiStageSession {
     fn handle_init(
         &mut self,
         session_id: [u8; 16],
-        pubkey: [u8; 32],
         ephemeral: [u8; 32],
         commitment_hash: [u8; 32],
         relay_url: Option<String>,
@@ -827,7 +808,6 @@ impl MultiStageSession {
 
         // Store peer info
         self.peer_session_id = Some(session_id);
-        self.peer_pubkey = Some(pubkey);
         self.peer_ephemeral = Some(ephemeral);
         self.peer_commitment_hash = Some(commitment_hash);
         self.peer_relay_url = relay_url;
@@ -865,7 +845,6 @@ impl MultiStageSession {
     fn handle_inid(
         &mut self,
         session_id: [u8; 16],
-        pubkey: [u8; 32],
         ephemeral: [u8; 32],
         commitment_hash: [u8; 32],
         relay_url: Option<String>,
@@ -875,7 +854,6 @@ impl MultiStageSession {
         // Process the INIT portion first
         let state = self.handle_init(
             session_id,
-            pubkey,
             ephemeral,
             commitment_hash,
             relay_url,

@@ -14,7 +14,7 @@ use proptest::prelude::*;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::exchange::multistage::qr_codec::{StageQr, format_init_qr_with_relay, parse_qr};
+use vauchi_core::exchange::multistage::qr_codec::{StageQr, format_ini2_qr_with_relay, parse_qr};
 use vauchi_core::exchange::{ExchangeQR, X3DHKeyPair};
 use vauchi_core::identity::Identity;
 use vauchi_core::network::relay_url::validate_relay_url;
@@ -163,12 +163,12 @@ proptest! {
         display_name in "[A-Za-z0-9 ]{1,20}"
     ) {
         let session_id = [42u8; 16];
-        let pk = [1u8; 32];
+        let _pk = [1u8; 32];
         let eph = [2u8; 32];
         let ch = [3u8; 32];
 
-        let qr = format_init_qr_with_relay(
-            &session_id, &pk, &eph, &ch,
+        let qr = format_ini2_qr_with_relay(
+            &session_id, &eph, &ch,
             &display_name,
             Some(&relay_url),
             Some(&pubkey),
@@ -178,7 +178,6 @@ proptest! {
         match parsed {
             StageQr::Init {
                 session_id: sid,
-                pubkey: p,
                 ephemeral: e,
                 commitment_hash: c,
                 display_name: name,
@@ -186,7 +185,6 @@ proptest! {
                 relay_noise_pubkey: npk,
             } => {
                 prop_assert_eq!(sid, session_id);
-                prop_assert_eq!(p, pk);
                 prop_assert_eq!(e, eph);
                 prop_assert_eq!(c, ch);
                 prop_assert_eq!(name, display_name);
@@ -203,12 +201,12 @@ proptest! {
         display_name in "[A-Za-z0-9 ]{1,20}"
     ) {
         let session_id = [43u8; 16];
-        let pk = [4u8; 32];
+        let _pk = [4u8; 32];
         let eph = [5u8; 32];
         let ch = [6u8; 32];
 
-        let qr = format_init_qr_with_relay(
-            &session_id, &pk, &eph, &ch,
+        let qr = format_ini2_qr_with_relay(
+            &session_id, &eph, &ch,
             &display_name,
             None, None,
         );

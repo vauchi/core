@@ -13,7 +13,7 @@ use vauchi_core::network::*;
 fn test_message_envelope_serialize_roundtrip() {
     let envelope = MessageEnvelope {
         version: PROTOCOL_VERSION,
-        message_id: "test-id-123".to_string(),
+        message_id: "test-id-123".to_string().into(),
         timestamp: 1234567890,
         payload: MessagePayload::Presence(PresenceUpdate {
             status: PresenceStatus::Online,
@@ -60,7 +60,7 @@ fn test_encrypted_update_serialize() {
 #[test]
 fn test_acknowledgment_serialize() {
     let ack = Acknowledgment {
-        message_id: "msg-123".to_string(),
+        message_id: "msg-123".to_string().into(),
         status: AckStatus::Delivered,
         error: None,
     };

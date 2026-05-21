@@ -143,7 +143,7 @@ fn test_register_mailbox_tokens_sends_256_tokens() {
             &vauchi_core::rng::OsSecureRng::new(),
         )
         .unwrap();
-    assert!(!msg_id.is_empty());
+    assert!(!msg_id.as_str().is_empty());
 
     let sent = client.connection().transport().sent_messages();
     assert_eq!(sent.len(), 1);
@@ -189,7 +189,7 @@ fn test_register_mailbox_tokens_with_no_contacts() {
             &vauchi_core::rng::OsSecureRng::new(),
         )
         .unwrap();
-    assert!(!msg_id.is_empty());
+    assert!(!msg_id.as_str().is_empty());
 
     let sent = client.connection().transport().sent_messages();
     if let MessagePayload::RegisterMailbox(rm) = &sent[0].payload {
@@ -222,7 +222,7 @@ fn test_device_sync_uses_self_token_as_recipient_id() {
     let msg_id = client
         .send_device_sync_message(&master_seed, ciphertext.clone(), &ratchet_msg, 0)
         .unwrap();
-    assert!(!msg_id.is_empty());
+    assert!(!msg_id.as_str().is_empty());
 
     let sent = client.connection().transport().sent_messages();
     assert_eq!(sent.len(), 1);

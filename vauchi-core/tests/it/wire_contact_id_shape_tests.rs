@@ -36,7 +36,7 @@ const RECIPIENT: &str = "2222222222222222222222222222222222222222222222222222222
 fn encrypted_update_sender_and_recipient_are_raw_strings() {
     let envelope = MessageEnvelope {
         version: PROTOCOL_VERSION,
-        message_id: "snapshot-eu-001".to_string(),
+        message_id: "snapshot-eu-001".to_string().into(),
         timestamp: 0,
         payload: MessagePayload::EncryptedUpdate(EncryptedUpdate {
             recipient_id: RECIPIENT.to_string().into(),
@@ -68,7 +68,7 @@ fn encrypted_update_sender_and_recipient_are_raw_strings() {
 fn identity_revoked_sender_and_recipient_are_raw_strings() {
     let envelope = MessageEnvelope {
         version: PROTOCOL_VERSION,
-        message_id: "snapshot-ir-001".to_string(),
+        message_id: "snapshot-ir-001".to_string().into(),
         timestamp: 0,
         payload: MessagePayload::IdentityRevoked(IdentityRevoked {
             sender_id: SENDER.to_string().into(),

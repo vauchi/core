@@ -29,7 +29,7 @@ const ACK_ID: &str = "9c1dcb9f-7ff3-5b5c-ad95-fc85b4f04f02";
 fn message_envelope_message_id_is_raw_string() {
     let envelope = MessageEnvelope {
         version: PROTOCOL_VERSION,
-        message_id: ENVELOPE_ID.to_string(),
+        message_id: ENVELOPE_ID.to_string().into(),
         timestamp: 0,
         payload: MessagePayload::Handshake(Handshake {
             identity_public_key: IdentityKey::from_bytes([0x11; 32]),
@@ -50,10 +50,10 @@ fn message_envelope_message_id_is_raw_string() {
 fn acknowledgment_message_id_is_raw_string() {
     let envelope = MessageEnvelope {
         version: PROTOCOL_VERSION,
-        message_id: ENVELOPE_ID.to_string(),
+        message_id: ENVELOPE_ID.to_string().into(),
         timestamp: 0,
         payload: MessagePayload::Acknowledgment(Acknowledgment {
-            message_id: ACK_ID.to_string(),
+            message_id: ACK_ID.to_string().into(),
             status: AckStatus::Delivered,
             error: None,
         }),
@@ -80,7 +80,7 @@ fn encrypted_update_envelope_message_id_is_raw_string() {
     // when the inner payload is the most common variant.
     let envelope = MessageEnvelope {
         version: PROTOCOL_VERSION,
-        message_id: ENVELOPE_ID.to_string(),
+        message_id: ENVELOPE_ID.to_string().into(),
         timestamp: 0,
         payload: MessagePayload::EncryptedUpdate(EncryptedUpdate {
             recipient_id: ContactId::from(

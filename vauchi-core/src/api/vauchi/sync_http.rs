@@ -300,7 +300,7 @@ impl Vauchi {
         while let Some(envelope) = adapter.receive().map_err(VauchiError::Network)? {
             if let MessagePayload::EncryptedUpdate(update) = envelope.payload {
                 blobs.push((
-                    envelope.message_id,
+                    envelope.message_id.into_string(),
                     update.recipient_id.into_string(),
                     update.ciphertext,
                 ));
@@ -343,7 +343,7 @@ impl Vauchi {
         for outcome in &outcomes {
             let ack_envelope = create_envelope(
                 MessagePayload::Acknowledgment(Acknowledgment {
-                    message_id: outcome.message_id.clone(),
+                    message_id: outcome.message_id.clone().into(),
                     status: if outcome.decrypted {
                         AckStatus::ReceivedByRecipient
                     } else {

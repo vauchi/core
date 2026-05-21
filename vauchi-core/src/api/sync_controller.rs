@@ -258,7 +258,7 @@ impl<'a, T: Transport> SyncController<'a, T> {
                     result.sent += 1;
                     self.events.dispatch(VauchiEvent::MessageDelivered {
                         contact_id: update.contact_id.clone(),
-                        message_id: msg_id,
+                        message_id: msg_id.into_string(),
                     });
                 }
                 Err(e) => {

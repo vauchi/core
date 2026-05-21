@@ -74,7 +74,7 @@ pub fn read_frame_length(header: &[u8; FRAME_HEADER_SIZE]) -> usize {
 pub fn create_envelope(payload: MessagePayload, now: u64) -> MessageEnvelope {
     MessageEnvelope {
         version: PROTOCOL_VERSION,
-        message_id: uuid::Uuid::new_v4().to_string(),
+        message_id: uuid::Uuid::new_v4().to_string().into(),
         timestamp: now,
         payload,
     }
@@ -89,7 +89,7 @@ mod tests {
     fn create_test_envelope() -> MessageEnvelope {
         MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: "test-123".to_string(),
+            message_id: "test-123".to_string().into(),
             timestamp: 1234567890,
             payload: MessagePayload::Presence(PresenceUpdate {
                 status: PresenceStatus::Online,

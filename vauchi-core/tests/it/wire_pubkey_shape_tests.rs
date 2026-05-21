@@ -71,7 +71,7 @@ fn handshake_identity_public_key_is_base64_string() {
 fn identity_deletion_notice_public_key_is_base64_string() {
     let envelope = MessageEnvelope {
         version: PROTOCOL_VERSION,
-        message_id: "snapshot-001".to_string(),
+        message_id: "snapshot-001".to_string().into(),
         timestamp: 0,
         payload: MessagePayload::IdentityDeletionNotice(IdentityDeletionNotice {
             stage: DeletionStage::Confirmed,
@@ -91,7 +91,7 @@ fn identity_deletion_notice_public_key_is_base64_string() {
 fn purge_request_public_key_and_token_are_base64_strings() {
     let envelope = MessageEnvelope {
         version: PROTOCOL_VERSION,
-        message_id: "snapshot-002".to_string(),
+        message_id: "snapshot-002".to_string().into(),
         timestamp: 0,
         payload: MessagePayload::PurgeRequest(PurgeRequest {
             public_key: IdentityKey::from_bytes(ID_BYTES),

@@ -147,7 +147,7 @@ impl Transport for MockTransport {
         if self.auto_ack {
             let ack = MessageEnvelope {
                 version: PROTOCOL_VERSION,
-                message_id: uuid::Uuid::new_v4().to_string(),
+                message_id: uuid::Uuid::new_v4().to_string().into(),
                 timestamp: message.timestamp,
                 payload: MessagePayload::Acknowledgment(Acknowledgment {
                     message_id: message.message_id.clone(),

@@ -124,7 +124,7 @@ impl HttpTransportAdapter {
 
         Ok(MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: blob.blob_id.clone(),
+            message_id: blob.blob_id.clone().into(),
             timestamp: blob.created_at,
             payload: MessagePayload::EncryptedUpdate(EncryptedUpdate {
                 recipient_id: ContactId::from(blob.mailbox_token.clone().unwrap_or_default()),
@@ -193,7 +193,8 @@ impl super::transport::Transport for HttpTransportAdapter {
             MessagePayload::Acknowledgment(ack) => {
                 // Queue acknowledgment — use first registered token as recipient_id
                 if let Some(token) = self.registered_tokens.first() {
-                    self.ack_queue.push((token.clone(), ack.message_id.clone()));
+                    self.ack_queue
+                        .push((token.clone(), ack.message_id.clone().into_string()));
                 }
                 Ok(())
             }
@@ -332,7 +333,7 @@ mod tests {
         // Register a token so receive actually polls the relay.
         let register = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: "reg".to_string(),
+            message_id: "reg".to_string().into(),
             timestamp: 0,
             payload: MessagePayload::RegisterMailbox(RegisterMailbox {
                 tokens: vec!["t".repeat(64)],
@@ -362,7 +363,7 @@ mod tests {
         let mut adapter = make_adapter(true);
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: "test".to_string(),
+            message_id: "test".to_string().into(),
             timestamp: 0,
             payload: MessagePayload::RegisterMailbox(RegisterMailbox {
                 tokens: vec!["token_a".into(), "token_b".into()],
@@ -378,7 +379,7 @@ mod tests {
         let mut adapter = make_adapter(true);
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: "test".to_string(),
+            message_id: "test".to_string().into(),
             timestamp: 0,
             payload: MessagePayload::RegisterMailbox(RegisterMailbox {
                 tokens: vec!["token_a".into()],
@@ -443,7 +444,7 @@ mod tests {
         // Registering new tokens should reset the guard
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: "reg".to_string(),
+            message_id: "reg".to_string().into(),
             timestamp: 0,
             payload: MessagePayload::RegisterMailbox(RegisterMailbox {
                 tokens: vec!["token_b".into()],
@@ -466,7 +467,7 @@ mod tests {
         // Registering the same token should NOT reset the guard
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: "reg".to_string(),
+            message_id: "reg".to_string().into(),
             timestamp: 0,
             payload: MessagePayload::RegisterMailbox(RegisterMailbox {
                 tokens: vec!["token_a".into()],
@@ -545,7 +546,7 @@ mod tests {
         let mut adapter = make_adapter(true);
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: "msg-1".to_string(),
+            message_id: "msg-1".to_string().into(),
             timestamp: 0,
             payload: MessagePayload::EncryptedUpdate(EncryptedUpdate {
                 recipient_id: ContactId::from("a".repeat(64)),

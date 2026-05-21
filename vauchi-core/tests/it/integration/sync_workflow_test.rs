@@ -48,7 +48,7 @@ fn test_sync_manager_workflow() {
     let update_id = sync_manager
         .queue_card_update("contact-1", &old_card, &new_card)
         .unwrap();
-    assert!(!update_id.is_empty());
+    assert!(!update_id.as_str().is_empty());
 
     // Check pending updates
     let pending = sync_manager.get_pending("contact-1").unwrap();
@@ -107,7 +107,7 @@ fn test_relay_client_workflow() {
         )
         .unwrap();
 
-    assert!(!msg_id.is_empty());
+    assert!(!msg_id.as_str().is_empty());
     assert_eq!(client.in_flight_count(), 1);
 
     // Check in-flight tracking

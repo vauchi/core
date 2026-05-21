@@ -234,7 +234,7 @@ impl<T: Transport> RelayClient<T> {
         let day = current_day_epoch(now);
         let batches = batch_register_tokens(rng, contact_keys, master_seed, day, days_offline);
 
-        let mut last_message_id = String::new();
+        let mut last_message_id = MessageId::from(String::new());
         for tokens in batches {
             let envelope = create_envelope(
                 MessagePayload::RegisterMailbox(super::message::RegisterMailbox { tokens }),

@@ -113,7 +113,7 @@ fn test_relay_send_update() {
         )
         .unwrap();
 
-    assert!(!msg_id.is_empty());
+    assert!(!msg_id.as_str().is_empty());
     assert_eq!(client.in_flight_count(), 1);
 }
 

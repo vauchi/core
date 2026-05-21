@@ -357,7 +357,7 @@ proptest! {
     ) {
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: msg_id.clone(),
+            message_id: msg_id.clone().into(),
             timestamp,
             payload: MessagePayload::EncryptedUpdate(EncryptedUpdate {
                 recipient_id: recipient_id.clone().into(),
@@ -410,10 +410,10 @@ proptest! {
     ) {
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: msg_id.clone(),
+            message_id: msg_id.clone().into(),
             timestamp,
             payload: MessagePayload::Acknowledgment(Acknowledgment {
-                message_id: ack_msg_id.clone(),
+                message_id: ack_msg_id.clone().into(),
                 status,
                 error: error_msg.clone(),
             }),
@@ -452,7 +452,7 @@ proptest! {
     ) {
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: msg_id.clone(),
+            message_id: msg_id.clone().into(),
             timestamp,
             payload: MessagePayload::Handshake(Handshake {
                 identity_public_key: vauchi_core::identifiers::IdentityKey::from_bytes(identity_key),
@@ -489,7 +489,7 @@ proptest! {
     ) {
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: msg_id.clone(),
+            message_id: msg_id.clone().into(),
             timestamp,
             payload: MessagePayload::Presence(PresenceUpdate {
                 status,
@@ -531,7 +531,7 @@ proptest! {
     ) {
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: msg_id.clone(),
+            message_id: msg_id.clone().into(),
             timestamp: env_timestamp,
             payload: MessagePayload::IdentityRevoked(IdentityRevoked {
                 sender_id: sender_id.clone().into(),
@@ -579,7 +579,7 @@ proptest! {
     ) {
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: msg_id.clone(),
+            message_id: msg_id.clone().into(),
             timestamp: env_timestamp,
             payload: MessagePayload::IdentityDeletionNotice(IdentityDeletionNotice {
                 stage,
@@ -616,7 +616,7 @@ proptest! {
     ) {
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: msg_id.clone(),
+            message_id: msg_id.clone().into(),
             timestamp: env_timestamp,
             payload: MessagePayload::PurgeRequest(PurgeRequest {
                 public_key: vauchi_core::identifiers::IdentityKey::from_bytes(public_key),
@@ -652,7 +652,7 @@ proptest! {
     ) {
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: msg_id.clone(),
+            message_id: msg_id.clone().into(),
             timestamp,
             payload: MessagePayload::ForwardingHints(ForwardingHints {
                 hints: vec![ForwardingHint {

@@ -230,7 +230,7 @@ mod tests {
         let envelopes = vec![
             MessageEnvelope {
                 version: PROTOCOL_VERSION,
-                message_id: "msg-1".to_string(),
+                message_id: "msg-1".to_string().into(),
                 timestamp: 100,
                 payload: MessagePayload::ForwardingHints(ForwardingHints {
                     hints: vec![],
@@ -240,7 +240,7 @@ mod tests {
             },
             MessageEnvelope {
                 version: PROTOCOL_VERSION,
-                message_id: "msg-1".to_string(), // duplicate
+                message_id: "msg-1".to_string().into(), // duplicate
                 timestamp: 200,
                 payload: MessagePayload::ForwardingHints(ForwardingHints {
                     hints: vec![],
@@ -250,7 +250,7 @@ mod tests {
             },
             MessageEnvelope {
                 version: PROTOCOL_VERSION,
-                message_id: "msg-2".to_string(),
+                message_id: "msg-2".to_string().into(),
                 timestamp: 300,
                 payload: MessagePayload::ForwardingHints(ForwardingHints {
                     hints: vec![],
@@ -336,7 +336,7 @@ mod tests {
     fn test_forwarding_hints_in_envelope() {
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: "test-fwd-1".to_string(),
+            message_id: "test-fwd-1".to_string().into(),
             timestamp: 1700000000,
             payload: MessagePayload::ForwardingHints(make_unsigned_hints(vec![make_hint(
                 "blob-1",

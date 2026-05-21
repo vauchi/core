@@ -160,7 +160,7 @@ fn test_sync_manager_queue_happy_path() {
     let update_id = sync_manager
         .queue_card_update(contact_id, &old_card, &new_card)
         .unwrap();
-    assert!(!update_id.is_empty());
+    assert!(!update_id.as_str().is_empty());
 
     // Verify update is pending
     let pending = sync_manager.get_pending(contact_id).unwrap();
@@ -403,7 +403,7 @@ fn test_relay_update_delivery_happy_path() {
         .unwrap();
 
     // Verify update is tracked
-    assert!(!msg_id.is_empty());
+    assert!(!msg_id.as_str().is_empty());
     assert_eq!(client.in_flight_count(), 1);
     assert!(
         client

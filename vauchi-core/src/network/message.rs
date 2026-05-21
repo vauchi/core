@@ -10,8 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::identifiers::{ContactId, DhPublicKey, IdentityKey};
 
-/// Unique message identifier for deduplication and acknowledgments.
-pub type MessageId = String;
+pub use crate::identifiers::MessageId;
 
 /// Wire protocol version.
 pub const PROTOCOL_VERSION: u8 = 1;
@@ -604,7 +603,7 @@ mod tests {
     fn test_identity_deletion_notice_in_envelope() {
         let envelope = MessageEnvelope {
             version: PROTOCOL_VERSION,
-            message_id: "test-id-123".to_string(),
+            message_id: "test-id-123".to_string().into(),
             timestamp: 1700000000,
             payload: MessagePayload::IdentityDeletionNotice(IdentityDeletionNotice {
                 stage: DeletionStage::Pending,

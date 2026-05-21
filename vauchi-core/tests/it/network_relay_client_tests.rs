@@ -68,7 +68,7 @@ fn test_relay_client_send_update() {
         )
         .unwrap();
 
-    assert!(!msg_id.is_empty());
+    assert!(!msg_id.as_str().is_empty());
     assert_eq!(client.in_flight_count(), 1);
 
     // Check the message was sent
@@ -145,10 +145,10 @@ fn test_process_incoming_captures_failed_ack_events() {
     // Manually queue a Failed ACK
     let failed_ack = MessageEnvelope {
         version: 1,
-        message_id: uuid::Uuid::new_v4().to_string(),
+        message_id: uuid::Uuid::new_v4().to_string().into(),
         timestamp: 0,
         payload: MessagePayload::Acknowledgment(Acknowledgment {
-            message_id: msg_id,
+            message_id: msg_id.into(),
             status: AckStatus::Failed,
             error: Some("relay overloaded".to_string()),
         }),
@@ -291,7 +291,7 @@ fn test_relay_client_send_raw_update() {
         .send_raw_update(0, "recipient-id", &ratchet_msg, "raw-update-1", None)
         .unwrap();
 
-    assert!(!msg_id.is_empty());
+    assert!(!msg_id.as_str().is_empty());
     assert_eq!(client.in_flight_count(), 1);
 }
 
@@ -325,7 +325,7 @@ fn test_send_purge_request() {
     };
 
     let msg_id = client.send_purge_request(&request, 0).unwrap();
-    assert!(!msg_id.is_empty());
+    assert!(!msg_id.as_str().is_empty());
 
     let sent = client.connection().transport().sent_messages();
     assert_eq!(sent.len(), 1);

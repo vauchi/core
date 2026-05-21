@@ -10,7 +10,7 @@ use vauchi_core::network::*;
 fn create_test_message() -> MessageEnvelope {
     MessageEnvelope {
         version: PROTOCOL_VERSION,
-        message_id: "test-msg-1".to_string(),
+        message_id: "test-msg-1".to_string().into(),
         timestamp: 12345,
         payload: MessagePayload::Presence(PresenceUpdate {
             status: PresenceStatus::Online,

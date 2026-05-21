@@ -177,12 +177,27 @@ impl FormDialogEngine {
         }
     }
 
-    /// Build single-page AddField screen matching the design target:
-    /// type list + value + display name + comment + groups visibility.
+    /// Build the AddField screen. Two-step flow per problem record
+    /// `2026-05-21-add-entry-form-mixes-picker-and-fields` §G1:
+    ///
+    ///   step 1 (picker) — `selected_entry_type.is_none()`
+    ///     ActionList of the catalog entries; Cancel only. The user
+    ///     picks a type and the engine flips into the form step.
+    ///
+    ///   step 2 (form) — `selected_entry_type.is_some()`
+    ///     Value / Display Name / Comment / group visibility inputs.
+    ///     Save (gated on a non-empty value) + `change_type` (returns
+    ///     to picker) + Cancel.
     fn build_add_field_screen(&self) -> ScreenModel {
-        let mut components = Vec::new();
+        if self.selected_entry_type.is_none() {
+            self.build_add_field_picker_step()
+        } else {
+            self.build_add_field_form_step()
+        }
+    }
 
-        // Type list (flat, all entries from all categories)
+    /// Picker step: catalog list only, no value inputs, no Save.
+    fn build_add_field_picker_step(&self) -> ScreenModel {
         let type_items: Vec<ActionListItem> = self
             .catalog_entries
             .iter()
@@ -190,11 +205,7 @@ impl FormDialogEngine {
                 id: e.key.clone(),
                 label: e.display_name.clone(),
                 icon: e.icon.clone(),
-                detail: if self.selected_entry_type.as_deref() == Some(&e.key) {
-                    Some("selected".into())
-                } else {
-                    None
-                },
+                detail: None,
                 a11y: Some(A11y {
                     label: Some(e.display_name.clone()),
                     hint: Some(format!("Select {} as the field type.", e.display_name)),
@@ -204,13 +215,35 @@ impl FormDialogEngine {
             })
             .collect();
 
-        components.push(Component::ActionList {
+        let components = vec![Component::ActionList {
             id: "entry_types".into(),
             items: type_items,
-        });
+        }];
 
-        // Value input
-        let selected_key = self.selected_entry_type.as_deref().unwrap_or("custom");
+        ScreenModel {
+            screen_id: "form_add_field".into(),
+            title: "Add to your card".into(),
+            subtitle: Some("Select a type".into()),
+            components,
+            actions: vec![ScreenAction {
+                id: "cancel".into(),
+                label: "Cancel".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            }],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    /// Form step: Value / Display Name / Comment / group visibility +
+    /// Save (gated) / `change_type` (back to picker) / Cancel.
+    fn build_add_field_form_step(&self) -> ScreenModel {
+        let selected_key = self
+            .selected_entry_type
+            .as_deref()
+            .expect("form step requires selected_entry_type");
         let catalog_entry = self.catalog_entries.iter().find(|e| e.key == selected_key);
         let placeholder = placeholder_for_key(selected_key);
 
@@ -220,57 +253,56 @@ impl FormDialogEngine {
             _ => InputType::Text,
         };
 
-        components.push(Component::TextInput {
-            id: "field_value".into(),
-            label: "Value".into(),
-            value: self.get_value("field_value").into(),
-            placeholder: Some(placeholder.into()),
-            max_length: Some(200),
-            validation_error: None,
-            input_type,
-            a11y: Some(A11y {
-                label: Some("Value input".into()),
-                hint: Some(placeholder.into()),
-                role: Some(AccessibilityRole::TextField),
-            }),
-            info_key: None,
-        });
+        let mut components = vec![
+            Component::TextInput {
+                id: "field_value".into(),
+                label: "Value".into(),
+                value: self.get_value("field_value").into(),
+                placeholder: Some(placeholder.into()),
+                max_length: Some(200),
+                validation_error: None,
+                input_type,
+                a11y: Some(A11y {
+                    label: Some("Value input".into()),
+                    hint: Some(placeholder.into()),
+                    role: Some(AccessibilityRole::TextField),
+                }),
+                info_key: None,
+            },
+            Component::TextInput {
+                id: "field_label".into(),
+                label: "Display Name (optional)".into(),
+                value: self.get_value("field_label").into(),
+                placeholder: Some("e.g. Work, Personal, Mobile".into()),
+                max_length: Some(50),
+                validation_error: None,
+                input_type: InputType::Text,
+                a11y: Some(A11y {
+                    label: Some("Display Name (optional) input".into()),
+                    hint: Some("e.g. Work, Personal, Mobile".into()),
+                    role: Some(AccessibilityRole::TextField),
+                }),
+                info_key: None,
+            },
+            Component::TextInput {
+                id: "field_note".into(),
+                label: "Comment (your eyes only, optional)".into(),
+                value: self.get_value("field_note").into(),
+                placeholder: Some("Only visible to you".into()),
+                max_length: Some(100),
+                validation_error: None,
+                input_type: InputType::Text,
+                a11y: Some(A11y {
+                    label: Some("Comment (your eyes only, optional) input".into()),
+                    hint: Some("Only visible to you".into()),
+                    role: Some(AccessibilityRole::TextField),
+                }),
+                info_key: None,
+            },
+        ];
 
-        // Display Name (optional) — the label shown next to the value
-        components.push(Component::TextInput {
-            id: "field_label".into(),
-            label: "Display Name (optional)".into(),
-            value: self.get_value("field_label").into(),
-            placeholder: Some("e.g. Work, Personal, Mobile".into()),
-            max_length: Some(50),
-            validation_error: None,
-            input_type: InputType::Text,
-            a11y: Some(A11y {
-                label: Some("Display Name (optional) input".into()),
-                hint: Some("e.g. Work, Personal, Mobile".into()),
-                role: Some(AccessibilityRole::TextField),
-            }),
-            info_key: None,
-        });
-
-        // Comment (your eyes only, optional) — private note
-        components.push(Component::TextInput {
-            id: "field_note".into(),
-            label: "Comment (your eyes only, optional)".into(),
-            value: self.get_value("field_note").into(),
-            placeholder: Some("Only visible to you".into()),
-            max_length: Some(100),
-            validation_error: None,
-            input_type: InputType::Text,
-            a11y: Some(A11y {
-                label: Some("Comment (your eyes only, optional) input".into()),
-                hint: Some("Only visible to you".into()),
-                role: Some(AccessibilityRole::TextField),
-            }),
-            info_key: None,
-        });
-
-        // Group visibility toggles
+        // Group visibility toggles (form step only — picking groups
+        // before picking a type would be confusing).
         let groups = self.available_groups();
         if !groups.is_empty() {
             let toggle_items: Vec<ToggleItem> = groups
@@ -284,7 +316,6 @@ impl FormDialogEngine {
                     info_key: None,
                 })
                 .collect();
-
             components.push(Component::ToggleList {
                 id: "group_visibility".into(),
                 label: "Groups Visibility".into(),
@@ -293,30 +324,21 @@ impl FormDialogEngine {
             });
         }
 
-        // User-facing copy — `MyInfo` is the internal CoreScreenView
-        // name and was leaking into the title verbatim. See problem
-        // record `2026-05-21-add-entry-form-mixes-picker-and-fields`.
-        let title = if self.selected_entry_type.is_some() {
-            if let Some(entry) = catalog_entry {
-                format!("Add {}", entry.display_name)
-            } else {
-                "Add to your card".into()
-            }
+        let title = if let Some(entry) = catalog_entry {
+            format!("Add {}", entry.display_name)
         } else {
             "Add to your card".into()
         };
 
-        // Save is only meaningful once the user has picked a type
-        // **and** typed a value. Without these guards Save was
-        // enabled from first render and tapping it with no input
-        // silently committed an empty `custom` entry — same record §G3.
-        let save_enabled =
-            self.selected_entry_type.is_some() && !self.get_value("field_value").is_empty();
+        // Save is gated on a non-empty value — same record §G3. The
+        // type-selected check is now structural (we only build this
+        // ScreenModel when `selected_entry_type.is_some()`).
+        let save_enabled = !self.get_value("field_value").is_empty();
 
         ScreenModel {
             screen_id: "form_add_field".into(),
             title,
-            subtitle: Some("Select a type".into()),
+            subtitle: None,
             components,
             actions: vec![
                 ScreenAction {
@@ -325,6 +347,17 @@ impl FormDialogEngine {
                     style: ActionStyle::Primary,
                     enabled: save_enabled,
                     a11y: None,
+                },
+                ScreenAction {
+                    id: "change_type".into(),
+                    label: "Back".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: Some(A11y {
+                        label: Some("Pick a different type".into()),
+                        hint: Some("Return to the type picker — your inputs are kept.".into()),
+                        role: None,
+                    }),
                 },
                 ScreenAction {
                     id: "cancel".into(),
@@ -608,6 +641,14 @@ impl WorkflowEngine for FormDialogEngine {
                 }
                 "cancel_discard" => {
                     self.pending_discard = false;
+                    ActionResult::UpdateScreen(self.current_screen())
+                }
+                "change_type" => {
+                    // G1 back-from-form: clear the selected type so
+                    // `build_add_field_screen` flips back to the
+                    // picker step. Field values persist so the user
+                    // can pick a different type without re-typing.
+                    self.selected_entry_type = None;
                     ActionResult::UpdateScreen(self.current_screen())
                 }
                 _ => ActionResult::UpdateScreen(self.current_screen()),

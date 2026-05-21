@@ -418,24 +418,27 @@ fn form_dialog_add_field_group_toggle() {
         ],
     });
 
-    // Groups should be visible immediately (single-page form)
+    // G1 redesign: groups appear only after a type is picked.
+    // Picking groups before picking a type was putting the cart
+    // before the horse — see problem record
+    // `2026-05-21-add-entry-form-mixes-picker-and-fields` §G1.
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "entry_types".into(),
+        item_id: "phone".into(),
+    });
     let screen = engine.current_screen();
     let has_toggle_list = screen.components.iter().any(|c| {
         matches!(c, Component::ToggleList { id, ..
         } if id == "group_visibility")
     });
-    assert!(has_toggle_list, "Should show group visibility toggles");
+    assert!(
+        has_toggle_list,
+        "Form step should show group visibility toggles"
+    );
 
-    // Toggle a group
     let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "group_visibility".into(),
         item_id: "g1".into(),
-    });
-
-    // Select type and add value for collected_input
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "entry_types".into(),
-        item_id: "phone".into(),
     });
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),

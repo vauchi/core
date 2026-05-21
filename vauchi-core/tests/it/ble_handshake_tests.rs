@@ -259,14 +259,16 @@ fn test_responder_processes_key_offer() {
         )
         .expect("process key offer");
 
-    // v2 KeyAck: version(1) + identity(32) + exchange(32) + ephemeral(32) + nonce(16) + commitment(32) = 145
-    assert_eq!(ack_bytes.len(), 145, "v2 KeyAck must be exactly 145 bytes");
+    // v3 KeyAck: version(1) + identity(32) + exchange(32) + ephemeral(32) + nonce(16)
+    //            + commitment(32) + sender_timestamp(8) = 153
+    assert_eq!(ack_bytes.len(), 153, "v3 KeyAck must be exactly 153 bytes");
     assert_eq!(
         ack_bytes[0], BLE_HANDSHAKE_VERSION,
         "KeyAck version must match"
     );
 
-    // Commitment is SHA-256 of encrypted card (at offset 113..145 in v2)
+    // Commitment is SHA-256 of encrypted card (at offset 113..145 — v3
+    // adds sender_timestamp at [145..153] after the commitment).
     let expected_commitment = Sha256::digest(&encrypted_card);
     assert_eq!(
         &ack_bytes[113..145],
@@ -860,15 +862,15 @@ fn test_process_committed_payload_in_wrong_state() {
 }
 
 // ============================================================
-// Identity Binding (Protocol v2)
+// Identity Binding (Protocol v3)
 // ============================================================
 
-// @scenario: ble_exchange :: Protocol version is 0x02
+// @scenario: ble_exchange :: Protocol version is 0x03
 #[test]
-fn test_protocol_version_is_v2() {
+fn test_protocol_version_is_v3() {
     assert_eq!(
-        BLE_HANDSHAKE_VERSION, 0x02,
-        "BLE handshake must use protocol version 2"
+        BLE_HANDSHAKE_VERSION, 0x03,
+        "BLE handshake must use protocol version 3"
     );
 }
 

@@ -67,11 +67,18 @@ use crate::crypto::encryption::{self, SymmetricKey};
 use crate::crypto::kdf::HKDF;
 use crate::identity::Identity;
 
-/// HKDF info prefix for BLE handshake key derivation (v2: identity binding).
-pub const BLE_HANDSHAKE_INFO: &[u8] = b"vauchi-ble-handshake-v2";
+/// HKDF info prefix for BLE handshake key derivation (v3: identity
+/// binding + sender_timestamp in KeyAck wire format). Bumping the info
+/// string from v2 → v3 prevents v2 and v3 session keys from colliding
+/// across protocol versions even when DH inputs are identical (same
+/// pattern as the v1 → v2 bump shipped in `core@a388d78e`).
+pub const BLE_HANDSHAKE_INFO: &[u8] = b"vauchi-ble-handshake-v3";
 
-/// Protocol version byte (v2: includes X25519 exchange key + identity DH).
-pub const BLE_HANDSHAKE_VERSION: u8 = 0x02;
+/// Protocol version byte (v3: KeyAck carries `sender_timestamp` so the
+/// receiver can reconstruct AAD with the SENDER's timestamp instead of
+/// its own clock, fixing the asymmetry that broke AEAD authentication
+/// under clock drift between peers).
+pub const BLE_HANDSHAKE_VERSION: u8 = 0x03;
 
 /// Maximum age of a KeyOffer before it is considered expired (seconds).
 const BLE_HANDSHAKE_EXPIRY_SECS: u64 = 60;
@@ -82,8 +89,13 @@ const NONCE_SIZE: usize = 16;
 /// KeyOffer wire size: version(1) + identity(32) + exchange(32) + ephemeral(32) + nonce(16) + timestamp(8).
 const KEY_OFFER_SIZE: usize = 1 + 32 + 32 + 32 + NONCE_SIZE + 8;
 
-/// KeyAck wire size: version(1) + identity(32) + exchange(32) + ephemeral(32) + nonce(16) + commitment(32).
-const KEY_ACK_SIZE: usize = 1 + 32 + 32 + 32 + NONCE_SIZE + 32;
+/// KeyAck wire size (v3): version(1) + identity(32) + exchange(32) +
+/// ephemeral(32) + nonce(16) + commitment(32) + sender_timestamp(8).
+///
+/// The trailing `sender_timestamp` was added in v3 — pre-v3 KeyAcks
+/// were 145 bytes and the receiver had no value to plug into AAD
+/// reconstruction (problem record `2026-05-21-ble-aad-asymmetry`).
+const KEY_ACK_SIZE: usize = 1 + 32 + 32 + 32 + NONCE_SIZE + 32 + 8;
 
 /// State of a BLE handshake session.
 ///
@@ -155,6 +167,12 @@ pub struct BleHandshakeSession {
     our_exchange_key: [u8; 32],
     our_card: BleCardPayload,
     our_timestamp: u64,
+    /// The PEER's offer/ack timestamp, parsed off the wire and held so
+    /// the reciprocal-decrypt site can reconstruct AAD with the value
+    /// the sender used to encrypt. `None` until the first wire message
+    /// from the peer has been parsed. v3 wire format addition (problem
+    /// record `2026-05-21-ble-aad-asymmetry`).
+    their_timestamp: Option<u64>,
     session_key: Option<SymmetricKey>,
     their_card: Option<BleCardPayload>,
     their_identity_key: Option<[u8; 32]>,
@@ -244,6 +262,7 @@ impl BleHandshakeSession {
             our_exchange_key: exchange_key,
             our_card: card,
             our_timestamp: timestamp,
+            their_timestamp: None,
             session_key: None,
             their_card: None,
             their_identity_key: None,
@@ -262,7 +281,8 @@ impl BleHandshakeSession {
 
     /// Phase 1 (Initiator): Create and serialize a KeyOffer message.
     ///
-    /// Produces a 121-byte v2 message:
+    /// Produces a 121-byte message (KeyOffer wire format is shared
+    /// across v2 and v3 — the wire change in v3 is on KeyAck only):
     /// `[version(1)][identity_pub(32)][exchange_pub(32)][ephemeral_pub(32)][nonce(16)][timestamp(8)]`
     ///
     /// Transitions: `Idle → KeyOfferSent`
@@ -289,8 +309,10 @@ impl BleHandshakeSession {
 
     /// Phase 2 (Responder): Process a KeyOffer, derive session key, return KeyAck + encrypted card.
     ///
-    /// Parses the initiator's 121-byte v2 KeyOffer, validates version and
-    /// timestamp, detects self-exchange, derives the shared session key via
+    /// Parses the initiator's 121-byte KeyOffer, validates version and
+    /// timestamp, detects self-exchange, persists the initiator's
+    /// `their_timestamp` for the eventual reciprocal-decrypt AAD at
+    /// `complete_exchange`, derives the shared session key via
     /// DH1 (identity binding) + DH2 (forward secrecy) + HKDF, encrypts our
     /// card, and computes commitment.
     ///
@@ -308,7 +330,7 @@ impl BleHandshakeSession {
             ));
         }
 
-        // Parse v2 KeyOffer
+        // Parse KeyOffer
         if their_offer.len() < KEY_OFFER_SIZE {
             return Err(ExchangeError::InvalidBleFormat);
         }
@@ -380,7 +402,8 @@ impl BleHandshakeSession {
         // Compute commitment: SHA-256(encrypted_card)
         let commitment = compute_commitment(&encrypted_card);
 
-        // Build v2 KeyAck: version(1) + identity(32) + exchange(32) + ephemeral(32) + nonce(16) + commitment(32)
+        // Build v3 KeyAck: version(1) + identity(32) + exchange(32) + ephemeral(32)
+        //                   + nonce(16) + commitment(32) + sender_timestamp(8) = 153
         let mut ack = Vec::with_capacity(KEY_ACK_SIZE);
         ack.push(BLE_HANDSHAKE_VERSION);
         ack.extend_from_slice(&self.our_identity_key);
@@ -388,9 +411,13 @@ impl BleHandshakeSession {
         ack.extend_from_slice(self.our_x3dh.public_key());
         ack.extend_from_slice(&self.our_nonce);
         ack.extend_from_slice(&commitment);
+        ack.extend_from_slice(&self.our_timestamp.to_be_bytes());
 
         self.session_key = Some(session_key);
         self.their_identity_key = Some(their_identity);
+        // Persist initiator's offer-timestamp for the reciprocal-decrypt
+        // AAD reconstruction in `complete_exchange` (v3 AAD-asymmetry fix).
+        self.their_timestamp = Some(their_timestamp);
         self.our_encrypted_card = Some(encrypted_card.clone());
         self.our_commitment = Some(commitment);
         self.state = BleHandshakeState::AwaitingPayload {
@@ -403,22 +430,24 @@ impl BleHandshakeSession {
 
     /// Phase 2 (Initiator): Process KeyAck + encrypted card from responder.
     ///
-    /// Parses the responder's 145-byte v2 KeyAck, derives the session key
+    /// Parses the responder's 153-byte v3 KeyAck, derives the session key
     /// via DH1 + DH2, verifies the responder's commitment against their
     /// encrypted card, decrypts the responder's card, encrypts our own card,
     /// and computes our commitment.
     ///
     /// Returns `(our_commitment, our_encrypted_card)`.
     ///
-    /// `now` is the current Unix time in seconds. Used to enforce an
-    /// initiator-side session timeout: the ack is rejected if more than
-    /// `BLE_HANDSHAKE_EXPIRY_SECS` have elapsed since this session sent its
-    /// offer. This is the deferred-timestamp half of
-    /// `_private/docs/problems/2026-05-21-ble-initiator-missing-checks/`
-    /// (Option B from § Rejected Approaches): we don't trust a peer-
-    /// supplied timestamp (the v2 wire format has no timestamp slot in
-    /// the KeyAck), but we do enforce that the initiator's own session
-    /// hasn't gone stale before it accepts an ack.
+    /// `now` is the current Unix time in seconds. Used twice:
+    /// (a) initiator-side session timeout — the ack is rejected if more
+    ///     than `BLE_HANDSHAKE_EXPIRY_SECS` have elapsed since this
+    ///     session sent its offer (catches replayed-ack-delivered-late);
+    /// (b) freshness check on the peer's `sender_timestamp` parsed off
+    ///     the v3 wire (mirror of `process_key_offer:345`).
+    /// v3 carries `sender_timestamp` so the receiver can both
+    /// freshness-check it and use it for AAD reconstruction; v2 had no
+    /// timestamp slot and the receiver was forced to use its own
+    /// `self.our_timestamp` for AAD, breaking AEAD under clock drift
+    /// (problem record `2026-05-21-ble-aad-asymmetry`).
     ///
     /// Transitions: `KeyOfferSent → PayloadsExchanged`
     pub fn process_key_ack(
@@ -438,12 +467,6 @@ impl BleHandshakeSession {
 
         // Initiator-side session timeout: reject ack arriving after
         // `BLE_HANDSHAKE_EXPIRY_SECS` since the offer was created.
-        // The v2 wire format doesn't carry a peer timestamp in the
-        // KeyAck, so we can't replicate the responder's
-        // peer-supplied-timestamp check (`process_key_offer:344-347`).
-        // We can — and do — refuse to accept any ack on a stuck
-        // session, which catches the dominant attack model (replayed
-        // ack delivered late) without a protocol-format change.
         // `saturating_sub` handles clock-skew where `now < our_timestamp`
         // (yields 0, never expires); negative drift is treated as
         // "session still fresh" rather than "always expired".
@@ -451,7 +474,7 @@ impl BleHandshakeSession {
             return Err(ExchangeError::BleExpired);
         }
 
-        // Parse v2 KeyAck
+        // Parse v3 KeyAck
         if their_ack.len() < KEY_ACK_SIZE {
             return Err(ExchangeError::InvalidBleFormat);
         }
@@ -485,6 +508,20 @@ impl BleHandshakeSession {
         let their_commitment: [u8; 32] = their_ack[113..145]
             .try_into()
             .map_err(|_| ExchangeError::InvalidBleFormat)?;
+        let their_ack_timestamp = u64::from_be_bytes(
+            their_ack[145..153]
+                .try_into()
+                .map_err(|_| ExchangeError::InvalidBleFormat)?,
+        );
+
+        // Freshness check on the peer-supplied timestamp (mirror of
+        // `process_key_offer:345`). Without this, a v3 ack carrying an
+        // old-but-self-consistent timestamp would authenticate; the
+        // session timeout above only covers ack-delivery latency on
+        // our own clock, not the responder's claimed ack-creation time.
+        if now.saturating_sub(their_ack_timestamp) > BLE_HANDSHAKE_EXPIRY_SECS {
+            return Err(ExchangeError::BleExpired);
+        }
 
         // Verify commitment: SHA-256(encrypted_card) must match
         let computed_commitment = compute_commitment(their_encrypted_card);
@@ -504,7 +541,7 @@ impl BleHandshakeSession {
         })?;
 
         // Decrypt their card
-        let their_aad = build_aad(&their_identity, &self.our_identity_key, self.our_timestamp);
+        let their_aad = build_aad(&their_identity, &self.our_identity_key, their_ack_timestamp);
         let their_plaintext =
             encryption::decrypt_with_ad(&session_key, their_encrypted_card, &their_aad)
                 .map_err(|_| ExchangeError::BleDecryptionFailed)?;
@@ -646,7 +683,15 @@ impl BleHandshakeSession {
                 .their_identity_key
                 .ok_or_else(|| ExchangeError::InvalidState("No remote identity key".into()))?;
 
-            let aad = build_aad(&their_identity, &self.our_identity_key, self.our_timestamp);
+            // Responder reconstructing AAD for the initiator's reciprocal
+            // payload — initiator encrypted at `process_key_ack:520` with
+            // its own `self.our_timestamp`, which here is the value we
+            // parsed and persisted at `process_key_offer:333` into
+            // `self.their_timestamp`.
+            let their_offer_timestamp = self
+                .their_timestamp
+                .ok_or_else(|| ExchangeError::InvalidState("No peer timestamp".into()))?;
+            let aad = build_aad(&their_identity, &self.our_identity_key, their_offer_timestamp);
             let plaintext = encryption::decrypt_with_ad(session_key, their_encrypted, &aad)
                 .map_err(|_| ExchangeError::BleDecryptionFailed)?;
             let card = BleCardPayload::from_bytes(&plaintext)

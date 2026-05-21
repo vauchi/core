@@ -173,7 +173,7 @@ fn ble_full_initiator_flow_via_command_event() {
         )
         .unwrap();
 
-    assert_eq!(key_ack.len(), 145, "v2 KeyAck should be 145 bytes");
+    assert_eq!(key_ack.len(), 153, "v3 KeyAck should be 153 bytes");
 
     // Feed KeyAck and encrypted card back to initiator as hardware events
     initiator

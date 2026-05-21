@@ -21,7 +21,7 @@
 //!   `[u8; 32]`)
 
 use std::collections::HashSet;
-use vauchi_core::identifiers::IdentityKey;
+use vauchi_core::identifiers::{DhPublicKey, IdentityKey};
 
 // @internal
 #[test]
@@ -88,4 +88,128 @@ fn serde_transparent_matches_underlying_array_shape() {
     let deserialized: IdentityKey =
         serde_json::from_str(&bytes_json).expect("deserialize bytes-shape into key");
     assert_eq!(deserialized, key);
+}
+
+// Phase 1B: DhPublicKey mirrors IdentityKey's contract but is a
+// nominally distinct type (X25519 DH key, not Ed25519). The tests
+// below mirror IdentityKey's tests so the two stay in lockstep.
+
+// @internal
+#[test]
+fn dh_pubkey_roundtrip_through_from_and_as_bytes() {
+    let bytes = [0xCDu8; 32];
+    let key = DhPublicKey::from(bytes);
+    assert_eq!(key.as_bytes(), &bytes);
+    assert_eq!(key.into_bytes(), bytes);
+}
+
+// @internal
+#[test]
+fn dh_pubkey_equal_underlying_bytes_compare_equal() {
+    let a = DhPublicKey::from_bytes([1u8; 32]);
+    let b = DhPublicKey::from_bytes([1u8; 32]);
+    let c = DhPublicKey::from_bytes([2u8; 32]);
+    assert_eq!(a, b);
+    assert_ne!(a, c);
+}
+
+// @internal
+#[test]
+fn dh_pubkey_hash_matches_when_bytes_match() {
+    let mut set = HashSet::new();
+    set.insert(DhPublicKey::from_bytes([7u8; 32]));
+    assert!(set.contains(&DhPublicKey::from_bytes([7u8; 32])));
+    assert!(!set.contains(&DhPublicKey::from_bytes([8u8; 32])));
+}
+
+// @internal
+#[test]
+fn dh_pubkey_display_format_is_lowercase_hex() {
+    let key = DhPublicKey::from_bytes([0xDE; 32]);
+    let expected: String = std::iter::repeat("de").take(32).collect();
+    assert_eq!(key.to_string(), expected);
+}
+
+// @internal
+#[test]
+fn dh_pubkey_serde_transparent_matches_underlying_array_shape() {
+    let bytes = [3u8; 32];
+    let key = DhPublicKey::from_bytes(bytes);
+    let key_json = serde_json::to_string(&key).expect("serialize key");
+    let bytes_json = serde_json::to_string(&bytes).expect("serialize bytes");
+    assert_eq!(key_json, bytes_json);
+
+    let deserialized: DhPublicKey =
+        serde_json::from_str(&bytes_json).expect("deserialize bytes-shape into key");
+    assert_eq!(deserialized, key);
+}
+
+// Wire serde adapters: confirm the per-field base64 adapters
+// produce the same shape as the existing `bytes_array_32` modules
+// so swapping a wire field's type does not break the JSON layout.
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
+struct WireIdentityKeyHarness {
+    #[serde(with = "vauchi_core::identifiers::wire_identity_key_base64")]
+    key: IdentityKey,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
+struct WireDhPublicKeyHarness {
+    #[serde(with = "vauchi_core::identifiers::wire_dh_public_key_base64")]
+    key: DhPublicKey,
+}
+
+// @internal
+#[test]
+fn wire_identity_key_adapter_emits_base64_string() {
+    let bytes = [0x11u8; 32];
+    let h = WireIdentityKeyHarness {
+        key: IdentityKey::from_bytes(bytes),
+    };
+    let json: serde_json::Value =
+        serde_json::from_str(&serde_json::to_string(&h).unwrap()).unwrap();
+    let expected = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes);
+    assert_eq!(json["key"], serde_json::Value::String(expected));
+
+    let restored: WireIdentityKeyHarness = serde_json::from_value(json).unwrap();
+    assert_eq!(restored, h);
+}
+
+// @internal
+#[test]
+fn wire_dh_public_key_adapter_emits_base64_string() {
+    let bytes = [0x22u8; 32];
+    let h = WireDhPublicKeyHarness {
+        key: DhPublicKey::from_bytes(bytes),
+    };
+    let json: serde_json::Value =
+        serde_json::from_str(&serde_json::to_string(&h).unwrap()).unwrap();
+    let expected = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes);
+    assert_eq!(json["key"], serde_json::Value::String(expected));
+
+    let restored: WireDhPublicKeyHarness = serde_json::from_value(json).unwrap();
+    assert_eq!(restored, h);
+}
+
+// @internal
+#[test]
+fn wire_identity_key_adapter_rejects_wrong_length() {
+    let too_short = serde_json::json!({ "key": "AQID" }); // 3 bytes
+    let result: Result<WireIdentityKeyHarness, _> = serde_json::from_value(too_short);
+    assert!(
+        result.is_err(),
+        "wire adapter must reject base64 that does not decode to 32 bytes"
+    );
+}
+
+// @internal
+#[test]
+fn wire_dh_public_key_adapter_rejects_wrong_length() {
+    let too_short = serde_json::json!({ "key": "AQID" }); // 3 bytes
+    let result: Result<WireDhPublicKeyHarness, _> = serde_json::from_value(too_short);
+    assert!(
+        result.is_err(),
+        "wire adapter must reject base64 that does not decode to 32 bytes"
+    );
 }

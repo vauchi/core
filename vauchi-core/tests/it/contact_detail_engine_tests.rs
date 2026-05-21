@@ -28,6 +28,7 @@ fn sample_fields() -> Vec<Field> {
         label: "Email".into(),
         value: "alice@example.com".into(),
         field_type: "email".into(),
+        icon: "envelope".into(),
         visibility: UiFieldVisibility::Shown,
         a11y: None,
     }]

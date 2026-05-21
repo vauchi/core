@@ -90,6 +90,7 @@ impl ContactEditEngine {
             field_type: field.field_type.clone(),
             label: field.label.clone(),
             value: field.value.clone(),
+            icon: crate::ui::component::icon_for_field_type(&field.field_type).into(),
             a11y: Some(A11y {
                 label: Some(format!("{}: {}", field.label, field.value)),
                 hint: match visibility {

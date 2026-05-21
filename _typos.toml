@@ -24,3 +24,6 @@ identite = "identite"
 sur = "sur"
 # NFC normalization test: "café" split across Unicode escape
 caf = "caf"
+# SF Symbol name for the map-pin icon — used in the platform-neutral
+# icon vocabulary on `Field.icon` (2026-05-21-core-ui-icon-on-wire)
+mappin = "mappin"

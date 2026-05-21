@@ -8,7 +8,9 @@ mod list;
 mod preview;
 
 pub use list::{Item, ListItemAction, ListItemActionKind};
-pub use preview::{Field, PreviewVariant, UiFieldVisibility, build_visible_fields};
+pub use preview::{
+    Field, PreviewVariant, UiFieldVisibility, build_visible_fields, icon_for_field_type,
+};
 
 /// An option in a [`Component::Dropdown`].
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]

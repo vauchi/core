@@ -30,6 +30,7 @@ fn sample_fields() -> Vec<Field> {
         field_type: "Phone".into(),
         label: "Mobile".into(),
         value: "+41 79 123 45 67".into(),
+        icon: "phone".into(),
         visibility: UiFieldVisibility::Shown,
         a11y: None,
     }]

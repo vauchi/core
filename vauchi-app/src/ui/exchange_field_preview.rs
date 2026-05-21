@@ -49,11 +49,13 @@ pub(super) fn build_field_preview_screen(
             } else {
                 UiFieldVisibility::Hidden
             };
+            let field_type_str = format!("{:?}", f.field_type());
             Field {
                 id: f.id().to_string(),
                 label: f.label().to_string(),
                 value: f.value().to_string(),
-                field_type: format!("{:?}", f.field_type()),
+                icon: crate::ui::component::icon_for_field_type(&field_type_str).into(),
+                field_type: field_type_str,
                 a11y: Some(A11y {
                     label: Some(format!("{}: {}", f.label(), f.value())),
                     hint: match visibility {

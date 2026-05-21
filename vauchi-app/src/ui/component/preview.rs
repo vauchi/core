@@ -16,6 +16,15 @@ use serde::{Deserialize, Serialize};
 use super::A11y;
 
 /// A contact field as displayed in the UI.
+///
+/// `icon` carries a platform-neutral icon vocabulary name (see
+/// [`icon_for_field_type`]) computed by core from `field_type`.
+/// Frontends render this directly instead of duplicating the
+/// `field_type` → icon switch in each renderer (ADR-021/043
+/// Humble UI). Five frontends previously carried the same switch
+/// (iOS×2, cli, tui, android); shipping `icon` on the wire collapses
+/// that duplication and makes adding a new field type a single-file
+/// change in core.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Field {
@@ -23,9 +32,37 @@ pub struct Field {
     pub field_type: String,
     pub label: String,
     pub value: String,
+    /// Platform-neutral icon name (see [`icon_for_field_type`]).
+    /// Frontends map this to their native icon system (SF Symbols /
+    /// Material Symbols / their preferred glyph table).
+    #[serde(default)]
+    pub icon: String,
     pub visibility: UiFieldVisibility,
     #[serde(default)]
     pub a11y: Option<A11y>,
+}
+
+/// Map a `field_type` string to the platform-neutral icon name carried
+/// on `Field.icon`.
+///
+/// The vocabulary follows the SF Symbols core set (`phone`, `envelope`,
+/// `globe`, `mappin`, `at`, `gift`) which has direct equivalents in
+/// Material Symbols and a documented mapping in every frontend's icon
+/// table. Unknown field types fall back to `"tag"` (generic) so the
+/// renderer always has something to draw.
+///
+/// Matching is case-insensitive so callers can pass either Debug-format
+/// (`"Phone"`) or lowercase (`"phone"`) strings — both common in tree.
+pub fn icon_for_field_type(field_type: &str) -> &'static str {
+    match field_type.to_ascii_lowercase().as_str() {
+        "phone" => "phone",
+        "email" => "envelope",
+        "website" => "globe",
+        "address" => "mappin",
+        "social" => "at",
+        "birthday" => "gift",
+        _ => "tag",
+    }
 }
 
 /// UI-level field visibility state.
@@ -108,9 +145,34 @@ mod build_visible_fields_tests {
             field_type: "text".into(),
             label: id.into(),
             value: format!("value-{id}"),
+            icon: icon_for_field_type("text").into(),
             visibility,
             a11y: None,
         }
+    }
+
+    // @internal
+    #[test]
+    fn icon_for_field_type_maps_known_types_case_insensitive() {
+        // Title-case (Debug format of FieldType)
+        assert_eq!(icon_for_field_type("Phone"), "phone");
+        assert_eq!(icon_for_field_type("Email"), "envelope");
+        assert_eq!(icon_for_field_type("Website"), "globe");
+        assert_eq!(icon_for_field_type("Address"), "mappin");
+        assert_eq!(icon_for_field_type("Social"), "at");
+        assert_eq!(icon_for_field_type("Birthday"), "gift");
+        // lowercase (typical EditableField input)
+        assert_eq!(icon_for_field_type("phone"), "phone");
+        assert_eq!(icon_for_field_type("email"), "envelope");
+    }
+
+    // @internal
+    #[test]
+    fn icon_for_field_type_unknown_falls_back_to_tag() {
+        assert_eq!(icon_for_field_type("custom"), "tag");
+        assert_eq!(icon_for_field_type("Custom"), "tag");
+        assert_eq!(icon_for_field_type("anything_else"), "tag");
+        assert_eq!(icon_for_field_type(""), "tag");
     }
 
     // @internal

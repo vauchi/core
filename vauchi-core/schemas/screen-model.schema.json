@@ -1218,7 +1218,7 @@
       }
     },
     "Field": {
-      "description": "A contact field as displayed in the UI.",
+      "description": "A contact field as displayed in the UI.\n\n`icon` carries a platform-neutral icon vocabulary name (see [`icon_for_field_type`]) computed by core from `field_type`. Frontends render this directly instead of duplicating the `field_type` → icon switch in each renderer (ADR-021/043 Humble UI). Five frontends previously carried the same switch (iOS×2, cli, tui, android); shipping `icon` on the wire collapses that duplication and makes adding a new field type a single-file change in core.",
       "type": "object",
       "required": [
         "field_type",
@@ -1240,6 +1240,11 @@
           ]
         },
         "field_type": {
+          "type": "string"
+        },
+        "icon": {
+          "description": "Platform-neutral icon name (see [`icon_for_field_type`]). Frontends map this to their native icon system (SF Symbols / Material Symbols / their preferred glyph table).",
+          "default": "",
           "type": "string"
         },
         "id": {

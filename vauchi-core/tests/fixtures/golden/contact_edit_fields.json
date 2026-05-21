@@ -26,6 +26,7 @@
             "field_type": "Phone",
             "label": "Mobile",
             "value": "+1-555-0100",
+            "icon": "phone",
             "visibility": {
               "Groups": [
                 "Family"
@@ -42,6 +43,7 @@
             "field_type": "Email",
             "label": "Work",
             "value": "alice@example.com",
+            "icon": "envelope",
             "visibility": {
               "Groups": [
                 "Friends",

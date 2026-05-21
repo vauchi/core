@@ -96,6 +96,7 @@ fn sample_field() -> Field {
         field_type: "phone".to_string(),
         label: "Phone".to_string(),
         value: "+1234567890".to_string(),
+        icon: "phone".to_string(),
         visibility: UiFieldVisibility::Shown,
         a11y: None,
     }

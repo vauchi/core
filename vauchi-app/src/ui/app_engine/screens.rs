@@ -584,13 +584,18 @@ impl AppEngine {
                         .card()
                         .fields()
                         .iter()
-                        .map(|f| Field {
-                            id: f.id().to_string(),
-                            field_type: format!("{:?}", f.field_type()),
-                            label: f.label().to_string(),
-                            value: f.value().to_string(),
-                            visibility: UiFieldVisibility::Shown,
-                            a11y: None,
+                        .map(|f| {
+                            let field_type_str = format!("{:?}", f.field_type());
+                            Field {
+                                id: f.id().to_string(),
+                                icon: crate::ui::component::icon_for_field_type(&field_type_str)
+                                    .into(),
+                                field_type: field_type_str,
+                                label: f.label().to_string(),
+                                value: f.value().to_string(),
+                                visibility: UiFieldVisibility::Shown,
+                                a11y: None,
+                            }
                         })
                         .collect();
                     let status = if vauchi.is_contact_revoked(contact.id()) {
@@ -946,9 +951,11 @@ impl AppEngine {
                 let is_visible = vauchi
                     .get_effective_field_visibility(contact_id, f.id())
                     .unwrap_or(true);
+                let field_type_str = format!("{:?}", f.field_type());
                 Field {
                     id: f.id().to_string(),
-                    field_type: format!("{:?}", f.field_type()),
+                    icon: crate::ui::component::icon_for_field_type(&field_type_str).into(),
+                    field_type: field_type_str,
                     label: f.label().to_string(),
                     value: f.value().to_string(),
                     visibility: if is_visible {

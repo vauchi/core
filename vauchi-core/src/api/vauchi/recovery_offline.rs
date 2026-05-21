@@ -60,7 +60,7 @@ impl Vauchi {
             .try_into()
             .map_err(|_| VauchiError::Serialization("public key must be 32 bytes".into()))?;
 
-        let claim = RecoveryClaim::new(&old_pk, identity.signing_public_key(), 0);
+        let claim = RecoveryClaim::new(old_pk, identity.signing_public_key(), 0);
         Ok(base64::engine::general_purpose::STANDARD.encode(claim.to_bytes()))
     }
 

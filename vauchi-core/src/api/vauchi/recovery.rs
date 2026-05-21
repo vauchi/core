@@ -198,7 +198,7 @@ impl Vauchi {
             .ok_or_else(|| VauchiError::ContactNotFound(contact_id.to_string()))?;
 
         // Query relay for guardian entries
-        let guardian_hash = compute_guardian_hash(claim.old_pk());
+        let guardian_hash = compute_guardian_hash(claim.old_pk().as_bytes());
         let transport = self.create_guardian_transport();
         let entries = transport.guardian_query(&guardian_hash)?;
 

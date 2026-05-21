@@ -60,9 +60,33 @@ impl From<&[u8; 32]> for IdentityKey {
     }
 }
 
+impl From<&IdentityKey> for IdentityKey {
+    fn from(key: &IdentityKey) -> Self {
+        *key
+    }
+}
+
 impl AsRef<[u8]> for IdentityKey {
     fn as_ref(&self) -> &[u8] {
         &self.0
+    }
+}
+
+/// Cross-equality with raw bytes so test assertions of the form
+/// `assert_eq!(thing.identity_key_accessor(), &expected_bytes)` keep
+/// working without forcing every assertion site to wrap the literal
+/// in `IdentityKey::from(...)`. The newtype guards swap-argument bugs
+/// at function-call boundaries, not equality misuse — bare `[u8; 32]`
+/// has the same equality-misuse hazard already.
+impl PartialEq<[u8; 32]> for IdentityKey {
+    fn eq(&self, other: &[u8; 32]) -> bool {
+        &self.0 == other
+    }
+}
+
+impl PartialEq<IdentityKey> for [u8; 32] {
+    fn eq(&self, other: &IdentityKey) -> bool {
+        self == &other.0
     }
 }
 

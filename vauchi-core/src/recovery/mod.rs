@@ -23,6 +23,7 @@ use thiserror::Error;
 
 use crate::contact::Contact;
 use crate::crypto::{PublicKey, Signature, SigningKeyPair};
+use crate::identifiers::IdentityKey;
 
 pub mod guardian;
 pub mod sealed_box;
@@ -186,8 +187,8 @@ impl RecoveryRateLimiter {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RecoveryClaim {
     claim_type: String,
-    old_pk: [u8; 32],
-    new_pk: [u8; 32],
+    old_pk: IdentityKey,
+    new_pk: IdentityKey,
     timestamp: u64,
 }
 
@@ -196,25 +197,27 @@ impl RecoveryClaim {
     pub const MAX_AGE_SECS: u64 = 48 * 60 * 60;
 
     /// Creates a new recovery claim.
-    pub fn new(old_pk: &[u8; 32], new_pk: &[u8; 32], now: u64) -> Self {
-        let timestamp = now;
-
+    pub fn new(old_pk: impl Into<IdentityKey>, new_pk: impl Into<IdentityKey>, now: u64) -> Self {
         Self {
             claim_type: "recovery_claim".to_string(),
-            old_pk: *old_pk,
-            new_pk: *new_pk,
-            timestamp,
+            old_pk: old_pk.into(),
+            new_pk: new_pk.into(),
+            timestamp: now,
         }
     }
 
     /// Creates a new recovery claim with a specific timestamp.
     /// Used for testing timestamp validation.
     #[doc(hidden)]
-    pub fn new_with_timestamp(old_pk: &[u8; 32], new_pk: &[u8; 32], timestamp: u64) -> Self {
+    pub fn new_with_timestamp(
+        old_pk: impl Into<IdentityKey>,
+        new_pk: impl Into<IdentityKey>,
+        timestamp: u64,
+    ) -> Self {
         Self {
             claim_type: "recovery_claim".to_string(),
-            old_pk: *old_pk,
-            new_pk: *new_pk,
+            old_pk: old_pk.into(),
+            new_pk: new_pk.into(),
             timestamp,
         }
     }
@@ -225,12 +228,12 @@ impl RecoveryClaim {
     }
 
     /// Returns the old (lost) public key.
-    pub fn old_pk(&self) -> &[u8; 32] {
+    pub fn old_pk(&self) -> &IdentityKey {
         &self.old_pk
     }
 
     /// Returns the new public key.
-    pub fn new_pk(&self) -> &[u8; 32] {
+    pub fn new_pk(&self) -> &IdentityKey {
         &self.new_pk
     }
 
@@ -244,8 +247,8 @@ impl RecoveryClaim {
         // Version byte + old_pk + new_pk + timestamp
         let mut bytes = Vec::with_capacity(1 + 32 + 32 + 8);
         bytes.push(1); // Version 1
-        bytes.extend_from_slice(&self.old_pk);
-        bytes.extend_from_slice(&self.new_pk);
+        bytes.extend_from_slice(self.old_pk.as_bytes());
+        bytes.extend_from_slice(self.new_pk.as_bytes());
         bytes.extend_from_slice(&self.timestamp.to_le_bytes());
         bytes
     }
@@ -276,8 +279,8 @@ impl RecoveryClaim {
 
         Ok(Self {
             claim_type: "recovery_claim".to_string(),
-            old_pk,
-            new_pk,
+            old_pk: IdentityKey::from_bytes(old_pk),
+            new_pk: IdentityKey::from_bytes(new_pk),
             timestamp,
         })
     }
@@ -290,9 +293,9 @@ const VOUCHER_DOMAIN: &[u8] = b"vauchi-recovery-voucher-v1";
 #[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RecoveryVoucher {
-    old_pk: [u8; 32],
-    new_pk: [u8; 32],
-    voucher_pk: [u8; 32],
+    old_pk: IdentityKey,
+    new_pk: IdentityKey,
+    voucher_pk: IdentityKey,
     timestamp: u64,
     #[serde_as(as = "[_; 64]")]
     signature: [u8; 64],
@@ -322,7 +325,7 @@ impl RecoveryVoucher {
         }
 
         // Prevent self-vouching
-        if voucher_keypair.public_key().as_bytes() == claim.new_pk() {
+        if voucher_keypair.public_key().as_bytes() == claim.new_pk().as_bytes() {
             return Err(RecoveryError::SelfVouching);
         }
 
@@ -337,23 +340,24 @@ impl RecoveryVoucher {
 
     /// Creates a signed voucher.
     pub fn create(
-        old_pk: &[u8; 32],
-        new_pk: &[u8; 32],
+        old_pk: impl Into<IdentityKey>,
+        new_pk: impl Into<IdentityKey>,
         voucher_keypair: &SigningKeyPair,
         guardian_token: Option<guardian::GuardianToken>,
         now: u64,
     ) -> Self {
         let timestamp = now;
-
-        let voucher_pk = *voucher_keypair.public_key().as_bytes();
+        let old_pk = old_pk.into();
+        let new_pk = new_pk.into();
+        let voucher_pk = IdentityKey::from_bytes(*voucher_keypair.public_key().as_bytes());
 
         // Build data to sign
-        let data = Self::build_sign_data(old_pk, new_pk, &voucher_pk, timestamp);
+        let data = Self::build_sign_data(&old_pk, &new_pk, &voucher_pk, timestamp);
         let signature = voucher_keypair.sign(&data);
 
         Self {
-            old_pk: *old_pk,
-            new_pk: *new_pk,
+            old_pk,
+            new_pk,
             voucher_pk,
             timestamp,
             signature: *signature.as_bytes(),
@@ -363,32 +367,32 @@ impl RecoveryVoucher {
 
     /// Builds the data to be signed/verified.
     fn build_sign_data(
-        old_pk: &[u8; 32],
-        new_pk: &[u8; 32],
-        voucher_pk: &[u8; 32],
+        old_pk: &IdentityKey,
+        new_pk: &IdentityKey,
+        voucher_pk: &IdentityKey,
         timestamp: u64,
     ) -> Vec<u8> {
         let mut data = Vec::with_capacity(VOUCHER_DOMAIN.len() + 32 + 32 + 32 + 8);
         data.extend_from_slice(VOUCHER_DOMAIN);
-        data.extend_from_slice(old_pk);
-        data.extend_from_slice(new_pk);
-        data.extend_from_slice(voucher_pk);
+        data.extend_from_slice(old_pk.as_bytes());
+        data.extend_from_slice(new_pk.as_bytes());
+        data.extend_from_slice(voucher_pk.as_bytes());
         data.extend_from_slice(&timestamp.to_le_bytes());
         data
     }
 
     /// Returns the old (lost) public key.
-    pub fn old_pk(&self) -> &[u8; 32] {
+    pub fn old_pk(&self) -> &IdentityKey {
         &self.old_pk
     }
 
     /// Returns the new public key.
-    pub fn new_pk(&self) -> &[u8; 32] {
+    pub fn new_pk(&self) -> &IdentityKey {
         &self.new_pk
     }
 
     /// Returns the voucher's public key.
-    pub fn voucher_pk(&self) -> &[u8; 32] {
+    pub fn voucher_pk(&self) -> &IdentityKey {
         &self.voucher_pk
     }
 
@@ -406,7 +410,7 @@ impl RecoveryVoucher {
     pub fn verify(&self) -> bool {
         let data =
             Self::build_sign_data(&self.old_pk, &self.new_pk, &self.voucher_pk, self.timestamp);
-        let public_key = PublicKey::from_bytes(self.voucher_pk);
+        let public_key = PublicKey::from_bytes(*self.voucher_pk.as_bytes());
         let signature = Signature::from_bytes(self.signature);
         public_key.verify(&data, &signature)
     }
@@ -420,9 +424,9 @@ impl RecoveryVoucher {
         // Version + old_pk + new_pk + voucher_pk + timestamp + signature
         let mut bytes = Vec::with_capacity(1 + 32 + 32 + 32 + 8 + 64);
         bytes.push(version);
-        bytes.extend_from_slice(&self.old_pk);
-        bytes.extend_from_slice(&self.new_pk);
-        bytes.extend_from_slice(&self.voucher_pk);
+        bytes.extend_from_slice(self.old_pk.as_bytes());
+        bytes.extend_from_slice(self.new_pk.as_bytes());
+        bytes.extend_from_slice(self.voucher_pk.as_bytes());
         bytes.extend_from_slice(&self.timestamp.to_le_bytes());
         bytes.extend_from_slice(&self.signature);
         if let Some(ref token) = self.guardian_token {
@@ -486,9 +490,9 @@ impl RecoveryVoucher {
         };
 
         Ok(Self {
-            old_pk,
-            new_pk,
-            voucher_pk,
+            old_pk: IdentityKey::from_bytes(old_pk),
+            new_pk: IdentityKey::from_bytes(new_pk),
+            voucher_pk: IdentityKey::from_bytes(voucher_pk),
             timestamp,
             signature,
             guardian_token,
@@ -497,8 +501,8 @@ impl RecoveryVoucher {
 
     /// Sets new_pk for testing purposes (to test tamper detection).
     #[doc(hidden)]
-    pub fn set_new_pk_for_testing(&mut self, new_pk: &[u8; 32]) {
-        self.new_pk = *new_pk;
+    pub fn set_new_pk_for_testing(&mut self, new_pk: impl Into<IdentityKey>) {
+        self.new_pk = new_pk.into();
     }
 }
 
@@ -531,8 +535,8 @@ pub struct RecoveryProof {
     /// Schema version for forward compatibility (#72).
     #[serde(default = "default_proof_version")]
     version: u8,
-    old_pk: [u8; 32],
-    new_pk: [u8; 32],
+    old_pk: IdentityKey,
+    new_pk: IdentityKey,
     threshold: u32,
     vouchers: Vec<RecoveryVoucher>,
     created_at: u64,
@@ -549,13 +553,18 @@ impl RecoveryProof {
     const DEFAULT_EXPIRY_DAYS: u64 = 90;
 
     /// Creates a new recovery proof.
-    pub fn new(old_pk: &[u8; 32], new_pk: &[u8; 32], threshold: u32, now: u64) -> Self {
+    pub fn new(
+        old_pk: impl Into<IdentityKey>,
+        new_pk: impl Into<IdentityKey>,
+        threshold: u32,
+        now: u64,
+    ) -> Self {
         let expires_at = now + Self::DEFAULT_EXPIRY_DAYS * 24 * 60 * 60;
 
         Self {
             version: RECOVERY_PROOF_VERSION,
-            old_pk: *old_pk,
-            new_pk: *new_pk,
+            old_pk: old_pk.into(),
+            new_pk: new_pk.into(),
             threshold,
             vouchers: Vec::new(),
             created_at: now,
@@ -583,12 +592,12 @@ impl RecoveryProof {
     }
 
     /// Returns the old (lost) public key.
-    pub fn old_pk(&self) -> &[u8; 32] {
+    pub fn old_pk(&self) -> &IdentityKey {
         &self.old_pk
     }
 
     /// Returns the new public key.
-    pub fn new_pk(&self) -> &[u8; 32] {
+    pub fn new_pk(&self) -> &IdentityKey {
         &self.new_pk
     }
 
@@ -653,11 +662,11 @@ impl RecoveryProof {
                 return Err(RecoveryError::InvalidSignature);
             }
             // Token's designator_pk must match the proof's old_pk (the recovering identity)
-            if token.designator_pk() != &self.old_pk {
+            if token.designator_pk() != self.old_pk.as_bytes() {
                 return Err(RecoveryError::MismatchedKeys);
             }
             // Token's guardian_pk must match the voucher's signer
-            if token.guardian_pk() != voucher.voucher_pk() {
+            if token.guardian_pk() != voucher.voucher_pk().as_bytes() {
                 return Err(RecoveryError::MismatchedKeys);
             }
         }
@@ -688,7 +697,7 @@ impl RecoveryProof {
         voucher: RecoveryVoucher,
         trusted_pks: &HashSet<[u8; 32]>,
     ) -> Result<(), RecoveryError> {
-        if !trusted_pks.contains(voucher.voucher_pk()) {
+        if !trusted_pks.contains(voucher.voucher_pk().as_bytes()) {
             return Err(RecoveryError::UntrustedVoucher);
         }
         self.add_voucher(voucher)
@@ -701,7 +710,7 @@ impl RecoveryProof {
         }
 
         // Check for duplicates
-        let mut seen_vouchers = HashSet::new();
+        let mut seen_vouchers: HashSet<IdentityKey> = HashSet::new();
         for voucher in &self.vouchers {
             if !seen_vouchers.insert(voucher.voucher_pk) {
                 return Err(RecoveryError::DuplicateVoucher);
@@ -723,7 +732,10 @@ impl RecoveryProof {
         my_contacts: &[Contact],
         settings: &RecoverySettings,
     ) -> VerificationResult {
-        // Find mutual contacts who vouched
+        // Find mutual contacts who vouched. The Contact API still hands us
+        // raw [u8; 32] pubkeys (Phase 2 / ContactId scope), so the set keys
+        // stay [u8; 32] and we unwrap IdentityKey -> &[u8; 32] at the
+        // query boundary.
         let my_contact_pks: HashSet<[u8; 32]> = my_contacts
             .iter()
             .filter_map(|c| c.public_key().copied())
@@ -732,7 +744,7 @@ impl RecoveryProof {
         let mutual_vouchers: Vec<_> = self
             .vouchers
             .iter()
-            .filter(|v| my_contact_pks.contains(&v.voucher_pk))
+            .filter(|v| my_contact_pks.contains(v.voucher_pk.as_bytes()))
             .collect();
 
         let mutual_names: Vec<String> = mutual_vouchers
@@ -740,7 +752,7 @@ impl RecoveryProof {
             .filter_map(|v| {
                 my_contacts
                     .iter()
-                    .find(|c| c.public_key() == Some(&v.voucher_pk))
+                    .find(|c| c.public_key() == Some(v.voucher_pk.as_bytes()))
                     .map(|c| c.display_name().to_string())
             })
             .collect();
@@ -875,7 +887,7 @@ impl RecoverySettings {
 #[derive(Debug, Clone)]
 pub struct RecoveryReminder {
     /// The old public key of the recovery claim.
-    old_pk: [u8; 32],
+    old_pk: IdentityKey,
     /// When the reminder was created/snoozed (Unix timestamp).
     created_at: u64,
     /// Number of days until reminder is due.
@@ -887,39 +899,39 @@ impl RecoveryReminder {
     pub const DEFAULT_REMINDER_DAYS: u32 = 7;
 
     /// Creates a new reminder with the default 7-day period.
-    pub fn new(old_pk: [u8; 32], now: u64) -> Self {
-        let created_at = now;
-
+    pub fn new(old_pk: impl Into<IdentityKey>, now: u64) -> Self {
         Self {
-            old_pk,
-            created_at,
+            old_pk: old_pk.into(),
+            created_at: now,
             reminder_days: Self::DEFAULT_REMINDER_DAYS,
         }
     }
 
     /// Creates a new reminder with a custom period.
-    pub fn with_days(old_pk: [u8; 32], days: u32, now: u64) -> Self {
-        let created_at = now;
-
+    pub fn with_days(old_pk: impl Into<IdentityKey>, days: u32, now: u64) -> Self {
         Self {
-            old_pk,
-            created_at,
+            old_pk: old_pk.into(),
+            created_at: now,
             reminder_days: days,
         }
     }
 
     /// Creates a reminder with a specific timestamp (for testing).
     #[doc(hidden)]
-    pub fn new_with_timestamp(old_pk: [u8; 32], created_at: u64, reminder_days: u32) -> Self {
+    pub fn new_with_timestamp(
+        old_pk: impl Into<IdentityKey>,
+        created_at: u64,
+        reminder_days: u32,
+    ) -> Self {
         Self {
-            old_pk,
+            old_pk: old_pk.into(),
             created_at,
             reminder_days,
         }
     }
 
     /// Returns the old public key this reminder is for.
-    pub fn old_pk(&self) -> &[u8; 32] {
+    pub fn old_pk(&self) -> &IdentityKey {
         &self.old_pk
     }
 
@@ -953,14 +965,14 @@ impl RecoveryReminder {
 #[derive(Debug, Clone)]
 pub struct ConflictingClaim {
     /// The new public key being claimed.
-    new_pk: [u8; 32],
+    new_pk: IdentityKey,
     /// Number of vouchers supporting this claim.
     voucher_count: usize,
 }
 
 impl ConflictingClaim {
     /// Returns the new public key.
-    pub fn new_pk(&self) -> &[u8; 32] {
+    pub fn new_pk(&self) -> &IdentityKey {
         &self.new_pk
     }
 
@@ -977,7 +989,7 @@ impl ConflictingClaim {
 #[derive(Debug, Clone)]
 pub struct RecoveryConflict {
     /// The old public key that has conflicting claims.
-    old_pk: [u8; 32],
+    old_pk: IdentityKey,
     /// The conflicting claims.
     claims: Vec<ConflictingClaim>,
 }
@@ -993,7 +1005,7 @@ impl RecoveryConflict {
         }
 
         // Group proofs by old_pk
-        let mut by_old_pk: HashMap<[u8; 32], Vec<&RecoveryProof>> = HashMap::new();
+        let mut by_old_pk: HashMap<IdentityKey, Vec<&RecoveryProof>> = HashMap::new();
         for proof in proofs {
             by_old_pk.entry(*proof.old_pk()).or_default().push(proof);
         }
@@ -1001,7 +1013,7 @@ impl RecoveryConflict {
         // Check each group for conflicts (different new_pks)
         for (old_pk, group) in by_old_pk {
             // Collect unique new_pks with their voucher counts
-            let mut new_pks: HashMap<[u8; 32], usize> = HashMap::new();
+            let mut new_pks: HashMap<IdentityKey, usize> = HashMap::new();
             for proof in &group {
                 let entry = new_pks.entry(*proof.new_pk()).or_insert(0);
                 *entry = (*entry).max(proof.voucher_count());
@@ -1025,7 +1037,7 @@ impl RecoveryConflict {
     }
 
     /// Returns the old public key that has conflicting claims.
-    pub fn old_pk(&self) -> &[u8; 32] {
+    pub fn old_pk(&self) -> &IdentityKey {
         &self.old_pk
     }
 
@@ -1126,11 +1138,9 @@ pub struct RecoveryRevocation {
     /// Type marker for QR/serialization.
     revocation_type: String,
     /// The old public key (being recovered from).
-    #[serde_as(as = "[_; 32]")]
-    old_pk: [u8; 32],
+    old_pk: IdentityKey,
     /// The new public key (that was being recovered to).
-    #[serde_as(as = "[_; 32]")]
-    new_pk: [u8; 32],
+    new_pk: IdentityKey,
     /// Unix timestamp when revocation was created.
     timestamp: u64,
     /// Signature over (revocation_type || old_pk || new_pk || timestamp).
@@ -1143,40 +1153,42 @@ impl RecoveryRevocation {
     ///
     /// Must be signed with the old private key to prove ownership.
     pub fn create(
-        old_pk: &[u8; 32],
-        new_pk: &[u8; 32],
+        old_pk: impl Into<IdentityKey>,
+        new_pk: impl Into<IdentityKey>,
         old_keypair: &SigningKeyPair,
         now: u64,
     ) -> Self {
         let timestamp = now;
+        let old_pk = old_pk.into();
+        let new_pk = new_pk.into();
 
         let revocation_type = "recovery_revocation".to_string();
 
         // Build signing message
         let mut msg = Vec::new();
         msg.extend_from_slice(revocation_type.as_bytes());
-        msg.extend_from_slice(old_pk);
-        msg.extend_from_slice(new_pk);
+        msg.extend_from_slice(old_pk.as_bytes());
+        msg.extend_from_slice(new_pk.as_bytes());
         msg.extend_from_slice(&timestamp.to_le_bytes());
 
         let signature = old_keypair.sign(&msg);
 
         Self {
             revocation_type,
-            old_pk: *old_pk,
-            new_pk: *new_pk,
+            old_pk,
+            new_pk,
             timestamp,
             signature: *signature.as_bytes(),
         }
     }
 
     /// Returns the old public key.
-    pub fn old_pk(&self) -> &[u8; 32] {
+    pub fn old_pk(&self) -> &IdentityKey {
         &self.old_pk
     }
 
     /// Returns the new public key (that was being recovered to).
-    pub fn new_pk(&self) -> &[u8; 32] {
+    pub fn new_pk(&self) -> &IdentityKey {
         &self.new_pk
     }
 
@@ -1187,14 +1199,14 @@ impl RecoveryRevocation {
 
     /// Verifies the revocation signature using the old public key.
     pub fn verify(&self) -> bool {
-        let pk = PublicKey::from_bytes(self.old_pk);
+        let pk = PublicKey::from_bytes(*self.old_pk.as_bytes());
         let sig = Signature::from_bytes(self.signature);
 
         // Reconstruct signing message
         let mut msg = Vec::new();
         msg.extend_from_slice(self.revocation_type.as_bytes());
-        msg.extend_from_slice(&self.old_pk);
-        msg.extend_from_slice(&self.new_pk);
+        msg.extend_from_slice(self.old_pk.as_bytes());
+        msg.extend_from_slice(self.new_pk.as_bytes());
         msg.extend_from_slice(&self.timestamp.to_le_bytes());
 
         pk.verify(&msg, &sig)

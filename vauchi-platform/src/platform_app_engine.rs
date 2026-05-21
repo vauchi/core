@@ -1087,8 +1087,8 @@ impl PlatformAppEngine {
 
         let new_pk = *identity.signing_public_key();
         let claim = RecoveryClaim::new(
-            &old_pk,
-            &new_pk,
+            old_pk,
+            new_pk,
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs())
@@ -1100,8 +1100,8 @@ impl PlatformAppEngine {
         // surfaces share state during the Phase-C migration window.
         // Threshold matches the legacy default (3).
         let proof = RecoveryProof::new(
-            &old_pk,
-            &new_pk,
+            old_pk,
+            new_pk,
             3,
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -2237,7 +2237,7 @@ impl PlatformAppEngine {
                 let known_voucher_count = proof
                     .vouchers()
                     .iter()
-                    .filter(|v| contact_pks.contains(v.voucher_pk()))
+                    .filter(|v| contact_pks.contains(v.voucher_pk().as_bytes()))
                     .count();
 
                 let (confidence, recommendation) = if known_voucher_count >= 2 {

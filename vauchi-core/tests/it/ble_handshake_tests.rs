@@ -648,7 +648,6 @@ fn test_self_exchange_rejected() {
     );
 }
 
-// @scenario: ble_exchange :: Self-exchange rejected in handshake
 // Mirrors `test_self_exchange_rejected` for the initiator's
 // `process_key_ack` path. Regression for
 // _private/docs/problems/2026-05-21-ble-initiator-missing-checks/.
@@ -656,6 +655,7 @@ fn test_self_exchange_rejected() {
 // KeyOffer back as a forged KeyAck reaches the commitment-derivation
 // step instead of failing at the identity layer the way the
 // responder does.
+// @scenario: ble_exchange :: Self-exchange rejected in handshake
 #[test]
 fn test_initiator_process_key_ack_rejects_self_identity() {
     let identity = make_test_identity();

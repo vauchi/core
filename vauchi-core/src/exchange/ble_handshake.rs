@@ -438,6 +438,15 @@ impl BleHandshakeSession {
         let their_identity: [u8; 32] = their_ack[1..33]
             .try_into()
             .map_err(|_| ExchangeError::InvalidBleFormat)?;
+
+        // Self-exchange check (mirror of `process_key_offer:340`).
+        // Without this, a reflection attack reaches the
+        // commitment-derivation layer instead of failing at the
+        // identity layer the way the responder side already does.
+        if their_identity == self.our_identity_key {
+            return Err(ExchangeError::SelfExchange);
+        }
+
         let their_exchange: [u8; 32] = their_ack[33..65]
             .try_into()
             .map_err(|_| ExchangeError::InvalidBleFormat)?;

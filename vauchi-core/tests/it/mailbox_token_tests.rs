@@ -15,7 +15,7 @@ fn test_contact_mailbox_token_deterministic() {
     let t1 = compute_mailbox_token(&shared_key, day);
     let t2 = compute_mailbox_token(&shared_key, day);
     assert_eq!(t1, t2);
-    assert_eq!(t1.len(), 32);
+    assert_eq!(t1.as_bytes().len(), 32);
 }
 
 // @internal

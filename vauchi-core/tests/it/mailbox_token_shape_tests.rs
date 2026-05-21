@@ -52,8 +52,8 @@ fn compute_self_token_is_deterministic_for_same_inputs() {
 // @internal
 #[test]
 fn token_hex_is_lowercase_64_char_hex() {
-    let bytes = [0xABu8; 32];
-    let hex = token_hex(&bytes);
+    let token = vauchi_core::identifiers::MailboxToken::from_bytes([0xABu8; 32]);
+    let hex = token_hex(&token);
     assert_eq!(hex.len(), 64);
     assert!(hex.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f')));
     assert_eq!(hex, "ab".repeat(32));

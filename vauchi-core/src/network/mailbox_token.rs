@@ -18,6 +18,7 @@
 //! yesterday's tokens.
 
 use crate::crypto::HKDF;
+use crate::identifiers::MailboxToken;
 
 const CONTACT_DOMAIN: &[u8] = b"Vauchi_Mailbox_v1";
 const DEVICE_SYNC_DOMAIN: &[u8] = b"Vauchi_DeviceSync_v1";
@@ -30,11 +31,11 @@ const DEVICE_SYNC_DOMAIN: &[u8] = b"Vauchi_DeviceSync_v1";
 ///
 /// - `shared_key`: the shared key established during card exchange.
 /// - `day_epoch`: current day as Unix timestamp / 86400 (UTC).
-pub fn compute_mailbox_token(shared_key: &[u8; 32], day_epoch: u64) -> [u8; 32] {
+pub fn compute_mailbox_token(shared_key: &[u8; 32], day_epoch: u64) -> MailboxToken {
     let mut info = Vec::with_capacity(CONTACT_DOMAIN.len() + 8);
     info.extend_from_slice(CONTACT_DOMAIN);
     info.extend_from_slice(&day_epoch.to_be_bytes());
-    *HKDF::derive_key(None, shared_key, &info)
+    MailboxToken::from_bytes(*HKDF::derive_key(None, shared_key, &info))
 }
 
 /// Compute a 32-byte self-token for device sync.
@@ -45,11 +46,11 @@ pub fn compute_mailbox_token(shared_key: &[u8; 32], day_epoch: u64) -> [u8; 32] 
 ///
 /// - `master_seed`: the identity master seed (32 bytes).
 /// - `day_epoch`: current day as Unix timestamp / 86400 (UTC).
-pub fn compute_self_token(master_seed: &[u8; 32], day_epoch: u64) -> [u8; 32] {
+pub fn compute_self_token(master_seed: &[u8; 32], day_epoch: u64) -> MailboxToken {
     let mut info = Vec::with_capacity(DEVICE_SYNC_DOMAIN.len() + 8);
     info.extend_from_slice(DEVICE_SYNC_DOMAIN);
     info.extend_from_slice(&day_epoch.to_be_bytes());
-    *HKDF::derive_key(None, master_seed, &info)
+    MailboxToken::from_bytes(*HKDF::derive_key(None, master_seed, &info))
 }
 
 /// Returns the current day epoch (UTC seconds / 86400).
@@ -62,8 +63,8 @@ pub fn current_day_epoch(now: u64) -> u64 {
 }
 
 /// Encode a 32-byte token as a lowercase hex string for wire transmission.
-pub fn token_hex(token: &[u8; 32]) -> String {
-    hex::encode(token)
+pub fn token_hex(token: &MailboxToken) -> String {
+    hex::encode(token.as_bytes())
 }
 
 /// Build padded registration token batches.
@@ -120,7 +121,7 @@ pub fn batch_register_tokens(
         while batch.len() < 256 {
             let mut random_token = [0u8; 32];
             rng.fill_bytes(&mut random_token);
-            batch.push(token_hex(&random_token));
+            batch.push(token_hex(&MailboxToken::from_bytes(random_token)));
         }
         // Shuffle to prevent positional leakage across sessions
         rng.shuffle(&mut batch);
@@ -133,7 +134,7 @@ pub fn batch_register_tokens(
         while batch.len() < 256 {
             let mut random_token = [0u8; 32];
             rng.fill_bytes(&mut random_token);
-            batch.push(token_hex(&random_token));
+            batch.push(token_hex(&MailboxToken::from_bytes(random_token)));
         }
         batches.push(batch);
     }

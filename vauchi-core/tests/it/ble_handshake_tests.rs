@@ -648,6 +648,69 @@ fn test_self_exchange_rejected() {
     );
 }
 
+// @scenario: ble_exchange :: Self-exchange rejected in handshake
+// Mirrors `test_self_exchange_rejected` for the initiator's
+// `process_key_ack` path. Regression for
+// _private/docs/problems/2026-05-21-ble-initiator-missing-checks/.
+// Without the check, an attacker who reflects the initiator's own
+// KeyOffer back as a forged KeyAck reaches the commitment-derivation
+// step instead of failing at the identity layer the way the
+// responder does.
+#[test]
+fn test_initiator_process_key_ack_rejects_self_identity() {
+    let identity = make_test_identity();
+    let card = make_test_card(&identity, "Alice");
+
+    // Alice (initiator) and "self-attacker" (responder) share the
+    // same identity key, so the ack the attacker produces is
+    // structurally identical to a legitimate ack from Alice's own
+    // perspective except the `their_identity` field equals
+    // Alice's own identity.
+    let mut alice = BleHandshakeSession::new_initiator(
+        &identity,
+        card.clone(),
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let mut attacker = BleHandshakeSession::new_responder(
+        &identity,
+        card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+
+    let offer = alice.create_key_offer().expect("key offer");
+    // Snapshot Alice's identity key bytes from her offer — bytes 1..33
+    // of the offer wire format are our_identity_key (see
+    // `create_key_offer`).
+    let alice_identity: [u8; 32] = offer[1..33].try_into().expect("identity slice is 32 bytes");
+
+    // Build a structurally-valid ack via a non-matching responder
+    // (process_key_offer on a same-identity responder would reject
+    // the offer up-front per test_self_exchange_rejected), then
+    // forge the their_identity field to Alice's own.
+    let other_id = make_test_identity();
+    let other_card = make_test_card(&other_id, "Other");
+    let mut other = BleHandshakeSession::new_responder(
+        &other_id,
+        other_card,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    );
+    let (mut ack_bytes, encrypted_card) = other
+        .process_key_offer(
+            &offer,
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        )
+        .expect("process offer");
+    ack_bytes[1..33].copy_from_slice(&alice_identity);
+
+    let _ = attacker; // silence unused — kept for clarity above
+    let result = alice.process_key_ack(&ack_bytes, &encrypted_card);
+    assert!(
+        matches!(result, Err(ExchangeError::SelfExchange)),
+        "Initiator must reject ack where their_identity == our_identity_key, got {:?}",
+        result
+    );
+}
+
 // ============================================================
 // Edge Cases
 // ============================================================

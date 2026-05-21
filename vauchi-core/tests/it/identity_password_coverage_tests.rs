@@ -86,12 +86,19 @@ fn test_password_strength_from_score() {
 }
 
 // @internal
+// Regression for audit-08 CRIT-A: the prior assert
+// `!feedback.is_empty() || feedback.is_empty()` was a textbook
+// tautology that passed for any output. zxcvbn rates "password123"
+// at score 0 (very weak) and always returns at least one
+// suggestion; assert non-empty feedback as the actual contract.
 #[test]
 fn test_password_feedback_weak_password() {
     let feedback = password_feedback("password123");
-    // Should return some feedback text for a weak password
-    // (exact text depends on zxcvbn's suggestions)
-    assert!(!feedback.is_empty() || feedback.is_empty()); // Just ensure no panic
+    assert!(
+        !feedback.is_empty(),
+        "zxcvbn must return at least one suggestion for the canonical \
+         weak password \"password123\"; got empty feedback"
+    );
 }
 
 // @internal

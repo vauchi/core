@@ -76,7 +76,10 @@ vauchi-platform/src/multistage_exchange.rs 1086
 #  drives import 2026-05-03 Phase 1 of 2026-05-03-core-file-picker-command)
 # (+2 from cascading now: u64 args through Contact::from_exchange_full in slice 28 2026-05-13)
 # (+5 from threading now: u64 into BleHandshakeSession + NfcHandshakeSession + ExchangeQR::generate callsites within ExchangeSession state machine in slice 30 2026-05-15)
-vauchi-core/src/exchange/session.rs 1822
+# (+3 for ADR-031 biometric hardware-event pathway: BiometricUnlockSucceeded
+#  arm in apply_hardware_event's auth-layer-event catch-all; problem
+#  2026-05-11-pure-functional-core-program Phase 2 Track B)
+vauchi-core/src/exchange/session.rs 1825
 # (+29 for Phase 1.C.3a foothold of
 #  2026-05-11-hover-graduation-plan.md: audio_proximity field
 #  + getter on MultiStageSession, AudioProximityState import.
@@ -121,7 +124,10 @@ vauchi-core/src/exchange/multistage/session.rs 1438
 # (+37 for Command::SetOrientationLock + Orientation enum + variant_name
 #  arm + 4 unit tests, Phase 2c of
 #  2026-05-04-exchange-command-screen-presentation)
-vauchi-core/src/platform.rs 1087
+# (+8 for ADR-031 biometric hardware-event: Event::BiometricUnlockSucceeded
+#  variant + docstring; problem 2026-05-11-pure-functional-core-program
+#  Phase 2 Track B)
+vauchi-core/src/platform.rs 1095
 
 # EXEMPT — transport layer: all relay methods must be co-located for protocol coherence
 # (+2 for #[tracing::instrument] on send_update + fetch — profiling, no logic change)

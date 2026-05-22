@@ -2252,8 +2252,6 @@ fn contact_detail_footer_action_id_returns_error_for_missing_contact() {
 }
 
 // Suppress unused-import warning when no tests reference these types.
-#[allow(dead_code)]
-const _BATCH11_UNUSED: Option<MobileAhaMomentType> = None;
 
 // ── B7 batch 12: Backup + Import ───────────────────────────────────────
 

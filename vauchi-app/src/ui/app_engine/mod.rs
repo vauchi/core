@@ -293,15 +293,9 @@ impl AppScreen {
 }
 
 /// Tracks which contact undo is pending (archive only — delete is now irrevocable).
-///
-/// The `contact_id` field exists for debugging and potential future use
-/// (e.g. confirming the undo matches the expected contact).
 #[derive(Clone, Debug)]
 pub(super) enum PendingContactUndo {
-    Archive {
-        #[allow(dead_code)]
-        contact_id: String,
-    },
+    Archive,
 }
 
 /// Unified orchestrator for all frontends.

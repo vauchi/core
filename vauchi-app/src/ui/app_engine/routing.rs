@@ -1310,9 +1310,7 @@ impl AppEngine {
         match kind {
             ContactActionKind::Archive => match self.vauchi.archive_contact(contact_id) {
                 Ok(()) => {
-                    self.pending_contact_undo = Some(super::PendingContactUndo::Archive {
-                        contact_id: contact_id.to_string(),
-                    });
+                    self.pending_contact_undo = Some(super::PendingContactUndo::Archive);
                     ActionResult::ShowToast {
                         message: "Contact archived".into(),
                         undo_action_id: Some(format!("undo_archive_contact:{contact_id}")),

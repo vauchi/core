@@ -15,7 +15,6 @@ fn test_protocol_state_default_is_idle() {
 #[test]
 fn test_chunk_bitmap_new_empty() {
     let bm = ChunkBitmap::new(10);
-    assert_eq!(bm.total(), 10);
     assert_eq!(bm.received_count(), 0);
     assert!(!bm.is_complete());
 }

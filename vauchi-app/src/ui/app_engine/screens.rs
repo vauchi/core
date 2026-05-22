@@ -750,11 +750,7 @@ impl AppEngine {
                         vec![],
                     ),
                 };
-                Box::new(ContactVisibilityEngine::new(
-                    contact_id.clone(),
-                    name,
-                    fields,
-                ))
+                Box::new(ContactVisibilityEngine::new(name, fields))
             }
             AppScreen::ContactEdit { contact_id } => match vauchi.get_contact(contact_id) {
                 Ok(Some(contact)) => {

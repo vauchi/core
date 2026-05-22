@@ -572,9 +572,7 @@ impl AppEngine {
                 // which surfaces ShowAlert on failure
                 #[allow(clippy::let_underscore_must_use)]
                 let _ = self.vauchi.archive_contact(contact_id);
-                self.pending_contact_undo = Some(super::PendingContactUndo::Archive {
-                    contact_id: contact_id.to_string(),
-                });
+                self.pending_contact_undo = Some(super::PendingContactUndo::Archive);
                 self.engine_cache.remove(&AppScreen::Contacts);
                 self.navigate_back();
                 Some(ActionResult::ShowToast {

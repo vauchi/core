@@ -28,7 +28,7 @@ fn sample_fields() -> Vec<ToggleItem> {
 }
 
 fn make_engine() -> ContactVisibilityEngine {
-    ContactVisibilityEngine::new("c1".into(), "Alice".into(), sample_fields())
+    ContactVisibilityEngine::new("Alice".into(), sample_fields())
 }
 
 // ── Tests ───────────────────────────────────────────────────────────

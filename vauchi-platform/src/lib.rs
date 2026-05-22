@@ -310,10 +310,8 @@ pub fn classify_device_type(name: String) -> types::MobileDeviceType {
 
 /// Serializable identity data for thread-safe storage.
 #[derive(Clone)]
-#[allow(dead_code)]
 struct IdentityData {
     backup_data: Vec<u8>,
-    display_name: String, // Reserved for future use
 }
 
 /// Generate a new random storage key.
@@ -901,7 +899,7 @@ impl VauchiPlatform {
         //    constructed. Mirrors `has_identity`'s pattern; populates
         //    the cache so subsequent calls take the hot path.
         let storage = self.open_storage()?;
-        let (backup_data, display_name) = storage
+        let (backup_data, _display_name) = storage
             .load_identity()
             .map_err(|e| MobileError::Other {
                 detail: format!("Identity load failed: {e}"),
@@ -912,7 +910,6 @@ impl VauchiPlatform {
 
         let cached = IdentityData {
             backup_data: backup_data.clone(),
-            display_name,
         };
         *lock_or(&self.identity_data)? = Some(cached);
 

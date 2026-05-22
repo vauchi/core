@@ -36,12 +36,9 @@ impl VauchiPlatform {
         }
 
         if let Ok(storage) = self.open_storage()
-            && let Ok(Some((backup_data, display_name))) = storage.load_identity()
+            && let Ok(Some((backup_data, _display_name))) = storage.load_identity()
         {
-            let identity_data = IdentityData {
-                backup_data,
-                display_name,
-            };
+            let identity_data = IdentityData { backup_data };
             let Ok(mut lock) = self.identity_data.lock() else {
                 return false;
             };
@@ -79,10 +76,7 @@ impl VauchiPlatform {
         let storage = self.open_storage()?;
         storage.save_identity(&backup_data, &display_name)?;
 
-        let identity_data = IdentityData {
-            backup_data,
-            display_name: display_name.clone(),
-        };
+        let identity_data = IdentityData { backup_data };
         *lock_or(&self.identity_data)? = Some(identity_data);
 
         let card = ContactCard::new(&display_name);

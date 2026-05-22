@@ -12,9 +12,7 @@
 
 use crate::ui::*;
 use vauchi_core::exchange::mode::ExchangeMode;
-use vauchi_core::exchange::proximity_runner::{
-    ProximityMethod, ProximityRunner, ProximityRunnerResult,
-};
+use vauchi_core::exchange::proximity_runner::{ProximityMethod, ProximityRunner};
 use vauchi_core::{Command, Event};
 
 // ── Step enum ──────────────────────────────────────────────────────────────
@@ -212,16 +210,6 @@ impl BleExchangeFlow {
         &self.step
     }
 
-    #[allow(dead_code)] // Used when trust scoring is integrated
-    pub(super) fn mode(&self) -> ExchangeMode {
-        self.mode
-    }
-
-    #[allow(dead_code)] // Used when trust scoring is integrated
-    pub(super) fn proximity_result(&self) -> Option<&ProximityRunnerResult> {
-        self.proximity_runner.as_ref()?.result()
-    }
-
     /// Process a hardware event and return the outcome.
     pub(super) fn handle_event(&mut self, event: &Event) -> BleHardwareOutcome {
         // BLE disconnection is always a failure (any step)
@@ -260,22 +248,6 @@ impl BleExchangeFlow {
             BleStep::Exchanging => self.handle_exchanging(event),
             BleStep::Verifying => self.handle_verifying(event),
             BleStep::Complete => BleHardwareOutcome::Ignored,
-        }
-    }
-
-    /// Handle BLE timeout. Called by parent engine when the discovery/connection
-    /// timer expires. Returns a fallback outcome if still waiting for BLE.
-    ///
-    /// Per spec: 10s for Magic, 30s for Bump/Shake. The timer is managed by
-    /// the parent engine, not by this flow.
-    #[allow(dead_code)] // Used when timer events are wired in
-    pub(super) fn handle_timeout(&mut self) -> BleHardwareOutcome {
-        match self.step {
-            BleStep::Discovering | BleStep::Handshaking => BleHardwareOutcome::FailedWithFallback {
-                reason: "Bluetooth connection timed out".into(),
-            },
-            // Once exchanging or later, BLE is connected — timeout is not applicable
-            _ => BleHardwareOutcome::Ignored,
         }
     }
 
@@ -648,7 +620,7 @@ mod tests {
             other => panic!("Expected Complete, got {other:?}"),
         }
         // Verify proximity result is available
-        let prox = flow.proximity_result().unwrap();
+        let prox = flow.proximity_runner.as_ref().unwrap().result().unwrap();
         assert!(prox.verified);
         assert!((prox.confidence - 0.85).abs() < f32::EPSILON);
     }
@@ -682,7 +654,7 @@ mod tests {
             other => panic!("Expected Complete, got {other:?}"),
         }
         // Proximity was a timeout — verified = false but exchange still completed
-        let prox = flow.proximity_result().unwrap();
+        let prox = flow.proximity_runner.as_ref().unwrap().result().unwrap();
         assert!(!prox.verified);
         assert_eq!(prox.confidence, 0.0);
     }
@@ -750,7 +722,7 @@ mod tests {
             }
             other => panic!("Expected Complete, got {other:?}"),
         }
-        let prox = flow.proximity_result().unwrap();
+        let prox = flow.proximity_runner.as_ref().unwrap().result().unwrap();
         assert!(prox.verified);
         assert!(prox.confidence <= 0.5); // Capped per spec
     }
@@ -798,71 +770,6 @@ mod tests {
         assert_eq!(*flow.step(), BleStep::Exchanging); // Still exchanging
         assert!(matches!(outcome, BleHardwareOutcome::Consumed { .. }));
         assert!(flow.received_card.is_some());
-    }
-
-    // ── Timeout / relay fallback tests ───────────────────────────
-
-    // @internal
-    #[test]
-    fn timeout_during_discovery_triggers_fallback() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
-        assert_eq!(*flow.step(), BleStep::Discovering);
-
-        let outcome = flow.handle_timeout();
-        match outcome {
-            BleHardwareOutcome::FailedWithFallback { reason } => {
-                assert!(reason.contains("timed out"));
-            }
-            other => panic!("Expected FailedWithFallback, got {other:?}"),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn timeout_during_handshaking_triggers_fallback() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
-        flow.handle_event(&Event::BleDeviceDiscovered {
-            id: "d1".into(),
-            rssi: -40,
-            adv_data: vec![],
-        });
-        assert_eq!(*flow.step(), BleStep::Handshaking);
-
-        let outcome = flow.handle_timeout();
-        assert!(matches!(
-            outcome,
-            BleHardwareOutcome::FailedWithFallback { .. }
-        ));
-    }
-
-    // @internal
-    #[test]
-    fn timeout_during_exchanging_is_ignored() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
-        advance_to_exchanging(&mut flow);
-        assert_eq!(*flow.step(), BleStep::Exchanging);
-
-        let outcome = flow.handle_timeout();
-        assert!(matches!(outcome, BleHardwareOutcome::Ignored));
-    }
-
-    // @internal
-    #[test]
-    fn timeout_during_complete_is_ignored() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
-        advance_to_exchanging(&mut flow);
-        flow.handle_event(&Event::BleCharacteristicNotified {
-            uuid: "c".into(),
-            data: vec![1],
-        });
-        flow.handle_event(&Event::ImpactDetected {
-            timestamp_ms: 0,
-            magnitude_milli_g: 3000,
-        });
-        assert_eq!(*flow.step(), BleStep::Complete);
-
-        let outcome = flow.handle_timeout();
-        assert!(matches!(outcome, BleHardwareOutcome::Ignored));
     }
 
     // ── Failure tests ──────────────────────────────────────────────
@@ -944,7 +851,7 @@ mod tests {
 
         assert_eq!(*flow.step(), BleStep::Complete);
         assert!(matches!(outcome, BleHardwareOutcome::Complete { .. }));
-        let prox = flow.proximity_result().unwrap();
+        let prox = flow.proximity_runner.as_ref().unwrap().result().unwrap();
         assert!(!prox.verified);
         assert!(prox.confidence < 0.6);
     }
@@ -966,7 +873,7 @@ mod tests {
             magnitude_milli_g: 10000,
         });
 
-        let prox = flow.proximity_result().unwrap();
+        let prox = flow.proximity_runner.as_ref().unwrap().result().unwrap();
         assert!(prox.verified);
         assert!((prox.confidence - 0.6).abs() < f32::EPSILON);
     }

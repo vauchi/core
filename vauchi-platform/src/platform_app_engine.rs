@@ -752,11 +752,6 @@ impl PlatformAppEngine {
     /// the full sync types over UniFFI.
     ///
     /// Audit `2026-04-28-lifecycle-session-residue-umbrella` P2-C.
-    /// Companion constants on the core side
-    /// (`PERIODIC_SYNC_INTERVAL_SECONDS = 900`,
-    /// `PERIODIC_SYNC_MAX_RETRIES = 3`) replace the duplicated
-    /// 15-min interval / 3-retry magic numbers in
-    /// `BackgroundSyncService` / `SyncWorker`.
     pub fn periodic_sync_tick(&self) -> Result<String, MobileError> {
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
@@ -770,23 +765,6 @@ impl PlatformAppEngine {
         serde_json::to_string(&format!("{outcome:?}")).map_err(|e| MobileError::Other {
             detail: format!("serialize sync outcome: {e}"),
         })
-    }
-
-    /// Recommended interval (seconds) between periodic sync ticks.
-    ///
-    /// Frontends call this once at scheduler-registration time to
-    /// configure their `BGTaskScheduler` / `WorkManager` interval.
-    /// Single source of truth lives in core
-    /// ([`vauchi_core::PERIODIC_SYNC_INTERVAL_SECONDS`]).
-    pub fn periodic_sync_interval_seconds(&self) -> u64 {
-        vauchi_core::PERIODIC_SYNC_INTERVAL_SECONDS
-    }
-
-    /// Maximum retries the platform scheduler should configure for
-    /// a failed periodic sync. Single source of truth lives in core
-    /// ([`vauchi_core::PERIODIC_SYNC_MAX_RETRIES`]).
-    pub fn periodic_sync_max_retries(&self) -> u32 {
-        vauchi_core::PERIODIC_SYNC_MAX_RETRIES
     }
 
     /// Push render-context preferences (locale + theme_id) from

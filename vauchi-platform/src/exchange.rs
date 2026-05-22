@@ -728,6 +728,8 @@ pub enum MobileEvent {
         filename: String,
     },
     FilePickCancelledByUser,
+    // Biometric auth (ADR-031)
+    BiometricUnlockSucceeded,
     // Errors
     HardwareError {
         transport: String,
@@ -805,6 +807,7 @@ impl From<MobileEvent> for Event {
                 Self::FilePickedFromUser { bytes, filename }
             }
             MobileEvent::FilePickCancelledByUser => Self::FilePickCancelledByUser,
+            MobileEvent::BiometricUnlockSucceeded => Self::BiometricUnlockSucceeded,
         }
     }
 }

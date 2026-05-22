@@ -1005,6 +1005,35 @@ fn text_changed_from_peer_scan_routes_to_multi_stage_session() {
 
 // @internal
 #[test]
+fn biometric_unlock_succeeded_hardware_event_returns_unlocked_outcome_when_no_duress() {
+    // ADR-031 routing test for the biometric unlock pathway. A fresh
+    // engine has no identity and no duress PIN configured, so
+    // `is_duress_enabled()` returns false and the outcome must be
+    // `Unlocked`. The `PromptForDuressPin` branch is exercised at
+    // the `Vauchi::biometric_unlock_decision` layer in
+    // `core/vauchi-core/src/api/vauchi/security.rs` tests; here we
+    // assert only that the hardware event is routed to that decision
+    // path and that the outcome rides back as
+    // `ActionResult::BiometricUnlockOutcome`. Retires the legacy
+    // `PlatformAppEngine::biometric_unlock_check` typed getter
+    // (Track B of `2026-05-11-pure-functional-core-program`).
+    use vauchi_platform::MobileEvent;
+    let (engine, _dir) = create_engine();
+
+    let result_json = engine
+        .handle_hardware_event(MobileEvent::BiometricUnlockSucceeded)
+        .expect("biometric event accepted")
+        .expect("biometric event must produce an ActionResult envelope");
+    let v: serde_json::Value =
+        serde_json::from_str(&result_json).expect("parse biometric result envelope");
+    assert_eq!(
+        v["BiometricUnlockOutcome"]["outcome"], "Unlocked",
+        "fresh engine without duress must yield Unlocked, got {v:?}",
+    );
+}
+
+// @internal
+#[test]
 fn text_changed_from_unknown_component_does_not_panic_on_multi_stage() {
     // Negative case for the auto-route: a `TextChanged` whose
     // `component_id` is not the peer-scan component must NOT call

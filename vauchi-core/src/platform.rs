@@ -469,6 +469,14 @@ pub enum Event {
     FilePickedFromUser { bytes: Vec<u8>, filename: String },
     /// The user dismissed the file picker without selecting a file.
     FilePickCancelledByUser,
+
+    // ── Biometric auth (ADR-031) ───────────────────────────────────
+    // Appended to preserve serde discriminant ordering.
+    /// Platform biometric authentication (LAContext on iOS,
+    /// BiometricPrompt on Android) succeeded. Core consults its
+    /// duress-PIN state to decide the next step; the result rides back
+    /// to the frontend as `ActionResult::BiometricUnlockOutcome`.
+    BiometricUnlockSucceeded,
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

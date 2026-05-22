@@ -477,6 +477,30 @@ impl PlatformAppEngine {
             // None and let the engine's default fall-through render.
         }
 
+        // ADR-031: biometric unlock arrives as a hardware event, not as
+        // a typed PAE method. Core consults its duress-PIN state and
+        // pads the wall-clock to `BIOMETRIC_UNLOCK_MIN_DURATION` so
+        // the unlock-screen timing can't leak whether duress is
+        // configured. The outcome rides back to the frontend as
+        // `ActionResult::BiometricUnlockOutcome`. Retires the legacy
+        // `PlatformAppEngine::biometric_unlock_check` getter (Track B
+        // of `2026-05-11-pure-functional-core-program`).
+        if let vauchi_core::Event::BiometricUnlockSucceeded = &hw_event {
+            let outcome = self
+                .engine
+                .lock()
+                .map_err(|e| MobileError::Other {
+                    detail: format!("Lock failed: {e}"),
+                })?
+                .vauchi_mut()
+                .biometric_unlock_check()
+                .map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+            let result = vauchi_app::ui::ActionResult::BiometricUnlockOutcome { outcome };
+            return Ok(Some(action_result_to_json(&result)?));
+        }
+
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
         })?;
@@ -700,43 +724,6 @@ impl PlatformAppEngine {
             detail: format!("Lock failed: {e}"),
         })?;
         Ok(engine.has_identity())
-    }
-
-    /// Decide what to do after a successful platform biometric
-    /// authentication, in constant wall-clock time.
-    ///
-    /// Frontends call this immediately after the OS biometric prompt
-    /// (iOS `LAContext`, Android `BiometricPrompt`) resolves with
-    /// success. The call returns either:
-    ///
-    /// - [`MobileBiometricUnlockOutcome::Unlocked`] — biometric
-    ///   proves the real user; the frontend can transition to the
-    ///   post-auth screen. `auth_mode` is set to `Normal` in core.
-    /// - [`MobileBiometricUnlockOutcome::PromptForDuressPin`] —
-    ///   duress is configured; the frontend must show the PIN entry
-    ///   screen. The subsequent `authenticate(pin)` call decides
-    ///   `Normal` vs `Duress`.
-    ///
-    /// The call always takes at least
-    /// [`vauchi_core::api::vauchi::BIOMETRIC_UNLOCK_MIN_DURATION`]
-    /// (300 ms). Padding lives in core so iOS / Android cannot
-    /// diverge on the constant-time floor that hides whether duress
-    /// is configured (audit item P2-B,
-    /// `2026-04-28-lifecycle-session-residue-umbrella`).
-    pub fn biometric_unlock_check(
-        &self,
-    ) -> Result<crate::types::MobileBiometricUnlockOutcome, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let outcome =
-            engine
-                .vauchi_mut()
-                .biometric_unlock_check()
-                .map_err(|e| MobileError::Other {
-                    detail: e.to_string(),
-                })?;
-        Ok(outcome.into())
     }
 
     /// Run one periodic sync tick.

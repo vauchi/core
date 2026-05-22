@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::notification_types::PendingNotification;
 use crate::ui::screen::ScreenModel;
+use vauchi_core::BiometricUnlockOutcome;
 use vauchi_core::Command;
 use vauchi_core::exchange::mode::ExchangeMode;
 
@@ -267,4 +268,15 @@ pub enum ActionResult {
     /// in the `QrPending` state when this is emitted; the new session
     /// will fire `on_qr_ready` to advance it.
     DeviceLinkRetry,
+    /// Outcome of the ADR-031 biometric-unlock hardware event
+    /// ([`vauchi_core::Event::BiometricUnlockSucceeded`]). `Unlocked`
+    /// proceeds straight to the post-auth screen; `PromptForDuressPin`
+    /// tells the frontend to present the PIN entry screen so the
+    /// subsequent `authenticate()` call can resolve Normal vs Duress.
+    /// Replaces the legacy `PlatformAppEngine::biometric_unlock_check`
+    /// typed getter (Track B of
+    /// `2026-05-11-pure-functional-core-program`).
+    BiometricUnlockOutcome {
+        outcome: BiometricUnlockOutcome,
+    },
 }

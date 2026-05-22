@@ -904,7 +904,10 @@ impl ExchangeSession {
             // File picking events drive vCard / backup import in vauchi-app —
             // the exchange session state machine ignores them.
             | Event::FilePickedFromUser { .. }
-            | Event::FilePickCancelledByUser => Ok(()),
+            | Event::FilePickCancelledByUser
+            // Biometric unlock event is auth-layer; the exchange state
+            // machine ignores it.
+            | Event::BiometricUnlockSucceeded => Ok(()),
         }
     }
 

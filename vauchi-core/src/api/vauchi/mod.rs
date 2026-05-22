@@ -109,7 +109,7 @@ pub enum AuthMode {
 /// [`security::BIOMETRIC_UNLOCK_MIN_DURATION`] regardless of which
 /// outcome is returned, so an observer cannot infer whether duress is
 /// configured by timing the unlock animation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum BiometricUnlockOutcome {
     /// Biometric authentication succeeded and no duress PIN is

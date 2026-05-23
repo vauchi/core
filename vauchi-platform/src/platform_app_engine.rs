@@ -4170,6 +4170,25 @@ impl PlatformAppEngine {
                     },
                 })
             }
+            DomainCommand::ParseDeviceLinkQr { qr_data } => {
+                use vauchi_core::exchange::device_link::DeviceLinkQR;
+
+                let qr = DeviceLinkQR::from_data_string(&qr_data).map_err(|_| {
+                    MobileError::InvalidInput {
+                        field: "qr".into(),
+                        detail: "Invalid QR code".into(),
+                    }
+                })?;
+
+                Ok(DomainCommandResult::DeviceLinkInfo {
+                    info: crate::types::MobileDeviceLinkInfo {
+                        identity_public_key: hex::encode(qr.identity_public_key()),
+                        timestamp: qr.timestamp(),
+                        is_expired: qr
+                            .is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
+                    },
+                })
+            }
         }
     }
 
@@ -4182,27 +4201,6 @@ impl PlatformAppEngine {
     // are intentionally NOT migrated — they were superseded by the
     // orchestrator session in
     // `done/2026-04-27-device-link-orchestrator-phase2d-windows`.
-
-    /// Parse a peer's device-link QR. Read-only — does not
-    /// persist any state.
-    pub fn parse_device_link_qr(
-        &self,
-        qr_data: String,
-    ) -> Result<crate::types::MobileDeviceLinkInfo, MobileError> {
-        use vauchi_core::exchange::device_link::DeviceLinkQR;
-
-        let qr =
-            DeviceLinkQR::from_data_string(&qr_data).map_err(|_| MobileError::InvalidInput {
-                field: "qr".into(),
-                detail: "Invalid QR code".into(),
-            })?;
-
-        Ok(crate::types::MobileDeviceLinkInfo {
-            identity_public_key: hex::encode(qr.identity_public_key()),
-            timestamp: qr.timestamp(),
-            is_expired: qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
-        })
-    }
 
     /// Create the orchestrator session for the initiator side of a
     /// device link. The frontend registers a

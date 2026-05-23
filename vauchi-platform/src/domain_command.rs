@@ -35,10 +35,10 @@ use crate::types::{
     MobileConsentType, MobileContact, MobileContactCard, MobileContactDisplayOptions,
     MobileDecoyContact, MobileDeletionInfo, MobileDeliveryRecord, MobileDeliveryStatus,
     MobileDeliverySummary, MobileDemoContact, MobileDemoContactState, MobileDeviceDeliveryRecord,
-    MobileDeviceInfo, MobileDeviceLinkData, MobileDuplicatePair, MobileDuressSettings,
-    MobileFieldNote, MobileFieldType, MobileGdprExport, MobileOnboardingProgress,
-    MobileOnboardingStep, MobileRecoveryVerification, MobileRetryEntry, MobileShredStatus,
-    MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDuplicatePair,
+    MobileDuressSettings, MobileFieldNote, MobileFieldType, MobileGdprExport,
+    MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryVerification, MobileRetryEntry,
+    MobileShredStatus, MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -52,13 +52,21 @@ use crate::types::{
 pub enum DomainCommand {
     // ── Consent (B7 batch 1, this MR) ──
     /// Grant consent for a specific consent type.
-    GrantConsent { consent_type: MobileConsentType },
+    GrantConsent {
+        consent_type: MobileConsentType,
+    },
     /// Revoke consent for a specific consent type.
-    RevokeConsent { consent_type: MobileConsentType },
+    RevokeConsent {
+        consent_type: MobileConsentType,
+    },
     /// Check whether consent is currently granted.
-    CheckConsent { consent_type: MobileConsentType },
+    CheckConsent {
+        consent_type: MobileConsentType,
+    },
     /// Aggregated consent status (granted, last change, policy version).
-    GetConsentStatus { consent_type: MobileConsentType },
+    GetConsentStatus {
+        consent_type: MobileConsentType,
+    },
     /// All persisted consent records.
     GetConsentRecords,
 
@@ -100,11 +108,15 @@ pub enum DomainCommand {
 
     // ── Aha Moments (B7 batch 5) ──
     /// Read whether the user has already seen a given milestone.
-    HasSeenAhaMoment { moment_type: MobileAhaMomentType },
+    HasSeenAhaMoment {
+        moment_type: MobileAhaMomentType,
+    },
     /// Try to trigger a milestone if not yet seen. Returns the moment
     /// payload (title / message / animation flag) on first trigger,
     /// `None` once seen.
-    TryTriggerAhaMoment { moment_type: MobileAhaMomentType },
+    TryTriggerAhaMoment {
+        moment_type: MobileAhaMomentType,
+    },
     /// Like `TryTriggerAhaMoment` but with a context string (e.g. a
     /// contact name) substituted into the message template.
     TryTriggerAhaMomentWithContext {
@@ -147,14 +159,23 @@ pub enum DomainCommand {
         value: String,
     },
     /// Update an existing field's value (looked up by label).
-    UpdateField { label: String, new_value: String },
+    UpdateField {
+        label: String,
+        new_value: String,
+    },
     /// Remove a field by label. Returns `true` if it existed.
-    RemoveField { label: String },
+    RemoveField {
+        label: String,
+    },
     /// Set the own card's display name.
-    SetDisplayName { name: String },
+    SetDisplayName {
+        name: String,
+    },
     /// Replace the own card's avatar (any common image format,
     /// normalised to WebP ≤ 32 KB by core).
-    SetOwnAvatar { avatar_bytes: Vec<u8> },
+    SetOwnAvatar {
+        avatar_bytes: Vec<u8>,
+    },
     /// Clear the own card's avatar.
     ClearOwnAvatar,
 
@@ -163,29 +184,49 @@ pub enum DomainCommand {
     /// resolution).
     ListContacts,
     /// Read a single contact by id (enriched).
-    GetContact { id: String },
+    GetContact {
+        id: String,
+    },
     /// SQL-level search across contacts.
-    SearchContacts { query: String },
+    SearchContacts {
+        query: String,
+    },
     /// Total contact count.
     ContactCount,
     /// Hard-delete an exchanged contact. Returns `true` if removed.
-    RemoveContact { id: String },
+    RemoveContact {
+        id: String,
+    },
     /// Soft-delete an imported contact (keeps it in trash).
-    SoftDeleteImportedContact { id: String },
+    SoftDeleteImportedContact {
+        id: String,
+    },
     /// Undo a soft-delete on an imported contact.
-    UndoDeleteImportedContact { id: String },
+    UndoDeleteImportedContact {
+        id: String,
+    },
     /// Hard-delete an imported contact (no undo).
-    HardDeleteImportedContact { id: String },
+    HardDeleteImportedContact {
+        id: String,
+    },
     /// Move an exchanged contact to the archive.
-    ArchiveContact { id: String },
+    ArchiveContact {
+        id: String,
+    },
     /// Restore an archived contact to the active list.
-    UnarchiveContact { id: String },
+    UnarchiveContact {
+        id: String,
+    },
     /// List archived contacts (enriched).
     ListArchivedContacts,
     /// Hide a contact (keeps record but excludes from default views).
-    HideContact { contact_id: String },
+    HideContact {
+        contact_id: String,
+    },
     /// Unhide a contact.
-    UnhideContact { contact_id: String },
+    UnhideContact {
+        contact_id: String,
+    },
 
     // ── Recovery leftovers (B7 batch 4 — completes the recovery
     // domain; B2 covered the main 9 typed methods, this batch covers
@@ -193,7 +234,9 @@ pub enum DomainCommand {
     // PlatformAppEngine surface). ──
     /// Verify a recovery proof from a contact and produce a confidence
     /// recommendation (high / medium / low) based on known vouchers.
-    VerifyRecoveryProof { proof_b64: String },
+    VerifyRecoveryProof {
+        proof_b64: String,
+    },
     /// Upload encrypted guardian entries (one per recovery-trusted
     /// contact) to the relay. Called after `trust_contact_for_recovery`
     /// or `untrust_contact_for_recovery` toggles the trust set.
@@ -215,9 +258,13 @@ pub enum DomainCommand {
     // gives iOS a uniform dispatch entry point.) ──
     /// Mark a contact as recovery-trusted. Errors if the contact is
     /// blocked. Returns `Unit`.
-    TrustContactForRecovery { contact_id: String },
+    TrustContactForRecovery {
+        contact_id: String,
+    },
     /// Remove recovery trust from a contact. Returns `Unit`.
-    UntrustContactForRecovery { contact_id: String },
+    UntrustContactForRecovery {
+        contact_id: String,
+    },
     /// Count the contacts marked as recovery-trusted. Returns
     /// `Count { value }`.
     TrustedContactCount,
@@ -225,13 +272,22 @@ pub enum DomainCommand {
     /// List every visibility label.
     ListLabels,
     /// Create a new label by name.
-    CreateLabel { name: String },
+    CreateLabel {
+        name: String,
+    },
     /// Read a label by id, including resolved contact rows.
-    GetLabel { label_id: String },
+    GetLabel {
+        label_id: String,
+    },
     /// Rename a label.
-    RenameLabel { label_id: String, new_name: String },
+    RenameLabel {
+        label_id: String,
+        new_name: String,
+    },
     /// Delete a label.
-    DeleteLabel { label_id: String },
+    DeleteLabel {
+        label_id: String,
+    },
     /// Add a contact to a label.
     AddContactToGroup {
         label_id: String,
@@ -243,7 +299,9 @@ pub enum DomainCommand {
         contact_id: String,
     },
     /// List labels that contain a contact.
-    GetGroupsForContact { contact_id: String },
+    GetGroupsForContact {
+        contact_id: String,
+    },
     /// Set whether a card field is visible to contacts in a label.
     SetGroupFieldVisibility {
         label_id: String,
@@ -281,11 +339,17 @@ pub enum DomainCommand {
     GetSuggestedLabels,
     // ── Passcode + Duress + Decoy (B7 batch 7) ──
     /// Set up the app password (PIN). Requires identity.
-    SetupAppPassword { password: String },
+    SetupAppPassword {
+        password: String,
+    },
     /// Set up the duress PIN. Requires app password configured.
-    SetupDuressPassword { duress_password: String },
+    SetupDuressPassword {
+        duress_password: String,
+    },
     /// Authenticate with a password. Returns Normal vs Duress mode.
-    Authenticate { password: String },
+    Authenticate {
+        password: String,
+    },
     /// Whether an app password is configured.
     IsPasswordEnabled,
     /// Whether duress mode is configured.
@@ -301,11 +365,16 @@ pub enum DomainCommand {
     GetDuressSettings,
     /// Add a decoy contact (shown in duress mode). `card_json` is a
     /// JSON-serialised `ContactCard`. Returns the generated decoy id.
-    AddDecoyContact { name: String, card_json: String },
+    AddDecoyContact {
+        name: String,
+        card_json: String,
+    },
     /// List configured decoy contacts.
     ListDecoyContacts,
     /// Delete a decoy contact by id.
-    DeleteDecoyContact { id: String },
+    DeleteDecoyContact {
+        id: String,
+    },
     // ── Sync / Delivery / Retry — read paths + simple writes (B7 batch 8) ──
     //
     // The state-heavy methods (sync, get_sync_status, delivery
@@ -316,32 +385,46 @@ pub enum DomainCommand {
     /// Total pending updates across all contacts.
     PendingUpdateCount,
     /// Read a delivery record by message id.
-    GetDeliveryRecord { message_id: String },
+    GetDeliveryRecord {
+        message_id: String,
+    },
     /// All delivery records.
     GetAllDeliveryRecords,
     /// Delivery records for a specific recipient.
-    GetDeliveryRecordsForContact { recipient_id: String },
+    GetDeliveryRecordsForContact {
+        recipient_id: String,
+    },
     /// Count of failed deliveries.
     CountFailedDeliveries,
     /// All failed delivery records.
     GetFailedDeliveryRecords,
     /// Reschedule a failed delivery for immediate retry.
     /// Returns `true` if the retry entry was found and rescheduled.
-    ManualRetry { message_id: String },
+    ManualRetry {
+        message_id: String,
+    },
     /// All non-terminal pending deliveries.
     GetPendingDeliveries,
     /// Count of deliveries in a specific status.
-    GetDeliveryCountByStatus { status: MobileDeliveryStatus },
+    GetDeliveryCountByStatus {
+        status: MobileDeliveryStatus,
+    },
     /// All retry entries due for retry now.
     GetDueRetries,
     /// Retry entries for a specific contact.
-    GetRetriesForContact { contact_id: String },
+    GetRetriesForContact {
+        contact_id: String,
+    },
     /// Total count of retry entries.
     GetRetryCount,
     /// Delete a retry entry by message id.
-    DeleteRetry { message_id: String },
+    DeleteRetry {
+        message_id: String,
+    },
     /// Compute the backoff (seconds) for a retry attempt. Pure.
-    CalculateRetryBackoff { attempt: u32 },
+    CalculateRetryBackoff {
+        attempt: u32,
+    },
     /// Total pending updates count (alias for `PendingUpdateCount`'s
     /// alternative implementation — counts via storage directly).
     GetTotalPendingCount,
@@ -351,17 +434,25 @@ pub enum DomainCommand {
     GetOfflineQueueCapacity,
     /// Drop all pending updates for a contact. Returns the cleared
     /// count.
-    ClearPendingUpdatesForContact { contact_id: String },
+    ClearPendingUpdatesForContact {
+        contact_id: String,
+    },
     /// Multi-device delivery summary for a message.
-    GetDeliverySummary { message_id: String },
+    GetDeliverySummary {
+        message_id: String,
+    },
     /// All device delivery records for a message.
-    GetDeviceDeliveries { message_id: String },
+    GetDeviceDeliveries {
+        message_id: String,
+    },
     /// All pending device deliveries.
     GetPendingDeviceDeliveries,
     // ── Identity reads + Onboarding helpers (B7 batch 9) ──
     /// Programmatically create an identity bypassing the onboarding
     /// `UserAction` flow. Errors when an identity already exists.
-    CreateIdentity { display_name: String },
+    CreateIdentity {
+        display_name: String,
+    },
     /// Read the active identity's public id (hex-encoded signing key).
     GetPublicId,
     /// Read the active identity's display name (own card).
@@ -370,25 +461,42 @@ pub enum DomainCommand {
     /// as 16 groups of 4 uppercase hex characters.
     GetOwnFingerprint,
     /// Compute display-name suggestions from a full name. Pure.
-    DisplayNameSuggestions { full_name: String },
+    DisplayNameSuggestions {
+        full_name: String,
+    },
     /// Reset the onboarding progress to step 0.
     ResetOnboarding,
     // ── Contact Verification + Duplicates + Notes + Misc (B7 batch 11) ──
     /// Mark a contact's fingerprint as verified.
-    VerifyContact { id: String },
+    VerifyContact {
+        id: String,
+    },
     /// Mark a contact as trusted for simplified contact proposals
     /// (local-only flag).
-    SetProposalTrusted { contact_id: String, trusted: bool },
+    SetProposalTrusted {
+        contact_id: String,
+        trusted: bool,
+    },
     /// Find duplicate-contact pairs.
     FindDuplicates,
     /// Dismiss a duplicate-contact pair so it stops being suggested.
-    DismissDuplicate { id1: String, id2: String },
+    DismissDuplicate {
+        id1: String,
+        id2: String,
+    },
     /// Save a personal note for a contact (cleared by passing "").
-    SetContactNote { contact_id: String, note: String },
+    SetContactNote {
+        contact_id: String,
+        note: String,
+    },
     /// Read the personal note for a contact, if any.
-    GetContactNote { contact_id: String },
+    GetContactNote {
+        contact_id: String,
+    },
     /// Delete the personal note for a contact.
-    DeleteContactNote { contact_id: String },
+    DeleteContactNote {
+        contact_id: String,
+    },
     /// Save a private note on a specific field of a contact.
     SetContactFieldNote {
         contact_id: String,
@@ -397,24 +505,40 @@ pub enum DomainCommand {
     },
     /// Read all private field notes for a contact (sorted by
     /// `field_id` for deterministic output).
-    GetContactFieldNotes { contact_id: String },
+    GetContactFieldNotes {
+        contact_id: String,
+    },
     /// Delete the private note on a specific field of a contact.
     DeleteContactFieldNote {
         contact_id: String,
         field_id: String,
     },
     /// Set a local nickname for a contact.
-    SetContactNickname { contact_id: String, name: String },
+    SetContactNickname {
+        contact_id: String,
+        name: String,
+    },
     /// Clear the local nickname for a contact.
-    ClearContactNickname { contact_id: String },
+    ClearContactNickname {
+        contact_id: String,
+    },
     /// Set a custom avatar for a contact (must be WebP, ≤ 32 KB).
-    SetContactCustomAvatar { contact_id: String, data: Vec<u8> },
+    SetContactCustomAvatar {
+        contact_id: String,
+        data: Vec<u8>,
+    },
     /// Clear the custom avatar for a contact.
-    ClearContactCustomAvatar { contact_id: String },
+    ClearContactCustomAvatar {
+        contact_id: String,
+    },
     /// Get the custom avatar for a contact, if set.
-    GetContactCustomAvatar { contact_id: String },
+    GetContactCustomAvatar {
+        contact_id: String,
+    },
     /// Search the social-network registry by query.
-    SearchSocialNetworks { query: String },
+    SearchSocialNetworks {
+        query: String,
+    },
     /// Format a profile URL for a given social network and username.
     GetProfileUrl {
         network_id: String,
@@ -424,12 +548,16 @@ pub enum DomainCommand {
     ListHiddenContacts,
     /// Returns the footer-button `ScreenAction` id that
     /// `ContactDetailEngine` would emit for the given contact.
-    ContactDetailFooterActionId { contact_id: String },
+    ContactDetailFooterActionId {
+        contact_id: String,
+    },
 
     // ── Backup + Import (B7 batch 12) ──
     /// Encrypt + export the active identity (legacy v1 backup).
     /// Returns base64-encoded backup data.
-    ExportBackup { password: String },
+    ExportBackup {
+        password: String,
+    },
     /// Import an identity-only backup. Engine must have no active
     /// identity. `backup_data` is base64-encoded from `ExportBackup`.
     ImportBackup {
@@ -438,7 +566,9 @@ pub enum DomainCommand {
     },
     /// Encrypt + export full v3 backup (identity + contacts + own
     /// card + labels). Returns base64-encoded data.
-    ExportFullBackup { password: String },
+    ExportFullBackup {
+        password: String,
+    },
     /// Import a full v3 backup. Engine must have no active identity.
     /// `backup_data` is base64-encoded from `ExportFullBackup`.
     ImportFullBackup {
@@ -447,7 +577,9 @@ pub enum DomainCommand {
     },
     /// Import contacts from a vCard 2.1/3.0/4.0 file. `data` is the
     /// raw `.vcf` bytes. Duplicates (by UID) are skipped.
-    ImportContactsFromVcf { data: Vec<u8> },
+    ImportContactsFromVcf {
+        data: Vec<u8>,
+    },
     // ── Offline Queue + Counts (B7 batch 13) ──
     // PendingUpdateCount, CountFailedDeliveries, GetTotalPendingCount,
     // IsOfflineQueueFull, GetOfflineQueueCapacity were already added by
@@ -499,10 +631,15 @@ pub enum DomainCommand {
     // ── Contact display options + paginated lists (B7 batch 17) ──
     /// Read all display options (names + avatars) for a contact, with
     /// the active preference highlighted. Used by the chooser screen.
-    GetContactDisplayOptions { contact_id: String },
+    GetContactDisplayOptions {
+        contact_id: String,
+    },
     /// List contacts with offset+limit pagination. Both bounds are
     /// applied at the storage layer; output is enriched.
-    ListContactsPaginated { offset: u32, limit: u32 },
+    ListContactsPaginated {
+        offset: u32,
+        limit: u32,
+    },
     // ListArchivedContacts is already declared in batch 10.
 
     // ── Sync flag persistence (B7 batch 18) ──
@@ -511,19 +648,25 @@ pub enum DomainCommand {
     /// directory.
     IsDeliveryReceiptsEnabled,
     /// Set the delivery-receipts flag. Persisted across restarts.
-    SetDeliveryReceiptsEnabled { enabled: bool },
+    SetDeliveryReceiptsEnabled {
+        enabled: bool,
+    },
     /// Whether presence suppression is enabled (the relay never
     /// learns whether the user is online). Persisted.
     IsSuppressPresenceEnabled,
     /// Set the suppress-presence flag. Persisted across restarts.
-    SetSuppressPresenceEnabled { enabled: bool },
+    SetSuppressPresenceEnabled {
+        enabled: bool,
+    },
 
     // ── Contact detail view state + social registry (B7 batch 19) ──
     /// Pre-computed contact-detail view (badges, banners, actions,
     /// added-time-display) — frontends iterate the returned arrays
     /// rather than branching on raw `MobileContact` flags. Closes
     /// ADR-021/043 audit V4.
-    ContactDetailViewState { contact_id: String },
+    ContactDetailViewState {
+        contact_id: String,
+    },
     /// All social networks in the default registry. Complement to
     /// `SearchSocialNetworks`.
     ListSocialNetworks,
@@ -532,14 +675,18 @@ pub enum DomainCommand {
     /// Encode arbitrary bytes into a sequence of multipart-QR
     /// payload strings (max ~1800 bytes per frame). Stateless —
     /// the decode side is a separate `MultipartDecoder`.
-    EncodeMultipartQr { data: Vec<u8> },
+    EncodeMultipartQr {
+        data: Vec<u8>,
+    },
 
     // ── Certificate pinning (B7 batch 21) ──
     /// Set the pinned TLS certificate (PEM-encoded). Empty string
     /// disables pinning. Persisted to a sidecar file at `.cert_pin`
     /// so the choice survives restarts. Mirrors the legacy
     /// `VauchiPlatform::set_pinned_certificate`.
-    SetPinnedCertificate { cert_pem: String },
+    SetPinnedCertificate {
+        cert_pem: String,
+    },
     /// Read whether certificate pinning is currently enabled.
     IsCertificatePinningEnabled,
 
@@ -563,10 +710,15 @@ pub enum DomainCommand {
     GetDevices,
     /// Revoke the device at `device_index`. Mirrors the legacy
     /// `PlatformAppEngine::unlink_device`.
-    UnlinkDevice { device_index: u32 },
+    UnlinkDevice {
+        device_index: u32,
+    },
     /// Generate the QR shown to a peer for device linking. Mirrors
     /// `PlatformAppEngine::generate_device_link_qr`.
     GenerateDeviceLinkQr,
+    ParseDeviceLinkQr {
+        qr_data: String,
+    },
 }
 
 /// Sum type of every legitimate return shape from
@@ -603,6 +755,8 @@ pub enum DomainCommandResult {
     Devices { devices: Vec<MobileDeviceInfo> },
     /// Device-link QR payload (B7 batch 22 — `GenerateDeviceLinkQr`).
     DeviceLinkData { data: MobileDeviceLinkData },
+    /// Parsed device-link QR info (B7 b22).
+    DeviceLinkInfo { info: MobileDeviceLinkInfo },
     /// GDPR export payload (B7 batch 3 — `ExportGdprData`).
     GdprExport { export: MobileGdprExport },
     /// Deletion-state snapshot (B7 batch 3 — `ScheduleIdentityDeletion`,

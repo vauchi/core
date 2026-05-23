@@ -166,16 +166,21 @@ fn generate_device_link_qr_returns_data_with_expiry() {
 fn parse_device_link_qr_round_trips_generate() {
     use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
-    let result = engine
+    let gen_result = engine
         .dispatch_domain_command(DomainCommand::GenerateDeviceLinkQr)
         .expect("dispatch GenerateDeviceLinkQr");
-    let DomainCommandResult::DeviceLinkData { data: qr } = result else {
-        panic!("GenerateDeviceLinkQr: unexpected result variant {result:?}");
+    let DomainCommandResult::DeviceLinkData { data: qr } = gen_result else {
+        panic!("GenerateDeviceLinkQr: unexpected result variant {gen_result:?}");
     };
 
-    let parsed = engine
-        .parse_device_link_qr(qr.qr_data)
-        .expect("parse_device_link_qr");
+    let parse_result = engine
+        .dispatch_domain_command(DomainCommand::ParseDeviceLinkQr {
+            qr_data: qr.qr_data,
+        })
+        .expect("dispatch ParseDeviceLinkQr");
+    let DomainCommandResult::DeviceLinkInfo { info: parsed } = parse_result else {
+        panic!("ParseDeviceLinkQr: unexpected result variant {parse_result:?}");
+    };
 
     assert_eq!(parsed.identity_public_key, qr.identity_public_key);
     assert_eq!(parsed.timestamp, qr.timestamp);
@@ -185,8 +190,11 @@ fn parse_device_link_qr_round_trips_generate() {
 // @internal
 #[test]
 fn parse_device_link_qr_rejects_garbage_input() {
+    use vauchi_platform::DomainCommand;
     let (engine, _dir) = create_engine_with_identity();
-    let result = engine.parse_device_link_qr("not-a-qr".into());
+    let result = engine.dispatch_domain_command(DomainCommand::ParseDeviceLinkQr {
+        qr_data: "not-a-qr".into(),
+    });
     assert!(result.is_err(), "garbage QR must error");
 }
 

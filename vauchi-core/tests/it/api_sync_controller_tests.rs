@@ -487,6 +487,7 @@ use vauchi_core::{PendingUpdate, UpdateStatus};
 /// `sync()` must NOT fall back to using the plaintext `contact_id` as the
 /// recipient_id — that would reintroduce a stable token (ADR-029
 /// violation). The update is skipped and recorded as failed instead.
+// @internal
 #[test]
 fn sync_skips_update_when_load_contact_returns_none_adr029() {
     let storage = create_test_storage();
@@ -547,6 +548,7 @@ fn sync_skips_update_when_load_contact_returns_none_adr029() {
 /// risks the caller silently treating the contact as "synced". Returning
 /// a typed `Err` is the honest signal. Pre-fix this path also produced
 /// the ADR-029 stable-token fallback.
+// @internal
 #[test]
 fn sync_contact_errors_when_load_contact_returns_none_adr029() {
     let storage = create_test_storage();

@@ -266,13 +266,17 @@ impl Storage {
             .conn
             .prepare("SELECT state_json_encrypted, state_json FROM device_sync_state")?;
 
-        let rows = stmt
+        // Site 2 peer (silent-failures audit): the original
+        // `.filter_map(|r| r.ok())` silently dropped row read errors,
+        // returning a short list under storage faults. Propagate so the
+        // caller can distinguish "no sync states" from "storage failed".
+        let rows: Vec<(Option<Vec<u8>>, String)> = stmt
             .query_map([], |row| {
                 let encrypted: Option<Vec<u8>> = row.get(0)?;
                 let plaintext: String = row.get(1)?;
                 Ok((encrypted, plaintext))
             })?
-            .filter_map(|r| r.ok());
+            .collect::<Result<_, _>>()?;
 
         let mut states = Vec::new();
         for (encrypted, plaintext) in rows {
@@ -573,6 +577,27 @@ impl Storage {
         Ok(())
     }
 
+    /// Test-only: insert a replay-nonce row with arbitrary (possibly
+    /// malformed) BLOB length, used to exercise the
+    /// [`Storage::load_replay_nonces`] error-propagation path (site 2 of
+    /// `2026-05-21-silent-failures-in-security-paths`). Pre-2026-05-23
+    /// the loader silently filtered such rows via `.filter_map`, opening
+    /// an ADR-029 replay-defense gap under storage corruption.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn test_insert_malformed_replay_nonce(
+        &self,
+        contact_id: &str,
+        bad_nonce: &[u8],
+        timestamp: u64,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT INTO replay_nonces (contact_id, nonce, timestamp)
+             VALUES (?1, ?2, ?3)",
+            params![contact_id, bad_nonce, timestamp as i64],
+        )?;
+        Ok(())
+    }
+
     /// Checks whether a replay nonce has already been recorded for a contact.
     ///
     /// Returns `true` if the nonce exists (i.e., this is a replay), `false` if fresh.
@@ -600,16 +625,31 @@ impl Storage {
             "SELECT nonce, timestamp FROM replay_nonces WHERE contact_id = ?1 ORDER BY timestamp",
         )?;
 
-        let nonces = stmt
+        // Site 2 of `2026-05-21-silent-failures-in-security-paths`: row
+        // read errors and `nonce_vec.try_into().ok()?` both used to be
+        // silently dropped via `.filter_map`. A corrupted nonce row would
+        // produce an empty/short set, opening an ADR-029 replay-defense
+        // window without surfacing the storage fault anywhere. Propagate
+        // both classes of error instead — a single corrupted row aborts
+        // the load with a typed `Err`, and the caller decides how to
+        // recover (e.g. refuse to process inbound updates until storage
+        // is repaired). Healthy storage is unaffected.
+        let raw_rows: Vec<(Vec<u8>, i64)> = stmt
             .query_map(params![contact_id], |row| {
                 Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, i64>(1)?))
             })?
-            .filter_map(|r| r.ok())
-            .filter_map(|(nonce_vec, ts)| {
-                let nonce: [u8; 32] = nonce_vec.try_into().ok()?;
-                Some((nonce, ts as u64))
-            })
-            .collect();
+            .collect::<Result<_, _>>()?;
+
+        let mut nonces = Vec::with_capacity(raw_rows.len());
+        for (nonce_vec, ts) in raw_rows {
+            let actual_len = nonce_vec.len();
+            let nonce: [u8; 32] = nonce_vec.try_into().map_err(|_| {
+                StorageError::Serialization(format!(
+                    "replay_nonces row has malformed nonce: expected 32 bytes, got {actual_len}"
+                ))
+            })?;
+            nonces.push((nonce, ts as u64));
+        }
 
         Ok(nonces)
     }

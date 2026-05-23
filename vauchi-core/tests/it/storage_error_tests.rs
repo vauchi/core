@@ -59,3 +59,55 @@ fn generic_error_user_message_is_safe() {
         "User message should not expose internal details"
     );
 }
+
+// ============================================================
+// Replay-nonce row-corruption propagation
+// (site 2 of _private/.../2026-05-21-silent-failures-in-security-paths)
+//
+// Pre-2026-05-23 `load_replay_nonces` discarded row read errors AND
+// rows whose `nonce` BLOB was not 32 bytes via `.filter_map(|r| r.ok())`
+// and `nonce_vec.try_into().ok()?`. A corrupted nonce row → empty set
+// → ADR-029 replay defense window. The fix propagates both classes of
+// error so storage faults surface loudly instead of opening a silent
+// security hole.
+// ============================================================
+
+use vauchi_core::SymmetricKey;
+use vauchi_core::storage::Storage;
+
+// @internal
+#[test]
+fn load_replay_nonces_returns_err_when_nonce_blob_has_wrong_length() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+
+    // Insert a malformed row directly: a 31-byte nonce (one byte short)
+    // simulates either DB tampering or single-row corruption that the
+    // current `nonce_vec.try_into().ok()?` silently filters out.
+    storage
+        .test_insert_malformed_replay_nonce("contact-1", &[0xAAu8; 31], 100)
+        .expect("test helper insert should succeed");
+
+    let result = storage.load_replay_nonces("contact-1");
+    assert!(
+        result.is_err(),
+        "malformed replay-nonce row must surface as Err (ADR-029 replay defense), got {:?}",
+        result
+    );
+}
+
+// @internal
+#[test]
+fn load_replay_nonces_happy_path_returns_inserted_nonces_in_order() {
+    let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
+    storage
+        .save_replay_nonce("contact-1", &[0x11u8; 32], 100)
+        .unwrap();
+    storage
+        .save_replay_nonce("contact-1", &[0x22u8; 32], 200)
+        .unwrap();
+
+    let nonces = storage.load_replay_nonces("contact-1").unwrap();
+    assert_eq!(nonces.len(), 2, "both inserted nonces should load");
+    assert_eq!(nonces[0], ([0x11u8; 32], 100));
+    assert_eq!(nonces[1], ([0x22u8; 32], 200));
+}

@@ -4160,6 +4160,29 @@ impl PlatformAppEngine {
                 engine.invalidate_screen(&AppScreen::DeviceLinking);
                 Ok(DomainCommandResult::Bool { value: result })
             }
+            DomainCommand::GenerateDeviceLinkQr => {
+                use vauchi_core::exchange::device_link::DeviceLinkQR;
+
+                let identity = engine
+                    .vauchi()
+                    .identity()
+                    .ok_or_else(|| MobileError::Other {
+                        detail: "Identity not initialized".into(),
+                    })?;
+
+                let qr = DeviceLinkQR::generate(
+                    identity,
+                    vauchi_core::clock::SystemClock::shared().unix_seconds(),
+                );
+                Ok(DomainCommandResult::DeviceLinkData {
+                    data: crate::types::MobileDeviceLinkData {
+                        qr_data: qr.to_data_string(),
+                        identity_public_key: hex::encode(identity.signing_public_key()),
+                        timestamp: qr.timestamp(),
+                        expires_at: qr.expires_at(),
+                    },
+                })
+            }
         }
     }
 
@@ -4172,36 +4195,6 @@ impl PlatformAppEngine {
     // are intentionally NOT migrated — they were superseded by the
     // orchestrator session in
     // `done/2026-04-27-device-link-orchestrator-phase2d-windows`.
-
-    /// Generate the QR shown to a peer for device linking. Read-only
-    /// — does not persist any state. The QR expires after 300 s
-    /// (ADR-035).
-    pub fn generate_device_link_qr(
-        &self,
-    ) -> Result<crate::types::MobileDeviceLinkData, MobileError> {
-        use vauchi_core::exchange::device_link::DeviceLinkQR;
-
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let identity = engine
-            .vauchi()
-            .identity()
-            .ok_or_else(|| MobileError::Other {
-                detail: "Identity not initialized".into(),
-            })?;
-
-        let qr = DeviceLinkQR::generate(
-            identity,
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        );
-        Ok(crate::types::MobileDeviceLinkData {
-            qr_data: qr.to_data_string(),
-            identity_public_key: hex::encode(identity.signing_public_key()),
-            timestamp: qr.timestamp(),
-            expires_at: qr.expires_at(),
-        })
-    }
 
     /// Parse a peer's device-link QR. Read-only — does not
     /// persist any state.

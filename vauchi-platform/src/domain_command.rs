@@ -35,10 +35,10 @@ use crate::types::{
     MobileConsentType, MobileContact, MobileContactCard, MobileContactDisplayOptions,
     MobileDecoyContact, MobileDeletionInfo, MobileDeliveryRecord, MobileDeliveryStatus,
     MobileDeliverySummary, MobileDemoContact, MobileDemoContactState, MobileDeviceDeliveryRecord,
-    MobileDeviceInfo, MobileDuplicatePair, MobileDuressSettings, MobileFieldNote, MobileFieldType,
-    MobileGdprExport, MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryVerification,
-    MobileRetryEntry, MobileShredStatus, MobileSocialNetwork, MobileVisibilityLabel,
-    MobileVisibilityLabelDetail,
+    MobileDeviceInfo, MobileDeviceLinkData, MobileDuplicatePair, MobileDuressSettings,
+    MobileFieldNote, MobileFieldType, MobileGdprExport, MobileOnboardingProgress,
+    MobileOnboardingStep, MobileRecoveryVerification, MobileRetryEntry, MobileShredStatus,
+    MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -564,6 +564,9 @@ pub enum DomainCommand {
     /// Revoke the device at `device_index`. Mirrors the legacy
     /// `PlatformAppEngine::unlink_device`.
     UnlinkDevice { device_index: u32 },
+    /// Generate the QR shown to a peer for device linking. Mirrors
+    /// `PlatformAppEngine::generate_device_link_qr`.
+    GenerateDeviceLinkQr,
 }
 
 /// Sum type of every legitimate return shape from
@@ -598,6 +601,8 @@ pub enum DomainCommandResult {
     /// List of devices linked to the active identity (B7 batch 22
     /// — `GetDevices`).
     Devices { devices: Vec<MobileDeviceInfo> },
+    /// Device-link QR payload (B7 batch 22 — `GenerateDeviceLinkQr`).
+    DeviceLinkData { data: MobileDeviceLinkData },
     /// GDPR export payload (B7 batch 3 — `ExportGdprData`).
     GdprExport { export: MobileGdprExport },
     /// Deletion-state snapshot (B7 batch 3 — `ScheduleIdentityDeletion`,

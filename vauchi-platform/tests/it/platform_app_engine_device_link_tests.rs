@@ -140,10 +140,14 @@ fn unlink_device_returns_false_when_no_registry_yet() {
 // @internal
 #[test]
 fn generate_device_link_qr_returns_data_with_expiry() {
+    use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
-    let qr = engine
-        .generate_device_link_qr()
-        .expect("generate_device_link_qr");
+    let result = engine
+        .dispatch_domain_command(DomainCommand::GenerateDeviceLinkQr)
+        .expect("dispatch GenerateDeviceLinkQr");
+    let DomainCommandResult::DeviceLinkData { data: qr } = result else {
+        panic!("GenerateDeviceLinkQr: unexpected result variant {result:?}");
+    };
 
     assert!(!qr.qr_data.is_empty(), "qr_data must not be empty");
     assert_eq!(
@@ -160,10 +164,14 @@ fn generate_device_link_qr_returns_data_with_expiry() {
 // @internal
 #[test]
 fn parse_device_link_qr_round_trips_generate() {
+    use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
-    let qr = engine
-        .generate_device_link_qr()
-        .expect("generate_device_link_qr");
+    let result = engine
+        .dispatch_domain_command(DomainCommand::GenerateDeviceLinkQr)
+        .expect("dispatch GenerateDeviceLinkQr");
+    let DomainCommandResult::DeviceLinkData { data: qr } = result else {
+        panic!("GenerateDeviceLinkQr: unexpected result variant {result:?}");
+    };
 
     let parsed = engine
         .parse_device_link_qr(qr.qr_data)

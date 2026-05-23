@@ -253,7 +253,10 @@ vauchi-app/src/ui/app_engine/routing.rs 1403
 #   `icon: icon_for_field_type(&field_type_str).into()` plus a
 #   `field_type_str` local hoist so the icon helper sees the same string
 #   the field_type field uses.)
-vauchi-app/src/ui/app_engine/screens.rs 1386
+# (+37 for reconstruct_identity_via_storage_bytes helper + tracing::error!
+#  on Identity round-trip failure; site 3 of
+#  2026-05-21-silent-failures-in-security-paths, 2026-05-23.)
+vauchi-app/src/ui/app_engine/screens.rs 1423
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

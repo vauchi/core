@@ -102,7 +102,7 @@ pub use mobile_import::{MobileImportResult, MobileImportWarning};
 pub use mobile_verifier_event::{
     MobileProximityConfidence, MobileProximityVerifierEvent, MobileVerifierMethod,
 };
-pub use multipart_qr::{MobileMultipartDecoder, MultipartDecoder, encode_multipart};
+pub use multipart_qr::{MultipartDecoder, encode_multipart};
 pub use multistage_exchange::{
     MobileAudioProximityState, MobileMultiStageSession, MobileProtocolState, MobileQrPayload,
     MultiStageAudioListener, MultiStageSessionListener,
@@ -1322,14 +1322,14 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_multipart_qr_roundtrip_with_mobile_decoder() {
+    fn test_encode_multipart_qr_roundtrip() {
         let (wb, _dir) = create_test_instance();
-        let original = b"End-to-end test: VauchiPlatform encodes, MobileMultipartDecoder decodes.";
+        let original = b"End-to-end test: VauchiPlatform encodes, MultipartDecoder decodes.";
         let chunks = wb.encode_multipart_qr(original.to_vec());
 
-        let decoder = multipart_qr::MobileMultipartDecoder::new();
+        let mut decoder = multipart_qr::MultipartDecoder::new();
         for chunk in &chunks {
-            decoder.add_chunk(chunk.clone()).expect("valid chunk");
+            decoder.add_chunk(chunk).expect("valid chunk");
         }
 
         assert!(decoder.is_complete(), "decoder should be complete");
@@ -1337,7 +1337,7 @@ mod tests {
         assert_eq!(
             assembled,
             original.to_vec(),
-            "roundtrip via VauchiPlatform + MobileMultipartDecoder must preserve data"
+            "roundtrip via VauchiPlatform + MultipartDecoder must preserve data"
         );
     }
 

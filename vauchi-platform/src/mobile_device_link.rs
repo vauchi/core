@@ -331,7 +331,7 @@ impl VauchiPlatform {
     ///
     /// Each chunk fits within a QR code's data capacity. The chunks should
     /// be displayed in sequence as an animated QR code for the scanning
-    /// device to reassemble using `MobileMultipartDecoder`.
+    /// device to reassemble using `MultipartDecoder`.
     pub fn encode_multipart_qr(&self, data: Vec<u8>) -> Vec<String> {
         crate::multipart_qr::encode_multipart(&data, 1800)
     }

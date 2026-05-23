@@ -340,7 +340,6 @@ const PERMITTED_UNIFFI_OBJECTS: &[&str] = &[
     "MobileDeviceLinkSession",
     "MobileExchangeSession",
     "MobileLinkResponderSession",
-    "MobileMultipartDecoder",
     "MobileMultiStageSession",
     // ── Legacy ──
     // `VauchiPlatform` is the Phase-B legacy facade; the

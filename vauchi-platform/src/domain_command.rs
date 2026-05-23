@@ -530,8 +530,7 @@ pub enum DomainCommand {
     // ── Multipart QR encoding (B7 batch 20) ──
     /// Encode arbitrary bytes into a sequence of multipart-QR
     /// payload strings (max ~1800 bytes per frame). Stateless —
-    /// the decode side is a separate `MobileMultipartDecoder`
-    /// object.
+    /// the decode side is a separate `MultipartDecoder`.
     EncodeMultipartQr { data: Vec<u8> },
 
     // ── Certificate pinning (B7 batch 21) ──

@@ -768,4 +768,37 @@ impl Storage {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
+
+    /// Test-only: overwrite a single TEXT column on the `contacts` row
+    /// for the given contact_id. Used to inject deserialization-failure
+    /// inputs for the trust-input columns (site 8 of
+    /// `2026-05-21-silent-failures-in-security-paths`): the public
+    /// setters refuse garbage by type, so direct SQL is the only way
+    /// to reach the parser in [`Storage::row_to_contact`].
+    ///
+    /// The column name is interpolated into the SQL string with an
+    /// allow-list check so the helper cannot be turned into a SQL
+    /// injection vector by a wandering caller.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn test_corrupt_contact_text_column(
+        &self,
+        contact_id: &str,
+        column: &str,
+        value: &str,
+    ) -> Result<(), StorageError> {
+        const ALLOWED: &[&str] = &[
+            "exchange_transport",
+            "trust_metrics",
+            "reciprocity",
+            "confirmation_channel",
+        ];
+        if !ALLOWED.contains(&column) {
+            return Err(StorageError::InvalidData(format!(
+                "test_corrupt_contact_text_column: column {column} not in allow-list"
+            )));
+        }
+        let sql = format!("UPDATE contacts SET {column} = ?1 WHERE id = ?2");
+        self.conn.execute(&sql, params![value, contact_id])?;
+        Ok(())
+    }
 }

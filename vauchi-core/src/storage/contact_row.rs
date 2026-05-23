@@ -207,10 +207,25 @@ impl Storage {
             contact.set_cek(cek);
         }
 
-        // Restore trust metric fields from storage
+        // Restore trust metric fields from storage.
+        //
+        // Site 8 of `2026-05-21-silent-failures-in-security-paths`:
+        // `exchange_transport` is the ADR-034 trust-derivation input. A
+        // corrupt or downgraded column used to fall back to `Default`
+        // (`Qr`) via `unwrap_or_default()`, silently producing a wrong
+        // trust badge. Propagate the deserialization error as
+        // `StorageError::Serialization` so the contact load fails loudly
+        // — that's the only honest signal for an ADR-034 input we
+        // couldn't parse.
         let transport: ExchangeTransport =
-            serde_json::from_value(serde_json::Value::String(row.exchange_transport))
-                .unwrap_or_default();
+            serde_json::from_value(serde_json::Value::String(row.exchange_transport.clone()))
+                .map_err(|e| {
+                    StorageError::Serialization(format!(
+                        "row_to_contact: exchange_transport column unparsable ({e}); ADR-034 \
+                 trust-derivation input must round-trip — raw value: {raw:?}",
+                        raw = row.exchange_transport
+                    ))
+                })?;
         contact.set_exchange_transport(transport);
         contact.set_has_recovered(row.has_recovered != 0);
         contact.set_card_updated_at(row.card_updated_at.map(|t| t as u64));
@@ -224,21 +239,60 @@ impl Storage {
             contact.set_relay_noise_pubkey(Some(pubkey));
         }
 
-        // Restore trust metrics from storage (JSON column, NULL for legacy contacts)
-        let trust_metrics: Option<TrustMetrics> = row
-            .trust_metrics
-            .and_then(|s| serde_json::from_str(&s).ok());
+        // Restore trust metrics from storage (JSON column, NULL for legacy contacts).
+        //
+        // Site 8 peer: enrichment field — a corrupt row should still let
+        // the contact load (so the user sees their name + can re-exchange
+        // to repair) but the failure must not be silent. Surface via
+        // tracing::warn! and fall back to None.
+        let trust_metrics: Option<TrustMetrics> =
+            row.trust_metrics
+                .and_then(|s| match serde_json::from_str(&s) {
+                    Ok(m) => Some(m),
+                    Err(e) => {
+                        tracing::warn!(
+                            target: "vauchi.storage.contact_row",
+                            contact_id = %row.id,
+                            error = %e,
+                            "trust_metrics column unparsable; falling back to None"
+                        );
+                        None
+                    }
+                });
         contact.set_trust_metrics(trust_metrics);
 
-        // Restore reciprocity from storage (TEXT column, NULL for legacy contacts)
-        if let Some(r) = row
-            .reciprocity
-            .and_then(|s| serde_json::from_value::<Reciprocity>(serde_json::Value::String(s)).ok())
-        {
+        // Restore reciprocity from storage (TEXT column, NULL for legacy contacts).
+        // Site 8 peer: same shape — log + fallback.
+        if let Some(r) = row.reciprocity.and_then(|s| {
+            match serde_json::from_value::<Reciprocity>(serde_json::Value::String(s)) {
+                Ok(r) => Some(r),
+                Err(e) => {
+                    tracing::warn!(
+                        target: "vauchi.storage.contact_row",
+                        contact_id = %row.id,
+                        error = %e,
+                        "reciprocity column unparsable; leaving contact reciprocity un-set"
+                    );
+                    None
+                }
+            }
+        }) {
             contact.set_reciprocity(r);
         }
+        // Site 8 peer: same shape — log + fallback.
         if let Some(c) = row.confirmation_channel.and_then(|s| {
-            serde_json::from_value::<ConfirmationChannel>(serde_json::Value::String(s)).ok()
+            match serde_json::from_value::<ConfirmationChannel>(serde_json::Value::String(s)) {
+                Ok(c) => Some(c),
+                Err(e) => {
+                    tracing::warn!(
+                        target: "vauchi.storage.contact_row",
+                        contact_id = %row.id,
+                        error = %e,
+                        "confirmation_channel column unparsable; leaving un-set"
+                    );
+                    None
+                }
+            }
         }) {
             contact.set_confirmation_channel(c);
         }

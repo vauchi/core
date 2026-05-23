@@ -294,33 +294,6 @@ impl From<&vauchi_core::api::ShredReport> for MobileShredReport {
     }
 }
 
-/// Post-shred verification result.
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct MobileShredVerification {
-    /// Whether SMK is absent from SecureStorage.
-    pub smk_absent: bool,
-    /// Whether the database file is absent.
-    pub database_absent: bool,
-    /// Whether the data directory is absent.
-    pub data_dir_absent: bool,
-    /// Whether the pre-signed messages file is absent.
-    pub pre_signed_absent: bool,
-    /// Overall: all checks passed.
-    pub all_clear: bool,
-}
-
-impl From<&vauchi_core::api::ShredVerification> for MobileShredVerification {
-    fn from(v: &vauchi_core::api::ShredVerification) -> Self {
-        MobileShredVerification {
-            smk_absent: v.smk_absent,
-            database_absent: v.database_absent,
-            data_dir_absent: v.data_dir_absent,
-            pre_signed_absent: v.pre_signed_absent,
-            all_clear: v.all_clear,
-        }
-    }
-}
-
 /// Current shred status for the identity.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum MobileShredStatus {

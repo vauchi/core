@@ -32,7 +32,7 @@ pub use security::{
     MobileConsentStatus, MobileConsentType, MobileDecoyContact, MobileDeletionInfo,
     MobileDeletionState, MobileDuressSettings, MobileEmergencyConfig, MobileGdprExport,
     MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
-    MobileShredReport, MobileShredStatus, MobileShredToken, MobileShredVerification,
+    MobileShredReport, MobileShredStatus, MobileShredToken,
 };
 pub use social::{
     MobileLabelContactBadge, MobileLabelContactRow, MobileLabelContactStatus, MobileSocialNetwork,

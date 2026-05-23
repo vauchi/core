@@ -14,19 +14,21 @@
 //! same-MR migration of those tests; per slice 32g-B precedent the
 //! `wb.*` call sites continue to resolve.
 //!
-//! The 5 shred methods (`soft_shred`, `cancel_shred`, `hard_shred`,
-//! `panic_shred`, `verify_shred`) + the `set_platform_keychain` setter
-//! stay here pending the B7 keychain-plumbing batch — `PlatformAppEngine`
-//! does not yet hold a `MobilePlatformKeychain` reference, so they
-//! cannot be routed through `DomainCommand` (note at
+//! The 4 shred methods (`soft_shred`, `cancel_shred`, `hard_shred`,
+//! `panic_shred`) + the `set_platform_keychain` setter stay here
+//! pending the B7 keychain-plumbing batch — `PlatformAppEngine` does
+//! not yet hold a `MobilePlatformKeychain` reference, so they cannot
+//! be routed through `DomainCommand` (note at
 //! `domain_command.rs:80-83`). Slice 32i.2 retires them once that
-//! plumbing lands. Record:
-//! `done/2026-05-17-slice-32i-mobile-gdpr-partial-retirement/`.
+//! plumbing lands. `verify_shred` retired 2026-05-23 (Track A) —
+//! zero hand-written consumers and `MobileShredVerification` had no
+//! other producer, so the type's `From` impl was retired too.
+//! Record: `done/2026-05-17-slice-32i-mobile-gdpr-partial-retirement/`.
 
 use std::sync::Arc;
 
 use super::error::{MobileError, lock_or};
-use super::types::{MobileShredReport, MobileShredToken, MobileShredVerification};
+use super::types::{MobileShredReport, MobileShredToken};
 use super::{MobilePlatformKeychain, VauchiPlatform};
 
 #[uniffi::export]
@@ -184,19 +186,5 @@ impl VauchiPlatform {
             mobile_report.revocation_error = Some(err);
         }
         Ok(mobile_report)
-    }
-
-    /// Verify that shredding was successful by checking for residual data.
-    ///
-    /// Returns verification results showing which items were confirmed destroyed.
-    pub fn verify_shred(&self) -> Result<MobileShredVerification, MobileError> {
-        let storage = self.open_storage()?;
-        let identity = self.get_identity()?;
-        let bridge = self.get_keychain_bridge()?;
-        let data_dir = self.data_dir();
-
-        let manager = vauchi_core::api::ShredManager::new(&storage, &bridge, &identity, &data_dir);
-        let verification = manager.verify_shred();
-        Ok(MobileShredVerification::from(&verification))
     }
 }

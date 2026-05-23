@@ -135,10 +135,10 @@ pub use types::{
     MobileNotificationCategory, MobileOnboardingProgress, MobileOnboardingStep,
     MobilePendingNotification, MobileRecoveryClaim, MobileRecoveryProgress,
     MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
-    MobileShredStatus, MobileShredToken, MobileShredVerification, MobileSocialNetwork,
-    MobileSpacingDirectionTokens, MobileSpacingTokens, MobileSyncResult, MobileSyncStatus,
-    MobileTabInfo, MobileTheme, MobileThemeColors, MobileThemeMode, MobileTouchTargetTokens,
-    MobileTypographyTokens, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileShredStatus, MobileShredToken, MobileSocialNetwork, MobileSpacingDirectionTokens,
+    MobileSpacingTokens, MobileSyncResult, MobileSyncStatus, MobileTabInfo, MobileTheme,
+    MobileThemeColors, MobileThemeMode, MobileTouchTargetTokens, MobileTypographyTokens,
+    MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 pub use validation::{
     mobile_is_valid_email, mobile_is_valid_pem_certificate, mobile_is_valid_phone,

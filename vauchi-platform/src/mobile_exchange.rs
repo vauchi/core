@@ -12,7 +12,6 @@ use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use super::VauchiPlatform;
 use super::error::MobileError;
 use super::exchange::MobileExchangeSession;
-use super::exchange::MobileProximityHandler;
 use super::multistage_exchange::MobileMultiStageSession;
 use super::types::MobileExchangeResult;
 
@@ -58,21 +57,6 @@ pub(crate) fn deserialize_exchange_payload(
 #[uniffi::export]
 impl VauchiPlatform {
     // === Exchange Operations ===
-
-    /// Create a QR exchange session with proximity verification.
-    ///
-    /// Both parties display and scan QR codes. Uses fresh ephemeral keys
-    /// for full forward secrecy.
-    pub fn create_qr_exchange(
-        &self,
-        proximity: Box<dyn MobileProximityHandler>,
-    ) -> Result<Arc<MobileExchangeSession>, MobileError> {
-        let identity = self.get_identity()?;
-        let our_card = self.get_own_card_or_default(&identity)?;
-        Ok(super::exchange::create_qr_exchange_proximity(
-            identity, our_card, proximity,
-        ))
-    }
 
     /// Create a QR exchange session with manual confirmation (no audio hardware).
     pub fn create_qr_exchange_manual(&self) -> Result<Arc<MobileExchangeSession>, MobileError> {

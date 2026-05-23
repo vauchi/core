@@ -32,8 +32,8 @@ in the private repo.
   yet at the time of this writing).
 - *(stays on session type)* — method is on a non-`VauchiPlatform`
   type (`MobileBleExchangeSession`, `MobileNfcHandshake`,
-  `MobileAnimatedQrSender`, `MobileDeviceLinkSession`,
-  `MobileMultiStageSession`, and the additional session peers
+  `MobileDeviceLinkSession`, `MobileMultiStageSession`, and the
+  additional session peers
   enumerated by `peer_uniffi_objects_count` in
   `core/vauchi-app/tests/it/humble_surface_contract_tests.rs`).
   These remain as their own `#[uniffi::Object]`s — they are not
@@ -189,9 +189,10 @@ already on `PlatformAppEngine`:
 | *(implicit)* `periodic_sync_tick` etc. | `PlatformAppEngine::periodic_sync_tick` + interval/retry | **MIGRATED** (Round 2 P2-C) |
 | *(implicit)* network state | `PlatformAppEngine::set_network_online` / `is_network_online` | **MIGRATED** (Round 2 P2-D) |
 
-### Exchange (`mobile_exchange.rs`, `mobile_animated_qr.rs`, `mobile_ble.rs`, `mobile_nfc.rs`)
+### Exchange (`mobile_exchange.rs`, `mobile_ble.rs`, `mobile_nfc.rs`)
 
 > `mobile_wifi_aware.rs` retired 2026-05-23 (Track A) — zero production consumers; future WiFi Aware support follows ADR-031 command/event pattern.
+> `mobile_animated_qr.rs` retired 2026-05-23 (Track A) — zero hand-written consumers; core's `AnimatedQrSession` survives at `vauchi-core::exchange::transport::animated_qr`.
 
 Mixed: high-level entry points migrate, session types stay.
 
@@ -200,7 +201,7 @@ Mixed: high-level entry points migrate, session types stay.
 | `VauchiPlatform::create_qr_exchange`, `create_qr_exchange_manual`, `finalize_exchange` | `dispatch_domain_command(DomainCommand::Exchange*)` | PENDING B7 |
 | `VauchiPlatform::create_multistage_session` | `PlatformAppEngine::handle_action_json` (auto-managed by engine) | **MIGRATED** (Pair 4) |
 | `MobileBleExchangeSession::*` | *(stays on session type)* | NOT MIGRATED — STAYS |
-| `MobileAnimatedQrSender::*` | *(stays on session type)* | NOT MIGRATED — STAYS |
+| `MobileAnimatedQrSender::*`, `MobileAnimatedQrReceiver::*`, `MobileAnimatedQrConfig` | *(file retired)* | **RETIRED 2026-05-23 (Track A)** — zero hand-written consumers in any frontend; `mobile_animated_qr.rs` deleted, core's `AnimatedQrSession` survives at `vauchi-core::exchange::transport::animated_qr`. |
 | `MobileNfcHandshake::*` | *(stays on session type)* | NOT MIGRATED — STAYS |
 | `VauchiPlatform::create_nfc_initiator`, `create_nfc_responder` | `dispatch_domain_command(DomainCommand::NfcCreate*)` | PENDING B7 |
 | `MobileMultiStageSession::*` | *(stays on session type)* | NOT MIGRATED — STAYS |
@@ -275,7 +276,7 @@ become `PlatformAppEngine` methods. They become top-level
 | MIGRATED (typed direct method) | 20 | 9 recovery (B2) + 4 emergency broadcast (B3) + 7 device linking (B4) |
 | MIGRATED (already on engine pre-collapse) | ~10 | `has_identity`, `boot`, `current_screen_json`, navigation, lifecycle, `periodic_sync_tick`, `set_network_online`, `biometric_unlock_check`, etc. |
 | PENDING B7 (DomainCommand long-tail) | ~150 | All `mobile_contacts`, `mobile_visibility`, `mobile_gdpr`, the rest of `mobile_security`, `mobile_content`, `mobile_delivery`, parts of `mobile_recovery`, `mobile_identity`, exchange entry points |
-| NOT MIGRATED — STAYS (session types) | ~30 | `MobileBleExchangeSession`, `MobileAnimatedQrSender`, `MobileNfcHandshake`, `MobileDeviceLinkSession`, `MobileMultiStageSession`, and the other session peers — full enumeration pinned by `peer_uniffi_objects_count` in `core/vauchi-app/tests/it/humble_surface_contract_tests.rs` (ADR-043 Am.2). `MobileOnboardingWorkflow` was retired by slice 32c (2026-05-17, screen-shaped — not a session peer). |
+| NOT MIGRATED — STAYS (session types) | ~30 | `MobileBleExchangeSession`, `MobileNfcHandshake`, `MobileDeviceLinkSession`, `MobileMultiStageSession`, and the other session peers — full enumeration pinned by `peer_uniffi_objects_count` in `core/vauchi-app/tests/it/humble_surface_contract_tests.rs` (ADR-043 Am.2). `MobileOnboardingWorkflow` was retired by slice 32c (2026-05-17, screen-shaped — not a session peer). |
 | NOT MIGRATED — STAYS (free functions) | ~40 | i18n, FAQ, theme, validation, helper functions on `lib.rs` |
 | PRE-ORCHESTRATOR — KEEP UNTIL D3 | 5 | `start_device_link`, `start_device_join`, `send_device_link_request`, `listen_for_device_link_request`, `send_device_link_response` — superseded by `MobileDeviceLinkSession`, retained for the deprecation cycle |
 

@@ -138,7 +138,7 @@ Everything else. Per-file count:
 | `mobile_device_link_session.rs` | 9 | session methods, not platform — keep as `MobileDeviceLinkSession` |
 | `mobile_ble.rs` | 8 | session methods on `MobileBleExchangeSession` — same |
 | `mobile_onboarding.rs` | 7 | yes |
-| `mobile_animated_qr.rs` | 7 | session methods on `MobileAnimatedQrSender` — keep |
+| `mobile_animated_qr.rs` | ~~7~~ 0 (file retired 2026-05-23) | **retired Track A** — zero hand-written consumers of `MobileAnimatedQrSender` / `MobileAnimatedQrReceiver` / `MobileAnimatedQrConfig` in any frontend; core's `AnimatedQrSession` (in `vauchi-core::exchange::transport::animated_qr`) survives and is reached by `vauchi-app::ui::exchange` directly. ADR-043 Amendment 2 strict-equality allowlist updated in the same MR. |
 | `mobile_ui.rs` | ~~4~~ 0 (file retired 2026-05-17) | **retired by slice 32c** — `MobileOnboardingWorkflow` collapsed into `PlatformAppEngine`. ADR-043 Amendment 2 codifies "one screen-driving UniFFI object per binding"; the new `peer_uniffi_objects_count` strict-equality test enforces. See `_private/docs/designs/2026-05-16-slice-32c-mobile-ui-retirement-design.md`. B1's earlier "partially superseded" note was the right read but didn't follow through. |
 | `mobile_exchange.rs` | 4 | yes |
 | `mobile_content.rs` | 4 | yes |
@@ -149,7 +149,7 @@ Everything else. Per-file count:
 
 After excluding session-shaped types that legitimately remain as
 their own `#[uniffi::Object]`s (`MobileBleExchangeSession`,
-`MobileAnimatedQrSender`, `MobileNfcHandshake`, `MobileDeviceLinkSession`),
+`MobileNfcHandshake`, `MobileDeviceLinkSession`),
 and free helpers in `lib.rs` that should become free `#[uniffi::export]`
 functions rather than `PlatformAppEngine` methods, the realistic count
 of **new `PlatformAppEngine` direct methods** is ~150–170.

@@ -28,7 +28,6 @@ mod error;
 mod exchange;
 mod json_helpers;
 mod link_responder_session;
-mod mobile_animated_qr;
 mod mobile_ble;
 mod mobile_contact_detail;
 mod mobile_contacts;
@@ -89,10 +88,6 @@ pub use exchange::{
 pub use link_responder_session::{
     LinkResponderSessionListener, MobileLinkResponderFailureReason, MobileLinkResponderSession,
     MobileLinkResponderState,
-};
-pub use mobile_animated_qr::{
-    MobileAnimatedQrConfig, MobileAnimatedQrError, MobileAnimatedQrProgress,
-    MobileAnimatedQrReceiver, MobileAnimatedQrSender,
 };
 pub use mobile_ble::{
     MobileBleDelegate, MobileBleError, MobileBleExchangeResult, MobileBleExchangeSession,

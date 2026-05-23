@@ -336,8 +336,6 @@ const PERMITTED_UNIFFI_OBJECTS: &[&str] = &[
     "PlatformAppEngine",
     // ── Session peers under ADR-031 (clarification 2) ──
     // Hardware-event-driven, short-lived, single-protocol-instance.
-    "MobileAnimatedQrReceiver",
-    "MobileAnimatedQrSender",
     "MobileBleExchangeSession",
     "MobileDeviceLinkSession",
     "MobileExchangeSession",

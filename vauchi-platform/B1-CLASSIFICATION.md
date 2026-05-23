@@ -85,7 +85,7 @@ for these.**
   `form_has_data`
 - `handle_deep_link_uri`
 - `invalidate_all`, `invalidate_screen_json`
-- `set_network_online`, `is_network_online`,
+- `set_network_online`,
   `periodic_sync_tick`, `periodic_sync_interval_seconds`,
   `periodic_sync_max_retries` (the work landed via the Round 2 P2 audit
   alongside ios!353 and android!340)
@@ -172,7 +172,7 @@ Each row maps an investigation-table domain to its actual classification.
 | Contact Verification | Ready (8) | 0 direct, 8 gap | `mobile_contacts.rs` |
 | Recovery | Needs API (18) | 0 direct, 18 gap | `mobile_recovery.rs`, plan B2 still correct |
 | Delivery Records / Retry | Ready (14) | 0 direct, 14 gap | `mobile_delivery.rs` |
-| Sync / Network / Relay | Ready (10) | 5 direct (P2-C/D from Round 2 audit), 5 gap | `set_network_online`, `is_network_online`, `periodic_sync_tick` + 2 constants |
+| Sync / Network / Relay | Ready (10) | 5 direct (P2-C/D from Round 2 audit), 5 gap | `set_network_online`, `periodic_sync_tick` + 2 constants |
 | Exchange (BLE/NFC/QR) | Ready (12) | 2 direct (`handle_hardware_event`, `advance_qr_frame_json`), 10 gap | Session creation methods stay as their own `Mobile*Session` types |
 | Backup / Import / Export | Ready (10) | 0 direct, 10 gap | `mobile_delivery.rs` (export/import) + `mobile_import.rs` |
 | Passcode / Duress | Ready (16) | 1 direct (`biometric_unlock_check`, P2-B audit fix), 15 gap | `mobile_security.rs` |

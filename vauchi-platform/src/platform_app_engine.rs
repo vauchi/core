@@ -788,19 +788,6 @@ impl PlatformAppEngine {
         Ok(())
     }
 
-    /// Returns the last frontend-reported network reachability.
-    ///
-    /// Defaults to `true` until the frontend reports otherwise. Used
-    /// by reachability tests; frontends do not need to query this —
-    /// the offline banner is injected into emitted `ScreenModel`s
-    /// automatically when the state is `false`.
-    pub fn is_network_online(&self) -> Result<bool, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        Ok(engine.is_network_online())
-    }
-
     /// Notify core that the app was backgrounded.
     ///
     /// If a password is set and the app is not already locked,

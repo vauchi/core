@@ -187,7 +187,7 @@ already on `PlatformAppEngine`:
 | *(`export_backup`, `import_backup`, `export_full_backup`, `import_full_backup`)* | `dispatch_domain_command(DomainCommand::Backup*)` | PENDING B7 |
 | `import_contacts_from_vcf` | `dispatch_domain_command(DomainCommand::ImportContactsFromVcf { vcf_data })` | PENDING B7 |
 | *(implicit)* `periodic_sync_tick` etc. | `PlatformAppEngine::periodic_sync_tick` + interval/retry | **MIGRATED** (Round 2 P2-C) |
-| *(implicit)* network state | `PlatformAppEngine::set_network_online` / `is_network_online` | **MIGRATED** (Round 2 P2-D) |
+| *(implicit)* network state | `PlatformAppEngine::set_network_online` (read-side auto-injected into emitted `ScreenModel`s via `apply_offline_overlay`) | **MIGRATED** (Round 2 P2-D); `is_network_online` getter retired via ADR-048 |
 
 ### Exchange (`mobile_exchange.rs`, `mobile_ble.rs`, `mobile_nfc.rs`)
 

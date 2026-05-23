@@ -225,25 +225,48 @@ impl<'a, T: Transport> SyncController<'a, T> {
                 }
             };
 
-            // Load contact's shared key for anonymous sender ID and mailbox token
-            let shared_key = self
-                .storage
-                .load_contact(&update.contact_id)
-                .ok()
-                .flatten()
-                .and_then(|c| c.shared_key().map(|k| *k.as_bytes()));
-
-            // Compute mailbox token as recipient_id (SP-33 Task 4.1)
-            let recipient_id = match &shared_key {
-                Some(key) => {
-                    let token = compute_mailbox_token(
-                        key,
-                        current_day_epoch(self.storage.clock().unix_seconds()),
-                    );
-                    token_hex(&token)
+            // Load contact's shared key for anonymous sender ID and mailbox token.
+            // ADR-029 forbids stable (non-rotating) recipient_ids: if we can't
+            // derive a daily-rotating mailbox token for this contact, the
+            // update MUST be skipped. Pre-2026-05-23 this path fell back to
+            // `update.contact_id.clone()` — a stable plaintext id — under any
+            // storage fault, missing contact, or incomplete exchange.
+            let shared_key = match self.storage.load_contact(&update.contact_id) {
+                Ok(Some(c)) => c.shared_key().map(|k| *k.as_bytes()),
+                Ok(None) => {
+                    result.failed += 1;
+                    result.errors.push((
+                        update.contact_id.clone(),
+                        "contact not found in storage; cannot derive mailbox token \
+                         (ADR-029 forbids stable plaintext recipient_id)"
+                            .into(),
+                    ));
+                    continue;
                 }
-                None => update.contact_id.clone(),
+                Err(e) => {
+                    result.failed += 1;
+                    result
+                        .errors
+                        .push((update.contact_id.clone(), e.to_string()));
+                    continue;
+                }
             };
+            let Some(key) = shared_key else {
+                result.failed += 1;
+                result.errors.push((
+                    update.contact_id.clone(),
+                    "contact has no shared_key; cannot derive mailbox token \
+                     (ADR-029 forbids stable plaintext recipient_id)"
+                        .into(),
+                ));
+                continue;
+            };
+            let shared_key = Some(key);
+
+            // Compute mailbox token as recipient_id (SP-33 Task 4.1).
+            let token =
+                compute_mailbox_token(&key, current_day_epoch(self.storage.clock().unix_seconds()));
+            let recipient_id = token_hex(&token);
 
             // Send the update (anonymous sender ID if shared key available)
             match self.relay.send_update(
@@ -312,25 +335,30 @@ impl<'a, T: Transport> SyncController<'a, T> {
             }
         };
 
-        // Load contact's shared key for anonymous sender ID and mailbox token
-        let shared_key = self
-            .storage
-            .load_contact(contact_id)
-            .ok()
-            .flatten()
-            .and_then(|c| c.shared_key().map(|k| *k.as_bytes()));
-
-        // Compute mailbox token as recipient_id (SP-33 Task 4.1)
-        let recipient_id = match &shared_key {
-            Some(key) => {
-                let token = compute_mailbox_token(
-                    key,
-                    current_day_epoch(self.storage.clock().unix_seconds()),
-                );
-                token_hex(&token)
+        // Load contact's shared key for anonymous sender ID and mailbox token.
+        // ADR-029 forbids stable (non-rotating) recipient_ids: if we can't
+        // derive a daily-rotating mailbox token for this contact, return
+        // a typed error rather than fall back to `contact_id.to_string()`
+        // (a stable plaintext id). Pre-2026-05-23 this path also produced
+        // the ADR-029 violation.
+        let shared_key = match self.storage.load_contact(contact_id)? {
+            Some(c) => c.shared_key().map(|k| *k.as_bytes()),
+            None => {
+                return Err(VauchiError::ContactNotFound(contact_id.to_string()));
             }
-            None => contact_id.to_string(),
         };
+        let Some(key) = shared_key else {
+            return Err(VauchiError::InvalidState(format!(
+                "contact {contact_id} has no shared_key; cannot derive mailbox token \
+                 (ADR-029 forbids stable plaintext recipient_id)"
+            )));
+        };
+        let shared_key = Some(key);
+
+        // Compute mailbox token as recipient_id (SP-33 Task 4.1).
+        let token =
+            compute_mailbox_token(&key, current_day_epoch(self.storage.clock().unix_seconds()));
+        let recipient_id = token_hex(&token);
 
         // Get pending updates for this contact
         let updates = self.sync_manager.get_pending(contact_id)?;

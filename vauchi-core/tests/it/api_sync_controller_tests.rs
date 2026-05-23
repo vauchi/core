@@ -404,12 +404,24 @@ fn test_sync_controller_sync_contact_with_ratchet() {
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
 
-    // Register ratchet
-    let ratchet = create_test_ratchet();
-    controller.register_ratchet("contact-1", ratchet);
+    // Save a contact with a shared_key so sync_contact can derive a
+    // daily-rotating mailbox token. (Pre-2026-05-23 the test relied on
+    // the implicit ADR-029 violation that let sync_contact succeed for
+    // contacts missing from storage — see
+    // `sync_contact_errors_when_load_contact_returns_none_adr029`.)
+    let public_key = [0xA1u8; 32];
+    let card = vauchi_core::contact_card::ContactCard::new("Alice");
+    let shared_key = SymmetricKey::generate();
+    let contact = vauchi_core::contact::Contact::from_exchange(public_key, card, shared_key, 0);
+    let contact_id = contact.id().to_string();
+    storage.save_contact(&contact).unwrap();
 
-    // Should succeed (no pending updates)
-    let result = controller.sync_contact("contact-1").unwrap();
+    // Register ratchet under the same contact_id.
+    let ratchet = create_test_ratchet();
+    controller.register_ratchet(&contact_id, ratchet);
+
+    // Should succeed (no pending updates).
+    let result = controller.sync_contact(&contact_id).unwrap();
     assert_eq!(result.sent, 0);
 }
 
@@ -461,4 +473,99 @@ fn test_sync_controller_process_device_sync() {
     let applied = controller.process_device_sync(&mut orchestrator, incoming);
     assert!(applied.is_ok(), "expected success");
     assert_eq!(applied.unwrap().len(), 1);
+}
+
+// ============================================================
+// ADR-029 stable-token-fallback regression
+// (_private/.../2026-05-21-silent-failures-in-security-paths
+//  site 5: sync_controller mailbox-token fallback)
+// ============================================================
+
+use vauchi_core::{PendingUpdate, UpdateStatus};
+
+/// When `load_contact` returns `Ok(None)` (contact missing from storage),
+/// `sync()` must NOT fall back to using the plaintext `contact_id` as the
+/// recipient_id — that would reintroduce a stable token (ADR-029
+/// violation). The update is skipped and recorded as failed instead.
+#[test]
+fn sync_skips_update_when_load_contact_returns_none_adr029() {
+    let storage = create_test_storage();
+    let relay = create_test_relay();
+    let events = Arc::new(EventDispatcher::new());
+    let config = SyncConfig::default();
+
+    let mut controller = SyncController::new(relay, &storage, config, events);
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+
+    // Ratchet registered, but contact NOT saved to storage —
+    // load_contact will return Ok(None).
+    let ratchet = create_test_ratchet();
+    controller.register_ratchet("contact-adr029", ratchet);
+
+    let update = PendingUpdate {
+        id: "u-adr029-1".to_string(),
+        contact_id: "contact-adr029".to_string(),
+        update_type: "card_update".to_string(),
+        payload: vec![1, 2, 3],
+        created_at: 0,
+        retry_count: 0,
+        status: UpdateStatus::Pending,
+        target_relay_url: None,
+    };
+    storage
+        .queue_update(&update)
+        .expect("queue_update should succeed");
+
+    let result = controller
+        .sync(&vauchi_core::rng::OsSecureRng::new())
+        .expect("sync should return Ok (skipping is not an error at this layer)");
+
+    assert_eq!(
+        result.sent, 0,
+        "must not send any update without a derivable mailbox token"
+    );
+    assert_eq!(
+        result.failed, 1,
+        "missing-shared-key skip must be recorded as failed"
+    );
+    assert_eq!(result.errors.len(), 1);
+    assert_eq!(result.errors[0].0, "contact-adr029");
+    let msg = &result.errors[0].1;
+    assert!(
+        msg.contains("mailbox token")
+            || msg.contains("shared_key")
+            || msg.contains("shared key")
+            || msg.contains("not found"),
+        "error message should indicate token-derivation failure: got {msg}"
+    );
+}
+
+/// `sync_contact()` takes a specific contact_id; when no shared_key is
+/// derivable, returning `Ok(SyncResult { sent: 0 })` is misleading and
+/// risks the caller silently treating the contact as "synced". Returning
+/// a typed `Err` is the honest signal. Pre-fix this path also produced
+/// the ADR-029 stable-token fallback.
+#[test]
+fn sync_contact_errors_when_load_contact_returns_none_adr029() {
+    let storage = create_test_storage();
+    let relay = create_test_relay();
+    let events = Arc::new(EventDispatcher::new());
+    let config = SyncConfig::default();
+
+    let mut controller = SyncController::new(relay, &storage, config, events);
+    controller
+        .connect(&vauchi_core::rng::OsSecureRng::new())
+        .unwrap();
+
+    let ratchet = create_test_ratchet();
+    controller.register_ratchet("contact-adr029-b", ratchet);
+
+    let result = controller.sync_contact("contact-adr029-b");
+    assert!(
+        result.is_err(),
+        "sync_contact must Err when no shared_key is derivable; got {:?}",
+        result
+    );
 }

@@ -1356,64 +1356,11 @@ mod tests {
     }
 
     // ── Import contacts via FFI ─────────────────────────────────────────────
-
-    // @scenario: contact_import.feature - Import vCard file
-    #[test]
-    fn test_import_vcf_creates_contacts() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        let vcf = b"BEGIN:VCARD\r\n\
-            VERSION:3.0\r\n\
-            FN:Bob Smith\r\n\
-            TEL:+1234567890\r\n\
-            END:VCARD\r\n\
-            BEGIN:VCARD\r\n\
-            VERSION:3.0\r\n\
-            FN:Carol Jones\r\n\
-            EMAIL:carol@example.com\r\n\
-            END:VCARD\r\n";
-
-        let result = wb.import_contacts_from_vcf(vcf.to_vec()).unwrap();
-        assert_eq!(result.imported, 2);
-        assert_eq!(result.skipped, 0);
-        assert!(result.warnings.is_empty());
-    }
-
-    // @scenario: contact_import.feature - Duplicate vCard UIDs are skipped
-    #[test]
-    fn test_import_vcf_skips_duplicates() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        let vcf = b"BEGIN:VCARD\r\n\
-            VERSION:3.0\r\n\
-            UID:unique-bob-123\r\n\
-            FN:Bob Smith\r\n\
-            END:VCARD\r\n";
-
-        let r1 = wb.import_contacts_from_vcf(vcf.to_vec()).unwrap();
-        assert_eq!(r1.imported, 1);
-
-        let r2 = wb.import_contacts_from_vcf(vcf.to_vec()).unwrap();
-        assert_eq!(r2.imported, 0);
-        assert_eq!(r2.skipped, 1);
-        assert_eq!(r2.warnings[0].key, "import.warning.duplicate_uid");
-        assert!(r2.warnings[0].legacy_text.contains("duplicate"));
-    }
-
-    // @scenario: contact_import.feature - Empty vCard data returns zero imports
-    #[test]
-    fn test_import_empty_vcf() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        let result = wb.import_contacts_from_vcf(Vec::new());
-        // Empty data is either zero imports or an error — both acceptable
-        if let Ok(r) = result {
-            assert_eq!(r.imported, 0);
-        }
-    }
+    // Coverage moved to `tests/it/platform_app_engine_domain_command_tests.rs`
+    // (search `import_contacts_from_vcf_*`) — the canonical surface is now
+    // `DomainCommand::ImportContactsFromVcf` via `dispatch_domain_command`.
+    // The legacy `VauchiPlatform::import_contacts_from_vcf` UniFFI export
+    // was retired 2026-05-23 (Track A); no hand-written consumer existed.
 
     // @internal
     #[test]

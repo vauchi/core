@@ -2377,7 +2377,7 @@ fn import_backup_rejects_invalid_base64() {
     );
 }
 
-// @internal
+// @scenario: contact_import.feature - Empty vCard data returns zero imports
 #[test]
 fn import_contacts_from_vcf_handles_empty_input() {
     let (engine, _dir) = create_engine_with_identity();
@@ -2394,27 +2394,71 @@ fn import_contacts_from_vcf_handles_empty_input() {
     }
 }
 
-// @internal
+// @scenario: contact_import.feature - Import vCard file
 #[test]
-fn import_contacts_from_vcf_imports_minimal_vcard() {
+fn import_contacts_from_vcf_imports_multiple_vcards() {
     let (engine, _dir) = create_engine_with_identity();
 
-    let vcard = b"BEGIN:VCARD\r\n\
+    let vcf = b"BEGIN:VCARD\r\n\
 VERSION:3.0\r\n\
-FN:Imported Friend\r\n\
-N:Friend;Imported;;;\r\n\
-EMAIL:imported@example.test\r\n\
+FN:Bob Smith\r\n\
+TEL:+1234567890\r\n\
+END:VCARD\r\n\
+BEGIN:VCARD\r\n\
+VERSION:3.0\r\n\
+FN:Carol Jones\r\n\
+EMAIL:carol@example.com\r\n\
 END:VCARD\r\n";
 
     match engine
-        .dispatch_domain_command(DomainCommand::ImportContactsFromVcf {
-            data: vcard.to_vec(),
-        })
+        .dispatch_domain_command(DomainCommand::ImportContactsFromVcf { data: vcf.to_vec() })
         .expect("vcf import")
     {
         DomainCommandResult::ImportResult { result } => {
-            assert_eq!(result.imported, 1, "exactly one vcard imported");
+            assert_eq!(result.imported, 2, "two vcards imported");
             assert_eq!(result.skipped, 0, "no duplicates on fresh storage");
+            assert!(result.warnings.is_empty(), "no warnings for clean import");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+}
+
+// @scenario: contact_import.feature - Duplicate vCard UIDs are skipped
+#[test]
+fn import_contacts_from_vcf_skips_duplicates() {
+    let (engine, _dir) = create_engine_with_identity();
+
+    let vcf = b"BEGIN:VCARD\r\n\
+VERSION:3.0\r\n\
+UID:unique-bob-123\r\n\
+FN:Bob Smith\r\n\
+END:VCARD\r\n";
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ImportContactsFromVcf { data: vcf.to_vec() })
+        .expect("first import")
+    {
+        DomainCommandResult::ImportResult { result } => {
+            assert_eq!(result.imported, 1, "first import succeeds");
+        }
+        other => panic!("unexpected result: {other:?}"),
+    }
+
+    match engine
+        .dispatch_domain_command(DomainCommand::ImportContactsFromVcf { data: vcf.to_vec() })
+        .expect("second import")
+    {
+        DomainCommandResult::ImportResult { result } => {
+            assert_eq!(result.imported, 0, "duplicate not re-imported");
+            assert_eq!(result.skipped, 1, "duplicate skipped");
+            assert_eq!(
+                result.warnings[0].key, "import.warning.duplicate_uid",
+                "structured warning emitted"
+            );
+            assert!(
+                result.warnings[0].legacy_text.contains("duplicate"),
+                "legacy text mentions duplicate"
+            );
         }
         other => panic!("unexpected result: {other:?}"),
     }

@@ -4,8 +4,6 @@
 
 //! Contact import operations — vCard file import for mobile platforms.
 
-use super::VauchiPlatform;
-use super::error::MobileError;
 use vauchi_core::api::ImportWarning;
 
 /// One localized-ready warning from a vCard import (G6 of the
@@ -46,29 +44,4 @@ pub struct MobileImportResult {
     /// `t(warning.key, warning.args)`; callers that do not yet
     /// localize can display `warning.legacy_text` verbatim.
     pub warnings: Vec<MobileImportWarning>,
-}
-
-#[uniffi::export]
-impl VauchiPlatform {
-    /// Import contacts from vCard data (supports 2.1 / 3.0 / 4.0).
-    ///
-    /// Pass the raw bytes of a `.vcf` file. Each parsed vCard becomes an
-    /// imported contact. Duplicates (by UID) are skipped. Returns counts
-    /// and per-contact warnings.
-    pub fn import_contacts_from_vcf(
-        &self,
-        data: Vec<u8>,
-    ) -> Result<MobileImportResult, MobileError> {
-        let vauchi = self.open_vauchi()?;
-        let result = vauchi
-            .import_contacts_from_vcf(&data)
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-        Ok(MobileImportResult {
-            imported: result.imported as u32,
-            skipped: result.skipped as u32,
-            warnings: result.warnings.into_iter().map(Into::into).collect(),
-        })
-    }
 }

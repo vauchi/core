@@ -541,6 +541,18 @@ pub enum DomainCommand {
     SetPinnedCertificate { cert_pem: String },
     /// Read whether certificate pinning is currently enabled.
     IsCertificatePinningEnabled,
+
+    // ── Device linking — Track B Tier 2 retirement (B7 batch 22) ──
+    //
+    // Mirrors the typed device-linking methods previously on
+    // `PlatformAppEngine`. Driven by the
+    // `2026-05-23-track-b-push-to-zero-plan.md` campaign;
+    // each method retires one `platform_app_engine_non_humble`
+    // ratchet entry.
+    /// Returns whether the current device is the primary device
+    /// (`device_index == 0`). Mirrors the legacy
+    /// `PlatformAppEngine::is_primary_device`.
+    IsPrimaryDevice,
 }
 
 /// Sum type of every legitimate return shape from

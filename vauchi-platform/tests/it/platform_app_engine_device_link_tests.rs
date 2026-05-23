@@ -76,8 +76,14 @@ fn device_count_is_one_initially() {
 // @internal
 #[test]
 fn is_primary_device_is_true_for_first_device() {
+    use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
-    let is_primary = engine.is_primary_device().expect("is_primary_device");
+    let result = engine
+        .dispatch_domain_command(DomainCommand::IsPrimaryDevice)
+        .expect("dispatch IsPrimaryDevice");
+    let DomainCommandResult::Bool { value: is_primary } = result else {
+        panic!("IsPrimaryDevice: unexpected result variant {result:?}");
+    };
     assert!(is_primary, "first device must be primary");
 }
 

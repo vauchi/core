@@ -4031,6 +4031,19 @@ impl PlatformAppEngine {
                     value: self.cert_pin_path_engine().exists(),
                 })
             }
+
+            // ── Device linking — Track B Tier 2 (B7 batch 22) ──
+            DomainCommand::IsPrimaryDevice => {
+                let identity = engine
+                    .vauchi()
+                    .identity()
+                    .ok_or_else(|| MobileError::Other {
+                        detail: "Identity not initialized".into(),
+                    })?;
+                Ok(DomainCommandResult::Bool {
+                    value: identity.device_info().device_index() == 0,
+                })
+            }
         }
     }
 
@@ -4114,21 +4127,6 @@ impl PlatformAppEngine {
             Some(r) => Ok(r.device_count() as u32),
             None => Ok(1),
         }
-    }
-
-    /// Returns whether the current device is the primary device
-    /// (`device_index == 0`).
-    pub fn is_primary_device(&self) -> Result<bool, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let identity = engine
-            .vauchi()
-            .identity()
-            .ok_or_else(|| MobileError::Other {
-                detail: "Identity not initialized".into(),
-            })?;
-        Ok(identity.device_info().device_index() == 0)
     }
 
     /// Revoke the device at `device_index`. Returns `true` when a

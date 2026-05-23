@@ -142,7 +142,7 @@ Everything else. Per-file count:
 | `mobile_ui.rs` | ~~4~~ 0 (file retired 2026-05-17) | **retired by slice 32c** — `MobileOnboardingWorkflow` collapsed into `PlatformAppEngine`. ADR-043 Amendment 2 codifies "one screen-driving UniFFI object per binding"; the new `peer_uniffi_objects_count` strict-equality test enforces. See `_private/docs/designs/2026-05-16-slice-32c-mobile-ui-retirement-design.md`. B1's earlier "partially superseded" note was the right read but didn't follow through. |
 | `mobile_exchange.rs` | 4 | yes |
 | `mobile_content.rs` | 4 | yes |
-| `mobile_wifi_aware.rs` | 1 | yes |
+| `mobile_wifi_aware.rs` | ~~1~~ 0 (file retired 2026-05-23) | **retired Track A** — zero production consumers (UniFFI exports unused by any frontend); WiFi Aware is future hardware per ADR-031 and will follow the command/event pattern when added. |
 | `mobile_import.rs` | 1 | yes |
 | Others (1 each) | 2 | type conversions / display helpers |
 | **Total** | **220** | **~190 unique callable methods need a destination** |

@@ -189,7 +189,9 @@ already on `PlatformAppEngine`:
 | *(implicit)* `periodic_sync_tick` etc. | `PlatformAppEngine::periodic_sync_tick` + interval/retry | **MIGRATED** (Round 2 P2-C) |
 | *(implicit)* network state | `PlatformAppEngine::set_network_online` / `is_network_online` | **MIGRATED** (Round 2 P2-D) |
 
-### Exchange (`mobile_exchange.rs`, `mobile_animated_qr.rs`, `mobile_ble.rs`, `mobile_nfc.rs`, `mobile_wifi_aware.rs`)
+### Exchange (`mobile_exchange.rs`, `mobile_animated_qr.rs`, `mobile_ble.rs`, `mobile_nfc.rs`)
+
+> `mobile_wifi_aware.rs` retired 2026-05-23 (Track A) — zero production consumers; future WiFi Aware support follows ADR-031 command/event pattern.
 
 Mixed: high-level entry points migrate, session types stay.
 

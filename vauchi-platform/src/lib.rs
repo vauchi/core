@@ -41,7 +41,6 @@ mod mobile_identity;
 mod mobile_import;
 mod mobile_verifier_event;
 mod mobile_visibility;
-mod mobile_wifi_aware;
 mod multipart_qr;
 mod multistage_exchange;
 mod platform_app_engine;
@@ -108,7 +107,6 @@ pub use mobile_import::{MobileImportResult, MobileImportWarning};
 pub use mobile_verifier_event::{
     MobileProximityConfidence, MobileProximityVerifierEvent, MobileVerifierMethod,
 };
-pub use mobile_wifi_aware::{MobileWifiAwareStatus, wifi_aware_check_availability};
 pub use multipart_qr::{MobileMultipartDecoder, MultipartDecoder, encode_multipart};
 pub use multistage_exchange::{
     MobileAudioProximityState, MobileMultiStageSession, MobileProtocolState, MobileQrPayload,

@@ -123,34 +123,6 @@ pub struct MobileDeviceInfo {
     pub created_at: u64,
 }
 
-/// Device type classification for UI icon selection.
-///
-/// Core classifies the device name into a type so all platforms
-/// produce consistent results without duplicating the logic.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum MobileDeviceType {
-    Phone,
-    Tablet,
-    Laptop,
-    Watch,
-    Desktop,
-    Unknown,
-}
-
-impl From<vauchi_core::identity::DeviceType> for MobileDeviceType {
-    fn from(dt: vauchi_core::identity::DeviceType) -> Self {
-        match dt {
-            vauchi_core::identity::DeviceType::Phone => MobileDeviceType::Phone,
-            vauchi_core::identity::DeviceType::Tablet => MobileDeviceType::Tablet,
-            vauchi_core::identity::DeviceType::Laptop => MobileDeviceType::Laptop,
-            vauchi_core::identity::DeviceType::Watch => MobileDeviceType::Watch,
-            vauchi_core::identity::DeviceType::Desktop => MobileDeviceType::Desktop,
-            vauchi_core::identity::DeviceType::Unknown => MobileDeviceType::Unknown,
-            _ => MobileDeviceType::Unknown,
-        }
-    }
-}
-
 /// Delivery status for tracking message delivery progression.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum MobileDeliveryStatus {

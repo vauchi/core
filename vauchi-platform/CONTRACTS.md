@@ -225,14 +225,18 @@ Mixed: high-level entry points migrate, session types stay.
 
 ### GDPR + Consent + Shred (`mobile_gdpr.rs`)
 
-17 methods. **All PENDING B7.**
+16 methods. **All PENDING B7.**
 
 `cancel_identity_deletion`, `cancel_shred`, `check_consent`,
 `execute_identity_deletion`, `export_gdpr_data`,
 `get_consent_records`, `get_consent_status`, `get_deletion_state`,
 `grant_consent`, `hard_shred`, `panic_shred`, `revoke_consent`,
 `schedule_identity_deletion`, `set_platform_keychain` *(constructor parameter)*,
-`shred_status`, `soft_shred`, `verify_shred`.
+`shred_status`, `soft_shred`.
+
+`verify_shred` retired 2026-05-23 (Track A — zero hand-written
+consumers; `MobileShredVerification` record + `From` impl retired
+alongside).
 
 `set_platform_keychain` is a constructor parameter on
 `PlatformAppEngine::new` (the secure-key seam) — not a runtime

@@ -77,10 +77,11 @@ pub enum DomainCommand {
 
     // ── GDPR / Deletion + read-only shred status (B7 batch 3) ──
     //
-    // Note: the 5 keychain-bound shred methods (panic_shred, soft_shred,
-    // hard_shred, cancel_shred, verify_shred) are NOT in this batch —
-    // they require platform-keychain plumbing that PlatformAppEngine
-    // doesn't have yet. Tracked as a separate B7 batch.
+    // Note: the 4 keychain-bound shred methods (panic_shred, soft_shred,
+    // hard_shred, cancel_shred) are NOT in this batch — they require
+    // platform-keychain plumbing that PlatformAppEngine doesn't have
+    // yet. Tracked as a separate B7 batch. (verify_shred retired
+    // 2026-05-23 Track A — zero hand-written consumers.)
     /// Export all user data as JSON (GDPR right-to-export).
     ExportGdprData,
     /// Schedule identity deletion with a 7-day grace period.

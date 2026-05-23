@@ -289,16 +289,21 @@ impl AppEngine {
                 // Identity is cloned via storage serialization (it intentionally
                 // doesn't impl Clone because it contains private key material).
                 // The intermediate buffer is zeroized to avoid leaking key material.
+                //
+                // Site 3 of `2026-05-21-silent-failures-in-security-paths`: the
+                // `from_storage_bytes` round-trip is a contract invariant pinned
+                // by `identity_storage_bytes_roundtrip_preserves_all_fields` in
+                // `core/vauchi-core/tests/it/identity_tests.rs`. A failure here
+                // means either a bug in the serializer/parser pair or genuine
+                // memory corruption — not a recoverable runtime condition. Pre-
+                // 2026-05-23 both sites used `.ok()` and silently dropped the
+                // error, so the user tapping "start exchange" got no feedback.
+                // We now surface the violation via tracing and keep the
+                // graceful-degradation fallback (engine without pre-built
+                // session / NFC identity) so the user retains an entry point.
                 let session = vauchi
                     .identity()
-                    .and_then(|id_ref| {
-                        let bytes = zeroize::Zeroizing::new(id_ref.to_storage_bytes());
-                        vauchi_core::identity::Identity::from_storage_bytes(
-                            &bytes,
-                            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-                        )
-                        .ok()
-                    })
+                    .and_then(reconstruct_identity_via_storage_bytes)
                     .and_then(|identity| {
                         card.map(|c| {
                             let proximity =
@@ -312,14 +317,9 @@ impl AppEngine {
                         })
                     });
 
-                let nfc_identity = vauchi.identity().and_then(|id_ref| {
-                    let bytes = zeroize::Zeroizing::new(id_ref.to_storage_bytes());
-                    vauchi_core::identity::Identity::from_storage_bytes(
-                        &bytes,
-                        vauchi_core::clock::SystemClock::shared().unix_seconds(),
-                    )
-                    .ok()
-                });
+                let nfc_identity = vauchi
+                    .identity()
+                    .and_then(reconstruct_identity_via_storage_bytes);
                 let clock = vauchi.clock().clone();
                 let mut engine = match session {
                     Some(s) => ExchangeEngine::with_session(config, s, clock),
@@ -1377,6 +1377,47 @@ fn format_relative_time(now: u64, timestamp: u64) -> String {
             "1 month ago".to_string()
         } else {
             format!("{months} months ago")
+        }
+    }
+}
+
+/// Round-trips an `Identity` reference via `to_storage_bytes` /
+/// `from_storage_bytes` to obtain an owned copy. `Identity` deliberately
+/// does not implement `Clone` because it contains private key material;
+/// the serialization round-trip is the documented clone path.
+///
+/// The intermediate buffer is wrapped in `zeroize::Zeroizing` to scrub
+/// the serialized form when this fn returns.
+///
+/// Returns `None` only on contract violation: `from_storage_bytes` is
+/// guaranteed to accept the output of `to_storage_bytes`
+/// (`identity_storage_bytes_roundtrip_preserves_all_fields` in
+/// `core/vauchi-core/tests/it/identity_tests.rs` pins this). A failure
+/// here therefore means a bug in the serializer/parser pair or memory
+/// corruption — surfaced via `tracing::error!` instead of silently
+/// dropped (site 3 of
+/// `2026-05-21-silent-failures-in-security-paths`). The caller falls
+/// through to the existing graceful-degradation path so the user keeps
+/// an entry point into the exchange flow rather than getting a hung
+/// "tap does nothing" no-op.
+fn reconstruct_identity_via_storage_bytes(
+    id_ref: &vauchi_core::identity::Identity,
+) -> Option<vauchi_core::identity::Identity> {
+    let bytes = zeroize::Zeroizing::new(id_ref.to_storage_bytes());
+    match vauchi_core::identity::Identity::from_storage_bytes(
+        &bytes,
+        vauchi_core::clock::SystemClock::shared().unix_seconds(),
+    ) {
+        Ok(identity) => Some(identity),
+        Err(e) => {
+            tracing::error!(
+                target: "vauchi.ui.app_engine.screens",
+                error = %e,
+                "Identity round-trip via to_storage_bytes -> from_storage_bytes failed; \
+                 falling back to engine without pre-built session. This is a contract \
+                 violation — see identity_storage_bytes_roundtrip_preserves_all_fields."
+            );
+            None
         }
     }
 }

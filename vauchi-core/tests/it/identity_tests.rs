@@ -134,3 +134,61 @@ fn test_identity_keys_not_degenerate() {
     let pid = identity.public_id();
     assert!(!pid.is_empty(), "Public ID must not be empty");
 }
+
+// ============================================================
+// to_storage_bytes / from_storage_bytes round-trip invariant
+// (site 3 of _private/.../2026-05-21-silent-failures-in-security-paths)
+//
+// `vauchi-app/src/ui/app_engine/screens.rs` clones an Identity by going
+// through this round-trip (Identity intentionally does not impl Clone
+// because it contains key material). The clone path used to be
+// `Identity::from_storage_bytes(&bytes).ok()` — a Result swallowed by
+// `.ok()`. The audit cited this as a silent-failure site: a
+// to_storage_bytes → from_storage_bytes failure means we silently
+// produce no exchange session and the user taps "start exchange" with
+// no feedback. The site-3 fix logs the violation via tracing instead of
+// dropping it, but the underlying contract (this test) is what keeps
+// the failure path unreachable in practice.
+// ============================================================
+
+// @internal
+#[test]
+fn identity_storage_bytes_roundtrip_preserves_all_fields() {
+    let original = Identity::create("Alice", 7);
+    let bytes = original.to_storage_bytes();
+    let restored = Identity::from_storage_bytes(&bytes, 0)
+        .expect("to_storage_bytes() output must always parse via from_storage_bytes()");
+
+    assert_eq!(restored.display_name(), original.display_name());
+    assert_eq!(restored.public_id(), original.public_id());
+    assert_eq!(
+        restored.signing_public_key(),
+        original.signing_public_key(),
+        "signing key must round-trip — drives exchange session keys"
+    );
+}
+
+// @internal
+#[test]
+fn identity_storage_bytes_roundtrip_preserves_unicode_display_name() {
+    let original = Identity::create("Зоя 中文 🦀", 0);
+    let bytes = original.to_storage_bytes();
+    let restored =
+        Identity::from_storage_bytes(&bytes, 0).expect("UTF-8 display name must round-trip");
+    assert_eq!(restored.display_name(), "Зоя 中文 🦀");
+}
+
+// @internal
+#[test]
+fn identity_from_storage_bytes_rejects_severely_truncated_input() {
+    // 30 bytes is too short to contain even `name_len(4) + master_seed(32)`
+    // (= 36 bytes minimum for any non-empty Identity), so the parser must
+    // Err. Tail-only truncation falls into the "old format" backward-
+    // compatibility branch and is intentionally tolerated (see
+    // parse_backup_plaintext at the `>= base_offset + 8` guard).
+    let result = Identity::from_storage_bytes(&[0u8; 30], 0);
+    assert!(
+        result.is_err(),
+        "severely truncated storage bytes must Err so the caller can log the contract violation (site 3 of silent-failures audit)"
+    );
+}

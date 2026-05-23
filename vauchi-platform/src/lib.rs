@@ -203,7 +203,6 @@ impl vauchi_core::storage::SecureStorage for KeychainBridge {
     }
 }
 
-
 // === Thread-safe state ===
 
 /// Serializable identity data for thread-safe storage.

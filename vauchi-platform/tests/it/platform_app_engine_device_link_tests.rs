@@ -198,27 +198,6 @@ fn parse_device_link_qr_rejects_garbage_input() {
     assert!(result.is_err(), "garbage QR must error");
 }
 
-// ── create_device_link_session_initiator ─────────────────────────────
-
-// @internal
-#[test]
-fn create_device_link_session_initiator_returns_session() {
-    // The orchestrator session is the post-Phase-2d entry point.
-    // Smoke-level: verify the wrapper constructs a session without
-    // panic. Driving the cycle thread end-to-end requires a real
-    // relay peer — covered by `device_link_listener_tests.rs`.
-    let (engine, _dir) = create_engine_with_identity();
-    let session = engine
-        .create_device_link_session_initiator()
-        .expect("create_device_link_session_initiator");
-
-    // Session is opaque; the wrapper's contract is just "returns a
-    // session that can be `start()`ed by the frontend". Drop the
-    // session here without start — the cycle thread is not spawned
-    // until start() is called.
-    drop(session);
-}
-
 // ── Cache invalidation contract ──────────────────────────────────────
 
 // @internal

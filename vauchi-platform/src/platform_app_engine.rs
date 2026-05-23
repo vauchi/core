@@ -4202,20 +4202,48 @@ impl PlatformAppEngine {
     // orchestrator session in
     // `done/2026-04-27-device-link-orchestrator-phase2d-windows`.
 
-    /// Create the orchestrator session for the initiator side of a
-    /// device link. The frontend registers a
-    /// `DeviceLinkSessionListener`, calls `start()` on the returned
-    /// session, and forwards user actions via `confirm_manual` /
-    /// `confirm_ultrasonic` / `deny`. The session owns the
-    /// relay-poll loop, the QR-expiry deadline, and the
-    /// user-confirm gate. Replaces the legacy split between
-    /// `start_device_link()`, `listen_for_device_link_request()`,
-    /// and `send_device_link_response()`.
+    /// Fetch the engine-owned link-mode responder session for the
+    /// `DeepLinkResponder` screen. Lazily constructs + caches on the
+    /// first call after navigation enters the screen; subsequent calls
+    /// return the same `Arc`. Returns `None` whenever the engine is on
+    /// any other screen.
     ///
-    /// Persistence: the session saves the updated `DeviceRegistry`
-    /// after `confirm_link` succeeds, closing a pre-existing gap
-    /// where the legacy single-shot path discarded it.
-    pub fn create_device_link_session_initiator(
+    /// Phase 1.6 of `_private/docs/problems/2026-04-27-deep-link-responder-flow`.
+    /// The frontend calls this when it observes
+    /// `screen_id == "link_responder_waiting"`, attaches its own
+    /// `LinkResponderSessionListener`, and calls `start()`. The engine
+    /// `cancel()`s + drops the cached session in
+    /// `after_screen_transition` whenever navigation leaves the
+    /// responder screen, so the same `current_link_responder_session()`
+    /// call after navigate-back returns `None` again.
+    pub fn current_link_responder_session(
+        &self,
+    ) -> Result<Option<Arc<crate::MobileLinkResponderSession>>, MobileError> {
+        // Lazy-build on demand. `ensure_link_responder_session` is a
+        // no-op if the engine is on any other screen, in which case
+        // the slot stays empty and we return `None`.
+        self.ensure_link_responder_session()?;
+        Ok(self
+            .link_responder_session
+            .lock()
+            .map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?
+            .clone())
+    }
+}
+
+impl PlatformAppEngine {
+    /// Internal constructor for the initiator-side orchestrator
+    /// session. Demoted from the UniFFI surface in B1-G of
+    /// `2026-05-23-track-b-push-to-zero-plan.md` — the engine owns
+    /// the session lifecycle via `ensure_device_link_session()`
+    /// (called from `after_screen_transition` on entry to
+    /// `AppScreen::DeviceLinking`), so the public factory had zero
+    /// hand-written frontend callers. The only remaining caller is
+    /// `ensure_device_link_session` in
+    /// `platform_app_engine_device_link.rs`.
+    pub(crate) fn create_device_link_session_initiator(
         &self,
     ) -> Result<Arc<crate::MobileDeviceLinkSession>, MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
@@ -4265,38 +4293,6 @@ impl PlatformAppEngine {
         ))
     }
 
-    /// Fetch the engine-owned link-mode responder session for the
-    /// `DeepLinkResponder` screen. Lazily constructs + caches on the
-    /// first call after navigation enters the screen; subsequent calls
-    /// return the same `Arc`. Returns `None` whenever the engine is on
-    /// any other screen.
-    ///
-    /// Phase 1.6 of `_private/docs/problems/2026-04-27-deep-link-responder-flow`.
-    /// The frontend calls this when it observes
-    /// `screen_id == "link_responder_waiting"`, attaches its own
-    /// `LinkResponderSessionListener`, and calls `start()`. The engine
-    /// `cancel()`s + drops the cached session in
-    /// `after_screen_transition` whenever navigation leaves the
-    /// responder screen, so the same `current_link_responder_session()`
-    /// call after navigate-back returns `None` again.
-    pub fn current_link_responder_session(
-        &self,
-    ) -> Result<Option<Arc<crate::MobileLinkResponderSession>>, MobileError> {
-        // Lazy-build on demand. `ensure_link_responder_session` is a
-        // no-op if the engine is on any other screen, in which case
-        // the slot stays empty and we return `None`.
-        self.ensure_link_responder_session()?;
-        Ok(self
-            .link_responder_session
-            .lock()
-            .map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?
-            .clone())
-    }
-}
-
-impl PlatformAppEngine {
     /// File path holding the in-progress recovery proof, parallel to
     /// the SQLite database. Mirrors the legacy `VauchiPlatform` layout
     /// so both surfaces observe the same on-disk state during the

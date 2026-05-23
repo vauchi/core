@@ -258,7 +258,9 @@ become `PlatformAppEngine` methods. They become top-level
 
 | Method | Replacement | Status |
 |--------|-------------|--------|
-| `core_version`, `app_compat_version`, `is_safe_url`, `is_allowed_scheme`, `is_blocked_scheme`, `is_valid_relay_url`, `parse_locale_code`, `check_password_strength`, `classify_device_type` | *(free function)* | NOT MIGRATED — STAYS (already free helpers) |
+| `core_version`, `app_compat_version`, `is_safe_url`, `is_allowed_scheme`, `is_blocked_scheme`, `is_valid_relay_url`, `parse_locale_code` | *(free function)* | NOT MIGRATED — STAYS (already free helpers) |
+| `check_password_strength` | *(retired)* | **RETIRED 2026-05-23 (Track A)** — zero hand-written consumers in any frontend; `#[uniffi::export] fn` + `MobilePasswordCheck` / `MobilePasswordStrength` deleted; `vauchi_core::identity::password::{validate_password, password_feedback, PasswordStrength}` survive for future renderer-side use. |
+| `classify_device_type` | *(free function)* | NOT MIGRATED — STAYS (already free helpers) |
 | `compute_confirmation_code`, `prepare_confirmation`, `proximity_challenge`, `confirm_link_manual`, `confirm_link_ultrasonic`, `expires_at`, `qr_data`, `create_request`, `finish_join`, `identity_fingerprint` | *(stays on session type)* | NOT MIGRATED — STAYS |
 | `widget_panic_shred` | `dispatch_domain_command(DomainCommand::PanicShred)` | PENDING B7 |
 | `is_certificate_pinning_enabled`, `set_pinned_certificate` | `PlatformAppEngine::is_certificate_pinning_enabled` / `set_pinned_certificate` | PENDING B7 (typed methods, low priority) |

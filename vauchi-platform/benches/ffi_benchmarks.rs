@@ -100,35 +100,11 @@ fn bench_storage(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark password strength checking (utility function)
-fn bench_password_check(c: &mut Criterion) {
-    let mut group = c.benchmark_group("password");
-
-    group.bench_function("check_weak", |b| {
-        b.iter(|| {
-            black_box(vauchi_platform::check_password_strength(
-                "password".to_string(),
-            ));
-        })
-    });
-
-    group.bench_function("check_strong", |b| {
-        b.iter(|| {
-            black_box(vauchi_platform::check_password_strength(
-                "correct-horse-battery-staple".to_string(),
-            ));
-        })
-    });
-
-    group.finish();
-}
-
 criterion_group!(
     benches,
     bench_identity_creation,
     bench_exchange_qr,
     bench_storage,
-    bench_password_check,
 );
 
 criterion_main!(benches);

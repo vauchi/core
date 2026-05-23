@@ -14,9 +14,8 @@
 use std::sync::Once;
 
 use vauchi_platform::{
-    MobileAhaMomentType, MobileLocale, MobilePasswordStrength, check_password_strength,
-    generate_storage_key, get_aha_moment_localized, is_allowed_scheme, is_blocked_scheme,
-    is_safe_url, is_valid_relay_url,
+    MobileAhaMomentType, MobileLocale, generate_storage_key, get_aha_moment_localized,
+    is_allowed_scheme, is_blocked_scheme, is_safe_url, is_valid_relay_url,
 };
 
 static INIT: Once = Once::new();
@@ -27,81 +26,6 @@ fn ensure_init() {
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales");
         let _ = vauchi_app::i18n::init(&locales_dir);
     });
-}
-
-// ============================================================================
-// Password Strength Tests
-// Based on: features/identity_management.feature - Backup security
-// ============================================================================
-
-// @scenario: identity_management:Password strength validation
-/// Test: Short passwords are rejected
-// @internal
-#[test]
-fn test_password_too_short() {
-    let result = check_password_strength("short".to_string());
-    assert!(matches!(result.strength, MobilePasswordStrength::TooWeak));
-    assert!(!result.is_acceptable);
-    assert!(result.feedback.contains("8 characters"));
-}
-
-// @scenario: identity_management:Password strength validation
-/// Test: Common passwords are weak
-// @internal
-#[test]
-fn test_common_passwords_are_weak() {
-    let common_passwords = ["password", "12345678", "qwertyui", "abcdefgh"];
-
-    for password in common_passwords {
-        let result = check_password_strength(password.to_string());
-        assert!(
-            !result.is_acceptable || matches!(result.strength, MobilePasswordStrength::Fair),
-            "Password '{}' should be weak or fair, got {:?}",
-            password,
-            result.strength
-        );
-    }
-}
-
-// @scenario: identity_management:Password strength validation
-/// Test: Strong passwords are accepted
-// @internal
-#[test]
-fn test_strong_passwords() {
-    let strong_passwords = [
-        "correct-horse-battery-staple",
-        "My$ecureP@ssw0rd!2024",
-        "xK9#mL2$vB7@nQ4&jR",
-    ];
-
-    for password in strong_passwords {
-        let result = check_password_strength(password.to_string());
-        assert!(
-            result.is_acceptable,
-            "Password should be acceptable: {:?}",
-            result
-        );
-    }
-}
-
-// @scenario: identity_management:Password strength validation
-/// Test: Empty password is too weak
-// @internal
-#[test]
-fn test_empty_password() {
-    let result = check_password_strength(String::new());
-    assert!(matches!(result.strength, MobilePasswordStrength::TooWeak));
-    assert!(!result.is_acceptable);
-}
-
-// @scenario: identity_management:Password strength validation
-/// Test: Exactly 8 character password
-// @internal
-#[test]
-fn test_minimum_length_password() {
-    let result = check_password_strength("abcd1234".to_string());
-    // 8 chars but weak content - should not be acceptable
-    assert!(!result.is_acceptable || !result.feedback.is_empty());
 }
 
 // ============================================================================

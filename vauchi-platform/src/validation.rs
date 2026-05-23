@@ -9,9 +9,7 @@
 //! single source of truth for what counts as valid.
 //!
 //! Length constants exposed so frontends can render hint text and disable
-//! buttons without baking the numbers into native code. For password
-//! strength checking frontends use [`check_password_strength`] (legacy
-//! surface, already exported from `lib.rs`).
+//! buttons without baking the numbers into native code.
 
 use vauchi_core::contact_card::{is_valid_email, is_valid_phone, is_valid_relay_url};
 use vauchi_core::identity::password::MIN_PASSWORD_LENGTH;

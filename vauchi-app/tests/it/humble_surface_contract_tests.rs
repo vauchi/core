@@ -59,7 +59,6 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "current_screen_id",
     "current_screen_json",
     "current_tab_id",
-    "default_screen_json",
     "drain_pending_notifications",
     "handle_action_json",
     "handle_app_backgrounded",
@@ -202,18 +201,21 @@ fn humble_allowlist_is_sorted_and_unique() {
 #[test]
 fn humble_allowlist_size_matches_plan() {
     // The plan's Task 0.2 originally named 25 methods as the genuine
-    // Humble surface; ADR-047 (Draft) added `set_render_context_json`
-    // for the render-context tier, bringing the size to 26. If this
-    // number changes again, the next ADR amendment must precede the
+    // Humble surface; ADR-047 added `set_render_context_json` for the
+    // render-context tier (25 → 26); ADR-048 ratified a retirement
+    // policy and the first retirement (`default_screen_json`, 26 → 25).
+    // If this number changes again, the next ADR amendment (or a
+    // retirement passing ADR-048's G1-G5 gates) must precede the
     // edit. Catching the count drift here is cheaper than discovering
     // it during an ADR audit.
     assert_eq!(
         HUMBLE_ALLOWLIST.len(),
-        26,
-        "Humble allow-list size drifted from the 26 expected after \
-         ADR-047 added `set_render_context_json`. Edits to this list \
-         require an ADR amendment (ADR-021/043, or ADR-047 for the \
-         render-context tier)."
+        25,
+        "Humble allow-list size drifted from the 25 expected after \
+         ADR-048 ratified the retirement of `default_screen_json`. \
+         Edits to this list require an ADR amendment (ADR-021/043 for \
+         the Humble engine framing, ADR-047 for the render-context \
+         tier, or ADR-048's G1-G5 gates for retirements)."
     );
 }
 

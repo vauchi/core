@@ -651,19 +651,6 @@ impl PlatformAppEngine {
         })
     }
 
-    /// Returns the default landing screen as a JSON string.
-    ///
-    /// Returns MyInfo when no contacts, Contacts when >=1 contact.
-    pub fn default_screen_json(&self) -> Result<String, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let screen = engine.default_screen();
-        serde_json::to_string(&screen).map_err(|e| MobileError::Other {
-            detail: format!("Failed to serialize screen: {e}"),
-        })
-    }
-
     /// Returns the current screen's screen_id (lightweight query).
     ///
     /// Useful for tab bar highlighting without deserializing the full ScreenModel.

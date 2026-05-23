@@ -80,7 +80,7 @@ for these.**
 
 - `boot`, `current_screen_json`, `current_screen_id`, `current_tab_id`,
   `tab_info`, `sidebar_items`, `available_screens_json`,
-  `default_screen_json`, `navigate_to_json`, `navigate_back_json`
+  `navigate_to_json`, `navigate_back_json`
 - `handle_action_json`, `handle_hardware_event`, `advance_qr_frame_json`,
   `form_has_data`
 - `handle_deep_link_uri`

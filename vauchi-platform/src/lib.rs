@@ -1046,11 +1046,6 @@ impl VauchiPlatform {
         }))
     }
 
-    /// Export the current storage key bytes for migration to secure storage.
-    pub fn export_storage_key(&self) -> Vec<u8> {
-        self.storage_key.as_bytes().to_vec()
-    }
-
     /// Set the pinned certificate for relay TLS connections.
     ///
     /// The certificate should be in PEM format. Once set, only connections

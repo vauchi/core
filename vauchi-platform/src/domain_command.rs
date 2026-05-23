@@ -35,9 +35,10 @@ use crate::types::{
     MobileConsentType, MobileContact, MobileContactCard, MobileContactDisplayOptions,
     MobileDecoyContact, MobileDeletionInfo, MobileDeliveryRecord, MobileDeliveryStatus,
     MobileDeliverySummary, MobileDemoContact, MobileDemoContactState, MobileDeviceDeliveryRecord,
-    MobileDuplicatePair, MobileDuressSettings, MobileFieldNote, MobileFieldType, MobileGdprExport,
-    MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryVerification, MobileRetryEntry,
-    MobileShredStatus, MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileDeviceInfo, MobileDuplicatePair, MobileDuressSettings, MobileFieldNote, MobileFieldType,
+    MobileGdprExport, MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryVerification,
+    MobileRetryEntry, MobileShredStatus, MobileSocialNetwork, MobileVisibilityLabel,
+    MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -557,6 +558,9 @@ pub enum DomainCommand {
     /// when no on-disk `DeviceRegistry` exists yet (only the current
     /// device). Mirrors the legacy `PlatformAppEngine::device_count`.
     GetDeviceCount,
+    /// List devices linked to the active identity (index 0 is the
+    /// primary). Mirrors the legacy `PlatformAppEngine::get_devices`.
+    GetDevices,
 }
 
 /// Sum type of every legitimate return shape from
@@ -588,6 +592,9 @@ pub enum DomainCommandResult {
     /// (`ExecuteIdentityDeletion` revocation count) and B7 batch 5
     /// (`AhaMomentsSeenCount`, `AhaMomentsTotalCount`).
     Count { value: u32 },
+    /// List of devices linked to the active identity (B7 batch 22
+    /// — `GetDevices`).
+    Devices { devices: Vec<MobileDeviceInfo> },
     /// GDPR export payload (B7 batch 3 — `ExportGdprData`).
     GdprExport { export: MobileGdprExport },
     /// Deletion-state snapshot (B7 batch 3 — `ScheduleIdentityDeletion`,

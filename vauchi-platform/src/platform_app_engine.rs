@@ -4057,6 +4057,57 @@ impl PlatformAppEngine {
                     };
                 Ok(DomainCommandResult::Count { value: count })
             }
+            DomainCommand::GetDevices => {
+                let identity = engine
+                    .vauchi()
+                    .identity()
+                    .ok_or_else(|| MobileError::Other {
+                        detail: "Identity not initialized".into(),
+                    })?;
+                let storage = engine.vauchi().storage();
+
+                let registry =
+                    match storage
+                        .load_device_registry()
+                        .map_err(|e| MobileError::StorageError {
+                            detail: e.to_string(),
+                        })? {
+                        Some(r) => r,
+                        None => {
+                            let device_info = identity.device_info();
+                            return Ok(DomainCommandResult::Devices {
+                                devices: vec![crate::types::MobileDeviceInfo {
+                                    device_index: device_info.device_index(),
+                                    device_name: device_info.device_name().to_string(),
+                                    is_current: true,
+                                    is_active: true,
+                                    public_key_prefix: hex::encode(&device_info.device_id()[..8]),
+                                    created_at: device_info.created_at(),
+                                }],
+                            });
+                        }
+                    };
+
+                let current_device_id = identity.device_info().device_id();
+                let devices = registry
+                    .all_devices()
+                    .iter()
+                    .enumerate()
+                    .map(
+                        |(idx, d): (usize, &vauchi_core::identity::RegisteredDevice)| {
+                            crate::types::MobileDeviceInfo {
+                                device_index: idx as u32,
+                                device_name: d.device_name.clone(),
+                                is_current: d.device_id == *current_device_id,
+                                is_active: d.is_active(),
+                                public_key_prefix: hex::encode(&d.device_id[..8]),
+                                created_at: d.created_at,
+                            }
+                        },
+                    )
+                    .collect();
+                Ok(DomainCommandResult::Devices { devices })
+            }
         }
     }
 
@@ -4069,60 +4120,6 @@ impl PlatformAppEngine {
     // are intentionally NOT migrated — they were superseded by the
     // orchestrator session in
     // `done/2026-04-27-device-link-orchestrator-phase2d-windows`.
-
-    /// List devices linked to the active identity. The first entry
-    /// (index 0) is the primary device.
-    pub fn get_devices(&self) -> Result<Vec<crate::types::MobileDeviceInfo>, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let identity = engine
-            .vauchi()
-            .identity()
-            .ok_or_else(|| MobileError::Other {
-                detail: "Identity not initialized".into(),
-            })?;
-        let storage = engine.vauchi().storage();
-
-        let registry =
-            match storage
-                .load_device_registry()
-                .map_err(|e| MobileError::StorageError {
-                    detail: e.to_string(),
-                })? {
-                Some(r) => r,
-                None => {
-                    let device_info = identity.device_info();
-                    return Ok(vec![crate::types::MobileDeviceInfo {
-                        device_index: device_info.device_index(),
-                        device_name: device_info.device_name().to_string(),
-                        is_current: true,
-                        is_active: true,
-                        public_key_prefix: hex::encode(&device_info.device_id()[..8]),
-                        created_at: device_info.created_at(),
-                    }]);
-                }
-            };
-
-        let current_device_id = identity.device_info().device_id();
-        Ok(registry
-            .all_devices()
-            .iter()
-            .enumerate()
-            .map(
-                |(idx, d): (usize, &vauchi_core::identity::RegisteredDevice)| {
-                    crate::types::MobileDeviceInfo {
-                        device_index: idx as u32,
-                        device_name: d.device_name.clone(),
-                        is_current: d.device_id == *current_device_id,
-                        is_active: d.is_active(),
-                        public_key_prefix: hex::encode(&d.device_id[..8]),
-                        created_at: d.created_at,
-                    }
-                },
-            )
-            .collect())
-    }
 
     /// Revoke the device at `device_index`. Returns `true` when a
     /// device was revoked, `false` when the index is out of range or

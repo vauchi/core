@@ -53,8 +53,14 @@ fn drive_onboarding(engine: &PlatformAppEngine) {
 // @internal
 #[test]
 fn get_devices_returns_only_current_device_initially() {
+    use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
-    let devices = engine.get_devices().expect("get_devices");
+    let result = engine
+        .dispatch_domain_command(DomainCommand::GetDevices)
+        .expect("dispatch GetDevices");
+    let DomainCommandResult::Devices { devices } = result else {
+        panic!("GetDevices: unexpected result variant {result:?}");
+    };
     assert_eq!(
         devices.len(),
         1,

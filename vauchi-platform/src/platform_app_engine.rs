@@ -4044,6 +4044,19 @@ impl PlatformAppEngine {
                     value: identity.device_info().device_index() == 0,
                 })
             }
+            DomainCommand::GetDeviceCount => {
+                let storage = engine.vauchi().storage();
+                let count =
+                    match storage
+                        .load_device_registry()
+                        .map_err(|e| MobileError::StorageError {
+                            detail: e.to_string(),
+                        })? {
+                        Some(r) => r.device_count() as u32,
+                        None => 1,
+                    };
+                Ok(DomainCommandResult::Count { value: count })
+            }
         }
     }
 
@@ -4109,24 +4122,6 @@ impl PlatformAppEngine {
                 },
             )
             .collect())
-    }
-
-    /// Number of devices linked to the active identity. Returns 1 when
-    /// no registry exists yet (only the current device).
-    pub fn device_count(&self) -> Result<u32, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let storage = engine.vauchi().storage();
-
-        match storage
-            .load_device_registry()
-            .map_err(|e| MobileError::StorageError {
-                detail: e.to_string(),
-            })? {
-            Some(r) => Ok(r.device_count() as u32),
-            None => Ok(1),
-        }
     }
 
     /// Revoke the device at `device_index`. Returns `true` when a

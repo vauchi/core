@@ -68,8 +68,14 @@ fn get_devices_returns_only_current_device_initially() {
 // @internal
 #[test]
 fn device_count_is_one_initially() {
+    use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
-    let count = engine.device_count().expect("device_count");
+    let result = engine
+        .dispatch_domain_command(DomainCommand::GetDeviceCount)
+        .expect("dispatch GetDeviceCount");
+    let DomainCommandResult::Count { value: count } = result else {
+        panic!("GetDeviceCount: unexpected result variant {result:?}");
+    };
     assert_eq!(count, 1, "fresh identity has one device");
 }
 

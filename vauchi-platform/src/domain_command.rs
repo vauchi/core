@@ -553,6 +553,10 @@ pub enum DomainCommand {
     /// (`device_index == 0`). Mirrors the legacy
     /// `PlatformAppEngine::is_primary_device`.
     IsPrimaryDevice,
+    /// Number of devices linked to the active identity. Returns 1
+    /// when no on-disk `DeviceRegistry` exists yet (only the current
+    /// device). Mirrors the legacy `PlatformAppEngine::device_count`.
+    GetDeviceCount,
 }
 
 /// Sum type of every legitimate return shape from

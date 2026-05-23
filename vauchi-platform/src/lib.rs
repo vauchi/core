@@ -124,11 +124,10 @@ pub use types::{
     MobileDeviceDeliveryStatus, MobileDeviceInfo, MobileDeviceJoinResult,
     MobileDeviceLinkConfirmation, MobileDeviceLinkData, MobileDeviceLinkInfo,
     MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileDuressSettings, MobileEmergencyConfig,
-    MobileExchangeResult, MobileFaqItem, MobileFieldNote, MobileFieldType, MobileGdprExport,
-    MobileHelpCategory, MobileHelpCategoryInfo, MobileLabelContactBadge, MobileLabelContactRow,
-    MobileLabelContactStatus, MobileLocale, MobileLocaleInfo, MobileMotionTokens,
-    MobileNotificationCategory, MobileOnboardingProgress, MobileOnboardingStep,
-    MobilePendingNotification, MobileRecoveryClaim, MobileRecoveryProgress,
+    MobileExchangeResult, MobileFieldNote, MobileFieldType, MobileGdprExport,
+    MobileLabelContactBadge, MobileLabelContactRow, MobileLabelContactStatus, MobileLocale,
+    MobileLocaleInfo, MobileMotionTokens, MobileNotificationCategory, MobileOnboardingProgress,
+    MobileOnboardingStep, MobilePendingNotification, MobileRecoveryClaim, MobileRecoveryProgress,
     MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredReport,
     MobileShredStatus, MobileShredToken, MobileSocialNetwork, MobileSpacingDirectionTokens,
     MobileSpacingTokens, MobileSyncResult, MobileSyncStatus, MobileTabInfo, MobileTheme,
@@ -443,108 +442,6 @@ pub fn get_string_with_args(
 #[uniffi::export]
 pub fn parse_locale_code(code: String) -> Option<MobileLocale> {
     vauchi_app::i18n::Locale::from_code(&code).map(MobileLocale::from)
-}
-
-// ============================================================
-// Help Functions
-// ============================================================
-
-/// Get all help categories with their display names.
-#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
-#[uniffi::export]
-pub fn get_help_categories() -> Vec<MobileHelpCategoryInfo> {
-    vauchi_app::help::HelpCategory::all()
-        .iter()
-        .map(|c| MobileHelpCategoryInfo {
-            category: (*c).into(),
-            display_name: c.display_name().to_string(),
-        })
-        .collect()
-}
-
-/// Get all FAQ items.
-#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
-#[uniffi::export]
-pub fn get_faqs() -> Vec<MobileFaqItem> {
-    vauchi_app::help::get_faqs()
-        .iter()
-        .map(MobileFaqItem::from)
-        .collect()
-}
-
-/// Get FAQ items for a specific category.
-#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
-#[uniffi::export]
-pub fn get_faqs_by_category(category: MobileHelpCategory) -> Vec<MobileFaqItem> {
-    vauchi_app::help::get_faqs_by_category(category.into())
-        .iter()
-        .map(MobileFaqItem::from)
-        .collect()
-}
-
-/// Get a specific FAQ item by ID.
-///
-/// Returns None if the FAQ is not found.
-#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
-#[uniffi::export]
-pub fn get_faq_by_id(id: String) -> Option<MobileFaqItem> {
-    vauchi_app::help::get_faq_by_id(&id).map(|f| MobileFaqItem::from(&f))
-}
-
-/// Search FAQs by query text.
-///
-/// Searches in both questions and answers (case-insensitive).
-#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
-#[uniffi::export]
-pub fn search_faqs(query: String) -> Vec<MobileFaqItem> {
-    vauchi_app::help::search_faqs(&query)
-        .iter()
-        .map(MobileFaqItem::from)
-        .collect()
-}
-
-/// Get all FAQ items in the specified locale.
-#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
-#[uniffi::export]
-pub fn get_faqs_localized(locale: MobileLocale) -> Vec<MobileFaqItem> {
-    vauchi_app::help::get_faqs_localized(locale.into())
-        .iter()
-        .map(MobileFaqItem::from)
-        .collect()
-}
-
-/// Get FAQ items for a specific category in the specified locale.
-#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
-#[uniffi::export]
-pub fn get_faqs_by_category_localized(
-    category: MobileHelpCategory,
-    locale: MobileLocale,
-) -> Vec<MobileFaqItem> {
-    vauchi_app::help::get_faqs_by_category_localized(category.into(), locale.into())
-        .iter()
-        .map(MobileFaqItem::from)
-        .collect()
-}
-
-/// Get a specific FAQ item by ID in the specified locale.
-///
-/// Returns None if the FAQ is not found.
-#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
-#[uniffi::export]
-pub fn get_faq_by_id_localized(id: String, locale: MobileLocale) -> Option<MobileFaqItem> {
-    vauchi_app::help::get_faq_by_id_localized(&id, locale.into()).map(|f| MobileFaqItem::from(&f))
-}
-
-/// Search FAQs by query text in the specified locale.
-///
-/// Searches in both questions and answers (case-insensitive).
-#[deprecated(note = "Use HelpWorkflowEngine via ScreenModel routing instead")]
-#[uniffi::export]
-pub fn search_faqs_localized(query: String, locale: MobileLocale) -> Vec<MobileFaqItem> {
-    vauchi_app::help::search_faqs_localized(&query, locale.into())
-        .iter()
-        .map(MobileFaqItem::from)
-        .collect()
 }
 
 /// Get localized aha moment content for a given moment type.

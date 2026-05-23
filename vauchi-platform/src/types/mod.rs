@@ -40,8 +40,7 @@ pub use social::{
 };
 pub use ux::{
     MobileAhaMoment, MobileAhaMomentType, MobileBorderRadiusTokens, MobileDemoContact,
-    MobileDemoContactState, MobileDesignTokens, MobileFaqItem, MobileHelpCategory,
-    MobileHelpCategoryInfo, MobileLocale, MobileLocaleInfo, MobileMotionTokens,
+    MobileDemoContactState, MobileDesignTokens, MobileLocale, MobileLocaleInfo, MobileMotionTokens,
     MobileOnboardingProgress, MobileOnboardingStep, MobileSpacingDirectionTokens,
     MobileSpacingTokens, MobileTabInfo, MobileTabLayout, MobileTheme, MobileThemeColors,
     MobileThemeMode, MobileTouchTargetTokens, MobileTypographyTokens, mobile_get_string,

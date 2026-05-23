@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! FFI Boundary Tests
-#![allow(deprecated)] // Help FFI functions deprecated pending iOS/Android refactor
 //!
 //! Tests the FFI boundary between Rust and mobile platforms.
 //! Focuses on type conversions, error handling, and standalone functions
@@ -15,10 +14,9 @@
 use std::sync::Once;
 
 use vauchi_platform::{
-    MobileAhaMomentType, MobileHelpCategory, MobileLocale, MobilePasswordStrength,
-    check_password_strength, generate_storage_key, get_aha_moment_localized,
-    get_faq_by_id_localized, get_faqs_by_category_localized, get_faqs_localized, is_allowed_scheme,
-    is_blocked_scheme, is_safe_url, is_valid_relay_url, search_faqs_localized,
+    MobileAhaMomentType, MobileLocale, MobilePasswordStrength, check_password_strength,
+    generate_storage_key, get_aha_moment_localized, is_allowed_scheme, is_blocked_scheme,
+    is_safe_url, is_valid_relay_url,
 };
 
 static INIT: Once = Once::new();
@@ -361,133 +359,6 @@ fn test_relay_url_other_schemes_rejected() {
     assert!(!is_valid_relay_url("ftp://relay.example.com".to_string()));
     assert!(!is_valid_relay_url("ssh://relay.example.com".to_string()));
     assert!(!is_valid_relay_url("".to_string()));
-}
-
-// ============================================================================
-// Localized FAQ Tests
-// Based on: features/help_system.feature - Localized help content
-// ============================================================================
-
-// @scenario: help_faq:FAQ localization for supported languages
-/// Test: Get all FAQs in German returns same count as English
-// @internal
-#[test]
-fn test_get_faqs_localized_german_count() {
-    ensure_init();
-    let english = get_faqs_localized(MobileLocale::English);
-    let german = get_faqs_localized(MobileLocale::German);
-    assert_eq!(english.len(), german.len());
-    assert!(!german.is_empty());
-}
-
-// @scenario: help_faq:FAQ localization for supported languages
-/// Test: German FAQs contain German text
-// @internal
-#[test]
-fn test_get_faqs_localized_german_content() {
-    ensure_init();
-    let german = get_faqs_localized(MobileLocale::German);
-    let phone_lost = german.iter().find(|f| f.id == "faq-phone-lost").unwrap();
-    assert!(
-        phone_lost.question.contains("Telefon"),
-        "German FAQ should contain 'Telefon', got: {}",
-        phone_lost.question
-    );
-}
-
-// @scenario: help_faq:FAQ localization for supported languages
-/// Test: French FAQs contain French text
-// @internal
-#[test]
-fn test_get_faqs_localized_french_content() {
-    ensure_init();
-    let french = get_faqs_localized(MobileLocale::French);
-    let phone_lost = french.iter().find(|f| f.id == "faq-phone-lost").unwrap();
-    assert!(
-        phone_lost.question.contains("telephone"),
-        "French FAQ should contain 'telephone', got: {}",
-        phone_lost.question
-    );
-}
-
-// @scenario: help_faq:FAQ localization for supported languages
-/// Test: Spanish FAQs contain Spanish text
-// @internal
-#[test]
-fn test_get_faqs_localized_spanish_content() {
-    ensure_init();
-    let spanish = get_faqs_localized(MobileLocale::Spanish);
-    let phone_lost = spanish.iter().find(|f| f.id == "faq-phone-lost").unwrap();
-    assert!(
-        phone_lost.question.contains("telefono"),
-        "Spanish FAQ should contain 'telefono', got: {}",
-        phone_lost.question
-    );
-}
-
-// @scenario: help_faq:Browse FAQs in a category
-/// Test: Get FAQs by category in German
-// @internal
-#[test]
-fn test_get_faqs_by_category_localized() {
-    ensure_init();
-    let german_privacy =
-        get_faqs_by_category_localized(MobileHelpCategory::Privacy, MobileLocale::German);
-    assert!(!german_privacy.is_empty());
-    for faq in &german_privacy {
-        assert_eq!(faq.category, MobileHelpCategory::Privacy);
-    }
-}
-
-// @scenario: help_faq:View a specific FAQ
-/// Test: Get specific FAQ by ID in German
-// @internal
-#[test]
-fn test_get_faq_by_id_localized() {
-    ensure_init();
-    let faq = get_faq_by_id_localized("faq-phone-lost".to_string(), MobileLocale::German);
-    assert!(faq.is_some(), "expected Some value");
-    assert!(faq.unwrap().question.contains("Telefon"));
-}
-
-// @scenario: help_faq:View a specific FAQ
-/// Test: Get FAQ by ID that doesn't exist
-// @internal
-#[test]
-fn test_get_faq_by_id_localized_not_found() {
-    ensure_init();
-    let faq = get_faq_by_id_localized("nonexistent".to_string(), MobileLocale::German);
-    assert!(faq.is_none());
-}
-
-// @scenario: help_faq:Search FAQs by keyword
-/// Test: Search FAQs in German
-// @internal
-#[test]
-fn test_search_faqs_localized_german() {
-    ensure_init();
-    let results = search_faqs_localized("Verschluesselung".to_string(), MobileLocale::German);
-    assert!(!results.is_empty(), "Should find German encryption FAQ");
-}
-
-// @scenario: help_faq:Search FAQs by keyword
-/// Test: Search FAQs in English
-// @internal
-#[test]
-fn test_search_faqs_localized_english() {
-    ensure_init();
-    let results = search_faqs_localized("encrypt".to_string(), MobileLocale::English);
-    assert!(!results.is_empty(), "Should find English encryption FAQ");
-}
-
-// @scenario: help_faq:Search with no results
-/// Test: Search with no results
-// @internal
-#[test]
-fn test_search_faqs_localized_no_results() {
-    ensure_init();
-    let results = search_faqs_localized("xyznonexistent123".to_string(), MobileLocale::German);
-    assert!(results.is_empty());
 }
 
 // ============================================================================

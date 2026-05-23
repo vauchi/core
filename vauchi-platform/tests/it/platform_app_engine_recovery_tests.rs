@@ -105,15 +105,21 @@ fn create_recovery_claim_rejects_wrong_length() {
 // @internal
 #[test]
 fn parse_recovery_claim_round_trips_create() {
+    use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
     let old_pk_hex = fake_old_pk_hex();
 
     let original = engine
         .create_recovery_claim(old_pk_hex.clone())
         .expect("create");
-    let parsed = engine
-        .parse_recovery_claim(original.claim_data.clone())
-        .expect("parse");
+    let parse_result = engine
+        .dispatch_domain_command(DomainCommand::ParseRecoveryClaim {
+            claim_b64: original.claim_data.clone(),
+        })
+        .expect("dispatch ParseRecoveryClaim");
+    let DomainCommandResult::RecoveryClaim { claim: parsed } = parse_result else {
+        panic!("ParseRecoveryClaim: unexpected result variant {parse_result:?}");
+    };
 
     assert_eq!(parsed.old_public_key, original.old_public_key);
     assert_eq!(parsed.new_public_key, original.new_public_key);
@@ -124,8 +130,11 @@ fn parse_recovery_claim_round_trips_create() {
 // @internal
 #[test]
 fn parse_recovery_claim_rejects_invalid_base64() {
+    use vauchi_platform::DomainCommand;
     let (engine, _dir) = create_engine_with_identity();
-    let result = engine.parse_recovery_claim("not!valid!base64!".into());
+    let result = engine.dispatch_domain_command(DomainCommand::ParseRecoveryClaim {
+        claim_b64: "not!valid!base64!".into(),
+    });
     assert!(result.is_err(), "invalid base64 must error");
 }
 

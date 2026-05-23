@@ -1037,40 +1037,6 @@ impl PlatformAppEngine {
         Ok(result)
     }
 
-    /// Parse a base64-encoded recovery claim. Read-only — does not
-    /// touch the recovery proof file.
-    pub fn parse_recovery_claim(
-        &self,
-        claim_b64: String,
-    ) -> Result<crate::types::MobileRecoveryClaim, MobileError> {
-        use base64::Engine as _;
-        use vauchi_core::recovery::RecoveryClaim;
-
-        let claim_bytes = base64::engine::general_purpose::STANDARD
-            .decode(&claim_b64)
-            .map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: format!("Invalid base64: {e}"),
-            })?;
-        let claim =
-            RecoveryClaim::from_bytes(&claim_bytes).map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: format!("Invalid claim: {e}"),
-            })?;
-
-        Ok(crate::types::MobileRecoveryClaim {
-            old_public_key: hex::encode(claim.old_pk()),
-            new_public_key: hex::encode(claim.new_pk()),
-            claim_data: claim_b64,
-            is_expired: claim.is_expired(
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0),
-            ),
-        })
-    }
-
     /// Create a voucher for someone else's recovery claim using the
     /// active identity's signing key.
     pub fn create_recovery_voucher(
@@ -4135,6 +4101,33 @@ impl PlatformAppEngine {
                         identity_public_key: hex::encode(qr.identity_public_key()),
                         timestamp: qr.timestamp(),
                         is_expired: qr
+                            .is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
+                    },
+                })
+            }
+            DomainCommand::ParseRecoveryClaim { claim_b64 } => {
+                use base64::Engine as _;
+                use vauchi_core::recovery::RecoveryClaim;
+
+                let claim_bytes = base64::engine::general_purpose::STANDARD
+                    .decode(&claim_b64)
+                    .map_err(|e| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: format!("Invalid base64: {e}"),
+                    })?;
+                let claim = RecoveryClaim::from_bytes(&claim_bytes).map_err(|e| {
+                    MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: format!("Invalid claim: {e}"),
+                    }
+                })?;
+
+                Ok(DomainCommandResult::RecoveryClaim {
+                    claim: crate::types::MobileRecoveryClaim {
+                        old_public_key: hex::encode(claim.old_pk()),
+                        new_public_key: hex::encode(claim.new_pk()),
+                        claim_data: claim_b64,
+                        is_expired: claim
                             .is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
                     },
                 })

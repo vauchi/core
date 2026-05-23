@@ -37,8 +37,9 @@ use crate::types::{
     MobileDeliverySummary, MobileDemoContact, MobileDemoContactState, MobileDeviceDeliveryRecord,
     MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDuplicatePair,
     MobileDuressSettings, MobileFieldNote, MobileFieldType, MobileGdprExport,
-    MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryVerification, MobileRetryEntry,
-    MobileShredStatus, MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryClaim,
+    MobileRecoveryVerification, MobileRetryEntry, MobileShredStatus, MobileSocialNetwork,
+    MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -232,8 +233,6 @@ pub enum DomainCommand {
     // domain; B2 covered the main 9 typed methods, this batch covers
     // the 3 long-tail methods that don't justify their own
     // PlatformAppEngine surface). ──
-    /// Verify a recovery proof from a contact and produce a confidence
-    /// recommendation (high / medium / low) based on known vouchers.
     VerifyRecoveryProof {
         proof_b64: String,
     },
@@ -268,6 +267,11 @@ pub enum DomainCommand {
     /// Count the contacts marked as recovery-trusted. Returns
     /// `Count { value }`.
     TrustedContactCount,
+
+    // ── Recovery typed-method retirement (Track B B4a) ──
+    ParseRecoveryClaim {
+        claim_b64: String,
+    },
     // ── Visibility Labels + Field Visibility (B7 batch 6) ──
     /// List every visibility label.
     ListLabels,
@@ -735,91 +739,154 @@ pub enum DomainCommandResult {
     /// Command returned `()` (write-path with no payload).
     Unit,
     /// Boolean result (`check_consent` etc.).
-    Bool { value: bool },
+    Bool {
+        value: bool,
+    },
     /// Aggregated `MobileConsentStatus` (B7 batch 1).
-    ConsentStatus { status: MobileConsentStatus },
+    ConsentStatus {
+        status: MobileConsentStatus,
+    },
     /// List of `MobileConsentRecord` (B7 batch 1).
-    ConsentRecords { records: Vec<MobileConsentRecord> },
+    ConsentRecords {
+        records: Vec<MobileConsentRecord>,
+    },
     /// Outcome of `CheckContentUpdates` (B7 batch 2).
-    UpdateStatus { status: MobileUpdateStatus },
+    UpdateStatus {
+        status: MobileUpdateStatus,
+    },
     /// Outcome of `ApplyContentUpdates` (B7 batch 2).
-    ApplyResult { result: MobileApplyResult },
+    ApplyResult {
+        result: MobileApplyResult,
+    },
     /// List of `MobileSocialNetwork` (B7 batch 2 — `ReloadSocialNetworks`).
-    SocialNetworks { networks: Vec<MobileSocialNetwork> },
+    SocialNetworks {
+        networks: Vec<MobileSocialNetwork>,
+    },
     /// Numeric `u32` result — used by both B7 batch 3
     /// (`ExecuteIdentityDeletion` revocation count) and B7 batch 5
     /// (`AhaMomentsSeenCount`, `AhaMomentsTotalCount`).
-    Count { value: u32 },
+    Count {
+        value: u32,
+    },
     /// List of devices linked to the active identity (B7 batch 22
     /// — `GetDevices`).
-    Devices { devices: Vec<MobileDeviceInfo> },
+    Devices {
+        devices: Vec<MobileDeviceInfo>,
+    },
     /// Device-link QR payload (B7 batch 22 — `GenerateDeviceLinkQr`).
-    DeviceLinkData { data: MobileDeviceLinkData },
+    DeviceLinkData {
+        data: MobileDeviceLinkData,
+    },
     /// Parsed device-link QR info (B7 b22).
-    DeviceLinkInfo { info: MobileDeviceLinkInfo },
+    DeviceLinkInfo {
+        info: MobileDeviceLinkInfo,
+    },
     /// GDPR export payload (B7 batch 3 — `ExportGdprData`).
-    GdprExport { export: MobileGdprExport },
+    GdprExport {
+        export: MobileGdprExport,
+    },
     /// Deletion-state snapshot (B7 batch 3 — `ScheduleIdentityDeletion`,
     /// `GetDeletionState`).
-    DeletionInfo { info: MobileDeletionInfo },
+    DeletionInfo {
+        info: MobileDeletionInfo,
+    },
     /// Shred-process status snapshot (B7 batch 3 — `ShredStatus`).
-    ShredStatus { status: MobileShredStatus },
+    ShredStatus {
+        status: MobileShredStatus,
+    },
     /// Optional aha-moment payload (B7 batch 5 —
     /// `TryTriggerAhaMoment` and friends).
-    AhaMomentOpt { moment: Option<MobileAhaMoment> },
+    AhaMomentOpt {
+        moment: Option<MobileAhaMoment>,
+    },
     /// Optional demo-contact payload (B7 batch 5 —
     /// `InitDemoContactIfNeeded`, `GetDemoContact`,
     /// `TriggerDemoUpdate`, `RestoreDemoContact`).
-    DemoContactOpt { contact: Option<MobileDemoContact> },
+    DemoContactOpt {
+        contact: Option<MobileDemoContact>,
+    },
     /// Demo-contact tracker state snapshot (B7 batch 5 —
     /// `GetDemoContactState`).
-    DemoContactState { state: MobileDemoContactState },
+    DemoContactState {
+        state: MobileDemoContactState,
+    },
     /// Own contact card (B7 batch 10 — `GetOwnCard`).
-    ContactCardPayload { card: MobileContactCard },
+    ContactCardPayload {
+        card: MobileContactCard,
+    },
     /// Optional contact (B7 batch 10 — `GetContact`).
-    ContactOpt { contact: Option<MobileContact> },
+    ContactOpt {
+        contact: Option<MobileContact>,
+    },
     /// List of contacts (B7 batch 10 — `ListContacts`,
     /// `SearchContacts`, `ListArchivedContacts`).
-    Contacts { contacts: Vec<MobileContact> },
+    Contacts {
+        contacts: Vec<MobileContact>,
+    },
     /// Recovery-proof verification result (B7 batch 4 —
     /// `VerifyRecoveryProof`).
     RecoveryVerification {
         verification: MobileRecoveryVerification,
     },
+    RecoveryClaim {
+        claim: MobileRecoveryClaim,
+    },
     /// List of visibility labels (B7 batch 6 — `ListLabels`,
     /// `GetGroupsForContact`).
-    Labels { labels: Vec<MobileVisibilityLabel> },
+    Labels {
+        labels: Vec<MobileVisibilityLabel>,
+    },
     /// Single visibility label (B7 batch 6 — `CreateLabel`).
-    Label { label: MobileVisibilityLabel },
+    Label {
+        label: MobileVisibilityLabel,
+    },
     /// Visibility label with resolved contact rows (B7 batch 6 —
     /// `GetLabel`).
-    LabelDetail { detail: MobileVisibilityLabelDetail },
+    LabelDetail {
+        detail: MobileVisibilityLabelDetail,
+    },
     /// List of `String` payload (B7 batch 6 — `GetSuggestedLabels`).
-    Strings { values: Vec<String> },
+    Strings {
+        values: Vec<String>,
+    },
     /// Generic `String` payload (B7 batch 7 — `AddDecoyContact`
     /// returns the generated decoy id).
-    Text { value: String },
+    Text {
+        value: String,
+    },
     /// Authentication-mode result (B7 batch 7 — `Authenticate`).
-    AuthMode { mode: MobileAuthMode },
+    AuthMode {
+        mode: MobileAuthMode,
+    },
     /// Optional duress-settings payload (B7 batch 7 —
     /// `GetDuressSettings`).
     DuressSettingsOpt {
         settings: Option<MobileDuressSettings>,
     },
     /// List of decoy contacts (B7 batch 7 — `ListDecoyContacts`).
-    DecoyContacts { contacts: Vec<MobileDecoyContact> },
+    DecoyContacts {
+        contacts: Vec<MobileDecoyContact>,
+    },
     /// Numeric u64 result (B7 batch 8 — `CalculateRetryBackoff`).
-    BackoffSeconds { seconds: u64 },
+    BackoffSeconds {
+        seconds: u64,
+    },
     /// Optional delivery record (B7 batch 8 — `GetDeliveryRecord`).
     DeliveryRecordOpt {
         record: Option<MobileDeliveryRecord>,
     },
     /// List of delivery records (B7 batch 8 — multiple).
-    DeliveryRecords { records: Vec<MobileDeliveryRecord> },
+    DeliveryRecords {
+        records: Vec<MobileDeliveryRecord>,
+    },
     /// List of retry entries (B7 batch 8).
-    RetryEntries { entries: Vec<MobileRetryEntry> },
+    RetryEntries {
+        entries: Vec<MobileRetryEntry>,
+    },
     /// Multi-device delivery summary (B7 batch 8 — `GetDeliverySummary`).
-    DeliverySummary { summary: MobileDeliverySummary },
+    DeliverySummary {
+        summary: MobileDeliverySummary,
+    },
     /// List of device delivery records (B7 batch 8 —
     /// `GetDeviceDeliveries`, `GetPendingDeviceDeliveries`).
     DeviceDeliveries {
@@ -827,23 +894,39 @@ pub enum DomainCommandResult {
     },
     /// Optional `String` payload (B7 batch 11 — `GetContactNote`,
     /// `GetProfileUrl`).
-    StringOpt { value: Option<String> },
+    StringOpt {
+        value: Option<String>,
+    },
     /// Optional avatar bytes (B7 batch 11 — `GetContactCustomAvatar`).
-    AvatarOpt { data: Option<Vec<u8>> },
+    AvatarOpt {
+        data: Option<Vec<u8>>,
+    },
     /// List of duplicate-contact pairs (B7 batch 11 — `FindDuplicates`).
-    DuplicatePairs { pairs: Vec<MobileDuplicatePair> },
+    DuplicatePairs {
+        pairs: Vec<MobileDuplicatePair>,
+    },
     /// List of field-notes (B7 batch 11 — `GetContactFieldNotes`).
-    FieldNotes { notes: Vec<MobileFieldNote> },
+    FieldNotes {
+        notes: Vec<MobileFieldNote>,
+    },
     /// vCard import outcome (B7 batch 12 — `ImportContactsFromVcf`).
-    ImportResult { result: MobileImportResult },
+    ImportResult {
+        result: MobileImportResult,
+    },
     /// Single enriched contact (B7 batch 14 — `MergeContacts`).
-    ContactSingle { contact: MobileContact },
+    ContactSingle {
+        contact: MobileContact,
+    },
     /// Onboarding progress snapshot (B7 batch 16 —
     /// `GetOnboardingProgress`, `AdvanceOnboarding`,
     /// `SkipOnboardingStep`).
-    OnboardingProgress { progress: MobileOnboardingProgress },
+    OnboardingProgress {
+        progress: MobileOnboardingProgress,
+    },
     /// Current onboarding step (B7 batch 16 — `CurrentOnboardingStep`).
-    OnboardingStep { step: MobileOnboardingStep },
+    OnboardingStep {
+        step: MobileOnboardingStep,
+    },
     /// Contact display options snapshot (B7 batch 17 —
     /// `GetContactDisplayOptions`).
     ContactDisplayOptions {
@@ -851,5 +934,7 @@ pub enum DomainCommandResult {
     },
     /// Pre-computed contact-detail view state (B7 batch 19 —
     /// `ContactDetailViewState`).
-    ContactDetailView { state: MobileContactDetailViewState },
+    ContactDetailView {
+        state: MobileContactDetailViewState,
+    },
 }

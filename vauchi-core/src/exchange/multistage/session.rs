@@ -127,6 +127,22 @@ pub enum AudioStateError {
     },
 }
 
+/// Reason a transport-encrypted DATA chunk was rejected.
+///
+/// Private to the module — exposed only as a counter via
+/// [`MultiStageSession::transport_decrypt_failure_count`]. Distinguishing
+/// the two variants publicly would let an attacker probe AEAD internals
+/// via error-shape oracles, so the observable surface is a single count
+/// rather than a per-reason histogram.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum TransportDecryptError {
+    /// Ciphertext shorter than nonce(12) + tag(16); malformed framing.
+    CiphertextTooShort,
+    /// AEAD verification failed: wrong key, tampered ciphertext, or
+    /// replay against a different chunk index.
+    AeadFailure,
+}
+
 /// Multi-stage exchange session managing the full 5-stage protocol.
 ///
 /// The session progresses through states:
@@ -165,6 +181,12 @@ pub struct MultiStageSession {
     inbound_bitmap: Option<ChunkBitmap>,
     peer_ack_bitmap: Option<ChunkBitmap>,
     peer_chunks_total: Option<u16>,
+    // Count of DATA chunks rejected by the transport AEAD layer.
+    // Site 1 of `2026-05-21-silent-failures-in-security-paths`: pre-
+    // 2026-05-23 `transport_decrypt` returned `Option<Vec<u8>>` so
+    // forgery probes, tag-mismatch corruption, and "chunk hasn't
+    // arrived yet" were indistinguishable from outside the session.
+    transport_decrypt_failures: u32,
 
     // Reveal key received from peer
     peer_reveal_key: Option<[u8; 32]>,
@@ -289,6 +311,7 @@ impl MultiStageSession {
             inbound_bitmap: None,
             peer_ack_bitmap: None,
             peer_chunks_total: None,
+            transport_decrypt_failures: 0,
             peer_reveal_key: None,
             state: ProtocolState::Idle,
             received_data: None,
@@ -911,15 +934,23 @@ impl MultiStageSession {
             self.peer_chunks_total = Some(chunk_total);
         }
 
-        // Transport-decrypt the chunk
-        if let Some(decrypted) =
-            self.transport_decrypt(&transport_key, chunk_idx, &encrypted_payload)
-        {
-            if let Some(ref mut buffer) = self.inbound_buffer {
-                buffer.insert(chunk_idx, decrypted);
+        // Transport-decrypt the chunk. On AEAD failure or malformed
+        // ciphertext, increment `transport_decrypt_failures` so callers can
+        // distinguish "chunk hasn't arrived" from "chunk arrived corrupted
+        // or tampered" (site 1 of silent-failures-in-security-paths). The
+        // buffer/bitmap stay untouched so a legitimate retransmit at this
+        // chunk_idx still succeeds — the counter is purely observational.
+        match self.transport_decrypt(&transport_key, chunk_idx, &encrypted_payload) {
+            Ok(decrypted) => {
+                if let Some(ref mut buffer) = self.inbound_buffer {
+                    buffer.insert(chunk_idx, decrypted);
+                }
+                if let Some(ref mut bitmap) = self.inbound_bitmap {
+                    bitmap.mark_received(chunk_idx);
+                }
             }
-            if let Some(ref mut bitmap) = self.inbound_bitmap {
-                bitmap.mark_received(chunk_idx);
+            Err(_) => {
+                self.transport_decrypt_failures = self.transport_decrypt_failures.saturating_add(1);
             }
         }
 
@@ -1199,14 +1230,29 @@ impl MultiStageSession {
         result
     }
 
+    /// Count of inbound DATA chunks rejected by the transport AEAD layer.
+    ///
+    /// Counts both malformed framing (ciphertext shorter than nonce+tag)
+    /// and AEAD-verification failures (wrong key, tampered ciphertext,
+    /// or replay). A nonzero count combined with stalled progress is
+    /// the signal site 1 of `2026-05-21-silent-failures-in-security-paths`
+    /// asked for: pre-2026-05-23 these failures were indistinguishable
+    /// from "the chunk just hasn't arrived yet" because
+    /// `transport_decrypt` returned `Option<Vec<u8>>` and the caller
+    /// silently skipped on `None`. The counter saturates at `u32::MAX`
+    /// to avoid panicking on a pathological flood.
+    pub fn transport_decrypt_failure_count(&self) -> u32 {
+        self.transport_decrypt_failures
+    }
+
     fn transport_decrypt(
         &self,
         key: &[u8; 32],
         chunk_idx: u16,
         ciphertext: &[u8],
-    ) -> Option<Vec<u8>> {
+    ) -> Result<Vec<u8>, TransportDecryptError> {
         if ciphertext.len() < 12 + 16 {
-            return None;
+            return Err(TransportDecryptError::CiphertextTooShort);
         }
         let (nonce_bytes, encrypted) = ciphertext.split_at(12);
         let idx_aad = chunk_idx.to_le_bytes();
@@ -1218,7 +1264,9 @@ impl MultiStageSession {
             msg: encrypted,
             aad: &idx_aad,
         };
-        cipher.decrypt(nonce, payload).ok()
+        cipher
+            .decrypt(nonce, payload)
+            .map_err(|_| TransportDecryptError::AeadFailure)
     }
 
     fn compute_card_hash(&self, data: &[u8]) -> [u8; 32] {

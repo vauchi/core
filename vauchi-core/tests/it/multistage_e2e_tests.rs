@@ -873,3 +873,88 @@ fn test_complete_shows_only_combo() {
         }
     }
 }
+
+// ============================================================
+// Transport-decrypt failure observability
+// (site 1 of _private/.../2026-05-21-silent-failures-in-security-paths)
+//
+// Pre-2026-05-23 `transport_decrypt` returned `Option<Vec<u8>>`, conflating
+// ciphertext-too-short, AEAD-tag-mismatch, and "no chunk yet". The caller
+// `if let Some(decrypted) = self.transport_decrypt(...)` had no `else`, so
+// forgery probes and tag-mismatch corruption were indistinguishable from a
+// legitimate "still buffering" state. The counter exposed below is the
+// observability surface the audit asked for.
+// ============================================================
+
+// @internal
+#[test]
+fn transport_decrypt_failure_count_starts_at_zero() {
+    let session = MultiStageSession::new(b"card".to_vec());
+    assert_eq!(session.transport_decrypt_failure_count(), 0);
+}
+
+// @internal
+#[test]
+fn transport_decrypt_failure_count_increments_on_tampered_data_chunk() {
+    use vauchi_core::exchange::multistage::qr_codec;
+
+    let mut alice = MultiStageSession::new(b"alice card".to_vec());
+    let mut bob = MultiStageSession::new(b"bob card".to_vec());
+
+    // Stage 1: alice must call get_display_qr first to transition
+    // Idle → Advertising; otherwise handle_init refuses bob's INIT and
+    // alice's transport_key stays None — short-circuiting handle_data
+    // before the AEAD step we're trying to exercise.
+    let _ai = alice.get_display_qr().expect("alice INIT");
+    let bi = bob.get_display_qr().expect("bob INIT");
+    alice.process_scanned_qr(&bi.data);
+
+    assert_eq!(
+        alice.transport_decrypt_failure_count(),
+        0,
+        "counter must be zero before any DATA arrives"
+    );
+
+    // Craft a tampered DATA QR: valid framing, valid length (12 nonce + 16 tag),
+    // garbage ciphertext. Pre-fix this silently produced None and skipped
+    // mark_received without surfacing the failure anywhere.
+    let tampered = qr_codec::format_data_qr(
+        &bob.session_id(),
+        0,   // chunk_idx
+        1,   // chunk_total
+        &[], // ack_bitmap (none of our chunks seen yet)
+        &[0xAAu8; 28],
+    );
+
+    alice.process_scanned_qr(&tampered);
+
+    assert_eq!(
+        alice.transport_decrypt_failure_count(),
+        1,
+        "tampered DATA chunk must be observable via the counter, not silently dropped"
+    );
+}
+
+// @internal
+#[test]
+fn transport_decrypt_failure_count_does_not_increment_on_legitimate_data_chunk() {
+    let mut alice = MultiStageSession::new(b"alice card".to_vec());
+    let mut bob = MultiStageSession::new(b"bob card".to_vec());
+
+    // INIT both ways so both sides have transport keys and reach Discovered.
+    let ai = alice.get_display_qr().expect("alice INIT");
+    let bi = bob.get_display_qr().expect("bob INIT");
+    alice.process_scanned_qr(&bi.data);
+    bob.process_scanned_qr(&ai.data);
+
+    // Get bob's first DATA chunk and feed it to alice — legitimate, must
+    // not increment the counter.
+    let bq = bob.get_display_qr().expect("bob DATA chunk");
+    alice.process_scanned_qr(&bq.data);
+
+    assert_eq!(
+        alice.transport_decrypt_failure_count(),
+        0,
+        "legitimate DATA chunks must not raise the counter"
+    );
+}

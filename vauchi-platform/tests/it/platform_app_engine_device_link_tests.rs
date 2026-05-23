@@ -104,9 +104,15 @@ fn is_primary_device_is_true_for_first_device() {
 // @internal
 #[test]
 fn unlink_device_returns_false_for_out_of_range_index() {
+    use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
-    let result = engine.unlink_device(99).expect("unlink_device");
-    assert!(!result, "out-of-range index returns false");
+    let result = engine
+        .dispatch_domain_command(DomainCommand::UnlinkDevice { device_index: 99 })
+        .expect("dispatch UnlinkDevice");
+    let DomainCommandResult::Bool { value } = result else {
+        panic!("UnlinkDevice: unexpected result variant {result:?}");
+    };
+    assert!(!value, "out-of-range index returns false");
 }
 
 // @internal
@@ -118,12 +124,15 @@ fn unlink_device_returns_false_when_no_registry_yet() {
     // and returns `false` rather than erroring. The "Cannot unlink the
     // current device" error path only fires once a registry has been
     // saved (after the first `confirm_link` succeeds end-to-end).
+    use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
-    let result = engine.unlink_device(0).expect("unlink_device(0)");
-    assert!(
-        !result,
-        "no registry yet → false (matches legacy behaviour)"
-    );
+    let result = engine
+        .dispatch_domain_command(DomainCommand::UnlinkDevice { device_index: 0 })
+        .expect("dispatch UnlinkDevice(0)");
+    let DomainCommandResult::Bool { value } = result else {
+        panic!("UnlinkDevice: unexpected result variant {result:?}");
+    };
+    assert!(!value, "no registry yet → false (matches legacy behaviour)");
 }
 
 // ── generate_device_link_qr / parse_device_link_qr ──────────────────
@@ -199,10 +208,11 @@ fn create_device_link_session_initiator_returns_session() {
 // @internal
 #[test]
 fn unlink_device_invalidates_device_management_cache() {
+    use vauchi_platform::DomainCommand;
     let (engine, _dir) = create_engine_with_identity();
     // out-of-range so no actual mutation, but the wrapper must still
     // be a no-panic call and the read-after-call must succeed.
-    let _ = engine.unlink_device(99);
+    let _ = engine.dispatch_domain_command(DomainCommand::UnlinkDevice { device_index: 99 });
     engine.invalidate_all().expect("invalidate_all");
     let _ = engine
         .current_screen_json()

@@ -4108,6 +4108,58 @@ impl PlatformAppEngine {
                     .collect();
                 Ok(DomainCommandResult::Devices { devices })
             }
+            DomainCommand::UnlinkDevice { device_index } => {
+                let identity = engine
+                    .vauchi()
+                    .identity()
+                    .ok_or_else(|| MobileError::Other {
+                        detail: "Identity not initialized".into(),
+                    })?;
+                let storage = engine.vauchi().storage();
+
+                let mut registry =
+                    match storage
+                        .load_device_registry()
+                        .map_err(|e| MobileError::StorageError {
+                            detail: e.to_string(),
+                        })? {
+                        Some(r) => r,
+                        None => return Ok(DomainCommandResult::Bool { value: false }),
+                    };
+
+                let devices = registry.all_devices();
+                if device_index as usize >= devices.len() {
+                    return Ok(DomainCommandResult::Bool { value: false });
+                }
+
+                let device_id = devices[device_index as usize].device_id;
+                if device_id == *identity.device_info().device_id() {
+                    return Err(MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: "Cannot unlink the current device".into(),
+                    });
+                }
+
+                let result = match registry.revoke_device(
+                    &device_id,
+                    identity.signing_keypair(),
+                    storage.clock().unix_seconds(),
+                ) {
+                    Ok(()) => {
+                        storage.save_device_registry(&registry).map_err(|e| {
+                            MobileError::StorageError {
+                                detail: e.to_string(),
+                            }
+                        })?;
+                        true
+                    }
+                    Err(_) => false,
+                };
+
+                engine.invalidate_screen(&AppScreen::DeviceManagement);
+                engine.invalidate_screen(&AppScreen::DeviceLinking);
+                Ok(DomainCommandResult::Bool { value: result })
+            }
         }
     }
 
@@ -4120,66 +4172,6 @@ impl PlatformAppEngine {
     // are intentionally NOT migrated — they were superseded by the
     // orchestrator session in
     // `done/2026-04-27-device-link-orchestrator-phase2d-windows`.
-
-    /// Revoke the device at `device_index`. Returns `true` when a
-    /// device was revoked, `false` when the index is out of range or
-    /// no registry exists. Errors when the caller targets the
-    /// current device — frontends must use identity deletion instead.
-    pub fn unlink_device(&self, device_index: u32) -> Result<bool, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let identity = engine
-            .vauchi()
-            .identity()
-            .ok_or_else(|| MobileError::Other {
-                detail: "Identity not initialized".into(),
-            })?;
-        let storage = engine.vauchi().storage();
-
-        let mut registry =
-            match storage
-                .load_device_registry()
-                .map_err(|e| MobileError::StorageError {
-                    detail: e.to_string(),
-                })? {
-                Some(r) => r,
-                None => return Ok(false),
-            };
-
-        let devices = registry.all_devices();
-        if device_index as usize >= devices.len() {
-            return Ok(false);
-        }
-
-        let device_id = devices[device_index as usize].device_id;
-        if device_id == *identity.device_info().device_id() {
-            return Err(MobileError::InvalidInput {
-                field: String::new(),
-                detail: "Cannot unlink the current device".into(),
-            });
-        }
-
-        let result = match registry.revoke_device(
-            &device_id,
-            identity.signing_keypair(),
-            storage.clock().unix_seconds(),
-        ) {
-            Ok(()) => {
-                storage
-                    .save_device_registry(&registry)
-                    .map_err(|e| MobileError::StorageError {
-                        detail: e.to_string(),
-                    })?;
-                true
-            }
-            Err(_) => false,
-        };
-
-        engine.invalidate_screen(&AppScreen::DeviceManagement);
-        engine.invalidate_screen(&AppScreen::DeviceLinking);
-        Ok(result)
-    }
 
     /// Generate the QR shown to a peer for device linking. Read-only
     /// — does not persist any state. The QR expires after 300 s

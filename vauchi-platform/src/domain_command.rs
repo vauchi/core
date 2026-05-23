@@ -561,6 +561,9 @@ pub enum DomainCommand {
     /// List devices linked to the active identity (index 0 is the
     /// primary). Mirrors the legacy `PlatformAppEngine::get_devices`.
     GetDevices,
+    /// Revoke the device at `device_index`. Mirrors the legacy
+    /// `PlatformAppEngine::unlink_device`.
+    UnlinkDevice { device_index: u32 },
 }
 
 /// Sum type of every legitimate return shape from

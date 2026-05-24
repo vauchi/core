@@ -29,8 +29,6 @@ EXPECTED_TYPES=(
     "MobileExchangeSession"
     "MobileExchangeState"
     "MobileProximityHandler"
-    "MobilePasswordCheck"
-    "MobilePasswordStrength"
     "MobileRecoveryClaim"
     "MobileRecoveryProgress"
     "MobileRecoveryVerification"

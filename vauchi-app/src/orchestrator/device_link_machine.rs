@@ -8,8 +8,9 @@
 //! `DeviceLinkSessionListener` callback trait with a deterministic,
 //! synchronous machine the engine owns and advances via the
 //! `poll_notifications` tick — **one non-blocking relay step per
-//! [`advance`]** through the [`DeviceLinkBroker`] seam (ADR-030: relay
-//! is core's domain; not the hardware command/event protocol).
+//! [`DeviceLinkInitiatorMachine::advance`]** through the
+//! [`DeviceLinkBroker`] seam (ADR-030: relay is core's domain; not the
+//! hardware command/event protocol).
 //!
 //! Design:
 //! `_private/docs/designs/2026-05-24-slice-32l-phase-1-device-link-state-machine-design.md`.
@@ -35,9 +36,14 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 
 use vauchi_core::exchange::{DeviceLinkInitiator, DeviceLinkRequest, ProximityProof};
+use vauchi_core::storage::Storage;
 
-use super::device_link_relay::DeviceLinkBroker;
+use super::device_link_relay::{ClaimPayload, DeviceLinkBroker};
 use super::device_link_session::DeviceLinkPersistence;
+
+/// User-confirmation window once the peer has claimed the offer.
+/// Mirrors `device_link_session::DEFAULT_USER_CONFIRM_TIMEOUT_S`.
+const USER_CONFIRM_TIMEOUT_S: u64 = 60;
 
 /// Observable phase of the initiator machine.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,11 +84,7 @@ pub enum InitiatorEvent {
     Failed { reason: String },
 }
 
-/// Internal state. `#[allow(dead_code)]`: the `AwaitingConfirmation` /
-/// `Finalizing` variants and the carried domain data are constructed by
-/// the transition logic landed in T1.2; the T1.1 skeleton only reaches
-/// `AwaitingClaim` / `Failed` / `Cancelled`.
-#[allow(dead_code)]
+/// Internal state. Carries the owned domain data each phase needs.
 enum State {
     AwaitingClaim {
         broker_code: String,
@@ -102,11 +104,6 @@ enum State {
 }
 
 /// Deterministic, poll-driven device-link initiator.
-///
-/// `#[allow(dead_code)]` on the fields the T1.2 transition logic reads
-/// (`initiator`, `deadline_unix`, `confirm_deadline_unix`,
-/// `persistence`) — the T1.1 skeleton only sets them.
-#[allow(dead_code)]
 pub struct DeviceLinkInitiatorMachine {
     initiator: DeviceLinkInitiator,
     state: State,
@@ -177,35 +174,133 @@ impl DeviceLinkInitiatorMachine {
 
     /// One non-blocking relay step. In `AwaitingClaim`: poll
     /// `exchange_complete` once → `ConfirmationRequired`, or
-    /// `Failed("qr_expired")` once `now >= deadline`. In `Finalizing`:
-    /// `confirm_link` + persist + `send_response` → `Completed`.
-    ///
-    /// T1.2: implement. The skeleton is a no-op so the relay/expiry/
-    /// finalize tests stay RED.
-    pub fn advance(&mut self, _broker: &dyn DeviceLinkBroker, _now: u64) -> InitiatorEvent {
-        InitiatorEvent::None
+    /// `Failed("qr_expired")` once `now >= deadline`. In
+    /// `AwaitingConfirmation`: surfaces `user_confirm_timeout`. In
+    /// `Finalizing`: `confirm_link` + persist + `send_response` →
+    /// `Completed`.
+    pub fn advance(&mut self, broker: &dyn DeviceLinkBroker, now: u64) -> InitiatorEvent {
+        // `State::Failed` is a transient placeholder; every arm
+        // reassigns `self.state` before returning.
+        match std::mem::replace(&mut self.state, State::Failed) {
+            State::AwaitingClaim { broker_code } => {
+                if now >= self.deadline_unix {
+                    self.state = State::Failed;
+                    return InitiatorEvent::Failed {
+                        reason: "qr_expired".to_string(),
+                    };
+                }
+                match broker.exchange_complete(&broker_code) {
+                    Ok(Some(claim_b64)) => self.on_claim(&claim_b64, now),
+                    Ok(None) => {
+                        self.state = State::AwaitingClaim { broker_code };
+                        InitiatorEvent::None
+                    }
+                    Err(e) => {
+                        self.state = State::Failed;
+                        InitiatorEvent::Failed {
+                            reason: format!("relay poll failed: {e}"),
+                        }
+                    }
+                }
+            }
+            State::AwaitingConfirmation {
+                request,
+                sender_token,
+            } => {
+                if self.confirm_deadline_unix.is_some_and(|d| now >= d) {
+                    self.state = State::Failed;
+                    return InitiatorEvent::Failed {
+                        reason: "user_confirm_timeout".to_string(),
+                    };
+                }
+                self.state = State::AwaitingConfirmation {
+                    request,
+                    sender_token,
+                };
+                InitiatorEvent::None
+            }
+            State::Finalizing {
+                request,
+                proof,
+                sender_token,
+            } => self.finalize(broker, &request, &proof, &sender_token, now),
+            terminal => {
+                self.state = terminal;
+                InitiatorEvent::None
+            }
+        }
     }
 
     /// User confirmed via matching codes (manual path). Builds the
-    /// proximity proof and moves to `Finalizing`.
-    ///
-    /// T1.2: implement.
-    pub fn confirm_manual(&mut self, _confirmation_code: String, _at: u64) -> InitiatorEvent {
-        InitiatorEvent::None
+    /// proximity proof and moves to `Finalizing`; the relay send
+    /// happens on the next [`advance`](Self::advance).
+    pub fn confirm_manual(&mut self, confirmation_code: String, at: u64) -> InitiatorEvent {
+        match std::mem::replace(&mut self.state, State::Failed) {
+            State::AwaitingConfirmation {
+                request,
+                sender_token,
+            } => {
+                let proof = ProximityProof::manual_confirmation(
+                    self.initiator.qr().link_key(),
+                    &confirmation_code,
+                    at,
+                );
+                self.state = State::Finalizing {
+                    request,
+                    proof,
+                    sender_token,
+                };
+                InitiatorEvent::None
+            }
+            other => {
+                self.state = other;
+                InitiatorEvent::None
+            }
+        }
     }
 
     /// User completed ultrasonic proximity verification.
-    ///
-    /// T1.2: implement.
-    pub fn confirm_ultrasonic(&mut self, _challenge_response: Vec<u8>, _at: u64) -> InitiatorEvent {
-        InitiatorEvent::None
+    pub fn confirm_ultrasonic(&mut self, challenge_response: Vec<u8>, at: u64) -> InitiatorEvent {
+        match std::mem::replace(&mut self.state, State::Failed) {
+            State::AwaitingConfirmation {
+                request,
+                sender_token,
+            } => match <[u8; 16]>::try_from(challenge_response.as_slice()) {
+                Ok(bytes) => {
+                    self.state = State::Finalizing {
+                        request,
+                        proof: ProximityProof::Ultrasonic {
+                            challenge_response: bytes,
+                            verified_at: at,
+                        },
+                        sender_token,
+                    };
+                    InitiatorEvent::None
+                }
+                Err(_) => {
+                    self.state = State::Failed;
+                    InitiatorEvent::Failed {
+                        reason: "challenge_response must be exactly 16 bytes".to_string(),
+                    }
+                }
+            },
+            other => {
+                self.state = other;
+                InitiatorEvent::None
+            }
+        }
     }
 
     /// User declined the link → `Failed("user_denied")`.
-    ///
-    /// T1.2: implement.
     pub fn deny(&mut self) -> InitiatorEvent {
-        InitiatorEvent::None
+        if matches!(self.state, State::AwaitingConfirmation { .. }) {
+            self.state = State::Failed;
+            InitiatorEvent::Failed {
+                reason: "user_denied".to_string(),
+            }
+        } else {
+            InitiatorEvent::None
+        }
     }
 
     /// Navigation left the device-linking screen. Absorbing.
@@ -213,6 +308,100 @@ impl DeviceLinkInitiatorMachine {
         self.state = State::Cancelled;
         InitiatorEvent::None
     }
+
+    /// Decode a claim, prepare the confirmation, and move to
+    /// `AwaitingConfirmation`. Self-contained so `advance` stays flat.
+    fn on_claim(&mut self, claim_b64: &str, now: u64) -> InitiatorEvent {
+        let (request_bytes, sender_token) = match decode_claim(claim_b64) {
+            Ok(pair) => pair,
+            Err(reason) => {
+                self.state = State::Failed;
+                return InitiatorEvent::Failed { reason };
+            }
+        };
+        match self.initiator.prepare_confirmation(&request_bytes) {
+            Ok((confirmation, request)) => {
+                let challenge = self.initiator.proximity_challenge().to_vec();
+                self.confirm_deadline_unix = Some(now.saturating_add(USER_CONFIRM_TIMEOUT_S));
+                self.state = State::AwaitingConfirmation {
+                    request,
+                    sender_token,
+                };
+                InitiatorEvent::ConfirmationRequired {
+                    device_name: confirmation.device_name,
+                    confirmation_code: confirmation.confirmation_code,
+                    identity_fingerprint: confirmation.identity_fingerprint,
+                    challenge,
+                }
+            }
+            Err(e) => {
+                self.state = State::Failed;
+                InitiatorEvent::Failed {
+                    reason: format!("prepare_confirmation: {e}"),
+                }
+            }
+        }
+    }
+
+    /// `confirm_link` + persist registry + `send_response` over the
+    /// relay → `Completed`.
+    fn finalize(
+        &mut self,
+        broker: &dyn DeviceLinkBroker,
+        request: &DeviceLinkRequest,
+        proof: &ProximityProof,
+        sender_token: &str,
+        now: u64,
+    ) -> InitiatorEvent {
+        let (encrypted_response, registry, device_info) =
+            match self.initiator.confirm_link(request, proof, now) {
+                Ok(triple) => triple,
+                Err(e) => {
+                    self.state = State::Failed;
+                    return InitiatorEvent::Failed {
+                        reason: format!("confirm_link: {e}"),
+                    };
+                }
+            };
+
+        if let Some(ctx) = &self.persistence {
+            let save = Storage::open(&ctx.storage_path, ctx.storage_key.clone())
+                .and_then(|s| s.save_device_registry(&registry));
+            if let Err(e) = save {
+                self.state = State::Failed;
+                return InitiatorEvent::Failed {
+                    reason: format!("save_device_registry: {e}"),
+                };
+            }
+        }
+
+        match broker.exchange_claim(sender_token, &BASE64.encode(&encrypted_response)) {
+            Ok(_) => {
+                let event = InitiatorEvent::Completed {
+                    device_name: device_info.device_name().to_string(),
+                    device_index: device_info.device_index(),
+                };
+                self.state = State::Completed;
+                event
+            }
+            Err(e) => {
+                self.state = State::Failed;
+                InitiatorEvent::Failed {
+                    reason: format!("send_response: {e}"),
+                }
+            }
+        }
+    }
+}
+
+/// Decode the base64 `ClaimPayload` a responder deposited.
+fn decode_claim(claim_b64: &str) -> Result<(Vec<u8>, String), String> {
+    let bytes = BASE64
+        .decode(claim_b64)
+        .map_err(|e| format!("claim decode: {e}"))?;
+    let claim: ClaimPayload =
+        serde_json::from_slice(&bytes).map_err(|e| format!("claim parse: {e}"))?;
+    Ok((claim.request, claim.response_code))
 }
 
 // INLINE_TEST_REQUIRED: state-machine unit tests drive the machine via
@@ -302,7 +491,7 @@ mod tests {
         }
     }
 
-    // ── Green: the R1 seam + start work end-to-end ─────────────────
+    // ── The R1 seam + start work end-to-end ────────────────────────
 
     #[test]
     fn start_creates_offer_and_emits_qr_ready() {
@@ -339,7 +528,7 @@ mod tests {
         assert_eq!(m.phase(), InitiatorPhase::Cancelled);
     }
 
-    // ── RED until T1.2 implements the transitions ──────────────────
+    // ── Relay / confirm / deny transitions (GREEN as of T1.2) ──────
 
     #[test]
     fn advance_emits_qr_expired_at_deadline() {

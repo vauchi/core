@@ -957,101 +957,6 @@ impl PlatformAppEngine {
     // and `RecoveryHelp` screens so reads after a write reflect the
     // mutation without an explicit `invalidate_*` call from the caller.
 
-    // ── Emergency Broadcast (Phase B3 — collapse-vauchi-platform-into-app-engine) ──
-    //
-    // Wraps the four emergency-broadcast methods that previously only
-    // lived on `VauchiPlatform`. The engine's `Vauchi` instance has
-    // identity loaded at construction time, so unlike the legacy code
-    // path no `set_identity` call is needed. Cache invalidation
-    // targets `Settings` + `EmergencyShred` so the next read after a
-    // configure / disable shows the updated state.
-
-    /// Configure the emergency-broadcast destination set, message,
-    /// and location-inclusion flag. `contact_ids.len()` must be ≤ the
-    /// core-side `MAX_TRUSTED_CONTACTS` cap (enforced by `Vauchi`).
-    pub fn configure_emergency_broadcast(
-        &self,
-        contact_ids: Vec<String>,
-        message: String,
-        include_location: bool,
-    ) -> Result<(), MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        engine
-            .vauchi_mut()
-            .configure_emergency_broadcast(contact_ids, message, include_location)
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-        engine.invalidate_screen(&AppScreen::Settings);
-        engine.invalidate_screen(&AppScreen::EmergencyShred);
-        Ok(())
-    }
-
-    /// Send the configured emergency broadcast. Errors when no
-    /// configuration exists (caller must `configure_emergency_broadcast`
-    /// first). Returns the count of alerts queued vs total trusted
-    /// contacts.
-    pub fn send_emergency_broadcast(
-        &self,
-    ) -> Result<crate::types::MobileBroadcastResult, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let result = engine
-            .vauchi_mut()
-            .send_emergency_broadcast()
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-        engine.invalidate_screen(&AppScreen::Settings);
-        engine.invalidate_screen(&AppScreen::EmergencyShred);
-        Ok(crate::types::MobileBroadcastResult {
-            sent: result.sent as u32,
-            total: result.total as u32,
-        })
-    }
-
-    /// Read the current emergency-broadcast configuration. Returns
-    /// `None` when never configured (or after `disable_emergency_broadcast`).
-    pub fn get_emergency_config(
-        &self,
-    ) -> Result<Option<crate::types::MobileEmergencyConfig>, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let config = engine
-            .vauchi()
-            .load_emergency_config()
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-        Ok(config.map(|c| crate::types::MobileEmergencyConfig {
-            trusted_contact_ids: c.trusted_contact_ids,
-            message: c.message,
-            include_location: c.include_location,
-        }))
-    }
-
-    /// Delete the emergency-broadcast configuration. Idempotent —
-    /// calling on a never-configured instance succeeds silently
-    /// (matches legacy `VauchiPlatform` semantics).
-    pub fn disable_emergency_broadcast(&self) -> Result<(), MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        engine
-            .vauchi_mut()
-            .delete_emergency_config()
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-        engine.invalidate_screen(&AppScreen::Settings);
-        engine.invalidate_screen(&AppScreen::EmergencyShred);
-        Ok(())
-    }
-
     // ── DomainCommand dispatch (Phase B7 — collapse-vauchi-platform-into-app-engine) ──
     //
     // Long-tail domain operations that don't justify their own typed
@@ -4092,6 +3997,64 @@ impl PlatformAppEngine {
                 engine.invalidate_screen(&AppScreen::Recovery);
                 engine.invalidate_screen(&AppScreen::RecoveryHelp);
                 Ok(DomainCommandResult::RecoveryClaim { claim: result })
+            }
+            DomainCommand::ConfigureEmergencyBroadcast {
+                contact_ids,
+                message,
+                include_location,
+            } => {
+                engine
+                    .vauchi_mut()
+                    .configure_emergency_broadcast(contact_ids, message, include_location)
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::EmergencyShred);
+                Ok(DomainCommandResult::Bool { value: true })
+            }
+            DomainCommand::SendEmergencyBroadcast => {
+                let result = engine
+                    .vauchi_mut()
+                    .send_emergency_broadcast()
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::EmergencyShred);
+                Ok(DomainCommandResult::BroadcastResult {
+                    result: crate::types::MobileBroadcastResult {
+                        sent: result.sent as u32,
+                        total: result.total as u32,
+                    },
+                })
+            }
+            DomainCommand::GetEmergencyConfig => {
+                let config =
+                    engine
+                        .vauchi()
+                        .load_emergency_config()
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?;
+                Ok(DomainCommandResult::OptionalEmergencyConfig {
+                    config: config.map(|c| crate::types::MobileEmergencyConfig {
+                        trusted_contact_ids: c.trusted_contact_ids,
+                        message: c.message,
+                        include_location: c.include_location,
+                    }),
+                })
+            }
+            DomainCommand::DisableEmergencyBroadcast => {
+                engine
+                    .vauchi_mut()
+                    .delete_emergency_config()
+                    .map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::EmergencyShred);
+                Ok(DomainCommandResult::Bool { value: true })
             }
         }
     }

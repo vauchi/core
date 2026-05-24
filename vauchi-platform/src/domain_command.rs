@@ -31,15 +31,16 @@ use crate::content::{MobileApplyResult, MobileUpdateStatus};
 use crate::mobile_contact_detail::MobileContactDetailViewState;
 use crate::mobile_import::MobileImportResult;
 use crate::types::{
-    MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileConsentRecord, MobileConsentStatus,
-    MobileConsentType, MobileContact, MobileContactCard, MobileContactDisplayOptions,
-    MobileDecoyContact, MobileDeletionInfo, MobileDeliveryRecord, MobileDeliveryStatus,
-    MobileDeliverySummary, MobileDemoContact, MobileDemoContactState, MobileDeviceDeliveryRecord,
-    MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDuplicatePair,
-    MobileDuressSettings, MobileFieldNote, MobileFieldType, MobileGdprExport,
-    MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryClaim, MobileRecoveryProgress,
-    MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredStatus,
-    MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileAhaMoment, MobileAhaMomentType, MobileAuthMode, MobileBroadcastResult,
+    MobileConsentRecord, MobileConsentStatus, MobileConsentType, MobileContact, MobileContactCard,
+    MobileContactDisplayOptions, MobileDecoyContact, MobileDeletionInfo, MobileDeliveryRecord,
+    MobileDeliveryStatus, MobileDeliverySummary, MobileDemoContact, MobileDemoContactState,
+    MobileDeviceDeliveryRecord, MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo,
+    MobileDuplicatePair, MobileDuressSettings, MobileEmergencyConfig, MobileFieldNote,
+    MobileFieldType, MobileGdprExport, MobileOnboardingProgress, MobileOnboardingStep,
+    MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
+    MobileRetryEntry, MobileShredStatus, MobileSocialNetwork, MobileVisibilityLabel,
+    MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -255,8 +256,6 @@ pub enum DomainCommand {
     UntrustContactForRecovery {
         contact_id: String,
     },
-    /// Count the contacts marked as recovery-trusted. Returns
-    /// `Count { value }`.
     TrustedContactCount,
 
     // ── Recovery typed-method retirement (Track B B4a) ──
@@ -274,6 +273,16 @@ pub enum DomainCommand {
     CreateRecoveryClaim {
         old_pk_hex: String,
     },
+
+    // ── Emergency-broadcast typed-method retirement (Track B B4b) ──
+    ConfigureEmergencyBroadcast {
+        contact_ids: Vec<String>,
+        message: String,
+        include_location: bool,
+    },
+    SendEmergencyBroadcast,
+    GetEmergencyConfig,
+    DisableEmergencyBroadcast,
     // ── Visibility Labels + Field Visibility (B7 batch 6) ──
     /// List every visibility label.
     ListLabels,
@@ -841,6 +850,12 @@ pub enum DomainCommandResult {
     },
     RecoveryProgress {
         progress: MobileRecoveryProgress,
+    },
+    BroadcastResult {
+        result: MobileBroadcastResult,
+    },
+    OptionalEmergencyConfig {
+        config: Option<MobileEmergencyConfig>,
     },
     /// List of visibility labels (B7 batch 6 — `ListLabels`,
     /// `GetGroupsForContact`).

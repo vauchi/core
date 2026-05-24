@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ImportSource;
 use crate::contact::Contact;
+use crate::contact_card::ContactCard;
 use crate::contact_card::vcard_import::import_vcf;
 
 use super::super::error::{VauchiError, VauchiResult};
@@ -142,5 +143,40 @@ impl Vauchi {
             skipped,
             warnings,
         })
+    }
+
+    /// Save a contact card received via a **link-mode** exchange,
+    /// returning the stored contact id.
+    ///
+    /// Link mode swaps the card over an ephemeral escrow key and
+    /// establishes no persistent update channel (no shared comms key,
+    /// no relay routing), so the result is an **imported** contact
+    /// ([`ImportSource::LinkExchange`]) — not exchanged: there is no
+    /// `shared_key`/relay to populate `ExchangedData` (HR-1). Idempotent:
+    /// re-receiving the same card (matched by its card id) returns the
+    /// existing contact id without duplicating.
+    ///
+    /// The caller (the deep-link responder) strips the
+    /// `[version][pubkey][card]` exchange-payload header and passes the
+    /// deserialized [`ContactCard`]. Slice
+    /// `2026-05-24-core-exchange-completion-contact-save`.
+    pub fn import_received_link_card(&self, card: ContactCard) -> VauchiResult<String> {
+        let uid = card.id().to_string();
+        // Idempotent dedup: the card id is the key.
+        if let Some(existing_id) = self.storage.find_imported_by_uid(&uid)? {
+            return Ok(existing_id);
+        }
+        // C3 — enforce the per-identity contact limit.
+        let count = self.storage.count_contacts()?;
+        let limit = self.storage.get_contact_limit()?;
+        if count >= limit {
+            return Err(VauchiError::InvalidState(format!(
+                "contact limit reached ({limit})"
+            )));
+        }
+        let now = self.clock.unix_seconds();
+        let contact = Contact::from_import(card, ImportSource::LinkExchange, Some(uid), now);
+        self.storage.save_contact(&contact)?;
+        Ok(contact.id().to_string())
     }
 }

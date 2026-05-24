@@ -179,4 +179,11 @@ pub enum ImportSource {
     AndroidPlatform,
     /// Manually created by the user.
     Manual,
+    /// Received via a link-mode exchange (deep-link + relay escrow).
+    /// Classified Imported — not Exchanged — because link mode swaps a
+    /// card over an ephemeral escrow key and establishes **no persistent
+    /// update channel** (no shared comms key, no relay routing), so per
+    /// HR-1 it carries no `ExchangedData`. Slice
+    /// `2026-05-24-core-exchange-completion-contact-save`.
+    LinkExchange,
 }

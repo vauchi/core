@@ -375,22 +375,6 @@ fn poll_notifications_returns_empty_before_events() {
     );
 }
 
-// @scenario: notification.feature - Drain notifications returns empty before events
-// @internal
-// @internal
-#[test]
-fn drain_pending_notifications_returns_empty_before_events() {
-    let (engine, _dir) = create_engine();
-    drive_onboarding(&engine);
-    let notifications = engine
-        .drain_pending_notifications()
-        .expect("drain_pending_notifications");
-    assert!(
-        notifications.is_empty(),
-        "drain should return empty when no events dispatched"
-    );
-}
-
 // @scenario: notification.feature - Card update produces no OS notification
 // @internal
 // @internal
@@ -425,24 +409,6 @@ fn poll_notifications_after_card_update_returns_no_notification() {
         notifications.is_empty(),
         "OwnCardUpdated should not produce a notification, got: {notifications:?}"
     );
-}
-
-// @scenario: notification.feature - Poll and drain are independently callable
-// @internal
-// @internal
-#[test]
-fn poll_and_drain_are_independently_callable() {
-    let (engine, _dir) = create_engine();
-    drive_onboarding(&engine);
-
-    // Both methods should work in sequence without interfering
-    let poll_result = engine.poll_notifications().expect("poll");
-    let drain_result = engine.drain_pending_notifications().expect("drain");
-    let poll_again = engine.poll_notifications().expect("poll again");
-
-    assert!(poll_result.is_empty());
-    assert!(drain_result.is_empty());
-    assert!(poll_again.is_empty());
 }
 
 // ============================================================================

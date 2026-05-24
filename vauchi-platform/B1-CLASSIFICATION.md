@@ -89,8 +89,7 @@ for these.**
   `periodic_sync_tick`, `periodic_sync_interval_seconds`,
   `periodic_sync_max_retries` (the work landed via the Round 2 P2 audit
   alongside ios!353 and android!340)
-- `handle_app_backgrounded`, `poll_notifications`,
-  `drain_pending_notifications`
+- `handle_app_backgrounded`, `poll_notifications`
 - `set_device_capabilities_json`, `set_event_listener`
 - `biometric_unlock_check`
 

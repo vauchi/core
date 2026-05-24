@@ -948,43 +948,6 @@ impl PlatformAppEngine {
         Ok(())
     }
 
-    /// Drain pending OS notifications.
-    ///
-    /// Returns notifications that should be shown to the user via the
-    /// platform's native notification system. Each call clears the buffer,
-    /// so notifications are never returned twice.
-    ///
-    /// Call this after receiving `on_screens_invalidated` from your
-    /// `PlatformEventListener`.
-    pub fn drain_pending_notifications(
-        &self,
-    ) -> Result<Vec<MobilePendingNotification>, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let notifications = engine.drain_pending_notifications();
-        Ok(notifications
-            .into_iter()
-            .map(|n| {
-                use vauchi_app::notification_types::NotificationCategory;
-                MobilePendingNotification {
-                    event_key: n.event_key,
-                    category: match n.category {
-                        NotificationCategory::EmergencyAlert => {
-                            MobileNotificationCategory::EmergencyAlert
-                        }
-                        NotificationCategory::ContactAdded => {
-                            MobileNotificationCategory::ContactAdded
-                        }
-                    },
-                    title: n.title,
-                    body: n.body,
-                    contact_id: n.contact_id,
-                }
-            })
-            .collect())
-    }
-
     // ── Recovery (Phase B2 — collapse-vauchi-platform-into-app-engine) ──
     //
     // Wraps the recovery domain that previously only lived on

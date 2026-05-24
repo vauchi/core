@@ -8,7 +8,7 @@
 //! Asserts that every `pub fn` inside an `impl PlatformAppEngine { … }`
 //! block in `core/vauchi-platform/src/**` either:
 //!
-//!   (a) appears in `HUMBLE_ALLOWLIST` — the 24-method genuine binding
+//!   (a) appears in `HUMBLE_ALLOWLIST` — the 23-method genuine binding
 //!       surface every frontend renders against, or
 //!   (b) is one of the `SURPLUS_RATCHET_CEILING` known-legacy methods
 //!       still pending retirement in Phase 3 of the program.
@@ -45,7 +45,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The 24-method Humble surface — the binding surface every frontend
+/// The 23-method Humble surface — the binding surface every frontend
 /// is allowed to depend on per ADR-021 / ADR-043. Source of truth for
 /// Phase 0 / Task 0.2 of the pure-functional-core program plan.
 ///
@@ -59,7 +59,6 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "current_screen_id",
     "current_screen_json",
     "current_tab_id",
-    "drain_pending_notifications",
     "handle_action_json",
     "handle_app_backgrounded",
     "handle_deep_link_uri",
@@ -202,22 +201,27 @@ fn humble_allowlist_size_matches_plan() {
     // The plan's Task 0.2 originally named 25 methods as the genuine
     // Humble surface; ADR-047 added `set_render_context_json` for the
     // render-context tier (25 → 26); ADR-048 ratified a retirement
-    // policy and the first retirement (`default_screen_json`, 26 → 25);
-    // a second ADR-048 retirement (`is_network_online`, 25 → 24)
-    // followed — frontends never need to query reachability because
-    // the offline banner is auto-injected into emitted ScreenModels
-    // when `network_online == false`. If this number changes again,
-    // the next ADR amendment (or a retirement passing ADR-048's
-    // G1-G5 gates) must precede the edit. Catching the count drift
-    // here is cheaper than discovering it during an ADR audit.
+    // policy and three retirements followed: `default_screen_json`
+    // (26 → 25), `is_network_online` (25 → 24, frontends never need
+    // to query reachability because the offline banner is
+    // auto-injected into emitted ScreenModels when
+    // `network_online == false`), and `drain_pending_notifications`
+    // (24 → 23, the UniFFI wrapper had only PAE-contract tests as
+    // callers; mobile frontends consume notifications via
+    // `poll_notifications`, desktop frontends via the cabi-routed
+    // AppEngine peer). If this number changes again, the next ADR
+    // amendment (or a retirement passing ADR-048's G1-G5 gates) must
+    // precede the edit. Catching the count drift here is cheaper than
+    // discovering it during an ADR audit.
     assert_eq!(
         HUMBLE_ALLOWLIST.len(),
-        24,
-        "Humble allow-list size drifted from the 24 expected after \
-         ADR-048's second retirement (`is_network_online`). Edits to \
-         this list require an ADR amendment (ADR-021/043 for the \
-         Humble engine framing, ADR-047 for the render-context tier, \
-         or ADR-048's G1-G5 gates for retirements)."
+        23,
+        "Humble allow-list size drifted from the 23 expected after \
+         ADR-048's third retirement (`drain_pending_notifications`). \
+         Edits to this list require an ADR amendment (ADR-021/043 \
+         for the Humble engine framing, ADR-047 for the \
+         render-context tier, or ADR-048's G1-G5 gates for \
+         retirements)."
     );
 }
 

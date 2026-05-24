@@ -1037,62 +1037,6 @@ impl PlatformAppEngine {
         Ok(result)
     }
 
-    /// Create a voucher for someone else's recovery claim using the
-    /// active identity's signing key.
-    pub fn create_recovery_voucher(
-        &self,
-        claim_b64: String,
-    ) -> Result<crate::types::MobileRecoveryVoucher, MobileError> {
-        use base64::Engine as _;
-        use vauchi_core::recovery::{RecoveryClaim, RecoveryVoucher};
-
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let identity = engine
-            .vauchi()
-            .identity()
-            .ok_or_else(|| MobileError::Other {
-                detail: "Identity not initialized".into(),
-            })?;
-
-        let claim_bytes = base64::engine::general_purpose::STANDARD
-            .decode(&claim_b64)
-            .map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: format!("Invalid base64: {e}"),
-            })?;
-        let claim =
-            RecoveryClaim::from_bytes(&claim_bytes).map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: format!("Invalid claim: {e}"),
-            })?;
-
-        if claim.is_expired(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0),
-        ) {
-            return Err(MobileError::InvalidInput {
-                field: String::new(),
-                detail: "Claim has expired".into(),
-            });
-        }
-
-        let voucher =
-            RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair(), None, 0)
-                .map_err(|e| MobileError::Other {
-                    detail: e.to_string(),
-                })?;
-        let voucher_data = base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes());
-
-        Ok(crate::types::MobileRecoveryVoucher {
-            voucher_public_key: hex::encode(voucher.voucher_pk()),
-            voucher_data,
-        })
-    }
-
     /// Add a voucher to the in-progress recovery proof. Requires that
     /// `create_recovery_claim` was called first.
     pub fn add_recovery_voucher(
@@ -4128,6 +4072,54 @@ impl PlatformAppEngine {
                         vouchers_needed: proof.threshold(),
                         is_complete: proof.voucher_count() >= proof.threshold() as usize,
                     }),
+                })
+            }
+            DomainCommand::CreateRecoveryVoucher { claim_b64 } => {
+                use base64::Engine as _;
+                use vauchi_core::recovery::{RecoveryClaim, RecoveryVoucher};
+
+                // `engine` is already locked by the dispatch entry point;
+                // re-locking the non-reentrant mutex would deadlock.
+                let identity = engine
+                    .vauchi()
+                    .identity()
+                    .ok_or_else(|| MobileError::Other {
+                        detail: "Identity not initialized".into(),
+                    })?;
+
+                let claim_bytes = base64::engine::general_purpose::STANDARD
+                    .decode(&claim_b64)
+                    .map_err(|e| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: format!("Invalid base64: {e}"),
+                    })?;
+                let claim = RecoveryClaim::from_bytes(&claim_bytes).map_err(|e| {
+                    MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: format!("Invalid claim: {e}"),
+                    }
+                })?;
+
+                if claim.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()) {
+                    return Err(MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: "Claim has expired".into(),
+                    });
+                }
+
+                let voucher =
+                    RecoveryVoucher::create_from_claim(&claim, identity.signing_keypair(), None, 0)
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?;
+                let voucher_data =
+                    base64::engine::general_purpose::STANDARD.encode(voucher.to_bytes());
+
+                Ok(DomainCommandResult::RecoveryVoucher {
+                    voucher: crate::types::MobileRecoveryVoucher {
+                        voucher_public_key: hex::encode(voucher.voucher_pk()),
+                        voucher_data,
+                    },
                 })
             }
         }

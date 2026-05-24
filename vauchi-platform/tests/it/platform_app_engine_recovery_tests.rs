@@ -244,14 +244,18 @@ fn add_recovery_voucher_errors_when_no_recovery_in_progress() {
 // @internal
 #[test]
 fn create_recovery_voucher_rejects_invalid_base64() {
+    use vauchi_platform::DomainCommand;
     let (engine, _dir) = create_engine_with_identity();
-    let result = engine.create_recovery_voucher("not!valid!".into());
+    let result = engine.dispatch_domain_command(DomainCommand::CreateRecoveryVoucher {
+        claim_b64: "not!valid!".into(),
+    });
     assert!(result.is_err(), "invalid base64 must error");
 }
 
 // @internal
 #[test]
 fn create_recovery_voucher_rejects_self_vouching() {
+    use vauchi_platform::DomainCommand;
     // The active identity creates a claim binding `old_pk → its own pk`
     // and tries to vouch for it. Core rejects self-vouching as a
     // security guard; the wrapper must surface that error rather than
@@ -261,7 +265,9 @@ fn create_recovery_voucher_rejects_self_vouching() {
         .create_recovery_claim(fake_old_pk_hex())
         .expect("create_claim");
 
-    let result = engine.create_recovery_voucher(claim.claim_data);
+    let result = engine.dispatch_domain_command(DomainCommand::CreateRecoveryVoucher {
+        claim_b64: claim.claim_data,
+    });
     assert!(result.is_err(), "self-vouching must be rejected");
     let err_str = format!("{:?}", result.unwrap_err());
     assert!(

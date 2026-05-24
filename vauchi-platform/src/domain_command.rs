@@ -38,8 +38,8 @@ use crate::types::{
     MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDuplicatePair,
     MobileDuressSettings, MobileFieldNote, MobileFieldType, MobileGdprExport,
     MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryClaim, MobileRecoveryProgress,
-    MobileRecoveryVerification, MobileRetryEntry, MobileShredStatus, MobileSocialNetwork,
-    MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileRecoveryVerification, MobileRecoveryVoucher, MobileRetryEntry, MobileShredStatus,
+    MobileSocialNetwork, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -249,8 +249,6 @@ pub enum DomainCommand {
     // and on `mobile_contacts.rs::impl VauchiPlatform`. Adding them as
     // DomainCommands lets slice 32g retire both copies atomically and
     // gives iOS a uniform dispatch entry point.) ──
-    /// Mark a contact as recovery-trusted. Errors if the contact is
-    /// blocked. Returns `Unit`.
     TrustContactForRecovery {
         contact_id: String,
     },
@@ -268,6 +266,9 @@ pub enum DomainCommand {
     },
     GetRecoveryProof,
     GetRecoveryStatus,
+    CreateRecoveryVoucher {
+        claim_b64: String,
+    },
     // ── Visibility Labels + Field Visibility (B7 batch 6) ──
     /// List every visibility label.
     ListLabels,
@@ -829,6 +830,9 @@ pub enum DomainCommandResult {
     },
     OptionalRecoveryProgress {
         progress: Option<MobileRecoveryProgress>,
+    },
+    RecoveryVoucher {
+        voucher: MobileRecoveryVoucher,
     },
     /// List of visibility labels (B7 batch 6 — `ListLabels`,
     /// `GetGroupsForContact`).

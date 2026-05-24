@@ -509,6 +509,7 @@ mod tests {
 
     // ── new() does no I/O; the first advance posts the offer ───────
 
+    // @internal
     #[test]
     fn new_starts_in_preparing_without_touching_the_relay() {
         let broker = FakeBroker::new("B");
@@ -520,6 +521,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn first_advance_creates_offer_and_emits_qr_ready() {
         let initiator = build_initiator("Alice", 0x11);
@@ -541,6 +543,7 @@ mod tests {
         assert_eq!(*broker.calls.borrow(), vec!["offer"]);
     }
 
+    // @internal
     #[test]
     fn cancel_is_absorbing() {
         let broker = FakeBroker::new("B");
@@ -555,6 +558,7 @@ mod tests {
 
     // ── Relay / confirm / deny transitions ─────────────────────────
 
+    // @internal
     #[test]
     fn advance_emits_qr_expired_at_deadline() {
         let broker = FakeBroker::new("B");
@@ -572,6 +576,7 @@ mod tests {
         assert_eq!(m.phase(), InitiatorPhase::Failed);
     }
 
+    // @internal
     #[test]
     fn claim_then_confirm_manual_completes() {
         let initiator = build_initiator("Alice", 0x11);
@@ -599,6 +604,7 @@ mod tests {
         assert_eq!(m.phase(), InitiatorPhase::Completed);
     }
 
+    // @internal
     #[test]
     fn deny_fails_with_user_denied() {
         let initiator = build_initiator("Alice", 0x11);
@@ -623,6 +629,7 @@ mod tests {
     // CC-13 stateful property: qr_expired fires exactly at the deadline
     // boundary while awaiting a claim, for any over-shoot.
     proptest! {
+        // @internal
         #[test]
         fn qr_expired_at_deadline_boundary(overshoot in 1u64..100_000) {
             let broker = FakeBroker::new("B");

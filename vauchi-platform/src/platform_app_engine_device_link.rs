@@ -2,237 +2,200 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Pair 5 device-link session wiring on `PlatformAppEngine`.
-//! Extracted from `platform_app_engine.rs` to keep that file under
-//! its size baseline. Pair 5 of
-//! `_private/docs/problems/2026-04-28-pure-humble-ui-retire-native-screens/`.
+//! Device-link **initiator** wiring on `PlatformAppEngine` (slice 32l
+//! Phase 1). The initiator runs as a synchronous
+//! [`DeviceLinkInitiatorMachine`] advanced from `poll_notifications` —
+//! one non-blocking relay step per tick through the `DeviceLinkBroker`
+//! seam. No spawned cycle thread, no `DeviceLinkSessionListener`
+//! callback bridge (both retired here; design
+//! `_private/docs/designs/2026-05-24-slice-32l-phase-1-device-link-state-machine-design.md`).
 //!
-//! Two halves:
-//!
-//! - Lifecycle + dispatch on `PlatformAppEngine` — the
-//!   `ensure_device_link_session` / `cancel_device_link_session`
-//!   pair that `after_screen_transition` calls when navigation
-//!   enters or leaves `AppScreen::DeviceLinking`, plus
-//!   `dispatch_device_link_side_effects` which translates the
-//!   engine's typed `ActionResult` variants into
-//!   `MobileDeviceLinkSession` calls.
-//! - The `DeviceLinkEngineBridge` listener — implements
-//!   `DeviceLinkSessionListener` (the UniFFI surface trait) and
-//!   forwards each cycle-thread callback into the active
-//!   `AppEngine`'s receiver-side bridge methods.
+//! - `ensure_device_link_session` / `cancel_device_link_session` are
+//!   driven by `after_screen_transition` on entry/exit of
+//!   `AppScreen::DeviceLinking`.
+//! - `advance_device_link_session` is called from `poll_notifications`.
+//! - `dispatch_device_link_side_effects` routes the engine's typed
+//!   `ActionResult::DeviceLink*` into the machine.
+//! - `apply_initiator_event` maps an [`InitiatorEvent`] onto the
+//!   engine's `device_link_*` screen handlers (the same mapping the old
+//!   `DeviceLinkEngineBridge` performed, now synchronous).
 
-use std::sync::{Arc, Mutex};
+use vauchi_app::orchestrator::device_link_machine::{DeviceLinkInitiatorMachine, InitiatorEvent};
+use vauchi_app::ui::ActionResult;
+use vauchi_core::network::HttpTransport;
 
-use vauchi_app::ui::{ActionResult, AppEngine};
-
-use crate::MobileDeviceLinkSession;
 use crate::error::MobileError;
-use crate::mobile_device_link_session::DeviceLinkSessionListener;
-use crate::platform_app_engine::{DirectListenerSlot, PlatformAppEngine};
+use crate::platform_app_engine::PlatformAppEngine;
 
-impl PlatformAppEngine {
-    /// Lazily create + start the `MobileDeviceLinkSession` and wire
-    /// the `DeviceLinkEngineBridge` listener so cycle-thread
-    /// callbacks reach the active engine. Idempotent: a no-op when
-    /// a session is already running.
-    pub(crate) fn ensure_device_link_session(&self) -> Result<(), MobileError> {
-        let mut slot = self
-            .device_link_session()
-            .lock()
-            .map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-        if slot.is_some() {
-            return Ok(());
-        }
-        // Drive the engine into QrPending up-front so the screen
-        // renders a generating-link spinner until `on_qr_ready`
-        // lands. Errors (off-screen) are non-fatal.
-        let _ = {
-            let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            engine.device_link_qr_pending()
-        };
-        let session = self.create_device_link_session_initiator()?;
-        let bridge = DeviceLinkEngineBridge {
-            engine: Arc::clone(self.engine()),
-            direct_listener: Arc::clone(self.direct_listener()),
-        };
-        session.set_listener(Box::new(bridge));
-        session.start();
-        *slot = Some(session);
-        Ok(())
-    }
+/// QR-expiry / relay-listen budget (ADR-035 device-link window = 300 s).
+pub(crate) const RELAY_TIMEOUT_SECS: u64 = 300;
 
-    /// Cancel + drop the active `MobileDeviceLinkSession`.
-    /// Cancellation is idempotent.
-    pub(crate) fn cancel_device_link_session(&self) {
-        let session_to_cancel = self
-            .device_link_session()
-            .lock()
-            .ok()
-            .and_then(|mut slot| slot.take());
-        if let Some(session) = session_to_cancel {
-            session.cancel();
-        }
-    }
+/// Holds the initiator machine plus the relay transport it offered on;
+/// `advance` polls the same transport each tick.
+pub(crate) struct DeviceLinkInitiatorHolder {
+    machine: DeviceLinkInitiatorMachine,
+    transport: HttpTransport,
+}
 
-    /// Translate the engine's typed device-link `ActionResult`
-    /// variants into calls on the active `MobileDeviceLinkSession`.
-    /// The cycle thread will then push the resulting state changes
-    /// back through the `DeviceLinkEngineBridge` listener.
-    pub(crate) fn dispatch_device_link_side_effects(
-        &self,
-        result: &ActionResult,
-    ) -> Result<(), MobileError> {
-        match result {
-            ActionResult::DeviceLinkConfirmManual { code } => {
-                if let Some(session) = self.device_link_session_clone()? {
-                    let _ = session.confirm_manual(code.clone(), now_unix_secs());
-                }
-            }
-            ActionResult::DeviceLinkDeny => {
-                if let Some(session) = self.device_link_session_clone()? {
-                    session.deny();
-                }
-            }
-            ActionResult::DeviceLinkRetry => {
-                // Engine already moved to QrPending. Cancel the
-                // stale session (idempotent) and create a fresh
-                // one — the new cycle thread fires `on_qr_ready`
-                // to advance the engine.
-                self.cancel_device_link_session();
-                self.ensure_device_link_session()?;
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-
-    fn device_link_session_clone(
-        &self,
-    ) -> Result<Option<Arc<MobileDeviceLinkSession>>, MobileError> {
-        Ok(self
-            .device_link_session()
-            .lock()
-            .map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?
-            .clone())
+fn lock_err<E: std::fmt::Display>(e: E) -> MobileError {
+    MobileError::Other {
+        detail: format!("Lock failed: {e}"),
     }
 }
 
 fn now_unix_secs() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
+    vauchi_core::clock::SystemClock::shared().unix_seconds()
 }
 
-/// Bridge listener that forwards `MobileDeviceLinkSession`
-/// cycle-thread callbacks into the active `AppEngine`'s
-/// receiver-side bridge methods. Pair 5 sibling of
-/// `MultiStageEngineBridge`.
-///
-/// Notification: every state-mutating callback ends with
-/// `on_screens_invalidated(["device_linking"])` so the frontend
-/// re-fetches `current_screen_json`.
-struct DeviceLinkEngineBridge {
-    engine: Arc<Mutex<AppEngine>>,
-    direct_listener: DirectListenerSlot,
-}
+impl PlatformAppEngine {
+    /// Lazily build + start the initiator machine and apply its first
+    /// event (QrReady). Idempotent: a no-op when a machine is running.
+    pub(crate) fn ensure_device_link_session(&self) -> Result<(), MobileError> {
+        if self
+            .device_link_session()
+            .lock()
+            .map_err(lock_err)?
+            .is_some()
+        {
+            return Ok(());
+        }
+        // Drive the engine into QrPending so the screen renders a
+        // generating-link spinner until the offer lands. Off-screen
+        // errors are non-fatal.
+        {
+            let mut engine = self.engine().lock().map_err(lock_err)?;
+            let _ = engine.device_link_qr_pending();
+        }
 
-impl DeviceLinkEngineBridge {
-    fn notify(&self) {
+        let (initiator, transport, identity_id, persistence) =
+            self.build_device_link_initiator()?;
+        let (machine, event) = DeviceLinkInitiatorMachine::start(
+            initiator,
+            &transport,
+            &identity_id,
+            now_unix_secs(),
+            RELAY_TIMEOUT_SECS,
+            Some(persistence),
+        );
+        self.apply_initiator_event(event);
+
+        *self.device_link_session().lock().map_err(lock_err)? =
+            Some(DeviceLinkInitiatorHolder { machine, transport });
+        Ok(())
+    }
+
+    /// Cancel + drop the active initiator machine. Idempotent.
+    pub(crate) fn cancel_device_link_session(&self) {
+        let holder = self
+            .device_link_session()
+            .lock()
+            .ok()
+            .and_then(|mut slot| slot.take());
+        if let Some(mut holder) = holder {
+            let _ = holder.machine.cancel();
+        }
+    }
+
+    /// One non-blocking relay step. Called from `poll_notifications`
+    /// (never while the engine lock is held). Returns true if the
+    /// device-linking screen changed.
+    pub(crate) fn advance_device_link_session(&self) -> bool {
+        let now = now_unix_secs();
+        let event = {
+            let mut slot = match self.device_link_session().lock() {
+                Ok(slot) => slot,
+                Err(_) => return false,
+            };
+            match slot.as_mut() {
+                Some(holder) => holder.machine.advance(&holder.transport, now),
+                None => return false,
+            }
+        };
+        self.apply_initiator_event(event)
+    }
+
+    /// Translate the engine's typed device-link `ActionResult`s into
+    /// machine inputs. Called after the engine lock is released.
+    pub(crate) fn dispatch_device_link_side_effects(
+        &self,
+        result: &ActionResult,
+    ) -> Result<(), MobileError> {
+        let event = {
+            let mut slot = self.device_link_session().lock().map_err(lock_err)?;
+            match (result, slot.as_mut()) {
+                (ActionResult::DeviceLinkConfirmManual { code }, Some(holder)) => {
+                    Some(holder.machine.confirm_manual(code.clone(), now_unix_secs()))
+                }
+                (ActionResult::DeviceLinkDeny, Some(holder)) => Some(holder.machine.deny()),
+                _ => None,
+            }
+        };
+        if let Some(event) = event {
+            self.apply_initiator_event(event);
+        }
+        if matches!(result, ActionResult::DeviceLinkRetry) {
+            // Engine already moved to QrPending. Drop the stale machine
+            // and start a fresh one — its offer fires QrReady.
+            self.cancel_device_link_session();
+            self.ensure_device_link_session()?;
+        }
+        Ok(())
+    }
+
+    /// Map an [`InitiatorEvent`] onto the engine's receiver-side
+    /// `device_link_*` handlers (same mapping the old bridge did), then
+    /// push a `device_linking` screen-invalidation so the frontend
+    /// re-fetches. Returns true if a handler applied.
+    fn apply_initiator_event(&self, event: InitiatorEvent) -> bool {
+        let applied = {
+            let mut engine = match self.engine().lock() {
+                Ok(engine) => engine,
+                Err(_) => return false,
+            };
+            match event {
+                InitiatorEvent::None => false,
+                InitiatorEvent::QrReady {
+                    qr_data,
+                    expires_at_unix,
+                } => engine
+                    .device_link_qr_ready(qr_data, expires_at_unix)
+                    .is_some(),
+                InitiatorEvent::ConfirmationRequired {
+                    device_name,
+                    confirmation_code,
+                    identity_fingerprint,
+                    challenge,
+                } => {
+                    // Concatenate fingerprint + challenge for the
+                    // engine's opaque hex payload (matches the prior
+                    // bridge encoding).
+                    let challenge_hex =
+                        format!("{identity_fingerprint}:{}", hex::encode(&challenge));
+                    engine
+                        .device_link_request_received(device_name, confirmation_code, challenge_hex)
+                        .is_some()
+                }
+                InitiatorEvent::Completed { .. } => engine.device_link_completed().is_some(),
+                InitiatorEvent::Failed { reason } => match reason.as_str() {
+                    "qr_expired" => engine.device_link_qr_expired().is_some(),
+                    _ => engine.device_link_failed(reason).is_some(),
+                },
+            }
+        };
+        if applied {
+            self.notify_device_linking_invalidated();
+        }
+        applied
+    }
+
+    fn notify_device_linking_invalidated(&self) {
         let listener = self
-            .direct_listener
+            .direct_listener()
             .lock()
             .ok()
             .and_then(|guard| guard.clone());
         if let Some(listener) = listener {
             listener.on_screens_invalidated(vec!["device_linking".into()]);
         }
-    }
-}
-
-impl DeviceLinkSessionListener for DeviceLinkEngineBridge {
-    fn on_qr_ready(&self, qr_data: String, expires_at_unix: u64) {
-        let applied = match self.engine.lock() {
-            Ok(mut e) => e.device_link_qr_ready(qr_data, expires_at_unix).is_some(),
-            Err(_) => false,
-        };
-        if applied {
-            self.notify();
-        }
-    }
-
-    fn on_confirmation_required(
-        &self,
-        device_name: String,
-        confirmation_code: String,
-        identity_fingerprint: String,
-        proximity_challenge: Vec<u8>,
-    ) {
-        // Concatenate fingerprint + challenge for the engine's hex
-        // payload — the receiver-side ConfirmingDevice screen
-        // renders both via the engine's `challenge_hex` field; the
-        // iOS `ProximityVerificationView` would use both halves to
-        // validate ultrasonic responses (deferred). For the
-        // manual-only path we only need to round-trip the bytes;
-        // the engine treats it as opaque hex.
-        let challenge_hex = format!(
-            "{}:{}",
-            identity_fingerprint,
-            hex::encode(&proximity_challenge)
-        );
-        let applied = match self.engine.lock() {
-            Ok(mut e) => e
-                .device_link_request_received(device_name, confirmation_code, challenge_hex)
-                .is_some(),
-            Err(_) => false,
-        };
-        if applied {
-            self.notify();
-        }
-    }
-
-    fn on_request_sent(&self, _confirmation_code: String) {
-        // Responder-side callback — Phase 1 cycle thread does not
-        // fire it. Recorded for completeness; no engine state
-        // change.
-    }
-
-    fn on_completed(&self, _device_name: String, _device_index: u32) {
-        let applied = match self.engine.lock() {
-            Ok(mut e) => e.device_link_completed().is_some(),
-            Err(_) => false,
-        };
-        if applied {
-            self.notify();
-        }
-    }
-
-    fn on_failed(&self, reason: String) {
-        // Stable identifiers (`"qr_expired"`, `"user_denied"`,
-        // `"user_confirm_timeout"`, `"cancelled"`) route to specific
-        // engine states; everything else falls through to the
-        // generic failed screen with the reason as the message.
-        let applied = match self.engine.lock() {
-            Ok(mut e) => match reason.as_str() {
-                "qr_expired" => e.device_link_qr_expired().is_some(),
-                _ => e.device_link_failed(reason).is_some(),
-            },
-            Err(_) => false,
-        };
-        if applied {
-            self.notify();
-        }
-    }
-
-    fn on_session_ended(&self) {
-        // Terminal-only invalidation; the prior `on_completed` /
-        // `on_failed` already set the engine state.
-        self.notify();
     }
 }

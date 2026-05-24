@@ -19,7 +19,6 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use crate::MobileDeviceLinkSession;
 use crate::mobile_exchange::serialize_exchange_payload;
 use crate::multistage_exchange::{
     MobileAudioProximityState, MobileMultiStageSession, MobileProtocolState, MobileQrPayload,
@@ -159,13 +158,12 @@ pub struct PlatformAppEngine {
     /// never see this — they only fire `UserAction`s and
     /// `Event`s and render the resulting `ScreenModel`.
     multi_stage_session: Mutex<Option<Arc<MobileMultiStageSession>>>,
-    /// Pair 5 — auto-managed `MobileDeviceLinkSession` for the
-    /// `DeviceLinking` screen. Same lifecycle pattern as multi-stage:
-    /// created on navigation in, cancelled on navigation out. The
-    /// `DeviceLinkEngineBridge` listener pushes cycle-thread events
-    /// (`on_qr_ready`, `on_confirmation_required`, `on_completed`,
-    /// `on_failed`) into `AppEngine`'s receiver-side bridge methods.
-    device_link_session: Mutex<Option<Arc<MobileDeviceLinkSession>>>,
+    /// Slice 32l — the device-link initiator runs as a synchronous
+    /// `DeviceLinkInitiatorMachine` (no cycle thread, no listener
+    /// bridge), advanced from `poll_notifications`. Created on
+    /// navigation into `DeviceLinking`, dropped on navigation out.
+    device_link_session:
+        Mutex<Option<crate::platform_app_engine_device_link::DeviceLinkInitiatorHolder>>,
     /// Phase 1.6 — auto-managed `MobileLinkResponderSession` for the
     /// `DeepLinkResponder` screen. Created lazily on the first
     /// `current_link_responder_session()` call after navigation enters
@@ -811,6 +809,10 @@ impl PlatformAppEngine {
 
     /// Poll core for pending OS notifications to render.
     pub fn poll_notifications(&self) -> Result<Vec<MobilePendingNotification>, MobileError> {
+        // Slice 32l: advance the device-link initiator machine one
+        // relay step (no-op when not linking). Done before locking the
+        // engine — `advance` takes the engine lock itself when applying.
+        self.advance_device_link_session();
         let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
         })?;
@@ -4101,18 +4103,23 @@ impl PlatformAppEngine {
 }
 
 impl PlatformAppEngine {
-    /// Internal constructor for the initiator-side orchestrator
-    /// session. Demoted from the UniFFI surface in B1-G of
-    /// `2026-05-23-track-b-push-to-zero-plan.md` — the engine owns
-    /// the session lifecycle via `ensure_device_link_session()`
-    /// (called from `after_screen_transition` on entry to
-    /// `AppScreen::DeviceLinking`), so the public factory had zero
-    /// hand-written frontend callers. The only remaining caller is
-    /// `ensure_device_link_session` in
-    /// `platform_app_engine_device_link.rs`.
-    pub(crate) fn create_device_link_session_initiator(
+    /// Build the parts the slice-32l `DeviceLinkInitiatorMachine`
+    /// needs: initiator, relay transport, identity id, and persistence.
+    /// The engine owns the machine lifecycle via
+    /// `ensure_device_link_session()` (driven from
+    /// `after_screen_transition` on `AppScreen::DeviceLinking` entry),
+    /// so this has no hand-written frontend callers.
+    pub(crate) fn build_device_link_initiator(
         &self,
-    ) -> Result<Arc<crate::MobileDeviceLinkSession>, MobileError> {
+    ) -> Result<
+        (
+            vauchi_core::exchange::DeviceLinkInitiator,
+            vauchi_core::network::HttpTransport,
+            String,
+            vauchi_app::orchestrator::device_link_session::DeviceLinkPersistence,
+        ),
+        MobileError,
+    > {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
         })?;
@@ -4137,27 +4144,18 @@ impl PlatformAppEngine {
         );
         let identity_id = hex::encode(identity.signing_public_key());
 
-        // ADR-035: device-link QR expiry is 300 s — align the
-        // relay-listen budget so the cycle thread's deadline matches
-        // the QR expiry observed by the peer.
-        const RELAY_TIMEOUT_SECS: u64 = 300;
-
         let relay_url = engine.vauchi().config().relay.server_url.clone();
         let connect_timeout_ms = engine.vauchi().config().relay.connect_timeout_ms;
         let transport = engine
             .vauchi()
             .build_relay_transport(relay_url, connect_timeout_ms.max(10_000));
 
-        Ok(Arc::new(
-            crate::mobile_device_link_session::MobileDeviceLinkSession::with_persistence_initiator(
-                initiator,
-                transport,
-                identity_id,
-                RELAY_TIMEOUT_SECS,
-                self.storage_path.clone(),
-                self.storage_key.clone(),
-            ),
-        ))
+        let persistence = vauchi_app::orchestrator::device_link_session::DeviceLinkPersistence {
+            storage_path: self.storage_path.clone(),
+            storage_key: self.storage_key.clone(),
+        };
+
+        Ok((initiator, transport, identity_id, persistence))
     }
 
     /// File path holding the in-progress recovery proof, parallel to
@@ -4504,7 +4502,9 @@ impl PlatformAppEngine {
     }
 
     /// Internal accessor: device-link session slot.
-    pub(crate) fn device_link_session(&self) -> &Mutex<Option<Arc<MobileDeviceLinkSession>>> {
+    pub(crate) fn device_link_session(
+        &self,
+    ) -> &Mutex<Option<crate::platform_app_engine_device_link::DeviceLinkInitiatorHolder>> {
         &self.device_link_session
     }
 

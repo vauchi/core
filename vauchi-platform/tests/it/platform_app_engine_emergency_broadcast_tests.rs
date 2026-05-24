@@ -176,8 +176,16 @@ fn send_emergency_broadcast_returns_total_after_configure() {
     // Sending fails to deliver because the contacts don't exist in
     // storage, but the call must surface a result with `total` > 0
     // OR a clearly-attributable error. Either is acceptable surface
-    // behavior — we mainly assert the wrapper does not panic.
-    let _ = engine.dispatch_domain_command(DomainCommand::SendEmergencyBroadcast);
+    // behavior — assert the dispatch routes to the right result shape
+    // on the Ok path and tolerate the delivery error.
+    let result = engine.dispatch_domain_command(DomainCommand::SendEmergencyBroadcast);
+    match result {
+        Ok(r) => assert!(
+            matches!(r, DomainCommandResult::BroadcastResult { .. }),
+            "SendEmergencyBroadcast must yield a BroadcastResult, got {r:?}"
+        ),
+        Err(_) => { /* delivery to non-existent contacts may legitimately error */ }
+    }
 }
 
 // ── Cache invalidation contract ──────────────────────────────────────

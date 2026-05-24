@@ -35,12 +35,13 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::error::MobileError;
 use crate::exchange::MobileCommand;
 use crate::exchange::MobileEvent;
 
+use vauchi_core::clock::SystemClock;
 use vauchi_core::exchange::link_mode::{
     LinkModeError, ParsedLinkUrl, responder_respond_with_card_bytes,
 };
@@ -298,8 +299,8 @@ impl MobileLinkResponderSession {
     ) -> Result<Arc<Self>, MobileError> {
         let (keys, deposits) = responder_respond_with_card_bytes(parsed, &our_card_bytes)
             .map_err(map_link_mode_error)?;
-        let deadline = Instant::now() + Duration::from_secs(POLLING_DEADLINE_SECS);
-        let session = LinkResponderSession::new(keys, deposits, deadline);
+        let deadline_unix = SystemClock::shared().unix_seconds() + POLLING_DEADLINE_SECS;
+        let session = LinkResponderSession::new(keys, deposits, deadline_unix);
         Ok(Arc::new(Self {
             inner: Arc::new(Mutex::new(session)),
             listener: Arc::new(Mutex::new(None)),
@@ -399,7 +400,7 @@ fn cycle_loop(
 
         // Tick the deadline, then sleep until the next iteration.
         if let Ok(mut session) = inner.lock() {
-            session.tick(Instant::now());
+            session.tick(SystemClock::shared().unix_seconds());
         }
 
         sleeper.sleep(Duration::from_millis(CYCLE_POLL_INTERVAL_MS));

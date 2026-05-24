@@ -22,8 +22,6 @@
 //! See `_private/docs/problems/2026-04-27-deep-link-responder-flow/`
 //! for the full design + risk register.
 
-use std::time::Instant;
-
 use crate::exchange::escrow::EscrowKeys;
 use crate::exchange::link_mode::{LinkModeError, responder_complete};
 use crate::platform::{Command, Event};
@@ -80,9 +78,12 @@ pub enum LinkResponderState {
 pub struct LinkResponderSession {
     state: LinkResponderState,
     keys: EscrowKeys,
-    /// Wall-clock deadline for the polling phase. Once reached without
-    /// `RelayEscrowReady`, transitions to `Failed(PollingTimedOut)`.
-    poll_deadline: Instant,
+    /// Unix-seconds deadline for the polling phase. Once reached
+    /// without `RelayEscrowReady`, transitions to
+    /// `Failed(PollingTimedOut)`. Unix-secs (not `Instant`) so the
+    /// deadline is injectable from the engine's `Clock` seam and
+    /// deterministic in tests (slice 32l Phase 2 R1).
+    poll_deadline_unix: u64,
     /// Bytes of `keys.gate_hash` decoded from hex once at construction
     /// time, so per-event comparisons are O(32) byte equality rather
     /// than re-decoding the hex string.
@@ -99,10 +100,10 @@ impl LinkResponderSession {
     /// relay starts watching the gate; the cycle thread drains all
     /// three commands on the first call to `drain_pending_commands`.
     ///
-    /// `poll_deadline` is the wall-clock instant after which the
+    /// `poll_deadline_unix` is the unix-seconds time after which the
     /// session transitions to `Failed(PollingTimedOut)` if no
     /// `RelayEscrowReady` event has arrived.
-    pub fn new(keys: EscrowKeys, deposit_commands: Vec<Command>, poll_deadline: Instant) -> Self {
+    pub fn new(keys: EscrowKeys, deposit_commands: Vec<Command>, poll_deadline_unix: u64) -> Self {
         let gate_hash_bytes =
             hex::decode(&keys.gate_hash).expect("hex from hex::encode is always valid");
 
@@ -117,7 +118,7 @@ impl LinkResponderSession {
         Self {
             state: LinkResponderState::Polling,
             keys,
-            poll_deadline,
+            poll_deadline_unix,
             gate_hash_bytes,
             pending,
         }
@@ -190,13 +191,14 @@ impl LinkResponderSession {
         }
     }
 
-    /// Wall-clock deadline check. The cycle thread calls this on each
-    /// poll iteration; tests pass arbitrary `Instant`s.
-    pub fn tick(&mut self, now: Instant) {
+    /// Unix-seconds deadline check. Called from the engine's poll
+    /// tick; tests pass arbitrary `now_unix` values.
+    pub fn tick(&mut self, now_unix: u64) {
         if self.is_terminal() {
             return;
         }
-        if now >= self.poll_deadline && matches!(self.state, LinkResponderState::Polling) {
+        if now_unix >= self.poll_deadline_unix && matches!(self.state, LinkResponderState::Polling)
+        {
             self.fail(LinkResponderFailureReason::PollingTimedOut);
         }
     }

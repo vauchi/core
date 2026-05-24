@@ -7,11 +7,9 @@
 //! The pure-Rust state machine (no threads, no sleeps) drives the
 //! responder side of link-mode contact exchange after the consent
 //! gate grants. Inputs are `apply_hardware_event` (relay events
-//! arriving from the cycle thread) and `tick(Instant)` (deadline
+//! arriving from the cycle thread) and `tick(now_unix)` (deadline
 //! checks); outputs are `drain_pending_commands` (commands the cycle
 //! thread should dispatch) and `current_state`.
-
-use std::time::{Duration, Instant};
 
 use proptest::prelude::{Strategy, any};
 use vauchi_core::exchange::link_mode::*;
@@ -20,14 +18,17 @@ use vauchi_core::exchange::link_responder::{
 };
 use vauchi_core::{Command, Event};
 
+/// Fixed unix-seconds base for deterministic deadline tests.
+const NOW: u64 = 1_700_000_000;
+
 /// Synthetic responder session — derives keys + commands the same way
 /// the production cycle thread will, but stays inside the test.
-fn make_session(deadline: Instant) -> LinkResponderSession {
+fn make_session(deadline_unix: u64) -> LinkResponderSession {
     let (init, _) = initiator_generate();
     let parsed = parse_link_url(&init.url).unwrap();
     // `responder_respond` returns the keys + 2 RelayEscrowDeposit commands.
     let (keys, deposits) = responder_respond(&parsed, b"responder_card".to_vec()).unwrap();
-    LinkResponderSession::new(keys, deposits, deadline)
+    LinkResponderSession::new(keys, deposits, deadline_unix)
 }
 
 // ================================================================
@@ -37,8 +38,8 @@ fn make_session(deadline: Instant) -> LinkResponderSession {
 // @internal
 #[test]
 fn fresh_session_emits_deposit_and_check_commands() {
-    let now = Instant::now();
-    let mut session = make_session(now + Duration::from_secs(300));
+    let now = NOW;
+    let mut session = make_session(now + 300);
 
     // Initial state is Polling — deposits are fire-and-forget; the
     // responder waits for the gate-count `RelayEscrowReady` ack rather
@@ -79,8 +80,8 @@ fn fresh_session_emits_deposit_and_check_commands() {
 // @internal
 #[test]
 fn relay_escrow_ready_on_our_gate_transitions_to_retrieving() {
-    let now = Instant::now();
-    let mut session = make_session(now + Duration::from_secs(300));
+    let now = NOW;
+    let mut session = make_session(now + 300);
     let _ = session.drain_pending_commands();
 
     let our_gate = session.gate_hash_bytes();
@@ -107,8 +108,8 @@ fn relay_escrow_ready_on_our_gate_transitions_to_retrieving() {
 // @internal
 #[test]
 fn relay_escrow_ready_on_unrelated_gate_is_noop() {
-    let now = Instant::now();
-    let mut session = make_session(now + Duration::from_secs(300));
+    let now = NOW;
+    let mut session = make_session(now + 300);
     let _ = session.drain_pending_commands();
 
     // Different gate hash — must not affect this session's state.
@@ -131,8 +132,8 @@ fn relay_escrow_ready_on_unrelated_gate_is_noop() {
 // @internal
 #[test]
 fn blob_received_with_valid_ciphertext_transitions_to_finalized() {
-    let now = Instant::now();
-    let mut session = make_session(now + Duration::from_secs(300));
+    let now = NOW;
+    let mut session = make_session(now + 300);
     let _ = session.drain_pending_commands();
 
     // Drive into Retrieving first.
@@ -169,8 +170,8 @@ fn blob_received_with_valid_ciphertext_transitions_to_finalized() {
 // @internal
 #[test]
 fn blob_received_with_garbage_ciphertext_transitions_to_failed_decrypt() {
-    let now = Instant::now();
-    let mut session = make_session(now + Duration::from_secs(300));
+    let now = NOW;
+    let mut session = make_session(now + 300);
     let _ = session.drain_pending_commands();
 
     let our_gate = session.gate_hash_bytes();
@@ -201,8 +202,8 @@ fn blob_received_with_garbage_ciphertext_transitions_to_failed_decrypt() {
 // @internal
 #[test]
 fn relay_escrow_failed_on_our_gate_transitions_to_failed_deposit_rejected() {
-    let now = Instant::now();
-    let mut session = make_session(now + Duration::from_secs(300));
+    let now = NOW;
+    let mut session = make_session(now + 300);
     let _ = session.drain_pending_commands();
 
     let our_gate = session.gate_hash_bytes();
@@ -224,8 +225,8 @@ fn relay_escrow_failed_on_our_gate_transitions_to_failed_deposit_rejected() {
 // @internal
 #[test]
 fn tick_past_deadline_transitions_to_failed_polling_timed_out() {
-    let now = Instant::now();
-    let deadline = now + Duration::from_secs(1);
+    let now = NOW;
+    let deadline = now + 1;
     let mut session = make_session(deadline);
     let _ = session.drain_pending_commands();
 
@@ -237,7 +238,7 @@ fn tick_past_deadline_transitions_to_failed_polling_timed_out() {
     ));
 
     // Tick past deadline → PollingTimedOut.
-    session.tick(deadline + Duration::from_millis(1));
+    session.tick(deadline + 1);
     assert!(
         matches!(
             session.current_state(),
@@ -251,8 +252,8 @@ fn tick_past_deadline_transitions_to_failed_polling_timed_out() {
 // @internal
 #[test]
 fn cancel_from_polling_transitions_to_failed_cancelled() {
-    let now = Instant::now();
-    let mut session = make_session(now + Duration::from_secs(300));
+    let now = NOW;
+    let mut session = make_session(now + 300);
     let _ = session.drain_pending_commands();
 
     session.cancel();
@@ -274,8 +275,8 @@ fn cancel_from_polling_transitions_to_failed_cancelled() {
 // @internal
 #[test]
 fn finalized_is_terminal() {
-    let now = Instant::now();
-    let mut session = make_session(now + Duration::from_secs(300));
+    let now = NOW;
+    let mut session = make_session(now + 300);
     let _ = session.drain_pending_commands();
 
     let our_gate = session.gate_hash_bytes();
@@ -295,7 +296,7 @@ fn finalized_is_terminal() {
     ));
 
     // Subsequent events are inert.
-    session.tick(now + Duration::from_secs(3600));
+    session.tick(now + 3600);
     session.cancel();
     session.apply_hardware_event(Event::RelayEscrowFailed {
         gate_hash: our_gate,
@@ -312,8 +313,8 @@ fn finalized_is_terminal() {
 // @internal
 #[test]
 fn failed_is_terminal() {
-    let now = Instant::now();
-    let mut session = make_session(now + Duration::from_secs(300));
+    let now = NOW;
+    let mut session = make_session(now + 300);
     let _ = session.drain_pending_commands();
 
     session.cancel();
@@ -327,7 +328,7 @@ fn failed_is_terminal() {
     session.apply_hardware_event(Event::RelayEscrowReady {
         gate_hash: our_gate,
     });
-    session.tick(now + Duration::from_secs(3600));
+    session.tick(now + 3600);
 
     assert!(matches!(
         session.current_state(),
@@ -359,8 +360,8 @@ proptest::proptest! {
             0..32,
         )
     ) {
-        let now = Instant::now();
-        let mut session = make_session(now + Duration::from_secs(300));
+        let now = NOW;
+        let mut session = make_session(now + 300);
         let _ = session.drain_pending_commands();
 
         let our_gate = session.gate_hash_bytes();
@@ -396,7 +397,7 @@ proptest::proptest! {
                     });
                 }
                 EventKind::TickPast => {
-                    session.tick(now + Duration::from_secs(7200));
+                    session.tick(now + 7200);
                 }
                 EventKind::Cancel => {
                     session.cancel();

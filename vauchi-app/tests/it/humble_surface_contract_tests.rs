@@ -8,7 +8,7 @@
 //! Asserts that every `pub fn` inside an `impl PlatformAppEngine { … }`
 //! block in `core/vauchi-platform/src/**` either:
 //!
-//!   (a) appears in `HUMBLE_ALLOWLIST` — the 23-method genuine binding
+//!   (a) appears in `HUMBLE_ALLOWLIST` — the 25-method genuine binding
 //!       surface every frontend renders against, or
 //!   (b) is one of the `SURPLUS_RATCHET_CEILING` known-legacy methods
 //!       still pending retirement in Phase 3 of the program.
@@ -45,7 +45,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The 23-method Humble surface — the binding surface every frontend
+/// The 25-method Humble surface — the binding surface every frontend
 /// is allowed to depend on per ADR-021 / ADR-043. Source of truth for
 /// Phase 0 / Task 0.2 of the pure-functional-core program plan.
 ///
@@ -59,6 +59,7 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "current_screen_id",
     "current_screen_json",
     "current_tab_id",
+    "dispatch_domain_command",
     "handle_action_json",
     "handle_app_backgrounded",
     "handle_deep_link_uri",
@@ -68,6 +69,7 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "invalidate_screen_json",
     "navigate_back_json",
     "navigate_to_json",
+    "new",
     "periodic_sync_tick",
     "poll_notifications",
     "set_device_capabilities_json",
@@ -84,7 +86,15 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
 /// Every retirement MR must decrement this. When it hits 0, replace
 /// the ratchet branch in `enforce_contract` with the strict-equality
 /// branch noted alongside it.
-const SURPLUS_RATCHET_CEILING: usize = 3;
+///
+/// Track B B5 (2026-05-24) drove this 3 -> 1: `dispatch_domain_command`
+/// and `new` were promoted to `HUMBLE_ALLOWLIST` (ADR-043 Amendment 3),
+/// not retired. The sole remaining surplus is
+/// `current_link_responder_session`, gated on slice 32l (the device-link
+/// cycle restructure that retires `mobile_device_link*.rs` — Track A's
+/// surface, see the Track-B plan §D2). The ratchet stays at 1 and the
+/// strict-equality companion below stays `#[ignore]` until 32l lands.
+const SURPLUS_RATCHET_CEILING: usize = 1;
 
 /// Path resolution: `CARGO_MANIFEST_DIR` for this integration test
 /// points at `core/vauchi-app/`. The platform sources live in the
@@ -209,18 +219,23 @@ fn humble_allowlist_size_matches_plan() {
     // (24 → 23, the UniFFI wrapper had only PAE-contract tests as
     // callers; mobile frontends consume notifications via
     // `poll_notifications`, desktop frontends via the cabi-routed
-    // AppEngine peer). If this number changes again, the next ADR
-    // amendment (or a retirement passing ADR-048's G1-G5 gates) must
-    // precede the edit. Catching the count drift here is cheaper than
-    // discovering it during an ADR audit.
+    // AppEngine peer). ADR-043 Amendment 3 (2026-05-24) then promoted
+    // the two Track-B linchpins `dispatch_domain_command` (the typed
+    // DomainCommand router the B7 extension-wrapper pattern dispatches
+    // through) and `new` (the mandatory boot constructor every binding
+    // calls) from the surplus ratchet to the allowlist (23 -> 25): both
+    // are permanent binding surface, not retirable legacy debt. If this
+    // number changes again, the next ADR amendment (or a retirement
+    // passing ADR-048's G1-G5 gates) must precede the edit. Catching the
+    // count drift here is cheaper than discovering it during an ADR audit.
     assert_eq!(
         HUMBLE_ALLOWLIST.len(),
-        23,
-        "Humble allow-list size drifted from the 23 expected after \
-         ADR-048's third retirement (`drain_pending_notifications`). \
+        25,
+        "Humble allow-list size drifted from the 25 expected after \
+         ADR-043 Amendment 3 promoted `dispatch_domain_command` + `new`. \
          Edits to this list require an ADR amendment (ADR-021/043 \
-         for the Humble engine framing, ADR-047 for the \
-         render-context tier, or ADR-048's G1-G5 gates for \
+         for the Humble engine framing — incl. Amendment 3 for the \
+         linchpin promotions — or ADR-048's G1-G5 gates for \
          retirements)."
     );
 }

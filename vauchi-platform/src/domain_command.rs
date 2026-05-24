@@ -236,9 +236,6 @@ pub enum DomainCommand {
     VerifyRecoveryProof {
         proof_b64: String,
     },
-    /// Upload encrypted guardian entries (one per recovery-trusted
-    /// contact) to the relay. Called after `trust_contact_for_recovery`
-    /// or `untrust_contact_for_recovery` toggles the trust set.
     UploadGuardianEntries,
     /// Persist a user's recovery response (accept / reject /
     /// remind_me_later). Used by the `RecoveryClaimReviewEngine` to
@@ -272,6 +269,7 @@ pub enum DomainCommand {
     ParseRecoveryClaim {
         claim_b64: String,
     },
+    GetRecoveryProof,
     // ── Visibility Labels + Field Visibility (B7 batch 6) ──
     /// List every visibility label.
     ListLabels,

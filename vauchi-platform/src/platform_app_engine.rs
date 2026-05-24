@@ -1220,38 +1220,6 @@ impl PlatformAppEngine {
         }))
     }
 
-    /// Read the completed recovery proof as base64. Returns `None`
-    /// until the threshold is met.
-    pub fn get_recovery_proof(&self) -> Result<Option<String>, MobileError> {
-        use base64::Engine as _;
-        use vauchi_core::recovery::RecoveryProof;
-
-        let proof_path = self.recovery_proof_path();
-        if !proof_path.exists() {
-            return Ok(None);
-        }
-
-        let proof_bytes = std::fs::read(&proof_path).map_err(|e| MobileError::StorageError {
-            detail: e.to_string(),
-        })?;
-        let proof =
-            RecoveryProof::from_bytes(&proof_bytes).map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: format!("Invalid proof: {e}"),
-            })?;
-
-        if proof.voucher_count() >= proof.threshold() as usize {
-            let bytes = proof.to_bytes().map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-            Ok(Some(
-                base64::engine::general_purpose::STANDARD.encode(bytes),
-            ))
-        } else {
-            Ok(None)
-        }
-    }
-
     // ── Emergency Broadcast (Phase B3 — collapse-vauchi-platform-into-app-engine) ──
     //
     // Wraps the four emergency-broadcast methods that previously only
@@ -4131,6 +4099,36 @@ impl PlatformAppEngine {
                             .is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
                     },
                 })
+            }
+            DomainCommand::GetRecoveryProof => {
+                use base64::Engine as _;
+                use vauchi_core::recovery::RecoveryProof;
+
+                let proof_path = self.recovery_proof_path();
+                if !proof_path.exists() {
+                    return Ok(DomainCommandResult::StringOpt { value: None });
+                }
+
+                let proof_bytes =
+                    std::fs::read(&proof_path).map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                let proof = RecoveryProof::from_bytes(&proof_bytes).map_err(|e| {
+                    MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: format!("Invalid proof: {e}"),
+                    }
+                })?;
+
+                let value = if proof.voucher_count() >= proof.threshold() as usize {
+                    let bytes = proof.to_bytes().map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?;
+                    Some(base64::engine::general_purpose::STANDARD.encode(bytes))
+                } else {
+                    None
+                };
+                Ok(DomainCommandResult::StringOpt { value })
             }
         }
     }

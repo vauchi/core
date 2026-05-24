@@ -171,20 +171,32 @@ fn get_recovery_status_reflects_create_recovery_claim() {
 // @internal
 #[test]
 fn get_recovery_proof_is_none_when_no_recovery_in_progress() {
+    use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
-    let proof = engine.get_recovery_proof().expect("get_recovery_proof");
+    let result = engine
+        .dispatch_domain_command(DomainCommand::GetRecoveryProof)
+        .expect("dispatch GetRecoveryProof");
+    let DomainCommandResult::StringOpt { value: proof } = result else {
+        panic!("GetRecoveryProof: unexpected result variant {result:?}");
+    };
     assert!(proof.is_none(), "no proof yet");
 }
 
 // @internal
 #[test]
 fn get_recovery_proof_is_none_when_threshold_not_met() {
+    use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
     engine
         .create_recovery_claim(fake_old_pk_hex())
         .expect("create");
 
-    let proof = engine.get_recovery_proof().expect("get_recovery_proof");
+    let result = engine
+        .dispatch_domain_command(DomainCommand::GetRecoveryProof)
+        .expect("dispatch GetRecoveryProof");
+    let DomainCommandResult::StringOpt { value: proof } = result else {
+        panic!("GetRecoveryProof: unexpected result variant {result:?}");
+    };
     assert!(proof.is_none(), "0 vouchers < threshold → None");
 }
 

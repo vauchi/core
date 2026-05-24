@@ -84,7 +84,7 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
 /// Every retirement MR must decrement this. When it hits 0, replace
 /// the ratchet branch in `enforce_contract` with the strict-equality
 /// branch noted alongside it.
-const SURPLUS_RATCHET_CEILING: usize = 12;
+const SURPLUS_RATCHET_CEILING: usize = 11;
 
 /// Path resolution: `CARGO_MANIFEST_DIR` for this integration test
 /// points at `core/vauchi-app/`. The platform sources live in the

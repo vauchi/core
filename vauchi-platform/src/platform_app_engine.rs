@@ -1037,104 +1037,6 @@ impl PlatformAppEngine {
         Ok(result)
     }
 
-    /// Add a voucher to the in-progress recovery proof. Requires that
-    /// `create_recovery_claim` was called first.
-    pub fn add_recovery_voucher(
-        &self,
-        voucher_b64: String,
-    ) -> Result<crate::types::MobileRecoveryProgress, MobileError> {
-        use base64::Engine as _;
-        use vauchi_core::recovery::{RecoveryProof, RecoveryVoucher};
-
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-
-        let voucher_bytes = base64::engine::general_purpose::STANDARD
-            .decode(&voucher_b64)
-            .map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: format!("Invalid base64: {e}"),
-            })?;
-        let voucher =
-            RecoveryVoucher::from_bytes(&voucher_bytes).map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: format!("Invalid voucher: {e}"),
-            })?;
-
-        if !voucher.verify() {
-            return Err(MobileError::InvalidInput {
-                field: String::new(),
-                detail: "Invalid voucher signature".into(),
-            });
-        }
-
-        let proof_path = self.recovery_proof_path();
-        if !proof_path.exists() {
-            return Err(MobileError::InvalidInput {
-                field: String::new(),
-                detail: "No recovery in progress".into(),
-            });
-        }
-        let proof_bytes = std::fs::read(&proof_path).map_err(|e| MobileError::StorageError {
-            detail: e.to_string(),
-        })?;
-        let mut proof =
-            RecoveryProof::from_bytes(&proof_bytes).map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: format!("Invalid proof: {e}"),
-            })?;
-
-        let contacts =
-            engine
-                .vauchi()
-                .storage()
-                .list_contacts()
-                .map_err(|e| MobileError::StorageError {
-                    detail: e.to_string(),
-                })?;
-        let trusted_keys: std::collections::HashSet<[u8; 32]> = contacts
-            .iter()
-            .filter(|c| c.is_recovery_trusted())
-            .filter_map(|c| c.public_key().copied())
-            .collect();
-
-        match proof.add_voucher_trusted(voucher, &trusted_keys) {
-            Ok(()) => {}
-            Err(vauchi_core::recovery::RecoveryError::UntrustedVoucher) => {
-                return Err(MobileError::InvalidInput {
-                    field: String::new(),
-                    detail: "Voucher is from an untrusted contact. Only contacts marked as recovery-trusted can provide valid vouchers.".into(),
-                });
-            }
-            Err(e) => {
-                return Err(MobileError::InvalidInput {
-                    field: String::new(),
-                    detail: format!("Cannot add voucher: {e}"),
-                });
-            }
-        }
-
-        let updated_bytes = proof.to_bytes().map_err(|e| MobileError::Other {
-            detail: e.to_string(),
-        })?;
-        std::fs::write(&proof_path, updated_bytes).map_err(|e| MobileError::StorageError {
-            detail: e.to_string(),
-        })?;
-
-        let progress = crate::types::MobileRecoveryProgress {
-            old_public_key: hex::encode(proof.old_pk()),
-            new_public_key: hex::encode(proof.new_pk()),
-            vouchers_collected: proof.voucher_count() as u32,
-            vouchers_needed: proof.threshold(),
-            is_complete: proof.voucher_count() >= proof.threshold() as usize,
-        };
-
-        engine.invalidate_screen(&AppScreen::Recovery);
-        engine.invalidate_screen(&AppScreen::RecoveryHelp);
-        Ok(progress)
-    }
-
     // ── Emergency Broadcast (Phase B3 — collapse-vauchi-platform-into-app-engine) ──
     //
     // Wraps the four emergency-broadcast methods that previously only
@@ -4121,6 +4023,97 @@ impl PlatformAppEngine {
                         voucher_data,
                     },
                 })
+            }
+            DomainCommand::AddRecoveryVoucher { voucher_b64 } => {
+                use base64::Engine as _;
+                use vauchi_core::recovery::{RecoveryProof, RecoveryVoucher};
+
+                // `engine` already locked by dispatch entry — do not re-lock.
+                let voucher_bytes = base64::engine::general_purpose::STANDARD
+                    .decode(&voucher_b64)
+                    .map_err(|e| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: format!("Invalid base64: {e}"),
+                    })?;
+                let voucher = RecoveryVoucher::from_bytes(&voucher_bytes).map_err(|e| {
+                    MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: format!("Invalid voucher: {e}"),
+                    }
+                })?;
+
+                if !voucher.verify() {
+                    return Err(MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: "Invalid voucher signature".into(),
+                    });
+                }
+
+                let proof_path = self.recovery_proof_path();
+                if !proof_path.exists() {
+                    return Err(MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: "No recovery in progress".into(),
+                    });
+                }
+                let proof_bytes =
+                    std::fs::read(&proof_path).map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                let mut proof = RecoveryProof::from_bytes(&proof_bytes).map_err(|e| {
+                    MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: format!("Invalid proof: {e}"),
+                    }
+                })?;
+
+                let contacts = engine.vauchi().storage().list_contacts().map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
+                let trusted_keys: std::collections::HashSet<[u8; 32]> = contacts
+                    .iter()
+                    .filter(|c| c.is_recovery_trusted())
+                    .filter_map(|c| c.public_key().copied())
+                    .collect();
+
+                match proof.add_voucher_trusted(voucher, &trusted_keys) {
+                    Ok(()) => {}
+                    Err(vauchi_core::recovery::RecoveryError::UntrustedVoucher) => {
+                        return Err(MobileError::InvalidInput {
+                            field: String::new(),
+                            detail: "Voucher is from an untrusted contact. Only contacts marked as recovery-trusted can provide valid vouchers.".into(),
+                        });
+                    }
+                    Err(e) => {
+                        return Err(MobileError::InvalidInput {
+                            field: String::new(),
+                            detail: format!("Cannot add voucher: {e}"),
+                        });
+                    }
+                }
+
+                let updated_bytes = proof.to_bytes().map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+                std::fs::write(&proof_path, updated_bytes).map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
+
+                let progress = crate::types::MobileRecoveryProgress {
+                    old_public_key: hex::encode(proof.old_pk()),
+                    new_public_key: hex::encode(proof.new_pk()),
+                    vouchers_collected: proof.voucher_count() as u32,
+                    vouchers_needed: proof.threshold(),
+                    is_complete: proof.voucher_count() >= proof.threshold() as usize,
+                };
+
+                engine.invalidate_screen(&AppScreen::Recovery);
+                engine.invalidate_screen(&AppScreen::RecoveryHelp);
+                Ok(DomainCommandResult::RecoveryProgress { progress })
             }
         }
     }

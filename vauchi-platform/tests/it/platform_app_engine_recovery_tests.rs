@@ -215,12 +215,15 @@ fn get_recovery_proof_is_none_when_threshold_not_met() {
 // @internal
 #[test]
 fn add_recovery_voucher_rejects_invalid_base64() {
+    use vauchi_platform::DomainCommand;
     let (engine, _dir) = create_engine_with_identity();
     engine
         .create_recovery_claim(fake_old_pk_hex())
         .expect("create");
 
-    let result = engine.add_recovery_voucher("not!valid!".into());
+    let result = engine.dispatch_domain_command(DomainCommand::AddRecoveryVoucher {
+        voucher_b64: "not!valid!".into(),
+    });
     assert!(result.is_err(), "invalid base64 must error");
 }
 
@@ -232,7 +235,10 @@ fn add_recovery_voucher_errors_when_no_recovery_in_progress() {
     // Feed it a syntactically-valid base64 but garbage voucher.
     use base64::Engine;
     let garbage = base64::engine::general_purpose::STANDARD.encode([0u8; 16]);
-    let result = engine.add_recovery_voucher(garbage);
+    let result =
+        engine.dispatch_domain_command(vauchi_platform::DomainCommand::AddRecoveryVoucher {
+            voucher_b64: garbage,
+        });
     assert!(
         result.is_err(),
         "no recovery in progress + invalid voucher → error"

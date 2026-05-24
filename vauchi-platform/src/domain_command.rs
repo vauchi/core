@@ -252,7 +252,6 @@ pub enum DomainCommand {
     TrustContactForRecovery {
         contact_id: String,
     },
-    /// Remove recovery trust from a contact. Returns `Unit`.
     UntrustContactForRecovery {
         contact_id: String,
     },
@@ -268,6 +267,9 @@ pub enum DomainCommand {
     GetRecoveryStatus,
     CreateRecoveryVoucher {
         claim_b64: String,
+    },
+    AddRecoveryVoucher {
+        voucher_b64: String,
     },
     // ── Visibility Labels + Field Visibility (B7 batch 6) ──
     /// List every visibility label.
@@ -833,6 +835,9 @@ pub enum DomainCommandResult {
     },
     RecoveryVoucher {
         voucher: MobileRecoveryVoucher,
+    },
+    RecoveryProgress {
+        progress: MobileRecoveryProgress,
     },
     /// List of visibility labels (B7 batch 6 — `ListLabels`,
     /// `GetGroupsForContact`).

@@ -1191,35 +1191,6 @@ impl PlatformAppEngine {
         Ok(progress)
     }
 
-    /// Read the in-progress recovery status, if any.
-    pub fn get_recovery_status(
-        &self,
-    ) -> Result<Option<crate::types::MobileRecoveryProgress>, MobileError> {
-        use vauchi_core::recovery::RecoveryProof;
-
-        let proof_path = self.recovery_proof_path();
-        if !proof_path.exists() {
-            return Ok(None);
-        }
-
-        let proof_bytes = std::fs::read(&proof_path).map_err(|e| MobileError::StorageError {
-            detail: e.to_string(),
-        })?;
-        let proof =
-            RecoveryProof::from_bytes(&proof_bytes).map_err(|e| MobileError::InvalidInput {
-                field: String::new(),
-                detail: format!("Invalid proof: {e}"),
-            })?;
-
-        Ok(Some(crate::types::MobileRecoveryProgress {
-            old_public_key: hex::encode(proof.old_pk()),
-            new_public_key: hex::encode(proof.new_pk()),
-            vouchers_collected: proof.voucher_count() as u32,
-            vouchers_needed: proof.threshold(),
-            is_complete: proof.voucher_count() >= proof.threshold() as usize,
-        }))
-    }
-
     // ── Emergency Broadcast (Phase B3 — collapse-vauchi-platform-into-app-engine) ──
     //
     // Wraps the four emergency-broadcast methods that previously only
@@ -4129,6 +4100,35 @@ impl PlatformAppEngine {
                     None
                 };
                 Ok(DomainCommandResult::StringOpt { value })
+            }
+            DomainCommand::GetRecoveryStatus => {
+                use vauchi_core::recovery::RecoveryProof;
+
+                let proof_path = self.recovery_proof_path();
+                if !proof_path.exists() {
+                    return Ok(DomainCommandResult::OptionalRecoveryProgress { progress: None });
+                }
+
+                let proof_bytes =
+                    std::fs::read(&proof_path).map_err(|e| MobileError::StorageError {
+                        detail: e.to_string(),
+                    })?;
+                let proof = RecoveryProof::from_bytes(&proof_bytes).map_err(|e| {
+                    MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: format!("Invalid proof: {e}"),
+                    }
+                })?;
+
+                Ok(DomainCommandResult::OptionalRecoveryProgress {
+                    progress: Some(crate::types::MobileRecoveryProgress {
+                        old_public_key: hex::encode(proof.old_pk()),
+                        new_public_key: hex::encode(proof.new_pk()),
+                        vouchers_collected: proof.voucher_count() as u32,
+                        vouchers_needed: proof.threshold(),
+                        is_complete: proof.voucher_count() >= proof.threshold() as usize,
+                    }),
+                })
             }
         }
     }

@@ -143,23 +143,33 @@ fn parse_recovery_claim_rejects_invalid_base64() {
 // @internal
 #[test]
 fn get_recovery_status_is_none_when_no_recovery_in_progress() {
+    use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
-    let status = engine.get_recovery_status().expect("get_recovery_status");
+    let result = engine
+        .dispatch_domain_command(DomainCommand::GetRecoveryStatus)
+        .expect("dispatch GetRecoveryStatus");
+    let DomainCommandResult::OptionalRecoveryProgress { progress: status } = result else {
+        panic!("GetRecoveryStatus: unexpected result variant {result:?}");
+    };
     assert!(status.is_none(), "no recovery in progress → None");
 }
 
 // @internal
 #[test]
 fn get_recovery_status_reflects_create_recovery_claim() {
+    use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
     engine
         .create_recovery_claim(fake_old_pk_hex())
         .expect("create");
 
-    let status = engine
-        .get_recovery_status()
-        .expect("get_recovery_status")
-        .expect("recovery in progress");
+    let result = engine
+        .dispatch_domain_command(DomainCommand::GetRecoveryStatus)
+        .expect("dispatch GetRecoveryStatus");
+    let DomainCommandResult::OptionalRecoveryProgress { progress: status } = result else {
+        panic!("GetRecoveryStatus: unexpected result variant {result:?}");
+    };
+    let status = status.expect("recovery in progress");
 
     assert_eq!(status.vouchers_collected, 0);
     assert!(status.vouchers_needed >= 1, "threshold must be ≥ 1");

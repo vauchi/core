@@ -37,7 +37,7 @@ use crate::types::{
     MobileDeliverySummary, MobileDemoContact, MobileDemoContactState, MobileDeviceDeliveryRecord,
     MobileDeviceInfo, MobileDeviceLinkData, MobileDeviceLinkInfo, MobileDuplicatePair,
     MobileDuressSettings, MobileFieldNote, MobileFieldType, MobileGdprExport,
-    MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryClaim,
+    MobileOnboardingProgress, MobileOnboardingStep, MobileRecoveryClaim, MobileRecoveryProgress,
     MobileRecoveryVerification, MobileRetryEntry, MobileShredStatus, MobileSocialNetwork,
     MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
@@ -237,9 +237,6 @@ pub enum DomainCommand {
         proof_b64: String,
     },
     UploadGuardianEntries,
-    /// Persist a user's recovery response (accept / reject /
-    /// remind_me_later). Used by the `RecoveryClaimReviewEngine` to
-    /// store the decision when the user reviews an incoming claim.
     SaveRecoveryResponse {
         claim_id: String,
         contact_id: String,
@@ -270,6 +267,7 @@ pub enum DomainCommand {
         claim_b64: String,
     },
     GetRecoveryProof,
+    GetRecoveryStatus,
     // ── Visibility Labels + Field Visibility (B7 batch 6) ──
     /// List every visibility label.
     ListLabels,
@@ -828,6 +826,9 @@ pub enum DomainCommandResult {
     },
     RecoveryClaim {
         claim: MobileRecoveryClaim,
+    },
+    OptionalRecoveryProgress {
+        progress: Option<MobileRecoveryProgress>,
     },
     /// List of visibility labels (B7 batch 6 — `ListLabels`,
     /// `GetGroupsForContact`).

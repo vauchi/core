@@ -271,6 +271,9 @@ pub enum DomainCommand {
     AddRecoveryVoucher {
         voucher_b64: String,
     },
+    CreateRecoveryClaim {
+        old_pk_hex: String,
+    },
     // ── Visibility Labels + Field Visibility (B7 batch 6) ──
     /// List every visibility label.
     ListLabels,

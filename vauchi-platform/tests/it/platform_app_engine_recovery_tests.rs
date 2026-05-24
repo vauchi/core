@@ -12,7 +12,7 @@
 
 use std::sync::Arc;
 
-use vauchi_platform::{DomainCommand, DomainCommandResult, PlatformAppEngine};
+use vauchi_platform::{DomainCommand, DomainCommandResult, MobileRecoveryClaim, PlatformAppEngine};
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -60,6 +60,19 @@ fn fake_old_pk_hex() -> String {
     hex::encode([0x42u8; 32])
 }
 
+/// Dispatch `CreateRecoveryClaim` and unwrap the resulting claim.
+/// Most recovery tests need an in-progress claim as setup; the typed
+/// `create_recovery_claim` method was retired in Track B B4a-6.
+fn create_claim(engine: &PlatformAppEngine, old_pk_hex: String) -> MobileRecoveryClaim {
+    let result = engine
+        .dispatch_domain_command(DomainCommand::CreateRecoveryClaim { old_pk_hex })
+        .expect("dispatch CreateRecoveryClaim");
+    let DomainCommandResult::RecoveryClaim { claim } = result else {
+        panic!("CreateRecoveryClaim: unexpected result variant {result:?}");
+    };
+    claim
+}
+
 // ── create_recovery_claim ────────────────────────────────────────────
 
 // @internal
@@ -68,9 +81,7 @@ fn create_recovery_claim_returns_claim_with_supplied_old_pk() {
     let (engine, _dir) = create_engine_with_identity();
     let old_pk_hex = fake_old_pk_hex();
 
-    let claim = engine
-        .create_recovery_claim(old_pk_hex.clone())
-        .expect("create_recovery_claim");
+    let claim = create_claim(&engine, old_pk_hex.clone());
 
     assert_eq!(claim.old_public_key, old_pk_hex);
     assert!(!claim.claim_data.is_empty(), "claim_data must be base64");
@@ -87,7 +98,9 @@ fn create_recovery_claim_returns_claim_with_supplied_old_pk() {
 #[test]
 fn create_recovery_claim_rejects_invalid_hex() {
     let (engine, _dir) = create_engine_with_identity();
-    let result = engine.create_recovery_claim("not-hex".into());
+    let result = engine.dispatch_domain_command(DomainCommand::CreateRecoveryClaim {
+        old_pk_hex: "not-hex".into(),
+    });
     assert!(result.is_err(), "invalid hex must error");
 }
 
@@ -96,7 +109,9 @@ fn create_recovery_claim_rejects_invalid_hex() {
 fn create_recovery_claim_rejects_wrong_length() {
     let (engine, _dir) = create_engine_with_identity();
     // 31 bytes = 62 hex chars
-    let result = engine.create_recovery_claim(hex::encode([0u8; 31]));
+    let result = engine.dispatch_domain_command(DomainCommand::CreateRecoveryClaim {
+        old_pk_hex: hex::encode([0u8; 31]),
+    });
     assert!(result.is_err(), "wrong-length pk must error");
 }
 
@@ -109,9 +124,7 @@ fn parse_recovery_claim_round_trips_create() {
     let (engine, _dir) = create_engine_with_identity();
     let old_pk_hex = fake_old_pk_hex();
 
-    let original = engine
-        .create_recovery_claim(old_pk_hex.clone())
-        .expect("create");
+    let original = create_claim(&engine, old_pk_hex.clone());
     let parse_result = engine
         .dispatch_domain_command(DomainCommand::ParseRecoveryClaim {
             claim_b64: original.claim_data.clone(),
@@ -159,9 +172,7 @@ fn get_recovery_status_is_none_when_no_recovery_in_progress() {
 fn get_recovery_status_reflects_create_recovery_claim() {
     use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
-    engine
-        .create_recovery_claim(fake_old_pk_hex())
-        .expect("create");
+    create_claim(&engine, fake_old_pk_hex());
 
     let result = engine
         .dispatch_domain_command(DomainCommand::GetRecoveryStatus)
@@ -197,9 +208,7 @@ fn get_recovery_proof_is_none_when_no_recovery_in_progress() {
 fn get_recovery_proof_is_none_when_threshold_not_met() {
     use vauchi_platform::{DomainCommand, DomainCommandResult};
     let (engine, _dir) = create_engine_with_identity();
-    engine
-        .create_recovery_claim(fake_old_pk_hex())
-        .expect("create");
+    create_claim(&engine, fake_old_pk_hex());
 
     let result = engine
         .dispatch_domain_command(DomainCommand::GetRecoveryProof)
@@ -217,9 +226,7 @@ fn get_recovery_proof_is_none_when_threshold_not_met() {
 fn add_recovery_voucher_rejects_invalid_base64() {
     use vauchi_platform::DomainCommand;
     let (engine, _dir) = create_engine_with_identity();
-    engine
-        .create_recovery_claim(fake_old_pk_hex())
-        .expect("create");
+    create_claim(&engine, fake_old_pk_hex());
 
     let result = engine.dispatch_domain_command(DomainCommand::AddRecoveryVoucher {
         voucher_b64: "not!valid!".into(),
@@ -267,9 +274,7 @@ fn create_recovery_voucher_rejects_self_vouching() {
     // security guard; the wrapper must surface that error rather than
     // silently swallowing it.
     let (engine, _dir) = create_engine_with_identity();
-    let claim = engine
-        .create_recovery_claim(fake_old_pk_hex())
-        .expect("create_claim");
+    let claim = create_claim(&engine, fake_old_pk_hex());
 
     let result = engine.dispatch_domain_command(DomainCommand::CreateRecoveryVoucher {
         claim_b64: claim.claim_data,
@@ -332,9 +337,7 @@ fn create_recovery_claim_invalidates_recovery_screen_cache() {
     // Smoke-level: assert no panic on read-after-write across the
     // affected screens.
     let (engine, _dir) = create_engine_with_identity();
-    engine
-        .create_recovery_claim(fake_old_pk_hex())
-        .expect("create");
+    create_claim(&engine, fake_old_pk_hex());
 
     // Reading the current screen (whatever it is) must succeed without
     // a stale-engine panic. The Recovery screen is reachable via

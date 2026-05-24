@@ -957,86 +957,6 @@ impl PlatformAppEngine {
     // and `RecoveryHelp` screens so reads after a write reflect the
     // mutation without an explicit `invalidate_*` call from the caller.
 
-    /// Create a recovery claim binding `old_pk_hex` (lost identity) to
-    /// the active identity's signing public key.
-    pub fn create_recovery_claim(
-        &self,
-        old_pk_hex: String,
-    ) -> Result<crate::types::MobileRecoveryClaim, MobileError> {
-        use base64::Engine as _;
-        use vauchi_core::recovery::{RecoveryClaim, RecoveryProof};
-
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let identity = engine
-            .vauchi()
-            .identity()
-            .ok_or_else(|| MobileError::Other {
-                detail: "Identity not initialized".into(),
-            })?;
-
-        let old_pk_bytes = hex::decode(&old_pk_hex).map_err(|e| MobileError::InvalidInput {
-            field: String::new(),
-            detail: format!("Invalid hex: {e}"),
-        })?;
-        let old_pk: [u8; 32] = old_pk_bytes
-            .try_into()
-            .map_err(|_| MobileError::InvalidInput {
-                field: String::new(),
-                detail: "Public key must be 32 bytes".into(),
-            })?;
-
-        let new_pk = *identity.signing_public_key();
-        let claim = RecoveryClaim::new(
-            old_pk,
-            new_pk,
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0),
-        );
-
-        // Persist a `RecoveryProof` shell beside the database — this
-        // mirrors the legacy `VauchiPlatform` file layout so the two
-        // surfaces share state during the Phase-C migration window.
-        // Threshold matches the legacy default (3).
-        let proof = RecoveryProof::new(
-            old_pk,
-            new_pk,
-            3,
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0),
-        );
-        let proof_bytes = proof.to_bytes().map_err(|e| MobileError::Other {
-            detail: e.to_string(),
-        })?;
-        std::fs::write(self.recovery_proof_path(), proof_bytes).map_err(|e| {
-            MobileError::StorageError {
-                detail: e.to_string(),
-            }
-        })?;
-
-        let claim_data = base64::engine::general_purpose::STANDARD.encode(claim.to_bytes());
-        let result = crate::types::MobileRecoveryClaim {
-            old_public_key: old_pk_hex,
-            new_public_key: hex::encode(new_pk),
-            claim_data,
-            is_expired: claim.is_expired(
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0),
-            ),
-        };
-
-        engine.invalidate_screen(&AppScreen::Recovery);
-        engine.invalidate_screen(&AppScreen::RecoveryHelp);
-        Ok(result)
-    }
-
     // ── Emergency Broadcast (Phase B3 — collapse-vauchi-platform-into-app-engine) ──
     //
     // Wraps the four emergency-broadcast methods that previously only
@@ -4114,6 +4034,64 @@ impl PlatformAppEngine {
                 engine.invalidate_screen(&AppScreen::Recovery);
                 engine.invalidate_screen(&AppScreen::RecoveryHelp);
                 Ok(DomainCommandResult::RecoveryProgress { progress })
+            }
+            DomainCommand::CreateRecoveryClaim { old_pk_hex } => {
+                use base64::Engine as _;
+                use vauchi_core::recovery::{RecoveryClaim, RecoveryProof};
+
+                // `engine` already locked by dispatch entry — do not re-lock.
+                // Scope the identity borrow so the later `invalidate_screen`
+                // mutable borrows are free.
+                let new_pk = {
+                    let identity =
+                        engine
+                            .vauchi()
+                            .identity()
+                            .ok_or_else(|| MobileError::Other {
+                                detail: "Identity not initialized".into(),
+                            })?;
+                    *identity.signing_public_key()
+                };
+
+                let old_pk_bytes =
+                    hex::decode(&old_pk_hex).map_err(|e| MobileError::InvalidInput {
+                        field: String::new(),
+                        detail: format!("Invalid hex: {e}"),
+                    })?;
+                let old_pk: [u8; 32] =
+                    old_pk_bytes
+                        .try_into()
+                        .map_err(|_| MobileError::InvalidInput {
+                            field: String::new(),
+                            detail: "Public key must be 32 bytes".into(),
+                        })?;
+
+                let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+                let claim = RecoveryClaim::new(old_pk, new_pk, now);
+
+                // Persist a `RecoveryProof` shell beside the database —
+                // mirrors the legacy file layout. Threshold default 3.
+                let proof = RecoveryProof::new(old_pk, new_pk, 3, now);
+                let proof_bytes = proof.to_bytes().map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+                std::fs::write(self.recovery_proof_path(), proof_bytes).map_err(|e| {
+                    MobileError::StorageError {
+                        detail: e.to_string(),
+                    }
+                })?;
+
+                let claim_data = base64::engine::general_purpose::STANDARD.encode(claim.to_bytes());
+                let result = crate::types::MobileRecoveryClaim {
+                    old_public_key: old_pk_hex,
+                    new_public_key: hex::encode(new_pk),
+                    claim_data,
+                    is_expired: claim.is_expired(now),
+                };
+
+                engine.invalidate_screen(&AppScreen::Recovery);
+                engine.invalidate_screen(&AppScreen::RecoveryHelp);
+                Ok(DomainCommandResult::RecoveryClaim { claim: result })
             }
         }
     }

@@ -18,7 +18,8 @@
 //! State sequence (extracted from the old `run_initiator_cycle`):
 //!
 //! ```text
-//! start ─exchange_offer→ AwaitingClaim {QR emitted}
+//! new ─(no I/O)→ CreatingOffer
+//! CreatingOffer ─advance: exchange_offer─▶ AwaitingClaim {QR emitted} | Failed
 //! AwaitingClaim ─advance: one exchange_complete─▶
 //!       claimed       → AwaitingConfirmation
 //!       now≥deadline  → Failed("qr_expired")
@@ -28,9 +29,12 @@
 //! (any) ─cancel─▶ Cancelled (absorbing)
 //! ```
 //!
-//! Time is passed explicitly as `now: u64` (matching the domain ops);
-//! tests drive expiry by passing `now` values — no `Clock`/`Sleeper`,
-//! no thread, no mpsc channel (CC-06).
+//! **All relay I/O happens inside `advance`** (driven from the poll
+//! thread) — `new` touches nothing, so navigation into the screen
+//! never blocks the action thread on a network round-trip. Time is
+//! passed explicitly as `now: u64`; tests drive expiry by passing
+//! `now` values — no `Clock`/`Sleeper`, no thread, no mpsc channel
+//! (CC-06).
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -48,6 +52,8 @@ const USER_CONFIRM_TIMEOUT_S: u64 = 60;
 /// Observable phase of the initiator machine.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InitiatorPhase {
+    /// Constructed, offer not yet posted (no relay I/O has occurred).
+    Preparing,
     AwaitingClaim,
     AwaitingConfirmation,
     Finalizing,
@@ -86,6 +92,7 @@ pub enum InitiatorEvent {
 
 /// Internal state. Carries the owned domain data each phase needs.
 enum State {
+    CreatingOffer,
     AwaitingClaim {
         broker_code: String,
     },
@@ -107,62 +114,38 @@ enum State {
 pub struct DeviceLinkInitiatorMachine {
     initiator: DeviceLinkInitiator,
     state: State,
+    identity_id: String,
+    relay_timeout_secs: u64,
     deadline_unix: u64,
     confirm_deadline_unix: Option<u64>,
     persistence: Option<DeviceLinkPersistence>,
 }
 
 impl DeviceLinkInitiatorMachine {
-    /// Create the relay offer and emit [`InitiatorEvent::QrReady`].
-    /// `now` + `relay_timeout_secs` set the QR-expiry deadline
-    /// (ADR-035 = 300 s in production).
-    pub fn start(
+    /// Construct the machine in `Preparing` — **no relay I/O**. The
+    /// offer is posted on the first [`advance`](Self::advance), so the
+    /// caller (navigation/action thread) never blocks on the network.
+    pub fn new(
         initiator: DeviceLinkInitiator,
-        broker: &dyn DeviceLinkBroker,
-        identity_id: &str,
-        now: u64,
+        identity_id: String,
         relay_timeout_secs: u64,
         persistence: Option<DeviceLinkPersistence>,
-    ) -> (Self, InitiatorEvent) {
-        let (qr_data, expires_at_unix) = {
-            let qr = initiator.qr();
-            (qr.to_data_string(), qr.expires_at())
-        };
-
-        let (state, event) = match broker.exchange_offer(
-            &BASE64.encode(identity_id.as_bytes()),
-            Some(relay_timeout_secs),
-        ) {
-            Ok(broker_code) => (
-                State::AwaitingClaim { broker_code },
-                InitiatorEvent::QrReady {
-                    qr_data,
-                    expires_at_unix,
-                },
-            ),
-            Err(e) => (
-                State::Failed,
-                InitiatorEvent::Failed {
-                    reason: format!("relay offer failed: {e}"),
-                },
-            ),
-        };
-
-        (
-            Self {
-                initiator,
-                state,
-                deadline_unix: now.saturating_add(relay_timeout_secs),
-                confirm_deadline_unix: None,
-                persistence,
-            },
-            event,
-        )
+    ) -> Self {
+        Self {
+            initiator,
+            state: State::CreatingOffer,
+            identity_id,
+            relay_timeout_secs,
+            deadline_unix: 0,
+            confirm_deadline_unix: None,
+            persistence,
+        }
     }
 
     /// Current observable phase.
     pub fn phase(&self) -> InitiatorPhase {
         match &self.state {
+            State::CreatingOffer => InitiatorPhase::Preparing,
             State::AwaitingClaim { .. } => InitiatorPhase::AwaitingClaim,
             State::AwaitingConfirmation { .. } => InitiatorPhase::AwaitingConfirmation,
             State::Finalizing { .. } => InitiatorPhase::Finalizing,
@@ -172,16 +155,17 @@ impl DeviceLinkInitiatorMachine {
         }
     }
 
-    /// One non-blocking relay step. In `AwaitingClaim`: poll
-    /// `exchange_complete` once → `ConfirmationRequired`, or
-    /// `Failed("qr_expired")` once `now >= deadline`. In
-    /// `AwaitingConfirmation`: surfaces `user_confirm_timeout`. In
-    /// `Finalizing`: `confirm_link` + persist + `send_response` →
-    /// `Completed`.
+    /// One non-blocking relay step. In `CreatingOffer`: post the offer
+    /// → `QrReady`. In `AwaitingClaim`: poll `exchange_complete` once →
+    /// `ConfirmationRequired`, or `Failed("qr_expired")` once
+    /// `now >= deadline`. In `AwaitingConfirmation`: surfaces
+    /// `user_confirm_timeout`. In `Finalizing`: `confirm_link` +
+    /// persist + `send_response` → `Completed`.
     pub fn advance(&mut self, broker: &dyn DeviceLinkBroker, now: u64) -> InitiatorEvent {
         // `State::Failed` is a transient placeholder; every arm
         // reassigns `self.state` before returning.
         match std::mem::replace(&mut self.state, State::Failed) {
+            State::CreatingOffer => self.create_offer(broker, now),
             State::AwaitingClaim { broker_code } => {
                 if now >= self.deadline_unix {
                     self.state = State::Failed;
@@ -307,6 +291,34 @@ impl DeviceLinkInitiatorMachine {
     pub fn cancel(&mut self) -> InitiatorEvent {
         self.state = State::Cancelled;
         InitiatorEvent::None
+    }
+
+    /// Post the relay offer and emit `QrReady`. Sets the QR-expiry
+    /// deadline from `now` (ADR-035 budget = `relay_timeout_secs`).
+    fn create_offer(&mut self, broker: &dyn DeviceLinkBroker, now: u64) -> InitiatorEvent {
+        let (qr_data, expires_at_unix) = {
+            let qr = self.initiator.qr();
+            (qr.to_data_string(), qr.expires_at())
+        };
+        match broker.exchange_offer(
+            &BASE64.encode(self.identity_id.as_bytes()),
+            Some(self.relay_timeout_secs),
+        ) {
+            Ok(broker_code) => {
+                self.deadline_unix = now.saturating_add(self.relay_timeout_secs);
+                self.state = State::AwaitingClaim { broker_code };
+                InitiatorEvent::QrReady {
+                    qr_data,
+                    expires_at_unix,
+                }
+            }
+            Err(e) => {
+                self.state = State::Failed;
+                InitiatorEvent::Failed {
+                    reason: format!("relay offer failed: {e}"),
+                }
+            }
+        }
     }
 
     /// Decode a claim, prepare the confirmation, and move to
@@ -439,6 +451,10 @@ mod tests {
         DeviceLinkInitiator::new([seed; 32], &identity, registry, NOW)
     }
 
+    fn machine(initiator: DeviceLinkInitiator) -> DeviceLinkInitiatorMachine {
+        DeviceLinkInitiatorMachine::new(initiator, "id".to_string(), TIMEOUT, None)
+    }
+
     /// Build the base64 claim payload a real responder would deposit,
     /// paired to `initiator`'s QR (real crypto — no mocking, ADR-002).
     fn responder_claim_b64(initiator: &DeviceLinkInitiator, response_code: &str) -> String {
@@ -491,19 +507,29 @@ mod tests {
         }
     }
 
-    // ── The R1 seam + start work end-to-end ────────────────────────
+    // ── new() does no I/O; the first advance posts the offer ───────
 
     #[test]
-    fn start_creates_offer_and_emits_qr_ready() {
+    fn new_starts_in_preparing_without_touching_the_relay() {
+        let broker = FakeBroker::new("B");
+        let m = machine(build_initiator("Alice", 0x11));
+        assert_eq!(m.phase(), InitiatorPhase::Preparing);
+        assert!(
+            broker.calls.borrow().is_empty(),
+            "new() must not call the relay"
+        );
+    }
+
+    #[test]
+    fn first_advance_creates_offer_and_emits_qr_ready() {
         let initiator = build_initiator("Alice", 0x11);
         let expected_qr = initiator.qr().to_data_string();
         let expected_expiry = initiator.qr().expires_at();
         let broker = FakeBroker::new("BROKER123");
+        let mut m = machine(initiator);
 
-        let (m, event) =
-            DeviceLinkInitiatorMachine::start(initiator, &broker, "id", NOW, TIMEOUT, None);
+        let event = m.advance(&broker, NOW);
 
-        assert_eq!(m.phase(), InitiatorPhase::AwaitingClaim);
         assert_eq!(
             event,
             InitiatorEvent::QrReady {
@@ -511,15 +537,14 @@ mod tests {
                 expires_at_unix: expected_expiry,
             }
         );
+        assert_eq!(m.phase(), InitiatorPhase::AwaitingClaim);
         assert_eq!(*broker.calls.borrow(), vec!["offer"]);
     }
 
     #[test]
     fn cancel_is_absorbing() {
-        let initiator = build_initiator("Alice", 0x11);
         let broker = FakeBroker::new("B");
-        let (mut m, _) =
-            DeviceLinkInitiatorMachine::start(initiator, &broker, "id", NOW, TIMEOUT, None);
+        let mut m = machine(build_initiator("Alice", 0x11));
 
         assert_eq!(m.cancel(), InitiatorEvent::None);
         assert_eq!(m.phase(), InitiatorPhase::Cancelled);
@@ -528,16 +553,15 @@ mod tests {
         assert_eq!(m.phase(), InitiatorPhase::Cancelled);
     }
 
-    // ── Relay / confirm / deny transitions (GREEN as of T1.2) ──────
+    // ── Relay / confirm / deny transitions ─────────────────────────
 
     #[test]
     fn advance_emits_qr_expired_at_deadline() {
-        let initiator = build_initiator("Alice", 0x11);
         let broker = FakeBroker::new("B");
-        broker.push_complete(Ok(None)); // not yet claimed
-        let (mut m, _) =
-            DeviceLinkInitiatorMachine::start(initiator, &broker, "id", NOW, TIMEOUT, None);
+        let mut m = machine(build_initiator("Alice", 0x11));
 
+        let _ = m.advance(&broker, NOW); // offer → deadline = NOW + TIMEOUT
+        assert_eq!(m.phase(), InitiatorPhase::AwaitingClaim);
         let event = m.advance(&broker, NOW + TIMEOUT + 1);
         assert_eq!(
             event,
@@ -554,10 +578,10 @@ mod tests {
         let claim_b64 = responder_claim_b64(&initiator, "RESP_CODE");
         let broker = FakeBroker::new("B");
         broker.push_complete(Ok(Some(claim_b64)));
-        let (mut m, _) =
-            DeviceLinkInitiatorMachine::start(initiator, &broker, "id", NOW, TIMEOUT, None);
+        let mut m = machine(initiator);
 
-        let e1 = m.advance(&broker, NOW + 1);
+        let _ = m.advance(&broker, NOW); // offer
+        let e1 = m.advance(&broker, NOW + 1); // poll → claim
         let code = match e1 {
             InitiatorEvent::ConfirmationRequired {
                 confirmation_code, ..
@@ -581,10 +605,10 @@ mod tests {
         let claim_b64 = responder_claim_b64(&initiator, "RESP_CODE");
         let broker = FakeBroker::new("B");
         broker.push_complete(Ok(Some(claim_b64)));
-        let (mut m, _) =
-            DeviceLinkInitiatorMachine::start(initiator, &broker, "id", NOW, TIMEOUT, None);
+        let mut m = machine(initiator);
 
-        let _ = m.advance(&broker, NOW + 1);
+        let _ = m.advance(&broker, NOW); // offer
+        let _ = m.advance(&broker, NOW + 1); // poll → claim
         assert_eq!(m.phase(), InitiatorPhase::AwaitingConfirmation);
         let event = m.deny();
         assert_eq!(
@@ -601,14 +625,13 @@ mod tests {
     proptest! {
         #[test]
         fn qr_expired_at_deadline_boundary(overshoot in 1u64..100_000) {
-            let initiator = build_initiator("Alice", 0x33);
             let broker = FakeBroker::new("B");
             broker.push_complete(Ok(None));
-            broker.push_complete(Ok(None));
-            let (mut m, _) =
-                DeviceLinkInitiatorMachine::start(initiator, &broker, "id", NOW, TIMEOUT, None);
+            let mut m = machine(build_initiator("Alice", 0x33));
 
-            // Just before the deadline: still awaiting.
+            let _ = m.advance(&broker, NOW); // offer → deadline = NOW + TIMEOUT
+
+            // Just before the deadline: poll returns None, still awaiting.
             let before = m.advance(&broker, NOW + TIMEOUT - 1);
             prop_assert_eq!(before, InitiatorEvent::None);
             prop_assert_eq!(m.phase(), InitiatorPhase::AwaitingClaim);

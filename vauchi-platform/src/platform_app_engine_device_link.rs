@@ -69,15 +69,15 @@ impl PlatformAppEngine {
 
         let (initiator, transport, identity_id, persistence) =
             self.build_device_link_initiator()?;
-        let (machine, event) = DeviceLinkInitiatorMachine::start(
+        // No relay I/O here — the offer is posted on the first
+        // `advance_device_link_session()` (poll thread), so navigation
+        // never blocks the action thread on the network.
+        let machine = DeviceLinkInitiatorMachine::new(
             initiator,
-            &transport,
-            &identity_id,
-            now_unix_secs(),
+            identity_id,
             RELAY_TIMEOUT_SECS,
             Some(persistence),
         );
-        self.apply_initiator_event(event);
 
         *self.device_link_session().lock().map_err(lock_err)? =
             Some(DeviceLinkInitiatorHolder { machine, transport });

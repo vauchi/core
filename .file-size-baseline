@@ -257,7 +257,7 @@ vauchi-app/src/ui/app_engine/mod.rs 1317
 #  bugfix/exchanged-ratchet-key 2026-05-25)
 # (+6 for slice 32l Phase 2 link-responder RelayEscrow* routing in
 #  handle_hardware_event; guard minimized into app_engine/link_responder.rs)
-vauchi-app/src/ui/app_engine/routing.rs 1422
+vauchi-app/src/ui/app_engine/routing.rs 1438
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)

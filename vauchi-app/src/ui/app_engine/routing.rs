@@ -1089,6 +1089,22 @@ impl AppEngine {
                 });
                 ActionResult::NavigateTo(screen)
             }
+            // General contact open (contacts list, social graph, delivery,
+            // activity log) — the More/Groups guards above intercept their
+            // reuse of OpenContact first, so this only sees a genuine
+            // "open this contact". Core resolves the navigation and hands
+            // back a generic NavigateTo(ScreenModel): the frontend renders
+            // whatever screen it receives and never has to know that
+            // `open_contact` maps to a `contact_detail` screen. Without
+            // this arm the result shipped raw and each frontend had to
+            // domain-map it — the mobile mapping was broken, navigating to
+            // My Card (problem 2026-05-25-contact-tap-opens-own-card). This
+            // keeps OpenContact off the wire entirely (Pure Humble UI,
+            // ADR-043/044): no path returns it raw anymore.
+            ActionResult::OpenContact { contact_id } => {
+                let screen = self.navigate_to(AppScreen::ContactDetail { contact_id });
+                ActionResult::NavigateTo(screen)
+            }
             // Navigate to MyInfo in preview mode for the given contact.
             ActionResult::PreviewAs { contact_id } => {
                 let screen = self.preview_as(contact_id);

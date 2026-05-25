@@ -785,6 +785,24 @@ mod tests {
         );
     }
 
+    // @scenario: ohttp_sync :: key error heuristic matches HTTP 502 (relay-masked decap failure)
+    #[test]
+    fn test_is_ohttp_key_error_http_502() {
+        // The OHTTP relay maps the gateway's decapsulation rejection (HTTP 400
+        // on a stale/rotated key) to 502 Bad Gateway before it reaches the
+        // client — it never forwards the upstream status. So a stale key
+        // surfaces to the client as 502, not 400, and the stale-key
+        // refetch+retry path must trigger on 502 too. Without this, a client
+        // holding a stale gateway key never refetches and stays broken across
+        // every key rotation until reinstall.
+        // Problem record: 2026-05-25-relay-ohttp-forward-hop-502.
+        let err = VauchiError::Network(NetworkError::ConnectionFailed("HTTP 502".to_string()));
+        assert!(
+            is_ohttp_key_error(&err),
+            "Network error containing '502' (relay-masked gateway decap failure) must be classified as an OHTTP key error"
+        );
+    }
+
     // @scenario: ohttp_sync :: key error heuristic rejects storage errors
     #[test]
     fn test_is_ohttp_key_error_storage_error_is_false() {

@@ -9,6 +9,8 @@
 //! frontends see a single uniform interface.
 
 mod device_link;
+#[cfg(all(feature = "network-http", feature = "storage"))]
+mod device_link_initiator;
 mod intercept;
 mod link_responder;
 mod navigation;
@@ -366,6 +368,10 @@ pub struct AppEngine {
     /// Engine-owned link-mode responder machine (slice 32l Phase 2), live
     /// only on `AppScreen::DeepLinkResponder`. See `app_engine/link_responder.rs`.
     link_responder: Option<vauchi_core::exchange::link_responder::LinkResponderSession>,
+    /// Engine-owned device-link **initiator** machine (slice 32l T3.1b), live
+    /// only on `AppScreen::DeviceLinking`. See `app_engine/device_link_initiator.rs`.
+    #[cfg(all(feature = "network-http", feature = "storage"))]
+    device_link_initiator: Option<device_link_initiator::DeviceLinkInitiatorHolder>,
 }
 
 impl AppEngine {
@@ -502,6 +508,8 @@ impl AppEngine {
             network_online: true,
             pending_commands: std::collections::VecDeque::new(),
             link_responder: None,
+            #[cfg(all(feature = "network-http", feature = "storage"))]
+            device_link_initiator: None,
         }
     }
 
@@ -1212,6 +1220,12 @@ impl WorkflowEngine for AppEngine {
 
         let result = self.engine.handle_action(action);
         let result = self.route_result(result);
+        // Slice 32l T3.1b: feed the engine's typed device-link
+        // ActionResults (confirm / deny / retry) into the engine-owned
+        // initiator machine. The result itself is preserved for the
+        // frontend envelope.
+        #[cfg(all(feature = "network-http", feature = "storage"))]
+        self.dispatch_device_link_side_effects(&result);
         let result = self.resolve_validation_error(result);
         self.apply_update_overlay_to_result(result)
     }
@@ -1222,6 +1236,12 @@ impl AppEngine {
     /// Public so PlatformAppEngine can expose it via UniFFI.
     pub fn poll_notifications(&mut self) -> Vec<PendingNotification> {
         self.drain_events_to_log();
+
+        // Slice 32l T3.1b: drive one non-blocking device-link relay step
+        // per poll tick. No-op (returns immediately) when no initiator
+        // session is held, so this is cheap on every other screen.
+        #[cfg(all(feature = "network-http", feature = "storage"))]
+        self.advance_device_link_session();
 
         let now = self.vauchi.clock().unix_seconds();
 

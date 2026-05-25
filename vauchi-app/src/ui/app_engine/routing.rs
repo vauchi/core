@@ -97,6 +97,21 @@ impl AppEngine {
             _ => {}
         }
 
+        // Slice 32l Phase 2: the engine-owned link-mode responder machine
+        // consumes `RelayEscrow*` events while the responder screen is
+        // active and surfaces its follow-up `RelayEscrowRetrieve` command
+        // via `ActionResult::Commands` (ADR-031 shared escrow surface).
+        if matches!(self.screen, AppScreen::DeepLinkResponder { .. })
+            && matches!(
+                &event,
+                Event::RelayEscrowReady { .. }
+                    | Event::RelayEscrowFailed { .. }
+                    | Event::RelayEscrowBlobReceived { .. }
+            )
+        {
+            return self.route_link_responder_hardware_event(event);
+        }
+
         if !matches!(
             self.screen,
             AppScreen::Exchange

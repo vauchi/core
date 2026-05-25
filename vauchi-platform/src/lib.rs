@@ -27,7 +27,6 @@ mod domain_command;
 mod error;
 mod exchange;
 mod json_helpers;
-mod link_responder_session;
 mod mobile_ble;
 mod mobile_contact_detail;
 mod mobile_contacts;
@@ -84,10 +83,6 @@ pub use exchange::{
     MobileBleExchangeStatus, MobileCommand, MobileEvent, MobileExchangeSession,
     MobileExchangeState, MobileProximityHandler, create_qr_exchange_manual,
     create_qr_exchange_proximity,
-};
-pub use link_responder_session::{
-    LinkResponderSessionListener, MobileLinkResponderFailureReason, MobileLinkResponderSession,
-    MobileLinkResponderState,
 };
 pub use mobile_ble::{
     MobileBleDelegate, MobileBleError, MobileBleExchangeResult, MobileBleExchangeSession,

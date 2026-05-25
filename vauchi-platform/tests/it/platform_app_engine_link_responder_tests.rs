@@ -2,15 +2,17 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Integration tests for the link-mode responder engine bridge —
-//! Phase 1.6 of `_private/docs/problems/2026-04-27-deep-link-responder-flow`.
-//!
-//! Covers `PlatformAppEngine::current_link_responder_session` and the
-//! lazy auto-creation / cancel-on-leave lifecycle wired through
-//! `after_screen_transition`. The companion in-isolation cycle-thread
-//! tests live in `link_responder_session_tests.rs`.
+//! Integration tests for the engine-owned link-mode responder
+//! (slice 32l Phase 2). The `AppEngine` owns the `LinkResponderSession`
+//! while on `AppScreen::DeepLinkResponder`: its deposit commands ride out
+//! in the grant action's `{action_result, commands}` envelope, and
+//! `RelayEscrow*` hardware events drive it to a terminal screen via
+//! `handle_hardware_event` (ADR-021/043 Humble UI; ADR-031 command/event).
+//! The frontend pulls no session object — the retired cycle-thread
+//! wrapper (`MobileLinkResponderSession`) and its
+//! `current_link_responder_session` getter are gone.
 
-use vauchi_platform::PlatformAppEngine;
+use vauchi_platform::{MobileEvent, PlatformAppEngine};
 
 fn create_engine() -> (std::sync::Arc<PlatformAppEngine>, tempfile::TempDir) {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -48,149 +50,82 @@ fn fresh_link_url() -> String {
     init.url
 }
 
-/// Drive the engine all the way to `link_responder_waiting`: onboarding
-/// → handle_deep_link_uri → grant → DeepLinkResponder.
-fn drive_to_link_responder(engine: &PlatformAppEngine) {
+/// Drive the engine to `link_responder_waiting` (onboarding →
+/// `handle_deep_link_uri` → grant) and return the responder's
+/// `gate_hash`, read from the `RelayEscrowCheck` deposit the grant
+/// action emits into its envelope. This is the engine-owned
+/// `LinkResponderSession`'s listen gate; hardware events must carry it
+/// to be accepted (the per-build ephemeral key makes it
+/// non-deterministic, so it MUST come from the live machine's own
+/// deposit — not a second responder build).
+fn drive_to_link_responder(engine: &PlatformAppEngine) -> Vec<u8> {
     drive_onboarding(engine);
     engine
         .handle_deep_link_uri(fresh_link_url())
         .expect("deep link routes to consent");
-    let consent_id = engine.current_screen_id().expect("screen id");
-    assert_eq!(consent_id, "deep_link_consent");
+    assert_eq!(
+        engine.current_screen_id().expect("screen id"),
+        "deep_link_consent",
+    );
     let grant_json = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "grant"}}"#.into())
         .expect("grant action");
-    let post_id = engine.current_screen_id().expect("screen id after grant");
     assert_eq!(
-        post_id, "link_responder_waiting",
+        engine.current_screen_id().expect("screen id after grant"),
+        "link_responder_waiting",
         "grant must route to the responder waiting screen — action returned {grant_json}",
     );
+    gate_hash_from_envelope(&grant_json)
+}
+
+/// Pull the responder gate_hash out of the `RelayEscrowCheck` command in
+/// an action-result envelope's `commands` array. Confirms the engine
+/// emitted the responder's escrow deposits on screen entry.
+fn gate_hash_from_envelope(envelope_json: &str) -> Vec<u8> {
+    let value: serde_json::Value =
+        serde_json::from_str(envelope_json).expect("envelope is valid JSON");
+    let commands = value["commands"]
+        .as_array()
+        .expect("envelope carries a commands array");
+    for command in commands {
+        if let Some(check) = command.get("RelayEscrowCheck") {
+            let bytes = check["gate_hash"]
+                .as_array()
+                .expect("RelayEscrowCheck carries a gate_hash byte array");
+            return bytes
+                .iter()
+                .map(|b| u8::try_from(b.as_u64().expect("gate_hash byte")).expect("byte in range"))
+                .collect();
+        }
+    }
+    panic!(
+        "grant envelope must carry a RelayEscrowCheck with the responder gate_hash; got: \
+         {envelope_json}"
+    );
 }
 
 // @internal
 #[test]
-fn current_link_responder_session_returns_none_off_screen() {
+fn responder_screen_entry_emits_escrow_deposits() {
     let (engine, _dir) = create_engine();
-    drive_onboarding(&engine);
-    // Post-onboarding we land on `my_info`, not the responder screen.
-    let session = engine
-        .current_link_responder_session()
-        .expect("getter must succeed off the responder screen");
+    // `drive_to_link_responder` panics unless the grant envelope carried
+    // a RelayEscrowCheck — i.e. the engine built + drove the responder on
+    // screen entry and surfaced its deposits via ActionResult::Commands.
+    let gate_hash = drive_to_link_responder(&engine);
     assert!(
-        session.is_none(),
-        "off the responder screen the engine must not hand out a session",
+        !gate_hash.is_empty(),
+        "the responder must expose a non-empty gate_hash — confirms the DH + key-derive ran",
     );
 }
 
 // @internal
 #[test]
-fn current_link_responder_session_lazily_creates_session_on_screen() {
-    let (engine, _dir) = create_engine();
-    drive_to_link_responder(&engine);
-
-    let session = engine
-        .current_link_responder_session()
-        .expect("getter must succeed on the responder screen")
-        .expect("session must be created when on the responder screen");
-    let gate = session.gate_hash_bytes();
-    assert!(
-        !gate.is_empty(),
-        "session must expose a non-empty gate_hash — confirms the DH + key-derive ran",
-    );
-}
-
-// @internal
-#[test]
-fn current_link_responder_session_returns_same_session_on_repeat_calls() {
-    let (engine, _dir) = create_engine();
-    drive_to_link_responder(&engine);
-
-    let first = engine
-        .current_link_responder_session()
-        .expect("first call ok")
-        .expect("first call returns session");
-    let second = engine
-        .current_link_responder_session()
-        .expect("second call ok")
-        .expect("second call returns session");
-    assert!(
-        std::sync::Arc::ptr_eq(&first, &second),
-        "the engine must cache the session — frontends fetch the same handle each time",
-    );
-}
-
-// @internal
-#[test]
-fn navigate_back_from_responder_drops_session() {
-    let (engine, _dir) = create_engine();
-    drive_to_link_responder(&engine);
-
-    // Force creation (lazily) so we have something to drop.
-    let _ = engine
-        .current_link_responder_session()
-        .expect("getter ok")
-        .expect("session created");
-
-    engine
-        .navigate_back_json()
-        .expect("navigate back away from responder");
-    assert_ne!(
-        engine.current_screen_id().expect("screen id post back"),
-        "link_responder_waiting",
-        "navigate_back must leave the responder screen",
-    );
-
-    let session_after_back = engine
-        .current_link_responder_session()
-        .expect("getter ok off-screen");
-    assert!(
-        session_after_back.is_none(),
-        "leaving the responder screen must drop the cached session",
-    );
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// Slice 32l Phase 2 — screen-driven responder (T2.1 RED)
-//
-// Design: `_private/docs/designs/2026-05-25-slice-32l-phase-2-responder-
-// screen-driven-design.md`. The engine must OWN the `LinkResponder` and
-// reflect its terminal state on the screen, driven by `handle_hardware_event`
-// — the frontend pulls NO session object. These fail RED until T2.2 wires
-// the engine-owned responder and adds the `link_responder_failed` /
-// `link_responder_completed` screens.
-//
-// RED scaffold: `gate_hash` is bootstrapped here via the (retiring)
-// `current_link_responder_session` getter. T2.2 GREEN replaces that with
-// `poll_link_responder_commands()` (the `RelayEscrowDeposit` command carries
-// `gate_hash`), then retires the getter. NOTE: getting the session only
-// builds it (DH + key derive) — it does NOT call `.start()`, so no cycle
-// thread is spawned.
-//
-// Deferred to T2.2 (need a valid encrypted blob fixture / the command
-// drain, out of scope for this RED): the success path
-// (`RelayEscrowBlobReceived` with a valid card → `link_responder_completed`
-// + `import_received_link_card` persistence) and the deposit-command
-// assertions.
-
-/// Bootstrap the responder's `gate_hash` for event construction.
-fn responder_gate_hash(engine: &PlatformAppEngine) -> Vec<u8> {
-    engine
-        .current_link_responder_session()
-        .expect("getter ok on screen")
-        .expect("session built on the responder screen")
-        .gate_hash_bytes()
-}
-
-// @internal
-#[test]
-#[ignore = "RED — slice 32l T2.2 GREEN wires the engine-owned LinkResponder + un-ignores"]
 fn relay_deposit_failure_drives_engine_to_failed_screen() {
     let (engine, _dir) = create_engine();
-    drive_to_link_responder(&engine);
-    let gate_hash = responder_gate_hash(&engine);
+    let gate_hash = drive_to_link_responder(&engine);
 
     engine
-        .handle_hardware_event(vauchi_platform::MobileEvent::RelayEscrowFailed {
+        .handle_hardware_event(MobileEvent::RelayEscrowFailed {
             gate_hash,
             reason: "deposit_rejected".into(),
         })
@@ -206,21 +141,20 @@ fn relay_deposit_failure_drives_engine_to_failed_screen() {
 
 // @internal
 #[test]
-#[ignore = "RED — slice 32l T2.2 GREEN wires the engine-owned LinkResponder + un-ignores"]
 fn undecryptable_relay_blob_drives_engine_to_failed_screen() {
     let (engine, _dir) = create_engine();
-    drive_to_link_responder(&engine);
-    let gate_hash = responder_gate_hash(&engine);
+    let gate_hash = drive_to_link_responder(&engine);
 
-    // `RelayEscrowReady` advances Polling → Retrieving; an undecryptable blob
-    // then fails the card decrypt, which must surface as the failed screen.
+    // `RelayEscrowReady` advances Polling → Retrieving; an undecryptable
+    // blob then fails the card decrypt, which must surface as the failed
+    // screen.
     engine
-        .handle_hardware_event(vauchi_platform::MobileEvent::RelayEscrowReady {
+        .handle_hardware_event(MobileEvent::RelayEscrowReady {
             gate_hash: gate_hash.clone(),
         })
         .expect("engine must accept RelayEscrowReady");
     engine
-        .handle_hardware_event(vauchi_platform::MobileEvent::RelayEscrowBlobReceived {
+        .handle_hardware_event(MobileEvent::RelayEscrowBlobReceived {
             gate_hash,
             blob: vec![0xde, 0xad, 0xbe, 0xef],
         })
@@ -230,5 +164,27 @@ fn undecryptable_relay_blob_drives_engine_to_failed_screen() {
         engine.current_screen_id().expect("screen id"),
         "link_responder_failed",
         "an undecryptable relay blob must drive the engine-owned responder to the failed screen",
+    );
+}
+
+// @internal
+#[test]
+fn relay_event_for_foreign_gate_leaves_responder_waiting() {
+    let (engine, _dir) = create_engine();
+    let _gate_hash = drive_to_link_responder(&engine);
+
+    // A relay failure for an unrelated gate must be ignored — the
+    // machine only reacts to events carrying its own gate_hash.
+    engine
+        .handle_hardware_event(MobileEvent::RelayEscrowFailed {
+            gate_hash: vec![0u8; 32],
+            reason: "deposit_rejected".into(),
+        })
+        .expect("engine must accept the event");
+
+    assert_eq!(
+        engine.current_screen_id().expect("screen id"),
+        "link_responder_waiting",
+        "an event for a foreign gate must not transition the responder",
     );
 }

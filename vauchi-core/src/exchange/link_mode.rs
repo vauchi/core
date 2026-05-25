@@ -19,8 +19,12 @@ use sha2::{Digest, Sha256};
 use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
 use zeroize::Zeroizing;
 
+use crate::contact_card::ContactCard;
 use crate::exchange::escrow::{EscrowKeys, EscrowRole};
 use crate::platform::Command;
+
+/// Version byte prefixing a serialized link-mode card payload.
+const CARD_PAYLOAD_VERSION: u8 = 1;
 
 /// Default TTL for escrow deposits (7 days, matching protocol max).
 const DEFAULT_TTL_SECONDS: u32 = 604_800;
@@ -43,6 +47,10 @@ pub enum LinkModeError {
     /// No card data available to send.
     #[error("no card snapshot available for exchange")]
     NoCardToSend,
+    /// A decrypted card payload could not be parsed (too short, wrong
+    /// version byte, or invalid card JSON).
+    #[error("malformed card payload: {0}")]
+    MalformedCardPayload(String),
 }
 
 // =========================================================================
@@ -456,6 +464,47 @@ pub fn responder_complete(
 ) -> Result<Vec<u8>, LinkModeError> {
     keys.decrypt_card(encrypted_card_blob)
         .map_err(|e| LinkModeError::CardCryptoFailed(e.to_string()))
+}
+
+/// Serialize an identity signing key + contact card into the link-mode
+/// card payload both sides swap over escrow.
+///
+/// Format: `[version: 1 byte][public_key: 32 bytes][card_json: rest]`.
+/// This is the plaintext fed to [`responder_respond_with_card_bytes`]
+/// (which encrypts it) and recovered by [`parse_card_payload`] after
+/// [`responder_complete`] decrypts the peer's deposit.
+pub fn serialize_card_payload(public_key: &[u8; 32], card: &ContactCard) -> Vec<u8> {
+    let card_json = serde_json::to_vec(card).expect("ContactCard serialization should not fail");
+    let mut payload = Vec::with_capacity(1 + 32 + card_json.len());
+    payload.push(CARD_PAYLOAD_VERSION);
+    payload.extend_from_slice(public_key);
+    payload.extend_from_slice(&card_json);
+    payload
+}
+
+/// Parse a link-mode card payload into `(signing_public_key, card)`.
+///
+/// Inverse of [`serialize_card_payload`]. Rejects payloads shorter than
+/// the 33-byte header, an unrecognized version byte, or invalid card
+/// JSON with [`LinkModeError::MalformedCardPayload`].
+pub fn parse_card_payload(data: &[u8]) -> Result<([u8; 32], ContactCard), LinkModeError> {
+    if data.len() < 33 {
+        return Err(LinkModeError::MalformedCardPayload(format!(
+            "payload too short: {} bytes",
+            data.len()
+        )));
+    }
+    if data[0] != CARD_PAYLOAD_VERSION {
+        return Err(LinkModeError::MalformedCardPayload(format!(
+            "unsupported version byte: {}",
+            data[0]
+        )));
+    }
+    let mut public_key = [0u8; 32];
+    public_key.copy_from_slice(&data[1..33]);
+    let card: ContactCard = serde_json::from_slice(&data[33..])
+        .map_err(|e| LinkModeError::MalformedCardPayload(e.to_string()))?;
+    Ok((public_key, card))
 }
 
 // =========================================================================

@@ -80,21 +80,15 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "tab_info",
 ];
 
-/// Surplus = `pub fn`s on `impl PlatformAppEngine` whose name is NOT
-/// in `HUMBLE_ALLOWLIST`. The 2026-05-11 baseline measured 38 such
-/// methods (see `_private/docs/audit/2026-05-11-legacy-baseline.md`).
-/// Every retirement MR must decrement this. When it hits 0, replace
-/// the ratchet branch in `enforce_contract` with the strict-equality
-/// branch noted alongside it.
-///
-/// Track B B5 (2026-05-24) drove this 3 -> 1: `dispatch_domain_command`
-/// and `new` were promoted to `HUMBLE_ALLOWLIST` (ADR-043 Amendment 3),
-/// not retired. The sole remaining surplus is
-/// `current_link_responder_session`, gated on slice 32l (the device-link
-/// cycle restructure that retires `mobile_device_link*.rs` — Track A's
-/// surface, see the Track-B plan §D2). The ratchet stays at 1 and the
-/// strict-equality companion below stays `#[ignore]` until 32l lands.
-const SURPLUS_RATCHET_CEILING: usize = 1;
+// Surplus reached 0 with slice 32l (2026-05-25): retiring
+// `current_link_responder_session` — the last non-Humble `pub fn` on
+// `PlatformAppEngine` — closed the Track-B push-to-zero queue. The
+// `SURPLUS_RATCHET_CEILING` constant + its ratchet test were removed;
+// `platform_app_engine_surface_matches_allowlist_strict` is now the live
+// strict-equality gate (no longer `#[ignore]`). The slice put the
+// responder machine in the AppEngine (vauchi-app) and surfaced its
+// commands through `ActionResult::Commands`, so no new binding surface
+// was added — `HUMBLE_ALLOWLIST` stays at 25.
 
 /// Path resolution: `CARGO_MANIFEST_DIR` for this integration test
 /// points at `core/vauchi-app/`. The platform sources live in the
@@ -274,51 +268,38 @@ fn platform_app_engine_surface_respects_ratchet() {
          deletion or amend ADR-021/043 + this list together."
     );
 
-    // Ratchet branch — current Phase-3 state. Strict equality forces
-    // a constant update whenever a method is retired, which keeps the
-    // ratchet honest. Replace with `assert!(surplus.is_empty(), …)` and
-    // delete `SURPLUS_RATCHET_CEILING` when surplus hits 0.
-    if surplus.len() != SURPLUS_RATCHET_CEILING {
-        panic!(
-            "PlatformAppEngine surplus method count drifted: actual = {}, \
-             ratchet ceiling = {}.\n\n\
-             If you ADDED a method: don't. Route the work through \
-             handle_action_json (UserAction) or render it via Component. \
-             See plan Phase 2 (`_private/docs/planning/todo/\
-             2026-05-11-pure-functional-core-program-plan.md`).\n\n\
-             If you RETIRED a method (good): decrement \
-             SURPLUS_RATCHET_CEILING in this file to {} and commit the \
-             two changes together so `git revert` undoes them atomically.\n\n\
-             Current surplus methods ({} total):\n{}",
-            surplus.len(),
-            SURPLUS_RATCHET_CEILING,
-            surplus.len(),
-            surplus.len(),
-            surplus
-                .iter()
-                .map(|n| format!("  - {n}"))
-                .collect::<Vec<_>>()
-                .join("\n"),
-        );
-    }
+    // Strict equality — the Track-B push-to-zero ratchet reached 0 with
+    // slice 32l (2026-05-25). PlatformAppEngine must now expose ONLY the
+    // Humble allow-list surface; any surplus is a regression.
+    assert!(
+        surplus.is_empty(),
+        "PlatformAppEngine exposes {} non-Humble surplus method(s) — the \
+         surface must match HUMBLE_ALLOWLIST exactly now that the ratchet \
+         is at 0.\n\n\
+         If you ADDED a method: don't. Route the work through \
+         handle_action_json (UserAction), render it via Component, push \
+         commands through ActionResult::Commands, or move it to a \
+         stateless vauchi-core free function. See \
+         `_private/docs/planning/todo/2026-05-11-pure-functional-core-program-plan.md`.\n\n\
+         Current surplus methods:\n{}",
+        surplus.len(),
+        surplus
+            .iter()
+            .map(|n| format!("  - {n}"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
 }
 
 // @internal
 #[test]
-#[ignore = "intentionally red: lists the Phase-3 retirement queue. \
-            Run with `cargo test -- --ignored \
-            platform_app_engine_surface_matches_allowlist_strict` to see it."]
 fn platform_app_engine_surface_matches_allowlist_strict() {
-    // The TDD-red companion to the ratchet test. Asserts the end
-    // state of the program (zero surplus) and currently fails by
-    // design — its failure message is the explicit Phase-3 work
-    // list, indexable by Cmd-F. Kept under `#[ignore]` so `just
-    // check` stays green; promoted to a non-ignored test in
-    // Phase 6 / Task 6.3 once the ratchet reaches 0.
-    //
-    // Plan Task 0.2 completion criterion: "test red, failure
-    // message clearly enumerates the legacy methods". This is that
-    // test.
+    // The end-state gate of the pure-functional-core program: zero
+    // surplus. Was `#[ignore]`-red through Phases 0–3; promoted to a
+    // live gate 2026-05-25 when slice 32l retired the final surplus
+    // (`current_link_responder_session`) and the Track-B ratchet hit 0
+    // (push-to-zero plan Done criterion #2). Its failure message
+    // enumerates any regressed surplus, indexable by Cmd-F.
     let dir = platform_src_dir();
     let names = collect_pae_pub_fn_names(&dir);
     let (_humble, surplus) = classify(&names);
@@ -362,7 +343,6 @@ const PERMITTED_UNIFFI_OBJECTS: &[&str] = &[
     "MobileBleExchangeSession",
     "MobileDeviceLinkSession",
     "MobileExchangeSession",
-    "MobileLinkResponderSession",
     "MobileMultiStageSession",
     // ── Legacy ──
     // `VauchiPlatform` is the Phase-B legacy facade; the

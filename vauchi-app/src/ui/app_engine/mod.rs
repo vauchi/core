@@ -363,6 +363,14 @@ pub struct AppEngine {
     /// (brightness, idle timer, future orientation lock, haptics).
     /// Phase 2b of `2026-05-04-exchange-command-screen-presentation`.
     pending_commands: std::collections::VecDeque<vauchi_core::Command>,
+    /// The engine-owned link-mode responder state machine, live only
+    /// while the active screen is [`AppScreen::DeepLinkResponder`].
+    /// Built on entry (deposits flow out via `pending_commands`), driven
+    /// by `RelayEscrow*` hardware events through
+    /// [`Self::handle_hardware_event`], dropped on exit. Slice 32l Phase 2
+    /// — replaces the retired `vauchi-platform` cycle-thread wrapper so
+    /// the responder lifecycle is a pure-core concern (ADR-021/043).
+    link_responder: Option<vauchi_core::exchange::link_responder::LinkResponderSession>,
 }
 
 impl AppEngine {
@@ -498,6 +506,7 @@ impl AppEngine {
             pending_backup_reminder,
             network_online: true,
             pending_commands: std::collections::VecDeque::new(),
+            link_responder: None,
         }
     }
 

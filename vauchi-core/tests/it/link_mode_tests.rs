@@ -7,7 +7,47 @@
 use base64::Engine as _;
 use proptest::prelude::any;
 use vauchi_core::Command;
+use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::link_mode::*;
+
+// ================================================================
+// Card payload codec ([version][pubkey][card])
+// ================================================================
+
+// @internal
+#[test]
+fn card_payload_roundtrips_key_and_card() {
+    let pubkey = [7u8; 32];
+    let card = ContactCard::new("Alice");
+    let bytes = serialize_card_payload(&pubkey, &card);
+
+    let (parsed_key, parsed_card) =
+        parse_card_payload(&bytes).expect("freshly serialized payload must parse");
+    assert_eq!(parsed_key, pubkey, "public key must round-trip exactly");
+    assert_eq!(
+        parsed_card.id(),
+        card.id(),
+        "decoded card must be the same card (matched by id)"
+    );
+}
+
+// @internal
+#[test]
+fn parse_card_payload_rejects_short_and_bad_version() {
+    let err = parse_card_payload(&[0u8; 10]).expect_err("a 10-byte payload is too short");
+    assert!(
+        matches!(err, LinkModeError::MalformedCardPayload(_)),
+        "short payload must be MalformedCardPayload, got {err:?}"
+    );
+
+    let mut bad_version = serialize_card_payload(&[1u8; 32], &ContactCard::new("Bob"));
+    bad_version[0] = 0xFF;
+    let err = parse_card_payload(&bad_version).expect_err("version 0xFF is unsupported");
+    assert!(
+        matches!(err, LinkModeError::MalformedCardPayload(_)),
+        "bad version must be MalformedCardPayload, got {err:?}"
+    );
+}
 
 // ================================================================
 // URL generation

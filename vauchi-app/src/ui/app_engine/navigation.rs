@@ -192,6 +192,10 @@ impl AppEngine {
         if old_screen != screen {
             self.pending_commands.extend(old_engine.screen_exited());
             self.pending_commands.extend(self.engine.screen_entered());
+            // Slice 32l Phase 2: build / drop the engine-owned link-mode
+            // responder machine on entry / exit of the responder screen.
+            // Its initial deposit commands ride out on the same drain.
+            self.sync_link_responder_lifecycle(&old_screen, &screen);
         }
 
         // Cache the old engine if its screen is cacheable

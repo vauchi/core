@@ -183,6 +183,7 @@ fn responder_gate_hash(engine: &PlatformAppEngine) -> Vec<u8> {
 
 // @internal
 #[test]
+#[ignore = "RED — slice 32l T2.2 GREEN wires the engine-owned LinkResponder + un-ignores"]
 fn relay_deposit_failure_drives_engine_to_failed_screen() {
     let (engine, _dir) = create_engine();
     drive_to_link_responder(&engine);
@@ -205,6 +206,7 @@ fn relay_deposit_failure_drives_engine_to_failed_screen() {
 
 // @internal
 #[test]
+#[ignore = "RED — slice 32l T2.2 GREEN wires the engine-owned LinkResponder + un-ignores"]
 fn undecryptable_relay_blob_drives_engine_to_failed_screen() {
     let (engine, _dir) = create_engine();
     drive_to_link_responder(&engine);

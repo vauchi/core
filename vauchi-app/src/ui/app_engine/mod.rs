@@ -1275,15 +1275,26 @@ impl AppEngine {
         }
     }
 
-    /// Apply the update overlay to any `ScreenModel` inside an `ActionResult`.
+    /// Decorate any `ScreenModel` inside a `NavigateTo`/`UpdateScreen`
+    /// result for the wire: update + offline overlays, then
+    /// `apply_screen_id_metadata` (parent_screen_id, presentation_kind,
+    /// and the Tier-0 (c) canonical `screen_id` stamp). Mirrors the
+    /// decoration `current_screen()` already applies, so results and
+    /// re-reads agree. Runs after `route_result`, so internal sub-state
+    /// `screen_id` routing (e.g. the `backup_processing` interception) is
+    /// unaffected.
     fn apply_update_overlay_to_result(&self, result: ActionResult) -> ActionResult {
         match result {
-            ActionResult::UpdateScreen(screen) => ActionResult::UpdateScreen(
-                self.apply_offline_overlay(self.apply_update_overlay(screen)),
-            ),
-            ActionResult::NavigateTo(screen) => ActionResult::NavigateTo(
-                self.apply_offline_overlay(self.apply_update_overlay(screen)),
-            ),
+            ActionResult::UpdateScreen(screen) => {
+                ActionResult::UpdateScreen(self.apply_screen_id_metadata(
+                    self.apply_offline_overlay(self.apply_update_overlay(screen)),
+                ))
+            }
+            ActionResult::NavigateTo(screen) => {
+                ActionResult::NavigateTo(self.apply_screen_id_metadata(
+                    self.apply_offline_overlay(self.apply_update_overlay(screen)),
+                ))
+            }
             other => other,
         }
     }

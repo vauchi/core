@@ -69,3 +69,45 @@ fn pressing_go_exchange_on_contacts_navigates_to_exchange() {
         other => panic!("go_exchange must route to Exchange, got: {other:?}"),
     }
 }
+
+// Regression for 2026-05-25-contact-tap-opens-own-card.
+//
+// Tapping a contact row must navigate to that contact's detail. The
+// frontend forwards a generic `ListItemSelected` and renders whatever
+// `ScreenModel` core returns — core must resolve the navigation to
+// `NavigateTo(contact_detail)`, NOT ship a raw `open_contact` result that
+// each frontend has to map to a "contact_detail" screen itself. That
+// domain-leaking contract is what broke: `route_result` had no general
+// `OpenContact` arm, so the result fell through raw and the mobile
+// frontends wrongly navigated to My Card.
+// @internal
+#[test]
+fn tapping_a_contact_navigates_to_contact_detail() {
+    let vauchi = new_vauchi_with_identity();
+    let vcf = b"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Bob\r\nEND:VCARD\r\n";
+    vauchi.import_contacts_from_vcf(vcf).unwrap();
+    let bob_id = vauchi.list_contacts().unwrap()[0].id().to_string();
+
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Contacts);
+
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "contacts".into(),
+        item_id: bob_id.clone(),
+    });
+
+    match result {
+        ActionResult::NavigateTo(ref screen) => {
+            assert_eq!(
+                screen.screen_id, "contact_detail",
+                "tapping a contact must navigate to contact_detail (core-resolved, \
+                 no domain leak to the frontend), got screen_id={}",
+                screen.screen_id
+            );
+        }
+        other => panic!(
+            "tapping a contact must return NavigateTo(contact_detail); a raw \
+             open_contact result forces frontends to know domain screen ids. Got: {other:?}"
+        ),
+    }
+}

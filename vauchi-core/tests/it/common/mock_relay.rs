@@ -127,9 +127,6 @@ impl MockRelay {
     /// Bind to 127.0.0.1 on a free port and start the listener thread.
     pub fn start() -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind 127.0.0.1:0");
-        listener
-            .set_nonblocking(true)
-            .expect("set_nonblocking on listener");
         let addr = listener.local_addr().expect("local_addr");
         let state = Arc::new(Mutex::new(State::default()));
         let shutdown = Arc::new(AtomicBool::new(false));
@@ -193,17 +190,23 @@ impl Drop for MockRelay {
 }
 
 fn run_listener(listener: TcpListener, state: Arc<Mutex<State>>, shutdown: Arc<AtomicBool>) {
-    while !shutdown.load(Ordering::SeqCst) {
-        match listener.accept() {
-            Ok((stream, _)) => {
-                let st = state.clone();
+    // Blocking accept(): wakes immediately on a real connection regardless of
+    // scheduler pressure. The previous non-blocking + 5 ms-poll spin could
+    // starve this thread past the client's 2 s timeout under heavy parallel
+    // load (full nextest run), producing a spurious request timeout — see
+    // `_private/docs/problems/2026-05-25-mock-relay-flake-under-parallelism`.
+    // Teardown stays clean: `Drop` sets `shutdown` then self-connects to
+    // unblock the pending accept, which we detect via the flag and break.
+    for stream in listener.incoming() {
+        if shutdown.load(Ordering::SeqCst) {
+            break;
+        }
+        match stream {
+            Ok(stream) => {
                 // Each request is short-lived — handle inline. ureq sends
                 // requests sequentially in our tests, so single-threaded
                 // handling is sufficient.
-                let _ = handle_connection(stream, st);
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(5));
+                let _ = handle_connection(stream, state.clone());
             }
             Err(_) => break,
         }

@@ -29,15 +29,6 @@ typedef struct VauchiApp VauchiApp;
 typedef struct VauchiDeviceLinkInitiator VauchiDeviceLinkInitiator;
 
 /**
- * Opaque handle to a device-link session.
- *
- * Wraps `Arc<DeviceLinkSession>`; the inner session's cycle thread
- * holds a clone of the listener `Arc` so callbacks remain live as
- * long as the session is alive.
- */
-typedef struct VauchiDeviceLinkSession VauchiDeviceLinkSession;
-
-/**
  * Opaque handle to an exchange session.
  */
 typedef struct VauchiExchange VauchiExchange;
@@ -57,39 +48,6 @@ typedef struct VauchiWorkflow VauchiWorkflow;
  * The string is owned by core and must NOT be freed by the caller.
  */
 typedef void (*VauchiEventCallback)(const char *screen_ids_json, void *user_data);
-
-/**
- * C-callable listener for device-link session events.
- *
- * Each field is an `Option<unsafe extern "C" fn(...)>` so consumers
- * may leave individual callbacks null. `user_data` is an opaque
- * pointer forwarded to every callback unchanged. The Rust side
- * never inspects or frees `user_data` — its lifetime is the
- * caller's responsibility (typically a `GCHandle` on .NET, a
- * `void*` to a C++ struct, etc).
- *
- * # String/byte ownership
- *
- * All `*const c_char` and `*const u8` arguments are valid only for
- * the duration of the callback invocation. The Rust side
- * constructs a temporary `CString` / borrows from a `Vec<u8>` and
- * drops it once the callback returns; consumers must copy bytes
- * they need to retain.
- */
-typedef struct VauchiDeviceLinkListener {
-    void (*on_qr_ready)(const char *qr_data, uint64_t expires_at_unix, void *user_data);
-    void (*on_confirmation_required)(const char *device_name,
-                                     const char *confirmation_code,
-                                     const char *identity_fingerprint,
-                                     const uint8_t *proximity_challenge,
-                                     uintptr_t proximity_challenge_len,
-                                     void *user_data);
-    void (*on_request_sent)(const char *confirmation_code, void *user_data);
-    void (*on_completed)(const char *device_name, uint32_t device_index, void *user_data);
-    void (*on_failed)(const char *reason, void *user_data);
-    void (*on_session_ended)(void *user_data);
-    void *user_data;
-} VauchiDeviceLinkListener;
 
 #ifdef __cplusplus
 extern "C" {
@@ -405,31 +363,6 @@ void vauchi_app_set_event_callback(struct VauchiApp *handle,
 struct VauchiApp *vauchi_app_create_with_keyring(const char *data_dir, const char *relay_url);
 
 /**
- * Signal that a peer device has connected during device linking.
- *
- * `verification_code` is the code to display for manual confirmation.
- * Returns the updated screen JSON, or null if not on the device linking
- * screen.
- *
- * # Safety
- * `handle` must be a valid app handle or null.
- * `verification_code` must be a valid null-terminated C string, or null.
- */
-char *vauchi_app_device_link_peer_connected(struct VauchiApp *handle,
-                                            const char *verification_code);
-
-/**
- * Signal that data sync has completed during device linking.
- *
- * Returns the updated screen JSON, or null if not on the device linking
- * screen.
- *
- * # Safety
- * `handle` must be a valid app handle or null.
- */
-char *vauchi_app_device_link_sync_complete(struct VauchiApp *handle);
-
-/**
  * Import contacts from vCard (.vcf) data.
  *
  * Returns a JSON object on success:
@@ -617,127 +550,6 @@ char *vauchi_device_link_listen(struct VauchiApp *handle, uint64_t timeout_secs)
 int32_t vauchi_device_link_send_response(struct VauchiApp *handle,
                                          const char *sender_token,
                                          const char *encrypted_response_b64);
-
-/**
- * Create a device-link session as the existing device (initiator).
- *
- * Returns null on null `handle`, on missing identity, on
- * storage-key absence, or on any panic. Caller takes ownership and
- * must call [`vauchi_device_link_session_destroy`] exactly once.
- *
- * # Safety
- *
- * `handle` must be a valid `VauchiApp` pointer or null.
- */
-struct VauchiDeviceLinkSession *vauchi_device_link_session_create(struct VauchiApp *handle);
-
-/**
- * Register or replace the session listener.
- *
- * Wraps the C-callable listener struct in an adapter that
- * implements the orchestrator's plain-Rust trait, then forwards to
- * the inner session. Safe to call before or after
- * [`vauchi_device_link_session_start`]; subsequent callbacks route
- * to the most recently installed listener.
- *
- * No-op on null `session`.
- *
- * # Safety
- *
- * `session` must be a valid pointer returned by
- * [`vauchi_device_link_session_create`] or null. The function
- * pointers in `listener` (when non-null) must remain valid +
- * thread-safe for the session lifetime, and `user_data` must
- * remain valid + thread-safe for the duration of every callback
- * invocation.
- */
-void vauchi_device_link_session_set_listener(struct VauchiDeviceLinkSession *session,
-                                             struct VauchiDeviceLinkListener listener);
-
-/**
- * Spawn the cycle thread. Idempotent — a second call while the
- * thread is running is a no-op.
- *
- * No-op on null `session`.
- *
- * # Safety
- *
- * `session` must be a valid pointer returned by
- * [`vauchi_device_link_session_create`] or null.
- */
-void vauchi_device_link_session_start(struct VauchiDeviceLinkSession *session);
-
-/**
- * User confirmed the codes match (manual / non-ultrasonic path).
- *
- * Returns 0 on success, -1 if `session` or `confirmation_code` is
- * null.
- *
- * # Safety
- *
- * `session` must be a valid pointer or null. `confirmation_code`
- * must be a valid null-terminated C string or null.
- */
-int32_t vauchi_device_link_session_confirm_manual(struct VauchiDeviceLinkSession *session,
-                                                  const char *confirmation_code,
-                                                  uint64_t confirmed_at);
-
-/**
- * User completed ultrasonic proximity verification.
- *
- * Returns 0 on success, -1 on null pointer, -2 on length validation
- * failure (challenge_response must be exactly 16 bytes).
- *
- * # Safety
- *
- * `session` must be a valid pointer or null. If
- * `challenge_response_len > 0` then `challenge_response` must point
- * to at least that many bytes of valid memory.
- */
-int32_t vauchi_device_link_session_confirm_ultrasonic(struct VauchiDeviceLinkSession *session,
-                                                      const uint8_t *challenge_response,
-                                                      uintptr_t challenge_response_len,
-                                                      uint64_t verified_at);
-
-/**
- * User denied the link.
- *
- * No-op on null `session`.
- *
- * # Safety
- *
- * `session` must be a valid pointer or null.
- */
-void vauchi_device_link_session_deny(struct VauchiDeviceLinkSession *session);
-
-/**
- * Cancel the session and join the cycle thread.
- *
- * No-op on null `session`. Idempotent — safe to call multiple
- * times.
- *
- * # Safety
- *
- * `session` must be a valid pointer or null.
- */
-void vauchi_device_link_session_cancel(struct VauchiDeviceLinkSession *session);
-
-/**
- * Destroy the session and free all associated resources.
- *
- * Calls `cancel()` first so the cycle thread joins before the
- * session is deallocated.
- *
- * No-op on null `session`. Each session must be destroyed exactly
- * once.
- *
- * # Safety
- *
- * `session` must be a pointer returned by
- * [`vauchi_device_link_session_create`] or null. After this call,
- * `session` is invalid.
- */
-void vauchi_device_link_session_destroy(struct VauchiDeviceLinkSession *session);
 
 /**
  * Create a new QR exchange session using the app's identity.

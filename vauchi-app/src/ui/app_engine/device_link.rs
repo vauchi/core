@@ -21,28 +21,6 @@ use crate::ui::WorkflowEngine;
 use crate::ui::device_linking::DeviceLinkingEngine;
 
 impl AppEngine {
-    /// Signal that a peer device has connected during device linking.
-    ///
-    /// Transitions the `DeviceLinkingEngine` from `ShowQr` to `VerifyCode`.
-    /// Returns the updated screen model, or `None` if the engine is not on
-    /// the device linking screen.
-    pub fn device_link_peer_connected(&mut self, verification_code: String) -> Option<ScreenModel> {
-        let dl = self.device_linking_engine_mut()?;
-        dl.peer_connected(verification_code);
-        Some(dl.current_screen())
-    }
-
-    /// Signal that data sync has completed during device linking.
-    ///
-    /// Transitions the `DeviceLinkingEngine` from `Syncing` to `Complete`.
-    /// Returns the updated screen model, or `None` if the engine is not on
-    /// the device linking screen.
-    pub fn device_link_sync_complete(&mut self) -> Option<ScreenModel> {
-        let dl = self.device_linking_engine_mut()?;
-        dl.sync_complete();
-        Some(dl.current_screen())
-    }
-
     /// Cycle-thread bridge: signal that a fresh device-link session
     /// has been spawned and is preparing the QR.
     pub fn device_link_qr_pending(&mut self) -> Option<ScreenModel> {

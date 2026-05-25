@@ -20,7 +20,6 @@ mod app_import_warnings;
 mod app_navigation;
 mod config;
 mod device_link;
-mod device_link_session;
 mod exchange;
 mod i18n;
 pub(crate) mod platform_event;
@@ -29,7 +28,6 @@ mod workflow;
 pub use app::*;
 pub use app_navigation::*;
 pub use device_link::*;
-pub use device_link_session::*;
 pub use exchange::*;
 pub use i18n::*;
 pub use workflow::*;
@@ -1566,128 +1564,6 @@ mod tests {
 
                 vauchi_app_destroy(handle);
             }
-        }
-    }
-
-    // ── Device link transition tests ───────────────────────────────
-
-    // @internal
-    #[test]
-    fn device_link_peer_connected_returns_null_when_not_on_device_link_screen() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let handle = vauchi_app_create();
-            let code = CString::new("ABC123").unwrap();
-            let result = vauchi_app_device_link_peer_connected(handle, code.as_ptr());
-            assert!(
-                result.is_null(),
-                "peer_connected on onboarding screen should return null"
-            );
-            vauchi_app_destroy(handle);
-        }
-    }
-
-    // @internal
-    #[test]
-    fn device_link_peer_connected_null_handle_returns_null() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let code = CString::new("ABC123").unwrap();
-            let result = vauchi_app_device_link_peer_connected(std::ptr::null_mut(), code.as_ptr());
-            assert!(result.is_null());
-        }
-    }
-
-    // @internal
-    #[test]
-    fn device_link_sync_complete_returns_null_when_not_on_device_link_screen() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let handle = vauchi_app_create();
-            let result = vauchi_app_device_link_sync_complete(handle);
-            assert!(
-                result.is_null(),
-                "sync_complete on onboarding screen should return null"
-            );
-            vauchi_app_destroy(handle);
-        }
-    }
-
-    // @internal
-    #[test]
-    fn device_link_sync_complete_null_handle_returns_null() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let result = vauchi_app_device_link_sync_complete(std::ptr::null_mut());
-            assert!(result.is_null());
-        }
-    }
-
-    // @scenario: device_sync:Device link CABI peer_connected transitions to verify
-    #[test]
-    fn device_link_peer_connected_on_device_link_screen_returns_verify_screen() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let handle = vauchi_app_create();
-
-            // Navigate to device_linking screen
-            let screen_name = CString::new("device_linking").unwrap();
-            let nav_result = vauchi_app_navigate_to(handle, screen_name.as_ptr());
-            assert!(!nav_result.is_null());
-            let nav_json = CStr::from_ptr(nav_result).to_str().unwrap();
-            let nav_screen: serde_json::Value = serde_json::from_str(nav_json).unwrap();
-            assert_eq!(nav_screen["screen_id"], "link_show_qr");
-            vauchi_string_free(nav_result);
-
-            // Signal peer connected
-            let code = CString::new("ABC123").unwrap();
-            let result = vauchi_app_device_link_peer_connected(handle, code.as_ptr());
-            assert!(!result.is_null(), "should return screen JSON");
-            let json = CStr::from_ptr(result).to_str().unwrap();
-            let screen: serde_json::Value = serde_json::from_str(json).unwrap();
-            assert_eq!(screen["screen_id"], "link_verify");
-            vauchi_string_free(result);
-
-            vauchi_app_destroy(handle);
-        }
-    }
-
-    // @scenario: device_sync:Device link CABI full flow QR to complete
-    #[test]
-    fn device_link_full_flow_qr_to_complete() {
-        // SAFETY: Calling FFI with valid inputs from this test scope.
-        unsafe {
-            let handle = vauchi_app_create();
-
-            // Navigate to device_linking
-            let screen_name = CString::new("device_linking").unwrap();
-            let nav_result = vauchi_app_navigate_to(handle, screen_name.as_ptr());
-            vauchi_string_free(nav_result);
-
-            // peer_connected → VerifyCode
-            let code = CString::new("ABC123").unwrap();
-            let result = vauchi_app_device_link_peer_connected(handle, code.as_ptr());
-            assert!(!result.is_null());
-            let json = CStr::from_ptr(result).to_str().unwrap();
-            let screen: serde_json::Value = serde_json::from_str(json).unwrap();
-            assert_eq!(screen["screen_id"], "link_verify");
-            vauchi_string_free(result);
-
-            // User confirms → Syncing
-            let confirm = CString::new(r#"{"ActionPressed":{"action_id":"confirm"}}"#).unwrap();
-            let result = vauchi_app_handle_action(handle, confirm.as_ptr());
-            assert!(!result.is_null());
-            vauchi_string_free(result);
-
-            // sync_complete → Complete
-            let result = vauchi_app_device_link_sync_complete(handle);
-            assert!(!result.is_null());
-            let json = CStr::from_ptr(result).to_str().unwrap();
-            let screen: serde_json::Value = serde_json::from_str(json).unwrap();
-            assert_eq!(screen["screen_id"], "link_complete");
-            vauchi_string_free(result);
-
-            vauchi_app_destroy(handle);
         }
     }
 

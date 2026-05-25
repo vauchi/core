@@ -21,6 +21,13 @@
 mutation:nightly:
   extends: [.mutation-nightly, .linux-runner]
   timeout: 12h
+  # `.linux-runner` (via rust-base.yml) defaults to interruptible: true, so a
+  # push to main auto-cancels this still-running scheduled job under GitLab's
+  # auto-cancel-redundant-pipelines. core's 11k-mutant run takes hours, so an
+  # ordinary push would kill it mid-flight (~800/11297 resolved before cancel
+  # in pipeline 2549972279). The nightly must run to completion or hit its own
+  # 12h timeout — never be cancelled by an unrelated push.
+  interruptible: false
   variables:
     MUTATION_PACKAGE: "vauchi-core"
     # Baseline needs ~60s for 3651 tests (argon2-based backup tests take 5-20s each).
@@ -40,9 +47,12 @@ mutation:nightly:
     # VAUCHI_LOCALES_DIR so the build scripts pick them up regardless of where
     # cargo-mutants relocates the workspace.
     #
-    # --jobs $(nproc) is appended in before_script (not in this variable)
-    # because GitLab parameter expansion does not recursively evaluate $(...)
-    # — see core!673 for the original substitution bug.
+    # --jobs is capped at 8, not $(nproc): on this 16-core shared runner,
+    # 16 parallel cargo processes thrashed CPU/IO and ballooned per-mutant
+    # builds from ~46s to ~1087s (pipeline 2549972279). cargo-mutants warns
+    # that values >8 overload the machine. min(8, nproc) is applied in
+    # before_script because GitLab parameter expansion does not recursively
+    # evaluate $(...) — see core!673 for the original substitution bug.
     MUTATION_EXTRA_FLAGS: "--exclude-re theme.rs"
   before_script:
     - !reference [.self-hosted, before_script]
@@ -50,7 +60,8 @@ mutation:nightly:
     - !reference [.clone-themes, before_script]
     - export VAUCHI_THEMES_DIR="$(cd ../themes && pwd)"
     - export VAUCHI_LOCALES_DIR="$(cd ../locales && pwd)"
-    - export MUTATION_EXTRA_FLAGS="${MUTATION_EXTRA_FLAGS} --jobs $(nproc)"
+    - 'MUTATION_JOBS=$(nproc); [ "$MUTATION_JOBS" -gt 8 ] && MUTATION_JOBS=8'
+    - export MUTATION_EXTRA_FLAGS="${MUTATION_EXTRA_FLAGS} --jobs ${MUTATION_JOBS}"
 
 # ============================================================
 # Fuzz Testing (Nightly scheduled, T2-10)

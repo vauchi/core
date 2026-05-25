@@ -67,7 +67,9 @@ vauchi-platform/src/exchange.rs 1044
 #  `try_audio_timeout` helper fn + cycle-loop call site that polls
 #  `MultiStageSession::check_and_apply_audio_timeout` to enforce
 #  the audio listen-window budget when Listening wedges.)
-vauchi-platform/src/multistage_exchange.rs 1086
+# (+13 for role-correct ratchet wiring in persist_finalized_contact,
+#  bugfix/exchanged-ratchet-key 2026-05-25)
+vauchi-platform/src/multistage_exchange.rs 1099
 
 # EXEMPT — state machine: scattered transitions create protocol bugs
 # (+8 for ADR-031 audio-as-samples migration — encode at emit, accept
@@ -112,7 +114,9 @@ vauchi-core/src/exchange/session.rs 1899
 # +26: TransportDecryptError enum + counter field + caller match arms +
 #  pub fn transport_decrypt_failure_count getter + docs (site 1 of
 #  problem 2026-05-21-silent-failures-in-security-paths, 2026-05-23)
-vauchi-core/src/exchange/multistage/session.rs 1464
+# (+68 for build_exchange_ratchet seam + retained ratchet ephemeral + RatchetSetupError,
+#  bugfix/exchanged-ratchet-key 2026-05-25; structural exemption — state machine, do not split)
+vauchi-core/src/exchange/multistage/session.rs 1532
 
 # EXEMPT — protocol command/event enum: variants + variant_name match
 # + From impls + serde-discriminant ordering must be co-located, splitting

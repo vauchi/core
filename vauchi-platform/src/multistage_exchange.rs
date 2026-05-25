@@ -39,7 +39,6 @@ use crate::mobile_exchange::deserialize_exchange_payload;
 use vauchi_core::Command;
 use vauchi_core::contact::Contact;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::{
     AudioConfig, MultiStageSession, ProtocolState, QrPayload, audio_modem,
 };
@@ -234,6 +233,9 @@ type ListenerSlot = Arc<Mutex<Option<Arc<dyn MultiStageSessionListener>>>>;
 pub(crate) struct PersistenceContext {
     pub(crate) storage_path: PathBuf,
     pub(crate) storage_key: SymmetricKey,
+    /// Our identity signing key — used for the deterministic ratchet-role
+    /// decision (smaller identity key = initiator) at finalize.
+    pub(crate) our_identity: [u8; 32],
 }
 
 /// Multi-stage exchange session handle for mobile platforms.
@@ -656,12 +658,14 @@ impl MobileMultiStageSession {
         local_card: Vec<u8>,
         storage_path: PathBuf,
         storage_key: SymmetricKey,
+        our_identity: [u8; 32],
     ) -> Self {
         MobileMultiStageSession::build(
             local_card,
             Some(PersistenceContext {
                 storage_path,
                 storage_key,
+                our_identity,
             }),
         )
     }
@@ -823,7 +827,7 @@ fn cycle_loop(
                             detail: "Finalized without transport key — cannot persist contact"
                                 .to_string(),
                         })?;
-                persist_finalized_contact(ctx, payload, transport_key)
+                persist_finalized_contact(ctx, payload, transport_key, &inner)
             });
 
             match persist_result {
@@ -985,10 +989,11 @@ fn persist_finalized_contact(
     ctx: &PersistenceContext,
     received_data: &[u8],
     transport_key: [u8; 32],
+    session: &Mutex<MultiStageSession>,
 ) -> Result<(), MobileError> {
     let (public_key, card) = deserialize_exchange_payload(received_data)?;
     let shared_key = SymmetricKey::from_bytes(transport_key);
-    let contact = Contact::from_exchange(public_key, card, shared_key.clone(), 0);
+    let contact = Contact::from_exchange(public_key, card, shared_key, 0);
 
     let storage =
         Storage::open(&ctx.storage_path, ctx.storage_key.clone()).map_err(MobileError::from)?;
@@ -996,13 +1001,21 @@ fn persist_finalized_contact(
 
     storage.save_contact(&contact)?;
 
-    let ratchet =
-        DoubleRatchetState::initialize_initiator(&shared_key, public_key).map_err(|e| {
-            MobileError::Other {
-                detail: e.to_string(),
-            }
+    // Build the ratchet via the session seam: role-correct (smaller identity =
+    // initiator) and keyed off the transport ephemerals, not the identity key.
+    // Both peers initializing as initiator, or feeding the identity key as the
+    // DH key, silently breaks the channel — the seam makes both unrepresentable.
+    let (ratchet, is_initiator) = {
+        let session = session.lock().map_err(|_| MobileError::Other {
+            detail: "multi-stage session lock poisoned".into(),
         })?;
-    storage.save_ratchet_state(&contact_id, &ratchet, true)?;
+        session
+            .build_exchange_ratchet(&ctx.our_identity, &public_key)
+            .map_err(|e| MobileError::Other {
+                detail: e.to_string(),
+            })?
+    };
+    storage.save_ratchet_state(&contact_id, &ratchet, is_initiator)?;
 
     Ok(())
 }

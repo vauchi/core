@@ -127,6 +127,7 @@ impl VauchiPlatform {
             payload,
             self.storage_path.clone(),
             self.storage_key.clone(),
+            *identity.signing_public_key(),
         )))
     }
 }

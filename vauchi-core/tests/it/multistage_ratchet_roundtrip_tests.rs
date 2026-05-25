@@ -2,25 +2,25 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! RED reproduction: multi-stage Exchanged contacts cannot message.
+//! Regression: multi-stage Exchanged contacts can message.
 //!
 //! Feature file: features/contact_exchange.feature @multi-stage
 //!
-//! `core/vauchi-platform/src/multistage_exchange.rs::persist_finalized_contact`
-//! initialises the Double Ratchet by calling `initialize_initiator` on BOTH
-//! peers with `transport_key` as the secret and the peer's Ed25519 identity key
-//! (from the deserialised payload) as the X25519 `their_dh_public` — the same
-//! two-defect pattern fixed for the QR/BLE/NFC path. This drives two real
-//! `MultiStageSession`s to `Finalized`, reproduces that sequence using the
-//! symmetric `transport_key`, and asserts a message round-trips. It FAILS today.
+//! Before the fix, `multistage_exchange.rs::persist_finalized_contact`
+//! initialised the Double Ratchet with both peers as `initialize_initiator`
+//! and the Ed25519 identity key as the X25519 `their_dh_public` — a silently
+//! broken channel (same defects as the QR/BLE/NFC path).
 //!
-//! The fix (Option A in the problem record) keys the ratchet off the transport
-//! ephemeral keys the session already holds (`peer_ephemeral` + our retained
-//! ephemeral), with the role derived deterministically from the identity keys —
-//! preserving the property that `transport_key` compromise (it is backed up and
-//! synced) does not by itself reveal the ratchet root.
+//! Option A (problem record `2026-05-25-in-person-exchange-ratchet-broken`):
+//! `MultiStageSession::build_exchange_ratchet` derives the role
+//! deterministically (smaller identity key = initiator) and keys the ratchet
+//! off the transport ephemeral keys the session already holds — `peer_ephemeral`
+//! (initiator) and our retained ephemeral (responder) — with `transport_key` as
+//! the root seed. The root therefore depends on a fresh ephemeral DH, not
+//! `transport_key` alone, so a leaked backup/synced `transport_key` does not by
+//! itself reveal the ratchet. This drives two real `MultiStageSession`s to
+//! `Finalized`, builds both ratchets via the seam, and round-trips both ways.
 
-use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
 use vauchi_core::exchange::multistage::session::MultiStageSession;
 use vauchi_core::exchange::multistage::types::ProtocolState;
 
@@ -76,25 +76,43 @@ fn multistage_in_person_ratchet_round_trips() {
     let bob_tk = bob.get_transport_key().expect("bob transport key");
     assert_eq!(alice_tk, bob_tk, "transport key must be symmetric");
 
-    // Reproduce the production save+ratchet sequence
-    // (multistage_exchange.rs::persist_finalized_contact): both peers
-    // initialize_initiator, with a peer-identity-shaped key as their_dh_public.
-    let synthetic_peer_identity = [7u8; 32];
-    let mut alice_ratchet = DoubleRatchetState::initialize_initiator(
-        &SymmetricKey::from_bytes(alice_tk),
-        synthetic_peer_identity,
-    )
-    .expect("alice ratchet init");
-    let mut bob_ratchet = DoubleRatchetState::initialize_initiator(
-        &SymmetricKey::from_bytes(bob_tk),
-        synthetic_peer_identity,
-    )
-    .expect("bob ratchet init");
+    // The seam takes the identity keys for the deterministic role decision;
+    // the protocol layer supplies them from the exchanged payloads. Synthetic
+    // here — only their ordering matters.
+    let alice_id = [1u8; 32];
+    let bob_id = [2u8; 32];
 
-    let msg = b"Hello from Alice over multi-stage";
-    let ct = alice_ratchet.encrypt(msg).expect("alice encrypts");
-    let pt = bob_ratchet
+    let (alice_ratchet, alice_is_initiator) = alice
+        .build_exchange_ratchet(&alice_id, &bob_id)
+        .expect("alice ratchet builds");
+    let (bob_ratchet, bob_is_initiator) = bob
+        .build_exchange_ratchet(&bob_id, &alice_id)
+        .expect("bob ratchet builds");
+
+    assert_ne!(
+        alice_is_initiator, bob_is_initiator,
+        "exactly one side must be the initiator"
+    );
+
+    // The responder has no sending chain until it receives the initiator's
+    // first message, so the initiator speaks first.
+    let (mut initiator, mut responder) = if alice_is_initiator {
+        (alice_ratchet, bob_ratchet)
+    } else {
+        (bob_ratchet, alice_ratchet)
+    };
+
+    let msg = b"Hello over multi-stage";
+    let ct = initiator.encrypt(msg).expect("initiator encrypts");
+    let pt = responder
         .decrypt(&ct)
-        .expect("bob must decrypt alice's first message");
-    assert_eq!(pt, msg, "multi-stage round-trip must preserve plaintext");
+        .expect("responder must decrypt the initiator's first message");
+    assert_eq!(pt, msg, "initiator->responder plaintext must survive");
+
+    let reply = b"Reply over multi-stage";
+    let ct = responder.encrypt(reply).expect("responder encrypts reply");
+    let pt = initiator
+        .decrypt(&ct)
+        .expect("initiator must decrypt the responder's reply");
+    assert_eq!(pt, reply, "responder->initiator plaintext must survive");
 }

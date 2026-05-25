@@ -4344,7 +4344,9 @@ impl PlatformAppEngine {
     /// card) required by `MobileMultiStageSession::with_persistence`.
     /// Pulls the current identity + card from the cached AppEngine's
     /// `Vauchi`. Returns an error if no identity exists.
-    fn build_exchange_payload(&self) -> Result<Vec<u8>, MobileError> {
+    /// Returns the serialized exchange payload and our identity signing key
+    /// (the latter feeds the deterministic ratchet-role decision at finalize).
+    fn build_exchange_payload(&self) -> Result<(Vec<u8>, [u8; 32]), MobileError> {
         let engine = self.engine.lock().map_err(|e| MobileError::Other {
             detail: format!("Lock failed: {e}"),
         })?;
@@ -4362,7 +4364,7 @@ impl PlatformAppEngine {
                 detail: e.to_string(),
             })?
             .unwrap_or_else(|| ContactCard::new(&display_name));
-        Ok(serialize_exchange_payload(&signing_key, &card))
+        Ok((serialize_exchange_payload(&signing_key, &card), signing_key))
     }
 
     /// Lazily create + start the `MobileMultiStageSession` and wire the
@@ -4379,11 +4381,12 @@ impl PlatformAppEngine {
         if slot.is_some() {
             return Ok(());
         }
-        let payload = self.build_exchange_payload()?;
+        let (payload, our_identity) = self.build_exchange_payload()?;
         let session = Arc::new(MobileMultiStageSession::with_persistence(
             payload,
             self.storage_path.clone(),
             self.storage_key.clone(),
+            our_identity,
         ));
         let bridge = MultiStageEngineBridge {
             engine: Arc::clone(&self.engine),
@@ -4469,7 +4472,7 @@ impl PlatformAppEngine {
                 _ => return Ok(()),
             }
         };
-        let our_card_bytes = self.build_exchange_payload()?;
+        let (our_card_bytes, _) = self.build_exchange_payload()?;
         let session =
             crate::MobileLinkResponderSession::from_parsed(payload.as_parsed(), our_card_bytes)?;
         *slot = Some(session);

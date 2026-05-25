@@ -34,6 +34,9 @@ use super::commitment::Commitment;
 use super::qr_codec::{self, StageQr};
 use super::types::{AudioProximityState, ChunkBitmap, ProtocolState, QrPayload};
 
+use crate::crypto::x3dh::X3DHKeyPair;
+use crate::crypto::{DoubleRatchetState, SymmetricKey};
+
 /// Maximum raw payload bytes per chunk (before transport encryption overhead).
 /// Transport encryption adds 12 (nonce) + 16 (Poly1305 tag) = 28 bytes overhead.
 ///
@@ -163,6 +166,15 @@ pub struct MultiStageSession {
     // Our keys
     ephemeral_secret: Option<X25519Secret>,
     ephemeral_public: X25519Public,
+    // Copy of the transport ephemeral secret, retained past `ephemeral_secret`'s
+    // `take()` at transport-key derivation so the post-finalize Double Ratchet
+    // bootstrap (responder role) can key off it — exactly as the unified
+    // ExchangeSession retains `our_x3dh`. Keeping the ratchet root dependent on
+    // this fresh ephemeral (not transport_key alone) preserves the property that
+    // transport_key compromise — it is backed up + synced — does not reveal the
+    // root. Zeroized on drop via `clear_sensitive`. See
+    // `_private/docs/problems/2026-05-25-in-person-exchange-ratchet-broken`.
+    ratchet_ephemeral: Option<X25519Secret>,
 
     // Peer data (populated after Stage 1)
     peer_ephemeral: Option<[u8; 32]>,
@@ -257,6 +269,19 @@ pub struct MultiStageSession {
     audio_listening_started_at: Option<Instant>,
 }
 
+/// Errors building the post-finalize Double Ratchet for a multi-stage exchange.
+#[derive(Debug, thiserror::Error)]
+pub enum RatchetSetupError {
+    #[error("multi-stage session has no transport key (not finalized)")]
+    NoTransportKey,
+    #[error("multi-stage session has no peer ephemeral key")]
+    NoPeerEphemeral,
+    #[error("multi-stage session ephemeral was not retained")]
+    NoEphemeral,
+    #[error("ratchet initialization failed: {0}")]
+    RatchetInit(String),
+}
+
 impl MultiStageSession {
     /// Create a new session for exchanging the given contact card data.
     pub fn new(local_card: Vec<u8>) -> Self {
@@ -300,6 +325,7 @@ impl MultiStageSession {
             commitment,
             session_id,
             ephemeral_secret: Some(ephemeral_secret),
+            ratchet_ephemeral: None,
             ephemeral_public,
             peer_ephemeral: None,
             peer_commitment_hash: None,
@@ -404,6 +430,43 @@ impl MultiStageSession {
     /// secret for the double ratchet after exchange completion.
     pub fn get_transport_key(&self) -> Option<[u8; 32]> {
         self.transport_key
+    }
+
+    /// Builds the role-correct Double Ratchet for a finalized multi-stage exchange.
+    ///
+    /// Mirrors [`crate::exchange::ExchangeSession::build_exchange_ratchet`]: the
+    /// role is derived deterministically from the identity keys (smaller =
+    /// initiator). The initiator keys the ratchet off the peer's transport
+    /// ephemeral (`peer_ephemeral`); the responder keys off our own retained
+    /// transport ephemeral (`ratchet_ephemeral`) -- the keypair whose public the
+    /// initiator received. `transport_key` is the root seed; both sides reconcile
+    /// on the first message (`DoubleRatchetState::dh_ratchet`).
+    ///
+    /// Keeping the root dependent on a fresh ephemeral DH (not `transport_key`
+    /// alone) preserves the property that `transport_key` compromise -- it is
+    /// backed up and synced -- does not by itself reveal the ratchet root. Pure
+    /// crypto; persistence stays with the caller.
+    pub fn build_exchange_ratchet(
+        &self,
+        our_identity: &[u8; 32],
+        their_identity: &[u8; 32],
+    ) -> Result<(DoubleRatchetState, bool), RatchetSetupError> {
+        let transport_key = self.transport_key.ok_or(RatchetSetupError::NoTransportKey)?;
+        let shared = SymmetricKey::from_bytes(transport_key);
+        let is_initiator = our_identity < their_identity;
+        let ratchet = if is_initiator {
+            let peer_ephemeral = self.peer_ephemeral.ok_or(RatchetSetupError::NoPeerEphemeral)?;
+            DoubleRatchetState::initialize_initiator(&shared, peer_ephemeral)
+                .map_err(|e| RatchetSetupError::RatchetInit(e.to_string()))?
+        } else {
+            let secret = self
+                .ratchet_ephemeral
+                .as_ref()
+                .ok_or(RatchetSetupError::NoEphemeral)?;
+            let our_dh = X3DHKeyPair::from_bytes(secret.to_bytes());
+            DoubleRatchetState::initialize_responder(&shared, our_dh)
+        };
+        Ok((ratchet, is_initiator))
     }
 
     /// Returns the peer's relay URL (available after INIT exchange).
@@ -847,6 +910,10 @@ impl MultiStageSession {
                 }
                 let transport_key = self.derive_transport_key(shared_secret.as_bytes());
                 self.transport_key = Some(transport_key);
+                // Retain the ephemeral for the post-finalize ratchet bootstrap
+                // (Option A). `ephemeral_secret` stays `None` so the
+                // double-key-agreement guard above still fires.
+                self.ratchet_ephemeral = Some(secret);
             }
             _ => {
                 self.state = ProtocolState::Failed("ephemeral secret already consumed".to_string());
@@ -1451,6 +1518,7 @@ impl MultiStageSession {
         self.transport_key = None;
         self.peer_reveal_key = None;
         self.ephemeral_secret = None;
+        self.ratchet_ephemeral = None;
         self.outbound_chunks.clear();
         self.inbound_buffer = None;
         self.received_data = None;

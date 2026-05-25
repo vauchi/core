@@ -148,3 +148,85 @@ fn navigate_back_from_responder_drops_session() {
         "leaving the responder screen must drop the cached session",
     );
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// Slice 32l Phase 2 — screen-driven responder (T2.1 RED)
+//
+// Design: `_private/docs/designs/2026-05-25-slice-32l-phase-2-responder-
+// screen-driven-design.md`. The engine must OWN the `LinkResponder` and
+// reflect its terminal state on the screen, driven by `handle_hardware_event`
+// — the frontend pulls NO session object. These fail RED until T2.2 wires
+// the engine-owned responder and adds the `link_responder_failed` /
+// `link_responder_completed` screens.
+//
+// RED scaffold: `gate_hash` is bootstrapped here via the (retiring)
+// `current_link_responder_session` getter. T2.2 GREEN replaces that with
+// `poll_link_responder_commands()` (the `RelayEscrowDeposit` command carries
+// `gate_hash`), then retires the getter. NOTE: getting the session only
+// builds it (DH + key derive) — it does NOT call `.start()`, so no cycle
+// thread is spawned.
+//
+// Deferred to T2.2 (need a valid encrypted blob fixture / the command
+// drain, out of scope for this RED): the success path
+// (`RelayEscrowBlobReceived` with a valid card → `link_responder_completed`
+// + `import_received_link_card` persistence) and the deposit-command
+// assertions.
+
+/// Bootstrap the responder's `gate_hash` for event construction.
+fn responder_gate_hash(engine: &PlatformAppEngine) -> Vec<u8> {
+    engine
+        .current_link_responder_session()
+        .expect("getter ok on screen")
+        .expect("session built on the responder screen")
+        .gate_hash_bytes()
+}
+
+// @internal
+#[test]
+fn relay_deposit_failure_drives_engine_to_failed_screen() {
+    let (engine, _dir) = create_engine();
+    drive_to_link_responder(&engine);
+    let gate_hash = responder_gate_hash(&engine);
+
+    engine
+        .handle_hardware_event(vauchi_platform::MobileEvent::RelayEscrowFailed {
+            gate_hash,
+            reason: "deposit_rejected".into(),
+        })
+        .expect("engine must accept the relay-failure hardware event");
+
+    assert_eq!(
+        engine.current_screen_id().expect("screen id"),
+        "link_responder_failed",
+        "a relay deposit failure must drive the engine-owned responder to the failed \
+         screen — not leave it on link_responder_waiting (the frontend pulls no session)",
+    );
+}
+
+// @internal
+#[test]
+fn undecryptable_relay_blob_drives_engine_to_failed_screen() {
+    let (engine, _dir) = create_engine();
+    drive_to_link_responder(&engine);
+    let gate_hash = responder_gate_hash(&engine);
+
+    // `RelayEscrowReady` advances Polling → Retrieving; an undecryptable blob
+    // then fails the card decrypt, which must surface as the failed screen.
+    engine
+        .handle_hardware_event(vauchi_platform::MobileEvent::RelayEscrowReady {
+            gate_hash: gate_hash.clone(),
+        })
+        .expect("engine must accept RelayEscrowReady");
+    engine
+        .handle_hardware_event(vauchi_platform::MobileEvent::RelayEscrowBlobReceived {
+            gate_hash,
+            blob: vec![0xde, 0xad, 0xbe, 0xef],
+        })
+        .expect("engine must accept RelayEscrowBlobReceived");
+
+    assert_eq!(
+        engine.current_screen_id().expect("screen id"),
+        "link_responder_failed",
+        "an undecryptable relay blob must drive the engine-owned responder to the failed screen",
+    );
+}

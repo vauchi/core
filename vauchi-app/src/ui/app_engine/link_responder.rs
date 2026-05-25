@@ -117,19 +117,31 @@ impl AppEngine {
         initial
     }
 
-    /// Feed a `RelayEscrow*` hardware event to the engine-owned
-    /// responder machine and reconcile the screen with its new state.
-    /// Returns `ActionResult::Commands` for the follow-up
-    /// `RelayEscrowRetrieve` while still polling/retrieving, and `None`
-    /// once a terminal screen has been rendered. A no-op (returns `None`)
-    /// when no machine is live.
+    /// Feed a `RelayEscrow*` hardware event to the engine-owned responder
+    /// machine and reconcile the screen with its new state. Returns
+    /// `ActionResult::Commands` for the follow-up `RelayEscrowRetrieve`
+    /// while still polling/retrieving, and `None` once a terminal screen
+    /// has been rendered. A no-op (returns `None`) off the responder
+    /// screen, for non-`RelayEscrow*` events, or when no machine is live —
+    /// so the caller can pass every hardware event through unconditionally.
     pub(super) fn route_link_responder_hardware_event(
         &mut self,
-        event: Event,
+        event: &Event,
     ) -> Option<ActionResult> {
+        if !matches!(self.screen, AppScreen::DeepLinkResponder { .. }) {
+            return None;
+        }
+        if !matches!(
+            event,
+            Event::RelayEscrowReady { .. }
+                | Event::RelayEscrowFailed { .. }
+                | Event::RelayEscrowBlobReceived { .. }
+        ) {
+            return None;
+        }
         let (state, new_commands) = {
             let machine = self.link_responder.as_mut()?;
-            machine.apply_hardware_event(event);
+            machine.apply_hardware_event(event.clone());
             (
                 machine.current_state().clone(),
                 machine.drain_pending_commands(),

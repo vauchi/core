@@ -1220,10 +1220,7 @@ impl WorkflowEngine for AppEngine {
 
         let result = self.engine.handle_action(action);
         let result = self.route_result(result);
-        // Slice 32l T3.1b: feed the engine's typed device-link
-        // ActionResults (confirm / deny / retry) into the engine-owned
-        // initiator machine. The result itself is preserved for the
-        // frontend envelope.
+        // Slice 32l T3.1b: feed typed DeviceLink* ActionResults into the engine-owned machine.
         #[cfg(all(feature = "network-http", feature = "storage"))]
         self.dispatch_device_link_side_effects(&result);
         let result = self.resolve_validation_error(result);
@@ -1237,9 +1234,7 @@ impl AppEngine {
     pub fn poll_notifications(&mut self) -> Vec<PendingNotification> {
         self.drain_events_to_log();
 
-        // Slice 32l T3.1b: drive one non-blocking device-link relay step
-        // per poll tick. No-op (returns immediately) when no initiator
-        // session is held, so this is cheap on every other screen.
+        // Slice 32l T3.1b: advance the device-link machine one relay step (no-op when idle).
         #[cfg(all(feature = "network-http", feature = "storage"))]
         self.advance_device_link_session();
 

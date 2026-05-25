@@ -22,14 +22,20 @@ use vauchi_app::i18n::{
 /// Initialize i18n once for integration tests using the bundled locale files.
 static INIT: Once = Once::new();
 
+/// Resolves the sibling locales/ repo.
+///
+/// Prefers `VAUCHI_LOCALES_DIR` (an absolute path exported by CI and the
+/// mutation job) so the path survives cargo-mutants' relocated source tree;
+/// a `CARGO_MANIFEST_DIR`-relative fallback covers plain local runs.
+fn locales_dir() -> PathBuf {
+    std::env::var_os("VAUCHI_LOCALES_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locales"))
+}
+
 fn ensure_init() {
     INIT.call_once(|| {
-        // Integration tests load from the sibling locales/ repo
-        let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
-            .join("locales");
-        vauchi_app::i18n::init(&locales_dir)
+        vauchi_app::i18n::init(&locales_dir())
             .expect("Failed to load locales from sibling locales/ repo");
     });
 }
@@ -403,10 +409,7 @@ fn test_spanish_coverage() {
 fn test_all_locale_files_have_same_keys_as_english() {
     use std::collections::BTreeSet;
 
-    let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("locales");
+    let locales_dir = locales_dir();
 
     let en_path = locales_dir.join("en.json");
     assert!(
@@ -467,10 +470,7 @@ fn test_all_locale_files_have_same_keys_as_english() {
 // @scenario: internationalization :: Locale files are complete
 #[test]
 fn test_no_locale_has_empty_values() {
-    let locales_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("locales");
+    let locales_dir = locales_dir();
 
     for entry in std::fs::read_dir(&locales_dir).expect("read locales dir") {
         let entry = entry.expect("read dir entry");

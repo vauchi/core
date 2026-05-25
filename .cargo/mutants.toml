@@ -48,5 +48,11 @@ timeout_multiplier = 1.5
 # Use nextest for faster mutant killing (exits on first failure)
 test_tool = "nextest"
 
-# Skip doctests — each doctest compiles as a separate binary, slow for mutation
-additional_cargo_test_args = ["--all-targets"]
+# Skip doctests — each doctest compiles as a separate binary, slow for mutation.
+# `--features testing` enables the `it` integration target (required-features =
+# ["testing"]). Without it, the entire integration suite — the bulk of the
+# crate's tests — never runs under mutation, so heavily-tested code reports as
+# MISSED. The `it` target builds under cargo-mutants' relocated source tree only
+# because contract_tests.rs loads themes.json at runtime (via VAUCHI_THEMES_DIR)
+# rather than a compile-time include_bytes! that escapes the temp copy.
+additional_cargo_test_args = ["--all-targets", "--features", "testing"]

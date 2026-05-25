@@ -282,8 +282,22 @@ fn malformed_user_action_json_returns_error_not_panic() {
 // @internal
 #[test]
 fn embedded_themes_json_parses_successfully() {
-    let themes_json = include_bytes!("../../../../themes/generated/themes.json");
-    let themes = load_themes_from_json(themes_json)
+    // Load at runtime, not via include_bytes!: the sibling themes/ repo lives
+    // outside the cargo workspace, so a compile-time include escapes the source
+    // tree that cargo-mutants relocates (mutation build error). VAUCHI_THEMES_DIR
+    // is an absolute path exported by the mutation/CI jobs; fall back to the
+    // sibling-repo layout for plain local runs.
+    let themes_dir = std::env::var_os("VAUCHI_THEMES_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../themes"));
+    let themes_path = themes_dir.join("generated/themes.json");
+    let themes_json = std::fs::read(&themes_path).unwrap_or_else(|e| {
+        panic!(
+            "themes.json must be readable at {}: {e}",
+            themes_path.display()
+        )
+    });
+    let themes = load_themes_from_json(&themes_json)
         .expect("themes.json must parse — silent fallback to default theme is a regression");
     assert!(
         themes.len() >= 2,

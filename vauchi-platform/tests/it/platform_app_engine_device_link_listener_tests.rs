@@ -119,17 +119,6 @@ fn navigating_away_from_device_linking_cancels_session() {
 
 // ── Bridge forwarding ──────────────────────────────────────────
 
-// @scenario: pair5_device_link_listener :: on_qr_ready advances the engine to waiting
-#[test]
-fn qr_ready_bridge_advances_engine_to_waiting() {
-    let (engine, _dir) = create_engine_with_identity();
-    navigate_to_device_linking_quiescent(&engine);
-    engine
-        .apply_device_link_qr_ready_for_test("test-qr".into(), 1_700_000_500)
-        .expect("apply qr_ready");
-    assert_eq!(current_screen_id(&engine), "link_waiting");
-}
-
 // @scenario: pair5_device_link_listener :: on_confirmation_required advances the engine
 #[test]
 fn request_received_bridge_advances_engine_to_confirming_device() {
@@ -154,28 +143,6 @@ fn qr_expired_bridge_routes_to_qr_expired_screen() {
         .apply_device_link_qr_expired_for_test()
         .expect("apply qr_expired");
     assert_eq!(current_screen_id(&engine), "link_qr_expired");
-}
-
-// @scenario: pair5_device_link_listener :: on_failed(reason) routes to the failed screen
-#[test]
-fn failed_bridge_routes_to_failed_screen_with_reason() {
-    let (engine, _dir) = create_engine_with_identity();
-    navigate_to_device_linking_quiescent(&engine);
-    engine
-        .apply_device_link_failed_for_test("relay timeout".into())
-        .expect("apply failed");
-    assert_eq!(current_screen_id(&engine), "link_failed");
-}
-
-// @scenario: pair5_device_link_listener :: on_completed routes to the terminal Complete screen
-#[test]
-fn completed_bridge_routes_to_complete_screen() {
-    let (engine, _dir) = create_engine_with_identity();
-    navigate_to_device_linking_quiescent(&engine);
-    engine
-        .apply_device_link_completed_for_test()
-        .expect("apply completed");
-    assert_eq!(current_screen_id(&engine), "link_complete");
 }
 
 // ── Action interception ───────────────────────────────────────

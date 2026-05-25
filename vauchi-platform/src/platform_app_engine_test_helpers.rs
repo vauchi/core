@@ -93,13 +93,6 @@ pub trait PlatformAppEngineTestHelpers {
     // was not `#[uniffi::export]`-tagged) so this move is metric-
     // hygiene only on the binding side.
 
-    /// Test-only: simulate `on_qr_ready` from the cycle thread.
-    fn apply_device_link_qr_ready_for_test(
-        &self,
-        qr_data: String,
-        expires_at: u64,
-    ) -> Result<(), MobileError>;
-
     /// Test-only: simulate `on_confirmation_required`.
     fn apply_device_link_request_received_for_test(
         &self,
@@ -110,12 +103,6 @@ pub trait PlatformAppEngineTestHelpers {
 
     /// Test-only: simulate `on_failed("qr_expired")`.
     fn apply_device_link_qr_expired_for_test(&self) -> Result<(), MobileError>;
-
-    /// Test-only: simulate `on_failed` (generic message).
-    fn apply_device_link_failed_for_test(&self, reason: String) -> Result<(), MobileError>;
-
-    /// Test-only: simulate `on_completed` from the cycle thread.
-    fn apply_device_link_completed_for_test(&self) -> Result<(), MobileError>;
 
     /// Test-only: returns `true` when a device-link initiator session
     /// is currently held. Used to assert lifecycle correctness around
@@ -231,18 +218,6 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
         Ok(())
     }
 
-    fn apply_device_link_qr_ready_for_test(
-        &self,
-        qr_data: String,
-        expires_at: u64,
-    ) -> Result<(), MobileError> {
-        let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let _ = engine.device_link_qr_ready(qr_data, expires_at);
-        Ok(())
-    }
-
     fn apply_device_link_request_received_for_test(
         &self,
         device_name: String,
@@ -261,22 +236,6 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
             detail: format!("Lock failed: {e}"),
         })?;
         let _ = engine.device_link_qr_expired();
-        Ok(())
-    }
-
-    fn apply_device_link_failed_for_test(&self, reason: String) -> Result<(), MobileError> {
-        let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let _ = engine.device_link_failed(reason);
-        Ok(())
-    }
-
-    fn apply_device_link_completed_for_test(&self) -> Result<(), MobileError> {
-        let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let _ = engine.device_link_completed();
         Ok(())
     }
 

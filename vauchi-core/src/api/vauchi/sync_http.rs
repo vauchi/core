@@ -726,14 +726,17 @@ impl Vauchi {
 
 /// Heuristic: does this error look like a stale/rejected OHTTP key?
 ///
-/// Checks for HTTP 400 responses or error messages containing "ohttp" —
-/// common signals when the relay rejects an outdated OHTTP config.
-/// A false positive causes one extra key fetch (cheap). A false negative
-/// means the caller sees a transient error and retries on the next sync.
+/// Matches HTTP 400/502 or messages containing "ohttp". 400 is the gateway
+/// rejecting decapsulation (stale/rotated key); 502 is the OHTTP relay masking
+/// that decap-400 as Bad Gateway — it never forwards the upstream status, so a
+/// stale key reaches the client as 502, not 400 (problem
+/// 2026-05-25-relay-ohttp-forward-hop-502), and must also trigger a refetch so
+/// key rotation survives without a reinstall. A false positive costs one extra
+/// key fetch (cheap); a false negative just retries on the next sync.
 fn is_ohttp_key_error(err: &VauchiError) -> bool {
     if let VauchiError::Network(ne) = err {
         let msg = ne.to_string().to_lowercase();
-        msg.contains("400") || msg.contains("ohttp")
+        msg.contains("400") || msg.contains("502") || msg.contains("ohttp")
     } else {
         false
     }

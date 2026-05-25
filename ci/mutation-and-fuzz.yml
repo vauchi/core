@@ -66,6 +66,14 @@ mutation:nightly:
     - export VAUCHI_LOCALES_DIR="$(cd ../locales && pwd)"
     - 'MUTATION_JOBS=$(nproc); [ "$MUTATION_JOBS" -gt 8 ] && MUTATION_JOBS=8'
     - export MUTATION_EXTRA_FLAGS="${MUTATION_EXTRA_FLAGS} --jobs ${MUTATION_JOBS}"
+    # Run one balanced 1/7 shard per weekday: each mutant now runs the full
+    # integration suite (~115s), so the whole 11k-mutant crate cannot finish in
+    # one 12h night. round-robin spreads every module evenly across shards, so
+    # each day tests ~1615 mutants (uniform runtime regardless of module size)
+    # and the full crate is covered over a week. `date -u +%u` is 1=Mon..7=Sun;
+    # cargo-mutants shards are 0-indexed, hence the -1.
+    - export MUTATION_SHARD="$(( $(date -u +%u) - 1 ))"
+    - export MUTATION_EXTRA_FLAGS="${MUTATION_EXTRA_FLAGS} --shard ${MUTATION_SHARD}/7 --sharding round-robin"
 
 # ============================================================
 # Fuzz Testing (Nightly scheduled, T2-10)

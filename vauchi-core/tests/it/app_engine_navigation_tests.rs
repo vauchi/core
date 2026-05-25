@@ -29,7 +29,7 @@ fn navigate_to_contacts_shows_contact_list() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Contacts);
-    assert_eq!(screen.screen_id, "contact_list");
+    assert_eq!(screen.screen_id, "contacts");
 }
 
 // @internal
@@ -124,7 +124,7 @@ fn navigate_to_backup_shows_backup() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Backup);
-    assert_eq!(screen.screen_id, "backup_choose");
+    assert_eq!(screen.screen_id, "backup");
 }
 
 // ── persistence tests ───────────────────────────────────────────────
@@ -321,7 +321,7 @@ fn navigate_creates_fresh_engine_first_time() {
 
     // First navigation to each screen should create a fresh engine
     let contacts = engine.navigate_to(AppScreen::Contacts);
-    assert_eq!(contacts.screen_id, "contact_list");
+    assert_eq!(contacts.screen_id, "contacts");
 
     let help = engine.navigate_to(AppScreen::Help);
     assert_eq!(help.screen_id, "help");
@@ -348,7 +348,7 @@ fn invalidate_screen_removes_cached_engine() {
 
     // Navigate back — should get fresh engine (not the cached one)
     let screen = engine.navigate_to(AppScreen::Contacts);
-    assert_eq!(screen.screen_id, "contact_list");
+    assert_eq!(screen.screen_id, "contacts");
 }
 
 // @internal
@@ -368,7 +368,7 @@ fn invalidate_all_clears_entire_cache() {
 
     // Both should get fresh engines
     let contacts = engine.navigate_to(AppScreen::Contacts);
-    assert_eq!(contacts.screen_id, "contact_list");
+    assert_eq!(contacts.screen_id, "contacts");
     let settings = engine.navigate_to(AppScreen::Settings);
     assert_eq!(settings.screen_id, "settings");
 }
@@ -402,8 +402,8 @@ fn back_from_contact_detail_returns_to_contacts() {
         panic!("expected NavigateTo, got {result:?}");
     };
     assert_eq!(
-        screen.screen_id, "contact_list",
-        "back should navigate to contact_list screen"
+        screen.screen_id, "contacts",
+        "back should navigate to the canonical contacts screen"
     );
     assert_eq!(
         engine.current_app_screen(),
@@ -499,7 +499,7 @@ fn navigate_to_sync_shows_sync_status() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Sync);
-    assert_eq!(screen.screen_id, "sync_status");
+    assert_eq!(screen.screen_id, "sync");
     assert_eq!(screen.title, "Sync");
     assert!(
         screen.actions.iter().any(|a| a.id == "sync_now"),
@@ -596,7 +596,7 @@ fn sync_engine_unknown_action_returns_screen() {
     });
     match result {
         ActionResult::UpdateScreen(screen) => {
-            assert_eq!(screen.screen_id, "sync_status");
+            assert_eq!(screen.screen_id, "sync");
         }
         other => panic!("Expected UpdateScreen, got {other:?}"),
     }

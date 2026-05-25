@@ -771,6 +771,23 @@ impl AppEngine {
     /// Idempotent: if the inner engine already set non-default values
     /// (it shouldn't, but the contract is clear), they are preserved.
     fn apply_screen_id_metadata(&self, mut screen: ScreenModel) -> ScreenModel {
+        // Tier-0 (c) narrow collapse: these 5 families back engines that
+        // emit per-sub-state `screen_id`s (`contact_list`, `backup_*`, …)
+        // that `CoreScreenIdMap` was hand-folding. Stamp the canonical
+        // `AppScreen::screen_id()` so frontends get a stable id. Narrow by
+        // design — screens outside the set keep their engine id for in-flow
+        // render-diffing and internal routing (the `backup_processing`
+        // interception runs before this decorator). See the (c) plan.
+        if matches!(
+            self.screen,
+            AppScreen::Contacts
+                | AppScreen::Groups
+                | AppScreen::DuressPin
+                | AppScreen::Backup
+                | AppScreen::Sync
+        ) {
+            screen.screen_id = self.screen.screen_id().to_string();
+        }
         if screen.parent_screen_id.is_none() {
             screen.parent_screen_id = self.screen.parent_screen_id().map(String::from);
         }
@@ -1275,13 +1292,10 @@ impl AppEngine {
         }
     }
 
-    /// Decorate any `ScreenModel` inside a `NavigateTo`/`UpdateScreen`
-    /// result for the wire: update + offline overlays, then
-    /// `apply_screen_id_metadata` (parent_screen_id, presentation_kind,
-    /// and the Tier-0 (c) canonical `screen_id` stamp). Mirrors the
-    /// decoration `current_screen()` already applies, so results and
-    /// re-reads agree. Runs after `route_result`, so internal sub-state
-    /// `screen_id` routing (e.g. the `backup_processing` interception) is
+    /// Decorate a `NavigateTo`/`UpdateScreen` result's `ScreenModel` for
+    /// the wire (overlays + `apply_screen_id_metadata`), mirroring
+    /// `current_screen()` so results and re-reads agree. Runs after
+    /// `route_result`, so internal sub-state `screen_id` routing is
     /// unaffected.
     fn apply_update_overlay_to_result(&self, result: ActionResult) -> ActionResult {
         match result {

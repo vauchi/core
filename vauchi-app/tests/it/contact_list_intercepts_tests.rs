@@ -26,7 +26,10 @@ fn pressing_add_contact_on_contacts_navigates_to_exchange() {
     engine.navigate_to(AppScreen::Contacts);
 
     let before = engine.current_screen();
-    assert_eq!(before.screen_id, "contact_list");
+    // Tier-0 (c) narrow collapse: the Contacts screen now reports the
+    // canonical `AppScreen::screen_id()` (`contacts`) on the wire, not the
+    // `ContactListEngine` sub-state id (`contact_list`).
+    assert_eq!(before.screen_id, "contacts");
 
     // The Primary "Add Contact" button surfaces this action id.
     let result = engine.handle_action(UserAction::ActionPressed {

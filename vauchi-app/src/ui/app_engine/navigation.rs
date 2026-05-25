@@ -203,7 +203,13 @@ impl AppEngine {
             self.engine_cache.insert(old_screen, old_engine);
         }
 
-        self.engine.current_screen()
+        // Decorate the inner engine's screen for the wire (Tier-0 (c)
+        // canonical `screen_id` stamp + parent_screen_id/presentation_kind)
+        // so the direct `navigate_to` / `navigate_back` / `set_initial_screen`
+        // returns — which CABI/UniFFI frontends read — agree with
+        // `current_screen()`. Idempotent: the route_result path re-decorates
+        // via `apply_update_overlay_to_result`.
+        self.apply_screen_id_metadata(self.engine.current_screen())
     }
 
     /// Navigate back using the history stack. Falls back to Home if empty.

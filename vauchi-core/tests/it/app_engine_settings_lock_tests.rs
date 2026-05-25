@@ -120,7 +120,7 @@ fn duress_pin_screen_renders_with_defaults() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::DuressPin);
-    assert_eq!(screen.screen_id, "duress_overview");
+    assert_eq!(screen.screen_id, "duress_pin");
     assert_eq!(screen.title, "Duress PIN");
 }
 

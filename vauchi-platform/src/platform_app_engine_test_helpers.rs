@@ -240,13 +240,15 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
     }
 
     fn device_link_session_is_active_for_test(&self) -> bool {
-        self.device_link_session()
+        self.engine()
             .lock()
-            .map(|slot| slot.is_some())
+            .map(|e| e.device_link_initiator_active())
             .unwrap_or(false)
     }
 
     fn cancel_device_link_session_for_test(&self) {
-        self.cancel_device_link_session();
+        if let Ok(mut e) = self.engine().lock() {
+            e.cancel_device_link_session();
+        }
     }
 }

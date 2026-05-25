@@ -77,8 +77,9 @@ impl AppEngine {
         self.device_link_initiator = Some(DeviceLinkInitiatorHolder { machine, transport });
     }
 
-    /// Cancel + drop the active initiator machine. Idempotent.
-    pub(super) fn cancel_device_link_session(&mut self) {
+    /// Cancel + drop the active initiator machine. Idempotent. `pub`
+    /// so binding crates (cabi, platform) can cancel without a nav-out.
+    pub fn cancel_device_link_session(&mut self) {
         if let Some(mut holder) = self.device_link_initiator.take() {
             let _ = holder.machine.cancel();
         }
@@ -195,8 +196,7 @@ impl AppEngine {
         Ok((initiator, transport, identity_id, persistence))
     }
 
-    /// Test-only: whether an initiator machine is currently held.
-    #[cfg(any(test, feature = "testing"))]
+    /// Whether an initiator machine is currently held.
     pub fn device_link_initiator_active(&self) -> bool {
         self.device_link_initiator.is_some()
     }

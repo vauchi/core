@@ -166,6 +166,19 @@ pub struct RelayConfig {
     /// When non-empty, verifies the server's leaf certificate matches a pin.
     pub pinned_certs: Vec<PinnedCertificate>,
 
+    /// Pinned certificates for the **OHTTP relay** host (`ohttp.vauchi.app`
+    /// in production) — a distinct entity from the data relay with its own
+    /// TLS key (ADR-037). Applied to the outer TLS of the OHTTP transport
+    /// (`POST /v2/ohttp` and the `GET /v2/ohttp-key` bootstrap) whenever the
+    /// OHTTP endpoint resolves to a different host than `server_url`.
+    ///
+    /// Empty = no OHTTP-host pinning: self-hosters who don't run a separate
+    /// OHTTP relay (OHTTP shares `server_url`), or who pin it themselves.
+    /// Must NOT reuse `pinned_certs` — the data relay and OHTTP relay have
+    /// distinct keys (problem 2026-05-25-relay-ohttp-forward-hop-502: pinning
+    /// the relay's SPKI against `ohttp.vauchi.app` made every sync fail).
+    pub ohttp_pinned_certs: Vec<PinnedCertificate>,
+
     /// TTL for cached pin configurations in seconds (default 86400 = 24h).
     ///
     /// Controls how long relay-served pin updates are trusted before
@@ -214,6 +227,23 @@ const RELAY_PROD_SPKI_PIN: [u8; 32] = [
     0xe1, 0x70, 0x0f, 0xb1, 0x00, 0xeb, 0x37, 0x84, 0xb8, 0xc3, 0x4f, 0x4e, 0x26, 0xb0, 0x6d, 0x00,
 ];
 
+/// SPKI SHA-256 pin for the `ohttp.vauchi.app` leaf certificate — the
+/// IP-stripping OHTTP relay (ADR-037), a **distinct entity** from the data
+/// relay with its own TLS key pair. This is NOT the relay's key.
+///
+/// Extracted via (same recipe as the relay pin, against the OHTTP host):
+/// ```sh
+/// echo | openssl s_client -connect ohttp.vauchi.app:443 -servername ohttp.vauchi.app 2>/dev/null \
+///   | openssl x509 -pubkey -noout | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | xxd -p
+/// ```
+///
+/// Update when `ohttp.vauchi.app`'s TLS key pair rotates (operator-managed,
+/// independently of the relay's).
+const OHTTP_PROD_SPKI_PIN: [u8; 32] = [
+    0xc5, 0xae, 0x02, 0xab, 0xae, 0x82, 0x9b, 0xac, 0xed, 0x50, 0x7c, 0x48, 0xed, 0x46, 0x8b, 0x72,
+    0x24, 0xb5, 0x3d, 0x78, 0xb7, 0x74, 0x99, 0x08, 0xfe, 0xe4, 0xbd, 0x87, 0x7b, 0x41, 0xb0, 0x2c,
+];
+
 impl Default for RelayConfig {
     /// Production relay configuration with SPKI certificate pinning.
     ///
@@ -232,6 +262,7 @@ impl Default for RelayConfig {
             proxy: ProxyConfig::None,
             relay_noise_pubkey: None,
             pinned_certs: vec![PinnedCertificate::new(RELAY_PROD_SPKI_PIN)],
+            ohttp_pinned_certs: Vec::new(),
             pin_ttl_secs: 86_400,        // 24 hours
             pin_config_verify_key: None, // disabled until relay signs pin-config
             ohttp_relay_url: None,       // derived from server_url (see ohttp_endpoint)
@@ -297,6 +328,7 @@ impl RelayConfig {
         RelayConfig {
             server_url,
             pinned_certs: Vec::new(),
+            ohttp_pinned_certs: Vec::new(),
             ..Default::default()
         }
     }
@@ -560,6 +592,39 @@ mod tests {
             ohttp_endpoint(&cfg.server_url, cfg.ohttp_relay_url.as_deref()),
             "https://ohttp.vauchi.app",
         );
+    }
+
+    // @scenario: pinning :: production default pins the OHTTP host distinctly
+    #[test]
+    fn default_relay_config_pins_ohttp_host_with_distinct_key() {
+        // The OHTTP relay (ohttp.vauchi.app) is a distinct entity with its
+        // own TLS key (ADR-037). The default must pin THAT key — not the
+        // data relay's — or every production sync fails pin verification
+        // (problem 2026-05-25-relay-ohttp-forward-hop-502).
+        let cfg = RelayConfig::default();
+        assert_eq!(
+            cfg.ohttp_pinned_certs,
+            vec![PinnedCertificate::new(OHTTP_PROD_SPKI_PIN)],
+            "default config must pin the OHTTP-relay host's SPKI",
+        );
+        // A copy-paste of the relay pin would silently reintroduce the bug.
+        assert_ne!(
+            OHTTP_PROD_SPKI_PIN, RELAY_PROD_SPKI_PIN,
+            "OHTTP-host pin must differ from the data-relay pin",
+        );
+        assert_ne!(
+            cfg.ohttp_pinned_certs, cfg.pinned_certs,
+            "OHTTP-host pin set must differ from the data-relay pin set",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn unpinned_relay_config_has_no_ohttp_host_pins() {
+        // Self-hosters opt out of vauchi's bundled pins entirely.
+        let cfg = RelayConfig::unpinned("https://relay.self.example".into());
+        assert!(cfg.ohttp_pinned_certs.is_empty());
+        assert!(cfg.pinned_certs.is_empty());
     }
 
     // @internal

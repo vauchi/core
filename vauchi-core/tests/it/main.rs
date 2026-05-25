@@ -259,6 +259,7 @@ mod multistage_e2e_tests;
 mod multistage_proptest;
 mod multistage_qr_codec_inid_ready_tests;
 mod multistage_qr_codec_tests;
+mod multistage_ratchet_roundtrip_tests;
 mod multistage_session_tests;
 mod multistage_timing_proptest;
 mod multistage_types_tests;

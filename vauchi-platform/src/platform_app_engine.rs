@@ -400,11 +400,11 @@ impl PlatformAppEngine {
             let cmds = engine.drain_pending_commands();
             (result, cmds)
         };
-        // Pair 5 — translate device-link typed ActionResults into
-        // `MobileDeviceLinkSession` calls. The engine has already
+        // Pair 5 — translate device-link typed ActionResults into the
+        // initiator-machine side effects. The engine has already
         // advanced its step (e.g. Completing for ConfirmManual,
-        // QrPending for Retry); the session push then drives the next
-        // state via the bridge.
+        // QrPending for Retry); the push then drives the next state via
+        // the bridge.
         self.dispatch_device_link_side_effects(&result)?;
         self.after_screen_transition(pre_screen)?;
         action_result_envelope_to_json(&result, &pending_commands)

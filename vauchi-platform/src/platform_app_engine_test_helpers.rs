@@ -117,8 +117,8 @@ pub trait PlatformAppEngineTestHelpers {
     /// Test-only: simulate `on_completed` from the cycle thread.
     fn apply_device_link_completed_for_test(&self) -> Result<(), MobileError>;
 
-    /// Test-only: returns `true` when a `MobileDeviceLinkSession` is
-    /// currently held. Used to assert lifecycle correctness around
+    /// Test-only: returns `true` when a device-link initiator session
+    /// is currently held. Used to assert lifecycle correctness around
     /// navigation in/out of the device-linking screen.
     fn device_link_session_is_active_for_test(&self) -> bool;
 

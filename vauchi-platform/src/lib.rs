@@ -31,8 +31,6 @@ mod mobile_ble;
 mod mobile_contact_detail;
 mod mobile_contacts;
 mod mobile_delivery;
-mod mobile_device_link;
-mod mobile_device_link_session;
 mod mobile_exchange;
 mod mobile_gdpr;
 mod mobile_identity;
@@ -92,7 +90,6 @@ pub use mobile_contact_detail::{
     MobileContactDetailAction, MobileContactDetailBadge, MobileContactDetailBanner,
     MobileContactDetailViewState,
 };
-pub use mobile_device_link_session::{DeviceLinkSessionListener, MobileDeviceLinkSession};
 pub use mobile_import::{MobileImportResult, MobileImportWarning};
 pub use mobile_verifier_event::{
     MobileProximityConfidence, MobileProximityVerifierEvent, MobileVerifierMethod,
@@ -867,7 +864,6 @@ impl VauchiPlatform {
 // - mobile_exchange.rs: Contact exchange operations
 // - mobile_delivery.rs: Sync, delivery status, retry/offline queue, multi-device, backup, async sync
 // - mobile_gdpr.rs: GDPR, crypto-shredding, consent
-// - mobile_device_link.rs: Device linking, relay transport, multipart QR
 // - mobile_content.rs: Content updates (feature-gated)
 
 // INLINE_TEST_REQUIRED: Tests require tempfile for VauchiPlatform instance creation
@@ -911,86 +907,6 @@ mod tests {
             qr_data.starts_with("wb://"),
             "QR data should start with wb://"
         );
-    }
-
-    // @scenario: device_management:User views linked devices
-    #[test]
-    fn test_get_devices_no_registry() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        // Without a registry, should return just the current device
-        let devices = wb.get_devices().unwrap();
-        assert_eq!(devices.len(), 1);
-        assert!(devices[0].is_current);
-        assert!(devices[0].is_active);
-        assert_eq!(devices[0].device_index, 0);
-    }
-
-    // @scenario: device_management:User links a new device
-    #[test]
-    fn test_generate_device_link_qr() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        let link_data = wb.generate_device_link_qr().unwrap();
-        assert!(!link_data.qr_data.is_empty());
-        assert!(!link_data.identity_public_key.is_empty());
-        assert!(link_data.expires_at > link_data.timestamp);
-    }
-
-    // @scenario: device_management:User links a new device
-    #[test]
-    fn test_parse_device_link_qr() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        let link_data = wb.generate_device_link_qr().unwrap();
-        let parsed = wb.parse_device_link_qr(link_data.qr_data).unwrap();
-
-        assert_eq!(parsed.identity_public_key, link_data.identity_public_key);
-        assert!(!parsed.is_expired);
-    }
-
-    // @scenario: device_management:Invalid device link QR rejected
-    #[test]
-    fn test_parse_device_link_qr_invalid() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        let result = wb.parse_device_link_qr("invalid_qr_data".to_string());
-        result.expect_err("expected error");
-    }
-
-    // @scenario: device_management:User views linked devices
-    #[test]
-    fn test_device_count() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        let count = wb.device_count().unwrap();
-        assert_eq!(count, 1);
-    }
-
-    // @scenario: device_management:User views linked devices
-    #[test]
-    fn test_is_primary_device() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        let is_primary = wb.is_primary_device().unwrap();
-        assert!(is_primary);
-    }
-
-    // @scenario: device_management:User unlinks a device
-    #[test]
-    fn test_unlink_device_no_registry() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        // No registry means no devices to unlink
-        let result = wb.unlink_device(1).unwrap();
-        assert!(!result);
     }
 
     // @scenario: device_sync:Sync result aggregation
@@ -1098,53 +1014,6 @@ mod tests {
                     .all(|c: char| c.is_ascii_hexdigit() && !c.is_ascii_lowercase())
             );
         }
-    }
-
-    // =========================================================================
-    // Multipart QR via VauchiPlatform
-    // =========================================================================
-
-    #[test]
-    fn test_encode_multipart_qr_returns_chunks() {
-        let (wb, _dir) = create_test_instance();
-        let data = vec![0xABu8; 5000];
-        let chunks = wb.encode_multipart_qr(data.clone());
-
-        assert!(
-            chunks.len() >= 3,
-            "5KB payload should produce multiple chunks, got {}",
-            chunks.len()
-        );
-
-        // Verify each chunk is valid format: index/total/crc32/data
-        for (i, chunk) in chunks.iter().enumerate() {
-            let parts: Vec<&str> = chunk.splitn(4, '/').collect();
-            assert_eq!(
-                parts.len(),
-                4,
-                "chunk {i} must have 4 slash-separated parts"
-            );
-        }
-    }
-
-    #[test]
-    fn test_encode_multipart_qr_roundtrip() {
-        let (wb, _dir) = create_test_instance();
-        let original = b"End-to-end test: VauchiPlatform encodes, MultipartDecoder decodes.";
-        let chunks = wb.encode_multipart_qr(original.to_vec());
-
-        let mut decoder = multipart_qr::MultipartDecoder::new();
-        for chunk in &chunks {
-            decoder.add_chunk(chunk).expect("valid chunk");
-        }
-
-        assert!(decoder.is_complete(), "decoder should be complete");
-        let assembled = decoder.assemble().expect("assemble should succeed");
-        assert_eq!(
-            assembled,
-            original.to_vec(),
-            "roundtrip via VauchiPlatform + MultipartDecoder must preserve data"
-        );
     }
 
     // ── Import contacts via FFI ─────────────────────────────────────────────

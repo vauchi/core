@@ -4,8 +4,7 @@
 
 //! Device-link session C ABI — listener-driven orchestrator.
 //!
-//! Mirrors `vauchi-platform`'s `MobileDeviceLinkSession` for CABI
-//! consumers (Windows, linux-qt). Wraps
+//! C ABI wrapper for desktop consumers (Windows, linux-qt). Wraps
 //! `vauchi_app::orchestrator::device_link_session::DeviceLinkSession`
 //! and adapts the platform's Box<dyn Listener> shape onto a struct of
 //! C function pointers + opaque `user_data`. The cycle thread,

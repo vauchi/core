@@ -341,7 +341,6 @@ const PERMITTED_UNIFFI_OBJECTS: &[&str] = &[
     // ── Session peers under ADR-031 (clarification 2) ──
     // Hardware-event-driven, short-lived, single-protocol-instance.
     "MobileBleExchangeSession",
-    "MobileDeviceLinkSession",
     "MobileExchangeSession",
     "MobileMultiStageSession",
     // ── Legacy ──

@@ -36,17 +36,26 @@
 //! `now` values — no `Clock`/`Sleeper`, no thread, no mpsc channel
 //! (CC-06).
 
+use std::path::PathBuf;
+
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 
+use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::exchange::{DeviceLinkInitiator, DeviceLinkRequest, ProximityProof};
 use vauchi_core::storage::Storage;
 
 use super::device_link_relay::{ClaimPayload, DeviceLinkBroker};
-use super::device_link_session::DeviceLinkPersistence;
+
+/// Persistence handle the machine uses to save the updated device
+/// registry on a successful link.
+#[derive(Clone)]
+pub struct DeviceLinkPersistence {
+    pub storage_path: PathBuf,
+    pub storage_key: SymmetricKey,
+}
 
 /// User-confirmation window once the peer has claimed the offer.
-/// Mirrors `device_link_session::DEFAULT_USER_CONFIRM_TIMEOUT_S`.
 const USER_CONFIRM_TIMEOUT_S: u64 = 60;
 
 /// Observable phase of the initiator machine.

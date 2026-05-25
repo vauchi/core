@@ -20,8 +20,8 @@
 //!   the `device_link_*` screen handlers (see `app_engine/device_link.rs`).
 
 use super::{AppEngine, AppScreen};
+use crate::orchestrator::device_link_machine::DeviceLinkPersistence;
 use crate::orchestrator::device_link_machine::{DeviceLinkInitiatorMachine, InitiatorEvent};
-use crate::orchestrator::device_link_session::DeviceLinkPersistence;
 use crate::ui::ActionResult;
 use vauchi_core::network::HttpTransport;
 

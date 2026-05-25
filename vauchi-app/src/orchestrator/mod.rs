@@ -14,7 +14,4 @@
 pub mod device_link_relay;
 
 #[cfg(all(feature = "network-http", feature = "storage"))]
-pub mod device_link_session;
-
-#[cfg(all(feature = "network-http", feature = "storage"))]
 pub mod device_link_machine;

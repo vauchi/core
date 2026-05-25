@@ -262,7 +262,7 @@ impl Default for RelayConfig {
             proxy: ProxyConfig::None,
             relay_noise_pubkey: None,
             pinned_certs: vec![PinnedCertificate::new(RELAY_PROD_SPKI_PIN)],
-            ohttp_pinned_certs: Vec::new(),
+            ohttp_pinned_certs: vec![PinnedCertificate::new(OHTTP_PROD_SPKI_PIN)],
             pin_ttl_secs: 86_400,        // 24 hours
             pin_config_verify_key: None, // disabled until relay signs pin-config
             ohttp_relay_url: None,       // derived from server_url (see ohttp_endpoint)

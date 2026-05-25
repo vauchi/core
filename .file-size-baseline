@@ -153,7 +153,7 @@ vauchi-core/src/network/http_transport.rs 1192
 # (+9 for Option B OHTTP routing fix: ohttp_endpoint wiring in http_relay_url
 #  + resolve_ohttp_key fetches the live key via the IP-stripping relay;
 #  problem 2026-05-25-relay-ohttp-forward-hop-502)
-vauchi-core/src/api/vauchi/sync_http.rs 1009
+vauchi-core/src/api/vauchi/sync_http.rs 1091
 
 # EXEMPT — security-critical: crypto + verification belong together
 vauchi-core/src/recovery/mod.rs 1253

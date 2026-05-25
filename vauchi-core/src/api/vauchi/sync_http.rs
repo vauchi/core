@@ -514,12 +514,14 @@ impl Vauchi {
     fn create_ohttp_adapter(&self, ohttp_key: &OhttpClient) -> VauchiResult<HttpTransportAdapter> {
         let adapter_ohttp =
             OhttpClient::new(ohttp_key.encoded_config().to_vec()).map_err(VauchiError::Network)?;
+        let relay_url = self.http_relay_url();
+        let pinned_certs = self.ohttp_endpoint_pins(&relay_url, self.resolve_pins());
         let mut transport = HttpTransport::new(HttpTransportConfig {
-            relay_url: self.http_relay_url(),
+            relay_url,
             timeout_ms: self.config.relay.connect_timeout_ms,
             proxy: self.config.relay.proxy.clone(),
             allow_direct: self.config.ohttp.allow_direct,
-            pinned_certs: self.resolve_pins(),
+            pinned_certs,
         });
         transport.set_ohttp(adapter_ohttp);
         Ok(HttpTransportAdapter::new(transport))
@@ -688,13 +690,43 @@ impl Vauchi {
     /// dependency: pin-config fetch must not depend on cached pins
     /// from a previous pin-config fetch.
     fn create_bootstrap_transport_direct(&self) -> HttpTransport {
+        let relay_url = self.http_relay_url();
+        // Bundled relay pins only (not resolve_pins) on the same-host path —
+        // pin-config fetch must not depend on cached pins (circular dep).
+        let pinned_certs =
+            self.ohttp_endpoint_pins(&relay_url, self.config.relay.pinned_certs.clone());
         HttpTransport::new(HttpTransportConfig {
-            relay_url: self.http_relay_url(),
+            relay_url,
             timeout_ms: self.config.relay.connect_timeout_ms,
             proxy: self.config.relay.proxy.clone(),
             allow_direct: true,
-            pinned_certs: self.config.relay.pinned_certs.clone(),
+            pinned_certs,
         })
+    }
+
+    /// Pin set for a transport targeting `relay_url`.
+    ///
+    /// When `relay_url` is the distinct OHTTP-relay host (`ohttp.vauchi.app`
+    /// in production — a separate entity with its own TLS key per ADR-037),
+    /// pin ITS SPKI (`ohttp_pinned_certs`). Otherwise — the OHTTP endpoint
+    /// shares the data-relay host (self-hosted / local / e2e), or the target
+    /// is the data relay itself — use `relay_pins` (the data-relay set the
+    /// caller would otherwise apply).
+    ///
+    /// Fixes 2026-05-25-relay-ohttp-forward-hop-502: pinning the relay's
+    /// SPKI against `ohttp.vauchi.app` made every production sync fail
+    /// `certificate pin verification failed`.
+    fn ohttp_endpoint_pins(
+        &self,
+        relay_url: &str,
+        relay_pins: Vec<PinnedCertificate>,
+    ) -> Vec<PinnedCertificate> {
+        let ohttp = self.http_relay_url();
+        if relay_url == ohttp && ohttp != self.config.relay.server_url {
+            self.config.relay.ohttp_pinned_certs.clone()
+        } else {
+            relay_pins
+        }
     }
 
     /// Build an `HttpTransport` to the given relay URL with OHTTP wired
@@ -707,12 +739,14 @@ impl Vauchi {
     /// cached, the transport fails closed on OHTTP failure instead of
     /// silently leaking the client's source IP.
     pub fn build_relay_transport(&self, relay_url: String, timeout_ms: u64) -> HttpTransport {
+        let pinned_certs =
+            self.ohttp_endpoint_pins(&relay_url, self.config.relay.pinned_certs.clone());
         let mut transport = HttpTransport::new(HttpTransportConfig {
             relay_url,
             timeout_ms,
             proxy: self.config.relay.proxy.clone(),
             allow_direct: self.ohttp_key.is_none(),
-            pinned_certs: self.config.relay.pinned_certs.clone(),
+            pinned_certs,
         });
 
         if let Some(ref cached) = self.ohttp_key
@@ -1005,5 +1039,53 @@ mod tests {
             "on refresh failure, resolve_pins must return bundled pins (not empty)"
         );
         assert!(!pins.is_empty(), "bundled pins must not be empty");
+    }
+
+    // @scenario: pinning :: OHTTP transport pins the OHTTP host, not the relay
+    #[test]
+    fn ohttp_endpoint_pins_uses_ohttp_host_pin_for_distinct_host() {
+        // Production: server_url = relay.vauchi.app, so the OHTTP endpoint
+        // derives to the DISTINCT ohttp.vauchi.app. The OHTTP transport must
+        // pin the OHTTP host's key, not the relay pins passed in
+        // (2026-05-25-relay-ohttp-forward-hop-502).
+        let (v, _dir) = vauchi_with_server_url("https://relay.vauchi.app");
+        let ohttp = v.http_relay_url();
+        assert_ne!(
+            ohttp, v.config.relay.server_url,
+            "precondition: production OHTTP endpoint is a distinct host"
+        );
+        let relay_sentinel = vec![PinnedCertificate::new([0x11; 32])];
+        let pins = v.ohttp_endpoint_pins(&ohttp, relay_sentinel.clone());
+        assert_eq!(
+            pins, v.config.relay.ohttp_pinned_certs,
+            "distinct OHTTP host must use the OHTTP-host pin set"
+        );
+        assert_ne!(
+            pins, relay_sentinel,
+            "must NOT pin the data-relay certs against the OHTTP host"
+        );
+        assert!(
+            !pins.is_empty(),
+            "production OHTTP-host pins must not be empty"
+        );
+    }
+
+    // @scenario: pinning :: OHTTP shares the relay host -> relay pins apply
+    #[test]
+    fn ohttp_endpoint_pins_uses_relay_pins_when_same_host() {
+        // Self-host / local: no distinct OHTTP relay, so the OHTTP endpoint
+        // equals server_url and the data-relay pins (passed in) apply.
+        let (v, _dir) = vauchi_with_server_url("http://127.0.0.1:8081");
+        let target = v.http_relay_url();
+        assert_eq!(
+            target, v.config.relay.server_url,
+            "precondition: non-production OHTTP endpoint equals server_url"
+        );
+        let relay_sentinel = vec![PinnedCertificate::new([0x22; 32])];
+        let pins = v.ohttp_endpoint_pins(&target, relay_sentinel.clone());
+        assert_eq!(
+            pins, relay_sentinel,
+            "same-host OHTTP endpoint must use the data-relay pins"
+        );
     }
 }

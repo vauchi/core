@@ -129,6 +129,12 @@ pub struct ExchangeSession {
     our_card: ContactCard,
     /// Our X3DH keypair for this session (fresh ephemeral)
     our_x3dh: X3DHKeyPair,
+    /// The peer's X25519 exchange (DH) public key, captured at key agreement.
+    /// Retained past `AwaitingCardExchange` so the post-`Complete` save sites
+    /// can initialize the Double Ratchet against the *exchange* key the X3DH
+    /// secret was derived from — not the Ed25519 identity key. `None` until key
+    /// agreement runs. See `build_exchange_ratchet`.
+    their_exchange_key: Option<[u8; 32]>,
     /// Proximity verifier (trait object — supports any verifier or chain).
     proximity: Box<dyn ProximityVerifier>,
     /// Proximity confidence result from the last proximity check.
@@ -228,6 +234,7 @@ impl ExchangeSession {
             identity,
             our_card,
             our_x3dh,
+            their_exchange_key: None,
             proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
             started_at: Instant::now(),
@@ -273,6 +280,7 @@ impl ExchangeSession {
             identity,
             our_card,
             our_x3dh,
+            their_exchange_key: None,
             proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
             started_at: Instant::now(),
@@ -323,6 +331,7 @@ impl ExchangeSession {
             identity,
             our_card,
             our_x3dh,
+            their_exchange_key: None,
             proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
             started_at: Instant::now(),
@@ -384,6 +393,7 @@ impl ExchangeSession {
             identity,
             our_card,
             our_x3dh,
+            their_exchange_key: None,
             proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
             started_at: Instant::now(),
@@ -440,6 +450,7 @@ impl ExchangeSession {
             identity,
             our_card,
             our_x3dh,
+            their_exchange_key: None,
             proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
             started_at: Instant::now(),
@@ -516,6 +527,60 @@ impl ExchangeSession {
                 None
             }
         }
+    }
+
+    /// Builds the role-correct Double Ratchet for a completed exchange.
+    ///
+    /// This is the single seam every in-person (non-relay) save site must use
+    /// to initialize the ratchet. The relay flow assigns the X3DH role by which
+    /// method runs (claim = initiator, complete = responder); symmetric
+    /// in-person exchange (QR/BLE/NFC) has no such split, so the role is derived
+    /// deterministically from the two identity keys -- smaller = initiator --
+    /// the same rule used for `EscrowRole` in `handle_perform_key_agreement`.
+    /// The initiator keys the ratchet off the peer's X25519 *exchange* key
+    /// (retained in `their_exchange_key` at key agreement); the responder keys
+    /// it off our own exchange keypair (`our_x3dh`) -- the keypair whose public
+    /// key the initiator received. Both sides reconcile on the first message
+    /// (see `DoubleRatchetState::dh_ratchet`).
+    ///
+    /// Returns the initialized ratchet and the `is_initiator` flag for
+    /// `Storage::save_ratchet_state`. Pure crypto -- persistence stays with the
+    /// caller (ADR-031).
+    ///
+    /// Why this exists: feeding `contact.public_key()` (the Ed25519 identity
+    /// key) as the DH key, or initializing both peers as initiator, silently
+    /// produces an undecryptable channel. Routing every save site through this
+    /// method makes both mistakes unrepresentable.
+    ///
+    /// `contact` is the completed exchange contact; it supplies the shared
+    /// secret and the peer's identity key (for the role decision).
+    pub fn build_exchange_ratchet(
+        &self,
+        contact: &Contact,
+    ) -> Result<(crate::crypto::DoubleRatchetState, bool), ExchangeError> {
+        let shared_key = contact.shared_key().ok_or_else(|| {
+            ExchangeError::InvalidState("exchange contact has no shared key".into())
+        })?;
+        let their_identity = contact.public_key().ok_or_else(|| {
+            ExchangeError::InvalidState("exchange contact has no identity key".into())
+        })?;
+        let their_exchange_key = self.their_exchange_key.ok_or_else(|| {
+            ExchangeError::InvalidState(
+                "no peer exchange key retained (key agreement not performed)".into(),
+            )
+        })?;
+
+        let our_identity = self.identity.signing_public_key();
+        let is_initiator = our_identity < their_identity;
+
+        let ratchet = if is_initiator {
+            crate::crypto::DoubleRatchetState::initialize_initiator(shared_key, their_exchange_key)
+                .map_err(|e| ExchangeError::KeyAgreementFailed(e.to_string()))?
+        } else {
+            let our_dh = X3DHKeyPair::from_bytes(*self.our_x3dh.secret_bytes());
+            crate::crypto::DoubleRatchetState::initialize_responder(shared_key, our_dh)
+        };
+        Ok((ratchet, is_initiator))
     }
 
     /// Returns the shared key from the `AwaitingCardExchange` state.
@@ -1256,6 +1321,10 @@ impl ExchangeSession {
         let relay_derived = HKDF::derive_key(None, &*dh_bytes, &relay_info);
         let relay_key = crate::crypto::SymmetricKey::from_bytes(*relay_derived);
 
+        // Retain the peer's X25519 exchange key so the post-Complete ratchet
+        // setup keys off it (initiator side), consistent with the relay_key DH.
+        self.their_exchange_key = Some(remote.exchange_key);
+
         let mut contact = Contact::from_exchange_full(
             remote.identity_key,
             their_card,
@@ -1320,6 +1389,11 @@ impl ExchangeSession {
                 ));
             }
         };
+
+        // Retain the peer's X25519 exchange key for post-Complete ratchet
+        // setup. The X3DH secret below is derived against this key, so the
+        // Double Ratchet must be too (initiator side) — not the identity key.
+        self.their_exchange_key = Some(their_exchange_key);
 
         // Symmetric DH: both sides have fresh ephemeral keys.
         // DH(our_secret × their_exchange_key) — both sides compute the same shared secret.

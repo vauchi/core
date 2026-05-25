@@ -2,64 +2,34 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! RED reproduction: face-to-face (non-relay) exchange ratchet wiring is broken.
+//! Regression: face-to-face (non-relay) exchanged contacts can message.
 //!
 //! Feature file: features/contact_exchange.feature @qr-mutual
 //!
-//! The production save sites for in-person Exchanged contacts —
-//! `core/vauchi-app/src/ui/app_engine/routing.rs:417`,
-//! `core/vauchi-platform/src/mobile_exchange.rs:112`, and
-//! `core/vauchi-platform/src/multistage_exchange.rs:1000` — all initialise the
-//! Double Ratchet by calling `initialize_initiator` on BOTH peers and passing
+//! Before the fix, the production save sites for in-person Exchanged contacts —
+//! `core/vauchi-app/src/ui/app_engine/routing.rs`,
+//! `core/vauchi-platform/src/mobile_exchange.rs`, and
+//! `core/vauchi-platform/src/multistage_exchange.rs` — initialised the Double
+//! Ratchet by calling `initialize_initiator` on BOTH peers and passing
 //! `contact.public_key()` (the Ed25519 *identity* key) as the X25519
 //! `their_dh_public`. Two independent defects:
 //!
 //!   1. **Role:** two initiators never reconcile root keys. A correct pair is
 //!      initiator + responder, where the responder's `our_dh` is the keypair
 //!      whose public the initiator received as `their_dh_public`
-//!      (`ratchet.rs:406` `dh_ratchet`). With two initiators each side derives
-//!      its root from `KDF(S, DH(own_fresh_dh, peer_key))` and there is no
-//!      matching responder step.
-//!   2. **Key:** the X3DH secret is computed against the X25519 *exchange* key
-//!      (`session.rs:1329`), not the Ed25519 identity key. The ratchet's first
-//!      DH must use the same exchange key.
+//!      (`ratchet.rs` `dh_ratchet`).
+//!   2. **Key:** the X3DH secret is derived against the X25519 *exchange* key
+//!      (`session.rs` `handle_perform_key_agreement`), not the identity key.
 //!
-//! Either defect alone breaks the secure channel. This test drives two real
-//! `ExchangeSession`s through a full mutual-QR exchange to `Complete`, then
-//! reproduces the production save+ratchet sequence verbatim and asserts a
-//! message round-trips both ways. It FAILS today — that is the proof of the
-//! bug. The existing `exchange_e2e_tests` round-trip passes only because it
-//! hand-rolls the correct `initialize_initiator`/`initialize_responder` pair
-//! with a real X25519 DH key and a synthetic shared secret, bypassing every
-//! production save site.
+//! Either alone breaks the secure channel. The fix routes every save site
+//! through `ExchangeSession::build_exchange_ratchet`, which derives the role
+//! deterministically (smaller identity key = initiator) and keys the ratchet
+//! off the retained X25519 exchange key. This test drives two real
+//! `ExchangeSession`s through a full mutual-QR exchange to `Complete`, builds
+//! both ratchets via that seam, and asserts a message round-trips both ways.
 
-use vauchi_core::crypto::{DoubleRatchetState, SymmetricKey};
-use vauchi_core::exchange::{ExchangeEvent, ExchangeSession, ExchangeState, MockProximityVerifier};
+use vauchi_core::exchange::{ExchangeEvent, ExchangeSession, MockProximityVerifier};
 use vauchi_core::{ContactCard, Identity};
-
-/// X3DH outputs the production save sites have available once a session reaches
-/// `Complete`: the contact id, the shared secret, and `contact.public_key()`.
-struct CompletedSide {
-    shared_key: SymmetricKey,
-    /// What `contact.public_key()` returns — the Ed25519 identity key, exactly
-    /// what the production save sites feed to the ratchet as `their_dh_public`.
-    contact_public_key: [u8; 32],
-}
-
-fn completed_side(session: &ExchangeSession) -> CompletedSide {
-    match session.state() {
-        ExchangeState::Complete { contact } => CompletedSide {
-            shared_key: contact
-                .shared_key()
-                .expect("exchange contact has shared key")
-                .clone(),
-            contact_public_key: *contact
-                .public_key()
-                .expect("exchange contact has public key"),
-        },
-        other => panic!("expected Complete, got {other:?}"),
-    }
-}
 
 // @scenario: contact_exchange :: In-person exchanged contacts can message each other
 #[test]
@@ -116,40 +86,54 @@ fn in_person_exchange_double_ratchet_round_trips() {
         .apply(ExchangeEvent::CompleteExchange(alice_card))
         .unwrap();
 
-    let alice = completed_side(&alice_session);
-    let bob = completed_side(&bob_session);
+    let alice_contact = alice_session
+        .extract_contact()
+        .expect("alice reached Complete");
+    let bob_contact = bob_session.extract_contact().expect("bob reached Complete");
 
-    // Both sides agree on the X3DH shared secret — that part is correct.
+    // Both sides agree on the X3DH shared secret — that part was always correct.
     assert_eq!(
-        alice.shared_key.as_bytes(),
-        bob.shared_key.as_bytes(),
+        alice_contact.shared_key().unwrap().as_bytes(),
+        bob_contact.shared_key().unwrap().as_bytes(),
         "both sides must derive the same X3DH shared secret"
     );
 
-    // Reproduce the production save+ratchet sequence verbatim:
-    // `initialize_initiator` on BOTH sides, `contact.public_key()` (identity
-    // key) as `their_dh_public`. Mirrors routing.rs:417 / mobile_exchange.rs:112
-    // / multistage_exchange.rs:1000.
-    let mut alice_ratchet =
-        DoubleRatchetState::initialize_initiator(&alice.shared_key, alice.contact_public_key)
-            .expect("alice ratchet init");
-    let mut bob_ratchet =
-        DoubleRatchetState::initialize_initiator(&bob.shared_key, bob.contact_public_key)
-            .expect("bob ratchet init");
+    // Build both ratchets via the production seam. Role + key are derived
+    // inside the seam — callers cannot pick the wrong ones.
+    let (alice_ratchet, alice_is_initiator) = alice_session
+        .build_exchange_ratchet(&alice_contact)
+        .expect("alice ratchet builds");
+    let (bob_ratchet, bob_is_initiator) = bob_session
+        .build_exchange_ratchet(&bob_contact)
+        .expect("bob ratchet builds");
 
-    // Alice -> Bob.
-    let msg = b"Hello Bob, this is Alice";
-    let ct = alice_ratchet.encrypt(msg).expect("alice encrypts");
-    let pt = bob_ratchet
-        .decrypt(&ct)
-        .expect("bob must decrypt alice's first message");
-    assert_eq!(pt, msg, "Alice->Bob plaintext must survive the ratchet");
+    // Exactly one initiator and one responder — the deterministic role rule.
+    assert_ne!(
+        alice_is_initiator, bob_is_initiator,
+        "exactly one side must be the initiator"
+    );
 
-    // Bob -> Alice.
-    let reply = b"Hi Alice, got it";
-    let ct = bob_ratchet.encrypt(reply).expect("bob encrypts");
-    let pt = alice_ratchet
+    // The responder has no sending chain until it receives the initiator's
+    // first message, so the initiator must speak first.
+    let (mut initiator, mut responder) = if alice_is_initiator {
+        (alice_ratchet, bob_ratchet)
+    } else {
+        (bob_ratchet, alice_ratchet)
+    };
+
+    // Initiator -> responder.
+    let msg = b"Hello, this is the initiator";
+    let ct = initiator.encrypt(msg).expect("initiator encrypts");
+    let pt = responder
         .decrypt(&ct)
-        .expect("alice must decrypt bob's reply");
-    assert_eq!(pt, reply, "Bob->Alice plaintext must survive the ratchet");
+        .expect("responder must decrypt the initiator's first message");
+    assert_eq!(pt, msg, "initiator->responder plaintext must survive");
+
+    // Responder -> initiator.
+    let reply = b"Reply from the responder";
+    let ct = responder.encrypt(reply).expect("responder encrypts reply");
+    let pt = initiator
+        .decrypt(&ct)
+        .expect("initiator must decrypt the responder's reply");
+    assert_eq!(pt, reply, "responder->initiator plaintext must survive");
 }

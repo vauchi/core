@@ -242,6 +242,23 @@ impl MobileExchangeSession {
             }),
         }
     }
+
+    /// Build the role-correct Double Ratchet for the completed exchange.
+    ///
+    /// Delegates to [`vauchi_core::exchange::ExchangeSession::build_exchange_ratchet`],
+    /// which owns the role decision and the exchange-key (not identity-key)
+    /// selection. Used by `finalize_exchange`.
+    pub fn build_exchange_ratchet(
+        &self,
+        contact: &Contact,
+    ) -> Result<(vauchi_core::crypto::ratchet::DoubleRatchetState, bool), MobileError> {
+        let inner = lock_or(&self.inner)?;
+        inner
+            .build_exchange_ratchet(contact)
+            .map_err(|e| MobileError::Other {
+                detail: e.to_string(),
+            })
+    }
 }
 
 #[uniffi::export]

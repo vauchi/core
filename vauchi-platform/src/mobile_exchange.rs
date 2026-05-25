@@ -7,7 +7,6 @@
 use std::sync::Arc;
 
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::crypto::ratchet::DoubleRatchetState;
 
 use super::VauchiPlatform;
 use super::error::MobileError;
@@ -100,20 +99,11 @@ impl VauchiPlatform {
         // rather than failing.
         storage.save_contact(&contact)?;
 
-        // Initialize double ratchet
-        // Exchange contacts are always exchanged type
-        let shared_key = contact
-            .shared_key()
-            .expect("exchange contact has shared key")
-            .clone();
-        let their_exchange_key = *contact
-            .public_key()
-            .expect("exchange contact has public key");
-        let ratchet = DoubleRatchetState::initialize_initiator(&shared_key, their_exchange_key)
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?;
-        storage.save_ratchet_state(&contact_id, &ratchet, true)?;
+        // Initialize the Double Ratchet via the session seam, which selects the
+        // role (initiator/responder) deterministically and keys off the X25519
+        // exchange key — not the Ed25519 identity key.
+        let (ratchet, is_initiator) = session.build_exchange_ratchet(&contact)?;
+        storage.save_ratchet_state(&contact_id, &ratchet, is_initiator)?;
 
         Ok(MobileExchangeResult {
             contact_id,

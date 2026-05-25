@@ -456,6 +456,23 @@ impl Vauchi {
         Ok(())
     }
 
+    /// Persists a Double Ratchet built by `ExchangeSession::build_exchange_ratchet`.
+    ///
+    /// The session owns role selection and key choice; this only persists the
+    /// result with the session-decided `is_initiator` flag. Unlike
+    /// [`Self::save_ratchet_state`], which defaults a fresh contact to
+    /// initiator, this never guesses the role.
+    pub fn save_exchange_ratchet(
+        &self,
+        contact_id: &str,
+        ratchet: &DoubleRatchetState,
+        is_initiator: bool,
+    ) -> VauchiResult<()> {
+        self.storage
+            .save_ratchet_state(contact_id, ratchet, is_initiator)?;
+        Ok(())
+    }
+
     // === Personal Notes Operations ===
 
     /// Adds or replaces a personal note for a contact.

@@ -50,7 +50,9 @@ vauchi-platform/src/mobile_ble.rs 1007
 # (+10 for ADR-031 file-picker mirror: FilePickedFromUser +
 #  FilePickCancelledByUser variants + From arms 2026-05-03 Phase 1 of
 #  2026-05-03-core-file-picker-command)
-vauchi-platform/src/exchange.rs 1027
+# (+17 for MobileExchangeSession::build_exchange_ratchet wrapper,
+#  bugfix/exchanged-ratchet-key 2026-05-25)
+vauchi-platform/src/exchange.rs 1044
 
 # EXEMPT — UniFFI facade + cycle-thread orchestrator: the audio-handshake
 # protocol straddles `MobileMultiStageSession` (the UniFFI surface,
@@ -79,7 +81,9 @@ vauchi-platform/src/multistage_exchange.rs 1086
 # (+3 for ADR-031 biometric hardware-event pathway: BiometricUnlockSucceeded
 #  arm in apply_hardware_event's auth-layer-event catch-all; problem
 #  2026-05-11-pure-functional-core-program Phase 2 Track B)
-vauchi-core/src/exchange/session.rs 1825
+# (+74 for build_exchange_ratchet seam + retained their_exchange_key,
+#  bugfix/exchanged-ratchet-key 2026-05-25; structural exemption — state machine, do not split)
+vauchi-core/src/exchange/session.rs 1899
 # (+29 for Phase 1.C.3a foothold of
 #  2026-05-11-hover-graduation-plan.md: audio_proximity field
 #  + getter on MultiStageSession, AudioProximityState import.
@@ -237,7 +241,9 @@ vauchi-app/src/ui/app_engine/mod.rs 1317
 #   hard delete_group (two sites), avatar save flow, and
 #   set_group_field_visibility_and_repropagate. Documented-best-effort
 #   #[allow] attrs on the remaining onboarding-loop sites.)
-vauchi-app/src/ui/app_engine/routing.rs 1403
+# (+13 for role-correct ratchet via build_exchange_ratchet seam,
+#  bugfix/exchanged-ratchet-key 2026-05-25)
+vauchi-app/src/ui/app_engine/routing.rs 1416
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)

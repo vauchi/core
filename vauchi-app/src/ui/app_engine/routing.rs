@@ -390,12 +390,17 @@ impl AppEngine {
                     .and_then(|a| a.downcast_ref::<crate::ui::exchange::ExchangeEngine>())
                     .and_then(|ex| {
                         let groups = ex.selected_groups().to_vec();
-                        // QR path: contact is in session.state() → Complete { contact }
-                        if let Some(session) = ex.session()
-                            && let vauchi_core::exchange::ExchangeState::Complete { contact } =
-                                session.state()
+                        // QR path: contact is in session.state() → Complete { contact }.
+                        // Build the ratchet here while `session` is in scope; it owns
+                        // the correct role + exchange-key selection (see
+                        // ExchangeSession::build_exchange_ratchet).
+                        let session = ex.session()?;
+                        if let vauchi_core::exchange::ExchangeState::Complete { contact } =
+                            session.state()
                         {
-                            return Some((*contact.clone(), groups));
+                            let contact = (**contact).clone();
+                            let ratchet = session.build_exchange_ratchet(&contact);
+                            return Some((contact, ratchet, groups));
                         }
                         None
                     });
@@ -403,7 +408,7 @@ impl AppEngine {
                 let screen = self.navigate_to_internal(AppScreen::Contacts);
 
                 // Persist exchange result: upsert contact + init ratchet + assign groups
-                if let Some((contact, groups)) = exchange_data {
+                if let Some((contact, ratchet, groups)) = exchange_data {
                     let contact_id = contact.id().to_string();
                     if let Err(e) = self.vauchi.update_contact(&contact) {
                         return ActionResult::ShowAlert {
@@ -411,15 +416,25 @@ impl AppEngine {
                             message: format!("Failed to save contact: {e}"),
                         };
                     }
-                    if let (Some(sk), Some(pk)) = (contact.shared_key(), contact.public_key())
-                        && let Err(e) =
-                            self.vauchi
-                                .create_ratchet_as_initiator(&contact_id, sk, *pk)
-                    {
-                        return ActionResult::ShowAlert {
-                            title: "Exchange Error".into(),
-                            message: format!("Failed to initialize encryption: {e}"),
-                        };
+                    match ratchet {
+                        Ok((ratchet, is_initiator)) => {
+                            if let Err(e) = self.vauchi.save_exchange_ratchet(
+                                &contact_id,
+                                &ratchet,
+                                is_initiator,
+                            ) {
+                                return ActionResult::ShowAlert {
+                                    title: "Exchange Error".into(),
+                                    message: format!("Failed to initialize encryption: {e}"),
+                                };
+                            }
+                        }
+                        Err(e) => {
+                            return ActionResult::ShowAlert {
+                                title: "Exchange Error".into(),
+                                message: format!("Failed to initialize encryption: {e}"),
+                            };
+                        }
                     }
                     for group_id in &groups {
                         // best-effort: group assignment after exchange;

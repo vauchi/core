@@ -10,6 +10,7 @@
 
 mod device_link;
 mod intercept;
+mod link_responder;
 mod navigation;
 mod routing;
 mod screens;

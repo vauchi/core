@@ -4,35 +4,45 @@
 
 //! Engine for the post-grant link-mode responder flow.
 //!
-//! Renders a single waiting screen while the cycle thread (in
-//! `vauchi-platform`) drives `LinkResponderSession` through
-//! Polling → Retrieving → Finalized. The engine itself is a humble
-//! object: it forwards a `cancel` user action through `was_cancelled`
-//! so `AppEngine::handle_completion` can route back to the default
-//! screen, but it never blocks on or polls the cycle thread.
+//! Renders the responder screens for the engine-owned `LinkResponder`
+//! state machine (in `vauchi-platform`): a waiting screen while
+//! Polling/Retrieving, then a terminal completed / failed screen. The
+//! engine is a humble object — it forwards a `cancel` user action via
+//! `was_cancelled` and exposes `transition_to_completed` /
+//! `transition_to_failed` for the platform layer to drive on terminal
+//! transitions. It never blocks on or polls the relay.
 //!
-//! Mirrors `DeepLinkConsentEngine` shape — single-screen, single
-//! decision, terminal on action.
+//! Mirrors `DeviceLinkingEngine`'s terminal transitions
+//! (`transition_to_link_success` / `transition_to_link_failed`).
 //!
 //! See `_private/docs/problems/2026-04-27-deep-link-responder-flow/`
-//! for the full design (Q4 — single-screen choice).
+//! and `_private/docs/designs/2026-05-25-slice-32l-phase-2-responder-screen-driven-design.md`.
 
 use crate::ui::*;
 use vauchi_core::exchange::link_mode::DeepLinkPayload;
 
 /// Action id for the Cancel button on the waiting screen.
 pub const ACTION_CANCEL: &str = "cancel";
+/// Action id for the Done button on the terminal screens.
+pub const ACTION_DONE: &str = "done";
+
+/// Terminal outcome of the responder flow. `None` while waiting.
+#[derive(Clone, Debug)]
+enum ResponderTerminal {
+    /// The sender's card was retrieved and persisted by core.
+    Completed,
+    /// The flow failed. `reason` is the stable `LinkResponder` failure
+    /// id (`polling_timed_out` / `deposit_rejected` / `decrypt_error` /
+    /// `cancelled`).
+    Failed { reason: String },
+}
 
 /// Engine for the post-grant link-mode responder flow.
-///
-/// Holds the parsed payload so the cycle thread (Phase 1 T6) can
-/// retrieve it via `payload()`. The `cancelled` flag flips on the
-/// Cancel action; the cycle thread observes via the platform-side
-/// session's `cancel()` method.
 #[derive(Clone, Debug)]
 pub struct LinkResponderEngine {
     payload: DeepLinkPayload,
     cancelled: bool,
+    terminal: Option<ResponderTerminal>,
 }
 
 impl LinkResponderEngine {
@@ -43,22 +53,42 @@ impl LinkResponderEngine {
         Self {
             payload,
             cancelled: false,
+            terminal: None,
         }
     }
 
-    /// Borrow the parsed payload. Used by the cycle thread to drive
-    /// `link_mode::responder_*` once the engine is created. Not
-    /// surfaced via UniFFI.
+    /// Borrow the parsed payload. Used by the platform layer to build the
+    /// engine-owned `LinkResponder`. Not surfaced via UniFFI.
     pub fn payload(&self) -> &DeepLinkPayload {
         &self.payload
     }
 
+    /// Terminal success — the sender's card was retrieved and persisted
+    /// by core. Renders `link_responder_completed`. Idempotent.
+    pub fn transition_to_completed(&mut self) {
+        if self.terminal.is_none() {
+            self.terminal = Some(ResponderTerminal::Completed);
+        }
+    }
+
+    /// Terminal failure. `reason` is the stable `LinkResponder` failure
+    /// id. Renders `link_responder_failed`. Idempotent (first terminal
+    /// transition wins).
+    pub fn transition_to_failed(&mut self, reason: String) {
+        if self.terminal.is_none() {
+            self.terminal = Some(ResponderTerminal::Failed { reason });
+        }
+    }
+
     fn build_screen(&self) -> ScreenModel {
-        // One screen for the entire grant→completion window. The
-        // cycle thread's three internal states (Depositing / Polling /
-        // Retrieving) are surfaced via the listener trait but do not
-        // branch this ScreenModel — Depositing and Retrieving are
-        // sub-second flashes, only Polling is user-perceptible.
+        match &self.terminal {
+            None => self.build_waiting_screen(),
+            Some(ResponderTerminal::Completed) => self.build_completed_screen(),
+            Some(ResponderTerminal::Failed { reason }) => self.build_failed_screen(reason),
+        }
+    }
+
+    fn build_waiting_screen(&self) -> ScreenModel {
         ScreenModel {
             screen_id: "link_responder_waiting".into(),
             title: "Waiting for Response".into(),
@@ -94,6 +124,77 @@ impl LinkResponderEngine {
             ..Default::default()
         }
     }
+
+    fn build_completed_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_responder_completed".into(),
+            title: "Contact Added".into(),
+            subtitle: Some("The sender's contact card has been saved.".into()),
+            components: vec![Component::StatusIndicator {
+                id: "completed_status".into(),
+                icon: None,
+                title: "Done".into(),
+                detail: Some("You can find the new contact in your contacts list.".into()),
+                status: Status::Success,
+                a11y: Some(A11y {
+                    label: Some("Contact added".into()),
+                    hint: None,
+                    role: None,
+                }),
+            }],
+            actions: vec![ScreenAction {
+                id: ACTION_DONE.into(),
+                label: "Done".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+                a11y: None,
+            }],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    fn build_failed_screen(&self, reason: &str) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_responder_failed".into(),
+            title: "Link Failed".into(),
+            subtitle: Some("The contact card could not be received.".into()),
+            components: vec![Component::StatusIndicator {
+                id: "failed_status".into(),
+                icon: None,
+                title: "Failed".into(),
+                detail: Some(failure_detail(reason).into()),
+                status: Status::Failed,
+                a11y: Some(A11y {
+                    label: Some("Link failed".into()),
+                    hint: None,
+                    role: None,
+                }),
+            }],
+            actions: vec![ScreenAction {
+                id: ACTION_DONE.into(),
+                label: "Done".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+                a11y: None,
+            }],
+            progress: None,
+            ..Default::default()
+        }
+    }
+}
+
+/// Map the stable `LinkResponder` failure id to a user-facing detail.
+fn failure_detail(reason: &str) -> &'static str {
+    match reason {
+        "polling_timed_out" => {
+            "The other device did not respond in time. Ask them to share the link again."
+        }
+        "deposit_rejected" => "The relay rejected the exchange. Please try sharing the link again.",
+        "decrypt_error" => "The received card could not be decrypted. Please try again.",
+        "cancelled" => "The exchange was cancelled.",
+        _ => "Something went wrong receiving the contact card. Please try again.",
+    }
 }
 
 impl WorkflowEngine for LinkResponderEngine {
@@ -102,9 +203,19 @@ impl WorkflowEngine for LinkResponderEngine {
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
-        // Once cancelled, further actions are inert — the cycle thread
-        // is winding down and re-firing cancel on a re-press would race
-        // the listener's on_session_ended callback.
+        // On a terminal screen, the only action is Done → back to the
+        // default screen. While waiting, Cancel ends the flow.
+        if self.terminal.is_some() {
+            return match action {
+                UserAction::ActionPressed { action_id } if action_id == ACTION_DONE => {
+                    ActionResult::Complete
+                }
+                _ => ActionResult::UpdateScreen(self.build_screen()),
+            };
+        }
+
+        // Once cancelled, further actions are inert — the platform layer
+        // is winding the responder down.
         if self.cancelled {
             return ActionResult::UpdateScreen(self.build_screen());
         }

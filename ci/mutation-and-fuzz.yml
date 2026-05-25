@@ -30,9 +30,13 @@ mutation:nightly:
   interruptible: false
   variables:
     MUTATION_PACKAGE: "vauchi-core"
-    # Baseline needs ~60s for 3651 tests (argon2-based backup tests take 5-20s each).
-    # Default 30s causes baseline timeout → zero mutants tested.
-    MUTATION_TIMEOUT_NIGHTLY: "240"
+    # With `--features testing` (.cargo/mutants.toml) each mutant runs the full
+    # integration suite: baseline ~115s single-threaded, and 2-4x that under
+    # `--jobs 8` CPU contention. 240s caused spurious timeouts on survivors,
+    # which run the suite to completion (caught mutants still exit on first
+    # failure). 600s leaves headroom while still bounding genuine infinite-loop
+    # mutants. Sharding remains the real throughput lever for the 11k budget.
+    MUTATION_TIMEOUT_NIGHTLY: "600"
     # `--in-place` was previously required because vauchi-platform's THEMES_JSON
     # const did include_bytes!("../../../themes/generated/themes.json") — a path
     # relative to a *sibling* of the cargo workspace that cargo-mutants' temp

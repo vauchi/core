@@ -147,6 +147,14 @@ vauchi-core/src/platform.rs 1095
 #  2026-05-21-silent-failures-in-security-paths)
 vauchi-core/src/network/http_transport.rs 1192
 
+# EXEMPT — security-critical sync + OHTTP-bootstrap flow: the sync state
+# machine, OHTTP key resolution/rotation handling, and version/pin gates
+# must stay co-located (scattering them creates protocol/privacy bugs).
+# (+9 for Option B OHTTP routing fix: ohttp_endpoint wiring in http_relay_url
+#  + resolve_ohttp_key fetches the live key via the IP-stripping relay;
+#  problem 2026-05-25-relay-ohttp-forward-hop-502)
+vauchi-core/src/api/vauchi/sync_http.rs 1009
+
 # EXEMPT — security-critical: crypto + verification belong together
 vauchi-core/src/recovery/mod.rs 1253
 

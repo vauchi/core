@@ -97,6 +97,16 @@ impl VauchiConfig {
         self
     }
 
+    /// Explicitly sets the OHTTP-relay URL (where OHTTP traffic is sent).
+    ///
+    /// Only needed by self-hosters running a separate OHTTP relay; the
+    /// production relay and local/e2e setups are handled by the default
+    /// derivation (see [`ohttp_endpoint`]).
+    pub fn with_ohttp_relay_url(mut self, url: impl Into<String>) -> Self {
+        self.relay.ohttp_relay_url = Some(url.into());
+        self
+    }
+
     /// Sets the multi-relay configuration.
     pub fn with_relay_list(mut self, config: MultiRelayConfig) -> Self {
         self.relay_list = Some(config);
@@ -174,6 +184,19 @@ pub struct RelayConfig {
     /// unauthenticated pin updates would allow a MITM to replace
     /// the pin set permanently.
     pub pin_config_verify_key: Option<[u8; 32]>,
+
+    /// Explicit OHTTP-relay base URL — where OHTTP traffic (`POST /v2/ohttp`
+    /// and the `GET /v2/ohttp-key` bootstrap) is sent: the IP-stripping hop
+    /// per ADR-037.
+    ///
+    /// When `None` (default), the endpoint is derived: the production relay
+    /// (`relay.vauchi.app`) routes through `ohttp.vauchi.app`; any other
+    /// `server_url` (self-hosted / local / e2e) uses `server_url` itself.
+    /// Self-hosters running a separate OHTTP relay set this explicitly.
+    /// Never point OHTTP traffic straight at the data relay — that listener
+    /// does not serve `/v2/ohttp` and leaks client IP (problem
+    /// 2026-05-25-relay-ohttp-forward-hop-502).
+    pub ohttp_relay_url: Option<String>,
 }
 
 /// SPKI SHA-256 pin for relay.vauchi.app leaf certificate.
@@ -211,8 +234,48 @@ impl Default for RelayConfig {
             pinned_certs: vec![PinnedCertificate::new(RELAY_PROD_SPKI_PIN)],
             pin_ttl_secs: 86_400,        // 24 hours
             pin_config_verify_key: None, // disabled until relay signs pin-config
+            ohttp_relay_url: None,       // derived from server_url (see ohttp_endpoint)
         }
     }
+}
+
+/// Production data relay host.
+pub(crate) const PROD_RELAY_HOST: &str = "relay.vauchi.app";
+/// Production OHTTP relay (IP-stripping hop, ADR-037) the client sends
+/// OHTTP traffic to when the data relay is `relay.vauchi.app`.
+pub(crate) const PROD_OHTTP_RELAY_URL: &str = "https://ohttp.vauchi.app";
+
+/// Resolve the OHTTP endpoint — the base URL for `POST /v2/ohttp` and the
+/// `GET /v2/ohttp-key` bootstrap.
+///
+/// Precedence: an explicit `ohttp_relay_url` wins; otherwise the production
+/// relay routes through [`PROD_OHTTP_RELAY_URL`] (the IP-stripping hop), and
+/// any other `server_url` (self-hosted / local / e2e) is used as-is. Never
+/// returns the production *data* relay — that host doesn't serve `/v2/ohttp`
+/// and would leak client IP (problem 2026-05-25-relay-ohttp-forward-hop-502).
+pub(crate) fn ohttp_endpoint(server_url: &str, ohttp_relay_url: Option<&str>) -> String {
+    if let Some(explicit) = ohttp_relay_url {
+        return explicit.to_string();
+    }
+    if is_production_relay(server_url) {
+        return PROD_OHTTP_RELAY_URL.to_string();
+    }
+    server_url.to_string()
+}
+
+/// Whether `server_url`'s host is the production data relay.
+///
+/// Matches the host component exactly (after stripping scheme, port, path)
+/// so `relay.vauchi.app.evil.com` does not pass.
+pub(crate) fn is_production_relay(server_url: &str) -> bool {
+    let after_scheme = server_url
+        .split_once("://")
+        .map_or(server_url, |(_, rest)| rest);
+    let host = after_scheme
+        .split(['/', ':'])
+        .next()
+        .unwrap_or(after_scheme);
+    host == PROD_RELAY_HOST
 }
 
 impl RelayConfig {
@@ -430,6 +493,84 @@ impl Default for RecoveryConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── OHTTP endpoint derivation (problem 2026-05-25-relay-ohttp-forward-hop-502) ──
+
+    // @internal
+    #[test]
+    fn ohttp_endpoint_routes_production_relay_through_ohttp_relay() {
+        // The production data relay must NOT receive OHTTP traffic directly
+        // (its main listener doesn't serve /v2/ohttp and it would leak IP);
+        // route through the IP-stripping ohttp.vauchi.app hop instead.
+        assert_eq!(
+            ohttp_endpoint("https://relay.vauchi.app", None),
+            "https://ohttp.vauchi.app",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn ohttp_endpoint_honours_explicit_override() {
+        assert_eq!(
+            ohttp_endpoint(
+                "https://relay.vauchi.app",
+                Some("https://ohttp.self.example")
+            ),
+            "https://ohttp.self.example",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn ohttp_endpoint_uses_server_url_for_local_and_custom() {
+        // Local / e2e / self-hosted (no explicit override): OHTTP goes to the
+        // same URL the caller configured — preserves existing behaviour.
+        assert_eq!(
+            ohttp_endpoint("http://127.0.0.1:8081", None),
+            "http://127.0.0.1:8081",
+        );
+        assert_eq!(
+            ohttp_endpoint("https://relay.self-hosted.example", None),
+            "https://relay.self-hosted.example",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn is_production_relay_matches_host_exactly() {
+        assert!(is_production_relay("https://relay.vauchi.app"));
+        assert!(is_production_relay("wss://relay.vauchi.app"));
+        assert!(is_production_relay("https://relay.vauchi.app:443/v2"));
+        // Not the production data relay:
+        assert!(!is_production_relay("https://ohttp.vauchi.app"));
+        assert!(!is_production_relay("https://relay.vauchi.app.evil.com"));
+        assert!(!is_production_relay("http://127.0.0.1:8081"));
+        assert!(!is_production_relay("https://relay.self-hosted.example"));
+    }
+
+    // @internal
+    #[test]
+    fn default_relay_config_derives_ohttp_relay_for_production() {
+        // The shipped default targets the production relay, so OHTTP must
+        // derive to ohttp.vauchi.app even though the field itself is None.
+        let cfg = RelayConfig::default();
+        assert_eq!(cfg.server_url, "https://relay.vauchi.app");
+        assert_eq!(cfg.ohttp_relay_url, None);
+        assert_eq!(
+            ohttp_endpoint(&cfg.server_url, cfg.ohttp_relay_url.as_deref()),
+            "https://ohttp.vauchi.app",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn with_ohttp_relay_url_sets_explicit_override() {
+        let cfg = VauchiConfig::default().with_ohttp_relay_url("https://ohttp.self.example");
+        assert_eq!(
+            cfg.relay.ohttp_relay_url.as_deref(),
+            Some("https://ohttp.self.example"),
+        );
+    }
 
     /// ADR-046: the bundled OHTTP key must advertise only
     /// ChaCha20-Poly1305 (RFC 9180 AEAD codepoint `0x0003`). An AES

@@ -571,14 +571,20 @@ impl Vauchi {
             return Ok(cached_bytes);
         }
 
-        // 2. Direct fetch (only for dev/testing — leaks client IP).
-        //    Check before bundled key so test relays with ephemeral keys
-        //    aren't shadowed by the compiled-in production key.
-        if self.config.ohttp.allow_direct {
-            return self.fetch_and_cache_ohttp_key(relay_url);
+        // 2. Fetch the live key when permitted: allow_direct (dev), or the
+        //    OHTTP endpoint is a distinct IP-stripping relay (so the fetch
+        //    doesn't leak IP to the data relay). Preferring the fetched key
+        //    over the stale bundle survives gateway key rotation (problem
+        //    2026-05-25-relay-ohttp-forward-hop-502); on failure/not-permitted
+        //    fall through to the bundled offline bootstrap.
+        let via_ohttp_relay = self.http_relay_url() != self.config.relay.server_url;
+        if (self.config.ohttp.allow_direct || via_ohttp_relay)
+            && let Ok(fetched) = self.fetch_and_cache_ohttp_key(relay_url)
+        {
+            return Ok(fetched);
         }
 
-        // 3. Try bundled key (no network, no IP leak)
+        // 3. Bundled key — offline/last-resort bootstrap (no network).
         if let Some(ref bundled) = self.config.ohttp.bundled_gateway_key {
             // Validate the bundled key before using it — skip if corrupt
             if OhttpClient::new(bundled.clone()).is_ok() {
@@ -589,7 +595,7 @@ impl Vauchi {
 
         Err(VauchiError::Network(
             crate::network::NetworkError::ConnectionFailed(
-                "no OHTTP key available: cache expired, no bundled key, direct fetch disabled"
+                "no OHTTP key available: cache expired, no bundled key, fetch failed/disabled"
                     .into(),
             ),
         ))
@@ -718,9 +724,14 @@ impl Vauchi {
         transport
     }
 
-    /// Returns the relay URL for HTTP requests.
+    /// OHTTP-relay base URL for `/v2/ohttp` + the `/v2/ohttp-key` bootstrap,
+    /// derived by [`crate::api::config::ohttp_endpoint`] (problem
+    /// 2026-05-25-relay-ohttp-forward-hop-502).
     pub(crate) fn http_relay_url(&self) -> String {
-        self.config.relay.server_url.clone()
+        crate::api::config::ohttp_endpoint(
+            &self.config.relay.server_url,
+            self.config.relay.ohttp_relay_url.as_deref(),
+        )
     }
 }
 

@@ -15,6 +15,73 @@ pub enum MobileSyncStatus {
     Error,
 }
 
+/// Logical state of the sync-status *indicator*, as the frontend
+/// observes it.
+///
+/// Distinct from [`MobileSyncStatus`] (the engine-level status):
+/// the indicator also distinguishes "has synced before" (`Synced`)
+/// from "never synced" (`NeverSynced`) to pick its label, while the
+/// timestamp itself stays a UI-local concern (the frontend formats
+/// the local clock into the `sync.synced_at` placeholder).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileSyncIndicatorState {
+    Syncing,
+    Error,
+    Synced,
+    NeverSynced,
+}
+
+/// Semantic color role for the sync-status label.
+///
+/// Frontends map this to their theme (e.g. Material
+/// `colorScheme.primary` / `error` / `outline`) instead of hardcoding
+/// a color per state (ADR-038/043 Humble UI).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MobileSyncStatusKind {
+    /// In-progress or freshly-synced — emphasis color.
+    Active,
+    /// Sync failed — error color.
+    Error,
+    /// Idle / never synced — muted color.
+    Neutral,
+}
+
+/// Presentational view-state for the sync-status indicator.
+///
+/// Core owns the indicator-state → label/kind mapping so frontends
+/// render `label_key` (via their i18n table) and map `kind` to a theme
+/// color, instead of a per-platform `when (SyncState)` switch that
+/// hardcodes both (ADR-021/043 Humble UI).
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct MobileSyncStatusView {
+    /// i18n key for the status label (e.g. `"sync.synced_at"`, which may
+    /// contain a `{time}` placeholder the frontend fills from the local
+    /// clock).
+    pub label_key: String,
+    /// Semantic color role for the label.
+    pub kind: MobileSyncStatusKind,
+}
+
+/// Compute the presentational view-state for the sync-status indicator.
+///
+/// Pure mapping — the single source of truth for which i18n label and
+/// color role each indicator state shows.
+#[uniffi::export]
+pub fn sync_status_view(state: MobileSyncIndicatorState) -> MobileSyncStatusView {
+    let (label_key, kind) = match state {
+        MobileSyncIndicatorState::Syncing => ("sync.syncing", MobileSyncStatusKind::Active),
+        MobileSyncIndicatorState::Error => ("sync.error_failed", MobileSyncStatusKind::Error),
+        MobileSyncIndicatorState::Synced => ("sync.synced_at", MobileSyncStatusKind::Active),
+        MobileSyncIndicatorState::NeverSynced => {
+            ("sync.tap_to_sync", MobileSyncStatusKind::Neutral)
+        }
+    };
+    MobileSyncStatusView {
+        label_key: label_key.to_string(),
+        kind,
+    }
+}
+
 /// Sync result with statistics.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct MobileSyncResult {
@@ -308,6 +375,45 @@ impl From<&vauchi_core::storage::DeliverySummary> for MobileDeliverySummary {
             failed_devices: summary.failed_devices as u32,
             is_fully_delivered: summary.is_fully_delivered(),
             progress_percent: (summary.progress() * 100.0) as u32,
+        }
+    }
+}
+
+// INLINE_TEST_REQUIRED: sync_status_view is a pure mapping; co-locate its
+// label-key/kind table with the implementation.
+#[cfg(test)]
+mod sync_status_view_tests {
+    use super::{MobileSyncIndicatorState, MobileSyncStatusKind, sync_status_view};
+
+    // @internal
+    #[test]
+    fn maps_each_indicator_state_to_label_and_kind() {
+        let cases = [
+            (
+                MobileSyncIndicatorState::Syncing,
+                "sync.syncing",
+                MobileSyncStatusKind::Active,
+            ),
+            (
+                MobileSyncIndicatorState::Error,
+                "sync.error_failed",
+                MobileSyncStatusKind::Error,
+            ),
+            (
+                MobileSyncIndicatorState::Synced,
+                "sync.synced_at",
+                MobileSyncStatusKind::Active,
+            ),
+            (
+                MobileSyncIndicatorState::NeverSynced,
+                "sync.tap_to_sync",
+                MobileSyncStatusKind::Neutral,
+            ),
+        ];
+        for (state, expected_key, expected_kind) in cases {
+            let view = sync_status_view(state);
+            assert_eq!(view.label_key, expected_key, "label for {state:?}");
+            assert_eq!(view.kind, expected_kind, "kind for {state:?}");
         }
     }
 }

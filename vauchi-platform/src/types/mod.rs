@@ -23,8 +23,9 @@ pub use device::{
     MobileDeliveryRecord, MobileDeliveryStatus, MobileDeliverySummary, MobileDeviceDeliveryRecord,
     MobileDeviceDeliveryStatus, MobileDeviceInfo, MobileDeviceJoinResult,
     MobileDeviceLinkConfirmation, MobileDeviceLinkData, MobileDeviceLinkInfo,
-    MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileRetryEntry, MobileSyncResult,
-    MobileSyncStatus,
+    MobileDeviceLinkRequest, MobileDeviceLinkResult, MobileRetryEntry, MobileSyncIndicatorState,
+    MobileSyncResult, MobileSyncStatus, MobileSyncStatusKind, MobileSyncStatusView,
+    sync_status_view,
 };
 pub use notification::{MobileNotificationCategory, MobilePendingNotification};
 pub use security::{

@@ -901,38 +901,6 @@ impl AppEngine {
     }
 }
 
-// INLINE_TEST_REQUIRED: from_screen_id_with_param is module-private, cannot be tested from external tests/
-#[cfg(test)]
-mod tests {
-    use super::AppScreen;
-
-    // @internal
-    #[test]
-    fn from_screen_id_with_param_contact_detail() {
-        let screen = AppScreen::from_screen_id_with_param("contact_detail", "abc-123");
-        assert_eq!(
-            screen,
-            Some(AppScreen::ContactDetail {
-                contact_id: "abc-123".to_string()
-            })
-        );
-    }
-
-    // @internal
-    #[test]
-    fn from_screen_id_with_param_falls_back() {
-        let screen = AppScreen::from_screen_id_with_param("contacts", "ignored");
-        assert_eq!(screen, Some(AppScreen::Contacts));
-    }
-
-    // @internal
-    #[test]
-    fn from_screen_id_with_param_unknown() {
-        let screen = AppScreen::from_screen_id_with_param("nonexistent", "x");
-        assert_eq!(screen, None);
-    }
-}
-
 impl WorkflowEngine for AppEngine {
     fn current_screen(&self) -> ScreenModel {
         let screen = self.engine.current_screen();
@@ -1308,5 +1276,37 @@ impl AppEngine {
                 Vec::new()
             }
         }
+    }
+}
+
+// INLINE_TEST_REQUIRED: from_screen_id_with_param is module-private, cannot be tested from external tests/
+#[cfg(test)]
+mod tests {
+    use super::AppScreen;
+
+    // @internal
+    #[test]
+    fn from_screen_id_with_param_contact_detail() {
+        let screen = AppScreen::from_screen_id_with_param("contact_detail", "abc-123");
+        assert_eq!(
+            screen,
+            Some(AppScreen::ContactDetail {
+                contact_id: "abc-123".to_string()
+            })
+        );
+    }
+
+    // @internal
+    #[test]
+    fn from_screen_id_with_param_falls_back() {
+        let screen = AppScreen::from_screen_id_with_param("contacts", "ignored");
+        assert_eq!(screen, Some(AppScreen::Contacts));
+    }
+
+    // @internal
+    #[test]
+    fn from_screen_id_with_param_unknown() {
+        let screen = AppScreen::from_screen_id_with_param("nonexistent", "x");
+        assert_eq!(screen, None);
     }
 }

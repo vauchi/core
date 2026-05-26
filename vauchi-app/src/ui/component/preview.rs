@@ -262,31 +262,37 @@ mod build_visible_fields_tests {
 mod initials_tests {
     use super::initials;
 
+    // @internal
     #[test]
     fn initials_single_word() {
         assert_eq!(initials("Alice"), "A");
     }
 
+    // @internal
     #[test]
     fn initials_two_words() {
         assert_eq!(initials("Alice Smith"), "AS");
     }
 
+    // @internal
     #[test]
     fn initials_three_words_takes_first_two() {
         assert_eq!(initials("Alice B Smith"), "AB");
     }
 
+    // @internal
     #[test]
     fn initials_empty_string() {
         assert_eq!(initials(""), "");
     }
 
+    // @internal
     #[test]
     fn initials_unicode() {
         assert_eq!(initials("Ägidius Ölmann"), "ÄÖ");
     }
 
+    // @internal
     #[test]
     fn initials_extra_whitespace() {
         assert_eq!(initials("  Alice   Smith  "), "AS");
@@ -301,6 +307,7 @@ mod initials_proptests {
     use proptest::prelude::*;
 
     proptest! {
+        // @internal
         #[test]
         fn initials_never_panics(name in "\\PC*") {
             let result = initials(&name);
@@ -310,6 +317,7 @@ mod initials_proptests {
             prop_assert_eq!(result.clone(), result.to_uppercase());
         }
 
+        // @internal
         #[test]
         fn initials_are_uppercase(name in "[a-z]+ [a-z]+") {
             let result = initials(&name);

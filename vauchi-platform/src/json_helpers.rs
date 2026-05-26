@@ -119,6 +119,7 @@ mod tests {
 
     // Regression: the serde `AppScreen` form (variant name + tagged
     // object) still parses — frontends use it for parameterized screens.
+    // @internal
     #[test]
     fn app_screen_from_json_accepts_serde_variant() {
         assert_eq!(
@@ -137,6 +138,7 @@ mod tests {
     // core handed it (`tab_info.id` / `ScreenModel.screen_id`) — e.g.
     // "contacts" — never by constructing the serde variant name
     // ("Contacts"). The canonical-id fallback resolves these.
+    // @internal
     #[test]
     fn app_screen_from_json_accepts_canonical_screen_id() {
         assert_eq!(
@@ -150,6 +152,7 @@ mod tests {
         assert_eq!(app_screen_from_json("\"more\"").unwrap(), AppScreen::More);
     }
 
+    // @internal
     #[test]
     fn app_screen_from_json_rejects_unknown_id() {
         assert!(app_screen_from_json("\"not_a_real_screen\"").is_err());

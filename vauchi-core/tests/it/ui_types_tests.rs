@@ -367,6 +367,7 @@ fn test_component_field_list_roundtrip() {
 fn test_component_card_preview_roundtrip() {
     let component = Component::Preview {
         name: "Alice".into(),
+        initials: "A".into(),
         avatar_data: None,
         fields: vec![Field {
             id: "phone".into(),
@@ -408,12 +409,14 @@ fn test_component_card_preview_roundtrip() {
     match restored {
         Component::Preview {
             name,
+            initials,
             fields,
             variants,
             selected_variant,
             ..
         } => {
             assert_eq!(name, "Alice");
+            assert_eq!(initials, "A");
             assert_eq!(fields.len(), 1);
             assert_eq!(variants.len(), 1);
             assert_eq!(variants[0].variant_id, "family");

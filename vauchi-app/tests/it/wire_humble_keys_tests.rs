@@ -150,6 +150,7 @@ fn all_components() -> Vec<Component> {
         },
         Component::Preview {
             name: "Alice".to_string(),
+            initials: "A".to_string(),
             avatar_data: None,
             fields: vec![sample_field()],
             visible_fields: vec![sample_field()],

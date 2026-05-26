@@ -424,6 +424,39 @@ fn edit_data_persists_across_steps() {
     assert_eq!(engine.edited_contact().display_name, "Updated Alice");
 }
 
+// Wire-level contract: `Component::Preview` carries core-derived `initials`
+// so frontends never recompute `displayName.take(1)` (ADR-021/043 Humble UI).
+//
+// @internal
+#[test]
+fn edit_preview_carries_core_derived_initials() {
+    let contact = EditableContact {
+        display_name: "Alice Smith".into(),
+        fields: vec![],
+    };
+    let mut engine = ContactEditEngine::new(contact, sample_groups());
+
+    // Step 1 → 2 → 3 (Preview)
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+
+    let screen = engine.current_screen();
+    let Component::Preview { initials, .. } = &screen.components[0] else {
+        panic!(
+            "Expected Component::Preview, got {:?}",
+            &screen.components[0]
+        );
+    };
+    assert_eq!(
+        initials, "AS",
+        "initials are first letters of first two words, uppercased"
+    );
+}
+
 // Wire-level contract: `Component::Preview.visible_fields` never includes
 // `UiFieldVisibility::Hidden` entries, even when the raw `fields` list does.
 //

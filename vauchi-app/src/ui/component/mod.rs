@@ -61,8 +61,13 @@ pub enum Component {
     },
     Preview {
         name: String,
+        /// Core-derived avatar initials (first letters of the first two
+        /// words of `name`, uppercased). Frontends render this directly in
+        /// the initials fallback — never recompute `name.take(1)`
+        /// (ADR-021/043 Humble UI).
+        initials: String,
         /// Avatar image bytes (WebP). Frontends show this in the circular
-        /// header area. Falls back to initials from `name` when None.
+        /// header area. Falls back to `initials` when None.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         avatar_data: Option<Vec<u8>>,
         /// All fields on the card (raw — retained for backwards compatibility).

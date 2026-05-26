@@ -8,13 +8,12 @@ use std::collections::HashMap;
 
 use super::AppEngine;
 use super::AppScreen;
-use super::initials;
 use crate::ui::activity_log::{ActivityLogEngine, ActivityLogItem};
 use crate::ui::archived_contacts::ArchivedContactsEngine;
 use crate::ui::backup_recovery::BackupRecoveryEngine;
 use crate::ui::change_password::ChangePasswordEngine;
 use crate::ui::component::{
-    A11y, Field, Item, ListItemAction, ListItemActionKind, Status, UiFieldVisibility,
+    A11y, Field, Item, ListItemAction, ListItemActionKind, Status, UiFieldVisibility, initials,
 };
 use crate::ui::contact_detail::{
     ContactDetailEngine, ContactNotFoundEngine, DeliverySummary, SharedInfoView,

@@ -901,48 +901,10 @@ impl AppEngine {
     }
 }
 
-fn initials(name: &str) -> String {
-    name.split_whitespace()
-        .filter_map(|w| w.chars().next())
-        .take(2)
-        .collect::<String>()
-        .to_uppercase()
-}
-
-// INLINE_TEST_REQUIRED: initials() is module-private, cannot be tested from external tests/
+// INLINE_TEST_REQUIRED: from_screen_id_with_param is module-private, cannot be tested from external tests/
 #[cfg(test)]
 mod tests {
-    use super::{AppScreen, initials};
-
-    #[test]
-    fn initials_single_word() {
-        assert_eq!(initials("Alice"), "A");
-    }
-
-    #[test]
-    fn initials_two_words() {
-        assert_eq!(initials("Alice Smith"), "AS");
-    }
-
-    #[test]
-    fn initials_three_words_takes_first_two() {
-        assert_eq!(initials("Alice B Smith"), "AB");
-    }
-
-    #[test]
-    fn initials_empty_string() {
-        assert_eq!(initials(""), "");
-    }
-
-    #[test]
-    fn initials_unicode() {
-        assert_eq!(initials("Ägidius Ölmann"), "ÄÖ");
-    }
-
-    #[test]
-    fn initials_extra_whitespace() {
-        assert_eq!(initials("  Alice   Smith  "), "AS");
-    }
+    use super::AppScreen;
 
     // @internal
     #[test]
@@ -968,30 +930,6 @@ mod tests {
     fn from_screen_id_with_param_unknown() {
         let screen = AppScreen::from_screen_id_with_param("nonexistent", "x");
         assert_eq!(screen, None);
-    }
-}
-
-// INLINE_TEST_REQUIRED: initials() is module-private, cannot be tested from external tests/
-#[cfg(test)]
-mod proptests {
-    use super::initials;
-    use proptest::prelude::*;
-
-    proptest! {
-        #[test]
-        fn initials_never_panics(name in "\\PC*") {
-            let result = initials(&name);
-            // Unicode to_uppercase() can expand a single char to multiple,
-            // so we only assert the result is valid UTF-8 (which String guarantees)
-            // and that it equals its own uppercase form.
-            prop_assert_eq!(result.clone(), result.to_uppercase());
-        }
-
-        #[test]
-        fn initials_are_uppercase(name in "[a-z]+ [a-z]+") {
-            let result = initials(&name);
-            prop_assert_eq!(result.clone(), result.to_uppercase());
-        }
     }
 }
 

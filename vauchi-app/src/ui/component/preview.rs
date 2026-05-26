@@ -131,6 +131,20 @@ pub fn build_visible_fields(
         .collect()
 }
 
+/// Derive avatar initials from a display name: the first character of each
+/// of the first two whitespace-separated words, uppercased.
+///
+/// Core owns this so frontends never recompute it (e.g. `displayName.take(1)`)
+/// — the initials ride the wire on `Component::Preview`/`AvatarPreview`
+/// (ADR-021/043 Humble UI). Empty/whitespace-only names yield `""`.
+pub(crate) fn initials(name: &str) -> String {
+    name.split_whitespace()
+        .filter_map(|w| w.chars().next())
+        .take(2)
+        .collect::<String>()
+        .to_uppercase()
+}
+
 // INLINE_TEST_REQUIRED: build_visible_fields is a pure helper with no public
 // behavior surface beyond Component::Preview's visible_fields field;
 // inline tests keep the filter logic + its invariants co-located with the
@@ -239,5 +253,67 @@ mod build_visible_fields_tests {
     fn empty_inputs_return_empty() {
         assert!(build_visible_fields(&[], &[], &None).is_empty());
         assert!(build_visible_fields(&[], &[], &Some("work".into())).is_empty());
+    }
+}
+
+// INLINE_TEST_REQUIRED: initials() is a pub(crate) helper, not reachable from
+// external tests/; co-locate its invariants with the implementation.
+#[cfg(test)]
+mod initials_tests {
+    use super::initials;
+
+    #[test]
+    fn initials_single_word() {
+        assert_eq!(initials("Alice"), "A");
+    }
+
+    #[test]
+    fn initials_two_words() {
+        assert_eq!(initials("Alice Smith"), "AS");
+    }
+
+    #[test]
+    fn initials_three_words_takes_first_two() {
+        assert_eq!(initials("Alice B Smith"), "AB");
+    }
+
+    #[test]
+    fn initials_empty_string() {
+        assert_eq!(initials(""), "");
+    }
+
+    #[test]
+    fn initials_unicode() {
+        assert_eq!(initials("Ägidius Ölmann"), "ÄÖ");
+    }
+
+    #[test]
+    fn initials_extra_whitespace() {
+        assert_eq!(initials("  Alice   Smith  "), "AS");
+    }
+}
+
+// INLINE_TEST_REQUIRED: initials() is a pub(crate) helper, not reachable from
+// external tests/; proptests co-located with the implementation.
+#[cfg(test)]
+mod initials_proptests {
+    use super::initials;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn initials_never_panics(name in "\\PC*") {
+            let result = initials(&name);
+            // Unicode to_uppercase() can expand a single char to multiple,
+            // so we only assert the result is valid UTF-8 (which String guarantees)
+            // and that it equals its own uppercase form.
+            prop_assert_eq!(result.clone(), result.to_uppercase());
+        }
+
+        #[test]
+        fn initials_are_uppercase(name in "[a-z]+ [a-z]+") {
+            let result = initials(&name);
+            prop_assert_eq!(result.clone(), result.to_uppercase());
+        }
     }
 }

@@ -8,6 +8,7 @@ mod list;
 mod preview;
 
 pub use list::{Item, ListItemAction, ListItemActionKind};
+pub(crate) use preview::initials;
 pub use preview::{
     Field, PreviewVariant, UiFieldVisibility, build_visible_fields, icon_for_field_type,
 };

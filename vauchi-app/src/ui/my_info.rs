@@ -318,17 +318,10 @@ impl WorkflowEngine for MyInfoEngine {
         let mut components = Vec::new();
 
         // Avatar preview at top of MyInfo — editable (tap to open AvatarEditor)
-        let initials: String = self
-            .display_name
-            .split_whitespace()
-            .filter_map(|w| w.chars().next())
-            .take(2)
-            .collect::<String>()
-            .to_uppercase();
         components.push(Component::AvatarPreview {
             id: "avatar".into(),
             image_data: self.avatar_data.clone(),
-            initials,
+            initials: crate::ui::component::initials(&self.display_name),
             bg_color: None,
             brightness: 0.0,
             editable: true,

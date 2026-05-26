@@ -26,6 +26,7 @@ mod diagnostic;
 mod domain_command;
 mod error;
 mod exchange;
+mod exchange_view;
 mod json_helpers;
 mod mobile_ble;
 mod mobile_contact_detail;
@@ -81,6 +82,7 @@ pub use exchange::{
     MobileExchangeState, MobileProximityHandler, create_qr_exchange_manual,
     create_qr_exchange_proximity,
 };
+pub use exchange_view::{MobileExchangeViewState, exchange_view_state};
 pub use mobile_ble::{
     MobileBleDelegate, MobileBleError, MobileBleExchangeResult, MobileBleExchangeSession,
     MobileBleField, MobileBleState, MobileBleTransportError,

@@ -515,6 +515,12 @@ impl PlatformAppEngine {
     /// The screen JSON must match the `AppScreen` enum format, e.g.:
     /// - `"Exchange"` (simple variant)
     /// - `{"ContactDetail": {"contact_id": "abc"}}` (parameterized variant)
+    ///
+    /// **Deprecated (Tier-0 d, ADR-043 Amendment 4):** a forward-navigate
+    /// surface that makes the caller construct a domain-shaped target.
+    /// Forward navigation is moving to `UserAction::NavigateToTab { action_id }`
+    /// (tab taps) and `handle_deep_link_uri` (deep links), both returning
+    /// `NavigateTo`. Do not add new callers; retires once frontends migrate.
     pub fn navigate_to_json(&self, screen_json: String) -> Result<String, MobileError> {
         let screen = app_screen_from_json(&screen_json)?;
         let pre_screen = self

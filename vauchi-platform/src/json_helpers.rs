@@ -92,3 +92,47 @@ pub(crate) fn app_screen_from_json(json: &str) -> Result<AppScreen, MobileError>
         detail: format!("Failed to parse AppScreen JSON: {e}"),
     })
 }
+
+// INLINE_TEST_REQUIRED: app_screen_from_json is pub(crate), cannot be tested from external tests/
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Regression: the serde `AppScreen` form (variant name + tagged
+    // object) still parses — frontends use it for parameterized screens.
+    #[test]
+    fn app_screen_from_json_accepts_serde_variant() {
+        assert_eq!(
+            app_screen_from_json("\"Contacts\"").unwrap(),
+            AppScreen::Contacts
+        );
+        assert_eq!(
+            app_screen_from_json("{\"ContactDetail\":{\"contact_id\":\"abc\"}}").unwrap(),
+            AppScreen::ContactDetail {
+                contact_id: "abc".to_string()
+            }
+        );
+    }
+
+    // ADR-043 Am4: a frontend navigates by the opaque canonical screen-id
+    // core handed it (`tab_info.id` / `ScreenModel.screen_id`) — e.g.
+    // "contacts" — never by constructing the serde variant name
+    // ("Contacts"). The canonical-id fallback resolves these.
+    #[test]
+    fn app_screen_from_json_accepts_canonical_screen_id() {
+        assert_eq!(
+            app_screen_from_json("\"contacts\"").unwrap(),
+            AppScreen::Contacts
+        );
+        assert_eq!(
+            app_screen_from_json("\"my_info\"").unwrap(),
+            AppScreen::MyInfo
+        );
+        assert_eq!(app_screen_from_json("\"more\"").unwrap(), AppScreen::More);
+    }
+
+    #[test]
+    fn app_screen_from_json_rejects_unknown_id() {
+        assert!(app_screen_from_json("\"not_a_real_screen\"").is_err());
+    }
+}

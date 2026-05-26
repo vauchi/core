@@ -243,8 +243,12 @@ impl AppScreen {
 
     /// Parse a screen name + parameter into a parameterized `AppScreen`.
     ///
-    /// Used by CABI frontends that receive `OpenContact { contact_id }` etc.
-    /// and need to navigate to the target screen.
+    /// Legacy: backs the CABI `vauchi_app_navigate_to_param` surface. Since
+    /// core!968, `route_result` resolves every navigation `ActionResult`
+    /// (`OpenContact`, `EditContact`, `OpenEntryDetail`, …) to
+    /// `NavigateTo(ScreenModel)` before the wire, so no frontend receives a
+    /// raw navigation action to re-map — this path is dead on the wire and
+    /// retires with the forward-navigate surface in Tier-0 (d).
     pub fn from_screen_id_with_param(id: &str, param: &str) -> Option<Self> {
         let param = param.to_string();
         Some(match id {

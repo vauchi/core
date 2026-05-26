@@ -115,3 +115,53 @@ fn tab_info_action_id_round_trips_through_navigate_to_tab() {
         );
     }
 }
+
+/// Regression: only the typed `NavigateToTab` triggers tab routing. An
+/// `ActionPressed` whose `action_id` happens to equal a canonical screen_id
+/// (`"groups"`) must dispatch to the current screen's engine, never navigate —
+/// guarding the dispatch-lane separation the interception relies on.
+// @internal
+#[test]
+fn action_pressed_with_screen_like_id_is_not_tab_navigation() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Contacts);
+    let before = engine.current_screen().screen_id;
+
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "groups".to_string(),
+    });
+    if let ActionResult::NavigateTo(screen) = &result {
+        assert_ne!(
+            screen.screen_id, "groups",
+            "ActionPressed must not be routed as tab navigation"
+        );
+    }
+    assert_eq!(
+        engine.current_screen().screen_id,
+        before,
+        "ActionPressed with a screen-like id must leave the screen unchanged"
+    );
+}
+
+/// Regression: `navigate_back` is unaffected by the NavigateToTab
+/// interception — forward via the action, then pop returns to the prior tab.
+// @internal
+#[test]
+fn navigate_back_after_navigate_to_tab_returns_to_prior_screen() {
+    let mut engine = engine_with_identity();
+    let _ = engine.handle_action(UserAction::NavigateToTab {
+        action_id: "contacts".to_string(),
+    });
+    let contacts_id = engine.current_screen().screen_id;
+    let _ = engine.handle_action(UserAction::NavigateToTab {
+        action_id: "groups".to_string(),
+    });
+    assert_eq!(engine.current_screen().screen_id, "groups");
+
+    engine.navigate_back();
+    assert_eq!(
+        engine.current_screen().screen_id,
+        contacts_id,
+        "navigate_back must return to the screen visited before the last NavigateToTab"
+    );
+}

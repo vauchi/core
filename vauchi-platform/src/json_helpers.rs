@@ -86,10 +86,29 @@ pub(crate) fn user_action_from_json(json: &str) -> Result<UserAction, MobileErro
 }
 
 /// Deserialize an `AppScreen` from JSON.
+///
+/// Accepts two forms:
+/// 1. The serde `AppScreen` shape — a variant name (`"Contacts"`) or a
+///    tagged object (`{"ContactDetail": {"contact_id": "…"}}`). Used for
+///    parameterized screens.
+/// 2. A canonical screen-id string the frontend received from core
+///    (`tab_info.id` / `ScreenModel.screen_id`), e.g. `"contacts"`. Lets
+///    frontends navigate by the opaque id core handed them instead of
+///    constructing the serde variant name (ADR-043 Am4 — zero domain
+///    vocabulary in frontends). Only simple (non-parameterized) screens
+///    resolve this way.
 pub(crate) fn app_screen_from_json(json: &str) -> Result<AppScreen, MobileError> {
-    serde_json::from_str(json).map_err(|e| MobileError::InvalidInput {
+    if let Ok(screen) = serde_json::from_str::<AppScreen>(json) {
+        return Ok(screen);
+    }
+    if let Ok(id) = serde_json::from_str::<String>(json)
+        && let Some(screen) = AppScreen::from_screen_id(&id)
+    {
+        return Ok(screen);
+    }
+    Err(MobileError::InvalidInput {
         field: String::new(),
-        detail: format!("Failed to parse AppScreen JSON: {e}"),
+        detail: format!("Failed to parse AppScreen JSON: {json}"),
     })
 }
 

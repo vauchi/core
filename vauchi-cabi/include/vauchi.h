@@ -223,6 +223,11 @@ char *vauchi_app_handle_action(struct VauchiApp *handle, const char *action_json
  * "sync", "recovery", "groups", "privacy", "support",
  * "contact_duplicates", "contact_limit", "more".
  *
+ * **Deprecated (Tier-0 d, ADR-043 Amendment 4):** a forward-navigate surface.
+ * Desktop frontends should forward tab taps via `UserAction::NavigateToTab`
+ * (carrying the `TabInfo.action_id` core minted) and render the returned
+ * `NavigateTo`. Do not add new callers; retires once frontends migrate.
+ *
  * # Safety
  * `handle` must be a valid app handle or null.
  * `screen_name` must be a valid null-terminated C string, or null.
@@ -231,6 +236,11 @@ char *vauchi_app_navigate_to(struct VauchiApp *handle, const char *screen_name);
 
 /**
  * Navigate to a parameterized screen (e.g. contact_detail with a contact_id).
+ *
+ * **Deprecated (Tier-0 d, ADR-043 Amendment 4):** dead on the wire since
+ * core!968 (`route_result` resolves every navigation `ActionResult` to
+ * `NavigateTo`, so no frontend receives a raw nav action to re-map via this
+ * path). Retires with the forward-navigate surface; do not add callers.
  *
  * # Safety
  * `handle` must be a valid app handle or null.

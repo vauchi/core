@@ -1028,6 +1028,20 @@ impl WorkflowEngine for AppEngine {
             };
         }
 
+        // Top-level / tab navigation (ADR-043 Amendment 4): a NavigateToTab
+        // action carries the opaque token core minted on `TabInfo.action_id`.
+        // Resolve it to a target screen and return `NavigateTo` *before*
+        // per-screen dispatch, so the frontend never constructs a navigation
+        // target. An unknown token (adversarial / stale) leaves the engine
+        // where it is rather than navigating somewhere wrong — same
+        // unknown-id stance as `route_result` (`from_screen_id` → `None`).
+        if let UserAction::NavigateToTab { ref action_id } = action {
+            return match AppScreen::from_screen_id(action_id) {
+                Some(target) => ActionResult::NavigateTo(self.navigate_to(target)),
+                None => ActionResult::UpdateScreen(self.engine.current_screen()),
+            };
+        }
+
         // Capture display name during onboarding for identity persistence
         if self.screen == AppScreen::Onboarding
             && let UserAction::TextChanged {

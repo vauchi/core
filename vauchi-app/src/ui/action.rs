@@ -26,6 +26,18 @@ pub enum UserAction {
     ActionPressed {
         action_id: String,
     },
+    /// User selected a top-level navigation target (tab bar / sidebar).
+    /// `action_id` is the opaque token core minted on the corresponding
+    /// `TabInfo.action_id`; the frontend forwards it verbatim and never
+    /// constructs or parses it. `AppEngine::handle_action` intercepts this
+    /// before per-screen dispatch and resolves it to `NavigateTo`
+    /// (ADR-043 Amendment 4: forward navigation is core-resolved). Kept
+    /// distinct from `ActionPressed` so global-chrome navigation and
+    /// per-screen actions stay on separate dispatch lanes and cannot
+    /// collide on `action_id`.
+    NavigateToTab {
+        action_id: String,
+    },
     FieldVisibilityChanged {
         field_id: String,
         group_id: Option<String>,

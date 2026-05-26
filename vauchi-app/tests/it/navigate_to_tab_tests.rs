@@ -85,3 +85,33 @@ fn navigate_to_tab_unknown_token_does_not_navigate() {
         "unknown NavigateToTab token must leave the current screen unchanged"
     );
 }
+
+/// Every `TabInfo` from `tab_info()` carries an `action_id` that the frontend
+/// forwards verbatim; routing it through `NavigateToTab` navigates. The wire
+/// field and the routing token are the same opaque value, so the frontend
+/// never constructs a navigation target.
+// @internal
+#[test]
+fn tab_info_action_id_round_trips_through_navigate_to_tab() {
+    let tabs = engine_with_identity().tab_info(vauchi_app::Locale::English);
+    assert!(
+        !tabs.is_empty(),
+        "expected top-level tabs after identity creation"
+    );
+    for tab in tabs {
+        assert!(
+            !tab.action_id.is_empty(),
+            "TabInfo `{}` must carry a non-empty action_id",
+            tab.id
+        );
+        let mut engine = engine_with_identity();
+        let result = engine.handle_action(UserAction::NavigateToTab {
+            action_id: tab.action_id.clone(),
+        });
+        assert!(
+            matches!(result, ActionResult::NavigateTo(_)),
+            "forwarding TabInfo.action_id `{}` must navigate",
+            tab.action_id
+        );
+    }
+}

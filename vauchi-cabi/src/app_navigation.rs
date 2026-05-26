@@ -24,6 +24,7 @@ pub(super) fn tabs_to_json(tabs: &[TabInfo]) -> String {
         .map(|t| {
             serde_json::json!({
                 "id": t.id,
+                "action_id": t.action_id,
                 "label": t.label,
                 "icon": t.icon,
                 "badge_count": t.badge_count,
@@ -136,6 +137,7 @@ mod tests {
     fn tabs_to_json_serializes_all_fields() {
         let tabs = vec![TabInfo {
             id: "contacts".into(),
+            action_id: "contacts".into(),
             label: "Contacts".into(),
             icon: "person.2".into(),
             badge_count: 3,
@@ -143,6 +145,7 @@ mod tests {
         let json = tabs_to_json(&tabs);
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed[0]["id"], "contacts");
+        assert_eq!(parsed[0]["action_id"], "contacts");
         assert_eq!(parsed[0]["label"], "Contacts");
         assert_eq!(parsed[0]["icon"], "person.2");
         assert_eq!(parsed[0]["badge_count"], 3);
@@ -160,12 +163,14 @@ mod tests {
         let tabs = vec![
             TabInfo {
                 id: "a".into(),
+                action_id: "a".into(),
                 label: "A".into(),
                 icon: "".into(),
                 badge_count: 0,
             },
             TabInfo {
                 id: "b".into(),
+                action_id: "b".into(),
                 label: "B".into(),
                 icon: "".into(),
                 badge_count: 0,

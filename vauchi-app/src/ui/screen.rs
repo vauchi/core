@@ -364,8 +364,15 @@ pub struct ScreenAction {
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TabInfo {
-    /// Stable identifier matching `AppScreen::screen_id()`.
+    /// Stable identifier matching `AppScreen::screen_id()`. Used by frontends
+    /// only for selection equality against `current_tab_id` — never to
+    /// construct a navigation target.
     pub id: String,
+    /// Opaque navigation token. Frontends forward it verbatim via
+    /// `UserAction::NavigateToTab { action_id }` on tap; core resolves it to
+    /// `NavigateTo`. The frontend never parses or branches on it
+    /// (ADR-043 Amendment 4 / ADR-044 Wire Humble).
+    pub action_id: String,
     /// Localized display label (resolved by core from `nav.*` keys).
     pub label: String,
     /// Icon name (SF Symbol format). Frontends map to platform equivalents

@@ -375,6 +375,7 @@ impl AppEngine {
         };
         TabInfo {
             id: screen.screen_id().to_string(),
+            action_id: screen.screen_id().to_string(),
             label,
             icon: icon.to_string(),
             badge_count: 0,

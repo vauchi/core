@@ -888,12 +888,103 @@ pub fn ble_exchange_status() -> MobileBleExchangeStatus {
     }
 }
 
+/// Presentational view-state for a BLE exchange status indicator.
+///
+/// Core owns the `MobileExchangeState` → label/progress mapping so
+/// frontends render `label_key` (via their i18n table) and
+/// `show_progress` directly, instead of duplicating a
+/// `when (MobileExchangeState)` switch per platform (ADR-021/043
+/// Humble UI).
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct MobileExchangeViewState {
+    /// i18n key for the status label (e.g. `"exchange.waiting_peer"`).
+    pub label_key: String,
+    /// Whether to render an in-progress affordance (spinner) alongside
+    /// the label. `false` for terminal states (Complete / Failed).
+    pub show_progress: bool,
+}
+
+/// Compute the presentational view-state for a BLE exchange status.
+///
+/// Pure mapping — the single source of truth for which i18n label and
+/// progress affordance each exchange state shows.
+#[uniffi::export]
+pub fn exchange_view_state(state: MobileExchangeState) -> MobileExchangeViewState {
+    let (label_key, show_progress) = match state {
+        MobileExchangeState::Idle | MobileExchangeState::DisplayingQr { .. } => {
+            ("exchange.waiting_peer", true)
+        }
+        MobileExchangeState::PeerScanned => ("exchange.peer_found", true),
+        MobileExchangeState::AwaitingKeyAgreement => ("exchange.verifying", true),
+        MobileExchangeState::AwaitingCardExchange => ("exchange.transferring", true),
+        MobileExchangeState::Complete { .. } => ("exchange.contact_exchanged", false),
+        MobileExchangeState::Failed { .. } => ("exchange.failed_title", false),
+    };
+    MobileExchangeViewState {
+        label_key: label_key.to_string(),
+        show_progress,
+    }
+}
+
 // === Tests ===
 
 // INLINE_TEST_REQUIRED: tests use private ProximityBridge internals and create_qr_exchange_manual/proximity helpers
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // @internal
+    #[test]
+    fn exchange_view_state_maps_each_state_to_label_and_progress() {
+        let cases = [
+            (MobileExchangeState::Idle, "exchange.waiting_peer", true),
+            (
+                MobileExchangeState::DisplayingQr {
+                    qr_data: "x".into(),
+                },
+                "exchange.waiting_peer",
+                true,
+            ),
+            (
+                MobileExchangeState::PeerScanned,
+                "exchange.peer_found",
+                true,
+            ),
+            (
+                MobileExchangeState::AwaitingKeyAgreement,
+                "exchange.verifying",
+                true,
+            ),
+            (
+                MobileExchangeState::AwaitingCardExchange,
+                "exchange.transferring",
+                true,
+            ),
+            (
+                MobileExchangeState::Complete {
+                    contact_id: "c".into(),
+                    contact_name: "Alice".into(),
+                },
+                "exchange.contact_exchanged",
+                false,
+            ),
+            (
+                MobileExchangeState::Failed {
+                    error: "boom".into(),
+                },
+                "exchange.failed_title",
+                false,
+            ),
+        ];
+        for (state, expected_key, expected_progress) in cases {
+            let vs = exchange_view_state(state.clone());
+            assert_eq!(vs.label_key, expected_key, "label for {state:?}");
+            assert_eq!(
+                vs.show_progress, expected_progress,
+                "progress for {state:?}"
+            );
+        }
+    }
 
     /// Mock proximity handler that always succeeds.
     struct SuccessHandler;

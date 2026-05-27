@@ -16,7 +16,9 @@ use super::x3dh::X3DHKeyPair;
 use super::{ExchangeError, ProximityError, ProximityVerifier};
 use crate::crypto::{PublicKey, SigningKeyPair};
 use crate::identity::Identity;
+use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 mod hex_array_32 {
@@ -370,6 +372,12 @@ pub struct BLEExchangeSession {
     local_contact_data: Option<Vec<u8>>,
     /// Peer's contact data (received during exchange)
     peer_contact_data: Option<Vec<u8>>,
+    /// Explicit-monotonic-time seam (Phase 1 / Task 1.1b). Stamps
+    /// `started_at` and drives the `check_timeout()` boundary. Defaults
+    /// to `SystemMonotonicClock::shared()`; inject via
+    /// [`BLEExchangeSession::with_monotonic`] for deterministic timeout
+    /// tests. The pure `check_timeout_at(now)` inner is retained.
+    monotonic: Arc<dyn MonotonicClock>,
 }
 
 impl BLEExchangeSession {
@@ -385,7 +393,17 @@ impl BLEExchangeSession {
             started_at: None,
             local_contact_data: None,
             peer_contact_data: None,
+            monotonic: SystemMonotonicClock::shared(),
         }
+    }
+
+    /// Replace the [`MonotonicClock`] stamping `started_at` and driving
+    /// the timeout check. Default is [`SystemMonotonicClock::shared`];
+    /// inject a `FakeMonotonicClock` for deterministic timeout tests.
+    #[must_use]
+    pub fn with_monotonic(mut self, monotonic: Arc<dyn MonotonicClock>) -> Self {
+        self.monotonic = monotonic;
+        self
     }
 
     /// Create a session with custom timeout.
@@ -410,7 +428,7 @@ impl BLEExchangeSession {
         match &self.state {
             BLEExchangeState::Idle => {
                 self.state = BLEExchangeState::Advertising;
-                self.started_at = Some(Instant::now());
+                self.started_at = Some(self.monotonic.now());
                 Ok(())
             }
             _ => Err(BLEError::SessionInProgress),
@@ -422,7 +440,7 @@ impl BLEExchangeSession {
         match &self.state {
             BLEExchangeState::Idle => {
                 self.state = BLEExchangeState::Scanning;
-                self.started_at = Some(Instant::now());
+                self.started_at = Some(self.monotonic.now());
                 Ok(())
             }
             _ => Err(BLEError::SessionInProgress),
@@ -463,7 +481,7 @@ impl BLEExchangeSession {
 
     /// Check for timeout and update state.
     pub fn check_timeout(&mut self) {
-        self.check_timeout_at(Instant::now());
+        self.check_timeout_at(self.monotonic.now());
     }
 
     /// Check for timeout at a given point in time.

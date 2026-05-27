@@ -260,6 +260,38 @@ fn test_session_timeout() {
     assert!(matches!(session.state(), BLEExchangeState::TimedOut));
 }
 
+/// Test: the session-timeout boundary `check_timeout()` is driven by
+/// the injected `MonotonicClock` (Phase 1 / Task 1.1b), not ambient
+/// `Instant::now()`. Exercises both the `started_at` stamp and the
+/// no-argument boundary. Before the migration this fails: advancing the
+/// fake clock has no effect, so the session never times out.
+// @scenario: ble_exchange :: Session timeout
+#[test]
+fn test_session_timeout_driven_by_injected_monotonic_clock() {
+    use std::sync::Arc;
+    use vauchi_core::monotonic::FakeMonotonicClock;
+
+    let keypair = SigningKeyPair::generate();
+    let fake = Arc::new(FakeMonotonicClock::new());
+    let mut session = BLEExchangeSession::with_timeout(&keypair, Duration::from_millis(10))
+        .with_monotonic(fake.clone());
+
+    session.start_scanning().unwrap();
+    // No advance yet: within the 10 ms window, not timed out.
+    session.check_timeout();
+    assert!(
+        !matches!(session.state(), BLEExchangeState::TimedOut),
+        "session must not time out before the injected clock advances"
+    );
+
+    fake.advance(Duration::from_millis(20));
+    session.check_timeout();
+    assert!(
+        matches!(session.state(), BLEExchangeState::TimedOut),
+        "advancing the injected clock past the timeout must mark the session TimedOut"
+    );
+}
+
 /// Test: Cancel session
 // @scenario: ble_exchange :: Cancel session
 #[test]

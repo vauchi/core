@@ -1080,10 +1080,16 @@ fn try_audio_timeout(
     }
 
     let fired = match inner.lock() {
-        Ok(mut session) => session
-            .check_and_apply_audio_timeout(std::time::Instant::now())
-            .ok()
-            .unwrap_or(false),
+        Ok(mut session) => {
+            // Feed the session's own monotonic clock (Phase 1 / Task
+            // 1.1b) so the timeout `now` shares the clock domain of the
+            // `audio_listening_started_at` stamp set inside the session.
+            let now = session.monotonic().now();
+            session
+                .check_and_apply_audio_timeout(now)
+                .ok()
+                .unwrap_or(false)
+        }
         Err(_) => return,
     };
 

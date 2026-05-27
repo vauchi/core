@@ -375,6 +375,13 @@ impl MultiStageSession {
     /// inject a `FakeMonotonicClock` for deterministic RDYY/finalized/
     /// audio-timeout tests.
     #[must_use]
+    /// Borrow this session's monotonic clock so the platform cycle-thread
+    /// driver feeds the same clock into `check_and_apply_audio_timeout`,
+    /// keeping the recorded start and the timeout `now` in one domain.
+    pub fn monotonic(&self) -> &Arc<dyn MonotonicClock> {
+        &self.monotonic
+    }
+
     pub fn with_monotonic(mut self, monotonic: Arc<dyn MonotonicClock>) -> Self {
         self.monotonic = monotonic;
         self

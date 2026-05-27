@@ -20,6 +20,7 @@
 #![warn(clippy::let_underscore_must_use)]
 
 pub mod clock;
+pub mod monotonic;
 pub mod rng;
 pub mod sleeper;
 

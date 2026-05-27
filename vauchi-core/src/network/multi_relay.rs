@@ -9,11 +9,13 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use thiserror::Error;
 
 use crate::contact::Contact;
+use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
 use crate::rng::SecureRngExt;
 
 /// Multi-relay configuration errors
@@ -222,7 +224,6 @@ struct RelayHealthState {
 }
 
 /// Tracks health status of relay servers
-#[derive(Debug)]
 pub struct RelayHealth {
     /// Health state per relay
     states: HashMap<String, RelayHealthState>,
@@ -230,6 +231,13 @@ pub struct RelayHealth {
     base_cooldown: Duration,
     /// Maximum cooldown duration
     max_cooldown: Duration,
+    /// Explicit-monotonic-time seam (Phase 1 / Task 1.1b). Drives the
+    /// `last_failure`/`last_success` stamps and the cooldown/retry
+    /// elapsed-time math. Defaults to `SystemMonotonicClock::shared()`;
+    /// inject via [`RelayHealth::with_monotonic`] for determinism.
+    /// `should_retry_at` retains its explicit `now: Instant` parameter
+    /// for callers that prefer to supply the instant directly.
+    monotonic: Arc<dyn MonotonicClock>,
 }
 
 impl Default for RelayHealth {
@@ -245,6 +253,7 @@ impl RelayHealth {
             states: HashMap::new(),
             base_cooldown: Duration::from_secs(5),
             max_cooldown: Duration::from_secs(300), // 5 minutes
+            monotonic: SystemMonotonicClock::shared(),
         }
     }
 
@@ -254,7 +263,17 @@ impl RelayHealth {
             states: HashMap::new(),
             base_cooldown,
             max_cooldown: Duration::from_secs(300),
+            monotonic: SystemMonotonicClock::shared(),
         }
+    }
+
+    /// Replace the [`MonotonicClock`] driving failure/success stamps and
+    /// cooldown math. Default is [`SystemMonotonicClock::shared`]; inject
+    /// a `FakeMonotonicClock` for deterministic cooldown/retry tests.
+    #[must_use]
+    pub fn with_monotonic(mut self, monotonic: Arc<dyn MonotonicClock>) -> Self {
+        self.monotonic = monotonic;
+        self
     }
 
     /// Record a successful operation
@@ -262,14 +281,14 @@ impl RelayHealth {
         let state = self.states.entry(relay.to_string()).or_default();
         state.failure_count = 0;
         state.last_failure = None;
-        state.last_success = Some(Instant::now());
+        state.last_success = Some(self.monotonic.now());
     }
 
     /// Record a failed operation
     pub fn record_failure(&mut self, relay: &str) {
         let state = self.states.entry(relay.to_string()).or_default();
         state.failure_count += 1;
-        state.last_failure = Some(Instant::now());
+        state.last_failure = Some(self.monotonic.now());
     }
 
     /// Check if a relay is considered healthy
@@ -288,7 +307,7 @@ impl RelayHealth {
 
     /// Check if we should retry a failed relay
     pub fn should_retry(&self, relay: &str) -> bool {
-        self.should_retry_at(relay, Instant::now())
+        self.should_retry_at(relay, self.monotonic.now())
     }
 
     /// Check if we should retry a failed relay at a given point in time.
@@ -322,7 +341,7 @@ impl RelayHealth {
                     None => Duration::ZERO,
                     Some(last_failure) => {
                         let cooldown = self.calculate_cooldown(state.failure_count);
-                        let elapsed = Instant::now().duration_since(last_failure);
+                        let elapsed = self.monotonic.now().duration_since(last_failure);
                         cooldown.saturating_sub(elapsed)
                     }
                 }

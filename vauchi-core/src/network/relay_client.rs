@@ -7,6 +7,7 @@
 //! High-level interface for sending encrypted updates through the relay.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Instant;
 
 use super::connection::ConnectionManager;
@@ -22,6 +23,7 @@ use super::protocol::create_envelope;
 use super::transport::{Transport, TransportConfig};
 use crate::crypto::ratchet::{DoubleRatchetState, RatchetMessage};
 use crate::identifiers::ContactId;
+use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
 
 /// Generates a hex-encoded anonymous sender ID from an optional shared key.
 /// Returns `None` if no shared key is provided (backward compat — uses real identity).
@@ -98,6 +100,13 @@ pub struct RelayClient<T: Transport> {
     in_flight: HashMap<MessageId, InFlightMessage>,
     /// Our identity public key fingerprint (for sender_id).
     our_identity_id: String,
+    /// Explicit-monotonic-time seam (Phase 1 / Task 1.1b). Drives
+    /// `in_flight` `sent_at` stamps and the `check_timeouts()` deadline.
+    /// Defaults to `SystemMonotonicClock::shared()`; the production
+    /// `Vauchi` sync path injects its shared clock via
+    /// [`RelayClient::with_monotonic`] so ack timeouts are deterministic
+    /// under test.
+    monotonic: Arc<dyn MonotonicClock>,
 }
 
 impl<T: Transport> RelayClient<T> {
@@ -111,7 +120,17 @@ impl<T: Transport> RelayClient<T> {
             config,
             in_flight: HashMap::new(),
             our_identity_id,
+            monotonic: SystemMonotonicClock::shared(),
         }
+    }
+
+    /// Replace the [`MonotonicClock`] driving in-flight ack timeouts.
+    /// Default is [`SystemMonotonicClock::shared`]; tests (or the
+    /// `Vauchi` sync path) inject a shared clock for determinism.
+    #[must_use]
+    pub fn with_monotonic(mut self, monotonic: Arc<dyn MonotonicClock>) -> Self {
+        self.monotonic = monotonic;
+        self
     }
 
     /// Connects to the relay server.
@@ -170,7 +189,7 @@ impl<T: Transport> RelayClient<T> {
             InFlightMessage {
                 message_id: message_id.clone(),
                 update_id: update_id.to_string(),
-                sent_at: Instant::now(),
+                sent_at: self.monotonic.now(),
                 retry_count: 0,
             },
         );
@@ -206,7 +225,7 @@ impl<T: Transport> RelayClient<T> {
             InFlightMessage {
                 message_id: message_id.clone(),
                 update_id: update_id.to_string(),
-                sent_at: Instant::now(),
+                sent_at: self.monotonic.now(),
                 retry_count: 0,
             },
         );
@@ -362,7 +381,7 @@ impl<T: Transport> RelayClient<T> {
     /// Timed-out messages are removed from the in-flight tracking.
     /// The caller should handle retry logic.
     pub fn check_timeouts(&mut self) -> Vec<String> {
-        self.check_timeouts_at(Instant::now())
+        self.check_timeouts_at(self.monotonic.now())
     }
 
     /// Checks for timed-out messages at a given point in time.

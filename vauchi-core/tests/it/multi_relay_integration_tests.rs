@@ -234,6 +234,36 @@ fn test_success_resets_failures() {
     assert!(health.is_healthy("https://relay.vauchi.app"));
 }
 
+/// The retry-cooldown gate is driven by the injected `MonotonicClock`
+/// (Phase 1 / Task 1.1b), not ambient `Instant::now()`. Exercises the
+/// `should_retry()` boundary and the `record_failure` set-site — both
+/// route through the seam. Before the migration this fails: advancing
+/// the fake clock has no effect because the boundary reads the OS clock.
+// @scenario: relay_network :: Relay node health check
+// @internal
+#[test]
+fn test_cooldown_gate_driven_by_injected_monotonic_clock() {
+    use std::sync::Arc;
+    use vauchi_core::monotonic::FakeMonotonicClock;
+
+    let fake = Arc::new(FakeMonotonicClock::new());
+    // base cooldown 50ms; one failure → cooldown in [25ms, 50ms].
+    let mut health =
+        RelayHealth::with_cooldown(Duration::from_millis(50)).with_monotonic(fake.clone());
+
+    health.record_failure("https://relay.vauchi.app");
+    assert!(
+        !health.should_retry("https://relay.vauchi.app"),
+        "fresh failure must gate retry via the injected clock (elapsed 0 < cooldown)"
+    );
+
+    fake.advance(Duration::from_millis(100));
+    assert!(
+        health.should_retry("https://relay.vauchi.app"),
+        "advancing the injected clock past cooldown must release the retry gate"
+    );
+}
+
 // ============================================================
 // Serialization
 // ============================================================

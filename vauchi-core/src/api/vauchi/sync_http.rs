@@ -21,7 +21,7 @@
 //! 5. Send phase: delegates to `SyncController` for outbound updates + ACKs.
 //! 6. Returns combined `VauchiSyncOutcome`.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Recommended interval (seconds) between scheduled sync ticks.
 ///
@@ -73,7 +73,7 @@ impl Vauchi {
         // C1 / C2 timing gate
         if self
             .next_sync_allowed
-            .is_some_and(|deadline| Instant::now() < deadline)
+            .is_some_and(|deadline| self.monotonic.now() < deadline)
         {
             return Ok(VauchiSyncOutcome::TooSoon);
         }
@@ -162,12 +162,12 @@ impl Vauchi {
             .config
             .sync
             .random_post_exchange_delay(self.rng.as_ref());
-        let new_deadline = Instant::now() + delay;
+        let new_deadline = self.monotonic.now() + delay;
         self.next_sync_allowed = Some(match self.next_sync_allowed {
             Some(existing) => existing.max(new_deadline),
             None => new_deadline,
         });
-        self.last_exchange_time = Some(Instant::now());
+        self.last_exchange_time = Some(self.monotonic.now());
     }
 
     /// Run one periodic sync tick — invoked by the platform
@@ -215,7 +215,7 @@ impl Vauchi {
 
     /// Test helper: directly set the `next_sync_allowed` deadline.
     #[cfg(any(test, feature = "testing"))]
-    pub fn set_next_sync_allowed(&mut self, deadline: Instant) {
+    pub fn set_next_sync_allowed(&mut self, deadline: std::time::Instant) {
         self.next_sync_allowed = Some(deadline);
     }
 
@@ -534,11 +534,11 @@ impl Vauchi {
     /// is also computed and the MAX of C1 and C2 is used.
     fn update_timing_after_sync(&mut self) {
         let c2_deadline =
-            Instant::now() + self.config.sync.jittered_sync_interval(self.rng.as_ref());
+            self.monotonic.now() + self.config.sync.jittered_sync_interval(self.rng.as_ref());
 
         let deadline = if let Some(exchange_time) = self.last_exchange_time {
             let max_delay = Duration::from_millis(self.config.sync.post_exchange_delay_max_ms);
-            if exchange_time.elapsed() < max_delay {
+            if self.monotonic.now().duration_since(exchange_time) < max_delay {
                 // Exchange was recent — enforce C1 as well
                 let c1_deadline = exchange_time
                     + self

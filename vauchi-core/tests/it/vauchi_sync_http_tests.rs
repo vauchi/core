@@ -139,6 +139,48 @@ fn test_set_post_exchange_delay_blocks_sync() {
     );
 }
 
+// @scenario: sync_privacy:OHTTP sync gate checks
+/// The C1 post-exchange timing gate is driven by the injected
+/// `MonotonicClock`, not ambient `Instant::now()`. Advancing a
+/// `FakeMonotonicClock` past the recorded deadline must release the
+/// gate — proving `set_post_exchange_delay` / `sync` route through the
+/// seam (Phase 1 / Task 1.1b). Before the migration this test fails:
+/// advancing the fake clock has no effect because the timing math reads
+/// the real OS clock, so `sync` stays `TooSoon` forever.
+// @internal
+#[test]
+#[cfg(feature = "testing")]
+fn test_post_exchange_delay_gate_driven_by_monotonic_clock() {
+    use std::sync::Arc;
+    use std::time::Duration;
+    use vauchi_core::monotonic::FakeMonotonicClock;
+
+    let fake = Arc::new(FakeMonotonicClock::new());
+    let mut vauchi = Vauchi::in_memory().unwrap().with_monotonic(fake.clone());
+    vauchi.create_identity("Test User").unwrap();
+    vauchi.set_ohttp_key_for_testing(make_test_ohttp_client());
+
+    // Records next_sync_allowed = monotonic.now() + jittered C1 delay
+    // (bounded by post_exchange_delay_max_ms, well under one hour).
+    vauchi.set_post_exchange_delay();
+    assert!(
+        matches!(vauchi.sync().unwrap(), VauchiSyncOutcome::TooSoon),
+        "fresh post-exchange delay must gate sync as TooSoon"
+    );
+
+    // Advance the injected clock well past any possible C1 deadline.
+    fake.advance(Duration::from_secs(3600));
+
+    // Gate released: sync proceeds past the timing check (then fails on
+    // the offline relay). The point is it is no longer TooSoon — the
+    // injected clock, not wall-clock, controls the gate.
+    let after = vauchi.sync();
+    assert!(
+        !matches!(after, Ok(VauchiSyncOutcome::TooSoon)),
+        "advancing the injected monotonic clock must release the C1 gate, got: {after:?}"
+    );
+}
+
 // @scenario: sync_privacy:OHTTP key bootstrap on connect
 /// After connect() fails (no real relay), disconnect() still leaves sync() returning NotConnected.
 // @internal

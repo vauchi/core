@@ -68,6 +68,51 @@ fn navigate_back_with_empty_history_returns_my_info() {
 
 // @internal
 #[test]
+fn can_go_back_reflects_nav_history_state() {
+    // The frontend's BackHandler must stop gating on
+    // `coreScreenIdToVariant(...) != null` (the CoreScreenIdMap oracle)
+    // and instead ask core whether a back step exists. `can_go_back`
+    // is that query: it tracks `nav_history` non-emptiness.
+    let mut engine = engine_with_identity();
+    assert!(
+        !engine.can_go_back(),
+        "fresh engine on MyInfo with empty history cannot go back"
+    );
+
+    engine.navigate_to(AppScreen::Settings);
+    assert!(
+        engine.can_go_back(),
+        "after navigating forward, a back step exists"
+    );
+
+    engine.navigate_back();
+    assert!(
+        !engine.can_go_back(),
+        "after backing out to the root, no further back step exists"
+    );
+}
+
+// @internal
+#[test]
+fn can_go_back_false_after_set_initial_screen() {
+    // set_initial_screen must NOT push history (bootstrap-only), so it
+    // must not make `can_go_back` report a phantom back step.
+    let mut engine = engine_no_identity();
+    engine.set_initial_screen(AppScreen::MyInfo);
+    assert!(
+        !engine.can_go_back(),
+        "set_initial_screen must not pollute nav_history / can_go_back"
+    );
+
+    engine.navigate_to(AppScreen::Settings);
+    assert!(
+        engine.can_go_back(),
+        "forward nav after bootstrap enables back"
+    );
+}
+
+// @internal
+#[test]
 fn set_initial_screen_does_not_push_history() {
     // Without identity, AppEngine::new initializes to Onboarding.
     // A frontend that detects identity at startup needs to swap to

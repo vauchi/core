@@ -222,6 +222,15 @@ impl AppEngine {
         self.navigate_to_internal(target)
     }
 
+    /// Whether a back step exists in the nav-history stack.
+    ///
+    /// Frontends query this for their back affordance / `BackHandler`
+    /// instead of inferring "is this a core-driven screen?" from a
+    /// frontend-side screen-id map (ADR-043: no constructed nav targets).
+    pub fn can_go_back(&self) -> bool {
+        !self.nav_history.is_empty()
+    }
+
     /// Screens that should never be cached — always start fresh.
     /// Onboarding IS cacheable: user navigates to FormDialog (add field)
     /// and back, must return to their current step with accumulated data.

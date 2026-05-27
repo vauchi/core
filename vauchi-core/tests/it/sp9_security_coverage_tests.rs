@@ -43,6 +43,41 @@ fn test_fresh_session_is_not_timed_out() {
     );
 }
 
+/// The session timeout is driven by the injected `MonotonicClock`
+/// (Phase 1 / Task 1.1b), not ambient `Instant::now()`. `with_monotonic`
+/// re-stamps `started_at` from the fake clock, so advancing it past
+/// `SESSION_TIMEOUT` (60s) flips `is_timed_out` with no real wait.
+// @scenario: security :: Replay attack prevention
+#[test]
+fn test_session_timeout_driven_by_injected_monotonic_clock() {
+    use std::sync::Arc;
+    use vauchi_core::monotonic::FakeMonotonicClock;
+
+    let identity = vauchi_core::Identity::create("Alice", 0);
+    let card = vauchi_core::contact_card::ContactCard::new("Alice");
+    let proximity = MockProximityVerifier::success();
+
+    let fake = Arc::new(FakeMonotonicClock::new());
+    let session = ExchangeSession::new_qr(
+        identity,
+        card,
+        proximity,
+        vauchi_core::clock::SystemClock::shared(),
+    )
+    .with_monotonic(fake.clone());
+
+    assert!(
+        !session.is_timed_out(),
+        "session must not be timed out at the injected clock's start"
+    );
+
+    fake.advance(std::time::Duration::from_secs(61));
+    assert!(
+        session.is_timed_out(),
+        "advancing the injected clock past SESSION_TIMEOUT must time the session out"
+    );
+}
+
 /// Verifies that the session timeout constant is reasonable (60 seconds).
 /// This is a specification test — if the constant changes, this test documents it.
 // @scenario: security :: Replay attack prevention

@@ -11,6 +11,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
+
 use super::ble_handshake::BleHandshakeSession;
 use super::ble_payload::BleCardPayload;
 use super::direct_transport::UsbRole;
@@ -198,6 +200,13 @@ pub struct ExchangeSession {
     /// `new_*` constructor; tests can override via `with_clock(...)`
     /// after construction. Phase 1 / Task 1.1 / Step 3b structural pass.
     clock: Arc<dyn crate::clock::Clock>,
+    /// Explicit-monotonic-time seam (Phase 1 / Task 1.1b). Stamps
+    /// `started_at` and backs the `is_timed_out` `SESSION_TIMEOUT`
+    /// comparison. Defaults to `SystemMonotonicClock::shared()` in every
+    /// `new_*` constructor; tests override via `with_monotonic(...)`,
+    /// which re-stamps `started_at` so the start and the timeout check
+    /// share one clock domain.
+    monotonic: Arc<dyn MonotonicClock>,
 }
 
 // Compile-time assertion: ExchangeSession must be Send + Sync because
@@ -237,7 +246,7 @@ impl ExchangeSession {
             their_exchange_key: None,
             proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
-            started_at: Instant::now(),
+            started_at: SystemMonotonicClock::new().now(),
             interrupted: false,
             used_qrs: HashSet::new(),
             their_audio_challenge: None,
@@ -262,6 +271,7 @@ impl ExchangeSession {
             confirmation_our_slot: None,
             confirmation_their_slot: None,
             clock,
+            monotonic: SystemMonotonicClock::shared(),
         }
     }
 
@@ -283,7 +293,7 @@ impl ExchangeSession {
             their_exchange_key: None,
             proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
-            started_at: Instant::now(),
+            started_at: SystemMonotonicClock::new().now(),
             interrupted: false,
             used_qrs: HashSet::new(),
             their_audio_challenge: None,
@@ -308,6 +318,7 @@ impl ExchangeSession {
             confirmation_our_slot: None,
             confirmation_their_slot: None,
             clock,
+            monotonic: SystemMonotonicClock::shared(),
         }
     }
 
@@ -334,7 +345,7 @@ impl ExchangeSession {
             their_exchange_key: None,
             proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
-            started_at: Instant::now(),
+            started_at: SystemMonotonicClock::new().now(),
             interrupted: false,
             used_qrs: HashSet::new(),
             their_audio_challenge: None,
@@ -359,6 +370,7 @@ impl ExchangeSession {
             confirmation_our_slot: None,
             confirmation_their_slot: None,
             clock,
+            monotonic: SystemMonotonicClock::shared(),
         }
     }
 
@@ -396,7 +408,7 @@ impl ExchangeSession {
             their_exchange_key: None,
             proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
-            started_at: Instant::now(),
+            started_at: SystemMonotonicClock::new().now(),
             interrupted: false,
             used_qrs: HashSet::new(),
             their_audio_challenge: None,
@@ -421,6 +433,7 @@ impl ExchangeSession {
             confirmation_our_slot: None,
             confirmation_their_slot: None,
             clock,
+            monotonic: SystemMonotonicClock::shared(),
         }
     }
 
@@ -453,7 +466,7 @@ impl ExchangeSession {
             their_exchange_key: None,
             proximity: Box::new(proximity),
             proximity_confidence: ProximityConfidence::Unknown,
-            started_at: Instant::now(),
+            started_at: SystemMonotonicClock::new().now(),
             interrupted: false,
             used_qrs: HashSet::new(),
             their_audio_challenge: None,
@@ -478,6 +491,7 @@ impl ExchangeSession {
             confirmation_our_slot: None,
             confirmation_their_slot: None,
             clock,
+            monotonic: SystemMonotonicClock::shared(),
         }
     }
 
@@ -601,6 +615,18 @@ impl ExchangeSession {
     /// Phase 1 / Task 1.1 / Step 3b structural pass (initial seam).
     pub fn with_clock(mut self, clock: Arc<dyn crate::clock::Clock>) -> Self {
         self.clock = clock;
+        self
+    }
+
+    /// Replaces the session's monotonic clock — for deterministic
+    /// timeout tests (Phase 1 / Task 1.1b). Re-stamps `started_at` from
+    /// the injected clock so the recorded start and the `is_timed_out`
+    /// comparison share one clock domain; a `FakeMonotonicClock` can
+    /// then drive `SESSION_TIMEOUT` purely by `advance`.
+    #[must_use]
+    pub fn with_monotonic(mut self, monotonic: Arc<dyn MonotonicClock>) -> Self {
+        self.started_at = monotonic.now();
+        self.monotonic = monotonic;
         self
     }
 
@@ -768,7 +794,7 @@ impl ExchangeSession {
 
     /// Checks if the session has timed out.
     pub fn is_timed_out(&self) -> bool {
-        self.started_at.elapsed() > SESSION_TIMEOUT
+        self.monotonic.now().duration_since(self.started_at) > SESSION_TIMEOUT
     }
 
     /// Checks if the session can be resumed (within timeout window).

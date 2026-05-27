@@ -240,28 +240,6 @@ impl AppScreen {
             _ => return None,
         })
     }
-
-    /// Parse a screen name + parameter into a parameterized `AppScreen`.
-    ///
-    /// Legacy: backs the CABI `vauchi_app_navigate_to_param` surface. Since
-    /// core!968, `route_result` resolves every navigation `ActionResult`
-    /// (`OpenContact`, `EditContact`, `OpenEntryDetail`, …) to
-    /// `NavigateTo(ScreenModel)` before the wire, so no frontend receives a
-    /// raw navigation action to re-map — this path is dead on the wire and
-    /// retires with the forward-navigate surface in Tier-0 (d).
-    pub fn from_screen_id_with_param(id: &str, param: &str) -> Option<Self> {
-        let param = param.to_string();
-        Some(match id {
-            "contact_detail" => Self::ContactDetail { contact_id: param },
-            "contact_edit" => Self::ContactEdit { contact_id: param },
-            "contact_visibility" => Self::ContactVisibility { contact_id: param },
-            "entry_detail" => Self::MyInfoEntryDetail { field_id: param },
-            "group_detail" => Self::GroupDetail { group_id: param },
-            "verify_fingerprint" => Self::VerifyFingerprint { contact_id: param },
-            _ => return Self::from_screen_id(id),
-        })
-    }
-
     /// The sidebar/tab this screen belongs to, if it is a sub-screen of
     /// a top-level tab. `None` for top-level tabs themselves and for
     /// transient/global screens (lock, onboarding, deep-link consent).
@@ -1276,37 +1254,5 @@ impl AppEngine {
                 Vec::new()
             }
         }
-    }
-}
-
-// INLINE_TEST_REQUIRED: from_screen_id_with_param is module-private, cannot be tested from external tests/
-#[cfg(test)]
-mod tests {
-    use super::AppScreen;
-
-    // @internal
-    #[test]
-    fn from_screen_id_with_param_contact_detail() {
-        let screen = AppScreen::from_screen_id_with_param("contact_detail", "abc-123");
-        assert_eq!(
-            screen,
-            Some(AppScreen::ContactDetail {
-                contact_id: "abc-123".to_string()
-            })
-        );
-    }
-
-    // @internal
-    #[test]
-    fn from_screen_id_with_param_falls_back() {
-        let screen = AppScreen::from_screen_id_with_param("contacts", "ignored");
-        assert_eq!(screen, Some(AppScreen::Contacts));
-    }
-
-    // @internal
-    #[test]
-    fn from_screen_id_with_param_unknown() {
-        let screen = AppScreen::from_screen_id_with_param("nonexistent", "x");
-        assert_eq!(screen, None);
     }
 }

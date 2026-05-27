@@ -19,7 +19,10 @@
 //! - FAIL QR type for immediate peer abort notification
 //! - Scan acknowledgment via RDYY payload
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
 
 use chacha20poly1305::ChaCha20Poly1305;
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
@@ -261,12 +264,21 @@ pub struct MultiStageSession {
     /// `None` outside Listening. Read by
     /// [`Self::check_and_apply_audio_timeout`] to enforce the
     /// `AUDIO_LISTEN_TIMEOUT` budget on the cycle thread. The
-    /// timestamp source is `Instant::now()` inside
-    /// [`Self::set_audio_proximity`]; tests inject by offsetting
-    /// against `Instant::now()` rather than mocking the clock
+    /// timestamp source is `self.monotonic.now()` inside
+    /// [`Self::set_audio_proximity`]; tests inject a
+    /// `FakeMonotonicClock` via [`Self::with_monotonic`] and advance it
     /// (matches the existing `phase_entered_at` style in this
     /// session for ProtocolState transitions).
     audio_listening_started_at: Option<Instant>,
+    /// Explicit-monotonic-time seam (Phase 1 / Task 1.1b). Source for
+    /// every `Instant` this session stamps (`phase_entered_at`,
+    /// `last_progress_at`, `fail_broadcast_until`,
+    /// `audio_listening_started_at`) and the RDYY/finalized/FAIL
+    /// timeout comparisons. Defaults to `SystemMonotonicClock::shared()`;
+    /// inject via [`Self::with_monotonic`] for deterministic timeout
+    /// tests. Note `check_and_apply_audio_timeout` retains its explicit
+    /// `now: Instant` parameter for cycle-thread callers.
+    monotonic: Arc<dyn MonotonicClock>,
 }
 
 /// Errors building the post-finalize Double Ratchet for a multi-stage exchange.
@@ -354,7 +366,18 @@ impl MultiStageSession {
             peer_relay_noise_pubkey: None,
             audio_proximity: AudioProximityState::Pending,
             audio_listening_started_at: None,
+            monotonic: SystemMonotonicClock::shared(),
         }
+    }
+
+    /// Replace the [`MonotonicClock`] driving this session's timeout and
+    /// timestamp logic. Default is [`SystemMonotonicClock::shared`];
+    /// inject a `FakeMonotonicClock` for deterministic RDYY/finalized/
+    /// audio-timeout tests.
+    #[must_use]
+    pub fn with_monotonic(mut self, monotonic: Arc<dyn MonotonicClock>) -> Self {
+        self.monotonic = monotonic;
+        self
     }
 
     /// Returns the current protocol state.
@@ -451,11 +474,15 @@ impl MultiStageSession {
         our_identity: &[u8; 32],
         their_identity: &[u8; 32],
     ) -> Result<(DoubleRatchetState, bool), RatchetSetupError> {
-        let transport_key = self.transport_key.ok_or(RatchetSetupError::NoTransportKey)?;
+        let transport_key = self
+            .transport_key
+            .ok_or(RatchetSetupError::NoTransportKey)?;
         let shared = SymmetricKey::from_bytes(transport_key);
         let is_initiator = our_identity < their_identity;
         let ratchet = if is_initiator {
-            let peer_ephemeral = self.peer_ephemeral.ok_or(RatchetSetupError::NoPeerEphemeral)?;
+            let peer_ephemeral = self
+                .peer_ephemeral
+                .ok_or(RatchetSetupError::NoPeerEphemeral)?;
             DoubleRatchetState::initialize_initiator(&shared, peer_ephemeral)
                 .map_err(|e| RatchetSetupError::RatchetInit(e.to_string()))?
         } else {
@@ -528,12 +555,12 @@ impl MultiStageSession {
         // Track the listen-window entry for
         // `check_and_apply_audio_timeout` (Phase 1.C.7). The window
         // is open exactly while `audio_proximity == Listening` —
-        // record on entry, clear on exit. `Instant::now()` is the
-        // monotonic source; the platform wrapper passes through its
-        // own `Instant::now()` to the cycle-thread timeout check so
-        // both timestamps share a clock domain.
+        // record on entry, clear on exit. `self.monotonic.now()` is the
+        // monotonic source (Phase 1 / Task 1.1b seam) — the same clock
+        // `check_and_apply_audio_timeout`'s caller must read, so the
+        // recorded start and the timeout `now` share a clock domain.
         self.audio_listening_started_at = match new_state {
-            AudioProximityState::Listening => Some(Instant::now()),
+            AudioProximityState::Listening => Some(self.monotonic.now()),
             _ => None,
         };
         Ok(())
@@ -702,7 +729,7 @@ impl MultiStageSession {
             }
             ProtocolState::Complete | ProtocolState::RetryReady => {
                 // S1: Wall-clock timeout with progress extension.
-                let now = Instant::now();
+                let now = self.monotonic.now();
                 let entered = *self.phase_entered_at.get_or_insert(now);
 
                 // Compute deadline: base + extension from last progress, capped at max.
@@ -754,7 +781,7 @@ impl MultiStageSession {
             ProtocolState::Finalized => {
                 // Continue broadcasting COMBO for a grace period so the peer
                 // can scan it and also finalize.
-                let now = Instant::now();
+                let now = self.monotonic.now();
                 let entered = *self.phase_entered_at.get_or_insert(now);
                 if now.duration_since(entered) > FINALIZED_GRACE_DURATION {
                     return None;
@@ -778,7 +805,7 @@ impl MultiStageSession {
                 // S5: Broadcast FAIL QR so peer aborts immediately.
                 if self
                     .fail_broadcast_until
-                    .is_some_and(|until| Instant::now() <= until)
+                    .is_some_and(|until| self.monotonic.now() <= until)
                 {
                     return self.get_fail_qr();
                 }
@@ -1140,7 +1167,7 @@ impl MultiStageSession {
         if bool::from(payload_hash.ct_eq(&expected_hash)) {
             self.state = ProtocolState::Complete;
             // S1: Start wall-clock timer for the RDYY phase.
-            self.phase_entered_at = Some(Instant::now());
+            self.phase_entered_at = Some(self.monotonic.now());
             self.last_progress_at = None;
             self.display_cycle = 0;
         } else {
@@ -1377,14 +1404,14 @@ impl MultiStageSession {
         }
 
         // S6: Any RDYY scan is progress — extend the deadline.
-        self.last_progress_at = Some(Instant::now());
+        self.last_progress_at = Some(self.monotonic.now());
 
         // Verify ack_hash matches our computation.
         let expected = self.compute_ready_hash();
         if bool::from(ack_hash.ct_eq(&expected)) {
             self.state = ProtocolState::Finalized;
             // Reset for the finalized grace period (wall-clock based).
-            self.phase_entered_at = Some(Instant::now());
+            self.phase_entered_at = Some(self.monotonic.now());
             self.display_cycle = 0;
         }
         // Ignore mismatched READY (could be from a different exchange)

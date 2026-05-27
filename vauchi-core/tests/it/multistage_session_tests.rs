@@ -413,6 +413,35 @@ fn audio_timeout_transitions_listening_to_failed_after_budget() {
 
 // @internal
 #[test]
+fn audio_timeout_set_site_uses_injected_monotonic_clock() {
+    use std::sync::Arc;
+    use vauchi_core::monotonic::{FakeMonotonicClock, MonotonicClock};
+
+    // Phase 1 / Task 1.1b: `set_audio_proximity` stamps the listen-window
+    // start via `self.monotonic.now()`. With an injected fake clock, the
+    // recorded start and the timeout `now` share one controlled domain,
+    // so advancing the fake clock alone fires the 5s budget — no real
+    // wait, and no dependence on ambient `Instant::now()`.
+    let fake = Arc::new(FakeMonotonicClock::new());
+    let mut s = MultiStageSession::new(b"card".to_vec()).with_monotonic(fake.clone());
+    s.set_audio_proximity(AudioProximityState::Listening)
+        .unwrap();
+
+    assert!(
+        !s.check_and_apply_audio_timeout(fake.now()).unwrap(),
+        "fresh listen window (fake at offset 0) must not time out"
+    );
+
+    fake.advance(Duration::from_secs(6));
+    assert!(
+        s.check_and_apply_audio_timeout(fake.now()).unwrap(),
+        "advancing the injected clock past the 5s budget must fire the timeout"
+    );
+    assert_eq!(s.audio_proximity(), AudioProximityState::Failed);
+}
+
+// @internal
+#[test]
 fn audio_timeout_no_op_before_budget() {
     let mut s = MultiStageSession::new(b"card".to_vec());
     let entered = Instant::now();

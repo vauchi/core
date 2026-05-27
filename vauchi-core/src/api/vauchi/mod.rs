@@ -50,6 +50,7 @@ use std::sync::{Arc, Mutex};
 use crate::clock::{Clock, SystemClock};
 use crate::crypto::{ShreddingMasterKey, SymmetricKey};
 use crate::identity::Identity;
+use crate::monotonic::{MonotonicClock, SystemMonotonicClock};
 use crate::rng::{OsSecureRng, SecureRng};
 use crate::sleeper::{Sleeper, SystemSleeper};
 use crate::storage::{SecureStorage, Storage};
@@ -221,6 +222,15 @@ pub struct Vauchi {
     /// inject a `FakeSleeper` via `Vauchi::with_sleeper` to skip
     /// the 300 ms pad while still asserting the floor was requested.
     sleeper: Arc<dyn Sleeper>,
+    /// Explicit-monotonic-time seam (Phase 1 / Task 1.1b of the pure-
+    /// functional-core program). Every `Instant::now()` read that
+    /// drives a timeout, deadline, or retry window under `vauchi-core`
+    /// migrates to `self.monotonic.now()` cluster by cluster. Default
+    /// is `SystemMonotonicClock::shared()`; tests inject a
+    /// `FakeMonotonicClock` via `Vauchi::with_monotonic` to advance
+    /// monotonic time deterministically. Diagnostic perf-timers are
+    /// exempt (see `crate::monotonic` module docs).
+    monotonic: Arc<dyn MonotonicClock>,
     /// In-memory queue of duress alerts waiting to be sent.
     ///
     /// Populated when `authenticate()` detects a duress PIN. Alerts are
@@ -322,6 +332,7 @@ impl Vauchi {
         let clock = clock.unwrap_or_else(SystemClock::shared);
         let rng = rng.unwrap_or_else(OsSecureRng::shared);
         let sleeper = SystemSleeper::shared();
+        let monotonic = SystemMonotonicClock::shared();
 
         // Determine the storage encryption key
         let storage_key = Self::resolve_storage_key(&config, secure_storage.as_deref())?;
@@ -360,6 +371,7 @@ impl Vauchi {
             clock,
             rng,
             sleeper,
+            monotonic,
             #[cfg(feature = "network-http")]
             ohttp_key: None,
             #[cfg(feature = "network-http")]
@@ -435,6 +447,27 @@ impl Vauchi {
     #[must_use]
     pub fn with_sleeper(mut self, sleeper: Arc<dyn Sleeper>) -> Self {
         self.sleeper = sleeper;
+        self
+    }
+
+    /// Borrow the explicit-monotonic-time seam. Tests inject a
+    /// `FakeMonotonicClock`; production wraps
+    /// [`SystemMonotonicClock::shared`]. See [`Vauchi::with_monotonic`].
+    pub fn monotonic(&self) -> &Arc<dyn MonotonicClock> {
+        &self.monotonic
+    }
+
+    /// Replace the [`MonotonicClock`] used by this `Vauchi`. The
+    /// default (set in every constructor) is
+    /// [`SystemMonotonicClock::shared`] — the real OS monotonic clock.
+    ///
+    /// Test-only seam: inject a `FakeMonotonicClock` (itself gated
+    /// behind `feature = "testing"`) to advance session-timeout,
+    /// deadline, and retry-window time deterministically without real
+    /// wall-clock waits.
+    #[must_use]
+    pub fn with_monotonic(mut self, monotonic: Arc<dyn MonotonicClock>) -> Self {
+        self.monotonic = monotonic;
         self
     }
 
@@ -525,6 +558,7 @@ impl Vauchi {
             clock,
             rng,
             sleeper: SystemSleeper::shared(),
+            monotonic: SystemMonotonicClock::shared(),
             #[cfg(feature = "network-http")]
             ohttp_key: None,
             #[cfg(feature = "network-http")]

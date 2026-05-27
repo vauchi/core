@@ -89,3 +89,40 @@ fn shared_constructors_return_dyn_handles() {
         "advance() on the concrete Arc was not visible through the dyn handle"
     );
 }
+
+// @internal
+#[test]
+fn vauchi_with_monotonic_injects_caller_clock() {
+    // Wiring contract every callsite-migration MR depends on:
+    // `Vauchi::with_monotonic` must store the caller-provided clock and
+    // expose it via `Vauchi::monotonic`. Without it, `self.monotonic`
+    // silently falls back to the real OS clock and timeout tests would
+    // block on wall-clock.
+    use vauchi_core::Vauchi;
+
+    let injected: Arc<dyn MonotonicClock> = Arc::new(FakeMonotonicClock::new());
+    let vauchi = Vauchi::in_memory()
+        .expect("in_memory Vauchi")
+        .with_monotonic(Arc::clone(&injected));
+
+    assert!(
+        Arc::ptr_eq(vauchi.monotonic(), &injected),
+        "with_monotonic cloned the clock instead of storing the original Arc"
+    );
+}
+
+// @internal
+#[test]
+fn vauchi_default_ctor_uses_system_monotonic_clock() {
+    // The default constructor must hand out a working monotonic clock
+    // with no injection — a sandwich check that it never goes backwards.
+    use vauchi_core::Vauchi;
+
+    let vauchi = Vauchi::in_memory().expect("in_memory Vauchi");
+    let t0 = vauchi.monotonic().now();
+    let t1 = vauchi.monotonic().now();
+    assert!(
+        t1 >= t0,
+        "default Vauchi monotonic clock went backwards: {t1:?} < {t0:?}"
+    );
+}

@@ -570,6 +570,19 @@ impl PlatformAppEngine {
         screen_envelope_to_json(&model, &pending_commands)
     }
 
+    /// Whether a back step exists in core's nav-history stack.
+    ///
+    /// Frontends drive their back affordance / `BackHandler` from this
+    /// instead of inferring "is this a core-driven screen?" from a
+    /// frontend-side screen-id map (ADR-043: no constructed nav targets).
+    /// Tier-0 of the CoreScreenIdMap rework.
+    pub fn can_go_back(&self) -> Result<bool, MobileError> {
+        let engine = self.engine.lock().map_err(|e| MobileError::Other {
+            detail: format!("Lock failed: {e}"),
+        })?;
+        Ok(engine.can_go_back())
+    }
+
     /// Handle an incoming `vauchi://exchange?...` deep link URI.
     ///
     /// On a successful parse, navigates to the consent gate (the new

@@ -346,6 +346,26 @@ fn navigate_back_returns_previous_screen() {
 
 // @internal
 #[test]
+fn can_go_back_plumbs_nav_history_through_boundary() {
+    let (engine, _dir) = create_engine();
+    // Fresh engine, no navigation has occurred: no back step.
+    assert!(
+        !engine.can_go_back().expect("can_go_back"),
+        "a freshly constructed engine has no back step"
+    );
+
+    drive_onboarding(&engine);
+    engine
+        .navigate_to_json(r#""Exchange""#.into())
+        .expect("navigate to exchange");
+    assert!(
+        engine.can_go_back().expect("can_go_back"),
+        "after forward navigation a back step exists"
+    );
+}
+
+// @internal
+#[test]
 fn available_screens_returns_nav_bar_items() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);

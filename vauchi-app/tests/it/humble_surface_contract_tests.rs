@@ -56,6 +56,7 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "advance_qr_frame_json",
     "available_screens_json",
     "boot",
+    "can_go_back",
     "current_screen_id",
     "current_screen_json",
     "current_tab_id",
@@ -222,11 +223,18 @@ fn humble_allowlist_size_matches_plan() {
     // number changes again, the next ADR amendment (or a retirement
     // passing ADR-048's G1-G5 gates) must precede the edit. Catching the
     // count drift here is cheaper than discovering it during an ADR audit.
+    //
+    // CoreScreenIdMap rework Tier-0 (2026-05-27) added `can_go_back`
+    // (25 -> 26): a genuine binding query that lets the frontend drive
+    // its back affordance from core's nav-history instead of inferring
+    // it from a frontend-side screen-id map. ADR-043-legitimate (a query,
+    // not domain logic); it is the prerequisite for retiring
+    // `navigate_to_json` once both frontends migrate off CoreScreenIdMap.
     assert_eq!(
         HUMBLE_ALLOWLIST.len(),
-        25,
-        "Humble allow-list size drifted from the 25 expected after \
-         ADR-043 Amendment 3 promoted `dispatch_domain_command` + `new`. \
+        26,
+        "Humble allow-list size drifted from the 26 expected after \
+         CoreScreenIdMap Tier-0 added `can_go_back`. \
          Edits to this list require an ADR amendment (ADR-021/043 \
          for the Humble engine framing — incl. Amendment 3 for the \
          linchpin promotions — or ADR-048's G1-G5 gates for \

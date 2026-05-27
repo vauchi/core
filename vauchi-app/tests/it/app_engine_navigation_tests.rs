@@ -5,7 +5,7 @@
 //! Integration tests for `AppEngine` navigation: `navigate_to`,
 //! `navigate_back`, and the bootstrap-only `set_initial_screen`.
 
-use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
+use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
 
 fn engine_with_identity() -> AppEngine {
@@ -90,6 +90,28 @@ fn can_go_back_reflects_nav_history_state() {
         !engine.can_go_back(),
         "after backing out to the root, no further back step exists"
     );
+}
+
+// @internal
+#[test]
+fn open_settings_chrome_action_navigates_to_settings() {
+    // The native top-bar gear forwards a reserved global-chrome
+    // `ActionPressed { action_id: "open_settings" }` instead of
+    // constructing the "Settings" screen name (CoreScreenIdMap rework
+    // Tier-0, item 2: chrome nav is core-resolved). Core intercepts it
+    // before per-screen dispatch and resolves to NavigateTo(Settings).
+    let mut engine = engine_with_identity();
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "open_settings".into(),
+    });
+    match result {
+        ActionResult::NavigateTo(screen) => assert_eq!(
+            screen.screen_id, "settings",
+            "open_settings must resolve to the Settings screen"
+        ),
+        other => panic!("expected NavigateTo(settings), got {other:?}"),
+    }
+    assert_eq!(*engine.current_app_screen(), AppScreen::Settings);
 }
 
 // @internal

@@ -41,6 +41,11 @@ use super::screen::{ActionStyle, ScreenAction, ScreenModel};
 
 /// Shared action ID for the update link button/banner.
 const ACTION_OPEN_UPDATE_LINK: &str = "open_update_link";
+/// Reserved global-chrome action id: the native top-bar gear forwards
+/// this instead of constructing the "Settings" screen name. Resolved
+/// to `NavigateTo(Settings)` before per-screen dispatch (CoreScreenIdMap
+/// rework Tier-0; ADR-043 Amendment 4 — forward nav is core-resolved).
+const ACTION_OPEN_SETTINGS: &str = "open_settings";
 /// Action id used by the offline `Component::Banner` injected by
 /// `apply_offline_overlay`. Currently presentational only — no
 /// dispatcher arm. Frontends rendering the banner can ignore taps.
@@ -924,6 +929,20 @@ impl WorkflowEngine for AppEngine {
                 Some(target) => ActionResult::NavigateTo(self.navigate_to(target)),
                 None => ActionResult::UpdateScreen(self.engine.current_screen()),
             };
+        }
+
+        // Global-chrome navigation (ADR-043 Amendment 4): the native
+        // top-bar gear forwards a reserved `ActionPressed` token rather
+        // than constructing the Settings screen name. Resolve it to
+        // `NavigateTo` before per-screen dispatch, on the same closed-set
+        // basis as `open_update_link` above. Settings lives on its own
+        // reserved id, so it cannot collide with the More-menu list item
+        // (`"settings"`) or any per-screen `ActionPressed`.
+        if matches!(
+            action,
+            UserAction::ActionPressed { ref action_id } if action_id == ACTION_OPEN_SETTINGS
+        ) {
+            return ActionResult::NavigateTo(self.navigate_to(AppScreen::Settings));
         }
 
         // Capture display name during onboarding for identity persistence

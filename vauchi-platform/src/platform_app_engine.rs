@@ -464,6 +464,33 @@ impl PlatformAppEngine {
             return Ok(None);
         }
 
+        // Slice 32m T2.2c — BLE event routing into the
+        // AppEngine-owned `BleHandshakeMachine`. Gated on
+        // `ble_handshake_session_active()` so this is a no-op until
+        // a frontend explicitly calls `ensure_ble_handshake_session`
+        // (the Android consumer rewire in Phase 4.2). Additive on
+        // top of `engine.handle_hardware_event` below so the
+        // existing `ExchangeEngine::BleExchangeFlow` proximity path
+        // continues to run undisturbed. Net effect today:
+        // `Event::BleMtuNegotiated` lands on the machine's
+        // `update_mtu` whenever a session is held; all other BLE
+        // events fall through to the regular routing.
+        if matches!(
+            &hw_event,
+            vauchi_core::Event::BleConnected { .. }
+                | vauchi_core::Event::BleCharacteristicNotified { .. }
+                | vauchi_core::Event::BleCharacteristicRead { .. }
+                | vauchi_core::Event::BleMtuNegotiated { .. }
+                | vauchi_core::Event::BleDisconnected { .. }
+        ) {
+            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            if engine.ble_handshake_session_active() {
+                let _ = engine.forward_ble_hardware_event(&hw_event);
+            }
+        }
+
         // ADR-031: biometric unlock arrives as a hardware event, not as
         // a typed PAE method. Core consults its duress-PIN state and
         // pads the wall-clock to `BIOMETRIC_UNLOCK_MIN_DURATION` so

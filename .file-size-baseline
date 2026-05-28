@@ -232,7 +232,10 @@ vauchi-core/src/storage/mod.rs 1079
 #  AppEngine + module declaration + initializer + 1-line wire into
 #  poll_notifications, mirrors the 32l device_link_initiator
 #  scaffolding)
-vauchi-app/src/ui/app_engine/mod.rs 1509
+# (+8 for slice 32m T2.2b: ble_handshake_session field on AppEngine
+#  + module declaration + initializer, mirrors T1.2b's
+#  multi_stage_session scaffolding)
+vauchi-app/src/ui/app_engine/mod.rs 1517
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts

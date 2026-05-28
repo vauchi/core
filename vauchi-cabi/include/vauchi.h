@@ -24,11 +24,6 @@ typedef struct CabiConfig CabiConfig;
 typedef struct VauchiApp VauchiApp;
 
 /**
- * Opaque handle to a device link initiator.
- */
-typedef struct VauchiDeviceLinkInitiator VauchiDeviceLinkInitiator;
-
-/**
  * Opaque handle to an exchange session.
  */
 typedef struct VauchiExchange VauchiExchange;
@@ -444,106 +439,6 @@ char *vauchi_app_tab_info(struct VauchiApp *handle, const char *locale_code);
  * Same as `vauchi_app_tab_info`.
  */
 char *vauchi_app_sidebar_items(struct VauchiApp *handle, const char *locale_code);
-
-/**
- * Start a device link as the existing device (initiator).
- *
- * Creates an initiator from the app's identity and device registry.
- * Returns null if no identity exists or on error.
- *
- * # Safety
- * `handle` must be a valid app handle or null.
- */
-struct VauchiDeviceLinkInitiator *vauchi_device_link_start(struct VauchiApp *handle);
-
-/**
- * Destroy a device link initiator.
- *
- * # Safety
- * `initiator` must be a pointer returned by `vauchi_device_link_start`, or null.
- */
-void vauchi_device_link_initiator_destroy(struct VauchiDeviceLinkInitiator *initiator);
-
-/**
- * Get the QR data string from the initiator.
- *
- * # Safety
- * `initiator` must be a valid initiator handle or null.
- */
-char *vauchi_device_link_qr_data(struct VauchiDeviceLinkInitiator *initiator);
-
-/**
- * Get the expiry timestamp (Unix seconds) of the QR code.
- *
- * Returns 0 on error.
- *
- * # Safety
- * `initiator` must be a valid initiator handle or null.
- */
-uint64_t vauchi_device_link_expires_at(struct VauchiDeviceLinkInitiator *initiator);
-
-/**
- * Decrypt an incoming link request and return confirmation details.
- *
- * `encrypted_request_b64` is the base64-encoded encrypted request from
- * the new device. Returns a JSON string:
- * `{"device_name":"...","confirmation_code":"...","identity_fingerprint":"..."}`
- * or `{"error":"..."}` on failure. Returns null on null inputs.
- *
- * # Safety
- * `initiator` must be a valid initiator handle or null.
- * `encrypted_request_b64` must be a valid null-terminated C string, or null.
- */
-char *vauchi_device_link_prepare_confirmation(struct VauchiDeviceLinkInitiator *initiator,
-                                              const char *encrypted_request_b64);
-
-/**
- * Confirm the device link with manual code verification.
- *
- * Must call `vauchi_device_link_prepare_confirmation` first.
- * `confirmation_code` is the human-readable code (e.g. "123-456").
- * Rust computes the HMAC internally — the link key never crosses FFI.
- * `confirmed_at` is the Unix timestamp (seconds).
- *
- * Returns JSON: `{"encrypted_response":"base64...","device_name":"...","device_index":N}`
- * or `{"error":"..."}`. Returns null on null inputs.
- *
- * # Safety
- * `initiator` must be a valid initiator handle or null.
- * `confirmation_code` must be a valid null-terminated C string, or null.
- */
-char *vauchi_device_link_confirm_manual(struct VauchiDeviceLinkInitiator *initiator,
-                                        const char *confirmation_code,
-                                        uint64_t confirmed_at);
-
-/**
- * Listen for an incoming device link request via relay (blocking).
- *
- * Creates an exchange offer with the identity, then polls until the new
- * device claims it. Blocks up to `timeout_secs` seconds.
- *
- * Returns JSON: `{"encrypted_payload":"base64...","sender_token":"..."}`
- * or `{"error":"..."}`. Returns null on null handle.
- *
- * # Safety
- * `handle` must be a valid app handle or null.
- */
-char *vauchi_device_link_listen(struct VauchiApp *handle, uint64_t timeout_secs);
-
-/**
- * Send device link response back via relay.
- *
- * Claims the return channel created by the new device.
- * Returns 0 on success, -1 on error.
- *
- * # Safety
- * `handle` must be a valid app handle or null.
- * `sender_token` and `encrypted_response_b64` must be valid null-terminated
- * C strings, or null.
- */
-int32_t vauchi_device_link_send_response(struct VauchiApp *handle,
-                                         const char *sender_token,
-                                         const char *encrypted_response_b64);
 
 /**
  * Create a new QR exchange session using the app's identity.

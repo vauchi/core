@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc f3a978d0861a4f1a5833e534d5c784bbdd6ebf799a20b73d9d38020b7c470960 # shrinks to events = [QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }, QrScanned { data: "vauchi://multistage/peer/00" }], tick_ms = 50

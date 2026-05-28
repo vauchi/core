@@ -51,6 +51,15 @@ const ACTION_OPEN_SETTINGS: &str = "open_settings";
 /// dispatcher arm. Frontends rendering the banner can ignore taps.
 const ACTION_OFFLINE_BANNER: &str = "offline_banner";
 
+/// Reserved action id for the demo-contact banner's dismiss button.
+/// Emitted on `Component::Banner` from `apply_demo_contact_overlay`;
+/// `handle_action` intercepts presses to call
+/// `Vauchi::dismiss_demo_contact`. Per ADR-043 / ADR-021: the
+/// state→banner mapping lives in core, not in any frontend's view
+/// (was iOS `DemoContactCard` rendering a frontend-derived banner
+/// from `viewModel.demoContact`).
+const ACTION_DISMISS_DEMO_CONTACT: &str = "dismiss_demo_contact";
+
 /// Top-level screens in the application.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -846,6 +855,52 @@ impl AppEngine {
         screen
     }
 
+    /// Inject a demo-contact banner on the Contacts screen when the
+    /// onboarding demo is active. Scoped to `AppScreen::Contacts` so the
+    /// banner doesn't leak onto other roots. Frontends render the
+    /// generic `Component::Banner` and dispatch
+    /// `ActionPressed { action_id: "dismiss_demo_contact" }` on tap of
+    /// the action; `handle_action` calls `Vauchi::dismiss_demo_contact`.
+    /// Idempotent — re-running doesn't duplicate the banner.
+    ///
+    /// Replaces iOS's `DemoContactCard` (~90 LOC) and the equivalent
+    /// Android frontend rendering — both previously derived this from
+    /// `viewModel.demoContact` frontend-side, which violated ADR-021's
+    /// "core owns the state→presentation mapping" rule.
+    fn apply_demo_contact_overlay(&self, mut screen: ScreenModel) -> ScreenModel {
+        if !matches!(self.screen, AppScreen::Contacts) {
+            return screen;
+        }
+        if !self.vauchi.is_demo_contact_active().unwrap_or(false) {
+            return screen;
+        }
+        let card = match self.vauchi.demo_contact_card() {
+            Ok(Some(card)) => card,
+            _ => return screen,
+        };
+        let already_present = screen.components.iter().any(|c| {
+            matches!(
+                c,
+                Component::Banner { action_id, .. } if action_id == ACTION_DISMISS_DEMO_CONTACT
+            )
+        });
+        if already_present {
+            return screen;
+        }
+        // Place at the top of the screen body so the onboarding hint
+        // is the first thing visible above the contact list.
+        screen.components.insert(
+            0,
+            Component::Banner {
+                text: format!("{}: {}", card.tip_title, card.tip_content),
+                action_label: "Dismiss".into(),
+                action_id: ACTION_DISMISS_DEMO_CONTACT.into(),
+                a11y: None,
+            },
+        );
+        screen
+    }
+
     /// Modify a `ScreenModel` to inject update banners or replace with a blocking screen.
     ///
     /// - `UpToDate` → no change
@@ -912,6 +967,7 @@ impl WorkflowEngine for AppEngine {
         let screen = self.engine.current_screen();
         let screen = self.apply_update_overlay(screen);
         let screen = self.apply_offline_overlay(screen);
+        let screen = self.apply_demo_contact_overlay(screen);
         self.apply_screen_id_metadata(screen)
     }
 
@@ -966,6 +1022,25 @@ impl WorkflowEngine for AppEngine {
             UserAction::ActionPressed { ref action_id } if action_id == ACTION_OPEN_SETTINGS
         ) {
             return ActionResult::NavigateTo(self.navigate_to(AppScreen::Settings));
+        }
+
+        // Demo-contact dismiss (Tier-0 for the shell-purity spike): the
+        // demo banner emitted by `apply_demo_contact_overlay` carries
+        // this reserved id; intercept it here and call Vauchi to clear
+        // the demo state, then re-render. Replaces iOS's
+        // `viewModel.dismissDemoContact()` direct dispatch from
+        // `DemoContactCard`.
+        if matches!(
+            action,
+            UserAction::ActionPressed { ref action_id } if action_id == ACTION_DISMISS_DEMO_CONTACT
+        ) {
+            // Storage failure here is non-actionable from the action
+            // loop; the next render still reflects the previous state, and
+            // the user can retry. Log instead of panicking.
+            if let Err(err) = self.vauchi.dismiss_demo_contact() {
+                tracing::warn!(?err, "dismiss_demo_contact storage write failed");
+            }
+            return ActionResult::UpdateScreen(self.current_screen());
         }
 
         // Capture display name during onboarding for identity persistence

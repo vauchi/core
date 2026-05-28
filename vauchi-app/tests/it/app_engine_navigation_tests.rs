@@ -116,6 +116,56 @@ fn open_settings_chrome_action_navigates_to_settings() {
 
 // @internal
 #[test]
+fn can_go_back_false_at_root_even_with_nonempty_history() {
+    // Roots (Onboarding + the five mobile bottom-nav tabs) are
+    // back-stoppers: pressing back at a root exits the app rather
+    // than popping `nav_history`. The bug this guards against is
+    // the post-onboarding handoff — onboarding completion lands the
+    // user on `MyInfo` with onboarding crumbs still in `nav_history`,
+    // and a naive `nav_history`-only `can_go_back` would offer a
+    // back affordance at the home tab. The rule is a screen
+    // property (`AppScreen::is_root`), not a history property.
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Settings);
+    engine.navigate_to(AppScreen::MyInfo);
+    assert_eq!(*engine.current_app_screen(), AppScreen::MyInfo);
+    // `navigate_to_pushes_history` verifies that the two navigates above
+    // left `nav_history` non-empty (MyInfo, then Settings). Under the
+    // history-only `can_go_back` this would return `true` — the new
+    // root-aware rule must return `false`.
+    assert!(
+        !engine.can_go_back(),
+        "tab root must not offer back even when nav_history is non-empty"
+    );
+}
+
+// @internal
+#[test]
+fn can_go_back_false_at_every_root_screen() {
+    // Each declared root must report `can_go_back == false` after
+    // we put a non-root above it in history. Drift catcher: adding
+    // a sixth bottom-nav tab without updating `AppScreen::is_root`
+    // would let the contact-tap-style fall-through reappear.
+    for root in [
+        AppScreen::Onboarding,
+        AppScreen::MyInfo,
+        AppScreen::Contacts,
+        AppScreen::Exchange,
+        AppScreen::Groups,
+        AppScreen::More,
+    ] {
+        let mut engine = engine_with_identity();
+        engine.navigate_to(AppScreen::Settings);
+        engine.navigate_to(root.clone());
+        assert!(
+            !engine.can_go_back(),
+            "root {root:?} must not offer back with non-empty history"
+        );
+    }
+}
+
+// @internal
+#[test]
 fn can_go_back_false_after_set_initial_screen() {
     // set_initial_screen must NOT push history (bootstrap-only), so it
     // must not make `can_go_back` report a phantom back step.

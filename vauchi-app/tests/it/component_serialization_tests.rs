@@ -8,7 +8,7 @@
 //! deserialized back to an identical value (serde roundtrip), and that
 //! the JSON shape matches the expected externally-tagged format.
 
-use vauchi_app::ui::{Component, DropdownOption};
+use vauchi_app::ui::{ActionListItem, Component, DropdownOption, IndicatorKind, Section};
 
 // --- Dropdown ---
 
@@ -125,4 +125,152 @@ fn dropdown_option_roundtrip() {
     let roundtrip: DropdownOption =
         serde_json::from_str(&json).expect("deserialize DropdownOption");
     assert_eq!(option, roundtrip);
+}
+
+// --- Indicator (chrome-positioned status, ADR-043 / shell-purity investigation) ---
+
+// @internal
+#[test]
+fn indicator_roundtrip_with_action() {
+    let component = Component::Indicator {
+        id: "sync".to_string(),
+        label: "Synced 15:47".to_string(),
+        kind: IndicatorKind::Active,
+        action_id: Some("sync_now".to_string()),
+        a11y: None,
+    };
+    let json = serde_json::to_string(&component).expect("serialize Indicator");
+    let roundtrip: Component = serde_json::from_str(&json).expect("deserialize Indicator");
+    assert_eq!(component, roundtrip);
+    // Wire shape check: action_id present on the wire, kind serialized as "Active".
+    assert!(
+        json.contains("\"action_id\":\"sync_now\""),
+        "action_id present on wire: {json}"
+    );
+    assert!(
+        json.contains("\"kind\":\"Active\""),
+        "kind serialized as Active: {json}"
+    );
+}
+
+// @internal
+#[test]
+fn indicator_roundtrip_display_only() {
+    // Display-only indicator: action_id = None. Wire shape must omit
+    // the field entirely via skip_serializing_if so frontends never see
+    // an empty/null action_id they'd have to special-case.
+    let component = Component::Indicator {
+        id: "online".to_string(),
+        label: "Offline".to_string(),
+        kind: IndicatorKind::Error,
+        action_id: None,
+        a11y: None,
+    };
+    let json = serde_json::to_string(&component).expect("serialize Indicator");
+    let roundtrip: Component = serde_json::from_str(&json).expect("deserialize Indicator");
+    assert_eq!(component, roundtrip);
+    assert!(
+        !json.contains("action_id"),
+        "display-only indicator must omit action_id: {json}"
+    );
+}
+
+// @internal
+#[test]
+fn indicator_kind_covers_four_states() {
+    // Exhaustive roundtrip across all IndicatorKind variants. Drift catcher:
+    // if a future MR adds a 5th kind, this test must be updated to keep the
+    // wire-shape coverage exhaustive.
+    for kind in [
+        IndicatorKind::Active,
+        IndicatorKind::Error,
+        IndicatorKind::Neutral,
+        IndicatorKind::Busy,
+    ] {
+        let component = Component::Indicator {
+            id: format!("k_{:?}", kind),
+            label: format!("{:?}", kind),
+            kind,
+            action_id: None,
+            a11y: None,
+        };
+        let json = serde_json::to_string(&component).expect("serialize");
+        let roundtrip: Component = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(component, roundtrip, "kind {kind:?} must roundtrip");
+    }
+}
+
+// --- SectionedActionList (grouped menu, ADR-043 / shell-purity investigation) ---
+
+// @internal
+#[test]
+fn sectioned_action_list_roundtrip_with_multiple_sections() {
+    let component = Component::SectionedActionList {
+        id: "more_menu".to_string(),
+        sections: vec![
+            Section {
+                id: "primary".to_string(),
+                label: "Primary".to_string(),
+                items: vec![
+                    ActionListItem {
+                        id: "settings".to_string(),
+                        label: "Settings".to_string(),
+                        icon: Some("gear".to_string()),
+                        detail: None,
+                        a11y: None,
+                        info_key: None,
+                    },
+                    ActionListItem {
+                        id: "help".to_string(),
+                        label: "Help".to_string(),
+                        icon: Some("questionmark.circle".to_string()),
+                        detail: None,
+                        a11y: None,
+                        info_key: None,
+                    },
+                ],
+            },
+            Section {
+                id: "legal".to_string(),
+                label: "Legal".to_string(),
+                items: vec![ActionListItem {
+                    id: "privacy".to_string(),
+                    label: "Privacy".to_string(),
+                    icon: None,
+                    detail: None,
+                    a11y: None,
+                    info_key: None,
+                }],
+            },
+        ],
+    };
+    let json = serde_json::to_string(&component).expect("serialize SectionedActionList");
+    let roundtrip: Component =
+        serde_json::from_str(&json).expect("deserialize SectionedActionList");
+    assert_eq!(component, roundtrip);
+    // Section labels reach the wire so frontends can render the native
+    // section idiom (SwiftUI Section, GTK4 group, Material header) without
+    // a per-frontend label table.
+    assert!(
+        json.contains("\"label\":\"Primary\""),
+        "section label on wire: {json}"
+    );
+    assert!(
+        json.contains("\"label\":\"Legal\""),
+        "section label on wire: {json}"
+    );
+}
+
+// @internal
+#[test]
+fn sectioned_action_list_roundtrip_empty_sections() {
+    // A SectionedActionList with no sections is technically valid wire shape.
+    // Frontends render nothing; serves as the empty-state placeholder.
+    let component = Component::SectionedActionList {
+        id: "empty_menu".to_string(),
+        sections: vec![],
+    };
+    let json = serde_json::to_string(&component).expect("serialize");
+    let roundtrip: Component = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(component, roundtrip);
 }

@@ -93,6 +93,28 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
                 });
             }
         }
+        Component::SectionedActionList { id, sections } => {
+            // Walk every item in every section — affordance shape is the
+            // same as ActionList (taps → ListItemSelected). Section
+            // grouping is presentation, not a different affordance.
+            for section in sections {
+                for item in &section.items {
+                    out.push(UserAction::ListItemSelected {
+                        component_id: id.clone(),
+                        item_id: item.id.clone(),
+                    });
+                }
+            }
+        }
+        Component::Indicator { action_id, .. } => {
+            // Indicators are tappable only when action_id is Some — None
+            // means display-only and produces no affordance to walk.
+            if let Some(action_id) = action_id {
+                out.push(UserAction::ActionPressed {
+                    action_id: action_id.clone(),
+                });
+            }
+        }
         Component::Dropdown { id, options, .. } => {
             for option in options {
                 out.push(UserAction::ListItemSelected {

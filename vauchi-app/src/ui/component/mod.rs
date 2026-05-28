@@ -242,6 +242,50 @@ pub enum Component {
         #[serde(default)]
         a11y: Option<A11y>,
     },
+    /// Ongoing-status indicator carrying a terse label, a semantic
+    /// kind (color category), and an optional tap action.
+    ///
+    /// Distinct semantic role from `Component::StatusIndicator`,
+    /// which today renders screen-body status of in-progress
+    /// operations (Sync / BackupRecovery / LinkResponder /
+    /// RecoveryClaimReview / RecoveryHelp use sites). `Indicator`
+    /// is the chrome-positioned counterpart — emitted by AppEngine
+    /// overlays (offline / update / future sync-chrome) for app-level
+    /// status that lives across screens, not as screen content.
+    ///
+    /// Per the shell-purity investigation
+    /// (`_private/docs/investigations/2026-05-28-core-screen-composition-surface.md`):
+    /// the variant is generic, not Sync-specific — same shape carries
+    /// connectivity / backup-overdue / update-available / sync-state
+    /// uses. Frontends render natively (iOS toolbar chip, GTK4 header
+    /// status icon, Android Material chip) by typed dispatch, no
+    /// action_id sniffing.
+    Indicator {
+        id: String,
+        label: String,
+        kind: IndicatorKind,
+        /// Optional tap action. `None` = display-only (informational);
+        /// `Some(id)` = tap fires `UserAction::ActionPressed { action_id: id }`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        action_id: Option<String>,
+        #[serde(default)]
+        a11y: Option<A11y>,
+    },
+    /// Sectioned action list — multiple labeled groups of tappable
+    /// items, each rendered as a native section (SwiftUI `Section`,
+    /// GTK4 ListBox group, Material category header). Distinct
+    /// semantic role from flat `Component::ActionList`: ignoring
+    /// the section grouping degrades UX from "structured menu" to
+    /// "flat dump", so the discriminant belongs at variant level.
+    ///
+    /// Used by `MoreEngine` to emit grouped settings entries
+    /// (primary / secondary / data / legal) without forcing
+    /// each frontend's renderer to special-case action_ids or
+    /// reproduce a section table.
+    SectionedActionList {
+        id: String,
+        sections: Vec<Section>,
+    },
 }
 
 /// Semantic role hint for screen readers.
@@ -380,6 +424,36 @@ pub enum Status {
     Success,
     Failed,
     Warning,
+}
+
+/// Semantic kind for `Component::Indicator` — the four-state color
+/// category each frontend maps to its theme palette.
+///
+/// Distinct from `Status` (used by `Component::StatusIndicator` for
+/// in-progress screen-body operations). `IndicatorKind` is for
+/// ongoing-state chrome and uses presentation-shaped categories
+/// (semantic color roles), not domain-shaped lifecycle states.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum IndicatorKind {
+    /// In-progress or freshly-confirmed — emphasis color (e.g. green / accent).
+    Active,
+    /// Failed / attention-required — error color (e.g. red / orange).
+    Error,
+    /// Idle / informational — muted color (e.g. gray / outline).
+    Neutral,
+    /// Transient busy state — animated indicator (e.g. spinner / pulse).
+    Busy,
+}
+
+/// A named section within a `Component::SectionedActionList`.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Section {
+    pub id: String,
+    pub label: String,
+    pub items: Vec<ActionListItem>,
 }
 
 /// QR code display mode.

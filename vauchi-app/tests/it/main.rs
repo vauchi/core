@@ -18,6 +18,7 @@ mod app_engine_stateful_proptest;
 mod avatar_editor_tests;
 mod avatar_editor_wiring_tests;
 mod backup_recovery_confirm_replace_tests;
+mod ble_handshake_machine_tests;
 mod canonical_screen_id_tests;
 mod component_serialization_tests;
 mod contact_detail_engine_tests;

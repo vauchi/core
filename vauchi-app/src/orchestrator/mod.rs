@@ -19,3 +19,9 @@ pub mod device_link_machine;
 /// Multi-stage face-to-face exchange machine (slice 32m Phase 1).
 /// In-person, BLE-less — no network-http feature required.
 pub mod multi_stage_machine;
+
+/// BLE handshake machine (slice 32m Phase 2). Replaces the
+/// `MobileBleExchangeSession` + `MobileBleDelegate` callback trait
+/// from `vauchi-platform/src/mobile_ble.rs`. In-person; no
+/// network-http feature required.
+pub mod ble_handshake_machine;

@@ -60,6 +60,42 @@ const ACTION_OFFLINE_BANNER: &str = "offline_banner";
 /// from `viewModel.demoContact`).
 const ACTION_DISMISS_DEMO_CONTACT: &str = "dismiss_demo_contact";
 
+/// Action id for the sync-chrome `Component::Indicator` tap target.
+/// Emitted on top-level screens by `apply_sync_chrome_overlay` when
+/// the indicator is tappable (Idle or after a Failed attempt).
+/// `handle_action` intercepts presses to call `Vauchi::sync`. Replaces
+/// iOS's `HomeView.SyncStatusIndicator` (state→icon switch + 4
+/// hardcoded English a11y strings — G1 of
+/// `2026-05-02-ios-humble-ui-deep-retirement`).
+const ACTION_SYNC_NOW: &str = "sync_now";
+
+/// Last sync attempt result tracked by `AppEngine` and surfaced as
+/// `Component::Indicator` chrome on every top-level screen via
+/// `apply_sync_chrome_overlay`. Design: see
+/// `_private/docs/designs/2026-05-28-sync-chrome-overlay-design.md`.
+///
+/// State source is the engine's own bookkeeping (set after each
+/// `Vauchi::sync()` call from the `sync_now` handler), not the
+/// `SyncController::connection_state()` — the design doc walks
+/// through why: `Vauchi` does not field a `SyncController` today,
+/// and the user-facing "Synced 15:47" / "Sync failed" model maps
+/// cleanly onto the existing `VauchiSyncOutcome` return value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SyncChromeStatus {
+    /// No sync attempt has been made in this session.
+    Idle,
+    /// Most recent sync succeeded — `unix_ts` is the wall-clock
+    /// completion time (`self.clock.now()` at the time of success).
+    Synced {
+        /// Unix timestamp in seconds.
+        unix_ts: u64,
+    },
+    /// Most recent sync attempt failed. The chrome chip surfaces a
+    /// `Component::Indicator` with kind `Error` and a `sync_now`
+    /// tap to retry.
+    Failed,
+}
+
 /// Top-level screens in the application.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -376,6 +412,12 @@ pub struct AppEngine {
     /// Defaults to `true` so installs without a network monitor (CLI,
     /// tests, embedded) behave as if always-online.
     network_online: bool,
+    /// Last sync attempt result. Drives the `Component::Indicator`
+    /// chrome chip injected on every top-level screen by
+    /// `apply_sync_chrome_overlay`. Updated in the `sync_now` handler
+    /// arm after each `Vauchi::sync()` call. Defaults to
+    /// `SyncChromeStatus::Idle` on engine boot.
+    sync_chrome_status: SyncChromeStatus,
     /// Screen-presentation [`Command`]s accumulated from
     /// `WorkflowEngine::screen_entered` / `screen_exited` callbacks
     /// during navigation. Frontends drain via
@@ -525,6 +567,7 @@ impl AppEngine {
             pending_merge: None,
             pending_backup_reminder,
             network_online: true,
+            sync_chrome_status: SyncChromeStatus::Idle,
             pending_commands: std::collections::VecDeque::new(),
             link_responder: None,
             #[cfg(all(feature = "network-http", feature = "storage"))]
@@ -960,6 +1003,58 @@ impl AppEngine {
             ),
         }
     }
+
+    /// Inject the sync-chrome `Component::Indicator` on every emitted
+    /// top-level screen. Idempotent. Skipped when offline (the
+    /// `apply_offline_overlay` Banner already conveys "no network").
+    /// Replaces iOS's `HomeView.SyncStatusIndicator` per G1 of
+    /// `2026-05-02-ios-humble-ui-deep-retirement` — design at
+    /// `_private/docs/designs/2026-05-28-sync-chrome-overlay-design.md`.
+    ///
+    /// State → presentation:
+    /// - `Idle`: label "Sync", kind `Neutral`, action_id `Some("sync_now")`
+    /// - `Synced { .. }`: label "Synced", kind `Active`, action_id `Some("sync_now")`
+    /// - `Failed`: label "Sync failed", kind `Error`, action_id `Some("sync_now")`
+    ///
+    /// Timestamp formatting in the `Synced` label is deferred — a
+    /// follow-up MR can render "Synced HH:MM" once locale-aware
+    /// formatting is available on `AppEngine`.
+    fn apply_sync_chrome_overlay(&self, mut screen: ScreenModel) -> ScreenModel {
+        if !self.network_online {
+            return screen;
+        }
+        let already_present = screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::Indicator { id, .. } if id == "sync"));
+        if already_present {
+            return screen;
+        }
+        let (label, kind) = match self.sync_chrome_status {
+            SyncChromeStatus::Idle => {
+                ("Sync".to_string(), super::component::IndicatorKind::Neutral)
+            }
+            SyncChromeStatus::Synced { .. } => (
+                "Synced".to_string(),
+                super::component::IndicatorKind::Active,
+            ),
+            SyncChromeStatus::Failed => (
+                "Sync failed".to_string(),
+                super::component::IndicatorKind::Error,
+            ),
+        };
+        screen.components.insert(
+            0,
+            Component::Indicator {
+                id: "sync".into(),
+                label,
+                kind,
+                action_id: Some(ACTION_SYNC_NOW.into()),
+                a11y: None,
+            },
+        );
+        screen
+    }
 }
 
 impl WorkflowEngine for AppEngine {
@@ -967,6 +1062,7 @@ impl WorkflowEngine for AppEngine {
         let screen = self.engine.current_screen();
         let screen = self.apply_update_overlay(screen);
         let screen = self.apply_offline_overlay(screen);
+        let screen = self.apply_sync_chrome_overlay(screen);
         let screen = self.apply_demo_contact_overlay(screen);
         self.apply_screen_id_metadata(screen)
     }
@@ -974,6 +1070,32 @@ impl WorkflowEngine for AppEngine {
     #[tracing::instrument(level = "debug", skip_all, name = "app.handle_action")]
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         self.drain_events_to_log();
+
+        // Handle sync_now from the chrome Indicator emitted by
+        // apply_sync_chrome_overlay. Updates sync_chrome_status with
+        // the outcome so the chip reflects the new state on next
+        // render. No-op in builds without network-http feature.
+        if matches!(
+            &action,
+            UserAction::ActionPressed { action_id } if action_id == ACTION_SYNC_NOW
+        ) {
+            #[cfg(feature = "network-http")]
+            {
+                use std::time::{SystemTime, UNIX_EPOCH};
+                use vauchi_core::api::VauchiSyncOutcome;
+                self.sync_chrome_status = match self.vauchi.sync() {
+                    Ok(VauchiSyncOutcome::Ok { .. }) => SyncChromeStatus::Synced {
+                        unix_ts: SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0),
+                    },
+                    Ok(_) => self.sync_chrome_status,
+                    Err(_) => SyncChromeStatus::Failed,
+                };
+            }
+            return ActionResult::UpdateScreen(self.current_screen());
+        }
 
         // Handle backup reminder toast action
         if matches!(

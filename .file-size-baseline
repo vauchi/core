@@ -222,7 +222,7 @@ vauchi-core/src/storage/mod.rs 1079
 #   per-site rationale comments on 3 best-effort sites (event-channel
 #   send, backup-reminder save, ArchivedContacts swipe-unarchive),
 #   problem 2026-05-21-silent-failures-in-security-paths)
-vauchi-app/src/ui/app_engine/mod.rs 1375
+vauchi-app/src/ui/app_engine/mod.rs 1497
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts

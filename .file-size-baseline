@@ -159,7 +159,10 @@ vauchi-core/src/network/http_transport.rs 1192
 # (+9 for Option B OHTTP routing fix: ohttp_endpoint wiring in http_relay_url
 #  + resolve_ohttp_key fetches the live key via the IP-stripping relay;
 #  problem 2026-05-25-relay-ohttp-forward-hop-502)
-vauchi-core/src/api/vauchi/sync_http.rs 1091
+# (+32 for last_sync_unix_seconds capture in update_timing_after_sync +
+#  inline FakeClock test; humble-UI follow-up to ios!472 lets MyInfoEngine
+#  render "Last synced X ago" without the frontend owning the timestamp)
+vauchi-core/src/api/vauchi/sync_http.rs 1123
 
 # EXEMPT — security-critical: crypto + verification belong together
 vauchi-core/src/recovery/mod.rs 1253
@@ -289,7 +292,10 @@ vauchi-app/src/ui/app_engine/routing.rs 1438
 # (+37 for reconstruct_identity_via_storage_bytes helper + tracing::error!
 #  on Identity round-trip failure; site 3 of
 #  2026-05-21-silent-failures-in-security-paths, 2026-05-23.)
-vauchi-app/src/ui/app_engine/screens.rs 1423
+# (+5 on screens.rs for humble-UI follow-up to ios!472: the AppScreen::MyInfo
+#  arm reads vauchi.pending_update_count() / last_sync_time() / clock and
+#  threads them into MyInfoEngine's new sync-caption builders.)
+vauchi-app/src/ui/app_engine/screens.rs 1428
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

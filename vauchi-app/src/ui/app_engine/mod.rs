@@ -8,6 +8,7 @@
 //! handles navigation routing, and implements `WorkflowEngine` so
 //! frontends see a single uniform interface.
 
+mod ble_handshake;
 mod device_link;
 #[cfg(all(feature = "network-http", feature = "storage"))]
 mod device_link_initiator;
@@ -441,6 +442,12 @@ pub struct AppEngine {
     /// removes the parallel cycle-thread bridge in PlatformAppEngine
     /// to avoid double-driving the active engine on mobile.
     multi_stage_session: Option<multi_stage_exchange::MultiStageHolder>,
+    /// Engine-owned BLE handshake machine (slice 32m T2.2b). Built
+    /// on `Event::BleConnected` (or PlatformAppEngine on BLE-eligible
+    /// screen entry), torn down by `cancel_ble_handshake_session`.
+    /// Replaces the `MobileBleExchangeSession` cycle thread; T2.2c
+    /// routes BLE events through `forward_ble_hardware_event`.
+    ble_handshake_session: Option<ble_handshake::BleHandshakeHolder>,
 }
 
 impl AppEngine {
@@ -581,6 +588,7 @@ impl AppEngine {
             #[cfg(all(feature = "network-http", feature = "storage"))]
             device_link_initiator: None,
             multi_stage_session: None,
+            ble_handshake_session: None,
         }
     }
 

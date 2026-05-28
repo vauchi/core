@@ -592,6 +592,7 @@ mod tests {
         })
     }
 
+    // @internal
     #[test]
     fn test_my_info_emits_pending_updates_caption() {
         let engine = MyInfoEngine::new(MyInfoProgress::default()).with_pending_updates(3);
@@ -602,6 +603,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn test_my_info_pending_updates_caption_uses_singular_for_one() {
         let engine = MyInfoEngine::new(MyInfoProgress::default()).with_pending_updates(1);
@@ -612,6 +614,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn test_my_info_omits_pending_updates_caption_when_zero() {
         let engine = MyInfoEngine::new(MyInfoProgress::default()).with_pending_updates(0);
@@ -619,6 +622,7 @@ mod tests {
         assert!(caption_content(&screen, "pending_updates_caption").is_none());
     }
 
+    // @internal
     #[test]
     fn test_my_info_emits_last_sync_caption() {
         // 5 minutes ago — format_relative_time renders "5 minutes ago"
@@ -633,6 +637,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn test_my_info_omits_last_sync_caption_when_none() {
         let engine = MyInfoEngine::new(MyInfoProgress::default()).with_now_seconds(1_700_000_000);
@@ -640,6 +645,7 @@ mod tests {
         assert!(caption_content(&screen, "last_sync_caption").is_none());
     }
 
+    // @internal
     #[test]
     fn test_my_info_emits_both_captions_in_order_pending_then_sync() {
         let now = 1_700_000_000u64;
@@ -668,6 +674,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn test_my_info_preview_mode_omits_sync_status_captions() {
         let now = 1_700_000_000u64;

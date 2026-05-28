@@ -143,6 +143,7 @@ proptest! {
     /// `Preparing`. Fails today — `advance` returns `None` and
     /// `handle_hardware_event` is a no-op for `QrScanned` in the
     /// T1.1 stub. GREEN when the protocol driver lands in T1.2.
+    // @internal
     #[test]
     fn machine_reaches_post_preparing_phase_after_qr_scans(
         events in proptest::collection::vec(arb_non_fatal_event(), 20..40),
@@ -176,6 +177,7 @@ proptest! {
     /// machine must too. Fails today — `advance` always returns
     /// `None` in the T1.1 stub. GREEN when T1.2 wires the per-frame
     /// `display_duration_ms` tick.
+    // @internal
     #[test]
     fn machine_emits_qr_frame_under_advance_only(
         ticks in 10usize..40,
@@ -202,6 +204,7 @@ proptest! {
     /// machine back to a non-terminal phase. Passes today under the
     /// T1.1 stub (the failure-handling branches already enforce
     /// this) — pins the invariant going into T1.2.
+    // @internal
     #[test]
     fn terminal_phases_are_absorbing(
         events in proptest::collection::vec(arb_event(), 0..15),
@@ -243,6 +246,7 @@ proptest! {
     /// this passes vacuously — keeps the invariant pinned going
     /// into T1.2, where it gates the GREEN's per-frame emission to
     /// the pre-terminal phases only.
+    // @internal
     #[test]
     fn no_qr_display_in_terminal_phase(
         events in proptest::collection::vec(arb_event(), 0..20),
@@ -271,6 +275,7 @@ proptest! {
 
     /// **I6:** mode is stable across the machine's lifetime —
     /// arbitrary event drives must not change it.
+    // @internal
     #[test]
     fn mode_is_stable(
         events in proptest::collection::vec(arb_event(), 0..20),
@@ -296,6 +301,7 @@ proptest! {
 /// **I3 explicit:** a freshly constructed machine cannot be
 /// `Completed`. T1.2 strengthens this into a Finalized-precedes-
 /// Completed trace assertion once the protocol driver lands.
+// @internal
 #[test]
 fn finalized_phase_strictly_precedes_completed_in_constructor_walk() {
     let machine = MultiStageMachine::new_glance(fixture_local_card(), 0);
@@ -304,6 +310,7 @@ fn finalized_phase_strictly_precedes_completed_in_constructor_walk() {
 
 /// **I5:** repeated `cancel` returns `None` and the phase stays
 /// `Cancelled`. Further events on a cancelled machine are inert.
+// @internal
 #[test]
 fn cancel_is_idempotent_and_absorbing() {
     let mut machine = MultiStageMachine::new_glance(fixture_local_card(), 0);
@@ -323,6 +330,7 @@ fn cancel_is_idempotent_and_absorbing() {
 }
 
 /// **I2 cross-check:** `Failed` is absorbing under `advance`.
+// @internal
 #[test]
 fn failed_phase_is_absorbing_under_advance() {
     let mut machine = MultiStageMachine::new_glance(fixture_local_card(), 0);

@@ -21,8 +21,7 @@
 //!   (`SURPLUS_RATCHET_CEILING` rationale)
 
 use crate::error::MobileError;
-use crate::multistage_exchange::{MobileProtocolState, MobileQrPayload};
-use crate::platform_app_engine::{PlatformAppEngine, mobile_state_to_core};
+use crate::platform_app_engine::PlatformAppEngine;
 
 /// Test-only helpers on `PlatformAppEngine`.
 ///
@@ -55,34 +54,19 @@ pub trait PlatformAppEngineTestHelpers {
         record: &vauchi_core::storage::DeliveryRecord,
     ) -> Result<(), MobileError>;
 
-    // ── Multi-stage exchange test helpers ──────────────────────────
+    // ── Multi-stage exchange test helpers retired (slice 32m T1.3) ──
     //
-    // Moved out of the `#[uniffi::export] impl PlatformAppEngine`
-    // block (2026-05-20) per record
-    // `2026-05-20-pae-test-helper-containment`: these methods are
-    // integration-test scaffolding, not the humble surface frontends
-    // should consume. The trait impl is invisible to both the UniFFI
-    // binding generator and the humble-surface ratchet's source-text
-    // scanner.
-
-    /// Test-only: drive the active engine's protocol state directly.
-    fn apply_multi_stage_state_for_test(
-        &self,
-        state: MobileProtocolState,
-    ) -> Result<(), MobileError>;
-
-    /// Test-only: push a QR payload into the active engine.
-    fn apply_multi_stage_qr_payload_for_test(
-        &self,
-        payload: MobileQrPayload,
-    ) -> Result<(), MobileError>;
-
-    /// Test-only: record the peer display name on Finalized.
-    fn apply_multi_stage_finalized_for_test(&self, contact_name: String)
-    -> Result<(), MobileError>;
-
-    /// Test-only: flag the cycle thread as ended.
-    fn apply_multi_stage_session_ended_for_test(&self) -> Result<(), MobileError>;
+    // The 4 `apply_multi_stage_*_for_test` methods were scaffolding
+    // around the pre-32m cycle-thread race (each first called
+    // `cancel_multi_stage_session()` to stop the cycle thread from
+    // re-pushing `Idle` over a test's manual state push). Slice 32m
+    // T1.2c retired the cycle thread; the race no longer exists. The
+    // new MultiStageMachine proptest
+    // (`vauchi-app/tests/it/multi_stage_machine_proptest.rs`) +
+    // reachability tests
+    // (`vauchi-app/tests/reachability/multi_stage_exchange.rs`) cover
+    // the invariants these fixtures asserted on the engine's
+    // rendering side.
 
     // ── Device-link test helpers ───────────────────────────────────
     //
@@ -145,77 +129,6 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
             .map_err(|e| MobileError::StorageError {
                 detail: e.to_string(),
             })
-    }
-
-    fn apply_multi_stage_state_for_test(
-        &self,
-        state: MobileProtocolState,
-    ) -> Result<(), MobileError> {
-        self.cancel_multi_stage_session();
-        let core_state = mobile_state_to_core(state);
-        let applied = {
-            let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            engine.apply_multi_stage_state(core_state)
-        };
-        if applied {
-            self.fire_invalidation_for_test();
-        }
-        Ok(())
-    }
-
-    fn apply_multi_stage_qr_payload_for_test(
-        &self,
-        payload: MobileQrPayload,
-    ) -> Result<(), MobileError> {
-        self.cancel_multi_stage_session();
-        let qr = vauchi_core::exchange::QrPayload {
-            data: payload.data,
-            error_correction: payload.error_correction,
-            display_duration_ms: payload.display_duration_ms,
-        };
-        let applied = {
-            let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            engine.apply_multi_stage_qr_payload(&qr)
-        };
-        if applied {
-            self.fire_invalidation_for_test();
-        }
-        Ok(())
-    }
-
-    fn apply_multi_stage_finalized_for_test(
-        &self,
-        contact_name: String,
-    ) -> Result<(), MobileError> {
-        self.cancel_multi_stage_session();
-        let applied = {
-            let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            engine.apply_multi_stage_finalized(contact_name)
-        };
-        if applied {
-            self.fire_invalidation_for_test();
-        }
-        Ok(())
-    }
-
-    fn apply_multi_stage_session_ended_for_test(&self) -> Result<(), MobileError> {
-        self.cancel_multi_stage_session();
-        let applied = {
-            let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            engine.apply_multi_stage_session_ended()
-        };
-        if applied {
-            self.fire_invalidation_for_test();
-        }
-        Ok(())
     }
 
     fn apply_device_link_request_received_for_test(

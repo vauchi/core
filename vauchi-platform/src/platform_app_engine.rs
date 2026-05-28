@@ -4353,6 +4353,13 @@ impl PlatformAppEngine {
     /// Cancel + drop the active `MobileMultiStageSession`. Cancellation
     /// is idempotent — calling this without an active session is a
     /// no-op.
+    ///
+    /// **T1.3 dead code.** All production callers were redirected to
+    /// `AppEngine::cancel_multi_stage_session` in T1.2c; the 4 fixture
+    /// methods that pre-called this were retired in T1.3. T3.1
+    /// deletes this method and the `multi_stage_session` field
+    /// outright when `MobileMultiStageSession` is removed.
+    #[allow(dead_code)]
     pub(crate) fn cancel_multi_stage_session(&self) {
         let session_to_cancel = self
             .multi_stage_session
@@ -4396,6 +4403,13 @@ impl PlatformAppEngine {
     // is already None) so the four `_for_test` entries can call it
     // unconditionally.
 
+    /// **T1.3 dead code.** Used by the retired multi-stage fixture
+    /// methods to push a synthetic invalidation after a direct state
+    /// push. After T1.2c the platform's `poll_notifications` wrapper
+    /// fires invalidations naturally whenever the AppEngine machine
+    /// advances; no fixture needs this helper. T3.1 deletes it
+    /// alongside the rest of the cycle-thread bridge.
+    #[allow(dead_code)]
     pub(crate) fn fire_invalidation_for_test(&self) {
         let listener = self
             .direct_listener

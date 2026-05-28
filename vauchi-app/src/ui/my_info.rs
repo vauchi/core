@@ -4,6 +4,8 @@
 
 //! MyInfo screen engine — shows user's own card, entries, and visibility controls.
 
+use crate::i18n::Locale;
+use crate::relative_time::format_relative_time;
 use crate::ui::contact_detail::SharedInfoView;
 use crate::ui::*;
 
@@ -62,6 +64,15 @@ pub struct MyInfoEngine {
     show_exchange_prompt: bool,
     /// Avatar image bytes (WebP) for the AvatarPreview component.
     avatar_data: Option<Vec<u8>>,
+    /// Outbound updates queued for the next sync (per
+    /// `Vauchi::pending_update_count`). Rendered as a caption only when > 0.
+    pending_updates: u32,
+    /// Wall-clock unix seconds of the last successful sync (per
+    /// `Vauchi::last_sync_time`). Rendered as a caption when present.
+    last_sync_seconds: Option<u64>,
+    /// Wall-clock unix seconds at render time, used to compute the
+    /// `last_sync_seconds` relative-time caption.
+    now_seconds: u64,
 }
 
 impl MyInfoEngine {
@@ -74,6 +85,9 @@ impl MyInfoEngine {
             preview_data: None,
             show_exchange_prompt: false,
             avatar_data: None,
+            pending_updates: 0,
+            last_sync_seconds: None,
+            now_seconds: 0,
         }
     }
 
@@ -112,6 +126,49 @@ impl MyInfoEngine {
     pub fn with_view_mode(mut self, mode: MyInfoViewMode) -> Self {
         self.view_mode = mode;
         self
+    }
+
+    /// Set the pending-updates count for the sync caption.
+    pub fn with_pending_updates(mut self, count: u32) -> Self {
+        self.pending_updates = count;
+        self
+    }
+
+    /// Set the wall-clock unix timestamp of the last successful sync.
+    pub fn with_last_sync_seconds(mut self, seconds: Option<u64>) -> Self {
+        self.last_sync_seconds = seconds;
+        self
+    }
+
+    /// Set the wall-clock "now" used to compute the last-sync relative caption.
+    pub fn with_now_seconds(mut self, seconds: u64) -> Self {
+        self.now_seconds = seconds;
+        self
+    }
+
+    fn sync_status_components(&self) -> Vec<Component> {
+        let mut out = Vec::new();
+        if self.pending_updates > 0 {
+            let label = if self.pending_updates == 1 {
+                "1 pending update".to_string()
+            } else {
+                format!("{} pending updates", self.pending_updates)
+            };
+            out.push(Component::Text {
+                id: "pending_updates_caption".into(),
+                content: label,
+                style: TextStyle::Caption,
+            });
+        }
+        if let Some(then) = self.last_sync_seconds {
+            let relative = format_relative_time(self.now_seconds, then, Locale::English);
+            out.push(Component::Text {
+                id: "last_sync_caption".into(),
+                content: format!("Last synced {relative}"),
+                style: TextStyle::Caption,
+            });
+        }
+        out
     }
 
     fn build_entry_view(&self) -> Vec<Component> {
@@ -357,6 +414,8 @@ impl WorkflowEngine for MyInfoEngine {
             MyInfoViewMode::PreviewAs { .. } => unreachable!("handled above"),
         });
 
+        components.extend(self.sync_status_components());
+
         let view_label = match &self.view_mode {
             MyInfoViewMode::EntryView => "Group View",
             MyInfoViewMode::GroupView { .. } => "Entry View",
@@ -522,5 +581,108 @@ mod tests {
             action_id: "preview-as-picker".into(),
         });
         assert_eq!(result, ActionResult::ShowContactPicker);
+    }
+
+    fn caption_content(screen: &ScreenModel, id: &str) -> Option<String> {
+        screen.components.iter().find_map(|c| match c {
+            Component::Text {
+                id: cid, content, ..
+            } if cid == id => Some(content.clone()),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn test_my_info_emits_pending_updates_caption() {
+        let engine = MyInfoEngine::new(MyInfoProgress::default()).with_pending_updates(3);
+        let screen = engine.current_screen();
+        assert_eq!(
+            caption_content(&screen, "pending_updates_caption").as_deref(),
+            Some("3 pending updates"),
+        );
+    }
+
+    #[test]
+    fn test_my_info_pending_updates_caption_uses_singular_for_one() {
+        let engine = MyInfoEngine::new(MyInfoProgress::default()).with_pending_updates(1);
+        let screen = engine.current_screen();
+        assert_eq!(
+            caption_content(&screen, "pending_updates_caption").as_deref(),
+            Some("1 pending update"),
+        );
+    }
+
+    #[test]
+    fn test_my_info_omits_pending_updates_caption_when_zero() {
+        let engine = MyInfoEngine::new(MyInfoProgress::default()).with_pending_updates(0);
+        let screen = engine.current_screen();
+        assert!(caption_content(&screen, "pending_updates_caption").is_none());
+    }
+
+    #[test]
+    fn test_my_info_emits_last_sync_caption() {
+        // 5 minutes ago — format_relative_time renders "5 minutes ago"
+        let now = 1_700_000_000u64;
+        let engine = MyInfoEngine::new(MyInfoProgress::default())
+            .with_last_sync_seconds(Some(now - 5 * 60))
+            .with_now_seconds(now);
+        let screen = engine.current_screen();
+        assert_eq!(
+            caption_content(&screen, "last_sync_caption").as_deref(),
+            Some("Last synced 5 minutes ago"),
+        );
+    }
+
+    #[test]
+    fn test_my_info_omits_last_sync_caption_when_none() {
+        let engine = MyInfoEngine::new(MyInfoProgress::default()).with_now_seconds(1_700_000_000);
+        let screen = engine.current_screen();
+        assert!(caption_content(&screen, "last_sync_caption").is_none());
+    }
+
+    #[test]
+    fn test_my_info_emits_both_captions_in_order_pending_then_sync() {
+        let now = 1_700_000_000u64;
+        let engine = MyInfoEngine::new(MyInfoProgress::default())
+            .with_pending_updates(2)
+            .with_last_sync_seconds(Some(now - 120))
+            .with_now_seconds(now);
+        let screen = engine.current_screen();
+        let positions: Vec<usize> = screen
+            .components
+            .iter()
+            .enumerate()
+            .filter_map(|(i, c)| match c {
+                Component::Text { id, .. }
+                    if id == "pending_updates_caption" || id == "last_sync_caption" =>
+                {
+                    Some(i)
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(positions.len(), 2, "expected both captions in the screen");
+        assert!(
+            positions[0] < positions[1],
+            "pending_updates_caption must appear before last_sync_caption"
+        );
+    }
+
+    #[test]
+    fn test_my_info_preview_mode_omits_sync_status_captions() {
+        let now = 1_700_000_000u64;
+        let engine = MyInfoEngine::new(MyInfoProgress::default())
+            .with_pending_updates(5)
+            .with_last_sync_seconds(Some(now - 60))
+            .with_now_seconds(now)
+            .with_view_mode(MyInfoViewMode::PreviewAs {
+                contact_name: "Alice".into(),
+            });
+        let screen = engine.current_screen();
+        assert!(
+            caption_content(&screen, "pending_updates_caption").is_none(),
+            "PreviewAs renders the card as the contact sees it — owner-only sync status must not leak"
+        );
+        assert!(caption_content(&screen, "last_sync_caption").is_none());
     }
 }

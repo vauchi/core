@@ -11,14 +11,19 @@
 
 use std::sync::Arc;
 
-use crate::ui::exchange_ble::{
-    self, BleActionOutcome, BleExchangeFlow, BleHardwareOutcome, BleStep,
-};
-use crate::ui::exchange_field_preview::{self, FieldPreviewConfig, FieldPreviewResult};
-use crate::ui::exchange_link::{self, LinkActionOutcome, LinkHardwareOutcome, LinkStep};
-use crate::ui::exchange_mode_selection::{ModeSelectionEngine, ModeSelectionResult};
-use crate::ui::exchange_nfc::{self, NfcExchangeFlow, NfcHardwareOutcome, NfcStep};
-use crate::ui::exchange_qr::{self, QrActionOutcome, QrStep, ScanQualityTracker};
+pub(crate) mod ble;
+pub(crate) mod field_preview;
+pub(crate) mod link;
+pub(crate) mod mode_selection;
+pub(crate) mod nfc;
+pub(crate) mod qr;
+
+use self::ble::{BleActionOutcome, BleExchangeFlow, BleHardwareOutcome, BleStep};
+use self::field_preview::{FieldPreviewConfig, FieldPreviewResult};
+use self::link::{LinkActionOutcome, LinkHardwareOutcome, LinkStep};
+use self::mode_selection::{ModeSelectionEngine, ModeSelectionResult};
+use self::nfc::{NfcExchangeFlow, NfcHardwareOutcome, NfcStep};
+use self::qr::{QrActionOutcome, QrStep, ScanQualityTracker};
 use crate::ui::*;
 use vauchi_core::Command;
 use vauchi_core::clock::Clock;
@@ -153,7 +158,7 @@ enum ExchangeStep {
     /// BLE exchange sub-flow (Magic/Bump/Shake modes).
     Ble(BleStep),
     /// NFC exchange sub-flow (3-phase encrypted handshake over an
-    /// NFC tap). See exchange_nfc.rs + 2026-05-19-nfc-exchange-engine-design.md.
+    /// NFC tap). See `self::nfc` + 2026-05-19-nfc-exchange-engine-design.md.
     Nfc(NfcStep),
     /// Link exchange sub-flow (async relay-mediated).
     Link(LinkStep),
@@ -723,14 +728,14 @@ impl ExchangeEngine {
 
         // Escrow phase: keys are known, handle card exchange events
         if let Some(ref keys) = self.escrow_keys
-            && let Some(outcome) = exchange_link::handle_escrow_hw_event(keys, &event)
+            && let Some(outcome) = link::handle_escrow_hw_event(keys, &event)
         {
             return Some(self.apply_link_outcome(outcome));
         }
 
         // Handshake phase: waiting for responder's epk
         let li = self.link_initiation.as_ref()?;
-        let outcome = exchange_link::handle_link_hw_event(li, &event)?;
+        let outcome = link::handle_link_hw_event(li, &event)?;
         Some(self.apply_link_outcome(outcome))
     }
 
@@ -750,7 +755,7 @@ impl ExchangeEngine {
                         "card serialization: {e}"
                     ))
                 })?;
-                exchange_link::handle_link_opened(li, peer_public_key, &card_bytes)
+                link::handle_link_opened(li, peer_public_key, &card_bytes)
             })();
 
         match result {
@@ -842,7 +847,7 @@ impl ExchangeEngine {
             ),
             ExchangeStep::FieldPreview => {
                 if let Some(ref fp) = self.field_preview {
-                    exchange_field_preview::build_field_preview_screen(fp, self.progress())
+                    field_preview::build_field_preview_screen(fp, self.progress())
                 } else {
                     ScreenModel::default()
                 }
@@ -854,40 +859,40 @@ impl ExchangeEngine {
                 } else {
                     &self.config.own_qr_data
                 };
-                exchange_qr::build_show_qr_screen(
+                qr::build_show_qr_screen(
                     frame_data,
                     &self.config.own_name,
                     self.progress(),
                 )
             }
-            ExchangeStep::Qr(QrStep::ScanQr) => exchange_qr::build_scan_qr_screen(
+            ExchangeStep::Qr(QrStep::ScanQr) => qr::build_scan_qr_screen(
                 self.progress(),
                 Some(self.scan_quality_tracker.quality()),
             ),
             ExchangeStep::Qr(QrStep::ManualEntry) => {
-                exchange_qr::build_manual_entry_screen(self.progress())
+                qr::build_manual_entry_screen(self.progress())
             }
             ExchangeStep::Qr(QrStep::Verifying) => {
-                exchange_qr::build_verifying_screen(self.progress())
+                qr::build_verifying_screen(self.progress())
             }
             ExchangeStep::Ble(BleStep::Discovering) => {
                 let mode = self.config.mode.unwrap_or(ExchangeMode::Magic);
-                exchange_ble::build_discovering_screen(mode, self.progress())
+                ble::build_discovering_screen(mode, self.progress())
             }
             ExchangeStep::Ble(BleStep::Handshaking | BleStep::Exchanging) => {
                 let mode = self.config.mode.unwrap_or(ExchangeMode::Magic);
-                exchange_ble::build_exchanging_screen(mode, self.progress())
+                ble::build_exchanging_screen(mode, self.progress())
             }
             ExchangeStep::Ble(BleStep::Verifying) => {
                 let mode = self.config.mode.unwrap_or(ExchangeMode::Magic);
-                exchange_ble::build_verifying_screen(mode, self.progress())
+                ble::build_verifying_screen(mode, self.progress())
             }
             ExchangeStep::Ble(BleStep::Complete) => {
                 // Handled by transition to ExchangeStep::Success
                 ScreenModel::default()
             }
             ExchangeStep::Nfc(ref nfc_step) => {
-                exchange_nfc::build_nfc_screen(nfc_step, self.progress())
+                nfc::build_nfc_screen(nfc_step, self.progress())
             }
             ExchangeStep::Link(LinkStep::ShareUrl) => {
                 let url = self
@@ -895,13 +900,13 @@ impl ExchangeEngine {
                     .as_ref()
                     .map(|li| li.url.as_str())
                     .unwrap_or("generating...");
-                exchange_link::build_share_url_screen(url, self.progress())
+                link::build_share_url_screen(url, self.progress())
             }
             ExchangeStep::Link(LinkStep::WaitingForResponse) => {
-                exchange_link::build_waiting_screen(self.progress())
+                link::build_waiting_screen(self.progress())
             }
             ExchangeStep::Link(LinkStep::Retrieving) => {
-                exchange_link::build_retrieving_screen(self.progress())
+                link::build_retrieving_screen(self.progress())
             }
             ExchangeStep::DirectTransport(DirectStep::WaitingForConnection) => ScreenModel {
                 screen_id: "exchange_direct_waiting".into(),
@@ -1382,9 +1387,7 @@ impl WorkflowEngine for ExchangeEngine {
             }
             // Field preview actions
             (ExchangeStep::FieldPreview, ref user_action) => {
-                if let Some(outcome) =
-                    exchange_field_preview::handle_field_preview_action(user_action)
-                {
+                if let Some(outcome) = field_preview::handle_field_preview_action(user_action) {
                     match outcome {
                         FieldPreviewResult::StartExchange => {
                             // Route to sub-flow based on selected mode
@@ -1412,9 +1415,9 @@ impl WorkflowEngine for ExchangeEngine {
                 }
                 ActionResult::UpdateScreen(self.build_screen())
             }
-            // QR sub-flow actions — delegated to exchange_qr module
+            // QR sub-flow actions — delegated to the `qr` sub-module.
             (ExchangeStep::Qr(qr_step), ref user_action) => {
-                if let Some(outcome) = exchange_qr::handle_qr_action(qr_step, user_action) {
+                if let Some(outcome) = qr::handle_qr_action(qr_step, user_action) {
                     match outcome {
                         QrActionOutcome::AdvanceToScan => {
                             // Always emit QrRequestScan — the legacy
@@ -1453,7 +1456,7 @@ impl WorkflowEngine for ExchangeEngine {
             }
             // BLE sub-flow actions
             (ExchangeStep::Ble(ble_step), ref user_action) => {
-                if let Some(outcome) = exchange_ble::handle_ble_action(ble_step, user_action) {
+                if let Some(outcome) = ble::handle_ble_action(ble_step, user_action) {
                     match outcome {
                         BleActionOutcome::FallbackToRelay => {
                             // Switch to relay escrow (Link mode as fallback)
@@ -1467,7 +1470,7 @@ impl WorkflowEngine for ExchangeEngine {
             }
             // Link sub-flow actions
             (ExchangeStep::Link(link_step), ref user_action) => {
-                if let Some(outcome) = exchange_link::handle_link_action(link_step, user_action) {
+                if let Some(outcome) = link::handle_link_action(link_step, user_action) {
                     match outcome {
                         LinkActionOutcome::ShareRequested => {
                             self.step = ExchangeStep::Link(LinkStep::WaitingForResponse);
@@ -2992,7 +2995,7 @@ mod tests {
     // @internal
     #[test]
     fn manual_entry_screen_has_text_input_and_submit() {
-        let screen = exchange_qr::build_manual_entry_screen(Progress {
+        let screen = qr::build_manual_entry_screen(Progress {
             current_step: 2,
             total_steps: TOTAL_STEPS,
             label: None,
@@ -3595,7 +3598,7 @@ mod tests {
         engine.set_nfc_identity(identity);
 
         // Picker emits ListItemSelected { component_id: "mode", item_id: "tap_tap" }
-        // for the TapTap option (per exchange_mode_selection.rs).
+        // for the TapTap option (per `self::mode_selection`).
         let result = engine.handle_action(UserAction::ListItemSelected {
             component_id: "category:fun".into(),
             item_id: "mode:tap_tap".into(),

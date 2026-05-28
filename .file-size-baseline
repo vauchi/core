@@ -312,13 +312,13 @@ vauchi-core/tests/it/migration_tests.rs 1226
 # permissions SettingsGroup + verify_button gating 2026-04-28 Pair 3)
 # (+7 for Glance → MultiStageExchange handoff branch + test rewrite 2026-04-28 Pair 4 L8)
 # (+204 for ExchangeEngine clock field + 117 test callsites threading SystemClock 2026-05-13 slice 21)
-vauchi-app/src/ui/exchange.rs 3656
+vauchi-app/src/ui/exchange/mod.rs 3659
 # (+2 for 2026-05-21-core-ui-icon-on-wire: inline `icon: ...` lines in
 #   sample_fields / sample_shared_info Field constructors.)
 vauchi-app/src/ui/contact_detail.rs 1425
 
 # EXEMPT — BLE exchange sub-flow: inline tests access private state (proximity_runner, shake_envelope_sent)
-vauchi-app/src/ui/exchange_ble.rs 1057
+vauchi-app/src/ui/exchange/ble.rs 1057
 
 # EXEMPT — state machine: 9 ProtocolState variants + camera-gate transitions need cohesion;
 # inline tests access private state (state, peer_name, session_ended, camera_gate, scan_quality_tracker).

@@ -6,6 +6,41 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.51.18] — 2026-05-28
+
+### Added
+
+- `PlatformAppEngine::can_go_back()` — UniFFI query returning whether
+  core's `nav_history` holds a back step. Frontends drive their back
+  affordance / `BackHandler` from this instead of inferring it from a
+  frontend-side screen-id map. `HUMBLE_ALLOWLIST` 25 → 26 (ADR-043
+  Amendment 4 legitimate: a query, not domain logic). Tier-0 item 1 of
+  the CoreScreenIdMap rework
+  (`_private/docs/planning/todo/2026-05-27-corescreenidmap-rework-plan.md`).
+- Reserved global-chrome action id `"open_settings"`: the native
+  top-bar gear forwards
+  `UserAction::ActionPressed { action_id: "open_settings" }` instead of
+  constructing the "Settings" screen name. Core intercepts it before
+  per-screen dispatch and resolves to `NavigateTo(Settings)`, on the
+  same closed-set basis as `"open_update_link"`. Tier-0 item 2 of the
+  same rework.
+
+### Internal
+
+- Retired the dead device-link relay surface
+  (`vauchi-app/orchestrator/device_link_relay.rs` 325 → 84 lines): the
+  5 superseded single-call fns (`listen_for_request`,
+  `create_offer_and_listen`, `poll_for_claim`, `send_and_receive`,
+  `poll_for_response`) and their orphan supporting code (`create_offer`,
+  `claim_and_send_request`, `send_response`, `DeviceLinkRelayMessage`,
+  `DeviceLinkError`, test-only encode/decode helpers). Surviving surface
+  = `DeviceLinkBroker` trait + `ClaimPayload` — the live broker
+  abstraction the state machines drive (slice 32l Phase 1). Zeroed 4 of
+  6 residual `core_instant_now` ratchet sites. The deprecated
+  `VauchiPlatform::*` device-link methods listed in §[0.24.1] remain;
+  their retirement is the separate slice 32l T3.1b work, blocked on the
+  windows `VauchiNative.cs` C# consumer migration.
+
 ## [0.25.0] — 2026-04-26
 
 ### Added

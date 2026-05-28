@@ -247,6 +247,12 @@ pub struct Vauchi {
     /// Timestamp of last successful exchange (for C1 post-exchange delay).
     #[cfg(feature = "network-http")]
     last_exchange_time: Option<std::time::Instant>,
+    /// Wall-clock unix seconds of the last successful sync, captured via
+    /// `clock().unix_seconds()` inside `update_timing_after_sync`. Resets
+    /// on process restart — in-memory only. Surfaced via `last_sync_time()`
+    /// so MyInfoEngine can render "Last synced X ago" without the frontend
+    /// owning the timestamp (humble-UI follow-up to ios!472).
+    last_sync_unix_seconds: Option<u64>,
 }
 
 impl Vauchi {
@@ -378,6 +384,7 @@ impl Vauchi {
             next_sync_allowed: None,
             #[cfg(feature = "network-http")]
             last_exchange_time: None,
+            last_sync_unix_seconds: None,
         })
     }
 
@@ -417,6 +424,13 @@ impl Vauchi {
     /// production wraps [`SystemClock::shared`]. See `Vauchi::new_with`.
     pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
+    }
+
+    /// Wall-clock unix seconds of the last successful sync. `None` until
+    /// the first sync completes after process start (in-memory only — no
+    /// storage migration). Returns `None` in builds without `network-http`.
+    pub fn last_sync_time(&self) -> Option<u64> {
+        self.last_sync_unix_seconds
     }
 
     /// Borrow the explicit-randomness seam. Tests pass a
@@ -565,6 +579,7 @@ impl Vauchi {
             next_sync_allowed: None,
             #[cfg(feature = "network-http")]
             last_exchange_time: None,
+            last_sync_unix_seconds: None,
         })
     }
 }

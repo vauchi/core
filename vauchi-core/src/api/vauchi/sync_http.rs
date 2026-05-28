@@ -531,7 +531,9 @@ impl Vauchi {
     ///
     /// Computes the C2 deadline using a jittered sync interval. If the last
     /// exchange was recent (within `post_exchange_delay_max_ms`), a C1 deadline
-    /// is also computed and the MAX of C1 and C2 is used.
+    /// is also computed and the MAX of C1 and C2 is used. Also captures the
+    /// wall-clock unix timestamp for `last_sync_time()` so MyInfoEngine can
+    /// render a "Last synced X ago" caption (humble-UI follow-up to ios!472).
     fn update_timing_after_sync(&mut self) {
         let c2_deadline =
             self.monotonic.now() + self.config.sync.jittered_sync_interval(self.rng.as_ref());
@@ -554,6 +556,7 @@ impl Vauchi {
         };
 
         self.next_sync_allowed = Some(deadline);
+        self.last_sync_unix_seconds = Some(self.clock.unix_seconds());
     }
 
     /// Resolve the OHTTP key: cached → bundled → direct fetch (if allowed).
@@ -1086,6 +1089,35 @@ mod tests {
         assert_eq!(
             pins, relay_sentinel,
             "same-host OHTTP endpoint must use the data-relay pins"
+        );
+    }
+
+    // =========================================================================
+    // last_sync_unix_seconds (humble-UI follow-up to ios!472)
+    // =========================================================================
+
+    // @scenario: ohttp_sync :: last_sync_time records wall-clock on success
+    #[test]
+    fn last_sync_time_records_wall_clock_via_update_timing() {
+        use crate::clock::FakeClock;
+        use std::time::{Duration, SystemTime};
+
+        let pinned = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+        let clock = FakeClock::new(pinned).shared();
+        let mut v = Vauchi::in_memory_with_clock(clock).unwrap();
+
+        assert_eq!(
+            v.last_sync_time(),
+            None,
+            "Vauchi starts with no recorded sync — last_sync_time must be None"
+        );
+
+        v.update_timing_after_sync();
+
+        assert_eq!(
+            v.last_sync_time(),
+            Some(1_700_000_000),
+            "update_timing_after_sync must capture clock().unix_seconds() so MyInfoEngine can render the relative caption"
         );
     }
 }

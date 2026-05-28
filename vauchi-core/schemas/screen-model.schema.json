@@ -1171,6 +1171,81 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "description": "Ongoing-status indicator carrying a terse label, a semantic kind (color category), and an optional tap action.\n\nDistinct semantic role from `Component::StatusIndicator`, which today renders screen-body status of in-progress operations (Sync / BackupRecovery / LinkResponder / RecoveryClaimReview / RecoveryHelp use sites). `Indicator` is the chrome-positioned counterpart — emitted by AppEngine overlays (offline / update / future sync-chrome) for app-level status that lives across screens, not as screen content.\n\nPer the shell-purity investigation (`_private/docs/investigations/2026-05-28-core-screen-composition-surface.md`): the variant is generic, not Sync-specific — same shape carries connectivity / backup-overdue / update-available / sync-state uses. Frontends render natively (iOS toolbar chip, GTK4 header status icon, Android Material chip) by typed dispatch, no action_id sniffing.",
+          "type": "object",
+          "required": [
+            "Indicator"
+          ],
+          "properties": {
+            "Indicator": {
+              "type": "object",
+              "required": [
+                "id",
+                "kind",
+                "label"
+              ],
+              "properties": {
+                "a11y": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/A11y"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "action_id": {
+                  "description": "Optional tap action. `None` = display-only (informational); `Some(id)` = tap fires `UserAction::ActionPressed { action_id: id }`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "$ref": "#/definitions/IndicatorKind"
+                },
+                "label": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Sectioned action list — multiple labeled groups of tappable items, each rendered as a native section (SwiftUI `Section`, GTK4 ListBox group, Material category header). Distinct semantic role from flat `Component::ActionList`: ignoring the section grouping degrades UX from \"structured menu\" to \"flat dump\", so the discriminant belongs at variant level.\n\nUsed by `MoreEngine` to emit grouped settings entries (primary / secondary / data / legal) without forcing each frontend's renderer to special-case action_ids or reproduce a section table.",
+          "type": "object",
+          "required": [
+            "SectionedActionList"
+          ],
+          "properties": {
+            "SectionedActionList": {
+              "type": "object",
+              "required": [
+                "id",
+                "sections"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "sections": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Section"
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -1265,6 +1340,39 @@
           "$ref": "#/definitions/UiFieldVisibility"
         }
       }
+    },
+    "IndicatorKind": {
+      "description": "Semantic kind for `Component::Indicator` — the four-state color category each frontend maps to its theme palette.\n\nDistinct from `Status` (used by `Component::StatusIndicator` for in-progress screen-body operations). `IndicatorKind` is for ongoing-state chrome and uses presentation-shaped categories (semantic color roles), not domain-shaped lifecycle states.",
+      "oneOf": [
+        {
+          "description": "In-progress or freshly-confirmed — emphasis color (e.g. green / accent).",
+          "type": "string",
+          "enum": [
+            "Active"
+          ]
+        },
+        {
+          "description": "Failed / attention-required — error color (e.g. red / orange).",
+          "type": "string",
+          "enum": [
+            "Error"
+          ]
+        },
+        {
+          "description": "Idle / informational — muted color (e.g. gray / outline).",
+          "type": "string",
+          "enum": [
+            "Neutral"
+          ]
+        },
+        {
+          "description": "Transient busy state — animated indicator (e.g. spinner / pulse).",
+          "type": "string",
+          "enum": [
+            "Busy"
+          ]
+        }
+      ]
     },
     "InfoItem": {
       "description": "An item in an info panel.",
@@ -1575,6 +1683,29 @@
           ]
         }
       ]
+    },
+    "Section": {
+      "description": "A named section within a `Component::SectionedActionList`.",
+      "type": "object",
+      "required": [
+        "id",
+        "items",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ActionListItem"
+          }
+        },
+        "label": {
+          "type": "string"
+        }
+      }
     },
     "SettingsItem": {
       "description": "An item in a settings group.",

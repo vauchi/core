@@ -6,6 +6,30 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.51.21] — 2026-05-28
+
+### Added
+
+- `Component::Indicator { id, label, kind, action_id, a11y }` —
+  generic ongoing-status primitive for chrome (sync / offline /
+  backup / update). Distinct from `Component::StatusIndicator`
+  (screen-body in-progress status); Indicator is chrome-positioned.
+  `IndicatorKind`: `Active` / `Error` / `Neutral` / `Busy`
+  (presentation-shaped semantic-color roles). `action_id` optional —
+  tappable when present, display-only when `None`.
+- `Component::SectionedActionList { id, sections: Vec<Section> }` —
+  structured menu primitive (multiple labeled groups of tappable
+  items). Distinct from `Component::ActionList` (flat menu); section
+  grouping is structural, not a hint, so the discriminant lives at
+  variant level. `Section { id, label, items: Vec<ActionListItem> }`.
+
+Wire-type additions only — no engine emits them yet. Renderer
+additions per frontend + engine emission flips (MoreEngine →
+SectionedActionList; new `apply_sync_chrome_overlay` → Indicator)
+land in follow-up work.
+
+Refs `_private/docs/investigations/2026-05-28-core-screen-composition-surface.md`.
+
 ## [0.51.20] — 2026-05-28
 
 ### Added

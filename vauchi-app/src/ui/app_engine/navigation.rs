@@ -200,6 +200,12 @@ impl AppEngine {
             // initiator machine on entry / exit of the DeviceLinking screen.
             #[cfg(all(feature = "network-http", feature = "storage"))]
             self.sync_device_link_lifecycle(&old_screen, &screen);
+            // Slice 32m T1.2b: build / drop the engine-owned multi-stage
+            // machine on entry / exit of the MultiStageExchange screen.
+            // T1.2c removes the parallel cycle-thread bridge in
+            // PlatformAppEngine to avoid double-driving the engine on
+            // mobile.
+            self.sync_multi_stage_lifecycle(&old_screen, &screen);
         }
 
         // Cache the old engine if its screen is cacheable

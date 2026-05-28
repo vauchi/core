@@ -13,6 +13,7 @@ mod device_link;
 mod device_link_initiator;
 mod intercept;
 mod link_responder;
+mod multi_stage_exchange;
 mod navigation;
 mod routing;
 mod screens;
@@ -433,6 +434,13 @@ pub struct AppEngine {
     /// only on `AppScreen::DeviceLinking`. See `app_engine/device_link_initiator.rs`.
     #[cfg(all(feature = "network-http", feature = "storage"))]
     device_link_initiator: Option<device_link_initiator::DeviceLinkInitiatorHolder>,
+    /// Engine-owned multi-stage exchange machine (slice 32m T1.2b), live
+    /// only on `AppScreen::MultiStageExchange`. See
+    /// `app_engine/multi_stage_exchange.rs`. Replaces the
+    /// `vauchi-platform::MobileMultiStageSession` cycle thread; T1.2c
+    /// removes the parallel cycle-thread bridge in PlatformAppEngine
+    /// to avoid double-driving the active engine on mobile.
+    multi_stage_session: Option<multi_stage_exchange::MultiStageHolder>,
 }
 
 impl AppEngine {
@@ -572,6 +580,7 @@ impl AppEngine {
             link_responder: None,
             #[cfg(all(feature = "network-http", feature = "storage"))]
             device_link_initiator: None,
+            multi_stage_session: None,
         }
     }
 
@@ -1378,6 +1387,9 @@ impl AppEngine {
         // Slice 32l T3.1b: advance the device-link machine one relay step (no-op when idle).
         #[cfg(all(feature = "network-http", feature = "storage"))]
         self.advance_device_link_session();
+        // Slice 32m T1.2b: advance the multi-stage machine one
+        // protocol step (no-op when idle / no active session).
+        self.advance_multi_stage_session();
 
         let now = self.vauchi.clock().unix_seconds();
 

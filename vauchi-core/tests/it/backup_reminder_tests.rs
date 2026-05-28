@@ -96,7 +96,7 @@ fn is_reminder_due_after_7_days_first_time() {
     assert!(state.is_reminder_due(now, identity_created));
 }
 
-// @scenario: backup_reminder :: no reminder before 7 days
+// @scenario: backup_reminder :: No reminder before the weekly threshold
 // @internal
 #[test]
 fn is_reminder_not_due_before_7_days() {

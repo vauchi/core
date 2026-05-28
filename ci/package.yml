@@ -24,6 +24,22 @@ package:xcframework:
   extends: [.macos-runner, .release-or-rc]
   stage: package
   needs: [build:apple, build:validate-bindings]
+  # Belt-and-braces against the nell file-variable staging race: the
+  # in-script retry budget in package-xcframework.sh already waits up to
+  # ~27s for COSIGN_KEY to land on disk, but if that still isn't enough,
+  # auto-retry the job once. The shared template's default `retry.when`
+  # is REPLACED (not merged) when a job overrides retry, so the standard
+  # system-failure conditions must be listed alongside script_failure.
+  # Two consecutive v0.51.17 + v0.51.18 release tag pipelines both lost
+  # the race on attempt 1 (jobs 14546357593 + 14577073994) — proof in
+  # MR description.
+  retry:
+    max: 2
+    when:
+      - script_failure
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - unknown_failure
   script:
     - ./scripts/package-xcframework.sh "$CI_COMMIT_TAG"
   artifacts:

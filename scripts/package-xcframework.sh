@@ -303,18 +303,25 @@ echo "$CHECKSUM" > "$DIST_DIR/VauchiPlatformFFI.xcframework.zip.sha256"
 if [[ -n "${COSIGN_KEY:-}" ]]; then
     # GitLab file-type variable: env holds a path to a staged file. The
     # nell runner has been observed to drop staging intermittently — env
-    # is set but file is missing. Retry briefly to absorb a staging race;
-    # if still missing, fail fast with an actionable message instead of
+    # is set but file is missing. Retry to absorb the staging race; if
+    # still missing, fail fast with an actionable message instead of
     # cascading head/base64 errors.
-    for attempt in 1 2 3; do
+    #
+    # Empirical (2026-05-28, pipelines 2553603199 + 2558069282): the
+    # earlier 3×2s = 4s budget consistently lost the race on both
+    # consecutive release tag runs (manual retries succeeded ~8 min
+    # later, suggesting the staging window is wider than 4s). Bumped to
+    # 10×3s = up to 27s to cover it. Job-level `retry: {when:
+    # [script_failure]}` in `ci/package.yml` is the belt-and-braces.
+    for attempt in 1 2 3 4 5 6 7 8 9 10; do
         [[ -f "$COSIGN_KEY" ]] && break
-        if [[ "$attempt" -lt 3 ]]; then
-            echo -e "${YELLOW}COSIGN_KEY path '$COSIGN_KEY' not present (attempt $attempt/3) — retrying in 2s${NC}" >&2
-            sleep 2
+        if [[ "$attempt" -lt 10 ]]; then
+            echo -e "${YELLOW}COSIGN_KEY path '$COSIGN_KEY' not present (attempt $attempt/10) — retrying in 3s${NC}" >&2
+            sleep 3
         fi
     done
     if [[ ! -f "$COSIGN_KEY" ]]; then
-        echo -e "${RED}ERROR: COSIGN_KEY env is set to '$COSIGN_KEY' but file does not exist after 3 attempts.${NC}" >&2
+        echo -e "${RED}ERROR: COSIGN_KEY env is set to '$COSIGN_KEY' but file does not exist after 10 attempts.${NC}" >&2
         echo -e "${RED}This is a GitLab Runner file-variable staging failure (runner-side issue).${NC}" >&2
         echo -e "${RED}Retry the job; if it persists, check runner config on the host.${NC}" >&2
         exit 1

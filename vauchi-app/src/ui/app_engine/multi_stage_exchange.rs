@@ -91,7 +91,11 @@ impl AppEngine {
     /// is already held. Build errors (missing identity, missing card)
     /// are non-fatal — the screen falls back to the empty engine and
     /// the next navigation attempt re-tries.
-    pub(super) fn ensure_multi_stage_session(&mut self, mode: ExchangeMode) {
+    ///
+    /// `pub` so the platform layer can rebuild the machine for an
+    /// in-place retry without an intermediate navigation
+    /// (`PlatformAppEngine::handle_action`'s retry branch in T1.2c).
+    pub fn ensure_multi_stage_session(&mut self, mode: ExchangeMode) {
         if self.multi_stage_session.is_some() {
             return;
         }
@@ -145,14 +149,9 @@ impl AppEngine {
     /// the existing `handle_hardware_event` entry point. T1.2c removes
     /// the parallel cycle-thread route from `PlatformAppEngine`.
     ///
-    /// T1.2b note: marked `dead_code`-allowed because the only call
-    /// site is `app_engine::routing::handle_hardware_event` — that
-    /// hook is added in T1.2c once the cycle thread is no longer the
-    /// authoritative driver. Wiring it in T1.2b would cause two
-    /// independent `MultiStageSession`s to parse the same scan and
-    /// the engine's screen state would race between them.
-    #[allow(dead_code)]
-    pub(crate) fn forward_multi_stage_hardware_event(
+    /// T1.2c calls this from `PlatformAppEngine` for the QrScanned
+    /// hardware event and the `peer_scan` TextChanged UserAction.
+    pub fn forward_multi_stage_hardware_event(
         &mut self,
         event: &vauchi_core::Event,
     ) -> MultiStageEvent {
@@ -167,7 +166,11 @@ impl AppEngine {
     /// `MultiStageExchangeEngine::set_*` setters (the same bridge
     /// entry points the cycle thread used pre-32m). Returns true if
     /// the engine accepted the update.
-    pub(crate) fn apply_multi_stage_event(&mut self, event: MultiStageEvent) -> bool {
+    ///
+    /// `pub` so the platform layer can consume a `MultiStageEvent`
+    /// produced by `forward_multi_stage_hardware_event` in the
+    /// QrScanned + peer-scan routes.
+    pub fn apply_multi_stage_event(&mut self, event: MultiStageEvent) -> bool {
         match event {
             MultiStageEvent::None => false,
             MultiStageEvent::QrFrameReady(payload) => self.apply_multi_stage_qr_payload(&payload),

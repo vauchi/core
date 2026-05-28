@@ -346,8 +346,24 @@ impl PlatformAppEngine {
                 if action_id == vauchi_app::ui::MULTI_STAGE_RETRY_ACTION_ID
         );
         if on_multi_stage && is_retry {
-            self.cancel_multi_stage_session();
-            self.ensure_multi_stage_session()?;
+            // T1.2c: rebuild the AppEngine-owned machine in place so
+            // the next advance emits a fresh INIT QR. The cycle-thread
+            // path is dead — `cancel_multi_stage_session` /
+            // `ensure_multi_stage_session` on `self` are kept around
+            // for the test helpers (T3.1 deletes them).
+            let mode = match &pre_screen {
+                AppScreen::MultiStageExchange { mode } => *mode,
+                _ => {
+                    return Err(MobileError::Other {
+                        detail: "retry dispatched off multi-stage screen".into(),
+                    });
+                }
+            };
+            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            engine.cancel_multi_stage_session();
+            engine.ensure_multi_stage_session(mode);
         }
 
         // Pair 4 — auto-route the peer-scan QR text into the live
@@ -367,16 +383,20 @@ impl PlatformAppEngine {
             } = &action
             && component_id == vauchi_app::ui::MULTI_STAGE_PEER_SCAN_COMPONENT_ID
         {
-            let session_clone = self
-                .multi_stage_session
-                .lock()
-                .map_err(|e| MobileError::Other {
-                    detail: format!("Lock failed: {e}"),
-                })?
-                .clone();
-            if let Some(session) = session_clone {
-                let _ = session.process_scanned_qr(value.clone());
-            }
+            // T1.2c: route the scan through the AppEngine-owned
+            // machine. The QR-scanner Component emits TextChanged
+            // with the scanned data; we wrap it in a synthetic
+            // `Event::QrScanned` so the same machine ingress
+            // handles both this UserAction path and the
+            // `handle_hardware_event` path below.
+            let qr_event = vauchi_core::Event::QrScanned {
+                data: value.clone(),
+            };
+            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            let m_event = engine.forward_multi_stage_hardware_event(&qr_event);
+            engine.apply_multi_stage_event(m_event);
         }
 
         let (result, pending_commands) = {
@@ -432,24 +452,16 @@ impl PlatformAppEngine {
                 .current_app_screen(),
             AppScreen::MultiStageExchange { .. }
         );
-        if on_multi_stage && let vauchi_core::Event::QrScanned { data } = &hw_event {
-            let session_clone = self
-                .multi_stage_session
-                .lock()
-                .map_err(|e| MobileError::Other {
-                    detail: format!("Lock failed: {e}"),
-                })?
-                .clone();
-            if let Some(session) = session_clone {
-                let _ = session.process_scanned_qr(data.clone());
-                // The bridge listener will push state changes via the
-                // cycle thread; no immediate ActionResult is needed
-                // because rendering re-fetches via current_screen_json
-                // after the listener fires `on_screens_invalidated`.
-                return Ok(None);
-            }
-            // No session active despite being on the screen — return
-            // None and let the engine's default fall-through render.
+        if on_multi_stage && let vauchi_core::Event::QrScanned { .. } = &hw_event {
+            // T1.2c: route through the AppEngine-owned machine.
+            // The cycle-thread bridge is dead. Rendering re-fetches
+            // via `current_screen_json` on the next frontend poll.
+            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            let m_event = engine.forward_multi_stage_hardware_event(&hw_event);
+            engine.apply_multi_stage_event(m_event);
+            return Ok(None);
         }
 
         // ADR-031: biometric unlock arrives as a hardware event, not as
@@ -809,6 +821,30 @@ impl PlatformAppEngine {
             detail: format!("Lock failed: {e}"),
         })?;
         let items = engine.poll_notifications();
+        // T1.2c: the multi-stage machine just advanced inside
+        // `engine.poll_notifications`. The cycle-thread bridge that
+        // used to fire `on_screens_invalidated` on every state change
+        // is dead, so fire one ourselves whenever a machine is held —
+        // the frontend re-fetches `current_screen_json` and reflects
+        // the new QR / state. Cheap over-fire (frontend renders are
+        // idempotent against the same screen JSON), correct in every
+        // case the cycle thread used to cover.
+        let multi_stage_active = engine.multi_stage_session_active()
+            && matches!(
+                engine.current_app_screen(),
+                AppScreen::MultiStageExchange { .. }
+            );
+        drop(engine);
+        if multi_stage_active {
+            let listener = self
+                .direct_listener
+                .lock()
+                .ok()
+                .and_then(|guard| guard.clone());
+            if let Some(listener) = listener {
+                listener.on_screens_invalidated(vec!["multi_stage_exchange".into()]);
+            }
+        }
         let mapped = items
             .into_iter()
             .map(|n| MobilePendingNotification {
@@ -4207,13 +4243,14 @@ impl PlatformAppEngine {
             })?
             .current_app_screen()
             .clone();
-        let was_multi = matches!(pre, AppScreen::MultiStageExchange { .. });
-        let is_multi = matches!(post, AppScreen::MultiStageExchange { .. });
-        match (was_multi, is_multi) {
-            (true, false) => self.cancel_multi_stage_session(),
-            (false, true) => self.ensure_multi_stage_session()?,
-            _ => {}
-        }
+        // T1.2c: the AppEngine-owned machine handles its own
+        // lifecycle via `sync_multi_stage_lifecycle` (called from
+        // `navigate_to_internal`). The cycle-thread bridge is dead;
+        // this method becomes a no-op for multi-stage. The
+        // platform-side `ensure_multi_stage_session` /
+        // `cancel_multi_stage_session` remain on `self` for the test
+        // helpers (T3.1 deletes them).
+        let _ = (pre, post);
         Ok(())
     }
 
@@ -4244,11 +4281,24 @@ impl PlatformAppEngine {
         Ok((serialize_exchange_payload(&signing_key, &card), signing_key))
     }
 
-    /// Lazily create + start the `MobileMultiStageSession` and wire the
-    /// core-supplied `MultiStageEngineBridge` listener so cycle-thread
-    /// callbacks reach the active engine. Idempotent: a no-op when a
-    /// session is already running.
+    /// **T1.2c no-op.** The AppEngine-owned multi-stage machine
+    /// (see `vauchi-app/src/ui/app_engine/multi_stage_exchange.rs`)
+    /// is the sole driver. This method is preserved so the test
+    /// helpers in `platform_app_engine_test_helpers.rs` can still
+    /// call it idempotently; T3.1 deletes both the method and the
+    /// `multi_stage_session` field outright. The body of the
+    /// pre-32m cycle-thread spawn is left as documentation of what
+    /// the cycle thread used to do.
+    #[allow(dead_code)]
     fn ensure_multi_stage_session(&self) -> Result<(), MobileError> {
+        Ok(())
+    }
+
+    /// **T1.2c dead code.** The pre-32m cycle-thread spawn — kept
+    /// only as a doc reference until T3.1 deletes
+    /// `MobileMultiStageSession` outright.
+    #[allow(dead_code)]
+    fn _retired_cycle_thread_ensure(&self) -> Result<(), MobileError> {
         let mut slot = self
             .multi_stage_session
             .lock()

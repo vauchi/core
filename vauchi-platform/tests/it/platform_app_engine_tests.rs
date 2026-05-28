@@ -875,9 +875,11 @@ fn navigate_to_multi_stage_auto_creates_session_no_frontend_call_needed() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
 
-    // Capture invalidation calls — once the session starts the cycle
-    // thread fires `on_state_changed(Idle/Advertising)` which the bridge
-    // forwards as a `multi_stage_exchange` invalidation.
+    // Capture invalidation calls. Pre-32m the cycle thread fired
+    // these from a background bridge listener; post-T1.2c the
+    // platform's `poll_notifications` wrapper fires one synchronously
+    // whenever the machine advanced while on the multi-stage screen.
+    // The test now polls explicitly to trigger the advance.
     let invalidations: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
     struct CaptureListener {
         sink: Arc<Mutex<Vec<Vec<String>>>>,
@@ -905,23 +907,30 @@ fn navigate_to_multi_stage_auto_creates_session_no_frontend_call_needed() {
         "multi_stage_exchange",
     );
 
-    // Give the cycle thread a moment to push at least one state.
-    std::thread::sleep(std::time::Duration::from_millis(150));
+    // Poll once — this advances the AppEngine-owned multi-stage
+    // machine and the platform wrapper fires the invalidation
+    // synchronously (T1.2c contract). A single poll is sufficient;
+    // wall-clock sleeps are not needed (CC-06 — no real waits in
+    // tests, the cycle thread that needed them is retired).
+    engine.poll_notifications().expect("poll");
     let calls = invalidations.lock().expect("lock").clone();
     let saw_multi_stage = calls
         .iter()
         .any(|ids| ids.iter().any(|id| id == "multi_stage_exchange"));
     assert!(
         saw_multi_stage,
-        "auto-managed session must push at least one invalidation; got {calls:?}",
+        "auto-managed session must push at least one invalidation on poll; got {calls:?}",
     );
 
-    // Navigating away cancels the session and stops further pushes.
+    // Navigating away cancels the session — subsequent polls fire no
+    // multi-stage invalidations because `multi_stage_session_active()`
+    // returns false.
     engine
         .navigate_back_json()
         .expect("navigate back away from multi_stage_exchange");
     let pre_count = invalidations.lock().expect("lock").len();
-    std::thread::sleep(std::time::Duration::from_millis(150));
+    engine.poll_notifications().expect("poll");
+    engine.poll_notifications().expect("poll");
     let post_count = invalidations.lock().expect("lock").len();
     assert_eq!(
         pre_count, post_count,

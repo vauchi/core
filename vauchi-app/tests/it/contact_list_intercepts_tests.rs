@@ -9,8 +9,19 @@
 //! regressions where an action id on a Primary-styled button ends up
 //! being a no-op because the intercept was removed or moved.
 
-use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, UserAction, WorkflowEngine};
+use vauchi_app::ui::{ActionResult, AppEngine, AppScreen, Component, UserAction, WorkflowEngine};
 use vauchi_core::api::Vauchi;
+
+const DISMISS_DEMO_CONTACT_ACTION_ID: &str = "dismiss_demo_contact";
+
+fn has_demo_banner(screen: &vauchi_app::ui::ScreenModel) -> bool {
+    screen.components.iter().any(|c| {
+        matches!(
+            c,
+            Component::Banner { action_id, .. } if action_id == DISMISS_DEMO_CONTACT_ACTION_ID
+        )
+    })
+}
 
 fn new_vauchi_with_identity() -> Vauchi {
     let mut vauchi = Vauchi::in_memory().unwrap();
@@ -113,4 +124,82 @@ fn tapping_a_contact_navigates_to_contact_detail() {
              open_contact result forces frontends to know domain screen ids. Got: {other:?}"
         ),
     }
+}
+
+// @internal
+#[test]
+fn demo_banner_appears_on_contacts_screen_when_demo_active() {
+    // The onboarding demo contact lives as a `DomainCommand`-driven
+    // Vauchi state today. Per the shell-purity audit
+    // (`_private/docs/investigations/2026-05-28-core-screen-composition-surface.md`),
+    // core emits the demo affordance as a `Component::Banner` from the
+    // Contacts screen so frontends render it as a generic Banner instead
+    // of owning a custom `DemoContactCard` view (~90 LOC on iOS).
+    let vauchi = new_vauchi_with_identity();
+    vauchi.initialize_demo_contact().expect("init demo");
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Contacts);
+
+    assert!(
+        has_demo_banner(&engine.current_screen()),
+        "Contacts screen must carry a Banner with action_id={DISMISS_DEMO_CONTACT_ACTION_ID} when demo is active",
+    );
+}
+
+// @internal
+#[test]
+fn demo_banner_absent_on_non_contacts_screens() {
+    // The demo banner is scoped to the Contacts screen. On MyInfo or
+    // any other root the banner must not appear — otherwise the
+    // overlay leaks app-chrome semantics that don't belong on the
+    // home tab.
+    let vauchi = new_vauchi_with_identity();
+    vauchi.initialize_demo_contact().expect("init demo");
+    let engine = AppEngine::new(vauchi);
+    // engine_with_identity defaults to MyInfo
+
+    assert!(
+        !has_demo_banner(&engine.current_screen()),
+        "Demo banner must not appear on the default (MyInfo) screen",
+    );
+}
+
+// @internal
+#[test]
+fn demo_banner_absent_when_demo_not_active() {
+    // Without `initialize_demo_contact`, the demo state is inactive
+    // and no banner should be emitted even on the Contacts screen.
+    let vauchi = new_vauchi_with_identity();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Contacts);
+
+    assert!(
+        !has_demo_banner(&engine.current_screen()),
+        "Demo banner must not appear when demo is not active",
+    );
+}
+
+// @internal
+#[test]
+fn dismiss_demo_contact_action_removes_banner() {
+    // Pressing the dismiss action surfaced on the demo banner clears
+    // the demo state in Vauchi; subsequent renders of the Contacts
+    // screen must not re-emit the banner.
+    let vauchi = new_vauchi_with_identity();
+    vauchi.initialize_demo_contact().expect("init demo");
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::Contacts);
+    assert!(
+        has_demo_banner(&engine.current_screen()),
+        "precondition: demo banner is present",
+    );
+
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: DISMISS_DEMO_CONTACT_ACTION_ID.into(),
+    });
+
+    assert!(
+        !has_demo_banner(&engine.current_screen()),
+        "Demo banner must disappear after dismiss action is dispatched",
+    );
 }

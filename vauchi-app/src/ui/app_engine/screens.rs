@@ -143,12 +143,18 @@ impl AppEngine {
                     .collect();
 
                 let has_contacts = vauchi.contact_count().unwrap_or(0) > 0;
+                let pending_updates = vauchi.pending_update_count().unwrap_or(0);
+                let last_sync_seconds = vauchi.last_sync_time();
+                let now_seconds = vauchi.clock().unix_seconds();
                 Box::new(
                     MyInfoEngine::new(progress)
                         .with_own_card(display_name, own_fields)
                         .with_groups(group_tabs)
                         .with_exchange_prompt(!has_contacts)
-                        .with_avatar_data(avatar_data),
+                        .with_avatar_data(avatar_data)
+                        .with_pending_updates(pending_updates)
+                        .with_last_sync_seconds(last_sync_seconds)
+                        .with_now_seconds(now_seconds),
                 )
             }
             AppScreen::MyInfoEntryDetail { field_id } => {

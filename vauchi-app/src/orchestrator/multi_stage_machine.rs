@@ -64,6 +64,7 @@
 
 use vauchi_core::Command;
 use vauchi_core::Event;
+use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::{
     AudioConfig, AudioProximityState, MultiStageSession, ProtocolState, QrPayload, audio_modem,
 };
@@ -72,6 +73,12 @@ use vauchi_core::exchange::{
 /// `MobileMultiStageSession::AUDIO_LISTEN_TIMEOUT_MS`. Kept private
 /// to this module — the platform binding never reads it directly.
 const AUDIO_LISTEN_TIMEOUT_MS: u64 = 5000;
+
+/// Exchange-payload format version byte. Mirrors the constant in
+/// `vauchi-platform/src/mobile_exchange.rs` (which T3.1 retires) and
+/// the inverse in `app_engine::multi_stage_exchange::serialize_exchange_payload`.
+/// Format: `[version: 1][public_key: 32][card_json: rest]`.
+const EXCHANGE_PAYLOAD_VERSION: u8 = 1;
 
 /// Observable phase of the multi-stage machine. 1:1 with
 /// [`ProtocolState`] (renamed for engine-side ergonomics — the
@@ -493,7 +500,16 @@ impl MultiStageMachine {
         if self.cancelled {
             return;
         }
-        let new_phase = phase_from_protocol_state(&self.inner.get_state());
+        let mut new_phase = phase_from_protocol_state(&self.inner.get_state());
+        // Late-bind the peer display name on the Finalized
+        // transition. `phase_from_protocol_state` returns an empty
+        // name because the mapping is a pure function of the
+        // protocol state; the name lives in the just-received
+        // payload, which only the session has.
+        if matches!(new_phase, MultiStagePhase::Finalized { .. }) {
+            let peer_name = extract_peer_name(&self.inner);
+            new_phase = MultiStagePhase::Finalized { peer_name };
+        }
         // Preserve `Failed { reason }` already set by a hardware
         // failure path — the inner state machine doesn't know about
         // those reason strings; only the host-side branches do.
@@ -503,6 +519,40 @@ impl MultiStageMachine {
             return;
         }
         self.phase = new_phase;
+    }
+}
+
+/// Decode the peer's display name from the just-received
+/// exchange payload. Called only on the `Finalized` transition;
+/// returns an empty string when the payload is absent (race —
+/// Finalized observed before reassembly completes) or malformed
+/// (deserialize failure — surfaces as the empty success-chrome
+/// name, never panics).
+///
+/// Wire format mirrors `serialize_exchange_payload`
+/// (`vauchi-app/src/ui/app_engine/multi_stage_exchange.rs`):
+/// `[version: 1][public_key: 32][card_json: rest]`. Drops the
+/// public key after the version check — the contact's signing
+/// key lives in storage via the persistence path, not on the
+/// success screen.
+fn extract_peer_name(session: &MultiStageSession) -> String {
+    let Some(data) = session.get_received_data() else {
+        return String::new();
+    };
+    decode_peer_name_from_payload(&data)
+}
+
+/// Pure-byte counterpart of [`extract_peer_name`] split out so the
+/// payload-shape edges (short input, wrong version, malformed
+/// `card_json`) can be unit-tested without spinning up a full
+/// `MultiStageSession` peer exchange.
+fn decode_peer_name_from_payload(data: &[u8]) -> String {
+    if data.len() < 34 || data[0] != EXCHANGE_PAYLOAD_VERSION {
+        return String::new();
+    }
+    match serde_json::from_slice::<ContactCard>(&data[33..]) {
+        Ok(card) => card.display_name().to_string(),
+        Err(_) => String::new(),
     }
 }
 
@@ -620,4 +670,60 @@ pub fn event_to_commands(event: &MultiStageEvent) -> Vec<Command> {
 #[doc(hidden)]
 pub fn protocol_state_for_test(machine: &MultiStageMachine) -> ProtocolState {
     machine.inner.get_state()
+}
+// INLINE_TEST_REQUIRED: decode_peer_name_from_payload is a private
+// helper; its edges (short input, wrong version, malformed card_json)
+// only exercise here.
+#[cfg(test)]
+mod peer_name_tests {
+    use super::{EXCHANGE_PAYLOAD_VERSION, decode_peer_name_from_payload};
+    use vauchi_core::contact_card::ContactCard;
+
+    fn build_payload(card: &ContactCard) -> Vec<u8> {
+        let json = serde_json::to_vec(card).expect("serialize card");
+        let mut out = Vec::with_capacity(1 + 32 + json.len());
+        out.push(EXCHANGE_PAYLOAD_VERSION);
+        out.extend_from_slice(&[0xAB; 32]);
+        out.extend_from_slice(&json);
+        out
+    }
+
+    // @internal
+    #[test]
+    fn well_formed_payload_returns_card_display_name() {
+        let card = ContactCard::new("Alice");
+        let payload = build_payload(&card);
+        assert_eq!(decode_peer_name_from_payload(&payload), "Alice");
+    }
+
+    // @internal
+    #[test]
+    fn empty_payload_returns_empty_string() {
+        assert_eq!(decode_peer_name_from_payload(&[]), "");
+    }
+
+    // @internal
+    #[test]
+    fn payload_shorter_than_header_returns_empty_string() {
+        let short = vec![EXCHANGE_PAYLOAD_VERSION; 20];
+        assert_eq!(decode_peer_name_from_payload(&short), "");
+    }
+
+    // @internal
+    #[test]
+    fn unknown_version_byte_returns_empty_string() {
+        let card = ContactCard::new("Bob");
+        let mut payload = build_payload(&card);
+        payload[0] = 0xFF;
+        assert_eq!(decode_peer_name_from_payload(&payload), "");
+    }
+
+    // @internal
+    #[test]
+    fn malformed_card_json_returns_empty_string() {
+        let mut payload = vec![EXCHANGE_PAYLOAD_VERSION];
+        payload.extend_from_slice(&[0xAB; 32]);
+        payload.extend_from_slice(b"{not-valid-json");
+        assert_eq!(decode_peer_name_from_payload(&payload), "");
+    }
 }

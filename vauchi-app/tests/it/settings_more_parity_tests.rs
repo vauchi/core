@@ -46,26 +46,36 @@ const EXPECTED_SETTINGS_GROUP_IDS: &[&str] = &[
     "danger",
 ];
 
-/// The canonical MoreEngine action_ids, in the order rendered by
-/// every Humble UI renderer that hosts the "More" tab.
+/// The canonical MoreEngine action_ids in render order — the
+/// cumulative iteration across the four sections (primary →
+/// secondary → data → legal). Mirrors the section grouping in
+/// `core/vauchi-app/src/ui/more.rs`'s `MORE_SECTIONS`.
 ///
 /// iOS currently hand-rolls its More tab (`ios/Vauchi/Views/MoreView.swift`)
-/// instead of routing through `CoreScreenView(screenName: "More")`.
-/// Pinning this list here means the day iOS adopts the unified
-/// renderer (deferred per G1), the contract is already locked.
+/// with the same 3-section structure for the items it surfaces
+/// (Settings, Help, Sync, Devices, Backup, Import, Privacy);
+/// adopting `CoreScreenView(screenName: "More")` is a like-for-like
+/// swap once G1 of `2026-05-02-ios-humble-ui-deep-retirement`
+/// flips on. The extra Android/TUI items (Activity, Archived,
+/// Merge, Replace, Backup-flat) live under the `secondary` / `data`
+/// section ids; iOS surfaces a subset.
 const EXPECTED_MORE_ACTION_IDS: &[&str] = &[
-    "activity_log",
+    // primary
+    "settings",
+    "help",
+    // secondary
     "sync",
     "device_management",
     "device_replacement",
     "recovery",
+    "backup",
+    // data
     "archived_contacts",
     "contact_duplicates",
     "import_contacts",
-    "settings",
-    "backup",
+    "activity_log",
+    // legal
     "privacy",
-    "help",
 ];
 
 fn sample_settings_config() -> SettingsConfig {
@@ -228,22 +238,27 @@ fn more_screen_emits_full_action_set_in_stable_order() {
     assert_eq!(screen.screen_id, "more");
     assert_eq!(screen.title, "More");
 
-    let action_list = screen
+    let sections = screen
         .components
         .iter()
         .find_map(|c| match c {
-            Component::ActionList { items, .. } => Some(items),
+            Component::SectionedActionList { sections, .. } => Some(sections),
             _ => None,
         })
-        .expect("MoreEngine must emit a single Component::ActionList");
+        .expect("MoreEngine must emit a single Component::SectionedActionList");
 
-    let actual_action_ids: Vec<&str> = action_list.iter().map(|item| item.id.as_str()).collect();
+    let actual_action_ids: Vec<&str> = sections
+        .iter()
+        .flat_map(|sec| sec.items.iter())
+        .map(|item| item.id.as_str())
+        .collect();
 
     assert_eq!(
         actual_action_ids, EXPECTED_MORE_ACTION_IDS,
-        "MoreEngine emitted action_ids do not match the cross-platform \
-         contract. Android renders these via CoreScreenView; iOS will adopt \
-         the same renderer when MoreView retires (deferred per G1 of \
+        "MoreEngine emitted action_ids (cumulative across sections) do not \
+         match the cross-platform contract. Android renders these via \
+         CoreScreenView; iOS will adopt the same renderer when MoreView \
+         retires (deferred per G1 of \
          `2026-05-02-ios-humble-ui-deep-retirement`)."
     );
 }

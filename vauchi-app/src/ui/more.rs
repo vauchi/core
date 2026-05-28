@@ -4,11 +4,15 @@
 
 //! More menu engine — navigation hub for secondary screens.
 //!
-//! Displays a single `ActionList` with entries for screens that moved
-//! out of the top-level tab bar: Sync, Devices, Settings, Backup,
-//! Privacy, Help.  Each entry emits `OpenContact { contact_id }` where
-//! the contact_id is a screen ID string — `route_result` in `routing.rs`
-//! maps it to the target `AppScreen`.
+//! Emits a `SectionedActionList` grouping entries into four sections
+//! (primary / secondary / data / legal) per the shell-purity
+//! investigation 2026-05-28-core-screen-composition-surface. Each
+//! entry emits `OpenContact { contact_id }` where the contact_id is a
+//! screen ID string — `route_result` in `routing.rs` maps it to the
+//! target `AppScreen`. Section grouping mirrors iOS's existing
+//! `MoreView` (`primarySection` / `secondarySection` / `legalSection`)
+//! so the unified renderer adoption (G1 of
+//! `2026-05-02-ios-humble-ui-deep-retirement`) is a like-for-like swap.
 
 use crate::ui::*;
 use vauchi_core::{Command, FilePickPurpose};
@@ -19,31 +23,70 @@ use vauchi_core::{Command, FilePickPurpose};
 /// screen, the action *is* the picker.
 pub(crate) const IMPORT_CONTACTS_ACTION_ID: &str = "import_contacts";
 
-/// Navigation targets exposed through the More menu. The set is the
-/// union of items every consuming platform (Android, TUI) needs to
-/// reach from a "More" navigation surface. Android's MoreScreen
-/// retirement (2026-05-01-more-engine-extension-android-retirement)
-/// added the device-management / device-replacement / recovery /
-/// archived-contacts / contact-duplicates entries; the legacy
-/// activity-log / sync / backup / privacy entries stay for TUI.
+/// Section in the More menu. Each section has a stable `id` (used by
+/// the cross-platform contract pinned in
+/// `tests/it/settings_more_parity_tests.rs`) and a `label` shown as
+/// the section header on frontends that surface it.
+struct MoreSection {
+    id: &'static str,
+    label: &'static str,
+    items: &'static [(&'static str, &'static str)],
+}
+
+/// More menu sections — primary / secondary / data / legal.
 ///
-/// `import_contacts` is the only entry that does not navigate to a
-/// screen — selecting it returns an `Commands` result that
-/// drives the frontend's native file picker per ADR-031.
-const MORE_ITEMS: &[(&str, &str)] = &[
-    ("activity_log", "Activity"),
-    ("sync", "Sync"),
-    ("device_management", "Linked Devices"),
-    ("device_replacement", "Replace Device"),
-    ("recovery", "Backup & Recovery"),
-    ("archived_contacts", "Archived Contacts"),
-    ("contact_duplicates", "Merge Contacts"),
-    (IMPORT_CONTACTS_ACTION_ID, "Import Contacts"),
-    ("settings", "Settings"),
-    ("backup", "Backup"),
-    ("privacy", "Privacy"),
-    ("help", "Help"),
+/// The four-section grouping is the cross-platform contract:
+/// - **primary**: most-used navigation (Settings, Help).
+/// - **secondary**: device / sync / backup management.
+/// - **data**: data-management entries (history, dedupe, import, archive).
+/// - **legal**: policy disclosures.
+///
+/// Frontends with native section headers render the labels;
+/// platforms without section affordances (TUI today) may flatten —
+/// the iteration order across sections preserves the contracted
+/// `EXPECTED_MORE_ACTION_IDS` sequence.
+const MORE_SECTIONS: &[MoreSection] = &[
+    MoreSection {
+        id: "primary",
+        label: "Primary",
+        items: &[("settings", "Settings"), ("help", "Help")],
+    },
+    MoreSection {
+        id: "secondary",
+        label: "Secondary",
+        items: &[
+            ("sync", "Sync"),
+            ("device_management", "Linked Devices"),
+            ("device_replacement", "Replace Device"),
+            ("recovery", "Backup & Recovery"),
+            ("backup", "Backup"),
+        ],
+    },
+    MoreSection {
+        id: "data",
+        label: "Data",
+        items: &[
+            ("archived_contacts", "Archived Contacts"),
+            ("contact_duplicates", "Merge Contacts"),
+            (IMPORT_CONTACTS_ACTION_ID, "Import Contacts"),
+            ("activity_log", "Activity"),
+        ],
+    },
+    MoreSection {
+        id: "legal",
+        label: "Legal",
+        items: &[("privacy", "Privacy")],
+    },
 ];
+
+/// Iterate every `(action_id, label)` pair across all sections in
+/// section order. Test-only — production code routes through the
+/// emitted `Component::SectionedActionList` and its handler arms,
+/// not through a flat helper.
+#[cfg(test)]
+fn iter_all_items() -> impl Iterator<Item = &'static (&'static str, &'static str)> {
+    MORE_SECTIONS.iter().flat_map(|s| s.items.iter())
+}
 
 /// MIME types accepted for vCard import. Frontends may filter the
 /// native picker to these; on platforms where the OS picker doesn't
@@ -75,15 +118,23 @@ impl MoreEngine {
 
 impl WorkflowEngine for MoreEngine {
     fn current_screen(&self) -> ScreenModel {
-        let items: Vec<ActionListItem> = MORE_ITEMS
+        let sections: Vec<Section> = MORE_SECTIONS
             .iter()
-            .map(|(id, label)| ActionListItem {
-                id: (*id).into(),
-                label: (*label).into(),
-                icon: None,
-                detail: None,
-                a11y: None,
-                info_key: None,
+            .map(|sec| Section {
+                id: sec.id.into(),
+                label: sec.label.into(),
+                items: sec
+                    .items
+                    .iter()
+                    .map(|(id, label)| ActionListItem {
+                        id: (*id).into(),
+                        label: (*label).into(),
+                        icon: None,
+                        detail: None,
+                        a11y: None,
+                        info_key: None,
+                    })
+                    .collect(),
             })
             .collect();
 
@@ -91,9 +142,9 @@ impl WorkflowEngine for MoreEngine {
             screen_id: "more".into(),
             title: "More".into(),
             subtitle: None,
-            components: vec![Component::ActionList {
+            components: vec![Component::SectionedActionList {
                 id: "more_menu".into(),
-                items,
+                sections,
             }],
             actions: vec![],
             progress: None,
@@ -130,7 +181,7 @@ impl WorkflowEngine for MoreEngine {
     }
 }
 
-// INLINE_TEST_REQUIRED: tests verify the private MORE_ITEMS constant
+// INLINE_TEST_REQUIRED: tests verify the private MORE_SECTIONS constant
 // + the engine's special-case branch on the private
 // IMPORT_CONTACTS_ACTION_ID — both are pub(crate)-or-tighter and not
 // reachable from an external test crate.
@@ -141,12 +192,10 @@ mod tests {
     // @internal
     #[test]
     fn import_contacts_entry_is_present() {
-        let entry = MORE_ITEMS
-            .iter()
-            .find(|(id, _)| *id == IMPORT_CONTACTS_ACTION_ID);
+        let entry = iter_all_items().find(|(id, _)| *id == IMPORT_CONTACTS_ACTION_ID);
         assert!(
             entry.is_some(),
-            "import_contacts entry missing from MORE_ITEMS"
+            "import_contacts entry missing from MORE_SECTIONS"
         );
         assert_eq!(entry.unwrap().1, "Import Contacts");
     }
@@ -183,9 +232,10 @@ mod tests {
     // @internal
     #[test]
     fn import_contacts_action_via_list_item_selected_emits_file_pick_command() {
-        // List-item selection from a `Component::ActionList` must
-        // route the same as `ActionPressed` — both map to the same
-        // affordance on every frontend.
+        // List-item selection from the emitted SectionedActionList
+        // must route the same as ActionPressed — both map to the
+        // same affordance on every frontend. Walker emits
+        // ListItemSelected { component_id: <list id>, item_id: <item id> }.
         let mut engine = MoreEngine::new();
         let result = engine.handle_action(UserAction::ListItemSelected {
             component_id: "more_menu".into(),
@@ -205,7 +255,7 @@ mod tests {
         // every other entry must still emit `OpenContact` so the
         // existing routing.rs MoreScreen mapping continues to work.
         let mut engine = MoreEngine::new();
-        for (id, _label) in MORE_ITEMS.iter() {
+        for (id, _label) in iter_all_items() {
             if *id == IMPORT_CONTACTS_ACTION_ID {
                 continue;
             }
@@ -223,23 +273,50 @@ mod tests {
 
     // @internal
     #[test]
-    fn current_screen_includes_import_contacts_in_action_list() {
+    fn current_screen_emits_sectioned_action_list_with_import_contacts() {
         let engine = MoreEngine::new();
         let screen = engine.current_screen();
         assert_eq!(screen.screen_id, "more");
-        let action_list = screen
+        let sections = screen
             .components
             .iter()
             .find_map(|c| match c {
-                Component::ActionList { items, .. } => Some(items),
+                Component::SectionedActionList { sections, .. } => Some(sections),
                 _ => None,
             })
-            .expect("ActionList component missing from More screen");
+            .expect("SectionedActionList component missing from More screen");
+        let has_import_contacts = sections
+            .iter()
+            .flat_map(|sec| sec.items.iter())
+            .any(|item| item.id == IMPORT_CONTACTS_ACTION_ID);
         assert!(
-            action_list
-                .iter()
-                .any(|item| item.id == IMPORT_CONTACTS_ACTION_ID),
-            "ActionList missing import_contacts entry"
+            has_import_contacts,
+            "SectionedActionList missing import_contacts entry across all sections"
         );
+    }
+
+    // @internal
+    #[test]
+    fn sections_have_stable_ids_and_are_non_empty() {
+        // Each section's id is part of the cross-platform contract
+        // (frontends may key A11y / analytics on section.id). Pin the
+        // four section ids in declaration order + assert no section
+        // ships empty — an empty section is a UX bug (renders an
+        // orphan header).
+        let engine = MoreEngine::new();
+        let screen = engine.current_screen();
+        let sections = screen
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::SectionedActionList { sections, .. } => Some(sections),
+                _ => None,
+            })
+            .expect("SectionedActionList component missing");
+        let ids: Vec<&str> = sections.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(ids, vec!["primary", "secondary", "data", "legal"]);
+        for sec in sections {
+            assert!(!sec.items.is_empty(), "section {} is empty", sec.id);
+        }
     }
 }

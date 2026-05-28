@@ -740,9 +740,10 @@ fn more_engine_has_expected_navigation_targets() {
         .components
         .iter()
         .flat_map(|c| match c {
-            vauchi_app::ui::Component::ActionList { items, .. } => {
-                items.iter().map(|item| item.id.clone()).collect::<Vec<_>>()
-            }
+            vauchi_app::ui::Component::SectionedActionList { sections, .. } => sections
+                .iter()
+                .flat_map(|s| s.items.iter().map(|i| i.id.clone()))
+                .collect(),
             _ => vec![],
         })
         .collect();

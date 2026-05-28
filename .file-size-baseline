@@ -299,7 +299,7 @@ vauchi-core/tests/it/field_validation_tests.rs 2256
 #  `is_active_engine_multi_stage_hover_returns_false_for_glance_multistage`
 #  — reframes "pending the Phase 1.E mode-dispatcher" to the
 #  post-1.E.3 shipped state.)
-vauchi-core/tests/it/app_engine_navigation_tests.rs 1240
+vauchi-core/tests/it/app_engine_navigation_tests.rs 1241
 vauchi-core/tests/it/onboarding_tests.rs 1301
 vauchi-core/tests/it/sync_device_orchestrator_tests.rs 1286
 vauchi-core/tests/it/visibility_label_tests.rs 1220

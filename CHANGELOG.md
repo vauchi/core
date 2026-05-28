@@ -6,6 +6,27 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+
+- `AppEngine::can_go_back()` now gates on `AppScreen::is_root()` in
+  addition to `nav_history` emptiness. Roots (Onboarding + the five
+  mobile bottom-nav tabs: MyInfo, Contacts, Exchange, Groups, More) are
+  back-stoppers — back at a root must exit, not pop history. Fixes the
+  post-onboarding gotcha where onboarding crumbs in `nav_history`
+  produced a phantom back affordance at the home tab. `navigate_back`
+  itself is unchanged, so programmatic back-after-tab-switch behavior
+  is preserved. Resolves the "decide `can_go_back` semantics" item in
+  the CoreScreenIdMap rework plan.
+
+### Added
+
+- `AppScreen::is_root()` — declares which screens are navigation roots
+  (closed set on the enum). Single source of truth for "back exits vs
+  back pops" at the screen level, so frontends never carry a tab-root
+  list.
+
 ## [0.51.18] — 2026-05-28
 
 ### Added

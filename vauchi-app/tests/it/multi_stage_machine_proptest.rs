@@ -40,6 +40,7 @@ use proptest::prelude::*;
 use vauchi_app::orchestrator::multi_stage_machine::{
     MultiStageEvent, MultiStageMachine, MultiStageMode, MultiStagePhase, event_to_commands,
 };
+use vauchi_core::exchange::{AudioConfig, AudioProximityState, audio_modem};
 use vauchi_core::{Command, Event};
 
 /// Strategy: arbitrary non-fatal events. Used by the I1 reachability
@@ -344,4 +345,114 @@ fn failed_phase_is_absorbing_under_advance() {
     let advance = machine.advance(100);
     assert!(matches!(advance, MultiStageEvent::None));
     assert!(matches!(machine.phase(), MultiStagePhase::Failed { .. }));
+}
+
+/// **T1.2c-audio:** Glance machines never emit audio commands —
+/// `try_audio_handshake_start` is a no-op for the mode gate.
+// @internal
+#[test]
+fn glance_machine_emits_no_audio_commands() {
+    let mut machine = MultiStageMachine::new_glance(fixture_local_card(), 0);
+    let cmds = machine.try_audio_handshake_start();
+    assert!(
+        cmds.is_empty(),
+        "Glance must not emit audio commands: {cmds:?}",
+    );
+    assert_eq!(machine.mode(), MultiStageMode::Glance);
+}
+
+/// **T1.2c-audio:** Hover machines emit the paired
+/// `AudioEmitChallenge` + `AudioListenForResponse` commands on
+/// `try_audio_handshake_start`, and decline a second call
+/// (idempotent — the inner state has moved past `Pending`).
+// @internal
+#[test]
+fn hover_machine_emits_paired_audio_commands_once() {
+    let mut machine = MultiStageMachine::new_hover(fixture_local_card(), 0);
+    let cmds = machine.try_audio_handshake_start();
+    assert_eq!(cmds.len(), 2, "Hover must emit exactly 2 audio commands");
+    assert!(matches!(cmds[0], Command::AudioEmitChallenge { .. }));
+    assert!(matches!(cmds[1], Command::AudioListenForResponse { .. }));
+    // Second call is a no-op — audio_proximity moved to Listening.
+    let repeat = machine.try_audio_handshake_start();
+    assert!(
+        repeat.is_empty(),
+        "second handshake call must be a no-op: {repeat:?}",
+    );
+}
+
+/// **T1.2c-audio:** `Event::AudioSamplesRecorded` on a Glance
+/// machine is inert (mode gate). Returns `None`, never produces
+/// an `AudioProximityChanged` event.
+// @internal
+#[test]
+fn glance_machine_ignores_audio_samples() {
+    let mut machine = MultiStageMachine::new_glance(fixture_local_card(), 0);
+    let event = machine.handle_hardware_event(
+        &Event::AudioSamplesRecorded {
+            samples: vec![0.1; 32],
+            sample_rate: 44_100,
+        },
+        0,
+    );
+    assert!(matches!(event, MultiStageEvent::None));
+}
+
+/// **T1.2c-audio:** A Hover machine that hasn't started the
+/// handshake (still `Pending`) ignores incoming audio samples —
+/// the state gate prevents `Pending` -> `Confirmed`/`Failed`
+/// transitions that would skip `Listening`.
+// @internal
+#[test]
+fn hover_machine_ignores_audio_samples_before_handshake_starts() {
+    let mut machine = MultiStageMachine::new_hover(fixture_local_card(), 0);
+    let event = machine.handle_hardware_event(
+        &Event::AudioSamplesRecorded {
+            samples: vec![0.1; 32],
+            sample_rate: 44_100,
+        },
+        0,
+    );
+    assert!(matches!(event, MultiStageEvent::None));
+}
+
+/// **T1.2c-audio:** Malformed audio samples after the handshake
+/// has started transition Hover's audio proximity to `Failed`
+/// (Listening -> Failed). The matching `MultiStageEvent` carries
+/// that state.
+// @internal
+#[test]
+fn hover_machine_transitions_to_failed_on_malformed_audio() {
+    let mut machine = MultiStageMachine::new_hover(fixture_local_card(), 0);
+    let _ = machine.try_audio_handshake_start();
+    // 32 zero samples decode to nothing — preamble not found.
+    let event = machine.handle_hardware_event(
+        &Event::AudioSamplesRecorded {
+            samples: vec![0.0; 32],
+            sample_rate: 44_100,
+        },
+        100,
+    );
+    match event {
+        MultiStageEvent::AudioProximityChanged(state) => {
+            assert_eq!(state, AudioProximityState::Failed);
+        }
+        other => panic!("expected AudioProximityChanged(Failed); got {other:?}"),
+    }
+}
+
+/// **T1.2c-audio:** `event_to_commands` for `AudioProximityChanged`
+/// is empty (the engine surfaces the state via
+/// `apply_multi_stage_audio_proximity`, not a Command).
+// @internal
+#[test]
+fn event_to_commands_audio_proximity_emits_no_commands() {
+    let cmds = event_to_commands(&MultiStageEvent::AudioProximityChanged(
+        AudioProximityState::Confirmed,
+    ));
+    assert!(cmds.is_empty());
+    // Sanity: the audio config matches what the FSK samples were
+    // generated with — proves the audio_modem import works for tests.
+    let _ = AudioConfig::default();
+    let _ = audio_modem::generate_fsk_samples(&[0u8; 16], &AudioConfig::default());
 }

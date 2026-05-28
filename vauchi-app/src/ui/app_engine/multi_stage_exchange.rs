@@ -41,6 +41,7 @@ use crate::orchestrator::multi_stage_machine::{
 };
 use vauchi_core::Command;
 use vauchi_core::contact_card::ContactCard;
+use vauchi_core::exchange::AudioProximityState;
 use vauchi_core::exchange::mode::ExchangeMode;
 
 /// Exchange payload format version byte. Mirrors the constant in
@@ -171,9 +172,27 @@ impl AppEngine {
     /// produced by `forward_multi_stage_hardware_event` in the
     /// QrScanned + peer-scan routes.
     pub fn apply_multi_stage_event(&mut self, event: MultiStageEvent) -> bool {
+        // Hover-only side effect: when the protocol reports
+        // `PeerDiscovered` the orchestrator fires the audio
+        // handshake. Mirrors the cycle-thread's
+        // `try_autonomous_audio_trigger` (Phase 1.C.3e-vi). Glance
+        // sessions return `None` from `try_audio_handshake_start`
+        // because they don't enter the `Listening` state.
+        if matches!(event, MultiStageEvent::PeerDiscovered)
+            && let Some(holder) = self.multi_stage_session.as_mut()
+        {
+            let cmds = holder.machine.try_audio_handshake_start();
+            if !cmds.is_empty() {
+                self.extend_pending_commands(cmds);
+                let _ = self.apply_multi_stage_audio_proximity(AudioProximityState::Listening);
+            }
+        }
         match event {
             MultiStageEvent::None => false,
             MultiStageEvent::QrFrameReady(payload) => self.apply_multi_stage_qr_payload(&payload),
+            MultiStageEvent::AudioProximityChanged(state) => {
+                self.apply_multi_stage_audio_proximity(state)
+            }
             MultiStageEvent::PeerDiscovered => {
                 self.apply_multi_stage_state(vauchi_core::exchange::ProtocolState::Discovered)
             }
@@ -222,14 +241,13 @@ impl AppEngine {
         self.multi_stage_session.as_ref().map(|h| h.machine.phase())
     }
 
-    /// Drain any commands the machine emitted on the most recent
-    /// `advance` / `forward_multi_stage_hardware_event`. T1.2b
-    /// emits commands via `apply_multi_stage_event`'s side-effect
-    /// path (`pending_commands` on `AppEngine`); this method is a
-    /// no-op today and reserved for the audio-handshake follow-up
-    /// (T1.2c-audio) that emits `Command::AudioEmitChallenge` +
-    /// `Command::AudioListenForResponse` on the `Confirming`
-    /// transition.
+    /// Drain any commands the machine emitted that aren't routed
+    /// through the standard `extend_pending_commands` path. T1.2b /
+    /// T1.2c emit all commands via `apply_multi_stage_event`
+    /// directly into `AppEngine::pending_commands`; this method is
+    /// kept for symmetry with the device-link API and may surface
+    /// future fan-out (e.g. test-driven probes) without a new public
+    /// drain.
     #[doc(hidden)]
     pub fn drain_multi_stage_commands(&mut self) -> Vec<Command> {
         Vec::new()

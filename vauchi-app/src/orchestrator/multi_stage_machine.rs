@@ -64,7 +64,14 @@
 
 use vauchi_core::Command;
 use vauchi_core::Event;
-use vauchi_core::exchange::{MultiStageSession, ProtocolState, QrPayload};
+use vauchi_core::exchange::{
+    AudioConfig, AudioProximityState, MultiStageSession, ProtocolState, QrPayload, audio_modem,
+};
+
+/// Audio-listen window default (ms). Mirrors the cycle-thread's
+/// `MobileMultiStageSession::AUDIO_LISTEN_TIMEOUT_MS`. Kept private
+/// to this module — the platform binding never reads it directly.
+const AUDIO_LISTEN_TIMEOUT_MS: u64 = 5000;
 
 /// Observable phase of the multi-stage machine. 1:1 with
 /// [`ProtocolState`] (renamed for engine-side ergonomics — the
@@ -139,6 +146,12 @@ pub enum MultiStageEvent {
     Completed,
     /// Terminal failure.
     Failed { reason: String },
+    /// Hover audio-proximity state changed (`Listening` →
+    /// `Confirmed` / `Failed`) as a result of an
+    /// `Event::AudioSamplesRecorded` ingress. The engine
+    /// integration maps this onto `set_audio_proximity` on the
+    /// active `MultiStageExchangeEngine`.
+    AudioProximityChanged(AudioProximityState),
 }
 
 /// Mode marker — Glance (bilateral QR only) vs Hover (QR + audio
@@ -350,15 +363,10 @@ impl MultiStageMachine {
                 // ScanQuality indicator. No protocol effect.
                 MultiStageEvent::None
             }
-            Event::AudioSamplesRecorded { .. } => {
-                // Hover ultrasonic ingress. T1.2b wires the FSK
-                // decode via `MultiStageSession::set_audio_proximity`
-                // + `verify_audio_response` and the matching
-                // `Command::AudioStop` emission. Glance flows emit
-                // zero `AudioSamplesRecorded` so this is purely a
-                // Hover-path TODO.
-                MultiStageEvent::None
-            }
+            Event::AudioSamplesRecorded {
+                samples,
+                sample_rate,
+            } => self.process_audio_samples(samples, *sample_rate),
             // Every other Event variant is inert for multi-stage —
             // late BLE notifications, NFC taps, link callbacks etc.
             // arriving on the multi-stage screen are ignored to
@@ -384,6 +392,96 @@ impl MultiStageMachine {
     /// Mode marker — read-only.
     pub fn mode(&self) -> MultiStageMode {
         self.mode
+    }
+
+    /// Hover-only side effect: fire the ultrasonic FSK
+    /// handshake when the protocol observes `Discovered`.
+    /// Mirrors the cycle-thread's `try_autonomous_audio_trigger`
+    /// (`vauchi-platform/src/multistage_exchange.rs::try_autonomous_audio_trigger`)
+    /// at the machine layer:
+    ///
+    /// - Mode gate: Glance returns `[]`; only Hover proceeds.
+    /// - State gate: returns `[]` unless `audio_proximity` is
+    ///   `Pending` (idempotent under repeated calls).
+    /// - Transition: drives the inner session
+    ///   `Pending -> Listening` via `set_audio_proximity`.
+    ///   On rejection (already started, terminal, etc.) returns `[]`.
+    /// - Emits the paired commands
+    ///   `Command::AudioEmitChallenge` (FSK-encoded `session_id` as
+    ///   the challenge — same temporary derivation the cycle
+    ///   thread used, Phase 1.C.3e-iii) +
+    ///   `Command::AudioListenForResponse` so the platform
+    ///   simultaneously plays the chirp and listens for the peer's
+    ///   reply within the listen-window budget.
+    pub fn try_audio_handshake_start(&mut self) -> Vec<Command> {
+        if self.mode != MultiStageMode::Hover {
+            return Vec::new();
+        }
+        if self.inner.audio_proximity() != AudioProximityState::Pending {
+            return Vec::new();
+        }
+        let challenge = self.inner.session_id();
+        let transitioned = self
+            .inner
+            .set_audio_proximity(AudioProximityState::Listening)
+            .is_ok();
+        if !transitioned {
+            return Vec::new();
+        }
+        let config = AudioConfig::default();
+        let samples = audio_modem::generate_fsk_samples(&challenge, &config);
+        let sample_rate = config.sample_rate;
+        vec![
+            Command::AudioEmitChallenge {
+                samples,
+                sample_rate,
+            },
+            Command::AudioListenForResponse {
+                timeout_ms: AUDIO_LISTEN_TIMEOUT_MS,
+                sample_rate,
+            },
+        ]
+    }
+
+    /// Decode FSK samples from a frontend `AudioSamplesRecorded`
+    /// event, verify against the peer's session_id, and transition
+    /// the audio-proximity state. Mirrors the cycle-thread's
+    /// `process_audio_samples_recorded`
+    /// (`vauchi-platform/src/multistage_exchange.rs`) at the
+    /// machine layer:
+    ///
+    /// - Decode succeeds AND bytes match peer_session_id ->
+    ///   Listening -> Confirmed.
+    /// - Decode succeeds but mismatch -> Listening -> Failed.
+    /// - Decode fails (malformed samples, preamble not found) ->
+    ///   Listening -> Failed.
+    /// - peer_session_id is None (Stage 1 not yet complete) ->
+    ///   Listening -> Failed.
+    ///
+    /// Glance flows return `MultiStageEvent::None` immediately
+    /// (mode gate). Returning `None` from a non-`Listening` state
+    /// is also a no-op so a stray late sample after Confirmed /
+    /// Failed cannot bounce the state.
+    fn process_audio_samples(&mut self, samples: &[f32], sample_rate: u32) -> MultiStageEvent {
+        if self.mode != MultiStageMode::Hover {
+            return MultiStageEvent::None;
+        }
+        if self.inner.audio_proximity() != AudioProximityState::Listening {
+            return MultiStageEvent::None;
+        }
+        let config = AudioConfig::default();
+        let decoded = audio_modem::decode_fsk_samples(samples, sample_rate, &config);
+        let next = match decoded {
+            Ok(bytes) => match self.inner.verify_audio_response(&bytes) {
+                Some(true) => AudioProximityState::Confirmed,
+                _ => AudioProximityState::Failed,
+            },
+            Err(_) => AudioProximityState::Failed,
+        };
+        if self.inner.set_audio_proximity(next).is_err() {
+            return MultiStageEvent::None;
+        }
+        MultiStageEvent::AudioProximityChanged(next)
     }
 
     /// Re-derive `self.phase` from the inner [`MultiStageSession`]

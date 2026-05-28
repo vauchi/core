@@ -1536,6 +1536,7 @@
               "type": "object",
               "required": [
                 "fields",
+                "initials",
                 "name",
                 "variants"
               ],
@@ -1552,7 +1553,7 @@
                   ]
                 },
                 "avatar_data": {
-                  "description": "Avatar image bytes (WebP). Frontends show this in the circular header area. Falls back to initials from `name` when None.",
+                  "description": "Avatar image bytes (WebP). Frontends show this in the circular header area. Falls back to `initials` when None.",
                   "type": [
                     "array",
                     "null"
@@ -1569,6 +1570,10 @@
                   "items": {
                     "$ref": "#/definitions/Field"
                   }
+                },
+                "initials": {
+                  "description": "Core-derived avatar initials (first letters of the first two words of `name`, uppercased). Frontends render this directly in the initials fallback — never recompute `name.take(1)` (ADR-021/043 Humble UI).",
+                  "type": "string"
                 },
                 "name": {
                   "type": "string"

@@ -6,6 +6,19 @@
 All notable changes to vauchi-core are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.51.20] — 2026-05-28
+
+### Added
+
+- `AppEngine::apply_demo_contact_overlay` injects a
+  `Component::Banner` on the Contacts screen when the onboarding
+  demo is active. Reserved action id `"dismiss_demo_contact"` on
+  the banner clears the demo via `Vauchi::dismiss_demo_contact`
+  when pressed. Exfiltrates the previously-frontend-owned demo
+  banner rendering (iOS `DemoContactCard`, ~90 LOC) to core per
+  the shell-purity investigation. Re-uses the existing
+  `Component::Banner` shape — no new variant.
+
 ## [0.51.19] — 2026-05-28
 
 ### Changed

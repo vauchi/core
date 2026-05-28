@@ -222,13 +222,21 @@ impl AppEngine {
         self.navigate_to_internal(target)
     }
 
-    /// Whether a back step exists in the nav-history stack.
+    /// Whether the user should be offered a back affordance from the
+    /// current screen.
     ///
     /// Frontends query this for their back affordance / `BackHandler`
     /// instead of inferring "is this a core-driven screen?" from a
     /// frontend-side screen-id map (ADR-043: no constructed nav targets).
+    ///
+    /// The rule is a property of the current screen, not just history:
+    /// declared roots (`AppScreen::is_root`) are back-stoppers — back at
+    /// a root must exit, not pop `nav_history`. This makes the
+    /// post-onboarding handoff safe (crumbs left in history at MyInfo
+    /// don't produce a phantom back arrow) without mutating history,
+    /// so `navigate_back` itself remains unchanged.
     pub fn can_go_back(&self) -> bool {
-        !self.nav_history.is_empty()
+        !self.screen.is_root() && !self.nav_history.is_empty()
     }
 
     /// Screens that should never be cached — always start fresh.

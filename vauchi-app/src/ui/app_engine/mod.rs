@@ -152,6 +152,29 @@ pub enum AppScreen {
 }
 
 impl AppScreen {
+    /// Whether this screen is a navigation root — a top-level entry
+    /// point where pressing back should exit the app rather than pop
+    /// `nav_history`. Drives `AppEngine::can_go_back`.
+    ///
+    /// The set is `Onboarding` plus the five mobile bottom-nav tabs
+    /// (`MyInfo`, `Contacts`, `Exchange`, `Groups`, `More`). Onboarding
+    /// is a root because it's the fresh-install entry; the five tab
+    /// screens are roots because the bottom-nav lands there directly
+    /// and the Android Material norm is that tab roots are back-stoppers.
+    /// `Settings` is **not** a root: it is reached via the top-bar gear,
+    /// which pushes onto history, so back must return to the prior screen.
+    pub fn is_root(&self) -> bool {
+        matches!(
+            self,
+            Self::Onboarding
+                | Self::MyInfo
+                | Self::Contacts
+                | Self::Exchange
+                | Self::Groups
+                | Self::More
+        )
+    }
+
     /// Canonical navigation-level string ID for this screen.
     ///
     /// Used by CABI to convert between `AppScreen` and the string IDs

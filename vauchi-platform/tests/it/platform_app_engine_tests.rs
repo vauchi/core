@@ -355,12 +355,14 @@ fn can_go_back_plumbs_nav_history_through_boundary() {
     );
 
     drive_onboarding(&engine);
+    // Navigate to a non-root (Settings); a root like Exchange would
+    // report no back step under the screen-aware `can_go_back` rule.
     engine
-        .navigate_to_json(r#""Exchange""#.into())
-        .expect("navigate to exchange");
+        .navigate_to_json(r#""Settings""#.into())
+        .expect("navigate to settings");
     assert!(
         engine.can_go_back().expect("can_go_back"),
-        "after forward navigation a back step exists"
+        "after forward navigation to a non-root a back step exists"
     );
 }
 

@@ -998,7 +998,12 @@ impl ExchangeSession {
             | Event::FilePickCancelledByUser
             // Biometric unlock event is auth-layer; the exchange state
             // machine ignores it.
-            | Event::BiometricUnlockSucceeded => Ok(()),
+            | Event::BiometricUnlockSucceeded
+            // BLE MTU negotiation is a transport-layer signal consumed
+            // by the binding's GATT chunker (and, post-32m T2.2, by
+            // `BleExchangeFlow` to size its writes). The core
+            // `ExchangeSession` state machine has no opinion on it.
+            | Event::BleMtuNegotiated { .. } => Ok(()),
         }
     }
 

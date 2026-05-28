@@ -85,7 +85,10 @@ vauchi-platform/src/multistage_exchange.rs 1105
 #  2026-05-11-pure-functional-core-program Phase 2 Track B)
 # (+74 for build_exchange_ratchet seam + retained their_exchange_key,
 #  bugfix/exchanged-ratchet-key 2026-05-25; structural exemption — state machine, do not split)
-vauchi-core/src/exchange/session.rs 1925
+# (+5 for slice 32m T2.1: Event::BleMtuNegotiated no-op arm on
+#  ExchangeSession::handle_event — transport-layer signal, no
+#  protocol effect)
+vauchi-core/src/exchange/session.rs 1930
 # (+29 for Phase 1.C.3a foothold of
 #  2026-05-11-hover-graduation-plan.md: audio_proximity field
 #  + getter on MultiStageSession, AudioProximityState import.
@@ -138,7 +141,10 @@ vauchi-core/src/exchange/multistage/session.rs 1566
 # (+8 for ADR-031 biometric hardware-event: Event::BiometricUnlockSucceeded
 #  variant + docstring; problem 2026-05-11-pure-functional-core-program
 #  Phase 2 Track B)
-vauchi-core/src/platform.rs 1095
+# (+31 for slice 32m T2.1: Event::BleMtuNegotiated { device_id,
+#  mtu } variant + roundtrip + variant-count updates per T0.2
+#  design §3.2)
+vauchi-core/src/platform.rs 1126
 
 # EXEMPT — transport layer: all relay methods must be co-located for protocol coherence
 # (+2 for #[tracing::instrument] on send_update + fetch — profiling, no logic change)
@@ -322,7 +328,10 @@ vauchi-app/src/ui/exchange/mod.rs 3659
 vauchi-app/src/ui/contact_detail.rs 1425
 
 # EXEMPT — BLE exchange sub-flow: inline tests access private state (proximity_runner, shake_envelope_sent)
-vauchi-app/src/ui/exchange/ble.rs 1057
+# (+63 for slice 32m T2.1: BleExchangeFlow.negotiated_mtu field +
+#  BleMtuNegotiated handler arm + 3 inline tests pinning the
+#  consumption seam + the subscribe-notify-hypothesis verification)
+vauchi-app/src/ui/exchange/ble.rs 1120
 
 # EXEMPT — state machine: 9 ProtocolState variants + camera-gate transitions need cohesion;
 # inline tests access private state (state, peer_name, session_ended, camera_gate, scan_quality_tracker).

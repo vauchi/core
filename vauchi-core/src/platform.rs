@@ -477,6 +477,25 @@ pub enum Event {
     /// duress-PIN state to decide the next step; the result rides back
     /// to the frontend as `ActionResult::BiometricUnlockOutcome`.
     BiometricUnlockSucceeded,
+
+    // ── BLE MTU negotiation (slice 32m T2.1) ───────────────────────
+    // Appended to preserve serde discriminant ordering.
+    /// MTU negotiated for the active BLE connection. `mtu` is the
+    /// raw value reported by the GATT stack (Android `MTU_CHANGED`
+    /// callback, CoreBluetooth `maximumWriteValueLength + 3`).
+    /// Core subtracts the 3-byte ATT header internally before
+    /// chunking via `BleChunker::new(data, mtu - 3)`.
+    ///
+    /// Decoupled from `BleConnected` so a re-negotiation mid-session
+    /// (Android `requestMtu` after connect) has a home, and so
+    /// platforms whose connection completes before MTU resolves
+    /// don't have to delay `BleConnected` waiting for it. Frontends
+    /// that don't programmatically observe MTU (desktop Bluetooth
+    /// stacks) simply never emit this event — the chunker stays at
+    /// `BLE_DEFAULT_USABLE` (20 bytes per ATT minimum).
+    ///
+    /// Per `_private/docs/designs/2026-05-28-slice-32m-phase-0-event-command-mapping-design.md` §3.2.
+    BleMtuNegotiated { device_id: String, mtu: u32 },
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access
@@ -741,6 +760,14 @@ mod tests {
                 filename: String::new(),
             },
             Event::FilePickCancelledByUser,
+            Event::BleMtuNegotiated {
+                device_id: "AA:BB:CC:DD:EE:FF".into(),
+                mtu: 247,
+            },
+            Event::BleMtuNegotiated {
+                device_id: String::new(),
+                mtu: 23, // ATT minimum
+            },
         ];
         for evt in &events {
             let json = serde_json::to_string(evt).expect("serialize");
@@ -916,9 +943,13 @@ mod tests {
                 filename: String::new(),
             },
             Event::FilePickCancelledByUser,
+            Event::BleMtuNegotiated {
+                device_id: "AA:BB".into(),
+                mtu: 247,
+            },
         ];
-        // 24 total event variants
-        assert_eq!(variants.len(), 24);
+        // 25 total event variants (+1 BleMtuNegotiated, slice 32m T2.1)
+        assert_eq!(variants.len(), 25);
     }
 
     // ── File-picker variants (Phase 1: types only) ──────────────────

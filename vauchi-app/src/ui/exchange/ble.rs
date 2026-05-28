@@ -192,6 +192,13 @@ pub(super) struct BleExchangeFlow {
     received_card: Option<Vec<u8>>,
     /// Whether our shake envelope has been sent to the peer.
     shake_envelope_sent: bool,
+    /// Last MTU reported by the GATT stack via `Event::BleMtuNegotiated`
+    /// (slice 32m T2.1 seam). `None` until the first negotiation lands;
+    /// the full T2.2 GATT rewire reads this to size `BleChunker::new(data,
+    /// mtu - 3)` on chunked writes. Decoupled from `connected_device`
+    /// so a re-negotiation mid-session overwrites cleanly without
+    /// resetting connection state.
+    negotiated_mtu: Option<u32>,
 }
 
 impl BleExchangeFlow {
@@ -203,7 +210,16 @@ impl BleExchangeFlow {
             proximity_runner: None,
             received_card: None,
             shake_envelope_sent: false,
+            negotiated_mtu: None,
         }
+    }
+
+    /// Last MTU reported by the GATT stack via `Event::BleMtuNegotiated`,
+    /// or `None` if no negotiation has occurred yet. T2.2 reads this to
+    /// size `BleChunker`; tests assert it is updated by the event.
+    #[cfg(test)]
+    pub(super) fn negotiated_mtu(&self) -> Option<u32> {
+        self.negotiated_mtu
     }
 
     pub(super) fn step(&self) -> &BleStep {
@@ -240,6 +256,18 @@ impl BleExchangeFlow {
             return BleHardwareOutcome::FailedWithFallback {
                 reason: "Bluetooth permission denied".into(),
             };
+        }
+
+        // Slice 32m T2.1 seam — transport-layer MTU negotiation is
+        // recorded but is NOT a step transition. The full T2.2 GATT
+        // rewire reads `negotiated_mtu` to size `BleChunker::new(data,
+        // mtu - 3)` on chunked writes; for now we just track the
+        // most recent value (re-negotiations mid-session overwrite
+        // cleanly) and report the event consumed with no commands so
+        // the flow stays in its current step.
+        if let Event::BleMtuNegotiated { mtu, .. } = event {
+            self.negotiated_mtu = Some(*mtu);
+            return BleHardwareOutcome::Consumed { commands: vec![] };
         }
 
         match &self.step {
@@ -932,6 +960,147 @@ mod tests {
             proximity_method_for_mode(ExchangeMode::Shake),
             ProximityMethod::Accelerometer
         );
+    }
+
+    // ── T2.1 RED — BLE MTU negotiation + subscribe-notify hypothesis ──
+    //
+    // Pinning the two observable contracts the slice 32m T0.2 design
+    // (`_private/docs/designs/2026-05-28-slice-32m-phase-0-event-command-mapping-design.md`)
+    // §3.1 + §3.2 call out for Phase 2 RED:
+    //
+    // - **MTU consumption**: the flow must consume
+    //   `Event::BleMtuNegotiated`, not treat it as `Ignored`. Today
+    //   the handshaking step's `handle_event` falls through to
+    //   `Ignored` for unknown events; T2.2 GREEN wires the mtu into
+    //   the flow's state so subsequent writes chunk to it. The test
+    //   asserts the *response shape* (Consumed/StepAdvanced — never
+    //   Ignored) rather than a specific internal field so T2.2 has
+    //   freedom in how it stores the value.
+    //
+    // - **subscribe_notify hypothesis**: a happy-path BLE handshake
+    //   must drive itself from `BleDeviceDiscovered` →
+    //   `BleConnected` → `BleCharacteristicNotified` *without* the
+    //   flow emitting a `Command::BleSubscribeNotify` step. Today
+    //   that variant doesn't exist on `Command`, so a name-based
+    //   scan of every emitted command in the trace catches a
+    //   regression (any future variant added in T2.2 that fires
+    //   subscribe). Confirming the hypothesis green is what unblocks
+    //   T3.1's retire-`mobile_ble.rs::subscribe_notify` step.
+
+    // @internal
+    #[test]
+    fn ble_mtu_negotiated_event_is_consumed_not_ignored() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
+        advance_to_exchanging(&mut flow);
+
+        let outcome = flow.handle_event(&Event::BleMtuNegotiated {
+            device_id: "d1".into(),
+            mtu: 247,
+        });
+
+        // The T2.1 seam consumes the event with no commands; the
+        // step must stay Exchanging because MTU negotiation isn't a
+        // protocol transition.
+        match outcome {
+            BleHardwareOutcome::Consumed { commands } => {
+                assert!(commands.is_empty(), "MTU consumption must emit no commands");
+            }
+            other => panic!("expected Consumed for BleMtuNegotiated, got {other:?}"),
+        }
+        assert_eq!(flow.negotiated_mtu(), Some(247));
+        assert_eq!(*flow.step(), BleStep::Exchanging);
+    }
+
+    // @internal
+    #[test]
+    fn ble_mtu_negotiated_during_handshaking_is_consumed_not_ignored() {
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        // Step into Handshaking via BleDeviceDiscovered, but stop
+        // before BleConnected. MTU often arrives between connection
+        // and subscription on Android (post-connect `requestMtu`).
+        flow.handle_event(&Event::BleDeviceDiscovered {
+            id: "d1".into(),
+            rssi: -50,
+            adv_data: vec![],
+        });
+        assert_eq!(*flow.step(), BleStep::Handshaking);
+
+        let outcome = flow.handle_event(&Event::BleMtuNegotiated {
+            device_id: "d1".into(),
+            mtu: 247,
+        });
+
+        match outcome {
+            BleHardwareOutcome::Consumed { commands } => {
+                assert!(commands.is_empty(), "MTU consumption must emit no commands");
+            }
+            other => panic!("expected Consumed for BleMtuNegotiated, got {other:?}"),
+        }
+        assert_eq!(flow.negotiated_mtu(), Some(247));
+        // Step must NOT regress / advance — MTU arrival is a
+        // transport-layer signal, not a step transition.
+        assert_eq!(*flow.step(), BleStep::Handshaking);
+
+        // Re-negotiation mid-session must overwrite cleanly.
+        let _ = flow.handle_event(&Event::BleMtuNegotiated {
+            device_id: "d1".into(),
+            mtu: 517,
+        });
+        assert_eq!(flow.negotiated_mtu(), Some(517));
+    }
+
+    // @internal
+    #[test]
+    fn happy_path_emits_no_subscribe_notify_command() {
+        // Verification of the favored hypothesis (T0.2 design §3.1):
+        // frontends auto-subscribe on connect, so the flow never
+        // needs to emit a subscribe_notify Command. If T2.2 GREEN
+        // (or a future change) adds a Command variant whose name
+        // contains "SubscribeNotify", this test fails and the
+        // hypothesis is invalidated — `mobile_ble.rs::subscribe_notify`
+        // would then need a Command variant before T3.1 can retire
+        // the delegate trait. Today this passes trivially because no
+        // such variant exists; it pins the contract going into T2.2.
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        let mut emitted: Vec<Command> = Vec::new();
+
+        let push = |out: BleHardwareOutcome, sink: &mut Vec<Command>| match out {
+            BleHardwareOutcome::StepAdvanced { commands }
+            | BleHardwareOutcome::Consumed { commands } => sink.extend(commands),
+            _ => {}
+        };
+
+        push(
+            flow.handle_event(&Event::BleDeviceDiscovered {
+                id: "d1".into(),
+                rssi: -40,
+                adv_data: vec![],
+            }),
+            &mut emitted,
+        );
+        push(
+            flow.handle_event(&Event::BleConnected {
+                device_id: "d1".into(),
+            }),
+            &mut emitted,
+        );
+        push(
+            flow.handle_event(&Event::BleCharacteristicNotified {
+                uuid: vauchi_core::exchange::CHAR_DATA_NOTIFY.into(),
+                data: vec![0xCC; 32],
+            }),
+            &mut emitted,
+        );
+
+        for cmd in &emitted {
+            let name = cmd.variant_name();
+            assert!(
+                !name.contains("SubscribeNotify"),
+                "happy-path emitted a SubscribeNotify-shaped command ({name}) \u{2014} \
+                 hypothesis from T0.2 §3.1 invalidated; T3.1 cannot retire \
+                 mobile_ble::subscribe_notify without a Command variant",
+            );
+        }
     }
 
     // ── Helper ─────────────────────────────────────────────────────

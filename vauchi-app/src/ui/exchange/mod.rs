@@ -13,14 +13,12 @@ use std::sync::Arc;
 
 pub(crate) mod ble;
 pub(crate) mod field_preview;
-pub(crate) mod link;
 pub(crate) mod mode_selection;
 pub(crate) mod nfc;
 pub(crate) mod qr;
 
 use self::ble::{BleActionOutcome, BleExchangeFlow, BleHardwareOutcome, BleStep};
 use self::field_preview::{FieldPreviewConfig, FieldPreviewResult};
-use self::link::{LinkActionOutcome, LinkHardwareOutcome, LinkStep};
 use self::mode_selection::{ModeSelectionEngine, ModeSelectionResult};
 use self::nfc::{NfcExchangeFlow, NfcHardwareOutcome, NfcStep};
 use self::qr::{QrActionOutcome, QrStep, ScanQualityTracker};
@@ -28,8 +26,6 @@ use crate::ui::*;
 use vauchi_core::Command;
 use vauchi_core::clock::Clock;
 use vauchi_core::exchange::capability::types::DeviceCapabilities;
-use vauchi_core::exchange::escrow::EscrowKeys;
-use vauchi_core::exchange::link_mode::{self, LinkInitiation};
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::exchange::{ExchangeEvent, ExchangeSession};
 
@@ -81,18 +77,6 @@ pub struct ExchangeEngine {
     mode_selection: Option<ModeSelectionEngine>,
     /// Field preview config (built when entering FieldPreview step).
     field_preview: Option<FieldPreviewConfig>,
-    /// Link mode initiation data (URL, nonce, secret key, handshake slot).
-    /// Populated when entering Link(ShareUrl) via `initiator_generate()`.
-    link_initiation: Option<LinkInitiation>,
-    /// Pending Link mode commands (presence deposit, relay calls).
-    /// Drained via `drain_commands()` same as session commands.
-    pending_link_commands: Vec<Command>,
-    /// Escrow keys derived after DH with responder (Link mode only).
-    /// Populated on `LinkOpened` event, used for card retrieval + decryption.
-    escrow_keys: Option<EscrowKeys>,
-    /// Decrypted card bytes from Link mode exchange (set on ExchangeComplete).
-    /// Callers check `link_received_card_bytes()` after Success to save the contact.
-    link_received_card: Option<Vec<u8>>,
     /// BLE exchange flow state machine (Magic/Bump/Shake modes).
     ble_flow: Option<BleExchangeFlow>,
     /// NFC exchange flow state machine (3-phase encrypted handshake).
@@ -160,8 +144,6 @@ enum ExchangeStep {
     /// NFC exchange sub-flow (3-phase encrypted handshake over an
     /// NFC tap). See `self::nfc` + 2026-05-19-nfc-exchange-engine-design.md.
     Nfc(NfcStep),
-    /// Link exchange sub-flow (async relay-mediated).
-    Link(LinkStep),
     /// USB cable / direct TCP exchange.
     DirectTransport(DirectStep),
     Success,
@@ -178,7 +160,6 @@ impl ExchangeStep {
             Self::Qr(qr) => qr.step_number(4),
             Self::Ble(ble) => ble.step_number(4),
             Self::Nfc(nfc) => nfc.step_number(4),
-            Self::Link(link) => link.step_number(4),
             Self::DirectTransport(direct) => direct.step_number(4),
             Self::Success => 4 + QrStep::STEP_COUNT,
             Self::Failed => 5 + QrStep::STEP_COUNT,
@@ -188,7 +169,6 @@ impl ExchangeStep {
 
 // mode + group + preview + sub-flow + success/failed
 // All sub-flows must have the same step count for consistent progress.
-const _: () = assert!(QrStep::STEP_COUNT == LinkStep::STEP_COUNT);
 const _: () = assert!(QrStep::STEP_COUNT == BleStep::STEP_COUNT);
 const _: () = assert!(QrStep::STEP_COUNT == NfcStep::STEP_COUNT);
 const _: () = assert!(DirectStep::STEP_COUNT == QrStep::STEP_COUNT);
@@ -204,9 +184,6 @@ impl ExchangeEngine {
             return ExchangeStep::ModeSelection;
         }
         if config.available_groups.is_empty() {
-            if config.mode == Some(ExchangeMode::Link) {
-                return ExchangeStep::Link(LinkStep::ShareUrl);
-            }
             if config.mode == Some(ExchangeMode::Cable) {
                 return ExchangeStep::DirectTransport(DirectStep::WaitingForConnection);
             }
@@ -240,15 +217,6 @@ impl ExchangeEngine {
         } else {
             None
         };
-        // If starting directly at Link mode, generate initiation data now.
-        // The presence deposit command is available via `drain_commands()`.
-        let (link_initiation, pending_link_commands) =
-            if step == ExchangeStep::Link(LinkStep::ShareUrl) {
-                let (init, cmds) = link_mode::initiator_generate();
-                (Some(init), cmds)
-            } else {
-                (None, Vec::new())
-            };
         // If starting directly at BLE mode, create the flow now.
         let ble_flow = if matches!(step, ExchangeStep::Ble(_)) {
             Some(BleExchangeFlow::new(
@@ -268,10 +236,6 @@ impl ExchangeEngine {
             qr_fallback_available: false,
             mode_selection,
             field_preview: None,
-            link_initiation,
-            pending_link_commands,
-            escrow_keys: None,
-            link_received_card: None,
             ble_flow,
             nfc_flow: None,
             nfc_identity: None,
@@ -329,10 +293,6 @@ impl ExchangeEngine {
                     qr_fallback_available: false,
                     mode_selection,
                     field_preview: None,
-                    link_initiation: None,
-                    pending_link_commands: Vec::new(),
-                    escrow_keys: None,
-                    link_received_card: None,
                     ble_flow: None,
                     nfc_flow: None,
                     nfc_identity: None,
@@ -360,10 +320,6 @@ impl ExchangeEngine {
             qr_fallback_available: false,
             mode_selection,
             field_preview: None,
-            link_initiation: None,
-            pending_link_commands: Vec::new(),
-            escrow_keys: None,
-            link_received_card: None,
             ble_flow: None,
             nfc_flow: None,
             nfc_identity: None,
@@ -381,9 +337,6 @@ impl ExchangeEngine {
     /// initial `QrDisplay` command, or after `new()` with Link mode to get
     /// the initial presence deposit command.
     pub fn drain_commands(&mut self) -> Vec<Command> {
-        if !self.pending_link_commands.is_empty() {
-            return std::mem::take(&mut self.pending_link_commands);
-        }
         self.session
             .as_mut()
             .map(|s| s.drain_commands())
@@ -436,15 +389,6 @@ impl ExchangeEngine {
     /// Returns a mutable reference to the protocol session, if any (ADR-031).
     pub fn session_mut(&mut self) -> Option<&mut ExchangeSession> {
         self.session.as_mut()
-    }
-
-    /// Returns the decrypted contact card bytes from a completed Link exchange.
-    ///
-    /// Available after `ExchangeComplete` is processed (step is `Success`).
-    /// The caller (AppEngine/PlatformAppEngine) should deserialize and save
-    /// the contact, matching the QR path's `session.extract_contact()` pattern.
-    pub fn link_received_card_bytes(&self) -> Option<&[u8]> {
-        self.link_received_card.as_deref()
     }
 
     /// Returns the confirmation state for persistence (crash recovery).
@@ -525,20 +469,14 @@ impl ExchangeEngine {
         ActionResult::NavigateTo(self.build_screen())
     }
 
-    /// Start Link mode: generate URL, store initiation data, emit presence
-    /// deposit command (ADR-031).
-    ///
-    /// Returns `Commands` with the presence deposit for the handshake
-    /// gate, or `NavigateTo` if no commands are needed (shouldn't happen).
-    fn start_link_mode(&mut self) -> ActionResult {
-        self.step = ExchangeStep::Link(LinkStep::ShareUrl);
-        let (initiation, commands) = link_mode::initiator_generate();
-        self.link_initiation = Some(initiation);
-        if commands.is_empty() {
-            ActionResult::NavigateTo(self.build_screen())
-        } else {
-            ActionResult::Commands { commands }
-        }
+    /// Hand off to the graduated `LinkExchangeEngine` (ADR-021/043 Humble
+    /// UI). The link-mode initiator flow (share-url / waiting / retrieving /
+    /// terminal screens) now lives in its own engine driven by the
+    /// engine-owned `LinkInitiatorSession`; this engine never enters a Link
+    /// sub-flow. AppEngine routes `StartLinkExchange` to construct the new
+    /// engine and build its `LinkInitiatorSession`.
+    fn start_link_mode(&self) -> ActionResult {
+        ActionResult::StartLinkExchange
     }
 
     /// Start BLE exchange mode (Magic/Bump/Shake).
@@ -713,94 +651,6 @@ impl ExchangeEngine {
         }
     }
 
-    /// Handle Link mode hardware events (ADR-031).
-    ///
-    /// Routes to handshake-phase or escrow-phase handler depending on
-    /// whether ECDH has completed (escrow_keys present).
-    fn handle_link_hardware_event(&mut self, event: vauchi_core::Event) -> Option<ActionResult> {
-        // Special case: LinkOpened triggers DH + card encryption
-        if let vauchi_core::Event::LinkOpened {
-            ref peer_public_key,
-        } = event
-        {
-            return self.handle_link_opened(peer_public_key);
-        }
-
-        // Escrow phase: keys are known, handle card exchange events
-        if let Some(ref keys) = self.escrow_keys
-            && let Some(outcome) = link::handle_escrow_hw_event(keys, &event)
-        {
-            return Some(self.apply_link_outcome(outcome));
-        }
-
-        // Handshake phase: waiting for responder's epk
-        let li = self.link_initiation.as_ref()?;
-        let outcome = link::handle_link_hw_event(li, &event)?;
-        Some(self.apply_link_outcome(outcome))
-    }
-
-    /// Process LinkOpened: derive keys, encrypt card, deposit + poll.
-    fn handle_link_opened(&mut self, peer_public_key: &[u8]) -> Option<ActionResult> {
-        let li = self.link_initiation.as_ref()?;
-
-        let result =
-            (|| -> Result<LinkHardwareOutcome, vauchi_core::exchange::link_mode::LinkModeError> {
-                let cs = self
-                    .config
-                    .card_snapshot
-                    .as_ref()
-                    .ok_or(vauchi_core::exchange::link_mode::LinkModeError::NoCardToSend)?;
-                let card_bytes = cs.to_bytes().map_err(|e| {
-                    vauchi_core::exchange::link_mode::LinkModeError::CardCryptoFailed(format!(
-                        "card serialization: {e}"
-                    ))
-                })?;
-                link::handle_link_opened(li, peer_public_key, &card_bytes)
-            })();
-
-        match result {
-            Ok(outcome) => Some(self.apply_link_outcome(outcome)),
-            Err(e) => {
-                self.failure_detail = Some(e.to_string());
-                self.step = ExchangeStep::Failed;
-                Some(ActionResult::UpdateScreen(self.build_screen()))
-            }
-        }
-    }
-
-    /// Apply a LinkHardwareOutcome — shared dispatch for all Link events.
-    fn apply_link_outcome(&mut self, outcome: LinkHardwareOutcome) -> ActionResult {
-        match outcome {
-            LinkHardwareOutcome::PollHandshakeGate { commands } => {
-                ActionResult::Commands { commands }
-            }
-            LinkHardwareOutcome::RetrieveFromHandshake { commands } => {
-                self.step = ExchangeStep::Link(LinkStep::Retrieving);
-                ActionResult::Commands { commands }
-            }
-            LinkHardwareOutcome::DhCompleteCardDeposited {
-                commands,
-                escrow_keys,
-            } => {
-                self.escrow_keys = Some(escrow_keys);
-                ActionResult::Commands { commands }
-            }
-            LinkHardwareOutcome::RetrieveFromEscrow { commands } => {
-                ActionResult::Commands { commands }
-            }
-            LinkHardwareOutcome::ExchangeComplete { card_bytes } => {
-                self.link_received_card = Some(card_bytes);
-                self.step = ExchangeStep::Success;
-                ActionResult::UpdateScreen(self.build_screen())
-            }
-            LinkHardwareOutcome::Failed { reason } => {
-                self.failure_detail = Some(reason);
-                self.step = ExchangeStep::Failed;
-                ActionResult::UpdateScreen(self.build_screen())
-            }
-        }
-    }
-
     /// Build a FieldPreviewConfig from the current state.
     ///
     /// Uses own_name as display name (group override would come from
@@ -893,20 +743,6 @@ impl ExchangeEngine {
             }
             ExchangeStep::Nfc(ref nfc_step) => {
                 nfc::build_nfc_screen(nfc_step, self.progress())
-            }
-            ExchangeStep::Link(LinkStep::ShareUrl) => {
-                let url = self
-                    .link_initiation
-                    .as_ref()
-                    .map(|li| li.url.as_str())
-                    .unwrap_or("generating...");
-                link::build_share_url_screen(url, self.progress())
-            }
-            ExchangeStep::Link(LinkStep::WaitingForResponse) => {
-                link::build_waiting_screen(self.progress())
-            }
-            ExchangeStep::Link(LinkStep::Retrieving) => {
-                link::build_retrieving_screen(self.progress())
             }
             ExchangeStep::DirectTransport(DirectStep::WaitingForConnection) => ScreenModel {
                 screen_id: "exchange_direct_waiting".into(),
@@ -1140,11 +976,6 @@ impl WorkflowEngine for ExchangeEngine {
         // NFC mode events — routed through NfcExchangeFlow
         if matches!(self.step, ExchangeStep::Nfc(_)) {
             return self.handle_nfc_hardware_event(event);
-        }
-
-        // Link mode events — handled without ExchangeSession
-        if matches!(self.step, ExchangeStep::Link(_)) {
-            return self.handle_link_hardware_event(event);
         }
 
         // QR scan progress → update quality tracker, refresh screen.
@@ -1517,28 +1348,6 @@ impl WorkflowEngine for ExchangeEngine {
                     }
                 }
                 ActionResult::UpdateScreen(self.build_screen())
-            }
-            // Link sub-flow actions
-            (ExchangeStep::Link(link_step), ref user_action) => {
-                if let Some(outcome) = link::handle_link_action(link_step, user_action) {
-                    match outcome {
-                        LinkActionOutcome::ShareRequested => {
-                            self.step = ExchangeStep::Link(LinkStep::WaitingForResponse);
-                            // Emit ShowShareSheet so the frontend presents the share UI
-                            if let Some(ref li) = self.link_initiation {
-                                return ActionResult::Commands {
-                                    commands: vec![Command::ShowShareSheet {
-                                        url: li.url.clone(),
-                                    }],
-                                };
-                            }
-                            ActionResult::NavigateTo(self.build_screen())
-                        }
-                        LinkActionOutcome::Cancelled => ActionResult::Complete,
-                    }
-                } else {
-                    ActionResult::UpdateScreen(self.build_screen())
-                }
             }
             (ExchangeStep::Success, UserAction::ActionPressed { action_id })
                 if action_id == "done" =>
@@ -2484,62 +2293,44 @@ mod tests {
     }
 
     // ── Link mode routing ─────────────────────────────────────────
+    //
+    // The link-mode initiator flow (share-url / waiting / retrieving /
+    // terminal screens, escrow polling, card decrypt) graduated to the
+    // pure `LinkExchangeEngine` + engine-owned `LinkInitiatorSession`
+    // (slice 32l Phase 2/3). This engine no longer enters an
+    // `ExchangeStep::Link` sub-flow — every Link entry point hands off
+    // via `ActionResult::StartLinkExchange`, which AppEngine routes to
+    // construct the new engine. The per-screen rendering + state
+    // machine coverage lives in `tests/reachability/link_exchange.rs`
+    // and `vauchi-core`'s `link_initiator` tests; here we pin only the
+    // handoff.
 
     // @internal
     #[test]
-    fn test_link_mode_starts_at_share_url() {
-        let engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Link),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        assert_eq!(engine.step, ExchangeStep::Link(LinkStep::ShareUrl));
-        let screen = engine.current_screen();
-        assert_eq!(screen.screen_id, "exchange_share_url");
-    }
-
-    // @internal
-    #[test]
-    fn test_link_mode_share_advances_to_waiting() {
+    fn link_mode_pick_routes_to_link_exchange_handoff() {
         let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Link),
-                ..config_no_groups()
-            },
+            config_mode_selection(),
             vauchi_core::clock::SystemClock::shared(),
         );
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "share".into(),
+
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:remote".into(),
+            item_id: "mode:link".into(),
         });
+        assert_eq!(engine.config.mode, Some(ExchangeMode::Link));
+        // Engine never advances into a Link sub-flow — the flow leaves
+        // Exchange once AppEngine routes the handoff.
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
         assert_eq!(
-            engine.step,
-            ExchangeStep::Link(LinkStep::WaitingForResponse)
+            result,
+            ActionResult::StartLinkExchange,
+            "Link mode-pick must hand off to LinkExchangeEngine; got {result:?}",
         );
-        let screen = engine.current_screen();
-        assert_eq!(screen.screen_id, "exchange_link_waiting");
     }
 
     // @internal
     #[test]
-    fn test_link_mode_cancel_completes() {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Link),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "cancel".into(),
-        });
-        assert_eq!(result, ActionResult::Complete);
-    }
-
-    // @internal
-    #[test]
-    fn test_link_mode_with_groups_goes_through_preview() {
+    fn link_mode_field_preview_start_routes_to_link_exchange() {
         let mut engine = ExchangeEngine::new(
             ExchangeConfig {
                 mode: Some(ExchangeMode::Link),
@@ -2555,16 +2346,21 @@ mod tests {
         });
         assert_eq!(engine.step, ExchangeStep::FieldPreview);
 
-        // Start exchange → Link ShareUrl (not QR)
-        let _ = engine.handle_action(UserAction::ActionPressed {
+        // Start exchange → hand off to LinkExchangeEngine (not a Link sub-flow)
+        let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "start_exchange".into(),
         });
-        assert_eq!(engine.step, ExchangeStep::Link(LinkStep::ShareUrl));
+        assert_eq!(
+            result,
+            ActionResult::StartLinkExchange,
+            "FieldPreview start in Link mode must hand off; got {result:?}",
+        );
+        assert_eq!(engine.step, ExchangeStep::FieldPreview);
     }
 
     // @internal
     #[test]
-    fn test_link_mode_retry_stays_in_link() {
+    fn link_mode_retry_routes_to_link_exchange() {
         let mut engine = ExchangeEngine::new(
             ExchangeConfig {
                 mode: Some(ExchangeMode::Link),
@@ -2575,233 +2371,13 @@ mod tests {
         engine.mark_failed();
         assert_eq!(engine.step, ExchangeStep::Failed);
 
-        let _ = engine.handle_action(UserAction::ActionPressed {
+        let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "retry".into(),
         });
         assert_eq!(
-            engine.step,
-            ExchangeStep::Link(LinkStep::ShareUrl),
-            "Retry in Link mode must return to Link, not QR"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn test_link_mode_generates_initiation_on_construction() {
-        let engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Link),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        assert!(
-            engine.link_initiation.is_some(),
-            "link_initiation must be populated at construction"
-        );
-        let li = engine.link_initiation.as_ref().unwrap();
-        assert!(li.url.starts_with("vauchi://exchange?"));
-    }
-
-    // @internal
-    #[test]
-    fn test_link_mode_drain_commands_returns_presence_deposit() {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Link),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let commands = engine.drain_commands();
-        assert_eq!(commands.len(), 1, "must emit 1 presence deposit command");
-        assert!(matches!(&commands[0], Command::RelayEscrowDeposit { .. }));
-        // Second drain is empty
-        assert!(engine.drain_commands().is_empty());
-    }
-
-    // @internal
-    #[test]
-    fn test_link_mode_share_url_screen_shows_generated_url() {
-        let engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Link),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let screen = engine.current_screen();
-        let url_text = screen
-            .components
-            .iter()
-            .find_map(|c| match c {
-                Component::Text { content, .. } => Some(content.as_str()),
-                _ => None,
-            })
-            .expect("ShareUrl screen must have a Text component");
-        assert!(
-            url_text.starts_with("vauchi://exchange?"),
-            "URL must be the generated link, not placeholder"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn test_link_mode_share_emits_show_share_sheet() {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Link),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.drain_commands(); // drain presence deposit
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "share".into(),
-        });
-        match result {
-            ActionResult::Commands { commands } => {
-                assert_eq!(commands.len(), 1);
-                assert!(
-                    matches!(&commands[0], Command::ShowShareSheet { url } if url.starts_with("vauchi://exchange?")),
-                    "Share must emit ShowShareSheet with the link URL"
-                );
-            }
-            other => panic!("Expected Commands, got {:?}", other),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn test_link_shared_event_emits_escrow_check() {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Link),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.drain_commands(); // drain presence deposit
-        // Move to WaitingForResponse
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "share".into(),
-        });
-        assert_eq!(
-            engine.step,
-            ExchangeStep::Link(LinkStep::WaitingForResponse)
-        );
-        // Frontend reports LinkShared
-        let result = engine.handle_hardware_event(vauchi_core::Event::LinkShared);
-        match result {
-            Some(ActionResult::Commands { commands }) => {
-                assert_eq!(commands.len(), 1);
-                assert!(
-                    matches!(&commands[0], Command::RelayEscrowCheck { .. }),
-                    "LinkShared must trigger escrow check polling"
-                );
-            }
-            other => panic!("Expected Commands, got {:?}", other),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn test_link_escrow_ready_emits_retrieve_and_transitions_to_retrieving() {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Link),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.drain_commands();
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "share".into(),
-        });
-        assert_eq!(
-            engine.step,
-            ExchangeStep::Link(LinkStep::WaitingForResponse)
-        );
-        // Simulate handshake gate ready
-        let li = engine.link_initiation.as_ref().unwrap();
-        let hs_gate = hex::decode(&li.handshake_slot).unwrap();
-        let expected_slot = hex::decode(&li.presence_slot).unwrap();
-        let result = engine
-            .handle_hardware_event(vauchi_core::Event::RelayEscrowReady { gate_hash: hs_gate });
-        // Must transition to Retrieving
-        assert_eq!(
-            engine.step,
-            ExchangeStep::Link(LinkStep::Retrieving),
-            "Must transition to Retrieving after handshake gate ready"
-        );
-        // Must emit RelayEscrowRetrieve with presence_slot (authenticates
-        // with OUR slot; relay returns the OTHER slot's blob = responder's epk)
-        match result {
-            Some(ActionResult::Commands { commands }) => {
-                assert_eq!(commands.len(), 1);
-                if let Command::RelayEscrowRetrieve { slot_hash, .. } = &commands[0] {
-                    assert_eq!(
-                        slot_hash, &expected_slot,
-                        "retrieve must use presence_slot for auth"
-                    );
-                } else {
-                    panic!("expected RelayEscrowRetrieve");
-                }
-            }
-            other => panic!("Expected Commands, got {:?}", other),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn test_link_escrow_failed_shows_error() {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Link),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.drain_commands();
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "share".into(),
-        });
-        let result = engine.handle_hardware_event(vauchi_core::Event::RelayEscrowFailed {
-            gate_hash: vec![],
-            reason: "gate expired".into(),
-        });
-        assert!(result.is_some());
-        assert_eq!(engine.step, ExchangeStep::Failed);
-        assert_eq!(
-            engine.failure_detail.as_deref(),
-            Some("gate expired"),
-            "failure reason must propagate to UI"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn test_link_unknown_gate_hash_ignored() {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Link),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.drain_commands();
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "share".into(),
-        });
-        // Unknown gate_hash — should be ignored (returns None)
-        let result = engine.handle_hardware_event(vauchi_core::Event::RelayEscrowReady {
-            gate_hash: vec![0xAA; 32],
-        });
-        assert!(result.is_none(), "unknown gate must be silently ignored");
-        assert_eq!(
-            engine.step,
-            ExchangeStep::Link(LinkStep::WaitingForResponse),
-            "step must not change for unknown gate"
+            result,
+            ActionResult::StartLinkExchange,
+            "Retry in Link mode must hand off to LinkExchangeEngine; got {result:?}",
         );
     }
 
@@ -2868,17 +2444,14 @@ mod tests {
         });
 
         assert_eq!(
-            engine.step,
-            ExchangeStep::Link(LinkStep::ShareUrl),
-            "Fallback must switch to Link mode"
+            result,
+            ActionResult::StartLinkExchange,
+            "Relay fallback must hand off to LinkExchangeEngine"
         );
+        // The fallback_relay arm clears the fallback + error state before
+        // handing off so a re-entry starts clean.
         assert!(!engine.ble_fallback_available);
         assert!(engine.failure_detail.is_none());
-        // Should return commands for link mode setup
-        assert!(
-            matches!(result, ActionResult::Commands { .. }),
-            "Expected Commands for link setup"
-        );
     }
 
     // @internal
@@ -3024,11 +2597,11 @@ mod tests {
         assert_eq!(engine.step, ExchangeStep::Failed);
         assert!(engine.ble_fallback_available);
 
-        // Accept fallback → switch to Link
-        let _ = engine.handle_action(UserAction::ActionPressed {
+        // Accept fallback → hand off to LinkExchangeEngine
+        let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "fallback_relay".into(),
         });
-        assert_eq!(engine.step, ExchangeStep::Link(LinkStep::ShareUrl));
+        assert_eq!(result, ActionResult::StartLinkExchange);
     }
 
     // ── Permission degradation fallback tests ─────────────────────────

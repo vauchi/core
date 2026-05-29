@@ -28,7 +28,6 @@
 use super::{AppEngine, AppScreen};
 use crate::ui::ActionResult;
 use crate::ui::LinkExchangeEngine;
-use crate::ui::WorkflowEngine;
 
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::link_initiator::{

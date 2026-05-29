@@ -8,7 +8,6 @@
 //! field preview → mode-specific sub-flow → result.
 
 use vauchi_app::ui::*;
-use vauchi_core::Command;
 use vauchi_core::exchange::mode::ExchangeMode;
 
 fn config_with_mode_selection() -> ExchangeConfig {
@@ -148,12 +147,22 @@ fn broadcast_full_flow_mode_to_qr_to_result() {
 }
 
 // ================================================================
-// Link: full flow
+// Link: mode-pick + field-preview hand off to LinkExchangeEngine
+//
+// The link-mode initiator flow (share-url / waiting / retrieving /
+// terminal screens, escrow polling, card decrypt) graduated to the
+// pure `LinkExchangeEngine` + engine-owned `LinkInitiatorSession`
+// (slice 32l Phase 3b). `ExchangeEngine` no longer enters a Link
+// sub-flow — it hands off via `ActionResult::StartLinkExchange`,
+// which AppEngine routes to construct the new engine. The full
+// share → waiting → retrieving → terminal flow is covered in
+// `vauchi-app/tests/reachability/link_exchange.rs` and the
+// `link_initiator` unit tests.
 // ================================================================
 
 // @internal
 #[test]
-fn link_full_flow_mode_to_share_to_waiting() {
+fn link_full_flow_mode_to_field_preview_hands_off() {
     let mut engine = ExchangeEngine::new(
         config_with_mode_selection(),
         vauchi_core::clock::SystemClock::shared(),
@@ -176,33 +185,15 @@ fn link_full_flow_mode_to_share_to_waiting() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_field_preview");
 
-    // Start exchange → Link share URL (emits presence deposit command)
+    // Start exchange → hand off to LinkExchangeEngine
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "start_exchange".to_string(),
     });
-    assert!(
-        matches!(result, ActionResult::Commands { ref commands } if commands.iter().any(|c| matches!(c, Command::RelayEscrowDeposit { .. }))),
-        "Start exchange in Link mode must emit RelayEscrowDeposit (presence)"
+    assert_eq!(
+        result,
+        ActionResult::StartLinkExchange,
+        "Start exchange in Link mode must hand off to LinkExchangeEngine"
     );
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_share_url");
-
-    // Share → Waiting (emits ShowShareSheet command)
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "share".to_string(),
-    });
-    assert!(
-        matches!(result, ActionResult::Commands { ref commands } if commands.iter().any(|c| matches!(c, Command::ShowShareSheet { .. }))),
-        "Share must emit ShowShareSheet command"
-    );
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_link_waiting");
-
-    // Cancel from waiting
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "cancel".to_string(),
-    });
-    assert_eq!(result, ActionResult::Complete);
 }
 
 // ================================================================
@@ -239,43 +230,18 @@ fn failed_retry_preserves_link_mode() {
         vauchi_core::clock::SystemClock::shared(),
     );
     engine.mark_failed();
-    let _ = engine.handle_action(UserAction::ActionPressed {
+    // Retry in Link mode hands off to LinkExchangeEngine rather than
+    // re-entering a Link sub-flow on this engine.
+    let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "retry".to_string(),
     });
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_share_url");
+    assert_eq!(result, ActionResult::StartLinkExchange);
 }
 
 // ================================================================
 // Progress tracking
+//
+// Link-flow progress (share-url → waiting → retrieving → terminal)
+// graduated to `LinkExchangeEngine::progress`; its per-screen
+// progression is covered by `vauchi-app/tests/reachability/link_exchange.rs`.
 // ================================================================
-
-// @internal
-#[test]
-fn progress_advances_through_link_flow() {
-    let mut engine = ExchangeEngine::new(
-        ExchangeConfig {
-            mode: Some(ExchangeMode::Link),
-            available_groups: vec![],
-            ..config_with_mode_selection()
-        },
-        vauchi_core::clock::SystemClock::shared(),
-    );
-
-    // Link starts at step 4 (after mode=1, groups=2, preview=3)
-    let s1 = engine.current_screen();
-    let step1 = s1.progress.as_ref().unwrap().current_step;
-
-    // Share → Waiting (step should advance)
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "share".to_string(),
-    });
-    let s2 = engine.current_screen();
-    let step2 = s2.progress.as_ref().unwrap().current_step;
-
-    assert!(
-        step2 > step1,
-        "Step must advance from ShareUrl ({step1}) to WaitingForResponse ({step2})"
-    );
-    assert_eq!(s2.progress.as_ref().unwrap().total_steps, 8);
-}

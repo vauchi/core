@@ -1041,7 +1041,18 @@ fn build_group_selection_screen(
             label: name.clone(),
             selected: selected_groups.contains(id),
             subtitle: None,
-            a11y: None,
+            // Mirror backup_recovery's ToggleItem a11y (the established
+            // convention for toggle leaves): the visible label is the
+            // group name, so the a11y label spells out the control's
+            // purpose and the role marks it as a toggle. The ToggleList
+            // container and the ScreenActions below intentionally stay
+            // `None` — a button's `label` is its accessible name, and no
+            // ScreenAction in the codebase carries a11y (d4-a11y phase 2).
+            a11y: Some(A11y {
+                label: Some(format!("{name} group toggle")),
+                hint: Some("Toggle to assign the new contact to this group.".into()),
+                role: Some(AccessibilityRole::Toggle),
+            }),
             info_key: None,
         })
         .collect();
@@ -1671,6 +1682,55 @@ mod tests {
         assert!(matches!(result, ActionResult::NavigateTo(_)));
         assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
         assert!(engine.selected_groups().is_empty());
+    }
+
+    // @internal
+    #[test]
+    fn test_group_selection_toggle_item_has_a11y() {
+        // d4-a11y phase 2: the group-picker ToggleItem leaves carry a11y
+        // (mirroring backup_recovery's toggle). The ToggleList container
+        // and the continue/skip ScreenActions intentionally stay None —
+        // a button's `label` is its accessible name.
+        let engine = ExchangeEngine::new(
+            config_with_groups(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        let screen = engine.current_screen();
+        assert_eq!(screen.screen_id, "exchange_group_selection");
+
+        let items = screen
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::ToggleList {
+                    id, items, a11y, ..
+                } if id == "group_picker" => {
+                    assert!(a11y.is_none(), "ToggleList container must not carry a11y");
+                    Some(items)
+                }
+                _ => None,
+            })
+            .expect("group_picker ToggleList present");
+
+        // First group is g1 "Family" (config_with_groups).
+        let family = &items[0];
+        assert_eq!(family.id, "g1");
+        let a11y = family.a11y.as_ref().expect("ToggleItem must carry a11y");
+        assert_eq!(a11y.label.as_deref(), Some("Family group toggle"));
+        assert_eq!(
+            a11y.hint.as_deref(),
+            Some("Toggle to assign the new contact to this group.")
+        );
+        assert_eq!(a11y.role, Some(AccessibilityRole::Toggle));
+
+        // The continue/skip actions intentionally have no a11y.
+        for action in &screen.actions {
+            assert!(
+                action.a11y.is_none(),
+                "ScreenAction {} must not carry a11y (label is the accessible name)",
+                action.id
+            );
+        }
     }
 
     // ── ADR-031: ExchangeSession integration tests ──────────────────

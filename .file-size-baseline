@@ -331,7 +331,7 @@ vauchi-core/tests/it/migration_tests.rs 1226
 # permissions SettingsGroup + verify_button gating 2026-04-28 Pair 3)
 # (+7 for Glance → MultiStageExchange handoff branch + test rewrite 2026-04-28 Pair 4 L8)
 # (+204 for ExchangeEngine clock field + 117 test callsites threading SystemClock 2026-05-13 slice 21)
-vauchi-app/src/ui/exchange/mod.rs 3659
+vauchi-app/src/ui/exchange/mod.rs 3719
 # (+2 for 2026-05-21-core-ui-icon-on-wire: inline `icon: ...` lines in
 #   sample_fields / sample_shared_info Field constructors.)
 vauchi-app/src/ui/contact_detail.rs 1425

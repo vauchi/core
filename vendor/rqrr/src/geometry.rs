@@ -1,3 +1,23 @@
+// ============================================================================
+// VENDORED PATCH — vauchi core fork of rqrr 0.10.1.
+//
+// This file is BYTE-IDENTICAL to upstream rqrr 0.10.1 EXCEPT for
+// `Perspective::map` (and the tests guarding it). Upstream `map` asserts
+// the mapped coordinates fit in i32 and ABORTS the process on a
+// near-degenerate perspective (near-zero denominator → NaN/inf/out-of-range).
+// Under vauchi's `panic = "abort"` release profile that abort is
+// uncatchable, so a marginal QR camera frame crashes the whole app
+// mid-exchange. The patch replaces the asserts with a clamped f64→i32
+// conversion (safe because PreparedImage::get_pixel_at_point already clamps
+// into image bounds — see the comment in `map`).
+//
+// If a future `cargo update` or re-vendor reverts this file, the tripwire
+// tests at the bottom of this module go RED.
+//
+// Source / rationale:
+//   _private/docs/problems/2026-05-25-rqrr-perspective-panic-crashes-qr-scan
+// ============================================================================
+
 use crate::identify::Point;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -52,13 +72,25 @@ impl Perspective {
         let x = x.round();
         let y = y.round();
 
-        assert!(x <= i32::MAX as f64);
-        assert!(x >= i32::MIN as f64);
-        assert!(y <= i32::MAX as f64);
-        assert!(y >= i32::MIN as f64);
+        // Upstream rqrr 0.10.1 asserts here and aborts under panic=abort
+        // (vauchi core release profile) on a near-degenerate perspective
+        // (near-zero `den` → NaN/inf/out-of-range). Clamp instead: the
+        // resulting Point samples a clamped pixel (get_pixel_at_point already
+        // clamps into image bounds), ECC then fails and decode() returns Err
+        // gracefully. Clamp well inside i32 so find_alignment_pattern's i32
+        // coordinate-delta product cannot overflow. VENDORED PATCH — see
+        // _private/docs/problems/2026-05-25-rqrr-perspective-panic-crashes-qr-scan.
+        const COORD_LIMIT: f64 = (i32::MAX / 4) as f64;
+        let clamp = |c: f64| -> i32 {
+            if c.is_nan() {
+                0
+            } else {
+                c.clamp(-COORD_LIMIT, COORD_LIMIT) as i32
+            }
+        };
         Point {
-            x: x as i32,
-            y: y as i32,
+            x: clamp(x),
+            y: clamp(y),
         }
     }
 
@@ -188,6 +220,80 @@ impl Iterator for BresenhamScan {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── VENDORED-PATCH tripwire tests (vauchi) ──────────────────────────
+    // These guard the clamped `Perspective::map` against a future
+    // `cargo update` / re-vendor silently reverting the patch back to the
+    // upstream assert-and-abort behaviour. See the top-of-file comment.
+    //
+    // `Perspective` is `pub struct Perspective(pub [f64; 8])`, so we build
+    // matrices directly. In `map`:
+    //   den = c[6]*u + c[7]*v + 1.0
+    //   x   = (c[0]*u + c[1]*v + c[2]) / den
+    //   y   = (c[3]*u + c[4]*v + c[5]) / den
+
+    const COORD_LIMIT: i32 = i32::MAX / 4;
+
+    #[test]
+    fn map_near_zero_den_clamps_in_range_without_panic() {
+        // den = c[6]*u + c[7]*v + 1.0; pick c[6] so that at u=1,v=0 the
+        // denominator is a tiny positive number → x,y blow up far past i32.
+        // c[6] = -1.0 gives den = 1e-300 (still finite, enormous quotient).
+        let tiny = -1.0 + 1e-300;
+        let p = Perspective([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, tiny, 0.0]);
+        let pt = p.map(1.0, 0.0);
+        // Must be clamped into ±(i32::MAX/4), never aborted.
+        assert!(
+            pt.x >= -COORD_LIMIT && pt.x <= COORD_LIMIT,
+            "x not clamped: {}",
+            pt.x
+        );
+        assert!(
+            pt.y >= -COORD_LIMIT && pt.y <= COORD_LIMIT,
+            "y not clamped: {}",
+            pt.y
+        );
+        // The huge positive quotient clamps to the positive limit.
+        assert_eq!(pt.x, COORD_LIMIT);
+    }
+
+    #[test]
+    fn map_infinite_numerator_clamps() {
+        // c[2] = f64::MAX, den = 1.0, then x = MAX*... overflow on round? No —
+        // drive a true +inf by den = 0 exactly (c[6]=-1.0 at u=1 → den=0.0,
+        // numerator>0 → +inf). +inf must clamp to the positive limit, -inf to
+        // the negative limit.
+        let p_pos = Perspective([1.0, 0.0, 5.0, 0.0, 1.0, 7.0, -1.0, 0.0]);
+        let pt_pos = p_pos.map(1.0, 0.0); // den = 0.0, num_x = 5.0 → +inf
+        assert_eq!(pt_pos.x, COORD_LIMIT, "+inf x should clamp to +limit");
+        assert_eq!(pt_pos.y, COORD_LIMIT, "+inf y should clamp to +limit");
+
+        let p_neg = Perspective([-1.0, 0.0, -5.0, 0.0, -1.0, -7.0, -1.0, 0.0]);
+        let pt_neg = p_neg.map(1.0, 0.0); // den = 0.0, num_x = -5.0 → -inf
+        assert_eq!(pt_neg.x, -COORD_LIMIT, "-inf x should clamp to -limit");
+        assert_eq!(pt_neg.y, -COORD_LIMIT, "-inf y should clamp to -limit");
+    }
+
+    #[test]
+    fn map_nan_becomes_zero() {
+        // den = 0.0 and numerator = 0.0 → 0.0/0.0 = NaN. NaN must map to 0,
+        // never abort.
+        let p = Perspective([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0]);
+        let pt = p.map(1.0, 0.0); // den = 0.0, num = 0.0 → NaN
+        assert_eq!(pt.x, 0, "NaN x should map to 0");
+        assert_eq!(pt.y, 0, "NaN y should map to 0");
+    }
+
+    #[test]
+    fn map_well_conditioned_is_finite_and_unclamped() {
+        // Identity-ish perspective: den = 1.0, so map(u,v) = (u + 2, v + 3).
+        // Proves the patch did not break the normal decoding path.
+        let p = Perspective([1.0, 0.0, 2.0, 0.0, 1.0, 3.0, 0.0, 0.0]);
+        let pt = p.map(10.0, 20.0);
+        assert_eq!(pt, Point { x: 12, y: 23 });
+        // Well inside the clamp limit — i.e. NOT clamped.
+        assert!(pt.x < COORD_LIMIT && pt.y < COORD_LIMIT);
+    }
 
     #[test]
     fn test_bresenham_straight() {

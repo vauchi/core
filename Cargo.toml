@@ -11,6 +11,12 @@ members = [
     "vauchi-platform",
     "vauchi-protocol",
 ]
+# Vendored fork of rqrr (see [patch.crates-io] below). Excluded from the
+# workspace so it is NOT formatted, clippy-linted, or built by `--workspace`
+# commands — it is third-party code held byte-identical to upstream (one
+# patched function). It is still consumed via the [patch] redirect, and its
+# own tripwire tests run standalone: `cargo test --manifest-path vendor/rqrr/Cargo.toml`.
+exclude = ["vendor/rqrr"]
 
 [workspace.package]
 version = "0.51.27"
@@ -24,6 +30,14 @@ authors = ["Vauchi Contributors"]
 vauchi-core = { path = "vauchi-core", version = "0.51.27", default-features = false }
 vauchi-app = { path = "vauchi-app", version = "0.51.27", default-features = false }
 vauchi-protocol = { path = "vauchi-protocol", version = "0.51.27" }
+
+# Vendored fork of rqrr 0.10.1 — patches Perspective::map to clamp instead of
+# abort on a near-degenerate QR perspective (panic=abort makes the upstream
+# assert uncatchable). Keeps version 0.10.1; redirects the `rqrr = "0.10"` dep
+# in vauchi-core. See _private/docs/problems/2026-05-25-rqrr-perspective-panic-crashes-qr-scan
+# and core/vendor/rqrr/src/geometry.rs (top-of-file patch marker).
+[patch.crates-io]
+rqrr = { path = "vendor/rqrr" }
 
 # Release profile: optimized for size (mobile binaries)
 [profile.release]

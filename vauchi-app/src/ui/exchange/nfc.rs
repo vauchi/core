@@ -26,8 +26,15 @@
 //!
 //! Cadence is per-phase, not per-APDU (iOS CoreNFC and Android HCE
 //! both reassemble extended APDUs transparently — see design doc §4).
+//!
+//! Wiring status (2026-05-29): the initiator path is reachable
+//! (`ExchangeMode::TapTap` -> `start_taptap_mode` -> `new_initiator`); the
+//! responder path (`new_responder` + `NfcStep::AckSent`) is unit-test-only,
+//! pending a production HCE-responder engine entry. That responder gap is
+//! what keeps the file-level `dead_code` allow alive. See
+//! `_private/docs/problems/2026-05-29-nfc-exchange-mode-entry-wiring`.
 
-#![allow(dead_code)] // wired into ExchangeEngine in a follow-up commit
+#![allow(dead_code)] // responder path still test-only (see module docs)
 
 use vauchi_core::clock::SystemClock;
 use vauchi_core::exchange::escrow::{EscrowKeys, EscrowRole};
@@ -701,13 +708,12 @@ mod tests {
     // ── CC-13 proptest: Complete is absorbing ──────────────────────────────
     //
     // Engine-walker reachability tests (the CC-22 pattern used by
-    // `core/vauchi-app/tests/reachability/exchange_ble.rs`) are deferred
-    // to a later phase: the production entry path through ExchangeEngine
-    // — `ExchangeMode::Nfc` + `start_nfc_mode` — has not been added yet
-    // (this Phase 1 ships test-reachable wiring only, per the engine-
-    // graduation record's Phase 4). The walker can't BFS into NFC steps
-    // without that entry, so we exercise the sub-flow's invariants at the
-    // unit-test layer instead.
+    // `core/vauchi-app/tests/reachability/exchange_ble.rs`): the INITIATOR
+    // entry IS wired (`ExchangeMode::TapTap` -> `start_taptap_mode`), but the
+    // RESPONDER entry (HCE-driven `new_responder`) is not yet wired into
+    // ExchangeEngine, so the walker cannot BFS the responder NFC steps.
+    // Tracked in `_private/docs/problems/2026-05-29-nfc-exchange-mode-entry-wiring`;
+    // until then we exercise the sub-flow invariants at the unit-test layer.
 
     use proptest::prelude::*;
 

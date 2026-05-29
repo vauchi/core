@@ -53,3 +53,13 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 path = ["ci/maven-publish/gradle/wrapper/gradle-wrapper.jar", "ci/maven-publish/gradle/wrapper/gradle-wrapper.properties", "ci/maven-publish/gradlew.bat"]
 SPDX-FileCopyrightText = "Gradle Inc."
 SPDX-License-Identifier = "Apache-2.0"
+
+# Vendored fork of rqrr 0.10.1 (third-party; see [patch.crates-io] in
+# Cargo.toml). Byte-identical to upstream except one patched function in
+# src/geometry.rs. Covers src/, Cargo.toml, README, LICENSE-* and
+# test_data/ — none carry per-file SPDX, so declare upstream's license
+# expression here rather than editing the vendored files.
+[[annotations]]
+path = ["vendor/rqrr/**"]
+SPDX-FileCopyrightText = "WanzenBug <moritz@wanzenbug.xyz>"
+SPDX-License-Identifier = "(MIT OR Apache-2.0) AND ISC"

@@ -42,6 +42,7 @@ pub mod group_detail;
 mod groups_list;
 mod help;
 pub mod info_content;
+pub mod link_exchange;
 mod link_responder;
 mod lock_screen;
 mod more;
@@ -108,6 +109,11 @@ pub use gdpr::GdprEngine;
 pub use group_detail::{GroupDetailEngine, GroupFieldVisibility};
 pub use groups_list::{GroupInfo, GroupsEngine, GroupsMode};
 pub use help::{HelpEngine, HelpItem};
+pub use link_exchange::{
+    ACTION_CANCEL as LINK_EXCHANGE_ACTION_CANCEL, ACTION_DONE as LINK_EXCHANGE_ACTION_DONE,
+    ACTION_RETRY as LINK_EXCHANGE_ACTION_RETRY, ACTION_SHARE as LINK_EXCHANGE_ACTION_SHARE,
+    LinkExchangeEngine,
+};
 pub use link_responder::{ACTION_CANCEL as LINK_RESPONDER_ACTION_CANCEL, LinkResponderEngine};
 pub use lock_screen::{DEFAULT_LOCK_MAX_ATTEMPTS, LockScreenEngine};
 pub use more::MoreEngine;

@@ -258,6 +258,18 @@ pub enum ActionResult {
     StartMultiStageExchange {
         mode: ExchangeMode,
     },
+    /// App layer should navigate to the link-mode initiator screen
+    /// (`AppScreen::LinkExchange`).
+    ///
+    /// Emitted by `ExchangeEngine` when the user picks
+    /// `ExchangeMode::Link` from the mode list, and by
+    /// `LinkExchangeEngine` itself on the failed screen's Retry action.
+    /// AppEngine routing navigates to the dedicated screen, whose factory
+    /// builds a fresh `LinkExchangeEngine` and the AppEngine
+    /// link-initiator lifecycle constructs the engine-owned
+    /// `LinkInitiatorSession`. Frontends never see this — the relay escrow
+    /// lifecycle is core/event-driven (no platform bridge).
+    StartLinkExchange,
     /// App layer should call `MobileDeviceLinkSession::confirm_manual`
     /// with the given confirmation code and the current unix timestamp.
     ///

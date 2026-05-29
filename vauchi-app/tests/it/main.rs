@@ -36,6 +36,7 @@ mod fingerprint_verify_engine_tests;
 mod group_delete_tests;
 mod help_engine_wiring_tests;
 mod humble_surface_contract_tests;
+mod link_exchange_tests;
 mod multi_stage_machine_proptest;
 mod navigate_to_tab_tests;
 mod notification_contract_tests;

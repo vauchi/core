@@ -196,6 +196,9 @@ impl AppEngine {
             // responder machine on entry / exit of the responder screen.
             // Its initial deposit commands ride out on the same drain.
             self.sync_link_responder_lifecycle(&old_screen, &screen);
+            // Slice 32l Phase 3: build / drop the engine-owned link-mode
+            // initiator machine on entry / exit of the LinkExchange screen.
+            self.sync_link_initiator_lifecycle(&old_screen, &screen);
             // Slice 32l T3.1b: build / drop the engine-owned device-link
             // initiator machine on entry / exit of the DeviceLinking screen.
             #[cfg(all(feature = "network-http", feature = "storage"))]

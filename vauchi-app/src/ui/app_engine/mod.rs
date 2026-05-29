@@ -13,6 +13,7 @@ mod device_link;
 #[cfg(all(feature = "network-http", feature = "storage"))]
 mod device_link_initiator;
 mod intercept;
+mod link_exchange;
 mod link_responder;
 mod multi_stage_exchange;
 mod navigation;
@@ -196,6 +197,15 @@ pub enum AppScreen {
     MultiStageExchange {
         mode: vauchi_core::exchange::mode::ExchangeMode,
     },
+    /// Link-mode **initiator** flow — generate a share URL, wait for the
+    /// responder to open it, then retrieve + persist their card. The
+    /// engine-owned `LinkInitiatorSession` (built on screen entry) drives
+    /// the relay-escrow two-gate handshake; the `LinkExchangeEngine`
+    /// renders the share-url / waiting / retrieving / terminal screens.
+    /// Replaces the retired `ExchangeStep::Link` sub-flow (slice 32l
+    /// Phase 3). Per
+    /// `_private/docs/problems/2026-05-11-link-exchange-engine-graduation`.
+    LinkExchange,
 }
 
 impl AppScreen {
@@ -270,6 +280,7 @@ impl AppScreen {
             Self::DeepLinkConsent { .. } => "deep_link_consent",
             Self::DeepLinkResponder { .. } => "deep_link_responder",
             Self::MultiStageExchange { .. } => "multi_stage_exchange",
+            Self::LinkExchange => "link_exchange",
         }
     }
 
@@ -431,6 +442,9 @@ pub struct AppEngine {
     /// Engine-owned link-mode responder machine (slice 32l Phase 2), live
     /// only on `AppScreen::DeepLinkResponder`. See `app_engine/link_responder.rs`.
     link_responder: Option<vauchi_core::exchange::link_responder::LinkResponderSession>,
+    /// Engine-owned link-mode **initiator** machine (slice 32l Phase 3), live
+    /// only on `AppScreen::LinkExchange`. See `app_engine/link_exchange.rs`.
+    link_initiator: Option<vauchi_core::exchange::link_initiator::LinkInitiatorSession>,
     /// Engine-owned device-link **initiator** machine (slice 32l T3.1b), live
     /// only on `AppScreen::DeviceLinking`. See `app_engine/device_link_initiator.rs`.
     #[cfg(all(feature = "network-http", feature = "storage"))]
@@ -585,6 +599,7 @@ impl AppEngine {
             sync_chrome_status: SyncChromeStatus::Idle,
             pending_commands: std::collections::VecDeque::new(),
             link_responder: None,
+            link_initiator: None,
             #[cfg(all(feature = "network-http", feature = "storage"))]
             device_link_initiator: None,
             multi_stage_session: None,

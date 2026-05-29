@@ -197,10 +197,12 @@ const MAX_BFS_SCREENS: usize = 256;
 ///   `NavigateTo`, and any variant that leaves the engine on a
 ///   new rendered screen.
 /// - `Complete` / `CompleteWith` / `StartDeviceLink` /
-///   `OpenContact` / `EditContact` /
+///   `StartLinkExchange` / `OpenContact` / `EditContact` /
 ///   `OpenUrl` / `BackupExportComplete` / `WipeComplete` are
 ///   terminal from the engine's POV — BFS stops following that
-///   path. Other non-screen-changing results
+///   path. (`StartLinkExchange` is the `LinkExchangeEngine`'s
+///   Retry handoff: it restarts a fresh link flow via the
+///   AppEngine, leaving the current engine's screen space.) Other non-screen-changing results
 ///   (`ValidationError`, `ShowAlert`, `ShowToast`, `Notify`,
 ///   `ShowInfoOverlay`, `RequestCamera`, `Commands`,
 ///   `PreviewAs`, `ShowContactPicker`, `VerifyFingerprint`,
@@ -287,6 +289,7 @@ fn is_terminal(result: &ActionResult) -> bool {
         ActionResult::Complete
             | ActionResult::CompleteWith { .. }
             | ActionResult::StartDeviceLink
+            | ActionResult::StartLinkExchange
             | ActionResult::OpenContact { .. }
             | ActionResult::EditContact { .. }
             | ActionResult::OpenUrl { .. }

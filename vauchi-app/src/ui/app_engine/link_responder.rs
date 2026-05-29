@@ -180,7 +180,7 @@ impl AppEngine {
     /// Decode a finalized card payload (`[version][pubkey][card]`) and
     /// persist it via the core import path (ADR-034 trust derivation +
     /// idempotent dedup live there). The frontend never sees the bytes.
-    fn import_link_card_bytes(&self, card_bytes: &[u8]) -> Result<(), String> {
+    pub(super) fn import_link_card_bytes(&self, card_bytes: &[u8]) -> Result<(), String> {
         let (_signing_key, card) = parse_card_payload(card_bytes).map_err(|e| e.to_string())?;
         self.vauchi
             .import_received_link_card(card)

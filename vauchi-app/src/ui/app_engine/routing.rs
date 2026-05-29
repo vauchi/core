@@ -103,6 +103,12 @@ impl AppEngine {
             return Some(result);
         }
 
+        // Slice 32l Phase 3: the engine-owned link initiator consumes
+        // LinkShared / LinkOpened / RelayEscrow* on its screen (ADR-031).
+        if let Some(result) = self.route_link_initiator_hardware_event(&event) {
+            return Some(result);
+        }
+
         if !matches!(
             self.screen,
             AppScreen::Exchange
@@ -1060,6 +1066,14 @@ impl AppEngine {
             // responsibility.
             ActionResult::StartMultiStageExchange { mode } => {
                 let screen = self.navigate_to(AppScreen::MultiStageExchange { mode });
+                ActionResult::NavigateTo(screen)
+            }
+            // Slice 32l Phase 3: ExchangeEngine emits StartLinkExchange when
+            // the user picks link mode; navigate to the dedicated
+            // LinkExchange screen whose engine-owned initiator drives the
+            // relay-escrow handshake. Replaces the legacy ExchangeStep::Link.
+            ActionResult::StartLinkExchange => {
+                let screen = self.navigate_to(AppScreen::LinkExchange);
                 ActionResult::NavigateTo(screen)
             }
             ActionResult::OpenEntryDetail { field_id } => {

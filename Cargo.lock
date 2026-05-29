@@ -5037,10 +5037,7 @@ dependencies = [
 name = "vauchi-cabi"
 version = "0.51.25"
 dependencies = [
- "base64",
  "cbindgen",
- "hex",
- "serde",
  "serde_json",
  "tempfile",
  "vauchi-app",
@@ -5126,7 +5123,6 @@ dependencies = [
  "uniffi",
  "vauchi-app",
  "vauchi-core",
- "zxcvbn",
 ]
 
 [[package]]

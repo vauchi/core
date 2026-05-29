@@ -15,7 +15,9 @@ members = [
 # workspace so it is NOT formatted, clippy-linted, or built by `--workspace`
 # commands — it is third-party code held byte-identical to upstream (one
 # patched function). It is still consumed via the [patch] redirect, and its
-# own tripwire tests run standalone: `cargo test --manifest-path vendor/rqrr/Cargo.toml`.
+# own tripwire tests run standalone: `cargo test --manifest-path vendor/rqrr/Cargo.toml --lib`
+# (--lib skips upstream's `img`-feature-gated crate-level doctest, which is
+# unrelated to the patch and not run in CI since the crate is workspace-excluded).
 exclude = ["vendor/rqrr"]
 
 [workspace.package]

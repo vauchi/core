@@ -20,6 +20,7 @@ mod exchange;
 mod exchange_ble;
 mod form_dialog;
 mod group_detail;
+mod link_exchange;
 mod link_responder;
 mod multi_stage_exchange;
 mod onboarding;

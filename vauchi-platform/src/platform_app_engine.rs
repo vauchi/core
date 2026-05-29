@@ -19,11 +19,6 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use crate::mobile_exchange::serialize_exchange_payload;
-use crate::multistage_exchange::{
-    MobileAudioProximityState, MobileMultiStageSession, MobileProtocolState, MobileQrPayload,
-    MultiStageAudioListener, MultiStageSessionListener,
-};
 use crate::types::{
     MobileLocale, MobileNotificationCategory, MobilePendingNotification, MobileTabInfo,
     MobileTabLayout,
@@ -31,9 +26,7 @@ use crate::types::{
 use vauchi_app::notification_types::NotificationCategory as CoreNotificationCategory;
 use vauchi_app::ui::{AppEngine, AppScreen, WorkflowEngine};
 use vauchi_core::api::{HandlerId, Vauchi, VauchiConfig, VauchiEvent};
-use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
-use vauchi_core::exchange::ProtocolState;
 
 use crate::error::MobileError;
 use crate::json_helpers::{
@@ -152,20 +145,10 @@ pub struct PlatformAppEngine {
     /// `on_screens_invalidated` directly when the engine state changes
     /// from a listener callback (Pair 4 of pure-humble-ui-retire-native-screens).
     direct_listener: DirectListenerSlot,
-    /// Pair 4 — auto-managed `MobileMultiStageSession` for the
-    /// `MultiStageExchange` screen. Created by core when navigation
-    /// enters the screen, cancelled when navigation leaves. Frontends
-    /// never see this — they only fire `UserAction`s and
-    /// `Event`s and render the resulting `ScreenModel`.
-    multi_stage_session: Mutex<Option<Arc<MobileMultiStageSession>>>,
-    /// Storage path retained for in-place session creation.
-    /// Mirrors `VauchiPlatform::storage_path` so the engine can build
-    /// `MobileMultiStageSession::with_persistence` instances without
-    /// depending on a sibling `VauchiPlatform` instance.
+    /// Storage path retained for in-place session creation. Mirrors
+    /// `VauchiPlatform::storage_path` so content-update internals can
+    /// resolve the data directory without a sibling `VauchiPlatform`.
     storage_path: PathBuf,
-    /// Storage key retained for in-place session creation. See
-    /// `storage_path` above.
-    storage_key: SymmetricKey,
 }
 
 /// Self-heal: if the engine is parked on `Onboarding` but identity now
@@ -236,9 +219,7 @@ impl PlatformAppEngine {
             engine: Arc::new(Mutex::new(AppEngine::new(vauchi))),
             event_handler_id: Mutex::new(None),
             direct_listener: Arc::new(Mutex::new(None)),
-            multi_stage_session: Mutex::new(None),
             storage_path,
-            storage_key,
         }))
     }
 
@@ -4281,362 +4262,10 @@ impl PlatformAppEngine {
         Ok(())
     }
 
-    /// Build the local exchange payload (identity public key + own
-    /// card) required by `MobileMultiStageSession::with_persistence`.
-    /// Pulls the current identity + card from the cached AppEngine's
-    /// `Vauchi`. Returns an error if no identity exists.
-    /// Returns the serialized exchange payload and our identity signing key
-    /// (the latter feeds the deterministic ratchet-role decision at finalize).
-    fn build_exchange_payload(&self) -> Result<(Vec<u8>, [u8; 32]), MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let vauchi = engine.vauchi();
-        let identity = vauchi.identity().ok_or_else(|| MobileError::Other {
-            detail: "Cannot start multi-stage exchange without an identity".to_string(),
-        })?;
-        // Snapshot the identity-derived bits before dropping the lock —
-        // `Identity` is not `Clone` (master seed is zeroized on drop).
-        let signing_key = *identity.signing_public_key();
-        let display_name = identity.display_name().to_string();
-        let card = vauchi
-            .own_card()
-            .map_err(|e| MobileError::Other {
-                detail: e.to_string(),
-            })?
-            .unwrap_or_else(|| ContactCard::new(&display_name));
-        Ok((serialize_exchange_payload(&signing_key, &card), signing_key))
-    }
-
-    /// **T1.2c no-op.** The AppEngine-owned multi-stage machine
-    /// (see `vauchi-app/src/ui/app_engine/multi_stage_exchange.rs`)
-    /// is the sole driver. This method is preserved so the test
-    /// helpers in `platform_app_engine_test_helpers.rs` can still
-    /// call it idempotently; T3.1 deletes both the method and the
-    /// `multi_stage_session` field outright. The body of the
-    /// pre-32m cycle-thread spawn is left as documentation of what
-    /// the cycle thread used to do.
-    #[allow(dead_code)]
-    fn ensure_multi_stage_session(&self) -> Result<(), MobileError> {
-        Ok(())
-    }
-
-    /// **T1.2c dead code.** The pre-32m cycle-thread spawn — kept
-    /// only as a doc reference until T3.1 deletes
-    /// `MobileMultiStageSession` outright.
-    #[allow(dead_code)]
-    fn _retired_cycle_thread_ensure(&self) -> Result<(), MobileError> {
-        let mut slot = self
-            .multi_stage_session
-            .lock()
-            .map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-        if slot.is_some() {
-            return Ok(());
-        }
-        let (payload, our_identity) = self.build_exchange_payload()?;
-        let session = Arc::new(MobileMultiStageSession::with_persistence(
-            payload,
-            self.storage_path.clone(),
-            self.storage_key.clone(),
-            our_identity,
-        ));
-        let bridge = MultiStageEngineBridge {
-            engine: Arc::clone(&self.engine),
-            direct_listener: Arc::clone(&self.direct_listener),
-        };
-        session.set_listener(Box::new(bridge));
-        // Hover-only wire-up: the cycle-thread autonomous trigger
-        // (`try_autonomous_audio_trigger` in `multistage_exchange.rs`)
-        // gates on the audio-listener slot — empty slot means no
-        // state-machine advance into `Listening` and no audio
-        // commands surface to the renderer. Glance flows (and every
-        // non-multi-stage active engine) leave the slot empty so the
-        // trigger stays a silent no-op. Until the Phase 1.E
-        // mode-dispatcher in `screens.rs` flips to per-mode
-        // constructors, `is_active_engine_multi_stage_hover` always
-        // returns `false`, which is the desired Phase 1.C-polish
-        // behaviour: no spurious audio chrome until the dispatcher
-        // is wired.
-        let is_hover = self
-            .engine
-            .lock()
-            .map(|guard| guard.is_active_engine_multi_stage_hover())
-            .unwrap_or(false);
-        if is_hover {
-            let audio_bridge = MultiStageAudioEngineBridge {
-                engine: Arc::clone(&self.engine),
-                direct_listener: Arc::clone(&self.direct_listener),
-                audio_commands: session.pending_audio_commands_handle(),
-            };
-            session.set_audio_listener(Box::new(audio_bridge));
-        }
-        session.start();
-        *slot = Some(session);
-        Ok(())
-    }
-
-    /// Cancel + drop the active `MobileMultiStageSession`. Cancellation
-    /// is idempotent — calling this without an active session is a
-    /// no-op.
-    ///
-    /// **T1.3 dead code.** All production callers were redirected to
-    /// `AppEngine::cancel_multi_stage_session` in T1.2c; the 4 fixture
-    /// methods that pre-called this were retired in T1.3. T3.1
-    /// deletes this method and the `multi_stage_session` field
-    /// outright when `MobileMultiStageSession` is removed.
-    #[allow(dead_code)]
-    pub(crate) fn cancel_multi_stage_session(&self) {
-        let session_to_cancel = self
-            .multi_stage_session
-            .lock()
-            .ok()
-            .and_then(|mut slot| slot.take());
-        if let Some(session) = session_to_cancel {
-            session.cancel();
-        }
-    }
-
     /// Internal accessor: `engine` Mutex. Used by the Pair 5
     /// device-link wiring in `platform_app_engine_device_link.rs`.
     pub(crate) fn engine(&self) -> &Arc<Mutex<AppEngine>> {
         &self.engine
-    }
-
-    // ── Test-only helpers ──────────────────────────────────────────
-    //
-    // These bridge entry points exist so integration tests can drive
-    // the multi-stage screen state without spinning up a real cycle
-    // thread + peer. They are not part of the UniFFI surface — Swift
-    // / Kotlin frontends never see them, and the production bridge
-    // (`MultiStageEngineBridge`) goes straight to
-    // `AppEngine::apply_multi_stage_*`. The `_for_test` suffix mirrors
-    // the existing convention (`set_cycle_sleep_override_ms_for_test`).
-    //
-    // Each method calls `cancel_multi_stage_session()` first because
-    // `navigate_to(MultiStageExchange)` (typically via the test helper
-    // `drive_to_multi_stage`) eagerly starts a real cycle thread via
-    // `after_screen_transition` → `ensure_multi_stage_session`. Without
-    // the cancel, the cycle thread races the test's manual state pushes
-    // — observed as ~20% flake on
-    // `apply_multi_stage_state_finalized_with_session_ended_renders_success_screen`
-    // where the cycle thread re-pushed `Idle` after the test set
-    // `Finalized`, leaving `session_ended` true but state Idle so the
-    // `Finalized | Complete | RetryReady if session_ended` arm in
-    // `MultiStageExchangeEngine::build_screen` missed and the screen
-    // fell through to the active "Waiting for peer…" chrome.
-    // `cancel_multi_stage_session` is idempotent (no-op when the slot
-    // is already None) so the four `_for_test` entries can call it
-    // unconditionally.
-
-    /// **T1.3 dead code.** Used by the retired multi-stage fixture
-    /// methods to push a synthetic invalidation after a direct state
-    /// push. After T1.2c the platform's `poll_notifications` wrapper
-    /// fires invalidations naturally whenever the AppEngine machine
-    /// advances; no fixture needs this helper. T3.1 deletes it
-    /// alongside the rest of the cycle-thread bridge.
-    #[allow(dead_code)]
-    pub(crate) fn fire_invalidation_for_test(&self) {
-        let listener = self
-            .direct_listener
-            .lock()
-            .ok()
-            .and_then(|guard| guard.clone());
-        if let Some(listener) = listener {
-            listener.on_screens_invalidated(vec!["multi_stage_exchange".into()]);
-        }
-    }
-}
-
-/// Core-supplied `MultiStageSessionListener` that bridges cycle-thread
-/// callbacks into the active `MultiStageExchangeEngine`.
-///
-/// Holds field clones (not an `Arc<PlatformAppEngine>`) so the cycle
-/// thread mutates engine state directly without re-entering the
-/// PlatformAppEngine API surface — and the entry methods on
-/// `PlatformAppEngine` stay on `&self` instead of `self: Arc<Self>`.
-struct MultiStageEngineBridge {
-    engine: Arc<Mutex<AppEngine>>,
-    direct_listener: DirectListenerSlot,
-}
-
-impl MultiStageEngineBridge {
-    fn notify(&self) {
-        // Clone the listener arc out from under the lock so the
-        // callback fires unlocked — a frontend implementation that
-        // re-enters Rust on the callback (typical: read
-        // current_screen_json) won't deadlock.
-        let listener = self
-            .direct_listener
-            .lock()
-            .ok()
-            .and_then(|guard| guard.clone());
-        if let Some(listener) = listener {
-            listener.on_screens_invalidated(vec!["multi_stage_exchange".into()]);
-        }
-    }
-}
-
-impl MultiStageSessionListener for MultiStageEngineBridge {
-    fn on_qr_payload(&self, payload: MobileQrPayload) {
-        // Errors here are non-actionable — the cycle thread is the
-        // only caller and re-attempting won't help. Drop silently per
-        // logging-rules.md (no PII; cycle is hot-path).
-        let qr = vauchi_core::exchange::QrPayload {
-            data: payload.data,
-            error_correction: payload.error_correction,
-            display_duration_ms: payload.display_duration_ms,
-        };
-        let applied = match self.engine.lock() {
-            Ok(mut e) => e.apply_multi_stage_qr_payload(&qr),
-            Err(_) => false,
-        };
-        if applied {
-            self.notify();
-        }
-    }
-
-    fn on_state_changed(&self, state: MobileProtocolState) {
-        let core_state = mobile_state_to_core(state);
-        let applied = match self.engine.lock() {
-            Ok(mut e) => e.apply_multi_stage_state(core_state),
-            Err(_) => false,
-        };
-        if applied {
-            self.notify();
-        }
-    }
-
-    fn on_finalized(&self, contact_name: String) {
-        let applied = match self.engine.lock() {
-            Ok(mut e) => e.apply_multi_stage_finalized(contact_name),
-            Err(_) => false,
-        };
-        if applied {
-            self.notify();
-        }
-    }
-
-    fn on_session_ended(&self) {
-        let applied = match self.engine.lock() {
-            Ok(mut e) => e.apply_multi_stage_session_ended(),
-            Err(_) => false,
-        };
-        if applied {
-            self.notify();
-        }
-    }
-}
-
-/// Core-supplied audio-proximity listener that bridges
-/// platform-side orchestrator transitions into the active
-/// `MultiStageExchangeEngine` view-state.
-///
-/// Sibling of [`MultiStageEngineBridge`] — Phase 1.C.3d of
-/// `_private/docs/planning/todo/2026-05-11-hover-graduation-plan.md`.
-/// The orchestrator that *fires* `on_audio_state_changed` (the
-/// `ProximityVerifier` invocation + `Command::AudioEmitChallenge` /
-/// `AudioListenForResponse` emission) lands in 1.C.3e; this bridge
-/// is dormant plumbing until then — the listener is registered but
-/// no callbacks fire.
-struct MultiStageAudioEngineBridge {
-    engine: Arc<Mutex<AppEngine>>,
-    direct_listener: DirectListenerSlot,
-    /// Arc-shared handle to the session's pending audio commands
-    /// queue. Drained from `on_audio_state_changed` after the
-    /// engine-side state apply so the AudioEmit/Listen commands
-    /// flow into AppEngine's pending stream in the same callback
-    /// tick. Phase 1.C.3e-v.
-    audio_commands: std::sync::Arc<std::sync::Mutex<Vec<vauchi_core::Command>>>,
-}
-
-impl MultiStageAudioEngineBridge {
-    fn notify(&self) {
-        // Same `clone-arc-out-of-lock` discipline as
-        // `MultiStageEngineBridge::notify` so a frontend
-        // implementation that re-enters Rust on the callback (typical:
-        // read current_screen_json) won't deadlock.
-        let listener = self
-            .direct_listener
-            .lock()
-            .ok()
-            .and_then(|guard| guard.clone());
-        if let Some(listener) = listener {
-            listener.on_screens_invalidated(vec!["multi_stage_exchange".into()]);
-        }
-    }
-}
-
-impl MultiStageAudioListener for MultiStageAudioEngineBridge {
-    fn on_audio_state_changed(&self, state: MobileAudioProximityState) {
-        let core_state = mobile_audio_to_core(state);
-        let applied = match self.engine.lock() {
-            Ok(mut e) => {
-                let ok = e.apply_multi_stage_audio_proximity(core_state);
-                if ok {
-                    // Phase 1.C.3e-v: drain the session's audio
-                    // commands and forward into AppEngine's pending
-                    // stream so the next screen_envelope_to_json
-                    // drain surfaces AudioEmitChallenge /
-                    // AudioListenForResponse to the frontend.
-                    let cmds = self
-                        .audio_commands
-                        .lock()
-                        .map(|mut q| std::mem::take(&mut *q))
-                        .unwrap_or_default();
-                    if !cmds.is_empty() {
-                        e.extend_pending_commands(cmds);
-                    }
-                }
-                ok
-            }
-            Err(_) => false,
-        };
-        if applied {
-            self.notify();
-        }
-    }
-}
-
-/// Translate [`MobileAudioProximityState`] (uniffi::Enum) to
-/// [`vauchi_core::exchange::AudioProximityState`] (the AppEngine's
-/// wire type). Mirrors [`mobile_state_to_core`].
-fn mobile_audio_to_core(
-    state: MobileAudioProximityState,
-) -> vauchi_core::exchange::AudioProximityState {
-    use vauchi_core::exchange::AudioProximityState;
-    match state {
-        MobileAudioProximityState::Pending => AudioProximityState::Pending,
-        MobileAudioProximityState::Listening => AudioProximityState::Listening,
-        MobileAudioProximityState::Confirmed => AudioProximityState::Confirmed,
-        MobileAudioProximityState::Failed => AudioProximityState::Failed,
-    }
-}
-
-/// Translate `MobileProtocolState` (uniffi::Enum) to
-/// `vauchi_core::exchange::ProtocolState` (the AppEngine's wire type).
-pub(crate) fn mobile_state_to_core(state: MobileProtocolState) -> ProtocolState {
-    match state {
-        MobileProtocolState::Idle => ProtocolState::Idle,
-        MobileProtocolState::Advertising => ProtocolState::Advertising,
-        MobileProtocolState::Discovered => ProtocolState::Discovered,
-        MobileProtocolState::Transferring {
-            chunks_sent,
-            chunks_total,
-            chunks_received,
-            peer_chunks_total,
-        } => ProtocolState::Transferring {
-            chunks_sent,
-            chunks_total,
-            chunks_received,
-            peer_chunks_total,
-        },
-        MobileProtocolState::Verifying => ProtocolState::Verifying,
-        MobileProtocolState::Confirming => ProtocolState::Confirming,
-        MobileProtocolState::Complete => ProtocolState::Complete,
-        MobileProtocolState::Finalized => ProtocolState::Finalized,
-        MobileProtocolState::Failed { reason } => ProtocolState::Failed(reason),
     }
 }
 

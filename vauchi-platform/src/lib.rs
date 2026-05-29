@@ -17,7 +17,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use vauchi_core::{ContactCard, Identity, Storage, SymmetricKey, Vauchi, VauchiConfig};
+use vauchi_core::{Identity, Storage, SymmetricKey, Vauchi, VauchiConfig};
 
 // === Modules ===
 
@@ -28,18 +28,14 @@ mod error;
 mod exchange;
 mod exchange_view;
 mod json_helpers;
-mod mobile_ble;
 mod mobile_contact_detail;
 mod mobile_contacts;
 mod mobile_delivery;
-mod mobile_exchange;
 mod mobile_gdpr;
 mod mobile_identity;
 mod mobile_import;
-mod mobile_verifier_event;
 mod mobile_visibility;
 mod multipart_qr;
-mod multistage_exchange;
 mod platform_app_engine;
 mod platform_app_engine_test_helpers;
 mod policies;
@@ -77,29 +73,14 @@ pub use diagnostic::{
 pub use domain_command::{DomainCommand, DomainCommandResult};
 use error::lock_or;
 pub use error::{KeychainError, MobileError};
-pub use exchange::{
-    MobileBleExchangeStatus, MobileCommand, MobileEvent, MobileExchangeSession,
-    MobileExchangeState, MobileProximityHandler, create_qr_exchange_manual,
-    create_qr_exchange_proximity,
-};
+pub use exchange::{MobileCommand, MobileEvent, MobileExchangeState};
 pub use exchange_view::{MobileExchangeViewState, exchange_view_state};
-pub use mobile_ble::{
-    MobileBleDelegate, MobileBleError, MobileBleExchangeResult, MobileBleExchangeSession,
-    MobileBleField, MobileBleState, MobileBleTransportError,
-};
 pub use mobile_contact_detail::{
     MobileContactDetailAction, MobileContactDetailBadge, MobileContactDetailBanner,
     MobileContactDetailViewState,
 };
 pub use mobile_import::{MobileImportResult, MobileImportWarning};
-pub use mobile_verifier_event::{
-    MobileProximityConfidence, MobileProximityVerifierEvent, MobileVerifierMethod,
-};
 pub use multipart_qr::{MultipartDecoder, encode_multipart};
-pub use multistage_exchange::{
-    MobileAudioProximityState, MobileMultiStageSession, MobileProtocolState, MobileQrPayload,
-    MultiStageAudioListener, MultiStageSessionListener,
-};
 pub use platform_app_engine::{PlatformAppEngine, PlatformEventListener};
 #[doc(hidden)]
 pub use platform_app_engine_test_helpers::PlatformAppEngineTestHelpers;
@@ -721,19 +702,6 @@ impl VauchiPlatform {
             detail: format!("Identity decode failed: {e}"),
         })
     }
-
-    /// Get our contact card, or create a default one from the identity.
-    pub(crate) fn get_own_card_or_default(
-        &self,
-        identity: &Identity,
-    ) -> Result<ContactCard, MobileError> {
-        let storage = self.open_storage()?;
-        Ok(storage
-            .load_own_card()
-            .ok()
-            .flatten()
-            .unwrap_or_else(|| ContactCard::new(identity.display_name())))
-    }
 }
 
 #[uniffi::export]
@@ -895,20 +863,6 @@ mod tests {
 
         let name = wb.get_display_name().unwrap();
         assert_eq!(name, "Alice");
-    }
-
-    // @scenario: contact_exchange:Two users exchange contact cards via QR code
-    #[test]
-    fn test_exchange_session_qr() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        let session = wb.create_qr_exchange_manual().unwrap();
-        let qr_data = session.generate_qr().unwrap();
-        assert!(
-            qr_data.starts_with("wb://"),
-            "QR data should start with wb://"
-        );
     }
 
     // @scenario: device_sync:Sync result aggregation

@@ -346,11 +346,6 @@ fn platform_app_engine_surface_matches_allowlist_strict() {
 const PERMITTED_UNIFFI_OBJECTS: &[&str] = &[
     // ── Screen-driving (ADR-043 Am.2 clarification 1) ──
     "PlatformAppEngine",
-    // ── Session peers under ADR-031 (clarification 2) ──
-    // Hardware-event-driven, short-lived, single-protocol-instance.
-    "MobileBleExchangeSession",
-    "MobileExchangeSession",
-    "MobileMultiStageSession",
     // ── Legacy ──
     // `VauchiPlatform` is the Phase-B legacy facade; the
     // `2026-05-11-pure-functional-core-program-plan.md` Phase 6 /

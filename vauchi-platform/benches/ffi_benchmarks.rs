@@ -69,21 +69,6 @@ fn bench_identity_creation(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark exchange session creation and QR generation
-fn bench_exchange_qr(c: &mut Criterion) {
-    let mut group = c.benchmark_group("exchange");
-
-    group.bench_function("create_qr_exchange_manual", |b| {
-        let (instance, _dir) = create_instance_with_identity("Test User");
-        b.iter(|| {
-            let session = instance.create_qr_exchange_manual().unwrap();
-            black_box(session.generate_qr().unwrap());
-        })
-    });
-
-    group.finish();
-}
-
 /// Benchmark storage operations overhead
 fn bench_storage(c: &mut Criterion) {
     let mut group = c.benchmark_group("storage");
@@ -100,11 +85,6 @@ fn bench_storage(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_identity_creation,
-    bench_exchange_qr,
-    bench_storage,
-);
+criterion_group!(benches, bench_identity_creation, bench_storage,);
 
 criterion_main!(benches);

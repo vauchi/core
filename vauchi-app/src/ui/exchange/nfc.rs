@@ -29,12 +29,16 @@
 //!
 //! Wiring status (2026-05-29): the initiator path is reachable
 //! (`ExchangeMode::TapTap` -> `start_taptap_mode` -> `new_initiator`); the
-//! responder path (`new_responder` + `NfcStep::AckSent`) is unit-test-only,
-//! pending a production HCE-responder engine entry. That responder gap is
-//! what keeps the file-level `dead_code` allow alive. See
+//! responder path is wired lazily on the first `NfcDataReceived` (HCE
+//! bootstrap in `ExchangeEngine::handle_hardware_event`, which spins up a
+//! `new_responder` flow so the engine — not the legacy `MobileExchangeSession`
+//! — drives the HCE handshake). The file-level `dead_code` allow now only
+//! covers Phase-1 outcome-enum items not yet consumed. See
 //! `_private/docs/problems/2026-05-29-nfc-exchange-mode-entry-wiring`.
 
-#![allow(dead_code)] // responder path still test-only (see module docs)
+#![allow(dead_code)] // Phase-1 outcome-enum follow-ups not yet consumed:
+// NfcHardwareOutcome::{Complete.card_bytes, Consumed} + RelayHandoff. The
+// responder path itself is now wired (see module docs).
 
 use vauchi_core::clock::SystemClock;
 use vauchi_core::exchange::escrow::{EscrowKeys, EscrowRole};

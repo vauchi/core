@@ -1093,6 +1093,27 @@ impl WorkflowEngine for ExchangeEngine {
     }
 
     fn handle_hardware_event(&mut self, event: vauchi_core::Event) -> Option<ActionResult> {
+        // Lazy HCE-responder bootstrap (responder entry —
+        // `problems/2026-05-29-nfc-exchange-mode-entry-wiring`): the HCE
+        // responder has no `NfcExchangeFlow` until the peer's first tap
+        // lands as an `NfcDataReceived`. Spin up an engine-driven responder
+        // flow (replacing the legacy `MobileExchangeSession`) so the
+        // step-gated routing below dispatches it. The initiator path
+        // (`start_taptap_mode`) creates its flow up-front instead.
+        if self.nfc_flow.is_none()
+            && matches!(event, vauchi_core::Event::NfcDataReceived { .. })
+            && let Some(identity) = self.nfc_identity.take()
+        {
+            let mut flow = NfcExchangeFlow::new_responder(identity, self.config.own_name.clone());
+            // Idle -> AwaitingTap. activate() emits an empty NfcActivate
+            // (responder already listens via HCE); discard it — the tap
+            // already happened and the offer is processed by the routing below.
+            if flow.activate().is_ok() {
+                self.nfc_flow = Some(flow);
+                self.step = ExchangeStep::Nfc(NfcStep::AwaitingTap);
+            }
+        }
+
         // BLE mode events — routed through BleExchangeFlow
         if matches!(self.step, ExchangeStep::Ble(_)) {
             return self.handle_ble_hardware_event(event);
@@ -3310,13 +3331,12 @@ mod tests {
     fn cable_mode_with_session_emits_direct_send() {
         use vauchi_core::contact_card::ContactCard;
         use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier, UsbRole};
-        use vauchi_core::identity::Identity;
 
         let config = ExchangeConfig {
             mode: Some(ExchangeMode::Cable),
             ..config_no_groups()
         };
-        let identity = Identity::create(
+        let identity = vauchi_core::identity::Identity::create(
             "Test",
             vauchi_core::clock::SystemClock::shared().unix_seconds(),
         );
@@ -3642,7 +3662,6 @@ mod tests {
     // @internal
     #[test]
     fn taptap_mode_selection_starts_nfc_flow_with_identity() {
-        use vauchi_core::identity::Identity;
         let mut engine = ExchangeEngine::new(
             config_mode_selection(),
             vauchi_core::clock::SystemClock::shared(),
@@ -3651,7 +3670,7 @@ mod tests {
 
         // Populate the cached identity (AppEngine does this at
         // engine construction in app_engine/screens.rs).
-        let identity = Identity::create(
+        let identity = vauchi_core::identity::Identity::create(
             "Alice",
             vauchi_core::clock::SystemClock::shared().unix_seconds(),
         );
@@ -3714,6 +3733,62 @@ mod tests {
                 );
             }
             other => panic!("expected UpdateScreen, got {other:?}"),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn nfc_responder_bootstraps_on_first_tap_and_emits_ack() {
+        // The HCE responder has no flow until tapped. Feeding the peer's
+        // key offer (the first NfcDataReceived) must lazily spin up an
+        // engine-owned responder NfcExchangeFlow, advance it to AckSent,
+        // and emit (key_ack || encrypted_card) as a single NfcSendApdu —
+        // exactly what the Android VauchiHceService binder-block returns.
+        let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+
+        // Real key offer from a separate initiator flow (real crypto, ADR-002).
+        let mut initiator = NfcExchangeFlow::new_initiator(
+            vauchi_core::identity::Identity::create("Alice", now),
+            "Alice".into(),
+        );
+        let offer = match &initiator.activate().expect("initiator activate")[0] {
+            vauchi_core::Command::NfcActivate { payload } => payload.clone(),
+            other => panic!("expected NfcActivate, got {other:?}"),
+        };
+        assert!(!offer.is_empty(), "initiator key offer must be non-empty");
+
+        // Responder engine: NFC identity set, no flow yet.
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        engine.set_nfc_identity(vauchi_core::identity::Identity::create("Bob", now));
+        assert!(engine.nfc_flow.is_none(), "no flow before first tap");
+
+        let result =
+            engine.handle_hardware_event(vauchi_core::Event::NfcDataReceived { data: offer });
+
+        // First tap bootstrapped + advanced the responder; identity consumed.
+        assert!(
+            engine.nfc_flow.is_some(),
+            "first tap must bootstrap the responder flow"
+        );
+        assert_eq!(engine.step, ExchangeStep::Nfc(NfcStep::AckSent));
+        assert!(
+            engine.nfc_identity.is_none(),
+            "bootstrap must consume nfc_identity"
+        );
+        match result {
+            Some(ActionResult::Commands { commands }) => match commands.as_slice() {
+                [vauchi_core::Command::NfcSendApdu { data }] => {
+                    assert!(
+                        !data.is_empty(),
+                        "responder must send key_ack || encrypted_card"
+                    );
+                }
+                other => panic!("expected single NfcSendApdu, got {other:?}"),
+            },
+            other => panic!("expected ActionResult::Commands, got {other:?}"),
         }
     }
 }

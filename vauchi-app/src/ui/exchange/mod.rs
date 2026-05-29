@@ -981,7 +981,18 @@ impl ExchangeEngine {
                         label: "Switch to QR".into(),
                         style: ActionStyle::Secondary,
                         enabled: true,
-                        a11y: None,
+                        // d4-a11y (selective): "Switch to QR" names a
+                        // transport whose consequence isn't self-evident —
+                        // add a hint. label/role stay None (the visible
+                        // label is the accessible name; no redundant role).
+                        a11y: Some(A11y {
+                            label: None,
+                            hint: Some(
+                                "Abandons this attempt and restarts the exchange using camera QR codes."
+                                    .into(),
+                            ),
+                            role: None,
+                        }),
                     });
                 }
                 if self.ble_fallback_available {
@@ -990,7 +1001,14 @@ impl ExchangeEngine {
                         label: "Switch to encrypted relay".into(),
                         style: ActionStyle::Secondary,
                         enabled: true,
-                        a11y: None,
+                        a11y: Some(A11y {
+                            label: None,
+                            hint: Some(
+                                "Abandons this attempt and completes the exchange over the encrypted relay server."
+                                    .into(),
+                            ),
+                            role: None,
+                        }),
                     });
                 }
                 actions.push(ScreenAction {

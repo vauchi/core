@@ -375,3 +375,81 @@ fn exchange_show_qr_has_a11y() {
         other => panic!("expected QrCode, got {:?}", other),
     }
 }
+
+// @scenario: accessibility :: Exchange fallback actions carry consequence hints
+//
+// Selective a11y (2026-05-29 decision, record
+// `2026-05-29-screenaction-a11y-convention`): a ScreenAction whose label
+// names a transport/mode with a non-obvious consequence carries an a11y
+// hint (label/role left None — the visible label is the accessible name).
+// The Failed screen's fallback_qr / fallback_relay get hints; the
+// plain-verb retry / cancel stay None.
+// @internal
+#[test]
+fn exchange_failed_fallback_actions_have_a11y_hints() {
+    // Reach Failed with BOTH fallbacks: a camera-capable device that
+    // BLE-disconnects mid-flow sets ble_fallback_available and (camera →)
+    // qr_fallback_available.
+    let mut engine = ExchangeEngine::new(
+        ExchangeConfig {
+            own_name: "Alice".to_string(),
+            own_qr_data: "alice-qr".to_string(),
+            available_groups: vec![],
+            device_capabilities: vauchi_core::exchange::capability::types::DeviceCapabilities {
+                has_camera: true,
+                ..Default::default()
+            },
+            mode: Some(vauchi_core::exchange::mode::ExchangeMode::Magic),
+            card_snapshot: None,
+        },
+        vauchi_core::clock::SystemClock::shared(),
+    );
+    let _ = engine.handle_hardware_event(vauchi_core::Event::BleDisconnected {
+        reason: "peer hung up".to_string(),
+    });
+
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "exchange_failed");
+
+    let find = |id: &str| {
+        screen
+            .actions
+            .iter()
+            .find(|a| a.id == id)
+            .unwrap_or_else(|| panic!("action {id} must be present on the Failed screen"))
+    };
+
+    // fallback_qr — hint names the consequence; label/role stay None.
+    let qr = find("fallback_qr")
+        .a11y
+        .as_ref()
+        .expect("fallback_qr must carry a11y");
+    assert_eq!(
+        qr.label, None,
+        "fallback_qr a11y must not duplicate the visible label"
+    );
+    assert_eq!(
+        qr.role, None,
+        "fallback_qr a11y must not set a redundant role"
+    );
+    assert_eq!(
+        qr.hint.as_deref(),
+        Some("Abandons this attempt and restarts the exchange using camera QR codes."),
+    );
+
+    // fallback_relay — hint names the consequence; label/role stay None.
+    let relay = find("fallback_relay")
+        .a11y
+        .as_ref()
+        .expect("fallback_relay must carry a11y");
+    assert_eq!(relay.label, None);
+    assert_eq!(relay.role, None);
+    assert_eq!(
+        relay.hint.as_deref(),
+        Some("Abandons this attempt and completes the exchange over the encrypted relay server."),
+    );
+
+    // Plain-verb actions stay None — the visible label is the accessible name.
+    assert_eq!(find("retry").a11y, None, "retry is self-evident");
+    assert_eq!(find("cancel").a11y, None, "cancel is self-evident");
+}

@@ -541,6 +541,31 @@ impl ExchangeEngine {
         ActionResult::Commands { commands }
     }
 
+    /// Explicit responder ("Receive") entry for TapTap.
+    ///
+    /// Unlike [`Self::start_taptap_mode`] (the "Send"/initiator path), this
+    /// does **not** create an `NfcExchangeFlow`: it leaves `nfc_flow = None`
+    /// and the cached `nfc_identity` in place so the lazy HCE bootstrap in
+    /// [`WorkflowEngine::handle_hardware_event`] spins up the responder on
+    /// the peer's first tap. It emits an **empty** `Command::NfcActivate`
+    /// up-front so the frontend registers its HCE `TransceiveContext` before
+    /// that tap arrives — the initiator path's non-empty key-offer payload
+    /// is the discriminator (empty payload = responder, register HCE;
+    /// non-empty = initiator, enable reader-mode).
+    fn start_nfc_receive_mode(&mut self) -> ActionResult {
+        if self.nfc_identity.is_none() {
+            self.failure_detail = Some("no active identity for NFC exchange".to_string());
+            self.step = ExchangeStep::Failed;
+            return ActionResult::UpdateScreen(self.build_screen());
+        }
+        self.step = ExchangeStep::Nfc(NfcStep::AwaitingTap);
+        ActionResult::Commands {
+            commands: vec![vauchi_core::Command::NfcActivate {
+                payload: Vec::new(),
+            }],
+        }
+    }
+
     /// Handle BLE mode hardware events via BleExchangeFlow.
     fn handle_ble_hardware_event(&mut self, event: vauchi_core::Event) -> Option<ActionResult> {
         let flow = self.ble_flow.as_mut()?;
@@ -1169,6 +1194,18 @@ impl WorkflowEngine for ExchangeEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         // Mode selection — delegated to ModeSelectionEngine
         if self.step == ExchangeStep::ModeSelection {
+            // Explicit responder ("Receive") entry — TapTap with no
+            // initiator flow, so the lazy HCE bootstrap fires on the peer's
+            // first tap. Distinct item id from "mode:tap_tap" (the "Send"/
+            // initiator path); intercepted here because the role is a
+            // sub-choice of TapTap, not a separate ExchangeMode.
+            if let UserAction::ListItemSelected { item_id, .. } = &action
+                && item_id == "mode:tap_tap_receive"
+            {
+                self.config.mode = Some(ExchangeMode::TapTap);
+                self.mode_selection = None;
+                return self.start_nfc_receive_mode();
+            }
             if let Some(ref ms) = self.mode_selection {
                 match ms.handle_action(&action) {
                     ModeSelectionResult::Selected(mode) => {
@@ -3313,6 +3350,78 @@ mod tests {
         let result = engine.handle_action(UserAction::ListItemSelected {
             component_id: "category:fun".into(),
             item_id: "mode:tap_tap".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::Failed);
+        match result {
+            ActionResult::UpdateScreen(_) => {
+                let detail = engine.failure_detail.as_deref().unwrap_or("");
+                assert!(
+                    detail.contains("identity"),
+                    "failure detail must mention identity, got: {detail}"
+                );
+            }
+            other => panic!("expected UpdateScreen, got {other:?}"),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn nfc_receive_mode_prepares_responder_without_flow() {
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        let identity = vauchi_core::identity::Identity::create(
+            "Bob",
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        );
+        engine.set_nfc_identity(identity);
+
+        // "Receive" emits a distinct item id from "mode:tap_tap" (the
+        // "Send"/initiator path). Responder prep must NOT create a flow.
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:fun".into(),
+            item_id: "mode:tap_tap_receive".into(),
+        });
+
+        assert_eq!(engine.step, ExchangeStep::Nfc(NfcStep::AwaitingTap));
+        assert!(
+            engine.nfc_flow.is_none(),
+            "receive mode must not pre-create an initiator flow"
+        );
+        assert!(
+            engine.nfc_identity.is_some(),
+            "identity stays cached for the lazy HCE bootstrap to consume"
+        );
+        match result {
+            ActionResult::Commands { commands } => {
+                assert_eq!(commands.len(), 1, "exactly one registration command");
+                match &commands[0] {
+                    vauchi_core::Command::NfcActivate { payload } => {
+                        assert!(
+                            payload.is_empty(),
+                            "responder activate signal must carry an empty payload \
+                             (the discriminator the frontend reads to register HCE)"
+                        );
+                    }
+                    other => panic!("expected Command::NfcActivate, got {other:?}"),
+                }
+            }
+            other => panic!("expected ActionResult::Commands, got {other:?}"),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn nfc_receive_mode_without_identity_routes_to_failed() {
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        // No set_nfc_identity — receive prep must fail-fast, not panic.
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:fun".into(),
+            item_id: "mode:tap_tap_receive".into(),
         });
         assert_eq!(engine.step, ExchangeStep::Failed);
         match result {

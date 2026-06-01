@@ -39,7 +39,7 @@ vauchi-app = { workspace = true, default-features = false, features = ["network-
 tokio = { version = "1.0", features = ["rt-multi-thread", "net", "time"], optional = true }
 
 # UniFFI for cross-language bindings (tokio feature enables async export support)
-uniffi = { version = "0.28", features = ["cli", "tokio"] }
+uniffi = { version = "0.31", features = ["cli", "tokio"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

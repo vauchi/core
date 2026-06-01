@@ -121,8 +121,8 @@ user-login = "BurntSushi"
 user-name = "Andrew Gallant"
 
 [[publisher.bumpalo]]
-version = "3.20.2"
-when = "2026-02-19"
+version = "3.20.3"
+when = "2026-05-22"
 user-id = 696
 user-login = "fitzgen"
 user-name = "Nick Fitzgerald"
@@ -141,8 +141,8 @@ user-id = 55123
 user-login = "rust-lang-owner"
 
 [[publisher.cbindgen]]
-version = "0.29.2"
-when = "2025-10-21"
+version = "0.29.3"
+when = "2026-05-28"
 user-id = 3788
 user-login = "emilio"
 user-name = "Emilio Cobos Álvarez"
@@ -340,8 +340,8 @@ user-login = "rozbb"
 user-name = "Michael Rosenberg"
 
 [[publisher.http]]
-version = "1.4.0"
-when = "2025-11-24"
+version = "1.4.1"
+when = "2026-05-25"
 user-id = 359
 user-login = "seanmonstar"
 user-name = "Sean McArthur"
@@ -361,8 +361,8 @@ user-login = "seanmonstar"
 user-name = "Sean McArthur"
 
 [[publisher.hyper]]
-version = "1.9.0"
-when = "2026-03-31"
+version = "1.10.1"
+when = "2026-05-29"
 user-id = 359
 user-login = "seanmonstar"
 user-name = "Sean McArthur"
@@ -519,8 +519,8 @@ user-login = "Amanieu"
 user-name = "Amanieu d'Antras"
 
 [[publisher.log]]
-version = "0.4.29"
-when = "2025-12-02"
+version = "0.4.30"
+when = "2026-05-25"
 user-id = 3204
 user-login = "KodrAus"
 user-name = "Ashley Mannix"
@@ -533,22 +533,15 @@ user-login = "JohnTitor"
 user-name = "Yuki Okushi"
 
 [[publisher.memchr]]
-version = "2.8.0"
-when = "2026-02-06"
+version = "2.8.1"
+when = "2026-05-27"
 user-id = 189
 user-login = "BurntSushi"
 user-name = "Andrew Gallant"
 
-[[publisher.mime]]
-version = "0.3.17"
-when = "2023-03-20"
-user-id = 359
-user-login = "seanmonstar"
-user-name = "Sean McArthur"
-
 [[publisher.mio]]
-version = "1.2.0"
-when = "2026-03-27"
+version = "1.2.1"
+when = "2026-05-28"
 user-id = 6025
 user-login = "Thomasdezeeuw"
 user-name = "Thomas de Zeeuw"
@@ -771,8 +764,8 @@ user-login = "dtolnay"
 user-name = "David Tolnay"
 
 [[publisher.serde_json]]
-version = "1.0.149"
-when = "2026-01-06"
+version = "1.0.150"
+when = "2026-05-21"
 user-id = 3618
 user-login = "dtolnay"
 user-name = "David Tolnay"
@@ -792,8 +785,8 @@ user-login = "Darksonn"
 user-name = "Alice Ryhl"
 
 [[publisher.socket2]]
-version = "0.6.3"
-when = "2026-03-06"
+version = "0.6.4"
+when = "2026-05-28"
 user-id = 6025
 user-login = "Thomasdezeeuw"
 user-name = "Thomas de Zeeuw"
@@ -855,13 +848,6 @@ user-login = "Darksonn"
 user-name = "Alice Ryhl"
 
 [[publisher.toml]]
-version = "0.5.11"
-when = "2023-01-20"
-user-id = 6743
-user-login = "epage"
-user-name = "Ed Page"
-
-[[publisher.toml]]
 version = "0.9.12+spec-1.1.0"
 when = "2026-02-10"
 user-id = 6743
@@ -876,8 +862,8 @@ user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.toml_edit]]
-version = "0.25.11+spec-1.1.0"
-when = "2026-04-07"
+version = "0.25.12+spec-1.1.0"
+when = "2026-05-27"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
@@ -904,15 +890,8 @@ user-login = "seanmonstar"
 user-name = "Sean McArthur"
 
 [[publisher.tower-http]]
-version = "0.6.10"
-when = "2026-05-06"
-user-id = 359
-user-login = "seanmonstar"
-user-name = "Sean McArthur"
-
-[[publisher.unicase]]
-version = "2.9.0"
-when = "2026-01-06"
+version = "0.6.11"
+when = "2026-05-18"
 user-id = 359
 user-login = "seanmonstar"
 user-name = "Sean McArthur"
@@ -932,8 +911,8 @@ user-login = "Manishearth"
 user-name = "Manish Goregaokar"
 
 [[publisher.unicode-segmentation]]
-version = "1.13.2"
-when = "2026-03-26"
+version = "1.13.3"
+when = "2026-06-01"
 user-id = 1139
 user-login = "Manishearth"
 user-name = "Manish Goregaokar"
@@ -953,50 +932,50 @@ user-login = "Manishearth"
 user-name = "Manish Goregaokar"
 
 [[publisher.uniffi]]
-version = "0.28.3"
-when = "2024-11-14"
+version = "0.31.1"
+when = "2026-04-13"
 user-id = 127697
 user-login = "bendk"
 
 [[publisher.uniffi_bindgen]]
-version = "0.28.3"
-when = "2024-11-14"
-user-id = 127697
-user-login = "bendk"
-
-[[publisher.uniffi_checksum_derive]]
-version = "0.28.3"
-when = "2024-11-14"
+version = "0.31.1"
+when = "2026-04-13"
 user-id = 127697
 user-login = "bendk"
 
 [[publisher.uniffi_core]]
-version = "0.28.3"
-when = "2024-11-14"
+version = "0.31.1"
+when = "2026-04-13"
+user-id = 127697
+user-login = "bendk"
+
+[[publisher.uniffi_internal_macros]]
+version = "0.31.1"
+when = "2026-04-13"
 user-id = 127697
 user-login = "bendk"
 
 [[publisher.uniffi_macros]]
-version = "0.28.3"
-when = "2024-11-14"
+version = "0.31.1"
+when = "2026-04-13"
 user-id = 127697
 user-login = "bendk"
 
 [[publisher.uniffi_meta]]
-version = "0.28.3"
-when = "2024-11-14"
+version = "0.31.1"
+when = "2026-04-13"
 user-id = 127697
 user-login = "bendk"
 
-[[publisher.uniffi_testing]]
-version = "0.28.3"
-when = "2024-11-14"
+[[publisher.uniffi_pipeline]]
+version = "0.31.1"
+when = "2026-04-13"
 user-id = 127697
 user-login = "bendk"
 
 [[publisher.uniffi_udl]]
-version = "0.28.3"
-when = "2024-11-14"
+version = "0.31.1"
+when = "2026-04-13"
 user-id = 127697
 user-login = "bendk"
 
@@ -1015,8 +994,8 @@ user-login = "hsivonen"
 user-name = "Henri Sivonen"
 
 [[publisher.uuid]]
-version = "1.23.1"
-when = "2026-04-16"
+version = "1.23.2"
+when = "2026-05-29"
 user-id = 3204
 user-login = "KodrAus"
 user-name = "Ashley Mannix"
@@ -1500,11 +1479,6 @@ criteria = "safe-to-deploy"
 version = "1.0.0"
 notes = "No new unsafe functions, most of the changes are formatting and the new functional code seems reasonable to me"
 
-[[audits.ariel-os.audits.num-conv]]
-who = "Nils Ponsard <nils.ponsard@inria.fr>"
-criteria = "safe-to-deploy"
-delta = "0.2.0 -> 0.2.1"
-
 [[audits.bytecode-alliance.wildcard-audits.bumpalo]]
 who = "Nick Fitzgerald <fitzgen@gmail.com>"
 criteria = "safe-to-deploy"
@@ -1645,6 +1619,18 @@ who = "Pat Hickey <phickey@fastly.com>"
 criteria = "safe-to-deploy"
 version = "0.15.3"
 notes = "no build, no unsafe, inputs to cargo command are reasonably sanitized"
+
+[[audits.bytecode-alliance.audits.cargo_metadata]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "0.17.0 -> 0.18.1"
+notes = "No major changes, no unsafe code here."
+
+[[audits.bytecode-alliance.audits.cargo_metadata]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "0.18.1 -> 0.19.2"
+notes = "Dependency updates and minor changes, nothing suspicious."
 
 [[audits.bytecode-alliance.audits.cfg-if]]
 who = "Alex Crichton <alex@alexcrichton.com>"
@@ -2065,6 +2051,12 @@ criteria = "safe-to-deploy"
 delta = "0.15.3 -> 0.15.4"
 notes = "No notable changes"
 
+[[audits.embark-studios.audits.cargo_metadata]]
+who = "Johan Andersson <opensource@embark-studios.com>"
+criteria = "safe-to-deploy"
+delta = "0.15.4 -> 0.17.0"
+notes = "No notable changes"
+
 [[audits.embark-studios.audits.ident_case]]
 who = "Johan Andersson <opensource@embark-studios.com>"
 criteria = "safe-to-deploy"
@@ -2159,13 +2151,6 @@ version = "0.1.5"
 notes = "Android system API FFI"
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
-[[audits.google.audits.autocfg]]
-who = "Manish Goregaokar <manishearth@google.com>"
-criteria = "safe-to-deploy"
-version = "1.4.0"
-notes = "Contains no unsafe"
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
 [[audits.google.audits.base64]]
 who = "amarjotgill <amarjotgill@google.com>"
 criteria = "safe-to-deploy"
@@ -2237,13 +2222,6 @@ who = "George Burgess IV <gbiv@google.com>"
 criteria = "safe-to-run"
 delta = "0.9.14 -> 0.9.15"
 aggregated-from = "https://chromium.googlesource.com/chromiumos/third_party/rust_crates/+/refs/heads/main/cargo-vet/audits.toml?format=TEXT"
-
-[[audits.google.audits.displaydoc]]
-who = "Manish Goregaokar <manishearth@google.com>"
-criteria = "safe-to-deploy"
-version = "0.2.5"
-notes = "No unsafe code"
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
 [[audits.google.audits.either]]
 who = "Manish Goregaokar <manishearth@google.com>"
@@ -3158,15 +3136,6 @@ end = "2027-04-23"
 notes = "Maintained by the Glean and Application Services teams"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
-[[audits.mozilla.wildcard-audits.uniffi_checksum_derive]]
-who = "Ben Dean-Kawamura <bdk@mozilla.com>"
-criteria = "safe-to-deploy"
-user-id = 127697 # bendk
-start = "2023-01-27"
-end = "2027-04-23"
-notes = "Maintained by the Glean and Application Services teams"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
 [[audits.mozilla.wildcard-audits.uniffi_core]]
 who = "Ben Dean-Kawamura <bdk@mozilla.com>"
 criteria = "safe-to-deploy"
@@ -3175,6 +3144,14 @@ start = "2023-01-27"
 end = "2027-04-23"
 notes = "Maintained by the Glean and Application Services teams"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.wildcard-audits.uniffi_internal_macros]]
+who = "Jan-Erik Rediger <jrediger@mozilla.com>"
+criteria = "safe-to-deploy"
+user-id = 127697 # bendk
+start = "2025-02-06"
+end = "2027-02-20"
+aggregated-from = "https://raw.githubusercontent.com/mozilla/glean/main/supply-chain/audits.toml"
 
 [[audits.mozilla.wildcard-audits.uniffi_macros]]
 who = "Ben Dean-Kawamura <bdk@mozilla.com>"
@@ -3194,11 +3171,11 @@ end = "2027-04-23"
 notes = "Maintained by the Glean and Application Services teams"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
-[[audits.mozilla.wildcard-audits.uniffi_testing]]
+[[audits.mozilla.wildcard-audits.uniffi_pipeline]]
 who = "Ben Dean-Kawamura <bdk@mozilla.com>"
 criteria = "safe-to-deploy"
 user-id = 127697 # bendk
-start = "2023-01-27"
+start = "2021-10-27"
 end = "2027-04-23"
 notes = "Maintained by the Glean and Application Services teams"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
@@ -3247,6 +3224,67 @@ who = "Mike Hommey <mh+mozilla@glandium.org>"
 criteria = "safe-to-deploy"
 delta = "0.2.20 -> 0.2.21"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.askama]]
+who = "Ben Dean-Kawamura <bdk@mozilla.com>"
+criteria = "safe-to-deploy"
+version = "0.13.1"
+notes = """
+Template crate.  This is only used to generate the Rust/JS code for UniFFI.
+
+We used to use askama, then we switched to rinja which was a fork.  Now rinja and
+askama have merged again.
+
+The differences from askama 0.12, are pretty straightforward and don't seem risky to me.  There's
+some unsafe code and macros, but nothing that complicated.
+"""
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.askama]]
+who = "Jan-Erik Rediger <jrediger@mozilla.com>"
+criteria = "safe-to-deploy"
+delta = "0.13.1 -> 0.14.0"
+aggregated-from = "https://raw.githubusercontent.com/mozilla/glean/main/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.askama_derive]]
+who = "Ben Dean-Kawamura <bdk@mozilla.com>"
+criteria = "safe-to-deploy"
+version = "0.13.1"
+notes = """
+Template crate.  This is only used to generate the Rust/JS code for UniFFI.
+
+We used to use askama, then we switched to rinja which was a fork.  Now rinja and
+askama have merged again.
+
+I did a quick scan of the current code and couldn't find any issues.
+"""
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.askama_derive]]
+who = "Jan-Erik Rediger <jrediger@mozilla.com>"
+criteria = "safe-to-deploy"
+delta = "0.13.1 -> 0.14.0"
+aggregated-from = "https://raw.githubusercontent.com/mozilla/glean/main/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.askama_parser]]
+who = "Ben Dean-Kawamura <bdk@mozilla.com>"
+criteria = "safe-to-deploy"
+version = "0.13.0"
+notes = """
+Template crate.  This is only used to generate the Rust/JS code for UniFFI.
+
+We used to use askama, then we switched to rinja which was a fork.  Now rinja and
+askama have merged again.
+
+I did a quick scan of the current code and couldn't find any issues.
+"""
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.askama_parser]]
+who = "Jan-Erik Rediger <jrediger@mozilla.com>"
+criteria = "safe-to-deploy"
+delta = "0.13.0 -> 0.14.0"
+aggregated-from = "https://raw.githubusercontent.com/mozilla/glean/main/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.basic-toml]]
 who = "Jan-Erik Rediger <jrediger@mozilla.com>"
@@ -3428,6 +3466,12 @@ criteria = "safe-to-deploy"
 delta = "0.2.10 -> 0.2.11"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
+[[audits.mozilla.audits.either]]
+who = "Erich Gubler <erichdongubler@gmail.com>"
+criteria = "safe-to-deploy"
+delta = "1.15.0 -> 1.16.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
 [[audits.mozilla.audits.errno]]
 who = "Mike Hommey <mh+mozilla@glandium.org>"
 criteria = "safe-to-deploy"
@@ -3513,23 +3557,6 @@ aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-ch
 who = "edgul <ed.guloien@gmail.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.3 -> 1.1.0"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.num-conv]]
-who = "Alex Franchuk <afranchuk@mozilla.com>"
-criteria = "safe-to-deploy"
-version = "0.1.0"
-notes = """
-Very straightforward, simple crate. No dependencies, unsafe, extern,
-side-effectful std functions, etc.
-"""
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.num-conv]]
-who = "Lars Eggert <lars@eggert.org>"
-criteria = "safe-to-deploy"
-delta = "0.1.0 -> 0.2.0"
-notes = "Revision only removes code"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.num-derive]]
@@ -3857,13 +3884,6 @@ This code DOES contain unsafe code required to internally call volatiles
 for deleting data. This is expected and documented behavior.
 """
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.zcash.audits.autocfg]]
-who = "Jack Grigg <jack@electriccoin.co>"
-criteria = "safe-to-deploy"
-delta = "1.4.0 -> 1.5.0"
-notes = "Filesystem change is to remove the generated LLVM IR output file after probing."
-aggregated-from = "https://raw.githubusercontent.com/zcash/zcash/master/qa/supply-chain/audits.toml"
 
 [[audits.zcash.audits.basic-toml]]
 who = "Jack Grigg <jack@electriccoin.co>"

@@ -90,6 +90,56 @@ fn save_avatar_persists_and_navigates_back() {
     );
 }
 
+// @scenario: avatar_editor_wiring :: Generate avatar then Use persists and navigates back
+#[test]
+fn generate_avatar_use_persists_and_navigates_back() {
+    let mut engine = engine_with_identity();
+    let _ = engine.navigate_to(AppScreen::AvatarEditor);
+
+    // Pick the "Generate" source row (ActionList id "sources").
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "sources".into(),
+        item_id: "source_generate".into(),
+    });
+
+    // Press "Use" to accept the generated preview.
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "use".into(),
+    });
+
+    // The screen the engine returns from "use" IS what the device renders
+    // (handle_completion → invalidate_screen(MyInfo) → navigate_back). Assert
+    // on THIS screen, not on a fresh navigate_to(MyInfo) which rebuilds and
+    // masks any stale-cache bug.
+    let returned = match result {
+        ActionResult::NavigateTo(screen) => screen,
+        other => panic!("use should navigate back, got {other:?}"),
+    };
+
+    let card = engine.vauchi().own_card().unwrap().unwrap();
+    assert!(
+        card.avatar().is_some(),
+        "generated avatar should be persisted after Use"
+    );
+
+    // The MyInfo screen the device receives must carry the avatar bytes.
+    let image_data = returned.components.iter().find_map(|c| match c {
+        Component::AvatarPreview { image_data, .. } => Some(image_data.clone()),
+        _ => None,
+    });
+    assert_eq!(
+        returned.screen_id, "my_info",
+        "use should land back on MyInfo, got {}",
+        returned.screen_id
+    );
+    assert!(
+        image_data.flatten().is_some(),
+        "the MyInfo screen returned by Use must carry the persisted avatar \
+         (image_data), else the device renders the placeholder despite a \
+         persisted avatar"
+    );
+}
+
 // ── Completion: cancel ─────────────────────────────────────────
 
 // @scenario: avatar_editor_wiring :: Cancel navigates back without persisting

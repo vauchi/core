@@ -88,11 +88,11 @@ pub enum DomainCommand {
 
     // ── GDPR / Deletion + read-only shred status (B7 batch 3) ──
     //
-    // Keychain-bound shred (B7 keychain batch, Phase 1a): `SoftShred` /
-    // `CancelShred` are wired below — they build `ShredManager` from the
-    // PAE keychain bridge but touch only storage (no SMK destruction).
-    // `HardShred` / `PanicShred` additionally need relay purge/revocation
-    // senders + SMK destruction; they land in Phase 1b.
+    // Keychain-bound shred (B7 keychain batch): all four variants are
+    // wired below, building `ShredManager` from the PAE keychain bridge.
+    // `SoftShred` / `CancelShred` (Phase 1a) touch only storage (no SMK
+    // destruction); `HardShred` / `PanicShred` (Phase 1b) additionally
+    // run relay purge/revocation senders + SMK destruction.
     // (verify_shred retired 2026-05-23 Track A.)
     /// Export all user data as JSON (GDPR right-to-export).
     ExportGdprData,

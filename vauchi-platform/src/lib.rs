@@ -403,7 +403,10 @@ pub fn widget_panic_shred(
 // === Shred Network Senders ===
 
 /// Sends relay purge and revocation messages via HTTP transport during shred.
-struct MobileRelaySender {
+///
+/// `pub(crate)` + `pub(crate) from_transport` so `PlatformAppEngine`'s
+/// shred dispatch arms (B7 Phase 1b) can build purge/revocation senders.
+pub(crate) struct MobileRelaySender {
     client: vauchi_core::network::RelayClient<vauchi_core::network::HttpTransportAdapter>,
 }
 
@@ -418,7 +421,7 @@ impl MobileRelaySender {
     /// `_private/docs/problems/2026-04-17-ohttp-allow-direct-fallback/`:
     /// the shred must complete even when OHTTP is unreachable, but once
     /// a key is cached the transport fails closed.
-    fn from_transport(
+    pub(crate) fn from_transport(
         transport: vauchi_core::network::HttpTransport,
         relay_url: String,
         sender_id: &str,

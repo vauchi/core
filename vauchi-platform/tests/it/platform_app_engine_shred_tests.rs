@@ -131,3 +131,46 @@ fn soft_shred_schedules_then_cancel_clears() {
         other => panic!("expected ShredStatus, got {other:?}"),
     }
 }
+
+// @internal
+#[test]
+fn panic_shred_returns_report_and_destroys_storage() {
+    let (engine, _dir) = engine_with_identity();
+    engine.set_platform_keychain(Box::new(FakeKeychain::new()));
+
+    // PanicShred is immediate + irreversible. The relay purge/revocation
+    // can't reach the non-resolving test relay URL, but local destruction
+    // (real ShredManager, ADR-002) still completes.
+    let report = match engine
+        .dispatch_domain_command(DomainCommand::PanicShred)
+        .expect("panic_shred dispatch")
+    {
+        DomainCommandResult::ShredCompleted { report } => report,
+        other => panic!("expected ShredCompleted, got {other:?}"),
+    };
+    assert!(
+        report.sqlite_destroyed,
+        "panic_shred must destroy the database, got {report:?}"
+    );
+}
+
+// @internal
+#[test]
+fn hard_shred_before_grace_period_errors() {
+    let (engine, _dir) = engine_with_identity();
+    engine.set_platform_keychain(Box::new(FakeKeychain::new()));
+
+    let token = match engine
+        .dispatch_domain_command(DomainCommand::SoftShred)
+        .expect("soft_shred dispatch")
+    {
+        DomainCommandResult::ShredScheduled { token } => token,
+        other => panic!("expected ShredScheduled, got {other:?}"),
+    };
+    // Immediate hard-shred → grace period has not elapsed → error.
+    let result = engine.dispatch_domain_command(DomainCommand::HardShred { token });
+    assert!(
+        result.is_err(),
+        "HardShred before the grace period must error, got {result:?}"
+    );
+}

@@ -153,6 +153,11 @@ pub struct PlatformAppEngine {
     /// post-construction via `set_platform_keychain`, mirroring
     /// `VauchiPlatform`'s slot. `None` until the frontend wires it.
     platform_keychain: Mutex<Option<Arc<dyn crate::MobilePlatformKeychain>>>,
+    /// Relay URL retained for building shred purge/revocation senders
+    /// (B7 Phase 1b) — PAE can't reopen a fresh relay `Vauchi` (no stored
+    /// storage key), so hard/panic shred builds senders off the live engine
+    /// `Vauchi` + this URL.
+    relay_url: String,
 }
 
 /// Self-heal: if the engine is parked on `Onboarding` but identity now
@@ -205,6 +210,22 @@ impl PlatformAppEngine {
             .unwrap_or(&self.storage_path)
             .to_path_buf()
     }
+
+    /// Build the (purge, revocation) relay senders for hard/panic shred
+    /// from the live engine `Vauchi` + the configured relay URL (B7 1b).
+    /// Both are best-effort — send failures don't abort the shred.
+    fn shred_senders(
+        &self,
+        vauchi: &Vauchi,
+        sender_id: &str,
+    ) -> (crate::MobileRelaySender, crate::MobileRelaySender) {
+        let purge_t = vauchi.build_relay_transport(self.relay_url.clone(), 10_000);
+        let rev_t = vauchi.build_relay_transport(self.relay_url.clone(), 10_000);
+        (
+            crate::MobileRelaySender::from_transport(purge_t, self.relay_url.clone(), sender_id),
+            crate::MobileRelaySender::from_transport(rev_t, self.relay_url.clone(), sender_id),
+        )
+    }
 }
 
 #[uniffi::export]
@@ -253,6 +274,7 @@ impl PlatformAppEngine {
             direct_listener: Arc::new(Mutex::new(None)),
             storage_path,
             platform_keychain: Mutex::new(None),
+            relay_url,
         }))
     }
 
@@ -1809,6 +1831,65 @@ impl PlatformAppEngine {
                 engine.invalidate_screen(&AppScreen::Privacy);
                 engine.invalidate_screen(&AppScreen::EmergencyShred);
                 Ok(DomainCommandResult::Unit)
+            }
+            DomainCommand::HardShred { token } => {
+                let bridge = self.shred_keychain_bridge()?;
+                let data_dir = self.shred_data_dir();
+                let core_token = vauchi_core::api::ShredToken::from_created_at(token.created_at);
+                let report = {
+                    let vauchi = engine.vauchi();
+                    let identity = vauchi.identity().ok_or_else(|| MobileError::Other {
+                        detail: "Identity not initialized".into(),
+                    })?;
+                    let sender_id = identity.public_id();
+                    let (mut purge, mut rev) = self.shred_senders(vauchi, &sender_id);
+                    let manager = vauchi_core::api::ShredManager::new(
+                        vauchi.storage(),
+                        &bridge,
+                        identity,
+                        data_dir,
+                    );
+                    manager
+                        .hard_shred(core_token, Some(&mut purge), Some(&mut rev))
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?
+                };
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                engine.invalidate_screen(&AppScreen::EmergencyShred);
+                Ok(DomainCommandResult::ShredCompleted {
+                    report: crate::types::MobileShredReport::from(&report),
+                })
+            }
+            DomainCommand::PanicShred => {
+                let bridge = self.shred_keychain_bridge()?;
+                let data_dir = self.shred_data_dir();
+                let report = {
+                    let vauchi = engine.vauchi();
+                    let identity = vauchi.identity().ok_or_else(|| MobileError::Other {
+                        detail: "Identity not initialized".into(),
+                    })?;
+                    let sender_id = identity.public_id();
+                    let (mut purge, mut rev) = self.shred_senders(vauchi, &sender_id);
+                    let manager = vauchi_core::api::ShredManager::new(
+                        vauchi.storage(),
+                        &bridge,
+                        identity,
+                        data_dir,
+                    );
+                    manager
+                        .panic_shred(Some(&mut purge), Some(&mut rev))
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?
+                };
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                engine.invalidate_screen(&AppScreen::EmergencyShred);
+                Ok(DomainCommandResult::ShredCompleted {
+                    report: crate::types::MobileShredReport::from(&report),
+                })
             }
 
             // ── Recovery leftovers (B7 batch 4) ──

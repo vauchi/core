@@ -39,7 +39,7 @@ use crate::types::{
     MobileDuplicatePair, MobileDuressSettings, MobileEmergencyConfig, MobileFieldNote,
     MobileFieldType, MobileGdprExport, MobileOnboardingProgress, MobileOnboardingStep,
     MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
-    MobileRetryEntry, MobileShredStatus, MobileShredToken, MobileSocialNetwork,
+    MobileRetryEntry, MobileShredReport, MobileShredStatus, MobileShredToken, MobileSocialNetwork,
     MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
@@ -117,6 +117,16 @@ pub enum DomainCommand {
     CancelShred {
         token: MobileShredToken,
     },
+    /// Execute irreversible crypto-shredding after the grace period
+    /// (Hard Shred). Requires the token from `SoftShred` + a keychain.
+    /// Destroys key material, the database, and local data; best-effort
+    /// purge + revocation to the relay.
+    HardShred {
+        token: MobileShredToken,
+    },
+    /// Immediate irreversible crypto-shredding with no grace period
+    /// (Panic Shred). Requires a platform keychain.
+    PanicShred,
 
     // ── Aha Moments (B7 batch 5) ──
     /// Read whether the user has already seen a given milestone.
@@ -819,6 +829,11 @@ pub enum DomainCommandResult {
     /// hard-shred (B7 keychain batch — `SoftShred`).
     ShredScheduled {
         token: MobileShredToken,
+    },
+    /// Irreversible shred completed — per-step destruction report
+    /// (B7 keychain batch — `HardShred` / `PanicShred`).
+    ShredCompleted {
+        report: MobileShredReport,
     },
     /// Optional aha-moment payload (B7 batch 5 —
     /// `TryTriggerAhaMoment` and friends).

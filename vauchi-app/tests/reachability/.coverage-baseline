@@ -25,9 +25,6 @@ ArchivedContactsEngine
 AvatarEditorEngine
 ContactLimitEngine
 ContactNotFoundEngine
-DuplicateDetectionEngine
-EmergencyShredEngine
-FingerprintVerifyEngine
 GdprEngine
 HelpEngine
 LockScreenEngine

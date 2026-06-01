@@ -5,22 +5,29 @@
 //! Reachability test for `AvatarEditorEngine`.
 //!
 //! The initial source-picker screen (`avatar_editor`) renders a
-//! `sources` `ActionList` (camera / photos / generate / remove) plus
-//! a `cancel` `ScreenAction`. The source rows are `ListItemSelected`
-//! pass-throughs, so the only `ActionPressed` affordance is
-//! `cancel`.
+//! `sources` `ActionList` (camera / photos / generate [/ remove when an
+//! avatar already exists]) plus a `cancel` `ScreenAction`. The source
+//! rows are `ListItemSelected` pass-throughs, so the only
+//! `ActionPressed` affordance is `cancel`.
 //!
-//! NOTE (flagged for follow-up): the source rows are an `ActionList`
-//! (so a tap emits `ListItemSelected`), but
-//! `AvatarEditorEngine::handle_action` consumes `source_camera` /
-//! `source_photos` / `source_generate` / `remove_avatar` only as
-//! `ActionPressed`, with no `ListItemSelected { component_id:
-//! "sources" }` arm. A structural walk therefore cannot advance past
-//! the picker, and the downstream editing / generating screens stay
-//! unreachable. Whether that is a real dispatch mismatch (taps no-op)
-//! or a frontend that re-emits `ActionPressed` for these rows is
-//! recorded in 2026-04-20-frontend-correctness-strategy as an L1
-//! follow-up.
+//! The source rows route through `handle_source_selection`
+//! (`avatar_editor.rs`), which handles the `ListItemSelected
+//! { component_id: "sources" }` shape every renderer emits for
+//! `ActionList` rows (fixed 2026-06-01 — was a dispatch mismatch where
+//! the handler matched these ids only as `ActionPressed`, so the rows
+//! silently no-op'd on every platform; see
+//! `2026-06-01-avatar-source-row-dispatch-mismatch`).
+//!
+//! Why this test still pins only `cancel` (not the downstream
+//! `use` / `regenerate`): all three engine states — picker, editing,
+//! generating — render under the **same** `screen_id` ("avatar_editor").
+//! The across-screens BFS dedups by `screen_id`, so it cannot
+//! distinguish the generating screen from the picker and never walks
+//! its affordances. That is a property of this single-screen-id modal
+//! engine, independent of the dispatch fix. The downstream
+//! editing / generating handlers (`use`, `regenerate`, `save`, the
+//! `gen_style` / `colors` `ListItemSelected` rows) and the source-row
+//! dispatch itself are covered by `tests/it/avatar_editor_tests.rs`.
 
 use vauchi_app::ui::testing::assert_reachability;
 use vauchi_app::ui::{AvatarEditorEngine, WorkflowEngine};

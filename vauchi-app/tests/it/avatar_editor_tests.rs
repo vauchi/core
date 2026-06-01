@@ -90,6 +90,103 @@ fn generate_action_transitions_to_generator() {
     assert!(has_preview, "generator state needs an AvatarPreview");
 }
 
+// ── Source picker via ListItemSelected (renderer-emitted shape) ──
+//
+// The source options live in a `Component::ActionList { id: "sources" }`.
+// Every renderer (linux-gtk, iOS, Android) maps an ActionList row tap to
+// `UserAction::ListItemSelected { component_id: "sources", item_id }`,
+// NOT `ActionPressed`. These tests pin that the engine handles the shape
+// the renderers actually emit — otherwise the source picker silently
+// no-ops on every platform (regression guard for the 2026-06-01
+// dispatch-mismatch bug).
+
+fn select_source(engine: &mut AvatarEditorEngine, item_id: &str) -> ActionResult {
+    engine.handle_action(UserAction::ListItemSelected {
+        component_id: "sources".into(),
+        item_id: item_id.into(),
+    })
+}
+
+// @scenario: avatar_editor :: Camera row tap (ListItemSelected) emits capture command
+#[test]
+fn camera_row_selected_emits_capture_command() {
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
+    match select_source(&mut engine, "source_camera") {
+        ActionResult::Commands { commands } => assert!(
+            commands
+                .iter()
+                .any(|c| matches!(c, Command::ImageCaptureFromCamera)),
+            "expected ImageCaptureFromCamera command"
+        ),
+        other => panic!("expected Commands, got {other:?}"),
+    }
+}
+
+// @scenario: avatar_editor :: Photos row tap (ListItemSelected) emits pick command
+#[test]
+fn photos_row_selected_emits_pick_command() {
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
+    match select_source(&mut engine, "source_photos") {
+        ActionResult::Commands { commands } => assert!(
+            commands.iter().any(|c| matches!(
+                c,
+                Command::ImagePickFromLibrary | Command::ImagePickFromFile
+            )),
+            "expected image pick command"
+        ),
+        other => panic!("expected Commands, got {other:?}"),
+    }
+}
+
+// @scenario: avatar_editor :: Generate row tap (ListItemSelected) transitions to generator
+#[test]
+fn generate_row_selected_transitions_to_generator() {
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
+    let result = select_source(&mut engine, "source_generate");
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "expected UpdateScreen, got {result:?}"
+    );
+    let has_preview = engine
+        .current_screen()
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::AvatarPreview { .. }));
+    assert!(has_preview, "generator state needs an AvatarPreview");
+}
+
+// @scenario: avatar_editor :: Remove row tap (ListItemSelected) completes with removed flag
+#[test]
+fn remove_row_selected_completes_with_removed_flag() {
+    let mut engine = AvatarEditorEngine::new("Alice".into(), true);
+    let result = select_source(&mut engine, "remove_avatar");
+    assert!(
+        matches!(result, ActionResult::Complete),
+        "expected Complete, got {result:?}"
+    );
+    assert!(engine.avatar_removed(), "removed flag should be set");
+    assert!(!engine.was_cancelled());
+    assert!(engine.result_avatar().is_none());
+}
+
+// @scenario: avatar_editor :: Unknown source row tap is a no-op UpdateScreen
+#[test]
+fn unknown_source_row_selected_is_noop_update() {
+    let mut engine = AvatarEditorEngine::new("Alice".into(), false);
+    let result = select_source(&mut engine, "source_bogus");
+    assert!(
+        matches!(result, ActionResult::UpdateScreen(_)),
+        "unknown source id should fall through to UpdateScreen, got {result:?}"
+    );
+    // Still on the source picker.
+    let has_action_list = engine
+        .current_screen()
+        .components
+        .iter()
+        .any(|c| matches!(c, Component::ActionList { .. }));
+    assert!(has_action_list, "should remain on source picker");
+}
+
 // ── Image received ──────────────────────────────────────────────
 
 // @scenario: avatar_editor :: Image received transitions to editing

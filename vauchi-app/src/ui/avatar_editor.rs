@@ -104,6 +104,34 @@ impl AvatarEditorEngine {
         }
     }
 
+    /// Dispatch a tap on the avatar source picker (the `"sources"`
+    /// `ActionList`). Returns `Some(result)` for a known source id,
+    /// `None` for an unrecognised id (caller falls through to
+    /// `UpdateScreen`).
+    ///
+    /// Renderers emit `UserAction::ListItemSelected` for `ActionList`
+    /// rows; the legacy `ActionPressed` arm routes here too so both
+    /// dispatch shapes resolve to the same logic.
+    fn handle_source_selection(&mut self, source_id: &str) -> Option<ActionResult> {
+        match source_id {
+            "remove_avatar" => {
+                self.removed = true;
+                Some(ActionResult::Complete)
+            }
+            "source_camera" => Some(ActionResult::Commands {
+                commands: vec![Command::ImageCaptureFromCamera],
+            }),
+            "source_photos" => Some(ActionResult::Commands {
+                commands: vec![Command::ImagePickFromLibrary, Command::ImagePickFromFile],
+            }),
+            "source_generate" => {
+                self.enter_generating(GenerateStyle::Initials);
+                Some(ActionResult::UpdateScreen(self.current_screen()))
+            }
+            _ => None,
+        }
+    }
+
     fn build_source_picker(&self) -> ScreenModel {
         let mut items = vec![
             ActionListItem {
@@ -340,26 +368,25 @@ impl WorkflowEngine for AvatarEditorEngine {
                 ActionResult::Complete
             }
 
-            // ── Remove avatar ───────────────────────────────────
-            UserAction::ActionPressed { action_id } if action_id == "remove_avatar" => {
-                self.removed = true;
-                ActionResult::Complete
-            }
-
-            // ── Source picker actions ────────────────────────────
-            UserAction::ActionPressed { action_id } if action_id == "source_camera" => {
-                ActionResult::Commands {
-                    commands: vec![Command::ImageCaptureFromCamera],
-                }
-            }
-            UserAction::ActionPressed { action_id } if action_id == "source_photos" => {
-                ActionResult::Commands {
-                    commands: vec![Command::ImagePickFromLibrary, Command::ImagePickFromFile],
-                }
-            }
-            UserAction::ActionPressed { action_id } if action_id == "source_generate" => {
-                self.enter_generating(GenerateStyle::Initials);
-                ActionResult::UpdateScreen(self.current_screen())
+            // ── Source picker rows ──────────────────────────────
+            // The four source options live in `ActionList { id: "sources" }`.
+            // Renderers emit `ListItemSelected` for ActionList rows; the
+            // `ActionPressed` arm below is a thin fallback so both shapes
+            // route to the same per-source logic.
+            UserAction::ListItemSelected {
+                component_id,
+                item_id,
+            } if component_id == "sources" => self
+                .handle_source_selection(&item_id)
+                .unwrap_or_else(|| ActionResult::UpdateScreen(self.current_screen())),
+            UserAction::ActionPressed { action_id }
+                if matches!(
+                    action_id.as_str(),
+                    "remove_avatar" | "source_camera" | "source_photos" | "source_generate"
+                ) =>
+            {
+                self.handle_source_selection(&action_id)
+                    .unwrap_or_else(|| ActionResult::UpdateScreen(self.current_screen()))
             }
 
             // ── Editing actions ─────────────────────────────────

@@ -19,19 +19,8 @@
 # special-casing the gate.
 #
 # Lines starting with `#` and blank lines are ignored.
-ActivityLogEngine
+# AppEngine is the composition root: current_screen/handle_action delegate to
+# the per-sub-state engines (each now has its own reachability test above). A
+# standalone test would need a full Vauchi instance and re-walk those same
+# screens, so it is intentionally retained here rather than ratcheted out.
 AppEngine
-ArchivedContactsEngine
-AvatarEditorEngine
-ContactLimitEngine
-ContactNotFoundEngine
-GdprEngine
-HelpEngine
-LockScreenEngine
-MoreEngine
-MyInfoEngine
-MyInfoEntryDetailEngine
-RecoveryHelpEngine
-SettingsEngine
-SocialGraphEngine
-SupportEngine

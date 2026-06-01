@@ -9,12 +9,17 @@
 //! `Cargo.toml` and wired into the `just reachability` recipe
 //! (plan Task 1.4).
 
+mod activity_log;
+mod archived_contacts;
+mod avatar_editor;
 mod backup_recovery;
 mod change_password;
 mod contact_detail;
 mod contact_edit;
+mod contact_limit;
 mod contact_list;
 mod contact_merge;
+mod contact_not_found;
 mod contact_visibility;
 mod decoy_contacts;
 mod deep_link_consent;
@@ -29,12 +34,22 @@ mod exchange;
 mod exchange_ble;
 mod fingerprint_verify;
 mod form_dialog;
+mod gdpr;
 mod group_detail;
 mod groups;
+mod help;
 mod link_exchange;
 mod link_responder;
+mod lock_screen;
+mod more;
 mod multi_stage_exchange;
+mod my_info;
+mod my_info_entry_detail;
 mod onboarding;
 mod recovery;
 mod recovery_claim_review;
+mod recovery_help;
+mod settings;
+mod social_graph;
+mod support;
 mod sync_status;

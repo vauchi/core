@@ -9,6 +9,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::api::sync::{DeviceSyncOrchestrator, SyncManager};
 use crate::crypto::ratchet::DoubleRatchetState;
 use crate::network::delivery::{
     DeliveryAckStatus, DeliveryService, OfflineManager, RetryScheduler,
@@ -16,8 +17,8 @@ use crate::network::delivery::{
 use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
 use crate::network::{ConnectionState, RelayClient, Transport};
 use crate::storage::Storage;
+use crate::sync::SyncState;
 use crate::sync::device_sync::SyncItem;
-use crate::sync::{DeviceSyncOrchestrator, SyncManager, SyncState};
 
 use super::config::SyncConfig;
 use super::error::{VauchiError, VauchiResult};

@@ -8,12 +8,12 @@
 
 use thiserror::Error;
 
+use crate::api::sync::SyncError;
 use crate::contact::ContactError;
 use crate::contact_card::{ContactCardError, ValidationError};
 use crate::exchange::ExchangeError;
 use crate::network::NetworkError;
 use crate::storage::StorageError;
-use crate::sync::SyncError;
 use crate::sync::device_sync::DeviceSyncError;
 
 /// Unified error type for Vauchi operations.

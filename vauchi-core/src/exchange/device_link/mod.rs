@@ -420,10 +420,11 @@ mod tests {
     // Phase 8: Device Linking with Sync Payload Tests (TDD)
     // ============================================================
 
+    use crate::DeviceSyncOrchestrator;
     use crate::contact::Contact;
     use crate::contact_card::ContactCard;
     use crate::storage::Storage;
-    use crate::sync::{DeviceSyncOrchestrator, DeviceSyncPayload};
+    use crate::sync::DeviceSyncPayload;
 
     fn create_test_storage() -> Storage {
         Storage::in_memory(SymmetricKey::generate()).unwrap()

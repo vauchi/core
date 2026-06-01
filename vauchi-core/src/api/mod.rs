@@ -105,6 +105,11 @@ pub mod vauchi;
 #[cfg(not(feature = "testing"))]
 mod vauchi;
 
+#[cfg(feature = "testing")]
+pub mod sync;
+#[cfg(not(feature = "testing"))]
+mod sync;
+
 // Identity Deletion
 pub use deletion::{DeletionError, DeletionManager, DeletionResult, delete_identity_data};
 
@@ -140,6 +145,13 @@ pub use contact_manager::ContactManager;
 
 // Sync Controller
 pub use sync_controller::{SyncController, SyncResult};
+
+// Sync Application Services
+pub use sync::{
+    AsyncBinarySender, BinarySendError, BinarySender, CardUpdateResult, DeviceSyncOrchestrator,
+    SyncError, SyncManager, build_device_sync_envelopes, process_card_updates,
+    process_single_card_update, send_device_sync, send_device_sync_async,
+};
 
 // App Password / Duress PIN
 pub use app_password::{AppPasswordConfig, AuthResult};

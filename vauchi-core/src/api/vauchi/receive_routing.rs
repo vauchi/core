@@ -36,9 +36,9 @@
 
 use std::collections::HashMap;
 
+use crate::api::sync::process_single_card_update;
 use crate::contact::Contact;
 use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
-use crate::sync::card_update::process_single_card_update;
 
 /// Outcome of processing a single received blob.
 ///

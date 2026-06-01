@@ -8,11 +8,11 @@
 //! Feature: relay_network.feature
 
 use vauchi_core::{
-    Contact, ContactCard, ContactField, FieldType, Storage, SymmetricKey, Vauchi,
+    Contact, ContactCard, ContactField, FieldType, Storage, SymmetricKey, SyncManager, Vauchi,
     crypto::ratchet::DoubleRatchetState,
     exchange::X3DHKeyPair,
     network::{MockTransport, RelayClient, RelayClientConfig, TransportConfig},
-    sync::{CardDelta, SyncManager},
+    sync::CardDelta,
 };
 
 /// Tests the sync and update propagation workflow.

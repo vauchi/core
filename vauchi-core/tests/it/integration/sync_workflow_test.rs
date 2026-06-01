@@ -7,11 +7,10 @@
 //! Tests for sync manager, relay client, and card propagation.
 
 use vauchi_core::{
-    Contact, ContactCard, ContactField, FieldType, SymmetricKey, Vauchi,
+    Contact, ContactCard, ContactField, FieldType, SymmetricKey, SyncManager, Vauchi,
     crypto::ratchet::DoubleRatchetState,
     exchange::X3DHKeyPair,
     network::{MockTransport, RelayClient, RelayClientConfig, TransportConfig},
-    sync::SyncManager,
 };
 
 /// Test: Sync manager workflow

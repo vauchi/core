@@ -517,13 +517,13 @@ impl Vauchi {
             _ => return,
         };
 
-        let mut orchestrator = crate::sync::DeviceSyncOrchestrator::load(
+        let mut orchestrator = crate::api::sync::DeviceSyncOrchestrator::load(
             &self.storage,
             identity.create_device_info(self.clock.unix_seconds()),
             registry.clone(),
         )
         .unwrap_or_else(|_| {
-            crate::sync::DeviceSyncOrchestrator::new(
+            crate::api::sync::DeviceSyncOrchestrator::new(
                 &self.storage,
                 identity.create_device_info(self.clock.unix_seconds()),
                 registry,

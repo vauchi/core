@@ -13,6 +13,7 @@
 //!
 //! Cross-reference: Tracker #225, #34
 
+use vauchi_core::DeviceSyncOrchestrator;
 use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{SigningKeyPair, SymmetricKey};

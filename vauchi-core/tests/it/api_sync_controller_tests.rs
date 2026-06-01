@@ -429,9 +429,10 @@ fn test_sync_controller_sync_contact_with_ratchet() {
 // Phase 7: Device Sync Integration Tests (TDD)
 // ============================================================
 
+use vauchi_core::DeviceSyncOrchestrator;
 use vauchi_core::crypto::SigningKeyPair;
 use vauchi_core::identity::device::{DeviceInfo, DeviceRegistry};
-use vauchi_core::sync::{DeviceSyncOrchestrator, SyncItem};
+use vauchi_core::sync::SyncItem;
 
 fn create_test_device(master_seed: &[u8; 32], index: u32, name: &str) -> DeviceInfo {
     DeviceInfo::derive(master_seed, index, name.to_string(), 0)

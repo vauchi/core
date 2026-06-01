@@ -9,10 +9,10 @@
 
 use crate::common;
 
+use vauchi_core::SyncManager;
 use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::Storage;
-use vauchi_core::sync::SyncManager;
 
 /// Helper: create a base card with a single field.
 fn base_card() -> ContactCard {

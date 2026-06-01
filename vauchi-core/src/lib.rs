@@ -108,16 +108,16 @@ pub use network::{
 #[cfg(feature = "storage")]
 pub mod sync;
 #[cfg(feature = "storage")]
-pub use sync::{CardDelta, DeltaError, FieldChange, SyncError, SyncManager, SyncState};
+pub use sync::{CardDelta, DeltaError, FieldChange, SyncState};
 
 #[cfg(feature = "network-rustls")]
 pub mod api;
 #[cfg(feature = "network-rustls")]
 pub use api::{
     AppPasswordConfig, AuthMode, AuthResult, BIOMETRIC_UNLOCK_MIN_DURATION, BiometricUnlockOutcome,
-    BroadcastResult, ConsentStatus, DuressAlert, DuressAlertType, EmergencyWipeStatus, HandlerId,
-    RecoveryReadiness, SetupProgress, Vauchi, VauchiBuilder, VauchiConfig, VauchiError,
-    VauchiEvent, VauchiResult, VauchiSyncOutcome,
+    BroadcastResult, ConsentStatus, DeviceSyncOrchestrator, DuressAlert, DuressAlertType,
+    EmergencyWipeStatus, HandlerId, RecoveryReadiness, SetupProgress, SyncError, SyncManager,
+    Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult, VauchiSyncOutcome,
 };
 #[cfg(all(feature = "network-rustls", feature = "network-http"))]
 pub use api::{PERIODIC_SYNC_INTERVAL_SECONDS, PERIODIC_SYNC_MAX_RETRIES};

@@ -23,7 +23,6 @@ ActivityLogEngine
 AppEngine
 ArchivedContactsEngine
 AvatarEditorEngine
-BackupRecoveryEngine
 ContactEditEngine
 ContactLimitEngine
 ContactMergeEngine

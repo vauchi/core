@@ -17,6 +17,7 @@
 //! fingerprint) would inherit a stale sync cursor and skip updates.
 
 use vauchi_core::contact::Contact;
+use vauchi_core::contact::kind::ImportSource;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::{PendingUpdate, Storage, UpdateStatus};
@@ -88,4 +89,44 @@ fn hard_delete_clears_all_relationship_scoped_side_tables() {
         storage.load_dismissed_duplicates().unwrap().is_empty(),
         "dismissed_duplicates referencing the contact must be cleared"
     );
+}
+
+/// The imported/exchanged distinction (HR-1) must be respected: an imported
+/// contact holds no crypto/sync/relay state, so the exchange-only deletes in
+/// `delete_contact` must be safe no-ops, while rows that *can* reference an
+/// imported contact (a dismissed-duplicate pair) are still cleared.
+// @internal
+#[test]
+fn hard_delete_imported_contact_cleans_its_rows_and_no_ops_exchange_only_tables() {
+    let storage = open_storage();
+    let contact = Contact::from_import(ContactCard::new("Bob"), ImportSource::VcardFile, None, 0);
+    let id = contact.id().to_string();
+    storage.save_contact(&contact).unwrap();
+
+    // A duplicate suggestion can pair an imported contact with another contact.
+    storage.dismiss_duplicate(&id, "some-exchanged-id").unwrap();
+    assert_eq!(storage.load_dismissed_duplicates().unwrap().len(), 1);
+
+    // HR-1: an imported contact has no sync cursor or queued updates — the
+    // exchange-only tables are empty going in, so their deletes are no-ops.
+    assert_eq!(storage.get_contact_last_sync(&id).unwrap(), None);
+    assert_eq!(storage.count_pending_updates(&id).unwrap(), 0);
+
+    assert!(
+        storage.delete_contact(&id).unwrap(),
+        "imported contact should have existed"
+    );
+
+    // Contact gone; its dismissed-duplicate pair cleared; the no-op deletes on
+    // the exchange-only tables neither erred nor affected anything.
+    assert!(
+        storage.load_contact(&id).unwrap().is_none(),
+        "imported contact must be removed"
+    );
+    assert!(
+        storage.load_dismissed_duplicates().unwrap().is_empty(),
+        "dismissed_duplicates pair referencing the imported contact must be cleared"
+    );
+    assert_eq!(storage.get_contact_last_sync(&id).unwrap(), None);
+    assert_eq!(storage.count_pending_updates(&id).unwrap(), 0);
 }

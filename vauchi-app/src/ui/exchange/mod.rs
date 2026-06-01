@@ -1264,6 +1264,20 @@ impl WorkflowEngine for ExchangeEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         // Mode selection — delegated to ModeSelectionEngine
         if self.step == ExchangeStep::ModeSelection {
+            // BACK/Cancel on the mode-selection screen exits the flow.
+            // `ModeSelection` is the flow root (back_nav.rs: deliberately
+            // not back-safe), so a cancel must Complete — AppEngine's
+            // `handle_completion` routes `AppScreen::Exchange` off to
+            // Contacts/MyInfo. Without this the press fell through to
+            // `ModeSelectionEngine` → `ModeSelectionResult::Screen` →
+            // `UpdateScreen(same)`, a dead BACK (Fix C of
+            // `2026-06-02-exchange-back-cancel-broken`). Mirrors the
+            // `NfcRoleSelection` cancel arm below.
+            if let UserAction::ActionPressed { action_id } = &action
+                && action_id == "cancel"
+            {
+                return ActionResult::Complete;
+            }
             if let Some(ref ms) = self.mode_selection {
                 match ms.handle_action(&action) {
                     ModeSelectionResult::Selected(mode) => {
@@ -2275,6 +2289,38 @@ mod tests {
         });
 
         assert_eq!(engine.step, ExchangeStep::GroupSelection);
+    }
+
+    // Fix C of `2026-06-02-exchange-back-cancel-broken`: BACK/Cancel on
+    // the mode-selection screen must EXIT the exchange flow, not no-op.
+    // `ModeSelection` is the flow root (back_nav.rs: deliberately not
+    // back-safe), so exiting is `ActionResult::Complete` — which
+    // `AppEngine::handle_completion` routes off `AppScreen::Exchange`.
+    // Before the fix, `cancel` fell through `ModeSelectionEngine` to
+    // `ModeSelectionResult::Screen` → `UpdateScreen(same)` → dead BACK.
+    // Mirrors the existing `NfcRoleSelection` cancel arm.
+    #[test]
+    fn mode_selection_cancel_completes_to_exit() {
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
+
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "cancel".into(),
+        });
+
+        assert!(
+            matches!(result, ActionResult::Complete),
+            "Cancel on mode selection must Complete (exit the flow), got {:?}",
+            result
+        );
+        // Negative (CC-11): it must NOT be the old no-op re-render.
+        assert!(
+            !matches!(result, ActionResult::UpdateScreen(_)),
+            "Cancel must not re-render the same screen (dead-BACK regression)"
+        );
     }
 
     // ── Hover / Glance mode tests ──────────────────────────────────

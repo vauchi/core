@@ -335,7 +335,11 @@ vauchi-core/tests/it/migration_tests.rs 1226
 #  engine state, 2026-05-30 nfc-exchange-mode-entry-wiring T-core)
 # (+121 for NfcRoleSelection step + build_nfc_role_screen + role-flow tests,
 #  2026-06-01 nfc-exchange-mode-entry-wiring core-driven role choice)
-vauchi-app/src/ui/exchange/mod.rs 3615
+# (+25 for engine-internal BACK wiring: step_history field + 2 trait-method
+#  delegations + selection-phase history pushes, 2026-06-01 exchange-step-back;
+#  the bulk of the logic lives in the new exchange/back_nav.rs. This file is a
+#  state-machine structural exemption — file-size.md says do NOT split it.)
+vauchi-app/src/ui/exchange/mod.rs 3640
 # (+2 for 2026-05-21-core-ui-icon-on-wire: inline `icon: ...` lines in
 #   sample_fields / sample_shared_info Field constructors.)
 vauchi-app/src/ui/contact_detail.rs 1425

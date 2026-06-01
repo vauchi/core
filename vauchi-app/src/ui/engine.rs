@@ -40,6 +40,36 @@ pub trait WorkflowEngine: Send {
         false
     }
 
+    /// Whether this engine can rewind one *internal* step right now.
+    ///
+    /// Some engines host a multi-step flow under a single `AppScreen`
+    /// (e.g. the exchange flow: mode selection → group selection →
+    /// field preview → sub-flow). Those step transitions never touch the
+    /// AppScreen `nav_history`, so without this hook a BACK press jumps
+    /// straight out of the whole flow — or, at an `is_root` screen like
+    /// `Exchange`, does nothing (the back-trap this hook fixes).
+    ///
+    /// When `true`, `AppEngine::can_go_back` reports BACK as available
+    /// even at an AppScreen root, and `AppEngine::navigate_back` routes
+    /// the press to [`Self::navigate_back_within`] first. Default `false`.
+    fn can_navigate_back_within(&self) -> bool {
+        false
+    }
+
+    /// Rewind exactly one internal step.
+    ///
+    /// Returns `true` if a step was consumed — the caller re-renders the
+    /// *same* engine via `current_screen()`. Returns `false` if the
+    /// engine is at its root step, in which case the caller falls through
+    /// to popping the AppScreen `nav_history`. Default `false`.
+    ///
+    /// Implementations must only rewind *back-safe* steps (selection /
+    /// pre-handshake) — never mid-protocol or terminal steps, where
+    /// rewinding would corrupt live cryptographic state.
+    fn navigate_back_within(&mut self) -> bool {
+        false
+    }
+
     /// Signal that async/background processing completed successfully.
     ///
     /// Used by backup and other engines that have an intermediate Processing

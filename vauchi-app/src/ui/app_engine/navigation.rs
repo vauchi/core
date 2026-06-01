@@ -226,7 +226,22 @@ impl AppEngine {
     }
 
     /// Navigate back using the history stack. Falls back to Home if empty.
+    ///
+    /// The active engine gets first refusal: engines that host a
+    /// multi-step flow under a single `AppScreen` (the exchange flow)
+    /// rewind one internal step here, keeping the *same* engine instance
+    /// and re-rendering it. Only when the engine reports it is at its
+    /// root step do we pop the AppScreen `nav_history`. Without this, a
+    /// BACK from an exchange sub-step would tear down the whole Exchange
+    /// screen instead of stepping back to mode selection.
     pub fn navigate_back(&mut self) -> ScreenModel {
+        if self.engine.navigate_back_within() {
+            // Re-decorate the same engine's screen exactly as
+            // `navigate_to_internal` does for its final return, so the
+            // `screen_id` / parent metadata stays consistent. No engine
+            // rebuild, no `nav_history` mutation, no lifecycle hooks.
+            return self.apply_screen_id_metadata(self.engine.current_screen());
+        }
         let target = self.nav_history.pop().unwrap_or(AppScreen::MyInfo);
         self.navigate_to_internal(target)
     }
@@ -245,7 +260,11 @@ impl AppEngine {
     /// don't produce a phantom back arrow) without mutating history,
     /// so `navigate_back` itself remains unchanged.
     pub fn can_go_back(&self) -> bool {
-        !self.screen.is_root() && !self.nav_history.is_empty()
+        // Engine-internal step history (exchange sub-flow) makes BACK
+        // available even at an AppScreen root: the flow lives under one
+        // screen but carries its own back-stack.
+        self.engine.can_navigate_back_within()
+            || (!self.screen.is_root() && !self.nav_history.is_empty())
     }
 
     /// Screens that should never be cached — always start fresh.

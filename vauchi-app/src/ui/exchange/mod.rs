@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+mod back_nav;
 pub(crate) mod ble;
 pub(crate) mod field_preview;
 pub(crate) mod mode_selection;
@@ -61,6 +62,13 @@ pub struct ExchangeConfig {
 /// behaves as a UI-only workflow (legacy behavior).
 pub struct ExchangeEngine {
     step: ExchangeStep,
+    /// Back-stack of *selection-phase* steps the user advanced through
+    /// (mode → group → field-preview → sub-flow entry). Drives the
+    /// engine-internal BACK (`navigate_back_within`) so a press rewinds
+    /// one step instead of tearing down the whole Exchange screen. Only
+    /// pushed on user-initiated forward transitions; protocol-driven
+    /// transitions (handshake progress, success/failure) never push.
+    step_history: Vec<ExchangeStep>,
     config: ExchangeConfig,
     scanned_data: Option<String>,
     /// Groups selected by the user before exchange.
@@ -233,6 +241,7 @@ impl ExchangeEngine {
         };
         Self {
             step,
+            step_history: Vec::new(),
             config,
             scanned_data: None,
             selected_groups: Vec::new(),
@@ -290,6 +299,7 @@ impl ExchangeEngine {
             if session.apply(ExchangeEvent::StartQR).is_err() {
                 return Self {
                     step,
+                    step_history: Vec::new(),
                     config,
                     scanned_data: None,
                     selected_groups: Vec::new(),
@@ -317,6 +327,7 @@ impl ExchangeEngine {
 
         Self {
             step,
+            step_history: Vec::new(),
             config,
             scanned_data: None,
             selected_groups: Vec::new(),
@@ -1018,6 +1029,14 @@ fn build_nfc_role_screen(progress: Progress) -> ScreenModel {
 }
 
 impl WorkflowEngine for ExchangeEngine {
+    fn can_navigate_back_within(&self) -> bool {
+        self.can_back_within()
+    }
+
+    fn navigate_back_within(&mut self) -> bool {
+        self.back_within()
+    }
+
     fn current_screen(&self) -> ScreenModel {
         self.build_screen()
     }
@@ -1250,6 +1269,9 @@ impl WorkflowEngine for ExchangeEngine {
                     ModeSelectionResult::Selected(mode) => {
                         self.config.mode = Some(mode);
                         self.mode_selection = None;
+                        // Record the selection step so a BACK press from
+                        // the sub-flow rewinds here (see navigate_back_within).
+                        self.step_history.push(ExchangeStep::ModeSelection);
                         // Advance to group selection or directly to sub-flow
                         if self.config.available_groups.is_empty() {
                             if mode == ExchangeMode::Link {
@@ -1345,6 +1367,9 @@ impl WorkflowEngine for ExchangeEngine {
             (ExchangeStep::GroupSelection, UserAction::ActionPressed { action_id })
                 if action_id == "continue" || action_id == "skip" =>
             {
+                // Record the group step so BACK from field-preview / sub-flow
+                // rewinds here (see navigate_back_within).
+                self.step_history.push(ExchangeStep::GroupSelection);
                 if action_id == "skip" {
                     self.selected_groups.clear();
                     // Skip → go straight to sub-flow (no preview needed)

@@ -582,26 +582,6 @@ impl VauchiPlatform {
             })
     }
 
-    /// Returns the data directory (parent of the database file).
-    pub(crate) fn data_dir(&self) -> PathBuf {
-        self.storage_path
-            .parent()
-            .unwrap_or(&self.storage_path)
-            .to_path_buf()
-    }
-
-    /// Gets the platform keychain bridge for shred operations.
-    pub(crate) fn get_keychain_bridge(&self) -> Result<KeychainBridge, MobileError> {
-        let lock = lock_or(&self.platform_keychain)?;
-        let callback = lock
-            .as_ref()
-            .ok_or_else(|| MobileError::Other {
-                detail: "Platform keychain not set. Call set_platform_keychain() first.".into(),
-            })?
-            .clone();
-        Ok(KeychainBridge { callback })
-    }
-
     /// Gets the identity from stored data.
     ///
     /// Falls back to disk when the in-memory cache is empty — same shape

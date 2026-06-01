@@ -6,6 +6,13 @@
 //!
 //! HR-1: Crypto fields live ONLY in [`ExchangedData`]. This makes it structurally
 //! impossible for imported contacts to have trust flags, keys, or relay channels.
+//!
+//! The seal is type-enforced, not convention-only: the sole mutable path into
+//! those fields, [`ContactKind::exchanged_data_mut`], is `pub(crate)` in
+//! production builds (widened to `pub` only under `test`/`testing` for
+//! fixtures). External consumers may read via [`ContactKind::exchanged_data`]
+//! but cannot mutate crypto/trust state around the `Contact` aggregate root.
+//! Guarded by `tests/it/exchangeddata_seal_guard.rs`.
 
 use serde::{Deserialize, Serialize};
 
@@ -45,6 +52,20 @@ impl ContactKind {
     }
 
     /// Returns a mutable reference to the exchanged data, if this is an exchanged contact.
+    ///
+    /// HR-1 seal: `pub(crate)` in production so external consumers cannot mutate
+    /// crypto/trust fields around the `Contact` root; widened to `pub` under
+    /// `test`/`testing` only, for fixtures.
+    #[cfg(not(any(test, feature = "testing")))]
+    pub(crate) fn exchanged_data_mut(&mut self) -> Option<&mut ExchangedData> {
+        match self {
+            ContactKind::Exchanged(data) => Some(data),
+            ContactKind::Imported(_) => None,
+        }
+    }
+
+    /// Test/`testing`-only public variant of [`Self::exchanged_data_mut`].
+    #[cfg(any(test, feature = "testing"))]
     pub fn exchanged_data_mut(&mut self) -> Option<&mut ExchangedData> {
         match self {
             ContactKind::Exchanged(data) => Some(data),
@@ -63,8 +84,15 @@ impl ContactKind {
 
 /// Crypto and trust fields for an exchanged contact.
 ///
-/// These fields will later move out of `Contact` into this struct,
-/// ensuring imported contacts cannot structurally hold crypto state.
+/// These fields live here (not on `Contact`), ensuring imported contacts
+/// cannot structurally hold crypto state.
+///
+/// Visibility (HR-1, problem `2026-06-01-exchangeddata-encapsulation-hardening`):
+/// the type stays `pub` because the `it` test crate constructs it via
+/// [`ExchangedData::new_for_test`]; all fields are `pub(crate)` and the mutable
+/// accessor is `pub(crate)` in production, so it exposes nothing mutable to
+/// external consumers — the read accessor [`ContactKind::exchanged_data`] is
+/// harmless (fields unreadable outside the crate).
 #[derive(Clone, Debug)]
 pub struct ExchangedData {
     /// Their Ed25519 public key.

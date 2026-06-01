@@ -200,6 +200,7 @@ mod exchange_transport_fallback_tests;
 mod exchange_transport_serde_tests;
 mod exchange_x3dh_tests;
 mod exchanged_ratchet_roundtrip_tests;
+mod exchangeddata_seal_guard;
 mod expanded_crypto_property_tests;
 mod field_catalog_tests;
 mod field_validation_contact_info_tests;

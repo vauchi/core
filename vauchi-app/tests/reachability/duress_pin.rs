@@ -4,46 +4,40 @@
 
 //! Reachability test for `DuressPinEngine`.
 //!
-//! Multi-step wizard - `duress_overview` -> `duress_enter_pin` ->
-//! `duress_confirm_pin` -> `duress_alerts` - each with a distinct
-//! `screen_id`. BFS reaches only the first two.
+//! Multi-step wizard — `duress_overview` -> `duress_enter_pin` ->
+//! `duress_confirm_pin` -> `duress_alerts` — each with a distinct
+//! `screen_id`. The BFS reaches **all four**: the structural walker
+//! now primes `Component::PinInput` by emitting one single-char
+//! `TextChanged` per slot (`screen_walker::walk_component`), filling
+//! the `pin` and `confirm_pin` fields. Both fields fill to the same
+//! value (`PIN_PRIMING_DIGIT`), so the empty-PIN gate on `EnterPin`'s
+//! "continue" *and* the `confirm_pin == new_pin` gate on
+//! `ConfirmPin`'s "continue" (`duress_pin.rs`) both clear, exposing
+//! `duress_alerts` and its `save` affordance.
 //!
-//! The PIN fields are `Component::PinInput`, and the structural
-//! walker only primes `TextInput` / `EditableText`
-//! (`screen_walker::walk_component`) - it does not synthesise
-//! `PinInput` entry. So the empty-PIN gate on `EnterPin`'s
-//! "continue" (`duress_pin.rs:360`) never clears, and
-//! `duress_confirm_pin` / `duress_alerts` stay unreachable from a
-//! structural walk. The reachable affordance set is
-//! `{configure, disable}` (overview, with `enabled = true`) plus
-//! `{back, continue}` (enter-pin).
+//! Still pinned via the engine integration tests, not BFS-reachable:
+//! - `confirm_disable` / `cancel_disable` — pressing `disable` flips
+//!   `pending_disable` and adds an `InlineConfirm`, but that screen
+//!   keeps `screen_id == "duress_overview"`, so `screen_id` dedup
+//!   collapses it.
 //!
-//! Pinned elsewhere (not BFS-reachable):
-//! - `duress_confirm_pin` (its `back` / `continue` share the
-//!   enter-pin ids) and `duress_alerts` (`save`) - behind the
-//!   PinInput gate;
-//! - `confirm_disable` / `cancel_disable` - pressing `disable`
-//!   flips `pending_disable` and adds an `InlineConfirm`, but that
-//!   screen keeps `screen_id == "duress_overview"`, so `screen_id`
-//!   dedup collapses it.
-//!
-//! All are exercised end-to-end by
-//! `core/vauchi-core/tests/it/duress_pin_engine_tests.rs`. Declaring
-//! any here would make them orphan handlers.
+//! End-to-end coverage lives in
+//! `core/vauchi-core/tests/it/duress_pin_engine_tests.rs`.
 
 use vauchi_app::ui::testing::assert_reachability_across_screens;
 use vauchi_app::ui::{DuressConfig, DuressPinEngine, WorkflowEngine};
 
-/// Action ids emitted across the two BFS-reachable screens
-/// (`duress_overview`, `duress_enter_pin`) and consumed by
-/// `DuressPinEngine::handle_action` -
-/// `core/vauchi-app/src/ui/duress_pin.rs`.
-const HANDLED: &[&str] = &["configure", "disable", "back", "continue"];
+/// Action ids emitted across the four BFS-reachable screens
+/// (`duress_overview`, `duress_enter_pin`, `duress_confirm_pin`,
+/// `duress_alerts`) and consumed by `DuressPinEngine::handle_action`
+/// — `core/vauchi-app/src/ui/duress_pin.rs`. `save` is the
+/// alerts-step affordance reached once the PIN gates clear.
+const HANDLED: &[&str] = &["configure", "disable", "back", "continue", "save"];
 
 fn factory() -> DuressPinEngine {
     // `enabled = true` so the `Overview` step renders the `disable`
     // affordance (it is hidden when duress is off). Empty alert
-    // config - the alerts step still renders `save` / `back`.
+    // config — the alerts step still renders `save` / `back`.
     DuressPinEngine::new(DuressConfig {
         enabled: true,
         alert_contacts: Vec::new(),

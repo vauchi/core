@@ -55,6 +55,22 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
                 value: PLACEHOLDER_TEXT.to_string(),
             });
         }
+        Component::PinInput { id, length, .. } => {
+            // Prime the field one digit at a time: PIN engines
+            // accumulate a single character per `TextChanged`
+            // (`value.len() == 1` — e.g. `duress_pin.rs`,
+            // `lock_screen.rs`), so emitting `length` single-char
+            // events fills the PIN and clears length / non-empty gates
+            // during BFS. A fixed digit means two PIN fields
+            // (enter + confirm) fill identically, so confirm-match
+            // gates (`confirm_pin == new_pin`) also clear.
+            for _ in 0..*length {
+                out.push(UserAction::TextChanged {
+                    component_id: id.clone(),
+                    value: PIN_PRIMING_DIGIT.to_string(),
+                });
+            }
+        }
         Component::ToggleList { id, items, .. } => {
             for item in items {
                 out.push(UserAction::ItemToggled {
@@ -149,17 +165,16 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
             }
         }
         // Components that carry no user affordance at the walker's
-        // current scope. Phase 2 extensions (PinInput digit entry,
-        // EditableText edit-toggle, Slider value change) require
-        // teaching  to diff non-ActionPressed
-        // shapes — see contact_list.rs reachability test docstring.
+        // current scope. Remaining Phase 2 extensions (Slider value
+        // change, EditableText edit-toggle) require teaching the
+        // walker to diff further non-ActionPressed shapes — see
+        // contact_list.rs reachability test docstring.
         Component::Text { .. }
         | Component::FieldList { .. }
         | Component::Preview { .. }
         | Component::InfoPanel { .. }
         | Component::SettingsGroup { .. }
         | Component::StatusIndicator { .. }
-        | Component::PinInput { .. }
         | Component::QrCode { .. }
         | Component::Divider
         | Component::AvatarPreview { .. }
@@ -173,6 +188,13 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
 /// `ValidationError`) still advance during BFS. Short enough that
 /// `max_length` constraints rarely reject it.
 pub const PLACEHOLDER_TEXT: &str = "x";
+
+/// Single digit emitted per `PinInput` slot during BFS priming.
+/// A fixed digit (not the alphabetic [`PLACEHOLDER_TEXT`]) so that
+/// `length` events fill a numeric PIN field, and two PIN fields
+/// (enter + confirm) fill to the *same* value — clearing
+/// `confirm_pin == new_pin` gates (e.g. `DuressPinEngine`).
+pub const PIN_PRIMING_DIGIT: &str = "1";
 
 /// Safety cap on BFS node expansion to bound harness runtime.
 ///
@@ -329,6 +351,18 @@ mod tests {
         }
     }
 
+    fn pin_input(id: &str, length: usize) -> Component {
+        Component::PinInput {
+            id: id.into(),
+            label: id.into(),
+            length,
+            filled: 0,
+            masked: true,
+            validation_error: None,
+            a11y: None,
+        }
+    }
+
     fn toggle_list(id: &str, item_ids: &[&str]) -> Component {
         Component::ToggleList {
             id: id.into(),
@@ -401,6 +435,42 @@ mod tests {
                 component_id: "display_name".into(),
                 value: PLACEHOLDER_TEXT.into(),
             }]
+        );
+    }
+
+    // @internal
+    #[test]
+    fn pin_input_emits_one_single_char_text_changed_per_digit() {
+        // The walker primes a PinInput one digit at a time: engines
+        // accumulate a single character per `TextChanged`
+        // (`value.len() == 1`), so `length` events fill the PIN and
+        // clear length / non-empty gates during BFS.
+        let screen = screen_with(vec![pin_input("pin", 4)], vec![]);
+        let actions = walk_actions(&screen);
+        assert_eq!(actions.len(), 4, "one priming event per digit");
+        let values: Vec<&str> = actions
+            .iter()
+            .map(|a| match a {
+                UserAction::TextChanged {
+                    component_id,
+                    value,
+                } => {
+                    assert_eq!(component_id, "pin", "primes the PinInput's own id");
+                    assert_eq!(
+                        value.chars().count(),
+                        1,
+                        "single char per event so the engine's len==1 accumulation branch fires"
+                    );
+                    value.as_str()
+                }
+                other => panic!("expected TextChanged, got {other:?}"),
+            })
+            .collect();
+        // Identical digits so two PIN fields (enter + confirm) fill to
+        // the same value and confirm-match gates clear.
+        assert!(
+            values.windows(2).all(|w| w[0] == w[1]),
+            "priming digits must be identical, got {values:?}"
         );
     }
 

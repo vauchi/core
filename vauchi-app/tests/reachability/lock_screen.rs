@@ -4,10 +4,12 @@
 
 //! Reachability test for `LockScreenEngine`.
 //!
-//! Single-screen PIN gate (`lock_screen`). The `pin` field is a
-//! `PinInput` (not walker-primed) and `auth_failed` is a hardware
-//! event, not a rendered affordance; the only `ScreenAction` is
-//! `unlock`, consumed by `LockScreenEngine::handle_action`
+//! Single-screen PIN gate (`lock_screen`). The walker primes the
+//! `pin` `PinInput` with digit `TextChanged`s, but the entered value
+//! won't match the stored credential, so `unlock` stays on the same
+//! screen — there is no further screen to reach, and the only
+//! `ScreenAction` is `unlock` (`auth_failed` is a hardware event, not
+//! a rendered affordance). Consumed by `LockScreenEngine::handle_action`
 //! (`core/vauchi-app/src/ui/lock_screen.rs`).
 
 use vauchi_app::ui::testing::assert_reachability;

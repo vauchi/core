@@ -17,6 +17,8 @@ mod decoy_contacts;
 mod deep_link_consent;
 mod delivery_status;
 mod device_linking;
+mod device_management;
+mod duress_pin;
 mod exchange;
 mod exchange_ble;
 mod form_dialog;

@@ -28,10 +28,8 @@ ContactLimitEngine
 ContactMergeEngine
 ContactNotFoundEngine
 ContactVisibilityEngine
-DeviceManagementEngine
 DeviceReplacementEngine
 DuplicateDetectionEngine
-DuressPinEngine
 EmergencyShredEngine
 FingerprintVerifyEngine
 GdprEngine

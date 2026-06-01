@@ -141,6 +141,10 @@ enum ExchangeStep {
     Qr(QrStep),
     /// BLE exchange sub-flow (Magic/Bump/Shake modes).
     Ble(BleStep),
+    /// Choose the NFC role (Send/Receive) after picking TapTap. Core-driven
+    /// (ADR-043/044): emits an i18n-keyed `ScreenModel` the frontend renders;
+    /// Send -> `start_taptap_mode`, Receive -> `start_nfc_receive_mode`.
+    NfcRoleSelection,
     /// NFC exchange sub-flow (3-phase encrypted handshake over an
     /// NFC tap). See `self::nfc` + 2026-05-19-nfc-exchange-engine-design.md.
     Nfc(NfcStep),
@@ -156,6 +160,8 @@ impl ExchangeStep {
             Self::ModeSelection => 1,
             Self::GroupSelection => 2,
             Self::FieldPreview => 3,
+            // The NFC role choice is part of the mode-selection phase.
+            Self::NfcRoleSelection => 1,
             // Sub-flow steps start at 4 (after mode + group + preview)
             Self::Qr(qr) => qr.step_number(4),
             Self::Ble(ble) => ble.step_number(4),
@@ -766,6 +772,7 @@ impl ExchangeEngine {
                 // Handled by transition to ExchangeStep::Success
                 ScreenModel::default()
             }
+            ExchangeStep::NfcRoleSelection => build_nfc_role_screen(self.progress()),
             ExchangeStep::Nfc(ref nfc_step) => {
                 nfc::build_nfc_screen(nfc_step, self.progress())
             }
@@ -961,6 +968,50 @@ fn build_group_selection_screen(
                 a11y: None,
             },
         ],
+        progress: Some(progress),
+        ..Default::default()
+    }
+}
+
+/// Core-driven NFC role choice (Send/Receive), shown after TapTap is
+/// picked. Per ADR-043/044 the renderer is humble: this emits a generic
+/// `ActionList` whose item/title strings are **i18n keys** the frontend
+/// resolves (ADR-038) — the first i18n-keyed core exchange screen. The
+/// item ids (`nfc_role:send` / `nfc_role:receive`) route in `handle_action`
+/// to `start_taptap_mode` / `start_nfc_receive_mode`.
+fn build_nfc_role_screen(progress: Progress) -> ScreenModel {
+    ScreenModel {
+        screen_id: "exchange_nfc_role".into(),
+        title: "exchange.nfc.choose_role".into(),
+        subtitle: Some("exchange.nfc.choose_role_subtitle".into()),
+        components: vec![Component::ActionList {
+            id: "nfc_role".into(),
+            items: vec![
+                ActionListItem {
+                    id: "nfc_role:send".into(),
+                    label: "exchange.mode.nfc_send".into(),
+                    icon: None,
+                    detail: Some("exchange.mode.nfc_send_description".into()),
+                    a11y: None,
+                    info_key: None,
+                },
+                ActionListItem {
+                    id: "nfc_role:receive".into(),
+                    label: "exchange.mode.nfc_receive".into(),
+                    icon: None,
+                    detail: Some("exchange.mode.nfc_receive_description".into()),
+                    a11y: None,
+                    info_key: None,
+                },
+            ],
+        }],
+        actions: vec![ScreenAction {
+            id: "cancel".into(),
+            label: "action.cancel".into(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: None,
+        }],
         progress: Some(progress),
         ..Default::default()
     }
@@ -1194,18 +1245,6 @@ impl WorkflowEngine for ExchangeEngine {
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         // Mode selection — delegated to ModeSelectionEngine
         if self.step == ExchangeStep::ModeSelection {
-            // Explicit responder ("Receive") entry — TapTap with no
-            // initiator flow, so the lazy HCE bootstrap fires on the peer's
-            // first tap. Distinct item id from "mode:tap_tap" (the "Send"/
-            // initiator path); intercepted here because the role is a
-            // sub-choice of TapTap, not a separate ExchangeMode.
-            if let UserAction::ListItemSelected { item_id, .. } = &action
-                && item_id == "mode:tap_tap_receive"
-            {
-                self.config.mode = Some(ExchangeMode::TapTap);
-                self.mode_selection = None;
-                return self.start_nfc_receive_mode();
-            }
             if let Some(ref ms) = self.mode_selection {
                 match ms.handle_action(&action) {
                     ModeSelectionResult::Selected(mode) => {
@@ -1224,7 +1263,12 @@ impl WorkflowEngine for ExchangeEngine {
                                 return self.start_ble_mode();
                             }
                             if mode == ExchangeMode::TapTap {
-                                return self.start_taptap_mode();
+                                // Core-driven role choice (Send/Receive) before
+                                // the NFC flow — a two-device exchange needs one
+                                // initiator + one responder, so both devices
+                                // opening the screen must NOT both Send.
+                                self.step = ExchangeStep::NfcRoleSelection;
+                                return ActionResult::NavigateTo(self.build_screen());
                             }
                             // Pair 4 — `Glance` is the canonical face-to-face
                             // mode (bilateral simultaneous QR with no proximity
@@ -1266,6 +1310,22 @@ impl WorkflowEngine for ExchangeEngine {
         }
 
         match (&self.step, action) {
+            // NFC role choice (Send/Receive) — core-driven sub-screen after
+            // TapTap. Send -> initiator (`start_taptap_mode`); Receive ->
+            // responder prep (`start_nfc_receive_mode`).
+            (ExchangeStep::NfcRoleSelection, UserAction::ListItemSelected { item_id, .. }) => {
+                match item_id.as_str() {
+                    "nfc_role:send" => self.start_taptap_mode(),
+                    "nfc_role:receive" => self.start_nfc_receive_mode(),
+                    _ => ActionResult::UpdateScreen(self.build_screen()),
+                }
+            }
+            // NFC role choice: cancel exits the exchange.
+            (ExchangeStep::NfcRoleSelection, UserAction::ActionPressed { action_id })
+                if action_id == "cancel" =>
+            {
+                ActionResult::Complete
+            }
             // Group selection: toggle group membership
             (
                 ExchangeStep::GroupSelection,
@@ -3311,8 +3371,30 @@ mod tests {
             item_id: "mode:tap_tap".into(),
         });
 
-        // Engine advances to NfcStep::AwaitingTap and emits the initial
-        // Command::NfcActivate with the initiator's key-offer payload.
+        // TapTap now shows the core-driven role choice (Send/Receive), not
+        // the NFC flow directly. The list items carry the role ids.
+        assert_eq!(engine.step, ExchangeStep::NfcRoleSelection);
+        let role_screen = match result {
+            ActionResult::NavigateTo(screen) => screen,
+            other => panic!("expected NavigateTo(role screen), got {other:?}"),
+        };
+        let item_ids: Vec<&str> = role_screen
+            .components
+            .iter()
+            .flat_map(|c| match c {
+                Component::ActionList { items, .. } => {
+                    items.iter().map(|i| i.id.as_str()).collect::<Vec<_>>()
+                }
+                _ => vec![],
+            })
+            .collect();
+        assert_eq!(item_ids, vec!["nfc_role:send", "nfc_role:receive"]);
+
+        // Selecting "Send" starts the initiator flow.
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "nfc_role".into(),
+            item_id: "nfc_role:send".into(),
+        });
         assert_eq!(engine.step, ExchangeStep::Nfc(NfcStep::AwaitingTap));
         match result {
             ActionResult::Commands { commands } => {
@@ -3329,12 +3411,10 @@ mod tests {
             }
             other => panic!("expected ActionResult::Commands, got {other:?}"),
         }
-        // nfc_identity has been consumed by start_taptap_mode.
         assert!(
             engine.nfc_identity.is_none(),
             "set_nfc_identity must be consumed by start_taptap_mode"
         );
-        // nfc_flow now exists and tracks the initiator state.
         assert!(engine.nfc_flow.is_some(), "nfc_flow must be populated");
     }
 
@@ -3345,11 +3425,16 @@ mod tests {
             config_mode_selection(),
             vauchi_core::clock::SystemClock::shared(),
         );
-        // No set_nfc_identity call — start_taptap_mode must fail-fast
-        // rather than panic.
-        let result = engine.handle_action(UserAction::ListItemSelected {
+        // No set_nfc_identity — the role choice itself doesn't fail; the
+        // Send selection (start_taptap_mode) fail-fasts rather than panicking.
+        let _ = engine.handle_action(UserAction::ListItemSelected {
             component_id: "category:fun".into(),
             item_id: "mode:tap_tap".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::NfcRoleSelection);
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "nfc_role".into(),
+            item_id: "nfc_role:send".into(),
         });
         assert_eq!(engine.step, ExchangeStep::Failed);
         match result {
@@ -3377,11 +3462,16 @@ mod tests {
         );
         engine.set_nfc_identity(identity);
 
-        // "Receive" emits a distinct item id from "mode:tap_tap" (the
-        // "Send"/initiator path). Responder prep must NOT create a flow.
-        let result = engine.handle_action(UserAction::ListItemSelected {
+        // Navigate TapTap -> role choice, then pick "Receive". Responder
+        // prep must NOT create a flow.
+        let _ = engine.handle_action(UserAction::ListItemSelected {
             component_id: "category:fun".into(),
-            item_id: "mode:tap_tap_receive".into(),
+            item_id: "mode:tap_tap".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::NfcRoleSelection);
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "nfc_role".into(),
+            item_id: "nfc_role:receive".into(),
         });
 
         assert_eq!(engine.step, ExchangeStep::Nfc(NfcStep::AwaitingTap));
@@ -3418,10 +3508,16 @@ mod tests {
             config_mode_selection(),
             vauchi_core::clock::SystemClock::shared(),
         );
-        // No set_nfc_identity — receive prep must fail-fast, not panic.
-        let result = engine.handle_action(UserAction::ListItemSelected {
+        // No set_nfc_identity — navigate to the role choice, then "Receive"
+        // fail-fasts on the missing identity.
+        let _ = engine.handle_action(UserAction::ListItemSelected {
             component_id: "category:fun".into(),
-            item_id: "mode:tap_tap_receive".into(),
+            item_id: "mode:tap_tap".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::NfcRoleSelection);
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "nfc_role".into(),
+            item_id: "nfc_role:receive".into(),
         });
         assert_eq!(engine.step, ExchangeStep::Failed);
         match result {
@@ -3434,6 +3530,31 @@ mod tests {
             }
             other => panic!("expected UpdateScreen, got {other:?}"),
         }
+    }
+
+    // @internal
+    #[test]
+    fn nfc_role_choice_cancel_completes_exchange() {
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        engine.set_nfc_identity(vauchi_core::identity::Identity::create(
+            "Alice",
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        ));
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:fun".into(),
+            item_id: "mode:tap_tap".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::NfcRoleSelection);
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "cancel".into(),
+        });
+        assert!(
+            matches!(result, ActionResult::Complete),
+            "cancel from the role choice exits the exchange"
+        );
     }
 
     // @internal

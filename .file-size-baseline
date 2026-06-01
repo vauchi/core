@@ -333,7 +333,9 @@ vauchi-core/tests/it/migration_tests.rs 1226
 # (+204 for ExchangeEngine clock field + 117 test callsites threading SystemClock 2026-05-13 slice 21)
 # (+109 for start_nfc_receive_mode responder entry + 2 tests on private
 #  engine state, 2026-05-30 nfc-exchange-mode-entry-wiring T-core)
-vauchi-app/src/ui/exchange/mod.rs 3494
+# (+121 for NfcRoleSelection step + build_nfc_role_screen + role-flow tests,
+#  2026-06-01 nfc-exchange-mode-entry-wiring core-driven role choice)
+vauchi-app/src/ui/exchange/mod.rs 3615
 # (+2 for 2026-05-21-core-ui-icon-on-wire: inline `icon: ...` lines in
 #   sample_fields / sample_shared_info Field constructors.)
 vauchi-app/src/ui/contact_detail.rs 1425

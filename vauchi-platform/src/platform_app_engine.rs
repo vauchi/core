@@ -149,6 +149,10 @@ pub struct PlatformAppEngine {
     /// `VauchiPlatform::storage_path` so content-update internals can
     /// resolve the data directory without a sibling `VauchiPlatform`.
     storage_path: PathBuf,
+    /// Platform keychain for crypto-shred `DomainCommand`s (B7). Set
+    /// post-construction via `set_platform_keychain`, mirroring
+    /// `VauchiPlatform`'s slot. `None` until the frontend wires it.
+    platform_keychain: Mutex<Option<Arc<dyn crate::MobilePlatformKeychain>>>,
 }
 
 /// Self-heal: if the engine is parked on `Onboarding` but identity now
@@ -172,6 +176,34 @@ fn self_heal_post_auth(engine: &mut AppEngine) {
         // `vauchi.refresh_identity_from_storage()` so the new screen's
         // engine sees the on-disk identity.
         engine.navigate_to(target);
+    }
+}
+
+impl PlatformAppEngine {
+    /// Build a `SecureStorage` bridge from the keychain set via
+    /// `set_platform_keychain`. Errs if none is set (B7 shred path).
+    fn shred_keychain_bridge(&self) -> Result<crate::KeychainBridge, MobileError> {
+        let lock = self
+            .platform_keychain
+            .lock()
+            .map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+        let callback = lock
+            .as_ref()
+            .ok_or_else(|| MobileError::Other {
+                detail: "Platform keychain not set. Call set_platform_keychain() first.".into(),
+            })?
+            .clone();
+        Ok(crate::KeychainBridge { callback })
+    }
+
+    /// Data directory (parent of the storage db) for shred operations.
+    fn shred_data_dir(&self) -> PathBuf {
+        self.storage_path
+            .parent()
+            .unwrap_or(&self.storage_path)
+            .to_path_buf()
     }
 }
 
@@ -220,6 +252,7 @@ impl PlatformAppEngine {
             event_handler_id: Mutex::new(None),
             direct_listener: Arc::new(Mutex::new(None)),
             storage_path,
+            platform_keychain: Mutex::new(None),
         }))
     }
 
@@ -800,6 +833,16 @@ impl PlatformAppEngine {
         })?;
         engine.set_network_online(online);
         Ok(())
+    }
+
+    /// Set the platform keychain for crypto-shred `DomainCommand`s (B7).
+    /// Mirrors `VauchiPlatform::set_platform_keychain`; frontends call it
+    /// post-construction like the other PAE setters. Used only by the
+    /// shred dispatch arms.
+    pub fn set_platform_keychain(&self, keychain: Box<dyn crate::MobilePlatformKeychain>) {
+        if let Ok(mut lock) = self.platform_keychain.lock() {
+            *lock = Some(Arc::from(keychain));
+        }
     }
 
     /// Notify core that the app was backgrounded.
@@ -1715,6 +1758,57 @@ impl PlatformAppEngine {
                     _ => MShred::None,
                 };
                 Ok(DomainCommandResult::ShredStatus { status })
+            }
+            DomainCommand::SoftShred => {
+                let bridge = self.shred_keychain_bridge()?;
+                let data_dir = self.shred_data_dir();
+                let token = {
+                    let vauchi = engine.vauchi();
+                    let identity = vauchi.identity().ok_or_else(|| MobileError::Other {
+                        detail: "Identity not initialized".into(),
+                    })?;
+                    let manager = vauchi_core::api::ShredManager::new(
+                        vauchi.storage(),
+                        &bridge,
+                        identity,
+                        data_dir,
+                    );
+                    manager.soft_shred().map_err(|e| MobileError::Other {
+                        detail: e.to_string(),
+                    })?
+                };
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                engine.invalidate_screen(&AppScreen::EmergencyShred);
+                Ok(DomainCommandResult::ShredScheduled {
+                    token: crate::types::MobileShredToken::from(&token),
+                })
+            }
+            DomainCommand::CancelShred { token } => {
+                let bridge = self.shred_keychain_bridge()?;
+                let data_dir = self.shred_data_dir();
+                let core_token = vauchi_core::api::ShredToken::from_created_at(token.created_at);
+                {
+                    let vauchi = engine.vauchi();
+                    let identity = vauchi.identity().ok_or_else(|| MobileError::Other {
+                        detail: "Identity not initialized".into(),
+                    })?;
+                    let manager = vauchi_core::api::ShredManager::new(
+                        vauchi.storage(),
+                        &bridge,
+                        identity,
+                        data_dir,
+                    );
+                    manager
+                        .cancel_shred(core_token)
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?;
+                }
+                engine.invalidate_screen(&AppScreen::Settings);
+                engine.invalidate_screen(&AppScreen::Privacy);
+                engine.invalidate_screen(&AppScreen::EmergencyShred);
+                Ok(DomainCommandResult::Unit)
             }
 
             // ── Recovery leftovers (B7 batch 4) ──

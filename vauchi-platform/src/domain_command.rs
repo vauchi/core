@@ -39,8 +39,8 @@ use crate::types::{
     MobileDuplicatePair, MobileDuressSettings, MobileEmergencyConfig, MobileFieldNote,
     MobileFieldType, MobileGdprExport, MobileOnboardingProgress, MobileOnboardingStep,
     MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
-    MobileRetryEntry, MobileShredStatus, MobileSocialNetwork, MobileVisibilityLabel,
-    MobileVisibilityLabelDetail,
+    MobileRetryEntry, MobileShredStatus, MobileShredToken, MobileSocialNetwork,
+    MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -88,11 +88,12 @@ pub enum DomainCommand {
 
     // ── GDPR / Deletion + read-only shred status (B7 batch 3) ──
     //
-    // Note: the 4 keychain-bound shred methods (panic_shred, soft_shred,
-    // hard_shred, cancel_shred) are NOT in this batch — they require
-    // platform-keychain plumbing that PlatformAppEngine doesn't have
-    // yet. Tracked as a separate B7 batch. (verify_shred retired
-    // 2026-05-23 Track A — zero hand-written consumers.)
+    // Keychain-bound shred (B7 keychain batch, Phase 1a): `SoftShred` /
+    // `CancelShred` are wired below — they build `ShredManager` from the
+    // PAE keychain bridge but touch only storage (no SMK destruction).
+    // `HardShred` / `PanicShred` additionally need relay purge/revocation
+    // senders + SMK destruction; they land in Phase 1b.
+    // (verify_shred retired 2026-05-23 Track A.)
     /// Export all user data as JSON (GDPR right-to-export).
     ExportGdprData,
     /// Schedule identity deletion with a 7-day grace period.
@@ -107,6 +108,15 @@ pub enum DomainCommand {
     /// Read-only shred-process status. Mirrors the legacy
     /// `VauchiPlatform::shred_status` — does NOT require keychain.
     ShredStatus,
+    /// Schedule crypto-shredding with a grace period (Soft Shred).
+    /// Requires a platform keychain set via `set_platform_keychain`.
+    /// Returns the `MobileShredToken` authorising a later `HardShred`.
+    SoftShred,
+    /// Cancel a scheduled soft-shred during the grace period.
+    /// Requires a platform keychain and the token from `SoftShred`.
+    CancelShred {
+        token: MobileShredToken,
+    },
 
     // ── Aha Moments (B7 batch 5) ──
     /// Read whether the user has already seen a given milestone.
@@ -804,6 +814,11 @@ pub enum DomainCommandResult {
     /// Shred-process status snapshot (B7 batch 3 — `ShredStatus`).
     ShredStatus {
         status: MobileShredStatus,
+    },
+    /// Soft-shred scheduled — carries the token authorising a later
+    /// hard-shred (B7 keychain batch — `SoftShred`).
+    ShredScheduled {
+        token: MobileShredToken,
     },
     /// Optional aha-moment payload (B7 batch 5 —
     /// `TryTriggerAhaMoment` and friends).

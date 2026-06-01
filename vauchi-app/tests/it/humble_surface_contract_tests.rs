@@ -76,6 +76,10 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "set_device_capabilities_json",
     "set_event_listener",
     "set_network_online",
+    // Platform-capability injection setter (B7) — same sanctioned class
+    // as the other set_* setters: the frontend injects native keychain
+    // access post-construction for the crypto-shred DomainCommands.
+    "set_platform_keychain",
     "set_render_context_json",
     "sidebar_items",
     "tab_info",
@@ -230,11 +234,18 @@ fn humble_allowlist_size_matches_plan() {
     // it from a frontend-side screen-id map. ADR-043-legitimate (a query,
     // not domain logic); it is the prerequisite for retiring
     // `navigate_to_json` once both frontends migrate off CoreScreenIdMap.
+    //
+    // B7 keychain batch Phase 1a (2026-06-01) added `set_platform_keychain`
+    // (26 -> 27): a platform-capability injection setter in the same
+    // sanctioned class as `set_device_capabilities_json` / `set_event_listener`
+    // — the frontend injects native keychain access post-construction so the
+    // crypto-shred `DomainCommand`s (`SoftShred` / `CancelShred`) can reach it.
+    // ADR-031-legitimate (platform injection, not domain logic).
     assert_eq!(
         HUMBLE_ALLOWLIST.len(),
-        26,
-        "Humble allow-list size drifted from the 26 expected after \
-         CoreScreenIdMap Tier-0 added `can_go_back`. \
+        27,
+        "Humble allow-list size drifted from the 27 expected after the \
+         B7 keychain batch added `set_platform_keychain`. \
          Edits to this list require an ADR amendment (ADR-021/043 \
          for the Humble engine framing — incl. Amendment 3 for the \
          linchpin promotions — or ADR-048's G1-G5 gates for \

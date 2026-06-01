@@ -154,8 +154,11 @@ pub trait MobilePlatformKeychain: Send + Sync {
 }
 
 /// Bridge that adapts the UniFFI callback interface to vauchi-core's SecureStorage trait.
-struct KeychainBridge {
-    callback: Arc<dyn MobilePlatformKeychain>,
+///
+/// `pub(crate)` so `PlatformAppEngine` (sibling module) can build a bridge
+/// from its own keychain for the shred `DomainCommand` path (B7).
+pub(crate) struct KeychainBridge {
+    pub(crate) callback: Arc<dyn MobilePlatformKeychain>,
 }
 
 impl vauchi_core::storage::SecureStorage for KeychainBridge {

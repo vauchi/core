@@ -23,12 +23,10 @@ ActivityLogEngine
 AppEngine
 ArchivedContactsEngine
 AvatarEditorEngine
-ContactEditEngine
 ContactLimitEngine
 ContactMergeEngine
 ContactNotFoundEngine
 ContactVisibilityEngine
-DeviceReplacementEngine
 DuplicateDetectionEngine
 EmergencyShredEngine
 FingerprintVerifyEngine
@@ -39,7 +37,6 @@ LockScreenEngine
 MoreEngine
 MyInfoEngine
 MyInfoEntryDetailEngine
-RecoveryClaimReviewEngine
 RecoveryHelpEngine
 SettingsEngine
 SocialGraphEngine

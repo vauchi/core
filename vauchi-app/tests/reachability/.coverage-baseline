@@ -24,14 +24,11 @@ AppEngine
 ArchivedContactsEngine
 AvatarEditorEngine
 ContactLimitEngine
-ContactMergeEngine
 ContactNotFoundEngine
-ContactVisibilityEngine
 DuplicateDetectionEngine
 EmergencyShredEngine
 FingerprintVerifyEngine
 GdprEngine
-GroupsEngine
 HelpEngine
 LockScreenEngine
 MoreEngine

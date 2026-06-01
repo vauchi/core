@@ -567,38 +567,6 @@ impl VauchiPlatform {
         Ok(vauchi)
     }
 
-    /// Build the pair of `MobileRelaySender`s used by shred/purge flows.
-    ///
-    /// Both senders share one fresh `Vauchi` instance so the OHTTP key
-    /// cache is reused. `open_vauchi_for_relay` resolves the bundled
-    /// OHTTP key eagerly so the first shred request goes through OHTTP
-    /// instead of leaking the client IP via the `allow_direct` fallback.
-    /// If the instance cannot be opened (no identity, storage error),
-    /// both results carry the same error string — shred itself proceeds
-    /// best-effort without relay-side purge/revocation.
-    pub(crate) fn build_shred_senders(
-        &self,
-        sender_id: &str,
-    ) -> (
-        Result<MobileRelaySender, String>,
-        Result<MobileRelaySender, String>,
-    ) {
-        let vauchi = match self.open_vauchi_for_relay() {
-            Ok(v) => v,
-            Err(e) => {
-                let msg = e.to_string();
-                return (Err(msg.clone()), Err(msg));
-            }
-        };
-        let purge_transport = vauchi.build_relay_transport(self.relay_url.clone(), 10_000);
-        let rev_transport = vauchi.build_relay_transport(self.relay_url.clone(), 10_000);
-        let purge =
-            MobileRelaySender::from_transport(purge_transport, self.relay_url.clone(), sender_id);
-        let rev =
-            MobileRelaySender::from_transport(rev_transport, self.relay_url.clone(), sender_id);
-        (Ok(purge), Ok(rev))
-    }
-
     /// Save a contact directly to storage.
     ///
     /// Used by integration tests that need exchanged or imported contacts

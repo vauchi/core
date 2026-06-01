@@ -555,9 +555,25 @@ impl Storage {
 
     /// Deletes a contact by ID.
     pub fn delete_contact(&self, id: &str) -> Result<bool, StorageError> {
-        // Also delete associated ratchet state
+        // Clear relationship-scoped state that neither lives on the contacts
+        // row (nickname/avatar/notes/cek drop with the row) nor cascades via
+        // FK (contact_field_notes/contact_shared_names/contact_shared_avatars).
+        // Without this these rows orphan; a stale contact_sync_timestamps row
+        // in particular wrongly gates sync on contact_id reuse (read with
+        // `.unwrap_or(0)` in sync/state.rs). See problem
+        // 2026-06-01-contact-delete-orphans.
         self.conn.execute(
             "DELETE FROM contact_ratchets WHERE contact_id = ?1",
+            params![id],
+        )?;
+        self.conn.execute(
+            "DELETE FROM contact_sync_timestamps WHERE contact_id = ?1",
+            params![id],
+        )?;
+        self.delete_pending_updates_for_contact(id)?;
+        self.delete_all_contact_overrides(id)?;
+        self.conn.execute(
+            "DELETE FROM dismissed_duplicates WHERE id1 = ?1 OR id2 = ?1",
             params![id],
         )?;
 

@@ -88,6 +88,7 @@ mod contact_card_coverage_tests;
 mod contact_card_field_tests;
 mod contact_card_tests;
 mod contact_delete_archive_tests;
+mod contact_delete_cleanup_tests;
 mod contact_detail_delivery_tests;
 mod contact_detail_engine_tests;
 mod contact_edit_engine_tests;

@@ -324,7 +324,7 @@ impl BackupRecoveryEngine {
             components: vec![Component::TextInput {
                 id: "confirm_password".into(),
                 label: "Confirm your backup password".into(),
-                value: String::new(),
+                value: self.confirm_password.clone(),
                 placeholder: None,
                 max_length: None,
                 validation_error: None,
@@ -597,7 +597,7 @@ impl WorkflowEngine for BackupRecoveryEngine {
                 ActionResult::UpdateScreen(self.current_screen())
             }
             (BackupStep::ConfirmPassword, UserAction::ActionPressed { action_id })
-                if action_id == "continue" =>
+                if action_id == "continue" || action_id == "submit_confirm_password" =>
             {
                 if self.confirm_password != self.password {
                     return ActionResult::ValidationError {

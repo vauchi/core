@@ -1414,6 +1414,10 @@ impl AppEngine {
         // Slice 32l T3.1b: advance the device-link machine one relay step (no-op when idle).
         #[cfg(all(feature = "network-http", feature = "storage"))]
         self.advance_device_link_session();
+        // ADR-049: advance the link-mode responder one relay step
+        // (no-op off the DeepLinkResponder screen / with no live machine).
+        #[cfg(all(feature = "network-http", feature = "storage"))]
+        self.advance_link_responder_session();
         // Slice 32m T1.2b: advance the multi-stage machine one
         // protocol step (no-op when idle / no active session).
         self.advance_multi_stage_session();

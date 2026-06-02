@@ -187,6 +187,75 @@ impl AppEngine {
             .map(|_| ())
             .map_err(|e| e.to_string())
     }
+
+    /// Advance the engine-owned link responder one relay step (ADR-049).
+    ///
+    /// Called each `poll_notifications` tick (a no-op off the responder
+    /// screen / with no live machine). Core — not the frontend — now
+    /// drives the escrow round-trip: it executes the machine's queued
+    /// deposit/retrieve commands via `Vauchi::run_escrow_command` and
+    /// feeds the resulting `RelayEscrow*` events back through
+    /// `route_link_responder_hardware_event`. Because the machine queues a
+    /// gate `Check` only once, while it is still `Polling` we re-issue one
+    /// per tick to detect both escrow slots filling; a `Ready` then drives
+    /// the queued `Retrieve` in the same tick so an already-deposited peer
+    /// completes immediately. Finally `tick` enforces the polling
+    /// deadline. Returns `true` if any machine event was applied.
+    #[cfg(all(feature = "network-http", feature = "storage"))]
+    pub(crate) fn advance_link_responder_session(&mut self) -> bool {
+        if !matches!(self.screen, AppScreen::DeepLinkResponder { .. }) {
+            return false;
+        }
+        let now = self.vauchi.clock().unix_seconds();
+        let mut advanced = false;
+
+        // 1. Execute whatever the machine has queued (initial deposits +
+        //    its one Check on entry; a Retrieve once Ready).
+        let queued = match self.link_responder.as_mut() {
+            Some(machine) => machine.drain_pending_commands(),
+            None => return false,
+        };
+        for command in queued {
+            if let Some(event) = self.vauchi.run_escrow_command(&command) {
+                self.route_link_responder_hardware_event(&event);
+                advanced = true;
+            }
+        }
+
+        // 2. Active gate poll while still waiting (the machine does not
+        //    re-queue Check itself).
+        let polling_gate = self.link_responder.as_ref().and_then(|machine| {
+            matches!(machine.current_state(), LinkResponderState::Polling)
+                .then(|| machine.gate_hash_bytes())
+        });
+        if let Some(gate_hash) = polling_gate {
+            let check = Command::RelayEscrowCheck {
+                gate_hash,
+                suggested_interval_ms: 0,
+            };
+            if let Some(event) = self.vauchi.run_escrow_command(&check) {
+                self.route_link_responder_hardware_event(&event);
+                advanced = true;
+                // Ready → Retrieving queued a Retrieve; run it now.
+                let after_ready = self
+                    .link_responder
+                    .as_mut()
+                    .map(|machine| machine.drain_pending_commands())
+                    .unwrap_or_default();
+                for command in after_ready {
+                    if let Some(event) = self.vauchi.run_escrow_command(&command) {
+                        self.route_link_responder_hardware_event(&event);
+                    }
+                }
+            }
+        }
+
+        // 3. Enforce the polling deadline (Failed(PollingTimedOut)).
+        if let Some(machine) = self.link_responder.as_mut() {
+            machine.tick(now);
+        }
+        advanced
+    }
 }
 
 /// Map a `LinkResponderFailureReason` to the stable failure id the

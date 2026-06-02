@@ -10,8 +10,8 @@
 
 #![cfg(feature = "network-http")]
 
-use vauchi_core::VauchiError;
 use vauchi_core::api::vauchi::VauchiBuilder;
+use vauchi_core::{Command, Event, VauchiError};
 use vauchi_protocol::escrow::{EscrowMessage, EscrowResponse};
 
 use crate::common::mock_relay::{CannedResponse, MockRelay};
@@ -107,4 +107,84 @@ fn escrow_exchange_maps_relay_error_to_vauchi_network_error() {
         matches!(err, VauchiError::Network(_)),
         "expected VauchiError::Network, got {err:?}"
     );
+}
+
+// ── run_escrow_command: Command -> relay -> Event ────────────────────
+
+#[test]
+fn run_escrow_command_deposit_returns_no_event() {
+    let mock = MockRelay::start();
+    mock.queue("escrow", canned(&EscrowResponse::Stored));
+    let (wb, _dir) = vauchi_pointing_at(&mock);
+
+    let event = wb.run_escrow_command(&Command::RelayEscrowDeposit {
+        gate_hash: vec![0xABu8; 32],
+        slot_hash: vec![0xCDu8; 32],
+        encrypted_card: vec![1, 2, 3],
+        ttl_seconds: 600,
+    });
+    assert_eq!(event, None, "a stored deposit produces no machine event");
+}
+
+#[test]
+fn run_escrow_command_check_full_gate_yields_ready_with_gate_hash() {
+    let mock = MockRelay::start();
+    mock.queue("escrow", canned(&EscrowResponse::Count { count: 2 }));
+    let (wb, _dir) = vauchi_pointing_at(&mock);
+
+    let event = wb.run_escrow_command(&Command::RelayEscrowCheck {
+        gate_hash: vec![0xABu8; 32],
+        suggested_interval_ms: 0,
+    });
+    assert_eq!(
+        event,
+        Some(Event::RelayEscrowReady {
+            gate_hash: vec![0xABu8; 32]
+        })
+    );
+}
+
+#[test]
+fn run_escrow_command_check_partial_gate_yields_no_event() {
+    let mock = MockRelay::start();
+    mock.queue("escrow", canned(&EscrowResponse::Count { count: 1 }));
+    let (wb, _dir) = vauchi_pointing_at(&mock);
+
+    let event = wb.run_escrow_command(&Command::RelayEscrowCheck {
+        gate_hash: vec![0xABu8; 32],
+        suggested_interval_ms: 0,
+    });
+    assert_eq!(event, None, "a partially-filled gate keeps polling");
+}
+
+#[test]
+fn run_escrow_command_retrieve_yields_blob_received_with_decoded_bytes() {
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+    let mock = MockRelay::start();
+    mock.queue(
+        "escrow",
+        canned(&EscrowResponse::Blob {
+            blob: URL_SAFE_NO_PAD.encode(b"peer-card-bytes"),
+        }),
+    );
+    let (wb, _dir) = vauchi_pointing_at(&mock);
+
+    let event = wb.run_escrow_command(&Command::RelayEscrowRetrieve {
+        gate_hash: vec![0xABu8; 32],
+        slot_hash: vec![0xCDu8; 32],
+    });
+    assert_eq!(
+        event,
+        Some(Event::RelayEscrowBlobReceived {
+            gate_hash: vec![0xABu8; 32],
+            blob: b"peer-card-bytes".to_vec(),
+        })
+    );
+}
+
+#[test]
+fn run_escrow_command_ignores_non_escrow_commands() {
+    let mock = MockRelay::start();
+    let (wb, _dir) = vauchi_pointing_at(&mock);
+    assert_eq!(wb.run_escrow_command(&Command::BleStopScanning), None);
 }

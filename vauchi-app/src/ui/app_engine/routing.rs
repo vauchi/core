@@ -618,9 +618,18 @@ impl AppEngine {
                 // here we just navigate back and show feedback.
                 let action = self.engine.collected_input().unwrap_or_default();
                 match action.as_str() {
-                    "export" => ActionResult::ShowToast {
-                        message: "Data export requested. Check your files.".into(),
-                        undo_action_id: None,
+                    "export" => match vauchi_core::api::export_all_data(self.vauchi.storage()) {
+                        Ok(export) => match serde_json::to_string_pretty(&export) {
+                            Ok(json) => ActionResult::GdprExportComplete { json },
+                            Err(_) => ActionResult::ShowToast {
+                                message: "Export failed: could not serialize data.".into(),
+                                undo_action_id: None,
+                            },
+                        },
+                        Err(_) => ActionResult::ShowToast {
+                            message: "Export failed: could not read data.".into(),
+                            undo_action_id: None,
+                        },
                     },
                     "delete" => ActionResult::ShowToast {
                         message: "Identity deletion scheduled. You have 7 days to cancel.".into(),

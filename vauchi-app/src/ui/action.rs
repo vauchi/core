@@ -181,6 +181,12 @@ pub enum ActionResult {
     BackupExportComplete {
         data: String,
     },
+    /// GDPR data export completed — frontend should save or share the
+    /// JSON (file dialog / share sheet). Mirrors `BackupExportComplete`;
+    /// the payload is the serialized `export_all_data` result.
+    GdprExportComplete {
+        json: String,
+    },
     /// All data has been wiped — frontend should reset to initial state.
     WipeComplete,
     /// Frontend should perform hardware actions for the exchange protocol (ADR-031).

@@ -109,6 +109,25 @@ fn consent_toggle_persists_and_reflects_on_revisit() {
     );
 }
 
+// GDPR export action returns the serialized data via GdprExportComplete
+// (core performs export_all_data; the frontend persists the payload).
+// @internal
+#[test]
+fn gdpr_export_returns_serialized_data() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Privacy);
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "export".into(),
+    });
+    match result {
+        ActionResult::GdprExportComplete { json } => {
+            assert!(!json.is_empty(), "export json should be non-empty");
+            assert!(json.contains('{'), "payload should be JSON");
+        }
+        other => panic!("Expected GdprExportComplete, got {other:?}"),
+    }
+}
+
 // @internal
 #[test]
 fn navigate_back_with_empty_history_returns_my_info() {

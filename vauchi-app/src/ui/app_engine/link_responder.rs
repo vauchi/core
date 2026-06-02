@@ -24,6 +24,9 @@ use crate::ui::LinkResponderEngine;
 use crate::ui::ScreenModel;
 use crate::ui::WorkflowEngine;
 
+#[cfg(all(feature = "network-http", feature = "storage"))]
+use vauchi_core::Command;
+use vauchi_core::Event;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::link_mode::{
     DeepLinkPayload, parse_card_payload, responder_respond_with_card_bytes, serialize_card_payload,
@@ -31,7 +34,6 @@ use vauchi_core::exchange::link_mode::{
 use vauchi_core::exchange::link_responder::{
     LinkResponderFailureReason, LinkResponderSession, LinkResponderState,
 };
-use vauchi_core::{Command, Event};
 
 /// Responder polling budget — mirrors the ADR-035 device-link window
 /// (300 s). After this many seconds without a `RelayEscrowReady`, a
@@ -67,9 +69,10 @@ impl AppEngine {
     /// Build / drop the engine-owned responder machine as navigation
     /// enters or leaves `AppScreen::DeepLinkResponder`. Called from
     /// `navigate_to_internal` after the screen-presentation lifecycle
-    /// hooks. On entry the machine's initial deposit commands are pushed
-    /// onto `pending_commands` so the same drain that carries
-    /// `screen_entered` commands surfaces them to the frontend.
+    /// hooks. On entry the responder machine is built (ADR-049); its
+    /// initial escrow commands stay *in the machine* for the core poll
+    /// (`advance_link_responder_session`) to drive — they are no longer
+    /// pushed onto the frontend `pending_commands` queue.
     pub(super) fn sync_link_responder_lifecycle(&mut self, old: &AppScreen, new: &AppScreen) {
         let was = matches!(old, AppScreen::DeepLinkResponder { .. });
         let is = matches!(new, AppScreen::DeepLinkResponder { .. });
@@ -78,43 +81,42 @@ impl AppEngine {
             (false, true) => {
                 if let AppScreen::DeepLinkResponder { payload } = new {
                     let payload = payload.clone();
-                    let deposits = self.build_link_responder(&payload);
-                    self.pending_commands.extend(deposits);
+                    self.build_link_responder(&payload);
                 }
             }
             _ => {}
         }
     }
 
-    /// Construct the responder machine for `payload` and return its
-    /// initial `RelayEscrowDeposit ×2 + RelayEscrowCheck` commands.
-    /// Returns an empty vec (leaving the screen on its waiting state) if
-    /// no identity exists or the ECDH / key-derive fails — both rare and
-    /// non-fatal at this layer.
-    fn build_link_responder(&mut self, payload: &DeepLinkPayload) -> Vec<Command> {
+    /// Construct the responder machine for `payload` and store it
+    /// (ADR-049). The machine's initial `RelayEscrowDeposit + RelayEscrowCheck`
+    /// commands stay queued *in the machine* so the core poll
+    /// (`advance_link_responder_session`) drains and executes them over the
+    /// relay — they are no longer surfaced to the frontend `pending_commands`
+    /// queue, which no frontend ever executed (the gap this ADR closes).
+    /// No-op (leaving the screen on its waiting state) if no identity exists
+    /// or the ECDH / key-derive fails — both rare and non-fatal here.
+    fn build_link_responder(&mut self, payload: &DeepLinkPayload) {
         let (signing_key, display_name) = match self.vauchi.identity() {
             Some(identity) => (
                 *identity.signing_public_key(),
                 identity.display_name().to_string(),
             ),
-            None => return Vec::new(),
+            None => return,
         };
         let card = match self.vauchi.own_card() {
             Ok(Some(card)) => card,
             Ok(None) => ContactCard::new(&display_name),
-            Err(_) => return Vec::new(),
+            Err(_) => return,
         };
         let card_bytes = serialize_card_payload(&signing_key, &card);
         let (keys, deposits) =
             match responder_respond_with_card_bytes(payload.as_parsed(), &card_bytes) {
                 Ok(parts) => parts,
-                Err(_) => return Vec::new(),
+                Err(_) => return,
             };
         let deadline = self.vauchi.clock().unix_seconds() + RESPONDER_POLL_DEADLINE_SECS;
-        let mut machine = LinkResponderSession::new(keys, deposits, deadline);
-        let initial = machine.drain_pending_commands();
-        self.link_responder = Some(machine);
-        initial
+        self.link_responder = Some(LinkResponderSession::new(keys, deposits, deadline));
     }
 
     /// Feed a `RelayEscrow*` hardware event to the engine-owned responder
@@ -210,20 +212,19 @@ impl AppEngine {
         let mut advanced = false;
 
         // 1. Execute whatever the machine has queued (initial deposits +
-        //    its one Check on entry; a Retrieve once Ready).
+        //    its one Check on entry). Each event may cascade into follow-up
+        //    commands (Ready → Retrieve → Finalized) handled by the helper.
         let queued = match self.link_responder.as_mut() {
             Some(machine) => machine.drain_pending_commands(),
             None => return false,
         };
         for command in queued {
-            if let Some(event) = self.vauchi.run_escrow_command(&command) {
-                self.route_link_responder_hardware_event(&event);
-                advanced = true;
-            }
+            advanced |= self.run_and_feed_escrow_command(&command);
         }
 
-        // 2. Active gate poll while still waiting (the machine does not
-        //    re-queue Check itself).
+        // 2. Active gate poll while still waiting (the machine queues a
+        //    Check only on entry; re-issue one per tick until the gate
+        //    fills). A Ready here cascades into the Retrieve.
         let polling_gate = self.link_responder.as_ref().and_then(|machine| {
             matches!(machine.current_state(), LinkResponderState::Polling)
                 .then(|| machine.gate_hash_bytes())
@@ -233,21 +234,7 @@ impl AppEngine {
                 gate_hash,
                 suggested_interval_ms: 0,
             };
-            if let Some(event) = self.vauchi.run_escrow_command(&check) {
-                self.route_link_responder_hardware_event(&event);
-                advanced = true;
-                // Ready → Retrieving queued a Retrieve; run it now.
-                let after_ready = self
-                    .link_responder
-                    .as_mut()
-                    .map(|machine| machine.drain_pending_commands())
-                    .unwrap_or_default();
-                for command in after_ready {
-                    if let Some(event) = self.vauchi.run_escrow_command(&command) {
-                        self.route_link_responder_hardware_event(&event);
-                    }
-                }
-            }
+            advanced |= self.run_and_feed_escrow_command(&check);
         }
 
         // 3. Enforce the polling deadline (Failed(PollingTimedOut)).
@@ -255,6 +242,30 @@ impl AppEngine {
             machine.tick(now);
         }
         advanced
+    }
+
+    /// Execute one escrow command over the relay, feed the resulting
+    /// `RelayEscrow*` event into the responder machine, and recursively run
+    /// any follow-up commands the machine queues in response (e.g. the
+    /// `Retrieve` it emits on `Ready`).
+    /// `route_link_responder_hardware_event` drains those follow-ups and
+    /// returns them as `ActionResult::Commands` — under ADR-049 core runs
+    /// them itself instead of handing them to a frontend. Returns `true` if
+    /// an event applied. Recursion is bounded by the machine's terminal
+    /// states (`Finalized` / `Failed` drain nothing).
+    #[cfg(all(feature = "network-http", feature = "storage"))]
+    fn run_and_feed_escrow_command(&mut self, command: &Command) -> bool {
+        let Some(event) = self.vauchi.run_escrow_command(command) else {
+            return false;
+        };
+        if let Some(ActionResult::Commands { commands }) =
+            self.route_link_responder_hardware_event(&event)
+        {
+            for command in commands {
+                self.run_and_feed_escrow_command(&command);
+            }
+        }
+        true
     }
 }
 

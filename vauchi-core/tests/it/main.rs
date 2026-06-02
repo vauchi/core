@@ -248,6 +248,7 @@ mod install_id_tests;
 mod link_card_import_tests;
 mod link_initiator_tests;
 mod link_mode_tests;
+mod link_responder_poll_tests;
 mod link_responder_tests;
 mod local_group_tests;
 mod local_keys_tests;

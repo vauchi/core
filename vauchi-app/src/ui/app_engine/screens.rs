@@ -548,16 +548,18 @@ impl AppEngine {
                 let state = vauchi_core::api::DeletionManager::new(vauchi.storage())
                     .deletion_state()
                     .unwrap_or(vauchi_core::storage::DeletionState::None);
-                let (deletion_status, scheduled) = match state {
-                    vauchi_core::storage::DeletionState::Scheduled { .. } => (
+                let now = vauchi.clock().unix_seconds();
+                let (deletion_status, scheduled, executable) = match state {
+                    vauchi_core::storage::DeletionState::Scheduled { execute_at, .. } => (
                         Some("Scheduled — cancel within the grace period".to_string()),
                         true,
+                        now >= execute_at,
                     ),
                     vauchi_core::storage::DeletionState::Executed { .. } => {
-                        (Some("Executed".to_string()), false)
+                        (Some("Executed".to_string()), false, false)
                     }
-                    vauchi_core::storage::DeletionState::None => (None, false),
-                    _ => (None, false),
+                    vauchi_core::storage::DeletionState::None => (None, false, false),
+                    _ => (None, false, false),
                 };
                 Box::new(
                     GdprEngine::new(deletion_status, "Active".into())
@@ -567,7 +569,8 @@ impl AppEngine {
                             device_count: 1,
                         })
                         .with_consent(consent)
-                        .with_deletion_scheduled(scheduled),
+                        .with_deletion_scheduled(scheduled)
+                        .with_deletion_executable(executable),
                 )
             }
             AppScreen::Support => Box::new(SupportEngine::new()),

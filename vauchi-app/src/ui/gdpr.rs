@@ -56,6 +56,9 @@ pub struct GdprEngine {
     /// Whether an identity deletion is currently scheduled (grace period
     /// active). Drives the cancel-vs-delete action on the overview.
     deletion_scheduled: bool,
+    /// Whether a scheduled deletion's grace period has elapsed, so it can
+    /// be executed now. Drives the "Delete Now" action.
+    deletion_executable: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -66,6 +69,10 @@ enum GdprStep {
     ConfirmDelete,
     /// Consent-management screen — per-type grant toggles.
     ManageConsent,
+    /// Confirm executing a scheduled deletion now (grace elapsed).
+    ConfirmExecute,
+    /// Confirm an immediate emergency wipe (panic shred).
+    ConfirmShred,
 }
 
 impl GdprEngine {
@@ -78,6 +85,7 @@ impl GdprEngine {
             last_action: None,
             consent: ConsentStatus::default(),
             deletion_scheduled: false,
+            deletion_executable: false,
         }
     }
 
@@ -99,6 +107,13 @@ impl GdprEngine {
     /// offers "Cancel Deletion" instead of "Delete Identity".
     pub fn with_deletion_scheduled(mut self, scheduled: bool) -> Self {
         self.deletion_scheduled = scheduled;
+        self
+    }
+
+    /// Mark whether a scheduled deletion can be executed now (grace
+    /// elapsed), so the overview offers "Delete Now".
+    pub fn with_deletion_executable(mut self, executable: bool) -> Self {
+        self.deletion_executable = executable;
         self
     }
 
@@ -169,6 +184,15 @@ impl GdprEngine {
                         enabled: true,
                         a11y: None,
                     });
+                    if self.deletion_executable {
+                        actions.push(ScreenAction {
+                            id: "execute_deletion".into(),
+                            label: "Delete Now".into(),
+                            style: ActionStyle::Destructive,
+                            enabled: true,
+                            a11y: None,
+                        });
+                    }
                 } else {
                     actions.push(ScreenAction {
                         id: "delete".into(),
@@ -178,6 +202,13 @@ impl GdprEngine {
                         a11y: None,
                     });
                 }
+                actions.push(ScreenAction {
+                    id: "panic_shred".into(),
+                    label: "Panic Shred".into(),
+                    style: ActionStyle::Destructive,
+                    enabled: true,
+                    a11y: None,
+                });
                 actions
             },
             progress: None,
@@ -321,11 +352,89 @@ impl GdprEngine {
         }
     }
 
+    fn build_confirm_execute(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "confirm_execute_deletion".into(),
+            title: "Delete Now".into(),
+            subtitle: Some("The grace period has elapsed".into()),
+            components: vec![Component::InfoPanel {
+                id: "execute_warning".into(),
+                icon: Some("warning".into()),
+                title: "Permanently delete now".into(),
+                items: vec![InfoItem {
+                    icon: Some("warning".into()),
+                    title: "This cannot be undone".into(),
+                    detail: "All identity, contact, and relay data is destroyed immediately."
+                        .into(),
+                }],
+                a11y: None,
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: "confirm_execute".into(),
+                    label: "Delete Permanently".into(),
+                    style: ActionStyle::Destructive,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: "cancel".into(),
+                    label: "Keep My Data".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    fn build_confirm_shred(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "confirm_panic_shred".into(),
+            title: "Panic Shred".into(),
+            subtitle: Some("Emergency wipe".into()),
+            components: vec![Component::InfoPanel {
+                id: "shred_warning".into(),
+                icon: Some("warning".into()),
+                title: "Immediately wipe everything".into(),
+                items: vec![InfoItem {
+                    icon: Some("warning".into()),
+                    title: "This cannot be undone".into(),
+                    detail: "All data is cryptographically shredded now, with no grace period."
+                        .into(),
+                }],
+                a11y: None,
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: "confirm_shred".into(),
+                    label: "Shred Everything".into(),
+                    style: ActionStyle::Destructive,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: "cancel".into(),
+                    label: "Cancel".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
     fn build_screen(&self) -> ScreenModel {
         match self.step {
             GdprStep::Overview => self.build_overview(),
             GdprStep::ConfirmDelete => self.build_confirm_delete(),
             GdprStep::ManageConsent => self.build_consent(),
+            GdprStep::ConfirmExecute => self.build_confirm_execute(),
+            GdprStep::ConfirmShred => self.build_confirm_shred(),
         }
     }
 }
@@ -358,6 +467,20 @@ impl WorkflowEngine for GdprEngine {
                 self.step = GdprStep::ConfirmDelete;
                 ActionResult::NavigateTo(self.build_screen())
             }
+            // Overview: execute-now navigates to its confirmation screen
+            (GdprStep::Overview, UserAction::ActionPressed { action_id })
+                if action_id == "execute_deletion" =>
+            {
+                self.step = GdprStep::ConfirmExecute;
+                ActionResult::NavigateTo(self.build_screen())
+            }
+            // Overview: panic shred navigates to its confirmation screen
+            (GdprStep::Overview, UserAction::ActionPressed { action_id })
+                if action_id == "panic_shred" =>
+            {
+                self.step = GdprStep::ConfirmShred;
+                ActionResult::NavigateTo(self.build_screen())
+            }
             // Confirmation: confirm triggers deletion
             (GdprStep::ConfirmDelete, UserAction::ActionPressed { action_id })
                 if action_id == "confirm_delete" =>
@@ -365,10 +488,25 @@ impl WorkflowEngine for GdprEngine {
                 self.last_action = Some("delete".into());
                 ActionResult::Complete
             }
-            // Confirmation: cancel goes back to overview
-            (GdprStep::ConfirmDelete, UserAction::ActionPressed { action_id })
-                if action_id == "cancel" =>
+            // Execute confirmation: confirm triggers immediate execution
+            (GdprStep::ConfirmExecute, UserAction::ActionPressed { action_id })
+                if action_id == "confirm_execute" =>
             {
+                self.last_action = Some("execute".into());
+                ActionResult::Complete
+            }
+            // Shred confirmation: confirm triggers the emergency wipe
+            (GdprStep::ConfirmShred, UserAction::ActionPressed { action_id })
+                if action_id == "confirm_shred" =>
+            {
+                self.last_action = Some("shred".into());
+                ActionResult::Complete
+            }
+            // Any confirmation screen: cancel goes back to overview
+            (
+                GdprStep::ConfirmDelete | GdprStep::ConfirmExecute | GdprStep::ConfirmShred,
+                UserAction::ActionPressed { action_id },
+            ) if action_id == "cancel" => {
                 self.step = GdprStep::Overview;
                 ActionResult::NavigateTo(self.build_screen())
             }
@@ -632,6 +770,62 @@ mod tests {
             !ids.contains(&"delete".to_string()),
             "scheduled deletion hides the delete action"
         );
+    }
+
+    // @internal
+    #[test]
+    fn overview_always_offers_panic_shred() {
+        let ids: Vec<String> = engine()
+            .current_screen()
+            .actions
+            .iter()
+            .map(|a| a.id.clone())
+            .collect();
+        assert!(
+            ids.contains(&"panic_shred".to_string()),
+            "panic shred is always available"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn overview_shows_execute_when_grace_elapsed() {
+        let ids: Vec<String> = GdprEngine::new(Some("Scheduled".into()), "Active".into())
+            .with_deletion_scheduled(true)
+            .with_deletion_executable(true)
+            .current_screen()
+            .actions
+            .iter()
+            .map(|a| a.id.clone())
+            .collect();
+        assert!(
+            ids.contains(&"execute_deletion".to_string()),
+            "grace elapsed shows the Delete Now action"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn confirm_execute_completes_with_execute_action() {
+        let mut e = engine();
+        e.step = GdprStep::ConfirmExecute;
+        let r = e.handle_action(UserAction::ActionPressed {
+            action_id: "confirm_execute".into(),
+        });
+        assert!(matches!(r, ActionResult::Complete));
+        assert_eq!(e.collected_input().as_deref(), Some("execute"));
+    }
+
+    // @internal
+    #[test]
+    fn confirm_shred_completes_with_shred_action() {
+        let mut e = engine();
+        e.step = GdprStep::ConfirmShred;
+        let r = e.handle_action(UserAction::ActionPressed {
+            action_id: "confirm_shred".into(),
+        });
+        assert!(matches!(r, ActionResult::Complete));
+        assert_eq!(e.collected_input().as_deref(), Some("shred"));
     }
 
     // @internal

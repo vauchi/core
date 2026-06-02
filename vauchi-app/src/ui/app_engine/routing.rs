@@ -669,6 +669,37 @@ impl AppEngine {
                             },
                         }
                     }
+                    "execute" => {
+                        // Borrow `identity` only long enough to run the delete;
+                        // then the cache can be cleared (all data is gone).
+                        let executed = match self.vauchi.identity() {
+                            Some(identity) => {
+                                vauchi_core::api::DeletionManager::new(self.vauchi.storage())
+                                    .execute_deletion(identity)
+                                    .is_ok()
+                            }
+                            None => false,
+                        };
+                        if executed {
+                            self.engine_cache.clear();
+                            ActionResult::WipeComplete
+                        } else {
+                            ActionResult::ShowToast {
+                                message: "Could not execute deletion.".into(),
+                                undo_action_id: None,
+                            }
+                        }
+                    }
+                    "shred" => match self.vauchi.perform_emergency_wipe(true) {
+                        Ok(_) => {
+                            self.engine_cache.clear();
+                            ActionResult::WipeComplete
+                        }
+                        Err(_) => ActionResult::ShowToast {
+                            message: "Emergency wipe failed.".into(),
+                            undo_action_id: None,
+                        },
+                    },
                     _ => {
                         let screen = self.navigate_back();
                         ActionResult::NavigateTo(screen)

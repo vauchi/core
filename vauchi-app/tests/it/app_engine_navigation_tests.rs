@@ -169,6 +169,55 @@ fn deletion_schedule_and_cancel_round_trip() {
     );
 }
 
+// Panic shred via the engine path wipes all data and returns WipeComplete.
+// @internal
+#[test]
+fn panic_shred_wipes_and_returns_wipe_complete() {
+    let mut engine = engine_with_identity();
+    assert!(
+        engine.vauchi().identity().is_some(),
+        "identity exists before shred"
+    );
+    engine.navigate_to(AppScreen::Privacy);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "panic_shred".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_shred".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::WipeComplete),
+        "shred returns WipeComplete"
+    );
+    assert!(
+        engine.vauchi().identity().is_none(),
+        "identity is wiped after shred"
+    );
+}
+
+// Execute-after-grace via the engine path: schedule with an elapsed grace,
+// then execute → WipeComplete.
+// @internal
+#[test]
+fn execute_deletion_after_grace_returns_wipe_complete() {
+    use vauchi_core::api::DeletionManager;
+    let mut engine = engine_with_identity();
+    DeletionManager::new(engine.vauchi().storage())
+        .schedule_deletion_with_execute_at(1, 1)
+        .unwrap();
+    engine.navigate_to(AppScreen::Privacy);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "execute_deletion".into(),
+    });
+    let result = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_execute".into(),
+    });
+    assert!(
+        matches!(result, ActionResult::WipeComplete),
+        "execute after grace returns WipeComplete"
+    );
+}
+
 // @internal
 #[test]
 fn navigate_back_with_empty_history_returns_my_info() {

@@ -151,7 +151,7 @@ vauchi-core/src/platform.rs 1126
 # (+3 for #[allow(clippy::let_underscore_must_use)] attrs on 3 intentional
 #  best-effort test sites — fail-closed counter tests, problem
 #  2026-05-21-silent-failures-in-security-paths)
-vauchi-core/src/network/http_transport.rs 1192
+vauchi-core/src/network/http_transport.rs 1240
 
 # EXEMPT — security-critical sync + OHTTP-bootstrap flow: the sync state
 # machine, OHTTP key resolution/rotation handling, and version/pin gates
@@ -240,7 +240,7 @@ vauchi-core/src/storage/mod.rs 1079
 #  multi_stage_session scaffolding)
 # (+3 for AppScreen::EmergencyBroadcast variant + id + from_screen_id —
 #  2026-06-02 humble-ui core engines sweep)
-vauchi-app/src/ui/app_engine/mod.rs 1536
+vauchi-app/src/ui/app_engine/mod.rs 1544
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts

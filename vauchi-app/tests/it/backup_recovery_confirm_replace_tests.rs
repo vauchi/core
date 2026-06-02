@@ -13,6 +13,12 @@ fn enter_password(engine: &mut BackupRecoveryEngine) {
         component_id: "password".into(),
         value: "secret123".into(),
     });
+    // Restore now requires a pasted backup blob before `continue`; harmless
+    // for Create (the field is ignored there).
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_data".into(),
+        value: "deadbeefcafe".into(),
+    });
 }
 
 // @internal

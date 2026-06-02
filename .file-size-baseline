@@ -277,7 +277,9 @@ vauchi-app/src/ui/app_engine/mod.rs 1532
 #  to the mode picker / Done to Contacts instead of the catch-all
 #  navigate_back that produced an empty screen_id. Fix A of
 #  2026-06-02-exchange-back-cancel-broken)
-vauchi-app/src/ui/app_engine/routing.rs 1479
+# (+22 for BackupRecoveryEngine paste-restore branch in execute_backup —
+#  2026-06-02-backup-recovery-engine-restore-gap)
+vauchi-app/src/ui/app_engine/routing.rs 1501
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)

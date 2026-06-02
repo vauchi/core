@@ -38,12 +38,16 @@ pub struct BackupRecoveryEngine {
     password: String,
     confirm_password: String,
     has_identity: bool,
+    /// Pasted backup blob (Restore mode only). Hex-encoded ASCII matching
+    /// `Vauchi::export_full_backup` output. Captured on the password screen.
+    restore_data: String,
 }
 
 impl Drop for BackupRecoveryEngine {
     fn drop(&mut self) {
         self.password.zeroize();
         self.confirm_password.zeroize();
+        self.restore_data.zeroize();
     }
 }
 
@@ -75,7 +79,15 @@ impl BackupRecoveryEngine {
             password: String::new(),
             confirm_password: String::new(),
             has_identity,
+            restore_data: String::new(),
         }
+    }
+
+    /// Returns the pasted backup blob (Restore mode). Only meaningful once
+    /// the user has pasted it on the password screen; consumed by the
+    /// AppEngine at `Processing` to drive `Vauchi::import_full_backup`.
+    pub fn restore_data(&self) -> &str {
+        &self.restore_data
     }
 
     /// Returns the current backup level (full or identity-only).
@@ -213,25 +225,49 @@ impl BackupRecoveryEngine {
             BackupMode::Create => "Choose a backup password",
             BackupMode::Restore => "Enter your backup password",
         };
+        let mut components = Vec::new();
+        // Restore needs the backup blob. Offer a paste field (keyboard
+        // frontends) ahead of the password; mobile may still drive restore
+        // through the file picker, which sets `restore_data` out of band.
+        if matches!(self.mode, BackupMode::Restore) {
+            components.push(Component::TextInput {
+                id: "backup_data".into(),
+                label: "Paste your backup".into(),
+                value: self.restore_data.clone(),
+                placeholder: Some("Paste the backup text you saved".into()),
+                max_length: None,
+                validation_error: None,
+                input_type: InputType::Text,
+                a11y: Some(A11y {
+                    label: Some("Backup data input".into()),
+                    hint: Some("Paste the encrypted backup you exported earlier.".into()),
+                    role: Some(AccessibilityRole::TextField),
+                }),
+                info_key: None,
+            });
+        }
+        // Reflect the captured value so keyboard frontends (which render the
+        // model value rather than holding their own buffer) keep the input.
+        components.push(Component::TextInput {
+            id: "password".into(),
+            label: label.into(),
+            value: self.password.clone(),
+            placeholder: None,
+            max_length: None,
+            validation_error: None,
+            input_type: InputType::Password,
+            a11y: Some(A11y {
+                label: Some(format!("{} input", label)),
+                hint: None,
+                role: Some(AccessibilityRole::TextField),
+            }),
+            info_key: None,
+        });
         ScreenModel {
             screen_id: "backup_password".into(),
             title: "Backup Password".into(),
             subtitle: None,
-            components: vec![Component::TextInput {
-                id: "password".into(),
-                label: label.into(),
-                value: String::new(),
-                placeholder: None,
-                max_length: None,
-                validation_error: None,
-                input_type: InputType::Password,
-                a11y: Some(A11y {
-                    label: Some(format!("{} input", label)),
-                    hint: None,
-                    role: Some(AccessibilityRole::TextField),
-                }),
-                info_key: None,
-            }],
+            components,
             actions: vec![
                 ScreenAction {
                     id: "back".into(),
@@ -487,6 +523,16 @@ impl WorkflowEngine for BackupRecoveryEngine {
                 self.password = value;
                 ActionResult::UpdateScreen(self.current_screen())
             }
+            (
+                BackupStep::EnterPassword,
+                UserAction::TextChanged {
+                    component_id,
+                    value,
+                },
+            ) if component_id == "backup_data" => {
+                self.restore_data = value;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
             (BackupStep::EnterPassword, UserAction::ActionPressed { action_id })
                 if action_id == "continue" =>
             {
@@ -494,6 +540,12 @@ impl WorkflowEngine for BackupRecoveryEngine {
                     return ActionResult::ValidationError {
                         component_id: "password".into(),
                         message: "Password is required".into(),
+                    };
+                }
+                if matches!(self.mode, BackupMode::Restore) && self.restore_data.trim().is_empty() {
+                    return ActionResult::ValidationError {
+                        component_id: "backup_data".into(),
+                        message: "Paste your backup to restore".into(),
                     };
                 }
                 match self.mode {

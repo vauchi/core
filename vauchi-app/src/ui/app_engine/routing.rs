@@ -1328,10 +1328,32 @@ impl AppEngine {
             .is_some_and(|e| *e.mode() == crate::ui::backup_recovery::BackupMode::Restore);
 
         if is_restore {
-            // Restore needs backup data from a file picker — not available here.
-            self.engine.processing_failed();
-            self.pending_backup_full = true;
-            return ActionResult::NavigateTo(self.engine.current_screen());
+            // Restore from a pasted/typed backup blob (keyboard frontends).
+            // The blob lives on the engine (`restore_data`); the password was
+            // captured into `pending_backup_password` by the AppScreen::Backup
+            // TextChanged intercept. Mobile's file-picker restore runs through
+            // `execute_backup_restore` instead and never reaches here.
+            let backup_hex = self
+                .engine
+                .as_any()
+                .and_then(|a| a.downcast_ref::<BackupRecoveryEngine>())
+                .map(|e| e.restore_data().trim().to_string())
+                .unwrap_or_default();
+            let password = self.pending_backup_password.take().unwrap_or_default();
+            if backup_hex.is_empty() || password.is_empty() {
+                self.engine.processing_failed();
+                return ActionResult::NavigateTo(self.engine.current_screen());
+            }
+            return match self.vauchi.import_full_backup(&backup_hex, &password) {
+                Ok(()) => {
+                    self.engine.processing_complete();
+                    ActionResult::NavigateTo(self.engine.current_screen())
+                }
+                Err(_) => {
+                    self.engine.processing_failed();
+                    ActionResult::NavigateTo(self.engine.current_screen())
+                }
+            };
         }
 
         let password = match self.pending_backup_password.take() {

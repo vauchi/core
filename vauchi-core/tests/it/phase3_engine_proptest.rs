@@ -616,6 +616,11 @@ proptest! {
             component_id: "password".into(),
             value: password,
         });
+        // Restore requires the pasted backup blob before continuing.
+        let _ = engine.handle_action(UserAction::TextChanged {
+            component_id: "backup_data".into(),
+            value: "deadbeef".into(),
+        });
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
         });

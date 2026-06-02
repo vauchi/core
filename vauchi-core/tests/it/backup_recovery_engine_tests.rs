@@ -92,6 +92,10 @@ fn backup_confirm_password_mismatch() {
         component_id: "password".into(),
         value: "my-secret".into(),
     });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_data".into(),
+        value: "deadbeef".into(),
+    });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -126,6 +130,10 @@ fn backup_confirm_match_to_processing() {
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "my-secret".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_data".into(),
+        value: "deadbeef".into(),
     });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
@@ -165,6 +173,10 @@ fn backup_restore_skips_confirm() {
         component_id: "password".into(),
         value: "my-secret".into(),
     });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_data".into(),
+        value: "deadbeef".into(),
+    });
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -189,6 +201,10 @@ fn backup_processing_complete() {
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "pw".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_data".into(),
+        value: "deadbeef".into(),
     });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
@@ -246,6 +262,10 @@ fn backup_processing_failed() {
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "pw".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_data".into(),
+        value: "deadbeef".into(),
     });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
@@ -307,6 +327,10 @@ fn backup_back_navigation() {
         component_id: "password".into(),
         value: "pw".into(),
     });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_data".into(),
+        value: "deadbeef".into(),
+    });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -345,6 +369,10 @@ fn processing_screen_shows_kdf_explanation_for_create() {
         component_id: "password".into(),
         value: "pw".into(),
     });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_data".into(),
+        value: "deadbeef".into(),
+    });
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -375,6 +403,10 @@ fn processing_screen_shows_kdf_explanation_for_restore() {
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "pw".into(),
+    });
+    let _ = engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_data".into(),
+        value: "deadbeef".into(),
     });
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
@@ -451,4 +483,92 @@ fn backup_mode_getter() {
 
     let engine2 = BackupRecoveryEngine::new(None, false);
     assert_eq!(*engine2.mode(), BackupMode::Create);
+}
+
+// Restore needs a keyboard/paste path for the backup blob (the engine
+// only had a file-picker path before). See
+// `2026-06-02-backup-recovery-engine-restore-gap`.
+
+// @internal
+#[test]
+fn backup_restore_password_screen_offers_paste_field() {
+    let engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), false);
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "backup_password");
+    assert!(
+        screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::TextInput { id, .. } if id == "backup_data")),
+        "restore password screen must offer a backup_data paste field"
+    );
+}
+
+// @internal
+#[test]
+fn backup_create_password_screen_has_no_paste_field() {
+    let engine = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
+    let screen = engine.current_screen();
+    assert!(
+        !screen
+            .components
+            .iter()
+            .any(|c| matches!(c, Component::TextInput { id, .. } if id == "backup_data")),
+        "create flow must not show a paste field"
+    );
+}
+
+// @internal
+#[test]
+fn backup_restore_captures_pasted_data_and_requires_it() {
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), false);
+
+    // Password set but no pasted data → continue must fail on backup_data.
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "pw".into(),
+    });
+    let r = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    assert!(
+        matches!(&r, ActionResult::ValidationError { component_id, .. } if component_id == "backup_data"),
+        "restore must require backup data, got {r:?}"
+    );
+
+    // Paste the blob → captured, and continue now advances.
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "backup_data".into(),
+        value: "deadbeef".into(),
+    });
+    assert_eq!(engine.restore_data(), "deadbeef");
+    let r2 = engine.handle_action(UserAction::ActionPressed {
+        action_id: "continue".into(),
+    });
+    assert!(
+        matches!(r2, ActionResult::NavigateTo(_)),
+        "with data + password, continue advances, got {r2:?}"
+    );
+}
+
+// @internal
+#[test]
+fn backup_password_value_is_reflected_for_keyboard_frontends() {
+    // Keyboard frontends (TUI) render the model value; an always-empty
+    // value field would drop typed input. The engine must echo it back.
+    let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "password".into(),
+        value: "secret".into(),
+    });
+    let screen = engine.current_screen();
+    let pw = screen.components.iter().find_map(|c| match c {
+        Component::TextInput { id, value, .. } if id == "password" => Some(value.clone()),
+        _ => None,
+    });
+    assert_eq!(
+        pw.as_deref(),
+        Some("secret"),
+        "password value must be reflected"
+    );
 }

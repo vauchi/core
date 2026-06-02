@@ -142,8 +142,9 @@ impl Contact {
 
     /// Creates an exchanged contact from a link-mode (relay-escrow)
     /// exchange (ADR-050). Like [`Contact::from_exchange`] but stamps
-    /// [`ExchangeTransport::Link`], records the peer's `relay_url` for the
-    /// update channel, and carries no proximity (link is not in-person).
+    /// [`ExchangeTransport::Link`] and records the peer's `relay_url` for
+    /// the update channel (link is not in-person, so proximity stays
+    /// `Unknown` as in `from_exchange`).
     pub fn from_link_exchange(
         public_key: [u8; 32],
         card: ContactCard,
@@ -151,38 +152,12 @@ impl Contact {
         relay_url: Option<String>,
         now: u64,
     ) -> Self {
-        let id = hex::encode(public_key);
-        let display_name = card.display_name().to_string();
-        Contact {
-            id,
-            display_name,
-            card,
-            kind: ContactKind::Exchanged(ExchangedData {
-                public_key,
-                shared_key,
-                exchange_timestamp: now,
-                exchange_transport: ExchangeTransport::Link,
-                fingerprint_verified: false,
-                recovery_trusted: false,
-                proposal_trusted: false,
-                proximity_confidence: ProximityConfidence::Unknown,
-                has_recovered: false,
-                relay_url,
-                relay_noise_pubkey: None,
-                trust_metrics: None,
-                visibility_rules: VisibilityRules::new(),
-                reciprocity: None,
-                confirmation_channel: None,
-            }),
-            hidden: false,
-            blocked: false,
-            favorite: false,
-            cek: None,
-            card_updated_at: None,
-            deleted_at: None,
-            archived: false,
-            archived_at: None,
+        let mut contact = Self::from_exchange(public_key, card, shared_key, now);
+        if let ContactKind::Exchanged(ref mut data) = contact.kind {
+            data.exchange_transport = ExchangeTransport::Link;
+            data.relay_url = relay_url;
         }
+        contact
     }
 
     /// Creates a new contact from exchange data with proximity confidence.

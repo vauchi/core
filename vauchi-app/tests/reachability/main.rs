@@ -29,6 +29,7 @@ mod device_management;
 mod device_replacement;
 mod duplicate_detection;
 mod duress_pin;
+mod emergency_broadcast;
 mod emergency_shred;
 mod exchange;
 mod exchange_ble;

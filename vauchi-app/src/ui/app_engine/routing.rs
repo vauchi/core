@@ -544,6 +544,74 @@ impl AppEngine {
                 let screen = self.navigate_to_internal(AppScreen::Onboarding);
                 ActionResult::NavigateTo(screen)
             }
+            AppScreen::EmergencyBroadcast => {
+                use crate::ui::{EmergencyBroadcastEngine, EmergencyOutcome};
+                // Read everything off the engine into owned values first so the
+                // immutable engine borrow is released before the mutating
+                // `vauchi` calls below.
+                let eng = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<EmergencyBroadcastEngine>());
+                let plan = eng.map(|e| {
+                    (
+                        e.outcome().cloned(),
+                        e.contact_ids(),
+                        e.message().to_string(),
+                        e.include_location(),
+                    )
+                });
+                let Some((outcome, ids, message, include_location)) = plan else {
+                    let screen = self.navigate_back();
+                    return ActionResult::NavigateTo(screen);
+                };
+                match outcome {
+                    Some(EmergencyOutcome::Save) => {
+                        if let Err(e) = self.vauchi.configure_emergency_broadcast(
+                            ids,
+                            message,
+                            include_location,
+                        ) {
+                            return ActionResult::ShowAlert {
+                                title: "Error".into(),
+                                message: format!("Failed to save emergency broadcast: {e}"),
+                            };
+                        }
+                        let screen = self.navigate_back();
+                        ActionResult::NavigateTo(screen)
+                    }
+                    Some(EmergencyOutcome::Send) => match self.vauchi.send_emergency_broadcast() {
+                        Ok(result) => {
+                            let _ = self.navigate_back();
+                            ActionResult::ShowToast {
+                                message: format!(
+                                    "Emergency alert sent to {}/{} contacts",
+                                    result.sent, result.total
+                                ),
+                                undo_action_id: None,
+                            }
+                        }
+                        Err(e) => ActionResult::ShowAlert {
+                            title: "Send failed".into(),
+                            message: format!("{e}"),
+                        },
+                    },
+                    Some(EmergencyOutcome::Disable) => {
+                        if let Err(e) = self.vauchi.delete_emergency_config() {
+                            return ActionResult::ShowAlert {
+                                title: "Error".into(),
+                                message: format!("Failed to disable emergency broadcast: {e}"),
+                            };
+                        }
+                        let screen = self.navigate_back();
+                        ActionResult::NavigateTo(screen)
+                    }
+                    None => {
+                        let screen = self.navigate_back();
+                        ActionResult::NavigateTo(screen)
+                    }
+                }
+            }
             AppScreen::Privacy => {
                 // GdprEngine returns "export" or "delete" via collected_input().
                 // The actual API calls happen in the platform layer (UniFFI/CABI);

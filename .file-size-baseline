@@ -238,7 +238,9 @@ vauchi-core/src/storage/mod.rs 1079
 # (+8 for slice 32m T2.2b: ble_handshake_session field on AppEngine
 #  + module declaration + initializer, mirrors T1.2b's
 #  multi_stage_session scaffolding)
-vauchi-app/src/ui/app_engine/mod.rs 1532
+# (+3 for AppScreen::EmergencyBroadcast variant + id + from_screen_id —
+#  2026-06-02 humble-ui core engines sweep)
+vauchi-app/src/ui/app_engine/mod.rs 1535
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -279,7 +281,9 @@ vauchi-app/src/ui/app_engine/mod.rs 1532
 #  2026-06-02-exchange-back-cancel-broken)
 # (+22 for BackupRecoveryEngine paste-restore branch in execute_backup —
 #  2026-06-02-backup-recovery-engine-restore-gap)
-vauchi-app/src/ui/app_engine/routing.rs 1501
+# (+68 for AppScreen::EmergencyBroadcast handle_completion arm — configure /
+#  send / disable outcome routing, 2026-06-02 humble-ui core engines sweep)
+vauchi-app/src/ui/app_engine/routing.rs 1569
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)
@@ -301,7 +305,9 @@ vauchi-app/src/ui/app_engine/routing.rs 1501
 # (+5 on screens.rs for humble-UI follow-up to ios!472: the AppScreen::MyInfo
 #  arm reads vauchi.pending_update_count() / last_sync_time() / clock and
 #  threads them into MyInfoEngine's new sync-caption builders.)
-vauchi-app/src/ui/app_engine/screens.rs 1429
+# (+5 for AppScreen::EmergencyBroadcast engine constructor + use —
+#  2026-06-02 humble-ui core engines sweep)
+vauchi-app/src/ui/app_engine/screens.rs 1434
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

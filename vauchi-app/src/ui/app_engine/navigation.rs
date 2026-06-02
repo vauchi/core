@@ -81,7 +81,10 @@ impl AppScreen {
                 | Self::Onboarding => canonical,
                 // Settings sub-flows — collapse under Settings on
                 // desktop (no More tab in the desktop sidebar).
-                Self::DuressPin | Self::ChangePassword | Self::EmergencyShred => Self::Settings,
+                Self::DuressPin
+                | Self::ChangePassword
+                | Self::EmergencyShred
+                | Self::EmergencyBroadcast => Self::Settings,
                 // Exchange-side sync indicator.
                 Self::DeliveryStatus => Self::Exchange,
                 // Multi-stage face-to-face exchange — collapses under
@@ -114,7 +117,8 @@ impl AppScreen {
                 | Self::Sync
                 | Self::DuressPin
                 | Self::ChangePassword
-                | Self::EmergencyShred => Self::More,
+                | Self::EmergencyShred
+                | Self::EmergencyBroadcast => Self::More,
                 Self::DeliveryStatus => Self::Exchange,
                 Self::MultiStageExchange { .. } => Self::Exchange,
                 _ => return None,

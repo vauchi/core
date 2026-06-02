@@ -32,6 +32,7 @@ mod device_replacement;
 mod display_hint;
 mod duplicate_detection;
 mod duress_pin;
+mod emergency_broadcast;
 mod emergency_shred;
 mod engine;
 mod exchange;
@@ -100,6 +101,7 @@ pub use device_replacement::{CompletionOutcome, DeviceReplacementEngine, Replace
 pub use display_hint::DisplayHint;
 pub use duplicate_detection::{DuplicateDetectionEngine, DuplicatePair};
 pub use duress_pin::{DuressConfig, DuressPinEngine};
+pub use emergency_broadcast::{EmergencyBroadcastEngine, EmergencyOutcome};
 pub use emergency_shred::EmergencyShredEngine;
 pub use engine::WorkflowEngine;
 pub use exchange::{ExchangeConfig, ExchangeEngine};

@@ -340,6 +340,16 @@ fn emergency_shred_fixture_is_fresh() {
     assert_fixture_fresh(&engine.current_screen(), "emergency_shred.json");
 }
 
+// @internal
+#[test]
+fn emergency_broadcast_overview_fixture_is_fresh() {
+    let engine = EmergencyBroadcastEngine::new(None);
+    assert_fixture_fresh(
+        &engine.current_screen(),
+        "emergency_broadcast_overview.json",
+    );
+}
+
 // ── Regenerate all fixtures (run with --ignored) ─────────────────
 
 // @internal
@@ -448,9 +458,13 @@ fn regenerate_all_engine_fixtures() {
             "emergency_shred.json",
             EmergencyShredEngine::new().current_screen(),
         ),
+        (
+            "emergency_broadcast_overview.json",
+            EmergencyBroadcastEngine::new(None).current_screen(),
+        ),
     ];
 
-    assert_eq!(fixtures.len(), 16, "expected 16 engine fixtures");
+    assert_eq!(fixtures.len(), 17, "expected 17 engine fixtures");
 
     for (filename, screen) in &fixtures {
         let json = screen_to_json(screen);

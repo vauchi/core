@@ -29,6 +29,7 @@ use crate::ui::device_linking::DeviceLinkingEngine;
 use crate::ui::device_management::{DeviceListItem, DeviceManagementEngine};
 use crate::ui::duplicate_detection::{DuplicateDetectionEngine, DuplicatePair};
 use crate::ui::duress_pin::{DuressConfig, DuressPinEngine};
+use crate::ui::emergency_broadcast::EmergencyBroadcastEngine;
 use crate::ui::emergency_shred::EmergencyShredEngine;
 use crate::ui::engine::WorkflowEngine;
 use crate::ui::exchange::{ExchangeConfig, ExchangeEngine};
@@ -406,6 +407,10 @@ impl AppEngine {
             }
             AppScreen::ChangePassword => Box::new(ChangePasswordEngine::new()),
             AppScreen::EmergencyShred => Box::new(EmergencyShredEngine::new()),
+            AppScreen::EmergencyBroadcast => {
+                let config = vauchi.load_emergency_config().ok().flatten();
+                Box::new(EmergencyBroadcastEngine::new(config))
+            }
             AppScreen::DeliveryStatus => {
                 let items = Self::load_delivery_items(vauchi);
                 let retries = Self::load_retry_entries(vauchi);

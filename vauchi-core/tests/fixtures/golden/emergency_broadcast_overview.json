@@ -1,0 +1,87 @@
+{
+  "schema_version": 3,
+  "screen_id": "emergency_overview",
+  "title": "Emergency Broadcast",
+  "subtitle": null,
+  "components": [
+    {
+      "InfoPanel": {
+        "id": "emergency_info",
+        "icon": "warning",
+        "title": "Emergency Broadcast",
+        "items": [
+          {
+            "icon": "info",
+            "title": "What is an emergency broadcast?",
+            "detail": "Silently alert your trusted contacts that you may be in danger. The alert is disguised as a normal card update."
+          }
+        ],
+        "a11y": null
+      }
+    },
+    {
+      "ToggleList": {
+        "id": "emergency_toggle",
+        "label": "Status",
+        "items": [
+          {
+            "id": "configured",
+            "label": "Emergency broadcast configured",
+            "selected": false,
+            "subtitle": null,
+            "a11y": null
+          }
+        ],
+        "a11y": null
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "configure",
+      "label": "Configure",
+      "style": "Primary",
+      "enabled": true
+    }
+  ],
+  "progress": null,
+  "tokens": {
+    "spacing": {
+      "xs": 4,
+      "sm": 8,
+      "sm_md": 12,
+      "md": 16,
+      "lg": 24,
+      "xl": 32
+    },
+    "spacing_direction": {
+      "content_start": 16,
+      "content_end": 16,
+      "list_item_start": 8,
+      "list_item_end": 8,
+      "list_item_inline_start": 12,
+      "list_item_inline_end": 12
+    },
+    "typography": {
+      "title_size": 24,
+      "subtitle_size": 18,
+      "body_size": 16,
+      "caption_size": 14
+    },
+    "border_radius": {
+      "sm": 4,
+      "md": 8,
+      "md_lg": 12,
+      "lg": 16
+    },
+    "touch_target": {
+      "minimum": 44
+    },
+    "motion": {
+      "enter_duration_ms": 200,
+      "exit_duration_ms": 150,
+      "emphasis_duration_ms": 300
+    }
+  },
+  "presentation_kind": "Page"
+}

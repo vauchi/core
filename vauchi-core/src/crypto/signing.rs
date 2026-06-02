@@ -116,3 +116,17 @@ impl Signature {
         &self.bytes
     }
 }
+
+/// Verify an Ed25519 `signature` over `message` against a *peer's* public
+/// key. Unlike [`SigningKeyPair::verify`] (which checks against the
+/// keypair's own key), this verifies a signature made by someone else —
+/// e.g. a link-mode bootstrap signed by a contact's identity key
+/// (ADR-050). Returns `false` for a malformed public key or signature, so
+/// callers fail closed.
+pub fn verify_signature(public_key: &[u8; 32], message: &[u8], signature: &Signature) -> bool {
+    let Ok(vk) = ed25519_dalek::VerifyingKey::from_bytes(public_key) else {
+        return false;
+    };
+    let sig = ed25519_dalek::Signature::from_bytes(signature.as_bytes());
+    vk.verify(message, &sig).is_ok()
+}

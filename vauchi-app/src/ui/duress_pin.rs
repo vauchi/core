@@ -435,7 +435,7 @@ impl WorkflowEngine for DuressPinEngine {
                 ActionResult::UpdateScreen(self.current_screen())
             }
             (DuressPinStep::ConfigureAlerts, UserAction::ActionPressed { action_id })
-                if action_id == "save" =>
+                if action_id == "save" || action_id == "submit_alert_message" =>
             {
                 self.config.enabled = true;
                 ActionResult::Complete

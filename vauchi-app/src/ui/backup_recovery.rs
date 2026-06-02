@@ -534,7 +534,9 @@ impl WorkflowEngine for BackupRecoveryEngine {
                 ActionResult::UpdateScreen(self.current_screen())
             }
             (BackupStep::EnterPassword, UserAction::ActionPressed { action_id })
-                if action_id == "continue" =>
+                if action_id == "continue"
+                    || action_id == "submit_password"
+                    || action_id == "submit_backup_data" =>
             {
                 if self.password.is_empty() {
                     return ActionResult::ValidationError {

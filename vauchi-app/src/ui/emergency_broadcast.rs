@@ -376,7 +376,7 @@ impl WorkflowEngine for EmergencyBroadcastEngine {
                 ActionResult::UpdateScreen(self.current_screen())
             }
             (EmergencyStep::ContactIds, UserAction::ActionPressed { action_id })
-                if action_id == "continue" =>
+                if action_id == "continue" || action_id == "submit_contact_ids" =>
             {
                 let ids = self.contact_ids();
                 if ids.is_empty() {
@@ -423,7 +423,7 @@ impl WorkflowEngine for EmergencyBroadcastEngine {
                 ActionResult::UpdateScreen(self.current_screen())
             }
             (EmergencyStep::Message, UserAction::ActionPressed { action_id })
-                if action_id == "save" =>
+                if action_id == "save" || action_id == "submit_message" =>
             {
                 self.configured = true;
                 self.outcome = Some(EmergencyOutcome::Save);

@@ -189,6 +189,37 @@ fn disable_requires_confirmation_and_sets_disable_outcome() {
 
 // @internal
 #[test]
+fn textinput_enter_submit_advances_like_continue_and_save() {
+    // Keyboard frontends emit `submit_<id>` when Enter is pressed on a
+    // non-empty TextInput (the FormDialog convention). The engine must treat
+    // those as continue / save so a typed field can advance via Enter.
+    let mut engine = EmergencyBroadcastEngine::new(None);
+    engine.handle_action(UserAction::ActionPressed {
+        action_id: "configure".into(),
+    });
+    engine.handle_action(UserAction::TextChanged {
+        component_id: "contact_ids".into(),
+        value: "abc".into(),
+    });
+    let r = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit_contact_ids".into(),
+    });
+    assert!(
+        matches!(r, ActionResult::NavigateTo(ref s) if s.screen_id == "emergency_message"),
+        "submit_contact_ids must advance like continue, got {r:?}"
+    );
+    let r = engine.handle_action(UserAction::ActionPressed {
+        action_id: "submit_message".into(),
+    });
+    assert!(
+        matches!(r, ActionResult::Complete),
+        "submit_message saves, got {r:?}"
+    );
+    assert_eq!(engine.outcome(), Some(&EmergencyOutcome::Save));
+}
+
+// @internal
+#[test]
 fn captured_values_are_reflected_for_keyboard_frontends() {
     let mut engine = EmergencyBroadcastEngine::new(None);
     engine.handle_action(UserAction::ActionPressed {

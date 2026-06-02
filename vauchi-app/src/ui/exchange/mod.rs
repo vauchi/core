@@ -3502,6 +3502,7 @@ mod tests {
     // handoff). Surfaced on-device: iOS "Tap tap" → Assign-to-Groups →
     // Skip → QR instead of the Send/Receive role chooser.
 
+    // @internal
     #[test]
     fn taptap_with_groups_skip_routes_to_nfc_role_selection() {
         let mut config = config_mode_selection();
@@ -3540,6 +3541,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn taptap_with_groups_continue_routes_to_nfc_role_selection() {
         let mut config = config_mode_selection();
@@ -3577,6 +3579,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn glance_with_groups_skip_routes_to_multi_stage() {
         // Same bug class for the multi-stage modes: grouped Glance + Skip

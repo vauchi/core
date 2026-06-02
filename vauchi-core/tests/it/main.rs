@@ -175,6 +175,7 @@ mod engine_golden_fixtures;
 mod error_handling_tests;
 mod escrow_client_tests;
 mod escrow_crypto_tests;
+mod escrow_exchange_tests;
 mod escrow_send_tests;
 mod exchange_audio_command_event_tests;
 mod exchange_ble_command_event_tests;

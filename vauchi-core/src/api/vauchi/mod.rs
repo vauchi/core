@@ -10,6 +10,8 @@ mod builder;
 mod contacts;
 mod devices;
 mod emergency;
+#[cfg(feature = "network-http")]
+mod escrow_exchange;
 mod exchange;
 #[cfg(feature = "network-http")]
 mod exchange_relay;

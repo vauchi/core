@@ -1328,6 +1328,20 @@ impl WorkflowEngine for ExchangeEngine {
                             // `ExchangeStep::Qr` path until their per-mode
                             // graduations land.
                             if matches!(mode, ExchangeMode::Glance | ExchangeMode::Hover) {
+                                // The multi-stage flow runs in its own
+                                // `AppScreen::MultiStageExchange` engine, but
+                                // this `ExchangeEngine` stays on the
+                                // `ModeSelection` step and is cached — Cancel
+                                // navigates back to it. Re-arm the picker so
+                                // the cached engine is not a zombie: a
+                                // `ModeSelection` step with `mode_selection ==
+                                // None` renders `ScreenModel::default()` (empty
+                                // `screen_id` → white screen) and ignores
+                                // further picks. Fix A of
+                                // `2026-06-02-exchange-back-cancel-broken`.
+                                self.mode_selection = Some(ModeSelectionEngine::new(
+                                    self.config.device_capabilities.clone(),
+                                ));
                                 return ActionResult::StartMultiStageExchange { mode };
                             }
                             self.step = ExchangeStep::Qr(QrStep::ShowQr);

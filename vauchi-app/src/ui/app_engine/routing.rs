@@ -458,6 +458,33 @@ impl AppEngine {
 
                 ActionResult::NavigateTo(screen)
             }
+            // Fix A of `2026-06-02-exchange-back-cancel-broken`: the
+            // core-driven multi-stage screen returns `Complete` on both
+            // Cancel and Done. Without an explicit arm this fell to the
+            // catch-all `navigate_back`, which popped an unstamped target
+            // and produced an empty `screen_id` → a white screen on
+            // device. Route to a deterministic, stamped destination:
+            // Done (success — the contact was already persisted on the
+            // `Finalized` event, see app_engine/multi_stage_exchange.rs)
+            // lands on Contacts; Cancel returns to the mode picker.
+            AppScreen::MultiStageExchange { .. } => {
+                let cancelled = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| {
+                        a.downcast_ref::<crate::ui::multi_stage_exchange::MultiStageExchangeEngine>(
+                        )
+                    })
+                    .map(|ms| ms.was_cancelled())
+                    .unwrap_or(false);
+                let target = if cancelled {
+                    AppScreen::Exchange
+                } else {
+                    AppScreen::Contacts
+                };
+                let screen = self.navigate_to_internal(target);
+                ActionResult::NavigateTo(screen)
+            }
             AppScreen::ContactVisibility { contact_id } => {
                 if let Some(input) = self.engine.collected_input() {
                     // Parse "field_id:visible,field_id:hidden,..." and persist

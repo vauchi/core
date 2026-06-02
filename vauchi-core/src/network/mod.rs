@@ -69,6 +69,8 @@ mod relay_client;
 
 pub mod simple_message;
 
+pub mod escrow_client;
+
 #[cfg(feature = "testing")]
 pub mod transport;
 #[cfg(not(feature = "testing"))]

@@ -583,6 +583,62 @@ impl ExchangeEngine {
         }
     }
 
+    /// Route to the mode-specific sub-flow once the optional group /
+    /// field-preview steps are done. Single source of truth for
+    /// `ExchangeMode` → `ExchangeStep`, so the three entry points
+    /// (no-groups direct, group-Skip, field-preview start) cannot
+    /// diverge — that divergence silently routed grouped TapTap, Glance
+    /// and Hover through the legacy QR step
+    /// (`2026-06-02-grouped-mode-routing-nfc`). Relies on
+    /// `self.config.mode`, set when the mode is picked (before any group
+    /// detour).
+    fn enter_mode_sub_flow(&mut self) -> ActionResult {
+        match self.config.mode {
+            Some(ExchangeMode::Link) => self.start_link_mode(),
+            Some(ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake) => {
+                self.step = ExchangeStep::Ble(BleStep::Discovering);
+                self.start_ble_mode()
+            }
+            Some(ExchangeMode::TapTap) => {
+                // Core-driven role choice (Send/Receive) before the NFC
+                // flow — a two-device exchange needs one initiator + one
+                // responder, so both devices opening the screen must NOT
+                // both Send.
+                self.step = ExchangeStep::NfcRoleSelection;
+                ActionResult::NavigateTo(self.build_screen())
+            }
+            // Pair 4 — `Glance` is the canonical face-to-face mode
+            // (bilateral simultaneous QR with no proximity signal); route
+            // it through the core-driven `MultiStageExchange` screen so the
+            // multi-stage protocol drives both QR display and scan from a
+            // pure ScreenModel rather than the legacy bespoke step state
+            // machine. Phase 1.E of `2026-05-11-hover-graduation-plan.md`
+            // extended the handoff to `Hover` (QR + ultrasonic). The `mode`
+            // payload tells AppEngine which engine constructor to use
+            // (`new_hover` vs `new_glance`). Broadcast (one-to-many) +
+            // TapHoverShake (Phase 2/3) keep the legacy `ExchangeStep::Qr`
+            // path until their per-mode graduations land.
+            Some(mode @ (ExchangeMode::Glance | ExchangeMode::Hover)) => {
+                // The multi-stage flow runs in its own
+                // `AppScreen::MultiStageExchange` engine, but this
+                // `ExchangeEngine` is cached — Cancel navigates back to it.
+                // Re-arm the picker so the cached engine is not a zombie: a
+                // `ModeSelection` step with `mode_selection == None` renders
+                // `ScreenModel::default()` (empty `screen_id` → white
+                // screen) and ignores further picks. Fix A of
+                // `2026-06-02-exchange-back-cancel-broken`.
+                self.mode_selection = Some(ModeSelectionEngine::new(
+                    self.config.device_capabilities.clone(),
+                ));
+                ActionResult::StartMultiStageExchange { mode }
+            }
+            _ => {
+                self.step = ExchangeStep::Qr(QrStep::ShowQr);
+                self.start_session_if_needed()
+            }
+        }
+    }
+
     /// Handle BLE mode hardware events via BleExchangeFlow.
     fn handle_ble_hardware_event(&mut self, event: vauchi_core::Event) -> Option<ActionResult> {
         let flow = self.ble_flow.as_mut()?;
@@ -1286,70 +1342,13 @@ impl WorkflowEngine for ExchangeEngine {
                         // Record the selection step so a BACK press from
                         // the sub-flow rewinds here (see navigate_back_within).
                         self.step_history.push(ExchangeStep::ModeSelection);
-                        // Advance to group selection or directly to sub-flow
+                        // Advance to group selection or, when the card has
+                        // no groups, straight to the mode-specific sub-flow.
                         if self.config.available_groups.is_empty() {
-                            if mode == ExchangeMode::Link {
-                                return self.start_link_mode();
-                            }
-                            if matches!(
-                                mode,
-                                ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake
-                            ) {
-                                self.step = ExchangeStep::Ble(BleStep::Discovering);
-                                return self.start_ble_mode();
-                            }
-                            if mode == ExchangeMode::TapTap {
-                                // Core-driven role choice (Send/Receive) before
-                                // the NFC flow — a two-device exchange needs one
-                                // initiator + one responder, so both devices
-                                // opening the screen must NOT both Send.
-                                self.step = ExchangeStep::NfcRoleSelection;
-                                return ActionResult::NavigateTo(self.build_screen());
-                            }
-                            // Pair 4 — `Glance` is the canonical face-to-face
-                            // mode (bilateral simultaneous QR with no proximity
-                            // signal); route it through the new core-driven
-                            // `MultiStageExchange` screen so the multi-stage
-                            // protocol drives both QR display and scan from a
-                            // pure ScreenModel rather than the legacy bespoke
-                            // step state machine.
-                            //
-                            // Phase 1.E of `2026-05-11-hover-graduation-plan.md`
-                            // extended the handoff to `Hover` (QR + ultrasonic).
-                            // The `mode` payload tells AppEngine which engine
-                            // constructor to use (`new_hover` vs `new_glance`)
-                            // — Hover defaults to the front camera and runs
-                            // the autonomous audio-handshake trigger; Glance
-                            // stays back-camera + audio-quiet (the
-                            // `is_active_engine_multi_stage_hover()` gate in
-                            // PlatformAppEngine pinned by the 1.C polish
-                            // regression tests). Broadcast (one-to-many) +
-                            // TapHoverShake (Phase 2/3) keep the legacy
-                            // `ExchangeStep::Qr` path until their per-mode
-                            // graduations land.
-                            if matches!(mode, ExchangeMode::Glance | ExchangeMode::Hover) {
-                                // The multi-stage flow runs in its own
-                                // `AppScreen::MultiStageExchange` engine, but
-                                // this `ExchangeEngine` stays on the
-                                // `ModeSelection` step and is cached — Cancel
-                                // navigates back to it. Re-arm the picker so
-                                // the cached engine is not a zombie: a
-                                // `ModeSelection` step with `mode_selection ==
-                                // None` renders `ScreenModel::default()` (empty
-                                // `screen_id` → white screen) and ignores
-                                // further picks. Fix A of
-                                // `2026-06-02-exchange-back-cancel-broken`.
-                                self.mode_selection = Some(ModeSelectionEngine::new(
-                                    self.config.device_capabilities.clone(),
-                                ));
-                                return ActionResult::StartMultiStageExchange { mode };
-                            }
-                            self.step = ExchangeStep::Qr(QrStep::ShowQr);
-                            return self.start_session_if_needed();
-                        } else {
-                            self.step = ExchangeStep::GroupSelection;
-                            return ActionResult::NavigateTo(self.build_screen());
+                            return self.enter_mode_sub_flow();
                         }
+                        self.step = ExchangeStep::GroupSelection;
+                        return ActionResult::NavigateTo(self.build_screen());
                     }
                     ModeSelectionResult::Screen(screen) => {
                         return ActionResult::UpdateScreen(*screen);
@@ -1400,16 +1399,10 @@ impl WorkflowEngine for ExchangeEngine {
                 self.step_history.push(ExchangeStep::GroupSelection);
                 if action_id == "skip" {
                     self.selected_groups.clear();
-                    // Skip → go straight to sub-flow (no preview needed)
-                    if matches!(
-                        self.config.mode,
-                        Some(ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake)
-                    ) {
-                        self.step = ExchangeStep::Ble(BleStep::Discovering);
-                        return self.start_ble_mode();
-                    }
-                    self.step = ExchangeStep::Qr(QrStep::ShowQr);
-                    return self.start_session_if_needed();
+                    // Skip → straight to the mode-specific sub-flow (no
+                    // preview needed), via the shared router so grouped
+                    // TapTap/Glance/Hover keep their NFC/multi-stage screens.
+                    return self.enter_mode_sub_flow();
                 }
                 // Continue with groups → show field preview
                 self.field_preview = Some(self.build_field_preview_config());
@@ -1421,21 +1414,10 @@ impl WorkflowEngine for ExchangeEngine {
                 if let Some(outcome) = field_preview::handle_field_preview_action(user_action) {
                     match outcome {
                         FieldPreviewResult::StartExchange => {
-                            // Route to sub-flow based on selected mode
-                            if self.config.mode == Some(ExchangeMode::Link) {
-                                return self.start_link_mode();
-                            }
-                            if matches!(
-                                self.config.mode,
-                                Some(
-                                    ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake
-                                )
-                            ) {
-                                self.step = ExchangeStep::Ble(BleStep::Discovering);
-                                return self.start_ble_mode();
-                            }
-                            self.step = ExchangeStep::Qr(QrStep::ShowQr);
-                            return self.start_session_if_needed();
+                            // Route to the mode-specific sub-flow via the
+                            // shared router (keeps grouped TapTap/Glance/Hover
+                            // on their NFC/multi-stage screens).
+                            return self.enter_mode_sub_flow();
                         }
                         FieldPreviewResult::ChangeGroups => {
                             self.field_preview = None;
@@ -1597,7 +1579,10 @@ mod tests {
                 ("g2".into(), "Friends".into()),
             ],
             device_capabilities: DeviceCapabilities::default(),
-            mode: Some(ExchangeMode::Glance),
+            // Broadcast routes through the legacy QR sub-flow (Glance now
+            // diverts to multi-stage even with groups — see
+            // `2026-06-02-grouped-mode-routing-nfc`).
+            mode: Some(ExchangeMode::Broadcast),
             card_snapshot: None,
         }
     }
@@ -3502,6 +3487,126 @@ mod tests {
             "set_nfc_identity must be consumed by start_taptap_mode"
         );
         assert!(engine.nfc_flow.is_some(), "nfc_flow must be populated");
+    }
+
+    // ── Grouped-card mode routing regression ───────────────────────
+    //
+    // `2026-06-02-grouped-mode-routing-nfc`: when the card has groups,
+    // mode selection detours through GroupSelection first. The
+    // resume-after-groups paths (group Skip; group Continue →
+    // FieldPreview → start_exchange) must replicate the SAME
+    // mode→sub-flow routing as the no-groups branch. Before the fix
+    // they special-cased only the BLE modes and collapsed everything
+    // else to the legacy QR step — so grouped TapTap silently lost its
+    // NFC role-selection screen (and Glance/Hover lost the multi-stage
+    // handoff). Surfaced on-device: iOS "Tap tap" → Assign-to-Groups →
+    // Skip → QR instead of the Send/Receive role chooser.
+
+    #[test]
+    fn taptap_with_groups_skip_routes_to_nfc_role_selection() {
+        let mut config = config_mode_selection();
+        config.available_groups = vec![("g1".into(), "Work".into())];
+        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
+        engine.set_nfc_identity(vauchi_core::identity::Identity::create(
+            "Alice",
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        ));
+
+        // Pick TapTap — with groups present, lands on GroupSelection first.
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:fun".into(),
+            item_id: "mode:tap_tap".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::GroupSelection);
+
+        // Skip groups → must enter the TapTap sub-flow (NFC role choice),
+        // never the legacy QR step.
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "skip".into(),
+        });
+        assert_eq!(
+            engine.step,
+            ExchangeStep::NfcRoleSelection,
+            "grouped TapTap + skip must reach NfcRoleSelection, not QR"
+        );
+        assert!(
+            matches!(result, ActionResult::NavigateTo(_)),
+            "expected NavigateTo(role screen), got {result:?}"
+        );
+        // Negative (CC-11): must not collapse to the QR sub-flow.
+        assert!(
+            !matches!(engine.step, ExchangeStep::Qr(_)),
+            "grouped TapTap must not route to QR"
+        );
+    }
+
+    #[test]
+    fn taptap_with_groups_continue_routes_to_nfc_role_selection() {
+        let mut config = config_mode_selection();
+        config.available_groups = vec![("g1".into(), "Work".into())];
+        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
+        engine.set_nfc_identity(vauchi_core::identity::Identity::create(
+            "Alice",
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        ));
+
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:fun".into(),
+            item_id: "mode:tap_tap".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::GroupSelection);
+
+        // Continue (keep groups) → field preview.
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::FieldPreview);
+
+        // Start the exchange from field preview → TapTap NFC role choice.
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "start_exchange".into(),
+        });
+        assert_eq!(
+            engine.step,
+            ExchangeStep::NfcRoleSelection,
+            "grouped TapTap + continue + start must reach NfcRoleSelection, not QR"
+        );
+        assert!(
+            matches!(result, ActionResult::NavigateTo(_)),
+            "expected NavigateTo(role screen), got {result:?}"
+        );
+    }
+
+    #[test]
+    fn glance_with_groups_skip_routes_to_multi_stage() {
+        // Same bug class for the multi-stage modes: grouped Glance + Skip
+        // must hand off to MultiStageExchange, not collapse to QR.
+        let mut config = config_mode_selection();
+        config.available_groups = vec![("g1".into(), "Work".into())];
+        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
+
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:quick".into(),
+            item_id: "mode:glance".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::GroupSelection);
+
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "skip".into(),
+        });
+        assert!(
+            matches!(
+                result,
+                ActionResult::StartMultiStageExchange {
+                    mode: ExchangeMode::Glance
+                }
+            ),
+            "grouped Glance + skip must hand off to MultiStageExchange, got {result:?}"
+        );
+        assert!(
+            !matches!(engine.step, ExchangeStep::Qr(_)),
+            "grouped Glance must not route to QR"
+        );
     }
 
     // @internal

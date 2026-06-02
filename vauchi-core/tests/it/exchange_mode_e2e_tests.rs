@@ -34,7 +34,7 @@ fn config_with_mode_selection() -> ExchangeConfig {
 
 // @internal
 #[test]
-fn glance_full_flow_mode_to_qr_to_result() {
+fn glance_full_flow_mode_to_multistage_handoff() {
     let mut engine = ExchangeEngine::new(
         config_with_mode_selection(),
         vauchi_core::clock::SystemClock::shared(),
@@ -61,38 +61,22 @@ fn glance_full_flow_mode_to_qr_to_result() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_field_preview");
 
-    // Step 5: Start exchange → QR show
-    let _ = engine.handle_action(UserAction::ActionPressed {
+    // Step 5: Start exchange → Glance hands off to the multi-stage
+    // engine; it no longer drives the legacy QR sub-flow on this
+    // ExchangeEngine. The grouped path now matches the no-groups path —
+    // before `2026-06-02-grouped-mode-routing-nfc` the group/field-preview
+    // resume incorrectly collapsed Glance (and TapTap, Hover) back onto
+    // `exchange_show_qr`. The end-to-end legacy-QR journey is covered by
+    // `broadcast_full_flow_mode_to_qr_to_result`.
+    let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "start_exchange".to_string(),
     });
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_show_qr");
-
-    // Step 6: Continue to scan
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".to_string(),
-    });
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_scan_qr");
-
-    // Step 7: Simulate scan → Verifying
-    let _ = engine.handle_action(UserAction::TextChanged {
-        component_id: "scanned_data".to_string(),
-        value: "bob-qr-payload".to_string(),
-    });
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_verifying");
-
-    // Step 8: Mark success
-    engine.mark_success();
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_success");
-
-    // Step 9: Done
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "done".to_string(),
-    });
-    assert_eq!(result, ActionResult::Complete);
+    assert_eq!(
+        result,
+        ActionResult::StartMultiStageExchange {
+            mode: ExchangeMode::Glance
+        }
+    );
 }
 
 // ================================================================

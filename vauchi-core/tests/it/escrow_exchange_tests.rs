@@ -32,6 +32,7 @@ fn canned(resp: &EscrowResponse) -> CannedResponse {
     CannedResponse::ok_json(serde_json::to_vec(resp).expect("serialize EscrowResponse"))
 }
 
+// @internal
 #[test]
 fn escrow_exchange_round_trips_a_put_over_the_relay_transport() {
     let mock = MockRelay::start();
@@ -56,6 +57,7 @@ fn escrow_exchange_round_trips_a_put_over_the_relay_transport() {
     assert_eq!(body["gate_hash"], "aa".repeat(32));
 }
 
+// @internal
 #[test]
 fn escrow_exchange_parses_a_blob_retrieve() {
     let mock = MockRelay::start();
@@ -82,6 +84,7 @@ fn escrow_exchange_parses_a_blob_retrieve() {
     );
 }
 
+// @internal
 #[test]
 fn escrow_exchange_maps_relay_error_to_vauchi_network_error() {
     let mock = MockRelay::start();
@@ -111,6 +114,7 @@ fn escrow_exchange_maps_relay_error_to_vauchi_network_error() {
 
 // ── run_escrow_command: Command -> relay -> Event ────────────────────
 
+// @internal
 #[test]
 fn run_escrow_command_deposit_returns_no_event() {
     let mock = MockRelay::start();
@@ -126,6 +130,7 @@ fn run_escrow_command_deposit_returns_no_event() {
     assert_eq!(event, None, "a stored deposit produces no machine event");
 }
 
+// @internal
 #[test]
 fn run_escrow_command_check_full_gate_yields_ready_with_gate_hash() {
     let mock = MockRelay::start();
@@ -144,6 +149,7 @@ fn run_escrow_command_check_full_gate_yields_ready_with_gate_hash() {
     );
 }
 
+// @internal
 #[test]
 fn run_escrow_command_check_partial_gate_yields_no_event() {
     let mock = MockRelay::start();
@@ -157,6 +163,7 @@ fn run_escrow_command_check_partial_gate_yields_no_event() {
     assert_eq!(event, None, "a partially-filled gate keeps polling");
 }
 
+// @internal
 #[test]
 fn run_escrow_command_retrieve_yields_blob_received_with_decoded_bytes() {
     use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -182,6 +189,7 @@ fn run_escrow_command_retrieve_yields_blob_received_with_decoded_bytes() {
     );
 }
 
+// @internal
 #[test]
 fn run_escrow_command_ignores_non_escrow_commands() {
     let mock = MockRelay::start();

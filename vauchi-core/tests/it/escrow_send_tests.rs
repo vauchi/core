@@ -24,6 +24,7 @@ fn canned(resp: &EscrowResponse) -> CannedResponse {
     CannedResponse::ok_json(serde_json::to_vec(resp).expect("serialize EscrowResponse"))
 }
 
+// @internal
 #[test]
 fn put_sends_escrow_action_envelope_and_parses_stored() {
     let mock = MockRelay::start();
@@ -58,6 +59,7 @@ fn put_sends_escrow_action_envelope_and_parses_stored() {
     assert_eq!(body["ttl_seconds"], 600);
 }
 
+// @internal
 #[test]
 fn get_parses_blob_response() {
     let mock = MockRelay::start();
@@ -87,6 +89,7 @@ fn get_parses_blob_response() {
     assert_eq!(body["escrow_action"], "Get");
 }
 
+// @internal
 #[test]
 fn count_parses_count_response() {
     let mock = MockRelay::start();
@@ -102,6 +105,7 @@ fn count_parses_count_response() {
     assert_eq!(result, EscrowResponse::Count { count: 2 });
 }
 
+// @internal
 #[test]
 fn relay_error_status_maps_to_network_error() {
     let mock = MockRelay::start();

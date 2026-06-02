@@ -20,6 +20,7 @@ fn slot() -> Vec<u8> {
 
 // ── escrow_request: Command → EscrowMessage ──────────────────────────
 
+// @internal
 #[test]
 fn deposit_command_maps_to_put_with_hex_hashes_and_base64_blob() {
     let card = vec![0x01u8, 0x02, 0x03];
@@ -49,6 +50,7 @@ fn deposit_command_maps_to_put_with_hex_hashes_and_base64_blob() {
     }
 }
 
+// @internal
 #[test]
 fn check_command_maps_to_count() {
     let msg = escrow_request(&Command::RelayEscrowCheck {
@@ -64,6 +66,7 @@ fn check_command_maps_to_count() {
     );
 }
 
+// @internal
 #[test]
 fn retrieve_command_maps_to_get() {
     let msg = escrow_request(&Command::RelayEscrowRetrieve {
@@ -80,6 +83,7 @@ fn retrieve_command_maps_to_get() {
     );
 }
 
+// @internal
 #[test]
 fn non_escrow_command_maps_to_none() {
     assert_eq!(escrow_request(&Command::BleStopScanning), None);
@@ -88,6 +92,7 @@ fn non_escrow_command_maps_to_none() {
 
 // ── escrow_outcome: EscrowResponse → EscrowOutcome ───────────────────
 
+// @internal
 #[test]
 fn stored_and_already_exists_are_deposited() {
     assert_eq!(
@@ -100,6 +105,7 @@ fn stored_and_already_exists_are_deposited() {
     );
 }
 
+// @internal
 #[test]
 fn full_gate_is_ready_partial_is_pending() {
     assert_eq!(
@@ -118,6 +124,7 @@ fn full_gate_is_ready_partial_is_pending() {
     );
 }
 
+// @internal
 #[test]
 fn blob_response_round_trips_to_retrieved_bytes() {
     let bytes = vec![0xDEu8, 0xAD, 0xBE, 0xEF];
@@ -127,6 +134,7 @@ fn blob_response_round_trips_to_retrieved_bytes() {
     assert_eq!(escrow_outcome(&resp), EscrowOutcome::Retrieved(bytes));
 }
 
+// @internal
 #[test]
 fn malformed_blob_is_a_failure_not_a_silent_empty() {
     let resp = EscrowResponse::Blob {
@@ -138,6 +146,7 @@ fn malformed_blob_is_a_failure_not_a_silent_empty() {
     }
 }
 
+// @internal
 #[test]
 fn terminal_responses_map_to_specific_failure_reasons() {
     assert_eq!(
@@ -157,6 +166,7 @@ fn terminal_responses_map_to_specific_failure_reasons() {
 // ── property: any deposit blob round-trips through the wire ──────────
 
 proptest! {
+    // @internal
     #[test]
     fn deposit_blob_round_trips_for_arbitrary_card(
         card in proptest::collection::vec(any::<u8>(), 0..2048),

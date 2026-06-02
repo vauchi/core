@@ -54,6 +54,7 @@ fn responder_epk_b64() -> String {
     URL_SAFE_NO_PAD.encode(epk)
 }
 
+// @internal
 #[test]
 fn initiator_poll_drives_handshake_then_polls_the_escrow_gate() {
     let mock = MockRelay::start();
@@ -91,6 +92,7 @@ fn initiator_poll_drives_handshake_then_polls_the_escrow_gate() {
     assert_contact_count(engine.vauchi(), 0);
 }
 
+// @internal
 #[test]
 fn initiator_poll_drives_to_failed_on_relay_failure() {
     let mock = MockRelay::start();

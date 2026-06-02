@@ -79,6 +79,7 @@ fn nth_put_blob(mock: &MockRelay, n: usize) -> String {
         .clone()
 }
 
+// @internal
 #[test]
 fn poll_completes_exchange_and_persists_contact() {
     let mock = MockRelay::start();
@@ -109,6 +110,7 @@ fn poll_completes_exchange_and_persists_contact() {
     assert_contact_count(engine.vauchi(), 1);
 }
 
+// @internal
 #[test]
 fn poll_drives_to_failed_on_undecryptable_blob() {
     let mock = MockRelay::start();
@@ -131,6 +133,7 @@ fn poll_drives_to_failed_on_undecryptable_blob() {
     assert_contact_count(engine.vauchi(), 0);
 }
 
+// @internal
 #[test]
 fn poll_stays_waiting_until_the_gate_fills() {
     let mock = MockRelay::start();

@@ -13,6 +13,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use serde::Serialize;
+use vauchi_protocol::escrow::{EscrowMessage, EscrowResponse};
 use vauchi_protocol::v2::{
     FetchedBlob, V2AckRequest, V2ExchangeClaimRequest, V2ExchangeCompleteRequest,
     V2ExchangeOfferRequest, V2FetchRequest, V2GuardianDeleteRequest, V2GuardianEntry,
@@ -487,6 +488,50 @@ impl HttpTransport {
         }
     }
 
+    /// Perform a single relay escrow round-trip (ADR-049).
+    ///
+    /// Builds the `escrow`-routed request from an [`EscrowMessage`] — the
+    /// message's serde tag is `action`, renamed here to `escrow_action`
+    /// so the relay's outer routing `action = "escrow"` is not shadowed —
+    /// and parses the [`EscrowResponse`]. Escrow is OHTTP-only in
+    /// production; the direct-HTTP branch exists for the in-process test
+    /// relay (and exposes the source IP, like every direct call).
+    pub fn escrow(&self, message: &EscrowMessage) -> Result<EscrowResponse, NetworkError> {
+        let mut body = serde_json::to_value(message)
+            .map_err(|e| NetworkError::Serialization(e.to_string()))?;
+        if let Some(obj) = body.as_object_mut()
+            && let Some(action) = obj.remove("action")
+        {
+            obj.insert("escrow_action".to_string(), action);
+        }
+
+        let value: serde_json::Value = if let Some(ohttp) = &self.ohttp {
+            self.post_via_ohttp(ohttp, "escrow", &body)?
+        } else if self.config.allow_direct {
+            self.direct_fallback_count.fetch_add(1, Ordering::Relaxed);
+            let url = format!("{}/v2/escrow", self.config.relay_url);
+            self.post_json(&url, &body)?
+        } else {
+            return Err(NetworkError::ConnectionFailed(
+                "OHTTP not configured and direct connections are disabled".into(),
+            ));
+        };
+
+        // The relay returns a bare EscrowResponse on success, or
+        // {"status":"error","error":...} on rejection (rate limit, bad
+        // payload). Surface the latter explicitly rather than letting it
+        // fail EscrowResponse deserialization opaquely.
+        if value.get("status").and_then(|s| s.as_str()) == Some("error") {
+            let detail = value
+                .get("error")
+                .and_then(|e| e.as_str())
+                .unwrap_or("escrow request rejected")
+                .to_string();
+            return Err(NetworkError::InvalidMessage(detail));
+        }
+        serde_json::from_value(value).map_err(|e| NetworkError::Serialization(e.to_string()))
+    }
+
     /// Stores (replaces) all guardian entries for a hash.
     ///
     /// Guardian queries go through OHTTP to prevent the relay from correlating
@@ -617,7 +662,9 @@ impl HttpTransport {
     ///
     /// The relay pads all OHTTP responses to bucket sizes before encryption
     /// (relay/src/http_api.rs). This reverses that padding before JSON parsing.
-    fn parse_padded_ohttp_response(padded: &[u8]) -> Result<V2Response, NetworkError> {
+    fn parse_padded_ohttp_response<Resp: serde::de::DeserializeOwned>(
+        padded: &[u8],
+    ) -> Result<Resp, NetworkError> {
         if !crate::crypto::padding::is_valid_bucket_size(padded.len()) {
             return Err(NetworkError::InvalidMessage(format!(
                 "OHTTP response has non-bucket size {} — possible relay bug or tampering",
@@ -631,12 +678,12 @@ impl HttpTransport {
     }
 
     /// Encrypt a request via OHTTP and decrypt the response.
-    fn post_via_ohttp<Req: Serialize>(
+    fn post_via_ohttp<Req: Serialize, Resp: serde::de::DeserializeOwned>(
         &self,
         ohttp: &OhttpClient,
         action: &str,
         body: &Req,
-    ) -> Result<V2Response, NetworkError> {
+    ) -> Result<Resp, NetworkError> {
         let padded_payload = Self::build_padded_ohttp_payload(action, body)?;
 
         // Encrypt padded payload
@@ -1123,7 +1170,7 @@ mod tests {
         let padded_response = padding::pad(&resp_bytes);
 
         // Client-side unpad
-        let parsed = HttpTransport::parse_padded_ohttp_response(&padded_response)
+        let parsed = HttpTransport::parse_padded_ohttp_response::<V2Response>(&padded_response)
             .expect("client must parse padded relay response");
 
         assert_eq!(parsed.status, "ok");
@@ -1135,7 +1182,7 @@ mod tests {
     fn test_ohttp_response_unpadding_rejects_invalid() {
         // Garbage bytes should fail cleanly, not panic
         let garbage = vec![0xFF; 100];
-        let result = HttpTransport::parse_padded_ohttp_response(&garbage);
+        let result = HttpTransport::parse_padded_ohttp_response::<V2Response>(&garbage);
         assert!(result.is_err(), "garbage bytes must produce an error");
     }
 
@@ -1186,7 +1233,8 @@ mod tests {
 
         // === Client: OHTTP decrypt + unpad + parse ===
         let decrypted_resp = response_nonce.decapsulate(&encrypted_resp).unwrap();
-        let parsed_resp = HttpTransport::parse_padded_ohttp_response(&decrypted_resp).unwrap();
+        let parsed_resp =
+            HttpTransport::parse_padded_ohttp_response::<V2Response>(&decrypted_resp).unwrap();
         assert_eq!(parsed_resp.status, "ok");
     }
 }

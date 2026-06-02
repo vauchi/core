@@ -631,10 +631,44 @@ impl AppEngine {
                             undo_action_id: None,
                         },
                     },
-                    "delete" => ActionResult::ShowToast {
-                        message: "Identity deletion scheduled. You have 7 days to cancel.".into(),
-                        undo_action_id: None,
+                    "delete" => match vauchi_core::api::DeletionManager::new(self.vauchi.storage())
+                        .schedule_deletion()
+                    {
+                        Ok(_) => {
+                            let _ = self.navigate_back();
+                            // Rebuild Privacy fresh on revisit so it shows the
+                            // now-scheduled state (cancel action) instead of the
+                            // cached ConfirmDelete sub-step.
+                            self.engine_cache.remove(&AppScreen::Privacy);
+                            ActionResult::ShowToast {
+                                message: "Identity deletion scheduled. You have 7 days to cancel."
+                                    .into(),
+                                undo_action_id: None,
+                            }
+                        }
+                        Err(_) => ActionResult::ShowToast {
+                            message: "Could not schedule deletion.".into(),
+                            undo_action_id: None,
+                        },
                     },
+                    "cancel_deletion" => {
+                        match vauchi_core::api::DeletionManager::new(self.vauchi.storage())
+                            .cancel_deletion()
+                        {
+                            Ok(_) => {
+                                let _ = self.navigate_back();
+                                self.engine_cache.remove(&AppScreen::Privacy);
+                                ActionResult::ShowToast {
+                                    message: "Identity deletion cancelled.".into(),
+                                    undo_action_id: None,
+                                }
+                            }
+                            Err(_) => ActionResult::ShowToast {
+                                message: "Could not cancel deletion.".into(),
+                                undo_action_id: None,
+                            },
+                        }
+                    }
                     _ => {
                         let screen = self.navigate_back();
                         ActionResult::NavigateTo(screen)

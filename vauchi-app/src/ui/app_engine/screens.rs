@@ -545,14 +545,29 @@ impl AppEngine {
                 let consent = crate::ui::gdpr::ConsentStatus::from_consent_records(
                     &vauchi.export_consent_log().unwrap_or_default(),
                 );
+                let state = vauchi_core::api::DeletionManager::new(vauchi.storage())
+                    .deletion_state()
+                    .unwrap_or(vauchi_core::storage::DeletionState::None);
+                let (deletion_status, scheduled) = match state {
+                    vauchi_core::storage::DeletionState::Scheduled { .. } => (
+                        Some("Scheduled — cancel within the grace period".to_string()),
+                        true,
+                    ),
+                    vauchi_core::storage::DeletionState::Executed { .. } => {
+                        (Some("Executed".to_string()), false)
+                    }
+                    vauchi_core::storage::DeletionState::None => (None, false),
+                    _ => (None, false),
+                };
                 Box::new(
-                    GdprEngine::new(None, "Active".into())
+                    GdprEngine::new(deletion_status, "Active".into())
                         .with_deletion_summary(crate::ui::gdpr::DeletionSummary {
                             contact_count,
                             has_backup: false,
                             device_count: 1,
                         })
-                        .with_consent(consent),
+                        .with_consent(consent)
+                        .with_deletion_scheduled(scheduled),
                 )
             }
             AppScreen::Support => Box::new(SupportEngine::new()),

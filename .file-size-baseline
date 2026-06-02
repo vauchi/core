@@ -283,7 +283,7 @@ vauchi-app/src/ui/app_engine/mod.rs 1536
 #  2026-06-02-backup-recovery-engine-restore-gap)
 # (+68 for AppScreen::EmergencyBroadcast handle_completion arm — configure /
 #  send / disable outcome routing, 2026-06-02 humble-ui core engines sweep)
-vauchi-app/src/ui/app_engine/routing.rs 1578
+vauchi-app/src/ui/app_engine/routing.rs 1612
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)
@@ -307,7 +307,7 @@ vauchi-app/src/ui/app_engine/routing.rs 1578
 #  threads them into MyInfoEngine's new sync-caption builders.)
 # (+5 for AppScreen::EmergencyBroadcast engine constructor + use —
 #  2026-06-02 humble-ui core engines sweep)
-vauchi-app/src/ui/app_engine/screens.rs 1437
+vauchi-app/src/ui/app_engine/screens.rs 1452
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

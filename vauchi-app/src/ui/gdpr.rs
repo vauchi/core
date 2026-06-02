@@ -53,6 +53,9 @@ pub struct GdprEngine {
     last_action: Option<String>,
     /// Current consent grant state, rendered on the consent sub-screen.
     consent: ConsentStatus,
+    /// Whether an identity deletion is currently scheduled (grace period
+    /// active). Drives the cancel-vs-delete action on the overview.
+    deletion_scheduled: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -74,6 +77,7 @@ impl GdprEngine {
             deletion_summary: DeletionSummary::default(),
             last_action: None,
             consent: ConsentStatus::default(),
+            deletion_scheduled: false,
         }
     }
 
@@ -88,6 +92,13 @@ impl GdprEngine {
     /// sub-screen. Called by the AppEngine with live state.
     pub fn with_consent(mut self, consent: ConsentStatus) -> Self {
         self.consent = consent;
+        self
+    }
+
+    /// Mark whether an identity deletion is scheduled, so the overview
+    /// offers "Cancel Deletion" instead of "Delete Identity".
+    pub fn with_deletion_scheduled(mut self, scheduled: bool) -> Self {
+        self.deletion_scheduled = scheduled;
         self
     }
 
@@ -142,22 +153,33 @@ impl GdprEngine {
                     ],
                 },
             ],
-            actions: vec![
-                ScreenAction {
+            actions: {
+                let mut actions = vec![ScreenAction {
                     id: "export".into(),
                     label: "Export Data".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
-                },
-                ScreenAction {
-                    id: "delete".into(),
-                    label: "Delete Identity".into(),
-                    style: ActionStyle::Destructive,
-                    enabled: true,
-                    a11y: None,
-                },
-            ],
+                }];
+                if self.deletion_scheduled {
+                    actions.push(ScreenAction {
+                        id: "cancel_deletion".into(),
+                        label: "Cancel Deletion".into(),
+                        style: ActionStyle::Secondary,
+                        enabled: true,
+                        a11y: None,
+                    });
+                } else {
+                    actions.push(ScreenAction {
+                        id: "delete".into(),
+                        label: "Delete Identity".into(),
+                        style: ActionStyle::Destructive,
+                        enabled: true,
+                        a11y: None,
+                    });
+                }
+                actions
+            },
             progress: None,
             ..Default::default()
         }
@@ -320,6 +342,13 @@ impl WorkflowEngine for GdprEngine {
                 if action_id == "export" =>
             {
                 self.last_action = Some("export".into());
+                ActionResult::Complete
+            }
+            // Overview: cancel a scheduled deletion (routing performs it)
+            (GdprStep::Overview, UserAction::ActionPressed { action_id })
+                if action_id == "cancel_deletion" =>
+            {
+                self.last_action = Some("cancel_deletion".into());
                 ActionResult::Complete
             }
             // Overview: delete navigates to confirmation screen
@@ -582,6 +611,27 @@ mod tests {
             }
             other => panic!("Expected NavigateTo, got {other:?}"),
         }
+    }
+
+    // @internal
+    #[test]
+    fn overview_shows_cancel_when_deletion_scheduled() {
+        let e = GdprEngine::new(Some("Scheduled".into()), "Active".into())
+            .with_deletion_scheduled(true);
+        let ids: Vec<String> = e
+            .current_screen()
+            .actions
+            .iter()
+            .map(|a| a.id.clone())
+            .collect();
+        assert!(
+            ids.contains(&"cancel_deletion".to_string()),
+            "scheduled deletion shows the cancel action"
+        );
+        assert!(
+            !ids.contains(&"delete".to_string()),
+            "scheduled deletion hides the delete action"
+        );
     }
 
     // @internal

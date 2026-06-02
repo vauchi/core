@@ -128,6 +128,47 @@ fn gdpr_export_returns_serialized_data() {
     }
 }
 
+// Deletion schedule + cancel performed in core via the engine path:
+// confirm_delete schedules; cancel_deletion (shown when scheduled) clears.
+// @internal
+#[test]
+fn deletion_schedule_and_cancel_round_trip() {
+    use vauchi_core::api::DeletionManager;
+    use vauchi_core::storage::DeletionState;
+
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Privacy);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "delete".into(),
+    });
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "confirm_delete".into(),
+    });
+    assert!(
+        matches!(
+            DeletionManager::new(engine.vauchi().storage())
+                .deletion_state()
+                .unwrap(),
+            DeletionState::Scheduled { .. }
+        ),
+        "confirm_delete schedules deletion in core"
+    );
+
+    engine.navigate_to(AppScreen::Privacy);
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "cancel_deletion".into(),
+    });
+    assert!(
+        matches!(
+            DeletionManager::new(engine.vauchi().storage())
+                .deletion_state()
+                .unwrap(),
+            DeletionState::None
+        ),
+        "cancel_deletion clears the scheduled deletion"
+    );
+}
+
 // @internal
 #[test]
 fn navigate_back_with_empty_history_returns_my_info() {

@@ -240,7 +240,7 @@ vauchi-core/src/storage/mod.rs 1079
 #  multi_stage_session scaffolding)
 # (+3 for AppScreen::EmergencyBroadcast variant + id + from_screen_id —
 #  2026-06-02 humble-ui core engines sweep)
-vauchi-app/src/ui/app_engine/mod.rs 1535
+vauchi-app/src/ui/app_engine/mod.rs 1536
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -307,7 +307,7 @@ vauchi-app/src/ui/app_engine/routing.rs 1569
 #  threads them into MyInfoEngine's new sync-caption builders.)
 # (+5 for AppScreen::EmergencyBroadcast engine constructor + use —
 #  2026-06-02 humble-ui core engines sweep)
-vauchi-app/src/ui/app_engine/screens.rs 1434
+vauchi-app/src/ui/app_engine/screens.rs 1437
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

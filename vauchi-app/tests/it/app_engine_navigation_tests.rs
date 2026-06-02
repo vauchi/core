@@ -54,6 +54,61 @@ fn navigate_back_chain_returns_through_history() {
     assert_eq!(*engine.current_app_screen(), AppScreen::MyInfo);
 }
 
+// Consent toggle on the Privacy screen flips the rendered toggle AND
+// persists via the AppEngine intercept (`persist_consent_toggle`), so a
+// fresh GdprEngine on revisit reads the granted state from storage.
+// @internal
+#[test]
+fn consent_toggle_persists_and_reflects_on_revisit() {
+    use vauchi_app::ui::{Component, SettingsItemKind};
+
+    fn dp_enabled(engine: &AppEngine) -> bool {
+        let screen = engine.current_screen();
+        let items = screen
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::SettingsGroup { id, items, .. } if id == "consent" => Some(items),
+                _ => None,
+            })
+            .expect("consent SettingsGroup should be rendered");
+        items
+            .iter()
+            .find(|i| i.id == "data_processing")
+            .map(|i| matches!(i.kind, SettingsItemKind::Toggle { enabled } if enabled))
+            .unwrap_or(false)
+    }
+
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Privacy);
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "consent_actions".into(),
+        item_id: "manage_consent".into(),
+    });
+    assert!(!dp_enabled(&engine), "data_processing starts off");
+
+    let _ = engine.handle_action(UserAction::SettingsToggled {
+        component_id: "consent".into(),
+        item_id: "data_processing".into(),
+    });
+    assert!(
+        dp_enabled(&engine),
+        "engine reflects the toggle immediately"
+    );
+
+    // Leave and return: a fresh GdprEngine must read the persisted grant.
+    engine.navigate_back();
+    engine.navigate_to(AppScreen::Privacy);
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "consent_actions".into(),
+        item_id: "manage_consent".into(),
+    });
+    assert!(
+        dp_enabled(&engine),
+        "consent grant persisted via the intercept and re-read on revisit"
+    );
+}
+
 // @internal
 #[test]
 fn navigate_back_with_empty_history_returns_my_info() {

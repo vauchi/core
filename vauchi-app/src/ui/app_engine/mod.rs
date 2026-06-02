@@ -1231,6 +1231,7 @@ impl WorkflowEngine for AppEngine {
         }
 
         self.persist_settings_toggle(&action);
+        self.persist_consent_toggle(&action);
 
         if let Some(result) = self.intercept_exit_preview(&action) {
             return result;

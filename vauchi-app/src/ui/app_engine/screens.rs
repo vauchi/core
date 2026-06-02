@@ -542,14 +542,17 @@ impl AppEngine {
             }
             AppScreen::Privacy => {
                 let contact_count = vauchi.contact_count().unwrap_or(0);
+                let consent = crate::ui::gdpr::ConsentStatus::from_consent_records(
+                    &vauchi.export_consent_log().unwrap_or_default(),
+                );
                 Box::new(
-                    GdprEngine::new(None, "Active".into()).with_deletion_summary(
-                        crate::ui::gdpr::DeletionSummary {
+                    GdprEngine::new(None, "Active".into())
+                        .with_deletion_summary(crate::ui::gdpr::DeletionSummary {
                             contact_count,
                             has_backup: false,
                             device_count: 1,
-                        },
-                    ),
+                        })
+                        .with_consent(consent),
                 )
             }
             AppScreen::Support => Box::new(SupportEngine::new()),

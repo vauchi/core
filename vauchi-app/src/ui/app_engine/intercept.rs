@@ -16,6 +16,44 @@ use crate::ui::info_content;
 use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 
 impl AppEngine {
+    /// Persist a consent toggle on the Privacy screen by flipping the
+    /// stored grant for the toggled `ConsentType`. The `GdprEngine` flips
+    /// its in-memory display in parallel; this owns durability.
+    pub(super) fn persist_consent_toggle(&mut self, action: &UserAction) {
+        if self.screen != AppScreen::Privacy {
+            return;
+        }
+        let UserAction::SettingsToggled {
+            component_id,
+            item_id,
+        } = action
+        else {
+            return;
+        };
+        if component_id != "consent" {
+            return;
+        }
+        let Some(consent_type) = vauchi_core::api::ConsentType::parse(item_id.as_str()) else {
+            return;
+        };
+        let granted = self
+            .vauchi
+            .export_consent_log()
+            .unwrap_or_default()
+            .iter()
+            .rfind(|r| r.consent_type == consent_type)
+            .map(|r| r.granted)
+            .unwrap_or(false);
+        let result = if granted {
+            self.vauchi.revoke_consent(consent_type)
+        } else {
+            self.vauchi.grant_consent(consent_type)
+        };
+        if let Err(err) = result {
+            tracing::warn!(?err, "consent toggle persist failed");
+        }
+    }
+
     /// Persist settings toggle changes to Vauchi config (fixes HIGH-4).
     pub(super) fn persist_settings_toggle(&mut self, action: &UserAction) {
         if self.screen != AppScreen::Settings {

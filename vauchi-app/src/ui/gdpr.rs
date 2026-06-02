@@ -24,6 +24,24 @@ pub struct ConsentStatus {
     pub recovery_vouching: bool,
 }
 
+impl ConsentStatus {
+    /// Build from a consent log, taking the latest decision per type.
+    pub fn from_consent_records(records: &[vauchi_core::api::ConsentRecord]) -> Self {
+        let granted = |t: vauchi_core::api::ConsentType| {
+            records
+                .iter()
+                .rfind(|r| r.consent_type == t)
+                .map(|r| r.granted)
+                .unwrap_or(false)
+        };
+        Self {
+            data_processing: granted(vauchi_core::api::ConsentType::DataProcessing),
+            contact_sharing: granted(vauchi_core::api::ConsentType::ContactSharing),
+            recovery_vouching: granted(vauchi_core::api::ConsentType::RecoveryVouching),
+        }
+    }
+}
+
 /// Engine that manages privacy and data settings (GDPR).
 #[derive(Clone, Debug)]
 pub struct GdprEngine {
@@ -339,6 +357,30 @@ impl WorkflowEngine for GdprEngine {
                 self.step = GdprStep::Overview;
                 ActionResult::NavigateTo(self.build_screen())
             }
+            // Consent screen: a toggle flips the in-memory display; the
+            // AppEngine intercept (`persist_consent_toggle`) owns the
+            // grant/revoke persistence, flipping the same starting state.
+            (
+                GdprStep::ManageConsent,
+                UserAction::SettingsToggled {
+                    component_id,
+                    item_id,
+                },
+            ) if component_id == "consent" => {
+                match item_id.as_str() {
+                    "data_processing" => {
+                        self.consent.data_processing = !self.consent.data_processing
+                    }
+                    "contact_sharing" => {
+                        self.consent.contact_sharing = !self.consent.contact_sharing
+                    }
+                    "recovery_vouching" => {
+                        self.consent.recovery_vouching = !self.consent.recovery_vouching
+                    }
+                    _ => {}
+                }
+                ActionResult::UpdateScreen(self.build_screen())
+            }
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }
     }
@@ -483,6 +525,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn manage_consent_navigates_to_consent_screen() {
         let mut e = engine();
@@ -498,6 +541,7 @@ mod tests {
         }
     }
 
+    // @internal
     #[test]
     fn consent_screen_reflects_grant_state() {
         let mut e = GdprEngine::new(None, "Active".into()).with_consent(ConsentStatus {
@@ -524,6 +568,7 @@ mod tests {
         assert!(on("recovery_vouching"), "recovery_vouching should be on");
     }
 
+    // @internal
     #[test]
     fn consent_cancel_returns_to_overview() {
         let mut e = engine();
@@ -537,5 +582,54 @@ mod tests {
             }
             other => panic!("Expected NavigateTo, got {other:?}"),
         }
+    }
+
+    // @internal
+    #[test]
+    fn consent_status_from_records_uses_latest_decision() {
+        use vauchi_core::api::{ConsentRecord, ConsentType};
+        let rec = |t: ConsentType, granted: bool, ts: u64| ConsentRecord {
+            id: format!("r{ts}"),
+            consent_type: t,
+            granted,
+            timestamp: ts,
+            policy_version: None,
+        };
+        let records = vec![
+            rec(ConsentType::DataProcessing, true, 1),
+            rec(ConsentType::DataProcessing, false, 2),
+            rec(ConsentType::ContactSharing, true, 3),
+        ];
+        let status = ConsentStatus::from_consent_records(&records);
+        assert!(
+            !status.data_processing,
+            "latest data_processing is a revoke"
+        );
+        assert!(status.contact_sharing, "contact_sharing granted");
+        assert!(!status.recovery_vouching, "never decided defaults to false");
+    }
+
+    // @internal
+    #[test]
+    fn consent_toggle_flips_display_state() {
+        let mut e = engine();
+        e.step = GdprStep::ManageConsent;
+        let result = e.handle_action(UserAction::SettingsToggled {
+            component_id: "consent".into(),
+            item_id: "data_processing".into(),
+        });
+        let screen = match result {
+            ActionResult::UpdateScreen(s) => s,
+            other => panic!("Expected UpdateScreen, got {other:?}"),
+        };
+        let items = match &screen.components[0] {
+            Component::SettingsGroup { items, .. } => items,
+            other => panic!("Expected SettingsGroup, got {other:?}"),
+        };
+        let dp = items.iter().find(|i| i.id == "data_processing").unwrap();
+        assert!(
+            matches!(dp.kind, SettingsItemKind::Toggle { enabled } if enabled),
+            "toggling data_processing should flip it on"
+        );
     }
 }

@@ -6,13 +6,12 @@
 //! signed bootstrap carrying the depositor's X3DH exchange key + relay
 //! routing, plus version negotiation against the legacy v1 import payload.
 
-use vauchi_core::ContactCard;
-use vauchi_core::SigningKeyPair;
 use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::exchange::link_mode::{
-    LinkCardPayload, parse_card_payload_versioned, serialize_card_payload,
+    LinkCardPayload, derive_link_shared_key, parse_card_payload_versioned, serialize_card_payload,
     serialize_card_payload_v2,
 };
+use vauchi_core::{Contact, ContactCard, ExchangeTransport, SigningKeyPair};
 
 fn sample() -> (SigningKeyPair, [u8; 32], [u8; 32], ContactCard) {
     let keypair = SigningKeyPair::generate();
@@ -187,4 +186,61 @@ fn wrong_length_signature_rejected() {
 fn unknown_version_and_empty_payloads_rejected() {
     assert!(parse_card_payload_versioned(&[]).is_err());
     assert!(parse_card_payload_versioned(&[9, 1, 2, 3]).is_err());
+}
+
+// ── T5a: symmetric key agreement + link-exchange contact ─────────────
+
+// @internal
+#[test]
+fn link_shared_key_is_symmetric() {
+    let alice = X3DHKeyPair::generate();
+    let bob = X3DHKeyPair::generate();
+
+    let alice_view = derive_link_shared_key(&alice, bob.public_key()).expect("alice derives");
+    let bob_view = derive_link_shared_key(&bob, alice.public_key()).expect("bob derives");
+
+    assert_eq!(
+        alice_view.as_bytes(),
+        bob_view.as_bytes(),
+        "both sides must derive the identical link shared key (symmetric exchange)",
+    );
+}
+
+// @internal
+#[test]
+fn link_shared_key_differs_per_peer() {
+    let ours = X3DHKeyPair::generate();
+    let peer_a = X3DHKeyPair::generate();
+    let peer_b = X3DHKeyPair::generate();
+
+    let ka = derive_link_shared_key(&ours, peer_a.public_key()).unwrap();
+    let kb = derive_link_shared_key(&ours, peer_b.public_key()).unwrap();
+
+    assert_ne!(ka.as_bytes(), kb.as_bytes());
+}
+
+// @internal
+#[test]
+fn from_link_exchange_stamps_link_transport_and_relay() {
+    let ours = X3DHKeyPair::generate();
+    let peer = X3DHKeyPair::generate();
+    let shared = derive_link_shared_key(&ours, peer.public_key()).unwrap();
+    let peer_identity = *SigningKeyPair::generate().public_key().as_bytes();
+
+    let contact = Contact::from_link_exchange(
+        peer_identity,
+        ContactCard::new("Bob"),
+        shared,
+        Some("https://relay.example".to_string()),
+        42,
+    );
+
+    // Link is an Exchange (counts in exchange_method_breakdown), not an
+    // Import — that is the whole point of ADR-050.
+    assert_eq!(
+        contact.exchange_transport(),
+        Some(ExchangeTransport::Link),
+        "a link exchange must stamp ExchangeTransport::Link",
+    );
+    assert_eq!(contact.display_name(), "Bob");
 }

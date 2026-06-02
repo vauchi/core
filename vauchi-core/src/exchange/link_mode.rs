@@ -20,7 +20,10 @@ use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
 use zeroize::Zeroizing;
 
 use crate::contact_card::ContactCard;
+use crate::crypto::encryption::SymmetricKey;
+use crate::crypto::kdf::HKDF;
 use crate::crypto::signing::{Signature, SigningKeyPair, verify_signature};
+use crate::crypto::x3dh::X3DHKeyPair;
 use crate::exchange::escrow::{EscrowKeys, EscrowRole};
 use crate::platform::Command;
 
@@ -39,6 +42,10 @@ const CARD_PAYLOAD_VERSION_V2: u8 = 2;
 /// if none)][relay_url]` — fixed-length fields first so the variable
 /// `relay_url` tail is unambiguous.
 const LINK_BOOTSTRAP_DOMAIN: &[u8] = b"vauchi-link-bootstrap-v2";
+
+/// HKDF info string for the persistent link-mode shared communication key
+/// (ADR-007 domain separation).
+const LINK_SHARED_KEY_INFO: &[u8] = b"vauchi-link-shared-key-v1";
 
 /// Default TTL for escrow deposits (7 days, matching protocol max).
 const DEFAULT_TTL_SECONDS: u32 = 604_800;
@@ -650,6 +657,24 @@ pub fn parse_card_payload_versioned(data: &[u8]) -> Result<LinkCardPayload, Link
             "empty payload".to_string(),
         )),
     }
+}
+
+/// Derive the persistent shared communication key for a link-mode exchange
+/// (ADR-050) from our fresh X3DH keypair and the peer's X3DH public key
+/// (carried in the v2 bootstrap). A single authenticated DH —
+/// *authenticated* because the peer's X3DH key is signed by their identity
+/// in the v2 payload, *forward-secure* because both keys are per-exchange.
+/// Both sides derive the **same** key (X25519 DH is commutative), so the
+/// resulting `ExchangedData.shared_key` is symmetric.
+pub fn derive_link_shared_key(
+    our_x3dh: &X3DHKeyPair,
+    their_x3dh_public: &[u8; 32],
+) -> Result<SymmetricKey, LinkModeError> {
+    let shared = our_x3dh
+        .diffie_hellman(their_x3dh_public)
+        .map_err(|e| LinkModeError::CardCryptoFailed(e.to_string()))?;
+    let derived = HKDF::derive_key(None, &shared[..], LINK_SHARED_KEY_INFO);
+    Ok(SymmetricKey::from_bytes(*derived))
 }
 
 // =========================================================================

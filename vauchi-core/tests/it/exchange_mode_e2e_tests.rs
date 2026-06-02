@@ -195,11 +195,18 @@ fn failed_retry_preserves_glance_mode() {
         vauchi_core::clock::SystemClock::shared(),
     );
     engine.mark_failed();
-    let _ = engine.handle_action(UserAction::ActionPressed {
+    // Glance retry hands back to the multi-stage engine (mode preserved),
+    // not the legacy QR step — Retry routes through `enter_mode_sub_flow`
+    // like the forward path (glance_full_flow_mode_to_multistage_handoff).
+    let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "retry".to_string(),
     });
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_show_qr");
+    assert_eq!(
+        result,
+        ActionResult::StartMultiStageExchange {
+            mode: ExchangeMode::Glance
+        }
+    );
 }
 
 // @internal

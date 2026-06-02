@@ -211,16 +211,21 @@ fn exchange_failed_retry_restarts() {
         action_id: "retry".to_string(),
     });
 
+    // Glance retry hands back to the multi-stage engine (mode preserved),
+    // not the legacy QR step — Retry now routes through the shared
+    // `enter_mode_sub_flow` router like the forward paths.
     match result {
-        ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "exchange_show_qr");
+        ActionResult::StartMultiStageExchange { mode } => {
+            assert_eq!(mode, vauchi_core::exchange::mode::ExchangeMode::Glance);
         }
-        other => panic!("expected NavigateTo(show_qr), got {:?}", other),
+        other => panic!("expected StartMultiStageExchange(Glance), got {:?}", other),
     }
 
-    // Scanned data should be cleared on retry
+    // Scanned data should be cleared on retry. (The StartMultiStageExchange
+    // result above is the meaningful "restart" — Glance hands off to the
+    // multi-stage engine; the cached ExchangeEngine's own screen is left
+    // behind, so it's not asserted here.)
     assert_eq!(engine.scanned_data(), None);
-    assert_eq!(engine.current_screen().screen_id, "exchange_show_qr");
 }
 
 // @internal

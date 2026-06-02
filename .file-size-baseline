@@ -356,7 +356,7 @@ vauchi-core/tests/it/migration_tests.rs 1226
 #  picker re-arm (keeps the cached engine interactive, no empty-screen zombie)
 #  + their inline regression test (with @internal annotation). Structural
 #  exemption — not split.)
-vauchi-app/src/ui/exchange/mod.rs 3809
+vauchi-app/src/ui/exchange/mod.rs 3847
 # (+2 for 2026-05-21-core-ui-icon-on-wire: inline `icon: ...` lines in
 #   sample_fields / sample_shared_info Field constructors.)
 vauchi-app/src/ui/contact_detail.rs 1425

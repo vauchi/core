@@ -1493,19 +1493,12 @@ impl WorkflowEngine for ExchangeEngine {
                 self.failure_detail = None;
                 self.ble_fallback_available = false;
                 self.qr_fallback_available = false;
-                // Restore to the correct sub-flow based on selected mode
-                if self.config.mode == Some(ExchangeMode::Link) {
-                    return self.start_link_mode();
-                }
-                if matches!(
-                    self.config.mode,
-                    Some(ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake)
-                ) {
-                    self.step = ExchangeStep::Ble(BleStep::Discovering);
-                    return self.start_ble_mode();
-                }
-                self.step = ExchangeStep::Qr(QrStep::ShowQr);
-                ActionResult::NavigateTo(self.build_screen())
+                // Restore the correct sub-flow for the selected mode via the
+                // shared router: TapTap → NFC role chooser, Glance/Hover →
+                // multi-stage, BLE → BLE, Link → link, else → QR. Previously
+                // only Link/BLE were special-cased and TapTap/Glance/Hover fell
+                // through to QR (the core!1041 divergence — missed 4th site).
+                self.enter_mode_sub_flow()
             }
             (ExchangeStep::Failed, UserAction::ActionPressed { action_id })
                 if action_id == "fallback_qr" =>
@@ -2175,6 +2168,11 @@ mod tests {
             config_no_groups(),
             vauchi_core::clock::SystemClock::shared(),
         );
+        // Broadcast is a QR-routing mode, so retry exercises the legacy QR
+        // path (Glance/TapTap now route to multi-stage / NFC via the shared
+        // router and have their own retry coverage). The point here is that
+        // Retry clears the failure detail and restores a sub-flow.
+        engine.config.mode = Some(ExchangeMode::Broadcast);
         engine.mark_failed_with_error(&vauchi_core::exchange::ExchangeError::BleOutOfRange);
         assert!(engine.failure_detail.is_some());
 
@@ -2187,6 +2185,46 @@ mod tests {
             "Retry should clear the failure detail"
         );
         assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
+    }
+
+    // Regression: the Failed-state Retry handler restored the sub-flow by
+    // mode but only special-cased Link/BLE, so a failed TapTap (NFC) retry
+    // fell through to the legacy QR step (and Glance/Hover lost multi-stage)
+    // — the same divergence core!1041 fixed for the forward paths, but the
+    // Retry handler was a missed 4th site. Retry must route through the
+    // shared `enter_mode_sub_flow` router. Surfaced on-device: "Retry" after
+    // a TapTap NFC failure dumped the user onto the QR screen.
+    // @internal
+    #[test]
+    fn taptap_retry_routes_to_nfc_role_selection() {
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        engine.set_nfc_identity(vauchi_core::identity::Identity::create(
+            "Alice",
+            vauchi_core::clock::SystemClock::shared().unix_seconds(),
+        ));
+        engine.config.mode = Some(ExchangeMode::TapTap);
+        engine.mark_failed();
+
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: "retry".into(),
+        });
+
+        assert_eq!(
+            engine.step,
+            ExchangeStep::NfcRoleSelection,
+            "TapTap retry must return to the NFC role chooser, not QR"
+        );
+        assert!(
+            matches!(result, ActionResult::NavigateTo(_)),
+            "expected NavigateTo(role screen), got {result:?}"
+        );
+        assert!(
+            !matches!(engine.step, ExchangeStep::Qr(_)),
+            "TapTap retry must not fall through to QR"
+        );
     }
 
     #[test]

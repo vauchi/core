@@ -29,12 +29,14 @@ use super::{AppEngine, AppScreen};
 use crate::ui::ActionResult;
 use crate::ui::LinkExchangeEngine;
 
+#[cfg(all(feature = "network-http", feature = "storage"))]
+use vauchi_core::Command;
+use vauchi_core::Event;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::link_initiator::{
     LinkInitiatorFailureReason, LinkInitiatorSession, LinkInitiatorState,
 };
 use vauchi_core::exchange::link_mode::{self, serialize_card_payload};
-use vauchi_core::{Command, Event};
 
 /// Initiator polling budget — mirrors the ADR-035 device-link window
 /// (300 s). After this many seconds without a terminal state, a `tick`
@@ -54,53 +56,53 @@ impl AppEngine {
     /// Build / drop the engine-owned initiator machine as navigation
     /// enters or leaves `AppScreen::LinkExchange`. Called from
     /// `navigate_to_internal` after the screen-presentation lifecycle
-    /// hooks. On entry the machine's initial presence-deposit commands
-    /// are pushed onto `pending_commands` so the same drain that carries
-    /// `screen_entered` commands surfaces them to the frontend, and the
-    /// generated share URL is pushed into the renderer.
+    /// hooks. On entry the initiator machine is built (ADR-049); its
+    /// escrow commands stay *in the machine* for the core poll
+    /// (`advance_link_initiator_session`) to drive — they are no longer
+    /// pushed onto the frontend `pending_commands` queue. The generated
+    /// share URL is pushed into the renderer.
     pub(super) fn sync_link_initiator_lifecycle(&mut self, old: &AppScreen, new: &AppScreen) {
         let was = matches!(old, AppScreen::LinkExchange);
         let is = matches!(new, AppScreen::LinkExchange);
         match (was, is) {
             (true, false) => self.link_initiator = None,
-            (false, true) => {
-                let presence = self.build_link_initiator();
-                self.pending_commands.extend(presence);
-            }
+            (false, true) => self.build_link_initiator(),
             _ => {}
         }
     }
 
-    /// Construct the initiator machine and return its initial presence
-    /// deposit commands. The generated share URL is pushed into the
-    /// `LinkExchangeEngine` renderer via `set_share_url`. Returns an
-    /// empty vec (leaving the renderer on its share-url screen with an
-    /// empty URL) if no identity exists — rare and non-fatal here.
-    fn build_link_initiator(&mut self) -> Vec<Command> {
+    /// Construct the initiator machine and store it (ADR-049). Its initial
+    /// presence-deposit commands stay queued in the machine for the core
+    /// poll to drive. The generated share URL is pushed into the
+    /// `LinkExchangeEngine` renderer via `set_share_url`. No-op (leaving the
+    /// renderer on its share-url screen with an empty URL) if no identity
+    /// exists — rare and non-fatal here.
+    fn build_link_initiator(&mut self) {
         let (signing_key, display_name) = match self.vauchi.identity() {
             Some(identity) => (
                 *identity.signing_public_key(),
                 identity.display_name().to_string(),
             ),
-            None => return Vec::new(),
+            None => return,
         };
         let card = match self.vauchi.own_card() {
             Ok(Some(card)) => card,
             Ok(None) => ContactCard::new(&display_name),
-            Err(_) => return Vec::new(),
+            Err(_) => return,
         };
         let card_bytes = serialize_card_payload(&signing_key, &card);
         let (initiation, presence_commands) = link_mode::initiator_generate();
         let share_url = initiation.url.clone();
         let deadline = self.vauchi.clock().unix_seconds() + INITIATOR_POLL_DEADLINE_SECS;
-        let mut machine =
-            LinkInitiatorSession::new(initiation, presence_commands, card_bytes, deadline);
-        let initial = machine.drain_pending_commands();
-        self.link_initiator = Some(machine);
+        self.link_initiator = Some(LinkInitiatorSession::new(
+            initiation,
+            presence_commands,
+            card_bytes,
+            deadline,
+        ));
         if let Some(engine) = self.link_exchange_engine_mut() {
             engine.set_share_url(share_url);
         }
-        initial
     }
 
     /// Feed a `LinkShared` / `LinkOpened` / `RelayEscrow*` hardware event
@@ -186,6 +188,90 @@ impl AppEngine {
                 }
             }
         }
+    }
+
+    /// Advance the engine-owned link-mode initiator one relay step
+    /// (ADR-049). Called each `poll_notifications` tick (a no-op off the
+    /// `LinkExchange` screen). Core drives the two-gate escrow round-trip:
+    /// it executes the machine's queued presence/card deposits and
+    /// retrieves via `Vauchi::run_escrow_command`, re-issues a `Check` per
+    /// tick for the gate the machine is currently watching (handshake while
+    /// `Polling`, escrow while `Retrieving`), and ticks the polling
+    /// deadline. Returns `true` if any machine event was applied.
+    #[cfg(all(feature = "network-http", feature = "storage"))]
+    pub(crate) fn advance_link_initiator_session(&mut self) -> bool {
+        if !matches!(self.screen, AppScreen::LinkExchange) {
+            return false;
+        }
+        let now = self.vauchi.clock().unix_seconds();
+        let mut advanced = false;
+
+        // 1. Execute whatever the machine has queued (presence deposits,
+        //    then the card deposit + escrow Check once the handshake
+        //    completes; retrieves). Each event may cascade follow-ups.
+        let queued = match self.link_initiator.as_mut() {
+            Some(machine) => machine.drain_pending_commands(),
+            None => return false,
+        };
+        for command in queued {
+            advanced |= self.run_and_feed_initiator_command(&command);
+        }
+
+        // 2. Re-issue a Check for the gate the machine currently watches
+        //    (it queues a Check only on each transition, not per tick).
+        let gate = self
+            .link_initiator
+            .as_ref()
+            .and_then(|machine| match machine.current_state() {
+                LinkInitiatorState::Polling => Some(machine.handshake_gate_bytes()),
+                LinkInitiatorState::Retrieving => machine.escrow_gate_bytes(),
+                _ => None,
+            });
+        if let Some(gate_hash) = gate {
+            let check = Command::RelayEscrowCheck {
+                gate_hash,
+                suggested_interval_ms: 0,
+            };
+            advanced |= self.run_and_feed_initiator_command(&check);
+        }
+
+        // 3. Enforce the polling deadline (Failed(PollingTimedOut)).
+        if let Some(machine) = self.link_initiator.as_mut() {
+            machine.tick(now);
+        }
+        advanced
+    }
+
+    /// Run one escrow command for the initiator, feed the resulting event
+    /// back, and recursively run the follow-up commands
+    /// `route_link_initiator_hardware_event` returns. A blob retrieved from
+    /// the handshake gate is the responder's epk and is fed as `LinkOpened`
+    /// (which the machine consumes to derive the escrow keys); escrow-gate
+    /// blobs stay `RelayEscrowBlobReceived`.
+    #[cfg(all(feature = "network-http", feature = "storage"))]
+    fn run_and_feed_initiator_command(&mut self, command: &Command) -> bool {
+        let Some(mut event) = self.vauchi.run_escrow_command(command) else {
+            return false;
+        };
+        if let Event::RelayEscrowBlobReceived { gate_hash, blob } = &event {
+            let is_handshake = self
+                .link_initiator
+                .as_ref()
+                .is_some_and(|machine| machine.handshake_gate_bytes() == *gate_hash);
+            if is_handshake {
+                event = Event::LinkOpened {
+                    peer_public_key: blob.clone(),
+                };
+            }
+        }
+        if let Some(ActionResult::Commands { commands }) =
+            self.route_link_initiator_hardware_event(&event)
+        {
+            for command in commands {
+                self.run_and_feed_initiator_command(&command);
+            }
+        }
+        true
     }
 }
 

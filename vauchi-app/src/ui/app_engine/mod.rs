@@ -1418,6 +1418,10 @@ impl AppEngine {
         // (no-op off the DeepLinkResponder screen / with no live machine).
         #[cfg(all(feature = "network-http", feature = "storage"))]
         self.advance_link_responder_session();
+        // ADR-049: advance the link-mode initiator one relay step
+        // (no-op off the LinkExchange screen / with no live machine).
+        #[cfg(all(feature = "network-http", feature = "storage"))]
+        self.advance_link_initiator_session();
         // Slice 32m T1.2b: advance the multi-stage machine one
         // protocol step (no-op when idle / no active session).
         self.advance_multi_stage_session();

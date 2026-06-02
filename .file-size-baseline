@@ -273,7 +273,11 @@ vauchi-app/src/ui/app_engine/mod.rs 1532
 #  bugfix/exchanged-ratchet-key 2026-05-25)
 # (+6 for slice 32l Phase 2 link-responder RelayEscrow* routing in
 #  handle_hardware_event; guard minimized into app_engine/link_responder.rs)
-vauchi-app/src/ui/app_engine/routing.rs 1452
+# (+27 for AppScreen::MultiStageExchange completion arm — routes Cancel
+#  to the mode picker / Done to Contacts instead of the catch-all
+#  navigate_back that produced an empty screen_id. Fix A of
+#  2026-06-02-exchange-back-cancel-broken)
+vauchi-app/src/ui/app_engine/routing.rs 1479
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)
@@ -339,7 +343,12 @@ vauchi-core/tests/it/migration_tests.rs 1226
 #  delegations + selection-phase history pushes, 2026-06-01 exchange-step-back;
 #  the bulk of the logic lives in the new exchange/back_nav.rs. This file is a
 #  state-machine structural exemption — file-size.md says do NOT split it.)
-vauchi-app/src/ui/exchange/mod.rs 3640
+# (+60 for Fix C/A of 2026-06-02-exchange-back-cancel-broken: ModeSelection
+#  cancel intercept (exits the flow instead of a dead re-render) + Glance/Hover
+#  picker re-arm (keeps the cached engine interactive, no empty-screen zombie)
+#  + their inline regression test (with @internal annotation). Structural
+#  exemption — not split.)
+vauchi-app/src/ui/exchange/mod.rs 3701
 # (+2 for 2026-05-21-core-ui-icon-on-wire: inline `icon: ...` lines in
 #   sample_fields / sample_shared_info Field constructors.)
 vauchi-app/src/ui/contact_detail.rs 1425

@@ -2313,6 +2313,7 @@ mod tests {
     // Before the fix, `cancel` fell through `ModeSelectionEngine` to
     // `ModeSelectionResult::Screen` → `UpdateScreen(same)` → dead BACK.
     // Mirrors the existing `NfcRoleSelection` cancel arm.
+    // @internal
     #[test]
     fn mode_selection_cancel_completes_to_exit() {
         let mut engine = ExchangeEngine::new(

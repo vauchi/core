@@ -14,6 +14,16 @@ pub struct DeletionSummary {
     pub device_count: usize,
 }
 
+/// Current consent grant state per type, rendered as toggles on the
+/// consent-management sub-screen. Item ids match `ConsentType::as_str()`
+/// so the AppEngine intercept can `ConsentType::parse` them.
+#[derive(Clone, Debug, Default)]
+pub struct ConsentStatus {
+    pub data_processing: bool,
+    pub contact_sharing: bool,
+    pub recovery_vouching: bool,
+}
+
 /// Engine that manages privacy and data settings (GDPR).
 #[derive(Clone, Debug)]
 pub struct GdprEngine {
@@ -23,6 +33,8 @@ pub struct GdprEngine {
     deletion_summary: DeletionSummary,
     /// Tracks which action triggered completion ("export" or "delete").
     last_action: Option<String>,
+    /// Current consent grant state, rendered on the consent sub-screen.
+    consent: ConsentStatus,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -31,6 +43,8 @@ enum GdprStep {
     Overview,
     /// Deletion confirmation screen showing what will be deleted.
     ConfirmDelete,
+    /// Consent-management screen — per-type grant toggles.
+    ManageConsent,
 }
 
 impl GdprEngine {
@@ -41,6 +55,7 @@ impl GdprEngine {
             consent_summary,
             deletion_summary: DeletionSummary::default(),
             last_action: None,
+            consent: ConsentStatus::default(),
         }
     }
 
@@ -48,6 +63,13 @@ impl GdprEngine {
     /// Called by AppEngine when constructing the screen with real data.
     pub fn with_deletion_summary(mut self, summary: DeletionSummary) -> Self {
         self.deletion_summary = summary;
+        self
+    }
+
+    /// Set the current consent grant state, rendered on the consent
+    /// sub-screen. Called by the AppEngine with live state.
+    pub fn with_consent(mut self, consent: ConsentStatus) -> Self {
+        self.consent = consent;
         self
     }
 
@@ -209,10 +231,61 @@ impl GdprEngine {
         }
     }
 
+    fn build_consent(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "manage_consent".into(),
+            title: "Manage Consent".into(),
+            subtitle: Some("Review and update your data consent".into()),
+            components: vec![Component::SettingsGroup {
+                id: "consent".into(),
+                label: "Consent".into(),
+                items: vec![
+                    SettingsItem {
+                        id: "data_processing".into(),
+                        label: "Data Processing".into(),
+                        kind: SettingsItemKind::Toggle {
+                            enabled: self.consent.data_processing,
+                        },
+                        a11y: None,
+                        info_key: None,
+                    },
+                    SettingsItem {
+                        id: "contact_sharing".into(),
+                        label: "Contact Sharing".into(),
+                        kind: SettingsItemKind::Toggle {
+                            enabled: self.consent.contact_sharing,
+                        },
+                        a11y: None,
+                        info_key: None,
+                    },
+                    SettingsItem {
+                        id: "recovery_vouching".into(),
+                        label: "Recovery Vouching".into(),
+                        kind: SettingsItemKind::Toggle {
+                            enabled: self.consent.recovery_vouching,
+                        },
+                        a11y: None,
+                        info_key: None,
+                    },
+                ],
+            }],
+            actions: vec![ScreenAction {
+                id: "cancel".into(),
+                label: "Back".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            }],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
     fn build_screen(&self) -> ScreenModel {
         match self.step {
             GdprStep::Overview => self.build_overview(),
             GdprStep::ConfirmDelete => self.build_confirm_delete(),
+            GdprStep::ManageConsent => self.build_consent(),
         }
     }
 }
@@ -247,6 +320,20 @@ impl WorkflowEngine for GdprEngine {
             }
             // Confirmation: cancel goes back to overview
             (GdprStep::ConfirmDelete, UserAction::ActionPressed { action_id })
+                if action_id == "cancel" =>
+            {
+                self.step = GdprStep::Overview;
+                ActionResult::NavigateTo(self.build_screen())
+            }
+            // Overview: selecting "manage_consent" opens the consent screen
+            (GdprStep::Overview, UserAction::ListItemSelected { item_id, .. })
+                if item_id == "manage_consent" =>
+            {
+                self.step = GdprStep::ManageConsent;
+                ActionResult::NavigateTo(self.build_screen())
+            }
+            // Consent screen: back to overview
+            (GdprStep::ManageConsent, UserAction::ActionPressed { action_id })
                 if action_id == "cancel" =>
             {
                 self.step = GdprStep::Overview;
@@ -394,5 +481,61 @@ mod tests {
                 .any(|i| i.detail.contains("7-day grace period")),
             "Should mention grace period"
         );
+    }
+
+    #[test]
+    fn manage_consent_navigates_to_consent_screen() {
+        let mut e = engine();
+        let result = e.handle_action(UserAction::ListItemSelected {
+            component_id: "consent_actions".into(),
+            item_id: "manage_consent".into(),
+        });
+        match result {
+            ActionResult::NavigateTo(screen) => {
+                assert_eq!(screen.screen_id, "manage_consent");
+            }
+            other => panic!("Expected NavigateTo, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn consent_screen_reflects_grant_state() {
+        let mut e = GdprEngine::new(None, "Active".into()).with_consent(ConsentStatus {
+            data_processing: true,
+            contact_sharing: false,
+            recovery_vouching: true,
+        });
+        e.step = GdprStep::ManageConsent;
+        let screen = e.current_screen();
+        let items = match &screen.components[0] {
+            Component::SettingsGroup { items, .. } => items,
+            other => panic!("Expected SettingsGroup, got {other:?}"),
+        };
+        assert_eq!(items.len(), 3, "three consent toggles");
+        let on = |id: &str| {
+            items
+                .iter()
+                .find(|i| i.id == id)
+                .map(|i| matches!(i.kind, SettingsItemKind::Toggle { enabled } if enabled))
+                .unwrap_or(false)
+        };
+        assert!(on("data_processing"), "data_processing should be on");
+        assert!(!on("contact_sharing"), "contact_sharing should be off");
+        assert!(on("recovery_vouching"), "recovery_vouching should be on");
+    }
+
+    #[test]
+    fn consent_cancel_returns_to_overview() {
+        let mut e = engine();
+        e.step = GdprStep::ManageConsent;
+        let result = e.handle_action(UserAction::ActionPressed {
+            action_id: "cancel".into(),
+        });
+        match result {
+            ActionResult::NavigateTo(screen) => {
+                assert_eq!(screen.screen_id, "privacy_settings");
+            }
+            other => panic!("Expected NavigateTo, got {other:?}"),
+        }
     }
 }

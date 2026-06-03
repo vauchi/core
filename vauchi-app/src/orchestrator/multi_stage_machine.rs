@@ -66,7 +66,8 @@ use vauchi_core::Command;
 use vauchi_core::Event;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::exchange::{
-    AudioConfig, AudioProximityState, MultiStageSession, ProtocolState, QrPayload, audio_modem,
+    AccelerometerProximityState, AudioConfig, AudioProximityState, MultiStageSession,
+    ProtocolState, QrPayload, audio_modem,
 };
 
 /// Audio-listen window default (ms). Mirrors the cycle-thread's
@@ -159,6 +160,10 @@ pub enum MultiStageEvent {
     /// integration maps this onto `set_audio_proximity` on the
     /// active `MultiStageExchangeEngine`.
     AudioProximityChanged(AudioProximityState),
+    /// TapHoverShake accelerometer-proximity state changed. The engine
+    /// integration maps this onto `set_accel_proximity` on the active
+    /// `MultiStageExchangeEngine` (same shape as `AudioProximityChanged`).
+    AccelProximityChanged(AccelerometerProximityState),
 }
 
 /// Mode marker — Glance (bilateral QR only) vs Hover (QR + audio
@@ -204,6 +209,11 @@ pub struct MultiStageMachine {
     /// `handle_hardware_event` calls return [`MultiStageEvent::None`]
     /// and leave the phase at [`MultiStagePhase::Cancelled`].
     cancelled: bool,
+    /// TapHoverShake local accelerometer magnitude envelope (g), accumulated
+    /// from `Event::AccelerometerData` while `accel_proximity == Listening`.
+    /// Empty for Glance/Hover. Consumed by the peer-envelope cross-correlate
+    /// in the accel-envelope-transport follow-up.
+    accel_samples: Vec<f32>,
 }
 
 impl MultiStageMachine {
@@ -218,6 +228,7 @@ impl MultiStageMachine {
             current_frame_started_at: None,
             current_frame_duration: 0,
             cancelled: false,
+            accel_samples: Vec::new(),
         }
     }
 
@@ -234,6 +245,7 @@ impl MultiStageMachine {
             current_frame_started_at: None,
             current_frame_duration: 0,
             cancelled: false,
+            accel_samples: Vec::new(),
         }
     }
 
@@ -252,6 +264,7 @@ impl MultiStageMachine {
             current_frame_started_at: None,
             current_frame_duration: 0,
             cancelled: false,
+            accel_samples: Vec::new(),
         }
     }
 
@@ -399,6 +412,12 @@ impl MultiStageMachine {
                 samples,
                 sample_rate,
             } => self.process_audio_samples(samples, *sample_rate),
+            Event::AccelerometerData {
+                x_milli_g,
+                y_milli_g,
+                z_milli_g,
+                ..
+            } => self.process_accel_data(*x_milli_g, *y_milli_g, *z_milli_g),
             // Every other Event variant is inert for multi-stage —
             // late BLE notifications, NFC taps, link callbacks etc.
             // arriving on the multi-stage screen are ignored to
@@ -478,6 +497,35 @@ impl MultiStageMachine {
         ]
     }
 
+    /// TapHoverShake-only: start the accelerometer capture for the shake
+    /// co-location signal. Mirrors [`Self::try_audio_handshake_start`] —
+    /// mode gate (only TapHoverShake), state gate (only from `Pending`,
+    /// idempotent), drives the inner session `Pending -> Listening`, and
+    /// emits `Command::AccelerometerStart` so the platform streams
+    /// `Event::AccelerometerData`.
+    ///
+    /// **Dormant in this scaffolding slice:** no autonomous caller fires it
+    /// yet — the live trigger + the peer-envelope cross-correlate land with
+    /// the accel-envelope-transport follow-up (ADR-009 amendment). Wired +
+    /// tested here so that work is purely additive.
+    pub fn try_accel_capture_start(&mut self) -> Vec<Command> {
+        if self.mode != MultiStageMode::TapHoverShake {
+            return Vec::new();
+        }
+        if self.inner.accel_proximity() != AccelerometerProximityState::Pending {
+            return Vec::new();
+        }
+        if self
+            .inner
+            .set_accel_proximity(AccelerometerProximityState::Listening)
+            .is_err()
+        {
+            return Vec::new();
+        }
+        self.accel_samples.clear();
+        vec![Command::AccelerometerStart]
+    }
+
     /// Decode FSK samples from a frontend `AudioSamplesRecorded`
     /// event, verify against the peer's session_id, and transition
     /// the audio-proximity state. Mirrors the cycle-thread's
@@ -520,6 +568,42 @@ impl MultiStageMachine {
             return MultiStageEvent::None;
         }
         MultiStageEvent::AudioProximityChanged(next)
+    }
+
+    /// Accumulate one `Event::AccelerometerData` sample into the local
+    /// magnitude envelope (TapHoverShake only, while `accel_proximity ==
+    /// Listening`). Samples are milli-g per axis; we store the Euclidean
+    /// magnitude in g, matching `exchange::accelerometer`'s envelope shape.
+    ///
+    /// **Local-only in this slice:** the `Listening -> Confirmed/Failed`
+    /// cross-correlation needs the *peer's* envelope, which arrives over the
+    /// transport in the accel-envelope-transport follow-up. Until then this
+    /// only builds the local envelope and returns `None`.
+    fn process_accel_data(
+        &mut self,
+        x_milli_g: i32,
+        y_milli_g: i32,
+        z_milli_g: i32,
+    ) -> MultiStageEvent {
+        if self.mode != MultiStageMode::TapHoverShake {
+            return MultiStageEvent::None;
+        }
+        if self.inner.accel_proximity() != AccelerometerProximityState::Listening {
+            return MultiStageEvent::None;
+        }
+        let x = x_milli_g as f32 / 1000.0;
+        let y = y_milli_g as f32 / 1000.0;
+        let z = z_milli_g as f32 / 1000.0;
+        self.accel_samples.push((x * x + y * y + z * z).sqrt());
+        MultiStageEvent::None
+    }
+
+    /// Number of accelerometer magnitude samples captured into the local
+    /// envelope. Public test seam (like `protocol_state_for_test`) for the
+    /// dormant capture path; also the length the peer-envelope exchange reads
+    /// before `encode_envelope` when the transport slice lands.
+    pub fn accel_sample_count(&self) -> usize {
+        self.accel_samples.len()
     }
 
     /// Re-derive `self.phase` from the inner [`MultiStageSession`]

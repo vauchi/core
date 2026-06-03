@@ -40,7 +40,9 @@ use proptest::prelude::*;
 use vauchi_app::orchestrator::multi_stage_machine::{
     MultiStageEvent, MultiStageMachine, MultiStageMode, MultiStagePhase, event_to_commands,
 };
-use vauchi_core::exchange::{AudioConfig, AudioProximityState, audio_modem};
+use vauchi_core::exchange::{
+    AccelerometerProximityState, AudioConfig, AudioProximityState, audio_modem,
+};
 use vauchi_core::{Command, Event};
 
 /// Strategy: arbitrary non-fatal events. Used by the I1 reachability
@@ -501,4 +503,98 @@ fn event_to_commands_audio_proximity_emits_no_commands() {
     // generated with — proves the audio_modem import works for tests.
     let _ = AudioConfig::default();
     let _ = audio_modem::generate_fsk_samples(&[0u8; 16], &AudioConfig::default());
+}
+
+// ── Accelerometer capture scaffolding (P2.C follow-up; dormant) ────────
+//
+// try_accel_capture_start + process_accel_data build the local shake
+// envelope for TapHoverShake. No autonomous caller fires them yet (the live
+// trigger + peer-envelope cross-correlate land with the accel-envelope-
+// transport follow-up / ADR-009 amendment), so accel_proximity stays Pending
+// in live flows — these tests pin the mechanism directly.
+
+// @internal
+#[test]
+fn tap_hover_shake_accel_capture_emits_start_once() {
+    let mut machine = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
+    let cmds = machine.try_accel_capture_start();
+    assert_eq!(cmds.len(), 1, "TapHoverShake must emit one accel command");
+    assert!(matches!(cmds[0], Command::AccelerometerStart));
+    // Second call is a no-op — accel_proximity moved past Pending.
+    let repeat = machine.try_accel_capture_start();
+    assert!(
+        repeat.is_empty(),
+        "second capture-start must be a no-op: {repeat:?}"
+    );
+}
+
+// @internal
+#[test]
+fn glance_and_hover_emit_no_accel_commands() {
+    let mut glance = MultiStageMachine::new_glance(fixture_local_card(), 0);
+    assert!(
+        glance.try_accel_capture_start().is_empty(),
+        "Glance must not start accel capture (mode gate)",
+    );
+    let mut hover = MultiStageMachine::new_hover(fixture_local_card(), 0);
+    assert!(
+        hover.try_accel_capture_start().is_empty(),
+        "Hover must not start accel capture (accel is TapHoverShake-only)",
+    );
+}
+
+// @internal
+#[test]
+fn accel_data_accumulates_into_envelope_when_listening() {
+    let mut machine = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
+    let _ = machine.try_accel_capture_start();
+    assert_eq!(machine.accel_sample_count(), 0);
+    for i in 0..3u64 {
+        let _ = machine.handle_hardware_event(
+            &Event::AccelerometerData {
+                timestamp_ms: i,
+                x_milli_g: 100,
+                y_milli_g: 50,
+                z_milli_g: 9800,
+            },
+            i,
+        );
+    }
+    assert_eq!(
+        machine.accel_sample_count(),
+        3,
+        "each AccelerometerData while Listening must append one magnitude sample",
+    );
+}
+
+// @internal
+#[test]
+fn accel_data_ignored_before_capture_start() {
+    // Without try_accel_capture_start, accel_proximity is still Pending — the
+    // state gate drops incoming samples so a stray reading can't build an
+    // envelope before the capture window opens.
+    let mut machine = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
+    let _ = machine.handle_hardware_event(
+        &Event::AccelerometerData {
+            timestamp_ms: 0,
+            x_milli_g: 100,
+            y_milli_g: 50,
+            z_milli_g: 9800,
+        },
+        0,
+    );
+    assert_eq!(
+        machine.accel_sample_count(),
+        0,
+        "samples before capture-start must be ignored (state gate)",
+    );
+}
+
+// @internal
+#[test]
+fn event_to_commands_accel_proximity_emits_no_commands() {
+    let cmds = event_to_commands(&MultiStageEvent::AccelProximityChanged(
+        AccelerometerProximityState::Confirmed,
+    ));
+    assert!(cmds.is_empty());
 }

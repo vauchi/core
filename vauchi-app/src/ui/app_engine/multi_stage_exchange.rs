@@ -192,6 +192,9 @@ impl AppEngine {
             MultiStageEvent::AudioProximityChanged(state) => {
                 self.apply_multi_stage_audio_proximity(state)
             }
+            MultiStageEvent::AccelProximityChanged(state) => {
+                self.apply_multi_stage_accel_proximity(state)
+            }
             MultiStageEvent::PeerDiscovered => {
                 self.apply_multi_stage_state(vauchi_core::exchange::ProtocolState::Discovered)
             }

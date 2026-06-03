@@ -835,6 +835,23 @@ impl AppEngine {
         false
     }
 
+    /// TapHoverShake mirror of [`Self::apply_multi_stage_audio_proximity`]:
+    /// routes a `MultiStageEvent::AccelProximityChanged` onto the active
+    /// engine's `set_accel_proximity`. Returns `false` if the active engine
+    /// is not the multi-stage one (navigated away).
+    pub fn apply_multi_stage_accel_proximity(
+        &mut self,
+        state: vauchi_core::exchange::AccelerometerProximityState,
+    ) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_accel_proximity(state);
+            return true;
+        }
+        false
+    }
+
     /// `true` when the active engine is a `MultiStageExchangeEngine`
     /// constructed via [`MultiStageExchangeEngine::new_hover`].
     /// Phase 1.C polish — the platform-binding wire-up

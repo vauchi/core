@@ -234,33 +234,25 @@ fn exchange_screen_with_identity_has_session() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_mode_selection");
 
-    // Pick TapHoverShake to advance to the legacy QR sub-flow.
-    // Glance + Hover now both hand off to MultiStageExchange
-    // (Pair 4 + Phase 1.E of the hover graduation plan) and so
-    // leave the Exchange engine entirely. TapHoverShake is the next
-    // QR-legacy mode in line for graduation — until then it's
-    // what this test needs to exercise ADR-031 session wiring
-    // on the legacy QR screen.
+    // Pick TapHoverShake — graduated to the multi-stage engine (P2.D of the
+    // TapHoverShake plan). It now hands off via StartMultiStageExchange and
+    // the AppEngine navigates to the multi-stage screen, which owns the
+    // ADR-031 session wiring (the legacy ShowQr screen is unreachable; the
+    // ephemeral-QR-from-session check now lives on the multi-stage path).
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "category:fun".into(),
         item_id: "mode:tap_hover_shake".into(),
     });
 
+    // The handoff navigates to the multi-stage exchange screen and the
+    // AppEngine creates the backing session (ADR-031 wiring).
     let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_show_qr");
-
-    // Verify the QR data comes from the session (ephemeral), not the static public ID.
-    // This confirms ADR-031 session wiring is active.
-    let qr_data = screen.components.iter().find_map(|c| match c {
-        vauchi_app::ui::Component::QrCode { data, .. } => Some(data.clone()),
-        _ => None,
-    });
-    let qr_data = qr_data.expect("exchange screen should have a QrCode component");
-    assert_ne!(
-        qr_data, static_public_id,
-        "QR data should be session-generated, not the static public ID"
+    assert_eq!(screen.screen_id, "multi_stage_exchange");
+    assert!(
+        engine.multi_stage_session_active(),
+        "AppEngine must create the multi-stage session on handoff (ADR-031 wiring)"
     );
-    assert!(!qr_data.is_empty(), "session QR data should not be empty");
+    let _ = static_public_id;
 }
 
 // @internal

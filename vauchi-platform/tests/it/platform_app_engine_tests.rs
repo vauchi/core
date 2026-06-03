@@ -680,6 +680,7 @@ fn drive_to_show_qr(engine: &PlatformAppEngine) {
 
 // @internal
 #[test]
+#[ignore = "Legacy animated-QR frame cycling on exchange_show_qr. After P2.D of the TapHoverShake graduation plan, no exchange mode reaches the legacy QR screen via the picker (all modes graduated; Broadcast removed), so drive_to_show_qr can no longer arrive there. This test + the advance_qr_frame_json UniFFI surface are retired together in P2.E (legacy QR deletion). Re-enable only if a QR-legacy entry path is reintroduced."]
 fn advance_qr_frame_json_cycles_frames_on_show_qr() {
     let (engine, _dir) = create_engine();
     drive_to_show_qr(&engine);

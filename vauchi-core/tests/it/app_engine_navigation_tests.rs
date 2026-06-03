@@ -232,44 +232,34 @@ fn navigate_away_and_back_preserves_engine_state() {
     let first_visit = engine.navigate_to(AppScreen::Exchange);
     assert_eq!(first_visit.screen_id, "exchange_mode_selection");
 
-    // Pick TapHoverShake mode (still routes through the legacy
-    // `ExchangeStep::Qr` sub-flow). Glance and Hover now both hand
-    // off to `MultiStageExchange` and so leave the Exchange engine
-    // entirely (Pair 4 graduated Glance; Phase 1.E of the hover
-    // graduation plan graduated Hover). TapHoverShake is the next QR-
-    // legacy mode in line for Phase 2/3 graduation — until then it's
-    // the only QR-legacy mode left, which is exactly what this
-    // regression test needs to exercise the cache-preserves-state
-    // behavior on a single engine.
+    // Pick TapTap (NFC) — an in-engine mode whose role-selection sub-screen
+    // stays inside the ExchangeEngine, so it exercises the cache-preserves-
+    // state behaviour on a single engine. The QR modes that this test used
+    // to ride (Glance/Hover/TapHoverShake) all graduated to the separate
+    // MultiStageExchange screen (P2.D of the TapHoverShake plan) and so
+    // leave the Exchange engine entirely — they can no longer demonstrate
+    // ExchangeEngine sub-step caching.
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "category:fun".into(),
-        item_id: "mode:tap_hover_shake".into(),
+        item_id: "mode:tap_tap".into(),
     });
-    let qr_screen = engine.current_screen();
+    let sub_screen = engine.current_screen();
     assert_eq!(
-        qr_screen.screen_id, "exchange_show_qr",
-        "after mode pick, should be at show_qr"
+        sub_screen.screen_id, "exchange_nfc_role",
+        "after picking TapTap, should be at the in-engine NFC role-selection step"
     );
 
-    // Advance to scan
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".into(),
-    });
-    let scan_screen = engine.current_screen();
-    assert_eq!(
-        scan_screen.screen_id, "exchange_scan_qr",
-        "exchange engine should advance to scan step"
-    );
-
-    // Navigate away to Home — Exchange engine should be cached at scan step
+    // Navigate away to Home — the Exchange engine should be cached at the
+    // NFC role-selection sub-step.
     let home = engine.navigate_to(AppScreen::MyInfo);
     assert_eq!(home.screen_id, "my_info");
 
-    // Navigate back to Exchange — should restore cached engine on scan step
+    // Navigate back to Exchange — should restore the cached engine on its
+    // sub-step, NOT reset to mode selection.
     let restored = engine.navigate_to(AppScreen::Exchange);
     assert_eq!(
-        restored.screen_id, "exchange_scan_qr",
-        "cached engine should preserve internal state (scan step, not show_qr)"
+        restored.screen_id, "exchange_nfc_role",
+        "cached engine should preserve internal state (NFC role step, not mode selection)"
     );
 }
 

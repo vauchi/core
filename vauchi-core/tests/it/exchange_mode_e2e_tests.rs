@@ -93,7 +93,13 @@ fn glance_full_flow_mode_to_multistage_handoff() {
 
 // @internal
 #[test]
-fn tap_hover_shake_full_flow_mode_to_qr_to_result() {
+fn tap_hover_shake_mode_pick_hands_off_to_multi_stage() {
+    // TapHoverShake graduated to the multi-stage engine (P2.D of the
+    // TapHoverShake graduation plan): picking it then skipping groups hands
+    // off via ActionResult::StartMultiStageExchange instead of the retired
+    // legacy ExchangeEngine QR walk. No QR mode remains on the legacy
+    // ExchangeEngine path (Broadcast was removed), so the old full-QR-flow
+    // walk this test used to exercise is no longer reachable here.
     let mut engine = ExchangeEngine::new(
         config_with_mode_selection(),
         vauchi_core::clock::SystemClock::shared(),
@@ -105,29 +111,19 @@ fn tap_hover_shake_full_flow_mode_to_qr_to_result() {
         item_id: "mode:tap_hover_shake".to_string(),
     });
 
-    // Skip groups
-    let _ = engine.handle_action(UserAction::ActionPressed {
+    // Skip groups -> multi-stage handoff
+    let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "skip".to_string(),
     });
-    let screen = engine.current_screen();
-    assert_eq!(
-        screen.screen_id, "exchange_show_qr",
-        "TapHoverShake skip-groups goes straight to QR"
+    assert!(
+        matches!(
+            result,
+            ActionResult::StartMultiStageExchange {
+                mode: vauchi_core::exchange::mode::ExchangeMode::TapHoverShake,
+            },
+        ),
+        "TapHoverShake must hand off to multi-stage; got {result:?}",
     );
-
-    // Complete the QR flow
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".to_string(),
-    });
-    let _ = engine.handle_action(UserAction::TextChanged {
-        component_id: "scanned_data".to_string(),
-        value: "peer-data".to_string(),
-    });
-    engine.mark_success();
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "done".to_string(),
-    });
-    assert_eq!(result, ActionResult::Complete);
 }
 
 // ================================================================

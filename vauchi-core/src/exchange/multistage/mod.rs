@@ -8,6 +8,7 @@
 //! Transfers full contact cards face-to-face via chunked QR codes
 //! with atomic commitment scheme.
 
+pub mod accel_envelope;
 pub mod base45;
 pub mod chunker;
 pub mod commitment;

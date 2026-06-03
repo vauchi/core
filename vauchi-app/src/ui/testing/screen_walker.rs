@@ -109,6 +109,14 @@ fn walk_component(component: &Component, out: &mut Vec<UserAction>) {
                 });
             }
         }
+        Component::Row { items, .. } => {
+            // A layout container — recurse so nested affordances (e.g.
+            // the exchange preview row's `ActionList` switch/cancel)
+            // are still walked for reachability.
+            for child in items {
+                walk_component(child, out);
+            }
+        }
         Component::SectionedActionList { id, sections } => {
             // Walk every item in every section — affordance shape is the
             // same as ActionList (taps → ListItemSelected). Section

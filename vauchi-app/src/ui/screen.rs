@@ -33,6 +33,32 @@ pub enum ScreenPresentationKind {
     Sheet,
 }
 
+/// Whether the renderer wraps content in a scroll container or renders
+/// a fixed, non-scrolling layout sized to the viewport. Frontends honour
+/// this instead of always wrapping content in a scroll view. `Fixed` is
+/// used by screens that must not reflow while a live element updates —
+/// e.g. the QR exchange screen, where a moving QR breaks the peer
+/// camera lock (`2026-06-03-exchange-qr-scan-stability`).
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum ScreenLayout {
+    /// Content may exceed the viewport; renderer wraps it in a scroll
+    /// container (the default for list / detail screens).
+    #[default]
+    Scroll,
+    /// Content is sized to the viewport and must not scroll or reflow.
+    Fixed,
+}
+
+impl ScreenLayout {
+    /// `true` when this is the default scrolling layout. Used by serde
+    /// `skip_serializing_if` so the field is omitted unless `Fixed`.
+    pub fn is_scroll(&self) -> bool {
+        matches!(self, ScreenLayout::Scroll)
+    }
+}
+
 /// Describes a full screen to render.
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -73,6 +99,11 @@ pub struct ScreenModel {
     /// screens are roots / back-stoppers).
     #[serde(default, skip_serializing_if = "is_false")]
     pub can_go_back: bool,
+    /// Whether the renderer scrolls the content or renders a fixed,
+    /// non-scrolling layout. See [`ScreenLayout`]. Omitted on the wire
+    /// when `Scroll` (the default) so only fixed-layout screens carry it.
+    #[serde(default, skip_serializing_if = "ScreenLayout::is_scroll")]
+    pub layout: ScreenLayout,
 }
 
 /// serde `skip_serializing_if` predicate for `bool` fields defaulting to
@@ -101,6 +132,7 @@ impl Default for ScreenModel {
             parent_screen_id: None,
             presentation_kind: ScreenPresentationKind::Page,
             can_go_back: false,
+            layout: ScreenLayout::Scroll,
         }
     }
 }
@@ -126,6 +158,7 @@ impl ScreenModel {
             parent_screen_id: None,
             presentation_kind: ScreenPresentationKind::Page,
             can_go_back: false,
+            layout: ScreenLayout::Scroll,
         }
     }
 

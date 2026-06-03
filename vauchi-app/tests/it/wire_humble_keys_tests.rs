@@ -119,7 +119,7 @@ fn sample_preview_variant() -> PreviewVariant {
 /// this integration-test crate (an *external* crate to `vauchi_app`)
 /// is rejected. Counting unique variant tags via the serialized form
 /// is the next-best mechanical check.
-const COMPONENT_VARIANT_COUNT: usize = 19;
+const COMPONENT_VARIANT_COUNT: usize = 20;
 
 /// Curated set of `Component` variants. Adding a new variant?
 /// **Append a sample here AND bump [`COMPONENT_VARIANT_COUNT`].**
@@ -185,6 +185,10 @@ fn all_components() -> Vec<Component> {
         },
         Component::ActionList {
             id: "al".to_string(),
+            items: vec![],
+        },
+        Component::Row {
+            id: "row".to_string(),
             items: vec![],
         },
         Component::StatusIndicator {

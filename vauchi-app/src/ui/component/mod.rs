@@ -118,6 +118,15 @@ pub enum Component {
         id: String,
         items: Vec<ActionListItem>,
     },
+    /// A horizontal container — lays its child components out in a single
+    /// row. Used to place a camera preview beside its action buttons so a
+    /// fixed-layout screen fits the viewport without scrolling
+    /// (`2026-06-03-exchange-qr-scan-stability`). The first child flexes;
+    /// later children take their natural width.
+    Row {
+        id: String,
+        items: Vec<Component>,
+    },
     StatusIndicator {
         id: String,
         icon: Option<String>,

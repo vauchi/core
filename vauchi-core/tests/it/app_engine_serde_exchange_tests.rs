@@ -324,11 +324,30 @@ fn multi_stage_exchange_navigates_to_engine_idle_screen() {
     assert_eq!(screen.screen_id, "multi_stage_exchange");
     // Initial screen must show the active chrome with cancel + switch
     // camera, not the success or failed terminal screens.
-    let action_ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+    // The active screen's switch/cancel buttons live inside the preview
+    // `Row`'s `ActionList` (so they sit beside the camera preview).
+    let mut ids: Vec<String> = screen.actions.iter().map(|a| a.id.clone()).collect();
+    collect_row_action_ids(&screen.components, &mut ids);
+    let action_ids: Vec<&str> = ids.iter().map(|s| s.as_str()).collect();
     assert!(action_ids.contains(&"cancel"));
     assert!(action_ids.contains(&"switch_camera"));
     assert!(!action_ids.contains(&"done"));
     assert!(!action_ids.contains(&"retry"));
+}
+
+/// Collect `ActionList` item ids from components, recursing into `Row`
+/// containers (the active exchange screen nests its buttons there).
+fn collect_row_action_ids(components: &[vauchi_app::ui::Component], out: &mut Vec<String>) {
+    use vauchi_app::ui::Component;
+    for c in components {
+        match c {
+            Component::ActionList { items, .. } => {
+                out.extend(items.iter().map(|i| i.id.clone()));
+            }
+            Component::Row { items, .. } => collect_row_action_ids(items, out),
+            _ => {}
+        }
+    }
 }
 
 // @internal

@@ -62,6 +62,15 @@ const COMPONENT_ID_OWN_QR: &str = "own_qr";
 /// session (see `core/vauchi-platform/src/platform_app_engine.rs`).
 pub const PEER_SCAN_COMPONENT_ID: &str = "peer_scan";
 const COMPONENT_ID_PEER_SCAN: &str = PEER_SCAN_COMPONENT_ID;
+/// Component id of the `ActionList` that holds the switch-camera /
+/// cancel buttons. It lives inside the active screen's preview `Row`
+/// (so the buttons sit beside the camera preview); its taps arrive as
+/// `UserAction::ListItemSelected` and are normalised back to action ids
+/// in `handle_action`.
+const EXCHANGE_ACTIONS_ID: &str = "exchange_actions";
+/// Component id of the `Row` grouping the peer-scan preview with the
+/// action buttons on the active exchange screen.
+const EXCHANGE_PREVIEW_ROW_ID: &str = "exchange_preview_row";
 const COMPONENT_ID_STATUS: &str = "status";
 const COMPONENT_ID_PEER_NAME: &str = "peer_name";
 const COMPONENT_ID_PERMISSION: &str = "permission_required";
@@ -412,11 +421,12 @@ impl MultiStageExchangeEngine {
     fn build_active_screen(&self, title: String) -> ScreenModel {
         let mut components: Vec<Component> = Vec::new();
 
-        // Own QR — rendered while we have payload data from the cycle
-        // thread. While the session is still in `Idle` (start has
-        // not produced a payload yet) we omit the QR component
-        // entirely so the frontend renders a chrome-only loading
-        // indicator instead of an empty box.
+        // Own QR — pinned at the TOP of a fixed (non-scrolling) layout.
+        // It is what the peer scans, so it must never move; keeping it
+        // above the status slot means status-height changes can't shift
+        // it. While the session is still in `Idle` (no payload yet) we
+        // omit it so the frontend shows a chrome-only loading indicator
+        // instead of an empty box.
         if let Some(data) = &self.current_qr_data {
             components.push(Component::QrCode {
                 id: COMPONENT_ID_OWN_QR.into(),
@@ -428,44 +438,59 @@ impl MultiStageExchangeEngine {
             });
         }
 
-        // Peer scanner — always present in Active rendering. Frontend
-        // composes camera preview + this overlay; the `scan_quality`
-        // value drives the viewfinder border colour.
-        components.push(Component::QrCode {
+        // Status narration — the single element that changes during the
+        // exchange. Sits below the own-QR so its reflow never moves the
+        // QR the peer is scanning.
+        let status = build_status_indicator(&self.state, self.audio_proximity);
+        components.push(status);
+
+        // Peer scanner + action buttons share one `Row` so the screen
+        // fits the viewport without scrolling (`ScreenLayout::Fixed`):
+        // the preview flexes, the buttons take their natural width. The
+        // buttons live in the row's `ActionList` rather than the
+        // screen-level `actions` (which stay empty); their taps are
+        // normalised back to action dispatch in `handle_action`.
+        let scan = Component::QrCode {
             id: COMPONENT_ID_PEER_SCAN.into(),
             data: String::new(),
             mode: QrMode::Scan,
             label: Some("Scan their code".into()),
             scan_quality: Some(self.scan_quality_tracker.quality()),
             a11y: None,
+        };
+        let buttons = Component::ActionList {
+            id: EXCHANGE_ACTIONS_ID.into(),
+            items: vec![
+                ActionListItem {
+                    id: SWITCH_CAMERA_ACTION_ID.into(),
+                    label: if self.use_front_camera {
+                        "Use Rear Camera".into()
+                    } else {
+                        "Use Front Camera".into()
+                    },
+                    icon: None,
+                    detail: None,
+                    a11y: None,
+                    info_key: None,
+                },
+                ActionListItem {
+                    id: CANCEL_ACTION_ID.into(),
+                    label: "Cancel".into(),
+                    icon: None,
+                    detail: None,
+                    a11y: None,
+                    info_key: None,
+                },
+            ],
+        };
+        components.push(Component::Row {
+            id: EXCHANGE_PREVIEW_ROW_ID.into(),
+            items: vec![scan, buttons],
         });
 
-        // Status narration — derived from ProtocolState plus the
-        // active audio-proximity layer (Hover only; Glance stays at
-        // Pending so the narration is unchanged for that mode).
-        let status = build_status_indicator(&self.state, self.audio_proximity);
-        components.push(status);
-
-        let mut actions = vec![ScreenAction {
-            id: SWITCH_CAMERA_ACTION_ID.into(),
-            label: if self.use_front_camera {
-                "Use Rear Camera".into()
-            } else {
-                "Use Front Camera".into()
-            },
-            style: ActionStyle::Secondary,
-            enabled: true,
-            a11y: None,
-        }];
-        actions.push(ScreenAction {
-            id: CANCEL_ACTION_ID.into(),
-            label: "Cancel".into(),
-            style: ActionStyle::Secondary,
-            enabled: true,
-            a11y: None,
-        });
-
-        ScreenModel::new(SCREEN_ID, title, components, actions)
+        let mut screen = ScreenModel::new(SCREEN_ID, title, components, Vec::new());
+        screen.layout = ScreenLayout::Fixed;
+        screen
     }
 
     fn build_success_screen(&self, title: String) -> ScreenModel {
@@ -665,8 +690,17 @@ impl WorkflowEngine for MultiStageExchangeEngine {
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
-        let UserAction::ActionPressed { action_id } = action else {
-            return ActionResult::UpdateScreen(self.build_screen());
+        let action_id = match action {
+            UserAction::ActionPressed { action_id } => action_id,
+            // The active screen's switch/cancel buttons live inside the
+            // preview `Row`'s `ActionList` (so they sit beside the camera
+            // preview); those taps arrive as `ListItemSelected`. Normalise
+            // them back to the same action dispatch.
+            UserAction::ListItemSelected {
+                component_id,
+                item_id,
+            } if component_id == EXCHANGE_ACTIONS_ID => item_id,
+            _ => return ActionResult::UpdateScreen(self.build_screen()),
         };
         match action_id.as_str() {
             CANCEL_ACTION_ID => {
@@ -828,7 +862,134 @@ mod tests {
     }
 
     fn action_ids(screen: &ScreenModel) -> Vec<&str> {
-        screen.actions.iter().map(|a| a.id.as_str()).collect()
+        // Screen-level actions (success / failed terminals) plus the
+        // buttons the active screen now carries inside its preview
+        // `Row`'s `ActionList` (so they sit beside the camera preview).
+        let mut ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+        fn collect<'a>(component: &'a Component, out: &mut Vec<&'a str>) {
+            match component {
+                Component::ActionList { items, .. } => {
+                    out.extend(items.iter().map(|i| i.id.as_str()));
+                }
+                Component::Row { items, .. } => {
+                    for child in items {
+                        collect(child, out);
+                    }
+                }
+                _ => {}
+            }
+        }
+        for c in &screen.components {
+            collect(c, &mut ids);
+        }
+        ids
+    }
+
+    /// Pull the switch-camera button label out of the active screen's
+    /// preview `Row` `ActionList`.
+    fn switch_camera_label(screen: &ScreenModel) -> String {
+        fn dig(c: &Component) -> Option<String> {
+            match c {
+                Component::ActionList { items, .. } => items
+                    .iter()
+                    .find(|i| i.id == SWITCH_CAMERA_ACTION_ID)
+                    .map(|i| i.label.clone()),
+                Component::Row { items, .. } => items.iter().find_map(dig),
+                _ => None,
+            }
+        }
+        screen
+            .components
+            .iter()
+            .find_map(dig)
+            .expect("switch_camera button must exist")
+    }
+
+    /// Find the peer-scan `QrCode` wherever it lives (top-level or inside
+    /// the active screen's preview `Row`).
+    fn find_peer_scan(screen: &ScreenModel) -> Option<&Component> {
+        fn dig(c: &Component) -> Option<&Component> {
+            match c {
+                Component::QrCode {
+                    id,
+                    mode: QrMode::Scan,
+                    ..
+                } if id == PEER_SCAN_COMPONENT_ID => Some(c),
+                Component::Row { items, .. } => items.iter().find_map(dig),
+                _ => None,
+            }
+        }
+        screen.components.iter().find_map(dig)
+    }
+
+    // ── Scan-stability layout (2026-06-03-exchange-qr-scan-stability) ──
+
+    // The active screen is a fixed (non-scrolling) layout so the own-QR
+    // never reflows while a live element updates — a moving QR breaks the
+    // peer camera's lock.
+    // @internal
+    #[test]
+    fn active_screen_layout_is_fixed() {
+        let screen = engine_with_qr(ProtocolState::Advertising, "payload").current_screen();
+        assert_eq!(screen.screen_id, SCREEN_ID);
+        assert_eq!(screen.layout, ScreenLayout::Fixed);
+    }
+
+    // The peer-scan preview and the buttons share one `Row`; the buttons
+    // live in that row's `ActionList` (not the screen-level `actions`).
+    // @internal
+    #[test]
+    fn active_screen_groups_preview_and_actions_in_row() {
+        let screen = engine_with_qr(ProtocolState::Advertising, "payload").current_screen();
+        assert!(
+            screen.actions.is_empty(),
+            "active screen actions must be empty; buttons live in the row"
+        );
+        let row = screen
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::Row { id, items } if id == EXCHANGE_PREVIEW_ROW_ID => Some(items),
+                _ => None,
+            })
+            .expect("active screen must have the preview Row");
+        assert!(
+            row.iter().any(|c| matches!(
+                c,
+                Component::QrCode { id, mode: QrMode::Scan, .. } if id == COMPONENT_ID_PEER_SCAN
+            )),
+            "row must contain the peer-scan preview"
+        );
+        let button_ids: Vec<&str> = row
+            .iter()
+            .find_map(|c| match c {
+                Component::ActionList { id, items } if id == EXCHANGE_ACTIONS_ID => Some(items),
+                _ => None,
+            })
+            .expect("row must contain the action list")
+            .iter()
+            .map(|i| i.id.as_str())
+            .collect();
+        assert_eq!(button_ids, vec![SWITCH_CAMERA_ACTION_ID, CANCEL_ACTION_ID]);
+    }
+
+    // Buttons now dispatch via `ListItemSelected` (ActionList); the engine
+    // normalises those back to the same handler as the old `ActionPressed`.
+    // @internal
+    #[test]
+    fn list_item_selected_on_action_list_toggles_camera() {
+        let mut engine = engine_with_qr(ProtocolState::Advertising, "payload");
+        let before = engine.use_front_camera();
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: EXCHANGE_ACTIONS_ID.into(),
+            item_id: SWITCH_CAMERA_ACTION_ID.into(),
+        });
+        assert_ne!(
+            engine.use_front_camera(),
+            before,
+            "switch_camera via ActionList must toggle the camera"
+        );
+        assert!(matches!(result, ActionResult::Commands { .. }));
     }
 
     // ── Mode-aware construction (Phase 1.A) ─────────────────────
@@ -1046,14 +1207,12 @@ mod tests {
                 .iter()
                 .any(|c| matches!(c, Component::QrCode { id, .. } if id == COMPONENT_ID_OWN_QR)),
         );
-        // Peer scanner is always present in Active rendering.
-        let has_scanner = screen.components.iter().any(|c| {
-            matches!(
-                c,
-                Component::QrCode { id, mode: QrMode::Scan, .. } if id == COMPONENT_ID_PEER_SCAN,
-            )
-        });
-        assert!(has_scanner, "Idle must compose camera scanner");
+        // Peer scanner is always present in Active rendering (now inside
+        // the preview Row, alongside the action buttons).
+        assert!(
+            find_peer_scan(&screen).is_some(),
+            "Idle must compose camera scanner"
+        );
         let status = first_status_indicator(&screen).expect("status indicator");
         match status {
             Component::StatusIndicator { title, status, .. } => {
@@ -1316,14 +1475,8 @@ mod tests {
         // Still active rendering — the BLE permission denial does not
         // gate the camera-only flow.
         let screen = engine.current_screen();
-        let has_scanner = screen.components.iter().any(|c| {
-            matches!(
-                c,
-                Component::QrCode { id, mode: QrMode::Scan, .. } if id == COMPONENT_ID_PEER_SCAN,
-            )
-        });
         assert!(
-            has_scanner,
+            find_peer_scan(&screen).is_some(),
             "unrelated transport must not gate the camera screen"
         );
     }
@@ -1410,25 +1563,17 @@ mod tests {
     #[test]
     fn switch_camera_label_reflects_current_orientation() {
         let mut engine = MultiStageExchangeEngine::new_glance();
-        let label_rear = engine
-            .current_screen()
-            .actions
-            .into_iter()
-            .find(|a| a.id == SWITCH_CAMERA_ACTION_ID)
-            .map(|a| a.label)
-            .unwrap();
-        assert_eq!(label_rear, "Use Front Camera");
+        assert_eq!(
+            switch_camera_label(&engine.current_screen()),
+            "Use Front Camera"
+        );
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: SWITCH_CAMERA_ACTION_ID.into(),
         });
-        let label_front = engine
-            .current_screen()
-            .actions
-            .into_iter()
-            .find(|a| a.id == SWITCH_CAMERA_ACTION_ID)
-            .map(|a| a.label)
-            .unwrap();
-        assert_eq!(label_front, "Use Rear Camera");
+        assert_eq!(
+            switch_camera_label(&engine.current_screen()),
+            "Use Rear Camera"
+        );
     }
 
     // @internal
@@ -1483,14 +1628,10 @@ mod tests {
             });
         }
         let screen = engine.current_screen();
-        let scan_quality = screen.components.iter().find_map(|c| match c {
-            Component::QrCode {
-                mode: QrMode::Scan,
-                scan_quality,
-                ..
-            } => Some(*scan_quality),
+        let scan_quality = match find_peer_scan(&screen) {
+            Some(Component::QrCode { scan_quality, .. }) => Some(*scan_quality),
             _ => None,
-        });
+        };
         assert_eq!(scan_quality, Some(Some(ScanQuality::Good)));
     }
 
@@ -1515,14 +1656,10 @@ mod tests {
             });
         }
         let screen = engine.current_screen();
-        let scan_quality = screen.components.iter().find_map(|c| match c {
-            Component::QrCode {
-                mode: QrMode::Scan,
-                scan_quality,
-                ..
-            } => *scan_quality,
+        let scan_quality = match find_peer_scan(&screen) {
+            Some(Component::QrCode { scan_quality, .. }) => *scan_quality,
             _ => None,
-        });
+        };
         assert_eq!(scan_quality, Some(ScanQuality::Good));
     }
 

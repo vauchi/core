@@ -1770,6 +1770,34 @@
           "additionalProperties": false
         },
         {
+          "description": "A horizontal container — lays its child components out in a single row. Used to place a camera preview beside its action buttons so a fixed-layout screen fits the viewport without scrolling (`2026-06-03-exchange-qr-scan-stability`). The first child flexes; later children take their natural width.",
+          "type": "object",
+          "required": [
+            "Row"
+          ],
+          "properties": {
+            "Row": {
+              "type": "object",
+              "required": [
+                "id",
+                "items"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Component"
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
           "type": "object",
           "required": [
             "StatusIndicator"
@@ -2969,6 +2997,25 @@
         }
       }
     },
+    "ScreenLayout": {
+      "description": "Whether the renderer wraps content in a scroll container or renders a fixed, non-scrolling layout sized to the viewport. Frontends honour this instead of always wrapping content in a scroll view. `Fixed` is used by screens that must not reflow while a live element updates — e.g. the QR exchange screen, where a moving QR breaks the peer camera lock (`2026-06-03-exchange-qr-scan-stability`).",
+      "oneOf": [
+        {
+          "description": "Content may exceed the viewport; renderer wraps it in a scroll container (the default for list / detail screens).",
+          "type": "string",
+          "enum": [
+            "Scroll"
+          ]
+        },
+        {
+          "description": "Content is sized to the viewport and must not scroll or reflow.",
+          "type": "string",
+          "enum": [
+            "Fixed"
+          ]
+        }
+      ]
+    },
     "ScreenModel": {
       "description": "Describes a full screen to render.",
       "type": "object",
@@ -3001,6 +3048,14 @@
           "items": {
             "type": "string"
           }
+        },
+        "layout": {
+          "description": "Whether the renderer scrolls the content or renders a fixed, non-scrolling layout. See [`ScreenLayout`]. Omitted on the wire when `Scroll` (the default) so only fixed-layout screens carry it.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ScreenLayout"
+            }
+          ]
         },
         "parent_screen_id": {
           "description": "Sidebar/tab the screen belongs to, when it is a sub-screen of a top-level tab (e.g. `contact_detail` belongs to `contacts`). `None` for top-level tabs and transient/global screens (lock, onboarding). Replaces frontend-side `MapScreenToParentId`-style switch statements (`2026-05-01-screen-id-metadata-in-core` G1).",

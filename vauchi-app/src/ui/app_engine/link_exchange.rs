@@ -32,11 +32,11 @@ use crate::ui::LinkExchangeEngine;
 #[cfg(all(feature = "network-http", feature = "storage"))]
 use vauchi_core::Command;
 use vauchi_core::Event;
-use vauchi_core::contact_card::ContactCard;
+use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::exchange::link_initiator::{
     LinkInitiatorFailureReason, LinkInitiatorSession, LinkInitiatorState,
 };
-use vauchi_core::exchange::link_mode::{self, serialize_card_payload};
+use vauchi_core::exchange::link_mode;
 
 /// Initiator polling budget — mirrors the ADR-035 device-link window
 /// (300 s). After this many seconds without a terminal state, a `tick`
@@ -65,7 +65,10 @@ impl AppEngine {
         let was = matches!(old, AppScreen::LinkExchange);
         let is = matches!(new, AppScreen::LinkExchange);
         match (was, is) {
-            (true, false) => self.link_initiator = None,
+            (true, false) => {
+                self.link_initiator = None;
+                self.link_initiator_x3dh = None;
+            }
             (false, true) => self.build_link_initiator(),
             _ => {}
         }
@@ -78,19 +81,13 @@ impl AppEngine {
     /// renderer on its share-url screen with an empty URL) if no identity
     /// exists — rare and non-fatal here.
     fn build_link_initiator(&mut self) {
-        let (signing_key, display_name) = match self.vauchi.identity() {
-            Some(identity) => (
-                *identity.signing_public_key(),
-                identity.display_name().to_string(),
-            ),
+        // Fresh per-exchange X3DH keypair: its public half is signed into the
+        // v2 bootstrap; its secret completes the exchange on `Finalized`.
+        let x3dh = X3DHKeyPair::generate();
+        let card_bytes = match self.build_link_card_bytes_v2(x3dh.public_key()) {
+            Some(bytes) => bytes,
             None => return,
         };
-        let card = match self.vauchi.own_card() {
-            Ok(Some(card)) => card,
-            Ok(None) => ContactCard::new(&display_name),
-            Err(_) => return,
-        };
-        let card_bytes = serialize_card_payload(&signing_key, &card);
         let (initiation, presence_commands) = link_mode::initiator_generate();
         let share_url = initiation.url.clone();
         let deadline = self.vauchi.clock().unix_seconds() + INITIATOR_POLL_DEADLINE_SECS;
@@ -100,6 +97,7 @@ impl AppEngine {
             card_bytes,
             deadline,
         ));
+        self.link_initiator_x3dh = Some(x3dh);
         if let Some(engine) = self.link_exchange_engine_mut() {
             engine.set_share_url(share_url);
         }
@@ -140,7 +138,12 @@ impl AppEngine {
         };
         match state {
             LinkInitiatorState::Finalized { card_bytes } => {
-                match self.import_link_card_bytes(&card_bytes) {
+                let completed = match self.link_initiator_x3dh.as_ref() {
+                    Some(x3dh) => self.complete_link_card_bytes(&card_bytes, x3dh),
+                    // No retained key (v1 peer / pre-T5b session) — frozen import.
+                    None => self.import_link_card_bytes(&card_bytes),
+                };
+                match completed {
                     Ok(()) => {
                         if let Some(engine) = self.link_exchange_engine_mut() {
                             engine.transition_to_success();
@@ -153,6 +156,7 @@ impl AppEngine {
                     }
                 }
                 self.link_initiator = None;
+                self.link_initiator_x3dh = None;
                 None
             }
             LinkInitiatorState::Failed(reason) => {

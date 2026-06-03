@@ -28,8 +28,10 @@ use crate::ui::WorkflowEngine;
 use vauchi_core::Command;
 use vauchi_core::Event;
 use vauchi_core::contact_card::ContactCard;
+use vauchi_core::exchange::X3DHKeyPair;
 use vauchi_core::exchange::link_mode::{
-    DeepLinkPayload, parse_card_payload, responder_respond_with_card_bytes, serialize_card_payload,
+    DeepLinkPayload, parse_card_payload, responder_respond_with_card_bytes,
+    serialize_card_payload_v2,
 };
 use vauchi_core::exchange::link_responder::{
     LinkResponderFailureReason, LinkResponderSession, LinkResponderState,
@@ -77,7 +79,10 @@ impl AppEngine {
         let was = matches!(old, AppScreen::DeepLinkResponder { .. });
         let is = matches!(new, AppScreen::DeepLinkResponder { .. });
         match (was, is) {
-            (true, false) => self.link_responder = None,
+            (true, false) => {
+                self.link_responder = None;
+                self.link_responder_x3dh = None;
+            }
             (false, true) => {
                 if let AppScreen::DeepLinkResponder { payload } = new {
                     let payload = payload.clone();
@@ -97,19 +102,13 @@ impl AppEngine {
     /// No-op (leaving the screen on its waiting state) if no identity exists
     /// or the ECDH / key-derive fails — both rare and non-fatal here.
     fn build_link_responder(&mut self, payload: &DeepLinkPayload) {
-        let (signing_key, display_name) = match self.vauchi.identity() {
-            Some(identity) => (
-                *identity.signing_public_key(),
-                identity.display_name().to_string(),
-            ),
+        // Fresh per-exchange X3DH keypair: its public half is signed into the
+        // v2 bootstrap; its secret completes the exchange on `Finalized`.
+        let x3dh = X3DHKeyPair::generate();
+        let card_bytes = match self.build_link_card_bytes_v2(x3dh.public_key()) {
+            Some(bytes) => bytes,
             None => return,
         };
-        let card = match self.vauchi.own_card() {
-            Ok(Some(card)) => card,
-            Ok(None) => ContactCard::new(&display_name),
-            Err(_) => return,
-        };
-        let card_bytes = serialize_card_payload(&signing_key, &card);
         let (keys, deposits) =
             match responder_respond_with_card_bytes(payload.as_parsed(), &card_bytes) {
                 Ok(parts) => parts,
@@ -117,6 +116,32 @@ impl AppEngine {
             };
         let deadline = self.vauchi.clock().unix_seconds() + RESPONDER_POLL_DEADLINE_SECS;
         self.link_responder = Some(LinkResponderSession::new(keys, deposits, deadline));
+        self.link_responder_x3dh = Some(x3dh);
+    }
+
+    /// Build the v2 symmetric-exchange bootstrap (ADR-050) we deposit: our
+    /// card + identity signature over `x3dh_pubkey` and our relay routing, so
+    /// the peer can verify it and establish a live update channel. Shared by
+    /// both link builders. `None` if no identity / card read fails (rare,
+    /// non-fatal — the caller leaves the screen on its waiting state).
+    /// `relay_noise_pubkey` is `None` until relay-noise pinning lands.
+    pub(super) fn build_link_card_bytes_v2(&self, x3dh_pubkey: &[u8; 32]) -> Option<Vec<u8>> {
+        let identity = self.vauchi.identity()?;
+        let identity_pubkey = *identity.signing_public_key();
+        let display_name = identity.display_name().to_string();
+        let card = match self.vauchi.own_card() {
+            Ok(Some(card)) => card,
+            Ok(None) => ContactCard::new(&display_name),
+            Err(_) => return None,
+        };
+        Some(serialize_card_payload_v2(
+            &identity_pubkey,
+            identity.signing_keypair(),
+            x3dh_pubkey,
+            self.vauchi.relay_server_url(),
+            None,
+            &card,
+        ))
     }
 
     /// Feed a `RelayEscrow*` hardware event to the engine-owned responder
@@ -151,7 +176,12 @@ impl AppEngine {
         };
         match state {
             LinkResponderState::Finalized { card_bytes } => {
-                match self.import_link_card_bytes(&card_bytes) {
+                let completed = match self.link_responder_x3dh.as_ref() {
+                    Some(x3dh) => self.complete_link_card_bytes(&card_bytes, x3dh),
+                    // No retained key (v1 peer / pre-T5b session) — frozen import.
+                    None => self.import_link_card_bytes(&card_bytes),
+                };
+                match completed {
                     Ok(()) => {
                         self.link_responder_completed();
                     }
@@ -160,6 +190,7 @@ impl AppEngine {
                     }
                 }
                 self.link_responder = None;
+                self.link_responder_x3dh = None;
                 None
             }
             LinkResponderState::Failed(reason) => {
@@ -186,6 +217,22 @@ impl AppEngine {
         let (_signing_key, card) = parse_card_payload(card_bytes).map_err(|e| e.to_string())?;
         self.vauchi
             .import_received_link_card(card)
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+
+    /// Complete a link exchange from the peer's finalized payload using the
+    /// retained X3DH secret (ADR-050 T5b): a v2 bootstrap yields a live,
+    /// updatable `Exchanged` contact + Double Ratchet; a v1 payload falls
+    /// back to a frozen import inside `complete_link_exchange`. The frontend
+    /// never sees the bytes. Shared by both link finalize paths.
+    pub(super) fn complete_link_card_bytes(
+        &self,
+        card_bytes: &[u8],
+        our_x3dh: &X3DHKeyPair,
+    ) -> Result<(), String> {
+        self.vauchi
+            .complete_link_exchange(card_bytes, our_x3dh)
             .map(|_| ())
             .map_err(|e| e.to_string())
     }

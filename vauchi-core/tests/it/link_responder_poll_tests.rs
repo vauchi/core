@@ -81,7 +81,18 @@ fn nth_put_blob(mock: &MockRelay, n: usize) -> String {
 
 // @internal
 #[test]
-fn poll_completes_exchange_and_persists_contact() {
+fn poll_drives_retrieve_then_rejects_a_self_bootstrap() {
+    // The escrow `card_key` is symmetric, so the only key-free blob the test
+    // can mint is the responder's *own* card deposit, captured off the mock.
+    // Under the v1 import this round-tripped into a (self-)contact; under the
+    // v2 symmetric exchange (ADR-050 T5b) completing your own signed
+    // bootstrap is a degenerate self-exchange — `complete_link_exchange`
+    // rejects it *after* a successful AEAD decrypt + retrieve. This test
+    // still exercises the full poll cascade (deposit → gate → Ready →
+    // Retrieve → decrypt → completion) in one tick; the rejection at the
+    // completion step is distinct from the AEAD-decrypt failure below.
+    // A genuine two-party persist (different identities) is covered by
+    // `complete_link_exchange_tests` + `link_two_party_exchange_tests`.
     let mock = MockRelay::start();
     // Poll 1: deposits + Check all see a half-full gate → stays Polling.
     mock.set_default(canned(&EscrowResponse::Count { count: 1 }));
@@ -104,10 +115,10 @@ fn poll_completes_exchange_and_persists_contact() {
 
     assert_eq!(
         engine.current_screen().screen_id,
-        "link_responder_completed",
-        "Count==2 → Ready → Retrieve → decrypted card → completed, in one poll"
+        "link_responder_failed",
+        "the cascade reaches completion, where a self-bootstrap is rejected",
     );
-    assert_contact_count(engine.vauchi(), 1);
+    assert_contact_count(engine.vauchi(), 0);
 }
 
 // @internal

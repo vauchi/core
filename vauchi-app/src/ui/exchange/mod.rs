@@ -1521,9 +1521,13 @@ impl WorkflowEngine for ExchangeEngine {
                 self.ble_fallback_available = false;
                 self.qr_fallback_available = false;
                 self.failure_detail = None;
+                // "Fall back to QR" routes to the graduated Glance
+                // (multi-stage QR), NOT the retired legacy QR sub-flow — the
+                // same fix P2.D applied to the picker path (the legacy QR is
+                // frozen on android). enter_mode_sub_flow routes Glance ->
+                // ActionResult::StartMultiStageExchange.
                 self.config.mode = Some(ExchangeMode::Glance);
-                self.step = ExchangeStep::Qr(QrStep::ShowQr);
-                self.start_session_if_needed()
+                self.enter_mode_sub_flow()
             }
             (ExchangeStep::Failed, UserAction::ActionPressed { action_id })
                 if action_id == "fallback_relay" =>
@@ -3119,7 +3123,11 @@ mod tests {
 
     // @internal
     #[test]
-    fn fallback_qr_action_switches_to_qr_flow() {
+    fn fallback_qr_action_routes_to_multi_stage_glance() {
+        // "Fall back to QR" after a BLE failure now routes to the graduated
+        // Glance (multi-stage QR), not the retired legacy QR sub-flow — the
+        // legacy QR is frozen on android, so the fallback uses the same
+        // graduated engine P2.D routed the picker to.
         let mut engine = ExchangeEngine::new(
             ExchangeConfig {
                 mode: Some(ExchangeMode::Magic),
@@ -3136,15 +3144,21 @@ mod tests {
             reason: "timeout".into(),
         });
 
-        let _ = engine.handle_action(UserAction::ActionPressed {
+        let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "fallback_qr".into(),
         });
 
-        assert_eq!(
-            engine.step,
-            ExchangeStep::Qr(QrStep::ShowQr),
-            "Fallback QR must switch to QR flow"
+        assert!(
+            matches!(
+                result,
+                ActionResult::StartMultiStageExchange {
+                    mode: ExchangeMode::Glance,
+                },
+            ),
+            "fallback_qr must hand off to multi-stage Glance; got {result:?}",
         );
+        assert_eq!(engine.config.mode, Some(ExchangeMode::Glance));
+        assert!(!matches!(engine.step, ExchangeStep::Qr(_)));
         assert!(!engine.ble_fallback_available);
         assert!(!engine.qr_fallback_available);
         assert!(engine.failure_detail.is_none());

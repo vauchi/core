@@ -585,39 +585,6 @@ impl PlatformAppEngine {
         }
     }
 
-    /// Navigate to a screen (as JSON) and return the new screen model as JSON.
-    ///
-    /// The screen JSON must match the `AppScreen` enum format, e.g.:
-    /// - `"Exchange"` (simple variant)
-    /// - `{"ContactDetail": {"contact_id": "abc"}}` (parameterized variant)
-    ///
-    /// **Deprecated (Tier-0 d, ADR-043 Amendment 4):** a forward-navigate
-    /// surface that makes the caller construct a domain-shaped target.
-    /// Forward navigation is moving to `UserAction::NavigateToTab { action_id }`
-    /// (tab taps) and `handle_deep_link_uri` (deep links), both returning
-    /// `NavigateTo`. Do not add new callers; retires once frontends migrate.
-    pub fn navigate_to_json(&self, screen_json: String) -> Result<String, MobileError> {
-        let screen = app_screen_from_json(&screen_json)?;
-        let pre_screen = self
-            .engine
-            .lock()
-            .map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?
-            .current_app_screen()
-            .clone();
-        let (model, pending_commands) = {
-            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            let model = engine.navigate_to(screen);
-            let cmds = engine.drain_pending_commands();
-            (model, cmds)
-        };
-        self.after_screen_transition(pre_screen)?;
-        screen_envelope_to_json(&model, &pending_commands)
-    }
-
     /// Navigate back in the history stack.
     ///
     /// Returns the previous screen model as JSON envelope:
@@ -4417,7 +4384,7 @@ impl PlatformAppEngine {
     /// (`MultiStageExchange`, `DeviceLinking`) and manage the
     /// corresponding session lifecycle. Called after every operation
     /// that mutates the active screen.
-    fn after_screen_transition(&self, pre: AppScreen) -> Result<(), MobileError> {
+    pub(crate) fn after_screen_transition(&self, pre: AppScreen) -> Result<(), MobileError> {
         let post = self
             .engine
             .lock()

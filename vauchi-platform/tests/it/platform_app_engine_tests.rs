@@ -6,7 +6,9 @@
 
 use std::sync::{Arc, Mutex};
 
-use vauchi_platform::{MobileLocale, PlatformAppEngine, PlatformEventListener};
+use vauchi_platform::{
+    MobileLocale, PlatformAppEngine, PlatformAppEngineTestHelpers, PlatformEventListener,
+};
 
 /// Helper: create a PlatformAppEngine with a temp directory.
 fn create_engine() -> (std::sync::Arc<PlatformAppEngine>, tempfile::TempDir) {
@@ -260,7 +262,7 @@ fn navigate_to_json_simple_variant() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     let result = engine
-        .navigate_to_json(r#""Exchange""#.into())
+        .navigate_to_json_for_test(r#""Exchange""#.into())
         .expect("navigate");
     let envelope: serde_json::Value = serde_json::from_str(&result).expect("parse");
     assert_eq!(envelope["screen"]["screen_id"], "exchange_mode_selection");
@@ -276,7 +278,7 @@ fn navigate_to_json_envelope_carries_lifecycle_commands() {
     // lock). The previous engine's `screen_exited` is the default
     // empty.
     let result = engine
-        .navigate_to_json(r#"{"MultiStageExchange":{"mode":"glance"}}"#.into())
+        .navigate_to_json_for_test(r#"{"MultiStageExchange":{"mode":"glance"}}"#.into())
         .expect("navigate to multi-stage");
     let envelope: serde_json::Value = serde_json::from_str(&result).expect("parse");
     assert_eq!(envelope["screen"]["screen_id"], "multi_stage_exchange");
@@ -335,7 +337,7 @@ fn navigate_back_returns_previous_screen() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     engine
-        .navigate_to_json(r#""Exchange""#.into())
+        .navigate_to_json_for_test(r#""Exchange""#.into())
         .expect("navigate to exchange");
     let result = engine.navigate_back_json().expect("navigate back");
     let envelope: serde_json::Value = serde_json::from_str(&result).expect("parse");
@@ -356,7 +358,7 @@ fn can_go_back_plumbs_nav_history_through_boundary() {
     // Navigate to a non-root (Settings); a root like Exchange would
     // report no back step under the screen-aware `can_go_back` rule.
     engine
-        .navigate_to_json(r#""Settings""#.into())
+        .navigate_to_json_for_test(r#""Settings""#.into())
         .expect("navigate to settings");
     assert!(
         engine.can_go_back().expect("can_go_back"),
@@ -447,7 +449,7 @@ fn handle_action_invalid_json_returns_error() {
 #[test]
 fn navigate_to_invalid_json_returns_error() {
     let (engine, _dir) = create_engine();
-    let result = engine.navigate_to_json("not valid json".into());
+    let result = engine.navigate_to_json_for_test("not valid json".into());
     assert!(result.is_err(), "should return error for invalid JSON");
 }
 
@@ -657,7 +659,7 @@ fn qr_data_from_screen_json(screen_json: &str) -> String {
 fn drive_to_show_qr(engine: &PlatformAppEngine) {
     drive_onboarding(engine);
     engine
-        .navigate_to_json(r#""Exchange""#.into())
+        .navigate_to_json_for_test(r#""Exchange""#.into())
         .expect("navigate to Exchange");
     // Pick Broadcast mode (group category) to drop into ShowQr.
     engine
@@ -719,7 +721,7 @@ fn advance_qr_frame_json_returns_none_off_exchange_screen() {
 fn drive_to_multi_stage(engine: &PlatformAppEngine) {
     drive_onboarding(engine);
     engine
-        .navigate_to_json(r#"{"MultiStageExchange":{"mode":"glance"}}"#.into())
+        .navigate_to_json_for_test(r#"{"MultiStageExchange":{"mode":"glance"}}"#.into())
         .expect("navigate to MultiStageExchange");
     let id = engine
         .current_screen_id()
@@ -733,7 +735,7 @@ fn picking_glance_from_mode_selection_auto_navigates_to_multi_stage_exchange() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     engine
-        .navigate_to_json(r#""Exchange""#.into())
+        .navigate_to_json_for_test(r#""Exchange""#.into())
         .expect("navigate to Exchange");
     assert_eq!(
         engine.current_screen_id().expect("screen id"),
@@ -783,7 +785,7 @@ fn navigate_to_multi_stage_auto_creates_session_no_frontend_call_needed() {
         .expect("set listener");
 
     engine
-        .navigate_to_json(r#"{"MultiStageExchange":{"mode":"glance"}}"#.into())
+        .navigate_to_json_for_test(r#"{"MultiStageExchange":{"mode":"glance"}}"#.into())
         .expect("navigate");
     // Engine is now on multi_stage_exchange. The frontend never asked
     // for a session — core created one.

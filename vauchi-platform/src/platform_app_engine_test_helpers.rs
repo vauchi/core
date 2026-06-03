@@ -99,6 +99,15 @@ pub trait PlatformAppEngineTestHelpers {
     /// before asserting state pushed via the
     /// `apply_device_link_*_for_test` helpers.
     fn cancel_device_link_session_for_test(&self);
+
+    /// Test-only: navigate to `screen_json` (an `AppScreen` JSON) and
+    /// return the screen envelope, driving `after_screen_transition` so
+    /// session-lifecycle side effects fire. Replaces the retired public
+    /// `navigate_to_json` binding (ADR-043 Am4): the production surface no
+    /// longer lets frontends construct domain targets, but device-link
+    /// listener tests still need a forward-nav seam to land on
+    /// `DeviceLinking` and assert the session spawn/cancel lifecycle.
+    fn navigate_to_json_for_test(&self, screen_json: String) -> Result<String, MobileError>;
 }
 
 impl PlatformAppEngineTestHelpers for PlatformAppEngine {
@@ -163,5 +172,28 @@ impl PlatformAppEngineTestHelpers for PlatformAppEngine {
         if let Ok(mut e) = self.engine().lock() {
             e.cancel_device_link_session();
         }
+    }
+
+    fn navigate_to_json_for_test(&self, screen_json: String) -> Result<String, MobileError> {
+        use crate::json_helpers::{app_screen_from_json, screen_envelope_to_json};
+        let screen = app_screen_from_json(&screen_json)?;
+        let pre_screen = self
+            .engine()
+            .lock()
+            .map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?
+            .current_app_screen()
+            .clone();
+        let (model, pending_commands) = {
+            let mut engine = self.engine().lock().map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?;
+            let model = engine.navigate_to(screen);
+            let cmds = engine.drain_pending_commands();
+            (model, cmds)
+        };
+        self.after_screen_transition(pre_screen)?;
+        screen_envelope_to_json(&model, &pending_commands)
     }
 }

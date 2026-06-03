@@ -54,7 +54,7 @@ fn drive_onboarding(engine: &PlatformAppEngine) {
 
 fn navigate_to_device_linking(engine: &PlatformAppEngine) {
     engine
-        .navigate_to_json(r#""DeviceLinking""#.into())
+        .navigate_to_json_for_test(r#""DeviceLinking""#.into())
         .expect("navigate_to DeviceLinking");
 }
 
@@ -95,7 +95,7 @@ fn navigating_to_device_linking_ensures_session() {
 fn re_navigating_to_device_linking_keeps_single_session() {
     let (engine, _dir) = create_engine_with_identity();
     navigate_to_device_linking(&engine);
-    let _ = engine.navigate_to_json(r#""Settings""#.into());
+    let _ = engine.navigate_to_json_for_test(r#""Settings""#.into());
     assert!(!engine.device_link_session_is_active_for_test());
     navigate_to_device_linking(&engine);
     assert!(engine.device_link_session_is_active_for_test());
@@ -110,7 +110,7 @@ fn navigating_away_from_device_linking_cancels_session() {
     let (engine, _dir) = create_engine_with_identity();
     navigate_to_device_linking(&engine);
     assert!(engine.device_link_session_is_active_for_test());
-    let _ = engine.navigate_to_json(r#""Settings""#.into());
+    let _ = engine.navigate_to_json_for_test(r#""Settings""#.into());
     assert!(
         !engine.device_link_session_is_active_for_test(),
         "session not cancelled after leaving DeviceLinking"

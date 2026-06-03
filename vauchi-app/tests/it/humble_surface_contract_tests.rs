@@ -69,7 +69,6 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "invalidate_all",
     "invalidate_screen_json",
     "navigate_back_json",
-    "navigate_to_json",
     "new",
     "periodic_sync_tick",
     "poll_notifications",
@@ -232,8 +231,9 @@ fn humble_allowlist_size_matches_plan() {
     // (25 -> 26): a genuine binding query that lets the frontend drive
     // its back affordance from core's nav-history instead of inferring
     // it from a frontend-side screen-id map. ADR-043-legitimate (a query,
-    // not domain logic); it is the prerequisite for retiring
-    // `navigate_to_json` once both frontends migrate off CoreScreenIdMap.
+    // not domain logic); it was the prerequisite for retiring
+    // `navigate_to_json` — done in the CoreScreenIdMap rework S5 once both
+    // frontends migrated off it (27 -> 26).
     //
     // B7 keychain batch Phase 1a (2026-06-01) added `set_platform_keychain`
     // (26 -> 27): a platform-capability injection setter in the same
@@ -243,9 +243,11 @@ fn humble_allowlist_size_matches_plan() {
     // ADR-031-legitimate (platform injection, not domain logic).
     assert_eq!(
         HUMBLE_ALLOWLIST.len(),
-        27,
-        "Humble allow-list size drifted from the 27 expected after the \
-         B7 keychain batch added `set_platform_keychain`. \
+        26,
+        "Humble allow-list size drifted from the 26 expected after \
+         retiring `navigate_to_json` (ADR-043 Am4 / CoreScreenIdMap \
+         rework S5: both frontends migrated off it, moved to the \
+         `PlatformAppEngineTestHelpers` test-only seam). \
          Edits to this list require an ADR amendment (ADR-021/043 \
          for the Humble engine framing — incl. Amendment 3 for the \
          linchpin promotions — or ADR-048's G1-G5 gates for \

@@ -27,7 +27,8 @@ pub(crate) fn action_result_to_json(result: &ActionResult) -> Result<String, Mob
     })
 }
 
-/// Envelope returned by `navigate_to_json` / `navigate_back_json`. Carries
+/// Envelope returned by `navigate_back_json` (and the `navigate_to_json_for_test`
+/// seam). Carries
 /// the rendered `ScreenModel` plus any `Command`s emitted by the
 /// `WorkflowEngine`'s `screen_entered` / `screen_exited` lifecycle hooks
 /// during the navigation. Phase 2b of

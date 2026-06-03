@@ -632,6 +632,14 @@ impl ExchangeEngine {
                 ));
                 ActionResult::StartMultiStageExchange { mode }
             }
+            Some(ExchangeMode::Cable) => {
+                // Cable is USB direct transport, not QR. Mirror `initial_step`
+                // so the picker entry doesn't drop it into the legacy QR
+                // catch-all (frozen on android — the android-qr bug record).
+                // `start_session_if_needed` handles the DirectTransport step.
+                self.step = ExchangeStep::DirectTransport(DirectStep::WaitingForConnection);
+                self.start_session_if_needed()
+            }
             _ => {
                 self.step = ExchangeStep::Qr(QrStep::ShowQr);
                 self.start_session_if_needed()
@@ -2224,6 +2232,39 @@ mod tests {
         assert!(
             !matches!(engine.step, ExchangeStep::Qr(_)),
             "TapTap retry must not fall through to QR"
+        );
+    }
+
+    // Regression: `Cable` (USB direct transport) was dropped into the legacy
+    // QR catch-all by the picker entry, rendering frozen on android
+    // (`2026-06-03-android-animated-qr-stuck-frame-zero`). Must route Direct.
+    // @internal
+    #[test]
+    fn cable_routes_to_direct_transport_not_qr() {
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        engine.config.mode = Some(ExchangeMode::Cable);
+        engine.mark_failed();
+
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "retry".into(),
+        });
+
+        assert!(
+            matches!(engine.step, ExchangeStep::DirectTransport(_)),
+            "Cable must route to its USB DirectTransport path, got {:?}",
+            engine.step
+        );
+        assert!(
+            !matches!(engine.step, ExchangeStep::Qr(_)),
+            "Cable must not fall through to the legacy QR step"
+        );
+        assert_ne!(
+            engine.current_screen().screen_id,
+            "exchange_show_qr",
+            "Cable must never render the frozen-on-android legacy QR screen"
         );
     }
 

@@ -615,10 +615,15 @@ impl ExchangeEngine {
             // machine. Phase 1.E of `2026-05-11-hover-graduation-plan.md`
             // extended the handoff to `Hover` (QR + ultrasonic). The `mode`
             // payload tells AppEngine which engine constructor to use
-            // (`new_hover` vs `new_glance`). TapHoverShake (Phase 2/3)
-            // keeps the legacy `ExchangeStep::Qr` path until its
-            // per-mode graduation lands.
-            Some(mode @ (ExchangeMode::Glance | ExchangeMode::Hover)) => {
+            // (`new_hover` vs `new_glance`). TapHoverShake (P2.D of the
+            // TapHoverShake graduation plan) now joins them — it routes to
+            // the new engine running QR + audio proximity (the accel shake
+            // signal is a follow-up). This removes the last mode from the
+            // legacy `ExchangeStep::Qr` catch-all, the permanent fix for the
+            // android frozen-QR bug (`2026-06-03-android-animated-qr-stuck-frame-zero`).
+            Some(
+                mode @ (ExchangeMode::Glance | ExchangeMode::Hover | ExchangeMode::TapHoverShake),
+            ) => {
                 // The multi-stage flow runs in its own
                 // `AppScreen::MultiStageExchange` engine, but this
                 // `ExchangeEngine` is cached — Cancel navigates back to it.
@@ -1580,9 +1585,9 @@ mod tests {
                 ("g2".into(), "Friends".into()),
             ],
             device_capabilities: DeviceCapabilities::default(),
-            // TapHoverShake routes through the legacy QR sub-flow (Glance now
-            // diverts to multi-stage even with groups — see
-            // `2026-06-02-grouped-mode-routing-nfc`).
+            // TapHoverShake — a grouped multi-stage mode (graduated in P2.D of
+            // the TapHoverShake plan; routes to multi-stage even with groups,
+            // like Glance). Carries the group-selection machinery tests.
             mode: Some(ExchangeMode::TapHoverShake),
             card_snapshot: None,
         }
@@ -1663,8 +1668,17 @@ mod tests {
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "skip".into(),
         });
-        assert!(matches!(result, ActionResult::NavigateTo(_)));
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
+        // TapHoverShake graduated (P2.D) — skipping groups hands off to the
+        // multi-stage engine instead of the retired legacy QR sub-flow.
+        assert!(
+            matches!(
+                result,
+                ActionResult::StartMultiStageExchange {
+                    mode: ExchangeMode::TapHoverShake,
+                },
+            ),
+            "skip must hand off to multi-stage; got {result:?}",
+        );
         assert!(engine.selected_groups().is_empty());
     }
 
@@ -1795,24 +1809,21 @@ mod tests {
         );
         assert_eq!(engine.step, ExchangeStep::FieldPreview);
 
-        // Start exchange from field preview → QR with session
+        // Start exchange from field preview → multi-stage handoff.
+        // TapHoverShake graduated in P2.D; the legacy QrDisplay path is gone
+        // for this mode. The FieldPreview step itself is still reached above.
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "start_exchange".into(),
         });
-
-        // Should emit Commands with QrDisplay
-        match result {
-            ActionResult::Commands { commands } => {
-                assert_eq!(commands.len(), 1);
-                assert!(
-                    matches!(&commands[0], vauchi_core::Command::QrDisplay { .. }),
-                    "Expected QrDisplay command, got {:?}",
-                    commands[0]
-                );
-            }
-            other => panic!("Expected Commands, got {:?}", other),
-        }
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
+        assert!(
+            matches!(
+                result,
+                ActionResult::StartMultiStageExchange {
+                    mode: ExchangeMode::TapHoverShake,
+                },
+            ),
+            "start_exchange must hand off to multi-stage; got {result:?}",
+        );
     }
 
     #[test]
@@ -2108,25 +2119,24 @@ mod tests {
         });
         assert_eq!(engine.step, ExchangeStep::FieldPreview);
 
-        // Start exchange from FieldPreview → ShowQr
-        let _ = engine.handle_action(UserAction::ActionPressed {
+        // Start exchange from FieldPreview → multi-stage handoff
+        // (TapHoverShake graduated in P2.D). The selected groups must survive
+        // the handoff; the legacy ShowQr → ScanQr → Verifying walk no longer
+        // applies to this mode (router-driven modes all left the QR sub-flow).
+        let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "start_exchange".into(),
         });
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
+        assert!(
+            matches!(
+                result,
+                ActionResult::StartMultiStageExchange {
+                    mode: ExchangeMode::TapHoverShake,
+                },
+            ),
+            "start_exchange must hand off to multi-stage; got {result:?}",
+        );
 
-        // Continue through ShowQr → ScanQr → Verifying → Success
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
-        let _ = engine.handle_action(UserAction::TextChanged {
-            component_id: "scanned_data".into(),
-            value: "their-qr".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::Verifying));
-        engine.mark_success();
-
-        // Groups still selected at the end
+        // Groups still selected at (and through) the handoff.
         assert_eq!(engine.selected_groups(), &["g2".to_string()]);
     }
 
@@ -2176,15 +2186,15 @@ mod tests {
             config_no_groups(),
             vauchi_core::clock::SystemClock::shared(),
         );
-        // TapHoverShake is a QR-routing mode, so retry exercises the legacy QR
-        // path (Glance/TapTap now route to multi-stage / NFC via the shared
-        // router and have their own retry coverage). The point here is that
-        // Retry clears the failure detail and restores a sub-flow.
+        // TapHoverShake graduated to the multi-stage engine (P2.D), so retry
+        // routes through the shared enter_mode_sub_flow router and hands off
+        // to multi-stage. The point here is that Retry clears the failure
+        // detail; all router-driven modes now leave the legacy QR sub-flow.
         engine.config.mode = Some(ExchangeMode::TapHoverShake);
         engine.mark_failed_with_error(&vauchi_core::exchange::ExchangeError::BleOutOfRange);
         assert!(engine.failure_detail.is_some());
 
-        let _ = engine.handle_action(UserAction::ActionPressed {
+        let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "retry".into(),
         });
 
@@ -2192,7 +2202,15 @@ mod tests {
             engine.failure_detail.is_none(),
             "Retry should clear the failure detail"
         );
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
+        assert!(
+            matches!(
+                result,
+                ActionResult::StartMultiStageExchange {
+                    mode: ExchangeMode::TapHoverShake,
+                },
+            ),
+            "TapHoverShake retry must hand off to multi-stage; got {result:?}",
+        );
     }
 
     // Regression: the Failed-state Retry handler restored the sub-flow by
@@ -2510,6 +2528,61 @@ mod tests {
                 },
             ),
             "Hover must hand off to multi-stage with mode=Hover; got {result:?}",
+        );
+    }
+
+    // P2.D of `2026-06-03-taphovershake-graduation-plan.md`. Mirror of
+    // the Hover handoff: selecting TapHoverShake routes to the new
+    // `MultiStageExchange` engine (mode payload `TapHoverShake`) instead
+    // of the legacy `ExchangeStep::Qr` sub-flow — closing the android
+    // frozen-QR bug, whose permanent fix is this graduation.
+    // @internal
+    #[test]
+    fn tap_hover_shake_mode_routes_through_multi_stage_handoff() {
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+
+        let result = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:fun".into(),
+            item_id: "mode:tap_hover_shake".into(),
+        });
+        assert_eq!(engine.config.mode, Some(ExchangeMode::TapHoverShake));
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
+        assert!(
+            matches!(
+                result,
+                ActionResult::StartMultiStageExchange {
+                    mode: ExchangeMode::TapHoverShake,
+                },
+            ),
+            "TapHoverShake must hand off to multi-stage with mode=TapHoverShake; got {result:?}",
+        );
+    }
+
+    // Unreachability regression gate (mirror of
+    // `hover_mode_does_not_advance_to_legacy_qr_step`): picking
+    // TapHoverShake must never land the engine on the legacy
+    // `ExchangeStep::Qr` step — it stays on ModeSelection while AppEngine
+    // navigates to the multi-stage screen.
+    // @internal
+    #[test]
+    fn tap_hover_shake_mode_does_not_advance_to_legacy_qr_step() {
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        let _ = engine.handle_action(UserAction::ListItemSelected {
+            component_id: "category:fun".into(),
+            item_id: "mode:tap_hover_shake".into(),
+        });
+        assert_eq!(engine.config.mode, Some(ExchangeMode::TapHoverShake));
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
+        assert!(
+            !matches!(engine.step, ExchangeStep::Qr(_)),
+            "TapHoverShake must not fall through to the legacy QR step; got {:?}",
+            engine.step,
         );
     }
 

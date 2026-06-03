@@ -104,6 +104,18 @@ pub enum StageQr {
     },
     /// Failure notification — tells peer to abort immediately.
     Fail { session_id: [u8; 16] },
+    /// SHAK stage: an AEAD-sealed accelerometer magnitude envelope for the
+    /// TapHoverShake "shake" co-location cross-correlation (advisory signal).
+    ///
+    /// `sealed_envelope` is **opaque ciphertext** (`nonce || ct+tag` from
+    /// [`super::accel_envelope::seal_envelope`]); the codec only frames it and
+    /// CRC-checks for QR-scan integrity — it never inspects or decrypts the
+    /// bytes. Opened by [`super::accel_envelope::open_envelope`] in the
+    /// orchestrator. Carries no protocol-state transition (ADR-009 amendment).
+    Shake {
+        session_id: [u8; 16],
+        sealed_envelope: Vec<u8>,
+    },
 }
 
 /// Base45-encoded widths for fixed-size binary fields.
@@ -370,6 +382,26 @@ pub fn format_fail_qr(session_id: &[u8; 16]) -> String {
     format!("FAIL{sid}", sid = base45::encode(session_id),)
 }
 
+/// Format a SHAK (shake-envelope) stage QR string with CRC-16 integrity check.
+///
+/// Layout: `SHAK<sid:24><crc:3><sealed(base45)>`. `sealed_envelope` is the
+/// opaque AEAD ciphertext from [`super::accel_envelope::seal_envelope`]; the
+/// CRC covers those sealed bytes (a scan-integrity check distinct from — and
+/// in addition to — the AEAD tag).
+///
+/// `parse_shake` (the receive path) is live via `parse_qr`; this emitter is
+/// wired into the orchestrator in slice 3, which removes this attribute.
+#[allow(dead_code)]
+pub fn format_shake_qr(session_id: &[u8; 16], sealed_envelope: &[u8]) -> String {
+    let crc = crc16::compute(sealed_envelope);
+    format!(
+        "SHAK{sid}{crc}{env}",
+        sid = base45::encode(session_id),
+        crc = base45::encode(&crc.to_be_bytes()),
+        env = base45::encode(sealed_envelope),
+    )
+}
+
 // ── Parsing ─────────────────────────────────────────────────────────────
 
 /// Parse a QR string into a [`StageQr`] variant.
@@ -388,6 +420,7 @@ pub fn parse_qr(raw: &str) -> Result<StageQr, QrCodecError> {
         "CONF" => parse_confirm(body),
         "RDYY" => parse_ready(body),
         "FAIL" => parse_fail(body),
+        "SHAK" => parse_shake(body),
         "CMBO" => parse_combo(body),
         // v1 prefixes are explicitly rejected (the identity-pubkey footgun
         // has been removed; see qr_codec.rs `StageQr::Init` doc comment).
@@ -599,6 +632,33 @@ fn parse_fail(body: &str) -> Result<StageQr, QrCodecError> {
 
     Ok(StageQr::Fail {
         session_id: decode_fixed(sid)?,
+    })
+}
+
+fn parse_shake(body: &str) -> Result<StageQr, QrCodecError> {
+    let mut pos = 0;
+    let sid = take(body, &mut pos, SID_LEN)?;
+    let crc_encoded = take(body, &mut pos, CRC_LEN)?;
+    let env_encoded = take_rest(body, pos);
+
+    let crc_bytes: [u8; 2] = decode_fixed(crc_encoded)?;
+    let crc = u16::from_be_bytes(crc_bytes);
+    let sealed_envelope = base45::decode(env_encoded)?;
+
+    // Scan-integrity check over the sealed bytes (the AEAD tag is verified
+    // later by `accel_envelope::open_envelope`; this catches QR-scan flips
+    // earlier, matching the DATA stage's convention).
+    let computed_crc = crc16::compute(&sealed_envelope);
+    if crc != computed_crc {
+        return Err(QrCodecError::CrcMismatch {
+            expected: crc,
+            got: computed_crc,
+        });
+    }
+
+    Ok(StageQr::Shake {
+        session_id: decode_fixed(sid)?,
+        sealed_envelope,
     })
 }
 

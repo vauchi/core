@@ -328,3 +328,82 @@ fn test_relay_url_without_noise_pubkey_rejected_tofu() {
         "relay URL without Noise pubkey must be rejected (TOFU fail-closed)"
     );
 }
+
+// === SHAK stage (accel-envelope co-location) ===
+
+// @internal
+#[test]
+fn test_parse_shake_qr_roundtrips_sealed_envelope() {
+    let session_id = [42u8; 16];
+    // Opaque AEAD-sealed bytes (nonce || ct+tag) from the slice-1 core.
+    let sealed = vauchi_core::exchange::multistage::accel_envelope::seal_envelope(
+        &[0x11; 32],
+        &session_id,
+        &[0.0, 1.0, 2.5, 5.0, 8.0],
+    );
+    let qr = format_shake_qr(&session_id, &sealed);
+    let parsed = parse_qr(&qr).unwrap();
+    match parsed {
+        StageQr::Shake {
+            session_id: sid,
+            sealed_envelope,
+        } => {
+            assert_eq!(sid, session_id);
+            assert_eq!(sealed_envelope, sealed);
+        }
+        _ => panic!("expected Shake"),
+    }
+}
+
+// @internal
+#[test]
+fn test_shake_qr_crc_rejects_corrupted_payload() {
+    let session_id = [7u8; 16];
+    // Two distinct envelopes → distinct CRC and payload regions.
+    let sealed_a = vauchi_core::exchange::multistage::accel_envelope::seal_envelope(
+        &[0x11; 32],
+        &session_id,
+        &[1.0; 10],
+    );
+    let sealed_b = vauchi_core::exchange::multistage::accel_envelope::seal_envelope(
+        &[0x11; 32],
+        &session_id,
+        &[2.0; 40],
+    );
+    let qr_a = format_shake_qr(&session_id, &sealed_a);
+    let qr_b = format_shake_qr(&session_id, &sealed_b);
+
+    // Layout: "SHAK"(4) + sid(24) + crc(3) + payload. Splice A's crc onto
+    // B's payload → CRC describes A but covers B's bytes → mismatch.
+    let header_len = 4 + 24 + 3;
+    let frankenstein = format!("{}{}", &qr_a[..header_len], &qr_b[header_len..]);
+    let err = parse_qr(&frankenstein).unwrap_err();
+    assert!(
+        format!("{err:?}").contains("CrcMismatch"),
+        "corrupted SHAK payload must fail CRC, got: {err:?}"
+    );
+}
+
+// @internal
+#[test]
+fn test_shake_qr_fits_single_dense_qr() {
+    // 300 samples → 301-byte envelope + 28 AEAD overhead = 329 sealed bytes.
+    let session_id = [3u8; 16];
+    let samples: Vec<f32> = (0..300)
+        .map(|i| (i as f32 / 100.0).sin().abs() * 3.0)
+        .collect();
+    let sealed = vauchi_core::exchange::multistage::accel_envelope::seal_envelope(
+        &[0x11; 32],
+        &session_id,
+        &samples,
+    );
+    let qr = format_shake_qr(&session_id, &sealed);
+    // base45 expands bytes ~1.5×; well under QR alphanumeric capacity (~4296).
+    assert!(
+        qr.len() < 1000,
+        "SHAK QR unexpectedly large: {} chars",
+        qr.len()
+    );
+    // Roundtrips intact.
+    assert!(matches!(parse_qr(&qr).unwrap(), StageQr::Shake { .. }));
+}

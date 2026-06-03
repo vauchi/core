@@ -740,10 +740,7 @@ impl MultiStageSession {
     /// the adapter no timeout, and `AccelerometerData` carries no "no peer
     /// motion" signal, so core enforces its own budget to keep the
     /// Listening state from wedging.
-    pub fn check_and_apply_accel_timeout(
-        &mut self,
-        now: Instant,
-    ) -> Result<bool, AccelStateError> {
+    pub fn check_and_apply_accel_timeout(&mut self, now: Instant) -> Result<bool, AccelStateError> {
         let started = match (self.accel_proximity, self.accel_recording_started_at) {
             (AccelerometerProximityState::Listening, Some(t)) => t,
             _ => return Ok(false),
@@ -1028,6 +1025,9 @@ impl MultiStageSession {
                 ciphertext,
             ),
             StageQr::Fail { session_id: _ } => self.handle_fail(),
+            // SHAK is advisory (ADR-009 amendment / F8): never transitions the
+            // state machine. Slice 3 adds the accel_proximity side-effect here.
+            StageQr::Shake { .. } => self.state.clone(),
         }
     }
 

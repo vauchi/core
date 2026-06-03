@@ -795,6 +795,12 @@ impl MultiStageSession {
         }
     }
 
+    /// Number of samples in the local accelerometer envelope captured so far.
+    /// The engine reads this as a shake-capture progress / readiness seam.
+    pub fn accel_envelope_len(&self) -> usize {
+        self.accel_local_envelope.len()
+    }
+
     /// Build the SHAK QR carrying our AEAD-sealed accelerometer envelope, or
     /// `None` if the shake stage is not ready to transmit.
     ///

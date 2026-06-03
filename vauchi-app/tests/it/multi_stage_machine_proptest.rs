@@ -505,13 +505,15 @@ fn event_to_commands_audio_proximity_emits_no_commands() {
     let _ = audio_modem::generate_fsk_samples(&[0u8; 16], &AudioConfig::default());
 }
 
-// ── Accelerometer capture scaffolding (P2.C follow-up; dormant) ────────
+// ── Accelerometer shake co-location (accel-envelope-transport) ─────────
 //
-// try_accel_capture_start + process_accel_data build the local shake
-// envelope for TapHoverShake. No autonomous caller fires them yet (the live
-// trigger + peer-envelope cross-correlate land with the accel-envelope-
-// transport follow-up / ADR-009 amendment), so accel_proximity stays Pending
-// in live flows — these tests pin the mechanism directly.
+// try_accel_capture_start emits Command::AccelerometerStart and drives the
+// inner session Pending -> Listening; process_accel_data forwards each
+// magnitude into the session envelope (the protocol source of truth, which
+// seals it into the SHAK QR and cross-correlates the peer's). The live
+// trigger fires on PeerDiscovered (app_engine apply_multi_stage_event). The
+// two-machine tests below exercise the full scanned-SHAK -> accel_proximity
+// path through the public machine API.
 
 // @internal
 #[test]
@@ -597,4 +599,100 @@ fn event_to_commands_accel_proximity_emits_no_commands() {
         AccelerometerProximityState::Confirmed,
     ));
     assert!(cmds.is_empty());
+}
+
+/// A varying (non-constant) accelerometer impulse — cross_correlate returns 0
+/// for constant signals, so the envelope must vary for a meaningful match.
+fn impulse_event(i: u64, amp: i32) -> Event {
+    // Magnitudes must stay under the envelope's 8 g quantization ceiling, or
+    // every sample saturates to a constant and cross_correlate returns 0.
+    // `amp == 0` yields a constant (uncorrelated) envelope.
+    Event::AccelerometerData {
+        timestamp_ms: i,
+        x_milli_g: 500 + ((i % 40) as i32) * amp,
+        y_milli_g: 300,
+        z_milli_g: 1000,
+    }
+}
+
+/// Drive two TapHoverShake machines via advance/QrScanned until both reach
+/// `Confirming` (transport_key derived on both inner sessions).
+fn drive_two_to_confirming() -> (MultiStageMachine, MultiStageMachine) {
+    let mut a = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
+    let mut b = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
+    for i in 0..4000u64 {
+        let t = i * 1_000; // step past the per-frame display-duration gate
+        let ae = a.advance(t);
+        let be = b.advance(t);
+        if let MultiStageEvent::QrFrameReady(p) = ae {
+            let _ = b.handle_hardware_event(&Event::QrScanned { data: p.data }, t);
+        }
+        if let MultiStageEvent::QrFrameReady(p) = be {
+            let _ = a.handle_hardware_event(&Event::QrScanned { data: p.data }, t);
+        }
+        if a.phase() == MultiStagePhase::Confirming && b.phase() == MultiStagePhase::Confirming {
+            return (a, b);
+        }
+    }
+    panic!("machines never both reached Confirming");
+}
+
+/// Poll `advance` until the machine emits a SHAK QR frame, returning its data.
+fn capture_shake_frame(m: &mut MultiStageMachine) -> String {
+    // Each advance must clear the per-frame display-duration gate, so step
+    // `now` well past it. Phase 6 of the mod-7 Confirming cycle carries SHAK,
+    // so 20 fresh frames cover several full cycles.
+    for i in 0..20u64 {
+        let now = 10_000_000 + i * 2_000;
+        if let MultiStageEvent::QrFrameReady(p) = m.advance(now)
+            && p.data.starts_with("SHAK")
+        {
+            return p.data;
+        }
+    }
+    panic!("machine never emitted a SHAK frame in Confirming");
+}
+
+// @internal
+#[test]
+fn scanned_shake_confirms_accel_proximity_on_matching_envelopes() {
+    let (mut a, mut b) = drive_two_to_confirming();
+    let _ = a.try_accel_capture_start();
+    let _ = b.try_accel_capture_start();
+    // Identical co-located impulse on both devices.
+    for t in 0..200u64 {
+        let _ = a.handle_hardware_event(&impulse_event(t, 20), t);
+        let _ = b.handle_hardware_event(&impulse_event(t, 20), t);
+    }
+    let shak = capture_shake_frame(&mut b);
+    let ev = a.handle_hardware_event(&Event::QrScanned { data: shak }, 6000);
+    assert!(
+        matches!(
+            ev,
+            MultiStageEvent::AccelProximityChanged(AccelerometerProximityState::Confirmed)
+        ),
+        "a scanned SHAK whose envelope matches must surface Confirmed",
+    );
+}
+
+// @internal
+#[test]
+fn scanned_shake_fails_accel_proximity_on_divergent_envelopes() {
+    let (mut a, mut b) = drive_two_to_confirming();
+    let _ = a.try_accel_capture_start();
+    let _ = b.try_accel_capture_start();
+    // A records a strongly varying impulse; B a near-constant one → low corr.
+    for t in 0..200u64 {
+        let _ = a.handle_hardware_event(&impulse_event(t, 40), t);
+        let _ = b.handle_hardware_event(&impulse_event(t, 0), t);
+    }
+    let shak = capture_shake_frame(&mut b);
+    let ev = a.handle_hardware_event(&Event::QrScanned { data: shak }, 6000);
+    assert!(
+        matches!(
+            ev,
+            MultiStageEvent::AccelProximityChanged(AccelerometerProximityState::Failed)
+        ),
+        "a scanned SHAK whose envelope diverges must surface Failed",
+    );
 }

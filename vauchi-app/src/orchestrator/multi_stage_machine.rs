@@ -209,11 +209,6 @@ pub struct MultiStageMachine {
     /// `handle_hardware_event` calls return [`MultiStageEvent::None`]
     /// and leave the phase at [`MultiStagePhase::Cancelled`].
     cancelled: bool,
-    /// TapHoverShake local accelerometer magnitude envelope (g), accumulated
-    /// from `Event::AccelerometerData` while `accel_proximity == Listening`.
-    /// Empty for Glance/Hover. Consumed by the peer-envelope cross-correlate
-    /// in the accel-envelope-transport follow-up.
-    accel_samples: Vec<f32>,
 }
 
 impl MultiStageMachine {
@@ -228,7 +223,6 @@ impl MultiStageMachine {
             current_frame_started_at: None,
             current_frame_duration: 0,
             cancelled: false,
-            accel_samples: Vec::new(),
         }
     }
 
@@ -245,7 +239,6 @@ impl MultiStageMachine {
             current_frame_started_at: None,
             current_frame_duration: 0,
             cancelled: false,
-            accel_samples: Vec::new(),
         }
     }
 
@@ -264,7 +257,6 @@ impl MultiStageMachine {
             current_frame_started_at: None,
             current_frame_duration: 0,
             cancelled: false,
-            accel_samples: Vec::new(),
         }
     }
 
@@ -397,9 +389,18 @@ impl MultiStageMachine {
                 // Transferring, etc.). Malformed scans are no-ops
                 // inside `process_scanned_qr`; either way we
                 // re-derive our phase from the new inner state.
+                let accel_before = self.inner.accel_proximity();
                 let _ = self.inner.process_scanned_qr(data);
                 let prior_phase = self.phase.clone();
                 self.sync_phase_from_inner_state();
+                // A scanned SHAK stage may have driven accel-proximity
+                // (open + cross-correlate) without any phase change; surface it
+                // so the engine updates the advisory shake chrome. One QR is one
+                // stage, so this never coincides with a phase transition.
+                let accel_after = self.inner.accel_proximity();
+                if accel_after != accel_before {
+                    return MultiStageEvent::AccelProximityChanged(accel_after);
+                }
                 phase_transition_event(&prior_phase, &self.phase)
             }
             Event::QrScanProgress { .. } => {
@@ -522,7 +523,6 @@ impl MultiStageMachine {
         {
             return Vec::new();
         }
-        self.accel_samples.clear();
         vec![Command::AccelerometerStart]
     }
 
@@ -594,7 +594,11 @@ impl MultiStageMachine {
         let x = x_milli_g as f32 / 1000.0;
         let y = y_milli_g as f32 / 1000.0;
         let z = z_milli_g as f32 / 1000.0;
-        self.accel_samples.push((x * x + y * y + z * z).sqrt());
+        // Feed the session envelope — the protocol source of truth: it seals
+        // this into the SHAK QR (`get_display_qr`) and cross-correlates the
+        // peer's on receive. The session re-applies the same `Listening` gate.
+        self.inner
+            .record_accel_envelope_samples(&[(x * x + y * y + z * z).sqrt()]);
         MultiStageEvent::None
     }
 
@@ -603,7 +607,7 @@ impl MultiStageMachine {
     /// dormant capture path; also the length the peer-envelope exchange reads
     /// before `encode_envelope` when the transport slice lands.
     pub fn accel_sample_count(&self) -> usize {
-        self.accel_samples.len()
+        self.inner.accel_envelope_len()
     }
 
     /// Re-derive `self.phase` from the inner [`MultiStageSession`]

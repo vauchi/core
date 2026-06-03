@@ -41,6 +41,7 @@ use crate::orchestrator::multi_stage_machine::{
 };
 use vauchi_core::Command;
 use vauchi_core::contact_card::ContactCard;
+use vauchi_core::exchange::AccelerometerProximityState;
 use vauchi_core::exchange::AudioProximityState;
 use vauchi_core::exchange::mode::ExchangeMode;
 
@@ -196,6 +197,20 @@ impl AppEngine {
             if !cmds.is_empty() {
                 self.extend_pending_commands(cmds);
                 let _ = self.apply_multi_stage_audio_proximity(AudioProximityState::Listening);
+            }
+        }
+        // TapHoverShake-only: on the same `PeerDiscovered` edge, start the
+        // accelerometer shake capture. `try_accel_capture_start` is mode-gated
+        // (Glance/Hover return `[]`) and idempotent, so this is a no-op for
+        // every other mode and on repeat discovery events.
+        if matches!(event, MultiStageEvent::PeerDiscovered)
+            && let Some(holder) = self.multi_stage_session.as_mut()
+        {
+            let accel_cmds = holder.machine.try_accel_capture_start();
+            if !accel_cmds.is_empty() {
+                self.extend_pending_commands(accel_cmds);
+                let _ =
+                    self.apply_multi_stage_accel_proximity(AccelerometerProximityState::Listening);
             }
         }
         match event {

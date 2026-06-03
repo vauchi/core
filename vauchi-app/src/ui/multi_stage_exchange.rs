@@ -1192,6 +1192,176 @@ mod tests {
         );
     }
 
+    // ── Accelerometer-proximity setter + rendering (P2.B) ────────
+    //
+    // TapHoverShake's second parallel proximity signal. Mirrors the
+    // audio-proximity suite above: a setter, status-detail hints, and a
+    // distinct Failed screen. Glance and Hover leave accel_proximity at
+    // Pending so their rendering is unchanged.
+
+    // @internal
+    #[test]
+    fn new_engines_initialise_accel_pending() {
+        assert_eq!(
+            MultiStageExchangeEngine::new_glance().accel_proximity(),
+            AccelerometerProximityState::Pending,
+            "Glance engine must start with accel proximity Pending",
+        );
+        assert_eq!(
+            MultiStageExchangeEngine::new_hover().accel_proximity(),
+            AccelerometerProximityState::Pending,
+            "Hover engine must start with accel proximity Pending",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn set_accel_proximity_transitions_state() {
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        assert_eq!(
+            engine.accel_proximity(),
+            AccelerometerProximityState::Pending
+        );
+        engine.set_accel_proximity(AccelerometerProximityState::Listening);
+        assert_eq!(
+            engine.accel_proximity(),
+            AccelerometerProximityState::Listening
+        );
+        engine.set_accel_proximity(AccelerometerProximityState::Confirmed);
+        assert_eq!(
+            engine.accel_proximity(),
+            AccelerometerProximityState::Confirmed
+        );
+    }
+
+    // @internal
+    #[test]
+    fn set_accel_proximity_is_noop_when_cancelled() {
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: CANCEL_ACTION_ID.into(),
+        });
+        engine.set_accel_proximity(AccelerometerProximityState::Confirmed);
+        assert_eq!(
+            engine.accel_proximity(),
+            AccelerometerProximityState::Pending,
+            "cancelled engine must reject set_accel_proximity",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn accel_proximity_listening_appends_to_status_detail() {
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        engine.set_state(ProtocolState::Discovered);
+        engine.set_accel_proximity(AccelerometerProximityState::Listening);
+        let screen = engine.current_screen();
+        let status = first_status_indicator(&screen).expect("status indicator");
+        let Component::StatusIndicator { detail, .. } = status else {
+            panic!("expected StatusIndicator");
+        };
+        assert!(
+            detail
+                .as_ref()
+                .is_some_and(|d| d.contains("Recording motion")),
+            "Listening must surface accel narration in detail; got {detail:?}",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn accel_proximity_confirmed_appends_to_status_detail() {
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        engine.set_state(ProtocolState::Discovered);
+        engine.set_accel_proximity(AccelerometerProximityState::Confirmed);
+        let screen = engine.current_screen();
+        let status = first_status_indicator(&screen).expect("status indicator");
+        let Component::StatusIndicator { detail, .. } = status else {
+            panic!("expected StatusIndicator");
+        };
+        assert!(
+            detail
+                .as_ref()
+                .is_some_and(|d| d.contains("Shake confirmed")),
+            "Confirmed must surface accel narration in detail; got {detail:?}",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn accel_proximity_failed_renders_accel_failed_screen() {
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        engine.set_accel_proximity(AccelerometerProximityState::Failed);
+        let screen = engine.current_screen();
+        let status = first_status_indicator(&screen).expect("status indicator");
+        let Component::StatusIndicator {
+            title: status_title,
+            ..
+        } = status
+        else {
+            panic!("expected StatusIndicator");
+        };
+        assert_eq!(
+            status_title, "Couldn't confirm the shake",
+            "accel-Failed must render the shake-specific chrome, not the generic Exchange Failed panel",
+        );
+        let ids: Vec<&str> = action_ids(&screen);
+        assert!(
+            ids.contains(&RETRY_ACTION_ID),
+            "accel-failed screen must offer Retry; got {ids:?}",
+        );
+        assert!(
+            ids.contains(&CANCEL_ACTION_ID),
+            "accel-failed screen must offer Cancel; got {ids:?}",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn accel_failed_takes_precedence_over_protocol_failed() {
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        engine.set_state(ProtocolState::Failed("generic-reason".to_string()));
+        engine.set_accel_proximity(AccelerometerProximityState::Failed);
+        let screen = engine.current_screen();
+        let status = first_status_indicator(&screen).expect("status indicator");
+        let Component::StatusIndicator {
+            title: status_title,
+            ..
+        } = status
+        else {
+            panic!("expected StatusIndicator");
+        };
+        assert_eq!(
+            status_title, "Couldn't confirm the shake",
+            "accel_proximity:Failed must take precedence over ProtocolState::Failed",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn audio_failed_takes_precedence_over_accel_failed() {
+        // When both proximity signals fail, the audio hint wins the
+        // single Failed screen — a deterministic, documented order
+        // (audio branch is checked first in build_screen). The accel
+        // failure is still recoverable via the shared Retry action.
+        let mut engine = MultiStageExchangeEngine::new_hover();
+        engine.set_audio_proximity(AudioProximityState::Failed);
+        engine.set_accel_proximity(AccelerometerProximityState::Failed);
+        let screen = engine.current_screen();
+        let status = first_status_indicator(&screen).expect("status indicator");
+        let Component::StatusIndicator {
+            title: status_title,
+            ..
+        } = status
+        else {
+            panic!("expected StatusIndicator");
+        };
+        assert_eq!(
+            status_title, "Couldn't confirm devices are close",
+            "audio-Failed must win over accel-Failed on the single Failed screen",
+        );
+    }
+
     // ── Per-ProtocolState rendering ──────────────────────────────
 
     // @internal

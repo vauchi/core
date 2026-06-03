@@ -2985,6 +2985,10 @@
             "$ref": "#/definitions/ScreenAction"
           }
         },
+        "can_go_back": {
+          "description": "Whether this screen offers a back affordance — engine nav state (`AppEngine::can_go_back`) stamped at the render boundary, so frontends gate their system-back handler on the rendered screen instead of a separate `can_go_back()` query (ADR-043 Am4). Absent == false (most screens are roots / back-stoppers).",
+          "type": "boolean"
+        },
         "components": {
           "type": "array",
           "items": {

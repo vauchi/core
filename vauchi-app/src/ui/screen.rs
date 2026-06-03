@@ -66,6 +66,20 @@ pub struct ScreenModel {
     /// `2026-05-01-screen-id-metadata-in-core`.
     #[serde(default)]
     pub presentation_kind: ScreenPresentationKind,
+    /// Whether this screen offers a back affordance — engine nav state
+    /// (`AppEngine::can_go_back`) stamped at the render boundary, so frontends
+    /// gate their system-back handler on the rendered screen instead of a
+    /// separate `can_go_back()` query (ADR-043 Am4). Absent == false (most
+    /// screens are roots / back-stoppers).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub can_go_back: bool,
+}
+
+/// serde `skip_serializing_if` predicate for `bool` fields defaulting to
+/// `false` — keeps the wire JSON (and golden fixtures) free of the field on
+/// the common case.
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 fn default_schema_version() -> u16 {
@@ -86,6 +100,7 @@ impl Default for ScreenModel {
             deprecated_components: Vec::new(),
             parent_screen_id: None,
             presentation_kind: ScreenPresentationKind::Page,
+            can_go_back: false,
         }
     }
 }
@@ -110,6 +125,7 @@ impl ScreenModel {
             deprecated_components: Vec::new(),
             parent_screen_id: None,
             presentation_kind: ScreenPresentationKind::Page,
+            can_go_back: false,
         }
     }
 

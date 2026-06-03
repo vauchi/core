@@ -38,6 +38,14 @@ pub enum UserAction {
     NavigateToTab {
         action_id: String,
     },
+    /// The OS back gesture (Android system BACK / swipe). `AppEngine::handle_action`
+    /// intercepts it before per-screen dispatch and pops the engine's nav
+    /// history via `navigate_back()` — the typed twin of the `navigate_back_json`
+    /// binding (ADR-043 Amendment 4: navigation is core-resolved). The back
+    /// *affordance* is gated by the frontend on `ScreenModel.can_go_back`, so a
+    /// `NavigateBack` is only forwarded when a back step exists; dispatching it
+    /// otherwise is a no-op re-render (matches `navigate_back_json`).
+    NavigateBack,
     FieldVisibilityChanged {
         field_id: String,
         group_id: Option<String>,

@@ -909,6 +909,8 @@ impl AppEngine {
         ) {
             screen.presentation_kind = self.screen.presentation_kind();
         }
+        // Back affordance from engine nav state (frontends read it off the screen).
+        screen.can_go_back = self.can_go_back();
         screen
     }
 
@@ -1172,6 +1174,12 @@ impl WorkflowEngine for AppEngine {
                 Some(target) => ActionResult::NavigateTo(self.navigate_to(target)),
                 None => ActionResult::UpdateScreen(self.engine.current_screen()),
             };
+        }
+
+        // System back gesture (ADR-043 Am4): typed twin of `navigate_back_json`
+        // — pops via `navigate_back()`, gated on the frontend by `can_go_back`.
+        if matches!(action, UserAction::NavigateBack) {
+            return ActionResult::NavigateTo(self.navigate_back());
         }
 
         // Global-chrome navigation (ADR-043 Amendment 4): the native

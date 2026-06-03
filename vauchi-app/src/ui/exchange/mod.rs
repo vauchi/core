@@ -16,7 +16,6 @@ pub(crate) mod ble;
 pub(crate) mod field_preview;
 pub(crate) mod mode_selection;
 pub(crate) mod nfc;
-pub(crate) mod qr;
 pub(crate) mod scan_quality;
 pub(crate) mod verifying;
 
@@ -24,7 +23,6 @@ use self::ble::{BleActionOutcome, BleExchangeFlow, BleHardwareOutcome, BleStep};
 use self::field_preview::{FieldPreviewConfig, FieldPreviewResult};
 use self::mode_selection::{ModeSelectionEngine, ModeSelectionResult};
 use self::nfc::{NfcExchangeFlow, NfcHardwareOutcome, NfcStep};
-use self::qr::{QrActionOutcome, QrStep};
 use self::scan_quality::ScanQualityTracker;
 use crate::ui::*;
 use vauchi_core::Command;
@@ -104,11 +102,6 @@ pub struct ExchangeEngine {
     nfc_identity: Option<vauchi_core::identity::Identity>,
     /// Reciprocity confirmation cascade driver (created on exchange completion).
     reciprocity_confirmer: Option<ReciprocityConfirmer>,
-    /// Animated QR frames for the exchange QR display (V6 chunked).
-    /// Populated when session generates a QR. Cycles via `advance_qr_frame()`.
-    qr_frames: Vec<String>,
-    /// Current frame index in `qr_frames` (wraps around).
-    qr_frame_index: usize,
     /// Rolling window tracker for QR scan quality (viewfinder frame color).
     scan_quality_tracker: ScanQualityTracker,
     /// Wall-clock source for time-stamped sub-engines
@@ -148,8 +141,6 @@ enum ExchangeStep {
     GroupSelection,
     /// Read-only preview of what will be shared (after group selection).
     FieldPreview,
-    /// QR exchange sub-flow (Glance/Hover modes).
-    Qr(QrStep),
     /// BLE exchange sub-flow (Magic/Bump/Shake modes).
     Ble(BleStep),
     /// Choose the NFC role (Send/Receive) after picking TapTap. Core-driven
@@ -179,23 +170,21 @@ impl ExchangeStep {
             // The NFC role choice is part of the mode-selection phase.
             Self::NfcRoleSelection => 1,
             // Sub-flow steps start at 4 (after mode + group + preview)
-            Self::Qr(qr) => qr.step_number(4),
             Self::Ble(ble) => ble.step_number(4),
             Self::Nfc(nfc) => nfc.step_number(4),
             Self::DirectTransport(direct) => direct.step_number(4),
             Self::Verifying => 6,
-            Self::Success => 4 + QrStep::STEP_COUNT,
-            Self::Failed => 5 + QrStep::STEP_COUNT,
+            Self::Success => 4 + BleStep::STEP_COUNT,
+            Self::Failed => 5 + BleStep::STEP_COUNT,
         }
     }
 }
 
 // mode + group + preview + sub-flow + success/failed
 // All sub-flows must have the same step count for consistent progress.
-const _: () = assert!(QrStep::STEP_COUNT == BleStep::STEP_COUNT);
-const _: () = assert!(QrStep::STEP_COUNT == NfcStep::STEP_COUNT);
-const _: () = assert!(DirectStep::STEP_COUNT == QrStep::STEP_COUNT);
-const TOTAL_STEPS: u8 = 3 + QrStep::STEP_COUNT + 2;
+const _: () = assert!(BleStep::STEP_COUNT == NfcStep::STEP_COUNT);
+const _: () = assert!(DirectStep::STEP_COUNT == BleStep::STEP_COUNT);
+const TOTAL_STEPS: u8 = 3 + BleStep::STEP_COUNT + 2;
 
 impl ExchangeEngine {
     /// Determine the initial step based on config.
@@ -216,7 +205,7 @@ impl ExchangeEngine {
             ) {
                 return ExchangeStep::Ble(BleStep::Discovering);
             }
-            ExchangeStep::Qr(QrStep::ShowQr)
+            ExchangeStep::ModeSelection
         } else {
             ExchangeStep::GroupSelection
         }
@@ -264,8 +253,6 @@ impl ExchangeEngine {
             nfc_flow: None,
             nfc_identity: None,
             reciprocity_confirmer: None,
-            qr_frames: Vec::new(),
-            qr_frame_index: 0,
             scan_quality_tracker: ScanQualityTracker::new(),
             clock,
         }
@@ -302,38 +289,6 @@ impl ExchangeEngine {
             session.emit_initial_commands();
         }
 
-        // If starting directly at ShowQr, kick off the session now.
-        // StartQR should always succeed on a fresh Idle session.
-        if step == ExchangeStep::Qr(QrStep::ShowQr) {
-            if session.apply(ExchangeEvent::StartQR).is_err() {
-                return Self {
-                    step,
-                    step_history: Vec::new(),
-                    config,
-                    scanned_data: None,
-                    selected_groups: Vec::new(),
-                    session: None,
-                    failure_detail: None,
-                    ble_fallback_available: false,
-                    qr_fallback_available: false,
-                    mode_selection,
-                    field_preview: None,
-                    ble_flow: None,
-                    nfc_flow: None,
-                    nfc_identity: None,
-                    reciprocity_confirmer: None,
-                    qr_frames: Vec::new(),
-                    qr_frame_index: 0,
-                    scan_quality_tracker: ScanQualityTracker::new(),
-                    clock,
-                };
-            }
-            session.emit_initial_commands();
-        }
-
-        // Generate animated QR frames (V6-sized chunks) from exchange payload.
-        let qr_frames = Self::generate_qr_frames(&session);
-
         Self {
             step,
             step_history: Vec::new(),
@@ -350,8 +305,6 @@ impl ExchangeEngine {
             nfc_flow: None,
             nfc_identity: None,
             reciprocity_confirmer: None,
-            qr_frames,
-            qr_frame_index: 0,
             scan_quality_tracker: ScanQualityTracker::new(),
             clock,
         }
@@ -367,44 +320,6 @@ impl ExchangeEngine {
             .as_mut()
             .map(|s| s.drain_commands())
             .unwrap_or_default()
-    }
-
-    /// Generate animated QR frames from the exchange session payload.
-    ///
-    /// Chunks the base64-encoded exchange QR data into V6-sized frames
-    /// using the multipart codec. V6 QR at EC-M holds 84 alphanumeric chars,
-    /// which the 240p camera can decode reliably (~10ms per frame).
-    ///
-    /// Returns an empty Vec if no session/QR is available.
-    fn generate_qr_frames(session: &ExchangeSession) -> Vec<String> {
-        use vauchi_core::exchange::transport::animated_qr::{AnimatedQrConfig, AnimatedQrSession};
-
-        let Some(qr) = session.qr() else {
-            return Vec::new();
-        };
-        let payload = qr.to_data_string();
-
-        // V6 QR at EC-M: 84 bytes binary capacity. The frame wire format is
-        // "{idx}/{total}/{crc32_8hex}/{base64url_data}". With ~15 bytes overhead
-        // and base64 expansion (4/3), usable raw bytes per chunk ≈ 50.
-        // This produces 4-6 frames for a typical exchange payload, cycling at
-        // 10fps = full cycle in 400-600ms.
-        let config = AnimatedQrConfig {
-            fps: 10,
-            chunk_size: 50,
-            cycle_padding: 3,
-        };
-
-        let sender = AnimatedQrSession::new_sender(payload.into_bytes(), config);
-        (0..sender.frame_count())
-            .filter_map(|i| sender.frame_at(i).ok())
-            .collect()
-    }
-
-    /// Number of animated QR frames (1 for static QR, >1 for animated).
-    #[cfg(test)]
-    pub fn qr_frame_count(&self) -> usize {
-        self.qr_frames.len().max(1)
     }
 
     /// Returns a reference to the protocol session, if any (ADR-031).
@@ -467,28 +382,6 @@ impl ExchangeEngine {
                 if !commands.is_empty() {
                     self.step = ExchangeStep::DirectTransport(DirectStep::Exchanging);
                     return ActionResult::Commands { commands };
-                }
-            }
-            // Existing QR path below...
-            match session.apply(ExchangeEvent::StartQR) {
-                Ok(()) => {
-                    session.emit_initial_commands();
-                    // Generate animated QR frames now that the session has a QR
-                    self.qr_frames = Self::generate_qr_frames(session);
-                    self.qr_frame_index = 0;
-                    let commands = session.drain_commands();
-                    if !commands.is_empty() {
-                        return ActionResult::Commands { commands };
-                    }
-                }
-                Err(_) => {
-                    // Session failed to start QR — drop it and fall back to
-                    // legacy UI-only mode with static QR data.
-                    self.session = None;
-                    return ActionResult::ShowToast {
-                        message: "Secure exchange unavailable — using basic mode".into(),
-                        undo_action_id: None,
-                    };
                 }
             }
         }
@@ -654,9 +547,14 @@ impl ExchangeEngine {
                 self.step = ExchangeStep::DirectTransport(DirectStep::WaitingForConnection);
                 self.start_session_if_needed()
             }
+            // No mode selected — return to the picker (production always
+            // enters with mode: None; no mode reaches the retired legacy QR).
             _ => {
-                self.step = ExchangeStep::Qr(QrStep::ShowQr);
-                self.start_session_if_needed()
+                self.mode_selection = Some(ModeSelectionEngine::new(
+                    self.config.device_capabilities.clone(),
+                ));
+                self.step = ExchangeStep::ModeSelection;
+                ActionResult::NavigateTo(self.build_screen())
             }
         }
     }
@@ -822,29 +720,6 @@ impl ExchangeEngine {
                     ScreenModel::default()
                 }
             }
-            ExchangeStep::Qr(QrStep::ShowQr) => {
-                // Use current animated frame, or fall back to static payload
-                let frame_data = if !self.qr_frames.is_empty() {
-                    &self.qr_frames[self.qr_frame_index]
-                } else {
-                    &self.config.own_qr_data
-                };
-                qr::build_show_qr_screen(
-                    frame_data,
-                    &self.config.own_name,
-                    self.progress(),
-                )
-            }
-            ExchangeStep::Qr(QrStep::ScanQr) => qr::build_scan_qr_screen(
-                self.progress(),
-                Some(self.scan_quality_tracker.quality()),
-            ),
-            ExchangeStep::Qr(QrStep::ManualEntry) => {
-                qr::build_manual_entry_screen(self.progress())
-            }
-            // Defensive — QrStep::Verifying is unconstructed after the
-            // neutral-Verifying extraction (removed with the QR-flow deletion).
-            ExchangeStep::Qr(QrStep::Verifying) => verifying::build_verifying_screen(self.progress()),
             ExchangeStep::Verifying => {
                 verifying::build_verifying_screen(self.progress())
             }
@@ -1154,36 +1029,6 @@ impl WorkflowEngine for ExchangeEngine {
             return self.handle_nfc_hardware_event(event);
         }
 
-        // QR scan progress → update quality tracker, refresh screen.
-        // Skipped frames (sharpness gating) are excluded — they indicate
-        // camera settling, not wrong pointing.
-        if matches!(self.step, ExchangeStep::Qr(QrStep::ScanQr))
-            && let vauchi_core::Event::QrScanProgress {
-                detected,
-                frame_skipped,
-                ..
-            } = &event
-        {
-            if !frame_skipped {
-                self.scan_quality_tracker.record_frame(*detected);
-            }
-            return Some(ActionResult::UpdateScreen(self.build_screen()));
-        }
-
-        // Camera unavailable/denied during QR scan → switch to manual entry
-        if matches!(self.step, ExchangeStep::Qr(QrStep::ScanQr)) {
-            let is_camera_fallback = matches!(
-                &event,
-                vauchi_core::Event::HardwareUnavailable { transport }
-                | vauchi_core::Event::PermissionDenied { transport }
-                    if transport.eq_ignore_ascii_case("camera")
-            );
-            if is_camera_fallback {
-                self.step = ExchangeStep::Qr(QrStep::ManualEntry);
-                return Some(ActionResult::NavigateTo(self.build_screen()));
-            }
-        }
-
         // No session — handle QR scan via legacy TextChanged path
         let session = match self.session.as_mut() {
             Some(s) => s,
@@ -1453,45 +1298,6 @@ impl WorkflowEngine for ExchangeEngine {
                 }
                 ActionResult::UpdateScreen(self.build_screen())
             }
-            // QR sub-flow actions — delegated to the `qr` sub-module.
-            (ExchangeStep::Qr(qr_step), ref user_action) => {
-                if let Some(outcome) = qr::handle_qr_action(qr_step, user_action) {
-                    match outcome {
-                        QrActionOutcome::AdvanceToScan => {
-                            // Always emit QrRequestScan — the legacy
-                            // `RequestCamera` ActionResult is deprecated
-                            // (see ADR-022 Addendum D) and is a silent
-                            // no-op on the mobile frontends, which only
-                            // implement the command/event protocol. This
-                            // is the gap that left the Android Glance
-                            // "Tap to Scan" button unresponsive on first
-                            // tap (verified on Pixel 3a 2026-04-27).
-                            self.step = ExchangeStep::Qr(QrStep::ScanQr);
-                            self.scan_quality_tracker.reset();
-                            ActionResult::Commands {
-                                commands: vec![Command::QrRequestScan],
-                            }
-                        }
-                        QrActionOutcome::BackToShowQr => {
-                            self.step = ExchangeStep::Qr(QrStep::ShowQr);
-                            ActionResult::NavigateTo(self.build_screen())
-                        }
-                        QrActionOutcome::QrScanned { data } => {
-                            self.scanned_data = Some(data);
-                            self.step = ExchangeStep::Verifying;
-                            ActionResult::NavigateTo(self.build_screen())
-                        }
-                        QrActionOutcome::ManualCodeEntered { data } => {
-                            // Manual entry is functionally equivalent to scanning
-                            self.scanned_data = Some(data);
-                            self.step = ExchangeStep::Verifying;
-                            ActionResult::NavigateTo(self.build_screen())
-                        }
-                    }
-                } else {
-                    ActionResult::UpdateScreen(self.build_screen())
-                }
-            }
             // BLE sub-flow actions
             (ExchangeStep::Ble(ble_step), ref user_action) => {
                 if let Some(outcome) = ble::handle_ble_action(ble_step, user_action) {
@@ -1559,20 +1365,6 @@ impl WorkflowEngine for ExchangeEngine {
     fn as_any(&self) -> Option<&dyn std::any::Any> {
         Some(self)
     }
-
-    /// Override the `WorkflowEngine::advance_qr_frame` default to cycle animated
-    /// QR frames while on the ShowQr step. Returns `None` on any other step (no
-    /// animation active) or when there are no frames (e.g. no session yet).
-    fn advance_qr_frame(&mut self) -> Option<ScreenModel> {
-        if !matches!(self.step, ExchangeStep::Qr(QrStep::ShowQr)) {
-            return None;
-        }
-        if self.qr_frames.len() <= 1 {
-            return None;
-        }
-        self.qr_frame_index = (self.qr_frame_index + 1) % self.qr_frames.len();
-        Some(self.build_screen())
-    }
 }
 
 // INLINE_TEST_REQUIRED: Tests access private ExchangeStep enum and ExchangeEngine internals
@@ -1622,18 +1414,6 @@ mod tests {
             mode: None, // triggers mode selection
             card_snapshot: None,
         }
-    }
-
-    #[test]
-    fn test_no_groups_skips_selection() {
-        let engine = ExchangeEngine::new(
-            config_no_groups(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        // Should start directly at ShowQr when no groups available
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
-        let screen = engine.current_screen();
-        assert_eq!(screen.screen_id, "exchange_show_qr");
     }
 
     #[test]
@@ -1765,48 +1545,6 @@ mod tests {
     }
 
     #[test]
-    fn test_with_session_starts_qr_and_emits_display_command() {
-        let session = create_test_session();
-        let mut engine = ExchangeEngine::with_session(
-            config_no_groups(),
-            session,
-            vauchi_core::clock::SystemClock::shared(),
-        );
-
-        // Session should be present
-        assert!(engine.session().is_some(), "expected Some value");
-
-        // Should be at ShowQr step
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
-
-        // Should have a QrDisplay command ready to drain
-        let commands = engine.drain_commands();
-        assert_eq!(commands.len(), 1);
-        assert!(
-            matches!(&commands[0], vauchi_core::Command::QrDisplay { .. }),
-            "Expected QrDisplay command, got {:?}",
-            commands[0]
-        );
-    }
-
-    #[test]
-    fn test_with_session_group_selection_defers_qr_start() {
-        let session = create_test_session();
-        let engine = ExchangeEngine::with_session(
-            config_with_groups(),
-            session,
-            vauchi_core::clock::SystemClock::shared(),
-        );
-
-        // Should be at GroupSelection step — session not started yet
-        assert_eq!(engine.step, ExchangeStep::GroupSelection);
-
-        // No commands should be pending (session hasn't started QR yet)
-        // (drain_commands is on mut self, so we check session state instead)
-        assert!(engine.session().is_some(), "expected Some value");
-    }
-
-    #[test]
     fn test_with_session_group_continue_shows_field_preview() {
         let session = create_test_session();
         let mut engine = ExchangeEngine::with_session(
@@ -1843,32 +1581,6 @@ mod tests {
     }
 
     #[test]
-    fn test_with_session_show_qr_continue_emits_scan_request() {
-        let session = create_test_session();
-        let mut engine = ExchangeEngine::with_session(
-            config_no_groups(),
-            session,
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.drain_commands(); // drain initial QrDisplay
-
-        // Press continue → ScanQr
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-
-        // Should emit QrRequestScan command
-        match result {
-            ActionResult::Commands { commands } => {
-                assert_eq!(commands.len(), 1);
-                assert_eq!(commands[0], vauchi_core::Command::QrRequestScan);
-            }
-            other => panic!("Expected Commands with QrRequestScan, got {:?}", other),
-        }
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
-    }
-
-    #[test]
     fn test_handle_hardware_event_ble_discovery_emits_connect() {
         let session = create_test_session();
         let mut engine = ExchangeEngine::with_session(
@@ -1896,219 +1608,6 @@ mod tests {
                 commands
             );
         }
-    }
-
-    #[test]
-    fn test_without_session_emits_qr_request_scan_command() {
-        let mut engine = ExchangeEngine::new(
-            config_no_groups(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-
-        // No session
-        assert!(engine.session().is_none());
-
-        // ShowQr → ScanQr emits the QrRequestScan Command even
-        // without an active peer session. The legacy `RequestCamera`
-        // ActionResult is deprecated (ADR-022 Addendum D) — frontends
-        // implement the command/event protocol only.
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-        match &result {
-            ActionResult::Commands { commands } => {
-                assert_eq!(commands, &vec![vauchi_core::Command::QrRequestScan])
-            }
-            other => panic!("Expected Commands with QrRequestScan, got {other:?}"),
-        }
-
-        // handle_hardware_event handles QrScanned via legacy TextChanged path
-        let result = engine.handle_hardware_event(vauchi_core::Event::QrScanned {
-            data: "test".into(),
-        });
-        assert!(
-            result.is_some(),
-            "QrScanned should be handled even without session"
-        );
-
-        // Non-QR events return None without session
-        let result = engine.handle_hardware_event(vauchi_core::Event::BleDeviceDiscovered {
-            id: "d1".into(),
-            rssi: -40,
-            adv_data: vec![],
-        });
-        assert!(
-            result.is_none(),
-            "BLE events should be ignored without session"
-        );
-    }
-
-    /// Helper: create two sessions (Alice and Bob) and return Alice's engine
-    /// plus Bob's QR data string (what Alice would scan).
-    fn create_alice_engine_and_bob_qr() -> (ExchangeEngine, String) {
-        let alice_identity = vauchi_core::identity::Identity::create(
-            "Alice",
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        );
-        let alice_card = vauchi_core::contact_card::ContactCard::new("Alice");
-        let alice_proximity = vauchi_core::exchange::ManualConfirmationVerifier::new();
-        let alice_session = vauchi_core::exchange::ExchangeSession::new_qr(
-            alice_identity,
-            alice_card,
-            alice_proximity,
-            vauchi_core::clock::SystemClock::shared(),
-        );
-
-        let bob_identity = vauchi_core::identity::Identity::create(
-            "Bob",
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        );
-        let bob_card = vauchi_core::contact_card::ContactCard::new("Bob");
-        let bob_proximity = vauchi_core::exchange::ManualConfirmationVerifier::new();
-        let mut bob_session = vauchi_core::exchange::ExchangeSession::new_qr(
-            bob_identity,
-            bob_card,
-            bob_proximity,
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        // Start Bob's QR so we can get his data string
-        bob_session
-            .apply(vauchi_core::exchange::ExchangeEvent::StartQR)
-            .unwrap();
-        let bob_qr = bob_session.qr().unwrap();
-        let bob_qr_data = bob_qr.to_data_string();
-
-        let engine = ExchangeEngine::with_session(
-            config_no_groups(),
-            alice_session,
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        (engine, bob_qr_data)
-    }
-
-    #[test]
-    fn test_qr_scanned_auto_advances_to_success() {
-        let (mut engine, bob_qr_data) = create_alice_engine_and_bob_qr();
-        let _ = engine.drain_commands(); // drain initial QrDisplay
-
-        // Move to ScanQr
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
-
-        // Simulate scanning Bob's QR — auto-advance drives session to Complete
-        let result =
-            engine.handle_hardware_event(vauchi_core::Event::QrScanned { data: bob_qr_data });
-
-        assert!(result.is_some(), "expected Some value");
-        // With reciprocity gating: step is Verifying (relay) or Success (no relay).
-        assert!(
-            matches!(engine.step, ExchangeStep::Success | ExchangeStep::Verifying),
-            "After QrScanned, engine should be Success or Verifying, got {:?}",
-            engine.step
-        );
-        // Session should be Complete
-        let session = engine.session().unwrap();
-        assert!(
-            matches!(
-                session.state(),
-                vauchi_core::exchange::ExchangeState::Complete { .. }
-            ),
-            "Session should be Complete after QR auto-advance, got {:?}",
-            session.state()
-        );
-    }
-
-    #[test]
-    fn test_show_qr_screen_uses_session_qr_data_when_active() {
-        let session = create_test_session();
-        let mut engine = ExchangeEngine::with_session(
-            config_no_groups(),
-            session,
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.drain_commands();
-
-        // The ShowQr screen should use the session's QR data, not config.own_qr_data
-        let screen = engine.current_screen();
-        assert_eq!(screen.screen_id, "exchange_show_qr");
-
-        // Find the QrCode component and verify its data is NOT the config's static data
-        let qr_component = screen.components.iter().find(|c| {
-            matches!(
-                c,
-                Component::QrCode {
-                    mode: QrMode::Display,
-                    ..
-                }
-            )
-        });
-        assert!(
-            qr_component.is_some(),
-            "ShowQr screen should have a QrCode component"
-        );
-        if let Some(Component::QrCode { data, .. }) = qr_component {
-            assert_ne!(
-                data, &"qr-data",
-                "QR data should come from session, not static config"
-            );
-            assert!(
-                !data.is_empty(),
-                "Session-generated QR data should not be empty"
-            );
-        }
-    }
-
-    #[test]
-    fn test_full_qr_exchange_flow_via_commands_and_events() {
-        let (mut engine, bob_qr_data) = create_alice_engine_and_bob_qr();
-
-        // 1. After construction: QrDisplay command should be pending
-        let commands = engine.drain_commands();
-        assert_eq!(commands.len(), 1);
-        assert!(matches!(
-            &commands[0],
-            vauchi_core::Command::QrDisplay { .. }
-        ));
-
-        // 2. User presses "Scan Their Code" → QrRequestScan command
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-        match result {
-            ActionResult::Commands { commands } => {
-                assert_eq!(commands.len(), 1);
-                assert_eq!(commands[0], vauchi_core::Command::QrRequestScan);
-            }
-            other => panic!("Expected Commands, got {:?}", other),
-        }
-
-        // 3. Frontend scans Bob's QR → auto-advance drives to Complete
-        let result =
-            engine.handle_hardware_event(vauchi_core::Event::QrScanned { data: bob_qr_data });
-        assert!(result.is_some(), "expected Some value");
-
-        // 4. Engine should be on Verifying — waiting for reciprocity confirmation.
-        //    Exchange is NOT Success until the peer confirms via relay escrow.
-        //    This prevents asymmetric exchanges (one side saves, other doesn't).
-        let session = engine.session().unwrap();
-        assert!(
-            matches!(
-                session.state(),
-                vauchi_core::exchange::ExchangeState::Complete { .. }
-            ),
-            "Session should be Complete, got {:?}",
-            session.state()
-        );
-        // Step depends on whether confirmation tokens are available.
-        // In test sessions without relay, it falls through to Success (backward compat).
-        // With relay tokens, it would be Verifying.
-        assert!(
-            matches!(engine.step, ExchangeStep::Success | ExchangeStep::Verifying),
-            "Step should be Success (no relay) or Verifying (with relay), got {:?}",
-            engine.step
-        );
     }
 
     #[test]
@@ -2257,10 +1756,6 @@ mod tests {
             matches!(result, ActionResult::NavigateTo(_)),
             "expected NavigateTo(role screen), got {result:?}"
         );
-        assert!(
-            !matches!(engine.step, ExchangeStep::Qr(_)),
-            "TapTap retry must not fall through to QR"
-        );
     }
 
     // Regression: `Cable` (USB direct transport) was dropped into the legacy
@@ -2284,10 +1779,6 @@ mod tests {
             matches!(engine.step, ExchangeStep::DirectTransport(_)),
             "Cable must route to its USB DirectTransport path, got {:?}",
             engine.step
-        );
-        assert!(
-            !matches!(engine.step, ExchangeStep::Qr(_)),
-            "Cable must not fall through to the legacy QR step"
         );
         assert_ne!(
             engine.current_screen().screen_id,
@@ -2344,16 +1835,6 @@ mod tests {
         assert_eq!(engine.step, ExchangeStep::ModeSelection);
         let screen = engine.current_screen();
         assert_eq!(screen.screen_id, "exchange_mode_selection");
-    }
-
-    #[test]
-    fn mode_preset_skips_mode_selection() {
-        let engine = ExchangeEngine::new(
-            config_no_groups(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        // config_no_groups() sets mode = Some(Glance)
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
     }
 
     #[test]
@@ -2568,31 +2049,6 @@ mod tests {
                 },
             ),
             "TapHoverShake must hand off to multi-stage with mode=TapHoverShake; got {result:?}",
-        );
-    }
-
-    // Unreachability regression gate (mirror of
-    // `hover_mode_does_not_advance_to_legacy_qr_step`): picking
-    // TapHoverShake must never land the engine on the legacy
-    // `ExchangeStep::Qr` step — it stays on ModeSelection while AppEngine
-    // navigates to the multi-stage screen.
-    // @internal
-    #[test]
-    fn tap_hover_shake_mode_does_not_advance_to_legacy_qr_step() {
-        let mut engine = ExchangeEngine::new(
-            config_mode_selection(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "category:fun".into(),
-            item_id: "mode:tap_hover_shake".into(),
-        });
-        assert_eq!(engine.config.mode, Some(ExchangeMode::TapHoverShake));
-        assert_eq!(engine.step, ExchangeStep::ModeSelection);
-        assert!(
-            !matches!(engine.step, ExchangeStep::Qr(_)),
-            "TapHoverShake must not fall through to the legacy QR step; got {:?}",
-            engine.step,
         );
     }
 
@@ -2948,127 +2404,6 @@ mod tests {
 
     // @internal
     #[test]
-    fn camera_unavailable_during_qr_scan_switches_to_manual_entry() {
-        let mut engine = ExchangeEngine::new(
-            config_with_camera(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        engine.step = ExchangeStep::Qr(QrStep::ScanQr);
-
-        let result = engine.handle_hardware_event(vauchi_core::Event::HardwareUnavailable {
-            transport: "camera".into(),
-        });
-
-        assert_eq!(
-            engine.step,
-            ExchangeStep::Qr(QrStep::ManualEntry),
-            "Camera unavailable must switch to manual entry"
-        );
-        assert!(
-            matches!(result, Some(ActionResult::NavigateTo(_))),
-            "Must navigate to manual entry screen"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn camera_permission_denied_during_qr_scan_switches_to_manual_entry() {
-        let mut engine = ExchangeEngine::new(
-            config_with_camera(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        engine.step = ExchangeStep::Qr(QrStep::ScanQr);
-
-        let result = engine.handle_hardware_event(vauchi_core::Event::PermissionDenied {
-            transport: "camera".into(),
-        });
-
-        assert_eq!(
-            engine.step,
-            ExchangeStep::Qr(QrStep::ManualEntry),
-            "Camera permission denied must switch to manual entry"
-        );
-        assert!(
-            matches!(result, Some(ActionResult::NavigateTo(_))),
-            "Must navigate to manual entry screen"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn manual_entry_screen_has_text_input_and_submit() {
-        let screen = qr::build_manual_entry_screen(Progress {
-            current_step: 2,
-            total_steps: TOTAL_STEPS,
-            label: None,
-        });
-
-        assert_eq!(screen.screen_id, "exchange_manual_entry");
-        assert!(
-            screen
-                .components
-                .iter()
-                .any(|c| matches!(c, Component::TextInput { id, .. } if id == "manual_code")),
-            "Manual entry screen must have a text input for the code"
-        );
-        assert!(
-            screen.actions.iter().any(|a| a.id == "submit_code"),
-            "Manual entry screen must have a submit button"
-        );
-        assert!(
-            screen.actions.iter().any(|a| a.id == "back"),
-            "Manual entry screen must have a back button"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn manual_code_entry_advances_to_verifying() {
-        let mut engine = ExchangeEngine::new(
-            config_with_camera(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        engine.step = ExchangeStep::Qr(QrStep::ManualEntry);
-
-        let _ = engine.handle_action(UserAction::TextChanged {
-            component_id: "manual_code".into(),
-            value: "vauchi://exchange/abc123".into(),
-        });
-
-        assert_eq!(
-            engine.step,
-            ExchangeStep::Verifying,
-            "Submitting manual code must advance to verifying"
-        );
-        assert_eq!(
-            engine.scanned_data.as_deref(),
-            Some("vauchi://exchange/abc123"),
-            "Manual code must be stored as scanned data"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn manual_entry_back_returns_to_show_qr() {
-        let mut engine = ExchangeEngine::new(
-            config_with_camera(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        engine.step = ExchangeStep::Qr(QrStep::ManualEntry);
-
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "back".into(),
-        });
-
-        assert_eq!(
-            engine.step,
-            ExchangeStep::Qr(QrStep::ShowQr),
-            "Back from manual entry must return to ShowQr"
-        );
-    }
-
-    // @internal
-    #[test]
     fn ble_failure_with_camera_shows_qr_fallback() {
         let mut engine = ExchangeEngine::new(
             ExchangeConfig {
@@ -3162,7 +2497,6 @@ mod tests {
             "fallback_qr must hand off to multi-stage Glance; got {result:?}",
         );
         assert_eq!(engine.config.mode, Some(ExchangeMode::Glance));
-        assert!(!matches!(engine.step, ExchangeStep::Qr(_)));
         assert!(!engine.ble_fallback_available);
         assert!(!engine.qr_fallback_available);
         assert!(engine.failure_detail.is_none());
@@ -3194,29 +2528,6 @@ mod tests {
             matches!(result, Some(ActionResult::UpdateScreen(_))),
             "BLE permission denied must return screen update with failed state"
         );
-    }
-
-    // @internal
-    #[test]
-    fn camera_unavailable_outside_scan_step_is_ignored() {
-        let mut engine = ExchangeEngine::new(
-            config_with_camera(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        // In ShowQr step — camera unavailable should not trigger manual entry
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
-
-        let result = engine.handle_hardware_event(vauchi_core::Event::HardwareUnavailable {
-            transport: "camera".into(),
-        });
-
-        assert_eq!(
-            engine.step,
-            ExchangeStep::Qr(QrStep::ShowQr),
-            "Camera unavailable in ShowQr should not switch to manual entry"
-        );
-        // Session is None so it returns None
-        assert!(result.is_none());
     }
 
     // ── Cable / DirectTransport mode tests ─────────────────────────
@@ -3310,194 +2621,6 @@ mod tests {
 
     // ── Scan quality tracking ──────────────────────────────────────
 
-    // @internal
-    #[test]
-    fn scan_quality_starts_as_no_signal() {
-        let mut engine = ExchangeEngine::new(
-            config_no_groups(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        // Advance to ScanQr
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
-
-        let screen = engine.current_screen();
-        match &screen.components[0] {
-            Component::QrCode { scan_quality, .. } => {
-                assert_eq!(*scan_quality, Some(ScanQuality::NoSignal));
-            }
-            other => panic!("expected QrCode, got {:?}", other),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn scan_progress_updates_quality_to_good() {
-        let mut engine = ExchangeEngine::new(
-            config_no_groups(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-
-        // Send 10 detected frames
-        for _ in 0..10 {
-            let result = engine.handle_hardware_event(vauchi_core::Event::QrScanProgress {
-                detected: true,
-                confidence: Some(90),
-                frame_skipped: false,
-            });
-            assert!(
-                matches!(result, Some(ActionResult::UpdateScreen(_))),
-                "QrScanProgress must trigger screen update"
-            );
-        }
-
-        let screen = engine.current_screen();
-        match &screen.components[0] {
-            Component::QrCode { scan_quality, .. } => {
-                assert_eq!(*scan_quality, Some(ScanQuality::Good));
-            }
-            other => panic!("expected QrCode, got {:?}", other),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn scan_progress_degrades_to_poor_on_low_detection() {
-        let mut engine = ExchangeEngine::new(
-            config_no_groups(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-
-        // 2 detected, 8 missed → 20% → Poor
-        for i in 0..10 {
-            engine.handle_hardware_event(vauchi_core::Event::QrScanProgress {
-                detected: i < 2,
-                confidence: None,
-                frame_skipped: false,
-            });
-        }
-
-        let screen = engine.current_screen();
-        match &screen.components[0] {
-            Component::QrCode { scan_quality, .. } => {
-                assert_eq!(*scan_quality, Some(ScanQuality::Poor));
-            }
-            other => panic!("expected QrCode, got {:?}", other),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn scan_quality_resets_on_back_and_re_enter() {
-        let mut engine = ExchangeEngine::new(
-            config_no_groups(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-
-        // Build up quality
-        for _ in 0..10 {
-            engine.handle_hardware_event(vauchi_core::Event::QrScanProgress {
-                detected: true,
-                confidence: None,
-                frame_skipped: false,
-            });
-        }
-
-        // Go back
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "back".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
-
-        // Re-enter scan
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ScanQr));
-
-        // Quality should be reset to NoSignal
-        let screen = engine.current_screen();
-        match &screen.components[0] {
-            Component::QrCode { scan_quality, .. } => {
-                assert_eq!(*scan_quality, Some(ScanQuality::NoSignal));
-            }
-            other => panic!("expected QrCode, got {:?}", other),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn scan_progress_ignored_outside_scan_step() {
-        let mut engine = ExchangeEngine::new(
-            config_no_groups(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        // Still on ShowQr step
-        assert_eq!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
-
-        let result = engine.handle_hardware_event(vauchi_core::Event::QrScanProgress {
-            detected: true,
-            confidence: Some(100),
-            frame_skipped: false,
-        });
-
-        // Should not be handled (no session, not in scan step)
-        assert!(
-            result.is_none(),
-            "QrScanProgress on ShowQr step should be ignored"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn skipped_frames_do_not_degrade_quality() {
-        let mut engine = ExchangeEngine::new(
-            config_no_groups(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-
-        // Send 5 detected frames → Good quality
-        for _ in 0..5 {
-            engine.handle_hardware_event(vauchi_core::Event::QrScanProgress {
-                detected: true,
-                confidence: None,
-                frame_skipped: false,
-            });
-        }
-
-        // Send 20 skipped frames — these should NOT count as misses
-        for _ in 0..20 {
-            engine.handle_hardware_event(vauchi_core::Event::QrScanProgress {
-                detected: false,
-                confidence: None,
-                frame_skipped: true,
-            });
-        }
-
-        // Quality should still be Good (5/5 = 100%, skipped frames excluded)
-        let screen = engine.current_screen();
-        match &screen.components[0] {
-            Component::QrCode { scan_quality, .. } => {
-                assert_eq!(*scan_quality, Some(ScanQuality::Good));
-            }
-            other => panic!("expected QrCode, got {:?}", other),
-        }
-    }
-
     fn qr_data_from_screen(screen: &ScreenModel) -> &str {
         for c in &screen.components {
             if let Component::QrCode {
@@ -3510,84 +2633,6 @@ mod tests {
             }
         }
         panic!("expected QrCode Display component in {:?}", screen);
-    }
-
-    // @internal
-    #[test]
-    fn test_advance_qr_frame_cycles_frames_on_show_qr() {
-        use crate::ui::engine::WorkflowEngine;
-
-        let session = create_test_session();
-        let mut engine = ExchangeEngine::with_session(
-            config_no_groups(),
-            session,
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.drain_commands();
-
-        let total = engine.qr_frame_count();
-        assert!(
-            total > 1,
-            "test session payload should yield >1 animated frame, got {total}"
-        );
-
-        let initial = qr_data_from_screen(&engine.current_screen()).to_owned();
-
-        // Advance once — must return Some(ScreenModel) with different frame data.
-        let next = WorkflowEngine::advance_qr_frame(&mut engine)
-            .expect("advance on ShowQr with animated frames returns Some");
-        assert_eq!(next.screen_id, "exchange_show_qr");
-        let after_one = qr_data_from_screen(&next).to_owned();
-        assert_ne!(
-            initial, after_one,
-            "frame data should change after one advance"
-        );
-
-        // Advance `total - 1` more times — should return to the initial frame.
-        for _ in 0..(total - 1) {
-            WorkflowEngine::advance_qr_frame(&mut engine).expect("still on ShowQr");
-        }
-        let wrapped_screen = engine.current_screen();
-        let wrapped = qr_data_from_screen(&wrapped_screen);
-        assert_eq!(
-            wrapped, initial,
-            "cycling through all {total} frames should wrap to initial"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn test_advance_qr_frame_returns_none_off_show_qr() {
-        use crate::ui::engine::WorkflowEngine;
-
-        // Engine parked on ModeSelection (no pre-selected mode).
-        let mut engine = ExchangeEngine::new(
-            config_mode_selection(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        assert_ne!(engine.step, ExchangeStep::Qr(QrStep::ShowQr));
-        assert!(
-            WorkflowEngine::advance_qr_frame(&mut engine).is_none(),
-            "advance must return None off the ShowQr step"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn test_advance_qr_frame_returns_none_when_no_frames() {
-        use crate::ui::engine::WorkflowEngine;
-
-        // Force ShowQr step without a session → qr_frames is empty.
-        let mut engine = ExchangeEngine::new(
-            config_no_groups(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        engine.step = ExchangeStep::Qr(QrStep::ShowQr);
-        assert!(engine.qr_frames.is_empty());
-        assert!(
-            WorkflowEngine::advance_qr_frame(&mut engine).is_none(),
-            "advance must return None when qr_frames is empty"
-        );
     }
 
     // @internal
@@ -3707,10 +2752,6 @@ mod tests {
             "expected NavigateTo(role screen), got {result:?}"
         );
         // Negative (CC-11): must not collapse to the QR sub-flow.
-        assert!(
-            !matches!(engine.step, ExchangeStep::Qr(_)),
-            "grouped TapTap must not route to QR"
-        );
     }
 
     // @internal
@@ -3777,10 +2818,6 @@ mod tests {
                 }
             ),
             "grouped Glance + skip must hand off to MultiStageExchange, got {result:?}"
-        );
-        assert!(
-            !matches!(engine.step, ExchangeStep::Qr(_)),
-            "grouped Glance must not route to QR"
         );
     }
 

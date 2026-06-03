@@ -20,101 +20,6 @@ fn make_engine() -> ExchangeEngine {
 
 // @internal
 #[test]
-fn exchange_starts_at_show_qr() {
-    let engine = make_engine();
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_show_qr");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 4);
-    assert_eq!(screen.progress.as_ref().unwrap().total_steps, 8);
-}
-
-// @internal
-#[test]
-fn exchange_shows_own_qr_data() {
-    let engine = make_engine();
-    let screen = engine.current_screen();
-
-    assert_eq!(screen.components.len(), 1);
-    match &screen.components[0] {
-        Component::QrCode {
-            id,
-            data,
-            mode,
-            label,
-            ..
-        } => {
-            assert_eq!(id, "own_qr");
-            assert_eq!(data, "alice-qr-payload");
-            assert_eq!(mode, &QrMode::Display);
-            assert_eq!(label.as_deref(), Some("Alice"));
-        }
-        other => panic!("expected QrCode, got {:?}", other),
-    }
-}
-
-// @internal
-#[test]
-fn exchange_continue_to_scan() {
-    let mut engine = make_engine();
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".to_string(),
-    });
-
-    // Always emits the QrRequestScan Command (the legacy
-    // RequestCamera ActionResult was deprecated per ADR-022 Addendum D
-    // and silently no-op'd on the mobile frontends, leaving the
-    // "Tap to Scan" button unresponsive on first tap).
-    match &result {
-        ActionResult::Commands { commands } => {
-            assert_eq!(commands, &vec![vauchi_core::Command::QrRequestScan])
-        }
-        other => panic!("expected Commands with QrRequestScan, got {other:?}"),
-    }
-
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_scan_qr");
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 5);
-
-    // Verify scan QR component
-    match &screen.components[0] {
-        Component::QrCode { data, mode, .. } => {
-            assert_eq!(data, "");
-            assert_eq!(mode, &QrMode::Scan);
-        }
-        other => panic!("expected QrCode in Scan mode, got {:?}", other),
-    }
-}
-
-// @internal
-#[test]
-fn exchange_scan_receives_data() {
-    let mut engine = make_engine();
-    // Move to scan step
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".to_string(),
-    });
-
-    let result = engine.handle_action(UserAction::TextChanged {
-        component_id: "scanned_data".to_string(),
-        value: "bob-qr-payload".to_string(),
-    });
-
-    match result {
-        ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "exchange_verifying");
-        }
-        other => panic!("expected NavigateTo(verifying), got {:?}", other),
-    }
-
-    assert_eq!(engine.scanned_data(), Some("bob-qr-payload"));
-
-    let screen = engine.current_screen();
-    assert_eq!(screen.progress.as_ref().unwrap().current_step, 6);
-    assert!(screen.actions.is_empty());
-}
-
-// @internal
-#[test]
 fn exchange_mark_success() {
     let mut engine = make_engine();
     // Move to scan → verifying
@@ -230,28 +135,6 @@ fn exchange_failed_retry_restarts() {
 
 // @internal
 #[test]
-fn exchange_back_from_scan() {
-    let mut engine = make_engine();
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "continue".to_string(),
-    });
-
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "back".to_string(),
-    });
-
-    match result {
-        ActionResult::NavigateTo(screen) => {
-            assert_eq!(screen.screen_id, "exchange_show_qr");
-        }
-        other => panic!("expected NavigateTo(show_qr), got {:?}", other),
-    }
-
-    assert_eq!(engine.current_screen().screen_id, "exchange_show_qr");
-}
-
-// @internal
-#[test]
 fn exchange_failed_cancel_completes() {
     let mut engine = make_engine();
     let _ = engine.handle_action(UserAction::ActionPressed {
@@ -350,35 +233,6 @@ fn with_session_auto_enables_debug_log() {
         &log.events()[0].event,
         vauchi_core::diagnostic::exchange_debug::ExchangeDebugEvent::SessionStarted { .. }
     ));
-}
-
-// @scenario: accessibility :: Exchange QR display screen has populated a11y
-//
-// Verifies that the own_qr QrCode component carries a meaningful accessibility
-// label and role so screen readers can identify it as an image.
-// @internal
-#[test]
-fn exchange_show_qr_has_a11y() {
-    let engine = make_engine();
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_show_qr");
-
-    match &screen.components[0] {
-        Component::QrCode { a11y, .. } => {
-            let a11y = a11y.as_ref().expect("QrCode must have a11y populated");
-            assert_eq!(
-                a11y.label.as_deref(),
-                Some("Your exchange QR code"),
-                "a11y label should identify the QR code"
-            );
-            assert_eq!(
-                a11y.role,
-                Some(AccessibilityRole::Image),
-                "QrCode role must be Image"
-            );
-        }
-        other => panic!("expected QrCode, got {:?}", other),
-    }
 }
 
 // @scenario: accessibility :: Exchange fallback actions carry consequence hints

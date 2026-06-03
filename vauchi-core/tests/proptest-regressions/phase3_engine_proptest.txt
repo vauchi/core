@@ -8,3 +8,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 20cb6d602dfdc701d360446a0e93a210be3b873fda6019f398882e1123889d70 # shrinks to password = "AA0a"
+cc 898aab194b907671413e7a7fb67aa31a072e91f4c9edbe9ac641dd54b70ea22a # shrinks to actions = [], trigger_external = []

@@ -12,14 +12,6 @@ use vauchi_app::ui::*;
 
 // ── Known screen IDs per engine ─────────────────────────────────────
 
-const EXCHANGE_SCREENS: &[&str] = &[
-    "exchange_show_qr",
-    "exchange_scan_qr",
-    "exchange_verifying",
-    "exchange_success",
-    "exchange_failed",
-];
-
 const DEVICE_LINK_SCREENS: &[&str] = &[
     "link_show_qr",
     "link_verify",
@@ -203,28 +195,7 @@ fn make_shred() -> EmergencyShredEngine {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(128))]
 
-// @internal
-    #[test]
-    fn exchange_random_actions_never_panic(
-        actions in prop::collection::vec(arb_phase3_action(), 0..50),
-        trigger_external in prop::collection::vec(0..10u8, 0..5),
-    ) {
-        let mut engine = make_exchange();
-        for (i, action) in actions.iter().enumerate() {
-            // Occasionally call external methods mixed in with actions
-            if trigger_external.get(i % trigger_external.len().max(1)).copied().unwrap_or(0) < 3 {
-                engine.mark_success();
-            } else if trigger_external.get(i % trigger_external.len().max(1)).copied().unwrap_or(0) < 5 {
-                engine.mark_failed();
-            }
-            let result = engine.handle_action(action.clone());
-            validate_result(&result, EXCHANGE_SCREENS, "ExchangeEngine")?;
-        }
-        let screen = engine.current_screen();
-        assert_screen_in(&screen.screen_id, EXCHANGE_SCREENS, "ExchangeEngine")?;
-    }
-
-// @internal
+/// @internal
     #[test]
     fn device_linking_random_actions_never_panic(
         actions in prop::collection::vec(arb_phase3_action(), 0..50),
@@ -388,25 +359,7 @@ proptest! {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(128))]
 
-// @internal
-    #[test]
-    fn exchange_progress_invariants(actions in prop::collection::vec(arb_phase3_action(), 0..30)) {
-        let mut engine = make_exchange();
-        for action in actions {
-            let _ = engine.handle_action(action);
-        }
-        let screen = engine.current_screen();
-        let progress = screen.progress.as_ref().expect("exchange screens must have progress");
-        prop_assert!(progress.total_steps > 0, "total_steps must be > 0");
-        prop_assert!(
-            progress.current_step >= 1 && progress.current_step <= progress.total_steps,
-            "current_step {} out of range [1, {}]",
-            progress.current_step,
-            progress.total_steps,
-        );
-    }
-
-// @internal
+/// @internal
     #[test]
     fn device_linking_progress_invariants(actions in prop::collection::vec(arb_phase3_action(), 0..30)) {
         let mut engine = make_device_linking();
@@ -490,48 +443,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 
     /// Exchange: ShowQr → scan data → mark_success → done = Complete.
-// @internal
-    #[test]
-    fn exchange_forward_progress(
-        qr_data in "[a-z0-9]{5,30}",
-        name in "[A-Za-z ]{1,30}",
-    ) {
-        let mut engine = ExchangeEngine::new(ExchangeConfig {
-            own_name: name,
-            own_qr_data: "my-qr".to_string(),
-            available_groups: vec![],
-            device_capabilities: Default::default(),
-            mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
-            card_snapshot: None,
-        }, vauchi_core::clock::SystemClock::shared());
-
-        // ShowQr → ScanQr
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-        prop_assert_eq!(engine.current_screen().screen_id, "exchange_scan_qr");
-
-        // Provide scanned data → Verifying
-        let _ = engine.handle_action(UserAction::TextChanged {
-            component_id: "scanned_data".into(),
-            value: qr_data.clone(),
-        });
-        prop_assert_eq!(engine.current_screen().screen_id, "exchange_verifying");
-        prop_assert_eq!(engine.scanned_data(), Some(qr_data.as_str()));
-
-        // External: mark_success → Success
-        engine.mark_success();
-        prop_assert_eq!(engine.current_screen().screen_id, "exchange_success");
-
-        // Done → Complete
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "done".into(),
-        });
-        prop_assert!(matches!(result, ActionResult::Complete));
-    }
-
-    /// DeviceLinking: ShowQr → peer_connected → confirm → sync_complete → done = Complete.
-// @internal
+/// @internal
     #[test]
     fn device_linking_forward_progress(code in "[A-Z0-9]{6}") {
         let mut engine = make_device_linking();

@@ -272,17 +272,6 @@ fn contact_edit_preview_fixture_is_fresh() {
 
 // ── Phase 3 sample data builders ─────────────────────────────────
 
-fn sample_exchange_config() -> ExchangeConfig {
-    ExchangeConfig {
-        own_name: "Alice".into(),
-        own_qr_data: "vauchi://exchange?token=abc123".into(),
-        available_groups: vec![],
-        device_capabilities: Default::default(),
-        mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
-        card_snapshot: None,
-    }
-}
-
 fn sample_duress_config() -> DuressConfig {
     DuressConfig {
         enabled: false,
@@ -301,16 +290,6 @@ fn sample_duress_config() -> DuressConfig {
 }
 
 // ── Phase 3 per-engine freshness tests ──────────────────────────
-
-// @internal
-#[test]
-fn exchange_show_qr_fixture_is_fresh() {
-    let engine = ExchangeEngine::new(
-        sample_exchange_config(),
-        vauchi_core::clock::SystemClock::shared(),
-    );
-    assert_fixture_fresh(&engine.current_screen(), "exchange_show_qr.json");
-}
 
 // @internal
 #[test]
@@ -435,14 +414,6 @@ fn regenerate_all_engine_fixtures() {
         },
         // Phase 3 engines
         (
-            "exchange_show_qr.json",
-            ExchangeEngine::new(
-                sample_exchange_config(),
-                vauchi_core::clock::SystemClock::shared(),
-            )
-            .current_screen(),
-        ),
-        (
             "device_linking.json",
             DeviceLinkingEngine::new("vauchi://link?token=abc123".to_string()).current_screen(),
         ),
@@ -464,7 +435,7 @@ fn regenerate_all_engine_fixtures() {
         ),
     ];
 
-    assert_eq!(fixtures.len(), 17, "expected 17 engine fixtures");
+    assert_eq!(fixtures.len(), 16, "expected 16 engine fixtures");
 
     for (filename, screen) in &fixtures {
         let json = screen_to_json(screen);

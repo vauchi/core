@@ -36,7 +36,7 @@ use vauchi_core::exchange::{
     AccelerometerProximityState, AudioProximityState, ProtocolState, QrPayload,
 };
 
-use crate::ui::exchange::qr::ScanQualityTracker;
+use crate::ui::exchange::scan_quality::ScanQualityTracker;
 use crate::ui::*;
 
 // ── Action IDs ─────────────────────────────────────────────────────

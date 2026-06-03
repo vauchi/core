@@ -17,12 +17,14 @@ pub(crate) mod field_preview;
 pub(crate) mod mode_selection;
 pub(crate) mod nfc;
 pub(crate) mod qr;
+pub(crate) mod scan_quality;
 
 use self::ble::{BleActionOutcome, BleExchangeFlow, BleHardwareOutcome, BleStep};
 use self::field_preview::{FieldPreviewConfig, FieldPreviewResult};
 use self::mode_selection::{ModeSelectionEngine, ModeSelectionResult};
 use self::nfc::{NfcExchangeFlow, NfcHardwareOutcome, NfcStep};
-use self::qr::{QrActionOutcome, QrStep, ScanQualityTracker};
+use self::qr::{QrActionOutcome, QrStep};
+use self::scan_quality::ScanQualityTracker;
 use crate::ui::*;
 use vauchi_core::Command;
 use vauchi_core::clock::Clock;

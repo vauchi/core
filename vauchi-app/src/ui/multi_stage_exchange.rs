@@ -1133,6 +1133,25 @@ mod tests {
         );
     }
 
+    // @internal
+    #[test]
+    fn new_tap_hover_shake_initialises_state() {
+        let engine = MultiStageExchangeEngine::new_tap_hover_shake();
+        assert!(
+            engine.use_front_camera(),
+            "TapHoverShake engine must default to the front camera",
+        );
+        assert_eq!(engine.audio_proximity(), AudioProximityState::Pending);
+        assert_eq!(
+            engine.accel_proximity(),
+            AccelerometerProximityState::Pending
+        );
+        assert!(
+            engine.is_hover_mode(),
+            "TapHoverShake runs the audio handshake, so the audio-listener marker must be set",
+        );
+    }
+
     // ── Audio-proximity setter + rendering (Phase 1.C.2 + 1.D) ────
 
     // @internal

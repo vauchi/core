@@ -441,6 +441,52 @@ fn hover_machine_transitions_to_failed_on_malformed_audio() {
     }
 }
 
+/// **P2.C:** TapHoverShake un-gates the audio handshake — it runs both
+/// audio (Hover's signal) and the accelerometer shake in parallel, so it
+/// must emit the paired audio commands exactly like Hover.
+// @internal
+#[test]
+fn tap_hover_shake_machine_emits_paired_audio_commands_once() {
+    let mut machine = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
+    assert_eq!(machine.mode(), MultiStageMode::TapHoverShake);
+    let cmds = machine.try_audio_handshake_start();
+    assert_eq!(
+        cmds.len(),
+        2,
+        "TapHoverShake must emit exactly 2 audio commands"
+    );
+    assert!(matches!(cmds[0], Command::AudioEmitChallenge { .. }));
+    assert!(matches!(cmds[1], Command::AudioListenForResponse { .. }));
+    let repeat = machine.try_audio_handshake_start();
+    assert!(
+        repeat.is_empty(),
+        "second handshake call must be a no-op: {repeat:?}",
+    );
+}
+
+/// **P2.C:** TapHoverShake processes audio samples like Hover — malformed
+/// samples after the handshake transition audio proximity to Failed via
+/// the un-gated `process_audio_samples` path.
+// @internal
+#[test]
+fn tap_hover_shake_machine_transitions_to_failed_on_malformed_audio() {
+    let mut machine = MultiStageMachine::new_tap_hover_shake(fixture_local_card(), 0);
+    let _ = machine.try_audio_handshake_start();
+    let event = machine.handle_hardware_event(
+        &Event::AudioSamplesRecorded {
+            samples: vec![0.0; 32],
+            sample_rate: 44_100,
+        },
+        100,
+    );
+    match event {
+        MultiStageEvent::AudioProximityChanged(state) => {
+            assert_eq!(state, AudioProximityState::Failed);
+        }
+        other => panic!("expected AudioProximityChanged(Failed); got {other:?}"),
+    }
+}
+
 /// **T1.2c-audio:** `event_to_commands` for `AudioProximityChanged`
 /// is empty (the engine surfaces the state via
 /// `apply_multi_stage_audio_proximity`, not a Command).

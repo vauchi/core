@@ -110,10 +110,9 @@ impl AppEngine {
         let now = self.vauchi.clock().unix_seconds();
         let machine = match mode {
             ExchangeMode::Hover => MultiStageMachine::new_hover(payload, now),
-            // Every non-Hover mode that lands on this screen today
-            // (Glance, plus the future per-mode constructors) maps to
-            // the Glance constructor — the proximity handshake is
-            // Hover-only.
+            ExchangeMode::TapHoverShake => MultiStageMachine::new_tap_hover_shake(payload, now),
+            // Every remaining mode that lands on this screen (Glance)
+            // maps to the Glance constructor — no proximity handshake.
             _ => MultiStageMachine::new_glance(payload, now),
         };
         self.multi_stage_session = Some(MultiStageHolder { machine });

@@ -248,6 +248,28 @@ impl MultiStageExchangeEngine {
         }
     }
 
+    /// Construct an engine wired for the TapHoverShake flow — front
+    /// camera + ultrasonic audio proximity (like Hover) plus the
+    /// accelerometer shake signal. `is_hover_mode` is `true` because the
+    /// audio handshake runs; `accel_proximity` starts `Pending`. The
+    /// accel cross-correlation chrome lands with the envelope-transport
+    /// follow-up (P2.C).
+    pub fn new_tap_hover_shake() -> Self {
+        Self {
+            state: ProtocolState::Idle,
+            current_qr_data: None,
+            peer_name: None,
+            session_ended: false,
+            camera_gate: CameraGate::Available,
+            use_front_camera: true,
+            scan_quality_tracker: ScanQualityTracker::new(),
+            cancelled: false,
+            audio_proximity: AudioProximityState::Pending,
+            accel_proximity: AccelerometerProximityState::Pending,
+            is_hover_mode: true,
+        }
+    }
+
     // ── Bridge setters (called by AppEngine from listener callbacks) ─
 
     /// Update the protocol state. Called by the AppEngine bridge after

@@ -168,6 +168,13 @@ pub enum MultiStageEvent {
 pub enum MultiStageMode {
     Glance,
     Hover,
+    /// QR + ultrasonic audio proximity (like Hover) **plus** the
+    /// accelerometer shake-correlation signal — the most signal-rich
+    /// face-to-face mode. Runs both proximity signals in parallel; both
+    /// are advisory (neither gates completion). The audio gates below
+    /// admit `TapHoverShake` alongside `Hover`; the accel signal is
+    /// driven through `accel_proximity` on the inner session.
+    TapHoverShake,
 }
 
 /// Deterministic, poll-driven multi-stage exchange machine.
@@ -223,6 +230,24 @@ impl MultiStageMachine {
         Self {
             inner: MultiStageSession::new(local_card),
             mode: MultiStageMode::Hover,
+            phase: MultiStagePhase::Preparing,
+            current_frame_started_at: None,
+            current_frame_duration: 0,
+            cancelled: false,
+        }
+    }
+
+    /// Construct a TapHoverShake-mode machine — QR + ultrasonic audio
+    /// proximity (like Hover) plus the accelerometer shake signal. Same
+    /// I/O discipline as `new_glance`. The audio handshake fires via the
+    /// shared `try_audio_handshake_start` (now un-gated for this mode);
+    /// the accel capture + envelope cross-correlation is a follow-up
+    /// (needs the envelope-over-transport protocol — see the TapHoverShake
+    /// graduation plan P2.C / the accel-envelope ADR).
+    pub fn new_tap_hover_shake(local_card: Vec<u8>, _now: u64) -> Self {
+        Self {
+            inner: MultiStageSession::new(local_card),
+            mode: MultiStageMode::TapHoverShake,
             phase: MultiStagePhase::Preparing,
             current_frame_started_at: None,
             current_frame_duration: 0,
@@ -421,7 +446,10 @@ impl MultiStageMachine {
     ///   simultaneously plays the chirp and listens for the peer's
     ///   reply within the listen-window budget.
     pub fn try_audio_handshake_start(&mut self) -> Vec<Command> {
-        if self.mode != MultiStageMode::Hover {
+        if !matches!(
+            self.mode,
+            MultiStageMode::Hover | MultiStageMode::TapHoverShake
+        ) {
             return Vec::new();
         }
         if self.inner.audio_proximity() != AudioProximityState::Pending {
@@ -470,7 +498,10 @@ impl MultiStageMachine {
     /// is also a no-op so a stray late sample after Confirmed /
     /// Failed cannot bounce the state.
     fn process_audio_samples(&mut self, samples: &[f32], sample_rate: u32) -> MultiStageEvent {
-        if self.mode != MultiStageMode::Hover {
+        if !matches!(
+            self.mode,
+            MultiStageMode::Hover | MultiStageMode::TapHoverShake
+        ) {
             return MultiStageEvent::None;
         }
         if self.inner.audio_proximity() != AudioProximityState::Listening {

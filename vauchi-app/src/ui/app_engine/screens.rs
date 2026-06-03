@@ -950,6 +950,9 @@ impl AppEngine {
                     vauchi_core::exchange::mode::ExchangeMode::Hover => {
                         crate::ui::MultiStageExchangeEngine::new_hover()
                     }
+                    vauchi_core::exchange::mode::ExchangeMode::TapHoverShake => {
+                        crate::ui::MultiStageExchangeEngine::new_tap_hover_shake()
+                    }
                     _ => crate::ui::MultiStageExchangeEngine::new_glance(),
                 };
                 Box::new(engine)

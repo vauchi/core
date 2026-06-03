@@ -13,10 +13,12 @@
 //! `LinkShared` / `LinkOpened` / `RelayEscrow*` hardware events via
 //! `route_link_initiator_hardware_event` (follow-up commands surface as
 //! `ActionResult::Commands`), and dropped on exit. On `Finalized` core
-//! decodes + persists the received card via `import_received_link_card`;
-//! on `Failed` it renders `exchange_link_failed`. Frontends pull no
-//! session object and own no workflow logic (ADR-021/043 Humble UI;
-//! ADR-031 command/event).
+//! completes the exchange via `complete_link_exchange` (ADR-050 T5b) — a
+//! v2 bootstrap establishes a live, updatable `Exchanged` Link contact +
+//! Double Ratchet, a v1 peer falls back to a frozen
+//! `import_received_link_card`; on `Failed` it renders
+//! `exchange_link_failed`. Frontends pull no session object and own no
+//! workflow logic (ADR-021/043 Humble UI; ADR-031 command/event).
 //!
 //! Mirror of `app_engine/link_responder.rs` for the initiator half — the
 //! initiator additionally owns the share URL and walks the engine through

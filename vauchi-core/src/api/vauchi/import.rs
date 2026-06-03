@@ -145,10 +145,10 @@ impl Vauchi {
         })
     }
 
-    /// Save a contact card received via a **link-mode** exchange,
+    /// Save a contact card received via a **legacy v1** link-mode payload,
     /// returning the stored contact id.
     ///
-    /// Link mode swaps the card over an ephemeral escrow key and
+    /// A v1 payload swaps the card over an ephemeral escrow key and
     /// establishes no persistent update channel (no shared comms key,
     /// no relay routing), so the result is an **imported** contact
     /// ([`ImportSource::LinkExchange`]) — not exchanged: there is no
@@ -156,9 +156,9 @@ impl Vauchi {
     /// re-receiving the same card (matched by its card id) returns the
     /// existing contact id without duplicating.
     ///
-    /// The caller (the deep-link responder) strips the
-    /// `[version][pubkey][card]` exchange-payload header and passes the
-    /// deserialized [`ContactCard`]. Slice
+    /// Since ADR-050 (T5b) this is the **fallback** path:
+    /// [`Self::complete_link_exchange`] dispatches v2 bootstraps to a live
+    /// `Exchanged` Link contact and only routes v1 payloads here. Slice
     /// `2026-05-24-core-exchange-completion-contact-save`.
     pub fn import_received_link_card(&self, card: ContactCard) -> VauchiResult<String> {
         let uid = card.id().to_string();

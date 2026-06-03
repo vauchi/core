@@ -207,11 +207,13 @@ pub enum ImportSource {
     AndroidPlatform,
     /// Manually created by the user.
     Manual,
-    /// Received via a link-mode exchange (deep-link + relay escrow).
-    /// Classified Imported — not Exchanged — because link mode swaps a
-    /// card over an ephemeral escrow key and establishes **no persistent
-    /// update channel** (no shared comms key, no relay routing), so per
-    /// HR-1 it carries no `ExchangedData`. Slice
+    /// Received via a **legacy v1** link-mode payload (deep-link + relay
+    /// escrow) — a one-shot card swap over an ephemeral escrow key with no
+    /// persistent update channel, so per HR-1 it carries no `ExchangedData`.
+    /// Since ADR-050 (T5b) the primary link path is the v2 symmetric
+    /// bootstrap, which `Vauchi::complete_link_exchange` turns into a live
+    /// **Exchanged** contact; this variant remains only for the v1 fallback
+    /// in `import_received_link_card`. Slice
     /// `2026-05-24-core-exchange-completion-contact-save`.
     LinkExchange,
 }

@@ -11,10 +11,12 @@
 //! flow out through the `pending_commands` queue), driven by
 //! `RelayEscrow*` hardware events via `handle_hardware_event` (follow-up
 //! commands surface as `ActionResult::Commands`), and dropped on exit.
-//! On `Finalized` core decodes + persists the received card via
-//! `import_received_link_card`; on `Failed` it renders
-//! `link_responder_failed`. Frontends pull no session object and own no
-//! workflow logic (ADR-021/043 Humble UI; ADR-031 command/event).
+//! On `Finalized` core completes the exchange via
+//! `complete_link_exchange` (ADR-050 T5b) — a v2 bootstrap establishes a
+//! live, updatable `Exchanged` Link contact + Double Ratchet, a v1 peer
+//! falls back to a frozen `import_received_link_card`; on `Failed` it
+//! renders `link_responder_failed`. Frontends pull no session object and
+//! own no workflow logic (ADR-021/043 Humble UI; ADR-031 command/event).
 //!
 //! Design: `_private/docs/designs/2026-05-25-slice-32l-phase-2-responder-screen-driven-design.md`.
 

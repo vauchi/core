@@ -107,7 +107,11 @@ impl AppEngine {
                 return;
             }
         };
-        let now = self.vauchi.clock().unix_seconds();
+        // Milliseconds — the MultiStageMachine's per-frame gate compares
+        // `now` against `display_duration_ms`. Seconds here froze the QR
+        // for ~1000× its window and deadlocked the exchange
+        // (2026-06-03-multistage-qr-exchange-stalls-init-on-device).
+        let now = self.vauchi.clock().unix_millis();
         let machine = match mode {
             ExchangeMode::Hover => MultiStageMachine::new_hover(payload, now),
             ExchangeMode::TapHoverShake => MultiStageMachine::new_tap_hover_shake(payload, now),
@@ -131,7 +135,11 @@ impl AppEngine {
     /// `poll_notifications`. Returns true if the engine's
     /// `ScreenModel` was updated.
     pub(crate) fn advance_multi_stage_session(&mut self) -> bool {
-        let now = self.vauchi.clock().unix_seconds();
+        // Milliseconds — the MultiStageMachine's per-frame gate compares
+        // `now` against `display_duration_ms`. Seconds here froze the QR
+        // for ~1000× its window and deadlocked the exchange
+        // (2026-06-03-multistage-qr-exchange-stalls-init-on-device).
+        let now = self.vauchi.clock().unix_millis();
         let event = match self.multi_stage_session.as_mut() {
             Some(holder) => holder.machine.advance(now),
             None => return false,
@@ -155,7 +163,11 @@ impl AppEngine {
         &mut self,
         event: &vauchi_core::Event,
     ) -> MultiStageEvent {
-        let now = self.vauchi.clock().unix_seconds();
+        // Milliseconds — the MultiStageMachine's per-frame gate compares
+        // `now` against `display_duration_ms`. Seconds here froze the QR
+        // for ~1000× its window and deadlocked the exchange
+        // (2026-06-03-multistage-qr-exchange-stalls-init-on-device).
+        let now = self.vauchi.clock().unix_millis();
         match self.multi_stage_session.as_mut() {
             Some(holder) => holder.machine.handle_hardware_event(event, now),
             None => MultiStageEvent::None,

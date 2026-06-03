@@ -43,6 +43,20 @@ pub trait Clock: Send + Sync {
             .map(|d| d.as_secs())
             .unwrap_or(0)
     }
+
+    /// Current Unix epoch **milliseconds**. Default impl derived from
+    /// `now()`. Use this — not `unix_seconds()` — wherever a duration is
+    /// compared in milliseconds (e.g. the multi-stage exchange's
+    /// per-frame `display_duration_ms` gate): feeding second-granularity
+    /// time into a millisecond comparison stalls the frame for ~1000×
+    /// its intended window (see
+    /// `2026-06-03-multistage-qr-exchange-stalls-init-on-device`).
+    fn unix_millis(&self) -> u64 {
+        self.now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+            .unwrap_or(0)
+    }
 }
 
 /// Production clock. Reads the OS wall-clock via `SystemTime::now()`.

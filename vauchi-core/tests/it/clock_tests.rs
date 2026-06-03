@@ -154,3 +154,53 @@ fn vauchi_default_ctor_uses_system_clock() {
         "default Vauchi clock returned {observed:?} outside [{before:?}, {after:?}]"
     );
 }
+
+// @internal
+#[test]
+fn unix_millis_reports_millisecond_granularity() {
+    // Sub-second resolution: seconds floors to 1, millis keeps 1500.
+    let c = FakeClock::new(SystemTime::UNIX_EPOCH + Duration::from_millis(1_500));
+    assert_eq!(c.unix_seconds(), 1, "unix_seconds floors to whole seconds");
+    assert_eq!(
+        c.unix_millis(),
+        1_500,
+        "unix_millis keeps sub-second resolution"
+    );
+
+    // A 250 ms advance is invisible to unix_seconds but visible to
+    // unix_millis — the property the multi-stage poll cadence relies on
+    // (2026-06-03-multistage-qr-exchange-stalls-init-on-device): feeding
+    // seconds into a millisecond frame gate froze the QR for ~1000× its
+    // window.
+    c.advance(Duration::from_millis(250));
+    assert_eq!(
+        c.unix_seconds(),
+        1,
+        "250ms advance does not cross a second boundary"
+    );
+    assert_eq!(
+        c.unix_millis(),
+        1_750,
+        "250ms advance is visible in unix_millis"
+    );
+}
+
+// @internal
+#[test]
+fn system_clock_unix_millis_is_monotonic_with_now() {
+    // unix_millis must sit within a sandwich of real OS reads, in ms.
+    let c = SystemClock::new();
+    let before = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    let observed = c.unix_millis();
+    let after = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    assert!(
+        observed >= before && observed <= after,
+        "unix_millis {observed} outside [{before}, {after}]"
+    );
+}

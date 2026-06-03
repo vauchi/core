@@ -33,6 +33,7 @@ use x25519_dalek::{PublicKey as X25519Public, StaticSecret as X25519Secret};
 use zeroize::Zeroize;
 
 use super::chunker::{Chunker, ReassemblyBuffer};
+use super::accel_envelope;
 use super::commitment::Commitment;
 use super::qr_codec::{self, StageQr};
 use super::types::{
@@ -317,6 +318,13 @@ pub struct MultiStageSession {
     /// in [`Self::set_accel_proximity`], same clock domain as the audio
     /// window — `None` outside Listening.
     accel_recording_started_at: Option<Instant>,
+    /// Locally-recorded accelerometer magnitude envelope for the TapHoverShake
+    /// shake co-location signal. Accumulated via
+    /// [`Self::record_accel_envelope_samples`] while `accel_proximity ==
+    /// Listening`; sealed into the SHAK QR on emit (F2 sender-AAD binding) and
+    /// cross-correlated against the peer's on receive. Dropped after correlation
+    /// and in `clear_sensitive` (F7) — transient proximity proof, never card data.
+    accel_local_envelope: Vec<f32>,
     /// Explicit-monotonic-time seam (Phase 1 / Task 1.1b). Source for
     /// every `Instant` this session stamps (`phase_entered_at`,
     /// `last_progress_at`, `fail_broadcast_until`,
@@ -415,6 +423,7 @@ impl MultiStageSession {
             audio_listening_started_at: None,
             accel_proximity: AccelerometerProximityState::Pending,
             accel_recording_started_at: None,
+            accel_local_envelope: Vec::new(),
             monotonic: SystemMonotonicClock::shared(),
         }
     }
@@ -720,7 +729,11 @@ impl MultiStageSession {
         // same clock domain as the audio window so the recorded start and
         // the timeout `now` share `self.monotonic`.
         self.accel_recording_started_at = match new_state {
-            AccelerometerProximityState::Listening => Some(self.monotonic.now()),
+            AccelerometerProximityState::Listening => {
+                // Fresh capture window — discard any envelope from a prior attempt.
+                self.accel_local_envelope.clear();
+                Some(self.monotonic.now())
+            }
             _ => None,
         };
         Ok(())
@@ -767,6 +780,84 @@ impl MultiStageSession {
                 | (Listening, Failed)
                 | (Failed, Listening)
         )
+    }
+
+    /// Append locally-captured accelerometer magnitude samples to the SHAK
+    /// envelope. Samples outside the `Listening` capture window are ignored.
+    ///
+    /// The engine forwards `Event::AccelerometerData` here while the
+    /// TapHoverShake shake stage is active (wired in the engine; ADR-031
+    /// command/event). Glance/Hover never enter `Listening`, so they record
+    /// nothing and never emit a SHAK.
+    pub fn record_accel_envelope_samples(&mut self, samples: &[f32]) {
+        if self.accel_proximity == AccelerometerProximityState::Listening {
+            self.accel_local_envelope.extend_from_slice(samples);
+        }
+    }
+
+    /// Build the SHAK QR carrying our AEAD-sealed accelerometer envelope, or
+    /// `None` if the shake stage is not ready to transmit.
+    ///
+    /// F5 timing gate: `None` unless `transport_key` exists (post-VRFY DH),
+    /// `accel_proximity == Listening`, and we have recorded samples. The
+    /// envelope is sealed under our own `session_id` (F2 sender-AAD binding) so
+    /// a peer that reflects it back fails AEAD at us.
+    fn build_shake_qr(&self) -> Option<String> {
+        if self.accel_proximity != AccelerometerProximityState::Listening
+            || self.accel_local_envelope.is_empty()
+        {
+            return None;
+        }
+        let key = self.transport_key?;
+        let sealed =
+            accel_envelope::seal_envelope(&key, &self.session_id, &self.accel_local_envelope);
+        Some(qr_codec::format_shake_qr(&self.session_id, &sealed))
+    }
+
+    /// Handle an inbound SHAK stage: open the peer's sealed envelope and
+    /// cross-correlate it against our local recording to drive `accel_proximity`.
+    ///
+    /// Advisory only — returns the unchanged `ProtocolState` and never gates
+    /// completion (security-review F8). Gates:
+    /// - Acts only while `accel_proximity == Listening` (TapHoverShake) and we
+    ///   have a local envelope — other modes record nothing to correlate.
+    /// - F5: requires `transport_key`; a SHAK arriving before the key exists is
+    ///   dropped (no buffering, no error).
+    /// - F2: opens under `peer_session_id`, so a reflected own-envelope (sealed
+    ///   under our sid) fails AEAD and is dropped, leaving `Listening` for the
+    ///   timeout backstop to resolve to `Failed`.
+    fn handle_shake(&mut self, sealed: &[u8]) -> ProtocolState {
+        if self.accel_proximity != AccelerometerProximityState::Listening
+            || self.accel_local_envelope.is_empty()
+        {
+            return self.state.clone();
+        }
+        let (Some(key), Some(peer_sid)) = (self.transport_key, self.peer_session_id) else {
+            return self.state.clone(); // F5: no transport_key yet -> drop
+        };
+        if let Some(peer_envelope) = accel_envelope::open_envelope(&key, &peer_sid, sealed) {
+            let correlation = crate::exchange::accelerometer::cross_correlate(
+                &self.accel_local_envelope,
+                &peer_envelope,
+            );
+            let threshold = crate::exchange::accelerometer::AccelerometerConfig::default()
+                .correlation_threshold;
+            let outcome = if correlation >= threshold {
+                AccelerometerProximityState::Confirmed
+            } else {
+                AccelerometerProximityState::Failed
+            };
+            // Listening -> Confirmed and Listening -> Failed are both in the
+            // graph, so this always succeeds; the transition must still run in
+            // release (debug_assert would compile the call out), so evaluate it
+            // unconditionally and only assert the must-use result in debug.
+            if self.set_accel_proximity(outcome).is_err() {
+                debug_assert!(false, "valid accel transition was rejected");
+            }
+            // F7: drop the transient envelope once correlated.
+            self.accel_local_envelope.clear();
+        }
+        self.state.clone()
     }
 
     /// Cancel the session, transitioning to Failed and clearing sensitive data.
@@ -852,6 +943,19 @@ impl MultiStageSession {
                 // ensures coprimality with scan_every_n 2..6, so the scanner
                 // cycles through all phases and sees both frame types.
                 let phase = self.display_cycle % 7;
+                // Phase 6 carries the SHAK accel envelope once the shake stage is
+                // recording and transport_key exists (advisory; `build_shake_qr`
+                // returns None for Glance/Hover and before capture, falling
+                // through to the CONF frame).
+                if phase == 6
+                    && let Some(shake_qr) = self.build_shake_qr()
+                {
+                    return Some(QrPayload {
+                        data: shake_qr,
+                        error_correction: "M".to_string(),
+                        display_duration_ms: jittered(DISPLAY_MS_CONF),
+                    });
+                }
                 if phase < 3 {
                     let qr_data =
                         qr_codec::format_verify_qr(&self.session_id, self.commitment.reveal_key());
@@ -1025,9 +1129,10 @@ impl MultiStageSession {
                 ciphertext,
             ),
             StageQr::Fail { session_id: _ } => self.handle_fail(),
-            // SHAK is advisory (ADR-009 amendment / F8): never transitions the
-            // state machine. Slice 3 adds the accel_proximity side-effect here.
-            StageQr::Shake { .. } => self.state.clone(),
+            StageQr::Shake {
+                session_id: _,
+                sealed_envelope,
+            } => self.handle_shake(&sealed_envelope),
         }
     }
 
@@ -1696,6 +1801,7 @@ impl MultiStageSession {
         self.outbound_chunks.clear();
         self.inbound_buffer = None;
         self.received_data = None;
+        self.accel_local_envelope.clear();
     }
 }
 

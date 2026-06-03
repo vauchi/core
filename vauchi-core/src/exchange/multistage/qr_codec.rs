@@ -388,10 +388,6 @@ pub fn format_fail_qr(session_id: &[u8; 16]) -> String {
 /// opaque AEAD ciphertext from [`super::accel_envelope::seal_envelope`]; the
 /// CRC covers those sealed bytes (a scan-integrity check distinct from — and
 /// in addition to — the AEAD tag).
-///
-/// `parse_shake` (the receive path) is live via `parse_qr`; this emitter is
-/// wired into the orchestrator in slice 3, which removes this attribute.
-#[allow(dead_code)]
 pub fn format_shake_qr(session_id: &[u8; 16], sealed_envelope: &[u8]) -> String {
     let crc = crc16::compute(sealed_envelope);
     format!(

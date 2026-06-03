@@ -31,12 +31,6 @@
 //! - **F4** — [`shake_protocol::decode_envelope`] is only ever fed
 //!   AEAD-decrypted bytes; the relay only ever sees the sealed blob.
 
-// Slice 1 lands the envelope AEAD core (security-review F1/F2/F3) with its full
-// adversarial test suite ahead of the orchestrator caller. Slice 3 wires
-// `seal_envelope`/`open_envelope` into the multi-stage SHAK flow and REMOVES
-// this attribute, at which point `-D dead-code` re-verifies nothing is unused.
-#![allow(dead_code)]
-
 use chacha20poly1305::ChaCha20Poly1305;
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 

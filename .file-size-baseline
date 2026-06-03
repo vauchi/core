@@ -119,7 +119,7 @@ vauchi-core/src/exchange/session.rs 1930
 #  problem 2026-05-21-silent-failures-in-security-paths, 2026-05-23)
 # (+68 for build_exchange_ratchet seam + retained ratchet ephemeral + RatchetSetupError,
 #  bugfix/exchanged-ratchet-key 2026-05-25; structural exemption — state machine, do not split)
-vauchi-core/src/exchange/multistage/session.rs 1706
+vauchi-core/src/exchange/multistage/session.rs 1812
 
 # EXEMPT — protocol command/event enum: variants + variant_name match
 # + From impls + serde-discriminant ordering must be co-located, splitting

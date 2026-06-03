@@ -10,7 +10,11 @@
 //! no orphan affordances).
 //!
 //! BFS coverage notes:
-//! - Active rendering exposes `cancel`, `switch_camera`.
+//! - Active rendering exposes `cancel` + `switch_camera` as `ActionList`
+//!   items inside the preview `Row` (emitted as `ListItemSelected`,
+//!   which the static `ActionPressed` diff treats as pass-through —
+//!   covered by `multi_stage_exchange.rs` unit tests). The active
+//!   screen has no `ActionPressed` affordances.
 //! - The Failed-state screen exposes `retry`, `cancel`.
 //! - The success-state screen (Finalized + session_ended) exposes `done`.
 //! - The permission-denied gate screen exposes
@@ -29,7 +33,13 @@ use vauchi_core::exchange::ProtocolState;
 
 /// Action ids handled by `MultiStageExchangeEngine` —
 /// `core/vauchi-app/src/ui/multi_stage_exchange.rs`.
-const ACTIVE_HANDLED: &[&str] = &["cancel", "switch_camera"];
+///
+/// The active screen carries NO `ActionPressed` affordances: its
+/// switch-camera / cancel buttons now live in the preview `Row`'s
+/// `ActionList` and dispatch via `ListItemSelected` (pass-through for
+/// the static reachability diff). The terminal screens below still use
+/// `ScreenAction`s, so they keep their declared sets.
+const ACTIVE_HANDLED: &[&str] = &[];
 const FAILED_HANDLED: &[&str] = &["retry", "cancel"];
 const SUCCESS_HANDLED: &[&str] = &["done"];
 const PERMISSION_HANDLED: &[&str] = &["grant_camera_permission", "cancel"];

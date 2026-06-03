@@ -35,7 +35,9 @@ use zeroize::Zeroize;
 use super::chunker::{Chunker, ReassemblyBuffer};
 use super::commitment::Commitment;
 use super::qr_codec::{self, StageQr};
-use super::types::{AudioProximityState, ChunkBitmap, ProtocolState, QrPayload};
+use super::types::{
+    AccelerometerProximityState, AudioProximityState, ChunkBitmap, ProtocolState, QrPayload,
+};
 
 use crate::crypto::x3dh::X3DHKeyPair;
 use crate::crypto::{DoubleRatchetState, SymmetricKey};
@@ -81,6 +83,17 @@ const FINALIZED_GRACE_DURATION: Duration = Duration::from_secs(60);
 /// honour its `timeout_ms` honestly). The check is invoked by the
 /// cycle thread via [`MultiStageSession::check_and_apply_audio_timeout`].
 const AUDIO_LISTEN_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// How long after `set_accel_proximity(Listening)` to wait for the shake
+/// to cross-correlate before transitioning to Failed (TapHoverShake P2.A).
+/// Longer than `AUDIO_LISTEN_TIMEOUT` because the accel window must cover
+/// the full `AccelerometerConfig::recording_duration_ms` motion recording
+/// (3s) *plus* the peer-envelope round-trip over transport, where audio's
+/// chirp-and-listen completes in a single acoustic exchange. Same defensive
+/// backstop role (ADR-031): core enforces its own budget so the Listening
+/// state cannot wedge if the platform adapter is silent. Checked by
+/// [`MultiStageSession::check_and_apply_accel_timeout`].
+const ACCEL_LISTEN_TIMEOUT: Duration = Duration::from_secs(8);
 
 /// Base display durations per QR type (jitter added at runtime).
 /// Tuned for <5s total exchange on typical hardware.
@@ -130,6 +143,27 @@ pub enum AudioStateError {
     InvalidTransition {
         from: AudioProximityState,
         to: AudioProximityState,
+    },
+}
+
+/// Error returned by [`MultiStageSession::set_accel_proximity`] when a
+/// requested accelerometer-proximity transition is not part of the state
+/// graph. The TapHoverShake-side mirror of [`AudioStateError`]; kept as a
+/// distinct type (not a shared generic) so the carried `from`/`to` are
+/// typed `AccelerometerProximityState` and a wrongly-wired
+/// audio/accel transition is a compile error, not a runtime confusion.
+///
+/// Retry semantics mirror audio: `Failed → Listening` is allowed so the
+/// user can re-attempt the shake without restarting the QR cycle.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AccelStateError {
+    /// The requested transition is not part of the state graph. Carries
+    /// the from-state and to-state for diagnostics. Indicates a
+    /// programming error in the orchestrator; the wrapper should surface
+    /// it as a generic proximity failure rather than panic.
+    InvalidTransition {
+        from: AccelerometerProximityState,
+        to: AccelerometerProximityState,
     },
 }
 
@@ -270,6 +304,19 @@ pub struct MultiStageSession {
     /// (matches the existing `phase_entered_at` style in this
     /// session for ProtocolState transitions).
     audio_listening_started_at: Option<Instant>,
+
+    /// TapHoverShake accelerometer-proximity state — the second parallel
+    /// proximity signal alongside `audio_proximity`. `Pending` for Glance
+    /// and Hover (never transitioned); TapHoverShake drives it through the
+    /// shake-correlation states. See [`AccelerometerProximityState`].
+    accel_proximity: AccelerometerProximityState,
+    /// `Some(t)` while `accel_proximity == Listening` — `t` is the
+    /// monotonic `Instant` at which the capture window opened, read by
+    /// [`Self::check_and_apply_accel_timeout`] to enforce the
+    /// `ACCEL_LISTEN_TIMEOUT` budget. Stamped from `self.monotonic.now()`
+    /// in [`Self::set_accel_proximity`], same clock domain as the audio
+    /// window — `None` outside Listening.
+    accel_recording_started_at: Option<Instant>,
     /// Explicit-monotonic-time seam (Phase 1 / Task 1.1b). Source for
     /// every `Instant` this session stamps (`phase_entered_at`,
     /// `last_progress_at`, `fail_broadcast_until`,
@@ -366,6 +413,8 @@ impl MultiStageSession {
             peer_relay_noise_pubkey: None,
             audio_proximity: AudioProximityState::Pending,
             audio_listening_started_at: None,
+            accel_proximity: AccelerometerProximityState::Pending,
+            accel_recording_started_at: None,
             monotonic: SystemMonotonicClock::shared(),
         }
     }
@@ -623,6 +672,97 @@ impl MultiStageSession {
         to: AudioProximityState,
     ) -> bool {
         use AudioProximityState::{Confirmed, Failed, Listening, Pending};
+        matches!(
+            (from, to),
+            (Pending, Listening)
+                | (Listening, Confirmed)
+                | (Listening, Failed)
+                | (Failed, Listening)
+        )
+    }
+
+    /// Returns the current accelerometer-proximity state. TapHoverShake-only
+    /// — Glance and Hover callers see `Pending` for the session lifetime
+    /// because neither runs the shake correlation.
+    pub fn accel_proximity(&self) -> AccelerometerProximityState {
+        self.accel_proximity
+    }
+
+    /// Drive the accelerometer-proximity state machine.
+    ///
+    /// The TapHoverShake mirror of [`Self::set_audio_proximity`], with the
+    /// identical transition graph and security gate: `Confirmed` is
+    /// reachable **only** from `Listening`, so the "devices shook together"
+    /// claim cannot be set without an actual recording + cross-correlation.
+    /// `Failed -> Listening` permits a retry without restarting the QR cycle.
+    ///
+    /// ```text
+    ///   Pending --> Listening --> Confirmed   (cross-correlation >= threshold)
+    ///                       \--> Failed       (timeout / mismatch)
+    ///                                ^
+    ///                              Listening  (retry)
+    /// ```
+    ///
+    /// Returns `Err(InvalidTransition { .. })` for any transition not in the
+    /// graph; the caller logs + surfaces a generic proximity-failure UX.
+    pub fn set_accel_proximity(
+        &mut self,
+        new_state: AccelerometerProximityState,
+    ) -> Result<(), AccelStateError> {
+        if !Self::accel_transition_allowed(self.accel_proximity, new_state) {
+            return Err(AccelStateError::InvalidTransition {
+                from: self.accel_proximity,
+                to: new_state,
+            });
+        }
+        self.accel_proximity = new_state;
+        // Open the capture window on entry to Listening, clear on exit --
+        // same clock domain as the audio window so the recorded start and
+        // the timeout `now` share `self.monotonic`.
+        self.accel_recording_started_at = match new_state {
+            AccelerometerProximityState::Listening => Some(self.monotonic.now()),
+            _ => None,
+        };
+        Ok(())
+    }
+
+    /// Enforce the accelerometer-capture timeout budget. The TapHoverShake
+    /// mirror of [`Self::check_and_apply_audio_timeout`]:
+    ///
+    /// - `Ok(false)` and leaves state untouched when not in Listening or
+    ///   when the `ACCEL_LISTEN_TIMEOUT` budget has not elapsed.
+    /// - `Ok(true)` and transitions Listening -> Failed once it has.
+    /// - `Err(AccelStateError::InvalidTransition)` is structurally
+    ///   unreachable (Listening -> Failed is in the graph) but the result
+    ///   type matches `set_accel_proximity` for caller symmetry.
+    ///
+    /// Defensive backstop per ADR-031: `Command::AccelerometerStart` gives
+    /// the adapter no timeout, and `AccelerometerData` carries no "no peer
+    /// motion" signal, so core enforces its own budget to keep the
+    /// Listening state from wedging.
+    pub fn check_and_apply_accel_timeout(
+        &mut self,
+        now: Instant,
+    ) -> Result<bool, AccelStateError> {
+        let started = match (self.accel_proximity, self.accel_recording_started_at) {
+            (AccelerometerProximityState::Listening, Some(t)) => t,
+            _ => return Ok(false),
+        };
+        if now.saturating_duration_since(started) < ACCEL_LISTEN_TIMEOUT {
+            return Ok(false);
+        }
+        self.set_accel_proximity(AccelerometerProximityState::Failed)?;
+        Ok(true)
+    }
+
+    /// Returns `true` iff the transition is permitted by the accelerometer
+    /// state graph. Pure function -- exposed for tests and orchestrator
+    /// preflight. Same graph as [`Self::audio_transition_allowed`].
+    pub(crate) fn accel_transition_allowed(
+        from: AccelerometerProximityState,
+        to: AccelerometerProximityState,
+    ) -> bool {
+        use AccelerometerProximityState::{Confirmed, Failed, Listening, Pending};
         matches!(
             (from, to),
             (Pending, Listening)

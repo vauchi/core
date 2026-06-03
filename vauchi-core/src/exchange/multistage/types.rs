@@ -67,6 +67,30 @@ pub enum AudioProximityState {
     Failed,
 }
 
+/// Accelerometer-proximity verification state used by `MultiStageSession`
+/// when the active exchange mode is `TapHoverShake`. A *second* parallel
+/// proximity signal alongside [`AudioProximityState`], with the identical
+/// 4-state graph: `Pending` is pre-capture, `Listening` covers the motion
+/// recording + peer-envelope round-trip window, `Confirmed` is reached only
+/// after the two devices' magnitude envelopes cross-correlate above
+/// threshold (proving they experienced the same physical impulse), and
+/// `Failed` triggers the proximity-specific Failed-state ScreenModel chrome.
+///
+/// Glance and Hover ignore this state — only TapHoverShake transitions it,
+/// because only that mode emits `Command::AccelerometerStart` and exchanges
+/// the envelope over transport. Lives in `vauchi-core` so the session (the
+/// protocol producer) and the engine (the renderer consumer) share a single
+/// source of truth — the same decision-of-record as `AudioProximityState`
+/// (Hover investigation Option B; TapHoverShake investigation Q2 DECISION,
+/// `_private/docs/problems/2026-05-11-multi-stage-engine-tap-hover-shake/investigation.md`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AccelerometerProximityState {
+    Pending,
+    Listening,
+    Confirmed,
+    Failed,
+}
+
 /// Bitmap tracking which chunks have been received.
 #[derive(Debug, Clone)]
 pub struct ChunkBitmap {

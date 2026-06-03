@@ -445,17 +445,13 @@ pub struct AppEngine {
     /// Engine-owned link-mode responder machine (slice 32l Phase 2), live
     /// only on `AppScreen::DeepLinkResponder`. See `app_engine/link_responder.rs`.
     link_responder: Option<vauchi_core::exchange::link_responder::LinkResponderSession>,
-    /// Per-exchange X3DH keypair retained for the responder while on
-    /// `AppScreen::DeepLinkResponder` — its public half is signed into the
-    /// v2 bootstrap (ADR-050 T5b); the secret completes the exchange
-    /// (`complete_link_exchange`). Dropped on screen exit alongside
-    /// `link_responder`.
+    /// Per-exchange X3DH keypair retained for the responder — signed into
+    /// the v2 bootstrap, completes the exchange (ADR-050 T5b).
     link_responder_x3dh: Option<vauchi_core::exchange::X3DHKeyPair>,
     /// Engine-owned link-mode **initiator** machine (slice 32l Phase 3), live
     /// only on `AppScreen::LinkExchange`. See `app_engine/link_exchange.rs`.
     link_initiator: Option<vauchi_core::exchange::link_initiator::LinkInitiatorSession>,
-    /// Per-exchange X3DH keypair retained for the initiator while on
-    /// `AppScreen::LinkExchange` (the initiator half of `link_responder_x3dh`).
+    /// The initiator half of `link_responder_x3dh` (ADR-050 T5b).
     link_initiator_x3dh: Option<vauchi_core::exchange::X3DHKeyPair>,
     /// Engine-owned device-link **initiator** machine (slice 32l T3.1b), live
     /// only on `AppScreen::DeviceLinking`. See `app_engine/device_link_initiator.rs`.

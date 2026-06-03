@@ -23,7 +23,6 @@ use self::ble::{BleActionOutcome, BleExchangeFlow, BleHardwareOutcome, BleStep};
 use self::field_preview::{FieldPreviewConfig, FieldPreviewResult};
 use self::mode_selection::{ModeSelectionEngine, ModeSelectionResult};
 use self::nfc::{NfcExchangeFlow, NfcHardwareOutcome, NfcStep};
-use self::scan_quality::ScanQualityTracker;
 use crate::ui::*;
 use vauchi_core::Command;
 use vauchi_core::clock::Clock;
@@ -102,8 +101,6 @@ pub struct ExchangeEngine {
     nfc_identity: Option<vauchi_core::identity::Identity>,
     /// Reciprocity confirmation cascade driver (created on exchange completion).
     reciprocity_confirmer: Option<ReciprocityConfirmer>,
-    /// Rolling window tracker for QR scan quality (viewfinder frame color).
-    scan_quality_tracker: ScanQualityTracker,
     /// Wall-clock source for time-stamped sub-engines
     /// (`ReciprocityConfirmer`). Threaded through both constructors;
     /// production callers pass `vauchi.clock()`, tests use
@@ -253,7 +250,6 @@ impl ExchangeEngine {
             nfc_flow: None,
             nfc_identity: None,
             reciprocity_confirmer: None,
-            scan_quality_tracker: ScanQualityTracker::new(),
             clock,
         }
     }
@@ -305,7 +301,6 @@ impl ExchangeEngine {
             nfc_flow: None,
             nfc_identity: None,
             reciprocity_confirmer: None,
-            scan_quality_tracker: ScanQualityTracker::new(),
             clock,
         }
     }
@@ -2392,16 +2387,6 @@ mod tests {
 
     // ── Permission degradation fallback tests ─────────────────────────
 
-    fn config_with_camera() -> ExchangeConfig {
-        ExchangeConfig {
-            device_capabilities: DeviceCapabilities {
-                has_camera: true,
-                ..Default::default()
-            },
-            ..config_no_groups()
-        }
-    }
-
     // @internal
     #[test]
     fn ble_failure_with_camera_shows_qr_fallback() {
@@ -2620,20 +2605,6 @@ mod tests {
     }
 
     // ── Scan quality tracking ──────────────────────────────────────
-
-    fn qr_data_from_screen(screen: &ScreenModel) -> &str {
-        for c in &screen.components {
-            if let Component::QrCode {
-                data,
-                mode: QrMode::Display,
-                ..
-            } = c
-            {
-                return data.as_str();
-            }
-        }
-        panic!("expected QrCode Display component in {:?}", screen);
-    }
 
     // @internal
     #[test]

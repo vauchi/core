@@ -32,7 +32,9 @@
 //! the corresponding chrome.
 
 use vauchi_core::Event;
-use vauchi_core::exchange::{AudioProximityState, ProtocolState, QrPayload};
+use vauchi_core::exchange::{
+    AccelerometerProximityState, AudioProximityState, ProtocolState, QrPayload,
+};
 
 use crate::ui::exchange::qr::ScanQualityTracker;
 use crate::ui::*;
@@ -180,6 +182,10 @@ pub struct MultiStageExchangeEngine {
     /// `Pending` for both Glance and Hover; Glance never transitions
     /// because it doesn't emit the audio commands.
     audio_proximity: AudioProximityState,
+    /// TapHoverShake accelerometer-proximity mirror. Pending for Glance
+    /// and Hover (never driven); TapHoverShake transitions it via
+    /// [`Self::set_accel_proximity`]. See [`AccelerometerProximityState`].
+    accel_proximity: AccelerometerProximityState,
     /// Mode marker — `true` for engines constructed via
     /// [`Self::new_hover`], `false` for [`Self::new_glance`].
     /// Consumed by the platform-binding wire-up to decide whether
@@ -210,6 +216,7 @@ impl MultiStageExchangeEngine {
             scan_quality_tracker: ScanQualityTracker::new(),
             cancelled: false,
             audio_proximity: AudioProximityState::Pending,
+            accel_proximity: AccelerometerProximityState::Pending,
             is_hover_mode: false,
         }
     }
@@ -236,6 +243,7 @@ impl MultiStageExchangeEngine {
             scan_quality_tracker: ScanQualityTracker::new(),
             cancelled: false,
             audio_proximity: AudioProximityState::Pending,
+            accel_proximity: AccelerometerProximityState::Pending,
             is_hover_mode: true,
         }
     }
@@ -334,6 +342,26 @@ impl MultiStageExchangeEngine {
         self.audio_proximity
     }
 
+    /// Drive the engine's accelerometer-proximity mirror. TapHoverShake
+    /// only — Glance and Hover never call this, so `accel_proximity`
+    /// stays `Pending` and the status detail + Failed branch are
+    /// unchanged for those modes. No-op after cancel, mirroring
+    /// [`Self::set_audio_proximity`].
+    pub fn set_accel_proximity(&mut self, state: AccelerometerProximityState) {
+        if self.cancelled {
+            return;
+        }
+        self.accel_proximity = state;
+    }
+
+    /// Returns the engine's accelerometer-proximity mirror. `Pending`
+    /// for Glance and Hover; TapHoverShake drives it through the shake
+    /// states (`Listening → Confirmed` on cross-correlation success or
+    /// `→ Failed` on timeout/mismatch).
+    pub fn accel_proximity(&self) -> AccelerometerProximityState {
+        self.accel_proximity
+    }
+
     // ── Internal helpers ───────────────────────────────────────────
 
     fn build_screen(&self) -> ScreenModel {
@@ -404,6 +432,12 @@ impl MultiStageExchangeEngine {
         if matches!(self.audio_proximity, AudioProximityState::Failed) {
             return self.build_audio_failed_screen(title);
         }
+        // Accel-proximity failure is the TapHoverShake mirror, checked
+        // after audio so audio wins the single Failed screen when both
+        // signals fail (see `audio_failed_takes_precedence_over_accel_failed`).
+        if matches!(self.accel_proximity, AccelerometerProximityState::Failed) {
+            return self.build_accel_failed_screen(title);
+        }
         match &self.state {
             ProtocolState::Failed(reason) => self.build_failed_screen(title, reason),
             ProtocolState::Finalized | ProtocolState::Complete | ProtocolState::RetryReady
@@ -441,7 +475,8 @@ impl MultiStageExchangeEngine {
         // Status narration — the single element that changes during the
         // exchange. Sits below the own-QR so its reflow never moves the
         // QR the peer is scanning.
-        let status = build_status_indicator(&self.state, self.audio_proximity);
+        let status =
+            build_status_indicator(&self.state, self.audio_proximity, self.accel_proximity);
         components.push(status);
 
         // Peer scanner + action buttons share one `Row` so the screen
@@ -559,6 +594,45 @@ impl MultiStageExchangeEngine {
         )
     }
 
+    /// TapHoverShake mirror of [`Self::build_audio_failed_screen`].
+    /// Distinct chrome from both generic protocol-Failed and
+    /// audio-Failed: "Couldn't confirm the shake" tells the user the
+    /// accelerometer cross-correlation didn't pass — an actionable
+    /// physical-setup hint (shake both phones together). Reached only
+    /// when `accel_proximity == Failed` and `audio_proximity != Failed`.
+    fn build_accel_failed_screen(&self, title: String) -> ScreenModel {
+        ScreenModel::new(
+            SCREEN_ID,
+            title,
+            vec![Component::StatusIndicator {
+                id: COMPONENT_ID_STATUS.into(),
+                icon: Some("move.3d".into()),
+                title: "Couldn't confirm the shake".into(),
+                detail: Some(
+                    "Shake both phones together at the same time and try again.".to_string(),
+                ),
+                status: Status::Failed,
+                a11y: None,
+            }],
+            vec![
+                ScreenAction {
+                    id: RETRY_ACTION_ID.into(),
+                    label: "Retry".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: CANCEL_ACTION_ID.into(),
+                    label: "Cancel".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+        )
+    }
+
     /// G1.3 of the Hover graduation problem record. Distinct chrome
     /// from generic protocol-Failed: "Couldn't confirm devices are
     /// close" tells the user the audio-proximity handshake timed out,
@@ -613,6 +687,7 @@ impl MultiStageExchangeEngine {
 pub(crate) fn build_status_indicator(
     state: &ProtocolState,
     audio: AudioProximityState,
+    accel: AccelerometerProximityState,
 ) -> Component {
     let (title, detail, status) = match state {
         ProtocolState::Idle | ProtocolState::Advertising => {
@@ -672,6 +747,21 @@ pub(crate) fn build_status_indicator(
         AudioProximityState::Confirmed => Some(match detail {
             Some(base) => format!("{base} · Devices confirmed close"),
             None => "Devices confirmed close".to_string(),
+        }),
+    };
+    // Layer accelerometer narration after audio so a TapHoverShake
+    // exchange running both signals surfaces both hints. Failed never
+    // reaches this helper — `build_screen` routes accel-Failed to
+    // `build_accel_failed_screen` upstream.
+    let detail = match accel {
+        AccelerometerProximityState::Pending | AccelerometerProximityState::Failed => detail,
+        AccelerometerProximityState::Listening => Some(match detail {
+            Some(base) => format!("{base} · Recording motion"),
+            None => "Recording motion".to_string(),
+        }),
+        AccelerometerProximityState::Confirmed => Some(match detail {
+            Some(base) => format!("{base} · Shake confirmed"),
+            None => "Shake confirmed".to_string(),
         }),
     };
     Component::StatusIndicator {

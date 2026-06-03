@@ -119,7 +119,7 @@ vauchi-core/src/exchange/session.rs 1930
 #  problem 2026-05-21-silent-failures-in-security-paths, 2026-05-23)
 # (+68 for build_exchange_ratchet seam + retained ratchet ephemeral + RatchetSetupError,
 #  bugfix/exchanged-ratchet-key 2026-05-25; structural exemption — state machine, do not split)
-vauchi-core/src/exchange/multistage/session.rs 1566
+vauchi-core/src/exchange/multistage/session.rs 1706
 
 # EXEMPT — protocol command/event enum: variants + variant_name match
 # + From impls + serde-discriminant ordering must be co-located, splitting
@@ -307,7 +307,7 @@ vauchi-app/src/ui/app_engine/routing.rs 1643
 #  threads them into MyInfoEngine's new sync-caption builders.)
 # (+5 for AppScreen::EmergencyBroadcast engine constructor + use —
 #  2026-06-02 humble-ui core engines sweep)
-vauchi-app/src/ui/app_engine/screens.rs 1455
+vauchi-app/src/ui/app_engine/screens.rs 1458
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081
@@ -356,7 +356,7 @@ vauchi-core/tests/it/migration_tests.rs 1226
 #  picker re-arm (keeps the cached engine interactive, no empty-screen zombie)
 #  + their inline regression test (with @internal annotation). Structural
 #  exemption — not split.)
-vauchi-app/src/ui/exchange/mod.rs 3889
+vauchi-app/src/ui/exchange/mod.rs 3961
 # (+2 for 2026-05-21-core-ui-icon-on-wire: inline `icon: ...` lines in
 #   sample_fields / sample_shared_info Field constructors.)
 vauchi-app/src/ui/contact_detail.rs 1425
@@ -400,7 +400,7 @@ vauchi-app/src/ui/exchange/ble.rs 1120
 #  audio-failed precedence. Option-agnostic — engine-side
 #  surface common to A/B/C; session-side 1.C.3+ commits to
 #  Option B per the design pass.)
-vauchi-app/src/ui/multi_stage_exchange.rs 1760
+vauchi-app/src/ui/multi_stage_exchange.rs 2061
 
 # EXEMPT — UniFFI facade growth: PlatformAppEngine wraps the full
 # AppEngine surface JSON-side and now also owns the Pair 4

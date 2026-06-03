@@ -648,11 +648,11 @@ fn qr_data_from_screen_json(screen_json: &str) -> String {
     panic!("no QrCode Display in screen: {screen_json}");
 }
 
-/// Drive onboarding → Exchange → QR (Broadcast mode) so the engine is parked on
+/// Drive onboarding → Exchange → QR (TapHoverShake mode) so the engine is parked on
 /// `exchange_show_qr` with an animated-QR session ready to cycle frames.
 ///
 /// Glance + Hover both graduated to `MultiStageExchange`
-/// (Pair 4 + Phase 1.E of the hover graduation plan); Broadcast is
+/// (Pair 4 + Phase 1.E of the hover graduation plan); TapHoverShake is
 /// the next QR-legacy mode in line for graduation — until then it
 /// drives the same `exchange_show_qr` chrome the legacy frame-cycling
 /// path needs.
@@ -661,12 +661,12 @@ fn drive_to_show_qr(engine: &PlatformAppEngine) {
     engine
         .navigate_to_json_for_test(r#""Exchange""#.into())
         .expect("navigate to Exchange");
-    // Pick Broadcast mode (group category) to drop into ShowQr.
+    // Pick TapHoverShake mode (fun category) to drop into ShowQr.
     engine
         .handle_action_json(
-            r#"{"ListItemSelected": {"component_id": "category:group", "item_id": "mode:broadcast"}}"#.into(),
+            r#"{"ListItemSelected": {"component_id": "category:fun", "item_id": "mode:tap_hover_shake"}}"#.into(),
         )
-        .expect("select broadcast mode");
+        .expect("select tap_hover_shake mode");
     // Regardless of which ActionResult shape mode-selection returns, the
     // current screen must now be exchange_show_qr.
     let id = engine
@@ -674,7 +674,7 @@ fn drive_to_show_qr(engine: &PlatformAppEngine) {
         .expect("screen id after mode select");
     assert_eq!(
         id, "exchange_show_qr",
-        "expected show_qr after selecting Broadcast, got {id}"
+        "expected show_qr after selecting TapHoverShake, got {id}"
     );
 }
 

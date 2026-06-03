@@ -615,9 +615,9 @@ impl ExchangeEngine {
             // machine. Phase 1.E of `2026-05-11-hover-graduation-plan.md`
             // extended the handoff to `Hover` (QR + ultrasonic). The `mode`
             // payload tells AppEngine which engine constructor to use
-            // (`new_hover` vs `new_glance`). Broadcast (one-to-many) +
-            // TapHoverShake (Phase 2/3) keep the legacy `ExchangeStep::Qr`
-            // path until their per-mode graduations land.
+            // (`new_hover` vs `new_glance`). TapHoverShake (Phase 2/3)
+            // keeps the legacy `ExchangeStep::Qr` path until its
+            // per-mode graduation lands.
             Some(mode @ (ExchangeMode::Glance | ExchangeMode::Hover)) => {
                 // The multi-stage flow runs in its own
                 // `AppScreen::MultiStageExchange` engine, but this
@@ -1572,10 +1572,10 @@ mod tests {
                 ("g2".into(), "Friends".into()),
             ],
             device_capabilities: DeviceCapabilities::default(),
-            // Broadcast routes through the legacy QR sub-flow (Glance now
+            // TapHoverShake routes through the legacy QR sub-flow (Glance now
             // diverts to multi-stage even with groups — see
             // `2026-06-02-grouped-mode-routing-nfc`).
-            mode: Some(ExchangeMode::Broadcast),
+            mode: Some(ExchangeMode::TapHoverShake),
             card_snapshot: None,
         }
     }
@@ -2168,11 +2168,11 @@ mod tests {
             config_no_groups(),
             vauchi_core::clock::SystemClock::shared(),
         );
-        // Broadcast is a QR-routing mode, so retry exercises the legacy QR
+        // TapHoverShake is a QR-routing mode, so retry exercises the legacy QR
         // path (Glance/TapTap now route to multi-stage / NFC via the shared
         // router and have their own retry coverage). The point here is that
         // Retry clears the failure detail and restores a sub-flow.
-        engine.config.mode = Some(ExchangeMode::Broadcast);
+        engine.config.mode = Some(ExchangeMode::TapHoverShake);
         engine.mark_failed_with_error(&vauchi_core::exchange::ExchangeError::BleOutOfRange);
         assert!(engine.failure_detail.is_some());
 
@@ -2371,8 +2371,8 @@ mod tests {
     // the engine staying on `ModeSelection` while AppEngine
     // navigates to `AppScreen::MultiStageExchange`. The legacy
     // `exchange_show_qr` screen is reached only by modes that
-    // have *not* graduated to the new engine (Broadcast,
-    // TapHoverShake — Phases 2/3 of the umbrella retirement).
+    // have *not* graduated to the new engine (TapHoverShake —
+    // Phase 2/3 of the umbrella retirement).
     //
     // This test pins the unreachability of the legacy path for
     // Hover — a regression gate so a future refactor can't

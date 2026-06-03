@@ -232,18 +232,18 @@ fn navigate_away_and_back_preserves_engine_state() {
     let first_visit = engine.navigate_to(AppScreen::Exchange);
     assert_eq!(first_visit.screen_id, "exchange_mode_selection");
 
-    // Pick Broadcast mode (still routes through the legacy
+    // Pick TapHoverShake mode (still routes through the legacy
     // `ExchangeStep::Qr` sub-flow). Glance and Hover now both hand
     // off to `MultiStageExchange` and so leave the Exchange engine
     // entirely (Pair 4 graduated Glance; Phase 1.E of the hover
-    // graduation plan graduated Hover). Broadcast is the next QR-
+    // graduation plan graduated Hover). TapHoverShake is the next QR-
     // legacy mode in line for Phase 2/3 graduation — until then it's
     // the only QR-legacy mode left, which is exactly what this
     // regression test needs to exercise the cache-preserves-state
     // behavior on a single engine.
     let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:group".into(),
-        item_id: "mode:broadcast".into(),
+        component_id: "category:fun".into(),
+        item_id: "mode:tap_hover_shake".into(),
     });
     let qr_screen = engine.current_screen();
     assert_eq!(

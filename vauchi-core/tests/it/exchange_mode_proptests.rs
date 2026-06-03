@@ -20,8 +20,6 @@ fn arb_exchange_mode() -> impl Strategy<Value = ExchangeMode> {
         Just(ExchangeMode::Magic),
         Just(ExchangeMode::TapTap),
         Just(ExchangeMode::TapHoverShake),
-        Just(ExchangeMode::Broadcast),
-        Just(ExchangeMode::Web),
         Just(ExchangeMode::Link),
     ]
 }

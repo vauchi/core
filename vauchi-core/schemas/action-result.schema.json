@@ -275,6 +275,27 @@
       "additionalProperties": false
     },
     {
+      "description": "GDPR data export completed — frontend should save or share the JSON (file dialog / share sheet). Mirrors `BackupExportComplete`; the payload is the serialized `export_all_data` result.",
+      "type": "object",
+      "required": [
+        "GdprExportComplete"
+      ],
+      "properties": {
+        "GdprExportComplete": {
+          "type": "object",
+          "required": [
+            "json"
+          ],
+          "properties": {
+            "json": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "description": "All data has been wiped — frontend should reset to initial state.",
       "type": "string",
       "enum": [
@@ -2452,20 +2473,6 @@
           "type": "string",
           "enum": [
             "tap_hover_shake"
-          ]
-        },
-        {
-          "description": "One-to-many QR broadcast for group exchanges.",
-          "type": "string",
-          "enum": [
-            "broadcast"
-          ]
-        },
-        {
-          "description": "Remote exchange via QR scanned through a browser camera.",
-          "type": "string",
-          "enum": [
-            "web"
           ]
         },
         {

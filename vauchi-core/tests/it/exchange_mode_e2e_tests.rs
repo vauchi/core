@@ -93,16 +93,16 @@ fn glance_full_flow_mode_to_multistage_handoff() {
 
 // @internal
 #[test]
-fn broadcast_full_flow_mode_to_qr_to_result() {
+fn tap_hover_shake_full_flow_mode_to_qr_to_result() {
     let mut engine = ExchangeEngine::new(
         config_with_mode_selection(),
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Select Broadcast
+    // Select TapHoverShake
     let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:group".to_string(),
-        item_id: "mode:broadcast".to_string(),
+        component_id: "category:fun".to_string(),
+        item_id: "mode:tap_hover_shake".to_string(),
     });
 
     // Skip groups
@@ -112,7 +112,7 @@ fn broadcast_full_flow_mode_to_qr_to_result() {
     let screen = engine.current_screen();
     assert_eq!(
         screen.screen_id, "exchange_show_qr",
-        "Broadcast skip-groups goes straight to QR"
+        "TapHoverShake skip-groups goes straight to QR"
     );
 
     // Complete the QR flow

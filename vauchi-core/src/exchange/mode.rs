@@ -4,7 +4,7 @@
 
 //! Exchange mode catalog.
 //!
-//! Defines the [`ExchangeMode`] enum (all 11 supported modes) along with
+//! Defines the [`ExchangeMode`] enum (all 9 supported modes) along with
 //! supporting type enums and the static [`ModeConfig`] catalog that describes
 //! transport, bootstrap, proximity signals, timeouts, and device requirements
 //! for every mode.
@@ -34,10 +34,6 @@ pub enum ExchangeMode {
     TapTap,
     /// NFC + BLE + audio + accelerometer multi-factor in-person exchange.
     TapHoverShake,
-    /// One-to-many QR broadcast for group exchanges.
-    Broadcast,
-    /// Remote exchange via QR scanned through a browser camera.
-    Web,
     /// Async remote exchange via a shareable URL.
     Link,
     /// USB cable exchange between a desktop and a phone.
@@ -45,7 +41,7 @@ pub enum ExchangeMode {
 }
 
 impl ExchangeMode {
-    /// Returns all eleven variants in declaration order.
+    /// Returns all nine variants in declaration order.
     pub fn all() -> &'static [Self] {
         &[
             Self::Glance,
@@ -55,8 +51,6 @@ impl ExchangeMode {
             Self::Magic,
             Self::TapTap,
             Self::TapHoverShake,
-            Self::Broadcast,
-            Self::Web,
             Self::Link,
             Self::Cable,
         ]
@@ -72,8 +66,6 @@ impl ExchangeMode {
             Self::Magic => "Magic",
             Self::TapTap => "Tap tap",
             Self::TapHoverShake => "Tap hover shake",
-            Self::Broadcast => "Broadcast",
-            Self::Web => "Web",
             Self::Link => "Link",
             Self::Cable => "Cable",
         }
@@ -85,8 +77,7 @@ impl ExchangeMode {
             Self::Glance | Self::Bump => ModeCategory::Quick,
             Self::Hover | Self::Magic | Self::Shake => ModeCategory::Standard,
             Self::TapTap | Self::TapHoverShake => ModeCategory::Fun,
-            Self::Broadcast => ModeCategory::Group,
-            Self::Web | Self::Link => ModeCategory::Remote,
+            Self::Link => ModeCategory::Remote,
             Self::Cable => ModeCategory::Standard,
         }
     }
@@ -112,8 +103,6 @@ impl ExchangeMode {
             Self::Magic => &MODE_MAGIC,
             Self::TapTap => &MODE_TAP_TAP,
             Self::TapHoverShake => &MODE_TAP_HOVER_SHAKE,
-            Self::Broadcast => &MODE_BROADCAST,
-            Self::Web => &MODE_WEB,
             Self::Link => &MODE_LINK,
             Self::Cable => &MODE_CABLE,
         }
@@ -130,7 +119,6 @@ pub enum ModeCategory {
     Quick,
     Standard,
     Fun,
-    Group,
     Remote,
 }
 
@@ -151,8 +139,6 @@ pub enum DataTransport {
 #[non_exhaustive]
 pub enum BootstrapMethod {
     QrMutualScan,
-    QrOneToMany,
-    QrRemoteCamera,
     BleDiscovery,
     NfcBootstrap,
     NfcAndBle,
@@ -304,29 +290,6 @@ static MODE_TAP_HOVER_SHAKE: ModeConfig = ModeConfig {
     ],
 };
 
-// Broadcast: BLE is the preferred data transport but relay serves
-// as fallback — BLE is deliberately not in `requires` because the
-// mode functions (degraded) without it. See spec footnote.
-static MODE_BROADCAST: ModeConfig = ModeConfig {
-    data_transport: DataTransport::Ble,
-    bootstrap: BootstrapMethod::QrOneToMany,
-    proximity: &[],
-    fallback_transport: Some(DataTransport::Relay),
-    context: ExchangeContext::InPerson,
-    timeout: Duration::from_secs(600),
-    requires: &[DeviceRequirement::Camera],
-};
-
-static MODE_WEB: ModeConfig = ModeConfig {
-    data_transport: DataTransport::QrMultiStage,
-    bootstrap: BootstrapMethod::QrRemoteCamera,
-    proximity: &[],
-    fallback_transport: Some(DataTransport::Relay),
-    context: ExchangeContext::Remote,
-    timeout: Duration::from_secs(300),
-    requires: &[DeviceRequirement::Camera, DeviceRequirement::Internet],
-};
-
 static MODE_LINK: ModeConfig = ModeConfig {
     data_transport: DataTransport::Relay,
     bootstrap: BootstrapMethod::UrlShare,
@@ -355,11 +318,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn exchange_mode_has_eleven_variants() {
+    fn exchange_mode_has_nine_variants() {
         let all = ExchangeMode::all();
-        assert_eq!(all.len(), 11);
+        assert_eq!(all.len(), 9);
         assert_eq!(all[0], ExchangeMode::Glance);
-        assert_eq!(all[10], ExchangeMode::Cable);
+        assert_eq!(all[8], ExchangeMode::Cable);
     }
 
     #[test]
@@ -412,8 +375,6 @@ mod tests {
             ExchangeMode::TapHoverShake.display_name(),
             "Tap hover shake"
         );
-        assert_eq!(ExchangeMode::Broadcast.display_name(), "Broadcast");
-        assert_eq!(ExchangeMode::Web.display_name(), "Web");
         assert_eq!(ExchangeMode::Link.display_name(), "Link");
         assert_eq!(ExchangeMode::Cable.display_name(), "Cable");
     }
@@ -427,8 +388,6 @@ mod tests {
         assert_eq!(ExchangeMode::Shake.category(), ModeCategory::Standard);
         assert_eq!(ExchangeMode::TapTap.category(), ModeCategory::Fun);
         assert_eq!(ExchangeMode::TapHoverShake.category(), ModeCategory::Fun);
-        assert_eq!(ExchangeMode::Broadcast.category(), ModeCategory::Group);
-        assert_eq!(ExchangeMode::Web.category(), ModeCategory::Remote);
         assert_eq!(ExchangeMode::Link.category(), ModeCategory::Remote);
         assert_eq!(ExchangeMode::Cable.category(), ModeCategory::Standard);
     }
@@ -472,13 +431,6 @@ mod tests {
     }
 
     #[test]
-    fn broadcast_config_has_long_timeout() {
-        let cfg = ExchangeMode::Broadcast.config();
-        assert_eq!(cfg.timeout, Duration::from_secs(600));
-        assert!(cfg.timeout > Duration::from_secs(300));
-    }
-
-    #[test]
     fn all_in_person_modes_have_relay_fallback() {
         for &mode in ExchangeMode::all() {
             let cfg = mode.config();
@@ -512,7 +464,7 @@ mod tests {
     #[test]
     fn all_covers_every_variant() {
         let modes = ExchangeMode::all();
-        assert_eq!(modes.len(), 11, "update this count when adding variants");
+        assert_eq!(modes.len(), 9, "update this count when adding variants");
         for &mode in modes {
             match mode {
                 ExchangeMode::Glance
@@ -522,8 +474,6 @@ mod tests {
                 | ExchangeMode::Magic
                 | ExchangeMode::TapTap
                 | ExchangeMode::TapHoverShake
-                | ExchangeMode::Broadcast
-                | ExchangeMode::Web
                 | ExchangeMode::Link
                 | ExchangeMode::Cable => {}
             }

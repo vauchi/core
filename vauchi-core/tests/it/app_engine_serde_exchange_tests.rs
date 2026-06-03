@@ -234,16 +234,16 @@ fn exchange_screen_with_identity_has_session() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_mode_selection");
 
-    // Pick Broadcast to advance to the legacy QR sub-flow.
+    // Pick TapHoverShake to advance to the legacy QR sub-flow.
     // Glance + Hover now both hand off to MultiStageExchange
     // (Pair 4 + Phase 1.E of the hover graduation plan) and so
-    // leave the Exchange engine entirely. Broadcast is the next
+    // leave the Exchange engine entirely. TapHoverShake is the next
     // QR-legacy mode in line for graduation — until then it's
     // what this test needs to exercise ADR-031 session wiring
     // on the legacy QR screen.
     let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:group".into(),
-        item_id: "mode:broadcast".into(),
+        component_id: "category:fun".into(),
+        item_id: "mode:tap_hover_shake".into(),
     });
 
     let screen = engine.current_screen();

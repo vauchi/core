@@ -37,11 +37,11 @@ fn back_from_exchange_subflow_rewinds_to_mode_selection() {
         "no in-engine back at the mode-selection root"
     );
 
-    // Pick a QR-family mode (Broadcast → Qr::ShowQr sub-flow entry). This
+    // Pick a QR-family mode (TapHoverShake → Qr::ShowQr sub-flow entry). This
     // records ModeSelection on the engine's step history.
     let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:standard".into(),
-        item_id: "mode:broadcast".into(),
+        component_id: "category:fun".into(),
+        item_id: "mode:tap_hover_shake".into(),
     });
     assert!(
         engine.can_go_back(),

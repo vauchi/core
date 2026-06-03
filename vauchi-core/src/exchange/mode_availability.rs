@@ -86,8 +86,6 @@ pub fn recommend_mode(caps: &DeviceCapabilities) -> ExchangeMode {
         ExchangeMode::TapTap,
         ExchangeMode::Bump,
         ExchangeMode::Glance,
-        ExchangeMode::Broadcast,
-        ExchangeMode::Web,
         ExchangeMode::Link,
     ];
 
@@ -186,11 +184,6 @@ mod tests {
             "Glance needs only camera"
         );
         assert_eq!(
-            check_mode_availability(ExchangeMode::Web, &caps),
-            ModeAvailability::Available,
-            "Web needs camera + internet"
-        );
-        assert_eq!(
             check_mode_availability(ExchangeMode::Link, &caps),
             ModeAvailability::Available,
             "Link needs only internet"
@@ -244,7 +237,7 @@ mod tests {
             has_internet: true,
             ..Default::default()
         };
-        // Glance only needs camera, comes before Web in priority (after BLE modes)
+        // Glance only needs camera, comes before Link in priority (after BLE modes)
         assert_eq!(recommend_mode(&caps), ExchangeMode::Glance);
     }
 

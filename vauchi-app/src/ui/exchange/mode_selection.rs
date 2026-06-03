@@ -16,7 +16,7 @@ use vauchi_core::exchange::mode_availability::{
 
 /// Engine that displays exchange mode selection.
 ///
-/// Shows all 11 modes grouped by `ModeCategory`, highlights the
+/// Shows all 9 modes grouped by `ModeCategory`, highlights the
 /// recommended mode, and grays out unavailable modes with a reason.
 /// When the user picks a mode, returns `ModeSelectionResult::Selected`.
 pub struct ModeSelectionEngine {
@@ -37,7 +37,6 @@ const CATEGORY_ORDER: &[(ModeCategory, &str)] = &[
     (ModeCategory::Quick, "Quick"),
     (ModeCategory::Standard, "Standard"),
     (ModeCategory::Fun, "Fun"),
-    (ModeCategory::Group, "Group"),
     (ModeCategory::Remote, "Remote"),
 ];
 
@@ -135,8 +134,6 @@ impl SerdeName for ExchangeMode {
             ExchangeMode::Magic => "magic",
             ExchangeMode::TapTap => "tap_tap",
             ExchangeMode::TapHoverShake => "tap_hover_shake",
-            ExchangeMode::Broadcast => "broadcast",
-            ExchangeMode::Web => "web",
             ExchangeMode::Link => "link",
             ExchangeMode::Cable => "cable",
             // Safety: all known variants are listed above; new variants added to
@@ -156,8 +153,6 @@ fn parse_mode(name: &str) -> Option<ExchangeMode> {
         "magic" => Some(ExchangeMode::Magic),
         "tap_tap" => Some(ExchangeMode::TapTap),
         "tap_hover_shake" => Some(ExchangeMode::TapHoverShake),
-        "broadcast" => Some(ExchangeMode::Broadcast),
-        "web" => Some(ExchangeMode::Web),
         "link" => Some(ExchangeMode::Link),
         "cable" => Some(ExchangeMode::Cable),
         _ => None,
@@ -195,7 +190,7 @@ mod tests {
     }
 
     #[test]
-    fn screen_shows_all_eleven_modes() {
+    fn screen_shows_all_nine_modes() {
         let engine = ModeSelectionEngine::new(full_caps());
         let screen = engine.screen();
         assert_eq!(screen.screen_id, "exchange_mode_selection");
@@ -209,7 +204,7 @@ mod tests {
                 _ => None,
             })
             .sum();
-        assert_eq!(mode_count, 11, "All 11 modes should be listed");
+        assert_eq!(mode_count, 9, "All 9 modes should be listed");
     }
 
     #[test]
@@ -232,7 +227,6 @@ mod tests {
                 "category:quick",
                 "category:standard",
                 "category:fun",
-                "category:group",
                 "category:remote",
             ]
         );

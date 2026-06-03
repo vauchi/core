@@ -69,6 +69,34 @@ fn sync_indicator_appears_first_in_components() {
     );
 }
 
+// @internal
+#[test]
+fn fixed_layout_screen_has_no_sync_indicator() {
+    // The QR exchange screen is `ScreenLayout::Fixed` and must not
+    // reflow — the sync chrome's state changes would shift the QR the
+    // peer is scanning and break the camera lock. The overlay must skip
+    // fixed-layout screens (`2026-06-03-exchange-qr-scan-stability`).
+    use vauchi_app::ui::{AppScreen, ScreenLayout};
+    use vauchi_core::exchange::mode::ExchangeMode;
+
+    let mut vauchi = Vauchi::in_memory().unwrap();
+    vauchi.create_identity("Alice").unwrap();
+    let mut engine = AppEngine::new(vauchi);
+    engine.navigate_to(AppScreen::MultiStageExchange {
+        mode: ExchangeMode::Glance,
+    });
+    let screen = engine.current_screen();
+    assert_eq!(
+        screen.layout,
+        ScreenLayout::Fixed,
+        "the exchange screen must be Fixed layout"
+    );
+    assert!(
+        find_sync_indicator(&screen.components).is_none(),
+        "a Fixed-layout screen must NOT carry the reflowing sync indicator"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Offline → overlay skipped (apply_offline_overlay Banner handles it)
 // ---------------------------------------------------------------------------

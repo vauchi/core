@@ -40,7 +40,7 @@ use crate::notification_types::{ActivityLogEntry, NotificationPreferences, Pendi
 use super::action::{ActionResult, UserAction};
 use super::component::{Component, TextStyle};
 use super::engine::WorkflowEngine;
-use super::screen::{ActionStyle, ScreenAction, ScreenModel};
+use super::screen::{ActionStyle, ScreenAction, ScreenLayout, ScreenModel};
 
 /// Shared action ID for the update link button/banner.
 const ACTION_OPEN_UPDATE_LINK: &str = "open_update_link";
@@ -1064,6 +1064,13 @@ impl AppEngine {
     /// follow-up MR can render "Synced HH:MM" once locale-aware
     /// formatting is available on `AppEngine`.
     fn apply_sync_chrome_overlay(&self, mut screen: ScreenModel) -> ScreenModel {
+        // Fixed-layout screens (e.g. the QR exchange) must not reflow:
+        // the sync chrome's state changes would shift a live element —
+        // the QR the peer is scanning — and break the camera lock.
+        // Skip the overlay there (`2026-06-03-exchange-qr-scan-stability`).
+        if screen.layout == ScreenLayout::Fixed {
+            return screen;
+        }
         if !self.network_online {
             return screen;
         }

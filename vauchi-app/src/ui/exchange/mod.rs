@@ -18,6 +18,7 @@ pub(crate) mod mode_selection;
 pub(crate) mod nfc;
 pub(crate) mod qr;
 pub(crate) mod scan_quality;
+pub(crate) mod verifying;
 
 use self::ble::{BleActionOutcome, BleExchangeFlow, BleHardwareOutcome, BleStep};
 use self::field_preview::{FieldPreviewConfig, FieldPreviewResult};
@@ -160,6 +161,11 @@ enum ExchangeStep {
     Nfc(NfcStep),
     /// USB cable / direct TCP exchange.
     DirectTransport(DirectStep),
+    /// Flow-agnostic "verification in progress". Set by the session->step
+    /// sync once the protocol passes display/scan; rendered by
+    /// `verifying::build_verifying_screen`. Replaces the legacy
+    /// `Qr(QrStep::Verifying)`.
+    Verifying,
     Success,
     Failed,
 }
@@ -177,6 +183,7 @@ impl ExchangeStep {
             Self::Ble(ble) => ble.step_number(4),
             Self::Nfc(nfc) => nfc.step_number(4),
             Self::DirectTransport(direct) => direct.step_number(4),
+            Self::Verifying => 6,
             Self::Success => 4 + QrStep::STEP_COUNT,
             Self::Failed => 5 + QrStep::STEP_COUNT,
         }
@@ -835,8 +842,11 @@ impl ExchangeEngine {
             ExchangeStep::Qr(QrStep::ManualEntry) => {
                 qr::build_manual_entry_screen(self.progress())
             }
-            ExchangeStep::Qr(QrStep::Verifying) => {
-                qr::build_verifying_screen(self.progress())
+            // Defensive — QrStep::Verifying is unconstructed after the
+            // neutral-Verifying extraction (removed with the QR-flow deletion).
+            ExchangeStep::Qr(QrStep::Verifying) => verifying::build_verifying_screen(self.progress()),
+            ExchangeStep::Verifying => {
+                verifying::build_verifying_screen(self.progress())
             }
             ExchangeStep::Ble(BleStep::Discovering) => {
                 let mode = self.config.mode.unwrap_or(ExchangeMode::Magic);
@@ -1284,7 +1294,7 @@ impl WorkflowEngine for ExchangeEngine {
                     commands.extend(confirmer.start());
                     self.reciprocity_confirmer = Some(confirmer);
                     // Stay on Verifying while waiting for peer confirmation
-                    self.step = ExchangeStep::Qr(QrStep::Verifying);
+                    self.step = ExchangeStep::Verifying;
                 } else if let Some(result) = reciprocity_result {
                     // Confirmer just finished — check result
                     match result {
@@ -1301,7 +1311,7 @@ impl WorkflowEngine for ExchangeEngine {
                     }
                 } else if self.reciprocity_confirmer.is_some() {
                     // Confirmer still running — stay on Verifying
-                    self.step = ExchangeStep::Qr(QrStep::Verifying);
+                    self.step = ExchangeStep::Verifying;
                 } else {
                     // No confirmation tokens available (e.g., no relay configured).
                     // Fall through to Success for backward compat — but log a warning.
@@ -1320,7 +1330,7 @@ impl WorkflowEngine for ExchangeEngine {
             | vauchi_core::exchange::ExchangeState::AwaitingNfcTap
             | vauchi_core::exchange::ExchangeState::AwaitingBleConnection
             | vauchi_core::exchange::ExchangeState::AwaitingBleVerification { .. } => {
-                self.step = ExchangeStep::Qr(QrStep::Verifying);
+                self.step = ExchangeStep::Verifying;
             }
             _ => {}
         }
@@ -1468,13 +1478,13 @@ impl WorkflowEngine for ExchangeEngine {
                         }
                         QrActionOutcome::QrScanned { data } => {
                             self.scanned_data = Some(data);
-                            self.step = ExchangeStep::Qr(QrStep::Verifying);
+                            self.step = ExchangeStep::Verifying;
                             ActionResult::NavigateTo(self.build_screen())
                         }
                         QrActionOutcome::ManualCodeEntered { data } => {
                             // Manual entry is functionally equivalent to scanning
                             self.scanned_data = Some(data);
-                            self.step = ExchangeStep::Qr(QrStep::Verifying);
+                            self.step = ExchangeStep::Verifying;
                             ActionResult::NavigateTo(self.build_screen())
                         }
                     }
@@ -1994,10 +2004,7 @@ mod tests {
         assert!(result.is_some(), "expected Some value");
         // With reciprocity gating: step is Verifying (relay) or Success (no relay).
         assert!(
-            matches!(
-                engine.step,
-                ExchangeStep::Success | ExchangeStep::Qr(QrStep::Verifying)
-            ),
+            matches!(engine.step, ExchangeStep::Success | ExchangeStep::Verifying),
             "After QrScanned, engine should be Success or Verifying, got {:?}",
             engine.step
         );
@@ -2098,10 +2105,7 @@ mod tests {
         // In test sessions without relay, it falls through to Success (backward compat).
         // With relay tokens, it would be Verifying.
         assert!(
-            matches!(
-                engine.step,
-                ExchangeStep::Success | ExchangeStep::Qr(QrStep::Verifying)
-            ),
+            matches!(engine.step, ExchangeStep::Success | ExchangeStep::Verifying),
             "Step should be Success (no relay) or Verifying (with relay), got {:?}",
             engine.step
         );
@@ -3033,7 +3037,7 @@ mod tests {
 
         assert_eq!(
             engine.step,
-            ExchangeStep::Qr(QrStep::Verifying),
+            ExchangeStep::Verifying,
             "Submitting manual code must advance to verifying"
         );
         assert_eq!(

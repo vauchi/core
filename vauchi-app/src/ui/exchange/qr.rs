@@ -17,6 +17,9 @@ pub(super) enum QrStep {
     ScanQr,
     /// Manual code entry — fallback when camera permission is denied.
     ManualEntry,
+    /// Unconstructed after the 2026-06-03 neutral-Verifying extraction
+    /// (now `ExchangeStep::Verifying`); removed with the QR-flow deletion.
+    #[allow(dead_code)]
     Verifying,
 }
 
@@ -152,29 +155,6 @@ pub(super) fn build_manual_entry_screen(progress: Progress) -> ScreenModel {
 }
 
 /// Builds the "Verifying" screen.
-pub(super) fn build_verifying_screen(progress: Progress) -> ScreenModel {
-    ScreenModel {
-        screen_id: "exchange_verifying".into(),
-        title: "Verifying".into(),
-        subtitle: None,
-        components: vec![Component::StatusIndicator {
-            id: "verifying_status".into(),
-            icon: None,
-            title: "Verifying...".into(),
-            detail: None,
-            status: Status::InProgress,
-            a11y: Some(A11y {
-                label: Some("Verifying exchange".into()),
-                hint: Some("Confirming the other person's identity".into()),
-                role: None,
-            }),
-        }],
-        actions: vec![],
-        progress: Some(progress),
-        ..Default::default()
-    }
-}
-
 /// Handle a user action while in a QR sub-flow step.
 ///
 /// Returns `Some(result)` if the action was handled, `None` if

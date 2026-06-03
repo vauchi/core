@@ -79,6 +79,7 @@ mod classify_message_tests;
 mod clock_skew_tests;
 mod clock_skew_validation_tests;
 mod clock_tests;
+mod complete_link_exchange_tests;
 mod concurrency_tests;
 mod consent_api_tests;
 mod consent_status_tests;

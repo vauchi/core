@@ -428,6 +428,13 @@ impl Vauchi {
         &self.clock
     }
 
+    /// The configured relay server URL. The link-mode builders embed it in
+    /// the v2 bootstrap (ADR-050) so the peer knows where to reach our
+    /// update channel, without exposing the whole `VauchiConfig`.
+    pub fn relay_server_url(&self) -> &str {
+        &self.config.relay.server_url
+    }
+
     /// Wall-clock unix seconds of the last successful sync. `None` until
     /// the first sync completes after process start (in-memory only — no
     /// storage migration). Returns `None` in builds without `network-http`.

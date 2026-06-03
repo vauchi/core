@@ -179,4 +179,117 @@ impl Vauchi {
         self.storage.save_contact(&contact)?;
         Ok(contact.id().to_string())
     }
+
+    /// Complete a link-mode exchange from a received card payload (ADR-050
+    /// Phase 2, T5b). For a **v2** symmetric bootstrap this establishes a
+    /// *live, updatable* `Exchanged` contact: it derives the symmetric link
+    /// shared key from `our_x3dh` (the retained per-exchange keypair whose
+    /// public half we deposited) and the peer's signed X3DH key, saves the
+    /// contact with `ExchangeTransport::Link` + the peer's relay routing,
+    /// and initializes the Double Ratchet with a deterministic role. A
+    /// **v1** payload carries no exchange key, so it falls back to
+    /// [`Self::import_received_link_card`] (a frozen import, no channel).
+    ///
+    /// **Ratchet role:** the smaller identity key is the initiator — the
+    /// same rule as in-person exchange
+    /// (`ExchangeSession::build_exchange_ratchet`), so link contacts share
+    /// one role convention. The initiator keys off the peer's X3DH public;
+    /// the responder off our retained keypair (it learns the initiator's DH
+    /// from the first message). Both sides hold both keys, so the role can
+    /// be derived from identity ordering alone — no flow-role plumbing.
+    ///
+    /// Idempotent: re-receiving the same peer (contact id = `hex(identity
+    /// pubkey)`) returns the existing contact and keeps its ratchet rather
+    /// than re-keying an in-flight channel. Enforces the per-identity
+    /// contact limit. Rejects the degenerate self-exchange (our own
+    /// bootstrap). Returns the contact id.
+    pub fn complete_link_exchange(
+        &self,
+        card_bytes: &[u8],
+        our_x3dh: &crate::exchange::X3DHKeyPair,
+    ) -> VauchiResult<String> {
+        use crate::crypto::DoubleRatchetState;
+        use crate::exchange::ExchangeError;
+        use crate::exchange::link_mode::{
+            LinkCardPayload, derive_link_shared_key, parse_card_payload_versioned,
+        };
+
+        let payload = parse_card_payload_versioned(card_bytes)
+            .map_err(|e| VauchiError::Exchange(ExchangeError::InvalidState(e.to_string())))?;
+
+        let (identity_pubkey, x3dh_pubkey, relay_url, card) = match payload {
+            // Legacy v1 has no exchange key — frozen import, no channel.
+            LinkCardPayload::V1 { card, .. } => return self.import_received_link_card(card),
+            LinkCardPayload::V2 {
+                identity_pubkey,
+                x3dh_pubkey,
+                relay_url,
+                card,
+                ..
+            } => (identity_pubkey, x3dh_pubkey, relay_url, card),
+        };
+
+        let our_identity = *self
+            .identity()
+            .ok_or_else(|| {
+                VauchiError::InvalidState("no identity — cannot complete a link exchange".into())
+            })?
+            .signing_public_key();
+
+        // Reject our own bootstrap (degenerate self-exchange) before any write.
+        if identity_pubkey == our_identity {
+            return Err(VauchiError::InvalidState(
+                "cannot complete a link exchange with our own identity".into(),
+            ));
+        }
+
+        let contact_id = hex::encode(identity_pubkey);
+
+        // Idempotent: keep the existing contact and its ratchet — re-keying
+        // would desync an already-established channel.
+        if self.storage.load_contact(&contact_id)?.is_some() {
+            return Ok(contact_id);
+        }
+
+        // Enforce the per-identity contact limit (C3) — mirrors the import path.
+        let count = self.storage.count_contacts()?;
+        let limit = self.storage.get_contact_limit()?;
+        if count >= limit {
+            return Err(VauchiError::InvalidState(format!(
+                "contact limit reached ({limit})"
+            )));
+        }
+
+        // Symmetric link shared key (commutative DH — both sides derive the
+        // same key, ADR-050), authenticated by the peer's identity signature
+        // over the bootstrap (verified during parsing).
+        let shared_key = derive_link_shared_key(our_x3dh, &x3dh_pubkey)
+            .map_err(|e| VauchiError::Exchange(ExchangeError::KeyAgreementFailed(e.to_string())))?;
+
+        let now = self.clock.unix_seconds();
+        let contact = Contact::from_link_exchange(
+            identity_pubkey,
+            card,
+            shared_key.clone(),
+            Some(relay_url),
+            now,
+        );
+        self.add_contact(contact)?;
+
+        // Deterministic Double Ratchet role (decision (b)): smaller identity
+        // key = initiator. The initiator keys off the peer's X3DH public; the
+        // responder off our retained keypair. Persisted with the chosen role
+        // via `save_exchange_ratchet`, which never guesses it.
+        let is_initiator = our_identity < identity_pubkey;
+        let ratchet = if is_initiator {
+            DoubleRatchetState::initialize_initiator(&shared_key, x3dh_pubkey)
+                .map_err(|e| VauchiError::Crypto(e.to_string()))?
+        } else {
+            let our_dh = crate::exchange::X3DHKeyPair::from_bytes(*our_x3dh.secret_bytes());
+            DoubleRatchetState::initialize_responder(&shared_key, our_dh)
+        };
+        self.save_exchange_ratchet(&contact_id, &ratchet, is_initiator)?;
+
+        Ok(contact_id)
+    }
 }

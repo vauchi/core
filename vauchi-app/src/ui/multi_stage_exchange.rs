@@ -821,19 +821,15 @@ impl WorkflowEngine for MultiStageExchangeEngine {
             }
             DONE_ACTION_ID => ActionResult::Complete,
             RETRY_ACTION_ID => {
-                // Reset transient state — AppEngine routes Complete to
-                // a fresh navigation, but a local Retry needs the engine
-                // to forget the failure narrative immediately so the
-                // next state push (typically Idle/Advertising) renders
-                // cleanly. Re-issuing `QrRequestScan` re-arms the
-                // camera pipeline.
-                self.state = ProtocolState::Idle;
-                self.peer_name = None;
-                self.session_ended = false;
-                self.scan_quality_tracker.reset();
-                ActionResult::Commands {
-                    commands: vec![vauchi_core::Command::QrRequestScan],
-                }
+                // Retry returns to the exchange mode-selection picker
+                // (AppScreen::Exchange) so the user can re-choose how to
+                // exchange — not an in-place restart of the failed mode.
+                // `cancelled` is the routing signal `handle_completion`
+                // reads to land on the picker instead of Contacts
+                // (routing.rs:470-486); the failed session ends and a
+                // fresh one spawns on the next mode pick.
+                self.cancelled = true;
+                ActionResult::Complete
             }
             SWITCH_CAMERA_ACTION_ID => {
                 self.use_front_camera = !self.use_front_camera;
@@ -953,6 +949,28 @@ mod tests {
         let mut e = MultiStageExchangeEngine::new_glance();
         e.set_state(state);
         e
+    }
+
+    // @internal
+    #[test]
+    fn retry_routes_to_mode_picker_via_cancelled_complete() {
+        // Retry on the Failed screen returns the user to the exchange
+        // mode-selection picker (not an in-place restart). It returns
+        // `Complete` with `cancelled` set, which `handle_completion`
+        // (routing.rs:470-486) routes to `AppScreen::Exchange` rather
+        // than Contacts.
+        let mut engine = engine_with_state(ProtocolState::Failed("boom".into()));
+        let result = engine.handle_action(UserAction::ActionPressed {
+            action_id: RETRY_ACTION_ID.into(),
+        });
+        assert!(
+            matches!(result, ActionResult::Complete),
+            "Retry must return Complete so the AppEngine routes the navigation, got {result:?}",
+        );
+        assert!(
+            engine.was_cancelled(),
+            "Retry must set cancelled so completion lands on the mode picker, not Contacts",
+        );
     }
 
     fn engine_with_qr(state: ProtocolState, data: &str) -> MultiStageExchangeEngine {
@@ -1809,30 +1827,6 @@ mod tests {
             action_id: DONE_ACTION_ID.into(),
         });
         assert!(matches!(result, ActionResult::Complete));
-    }
-
-    // @internal
-    #[test]
-    fn retry_action_resets_state_and_re_arms_camera() {
-        let mut engine = engine_with_state(ProtocolState::Failed("bad".into()));
-        engine.set_finalized("Stale".into());
-        engine.scan_quality_tracker.record_frame(true);
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: RETRY_ACTION_ID.into(),
-        });
-        match result {
-            ActionResult::Commands { commands } => {
-                assert_eq!(commands.len(), 1);
-                assert!(matches!(&commands[0], vauchi_core::Command::QrRequestScan,));
-            }
-            other => panic!("expected Commands, got {other:?}"),
-        }
-        assert_eq!(engine.state, ProtocolState::Idle);
-        assert!(
-            engine.peer_name.is_none(),
-            "retry must clear stale peer name"
-        );
-        assert!(!engine.session_ended);
     }
 
     // @internal

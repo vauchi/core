@@ -77,13 +77,6 @@ impl ScanQualityTracker {
             ScanQuality::NoSignal
         }
     }
-
-    /// Reset the tracker (e.g., when leaving and re-entering scan mode).
-    pub(crate) fn reset(&mut self) {
-        self.frames = [false; SCAN_QUALITY_WINDOW];
-        self.cursor = 0;
-        self.total = 0;
-    }
 }
 
 // INLINE_TEST_REQUIRED: tests exercise the pub(crate) ScanQualityTracker
@@ -189,19 +182,6 @@ mod tests {
         for _ in 0..10 {
             tracker.record_frame(false);
         }
-        assert_eq!(tracker.quality(), ScanQuality::NoSignal);
-    }
-
-    // @internal
-    #[test]
-    fn reset_clears_state() {
-        let mut tracker = ScanQualityTracker::new();
-        for _ in 0..5 {
-            tracker.record_frame(true);
-        }
-        assert_eq!(tracker.quality(), ScanQuality::Good);
-
-        tracker.reset();
         assert_eq!(tracker.quality(), ScanQuality::NoSignal);
     }
 

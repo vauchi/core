@@ -245,6 +245,10 @@ impl AppEngine {
             MultiStageEvent::Finalized { peer_name } => {
                 let state_applied =
                     self.apply_multi_stage_state(vauchi_core::exchange::ProtocolState::Finalized);
+                // Persist the exchanged contact now (atomic — both sides
+                // confirmed). Was the cycle thread's `on_finalized` job;
+                // the poll path dropped it (Part B of the stall bug).
+                self.persist_exchanged_contact();
                 if !peer_name.is_empty() {
                     let _ = self.apply_multi_stage_finalized(peer_name);
                 }
@@ -300,5 +304,70 @@ impl AppEngine {
             .flatten()
             .unwrap_or_else(|| ContactCard::new(&display_name));
         Some(serialize_exchange_payload(&signing_key, &card))
+    }
+
+    /// Persist the just-finalized peer as an exchanged contact + ratchet.
+    ///
+    /// Restores the terminal-side job the retired cycle thread's
+    /// `on_finalized` listener used to do. The poll path dropped it, so
+    /// the exchange finalized internally but no contact was ever saved
+    /// (2026-06-03-multistage-qr-exchange-stalls-init-on-device, Part B).
+    ///
+    /// Best-effort: a missing payload / malformed card / storage error
+    /// leaves the exchange finalized on-screen but uncreated — never
+    /// panics on the hot finalize path. `get_received_data` only returns
+    /// `Some` in `Finalized` (both sides confirmed), so this is atomic.
+    fn persist_exchanged_contact(&mut self) {
+        // Pull the session-owned bytes off under a short borrow so the
+        // `self.vauchi` persistence calls below don't fight the borrow.
+        let Some((payload, transport_key)) = self.multi_stage_session.as_ref().and_then(|h| {
+            Some((
+                h.machine.received_exchange_payload()?,
+                h.machine.transport_key()?,
+            ))
+        }) else {
+            return;
+        };
+        // `[version: 1][peer_pk: 32][card_json: rest]` — mirrors
+        // `serialize_exchange_payload`.
+        if payload.len() < 33 || payload[0] != EXCHANGE_PAYLOAD_VERSION {
+            return;
+        }
+        let Ok(peer_pk) = <[u8; 32]>::try_from(&payload[1..33]) else {
+            return;
+        };
+        let Ok(card) = serde_json::from_slice::<ContactCard>(&payload[33..]) else {
+            return;
+        };
+        let Some(identity) = self.vauchi.identity() else {
+            return;
+        };
+        let our_identity = *identity.signing_public_key();
+        let now = self.vauchi.clock().unix_seconds();
+        let contact = vauchi_core::Contact::from_exchange(
+            peer_pk,
+            card,
+            vauchi_core::crypto::SymmetricKey::from_bytes(transport_key),
+            now,
+        );
+        let contact_id = contact.id().to_string();
+        if self.vauchi.add_contact(contact).is_err() {
+            return;
+        }
+        // Persist the role-correct Double Ratchet so future card updates
+        // from this contact decrypt. Returns owned data, so the session
+        // borrow ends before the `self.vauchi` save.
+        let ratchet = self
+            .multi_stage_session
+            .as_ref()
+            .and_then(|h| h.machine.build_exchange_ratchet(&our_identity, &peer_pk));
+        if let Some((ratchet, is_initiator)) = ratchet
+            && self
+                .vauchi
+                .save_exchange_ratchet(&contact_id, &ratchet, is_initiator)
+                .is_err()
+        {
+            log::warn!("multi-stage: failed to persist exchange ratchet");
+        }
     }
 }

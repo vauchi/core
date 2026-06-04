@@ -317,7 +317,21 @@ impl MultiStageMachine {
             // or FAIL broadcast window closed. Re-derive the phase
             // from the inner state without emitting a frame.
             None => {
+                let prior = self.phase.clone();
                 self.sync_phase_from_inner_state();
+                // Cycle-end: once the session is Finalized and has
+                // stopped emitting QR (grace window closed), surface
+                // `Completed` so the engine flips to the success screen
+                // (`session_ended`). `phase_from_protocol_state` never
+                // yields `Completed` — the retired cycle thread's
+                // `on_session_ended` set it; the poll path dropped it,
+                // leaving the machine stuck in `Finalized` forever and
+                // the screen on "Almost done"
+                // (2026-06-03-multistage-qr-exchange-stalls-init-on-device).
+                if matches!(self.phase, MultiStagePhase::Finalized { .. }) {
+                    self.phase = MultiStagePhase::Completed;
+                    return phase_transition_event(&prior, &self.phase);
+                }
                 return MultiStageEvent::None;
             }
         };
@@ -444,6 +458,36 @@ impl MultiStageMachine {
     /// Mode marker — read-only.
     pub fn mode(&self) -> MultiStageMode {
         self.mode
+    }
+
+    /// Received exchange payload (`[version][peer_pk:32][card_json]`),
+    /// available only once the inner session is `Finalized` (atomic —
+    /// both sides confirmed). The AppEngine deserializes this to persist
+    /// the exchanged contact — the job the retired cycle thread's
+    /// `on_finalized` listener used to do
+    /// (2026-06-03-multistage-qr-exchange-stalls-init-on-device).
+    pub fn received_exchange_payload(&self) -> Option<Vec<u8>> {
+        self.inner.get_received_data()
+    }
+
+    /// Transport key (shared-secret seed) for the exchanged contact's
+    /// secure channel. `Some` once the transport DH has run.
+    pub fn transport_key(&self) -> Option<[u8; 32]> {
+        self.inner.get_transport_key()
+    }
+
+    /// Build the role-correct Double Ratchet for the finalized exchange.
+    /// `None` if the transport key / ephemerals aren't available (the
+    /// AppEngine then persists the contact without the update channel
+    /// rather than dropping it entirely).
+    pub fn build_exchange_ratchet(
+        &self,
+        our_identity: &[u8; 32],
+        their_identity: &[u8; 32],
+    ) -> Option<(vauchi_core::crypto::DoubleRatchetState, bool)> {
+        self.inner
+            .build_exchange_ratchet(our_identity, their_identity)
+            .ok()
     }
 
     /// Hover-only side effect: fire the ultrasonic FSK

@@ -27,30 +27,27 @@ pub struct GroupInfo {
     pub visible_field_count: usize,
 }
 
-/// Engine that displays and manages contact groups.
+/// Engine that displays contact groups.
+///
+/// Rename / delete are per-group actions reached by tapping a group row →
+/// `GroupDetail` (which owns them unambiguously). The list itself offers
+/// only "New Group": the former list-level Rename/Delete operated on
+/// `groups.first()` regardless of which group the user meant — a
+/// wrong-group bug — and "Merge Groups" was an unimplemented stub. See
+/// `2026-06-05-screen-ux-declutter`.
 pub struct GroupsEngine {
     groups: Vec<GroupInfo>,
     mode: GroupsMode,
-    pending_delete_group_id: Option<String>,
 }
 
 impl GroupsEngine {
     pub fn new(groups: Vec<GroupInfo>, mode: GroupsMode) -> Self {
-        Self {
-            groups,
-            mode,
-            pending_delete_group_id: None,
-        }
+        Self { groups, mode }
     }
 
     /// Returns the current mode.
     pub fn mode(&self) -> &GroupsMode {
         &self.mode
-    }
-
-    /// Returns the group ID pending deletion, if any.
-    pub fn pending_delete_group_id(&self) -> Option<&str> {
-        self.pending_delete_group_id.as_deref()
     }
 
     fn build_screen(&self) -> ScreenModel {
@@ -148,54 +145,21 @@ impl GroupsEngine {
             items,
         });
 
-        if self.pending_delete_group_id.is_some() {
-            components.push(Component::InlineConfirm {
-                id: "delete_group".into(),
-                warning:
-                    "This will permanently delete the selected group. Members will be unassigned."
-                        .into(),
-                confirm_text: "Delete Group".into(),
-                cancel_text: "Cancel".into(),
-                destructive: true,
-                a11y: None,
-            });
-        }
-
         ScreenModel {
             screen_id: "groups_list".into(),
             title: "Groups".into(),
             subtitle: None,
             components,
-            actions: vec![
-                ScreenAction {
-                    id: "new_group".into(),
-                    label: "New Group".into(),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: None,
-                },
-                ScreenAction {
-                    id: "rename_group".into(),
-                    label: "Rename Group".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: !self.groups.is_empty(),
-                    a11y: None,
-                },
-                ScreenAction {
-                    id: "delete_group".into(),
-                    label: "Delete Group".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: !self.groups.is_empty(),
-                    a11y: None,
-                },
-                ScreenAction {
-                    id: "merge_groups".into(),
-                    label: "Merge Groups".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: self.groups.len() >= 2,
-                    a11y: None,
-                },
-            ],
+            // Only "New Group" is a list-level action. Rename/delete a group
+            // by opening it (tap a row → GroupDetail), where the target is
+            // unambiguous.
+            actions: vec![ScreenAction {
+                id: "new_group".into(),
+                label: "New Group".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+                a11y: None,
+            }],
             progress: None,
             ..Default::default()
         }
@@ -237,40 +201,14 @@ impl WorkflowEngine for GroupsEngine {
             } if component_id == "groups" => ActionResult::OpenContact {
                 contact_id: item_id,
             },
-            // Screen-level actions
-            UserAction::ActionPressed { action_id } => match action_id.as_str() {
-                "delete_group" => {
-                    if let Some(group) = self.groups.first() {
-                        self.pending_delete_group_id = Some(group.id.clone());
-                    }
-                    ActionResult::UpdateScreen(self.build_screen())
-                }
-                "confirm_delete_group" => {
-                    // Keep pending_delete_group_id for handle_completion to read
-                    ActionResult::Complete
-                }
-                "cancel_delete_group" => {
-                    self.pending_delete_group_id = None;
-                    ActionResult::UpdateScreen(self.build_screen())
-                }
-                "new_group" => ActionResult::ShowFormDialog {
+            // Screen-level actions. Only "New Group" lives here now; rename
+            // and delete are per-group affordances on `GroupDetail`.
+            UserAction::ActionPressed { action_id } if action_id == "new_group" => {
+                ActionResult::ShowFormDialog {
                     dialog_type: "create_group".into(),
                     context_id: None,
-                },
-                "rename_group" => {
-                    // Use first group if none specifically selected
-                    let group_id = self.groups.first().map(|g| g.id.clone());
-                    ActionResult::ShowFormDialog {
-                        dialog_type: "rename_group".into(),
-                        context_id: group_id,
-                    }
                 }
-                "merge_groups" => ActionResult::ShowAlert {
-                    title: "Coming Soon".into(),
-                    message: "Group merging will be available in a future update.".into(),
-                },
-                _ => ActionResult::UpdateScreen(self.build_screen()),
-            },
+            }
             _ => ActionResult::UpdateScreen(self.build_screen()),
         }
     }
@@ -393,65 +331,20 @@ mod tests {
     }
 
     #[test]
-    fn test_actions_disabled_when_no_groups() {
-        let engine = GroupsEngine::new(vec![], GroupsMode::Members);
-        let screen = engine.current_screen();
-
-        let new_action = screen.actions.iter().find(|a| a.id == "new_group").unwrap();
-        assert!(new_action.enabled);
-
-        let rename = screen
-            .actions
-            .iter()
-            .find(|a| a.id == "rename_group")
-            .unwrap();
-        assert!(!rename.enabled);
-
-        let delete = screen
-            .actions
-            .iter()
-            .find(|a| a.id == "delete_group")
-            .unwrap();
-        assert!(!delete.enabled);
-
-        let merge = screen
-            .actions
-            .iter()
-            .find(|a| a.id == "merge_groups")
-            .unwrap();
-        assert!(!merge.enabled);
-    }
-
-    #[test]
-    fn test_merge_requires_at_least_two_groups() {
-        let one_group = vec![GroupInfo {
-            id: "g1".into(),
-            name: "Family".into(),
-            member_count: 3,
-            visible_field_count: 2,
-        }];
-        let engine = GroupsEngine::new(one_group, GroupsMode::Members);
-        let screen = engine.current_screen();
-
-        let merge = screen
-            .actions
-            .iter()
-            .find(|a| a.id == "merge_groups")
-            .unwrap();
-        assert!(!merge.enabled);
-    }
-
-    #[test]
-    fn test_merge_enabled_with_two_groups() {
-        let engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-        let screen = engine.current_screen();
-
-        let merge = screen
-            .actions
-            .iter()
-            .find(|a| a.id == "merge_groups")
-            .unwrap();
-        assert!(merge.enabled);
+    fn groups_list_offers_only_new_group_action() {
+        // The list is intentionally a single primary action — rename/delete
+        // a group from its detail screen, not here (no ambiguous selection).
+        for groups in [vec![], sample_groups()] {
+            let engine = GroupsEngine::new(groups, GroupsMode::Members);
+            let screen = engine.current_screen();
+            let ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
+            assert_eq!(
+                ids,
+                vec!["new_group"],
+                "Groups list must offer only New Group, got {ids:?}"
+            );
+            assert!(screen.actions[0].enabled, "New Group is always enabled");
+        }
     }
 
     #[test]
@@ -484,68 +377,19 @@ mod tests {
 
     // @internal
     #[test]
-    fn test_rename_group_action_returns_form_dialog() {
+    fn unknown_screen_actions_are_inert() {
+        // Rename/delete/merge are no longer list-level actions; if a stale
+        // frontend still emits one, the engine must not crash or mutate —
+        // it just re-renders the current screen.
         let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "rename_group".into(),
-        });
-        assert!(
-            matches!(result, ActionResult::ShowFormDialog { dialog_type, .. } if dialog_type == "rename_group")
-        );
-    }
-
-    #[test]
-    fn delete_group_shows_inline_confirm() {
-        let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "delete_group".into(),
-        });
-        let screen = match result {
-            ActionResult::UpdateScreen(s) => s,
-            other => panic!("Expected UpdateScreen, got {:?}", other),
-        };
-        let has_inline_confirm = screen
-            .components
-            .iter()
-            .any(|c| matches!(c, Component::InlineConfirm { destructive, .. } if *destructive));
-        assert!(
-            has_inline_confirm,
-            "delete_group should show a destructive InlineConfirm"
-        );
-    }
-
-    #[test]
-    fn confirm_delete_group_returns_complete() {
-        let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "delete_group".into(),
-        });
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "confirm_delete_group".into(),
-        });
-        assert!(
-            matches!(result, ActionResult::Complete),
-            "confirm should return Complete"
-        );
-    }
-
-    #[test]
-    fn cancel_delete_group_removes_inline_confirm() {
-        let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "delete_group".into(),
-        });
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "cancel_delete_group".into(),
-        });
-        let screen = match result {
-            ActionResult::UpdateScreen(s) => s,
-            other => panic!("Expected UpdateScreen, got {:?}", other),
-        };
-        let has_inline_confirm = screen
-            .components
-            .iter()
-            .any(|c| matches!(c, Component::InlineConfirm { .. }));
-        assert!(!has_inline_confirm, "cancel should remove InlineConfirm");
+        for stale in ["rename_group", "delete_group", "merge_groups"] {
+            let result = engine.handle_action(UserAction::ActionPressed {
+                action_id: stale.into(),
+            });
+            assert!(
+                matches!(result, ActionResult::UpdateScreen(_)),
+                "stale action `{stale}` must be inert, got {result:?}"
+            );
+        }
     }
 }

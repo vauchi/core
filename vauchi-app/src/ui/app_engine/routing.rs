@@ -1038,19 +1038,10 @@ impl AppEngine {
                 ActionResult::NavigateTo(screen)
             }
             AppScreen::Groups => {
-                if let Some(group_id) = self
-                    .engine
-                    .as_any()
-                    .and_then(|a| a.downcast_ref::<crate::ui::groups_list::GroupsEngine>())
-                    .and_then(|e| e.pending_delete_group_id().map(|s| s.to_string()))
-                    && let Err(e) = self.vauchi.delete_group(&group_id)
-                {
-                    return ActionResult::ShowAlert {
-                        title: "Delete Group Failed".into(),
-                        message: format!("{e}"),
-                    };
-                }
-                self.engine_cache.remove(&AppScreen::Groups);
+                // Group deletion is confirmed on GroupDetail (the arm above),
+                // where the target group is unambiguous. The Groups list no
+                // longer offers a list-level delete, so it never issues a
+                // Complete here; kept as a defensive navigate-back.
                 let screen = self.navigate_back();
                 ActionResult::NavigateTo(screen)
             }

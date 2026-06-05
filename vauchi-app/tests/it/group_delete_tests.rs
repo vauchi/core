@@ -102,50 +102,10 @@ fn group_detail_cancel_delete_removes_confirm() {
 
 // --- GroupsEngine tests ---
 
-// @internal
-#[test]
-fn groups_engine_delete_tracks_group_id() {
-    let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "delete_group".into(),
-    });
-
-    // Verify pending_delete_group_id is set (first group)
-    assert_eq!(engine.pending_delete_group_id(), Some("g1"));
-}
-
-// @internal
-#[test]
-fn groups_engine_confirm_delete_returns_complete() {
-    let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "delete_group".into(),
-    });
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "confirm_delete_group".into(),
-    });
-
-    assert_eq!(result, ActionResult::Complete);
-    // pending_delete_group_id is preserved for handle_completion to read
-    assert!(engine.pending_delete_group_id().is_some());
-}
-
-// @internal
-#[test]
-fn groups_engine_cancel_delete_clears_group_id() {
-    let mut engine = GroupsEngine::new(sample_groups(), GroupsMode::Members);
-
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "delete_group".into(),
-    });
-    let _ = engine.handle_action(UserAction::ActionPressed {
-        action_id: "cancel_delete_group".into(),
-    });
-
-    assert_eq!(engine.pending_delete_group_id(), None);
-}
+// Group deletion is now a per-group action on GroupDetail (covered above).
+// The former list-level GroupsEngine delete (pending_delete_group_id +
+// confirm/cancel) was removed — it deleted `groups.first()`, the wrong
+// group — in 2026-06-05-screen-ux-declutter.
 
 // @internal
 #[test]

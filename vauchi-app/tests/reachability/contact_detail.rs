@@ -12,13 +12,15 @@ use vauchi_app::ui::{ContactDetailEngine, Field, Item, WorkflowEngine};
 use vauchi_core::contact::trust::TrustLevel;
 
 /// Action ids handled by `ContactDetailEngine` —
-/// `core/vauchi-app/src/ui/contact_detail.rs`. The `preview-as:<id>`
-/// id is dynamic per contact; the factory below seeds id `c-alice` so
-/// the walker observes the matching `preview-as:c-alice`.
+/// `core/vauchi-app/src/ui/contact_detail.rs`.
 ///
 /// `verify_fingerprint` is gated on `verify_button_visible(is_verified,
 /// trust_level)` — the factory sets is_verified=false + Standard trust
 /// so the action IS emitted.
+///
+/// The former `preview-as:<id>` ("What do they see?") footer action was
+/// removed in 2026-06-05-screen-ux-declutter (it duplicated the on-screen
+/// perspective toggle; preview-as stays reachable from My Card).
 ///
 /// `confirm_delete_contact` / `cancel_delete_contact` reach the same
 /// screen_id via the InlineConfirm second-state ScreenModel which the
@@ -26,7 +28,6 @@ use vauchi_core::contact::trust::TrustLevel;
 const HANDLED: &[&str] = &[
     "edit",
     "verify_fingerprint",
-    "preview-as:c-alice",
     "toggle_hidden",
     "delete_contact",
     "back",

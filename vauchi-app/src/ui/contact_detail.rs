@@ -750,13 +750,6 @@ impl ContactDetailEngine {
                     });
                 }
                 actions.push(ScreenAction {
-                    id: format!("preview-as:{}", self.contact.id),
-                    label: "What do they see?".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                });
-                actions.push(ScreenAction {
                     id: "toggle_hidden".into(),
                     label: if self.is_hidden {
                         "Unhide contact".into()
@@ -847,16 +840,6 @@ impl WorkflowEngine for ContactDetailEngine {
             }
             UserAction::ActionPressed { action_id } if action_id == "verify_fingerprint" => {
                 ActionResult::VerifyFingerprint {
-                    contact_id: self.contact.id.clone(),
-                }
-            }
-            UserAction::ActionPressed { action_id }
-                if action_id
-                    .strip_prefix("preview-as:")
-                    .map(|id| id == self.contact.id)
-                    .unwrap_or(false) =>
-            {
-                ActionResult::PreviewAs {
                     contact_id: self.contact.id.clone(),
                 }
             }
@@ -1140,29 +1123,21 @@ mod tests {
     }
 
     #[test]
-    fn test_contact_detail_has_what_they_see_action() {
+    fn test_contact_detail_has_no_preview_action() {
+        // "What do they see?" was removed (2026-06-05-screen-ux-declutter):
+        // it duplicated the on-screen "My Info for Them" perspective toggle.
+        // The full preview-as flow stays reachable from My Card → "Preview
+        // as…". The footer is leaner as a result.
         let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new());
         let screen = engine.current_screen();
 
-        let preview_action = screen.actions.iter().find(|a| a.id == "preview-as:c1");
         assert!(
-            preview_action.is_some(),
-            "Should have 'preview-as:c1' action"
-        );
-        assert_eq!(preview_action.unwrap().label, "What do they see?");
-    }
-
-    #[test]
-    fn test_what_they_see_returns_preview_as_result() {
-        let mut engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new());
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "preview-as:c1".into(),
-        });
-        assert_eq!(
-            result,
-            ActionResult::PreviewAs {
-                contact_id: "c1".into()
-            }
+            !screen
+                .actions
+                .iter()
+                .any(|a| a.id.starts_with("preview-as:")),
+            "contact-detail must not offer a preview-as footer action; \
+             use the perspective toggle or My Card → Preview as…"
         );
     }
 

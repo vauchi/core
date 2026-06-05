@@ -612,6 +612,12 @@ verify:downstream-rust:
     matrix:
       - DOWNSTREAM: [vauchi/cli, vauchi/tui, vauchi/e2e, vauchi/relay, vauchi/linux-gtk]
   rules:
+    # Skip on the scheduled (nightly) pipeline — this fans out to 5 downstream
+    # repos; changes: evaluates true on schedules so it rode along, triggering
+    # pointless downstream verify pipelines. Downstream verify belongs to main
+    # merges (source=push), not the mutation/fuzz nightly.
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
         paths:

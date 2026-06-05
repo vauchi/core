@@ -38,6 +38,11 @@ prebuild:apple:
   # A test-only change on core main used to cost ~4-8 min of Apple prebuild;
   # with this filter those commits skip prebuild entirely.
   rules:
+    # Skip on the scheduled (nightly) pipeline — prebuild is release-prep,
+    # pointless on a mutation/fuzz nightly (changes: evaluates true on
+    # schedules, so it rode along). Main merges still run it.
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
         paths:
@@ -83,6 +88,11 @@ prebuild:android:
   # A test-only change on core main used to cost ~9 min of Android prebuild;
   # with this filter those commits skip prebuild entirely.
   rules:
+    # Skip on the scheduled (nightly) pipeline — prebuild is release-prep,
+    # pointless on a mutation/fuzz nightly (changes: evaluates true on
+    # schedules, so it rode along). Main merges still run it.
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
         paths:

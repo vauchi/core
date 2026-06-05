@@ -152,7 +152,7 @@ impl NfcExchangeEngine {
 
     fn build_screen(&self) -> ScreenModel {
         match &self.screen {
-            NfcScreen::RoleSelection => super::build_nfc_role_screen(self.progress()),
+            NfcScreen::RoleSelection => build_nfc_role_screen(self.progress()),
             NfcScreen::Active => build_nfc_screen(&self.active_step(), self.progress()),
             NfcScreen::Success => self.build_success_screen(),
             NfcScreen::Failed { reason } => self.build_failed_screen(reason.clone()),
@@ -397,6 +397,48 @@ impl WorkflowEngine for NfcExchangeEngine {
     }
 }
 
+/// Core-driven NFC role chooser (Send/Receive), the engine's opening screen.
+/// Per ADR-043/044 the renderer is humble: a generic `ActionList` whose
+/// item/title strings are i18n keys the frontend resolves (ADR-038). The item
+/// ids route in `handle_action` to the initiator / responder entry.
+fn build_nfc_role_screen(progress: Progress) -> ScreenModel {
+    ScreenModel {
+        screen_id: "exchange_nfc_role".into(),
+        title: "exchange.nfc.choose_role".into(),
+        subtitle: Some("exchange.nfc.choose_role_subtitle".into()),
+        components: vec![Component::ActionList {
+            id: "nfc_role".into(),
+            items: vec![
+                ActionListItem {
+                    id: ROLE_SEND.into(),
+                    label: "exchange.mode.nfc_send".into(),
+                    icon: None,
+                    detail: Some("exchange.mode.nfc_send_description".into()),
+                    a11y: None,
+                    info_key: None,
+                },
+                ActionListItem {
+                    id: ROLE_RECEIVE.into(),
+                    label: "exchange.mode.nfc_receive".into(),
+                    icon: None,
+                    detail: Some("exchange.mode.nfc_receive_description".into()),
+                    a11y: None,
+                    info_key: None,
+                },
+            ],
+        }],
+        actions: vec![ScreenAction {
+            id: ACTION_CANCEL.into(),
+            label: "action.cancel".into(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: None,
+        }],
+        progress: Some(progress),
+        ..Default::default()
+    }
+}
+
 // INLINE_TEST_REQUIRED: the engine wraps private flow state; tests drive it via
 // the public WorkflowEngine surface + the screen/action ids.
 #[cfg(test)]
@@ -541,6 +583,30 @@ mod tests {
             .collect();
         assert!(!without_ids.iter().any(|i| i == "fallback_qr"));
         assert!(without_ids.iter().any(|i| i == "retry"));
+    }
+
+    // @internal
+    #[test]
+    fn receive_then_first_tap_lazily_bootstraps_the_responder_flow() {
+        let mut e = engine();
+        let _ = e.handle_action(select(ROLE_RECEIVE));
+        assert!(
+            e.flow.is_none(),
+            "responder flow is not built until the first tap"
+        );
+
+        // The peer's first tap arrives. Even with a payload the handshake will
+        // reject, the bootstrap must build the flow and consume the event
+        // (returning Some), rather than dropping it on the floor (None).
+        let result = e.handle_hardware_event(Event::NfcDataReceived { data: vec![0u8; 8] });
+        assert!(
+            result.is_some(),
+            "the lazy-bootstrapped responder flow must handle the first tap"
+        );
+        assert!(
+            e.flow.is_some(),
+            "the responder flow exists after the first tap"
+        );
     }
 
     // @internal

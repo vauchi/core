@@ -226,31 +226,33 @@ fn navigate_to_settings_without_identity() {
 fn navigate_away_and_back_preserves_engine_state() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
+    // A group makes the picker advance to the in-engine GroupSelection
+    // sub-step, which is what this test rides to prove engine-state caching.
+    // Every transport mode now graduates to its own dedicated screen
+    // (Glance/Hover/THS → MultiStageExchange, Magic/Bump/Shake → BleExchange,
+    // TapTap → NfcExchange, Link → LinkExchange), so the only sub-steps left
+    // *inside* the ExchangeEngine are GroupSelection / FieldPreview.
+    vauchi.create_group("Family").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
     // Navigate to Exchange — starts on mode selection
     let first_visit = engine.navigate_to(AppScreen::Exchange);
     assert_eq!(first_visit.screen_id, "exchange_mode_selection");
 
-    // Pick TapTap (NFC) — an in-engine mode whose role-selection sub-screen
-    // stays inside the ExchangeEngine, so it exercises the cache-preserves-
-    // state behaviour on a single engine. The QR modes that this test used
-    // to ride (Glance/Hover/TapHoverShake) all graduated to the separate
-    // MultiStageExchange screen (P2.D of the TapHoverShake plan) and so
-    // leave the Exchange engine entirely — they can no longer demonstrate
-    // ExchangeEngine sub-step caching.
+    // Pick any mode — with a group present the engine advances to the
+    // in-engine group-selection sub-step (before any sub-flow handoff).
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "category:fun".into(),
         item_id: "mode:tap_tap".into(),
     });
     let sub_screen = engine.current_screen();
     assert_eq!(
-        sub_screen.screen_id, "exchange_nfc_role",
-        "after picking TapTap, should be at the in-engine NFC role-selection step"
+        sub_screen.screen_id, "exchange_group_selection",
+        "after picking a mode with groups, should be at the in-engine group step"
     );
 
     // Navigate away to Home — the Exchange engine should be cached at the
-    // NFC role-selection sub-step.
+    // group-selection sub-step.
     let home = engine.navigate_to(AppScreen::MyInfo);
     assert_eq!(home.screen_id, "my_info");
 
@@ -258,8 +260,8 @@ fn navigate_away_and_back_preserves_engine_state() {
     // sub-step, NOT reset to mode selection.
     let restored = engine.navigate_to(AppScreen::Exchange);
     assert_eq!(
-        restored.screen_id, "exchange_nfc_role",
-        "cached engine should preserve internal state (NFC role step, not mode selection)"
+        restored.screen_id, "exchange_group_selection",
+        "cached engine should preserve internal state (group step, not mode selection)"
     );
 }
 

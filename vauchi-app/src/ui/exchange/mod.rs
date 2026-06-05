@@ -24,7 +24,7 @@ pub(crate) mod verifying;
 
 use self::field_preview::{FieldPreviewConfig, FieldPreviewResult};
 use self::mode_selection::{ModeSelectionEngine, ModeSelectionResult};
-use self::nfc::{NfcExchangeFlow, NfcHardwareOutcome, NfcStep};
+use self::nfc::NfcStep;
 use crate::ui::*;
 use vauchi_core::Command;
 use vauchi_core::clock::Clock;
@@ -87,18 +87,6 @@ pub struct ExchangeEngine {
     mode_selection: Option<ModeSelectionEngine>,
     /// Field preview config (built when entering FieldPreview step).
     field_preview: Option<FieldPreviewConfig>,
-    /// NFC exchange flow state machine (3-phase encrypted handshake).
-    /// Constructed at TapTap dispatch via [`Self::start_taptap_mode`];
-    /// `NfcExchangeFlow` consumes the cached [`Self::nfc_identity`].
-    nfc_flow: Option<NfcExchangeFlow>,
-    /// Owned `Identity` clone reserved for `NfcExchangeFlow`
-    /// construction. Populated by the engine constructor when the
-    /// caller (AppEngine in `screens.rs`) clones identity via the
-    /// storage-bytes roundtrip; consumed by `start_taptap_mode`. None
-    /// for non-NFC flows or when no identity is available — TapTap
-    /// dispatch then routes to the Failed step with an explanatory
-    /// `failure_detail`.
-    nfc_identity: Option<vauchi_core::identity::Identity>,
     /// Reciprocity confirmation cascade driver (created on exchange completion).
     reciprocity_confirmer: Option<ReciprocityConfirmer>,
     /// Wall-clock source for time-stamped sub-engines
@@ -143,13 +131,6 @@ enum ExchangeStep {
     GroupSelection,
     /// Read-only preview of what will be shared (after group selection).
     FieldPreview,
-    /// Choose the NFC role (Send/Receive) after picking TapTap. Core-driven
-    /// (ADR-043/044): emits an i18n-keyed `ScreenModel` the frontend renders;
-    /// Send -> `start_taptap_mode`, Receive -> `start_nfc_receive_mode`.
-    NfcRoleSelection,
-    /// NFC exchange sub-flow (3-phase encrypted handshake over an
-    /// NFC tap). See `self::nfc` + 2026-05-19-nfc-exchange-engine-design.md.
-    Nfc(NfcStep),
     /// USB cable / direct TCP exchange.
     DirectTransport(DirectStep),
     /// Flow-agnostic "verification in progress". Set by the session->step
@@ -167,10 +148,7 @@ impl ExchangeStep {
             Self::ModeSelection => 1,
             Self::GroupSelection => 2,
             Self::FieldPreview => 3,
-            // The NFC role choice is part of the mode-selection phase.
-            Self::NfcRoleSelection => 1,
             // Sub-flow steps start at 4 (after mode + group + preview)
-            Self::Nfc(nfc) => nfc.step_number(4),
             Self::DirectTransport(direct) => direct.step_number(4),
             Self::Verifying => 6,
             Self::Success => 4 + NfcStep::STEP_COUNT,
@@ -203,17 +181,6 @@ impl ExchangeEngine {
         }
     }
 
-    /// Populate the identity clone reserved for TapTap (NFC) dispatch.
-    ///
-    /// Called by `AppEngine` at engine construction (see
-    /// `app_engine/screens.rs`) when an active identity is available.
-    /// `start_taptap_mode` consumes it. Identity doesn't impl `Clone`
-    /// for key-zeroize reasons; callers produce the clone via
-    /// `Identity::to_storage_bytes()` + `Identity::from_storage_bytes()`.
-    pub fn set_nfc_identity(&mut self, identity: vauchi_core::identity::Identity) {
-        self.nfc_identity = Some(identity);
-    }
-
     pub fn new(config: ExchangeConfig, clock: Arc<dyn Clock>) -> Self {
         let step = Self::initial_step(&config);
         let mode_selection = if step == ExchangeStep::ModeSelection {
@@ -233,8 +200,6 @@ impl ExchangeEngine {
             qr_fallback_available: false,
             mode_selection,
             field_preview: None,
-            nfc_flow: None,
-            nfc_identity: None,
             reciprocity_confirmer: None,
             clock,
             success_summary: None,
@@ -284,8 +249,6 @@ impl ExchangeEngine {
             qr_fallback_available: false,
             mode_selection,
             field_preview: None,
-            nfc_flow: None,
-            nfc_identity: None,
             reciprocity_confirmer: None,
             clock,
             success_summary: None,
@@ -380,73 +343,6 @@ impl ExchangeEngine {
         ActionResult::StartLinkExchange
     }
 
-    /// Start TapTap exchange mode (NFC).
-    ///
-    /// TapTap is the domain/user-facing name for the pure-NFC exchange —
-    /// `DataTransport::Nfc` per `MODE_TAP_TAP`. Creates an
-    /// `NfcExchangeFlow` (initiator side) and activates it, emitting the
-    /// initial `Command::NfcActivate { payload: key_offer }`. The
-    /// responder side is driven by the peer's HCE service through the
-    /// same `NfcExchangeFlow` shape — Phase 3b binding work (`android!410`)
-    /// added the binder-block pattern that lets HCE consume
-    /// `Event::NfcDataReceived` + return `Command::NfcSendApdu`
-    /// synchronously.
-    ///
-    /// Identity is consumed from `self.nfc_identity` — populated at
-    /// engine construction via [`Self::with_session_and_nfc_identity`]
-    /// or [`Self::set_nfc_identity`]. The `NfcHandshakeSession`
-    /// Phase-1 key offer needs the full `Identity` to sign the
-    /// payload (see `NfcHandshakeSession::create_key_offer` in
-    /// `vauchi_core::exchange::nfc_handshake`).
-    fn start_taptap_mode(&mut self) -> ActionResult {
-        let identity = match self.nfc_identity.take() {
-            Some(id) => id,
-            None => {
-                self.failure_detail = Some("no active identity for NFC exchange".to_string());
-                self.step = ExchangeStep::Failed;
-                return ActionResult::UpdateScreen(self.build_screen());
-            }
-        };
-        let display_name = self.config.own_name.clone();
-        let mut flow = NfcExchangeFlow::new_initiator(identity, display_name);
-        let commands = match flow.activate() {
-            Ok(cmds) => cmds,
-            Err(e) => {
-                self.failure_detail = Some(format!("NFC activation failed: {e:?}"));
-                self.step = ExchangeStep::Failed;
-                return ActionResult::UpdateScreen(self.build_screen());
-            }
-        };
-        self.nfc_flow = Some(flow);
-        self.step = ExchangeStep::Nfc(NfcStep::AwaitingTap);
-        ActionResult::Commands { commands }
-    }
-
-    /// Explicit responder ("Receive") entry for TapTap.
-    ///
-    /// Unlike [`Self::start_taptap_mode`] (the "Send"/initiator path), this
-    /// does **not** create an `NfcExchangeFlow`: it leaves `nfc_flow = None`
-    /// and the cached `nfc_identity` in place so the lazy HCE bootstrap in
-    /// [`WorkflowEngine::handle_hardware_event`] spins up the responder on
-    /// the peer's first tap. It emits an **empty** `Command::NfcActivate`
-    /// up-front so the frontend registers its HCE `TransceiveContext` before
-    /// that tap arrives — the initiator path's non-empty key-offer payload
-    /// is the discriminator (empty payload = responder, register HCE;
-    /// non-empty = initiator, enable reader-mode).
-    fn start_nfc_receive_mode(&mut self) -> ActionResult {
-        if self.nfc_identity.is_none() {
-            self.failure_detail = Some("no active identity for NFC exchange".to_string());
-            self.step = ExchangeStep::Failed;
-            return ActionResult::UpdateScreen(self.build_screen());
-        }
-        self.step = ExchangeStep::Nfc(NfcStep::AwaitingTap);
-        ActionResult::Commands {
-            commands: vec![vauchi_core::Command::NfcActivate {
-                payload: Vec::new(),
-            }],
-        }
-    }
-
     /// Route to the mode-specific sub-flow once the optional group /
     /// field-preview steps are done. Single source of truth for
     /// `ExchangeMode` → `ExchangeStep`, so the three entry points
@@ -470,14 +366,15 @@ impl ExchangeEngine {
                 ActionResult::StartBleExchange { mode }
             }
             Some(ExchangeMode::TapTap) => {
-                // Core-driven role choice (Send/Receive) before the NFC
-                // flow — a two-device exchange needs one initiator + one
-                // responder, so both devices opening the screen must NOT
-                // both Send. (NFC graduation slice 2 flips this to
-                // `ActionResult::StartNfcExchange` → the dedicated
-                // `NfcExchangeEngine`; the engine + plumbing land first.)
-                self.step = ExchangeStep::NfcRoleSelection;
-                ActionResult::NavigateTo(self.build_screen())
+                // The NFC flow (Send/Receive role choice + 3-phase tap
+                // handshake) runs in its own `AppScreen::NfcExchange` engine
+                // (`NfcExchangeEngine`); this cached `ExchangeEngine` is kept
+                // for Cancel. Re-arm the picker so it is not a zombie (Fix A of
+                // 2026-06-02-exchange-back-cancel-broken).
+                self.mode_selection = Some(ModeSelectionEngine::new(
+                    self.config.device_capabilities.clone(),
+                ));
+                ActionResult::StartNfcExchange
             }
             // Pair 4 — `Glance` is the canonical face-to-face mode
             // (bilateral simultaneous QR with no proximity signal); route
@@ -526,71 +423,6 @@ impl ExchangeEngine {
                 self.step = ExchangeStep::ModeSelection;
                 ActionResult::NavigateTo(self.build_screen())
             }
-        }
-    }
-
-    /// Handle NFC mode hardware events via NfcExchangeFlow.
-    /// Mirrors `handle_ble_hardware_event`; the sub-flow owns the
-    /// 3-phase state machine and either advances or fails.
-    fn handle_nfc_hardware_event(&mut self, event: vauchi_core::Event) -> Option<ActionResult> {
-        let flow = self.nfc_flow.as_mut()?;
-        let outcome = flow.handle_event(&event);
-        self.step = ExchangeStep::Nfc(flow.step().clone());
-        Some(self.apply_nfc_outcome(outcome))
-    }
-
-    /// Apply an `NfcHardwareOutcome` — translate to `ActionResult`.
-    /// Mirrors `apply_ble_outcome`; the `RelayHandoff` payload on a
-    /// failed outcome is intentionally not consumed yet (TODO in the
-    /// next Phase 1 commit, paired with `Command::RelayEscrowDeposit`).
-    fn apply_nfc_outcome(&mut self, outcome: NfcHardwareOutcome) -> ActionResult {
-        match outcome {
-            NfcHardwareOutcome::StepAdvanced { commands }
-            | NfcHardwareOutcome::Consumed { commands } => {
-                if commands.is_empty() {
-                    ActionResult::UpdateScreen(self.build_screen())
-                } else {
-                    ActionResult::Commands { commands }
-                }
-            }
-            NfcHardwareOutcome::Complete {
-                card_bytes: _,
-                commands,
-            } => {
-                // TODO: save card_bytes (Phase 1 follow-up — same TODO
-                // as apply_ble_outcome).
-                self.step = ExchangeStep::Success;
-                if commands.is_empty() {
-                    ActionResult::UpdateScreen(self.build_screen())
-                } else {
-                    ActionResult::Commands { commands }
-                }
-            }
-            NfcHardwareOutcome::FailedWithFallback {
-                reason,
-                relay_handoff,
-            } => {
-                self.failure_detail = Some(reason);
-                self.qr_fallback_available = self.config.device_capabilities.has_camera;
-                self.step = ExchangeStep::Failed;
-                // Mirror Link-mode TTL (link_mode.rs:26
-                // DEFAULT_TTL_SECONDS = 604_800 = 7 days). Wired inline
-                // since the const is private to link_mode.
-                const NFC_RELAY_TTL_SECONDS: u32 = 604_800;
-                if let Some(handoff) = relay_handoff {
-                    ActionResult::Commands {
-                        commands: vec![vauchi_core::Command::RelayEscrowDeposit {
-                            gate_hash: handoff.gate_hash,
-                            slot_hash: handoff.slot_hash,
-                            encrypted_card: handoff.encrypted_card,
-                            ttl_seconds: NFC_RELAY_TTL_SECONDS,
-                        }],
-                    }
-                } else {
-                    ActionResult::UpdateScreen(self.build_screen())
-                }
-            }
-            NfcHardwareOutcome::Ignored => ActionResult::UpdateScreen(self.build_screen()),
         }
     }
 
@@ -647,10 +479,6 @@ impl ExchangeEngine {
             }
             ExchangeStep::Verifying => {
                 verifying::build_verifying_screen(self.progress())
-            }
-            ExchangeStep::NfcRoleSelection => build_nfc_role_screen(self.progress()),
-            ExchangeStep::Nfc(ref nfc_step) => {
-                nfc::build_nfc_screen(nfc_step, self.progress())
             }
             ExchangeStep::DirectTransport(DirectStep::WaitingForConnection) => ScreenModel {
                 screen_id: "exchange_direct_waiting".into(),
@@ -863,50 +691,6 @@ fn build_group_selection_screen(
     }
 }
 
-/// Core-driven NFC role choice (Send/Receive), shown after TapTap is
-/// picked. Per ADR-043/044 the renderer is humble: this emits a generic
-/// `ActionList` whose item/title strings are **i18n keys** the frontend
-/// resolves (ADR-038) — the first i18n-keyed core exchange screen. The
-/// item ids (`nfc_role:send` / `nfc_role:receive`) route in `handle_action`
-/// to `start_taptap_mode` / `start_nfc_receive_mode`.
-fn build_nfc_role_screen(progress: Progress) -> ScreenModel {
-    ScreenModel {
-        screen_id: "exchange_nfc_role".into(),
-        title: "exchange.nfc.choose_role".into(),
-        subtitle: Some("exchange.nfc.choose_role_subtitle".into()),
-        components: vec![Component::ActionList {
-            id: "nfc_role".into(),
-            items: vec![
-                ActionListItem {
-                    id: "nfc_role:send".into(),
-                    label: "exchange.mode.nfc_send".into(),
-                    icon: None,
-                    detail: Some("exchange.mode.nfc_send_description".into()),
-                    a11y: None,
-                    info_key: None,
-                },
-                ActionListItem {
-                    id: "nfc_role:receive".into(),
-                    label: "exchange.mode.nfc_receive".into(),
-                    icon: None,
-                    detail: Some("exchange.mode.nfc_receive_description".into()),
-                    a11y: None,
-                    info_key: None,
-                },
-            ],
-        }],
-        actions: vec![ScreenAction {
-            id: "cancel".into(),
-            label: "action.cancel".into(),
-            style: ActionStyle::Secondary,
-            enabled: true,
-            a11y: None,
-        }],
-        progress: Some(progress),
-        ..Default::default()
-    }
-}
-
 impl WorkflowEngine for ExchangeEngine {
     fn can_navigate_back_within(&self) -> bool {
         self.can_back_within()
@@ -921,32 +705,6 @@ impl WorkflowEngine for ExchangeEngine {
     }
 
     fn handle_hardware_event(&mut self, event: vauchi_core::Event) -> Option<ActionResult> {
-        // Lazy HCE-responder bootstrap (responder entry —
-        // `problems/2026-05-29-nfc-exchange-mode-entry-wiring`): the HCE
-        // responder has no `NfcExchangeFlow` until the peer's first tap
-        // lands as an `NfcDataReceived`. Spin up an engine-driven responder
-        // flow (replacing the legacy `MobileExchangeSession`) so the
-        // step-gated routing below dispatches it. The initiator path
-        // (`start_taptap_mode`) creates its flow up-front instead.
-        if self.nfc_flow.is_none()
-            && matches!(event, vauchi_core::Event::NfcDataReceived { .. })
-            && let Some(identity) = self.nfc_identity.take()
-        {
-            let mut flow = NfcExchangeFlow::new_responder(identity, self.config.own_name.clone());
-            // Idle -> AwaitingTap. activate() emits an empty NfcActivate
-            // (responder already listens via HCE); discard it — the tap
-            // already happened and the offer is processed by the routing below.
-            if flow.activate().is_ok() {
-                self.nfc_flow = Some(flow);
-                self.step = ExchangeStep::Nfc(NfcStep::AwaitingTap);
-            }
-        }
-
-        // NFC mode events — routed through NfcExchangeFlow
-        if matches!(self.step, ExchangeStep::Nfc(_)) {
-            return self.handle_nfc_hardware_event(event);
-        }
-
         // No session — handle QR scan via legacy TextChanged path
         let session = match self.session.as_mut() {
             Some(s) => s,
@@ -1157,22 +915,6 @@ impl WorkflowEngine for ExchangeEngine {
         }
 
         match (&self.step, action) {
-            // NFC role choice (Send/Receive) — core-driven sub-screen after
-            // TapTap. Send -> initiator (`start_taptap_mode`); Receive ->
-            // responder prep (`start_nfc_receive_mode`).
-            (ExchangeStep::NfcRoleSelection, UserAction::ListItemSelected { item_id, .. }) => {
-                match item_id.as_str() {
-                    "nfc_role:send" => self.start_taptap_mode(),
-                    "nfc_role:receive" => self.start_nfc_receive_mode(),
-                    _ => ActionResult::UpdateScreen(self.build_screen()),
-                }
-            }
-            // NFC role choice: cancel exits the exchange.
-            (ExchangeStep::NfcRoleSelection, UserAction::ActionPressed { action_id })
-                if action_id == "cancel" =>
-            {
-                ActionResult::Complete
-            }
             // Group selection: toggle group membership
             (
                 ExchangeStep::GroupSelection,
@@ -1760,42 +1502,6 @@ mod tests {
         );
     }
 
-    // Regression: the Failed-state Retry handler restored the sub-flow by
-    // mode but only special-cased Link/BLE, so a failed TapTap (NFC) retry
-    // fell through to the legacy QR step (and Glance/Hover lost multi-stage)
-    // — the same divergence core!1041 fixed for the forward paths, but the
-    // Retry handler was a missed 4th site. Retry must route through the
-    // shared `enter_mode_sub_flow` router. Surfaced on-device: "Retry" after
-    // a TapTap NFC failure dumped the user onto the QR screen.
-    // @internal
-    #[test]
-    fn taptap_retry_routes_to_nfc_role_selection() {
-        let mut engine = ExchangeEngine::new(
-            config_mode_selection(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        engine.set_nfc_identity(vauchi_core::identity::Identity::create(
-            "Alice",
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        ));
-        engine.config.mode = Some(ExchangeMode::TapTap);
-        engine.mark_failed();
-
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "retry".into(),
-        });
-
-        assert_eq!(
-            engine.step,
-            ExchangeStep::NfcRoleSelection,
-            "TapTap retry must return to the NFC role chooser, not QR"
-        );
-        assert!(
-            matches!(result, ActionResult::NavigateTo(_)),
-            "expected NavigateTo(role screen), got {result:?}"
-        );
-    }
-
     // Regression: `Cable` (USB direct transport) was dropped into the legacy
     // QR catch-all by the picker entry, rendering frozen on android
     // (`2026-06-03-android-animated-qr-stuck-frame-zero`). Must route Direct.
@@ -2296,77 +2002,6 @@ mod tests {
 
     // ── Scan quality tracking ──────────────────────────────────────
 
-    // @internal
-    #[test]
-    fn taptap_mode_selection_starts_nfc_flow_with_identity() {
-        let mut engine = ExchangeEngine::new(
-            config_mode_selection(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        assert_eq!(engine.step, ExchangeStep::ModeSelection);
-
-        // Populate the cached identity (AppEngine does this at
-        // engine construction in app_engine/screens.rs).
-        let identity = vauchi_core::identity::Identity::create(
-            "Alice",
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        );
-        engine.set_nfc_identity(identity);
-
-        // Picker emits ListItemSelected { component_id: "mode", item_id: "tap_tap" }
-        // for the TapTap option (per `self::mode_selection`).
-        let result = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "category:fun".into(),
-            item_id: "mode:tap_tap".into(),
-        });
-
-        // TapTap now shows the core-driven role choice (Send/Receive), not
-        // the NFC flow directly. The list items carry the role ids.
-        assert_eq!(engine.step, ExchangeStep::NfcRoleSelection);
-        let role_screen = match result {
-            ActionResult::NavigateTo(screen) => screen,
-            other => panic!("expected NavigateTo(role screen), got {other:?}"),
-        };
-        let item_ids: Vec<&str> = role_screen
-            .components
-            .iter()
-            .flat_map(|c| match c {
-                Component::ActionList { items, .. } => {
-                    items.iter().map(|i| i.id.as_str()).collect::<Vec<_>>()
-                }
-                _ => vec![],
-            })
-            .collect();
-        assert_eq!(item_ids, vec!["nfc_role:send", "nfc_role:receive"]);
-
-        // Selecting "Send" starts the initiator flow.
-        let result = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "nfc_role".into(),
-            item_id: "nfc_role:send".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::Nfc(NfcStep::AwaitingTap));
-        match result {
-            ActionResult::Commands { commands } => {
-                assert_eq!(commands.len(), 1, "exactly one initial command");
-                match &commands[0] {
-                    vauchi_core::Command::NfcActivate { payload } => {
-                        assert!(
-                            !payload.is_empty(),
-                            "initiator activate must carry a non-empty key offer payload"
-                        );
-                    }
-                    other => panic!("expected Command::NfcActivate, got {other:?}"),
-                }
-            }
-            other => panic!("expected ActionResult::Commands, got {other:?}"),
-        }
-        assert!(
-            engine.nfc_identity.is_none(),
-            "set_nfc_identity must be consumed by start_taptap_mode"
-        );
-        assert!(engine.nfc_flow.is_some(), "nfc_flow must be populated");
-    }
-
     // ── Grouped-card mode routing regression ───────────────────────
     //
     // `2026-06-02-grouped-mode-routing-nfc`: when the card has groups,
@@ -2379,79 +2014,6 @@ mod tests {
     // NFC role-selection screen (and Glance/Hover lost the multi-stage
     // handoff). Surfaced on-device: iOS "Tap tap" → Assign-to-Groups →
     // Skip → QR instead of the Send/Receive role chooser.
-
-    // @internal
-    #[test]
-    fn taptap_with_groups_skip_routes_to_nfc_role_selection() {
-        let mut config = config_mode_selection();
-        config.available_groups = vec![("g1".into(), "Work".into())];
-        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
-        engine.set_nfc_identity(vauchi_core::identity::Identity::create(
-            "Alice",
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        ));
-
-        // Pick TapTap — with groups present, lands on GroupSelection first.
-        let _ = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "category:fun".into(),
-            item_id: "mode:tap_tap".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::GroupSelection);
-
-        // Skip groups → must enter the TapTap sub-flow (NFC role choice),
-        // never the legacy QR step.
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "skip".into(),
-        });
-        assert_eq!(
-            engine.step,
-            ExchangeStep::NfcRoleSelection,
-            "grouped TapTap + skip must reach NfcRoleSelection, not QR"
-        );
-        assert!(
-            matches!(result, ActionResult::NavigateTo(_)),
-            "expected NavigateTo(role screen), got {result:?}"
-        );
-        // Negative (CC-11): must not collapse to the QR sub-flow.
-    }
-
-    // @internal
-    #[test]
-    fn taptap_with_groups_continue_routes_to_nfc_role_selection() {
-        let mut config = config_mode_selection();
-        config.available_groups = vec![("g1".into(), "Work".into())];
-        let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
-        engine.set_nfc_identity(vauchi_core::identity::Identity::create(
-            "Alice",
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        ));
-
-        let _ = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "category:fun".into(),
-            item_id: "mode:tap_tap".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::GroupSelection);
-
-        // Continue (keep groups) → field preview.
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::FieldPreview);
-
-        // Start the exchange from field preview → TapTap NFC role choice.
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "start_exchange".into(),
-        });
-        assert_eq!(
-            engine.step,
-            ExchangeStep::NfcRoleSelection,
-            "grouped TapTap + continue + start must reach NfcRoleSelection, not QR"
-        );
-        assert!(
-            matches!(result, ActionResult::NavigateTo(_)),
-            "expected NavigateTo(role screen), got {result:?}"
-        );
-    }
 
     // @internal
     #[test]
@@ -2480,200 +2042,5 @@ mod tests {
             ),
             "grouped Glance + skip must hand off to MultiStageExchange, got {result:?}"
         );
-    }
-
-    // @internal
-    #[test]
-    fn taptap_mode_without_identity_routes_to_failed() {
-        let mut engine = ExchangeEngine::new(
-            config_mode_selection(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        // No set_nfc_identity — the role choice itself doesn't fail; the
-        // Send selection (start_taptap_mode) fail-fasts rather than panicking.
-        let _ = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "category:fun".into(),
-            item_id: "mode:tap_tap".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::NfcRoleSelection);
-        let result = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "nfc_role".into(),
-            item_id: "nfc_role:send".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::Failed);
-        match result {
-            ActionResult::UpdateScreen(_) => {
-                let detail = engine.failure_detail.as_deref().unwrap_or("");
-                assert!(
-                    detail.contains("identity"),
-                    "failure detail must mention identity, got: {detail}"
-                );
-            }
-            other => panic!("expected UpdateScreen, got {other:?}"),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn nfc_receive_mode_prepares_responder_without_flow() {
-        let mut engine = ExchangeEngine::new(
-            config_mode_selection(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let identity = vauchi_core::identity::Identity::create(
-            "Bob",
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        );
-        engine.set_nfc_identity(identity);
-
-        // Navigate TapTap -> role choice, then pick "Receive". Responder
-        // prep must NOT create a flow.
-        let _ = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "category:fun".into(),
-            item_id: "mode:tap_tap".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::NfcRoleSelection);
-        let result = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "nfc_role".into(),
-            item_id: "nfc_role:receive".into(),
-        });
-
-        assert_eq!(engine.step, ExchangeStep::Nfc(NfcStep::AwaitingTap));
-        assert!(
-            engine.nfc_flow.is_none(),
-            "receive mode must not pre-create an initiator flow"
-        );
-        assert!(
-            engine.nfc_identity.is_some(),
-            "identity stays cached for the lazy HCE bootstrap to consume"
-        );
-        match result {
-            ActionResult::Commands { commands } => {
-                assert_eq!(commands.len(), 1, "exactly one registration command");
-                match &commands[0] {
-                    vauchi_core::Command::NfcActivate { payload } => {
-                        assert!(
-                            payload.is_empty(),
-                            "responder activate signal must carry an empty payload \
-                             (the discriminator the frontend reads to register HCE)"
-                        );
-                    }
-                    other => panic!("expected Command::NfcActivate, got {other:?}"),
-                }
-            }
-            other => panic!("expected ActionResult::Commands, got {other:?}"),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn nfc_receive_mode_without_identity_routes_to_failed() {
-        let mut engine = ExchangeEngine::new(
-            config_mode_selection(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        // No set_nfc_identity — navigate to the role choice, then "Receive"
-        // fail-fasts on the missing identity.
-        let _ = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "category:fun".into(),
-            item_id: "mode:tap_tap".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::NfcRoleSelection);
-        let result = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "nfc_role".into(),
-            item_id: "nfc_role:receive".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::Failed);
-        match result {
-            ActionResult::UpdateScreen(_) => {
-                let detail = engine.failure_detail.as_deref().unwrap_or("");
-                assert!(
-                    detail.contains("identity"),
-                    "failure detail must mention identity, got: {detail}"
-                );
-            }
-            other => panic!("expected UpdateScreen, got {other:?}"),
-        }
-    }
-
-    // @internal
-    #[test]
-    fn nfc_role_choice_cancel_completes_exchange() {
-        let mut engine = ExchangeEngine::new(
-            config_mode_selection(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        engine.set_nfc_identity(vauchi_core::identity::Identity::create(
-            "Alice",
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        ));
-        let _ = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "category:fun".into(),
-            item_id: "mode:tap_tap".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::NfcRoleSelection);
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "cancel".into(),
-        });
-        assert!(
-            matches!(result, ActionResult::Complete),
-            "cancel from the role choice exits the exchange"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn nfc_responder_bootstraps_on_first_tap_and_emits_ack() {
-        // The HCE responder has no flow until tapped. Feeding the peer's
-        // key offer (the first NfcDataReceived) must lazily spin up an
-        // engine-owned responder NfcExchangeFlow, advance it to AckSent,
-        // and emit (key_ack || encrypted_card) as a single NfcSendApdu —
-        // exactly what the Android VauchiHceService binder-block returns.
-        let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
-
-        // Real key offer from a separate initiator flow (real crypto, ADR-002).
-        let mut initiator = NfcExchangeFlow::new_initiator(
-            vauchi_core::identity::Identity::create("Alice", now),
-            "Alice".into(),
-        );
-        let offer = match &initiator.activate().expect("initiator activate")[0] {
-            vauchi_core::Command::NfcActivate { payload } => payload.clone(),
-            other => panic!("expected NfcActivate, got {other:?}"),
-        };
-        assert!(!offer.is_empty(), "initiator key offer must be non-empty");
-
-        // Responder engine: NFC identity set, no flow yet.
-        let mut engine = ExchangeEngine::new(
-            config_mode_selection(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        engine.set_nfc_identity(vauchi_core::identity::Identity::create("Bob", now));
-        assert!(engine.nfc_flow.is_none(), "no flow before first tap");
-
-        let result =
-            engine.handle_hardware_event(vauchi_core::Event::NfcDataReceived { data: offer });
-
-        // First tap bootstrapped + advanced the responder; identity consumed.
-        assert!(
-            engine.nfc_flow.is_some(),
-            "first tap must bootstrap the responder flow"
-        );
-        assert_eq!(engine.step, ExchangeStep::Nfc(NfcStep::AckSent));
-        assert!(
-            engine.nfc_identity.is_none(),
-            "bootstrap must consume nfc_identity"
-        );
-        match result {
-            Some(ActionResult::Commands { commands }) => match commands.as_slice() {
-                [vauchi_core::Command::NfcSendApdu { data }] => {
-                    assert!(
-                        !data.is_empty(),
-                        "responder must send key_ack || encrypted_card"
-                    );
-                }
-                other => panic!("expected single NfcSendApdu, got {other:?}"),
-            },
-            other => panic!("expected ActionResult::Commands, got {other:?}"),
-        }
     }
 }

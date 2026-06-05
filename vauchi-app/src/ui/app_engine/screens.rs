@@ -323,17 +323,16 @@ impl AppEngine {
                         })
                     });
 
-                let nfc_identity = vauchi
-                    .identity()
-                    .and_then(reconstruct_identity_via_storage_bytes);
+                // NFC graduation: TapTap now routes to the dedicated
+                // `NfcExchangeEngine` (reached via `StartNfcExchange`), which
+                // reconstructs its own signing identity in the
+                // `AppScreen::NfcExchange` factory arm. The legacy
+                // `ExchangeEngine` no longer holds an NFC identity.
                 let clock = vauchi.clock().clone();
-                let mut engine = match session {
+                let engine = match session {
                     Some(s) => ExchangeEngine::with_session(config, s, clock),
                     None => ExchangeEngine::new(config, clock),
                 };
-                if let Some(id) = nfc_identity {
-                    engine.set_nfc_identity(id);
-                }
                 Box::new(engine)
             }
             AppScreen::Help => Box::new(HelpEngine::new(Self::default_help_items())),

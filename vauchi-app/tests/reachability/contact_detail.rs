@@ -25,12 +25,15 @@ use vauchi_core::contact::trust::TrustLevel;
 /// `confirm_delete_contact` / `cancel_delete_contact` reach the same
 /// screen_id via the InlineConfirm second-state ScreenModel which the
 /// BFS walker dedupes (same shape as form_dialog reachability test).
+// `back` is no longer a footer action — every frontend renders a
+// core-driven back affordance from `can_go_back`
+// (2026-06-05-core-driven-back-chrome). The not-found error screen keeps
+// its own `back` (covered by contact_not_found reachability).
 const HANDLED: &[&str] = &[
     "edit",
     "verify_fingerprint",
     "toggle_hidden",
     "delete_contact",
-    "back",
 ];
 
 fn factory() -> ContactDetailEngine {

@@ -121,13 +121,8 @@ impl FingerprintVerifyEngine {
                 a11y: None,
             });
         }
-        actions.push(ScreenAction {
-            id: "back".into(),
-            label: "Back".into(),
-            style: ActionStyle::Secondary,
-            enabled: true,
-            a11y: None,
-        });
+        // Back is the frontend's core-driven back chrome now (gated on
+        // `can_go_back`); no footer "Back" — see 2026-06-05-core-driven-back-chrome.
 
         ScreenModel {
             screen_id: "fingerprint_verify".into(),
@@ -163,7 +158,6 @@ impl WorkflowEngine for FingerprintVerifyEngine {
                     self.action = VerifyAction::Unverified;
                     ActionResult::Complete
                 }
-                "back" => ActionResult::Complete,
                 _ => ActionResult::UpdateScreen(self.build_screen()),
             },
             _ => ActionResult::UpdateScreen(self.build_screen()),

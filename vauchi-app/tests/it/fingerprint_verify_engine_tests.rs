@@ -77,23 +77,26 @@ fn test_already_verified_shows_status() {
 
 // @scenario: fingerprint.feature - Back navigates away without verifying
 #[test]
-fn test_back_sets_none_action() {
-    let mut engine = FingerprintVerifyEngine::new(
+fn test_no_footer_back_completion_defaults_none() {
+    // Back is the frontend's core-driven chrome now (gated on can_go_back),
+    // not a footer action — 2026-06-05-core-driven-back-chrome. Leaving via
+    // chrome back navigates away with no verify action (the default).
+    let engine = FingerprintVerifyEngine::new(
         "contact-123",
         "AB12 CD34 EF56 7890",
         "1234 5678 9ABC DEF0",
         false,
     );
 
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "back".into(),
-    });
-
-    assert_eq!(result, ActionResult::Complete);
+    let screen = engine.current_screen();
+    assert!(
+        !screen.actions.iter().any(|a| a.id == "back"),
+        "fingerprint_verify must not offer a footer back action"
+    );
     assert_eq!(
         engine.completion_action(),
         VerifyAction::None,
-        "Back must set None — routing does nothing"
+        "default completion is None until the user confirms/unverifies"
     );
 }
 

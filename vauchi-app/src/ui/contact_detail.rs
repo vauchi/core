@@ -775,13 +775,10 @@ impl ContactDetailEngine {
                     enabled: true,
                     a11y: None,
                 });
-                actions.push(ScreenAction {
-                    id: "back".into(),
-                    label: "Back".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                });
+                // Back is the frontend's job now: every frontend renders a
+                // core-driven back affordance from `can_go_back` (2026-06-05-
+                // core-driven-back-chrome). Dropping the footer "Back" leaves
+                // Edit (primary) + a small secondary/destructive set.
                 actions
             },
             progress: None,
@@ -860,9 +857,6 @@ impl WorkflowEngine for ContactDetailEngine {
                     message: "Contact archived".into(),
                     undo_action_id: Some(format!("undo_archive_contact:{}", self.contact.id)),
                 }
-            }
-            UserAction::ActionPressed { action_id } if action_id == "back" => {
-                ActionResult::Complete
             }
             _ => ActionResult::UpdateScreen(self.current_screen()),
         }
@@ -1114,12 +1108,17 @@ mod tests {
     }
 
     #[test]
-    fn test_back_action_completes() {
-        let mut engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new());
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "back".into(),
-        });
-        assert_eq!(result, ActionResult::Complete);
+    fn test_main_screen_has_no_back_action() {
+        // Back is the frontend's core-driven chrome now (gated on
+        // `can_go_back`); the main contact-detail footer no longer offers a
+        // "back" action (2026-06-05-core-driven-back-chrome). The not-found
+        // error screen keeps its own explicit Back.
+        let engine = ContactDetailEngine::new(sample_contact(), sample_fields(), String::new());
+        let screen = engine.current_screen();
+        assert!(
+            !screen.actions.iter().any(|a| a.id == "back"),
+            "main contact-detail must not offer a footer back action"
+        );
     }
 
     #[test]

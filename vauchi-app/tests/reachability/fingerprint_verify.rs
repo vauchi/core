@@ -18,17 +18,19 @@ use vauchi_app::ui::{FingerprintVerifyEngine, WorkflowEngine};
 // @internal
 #[test]
 fn unverified_screen_offers_confirm_match() {
-    // Not yet verified: the screen renders `confirm_match` / `back`.
+    // Not yet verified: the screen renders `confirm_match` (back is the
+    // frontend's core-driven chrome now — 2026-06-05-core-driven-back-chrome).
     let engine = FingerprintVerifyEngine::new("contact-1", "AA:BB:CC", "DD:EE:FF", false);
     assert_eq!(engine.current_screen().screen_id, "fingerprint_verify");
-    assert_reachability(&engine, &["confirm_match", "back"]);
+    assert_reachability(&engine, &["confirm_match"]);
 }
 
 // @internal
 #[test]
 fn verified_screen_offers_unverify() {
-    // Already verified: the screen renders `unverify` / `back`.
+    // Already verified: the screen renders `unverify` (back is the
+    // frontend's core-driven chrome now — 2026-06-05-core-driven-back-chrome).
     let engine = FingerprintVerifyEngine::new("contact-1", "AA:BB:CC", "DD:EE:FF", true);
     assert_eq!(engine.current_screen().screen_id, "fingerprint_verify");
-    assert_reachability(&engine, &["unverify", "back"]);
+    assert_reachability(&engine, &["unverify"]);
 }

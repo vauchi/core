@@ -802,6 +802,57 @@ impl AppEngine {
         false
     }
 
+    /// Build the shared exchange-success summary from a just-persisted
+    /// contact: who you exchanged with, what they shared, which of *your*
+    /// fields they can now see, and the groups they joined. Mode-agnostic
+    /// so every exchange engine can render the same terminal screen
+    /// (2026-06-04-exchange-terminal-screens). Returns the default
+    /// (status-only) summary if the contact can't be read back.
+    pub(crate) fn build_exchange_summary(
+        &self,
+        contact_id: &str,
+        group_names: Vec<String>,
+    ) -> crate::ui::exchange::success::ExchangeSuccessSummary {
+        let Some(contact) = self.vauchi.get_contact(contact_id).ok().flatten() else {
+            return Default::default();
+        };
+        let card = contact.card();
+        let received_fields: Vec<(String, String, String)> = card
+            .fields()
+            .iter()
+            .map(|f| {
+                (
+                    format!("{:?}", f.field_type()),
+                    f.label().to_string(),
+                    f.value().to_string(),
+                )
+            })
+            .collect();
+        let my_visible_fields: Vec<String> = self
+            .vauchi
+            .own_card()
+            .ok()
+            .flatten()
+            .map(|own| {
+                own.fields()
+                    .iter()
+                    .filter(|f| {
+                        self.vauchi
+                            .get_effective_field_visibility(contact_id, f.id())
+                            .unwrap_or(false)
+                    })
+                    .map(|f| f.label().to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+        crate::ui::exchange::success::ExchangeSuccessSummary {
+            peer_name: card.display_name().to_string(),
+            received_fields,
+            my_visible_fields,
+            group_names,
+        }
+    }
+
     /// Bridge: attach the rich exchange-success summary (received card +
     /// group + visibility) to the active multi-stage engine so its
     /// success screen renders it (2026-06-04-exchange-terminal-screens).

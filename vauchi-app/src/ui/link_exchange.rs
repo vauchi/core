@@ -69,6 +69,11 @@ pub struct LinkExchangeEngine {
     /// `set_share_url`.
     share_url: String,
     cancelled: bool,
+    /// Rich success-screen content (received card + visibility + groups),
+    /// attached by the link-initiator lifecycle once the peer's card is
+    /// persisted. When `None` the success screen falls back to minimal
+    /// completion chrome.
+    success_summary: Option<crate::ui::exchange::success::ExchangeSuccessSummary>,
 }
 
 impl Default for LinkExchangeEngine {
@@ -87,7 +92,21 @@ impl LinkExchangeEngine {
             state: InitiatorScreen::ShareUrl,
             share_url: String::new(),
             cancelled: false,
+            success_summary: None,
         }
+    }
+
+    /// Attach the rich success summary the terminal screen renders. Inert
+    /// once cancelled or terminal so a late setter can't resurrect torn-down
+    /// state; call before `transition_to_success`.
+    pub fn set_success_summary(
+        &mut self,
+        summary: crate::ui::exchange::success::ExchangeSuccessSummary,
+    ) {
+        if self.cancelled || self.state.is_terminal() {
+            return;
+        }
+        self.success_summary = Some(summary);
     }
 
     /// Set the URL the share-url screen renders. Inert once cancelled or
@@ -248,6 +267,19 @@ impl LinkExchangeEngine {
     }
 
     fn build_success_screen(&self) -> ScreenModel {
+        // Rich, core-driven success screen (received card + visibility +
+        // groups) when the lifecycle attached a summary; otherwise the
+        // minimal completion chrome below.
+        if let Some(summary) = &self.success_summary {
+            let mut screen = crate::ui::exchange::success::build_exchange_success_screen(
+                "exchange_link_success",
+                "Contact Added",
+                ACTION_DONE,
+                summary,
+            );
+            screen.progress = Some(self.progress());
+            return screen;
+        }
         ScreenModel {
             screen_id: "exchange_link_success".into(),
             title: "Contact Added".into(),
@@ -407,5 +439,61 @@ impl WorkflowEngine for LinkExchangeEngine {
 
     fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
         Some(self)
+    }
+}
+
+// INLINE_TEST_REQUIRED: exercises the success-screen rich/minimal branch
+// against the crate-internal `ExchangeSuccessSummary` (pub(crate)); the
+// engine's public-API behavior is covered in `tests/it/link_exchange_tests.rs`.
+#[cfg(test)]
+mod success_summary_tests {
+    use super::*;
+    use crate::ui::exchange::success::ExchangeSuccessSummary;
+
+    // @internal
+    #[test]
+    fn success_screen_renders_rich_summary_when_attached() {
+        let mut engine = LinkExchangeEngine::new();
+        engine.set_success_summary(ExchangeSuccessSummary {
+            peer_name: "Bob".into(),
+            received_fields: vec![("email".into(), "Email".into(), "bob@example.com".into())],
+            my_visible_fields: vec!["Phone".into()],
+            group_names: Vec::new(),
+        });
+        engine.transition_to_success();
+        let screen = engine.build_screen();
+        assert_eq!(screen.screen_id, "exchange_link_success");
+        assert!(
+            screen.components.iter().any(|c| matches!(
+                c,
+                Component::FieldList { id, .. } if id == "received_fields"
+            )),
+            "rich success screen must render the received card fields",
+        );
+        assert!(
+            screen.components.iter().any(|c| matches!(
+                c,
+                Component::InfoPanel { id, .. } if id == "my_visibility"
+            )),
+            "rich success screen must render the visibility section",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn success_screen_without_summary_falls_back_to_minimal_chrome() {
+        let mut engine = LinkExchangeEngine::new();
+        engine.transition_to_success();
+        let screen = engine.build_screen();
+        assert_eq!(screen.screen_id, "exchange_link_success");
+        // No summary attached → the minimal StatusIndicator chrome, no
+        // received-fields section.
+        assert!(
+            !screen.components.iter().any(|c| matches!(
+                c,
+                Component::FieldList { id, .. } if id == "received_fields"
+            )),
+            "minimal success screen must not render a received-fields section",
+        );
     }
 }

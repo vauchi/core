@@ -46,9 +46,15 @@ const RESPONDER_POLL_DEADLINE_SECS: u64 = 300;
 
 impl AppEngine {
     /// Terminal success — the sender's card was retrieved and persisted.
-    /// Transitions the responder engine to `link_responder_completed`.
-    pub fn link_responder_completed(&mut self) -> Option<ScreenModel> {
+    /// Builds the rich success summary from the persisted contact, attaches
+    /// it, and transitions the responder engine to
+    /// `link_responder_completed`.
+    pub fn link_responder_completed(&mut self, contact_id: &str) -> Option<ScreenModel> {
+        // Build the summary first so the immutable `self.vauchi` borrow ends
+        // before the `&mut self` engine borrow. Link mode assigns no group.
+        let summary = self.build_exchange_summary(contact_id, Vec::new());
         let engine = self.link_responder_engine_mut()?;
+        engine.set_success_summary(summary);
         engine.transition_to_completed();
         Some(engine.current_screen())
     }
@@ -184,8 +190,8 @@ impl AppEngine {
                     None => self.import_link_card_bytes(&card_bytes),
                 };
                 match completed {
-                    Ok(()) => {
-                        self.link_responder_completed();
+                    Ok(contact_id) => {
+                        self.link_responder_completed(&contact_id);
                     }
                     Err(_) => {
                         self.link_responder_failed("decrypt_error".to_string());
@@ -215,11 +221,11 @@ impl AppEngine {
     /// Decode a finalized card payload (`[version][pubkey][card]`) and
     /// persist it via the core import path (ADR-034 trust derivation +
     /// idempotent dedup live there). The frontend never sees the bytes.
-    pub(super) fn import_link_card_bytes(&self, card_bytes: &[u8]) -> Result<(), String> {
+    /// Returns the persisted contact id (for building the success summary).
+    pub(super) fn import_link_card_bytes(&self, card_bytes: &[u8]) -> Result<String, String> {
         let (_signing_key, card) = parse_card_payload(card_bytes).map_err(|e| e.to_string())?;
         self.vauchi
             .import_received_link_card(card)
-            .map(|_| ())
             .map_err(|e| e.to_string())
     }
 
@@ -228,14 +234,14 @@ impl AppEngine {
     /// updatable `Exchanged` contact + Double Ratchet; a v1 payload falls
     /// back to a frozen import inside `complete_link_exchange`. The frontend
     /// never sees the bytes. Shared by both link finalize paths.
+    /// Returns the persisted contact id (for building the success summary).
     pub(super) fn complete_link_card_bytes(
         &self,
         card_bytes: &[u8],
         our_x3dh: &X3DHKeyPair,
-    ) -> Result<(), String> {
+    ) -> Result<String, String> {
         self.vauchi
             .complete_link_exchange(card_bytes, our_x3dh)
-            .map(|_| ())
             .map_err(|e| e.to_string())
     }
 

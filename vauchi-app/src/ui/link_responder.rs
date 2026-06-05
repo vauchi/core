@@ -43,6 +43,9 @@ pub struct LinkResponderEngine {
     payload: DeepLinkPayload,
     cancelled: bool,
     terminal: Option<ResponderTerminal>,
+    /// Rich success-screen content, attached by the responder lifecycle
+    /// once the sender's card is persisted. `None` → minimal chrome.
+    success_summary: Option<crate::ui::exchange::success::ExchangeSuccessSummary>,
 }
 
 impl LinkResponderEngine {
@@ -54,7 +57,21 @@ impl LinkResponderEngine {
             payload,
             cancelled: false,
             terminal: None,
+            success_summary: None,
         }
+    }
+
+    /// Attach the rich success summary the completed screen renders. Inert
+    /// once a terminal transition has occurred; call before
+    /// `transition_to_completed`.
+    pub fn set_success_summary(
+        &mut self,
+        summary: crate::ui::exchange::success::ExchangeSuccessSummary,
+    ) {
+        if self.cancelled || self.terminal.is_some() {
+            return;
+        }
+        self.success_summary = Some(summary);
     }
 
     /// Borrow the parsed payload. Used by the platform layer to build the
@@ -126,6 +143,16 @@ impl LinkResponderEngine {
     }
 
     fn build_completed_screen(&self) -> ScreenModel {
+        // Rich, core-driven success screen when the lifecycle attached a
+        // summary; otherwise the minimal completion chrome below.
+        if let Some(summary) = &self.success_summary {
+            return crate::ui::exchange::success::build_exchange_success_screen(
+                "link_responder_completed",
+                "Contact Added",
+                ACTION_DONE,
+                summary,
+            );
+        }
         ScreenModel {
             screen_id: "link_responder_completed".into(),
             title: "Contact Added".into(),
@@ -239,5 +266,58 @@ impl WorkflowEngine for LinkResponderEngine {
     /// `Failed`.
     fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
         Some(self)
+    }
+}
+
+// INLINE_TEST_REQUIRED: exercises the completed-screen rich/minimal branch
+// against the crate-internal `ExchangeSuccessSummary` (pub(crate)); the
+// engine's public-API behavior is covered in `tests/it/`.
+#[cfg(test)]
+mod success_summary_tests {
+    use super::*;
+    use crate::ui::exchange::success::ExchangeSuccessSummary;
+    use vauchi_core::exchange::link_mode::{initiator_generate, parse_exchange_deep_link};
+
+    fn payload() -> DeepLinkPayload {
+        let (init, _) = initiator_generate();
+        parse_exchange_deep_link(&init.url).expect("canonical URL parses")
+    }
+
+    // @internal
+    #[test]
+    fn completed_screen_renders_rich_summary_when_attached() {
+        let mut engine = LinkResponderEngine::new(payload());
+        engine.set_success_summary(ExchangeSuccessSummary {
+            peer_name: "Bob".into(),
+            received_fields: vec![("email".into(), "Email".into(), "bob@example.com".into())],
+            my_visible_fields: vec!["Phone".into()],
+            group_names: Vec::new(),
+        });
+        engine.transition_to_completed();
+        let screen = engine.build_screen();
+        assert_eq!(screen.screen_id, "link_responder_completed");
+        assert!(
+            screen.components.iter().any(|c| matches!(
+                c,
+                Component::FieldList { id, .. } if id == "received_fields"
+            )),
+            "rich completed screen must render the received card fields",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn completed_screen_without_summary_falls_back_to_minimal_chrome() {
+        let mut engine = LinkResponderEngine::new(payload());
+        engine.transition_to_completed();
+        let screen = engine.build_screen();
+        assert_eq!(screen.screen_id, "link_responder_completed");
+        assert!(
+            !screen.components.iter().any(|c| matches!(
+                c,
+                Component::FieldList { id, .. } if id == "received_fields"
+            )),
+            "minimal completed screen must not render a received-fields section",
+        );
     }
 }

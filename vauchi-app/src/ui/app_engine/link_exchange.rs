@@ -146,8 +146,11 @@ impl AppEngine {
                     None => self.import_link_card_bytes(&card_bytes),
                 };
                 match completed {
-                    Ok(()) => {
+                    Ok(contact_id) => {
+                        // Link mode assigns no group, so group_names is empty.
+                        let summary = self.build_exchange_summary(&contact_id, Vec::new());
                         if let Some(engine) = self.link_exchange_engine_mut() {
+                            engine.set_success_summary(summary);
                             engine.transition_to_success();
                         }
                     }

@@ -207,6 +207,14 @@ pub enum AppScreen {
     /// Phase 3). Per
     /// `_private/docs/problems/2026-05-11-link-exchange-engine-graduation`.
     LinkExchange,
+    /// BLE in-person exchange (Magic/Bump/Shake) — the dedicated
+    /// `BleExchangeEngine` drives discovery → handshake → exchange →
+    /// proximity from a pure ScreenModel. `mode` selects the proximity
+    /// signal layer. Replaces the legacy `ExchangeStep::Ble` sub-flow.
+    /// Per `2026-05-11-ble-exchange-engine-graduation`.
+    BleExchange {
+        mode: vauchi_core::exchange::mode::ExchangeMode,
+    },
 }
 
 impl AppScreen {
@@ -283,6 +291,7 @@ impl AppScreen {
             Self::DeepLinkResponder { .. } => "deep_link_responder",
             Self::MultiStageExchange { .. } => "multi_stage_exchange",
             Self::LinkExchange => "link_exchange",
+            Self::BleExchange { .. } => "ble_exchange",
         }
     }
 

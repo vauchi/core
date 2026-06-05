@@ -910,6 +910,10 @@ impl AppEngine {
                 Box::new(crate::ui::LinkResponderEngine::new(payload.clone()))
             }
             AppScreen::LinkExchange => Box::new(crate::ui::LinkExchangeEngine::new()),
+            AppScreen::BleExchange { mode } => Box::new(crate::ui::BleExchangeEngine::new(
+                *mode,
+                device_capabilities.has_camera,
+            )),
             AppScreen::VerifyFingerprint { contact_id } => {
                 let contact = vauchi.get_contact(contact_id).ok().flatten();
                 let their_fp = contact

@@ -406,6 +406,11 @@ impl ExchangeEngine {
     ///
     /// Creates a `BleExchangeFlow` and emits BLE advertising + scanning
     /// commands to begin discovery.
+    ///
+    /// Superseded by `BleExchangeEngine` (graduation slice 2 — the mode
+    /// dispatch now returns `ActionResult::StartBleExchange`). Retired with
+    /// the rest of the legacy `ExchangeStep::Ble` machinery in slice 3.
+    #[allow(dead_code)]
     fn start_ble_mode(&mut self) -> ActionResult {
         let mode = self.config.mode.unwrap_or(ExchangeMode::Magic);
         self.ble_flow = Some(BleExchangeFlow::new(mode));
@@ -501,9 +506,15 @@ impl ExchangeEngine {
     fn enter_mode_sub_flow(&mut self) -> ActionResult {
         match self.config.mode {
             Some(ExchangeMode::Link) => self.start_link_mode(),
-            Some(ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake) => {
-                self.step = ExchangeStep::Ble(BleStep::Discovering);
-                self.start_ble_mode()
+            Some(mode @ (ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake)) => {
+                // The BLE flow runs in its own `AppScreen::BleExchange` engine
+                // (`BleExchangeEngine`); this cached `ExchangeEngine` is kept for
+                // Cancel. Re-arm the picker so it is not a zombie (Fix A of
+                // 2026-06-02-exchange-back-cancel-broken).
+                self.mode_selection = Some(ModeSelectionEngine::new(
+                    self.config.device_capabilities.clone(),
+                ));
+                ActionResult::StartBleExchange { mode }
             }
             Some(ExchangeMode::TapTap) => {
                 // Core-driven role choice (Send/Receive) before the NFC
@@ -2437,15 +2448,23 @@ mod tests {
         });
         assert!(engine.ble_fallback_available);
 
-        let _ = engine.handle_action(UserAction::ActionPressed {
+        let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "retry".into(),
         });
 
         assert!(!engine.ble_fallback_available);
-        assert_eq!(
-            engine.step,
-            ExchangeStep::Ble(BleStep::Discovering),
-            "Retry in Bump mode must return to BLE discovering"
+        // BLE graduation slice 2: retry now clears the fallback flag and hands
+        // off to the dedicated `BleExchangeEngine` via `StartBleExchange`
+        // (the engine owns the retry → fresh-flow behaviour); the legacy
+        // `ExchangeStep::Ble` re-entry is retired.
+        assert!(
+            matches!(
+                result,
+                ActionResult::StartBleExchange {
+                    mode: ExchangeMode::Bump
+                }
+            ),
+            "Retry in Bump mode must hand off to the BLE engine, got {result:?}"
         );
     }
 

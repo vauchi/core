@@ -1256,6 +1256,19 @@ impl AppEngine {
                 let screen = self.navigate_to(AppScreen::LinkExchange);
                 ActionResult::NavigateTo(screen)
             }
+            // BLE graduation slice 2: ExchangeEngine emits StartBleExchange when
+            // the user picks Magic/Bump/Shake; navigate to the dedicated
+            // BleExchange screen whose BleExchangeEngine drives the flow.
+            ActionResult::StartBleExchange { mode } => {
+                self.pending_exchange_groups = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::exchange::ExchangeEngine>())
+                    .map(|ex| ex.selected_groups().to_vec())
+                    .unwrap_or_default();
+                let screen = self.navigate_to(AppScreen::BleExchange { mode });
+                ActionResult::NavigateTo(screen)
+            }
             ActionResult::OpenEntryDetail { field_id } => {
                 let screen = self.navigate_to(AppScreen::MyInfoEntryDetail { field_id });
                 ActionResult::NavigateTo(screen)

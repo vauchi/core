@@ -18,11 +18,6 @@
 //! entry (`ActionResult::StartBleExchange`) + the legacy parent-arm retirement
 //! land in slices 2–3.
 
-// Slice 1 lands the engine + its tests ahead of the router wiring. Slice 2
-// constructs it via `ActionResult::StartBleExchange` and REMOVES this
-// attribute, at which point `-D dead-code` re-verifies nothing is unused.
-#![allow(dead_code)]
-
 use crate::ui::*;
 use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::{Command, Event};

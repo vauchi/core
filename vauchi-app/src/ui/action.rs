@@ -284,6 +284,14 @@ pub enum ActionResult {
     /// `LinkInitiatorSession`. Frontends never see this — the relay escrow
     /// lifecycle is core/event-driven (no platform bridge).
     StartLinkExchange,
+    /// App layer should navigate to the dedicated BLE-exchange screen
+    /// (`AppScreen::BleExchange { mode }`) for Magic/Bump/Shake. The screen
+    /// factory builds a fresh `BleExchangeEngine`; the legacy
+    /// `ExchangeStep::Ble` sub-flow is retired in slice 3. Per
+    /// `2026-05-11-ble-exchange-engine-graduation`.
+    StartBleExchange {
+        mode: ExchangeMode,
+    },
     /// App layer should call `MobileDeviceLinkSession::confirm_manual`
     /// with the given confirmation code and the current unix timestamp.
     ///

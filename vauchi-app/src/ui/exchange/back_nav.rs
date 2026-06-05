@@ -23,7 +23,7 @@
 //! steps must never rewind — doing so would discard live cryptographic
 //! session state mid-protocol.
 
-use super::{DirectStep, ExchangeStep, mode_selection::ModeSelectionEngine};
+use super::{ExchangeStep, mode_selection::ModeSelectionEngine};
 
 impl super::ExchangeEngine {
     /// A step is back-safe when the user is *choosing* (selection phase)
@@ -36,9 +36,7 @@ impl super::ExchangeEngine {
     fn is_back_safe_step(step: &ExchangeStep) -> bool {
         matches!(
             step,
-            ExchangeStep::GroupSelection
-                | ExchangeStep::FieldPreview
-                | ExchangeStep::DirectTransport(DirectStep::WaitingForConnection)
+            ExchangeStep::GroupSelection | ExchangeStep::FieldPreview
         )
     }
 

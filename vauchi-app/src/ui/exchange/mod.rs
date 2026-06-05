@@ -102,28 +102,6 @@ pub struct ExchangeEngine {
     success_summary: Option<crate::ui::exchange::success::ExchangeSuccessSummary>,
 }
 
-/// Sub-steps for the USB cable / direct TCP exchange flow.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DirectStep {
-    /// Waiting for USB connection (phone acts as server).
-    WaitingForConnection,
-    /// TCP exchange in progress.
-    Exchanging,
-}
-
-impl DirectStep {
-    /// Matches `QrStep::STEP_COUNT` / `BleStep::STEP_COUNT` for consistent
-    /// progress bar. Padded to 3 with a no-op mapping for the third slot.
-    pub(self) const STEP_COUNT: u8 = 3;
-
-    fn step_number(self, base: u8) -> u8 {
-        base + match self {
-            Self::WaitingForConnection => 0,
-            Self::Exchanging => 1,
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 enum ExchangeStep {
     /// User picks an exchange mode (first step when mode is not pre-set).
@@ -132,8 +110,6 @@ enum ExchangeStep {
     GroupSelection,
     /// Read-only preview of what will be shared (after group selection).
     FieldPreview,
-    /// USB cable / direct TCP exchange.
-    DirectTransport(DirectStep),
     /// Flow-agnostic "verification in progress". Set by the session->step
     /// sync once the protocol passes display/scan; rendered by
     /// `verifying::build_verifying_screen`. Replaces the legacy
@@ -149,8 +125,6 @@ impl ExchangeStep {
             Self::ModeSelection => 1,
             Self::GroupSelection => 2,
             Self::FieldPreview => 3,
-            // Sub-flow steps start at 4 (after mode + group + preview)
-            Self::DirectTransport(direct) => direct.step_number(4),
             Self::Verifying => 6,
             Self::Success => 4 + NfcStep::STEP_COUNT,
             Self::Failed => 5 + NfcStep::STEP_COUNT,
@@ -159,8 +133,6 @@ impl ExchangeStep {
 }
 
 // mode + group + preview + sub-flow + success/failed
-// All sub-flows must have the same step count for consistent progress.
-const _: () = assert!(DirectStep::STEP_COUNT == NfcStep::STEP_COUNT);
 const TOTAL_STEPS: u8 = 3 + NfcStep::STEP_COUNT + 2;
 
 impl ExchangeEngine {
@@ -173,9 +145,6 @@ impl ExchangeEngine {
             return ExchangeStep::ModeSelection;
         }
         if config.available_groups.is_empty() {
-            if config.mode == Some(ExchangeMode::Cable) {
-                return ExchangeStep::DirectTransport(DirectStep::WaitingForConnection);
-            }
             ExchangeStep::ModeSelection
         } else {
             ExchangeStep::GroupSelection
@@ -231,12 +200,6 @@ impl ExchangeEngine {
         } else {
             None
         };
-
-        // If starting directly at DirectTransport, emit initial commands now.
-        // USB sessions begin in AwaitingDirectPayload — no StartQR needed.
-        if matches!(step, ExchangeStep::DirectTransport(_)) {
-            session.emit_initial_commands();
-        }
 
         Self {
             step,
@@ -315,25 +278,6 @@ impl ExchangeEngine {
 
     /// Start the protocol session (ADR-031) when entering ShowQr.
     ///
-    /// If a session is present, applies `StartQR` to generate the QR code,
-    /// emits initial commands, and returns `Commands`.
-    /// Otherwise, returns `NavigateTo` for legacy UI-only behavior.
-    fn start_session_if_needed(&mut self) -> ActionResult {
-        if let Some(ref mut session) = self.session {
-            // USB direct transport: session is already in AwaitingDirectPayload.
-            // Just emit initial commands (DirectSend) without starting QR.
-            if matches!(self.step, ExchangeStep::DirectTransport(_)) {
-                session.emit_initial_commands();
-                let commands = session.drain_commands();
-                if !commands.is_empty() {
-                    self.step = ExchangeStep::DirectTransport(DirectStep::Exchanging);
-                    return ActionResult::Commands { commands };
-                }
-            }
-        }
-        ActionResult::NavigateTo(self.build_screen())
-    }
-
     /// Hand off to the graduated `LinkExchangeEngine` (ADR-021/043 Humble
     /// UI). The link-mode initiator flow (share-url / waiting / retrieving /
     /// terminal screens) now lives in its own engine driven by the
@@ -408,15 +352,15 @@ impl ExchangeEngine {
                 ActionResult::StartMultiStageExchange { mode }
             }
             Some(ExchangeMode::Cable) => {
-                // Cable is USB direct transport, not QR. Mirror `initial_step`
-                // so the picker entry doesn't drop it into the legacy QR
-                // catch-all (frozen on android — the android-qr bug record).
-                // `start_session_if_needed` handles the DirectTransport step.
-                // NOTE: slice 3 flips this to `ActionResult::StartDirectTransport`
-                // (the dedicated `DirectTransportEngine`) and retires the legacy
-                // step + session machinery in the same change.
-                self.step = ExchangeStep::DirectTransport(DirectStep::WaitingForConnection);
-                self.start_session_if_needed()
+                // The Cable flow (USB / direct-TCP) runs in its own
+                // `AppScreen::DirectTransport` engine (`DirectTransportEngine`);
+                // this cached `ExchangeEngine` is kept for Cancel. Re-arm the
+                // picker so it is not a zombie (Fix A of
+                // 2026-06-02-exchange-back-cancel-broken).
+                self.mode_selection = Some(ModeSelectionEngine::new(
+                    self.config.device_capabilities.clone(),
+                ));
+                ActionResult::StartDirectTransport
             }
             // No mode selected — return to the picker (production always
             // enters with mode: None; no mode reaches the retired legacy QR).
@@ -481,46 +425,9 @@ impl ExchangeEngine {
                     ScreenModel::default()
                 }
             }
-            ExchangeStep::Verifying => {
-                verifying::build_verifying_screen(self.progress())
-            }
-            ExchangeStep::DirectTransport(DirectStep::WaitingForConnection) => ScreenModel {
-                screen_id: "exchange_direct_waiting".into(),
-                title: "USB Exchange".into(),
-                subtitle: Some("Connect your phone via USB cable".into()),
-                components: vec![Component::Text {
-                    id: "instructions".into(),
-                    content: "1. Connect your phone with a USB cable\n2. Enable USB tethering (Android) or trust this computer (iOS)\n3. Open Vauchi on your phone and start an exchange".into(),
-                    style: TextStyle::Body,
-                }],
-                actions: vec![ScreenAction {
-                    id: "cancel".into(),
-                    label: "Cancel".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                }],
-                progress: Some(self.progress()),
-                ..Default::default()
-            },
-            ExchangeStep::DirectTransport(DirectStep::Exchanging) => ScreenModel {
-                screen_id: "exchange_direct_exchanging".into(),
-                title: "USB Exchange".into(),
-                subtitle: Some("Exchanging contact cards...".into()),
-                components: vec![Component::Text {
-                    id: "status".into(),
-                    content: "Connected. Exchanging encrypted data...".into(),
-                    style: TextStyle::Body,
-                }],
-                actions: vec![],
-                progress: Some(self.progress()),
-                ..Default::default()
-            },
+            ExchangeStep::Verifying => verifying::build_verifying_screen(self.progress()),
             ExchangeStep::Success if self.success_summary.is_some() => {
-                let summary = self
-                    .success_summary
-                    .as_ref()
-                    .expect("guarded by is_some()");
+                let summary = self.success_summary.as_ref().expect("guarded by is_some()");
                 let mut screen = crate::ui::exchange::success::build_exchange_success_screen(
                     "exchange_success",
                     "Success",
@@ -1519,19 +1426,16 @@ mod tests {
         engine.config.mode = Some(ExchangeMode::Cable);
         engine.mark_failed();
 
-        let _ = engine.handle_action(UserAction::ActionPressed {
+        let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "retry".into(),
         });
 
+        // Cable graduated to the dedicated `DirectTransportEngine`; retry now
+        // emits the navigation signal rather than entering a legacy USB step
+        // (and so can never render the frozen-on-android legacy QR screen).
         assert!(
-            matches!(engine.step, ExchangeStep::DirectTransport(_)),
-            "Cable must route to its USB DirectTransport path, got {:?}",
-            engine.step
-        );
-        assert_ne!(
-            engine.current_screen().screen_id,
-            "exchange_show_qr",
-            "Cable must never render the frozen-on-android legacy QR screen"
+            matches!(result, ActionResult::StartDirectTransport),
+            "Cable retry routes to the dedicated DirectTransportEngine, got {result:?}"
         );
     }
 
@@ -1912,95 +1816,6 @@ mod tests {
             result,
             ActionResult::StartLinkExchange,
             "Retry in Link mode must hand off to LinkExchangeEngine; got {result:?}",
-        );
-    }
-
-    // ── Cable / DirectTransport mode tests ─────────────────────────
-
-    // @internal
-    #[test]
-    fn cable_mode_creates_direct_transport_step() {
-        let engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Cable),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        assert_eq!(
-            engine.step,
-            ExchangeStep::DirectTransport(DirectStep::WaitingForConnection)
-        );
-        let screen = engine.current_screen();
-        assert_eq!(screen.screen_id, "exchange_direct_waiting");
-    }
-
-    // @internal
-    #[test]
-    fn cable_mode_screen_shows_usb_title_and_cancel_action() {
-        let engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Cable),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let screen = engine.current_screen();
-        assert_eq!(screen.title, "USB Exchange");
-        assert!(
-            screen.actions.iter().any(|a| a.id == "cancel"),
-            "DirectTransport screen must have a cancel action"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn cable_mode_with_session_emits_direct_send() {
-        use vauchi_core::contact_card::ContactCard;
-        use vauchi_core::exchange::{ExchangeSession, ManualConfirmationVerifier, UsbRole};
-
-        let config = ExchangeConfig {
-            mode: Some(ExchangeMode::Cable),
-            ..config_no_groups()
-        };
-        let identity = vauchi_core::identity::Identity::create(
-            "Test",
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        );
-        let card = ContactCard::new("Test");
-        let verifier = ManualConfirmationVerifier::new();
-        let session = ExchangeSession::new_usb(
-            identity,
-            card,
-            verifier,
-            UsbRole::Initiator,
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let engine = ExchangeEngine::with_session(
-            config,
-            session,
-            vauchi_core::clock::SystemClock::shared(),
-        );
-
-        // start_session_if_needed is called via handle_action in the USB path;
-        // after construction the step should be DirectTransport(WaitingForConnection).
-        assert_eq!(
-            engine.step,
-            ExchangeStep::DirectTransport(DirectStep::WaitingForConnection)
-        );
-
-        // drain_commands calls session.drain_commands() which should contain DirectSend
-        // emitted by emit_initial_commands during with_session construction.
-        // For USB, emit_initial_commands is NOT called during with_session (only QR is).
-        // We call start_session_if_needed indirectly by triggering it.
-        // The method is private so we test via the public drain_commands after
-        // forcing emit_initial_commands through a cancel + retry path. Instead,
-        // directly test by checking that the session is set and the screen title matches.
-        let screen = engine.current_screen();
-        assert_eq!(screen.screen_id, "exchange_direct_waiting");
-        assert!(
-            engine.session().is_some(),
-            "Session must be retained for DirectTransport"
         );
     }
 

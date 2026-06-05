@@ -24,9 +24,3 @@
 # standalone test would need a full Vauchi instance and re-walk those same
 # screens, so it is intentionally retained here rather than ratcheted out.
 AppEngine
-
-# BLE graduation slice 2 wired BleExchangeEngine live; slice 4 adds
-# tests/reachability/ble_exchange.rs (needs a Success-state factory —
-# the Complete path requires the full proximity+card event sequence) and
-# REMOVES this entry. 2026-05-11-ble-exchange-engine-graduation.
-BleExchangeEngine

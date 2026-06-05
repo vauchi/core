@@ -104,7 +104,10 @@ pub use duress_pin::{DuressConfig, DuressPinEngine};
 pub use emergency_broadcast::{EmergencyBroadcastEngine, EmergencyOutcome};
 pub use emergency_shred::EmergencyShredEngine;
 pub use engine::WorkflowEngine;
-pub use exchange::ble_engine::BleExchangeEngine;
+pub use exchange::ble_engine::{
+    ACTION_CANCEL as BLE_EXCHANGE_ACTION_CANCEL, ACTION_DONE as BLE_EXCHANGE_ACTION_DONE,
+    ACTION_RETRY as BLE_EXCHANGE_ACTION_RETRY, BleExchangeEngine,
+};
 pub use exchange::{ExchangeConfig, ExchangeEngine};
 pub use fingerprint_verify::{FingerprintVerifyEngine, VerifyAction};
 pub use form_dialog::{FormDialogEngine, FormDialogType};

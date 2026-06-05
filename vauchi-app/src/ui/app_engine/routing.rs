@@ -115,6 +115,7 @@ impl AppEngine {
                 | AppScreen::AvatarEditor
                 | AppScreen::Recovery
                 | AppScreen::MultiStageExchange { .. }
+                | AppScreen::BleExchange { .. }
         ) {
             return None;
         }

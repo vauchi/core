@@ -28,6 +28,17 @@
 
 auto-tag:version:
   extends: [.linux-runner-nocache, .main-only]
+  # Never cut a (dev) tag on a SCHEDULED (nightly) pipeline. A tag push
+  # triggers the downstream release verify/build chain (release:verify,
+  # build:validate-bindings, build:apple, build:android). The nightly exists
+  # for mutation/fuzz/bench only — it must not spawn release-verify pipelines.
+  # Tagging belongs to main MERGES (source=push). This overrides .main-only's
+  # rules (CI_COMMIT_BRANCH == default) to add the never-on-schedule guard;
+  # merge behaviour is unchanged.
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   stage: auto-tag
   resource_group: auto-tag
   needs: []

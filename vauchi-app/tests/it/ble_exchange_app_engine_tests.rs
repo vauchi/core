@@ -29,7 +29,9 @@ fn engine_with_identity() -> AppEngine {
 fn enter_ble_mode(item_id: &str) -> AppEngine {
     let mut engine = engine_with_identity();
     let entry = engine.navigate_to(AppScreen::Exchange);
-    assert_eq!(entry.screen_id, "exchange_mode_selection");
+    // Mode-selection root reports the canonical tab-root id `exchange`
+    // (so frontends render the bottom nav bar) — see canonical_screen_id_tests.
+    assert_eq!(entry.screen_id, "exchange");
     // The picker parses only the `mode:` prefix of `item_id`; the
     // component_id (category) is ignored.
     let _ = engine.handle_action(UserAction::ListItemSelected {
@@ -146,8 +148,8 @@ fn cancel_on_ble_exchange_lands_on_mode_picker() {
         "Cancel must not land on an empty screen_id (white-screen regression)"
     );
     assert_eq!(
-        landed, "exchange_mode_selection",
-        "Cancel should return to the re-armed mode picker"
+        landed, "exchange",
+        "Cancel should return to the re-armed mode picker (canonical tab-root id)"
     );
     assert!(
         !matches!(engine.current_app_screen(), AppScreen::BleExchange { .. }),

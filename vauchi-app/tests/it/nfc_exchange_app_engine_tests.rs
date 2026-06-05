@@ -25,7 +25,8 @@ fn engine_with_identity() -> AppEngine {
 fn enter_taptap() -> AppEngine {
     let mut engine = engine_with_identity();
     let entry = engine.navigate_to(AppScreen::Exchange);
-    assert_eq!(entry.screen_id, "exchange_mode_selection");
+    // Canonical tab-root id (see canonical_screen_id_tests).
+    assert_eq!(entry.screen_id, "exchange");
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "category:fun".into(),
         item_id: "mode:tap_tap".into(),
@@ -115,8 +116,8 @@ fn cancel_on_nfc_role_lands_on_mode_picker() {
         "Cancel must not land on an empty screen_id (white-screen regression)"
     );
     assert_eq!(
-        landed, "exchange_mode_selection",
-        "Cancel should return to the re-armed mode picker"
+        landed, "exchange",
+        "Cancel should return to the re-armed mode picker (canonical tab-root id)"
     );
     assert!(
         !matches!(engine.current_app_screen(), AppScreen::NfcExchange),

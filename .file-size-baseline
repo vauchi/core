@@ -240,7 +240,8 @@ vauchi-core/src/storage/mod.rs 1079
 #  multi_stage_session scaffolding)
 # (+3 for AppScreen::EmergencyBroadcast variant + id + from_screen_id —
 #  2026-06-02 humble-ui core engines sweep)
-vauchi-app/src/ui/app_engine/mod.rs 1665
+# (+6 for AppScreen::NfcExchange variant + screen_id — NFC graduation)
+vauchi-app/src/ui/app_engine/mod.rs 1671
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -286,7 +287,8 @@ vauchi-app/src/ui/app_engine/mod.rs 1665
 # (+1 for AppScreen::BleExchange in the handle_hardware_event screen guard —
 #  BLE graduation slice 4: the live BleExchangeEngine was deaf to hardware
 #  events without it. 2026-05-11-ble-exchange-engine-graduation)
-vauchi-app/src/ui/app_engine/routing.rs 1668
+# (+15 for StartNfcExchange routing arm + hardware-event guard — NFC graduation)
+vauchi-app/src/ui/app_engine/routing.rs 1683
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)
@@ -310,7 +312,8 @@ vauchi-app/src/ui/app_engine/routing.rs 1668
 #  threads them into MyInfoEngine's new sync-caption builders.)
 # (+5 for AppScreen::EmergencyBroadcast engine constructor + use —
 #  2026-06-02 humble-ui core engines sweep)
-vauchi-app/src/ui/app_engine/screens.rs 1462
+# (+18 for AppScreen::NfcExchange factory arm — NFC graduation)
+vauchi-app/src/ui/app_engine/screens.rs 1480
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

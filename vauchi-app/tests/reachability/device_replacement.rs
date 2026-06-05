@@ -28,12 +28,15 @@ use vauchi_app::ui::{DeviceReplacementEngine, WorkflowEngine};
 #[test]
 fn target_select_mode_screen_is_reachable() {
     // New (target) device: choose "I have my old device" /
-    // "I lost my old device" / back. None of these change `step`
-    // (link / commands / complete), so the select-mode screen is a
-    // single-screen island.
+    // "I lost my old device". Neither changes `step` (link / commands
+    // / complete), so the select-mode screen is a single-screen island.
+    // The footer `back` was dropped in the Goal 3 back-chrome sweep:
+    // SelectMode is a pushed sub-screen (chrome `can_go_back` true), so
+    // the footer button duplicated the core-driven back affordance —
+    // and its `cancelled`→`Complete` routed to the same `navigate_back`.
     let engine = DeviceReplacementEngine::new_target();
     assert_eq!(engine.current_screen().screen_id, "replacement_select_mode");
-    assert_reachability(&engine, &["has_old_device", "lost_device", "back"]);
+    assert_reachability(&engine, &["has_old_device", "lost_device"]);
 }
 
 // @internal

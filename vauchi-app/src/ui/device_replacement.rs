@@ -227,13 +227,6 @@ impl DeviceReplacementEngine {
                     enabled: true,
                     a11y: None,
                 },
-                ScreenAction {
-                    id: "back".into(),
-                    label: "Back".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                },
             ],
             progress: self.progress(),
             ..Default::default()
@@ -556,10 +549,6 @@ impl WorkflowEngine for DeviceReplacementEngine {
                             purpose: FilePickPurpose::ImportBackup,
                         }],
                     },
-                    "back" => {
-                        self.cancelled = true;
-                        ActionResult::Complete
-                    }
                     _ => ActionResult::UpdateScreen(self.build_screen()),
                 },
                 Step::ShowQr if action_id == "cancel" => {
@@ -817,16 +806,6 @@ mod tests {
 
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "cancel".into(),
-        });
-        assert!(engine.was_cancelled());
-    }
-
-    // @internal
-    #[test]
-    fn select_mode_back_sets_cancelled() {
-        let mut engine = DeviceReplacementEngine::new_target();
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "back".into(),
         });
         assert!(engine.was_cancelled());
     }

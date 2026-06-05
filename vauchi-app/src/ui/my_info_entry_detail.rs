@@ -171,13 +171,6 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
                         role: None,
                     }),
                 },
-                ScreenAction {
-                    id: "back".into(),
-                    label: "Back".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                },
             ],
             progress: None,
             ..Default::default()
@@ -196,7 +189,6 @@ impl WorkflowEngine for MyInfoEntryDetailEngine {
             UserAction::ActionPressed { action_id } => match action_id.as_str() {
                 "edit" => ActionResult::NavigateTo(self.current_screen()),
                 "delete" => ActionResult::Complete,
-                "back" => ActionResult::NavigateTo(self.current_screen()),
                 _ => ActionResult::UpdateScreen(self.current_screen()),
             },
             _ => ActionResult::UpdateScreen(self.current_screen()),

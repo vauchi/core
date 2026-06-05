@@ -20,6 +20,7 @@ use vauchi_core::storage::Storage;
 /// Traces to: features/performance.feature @resources
 // @scenario: performance :: Efficient cryptographic operations
 #[test]
+#[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_encryption_under_100ms() {
     let key = SymmetricKey::generate();
     let plaintext = vec![0xABu8; 64 * 1024]; // 64KB
@@ -40,6 +41,7 @@ fn test_encryption_under_100ms() {
 /// Traces to: features/performance.feature @resources
 // @scenario: performance :: Efficient cryptographic operations
 #[test]
+#[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_decryption_under_100ms() {
     let key = SymmetricKey::generate();
     let plaintext = vec![0xCDu8; 64 * 1024]; // 64KB
@@ -62,6 +64,7 @@ fn test_decryption_under_100ms() {
 // @scenario: performance :: Efficient database queries
 // @scenario: performance :: Search performance with many contacts
 #[test]
+#[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_query_under_50ms_with_1000_contacts() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key.clone()).unwrap();
@@ -109,6 +112,7 @@ fn test_query_under_50ms_with_1000_contacts() {
 /// Traces to: features/performance.feature @pagination
 // @scenario: performance :: Batch contact loading with pagination
 #[test]
+#[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_pagination_under_100ms_per_page() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key.clone()).unwrap();
@@ -157,6 +161,7 @@ fn test_pagination_under_100ms_per_page() {
 /// Traces to: features/performance.feature @startup
 // @scenario: performance :: Cold start time
 #[test]
+#[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_storage_open_under_500ms() {
     let tmp = NamedTempFile::new().unwrap();
 
@@ -175,6 +180,7 @@ fn test_storage_open_under_500ms() {
 /// Traces to: features/performance.feature @contacts @scale
 // @scenario: performance :: Handle 1000 contacts
 #[test]
+#[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_list_1000_contacts_under_500ms() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key.clone()).unwrap();
@@ -208,6 +214,7 @@ fn test_list_1000_contacts_under_500ms() {
 /// Traces to: features/performance.feature @contacts @scale
 // @scenario: performance :: Handle 100 contacts smoothly
 #[test]
+#[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_list_100_contacts_under_100ms() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key.clone()).unwrap();
@@ -241,6 +248,7 @@ fn test_list_100_contacts_under_100ms() {
 /// Traces to: features/performance.feature @sync
 // @scenario: performance :: Sync large batch of updates
 #[test]
+#[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_queue_100_pending_updates_under_2s() {
     use vauchi_core::storage::{PendingUpdate, UpdateStatus};
 
@@ -282,6 +290,7 @@ fn test_queue_100_pending_updates_under_2s() {
 /// Traces to: features/performance.feature @stress
 // @scenario: performance :: Handle many simultaneous operations
 #[test]
+#[ignore = "wall-clock perf threshold: flaky under coverage/mutation instrumentation + machine load. Perf regressions are gated by the criterion `performance_regression` bench; these run in the `--ignored` nightly slow-test job. Kept out of the cargo-mutants baseline so it does not abort before testing mutants."]
 fn test_sequential_ratchet_operations() {
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::exchange::X3DHKeyPair;

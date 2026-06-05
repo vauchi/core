@@ -48,17 +48,20 @@ struct MoreSection {
 const MORE_SECTIONS: &[MoreSection] = &[
     MoreSection {
         id: "primary",
-        label: "Primary",
+        label: "App",
         items: &[("settings", "Settings"), ("help", "Help")],
     },
     MoreSection {
         id: "secondary",
-        label: "Secondary",
+        label: "Account & Devices",
         items: &[
             ("sync", "Sync"),
             ("device_management", "Linked Devices"),
             ("device_replacement", "Replace Device"),
-            ("recovery", "Backup & Recovery"),
+            // `recovery` opens the Social-Recovery screen — label it for
+            // what it is, not "Backup & Recovery", which collided with the
+            // adjacent file-`backup` entry and read as a duplicate.
+            ("recovery", "Social Recovery"),
             ("backup", "Backup"),
         ],
     },

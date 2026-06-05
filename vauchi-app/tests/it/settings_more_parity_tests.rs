@@ -262,3 +262,45 @@ fn more_screen_emits_full_action_set_in_stable_order() {
          `2026-05-02-ios-humble-ui-deep-retirement`)."
     );
 }
+
+/// Section headers must describe their *contents*, not their priority
+/// rank. "Primary"/"Secondary" are meaningless to a user (you cannot
+/// guess what "Secondary" holds), so the headers are semantic. The two
+/// backup/recovery entries must also be distinguishable: the entry that
+/// opens the **Social Recovery** screen says exactly that — not a second
+/// "Backup …" string sitting next to the file-`backup` entry, which read
+/// as a confusing duplicate on device (2026-06-05-screen-ux-declutter).
+// @internal
+#[test]
+fn more_section_headers_are_semantic_and_backup_recovery_disambiguated() {
+    let engine = MoreEngine::new();
+    let screen = engine.current_screen();
+    let sections = screen
+        .components
+        .iter()
+        .find_map(|c| match c {
+            Component::SectionedActionList { sections, .. } => Some(sections),
+            _ => None,
+        })
+        .expect("MoreEngine must emit a single Component::SectionedActionList");
+
+    let section_labels: Vec<&str> = sections.iter().map(|s| s.label.as_str()).collect();
+    for banned in ["Primary", "Secondary"] {
+        assert!(
+            !section_labels.contains(&banned),
+            "section headers must be semantic, not priority-rank — found `{banned}` in {section_labels:?}"
+        );
+    }
+
+    let recovery_label = sections
+        .iter()
+        .flat_map(|s| s.items.iter())
+        .find(|i| i.id == "recovery")
+        .map(|i| i.label.as_str())
+        .expect("`recovery` entry must exist");
+    assert_eq!(
+        recovery_label, "Social Recovery",
+        "the entry opening the Social-Recovery screen must be labeled for it, \
+         not a second `Backup & Recovery` string adjacent to the file-backup entry"
+    );
+}

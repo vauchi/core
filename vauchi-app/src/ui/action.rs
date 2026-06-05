@@ -302,6 +302,14 @@ pub enum ActionResult {
     /// `NfcRoleSelection` sub-flow is retired in a follow-up slice. Per
     /// `2026-05-11`-era exchange-engine graduation program.
     StartNfcExchange,
+    /// App layer should navigate to the dedicated DirectTransport (Cable/USB)
+    /// exchange screen (`AppScreen::DirectTransport`). The screen factory builds
+    /// a fresh `DirectTransportEngine` (re-provisioning the consumed `Identity`).
+    /// Emitted by `ExchangeEngine` when the user picks `ExchangeMode::Cable`, and
+    /// by `DirectTransportEngine` itself on the failed screen's Retry action. The
+    /// legacy `ExchangeStep::DirectTransport` sub-flow is retired in slice 3. Per
+    /// `2026-05-11-direct-transport-engine-graduation`.
+    StartDirectTransport,
     /// App layer should call `MobileDeviceLinkSession::confirm_manual`
     /// with the given confirmation code and the current unix timestamp.
     ///

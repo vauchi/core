@@ -28,6 +28,7 @@ mod delivery_status;
 mod device_linking;
 mod device_management;
 mod device_replacement;
+mod direct_transport;
 mod duplicate_detection;
 mod duress_pin;
 mod emergency_broadcast;

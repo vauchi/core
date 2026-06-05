@@ -404,11 +404,26 @@ impl AppEngine {
                     .collect()
             })
             .unwrap_or_default();
+        // Assign the contact to the groups chosen in the preamble and
+        // resolve their names for the success screen (best-effort: a
+        // group failure doesn't block the exchange).
+        let pending_groups = std::mem::take(&mut self.pending_exchange_groups);
+        let mut group_names = Vec::new();
+        for group_id in &pending_groups {
+            if self
+                .vauchi
+                .add_contact_to_group(group_id, &contact_id)
+                .is_ok()
+                && let Ok(group) = self.vauchi.get_group(group_id)
+            {
+                group_names.push(group.name().to_string());
+            }
+        }
         let summary = crate::ui::exchange::success::ExchangeSuccessSummary {
             peer_name,
             received_fields,
             my_visible_fields,
-            group_names: Vec::new(),
+            group_names,
         };
         self.apply_multi_stage_success_summary(summary);
     }

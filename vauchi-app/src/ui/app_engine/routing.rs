@@ -1234,6 +1234,17 @@ impl AppEngine {
             // — picking a mode is a user-action, the rest is core's
             // responsibility.
             ActionResult::StartMultiStageExchange { mode } => {
+                // Carry the group-selection preamble's choice across the
+                // engine handoff (navigate_to replaces the ExchangeEngine)
+                // so persist_exchanged_contact can assign the new contact
+                // + show the group on the success screen
+                // (2026-06-04-exchange-terminal-screens).
+                self.pending_exchange_groups = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::exchange::ExchangeEngine>())
+                    .map(|ex| ex.selected_groups().to_vec())
+                    .unwrap_or_default();
                 let screen = self.navigate_to(AppScreen::MultiStageExchange { mode });
                 ActionResult::NavigateTo(screen)
             }

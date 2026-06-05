@@ -18,6 +18,37 @@
 # Mutation Stage (uses shared template from vauchi/scripts)
 # ============================================================
 
+# ── Baseline-health guard (HARD gate, allow_failure: false) ──────────
+# cargo-mutants aborts before testing ANY mutant if the unmutated baseline
+# is red. mutation:nightly is allow_failure: true (advisory by design), so
+# such a break is otherwise SILENT — it was: an ADR-050 feature-cfg
+# regression (vauchi-app/network-http off => the core-driven link poll
+# compiled out, failing link_{initiator,responder}_poll_tests) produced
+# ZERO mutation data for ~10 days (2026-05-26 .. 06-05) with nothing
+# alarming. This job runs cargo-mutants' EXACT baseline — the command
+# .cargo/mutants.toml drives: nextest, --all-targets --features testing;
+# the default nextest profile excludes cucumber_tests — and FAILS the
+# nightly pipeline loudly when the tree is red. mutation:nightly `needs`
+# it, so the 12h run is skipped (not wasted) on a broken baseline.
+# Fast: ~10 min vs the 12h mutation run.
+mutation:baseline-check:
+  extends: [.linux-runner]
+  stage: mutation
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: false
+  interruptible: false
+  timeout: 1h
+  before_script:
+    - !reference [.self-hosted, before_script]
+    - !reference [.clone-locales, before_script]
+    - !reference [.clone-themes, before_script]
+    - export VAUCHI_THEMES_DIR="$(cd ../themes && pwd)"
+    - export VAUCHI_LOCALES_DIR="$(cd ../locales && pwd)"
+    - command -v cargo-nextest >/dev/null 2>&1 || cargo binstall cargo-nextest --no-confirm 2>/dev/null || true
+  script:
+    - cargo nextest run -p vauchi-core --all-targets --features testing
+
 mutation:nightly:
   extends: [.mutation-nightly, .linux-runner]
   timeout: 12h
@@ -28,6 +59,10 @@ mutation:nightly:
   # in pipeline 2549972279). The nightly must run to completion or hit its own
   # 12h timeout — never be cancelled by an unrelated push.
   interruptible: false
+  # Gate the 12h run on the baseline-health guard: a red baseline aborts
+  # cargo-mutants anyway, so skip the wasted run and let the guard alarm.
+  needs:
+    - job: mutation:baseline-check
   variables:
     MUTATION_PACKAGE: "vauchi-core"
     # With `--features testing` (.cargo/mutants.toml) each mutant runs the full

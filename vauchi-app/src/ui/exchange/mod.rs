@@ -412,6 +412,9 @@ impl ExchangeEngine {
                 // so the picker entry doesn't drop it into the legacy QR
                 // catch-all (frozen on android — the android-qr bug record).
                 // `start_session_if_needed` handles the DirectTransport step.
+                // NOTE: slice 3 flips this to `ActionResult::StartDirectTransport`
+                // (the dedicated `DirectTransportEngine`) and retires the legacy
+                // step + session machinery in the same change.
                 self.step = ExchangeStep::DirectTransport(DirectStep::WaitingForConnection);
                 self.start_session_if_needed()
             }

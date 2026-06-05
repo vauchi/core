@@ -45,7 +45,12 @@ fn identity() -> Identity {
 fn waiting_factory() -> DirectTransportEngine {
     let id = identity();
     let card = ContactCard::new(id.display_name());
-    DirectTransportEngine::new(id, card, UsbRole::Initiator, SystemClock::shared())
+    DirectTransportEngine::new(
+        Some(id),
+        Some(card),
+        UsbRole::Initiator,
+        SystemClock::shared(),
+    )
 }
 
 /// Failed root — an invalid payload drives the engine to the failed screen.

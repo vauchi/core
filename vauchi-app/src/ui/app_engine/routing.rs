@@ -117,6 +117,7 @@ impl AppEngine {
                 | AppScreen::MultiStageExchange { .. }
                 | AppScreen::BleExchange { .. }
                 | AppScreen::NfcExchange
+                | AppScreen::DirectTransport
         ) {
             return None;
         }
@@ -1274,6 +1275,20 @@ impl AppEngine {
                     .map(|ex| ex.selected_groups().to_vec())
                     .unwrap_or_default();
                 let screen = self.navigate_to(AppScreen::NfcExchange);
+                ActionResult::NavigateTo(screen)
+            }
+            // Cable graduation: ExchangeEngine emits StartDirectTransport when
+            // the user picks Cable; DirectTransportEngine also emits it on retry
+            // (a fresh engine re-provisions the consumed identity). Navigate to
+            // the dedicated DirectTransport screen.
+            ActionResult::StartDirectTransport => {
+                self.pending_exchange_groups = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::exchange::ExchangeEngine>())
+                    .map(|ex| ex.selected_groups().to_vec())
+                    .unwrap_or_default();
+                let screen = self.navigate_to(AppScreen::DirectTransport);
                 ActionResult::NavigateTo(screen)
             }
             ActionResult::OpenEntryDetail { field_id } => {

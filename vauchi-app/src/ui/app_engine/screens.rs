@@ -932,6 +932,25 @@ impl AppEngine {
                     device_capabilities.has_camera,
                 ))
             }
+            AppScreen::DirectTransport => {
+                // The Cable engine signs its key offer with the full identity
+                // and sends its own card, so reconstruct both via the
+                // storage-bytes round-trip (Identity has no Clone). A missing
+                // identity/own-card degrades to the engine's Failed screen
+                // (the legacy factory's graceful-degradation contract). The
+                // desktop is always the USB initiator.
+                let identity = vauchi
+                    .identity()
+                    .and_then(reconstruct_identity_via_storage_bytes);
+                let card = vauchi.own_card().ok().flatten();
+                let clock = vauchi.clock().clone();
+                Box::new(crate::ui::DirectTransportEngine::new(
+                    identity,
+                    card,
+                    vauchi_core::exchange::UsbRole::Initiator,
+                    clock,
+                ))
+            }
             AppScreen::VerifyFingerprint { contact_id } => {
                 let contact = vauchi.get_contact(contact_id).ok().flatten();
                 let their_fp = contact

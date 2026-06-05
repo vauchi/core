@@ -5,7 +5,7 @@
 //! Dedicated core-driven Humble engine for `ExchangeMode::Cable` (USB cable /
 //! direct-TCP exchange).
 //!
-//! Graduation Slice 1 (`_private/docs/problems/2026-05-11-direct-transport-engine-graduation/`).
+//! Graduation Slice 1–2 (`_private/docs/problems/2026-05-11-direct-transport-engine-graduation/`).
 //! Unlike BLE/NFC (which wrap a self-contained flow struct), Cable has none —
 //! it owns an [`ExchangeSession`] (`new_usb`) directly and drives the
 //! security-critical completion machinery the legacy `ExchangeEngine` used to
@@ -26,9 +26,11 @@
 //!   shared completion machinery (reciprocity confirmer + success summary +
 //!   state sync).
 //!
-//! The mode-dispatch entry (`ActionResult::StartDirectTransport`), the
-//! `AppScreen::DirectTransport` factory, and the legacy parent retirement land
-//! in slices 2–3.
+//! The session is `Option`: the factory degrades gracefully to a Failed screen
+//! when no identity/own-card is available (mirrors the legacy `ExchangeEngine`
+//! factory contract, `screens.rs:300` — a missing identity is a should-never-
+//! happen contract violation, not a panic). The legacy parent retirement lands
+//! in slice 3.
 
 use std::sync::Arc;
 
@@ -81,7 +83,10 @@ enum StateSync {
 /// Dedicated Cable (USB / direct-TCP) exchange engine — owns its
 /// [`ExchangeSession`] and the completion machinery.
 pub struct DirectTransportEngine {
-    session: ExchangeSession,
+    /// `None` only when the factory could not provide an identity + own card;
+    /// the engine then starts on the Failed screen. Always `Some` on a
+    /// non-terminal screen.
+    session: Option<ExchangeSession>,
     reciprocity_confirmer: Option<ReciprocityConfirmer>,
     success_summary: Option<super::success::ExchangeSuccessSummary>,
     clock: Arc<dyn Clock>,
@@ -93,28 +98,40 @@ pub struct DirectTransportEngine {
 }
 
 impl DirectTransportEngine {
-    /// Build a fresh Cable engine. The `identity` + `card` are consumed by the
+    /// Build a fresh Cable engine. `identity` + `card` are consumed by the
     /// `new_usb` session (the identity is not cloneable — retry re-provisions a
-    /// fresh engine via the factory, mirroring NFC/Link).
+    /// fresh engine via the factory, mirroring NFC/Link). When either is
+    /// `None` (a should-never-happen contract violation post-onboarding) the
+    /// engine degrades to the Failed screen rather than panicking.
     pub fn new(
-        identity: Identity,
-        card: ContactCard,
+        identity: Option<Identity>,
+        card: Option<ContactCard>,
         role: UsbRole,
         clock: Arc<dyn Clock>,
     ) -> Self {
-        let session = ExchangeSession::new_usb(
-            identity,
-            card,
-            ManualConfirmationVerifier::new(),
-            role,
-            clock.clone(),
-        );
+        let session = match (identity, card) {
+            (Some(identity), Some(card)) => Some(ExchangeSession::new_usb(
+                identity,
+                card,
+                ManualConfirmationVerifier::new(),
+                role,
+                clock.clone(),
+            )),
+            _ => None,
+        };
+        let screen = if session.is_some() {
+            DirectScreen::Waiting
+        } else {
+            DirectScreen::Failed {
+                reason: Some("Identity unavailable — cannot start a USB exchange".into()),
+            }
+        };
         Self {
             session,
             reciprocity_confirmer: None,
             success_summary: None,
             clock,
-            screen: DirectScreen::Waiting,
+            screen,
             started: false,
             cancelled: false,
         }
@@ -261,11 +278,13 @@ impl DirectTransportEngine {
     /// Snapshot the session state into an owned [`StateSync`], dropping the
     /// session borrow so the completion machinery can mutate `self`.
     fn snapshot_state(&self) -> StateSync {
-        match self.session.state() {
-            ExchangeState::Complete { contact } => StateSync::Complete(contact.clone()),
-            ExchangeState::Failed { error } => StateSync::Failed(error.user_message().to_string()),
-            ExchangeState::AwaitingKeyAgreement { .. }
-            | ExchangeState::AwaitingCardExchange { .. } => StateSync::Progressing,
+        match self.session.as_ref().map(|s| s.state()) {
+            Some(ExchangeState::Complete { contact }) => StateSync::Complete(contact.clone()),
+            Some(ExchangeState::Failed { error }) => {
+                StateSync::Failed(error.user_message().to_string())
+            }
+            Some(ExchangeState::AwaitingKeyAgreement { .. })
+            | Some(ExchangeState::AwaitingCardExchange { .. }) => StateSync::Progressing,
             _ => StateSync::Other,
         }
     }
@@ -286,23 +305,26 @@ impl DirectTransportEngine {
 
         // Create the reciprocity confirmer from the session's tokens + escrow
         // keys. Don't transition to Success until reciprocity is confirmed.
-        let tokens = (
-            self.session.our_confirmation_token().copied(),
-            self.session.expected_their_token().copied(),
-        );
-        let escrow = self
+        let our_token = self
             .session
-            .confirmation_escrow()
-            .map(|(gate, our_slot, their_slot)| {
+            .as_ref()
+            .and_then(|s| s.our_confirmation_token().copied());
+        let their_token = self
+            .session
+            .as_ref()
+            .and_then(|s| s.expected_their_token().copied());
+        let escrow = self.session.as_ref().and_then(|s| {
+            s.confirmation_escrow().map(|(gate, our_slot, their_slot)| {
                 (
                     gate.to_string(),
                     our_slot.to_string(),
                     their_slot.to_string(),
                 )
-            });
+            })
+        });
 
         if self.reciprocity_confirmer.is_none()
-            && let (Some(our_token), Some(their_token)) = tokens
+            && let (Some(our_token), Some(their_token)) = (our_token, their_token)
             && let Some((gate, our_slot, their_slot)) = escrow
         {
             let mut confirmer = ReciprocityConfirmer::new(
@@ -346,8 +368,11 @@ impl WorkflowEngine for DirectTransportEngine {
             return Vec::new();
         }
         self.started = true;
-        self.session.emit_initial_commands();
-        self.session.drain_commands()
+        if let Some(session) = self.session.as_mut() {
+            session.emit_initial_commands();
+            return session.drain_commands();
+        }
+        Vec::new()
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
@@ -398,30 +423,46 @@ impl WorkflowEngine for DirectTransportEngine {
             None
         };
 
-        if let Err(e) = self.session.apply_hardware_event(event) {
-            self.screen = DirectScreen::Failed {
-                reason: Some(e.user_message().to_string()),
-            };
-            return Some(ActionResult::UpdateScreen(self.build_screen()));
-        }
-        let mut commands = self.session.drain_commands();
-
-        // Phase A: USB auto-advance. After DirectPayloadReceived →
-        // AwaitingKeyAgreement, drive PerformKeyAgreement (emits DirectSendCard,
-        // sets proximity High internally for USB). The peer's card arrives later
-        // as DirectCardReceived (Phase B), which completes the session.
-        if matches!(
-            self.session.state(),
-            ExchangeState::AwaitingKeyAgreement { .. }
-        ) && self.session.transport() == ExchangeTransport::Usb
-        {
-            if let Err(e) = self.session.apply(ExchangeEvent::PerformKeyAgreement) {
+        // Apply the event to the session. Each access is a short `as_mut`/
+        // `as_ref` so the borrow drops before we mutate `self.screen`.
+        match self.session.as_mut().map(|s| s.apply_hardware_event(event)) {
+            None => return None, // no session (degenerate Failed-at-construction)
+            Some(Err(e)) => {
                 self.screen = DirectScreen::Failed {
                     reason: Some(e.user_message().to_string()),
                 };
                 return Some(ActionResult::UpdateScreen(self.build_screen()));
             }
-            commands.extend(self.session.drain_commands());
+            Some(Ok(())) => {}
+        }
+        let mut commands = self
+            .session
+            .as_mut()
+            .map(|s| s.drain_commands())
+            .unwrap_or_default();
+
+        // Phase A: USB auto-advance. After DirectPayloadReceived →
+        // AwaitingKeyAgreement, drive PerformKeyAgreement (emits DirectSendCard,
+        // sets proximity High internally for USB). The peer's card arrives later
+        // as DirectCardReceived (Phase B), which completes the session.
+        let needs_key_agreement = self.session.as_ref().is_some_and(|s| {
+            matches!(s.state(), ExchangeState::AwaitingKeyAgreement { .. })
+                && s.transport() == ExchangeTransport::Usb
+        });
+        if needs_key_agreement {
+            if let Some(Err(e)) = self
+                .session
+                .as_mut()
+                .map(|s| s.apply(ExchangeEvent::PerformKeyAgreement))
+            {
+                self.screen = DirectScreen::Failed {
+                    reason: Some(e.user_message().to_string()),
+                };
+                return Some(ActionResult::UpdateScreen(self.build_screen()));
+            }
+            if let Some(session) = self.session.as_mut() {
+                commands.extend(session.drain_commands());
+            }
         }
 
         // Route escrow events to the reciprocity confirmer if active.
@@ -486,7 +527,7 @@ mod tests {
     fn engine(name: &str) -> DirectTransportEngine {
         let id = identity(name);
         let c = ContactCard::new(id.display_name());
-        DirectTransportEngine::new(id, c, UsbRole::Initiator, SystemClock::shared())
+        DirectTransportEngine::new(Some(id), Some(c), UsbRole::Initiator, SystemClock::shared())
     }
 
     /// Pull the `DirectSend` payload out of an engine's `screen_entered` output.
@@ -518,6 +559,14 @@ mod tests {
     fn new_engine_renders_waiting_and_not_cancelled() {
         let e = engine("Alice");
         assert_eq!(e.current_screen().screen_id, "exchange_direct_waiting");
+        assert!(!e.was_cancelled());
+    }
+
+    // @internal
+    #[test]
+    fn no_identity_degrades_to_failed_screen() {
+        let e = DirectTransportEngine::new(None, None, UsbRole::Initiator, SystemClock::shared());
+        assert_eq!(e.current_screen().screen_id, "exchange_failed");
         assert!(!e.was_cancelled());
     }
 

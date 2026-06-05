@@ -220,6 +220,12 @@ pub enum AppScreen {
     /// ScreenModel. Replaces the legacy `ExchangeStep::NfcRoleSelection` +
     /// `ExchangeStep::Nfc` sub-flow. Per the exchange-engine graduation program.
     NfcExchange,
+    /// Cable (USB / direct-TCP) exchange — the dedicated `DirectTransportEngine`
+    /// owns a `new_usb` `ExchangeSession` and drives the two-phase card-exchange
+    /// ceremony from a pure ScreenModel. Replaces the legacy
+    /// `ExchangeStep::DirectTransport` sub-flow. Per
+    /// `2026-05-11-direct-transport-engine-graduation`.
+    DirectTransport,
 }
 
 impl AppScreen {
@@ -298,6 +304,7 @@ impl AppScreen {
             Self::LinkExchange => "link_exchange",
             Self::BleExchange { .. } => "ble_exchange",
             Self::NfcExchange => "nfc_exchange",
+            Self::DirectTransport => "direct_transport",
         }
     }
 

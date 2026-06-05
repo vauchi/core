@@ -1,0 +1,556 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Dedicated core-driven Humble engine for the NFC exchange mode
+//! (`ExchangeMode::TapTap`).
+//!
+//! NFC graduation (exchange-engine graduation program): a `WorkflowEngine`
+//! that **wraps** the existing, well-tested [`super::nfc::NfcExchangeFlow`]
+//! 3-phase handshake state machine rather than rewriting it. The engine owns
+//! the flow, renders the role-chooser + sub-flow screens, maps the flow's
+//! `NfcHardwareOutcome`s to `ActionResult`s (lifted from the legacy
+//! `ExchangeEngine::apply_nfc_outcome`, including the relay-escrow handoff on
+//! a dropped tap), and performs the lazy HCE-responder bootstrap on the peer's
+//! first tap.
+//!
+//! Mirrors [`super::ble_engine::BleExchangeEngine`] /
+//! `LinkExchangeEngine` / `MultiStageExchangeEngine`. Two NFC-specific
+//! wrinkles vs BLE:
+//! - **Role selection.** The engine opens on a Send/Receive chooser
+//!   (`exchange_nfc_role`); Send starts an initiator flow up-front, Receive
+//!   defers flow creation to the lazy bootstrap.
+//! - **Retry re-creates the engine.** The signing `Identity` is consumed
+//!   (un-cloneable) when a flow is built, so the failed screen's Retry emits
+//!   `ActionResult::StartNfcExchange` (a fresh engine re-provisions it),
+//!   mirroring `LinkExchangeEngine` rather than BLE's in-place reset.
+
+use crate::ui::*;
+use vauchi_core::identity::Identity;
+use vauchi_core::{Command, Event};
+
+use super::nfc::{NfcExchangeFlow, NfcHardwareOutcome, NfcStep, build_nfc_screen};
+
+/// Action id for the Cancel button (any screen).
+pub const ACTION_CANCEL: &str = "cancel";
+/// Action id for the Retry button on the failed screen.
+pub const ACTION_RETRY: &str = "retry";
+/// Action id for the Done button on the success screen.
+pub const ACTION_DONE: &str = "done";
+/// Role-chooser item id: act as the initiator ("Send").
+pub const ROLE_SEND: &str = "nfc_role:send";
+/// Role-chooser item id: act as the responder ("Receive").
+pub const ROLE_RECEIVE: &str = "nfc_role:receive";
+
+/// Relay-escrow TTL when an NFC tap drops after the shared key is established.
+/// Mirrors Link-mode's 7-day default (`link_mode.rs` `DEFAULT_TTL_SECONDS`).
+const NFC_RELAY_TTL_SECONDS: u32 = 604_800;
+
+/// Presentation state of the NFC engine. The active sub-flow screen is derived
+/// from the wrapped flow's `NfcStep`; `Success`/`Failed` are terminal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum NfcScreen {
+    /// Send/Receive chooser, rendered before any flow exists.
+    RoleSelection,
+    /// A role was picked; render the sub-flow (or the AwaitingTap holding
+    /// screen for the responder before its lazy bootstrap fires).
+    Active,
+    Success,
+    Failed {
+        reason: Option<String>,
+    },
+}
+
+/// Dedicated NFC exchange engine — wraps [`NfcExchangeFlow`].
+pub struct NfcExchangeEngine {
+    /// The signing identity, consumed when a flow is built (initiator on Send,
+    /// responder on the lazy bootstrap). `None` after consumption or if the
+    /// host could not reconstruct it.
+    identity: Option<Identity>,
+    display_name: String,
+    /// QR fallback is offered on failure only when this device has a camera.
+    has_camera: bool,
+    /// The wrapped handshake flow. `None` until a role builds it (Send builds
+    /// it up-front; Receive defers to the first-tap lazy bootstrap).
+    flow: Option<NfcExchangeFlow>,
+    screen: NfcScreen,
+    cancelled: bool,
+}
+
+impl NfcExchangeEngine {
+    /// Build a fresh NFC engine. `identity` is the reconstructed signing
+    /// identity (None if the host could not provide one — the role pick then
+    /// fails gracefully); `has_camera` gates the QR fallback on the failed
+    /// screen.
+    pub fn new(identity: Option<Identity>, display_name: String, has_camera: bool) -> Self {
+        Self {
+            identity,
+            display_name,
+            has_camera,
+            flow: None,
+            screen: NfcScreen::RoleSelection,
+            cancelled: false,
+        }
+    }
+
+    /// The sub-flow step currently driving the Active screen — the flow's step
+    /// if it exists, else `AwaitingTap` (the responder holding screen before
+    /// its lazy bootstrap).
+    fn active_step(&self) -> NfcStep {
+        self.flow
+            .as_ref()
+            .map(|f| f.step().clone())
+            .unwrap_or(NfcStep::AwaitingTap)
+    }
+
+    fn progress(&self) -> Progress {
+        Progress {
+            current_step: self.active_step().step_number(0),
+            total_steps: NfcStep::STEP_COUNT,
+            label: None,
+        }
+    }
+
+    /// Send: build the initiator flow now and emit its key-offer activation.
+    fn start_send(&mut self) -> ActionResult {
+        let identity = match self.identity.take() {
+            Some(id) => id,
+            None => return self.fail("no active identity for NFC exchange".into()),
+        };
+        let mut flow = NfcExchangeFlow::new_initiator(identity, self.display_name.clone());
+        match flow.activate() {
+            Ok(commands) => {
+                self.flow = Some(flow);
+                self.screen = NfcScreen::Active;
+                ActionResult::Commands { commands }
+            }
+            Err(e) => self.fail(format!("NFC activation failed: {e:?}")),
+        }
+    }
+
+    /// Receive: defer flow creation to the lazy bootstrap, but emit an empty
+    /// `NfcActivate` now so the frontend registers its HCE context before the
+    /// peer's first tap (empty payload = responder; non-empty = initiator).
+    fn start_receive(&mut self) -> ActionResult {
+        if self.identity.is_none() {
+            return self.fail("no active identity for NFC exchange".into());
+        }
+        self.screen = NfcScreen::Active;
+        ActionResult::Commands {
+            commands: vec![Command::NfcActivate {
+                payload: Vec::new(),
+            }],
+        }
+    }
+
+    fn fail(&mut self, reason: String) -> ActionResult {
+        self.screen = NfcScreen::Failed {
+            reason: Some(reason),
+        };
+        ActionResult::UpdateScreen(self.build_screen())
+    }
+
+    fn build_screen(&self) -> ScreenModel {
+        match &self.screen {
+            NfcScreen::RoleSelection => super::build_nfc_role_screen(self.progress()),
+            NfcScreen::Active => build_nfc_screen(&self.active_step(), self.progress()),
+            NfcScreen::Success => self.build_success_screen(),
+            NfcScreen::Failed { reason } => self.build_failed_screen(reason.clone()),
+        }
+    }
+
+    fn build_success_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "exchange_success".into(),
+            title: "Success".into(),
+            subtitle: None,
+            components: vec![Component::StatusIndicator {
+                id: "success_status".into(),
+                icon: None,
+                title: "Exchange Complete".into(),
+                detail: None,
+                status: Status::Success,
+                a11y: Some(A11y {
+                    label: Some("Exchange complete".into()),
+                    hint: Some("Contact cards have been exchanged successfully".into()),
+                    role: None,
+                }),
+            }],
+            actions: vec![ScreenAction {
+                id: ACTION_DONE.into(),
+                label: "Done".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+                a11y: None,
+            }],
+            progress: Some(self.progress()),
+            ..Default::default()
+        }
+    }
+
+    fn build_failed_screen(&self, detail: Option<String>) -> ScreenModel {
+        let mut actions = vec![ScreenAction {
+            id: ACTION_RETRY.into(),
+            label: "Retry".into(),
+            style: ActionStyle::Primary,
+            enabled: true,
+            a11y: None,
+        }];
+        if self.has_camera {
+            actions.push(ScreenAction {
+                id: "fallback_qr".into(),
+                label: "Switch to QR".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: Some(A11y {
+                    label: None,
+                    hint: Some(
+                        "Abandons this attempt and restarts the exchange using camera QR codes."
+                            .into(),
+                    ),
+                    role: None,
+                }),
+            });
+        }
+        actions.push(ScreenAction {
+            id: "fallback_relay".into(),
+            label: "Switch to encrypted relay".into(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: Some(A11y {
+                label: None,
+                hint: Some(
+                    "Abandons this attempt and completes the exchange over the encrypted relay server."
+                        .into(),
+                ),
+                role: None,
+            }),
+        });
+        actions.push(ScreenAction {
+            id: ACTION_CANCEL.into(),
+            label: "Cancel".into(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: None,
+        });
+        ScreenModel {
+            screen_id: "exchange_failed".into(),
+            title: "Failed".into(),
+            subtitle: None,
+            components: vec![Component::StatusIndicator {
+                id: "failed_status".into(),
+                icon: None,
+                title: "Exchange Failed".into(),
+                detail,
+                status: Status::Failed,
+                a11y: Some(A11y {
+                    label: Some("Exchange failed".into()),
+                    hint: Some("The exchange did not complete. Retry or cancel.".into()),
+                    role: None,
+                }),
+            }],
+            actions,
+            progress: Some(self.progress()),
+            ..Default::default()
+        }
+    }
+
+    /// Translate an `NfcHardwareOutcome` to an `ActionResult` + state change.
+    /// Lifted from the legacy `ExchangeEngine::apply_nfc_outcome`.
+    fn apply_outcome(&mut self, outcome: NfcHardwareOutcome) -> ActionResult {
+        match outcome {
+            NfcHardwareOutcome::StepAdvanced { commands }
+            | NfcHardwareOutcome::Consumed { commands } => {
+                if commands.is_empty() {
+                    ActionResult::UpdateScreen(self.build_screen())
+                } else {
+                    ActionResult::Commands { commands }
+                }
+            }
+            NfcHardwareOutcome::Complete {
+                card_bytes: _,
+                commands,
+            } => {
+                // Card persistence is core-owned via the completion path; the
+                // engine only flips to the terminal success screen.
+                self.screen = NfcScreen::Success;
+                if commands.is_empty() {
+                    ActionResult::UpdateScreen(self.build_screen())
+                } else {
+                    ActionResult::Commands { commands }
+                }
+            }
+            NfcHardwareOutcome::FailedWithFallback {
+                reason,
+                relay_handoff,
+            } => {
+                self.screen = NfcScreen::Failed {
+                    reason: Some(reason),
+                };
+                // A tap that drops after the shared key is established can still
+                // complete over the relay: deposit the encrypted card into
+                // escrow rather than just showing the failed screen.
+                if let Some(handoff) = relay_handoff {
+                    ActionResult::Commands {
+                        commands: vec![Command::RelayEscrowDeposit {
+                            gate_hash: handoff.gate_hash,
+                            slot_hash: handoff.slot_hash,
+                            encrypted_card: handoff.encrypted_card,
+                            ttl_seconds: NFC_RELAY_TTL_SECONDS,
+                        }],
+                    }
+                } else {
+                    ActionResult::UpdateScreen(self.build_screen())
+                }
+            }
+            NfcHardwareOutcome::Ignored => ActionResult::UpdateScreen(self.build_screen()),
+        }
+    }
+}
+
+impl WorkflowEngine for NfcExchangeEngine {
+    fn current_screen(&self) -> ScreenModel {
+        self.build_screen()
+    }
+
+    fn handle_action(&mut self, action: UserAction) -> ActionResult {
+        match &self.screen {
+            NfcScreen::RoleSelection => match action {
+                UserAction::ListItemSelected { item_id, .. } if item_id == ROLE_SEND => {
+                    self.start_send()
+                }
+                UserAction::ListItemSelected { item_id, .. } if item_id == ROLE_RECEIVE => {
+                    self.start_receive()
+                }
+                UserAction::ActionPressed { action_id } if action_id == ACTION_CANCEL => {
+                    self.cancelled = true;
+                    ActionResult::Complete
+                }
+                _ => ActionResult::UpdateScreen(self.build_screen()),
+            },
+            NfcScreen::Active => match action {
+                UserAction::ActionPressed { action_id } if action_id == ACTION_CANCEL => {
+                    self.cancelled = true;
+                    ActionResult::Complete
+                }
+                _ => ActionResult::UpdateScreen(self.build_screen()),
+            },
+            NfcScreen::Success => match action {
+                UserAction::ActionPressed { action_id } if action_id == ACTION_DONE => {
+                    ActionResult::Complete
+                }
+                _ => ActionResult::UpdateScreen(self.build_screen()),
+            },
+            NfcScreen::Failed { .. } => match action {
+                UserAction::ActionPressed { action_id } if action_id == ACTION_RETRY => {
+                    // The consumed `Identity` cannot be re-cloned, so retry asks
+                    // the AppEngine for a fresh engine (mirrors Link).
+                    ActionResult::StartNfcExchange
+                }
+                // `cancel` and the `fallback_*` transport switches all end this
+                // attempt; the relay/QR switch is a router concern, treated as
+                // cancel here so the buttons never dead-end silently.
+                _ => {
+                    self.cancelled = true;
+                    ActionResult::Complete
+                }
+            },
+        }
+    }
+
+    fn handle_hardware_event(&mut self, event: Event) -> Option<ActionResult> {
+        if !matches!(self.screen, NfcScreen::Active) {
+            return None;
+        }
+
+        // Lazy HCE-responder bootstrap: the responder has no flow until the
+        // peer's first tap lands as `NfcDataReceived`. Spin it up, then let the
+        // same event fall through to the flow below
+        // (`2026-05-29-nfc-exchange-mode-entry-wiring`).
+        if self.flow.is_none()
+            && matches!(event, Event::NfcDataReceived { .. })
+            && let Some(identity) = self.identity.take()
+        {
+            let mut flow = NfcExchangeFlow::new_responder(identity, self.display_name.clone());
+            // activate() emits an empty NfcActivate (already listening via HCE);
+            // discard it — the tap already happened and is processed below.
+            if flow.activate().is_ok() {
+                self.flow = Some(flow);
+            }
+        }
+
+        let flow = self.flow.as_mut()?;
+        let outcome = flow.handle_event(&event);
+        Some(self.apply_outcome(outcome))
+    }
+
+    fn was_cancelled(&self) -> bool {
+        self.cancelled
+    }
+
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        Some(self)
+    }
+}
+
+// INLINE_TEST_REQUIRED: the engine wraps private flow state; tests drive it via
+// the public WorkflowEngine surface + the screen/action ids.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vauchi_core::clock::SystemClock;
+
+    fn identity() -> Identity {
+        Identity::create("Alice", SystemClock::shared().unix_seconds())
+    }
+
+    fn engine() -> NfcExchangeEngine {
+        NfcExchangeEngine::new(Some(identity()), "Alice".into(), true)
+    }
+
+    fn select(item: &str) -> UserAction {
+        UserAction::ListItemSelected {
+            component_id: "nfc_role".into(),
+            item_id: item.into(),
+        }
+    }
+
+    fn press(id: &str) -> UserAction {
+        UserAction::ActionPressed {
+            action_id: id.into(),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn new_engine_renders_role_chooser() {
+        let e = engine();
+        assert_eq!(e.current_screen().screen_id, "exchange_nfc_role");
+        assert!(!e.was_cancelled());
+    }
+
+    // @internal
+    #[test]
+    fn send_starts_initiator_and_emits_nfc_activate_with_payload() {
+        let mut e = engine();
+        let result = e.handle_action(select(ROLE_SEND));
+        match result {
+            ActionResult::Commands { commands } => match &commands[0] {
+                Command::NfcActivate { payload } => {
+                    assert!(!payload.is_empty(), "initiator sends a non-empty key offer")
+                }
+                other => panic!("expected NfcActivate, got {other:?}"),
+            },
+            other => panic!("expected Commands, got {other:?}"),
+        }
+        assert_eq!(
+            e.current_screen().screen_id,
+            "exchange_nfc_awaiting_tap",
+            "after Send the engine awaits the tap"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn receive_emits_empty_nfc_activate_and_defers_flow() {
+        let mut e = engine();
+        let result = e.handle_action(select(ROLE_RECEIVE));
+        match result {
+            ActionResult::Commands { commands } => match &commands[0] {
+                Command::NfcActivate { payload } => {
+                    assert!(
+                        payload.is_empty(),
+                        "responder registers HCE with empty payload"
+                    )
+                }
+                other => panic!("expected NfcActivate, got {other:?}"),
+            },
+            other => panic!("expected Commands, got {other:?}"),
+        }
+        assert_eq!(e.current_screen().screen_id, "exchange_nfc_awaiting_tap");
+        assert!(
+            e.flow.is_none(),
+            "responder flow is built lazily on first tap"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn send_without_identity_fails_gracefully() {
+        let mut e = NfcExchangeEngine::new(None, "Alice".into(), true);
+        let _ = e.handle_action(select(ROLE_SEND));
+        assert_eq!(e.current_screen().screen_id, "exchange_failed");
+    }
+
+    // @internal
+    #[test]
+    fn cancel_on_role_chooser_completes_and_marks_cancelled() {
+        let mut e = engine();
+        let result = e.handle_action(press(ACTION_CANCEL));
+        assert!(matches!(result, ActionResult::Complete));
+        assert!(e.was_cancelled());
+    }
+
+    // @internal
+    #[test]
+    fn cancel_during_active_flow_completes() {
+        let mut e = engine();
+        let _ = e.handle_action(select(ROLE_SEND));
+        let result = e.handle_action(press(ACTION_CANCEL));
+        assert!(matches!(result, ActionResult::Complete));
+        assert!(e.was_cancelled());
+    }
+
+    // @internal
+    #[test]
+    fn retry_from_failed_requests_a_fresh_engine() {
+        let mut e = NfcExchangeEngine::new(None, "Alice".into(), true);
+        let _ = e.handle_action(select(ROLE_SEND)); // -> Failed (no identity)
+        assert_eq!(e.current_screen().screen_id, "exchange_failed");
+        let result = e.handle_action(press(ACTION_RETRY));
+        assert!(
+            matches!(result, ActionResult::StartNfcExchange),
+            "retry re-creates the engine to re-provision the identity, got {result:?}"
+        );
+    }
+
+    // @internal
+    #[test]
+    fn failed_screen_offers_qr_fallback_only_with_camera() {
+        let mut with = NfcExchangeEngine::new(None, "A".into(), true);
+        let _ = with.handle_action(select(ROLE_SEND));
+        let with_ids: Vec<String> = with
+            .current_screen()
+            .actions
+            .iter()
+            .map(|a| a.id.clone())
+            .collect();
+        assert!(with_ids.iter().any(|i| i == "fallback_qr"));
+
+        let mut without = NfcExchangeEngine::new(None, "A".into(), false);
+        let _ = without.handle_action(select(ROLE_SEND));
+        let without_ids: Vec<String> = without
+            .current_screen()
+            .actions
+            .iter()
+            .map(|a| a.id.clone())
+            .collect();
+        assert!(!without_ids.iter().any(|i| i == "fallback_qr"));
+        assert!(without_ids.iter().any(|i| i == "retry"));
+    }
+
+    // @internal
+    #[test]
+    fn hardware_event_ignored_off_active_screen() {
+        let mut e = engine();
+        // On the role chooser, a stray NFC event is a no-op.
+        let result = e.handle_hardware_event(Event::NfcDataReceived {
+            data: vec![1, 2, 3],
+        });
+        assert!(result.is_none());
+    }
+}

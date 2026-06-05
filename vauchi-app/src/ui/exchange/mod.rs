@@ -17,6 +17,7 @@ pub mod ble_engine;
 pub(crate) mod field_preview;
 pub(crate) mod mode_selection;
 pub(crate) mod nfc;
+pub mod nfc_engine;
 pub(crate) mod scan_quality;
 pub(crate) mod success;
 pub(crate) mod verifying;
@@ -472,7 +473,9 @@ impl ExchangeEngine {
                 // Core-driven role choice (Send/Receive) before the NFC
                 // flow — a two-device exchange needs one initiator + one
                 // responder, so both devices opening the screen must NOT
-                // both Send.
+                // both Send. (NFC graduation slice 2 flips this to
+                // `ActionResult::StartNfcExchange` → the dedicated
+                // `NfcExchangeEngine`; the engine + plumbing land first.)
                 self.step = ExchangeStep::NfcRoleSelection;
                 ActionResult::NavigateTo(self.build_screen())
             }

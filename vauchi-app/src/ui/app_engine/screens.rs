@@ -914,6 +914,25 @@ impl AppEngine {
                 *mode,
                 device_capabilities.has_camera,
             )),
+            AppScreen::NfcExchange => {
+                // The NFC engine signs its key offer with the full identity, so
+                // reconstruct it via the storage-bytes round-trip (Identity has
+                // no Clone — same path the legacy `set_nfc_identity` used).
+                let display_name = vauchi
+                    .own_card()
+                    .ok()
+                    .flatten()
+                    .map(|c| c.display_name().to_string())
+                    .unwrap_or_default();
+                let identity = vauchi
+                    .identity()
+                    .and_then(reconstruct_identity_via_storage_bytes);
+                Box::new(crate::ui::NfcExchangeEngine::new(
+                    identity,
+                    display_name,
+                    device_capabilities.has_camera,
+                ))
+            }
             AppScreen::VerifyFingerprint { contact_id } => {
                 let contact = vauchi.get_contact(contact_id).ok().flatten();
                 let their_fp = contact

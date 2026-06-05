@@ -24,3 +24,9 @@
 # standalone test would need a full Vauchi instance and re-walk those same
 # screens, so it is intentionally retained here rather than ratcheted out.
 AppEngine
+
+# NFC graduation: NfcExchangeEngine is wired live in the screen factory but
+# the TapTap dispatch is not flipped to it until slice 2, and its reachability
+# test (tests/reachability/nfc_exchange.rs) lands in the final slice — which
+# REMOVES this entry. Exchange-engine graduation program (NFC).
+NfcExchangeEngine

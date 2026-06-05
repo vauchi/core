@@ -292,6 +292,16 @@ pub enum ActionResult {
     StartBleExchange {
         mode: ExchangeMode,
     },
+    /// App layer should navigate to the dedicated NFC-exchange screen
+    /// (`AppScreen::NfcExchange`) for TapTap. The screen factory builds a
+    /// fresh `NfcExchangeEngine` (reconstructing the signing `Identity` from
+    /// storage). Emitted by `ExchangeEngine` when the user picks
+    /// `ExchangeMode::TapTap`, and by `NfcExchangeEngine` itself on the failed
+    /// screen's Retry action (a fresh engine re-provisions the consumed,
+    /// un-cloneable `Identity`). The legacy `ExchangeStep::Nfc` /
+    /// `NfcRoleSelection` sub-flow is retired in a follow-up slice. Per
+    /// `2026-05-11`-era exchange-engine graduation program.
+    StartNfcExchange,
     /// App layer should call `MobileDeviceLinkSession::confirm_manual`
     /// with the given confirmation code and the current unix timestamp.
     ///

@@ -215,6 +215,11 @@ pub enum AppScreen {
     BleExchange {
         mode: vauchi_core::exchange::mode::ExchangeMode,
     },
+    /// NFC in-person exchange (TapTap) — the dedicated `NfcExchangeEngine`
+    /// drives the Send/Receive role choice → 3-phase tap handshake from a pure
+    /// ScreenModel. Replaces the legacy `ExchangeStep::NfcRoleSelection` +
+    /// `ExchangeStep::Nfc` sub-flow. Per the exchange-engine graduation program.
+    NfcExchange,
 }
 
 impl AppScreen {
@@ -292,6 +297,7 @@ impl AppScreen {
             Self::MultiStageExchange { .. } => "multi_stage_exchange",
             Self::LinkExchange => "link_exchange",
             Self::BleExchange { .. } => "ble_exchange",
+            Self::NfcExchange => "nfc_exchange",
         }
     }
 

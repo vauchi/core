@@ -108,6 +108,11 @@ pub use exchange::ble_engine::{
     ACTION_CANCEL as BLE_EXCHANGE_ACTION_CANCEL, ACTION_DONE as BLE_EXCHANGE_ACTION_DONE,
     ACTION_RETRY as BLE_EXCHANGE_ACTION_RETRY, BleExchangeEngine,
 };
+pub use exchange::nfc_engine::{
+    ACTION_CANCEL as NFC_EXCHANGE_ACTION_CANCEL, ACTION_DONE as NFC_EXCHANGE_ACTION_DONE,
+    ACTION_RETRY as NFC_EXCHANGE_ACTION_RETRY, NfcExchangeEngine, ROLE_RECEIVE as NFC_ROLE_RECEIVE,
+    ROLE_SEND as NFC_ROLE_SEND,
+};
 pub use exchange::{ExchangeConfig, ExchangeEngine};
 pub use fingerprint_verify::{FingerprintVerifyEngine, VerifyAction};
 pub use form_dialog::{FormDialogEngine, FormDialogType};

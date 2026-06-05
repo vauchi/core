@@ -116,6 +116,7 @@ impl AppEngine {
                 | AppScreen::Recovery
                 | AppScreen::MultiStageExchange { .. }
                 | AppScreen::BleExchange { .. }
+                | AppScreen::NfcExchange
         ) {
             return None;
         }
@@ -1268,6 +1269,20 @@ impl AppEngine {
                     .map(|ex| ex.selected_groups().to_vec())
                     .unwrap_or_default();
                 let screen = self.navigate_to(AppScreen::BleExchange { mode });
+                ActionResult::NavigateTo(screen)
+            }
+            // NFC graduation: ExchangeEngine emits StartNfcExchange when the
+            // user picks TapTap; NfcExchangeEngine also emits it on retry (a
+            // fresh engine re-provisions the consumed identity). Navigate to
+            // the dedicated NfcExchange screen.
+            ActionResult::StartNfcExchange => {
+                self.pending_exchange_groups = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<crate::ui::exchange::ExchangeEngine>())
+                    .map(|ex| ex.selected_groups().to_vec())
+                    .unwrap_or_default();
+                let screen = self.navigate_to(AppScreen::NfcExchange);
                 ActionResult::NavigateTo(screen)
             }
             ActionResult::OpenEntryDetail { field_id } => {

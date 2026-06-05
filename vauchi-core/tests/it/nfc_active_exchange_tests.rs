@@ -11,7 +11,7 @@
 
 use vauchi_core::exchange::{
     ExchangeError, ExchangeEvent, ExchangeNfc, ExchangeSession, ExchangeState, ExchangeTransport,
-    MockProximityVerifier, NFC_PAYLOAD_SIZE, X3DHKeyPair,
+    MockProximityVerifier, NFC_PAYLOAD_SIZE, NfcHandshakeSession, X3DHKeyPair,
 };
 use vauchi_core::{ContactCard, Identity};
 
@@ -311,8 +311,84 @@ fn test_nfc_apdu_select_build() {
     );
     let bytes = payload.to_bytes();
 
-    // Payload should be embeddable in a single APDU (< 255 bytes)
+    // The key_offer leg fits a single short APDU (< 255 bytes). NOTE: this
+    // covers ONLY the Phase-1 send. The Phase-2 *response*
+    // (`key_ack || encrypted_card`) does NOT fit a short APDU — see
+    // `test_nfc_phase2_response_exceeds_short_apdu` below.
     assert!(bytes.len() < 255, "NFC payload should fit in a single APDU");
+}
+
+/// Regression guard for the NFC Phase-2 transport size assumption.
+///
+/// The responder's Phase-2 reply is `key_ack || encrypted_card`
+/// (`vauchi-app/src/ui/exchange/nfc.rs` `handle_awaiting_tap`). The
+/// `key_ack` alone is `NFC_PAYLOAD_SIZE` (174 B), and the encrypted card
+/// adds ~110-130 B (postcard `NfcCardPayload` + XChaCha20-Poly1305
+/// overhead), so the combined reply *unconditionally* exceeds the
+/// ISO 7816-4 short-APDU data limit. The platform transceive shims must
+/// therefore carry it via extended-length APDUs or application-level
+/// chunking — a path that `test_nfc_apdu_select_build` (key_offer only)
+/// never exercised, which let the Phase-2 size bug hide.
+///
+/// See `_private/docs/problems/2026-06-03-nfc-phase2-apdu-chunking`
+/// (Bug 2). This test fails loudly if the reply ever shrinks to fit a
+/// short APDU (transport assumption changed — revisit deliberately) or
+/// bloats past a small-card ceiling (e.g. an avatar added to
+/// `NfcCardPayload` — the transport ceiling must be re-evaluated).
+// @internal — transport-size invariant, no Gherkin scenario
+#[test]
+fn test_nfc_phase2_response_exceeds_short_apdu() {
+    /// ISO 7816-4 short-APDU data field limit (1-byte Lc).
+    const SHORT_APDU_DATA_MAX: usize = 255;
+    /// Sane upper bound for a small (avatar-less) NFC card reply.
+    const PHASE2_RESPONSE_CEILING: usize = 512;
+
+    let now = vauchi_core::clock::SystemClock::shared().unix_seconds();
+    let alice = Identity::create("Alice", 0);
+    let bob = Identity::create("Bob", 0);
+
+    // Phase 1: initiator builds its key offer (fits a short APDU).
+    let mut initiator = NfcHandshakeSession::new_initiator(&alice, "Alice".to_string());
+    let offer = initiator
+        .create_key_offer(&alice, now)
+        .expect("initiator builds key offer");
+    assert_eq!(
+        offer.len(),
+        NFC_PAYLOAD_SIZE,
+        "key_offer must be exactly the fixed NFC payload size"
+    );
+
+    // Phase 2: responder replies with `key_ack || encrypted_card`.
+    let mut responder = NfcHandshakeSession::new_responder(&bob, "Bob".to_string());
+    let (key_ack, encrypted_card) = responder
+        .process_key_offer(&bob, &offer, now)
+        .expect("responder processes key offer");
+
+    assert_eq!(
+        key_ack.len(),
+        NFC_PAYLOAD_SIZE,
+        "key_ack must be exactly the fixed NFC payload size"
+    );
+    assert!(
+        !encrypted_card.is_empty(),
+        "encrypted card must carry the responder's payload"
+    );
+
+    let phase2_len = key_ack.len() + encrypted_card.len();
+
+    assert!(
+        phase2_len > SHORT_APDU_DATA_MAX,
+        "Phase-2 reply is {phase2_len} B; expected > {SHORT_APDU_DATA_MAX}. \
+         The transport MUST handle payloads larger than a short APDU \
+         (extended-length or chunking), so a single-short-APDU assumption \
+         is wrong for the response leg."
+    );
+    assert!(
+        phase2_len <= PHASE2_RESPONSE_CEILING,
+        "Phase-2 reply grew to {phase2_len} B (> {PHASE2_RESPONSE_CEILING}); \
+         the NFC card likely gained a large field (avatar?) — re-evaluate \
+         the transport ceiling and chunking strategy."
+    );
 }
 
 // ============================================================

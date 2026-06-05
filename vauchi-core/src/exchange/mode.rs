@@ -20,9 +20,14 @@ use std::time::Duration;
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ExchangeMode {
-    /// Quick visual scan — both devices display and scan QR codes simultaneously.
+    /// Scan a one-sided QR code, then BLE transfers the card — a quick
+    /// "glance" at one peer's QR to bootstrap a BLE connection (the other peer
+    /// shows the QR). **Not yet implemented:** the config currently named
+    /// `MODE_GLANCE` is a multi-stage-QR config (that transport belongs to the
+    /// `Hover` family), mislabelled as Glance. The real Glance flow (one-sided
+    /// QR bootstrap + BLE data) is tracked by the exchange-mode taxonomy design.
     Glance,
-    /// QR + ultrasonic audio proximity confirmation.
+    /// Bidirectional multi-stage QR + ultrasonic audio proximity confirmation.
     Hover,
     /// BLE + physical impact detection.
     Bump,
@@ -30,7 +35,10 @@ pub enum ExchangeMode {
     Shake,
     /// BLE + ambient audio fingerprint match.
     Magic,
-    /// BLE bootstrapped via NFC tap.
+    /// Pure NFC tap exchange — data over NFC (`DataTransport::Nfc`,
+    /// `NfcBootstrap`), no BLE. Dispatched to `NfcExchangeFlow` via
+    /// `start_taptap_mode`. (Previously documented as "BLE bootstrapped via
+    /// NFC tap" — stale; the implementation is NFC end to end.)
     TapTap,
     /// NFC + BLE + audio + accelerometer multi-factor in-person exchange.
     TapHoverShake,

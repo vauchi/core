@@ -260,6 +260,21 @@ pub enum Command {
     /// retires the orientation `DisposableEffect` in
     /// `android/app/src/main/kotlin/app/vauchi/ui/FaceToFaceExchangeScreen.kt`.
     SetOrientationLock { orientation: Option<Orientation> },
+
+    // ── USB / direct-transport card exchange ───────────────────────
+    // Appended to preserve serde discriminant ordering.
+    /// Send our AEAD-encrypted `ContactCard` to the peer over the established
+    /// USB / direct-TCP connection (the second leg of the wired exchange, after
+    /// the key-bearing [`Command::DirectSend`] / [`Event::DirectPayloadReceived`]
+    /// round). `ciphertext` is our card encrypted under a key HKDF-derived from
+    /// the agreed `shared_key` (ADR-019 XChaCha20-Poly1305, ADR-007 domain
+    /// separation). The frontend sends it and reports the peer's encrypted card
+    /// via [`Event::DirectCardReceived`]. `is_initiator` keeps the same
+    /// send/recv ordering discriminator as `DirectSend` (avoids TCP deadlock).
+    DirectSendCard {
+        ciphertext: Vec<u8>,
+        is_initiator: bool,
+    },
 }
 
 /// Screen orientation a frontend should pin to via
@@ -325,6 +340,7 @@ impl Command {
             Self::ShowShareSheet { .. } => "ShowShareSheet",
             Self::BleStopScanning => "BleStopScanning",
             Self::DirectSend { .. } => "DirectSend",
+            Self::DirectSendCard { .. } => "DirectSendCard",
             Self::ImagePickFromLibrary => "ImagePickFromLibrary",
             Self::ImageCaptureFromCamera => "ImageCaptureFromCamera",
             Self::ImagePickFromFile => "ImagePickFromFile",
@@ -496,6 +512,14 @@ pub enum Event {
     ///
     /// Per `_private/docs/designs/2026-05-28-slice-32m-phase-0-event-command-mapping-design.md` §3.2.
     BleMtuNegotiated { device_id: String, mtu: u32 },
+
+    // ── USB / direct-transport card exchange ───────────────────────
+    // Appended to preserve serde discriminant ordering.
+    /// The peer's AEAD-encrypted `ContactCard`, reported by the frontend after
+    /// the second USB / direct-TCP swap requested by [`Command::DirectSendCard`].
+    /// The session decrypts it under the HKDF-derived card key and completes the
+    /// exchange (USB is physical → proximity High, no user step).
+    DirectCardReceived { ciphertext: Vec<u8> },
 }
 
 // INLINE_TEST_REQUIRED: serde roundtrip tests need private enum variant access

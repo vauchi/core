@@ -12,7 +12,8 @@
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 
-use vauchi_core::contact_card::ContactCard;
+use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
+use vauchi_core::exchange::ExchangeError;
 use vauchi_core::exchange::session::{ExchangeEvent, ExchangeSession, ExchangeState};
 use vauchi_core::exchange::tcp_transport::TcpDirectTransport;
 use vauchi_core::exchange::{ManualConfirmationVerifier, ProximityConfidence, UsbRole};
@@ -487,5 +488,167 @@ fn usb_direct_payload_on_qr_session_is_rejected() {
     assert!(
         result.is_err(),
         "DirectPayloadReceived should be rejected on QR session"
+    );
+}
+
+// ── Real card round-trip (no hand-feeding) ──────────────────────
+//
+// `2026-06-05-usb-card-exchange-protocol`: each session learns the *peer's*
+// ContactCard ONLY via the encrypted `DirectSendCard` / `DirectCardReceived`
+// round — proving the wire actually carries the card. (The ceremony test
+// above hand-feeds both cards, so it never exercised this.)
+
+fn card_with_email(identity: &Identity, email: &str) -> ContactCard {
+    let mut card = ContactCard::new(identity.display_name());
+    card.add_field(ContactField::new(FieldType::Email, "Email", email, 0))
+        .expect("add_field");
+    card
+}
+
+/// Emit our `DirectSend` and return its payload (the QR/key leg).
+fn direct_send_payload(session: &mut ExchangeSession) -> Vec<u8> {
+    session.emit_initial_commands();
+    match &session.drain_commands()[0] {
+        Command::DirectSend { payload, .. } => payload.clone(),
+        other => panic!("expected DirectSend, got {other:?}"),
+    }
+}
+
+/// Receive the peer's QR payload + perform key agreement, then return our
+/// encrypted-card ciphertext (the second leg). Leaves the session in
+/// `AwaitingCardExchange` with proximity High (USB is physical).
+fn key_agree_and_get_card_ciphertext(
+    session: &mut ExchangeSession,
+    peer_payload: Vec<u8>,
+) -> Vec<u8> {
+    session
+        .apply_hardware_event(Event::DirectPayloadReceived { data: peer_payload })
+        .expect("process peer payload");
+    session
+        .apply(ExchangeEvent::PerformKeyAgreement)
+        .expect("key agreement");
+    assert!(
+        matches!(session.state(), ExchangeState::AwaitingCardExchange { .. }),
+        "USB key agreement lands in AwaitingCardExchange"
+    );
+    session
+        .drain_commands()
+        .into_iter()
+        .find_map(|c| match c {
+            Command::DirectSendCard { ciphertext, .. } => Some(ciphertext),
+            _ => None,
+        })
+        .expect("PerformKeyAgreement must emit DirectSendCard for USB")
+}
+
+// @internal
+#[test]
+fn usb_card_round_trip_completes_with_peer_card() {
+    let alice_id = create_identity("Alice");
+    let bob_id = create_identity("Bob");
+    let alice_card = card_with_email(&alice_id, "alice@example.com");
+    let bob_card = card_with_email(&bob_id, "bob@example.com");
+
+    let mut alice = ExchangeSession::new_usb(
+        alice_id,
+        alice_card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
+    );
+    let mut bob = ExchangeSession::new_usb(
+        bob_id,
+        bob_card,
+        ManualConfirmationVerifier::new(),
+        UsbRole::Responder,
+        vauchi_core::clock::SystemClock::shared(),
+    );
+
+    // Leg 1: swap the key-bearing QR payloads.
+    let alice_payload = direct_send_payload(&mut alice);
+    let bob_payload = direct_send_payload(&mut bob);
+
+    // Key agreement → each emits its encrypted card.
+    let alice_card_ct = key_agree_and_get_card_ciphertext(&mut alice, bob_payload);
+    let bob_card_ct = key_agree_and_get_card_ciphertext(&mut bob, alice_payload);
+
+    // Leg 2: swap the encrypted cards. Each side decrypts the PEER's card under
+    // the agreed shared key and completes — no card was ever hand-fed.
+    alice
+        .apply_hardware_event(Event::DirectCardReceived {
+            ciphertext: bob_card_ct,
+        })
+        .expect("alice receives bob's card");
+    bob.apply_hardware_event(Event::DirectCardReceived {
+        ciphertext: alice_card_ct,
+    })
+    .expect("bob receives alice's card");
+
+    assert!(alice.is_complete(), "alice completed");
+    assert!(bob.is_complete(), "bob completed");
+
+    let alice_contact = alice.extract_contact().expect("alice contact");
+    let bob_contact = bob.extract_contact().expect("bob contact");
+
+    // Each saved the OTHER's full card (display name + the email field), proving
+    // the card crossed the wire encrypted — not just QR metadata.
+    assert_eq!(alice_contact.card().display_name(), "Bob");
+    assert_eq!(bob_contact.card().display_name(), "Alice");
+    assert!(
+        alice_contact
+            .card()
+            .fields()
+            .iter()
+            .any(|f| f.value() == "bob@example.com"),
+        "Alice must receive Bob's full card via the encrypted round-trip"
+    );
+    assert!(
+        bob_contact
+            .card()
+            .fields()
+            .iter()
+            .any(|f| f.value() == "alice@example.com"),
+        "Bob must receive Alice's full card via the encrypted round-trip"
+    );
+}
+
+// @internal
+#[test]
+fn usb_tampered_card_ciphertext_is_rejected() {
+    let alice_id = create_identity("Alice");
+    let bob_id = create_identity("Bob");
+    let mut alice = ExchangeSession::new_usb(
+        alice_id,
+        card_with_email(&create_identity("Alice"), "alice@example.com"),
+        ManualConfirmationVerifier::new(),
+        UsbRole::Initiator,
+        vauchi_core::clock::SystemClock::shared(),
+    );
+    let mut bob = ExchangeSession::new_usb(
+        bob_id,
+        card_with_email(&create_identity("Bob"), "bob@example.com"),
+        ManualConfirmationVerifier::new(),
+        UsbRole::Responder,
+        vauchi_core::clock::SystemClock::shared(),
+    );
+
+    let alice_payload = direct_send_payload(&mut alice);
+    let bob_payload = direct_send_payload(&mut bob);
+    let _ = key_agree_and_get_card_ciphertext(&mut alice, bob_payload);
+    let mut bob_card_ct = key_agree_and_get_card_ciphertext(&mut bob, alice_payload);
+
+    // Flip a byte of the ciphertext → AEAD authentication must fail.
+    *bob_card_ct.last_mut().expect("non-empty ciphertext") ^= 0xFF;
+
+    let result = alice.apply_hardware_event(Event::DirectCardReceived {
+        ciphertext: bob_card_ct,
+    });
+    assert!(
+        matches!(result, Err(ExchangeError::UsbDecryptionFailed)),
+        "tampered card ciphertext must be rejected, got {result:?}"
+    );
+    assert!(
+        !alice.is_complete(),
+        "a rejected card must not complete the exchange"
     );
 }

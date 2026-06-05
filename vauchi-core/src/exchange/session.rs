@@ -22,6 +22,10 @@ use super::{ExchangeError, ExchangeQR, ProximityConfidence, ProximityVerifier, X
 use crate::contact::Contact;
 use crate::contact_card::ContactCard;
 use crate::crypto::kdf::HKDF;
+
+/// HKDF domain-separation label for the USB/direct-transport card-exchange key
+/// (ADR-007). Bumping `v1` is a wire break.
+const USB_CARD_EXCHANGE_INFO: &[u8] = b"vauchi/usb-card-exchange/v1";
 use crate::diagnostic::exchange_debug::{ExchangeDebugEvent, ExchangeDebugLog};
 use crate::identity::Identity;
 use crate::{Command, Event};
@@ -976,6 +980,9 @@ impl ExchangeSession {
                     String::from_utf8(data).map_err(|_| ExchangeError::InvalidQRFormat)?;
                 self.handle_direct_payload_received(payload_str)
             }
+            Event::DirectCardReceived { ciphertext } => {
+                self.handle_direct_card_received(ciphertext)
+            }
             // New hardware event variants — not yet wired into the session state machine.
             // Frontends may send these; they are acknowledged without state change until
             // the corresponding session logic is implemented.
@@ -1478,6 +1485,15 @@ impl ExchangeSession {
         self.confirmation_our_slot = Some(confirm_escrow.our_slot);
         self.confirmation_their_slot = Some(confirm_escrow.their_slot);
 
+        // USB/direct transport ships our card encrypted under the agreed key as
+        // the second wire leg (the peer decrypts with the same shared key). Built
+        // here, before `shared_key` moves into the state below.
+        let usb_card_command = if self.transport == ExchangeTransport::Usb {
+            Some(self.build_direct_send_card(&shared_key)?)
+        } else {
+            None
+        };
+
         self.state = ExchangeState::AwaitingCardExchange {
             their_public_key,
             shared_key,
@@ -1485,9 +1501,12 @@ impl ExchangeSession {
 
         self.debug_event(ExchangeDebugEvent::KeyAgreementCompleted);
 
-        // AU-2: Auto-invoke proximity check after key agreement.
-        // NFC is exempt: the physical tap IS the proximity proof.
-        if self.transport == ExchangeTransport::Nfc {
+        // AU-2: Auto-invoke proximity check after key agreement. NFC and USB are
+        // exempt: the physical tap / cable IS the proximity proof.
+        if matches!(
+            self.transport,
+            ExchangeTransport::Nfc | ExchangeTransport::Usb
+        ) {
             self.proximity_confidence = ProximityConfidence::High;
         } else {
             // ADR-031: Emit audio commands for async proximity verification.
@@ -1495,6 +1514,10 @@ impl ExchangeSession {
             // If no audio challenges are available (no QR scanned), fall back
             // to the synchronous verifier (ManualConfirmation etc.).
             self.emit_proximity_commands();
+        }
+
+        if let Some(cmd) = usb_card_command {
+            self.emit_command(cmd);
         }
 
         Ok(())
@@ -1713,6 +1736,54 @@ impl ExchangeSession {
             their_exchange_key,
         };
         Ok(())
+    }
+
+    /// Derive the USB card-exchange AEAD key from the agreed `shared_key`
+    /// (ADR-007 domain separation; ADR-019 XChaCha20-Poly1305 at use sites).
+    fn usb_card_key(shared_key: &crate::crypto::SymmetricKey) -> crate::crypto::SymmetricKey {
+        let derived = HKDF::derive_key(None, shared_key.as_bytes(), USB_CARD_EXCHANGE_INFO);
+        crate::crypto::SymmetricKey::from_bytes(*derived)
+    }
+
+    /// Build the `DirectSendCard` command — our card serialized + AEAD-encrypted
+    /// under the USB card key.
+    fn build_direct_send_card(
+        &self,
+        shared_key: &crate::crypto::SymmetricKey,
+    ) -> Result<Command, ExchangeError> {
+        let card_key = Self::usb_card_key(shared_key);
+        let plaintext =
+            serde_json::to_vec(&self.our_card).map_err(|_| ExchangeError::SerializationFailed)?;
+        let ciphertext = crate::crypto::encryption::encrypt(&card_key, &plaintext)
+            .map_err(|_| ExchangeError::SerializationFailed)?;
+        Ok(Command::DirectSendCard {
+            ciphertext,
+            is_initiator: self.usb_role == Some(UsbRole::Initiator),
+        })
+    }
+
+    /// Handle the peer's encrypted card (USB second leg): decrypt under the
+    /// shared card key, parse, and complete the exchange.
+    fn handle_direct_card_received(&mut self, ciphertext: Vec<u8>) -> Result<(), ExchangeError> {
+        if self.transport != ExchangeTransport::Usb {
+            return Err(ExchangeError::InvalidState(
+                "DirectCardReceived requires Usb transport".into(),
+            ));
+        }
+        let shared_key = match &self.state {
+            ExchangeState::AwaitingCardExchange { shared_key, .. } => shared_key.clone(),
+            _ => {
+                return Err(ExchangeError::InvalidState(
+                    "DirectCardReceived requires AwaitingCardExchange state".into(),
+                ));
+            }
+        };
+        let card_key = Self::usb_card_key(&shared_key);
+        let plaintext = crate::crypto::encryption::decrypt(&card_key, &ciphertext)
+            .map_err(|_| ExchangeError::UsbDecryptionFailed)?;
+        let their_card: ContactCard =
+            serde_json::from_slice(&plaintext).map_err(|_| ExchangeError::SerializationFailed)?;
+        self.handle_complete_exchange(their_card).map(|_| ())
     }
 
     // ---- NFC handlers ----

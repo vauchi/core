@@ -88,7 +88,11 @@ vauchi-platform/src/multistage_exchange.rs 1105
 # (+5 for slice 32m T2.1: Event::BleMtuNegotiated no-op arm on
 #  ExchangeSession::handle_event — transport-layer signal, no
 #  protocol effect)
-vauchi-core/src/exchange/session.rs 1930
+# (+71 for the USB card-exchange round-trip: DirectSendCard build + emit on
+#  AwaitingCardExchange, handle_direct_card_received decrypt+complete, usb_card_key
+#  HKDF derivation, USB proximity-exempt branch — 2026-06-05-usb-card-exchange-protocol;
+#  structural exemption — state machine, do not split)
+vauchi-core/src/exchange/session.rs 2001
 # (+29 for Phase 1.C.3a foothold of
 #  2026-05-11-hover-graduation-plan.md: audio_proximity field
 #  + getter on MultiStageSession, AudioProximityState import.
@@ -144,7 +148,9 @@ vauchi-core/src/exchange/multistage/session.rs 1818
 # (+31 for slice 32m T2.1: Event::BleMtuNegotiated { device_id,
 #  mtu } variant + roundtrip + variant-count updates per T0.2
 #  design §3.2)
-vauchi-core/src/platform.rs 1126
+# (+24 for Command::DirectSendCard + Event::DirectCardReceived + variant_name arm —
+#  USB card-exchange protocol 2026-06-05; command/event facade)
+vauchi-core/src/platform.rs 1150
 
 # EXEMPT — transport layer: all relay methods must be co-located for protocol coherence
 # (+2 for #[tracing::instrument] on send_update + fetch — profiling, no logic change)

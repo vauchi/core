@@ -135,6 +135,11 @@ pub enum ExchangeError {
     #[error("BLE handshake failed: {0}")]
     BleHandshakeFailed(String),
 
+    /// USB/direct-transport encrypted card failed AEAD authentication
+    /// (tampered ciphertext or wrong shared key)
+    #[error("USB card decryption failed")]
+    UsbDecryptionFailed,
+
     /// BLE ECDH or HKDF key derivation error
     #[error("BLE key derivation failed")]
     BleKeyDerivationFailed,
@@ -260,6 +265,7 @@ impl ExchangeError {
             | Self::NfcCrcMismatch
             | Self::InvalidBleFormat
             | Self::BleDecryptionFailed
+            | Self::UsbDecryptionFailed
             | Self::BleHandshakeFailed(_)
             | Self::BleKeyDerivationFailed
             | Self::BleCommitmentMismatch

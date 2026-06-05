@@ -60,21 +60,24 @@ impl ModeSelectionEngine {
                     .map(|&mode| {
                         let availability = check_mode_availability(mode, &self.capabilities);
                         let is_recommended = mode == self.recommended;
-                        let icon = if is_recommended {
-                            Some("star.fill".into())
-                        } else {
-                            None
-                        };
+                        // When the mode can't run, the availability reason is the
+                        // most useful subtitle; otherwise show the short "what to
+                        // do" instruction. The recommended mode (always available,
+                        // since `recommend_mode` only picks runnable modes) gets a
+                        // leading marker so the suggestion survives without a
+                        // dedicated badge field on the wire item.
                         let detail = match &availability {
-                            ModeAvailability::Available => None,
                             ModeAvailability::Degraded { reason }
                             | ModeAvailability::Unavailable { reason } => Some(reason.clone()),
-                            _ => None,
+                            _ if is_recommended => {
+                                Some(format!("Recommended · {}", mode_instruction(mode)))
+                            }
+                            _ => Some(mode_instruction(mode).to_string()),
                         };
                         ActionListItem {
                             id: format!("mode:{}", mode.serde_name()),
                             label: mode.display_name().to_string(),
-                            icon,
+                            icon: Some(mode_icon(mode).into()),
                             detail,
                             a11y: None,
                             info_key: None,
@@ -140,6 +143,43 @@ impl SerdeName for ExchangeMode {
             // vauchi-core must also be added here before shipping.
             _ => panic!("unknown ExchangeMode variant — update serde_name()"),
         }
+    }
+}
+
+/// Semantic icon token for each mode. Frontends map these names to their
+/// native symbol set (Material on Android, SF Symbols on iOS/macOS);
+/// unknown tokens fall back to a generic glyph, so the list never breaks.
+fn mode_icon(mode: ExchangeMode) -> &'static str {
+    match mode {
+        ExchangeMode::Glance => "qrcode",
+        ExchangeMode::Hover => "nfc",
+        ExchangeMode::Bump => "bump",
+        ExchangeMode::Shake => "shake",
+        ExchangeMode::Magic => "sparkles",
+        ExchangeMode::TapTap => "tap",
+        ExchangeMode::TapHoverShake => "gesture",
+        ExchangeMode::Link => "link",
+        ExchangeMode::Cable => "cable",
+        // New core variants must add an icon token before shipping.
+        _ => "tag",
+    }
+}
+
+/// One-line "what you do" instruction per mode, shown as the row subtitle.
+/// Kept short enough to read on a phone list row.
+fn mode_instruction(mode: ExchangeMode) -> &'static str {
+    match mode {
+        ExchangeMode::Glance => "Point cameras at each other's screen",
+        ExchangeMode::Hover => "Hold the phones close together",
+        ExchangeMode::Bump => "Gently bump the phones together",
+        ExchangeMode::Shake => "Hold together, then shake",
+        ExchangeMode::Magic => "Bring the phones close — it connects itself",
+        ExchangeMode::TapTap => "Tap the phones together twice",
+        ExchangeMode::TapHoverShake => "Tap, hold close, then shake",
+        ExchangeMode::Link => "Send a link to connect remotely",
+        ExchangeMode::Cable => "Connect both with a USB cable",
+        // New core variants must add an instruction before shipping.
+        _ => "",
     }
 }
 
@@ -232,19 +272,42 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
-    fn recommended_mode_has_star_icon() {
+    fn recommended_mode_is_marked_in_detail() {
         let engine = ModeSelectionEngine::new(full_caps());
         let screen = engine.screen();
 
-        // With full caps, recommended should be Hover
-        let hover_item = find_mode_item(&screen, "hover");
-        assert!(hover_item.is_some(), "Hover should be in the list");
-        assert_eq!(
-            hover_item.unwrap().icon.as_deref(),
-            Some("star.fill"),
-            "Recommended mode should have star icon"
+        // With full caps, recommended should be Hover.
+        let hover_item = find_mode_item(&screen, "hover").expect("Hover should be in the list");
+        let detail = hover_item
+            .detail
+            .as_deref()
+            .expect("recommended mode has a detail subtitle");
+        assert!(
+            detail.starts_with("Recommended · "),
+            "recommended detail should carry the marker, got: {detail}"
         );
+        assert!(
+            detail.contains("Hold the phones close together"),
+            "recommended detail should still include the instruction, got: {detail}"
+        );
+        // Recommendation no longer rides on the icon — that's now the per-mode glyph.
+        assert_eq!(hover_item.icon.as_deref(), Some("nfc"));
+    }
+
+    // @internal
+    #[test]
+    fn every_mode_has_a_per_mode_icon() {
+        let engine = ModeSelectionEngine::new(full_caps());
+        let screen = engine.screen();
+        for &mode in ExchangeMode::all() {
+            let item =
+                find_mode_item(&screen, mode.serde_name()).expect("every mode should be listed");
+            let icon = item.icon.as_deref().expect("every mode carries an icon");
+            assert_ne!(icon, "tag", "{:?} should have a dedicated icon", mode);
+            assert!(!icon.is_empty(), "{:?} icon must be non-empty", mode);
+        }
     }
 
     #[test]
@@ -264,16 +327,19 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
-    fn available_modes_have_no_detail() {
+    fn available_modes_show_instruction_detail() {
         let engine = ModeSelectionEngine::new(full_caps());
         let screen = engine.screen();
 
-        let glance = find_mode_item(&screen, "glance");
-        assert!(glance.is_some(), "Glance should be listed");
-        assert!(
-            glance.unwrap().detail.is_none(),
-            "Available mode should have no detail"
+        // Glance is available with full caps and is not the recommended mode,
+        // so its detail is the plain instruction (no "Recommended" marker).
+        let glance = find_mode_item(&screen, "glance").expect("Glance should be listed");
+        assert_eq!(
+            glance.detail.as_deref(),
+            Some("Point cameras at each other's screen"),
+            "available non-recommended mode shows its instruction"
         );
     }
 

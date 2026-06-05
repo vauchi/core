@@ -107,6 +107,11 @@ pub struct ExchangeEngine {
     /// production callers pass `vauchi.clock()`, tests use
     /// `SystemClock::shared()` or a `FakeClock`.
     clock: Arc<dyn Clock>,
+    /// Rich success-screen content built from the session's completed
+    /// contact (+ the field-preview the user shared) when the exchange
+    /// reaches `Success`. `None` → minimal completion chrome. Mirrors the
+    /// multi-stage / link engines so every mode renders the shared screen.
+    success_summary: Option<crate::ui::exchange::success::ExchangeSuccessSummary>,
 }
 
 /// Sub-steps for the USB cable / direct TCP exchange flow.
@@ -252,6 +257,7 @@ impl ExchangeEngine {
             nfc_identity: None,
             reciprocity_confirmer: None,
             clock,
+            success_summary: None,
         }
     }
 
@@ -303,6 +309,7 @@ impl ExchangeEngine {
             nfc_identity: None,
             reciprocity_confirmer: None,
             clock,
+            success_summary: None,
         }
     }
 
@@ -771,6 +778,20 @@ impl ExchangeEngine {
                 progress: Some(self.progress()),
                 ..Default::default()
             },
+            ExchangeStep::Success if self.success_summary.is_some() => {
+                let summary = self
+                    .success_summary
+                    .as_ref()
+                    .expect("guarded by is_some()");
+                let mut screen = crate::ui::exchange::success::build_exchange_success_screen(
+                    "exchange_success",
+                    "Success",
+                    "done",
+                    summary,
+                );
+                screen.progress = Some(self.progress());
+                screen
+            }
             ExchangeStep::Success => ScreenModel {
                 screen_id: "exchange_success".into(),
                 title: "Success".into(),
@@ -1111,7 +1132,17 @@ impl WorkflowEngine for ExchangeEngine {
 
         // Sync engine step from session state
         match session.state() {
-            vauchi_core::exchange::ExchangeState::Complete { .. } => {
+            vauchi_core::exchange::ExchangeState::Complete { contact } => {
+                // Capture the rich success summary (what they shared + what
+                // we shared) from the just-completed session before the
+                // step flips — the engine owns no storage, so this reads the
+                // session contact + the confirmed field-preview directly.
+                if self.success_summary.is_none() {
+                    self.success_summary = Some(build_legacy_success_summary(
+                        contact,
+                        self.field_preview.as_ref(),
+                    ));
+                }
                 // Create reciprocity confirmer from session tokens.
                 // Don't transition to Success until reciprocity is confirmed —
                 // this prevents asymmetric exchanges where one side saves a
@@ -1363,6 +1394,49 @@ impl WorkflowEngine for ExchangeEngine {
     }
 }
 
+/// Build the shared exchange-success summary for the legacy engine from
+/// the session's completed `contact` and the field-preview the user
+/// confirmed. Free fn (not `&self`) so it composes with the live
+/// `&mut self.session` borrow at the success-sync site. Link mode assigns
+/// no group here, so `group_names` is empty (the legacy flow assigns
+/// groups on Done, after this screen).
+fn build_legacy_success_summary(
+    contact: &vauchi_core::Contact,
+    field_preview: Option<&FieldPreviewConfig>,
+) -> crate::ui::exchange::success::ExchangeSuccessSummary {
+    let card = contact.card();
+    let received_fields = card
+        .fields()
+        .iter()
+        .map(|f| {
+            (
+                format!("{:?}", f.field_type()),
+                f.label().to_string(),
+                f.value().to_string(),
+            )
+        })
+        .collect();
+    // What *we* shared, from the confirmed preview (empty visible set =
+    // share all). No preview (mode skipped it) → unknown → empty.
+    let my_visible_fields = field_preview
+        .map(|fp| {
+            let share_all = fp.visible_field_ids.is_empty();
+            fp.card
+                .fields()
+                .iter()
+                .filter(|f| share_all || fp.visible_field_ids.contains(f.id()))
+                .map(|f| f.label().to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+    crate::ui::exchange::success::ExchangeSuccessSummary {
+        peer_name: card.display_name().to_string(),
+        received_fields,
+        my_visible_fields,
+        group_names: Vec::new(),
+    }
+}
+
 // INLINE_TEST_REQUIRED: Tests access private ExchangeStep enum and ExchangeEngine internals
 #[cfg(test)]
 mod tests {
@@ -1395,6 +1469,117 @@ mod tests {
             mode: Some(ExchangeMode::TapHoverShake),
             card_snapshot: None,
         }
+    }
+
+    // @internal
+    #[test]
+    fn legacy_success_summary_extracts_peer_received_and_shared_fields() {
+        use std::collections::HashSet;
+        use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
+        // Peer's card (what they shared).
+        let mut peer = ContactCard::new("Bob");
+        peer.add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "bob@example.com",
+            0,
+        ))
+        .unwrap();
+        let contact =
+            vauchi_core::Contact::from_import(peer, vauchi_core::ImportSource::VcardFile, None, 0);
+
+        // Our confirmed preview (what we shared) — only the phone field visible.
+        let mut mine = ContactCard::new("Alice");
+        mine.add_field(ContactField::new(
+            FieldType::Phone,
+            "Phone",
+            "+1234567890",
+            0,
+        ))
+        .unwrap();
+        mine.add_field(ContactField::new(
+            FieldType::Email,
+            "Email",
+            "alice@example.com",
+            0,
+        ))
+        .unwrap();
+        let phone_id = mine.fields()[0].id().to_string();
+        let preview = FieldPreviewConfig {
+            card: mine,
+            display_name: "Alice".into(),
+            visible_field_ids: HashSet::from([phone_id]),
+        };
+
+        let summary = build_legacy_success_summary(&contact, Some(&preview));
+        assert_eq!(summary.peer_name, "Bob");
+        assert_eq!(summary.received_fields.len(), 1, "one shared peer field");
+        assert_eq!(summary.received_fields[0].1, "Email");
+        assert_eq!(summary.received_fields[0].2, "bob@example.com");
+        assert_eq!(
+            summary.my_visible_fields,
+            vec!["Phone".to_string()],
+            "only the phone field was marked visible in the preview",
+        );
+        assert!(summary.group_names.is_empty());
+    }
+
+    // @internal
+    #[test]
+    fn success_screen_renders_rich_summary_when_attached() {
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        engine.success_summary = Some(crate::ui::exchange::success::ExchangeSuccessSummary {
+            peer_name: "Bob".into(),
+            received_fields: vec![("Email".into(), "Email".into(), "bob@example.com".into())],
+            my_visible_fields: vec!["Phone".into()],
+            group_names: Vec::new(),
+        });
+        engine.step = ExchangeStep::Success;
+        let screen = engine.build_screen();
+        assert_eq!(screen.screen_id, "exchange_success");
+        assert!(
+            screen.components.iter().any(|c| matches!(
+                c,
+                Component::FieldList { id, .. } if id == "received_fields"
+            )),
+            "rich success screen renders the received card fields",
+        );
+        assert!(
+            screen.components.iter().any(|c| matches!(
+                c,
+                Component::InfoPanel { id, .. } if id == "my_visibility"
+            )),
+            "rich success screen renders the visibility section",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn success_screen_without_summary_renders_minimal_chrome() {
+        let mut engine = ExchangeEngine::new(
+            config_mode_selection(),
+            vauchi_core::clock::SystemClock::shared(),
+        );
+        engine.step = ExchangeStep::Success;
+        let screen = engine.build_screen();
+        assert_eq!(screen.screen_id, "exchange_success");
+        assert!(
+            !screen.components.iter().any(|c| matches!(
+                c,
+                Component::FieldList { id, .. } if id == "received_fields"
+            )),
+            "minimal success screen has no received-fields section",
+        );
+        assert!(
+            screen.components.iter().any(|c| matches!(
+                c,
+                Component::StatusIndicator { id, .. } if id == "success_status"
+            )),
+            "minimal success screen keeps its StatusIndicator",
+        );
     }
 
     fn config_mode_selection() -> ExchangeConfig {

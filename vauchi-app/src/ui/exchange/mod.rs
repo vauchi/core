@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 mod back_nav;
 pub(crate) mod ble;
+pub mod ble_engine;
 pub(crate) mod field_preview;
 pub(crate) mod mode_selection;
 pub(crate) mod nfc;

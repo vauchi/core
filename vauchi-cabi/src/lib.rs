@@ -654,6 +654,40 @@ mod tests {
         }
     }
 
+    // @internal
+    #[test]
+    fn app_navigate_back_returns_a_screen() {
+        // After navigating into a sub-screen, navigate_back returns a valid
+        // ScreenModel (the prior screen) — the C-ABI path desktop frontends
+        // use for their back chrome instead of a footer "Back" action.
+        // SAFETY: Calling FFI with valid inputs from this test scope.
+        unsafe {
+            let handle = create_app_with_identity();
+            let settings = CString::new("settings").unwrap();
+            let fwd = vauchi_app_navigate_to(handle, settings.as_ptr());
+            vauchi_string_free(fwd);
+
+            let back_ptr = vauchi_app_navigate_back(handle);
+            assert!(!back_ptr.is_null(), "navigate_back must return a screen");
+            let json = CStr::from_ptr(back_ptr).to_str().unwrap();
+            assert!(
+                json.contains("screen_id"),
+                "navigate_back must return a ScreenModel, got: {json}"
+            );
+            assert!(
+                !json.contains(r#""error""#),
+                "navigate_back must not error, got: {json}"
+            );
+            vauchi_string_free(back_ptr);
+            vauchi_app_destroy(handle);
+        }
+        // Null handle is tolerated and returns null.
+        // SAFETY: passing null is explicitly handled by the function.
+        unsafe {
+            assert!(vauchi_app_navigate_back(std::ptr::null_mut()).is_null());
+        }
+    }
+
     // ── Exchange session tests ──────────────────────────────────────
 
     /// Drive a VauchiApp through onboarding to create an identity.

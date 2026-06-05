@@ -359,6 +359,42 @@ pub unsafe extern "C" fn vauchi_app_navigate_to(
         }
     }
 }
+/// Navigate back one step. Returns the resulting screen as JSON.
+///
+/// Pops the engine's `AppScreen` nav history, or rewinds one in-engine
+/// sub-flow step (the exchange flow). Frontends gate this on the
+/// `can_go_back` field of the current screen and render a back affordance
+/// in their own chrome — so C-ABI frontends (linux-qt, windows) no longer
+/// depend on a footer "Back" action.
+///
+/// # Safety
+/// `handle` must be a valid app handle or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vauchi_app_navigate_back(handle: *mut VauchiApp) -> *mut c_char {
+    // SAFETY: handle is checked non-null; ptr was created by Box::into_raw and has not been freed.
+    unsafe {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if handle.is_null() {
+                return std::ptr::null_mut();
+            }
+            let app = &*handle;
+            match app.engine.lock() {
+                Ok(mut engine) => {
+                    let model = engine.navigate_back();
+                    serde_json::to_string(&model).map_or_else(
+                        |e| to_c_string(&format!(r#"{{"error":"{}"}}"#, e)),
+                        |j| to_c_string(&j),
+                    )
+                }
+                Err(_) => to_c_string(r#"{"error":"lock poisoned"}"#),
+            }
+        })) {
+            Ok(result) => result,
+            Err(_) => std::ptr::null_mut(),
+        }
+    }
+}
+
 /// Get available screens as a JSON array of strings.
 ///
 /// # Safety

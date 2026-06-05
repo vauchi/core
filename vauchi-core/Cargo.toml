@@ -183,8 +183,12 @@ getrandom = { version = "0.2", features = ["js"] }
 # OHTTP server features for roundtrip tests (merged with optional ohttp dep)
 ohttp = { version = "0.7", default-features = false, features = ["server", "rust-hpke"] }
 # App-layer modules (tests reference ui, theme, help, i18n, content)
-# Use rustls (not native-tls) — native-tls requires OpenSSL, which is unavailable on Android/WASM targets
-vauchi-app = { workspace = true, features = ["content-updates", "network-rustls"] }
+# Use rustls (not native-tls) — native-tls requires OpenSSL, which is unavailable on Android/WASM targets.
+# network-http is REQUIRED so vauchi-app's core-driven link poll
+# (advance_link_initiator/responder_session, #[cfg(all(network-http, storage))])
+# compiles in — without it the whole ADR-049/050 escrow poll is cfg'd out and
+# link_{initiator,responder}_poll_tests fail (broke the nightly mutation baseline).
+vauchi-app = { workspace = true, features = ["content-updates", "network-rustls", "network-http"] }
 # JSON Schema validation for contract tests
 jsonschema = "0.28"
 # Temporary directories for storage tests

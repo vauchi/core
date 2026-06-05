@@ -405,6 +405,57 @@ metric:audit-mobile-surface:
           - "**/*.rs"
           - ".gitlab-ci.yml"
 
+# Pure-functional-core seal (HARD gate). The metric:audit-mobile-surface
+# job above is intentionally advisory (allow_failure: true) — its
+# legacy-surface counters can legitimately be non-zero mid-retirement, so a
+# delta there is information, not a failure. The purity seal is categorically
+# different: vauchi-core state machines must own NO ambient time/rng/sleep
+# (the five core_* counters are locked at 0), so any regression is always a
+# bug, never expected debt. A separate hard job keeps the metric advisory
+# while gating the seal. Same script, --check-core-purity mode, which scans
+# only core/vauchi-core/src (seam files clock/rng/sleeper/monotonic, the test
+# trees, and diagnostic perf-timers are exempt — see the script header).
+# This is the CI half of closing the "seal is local-only" gap; the workspace
+# humble-UI ratchets (frontend-vocab / dispatch-purity / app-preferences)
+# cannot be gated here — they scan the android/ios/cli trees, absent in a
+# single-repo pipeline, so they live in the push hook instead.
+lint:core-purity:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  allow_failure: false
+  before_script:
+    - apk add --no-cache bash git
+    - |
+      if [ ! -d ../scripts ]; then
+        git clone --depth=1 https://gitlab.com/vauchi/scripts.git ../scripts
+      else
+        git -C ../scripts pull --ff-only 2>/dev/null || true
+      fi
+  script:
+    - |
+      set -eu
+      SCRIPT=../scripts/scripts/audit-mobile-surface.sh
+      if [ ! -f "$SCRIPT" ]; then
+        echo "audit-mobile-surface.sh not yet on scripts/main — skipping."
+        echo "(Will activate automatically once the introducing MR merges.)"
+        exit 0
+      fi
+      # The audit expects a workspace root containing a core/ sub-directory.
+      # We are inside core, so symlink to mimic the layout — the same dance
+      # metric:audit-mobile-surface uses for its HEAD snapshot.
+      WS=$(mktemp -d)
+      ln -sfn "$CI_PROJECT_DIR" "$WS/core"
+      bash "$SCRIPT" --check-core-purity "$WS"
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "**/*.rs"
+          - ".gitlab-ci.yml"
+
 # REUSE compliance provided by vauchi/scripts ci-templates/reuse.yml
 
 # ============================================================

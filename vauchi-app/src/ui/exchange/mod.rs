@@ -17,6 +17,7 @@ pub(crate) mod field_preview;
 pub(crate) mod mode_selection;
 pub(crate) mod nfc;
 pub(crate) mod scan_quality;
+pub(crate) mod success;
 pub(crate) mod verifying;
 
 use self::ble::{BleActionOutcome, BleExchangeFlow, BleHardwareOutcome, BleStep};

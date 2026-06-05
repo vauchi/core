@@ -240,7 +240,7 @@ vauchi-core/src/storage/mod.rs 1079
 #  multi_stage_session scaffolding)
 # (+3 for AppScreen::EmergencyBroadcast variant + id + from_screen_id —
 #  2026-06-02 humble-ui core engines sweep)
-vauchi-app/src/ui/app_engine/mod.rs 1583
+vauchi-app/src/ui/app_engine/mod.rs 1599
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -400,7 +400,7 @@ vauchi-app/src/ui/exchange/ble.rs 1120
 #  audio-failed precedence. Option-agnostic — engine-side
 #  surface common to A/B/C; session-side 1.C.3+ commits to
 #  Option B per the design pass.)
-vauchi-app/src/ui/multi_stage_exchange.rs 2061
+vauchi-app/src/ui/multi_stage_exchange.rs 2118
 
 # EXEMPT — UniFFI facade growth: PlatformAppEngine wraps the full
 # AppEngine surface JSON-side and now also owns the Pair 4

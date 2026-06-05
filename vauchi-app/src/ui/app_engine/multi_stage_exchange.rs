@@ -339,6 +339,20 @@ impl AppEngine {
         let Ok(card) = serde_json::from_slice::<ContactCard>(&payload[33..]) else {
             return;
         };
+        // Pull the success-screen content off the peer card before it is
+        // moved into the contact (2026-06-04-exchange-terminal-screens).
+        let peer_name = card.display_name().to_string();
+        let received_fields: Vec<(String, String, String)> = card
+            .fields()
+            .iter()
+            .map(|f| {
+                (
+                    format!("{:?}", f.field_type()),
+                    f.label().to_string(),
+                    f.value().to_string(),
+                )
+            })
+            .collect();
         let Some(identity) = self.vauchi.identity() else {
             return;
         };
@@ -369,5 +383,33 @@ impl AppEngine {
         {
             log::warn!("multi-stage: failed to persist exchange ratchet");
         }
+
+        // Assemble the rich success screen: what they shared (above),
+        // which of our own fields this new contact can now see, and the
+        // group(s) they joined (none on the multi-stage path yet).
+        let my_visible_fields: Vec<String> = self
+            .vauchi
+            .own_card()
+            .ok()
+            .flatten()
+            .map(|own| {
+                own.fields()
+                    .iter()
+                    .filter(|f| {
+                        self.vauchi
+                            .get_effective_field_visibility(&contact_id, f.id())
+                            .unwrap_or(false)
+                    })
+                    .map(|f| f.label().to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let summary = crate::ui::exchange::success::ExchangeSuccessSummary {
+            peer_name,
+            received_fields,
+            my_visible_fields,
+            group_names: Vec::new(),
+        };
+        self.apply_multi_stage_success_summary(summary);
     }
 }

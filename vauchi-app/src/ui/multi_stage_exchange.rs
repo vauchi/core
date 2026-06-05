@@ -165,6 +165,11 @@ pub struct MultiStageExchangeEngine {
     current_qr_data: Option<String>,
     /// Peer display name — set on the Finalized transition.
     peer_name: Option<String>,
+    /// Rich success-screen summary (received card + group + visibility),
+    /// assembled by the AppEngine at finalize. `None` falls back to the
+    /// minimal "Exchange Complete" chrome
+    /// (`2026-06-04-exchange-terminal-screens`).
+    success_summary: Option<crate::ui::exchange::success::ExchangeSuccessSummary>,
     /// Cycle thread reported `on_session_ended` — terminal cleanup
     /// done, frontend may dismiss the screen.
     session_ended: bool,
@@ -210,6 +215,7 @@ impl MultiStageExchangeEngine {
             state: ProtocolState::Idle,
             current_qr_data: None,
             peer_name: None,
+            success_summary: None,
             session_ended: false,
             camera_gate: CameraGate::Available,
             use_front_camera: false,
@@ -237,6 +243,7 @@ impl MultiStageExchangeEngine {
             state: ProtocolState::Idle,
             current_qr_data: None,
             peer_name: None,
+            success_summary: None,
             session_ended: false,
             camera_gate: CameraGate::Available,
             use_front_camera: true,
@@ -259,6 +266,7 @@ impl MultiStageExchangeEngine {
             state: ProtocolState::Idle,
             current_qr_data: None,
             peer_name: None,
+            success_summary: None,
             session_ended: false,
             camera_gate: CameraGate::Available,
             use_front_camera: true,
@@ -321,6 +329,19 @@ impl MultiStageExchangeEngine {
             return;
         }
         self.peer_name = Some(peer_name);
+    }
+
+    /// Attach the rich success-screen summary (received card + group +
+    /// visibility) the AppEngine assembles at finalize. No-op while
+    /// cancelled (2026-06-04-exchange-terminal-screens).
+    pub fn set_success_summary(
+        &mut self,
+        summary: crate::ui::exchange::success::ExchangeSuccessSummary,
+    ) {
+        if self.cancelled {
+            return;
+        }
+        self.success_summary = Some(summary);
     }
 
     /// Mark the cycle thread as ended. Called after
@@ -551,6 +572,17 @@ impl MultiStageExchangeEngine {
     }
 
     fn build_success_screen(&self, title: String) -> ScreenModel {
+        // Rich, core-driven success screen (received card + group +
+        // visibility) when the AppEngine attached a summary; otherwise
+        // the minimal completion chrome below.
+        if let Some(summary) = &self.success_summary {
+            return crate::ui::exchange::success::build_exchange_success_screen(
+                SCREEN_ID,
+                title,
+                DONE_ACTION_ID,
+                summary,
+            );
+        }
         let detail = self
             .peer_name
             .as_ref()
@@ -970,6 +1002,37 @@ mod tests {
         assert!(
             engine.was_cancelled(),
             "Retry must set cancelled so completion lands on the mode picker, not Contacts",
+        );
+    }
+
+    // @internal
+    #[test]
+    fn success_screen_renders_rich_summary_when_attached() {
+        // Finalized + session_ended routes build_screen to the success
+        // screen; with a summary attached it renders the rich, shared
+        // core-driven chrome (2026-06-04-exchange-terminal-screens).
+        let mut engine = engine_with_state(ProtocolState::Finalized);
+        engine.session_ended = true;
+        engine.set_success_summary(crate::ui::exchange::success::ExchangeSuccessSummary {
+            peer_name: "Bob".into(),
+            received_fields: vec![("email".into(), "Email".into(), "bob@example.com".into())],
+            my_visible_fields: vec!["Phone".into()],
+            group_names: Vec::new(),
+        });
+        let screen = engine.build_screen();
+        assert!(
+            screen.components.iter().any(|c| matches!(
+                c,
+                Component::FieldList { id, .. } if id == "received_fields"
+            )),
+            "rich success screen must render the received card fields",
+        );
+        assert!(
+            screen.components.iter().any(|c| matches!(
+                c,
+                Component::InfoPanel { id, .. } if id == "my_visibility"
+            )),
+            "rich success screen must render the visibility section",
         );
     }
 

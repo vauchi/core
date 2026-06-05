@@ -796,6 +796,22 @@ impl AppEngine {
         false
     }
 
+    /// Bridge: attach the rich exchange-success summary (received card +
+    /// group + visibility) to the active multi-stage engine so its
+    /// success screen renders it (2026-06-04-exchange-terminal-screens).
+    pub fn apply_multi_stage_success_summary(
+        &mut self,
+        summary: crate::ui::exchange::success::ExchangeSuccessSummary,
+    ) -> bool {
+        if let Some(any) = self.engine.as_any_mut()
+            && let Some(active) = any.downcast_mut::<crate::ui::MultiStageExchangeEngine>()
+        {
+            active.set_success_summary(summary);
+            return true;
+        }
+        false
+    }
+
     /// Bridge from the multi-stage cycle thread — flag the cycle as
     /// ended so the engine flips to the success / failure terminal
     /// chrome.

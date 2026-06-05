@@ -456,6 +456,48 @@ lint:core-purity:
           - "**/*.rs"
           - ".gitlab-ci.yml"
 
+# Crypto-hygiene ratchet (HARD gate). Converts the grep-tractable honor-
+# system crypto rules into a mechanical gate: empty HKDF info, a
+# non-allow-listed HKDF info collision (ADR-007 domain separation), or a
+# direct trust-level setter (ADR-034). Baseline 0; the allow-list of
+# intentionally-shared derivations lives next to the script. Core-local,
+# so — unlike the workspace humble-UI ratchets — it works as a real CI
+# gate. Same alpine + symlink skeleton as lint:core-purity above.
+lint:crypto-hygiene:
+  stage: lint
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/alpine:3.21
+  tags: [docker]
+  needs: []
+  allow_failure: false
+  before_script:
+    - apk add --no-cache bash git
+    - |
+      if [ ! -d ../scripts ]; then
+        git clone --depth=1 https://gitlab.com/vauchi/scripts.git ../scripts
+      else
+        git -C ../scripts pull --ff-only 2>/dev/null || true
+      fi
+  script:
+    - |
+      set -eu
+      SCRIPT=../scripts/scripts/audit-crypto-hygiene.sh
+      BASELINE=../scripts/scripts/audit-crypto-hygiene.baseline.json
+      if [ ! -f "$SCRIPT" ] || [ ! -f "$BASELINE" ]; then
+        echo "audit-crypto-hygiene not yet on scripts/main — skipping."
+        echo "(Will activate automatically once the introducing MR merges.)"
+        exit 0
+      fi
+      WS=$(mktemp -d)
+      ln -sfn "$CI_PROJECT_DIR" "$WS/core"
+      bash "$SCRIPT" --check "$BASELINE" "$WS"
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      changes:
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+        paths:
+          - "**/*.rs"
+          - ".gitlab-ci.yml"
+
 # REUSE compliance provided by vauchi/scripts ci-templates/reuse.yml
 
 # ============================================================

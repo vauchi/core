@@ -249,20 +249,9 @@ fn exchange_failed_fallback_actions_have_a11y_hints() {
     // Reach Failed with BOTH fallbacks: a camera-capable device that
     // BLE-disconnects mid-flow sets ble_fallback_available and (camera →)
     // qr_fallback_available.
-    let mut engine = ExchangeEngine::new(
-        ExchangeConfig {
-            own_name: "Alice".to_string(),
-            own_qr_data: "alice-qr".to_string(),
-            available_groups: vec![],
-            device_capabilities: vauchi_core::exchange::capability::types::DeviceCapabilities {
-                has_camera: true,
-                ..Default::default()
-            },
-            mode: Some(vauchi_core::exchange::mode::ExchangeMode::Magic),
-            card_snapshot: None,
-        },
-        vauchi_core::clock::SystemClock::shared(),
-    );
+    // Post BLE graduation the BLE flow lives in the dedicated
+    // `BleExchangeEngine`; `has_camera = true` gates the QR fallback offer.
+    let mut engine = BleExchangeEngine::new(vauchi_core::exchange::mode::ExchangeMode::Magic, true);
     let _ = engine.handle_hardware_event(vauchi_core::Event::BleDisconnected {
         reason: "peer hung up".to_string(),
     });

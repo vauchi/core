@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Property-based invariants for the BLE branch of `ExchangeEngine`
+//! Property-based invariants for the dedicated `BleExchangeEngine`
 //! (CC-13: stateful proptest for state machines).
 //!
 //! Phase 1.2 of `_private/docs/problems/2026-05-03-ble-exchange-humble-ui-migration`.
@@ -21,7 +21,7 @@
 //! and dropping the saved card.
 
 use proptest::prelude::*;
-use vauchi_app::ui::{ExchangeConfig, ExchangeEngine, WorkflowEngine};
+use vauchi_app::ui::{BleExchangeEngine, WorkflowEngine};
 use vauchi_core::Event;
 use vauchi_core::exchange::audio_modem::{AudioConfig, generate_fsk_samples};
 use vauchi_core::exchange::mode::ExchangeMode;
@@ -76,25 +76,11 @@ fn arb_post_complete_event() -> impl Strategy<Value = Event> {
     ]
 }
 
-fn config_for_mode(mode: ExchangeMode) -> ExchangeConfig {
-    ExchangeConfig {
-        own_name: "Test".into(),
-        own_qr_data: "v1:test".into(),
-        available_groups: Vec::new(),
-        device_capabilities: Default::default(),
-        mode: Some(mode),
-        card_snapshot: None,
-    }
-}
-
-/// Drive `ExchangeEngine` through the Magic-mode happy path to
-/// `ExchangeStep::Success`. Mirrors the deterministic path in
-/// `ui::exchange::tests::magic_full_flow_discovery_to_success`.
-fn drive_magic_to_success() -> ExchangeEngine {
-    let mut e = ExchangeEngine::new(
-        config_for_mode(ExchangeMode::Magic),
-        vauchi_core::clock::SystemClock::shared(),
-    );
+/// Drive `BleExchangeEngine` through the Magic-mode happy path to its
+/// terminal `Success` screen. Post BLE graduation the BLE flow lives in
+/// the dedicated engine, not the legacy `ExchangeEngine` sub-flow.
+fn drive_magic_to_success() -> BleExchangeEngine {
+    let mut e = BleExchangeEngine::new(ExchangeMode::Magic, true);
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
         rssi: -45,

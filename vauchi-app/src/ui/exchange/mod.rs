@@ -21,7 +21,6 @@ pub(crate) mod scan_quality;
 pub(crate) mod success;
 pub(crate) mod verifying;
 
-use self::ble::{BleActionOutcome, BleExchangeFlow, BleHardwareOutcome, BleStep};
 use self::field_preview::{FieldPreviewConfig, FieldPreviewResult};
 use self::mode_selection::{ModeSelectionEngine, ModeSelectionResult};
 use self::nfc::{NfcExchangeFlow, NfcHardwareOutcome, NfcStep};
@@ -87,8 +86,6 @@ pub struct ExchangeEngine {
     mode_selection: Option<ModeSelectionEngine>,
     /// Field preview config (built when entering FieldPreview step).
     field_preview: Option<FieldPreviewConfig>,
-    /// BLE exchange flow state machine (Magic/Bump/Shake modes).
-    ble_flow: Option<BleExchangeFlow>,
     /// NFC exchange flow state machine (3-phase encrypted handshake).
     /// Constructed at TapTap dispatch via [`Self::start_taptap_mode`];
     /// `NfcExchangeFlow` consumes the cached [`Self::nfc_identity`].
@@ -145,8 +142,6 @@ enum ExchangeStep {
     GroupSelection,
     /// Read-only preview of what will be shared (after group selection).
     FieldPreview,
-    /// BLE exchange sub-flow (Magic/Bump/Shake modes).
-    Ble(BleStep),
     /// Choose the NFC role (Send/Receive) after picking TapTap. Core-driven
     /// (ADR-043/044): emits an i18n-keyed `ScreenModel` the frontend renders;
     /// Send -> `start_taptap_mode`, Receive -> `start_nfc_receive_mode`.
@@ -174,21 +169,19 @@ impl ExchangeStep {
             // The NFC role choice is part of the mode-selection phase.
             Self::NfcRoleSelection => 1,
             // Sub-flow steps start at 4 (after mode + group + preview)
-            Self::Ble(ble) => ble.step_number(4),
             Self::Nfc(nfc) => nfc.step_number(4),
             Self::DirectTransport(direct) => direct.step_number(4),
             Self::Verifying => 6,
-            Self::Success => 4 + BleStep::STEP_COUNT,
-            Self::Failed => 5 + BleStep::STEP_COUNT,
+            Self::Success => 4 + NfcStep::STEP_COUNT,
+            Self::Failed => 5 + NfcStep::STEP_COUNT,
         }
     }
 }
 
 // mode + group + preview + sub-flow + success/failed
 // All sub-flows must have the same step count for consistent progress.
-const _: () = assert!(BleStep::STEP_COUNT == NfcStep::STEP_COUNT);
-const _: () = assert!(DirectStep::STEP_COUNT == BleStep::STEP_COUNT);
-const TOTAL_STEPS: u8 = 3 + BleStep::STEP_COUNT + 2;
+const _: () = assert!(DirectStep::STEP_COUNT == NfcStep::STEP_COUNT);
+const TOTAL_STEPS: u8 = 3 + NfcStep::STEP_COUNT + 2;
 
 impl ExchangeEngine {
     /// Determine the initial step based on config.
@@ -202,12 +195,6 @@ impl ExchangeEngine {
         if config.available_groups.is_empty() {
             if config.mode == Some(ExchangeMode::Cable) {
                 return ExchangeStep::DirectTransport(DirectStep::WaitingForConnection);
-            }
-            if matches!(
-                config.mode,
-                Some(ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake)
-            ) {
-                return ExchangeStep::Ble(BleStep::Discovering);
             }
             ExchangeStep::ModeSelection
         } else {
@@ -233,14 +220,6 @@ impl ExchangeEngine {
         } else {
             None
         };
-        // If starting directly at BLE mode, create the flow now.
-        let ble_flow = if matches!(step, ExchangeStep::Ble(_)) {
-            Some(BleExchangeFlow::new(
-                config.mode.unwrap_or(ExchangeMode::Magic),
-            ))
-        } else {
-            None
-        };
         Self {
             step,
             step_history: Vec::new(),
@@ -253,7 +232,6 @@ impl ExchangeEngine {
             qr_fallback_available: false,
             mode_selection,
             field_preview: None,
-            ble_flow,
             nfc_flow: None,
             nfc_identity: None,
             reciprocity_confirmer: None,
@@ -305,7 +283,6 @@ impl ExchangeEngine {
             qr_fallback_available: false,
             mode_selection,
             field_preview: None,
-            ble_flow: None,
             nfc_flow: None,
             nfc_identity: None,
             reciprocity_confirmer: None,
@@ -400,31 +377,6 @@ impl ExchangeEngine {
     /// engine and build its `LinkInitiatorSession`.
     fn start_link_mode(&self) -> ActionResult {
         ActionResult::StartLinkExchange
-    }
-
-    /// Start BLE exchange mode (Magic/Bump/Shake).
-    ///
-    /// Creates a `BleExchangeFlow` and emits BLE advertising + scanning
-    /// commands to begin discovery.
-    ///
-    /// Superseded by `BleExchangeEngine` (graduation slice 2 — the mode
-    /// dispatch now returns `ActionResult::StartBleExchange`). Retired with
-    /// the rest of the legacy `ExchangeStep::Ble` machinery in slice 3.
-    #[allow(dead_code)]
-    fn start_ble_mode(&mut self) -> ActionResult {
-        let mode = self.config.mode.unwrap_or(ExchangeMode::Magic);
-        self.ble_flow = Some(BleExchangeFlow::new(mode));
-        self.step = ExchangeStep::Ble(BleStep::Discovering);
-        let service_uuid = vauchi_core::exchange::VAUCHI_BLE_SERVICE_UUID.to_string();
-        ActionResult::Commands {
-            commands: vec![
-                Command::BleStartAdvertising {
-                    service_uuid: service_uuid.clone(),
-                    payload: vec![],
-                },
-                Command::BleStartScanning { service_uuid },
-            ],
-        }
     }
 
     /// Start TapTap exchange mode (NFC).
@@ -574,51 +526,6 @@ impl ExchangeEngine {
         }
     }
 
-    /// Handle BLE mode hardware events via BleExchangeFlow.
-    fn handle_ble_hardware_event(&mut self, event: vauchi_core::Event) -> Option<ActionResult> {
-        let flow = self.ble_flow.as_mut()?;
-        let outcome = flow.handle_event(&event);
-
-        // Sync engine step from flow step
-        self.step = ExchangeStep::Ble(flow.step().clone());
-
-        Some(self.apply_ble_outcome(outcome))
-    }
-
-    /// Apply a BleHardwareOutcome — translate to ActionResult.
-    fn apply_ble_outcome(&mut self, outcome: BleHardwareOutcome) -> ActionResult {
-        match outcome {
-            BleHardwareOutcome::StepAdvanced { commands }
-            | BleHardwareOutcome::Consumed { commands } => {
-                if commands.is_empty() {
-                    ActionResult::UpdateScreen(self.build_screen())
-                } else {
-                    ActionResult::Commands { commands }
-                }
-            }
-            BleHardwareOutcome::Complete {
-                card_bytes: _,
-                commands,
-            } => {
-                // TODO: save card_bytes (Phase 1 integration)
-                self.step = ExchangeStep::Success;
-                if commands.is_empty() {
-                    ActionResult::UpdateScreen(self.build_screen())
-                } else {
-                    ActionResult::Commands { commands }
-                }
-            }
-            BleHardwareOutcome::FailedWithFallback { reason } => {
-                self.failure_detail = Some(reason);
-                self.ble_fallback_available = true;
-                self.qr_fallback_available = self.config.device_capabilities.has_camera;
-                self.step = ExchangeStep::Failed;
-                ActionResult::UpdateScreen(self.build_screen())
-            }
-            BleHardwareOutcome::Ignored => ActionResult::UpdateScreen(self.build_screen()),
-        }
-    }
-
     /// Handle NFC mode hardware events via NfcExchangeFlow.
     /// Mirrors `handle_ble_hardware_event`; the sub-flow owns the
     /// 3-phase state machine and either advances or fails.
@@ -737,22 +644,6 @@ impl ExchangeEngine {
             }
             ExchangeStep::Verifying => {
                 verifying::build_verifying_screen(self.progress())
-            }
-            ExchangeStep::Ble(BleStep::Discovering) => {
-                let mode = self.config.mode.unwrap_or(ExchangeMode::Magic);
-                ble::build_discovering_screen(mode, self.progress())
-            }
-            ExchangeStep::Ble(BleStep::Handshaking | BleStep::Exchanging) => {
-                let mode = self.config.mode.unwrap_or(ExchangeMode::Magic);
-                ble::build_exchanging_screen(mode, self.progress())
-            }
-            ExchangeStep::Ble(BleStep::Verifying) => {
-                let mode = self.config.mode.unwrap_or(ExchangeMode::Magic);
-                ble::build_verifying_screen(mode, self.progress())
-            }
-            ExchangeStep::Ble(BleStep::Complete) => {
-                // Handled by transition to ExchangeStep::Success
-                ScreenModel::default()
             }
             ExchangeStep::NfcRoleSelection => build_nfc_role_screen(self.progress()),
             ExchangeStep::Nfc(ref nfc_step) => {
@@ -1048,11 +939,6 @@ impl WorkflowEngine for ExchangeEngine {
             }
         }
 
-        // BLE mode events — routed through BleExchangeFlow
-        if matches!(self.step, ExchangeStep::Ble(_)) {
-            return self.handle_ble_hardware_event(event);
-        }
-
         // NFC mode events — routed through NfcExchangeFlow
         if matches!(self.step, ExchangeStep::Nfc(_)) {
             return self.handle_nfc_hardware_event(event);
@@ -1333,20 +1219,6 @@ impl WorkflowEngine for ExchangeEngine {
                             self.step = ExchangeStep::GroupSelection;
                             return ActionResult::NavigateTo(self.build_screen());
                         }
-                    }
-                }
-                ActionResult::UpdateScreen(self.build_screen())
-            }
-            // BLE sub-flow actions
-            (ExchangeStep::Ble(ble_step), ref user_action) => {
-                if let Some(outcome) = ble::handle_ble_action(ble_step, user_action) {
-                    match outcome {
-                        BleActionOutcome::FallbackToRelay => {
-                            // Switch to relay escrow (Link mode as fallback)
-                            return self.start_link_mode();
-                        }
-                        BleActionOutcome::Cancel => return ActionResult::Complete,
-                        BleActionOutcome::Ignored => {}
                     }
                 }
                 ActionResult::UpdateScreen(self.build_screen())
@@ -1771,36 +1643,6 @@ mod tests {
             ),
             "start_exchange must hand off to multi-stage; got {result:?}",
         );
-    }
-
-    #[test]
-    fn test_handle_hardware_event_ble_discovery_emits_connect() {
-        let session = create_test_session();
-        let mut engine = ExchangeEngine::with_session(
-            config_no_groups(),
-            session,
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.drain_commands();
-
-        // Simulate BLE discovery
-        let result = engine.handle_hardware_event(vauchi_core::Event::BleDeviceDiscovered {
-            id: "device-1".into(),
-            rssi: -42,
-            adv_data: vec![],
-        });
-
-        // Should emit BleConnect command
-        assert!(result.is_some(), "expected Some value");
-        if let Some(ActionResult::Commands { commands }) = result {
-            assert!(
-                commands
-                    .iter()
-                    .any(|c| matches!(c, vauchi_core::Command::BleConnect { .. })),
-                "Expected BleConnect command in {:?}",
-                commands
-            );
-        }
     }
 
     #[test]
@@ -2357,367 +2199,6 @@ mod tests {
             result,
             ActionResult::StartLinkExchange,
             "Retry in Link mode must hand off to LinkExchangeEngine; got {result:?}",
-        );
-    }
-
-    // ── Phase 4: BLE fallback degradation tests ────────────────────
-
-    // @internal
-    #[test]
-    fn ble_failure_shows_relay_fallback_action() {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Magic),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        // Simulate BLE failure via apply_ble_outcome
-        let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
-            reason: "BLE timeout".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::Failed);
-        assert!(engine.ble_fallback_available);
-
-        let screen = engine.build_screen();
-        assert!(
-            screen.actions.iter().any(|a| a.id == "fallback_relay"),
-            "Failed screen must show relay fallback for BLE failures"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn non_ble_failure_does_not_show_relay_fallback() {
-        let mut engine = ExchangeEngine::new(
-            config_no_groups(),
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        engine.mark_failed();
-        assert!(!engine.ble_fallback_available);
-
-        let screen = engine.build_screen();
-        assert!(
-            !screen.actions.iter().any(|a| a.id == "fallback_relay"),
-            "Non-BLE failure must not show relay fallback"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn fallback_relay_action_switches_to_link_mode() {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Magic),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
-            reason: "timeout".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::Failed);
-
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "fallback_relay".into(),
-        });
-
-        assert_eq!(
-            result,
-            ActionResult::StartLinkExchange,
-            "Relay fallback must hand off to LinkExchangeEngine"
-        );
-        // The fallback_relay arm clears the fallback + error state before
-        // handing off so a re-entry starts clean.
-        assert!(!engine.ble_fallback_available);
-        assert!(engine.failure_detail.is_none());
-    }
-
-    // @internal
-    #[test]
-    fn retry_clears_ble_fallback_flag() {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Bump),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
-            reason: "disconnect".into(),
-        });
-        assert!(engine.ble_fallback_available);
-
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "retry".into(),
-        });
-
-        assert!(!engine.ble_fallback_available);
-        // BLE graduation slice 2: retry now clears the fallback flag and hands
-        // off to the dedicated `BleExchangeEngine` via `StartBleExchange`
-        // (the engine owns the retry → fresh-flow behaviour); the legacy
-        // `ExchangeStep::Ble` re-entry is retired.
-        assert!(
-            matches!(
-                result,
-                ActionResult::StartBleExchange {
-                    mode: ExchangeMode::Bump
-                }
-            ),
-            "Retry in Bump mode must hand off to the BLE engine, got {result:?}"
-        );
-    }
-
-    // ── Phase 5: BLE mode integration tests (full engine flow) ─────
-
-    /// Helper: create a BLE mode engine and advance through discovery + connection.
-    fn ble_engine_to_exchanging(mode: ExchangeMode) -> ExchangeEngine {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(mode),
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        assert_eq!(engine.step, ExchangeStep::Ble(BleStep::Discovering));
-
-        // Discovery
-        let result = engine.handle_hardware_event(vauchi_core::Event::BleDeviceDiscovered {
-            id: "peer-1".into(),
-            rssi: -45,
-            adv_data: vec![],
-        });
-        assert!(result.is_some());
-        assert_eq!(engine.step, ExchangeStep::Ble(BleStep::Handshaking));
-
-        // Connection
-        let result = engine.handle_hardware_event(vauchi_core::Event::BleConnected {
-            device_id: "peer-1".into(),
-        });
-        assert!(result.is_some());
-        assert_eq!(engine.step, ExchangeStep::Ble(BleStep::Exchanging));
-        engine
-    }
-
-    // @internal
-    #[test]
-    fn magic_full_flow_discovery_to_success() {
-        let mut engine = ble_engine_to_exchanging(ExchangeMode::Magic);
-
-        // Card data
-        engine.handle_hardware_event(vauchi_core::Event::BleCharacteristicNotified {
-            uuid: "card".into(),
-            data: vec![1, 2, 3],
-        });
-        // Audio response → proximity done → complete. Build a real
-        // FSK-encoded sample buffer so the runner's decode succeeds.
-        let modem_config = vauchi_core::exchange::audio_modem::AudioConfig::default();
-        let samples =
-            vauchi_core::exchange::audio_modem::generate_fsk_samples(&[0xAA], &modem_config);
-        let result = engine.handle_hardware_event(vauchi_core::Event::AudioSamplesRecorded {
-            samples,
-            sample_rate: modem_config.sample_rate,
-        });
-        assert!(result.is_some());
-        assert_eq!(engine.step, ExchangeStep::Success);
-    }
-
-    // @internal
-    #[test]
-    fn bump_full_flow_discovery_to_success() {
-        let mut engine = ble_engine_to_exchanging(ExchangeMode::Bump);
-
-        // Card data
-        engine.handle_hardware_event(vauchi_core::Event::BleCharacteristicNotified {
-            uuid: "card".into(),
-            data: vec![4, 5, 6],
-        });
-        // Impact → proximity done → complete
-        let result = engine.handle_hardware_event(vauchi_core::Event::ImpactDetected {
-            timestamp_ms: 100,
-            magnitude_milli_g: 3500,
-        });
-        assert!(result.is_some());
-        assert_eq!(engine.step, ExchangeStep::Success);
-    }
-
-    // @internal
-    #[test]
-    fn shake_full_flow_discovery_to_success() {
-        let mut engine = ble_engine_to_exchanging(ExchangeMode::Shake);
-
-        // Feed accel samples (triggers recording + envelope send)
-        for i in 0..50 {
-            engine.handle_hardware_event(vauchi_core::Event::AccelerometerData {
-                x_milli_g: ((i as f32 * 0.1).sin() * 2000.0) as i32,
-                y_milli_g: ((i as f32 * 0.1).cos() * 1500.0) as i32,
-                z_milli_g: 1000,
-                timestamp_ms: i * 10,
-            });
-        }
-
-        // Card data
-        engine.handle_hardware_event(vauchi_core::Event::BleCharacteristicNotified {
-            uuid: "card".into(),
-            data: vec![7, 8, 9],
-        });
-
-        // Peer shake envelope (use encoded constant data for simplicity)
-        let peer_envelope = vauchi_core::exchange::shake_protocol::encode_envelope(&[1.5; 50]);
-        let result = engine.handle_hardware_event(vauchi_core::Event::BleCharacteristicNotified {
-            uuid: vauchi_core::exchange::CHAR_DATA_WRITE.into(),
-            data: peer_envelope,
-        });
-        assert!(result.is_some());
-        assert_eq!(engine.step, ExchangeStep::Success);
-    }
-
-    // @internal
-    #[test]
-    fn ble_disconnect_during_exchange_offers_relay_fallback() {
-        let mut engine = ble_engine_to_exchanging(ExchangeMode::Magic);
-
-        let result = engine.handle_hardware_event(vauchi_core::Event::BleDisconnected {
-            reason: "connection lost".into(),
-        });
-        assert!(result.is_some());
-        assert_eq!(engine.step, ExchangeStep::Failed);
-        assert!(engine.ble_fallback_available);
-
-        // Accept fallback → hand off to LinkExchangeEngine
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "fallback_relay".into(),
-        });
-        assert_eq!(result, ActionResult::StartLinkExchange);
-    }
-
-    // ── Permission degradation fallback tests ─────────────────────────
-
-    // @internal
-    #[test]
-    fn ble_failure_with_camera_shows_qr_fallback() {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Magic),
-                device_capabilities: DeviceCapabilities {
-                    has_camera: true,
-                    has_ble: true,
-                    ..Default::default()
-                },
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
-            reason: "BLE timeout".into(),
-        });
-
-        assert!(engine.qr_fallback_available);
-        let screen = engine.build_screen();
-        assert!(
-            screen.actions.iter().any(|a| a.id == "fallback_qr"),
-            "BLE failure with camera must show QR fallback"
-        );
-        assert!(
-            screen.actions.iter().any(|a| a.id == "fallback_relay"),
-            "BLE failure must also show relay fallback"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn ble_failure_without_camera_has_no_qr_fallback() {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Magic),
-                device_capabilities: DeviceCapabilities {
-                    has_camera: false,
-                    has_ble: true,
-                    ..Default::default()
-                },
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
-            reason: "BLE timeout".into(),
-        });
-
-        assert!(!engine.qr_fallback_available);
-        let screen = engine.build_screen();
-        assert!(
-            !screen.actions.iter().any(|a| a.id == "fallback_qr"),
-            "BLE failure without camera must not show QR fallback"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn fallback_qr_action_routes_to_multi_stage_glance() {
-        // "Fall back to QR" after a BLE failure now routes to the graduated
-        // Glance (multi-stage QR), not the retired legacy QR sub-flow — the
-        // legacy QR is frozen on android, so the fallback uses the same
-        // graduated engine P2.D routed the picker to.
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Magic),
-                device_capabilities: DeviceCapabilities {
-                    has_camera: true,
-                    has_ble: true,
-                    ..Default::default()
-                },
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-        let _ = engine.apply_ble_outcome(BleHardwareOutcome::FailedWithFallback {
-            reason: "timeout".into(),
-        });
-
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "fallback_qr".into(),
-        });
-
-        assert!(
-            matches!(
-                result,
-                ActionResult::StartMultiStageExchange {
-                    mode: ExchangeMode::Glance,
-                },
-            ),
-            "fallback_qr must hand off to multi-stage Glance; got {result:?}",
-        );
-        assert_eq!(engine.config.mode, Some(ExchangeMode::Glance));
-        assert!(!engine.ble_fallback_available);
-        assert!(!engine.qr_fallback_available);
-        assert!(engine.failure_detail.is_none());
-    }
-
-    // @internal
-    #[test]
-    fn ble_permission_denied_shows_fallback() {
-        let mut engine = ExchangeEngine::new(
-            ExchangeConfig {
-                mode: Some(ExchangeMode::Magic),
-                device_capabilities: DeviceCapabilities {
-                    has_camera: true,
-                    has_ble: true,
-                    ..Default::default()
-                },
-                ..config_no_groups()
-            },
-            vauchi_core::clock::SystemClock::shared(),
-        );
-
-        let result = engine.handle_hardware_event(vauchi_core::Event::PermissionDenied {
-            transport: "BLE".into(),
-        });
-
-        assert_eq!(engine.step, ExchangeStep::Failed);
-        assert!(engine.ble_fallback_available);
-        assert!(
-            matches!(result, Some(ActionResult::UpdateScreen(_))),
-            "BLE permission denied must return screen update with failed state"
         );
     }
 

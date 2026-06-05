@@ -23,7 +23,7 @@
 //! steps must never rewind — doing so would discard live cryptographic
 //! session state mid-protocol.
 
-use super::{BleStep, DirectStep, ExchangeStep, NfcStep, mode_selection::ModeSelectionEngine};
+use super::{DirectStep, ExchangeStep, NfcStep, mode_selection::ModeSelectionEngine};
 
 impl super::ExchangeEngine {
     /// A step is back-safe when the user is *choosing* (selection phase)
@@ -39,7 +39,6 @@ impl super::ExchangeEngine {
             ExchangeStep::GroupSelection
                 | ExchangeStep::FieldPreview
                 | ExchangeStep::NfcRoleSelection
-                | ExchangeStep::Ble(BleStep::Discovering)
                 | ExchangeStep::Nfc(NfcStep::AwaitingTap)
                 | ExchangeStep::DirectTransport(DirectStep::WaitingForConnection)
         )
@@ -78,7 +77,6 @@ impl super::ExchangeEngine {
         // not-yet-used QR/transport session (back-safety guarantees no
         // handshake was in flight), so this discards no confirmed contact.
         self.session = None;
-        self.ble_flow = None;
         self.nfc_flow = None;
         self.field_preview = None;
         self.scanned_data = None;

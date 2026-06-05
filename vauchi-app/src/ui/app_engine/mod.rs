@@ -1007,16 +1007,12 @@ impl AppEngine {
         } else if matches!(self.screen, AppScreen::Exchange)
             && screen.screen_id == "exchange_mode_selection"
         {
-            // Exchange is special: its engine emits many sub-state ids
-            // (`exchange_verifying`, `exchange_success`, `exchange_nfc_role`,
-            // …) under one `AppScreen`, so it cannot join the blanket set
-            // above. Only the mode-selection ROOT is a bottom-tab root, so
-            // only it carries the canonical `exchange` id. Frontends show the
-            // nav bar where `screen_id == tab_id`; without this stamp the
-            // Exchange tab rendered no bar and system-BACK exited the app
-            // (`2026-05-21-android-back-stack-and-bottom-nav-broken`).
-            // Sub-states keep their distinct ids so the bar hides mid-flow
-            // and the native NFC/multi-stage wrappers still dispatch.
+            // Only the mode-selection ROOT carries the canonical `exchange`
+            // id so frontends show the nav bar (screen_id == tab_id). The
+            // engine's other sub-states (verifying/success/nfc_role) can't
+            // join the blanket set above — they keep their ids so the bar
+            // hides mid-flow and native wrappers still dispatch. See
+            // canonical_screen_id_tests + 2026-06-05-screen-ux-declutter.
             screen.screen_id = AppScreen::Exchange.screen_id().to_string();
         }
         if screen.parent_screen_id.is_none() {

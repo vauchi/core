@@ -24,11 +24,12 @@ fn engine_with_identity() -> AppEngine {
 fn back_from_exchange_subflow_rewinds_to_mode_selection() {
     let mut engine = engine_with_identity();
 
-    // Entering Exchange lands on the mode-selection root step.
+    // Entering Exchange lands on the mode-selection root step, stamped with
+    // the canonical tab-root id so the bottom nav bar renders.
     let screen = engine.navigate_to(AppScreen::Exchange);
     assert_eq!(
-        screen.screen_id, "exchange_mode_selection",
-        "Exchange entry should show mode selection"
+        screen.screen_id, "exchange",
+        "Exchange entry should show the mode picker under the canonical id"
     );
     // The root step offers no engine-internal back yet (BACK here exits
     // the Exchange screen via the AppScreen path, not handled by this hook).
@@ -47,12 +48,22 @@ fn back_from_exchange_subflow_rewinds_to_mode_selection() {
         engine.can_go_back(),
         "a sub-flow entry step must offer engine-internal BACK"
     );
+    // Narrowness guard: only the mode-selection ROOT is stamped `exchange`.
+    // A sub-flow state under the same `AppScreen::Exchange` must keep its
+    // distinct engine id so the nav bar hides mid-flow and native wrappers
+    // still dispatch — a blanket Exchange stamp would regress this to
+    // `exchange`.
+    assert_ne!(
+        engine.current_screen().screen_id,
+        "exchange",
+        "an exchange sub-flow state must NOT carry the canonical root id"
+    );
 
     // BACK rewinds the step rather than leaving Exchange.
     let back = engine.navigate_back();
     assert_eq!(
-        back.screen_id, "exchange_mode_selection",
-        "BACK must rewind to mode selection, not exit the Exchange screen"
+        back.screen_id, "exchange",
+        "BACK must rewind to the mode picker (canonical id), not exit Exchange"
     );
     assert_eq!(
         *engine.current_app_screen(),

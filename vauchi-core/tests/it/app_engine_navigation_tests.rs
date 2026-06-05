@@ -49,8 +49,9 @@ fn navigate_to_exchange_shows_mode_selection() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::Exchange);
-    // Mode selection is the first screen when no mode is pre-set
-    assert_eq!(screen.screen_id, "exchange_mode_selection");
+    // The mode-selection root is the first screen; it reports the canonical
+    // tab-root id `exchange` (so frontends render the bottom nav bar).
+    assert_eq!(screen.screen_id, "exchange");
 }
 
 // @internal
@@ -235,9 +236,9 @@ fn navigate_away_and_back_preserves_engine_state() {
     vauchi.create_group("Family").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate to Exchange — starts on mode selection
+    // Navigate to Exchange — starts on mode selection (canonical root id)
     let first_visit = engine.navigate_to(AppScreen::Exchange);
-    assert_eq!(first_visit.screen_id, "exchange_mode_selection");
+    assert_eq!(first_visit.screen_id, "exchange");
 
     // Pick any mode — with a group present the engine advances to the
     // in-engine group-selection sub-step (before any sub-flow handoff).
@@ -891,8 +892,8 @@ fn go_exchange_from_contacts_navigates_to_exchange() {
     match result {
         ActionResult::NavigateTo(screen) => {
             assert_eq!(
-                screen.screen_id, "exchange_mode_selection",
-                "go_exchange should navigate to exchange screen"
+                screen.screen_id, "exchange",
+                "go_exchange should navigate to the Exchange tab root (canonical id)"
             );
         }
         other => panic!("Expected NavigateTo, got {other:?}"),
@@ -915,8 +916,8 @@ fn go_exchange_from_my_info_navigates_to_exchange() {
     match result {
         ActionResult::NavigateTo(screen) => {
             assert_eq!(
-                screen.screen_id, "exchange_mode_selection",
-                "go_exchange should navigate to exchange screen"
+                screen.screen_id, "exchange",
+                "go_exchange should navigate to the Exchange tab root (canonical id)"
             );
         }
         other => panic!("Expected NavigateTo, got {other:?}"),

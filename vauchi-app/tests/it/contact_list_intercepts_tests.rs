@@ -50,8 +50,9 @@ fn pressing_add_contact_on_contacts_navigates_to_exchange() {
     match result {
         ActionResult::NavigateTo(ref screen) => {
             assert_eq!(
-                screen.screen_id, "exchange_mode_selection",
-                "add_contact must route to the Exchange mode-picker, got screen_id={}",
+                screen.screen_id, "exchange",
+                "add_contact must route to the Exchange tab root (canonical \
+                 `exchange` id, so the nav bar renders), got screen_id={}",
                 screen.screen_id
             );
         }
@@ -78,7 +79,7 @@ fn pressing_go_exchange_on_contacts_navigates_to_exchange() {
 
     match result {
         ActionResult::NavigateTo(ref screen) => {
-            assert_eq!(screen.screen_id, "exchange_mode_selection");
+            assert_eq!(screen.screen_id, "exchange");
         }
         other => panic!("go_exchange must route to Exchange, got: {other:?}"),
     }

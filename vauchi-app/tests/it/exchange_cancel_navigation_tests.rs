@@ -39,8 +39,9 @@ fn cancel_on_multi_stage_exchange_lands_on_real_screen() {
     // dedicated `MultiStageExchange` screen (no groups → direct handoff).
     let entry = engine.navigate_to(AppScreen::Exchange);
     assert_eq!(
-        entry.screen_id, "exchange_mode_selection",
-        "Exchange entry should show mode selection"
+        entry.screen_id, "exchange",
+        "Exchange entry should show the mode picker under the canonical \
+         tab-root id (`exchange`), so frontends render the bottom nav bar"
     );
 
     let _ = engine.handle_action(UserAction::ListItemSelected {
@@ -80,10 +81,12 @@ fn cancel_on_multi_stage_exchange_lands_on_real_screen() {
         "Cancel must navigate off the MultiStageExchange AppScreen, still on {:?}",
         engine.current_app_screen()
     );
-    // Cancel returns to the mode picker so the user can retry.
+    // Cancel returns to the mode picker so the user can retry — under the
+    // canonical `exchange` tab-root id so the nav bar shows (no post-cancel
+    // dead-end).
     assert_eq!(
-        landed, "exchange_mode_selection",
-        "Cancel should return to the mode picker"
+        landed, "exchange",
+        "Cancel should return to the mode picker (canonical tab-root id)"
     );
 }
 

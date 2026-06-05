@@ -265,7 +265,9 @@ fn navigate_to_json_simple_variant() {
         .navigate_to_json_for_test(r#""Exchange""#.into())
         .expect("navigate");
     let envelope: serde_json::Value = serde_json::from_str(&result).expect("parse");
-    assert_eq!(envelope["screen"]["screen_id"], "exchange_mode_selection");
+    // The wire envelope mobile frontends consume: the Exchange tab root
+    // reports the canonical `exchange` id so the bottom nav bar renders.
+    assert_eq!(envelope["screen"]["screen_id"], "exchange");
 }
 
 // @scenario: exchange.feature :: Multi-stage exchange entry surfaces lifecycle commands in envelope
@@ -738,10 +740,7 @@ fn picking_glance_from_mode_selection_auto_navigates_to_multi_stage_exchange() {
     engine
         .navigate_to_json_for_test(r#""Exchange""#.into())
         .expect("navigate to Exchange");
-    assert_eq!(
-        engine.current_screen_id().expect("screen id"),
-        "exchange_mode_selection",
-    );
+    assert_eq!(engine.current_screen_id().expect("screen id"), "exchange",);
     // User picks Glance — the simplest face-to-face mode. No further
     // frontend call needed: AppEngine routes `StartMultiStageExchange`
     // → `AppScreen::MultiStageExchange`, the platform layer

@@ -20,9 +20,19 @@ fn engine_with_identity() -> AppEngine {
     AppEngine::new(vauchi)
 }
 
-/// The five collapsed families: navigating to each yields a
+/// The collapsed families: navigating to each yields a
 /// `current_screen().screen_id` equal to the canonical
 /// `AppScreen::screen_id()`, not the engine's sub-state id.
+///
+/// `Exchange` is the special member: its engine emits *many* sub-state
+/// ids (`exchange_mode_selection`, `exchange_verifying`,
+/// `exchange_success`, `exchange_nfc_role`, …), but only the
+/// mode-selection **root** is stamped with the canonical `exchange` id.
+/// That root is a bottom-tab root, and Android's tab-bar shows only when
+/// `screen_id == tab_id`; without the stamp the Exchange tab rendered no
+/// nav bar and system-BACK exited the app
+/// (`2026-05-21-android-back-stack-and-bottom-nav-broken`). The sub-state
+/// ids are preserved (see `non_allowlisted_screen_keeps_engine_screen_id`).
 // @internal
 #[test]
 fn collapsed_families_report_canonical_screen_id() {
@@ -32,6 +42,8 @@ fn collapsed_families_report_canonical_screen_id() {
         (AppScreen::Backup, "backup"),
         (AppScreen::DuressPin, "duress_pin"),
         (AppScreen::Sync, "sync"),
+        // Mode-selection root only — sub-states keep their engine ids.
+        (AppScreen::Exchange, "exchange"),
     ];
     for (screen, canonical) in cases {
         let mut engine = engine_with_identity();
@@ -44,17 +56,19 @@ fn collapsed_families_report_canonical_screen_id() {
     }
 }
 
-/// Control: a multi-state screen *outside* the allow-list (Exchange,
-/// whose engine emits `exchange_mode_selection`) keeps its engine
-/// sub-state id. Guards against the collapse silently widening to blanket.
+/// Control: a multi-state screen *outside* the allow-list (Recovery,
+/// whose engine emits the sub-state id `recovery_status`) keeps its
+/// engine sub-state id. Guards against the collapse silently widening to
+/// blanket — the narrow set is `Contacts | Groups | Backup | DuressPin |
+/// Sync` plus the single `Exchange` mode-selection root.
 // @internal
 #[test]
 fn non_allowlisted_screen_keeps_engine_screen_id() {
     let mut engine = engine_with_identity();
-    engine.navigate_to(AppScreen::Exchange);
+    engine.navigate_to(AppScreen::Recovery);
     assert_eq!(
         engine.current_screen().screen_id,
-        "exchange_mode_selection",
-        "Exchange is not in the narrow collapse set — its engine sub-state id must survive"
+        "recovery_status",
+        "Recovery is not in the narrow collapse set — its engine sub-state id must survive"
     );
 }

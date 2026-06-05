@@ -230,9 +230,9 @@ fn exchange_screen_with_identity_has_session() {
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::Exchange);
 
-    // Mode selection is the first screen
+    // Mode selection is the first screen — canonical tab-root id `exchange`.
     let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_mode_selection");
+    assert_eq!(screen.screen_id, "exchange");
 
     // Pick TapHoverShake — graduated to the multi-stage engine (P2.D of the
     // TapHoverShake plan). It now hands off via StartMultiStageExchange and

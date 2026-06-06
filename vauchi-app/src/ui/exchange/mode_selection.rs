@@ -50,51 +50,34 @@ impl ModeSelectionEngine {
     }
 
     /// Build the mode selection screen.
+    ///
+    /// The dynamically-recommended mode (e.g. Hover with full capabilities)
+    /// leads the picker in its own `recommended` group so the suggested ritual
+    /// comes first; the remaining modes follow grouped by category, with the
+    /// recommended mode excluded so it is never listed twice. See
+    /// `_private/docs/problems/2026-06-06-exchange-ritual-flow/` (Hover first).
     pub fn screen(&self) -> ScreenModel {
-        let components: Vec<Component> = CATEGORY_ORDER
-            .iter()
-            .filter_map(|(category, label)| {
-                let items: Vec<ActionListItem> = ExchangeMode::all()
-                    .iter()
-                    .filter(|m| m.category() == *category)
-                    .map(|&mode| {
-                        let availability = check_mode_availability(mode, &self.capabilities);
-                        let is_recommended = mode == self.recommended;
-                        // When the mode can't run, the availability reason is the
-                        // most useful subtitle; otherwise show the short "what to
-                        // do" instruction. The recommended mode (always available,
-                        // since `recommend_mode` only picks runnable modes) gets a
-                        // leading marker so the suggestion survives without a
-                        // dedicated badge field on the wire item.
-                        let detail = match &availability {
-                            ModeAvailability::Degraded { reason }
-                            | ModeAvailability::Unavailable { reason } => Some(reason.clone()),
-                            _ if is_recommended => {
-                                Some(format!("Recommended · {}", mode_instruction(mode)))
-                            }
-                            _ => Some(mode_instruction(mode).to_string()),
-                        };
-                        ActionListItem {
-                            id: format!("mode:{}", mode.serde_name()),
-                            label: mode.display_name().to_string(),
-                            icon: Some(mode_icon(mode).into()),
-                            detail,
-                            a11y: None,
-                            info_key: None,
-                        }
-                    })
-                    .collect();
+        let mut components: Vec<Component> = vec![Component::ActionList {
+            id: "recommended".into(),
+            items: vec![self.mode_item(self.recommended)],
+        }];
 
-                if items.is_empty() {
-                    return None;
-                }
+        for (category, label) in CATEGORY_ORDER {
+            let items: Vec<ActionListItem> = ExchangeMode::all()
+                .iter()
+                .filter(|m| m.category() == *category && **m != self.recommended)
+                .map(|&mode| self.mode_item(mode))
+                .collect();
 
-                Some(Component::ActionList {
-                    id: format!("category:{}", label.to_lowercase()),
-                    items,
-                })
-            })
-            .collect();
+            if items.is_empty() {
+                continue;
+            }
+
+            components.push(Component::ActionList {
+                id: format!("category:{}", label.to_lowercase()),
+                items,
+            });
+        }
 
         ScreenModel {
             screen_id: "exchange_mode_selection".into(),
@@ -104,6 +87,33 @@ impl ModeSelectionEngine {
             actions: vec![],
             progress: None,
             ..Default::default()
+        }
+    }
+
+    /// Build the list item for a single mode: availability-aware detail,
+    /// recommendation marker, and per-mode icon.
+    fn mode_item(&self, mode: ExchangeMode) -> ActionListItem {
+        let availability = check_mode_availability(mode, &self.capabilities);
+        let is_recommended = mode == self.recommended;
+        // When the mode can't run, the availability reason is the most useful
+        // subtitle; otherwise show the short "what to do" instruction. The
+        // recommended mode (always available, since `recommend_mode` only picks
+        // runnable modes) gets a leading marker so the suggestion survives
+        // without a dedicated badge field on the wire item.
+        let detail = match &availability {
+            ModeAvailability::Degraded { reason } | ModeAvailability::Unavailable { reason } => {
+                Some(reason.clone())
+            }
+            _ if is_recommended => Some(format!("Recommended · {}", mode_instruction(mode))),
+            _ => Some(mode_instruction(mode).to_string()),
+        };
+        ActionListItem {
+            id: format!("mode:{}", mode.serde_name()),
+            label: mode.display_name().to_string(),
+            icon: Some(mode_icon(mode).into()),
+            detail,
+            a11y: None,
+            info_key: None,
         }
     }
 
@@ -264,11 +274,34 @@ mod tests {
         assert_eq!(
             category_ids,
             vec![
+                "recommended",
                 "category:quick",
                 "category:standard",
                 "category:fun",
                 "category:remote",
             ]
+        );
+    }
+
+    #[test]
+    fn recommended_mode_is_first_in_picker() {
+        let engine = ModeSelectionEngine::new(full_caps());
+        let screen = engine.screen();
+        // The recommended mode (Hover with full caps) leads the picker as the
+        // first item of the first ("recommended") group — see
+        // _private/docs/problems/2026-06-06-exchange-ritual-flow/ (Hover first).
+        let first_item_id = screen
+            .components
+            .iter()
+            .find_map(|c| match c {
+                Component::ActionList { items, .. } => items.first(),
+                _ => None,
+            })
+            .map(|item| item.id.as_str());
+        assert_eq!(
+            first_item_id,
+            Some("mode:hover"),
+            "the recommended mode (Hover) should be the first item in the picker"
         );
     }
 

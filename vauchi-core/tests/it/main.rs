@@ -305,6 +305,7 @@ mod onboarding_scenario_tests;
 mod onboarding_tests;
 mod panic_widget_tests;
 mod parent_tab_tests;
+mod parser_panic_safety_tests;
 mod password_kdf_tests;
 mod per_contact_relay_routing_tests;
 mod performance_batch_sync_tests;

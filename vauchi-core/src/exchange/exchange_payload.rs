@@ -81,7 +81,7 @@ pub fn parse_exchange_payload(
     format_error: ExchangeError,
 ) -> Result<ParsedPayload, ExchangeError> {
     if bytes.len() < EXCHANGE_PAYLOAD_SIZE {
-        return Err(format_error.clone());
+        return Err(format_error);
     }
 
     if &bytes[0..4] != expected_magic {

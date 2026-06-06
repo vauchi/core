@@ -1103,7 +1103,7 @@ impl ExchangeSession {
             let modem_rate = modem_config.sample_rate;
             let samples = crate::exchange::audio_modem::generate_fsk_samples(&their, &modem_config);
             let emit = Command::AudioEmitChallenge {
-                samples: samples.clone(),
+                samples,
                 sample_rate: modem_rate,
             };
             let listen = Command::AudioListenForResponse {

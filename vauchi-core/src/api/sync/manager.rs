@@ -185,7 +185,7 @@ impl<'a> SyncManager<'a> {
     pub fn mark_delivered(&self, update_id: &str) -> Result<bool, SyncError> {
         // Get the update first to find the contact_id
         if let Some(update) = self.storage.get_pending_update(update_id)? {
-            let contact_id = update.contact_id.clone();
+            let contact_id = update.contact_id;
 
             // Delete the update
             let deleted = self.storage.mark_update_sent(update_id)?;

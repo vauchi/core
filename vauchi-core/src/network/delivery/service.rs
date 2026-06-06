@@ -99,9 +99,7 @@ impl DeliveryService {
             DeliveryAckStatus::Failed { reason } => {
                 storage.update_delivery_status(
                     message_id,
-                    &DeliveryStatus::Failed {
-                        reason: reason.clone(),
-                    },
+                    &DeliveryStatus::Failed { reason },
                     now,
                 )?;
 

@@ -14,7 +14,7 @@ use crate::crypto::{HKDF, SymmetricKey, encryption};
 use crate::identity::device::{DeviceInfo, DeviceRegistry};
 use crate::storage::Storage;
 use crate::sync::device_sync::{
-    DeviceSyncError, DeviceSyncPayload, InterDeviceSyncState, SyncItem, VersionVector,
+    DeviceSyncError, DeviceSyncPayload, FieldStamp, InterDeviceSyncState, SyncItem, VersionVector,
 };
 
 /// Domain separation for device-to-device encryption key derivation.
@@ -35,9 +35,11 @@ pub struct DeviceSyncOrchestrator<'a> {
     device_states: HashMap<[u8; 32], InterDeviceSyncState>,
     /// Local version vector for causality tracking.
     version_vector: VersionVector,
-    /// Timestamps of the last change to each field (for conflict resolution).
-    /// Key is the field identifier (e.g., "field:email" or "contact:abc123").
-    field_timestamps: HashMap<String, u64>,
+    /// Last-write stamp per field for conflict resolution: `(timestamp,
+    /// device_id)`, compared lexicographically (ADR-020 LWW + device-id
+    /// tie-break). Key is the field identifier (e.g., "field:email" or
+    /// "contact:abc123"). Persisted via `Storage::save_field_timestamps`.
+    field_timestamps: HashMap<String, FieldStamp>,
 }
 
 impl<'a> DeviceSyncOrchestrator<'a> {
@@ -105,10 +107,14 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     /// Queues the SyncItem for all other linked devices and increments
     /// the local version vector.
     pub fn record_local_change(&mut self, item: SyncItem) -> Result<(), DeviceSyncError> {
-        // Track timestamp for conflict resolution
+        // Track the last-write stamp for conflict resolution: this device
+        // originated the change, so stamp it with our device id (ADR-020).
         let key = Self::conflict_key(&item);
-        let timestamp = item.timestamp();
-        self.field_timestamps.insert(key, timestamp);
+        let stamp = FieldStamp {
+            timestamp: item.timestamp(),
+            device_id: *self.current_device.device_id(),
+        };
+        self.field_timestamps.insert(key, stamp);
 
         // Increment our version
         self.version_vector
@@ -365,8 +371,9 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     ///
     /// Rules:
     /// - **Newer wins:** If incoming timestamp > local timestamp for the same key, apply it.
-    /// - **Tie → local wins:** If timestamps are equal, the incoming item is rejected.
-    ///   This avoids unnecessary churn when both devices produce identical timestamps.
+    /// - **Tie → higher device id wins (ADR-020):** If timestamps are equal, the
+    ///   item from the lexicographically-higher device id wins — deterministic and
+    ///   identical on every device, so concurrent same-ms edits converge.
     /// - **Independent fields coexist:** Items with different conflict keys never conflict.
     ///   E.g., updating email and phone simultaneously on two devices both succeed.
     /// - **Cross-type conflicts:** ContactAdded and ContactRemoved share the same
@@ -376,25 +383,28 @@ impl<'a> DeviceSyncOrchestrator<'a> {
     pub fn process_incoming(
         &mut self,
         items: Vec<SyncItem>,
+        sender_device_id: &[u8; 32],
     ) -> Result<Vec<SyncItem>, DeviceSyncError> {
         let mut applied = Vec::new();
 
         for item in items {
             let key = Self::conflict_key(&item);
-            let incoming_timestamp = item.timestamp();
+            // Every item in a batch was authored by the sending device, so
+            // the sender's id is the originating device id for the tie-break.
+            let incoming = FieldStamp {
+                timestamp: item.timestamp(),
+                device_id: *sender_device_id,
+            };
 
-            // Check if we have a local timestamp for this key
-            let local_timestamp = self.field_timestamps.get(&key).copied().unwrap_or(0);
-
-            // Last-write-wins: only apply if incoming is newer
-            if incoming_timestamp > local_timestamp {
-                // Update our local timestamp
-                self.field_timestamps.insert(key, incoming_timestamp);
-
-                // Add to applied list
+            // LWW + device-id tie-break (ADR-020): apply iff the incoming
+            // (timestamp, device_id) is lexicographically greater than the
+            // local stamp. An equal stamp (same write echoed back) is rejected.
+            let local = self.field_timestamps.get(&key).copied();
+            if local.is_none_or(|local| incoming > local) {
+                self.field_timestamps.insert(key, incoming);
                 applied.push(item);
             }
-            // If incoming is older or equal, we reject it (don't add to applied)
+            // Older-or-equal incoming is rejected (not added to applied).
         }
 
         // Persist the updated timestamps so the LWW gate survives a reload

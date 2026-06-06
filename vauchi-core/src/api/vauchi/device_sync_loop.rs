@@ -182,8 +182,10 @@ impl Vauchi {
                 Ok(i) => i,
                 Err(_) => return Ok(0), // decrypted but malformed — drop
             };
+            // The decrypting device IS the sender — use its id for the
+            // ADR-020 tie-break (no wire field needed).
             let applied = orchestrator
-                .process_incoming(items)
+                .process_incoming(items, &device.device_id)
                 .map_err(VauchiError::DeviceSync)?;
             return self.apply_sync_items(applied);
         }

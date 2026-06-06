@@ -574,6 +574,21 @@ impl InterDeviceSyncState {
     }
 }
 
+/// Conflict-resolution stamp for one field: the timestamp and the
+/// originating device id of the current winning write.
+///
+/// Ordering is **lexicographic — timestamp first, then device id** (the
+/// derived `Ord` compares fields in declaration order), implementing
+/// ADR-020: last-write-wins, with the higher device id breaking exact
+/// timestamp ties deterministically and identically on every device.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct FieldStamp {
+    /// Unix-ms timestamp of the write.
+    pub timestamp: u64,
+    /// Device id that originated the write (ADR-020 tie-breaker).
+    pub device_id: [u8; 32],
+}
+
 /// Version vector for causality tracking across devices.
 ///
 /// Used to detect concurrent updates and determine if changes
@@ -583,9 +598,10 @@ impl InterDeviceSyncState {
 ///
 /// The `is_concurrent_with` and `dominates` methods are implemented and tested,
 /// but the `DeviceSyncOrchestrator::process_incoming` method does NOT use them.
-/// Conflict resolution currently relies on scalar `field_timestamps` (LWW) rather
-/// than vector clock causality. The `field_timestamps` map is also in-memory only,
-/// not persisted to storage.
+/// Conflict resolution currently relies on `field_timestamps` ([`FieldStamp`]
+/// LWW + device-id tie-break, ADR-020) rather than vector clock causality.
+/// The `field_timestamps` map is persisted to storage (table
+/// `sync_field_timestamps`, migration v48).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VersionVector {
     /// Map of device ID to version number.

@@ -465,7 +465,9 @@ fn test_conflict_resolution_last_write_wins() {
     }];
 
     // Process incoming items
-    let applied = orchestrator.process_incoming(incoming_items).unwrap();
+    let applied = orchestrator
+        .process_incoming(incoming_items, &[0x99u8; 32])
+        .unwrap();
 
     // The newer remote change should be applied
     assert_eq!(applied.len(), 1);
@@ -505,7 +507,9 @@ fn test_conflict_resolution_rejects_older() {
     }];
 
     // Process incoming items
-    let applied = orchestrator.process_incoming(incoming_items).unwrap();
+    let applied = orchestrator
+        .process_incoming(incoming_items, &[0x99u8; 32])
+        .unwrap();
 
     // The older remote change should be rejected (empty applied list)
     assert!(applied.is_empty());
@@ -542,7 +546,9 @@ fn test_concurrent_updates_different_fields_both_preserved() {
     }];
 
     // Process incoming - different fields, no conflict
-    let applied = orchestrator.process_incoming(incoming_items).unwrap();
+    let applied = orchestrator
+        .process_incoming(incoming_items, &[0x99u8; 32])
+        .unwrap();
 
     // The phone update should be applied (different field)
     assert_eq!(applied.len(), 1);
@@ -618,8 +624,12 @@ fn test_bidirectional_field_additions() {
     let b_to_a = orchestrator_b.pending_for_device(&device_a_id).to_vec();
 
     // Apply on each side
-    let applied_on_b = orchestrator_b.process_incoming(a_to_b).unwrap();
-    let applied_on_a = orchestrator_a.process_incoming(b_to_a).unwrap();
+    let applied_on_b = orchestrator_b
+        .process_incoming(a_to_b, &[0x99u8; 32])
+        .unwrap();
+    let applied_on_a = orchestrator_a
+        .process_incoming(b_to_a, &[0x99u8; 32])
+        .unwrap();
 
     // Both should have applied the other's changes (different fields, no conflict)
     assert_eq!(applied_on_b.len(), 1); // phone from A
@@ -749,11 +759,14 @@ fn field_timestamps_persist_across_reload_for_lww() {
 
     // An OLDER incoming edit to the same field is rejected (LWW).
     let stale = reloaded
-        .process_incoming(vec![SyncItem::CardUpdated {
-            field_label: "email".to_string(),
-            new_value: "stale@example.com".to_string(),
-            timestamp: 500,
-        }])
+        .process_incoming(
+            vec![SyncItem::CardUpdated {
+                field_label: "email".to_string(),
+                new_value: "stale@example.com".to_string(),
+                timestamp: 500,
+            }],
+            &[0x99u8; 32],
+        )
         .unwrap();
     assert!(
         stale.is_empty(),
@@ -762,11 +775,14 @@ fn field_timestamps_persist_across_reload_for_lww() {
 
     // A NEWER incoming edit to the same field is applied.
     let fresh = reloaded
-        .process_incoming(vec![SyncItem::CardUpdated {
-            field_label: "email".to_string(),
-            new_value: "fresh@example.com".to_string(),
-            timestamp: 1500,
-        }])
+        .process_incoming(
+            vec![SyncItem::CardUpdated {
+                field_label: "email".to_string(),
+                new_value: "fresh@example.com".to_string(),
+                timestamp: 1500,
+            }],
+            &[0x99u8; 32],
+        )
         .unwrap();
     assert_eq!(fresh.len(), 1, "newer incoming edit must win");
 }

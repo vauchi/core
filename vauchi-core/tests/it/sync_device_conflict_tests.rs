@@ -41,13 +41,14 @@ fn create_test_contact(name: &str) -> Contact {
 // Documenting and testing the Last-Write-Wins strategy
 // ============================================================
 
-/// Test: Equal timestamps are treated as a tie — incoming is rejected (#193).
+/// Test: Equal timestamps break by device id (ADR-020), not "local always wins".
 ///
-/// LWW strategy: `incoming_timestamp > local_timestamp` uses strict greater-than.
-/// Equal timestamps mean "no new information", so the local value is kept.
+/// `process_incoming` compares `(timestamp, device_id)` lexicographically. On a
+/// timestamp tie the item from the higher device id wins — deterministically and
+/// identically on every device — so concurrent same-ms edits converge.
 // @scenario: device_management :: Conflict resolution between devices
 #[test]
-fn test_conflict_equal_timestamp_rejects_incoming() {
+fn test_conflict_equal_timestamp_breaks_by_device_id() {
     let storage = create_test_storage();
     let master_seed = [0x42u8; 32];
 
@@ -56,7 +57,8 @@ fn test_conflict_equal_timestamp_rejects_incoming() {
 
     let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
 
-    // Local change at timestamp 5000
+    // Local change at timestamp 5000, stamped with this device's (derived,
+    // non-zero) id.
     orchestrator
         .record_local_change(SyncItem::CardUpdated {
             field_label: "email".to_string(),
@@ -65,19 +67,31 @@ fn test_conflict_equal_timestamp_rejects_incoming() {
         })
         .unwrap();
 
-    // Incoming change from another device at the *same* timestamp
-    let incoming = vec![SyncItem::CardUpdated {
-        field_label: "email".to_string(),
-        new_value: "remote@example.com".to_string(),
-        timestamp: 5000,
-    }];
+    let remote = || {
+        vec![SyncItem::CardUpdated {
+            field_label: "email".to_string(),
+            new_value: "remote@example.com".to_string(),
+            timestamp: 5000,
+        }]
+    };
 
-    let applied = orchestrator.process_incoming(incoming).unwrap();
-
-    // Equal timestamp → incoming rejected (local wins on tie)
+    // Same timestamp, LOWER sender id (all-zero < any derived id): local wins.
+    let rejected = orchestrator
+        .process_incoming(remote(), &[0x00u8; 32])
+        .unwrap();
     assert!(
-        applied.is_empty(),
-        "Equal-timestamp incoming should be rejected"
+        rejected.is_empty(),
+        "equal timestamp + lower sender device id must lose the tie"
+    );
+
+    // Same timestamp, HIGHER sender id (all-0xFF > any derived id): remote wins.
+    let applied = orchestrator
+        .process_incoming(remote(), &[0xFFu8; 32])
+        .unwrap();
+    assert_eq!(
+        applied.len(),
+        1,
+        "equal timestamp + higher sender device id must win the tie (ADR-020)"
     );
 }
 
@@ -115,7 +129,9 @@ fn test_conflict_rapid_updates_only_latest_applied() {
         },
     ];
 
-    let applied = orchestrator.process_incoming(incoming).unwrap();
+    let applied = orchestrator
+        .process_incoming(incoming, &[0x99u8; 32])
+        .unwrap();
 
     // All three have ascending timestamps, so all are applied sequentially.
     // The field_timestamps map ends at 3000.
@@ -128,7 +144,7 @@ fn test_conflict_rapid_updates_only_latest_applied() {
         timestamp: 1500,
     }];
 
-    let rejected = orchestrator.process_incoming(stale).unwrap();
+    let rejected = orchestrator.process_incoming(stale, &[0x99u8; 32]).unwrap();
     assert!(
         rejected.is_empty(),
         "Stale update after rapid burst should be rejected"
@@ -157,7 +173,9 @@ fn test_conflict_contact_add_then_remove() {
         contact_data,
         timestamp: 1000,
     };
-    let applied = orchestrator.process_incoming(vec![add_item]).unwrap();
+    let applied = orchestrator
+        .process_incoming(vec![add_item], &[0x99u8; 32])
+        .unwrap();
     assert_eq!(applied.len(), 1, "Add should be applied");
 
     // Contact removed at t=2000 (newer — should win)
@@ -165,7 +183,9 @@ fn test_conflict_contact_add_then_remove() {
         contact_id: contact_id.clone(),
         timestamp: 2000,
     };
-    let applied = orchestrator.process_incoming(vec![remove_item]).unwrap();
+    let applied = orchestrator
+        .process_incoming(vec![remove_item], &[0x99u8; 32])
+        .unwrap();
     assert_eq!(applied.len(), 1, "Remove should win (newer)");
 
     // Re-add at t=1500 (older than remove — should be rejected)
@@ -175,7 +195,9 @@ fn test_conflict_contact_add_then_remove() {
         contact_data: contact_data2,
         timestamp: 1500,
     };
-    let applied = orchestrator.process_incoming(vec![readd_item]).unwrap();
+    let applied = orchestrator
+        .process_incoming(vec![readd_item], &[0x99u8; 32])
+        .unwrap();
     assert!(
         applied.is_empty(),
         "Re-add with older timestamp should be rejected"
@@ -204,12 +226,16 @@ fn test_conflict_deletion_schedule_and_cancel_independent() {
         execute_at: 1000 + 7 * 86400,
         timestamp: 1000,
     };
-    let applied = orchestrator.process_incoming(vec![schedule]).unwrap();
+    let applied = orchestrator
+        .process_incoming(vec![schedule], &[0x99u8; 32])
+        .unwrap();
     assert_eq!(applied.len(), 1);
 
     // Cancel deletion on another device (different conflict key)
     let cancel = SyncItem::DeletionCancelled { timestamp: 2000 };
-    let applied = orchestrator.process_incoming(vec![cancel]).unwrap();
+    let applied = orchestrator
+        .process_incoming(vec![cancel], &[0x99u8; 32])
+        .unwrap();
     assert_eq!(
         applied.len(),
         1,
@@ -510,7 +536,7 @@ fn test_conflict_visibility_changed() {
         is_visible: false,
         timestamp: 1000,
     }];
-    let applied = orchestrator.process_incoming(items).unwrap();
+    let applied = orchestrator.process_incoming(items, &[0x99u8; 32]).unwrap();
     assert_eq!(applied.len(), 1);
 
     // Older visibility change should be rejected
@@ -520,7 +546,7 @@ fn test_conflict_visibility_changed() {
         is_visible: true,
         timestamp: 500,
     }];
-    let rejected = orchestrator.process_incoming(stale).unwrap();
+    let rejected = orchestrator.process_incoming(stale, &[0x99u8; 32]).unwrap();
     assert!(
         rejected.is_empty(),
         "Stale visibility change should be rejected"
@@ -533,7 +559,9 @@ fn test_conflict_visibility_changed() {
         is_visible: true,
         timestamp: 500,
     }];
-    let applied = orchestrator.process_incoming(independent).unwrap();
+    let applied = orchestrator
+        .process_incoming(independent, &[0x99u8; 32])
+        .unwrap();
     assert_eq!(applied.len(), 1, "Different contact_id should not conflict");
 }
 
@@ -558,7 +586,7 @@ fn test_conflict_label_change() {
         is_deleted: false,
         timestamp: 2000,
     }];
-    let applied = orchestrator.process_incoming(items).unwrap();
+    let applied = orchestrator.process_incoming(items, &[0x99u8; 32]).unwrap();
     assert_eq!(applied.len(), 1);
 
     // Older label change for same label_id should be rejected
@@ -570,7 +598,7 @@ fn test_conflict_label_change() {
         is_deleted: false,
         timestamp: 1000,
     }];
-    let rejected = orchestrator.process_incoming(stale).unwrap();
+    let rejected = orchestrator.process_incoming(stale, &[0x99u8; 32]).unwrap();
     assert!(rejected.is_empty(), "Stale label change should be rejected");
 }
 
@@ -593,7 +621,7 @@ fn test_conflict_contact_trust_changed() {
         recovery_trusted: true,
         timestamp: 1000,
     }];
-    let applied = orchestrator.process_incoming(items).unwrap();
+    let applied = orchestrator.process_incoming(items, &[0x99u8; 32]).unwrap();
     assert_eq!(applied.len(), 1);
 
     // Newer trust change for same contact should win
@@ -602,7 +630,7 @@ fn test_conflict_contact_trust_changed() {
         recovery_trusted: false,
         timestamp: 2000,
     }];
-    let applied = orchestrator.process_incoming(newer).unwrap();
+    let applied = orchestrator.process_incoming(newer, &[0x99u8; 32]).unwrap();
     assert_eq!(applied.len(), 1, "Newer trust change should be applied");
 
     // Stale trust change should be rejected
@@ -611,6 +639,6 @@ fn test_conflict_contact_trust_changed() {
         recovery_trusted: true,
         timestamp: 1500,
     }];
-    let rejected = orchestrator.process_incoming(stale).unwrap();
+    let rejected = orchestrator.process_incoming(stale, &[0x99u8; 32]).unwrap();
     assert!(rejected.is_empty(), "Stale trust change should be rejected");
 }

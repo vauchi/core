@@ -471,7 +471,7 @@ fn test_sync_controller_process_device_sync() {
     }];
 
     // Process via controller
-    let applied = controller.process_device_sync(&mut orchestrator, incoming);
+    let applied = controller.process_device_sync(&mut orchestrator, incoming, &[0x42u8; 32]);
     assert!(applied.is_ok(), "expected success");
     assert_eq!(applied.unwrap().len(), 1);
 }

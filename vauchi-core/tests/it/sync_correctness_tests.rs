@@ -265,7 +265,9 @@ fn test_process_incoming_rejects_equal_timestamp() {
         timestamp: 1500,
     }];
 
-    let applied = orchestrator.process_incoming(incoming).unwrap();
+    let applied = orchestrator
+        .process_incoming(incoming, &[0x99u8; 32])
+        .unwrap();
 
     // Equal timestamp should reject incoming (local wins)
     assert!(
@@ -307,11 +309,14 @@ fn test_concurrent_same_field_newer_wins() {
 
     // Device B updates email at t=2000 (newer) — arrives as incoming
     let applied = orch_a
-        .process_incoming(vec![SyncItem::CardUpdated {
-            field_label: "email".to_string(),
-            new_value: "b@example.com".to_string(),
-            timestamp: 2000,
-        }])
+        .process_incoming(
+            vec![SyncItem::CardUpdated {
+                field_label: "email".to_string(),
+                new_value: "b@example.com".to_string(),
+                timestamp: 2000,
+            }],
+            &[0x99u8; 32],
+        )
         .unwrap();
 
     // Newer wins
@@ -353,11 +358,14 @@ fn test_concurrent_different_fields_both_accepted() {
 
     // Device B updates email — arrives as incoming (different field, no conflict)
     let applied = orch_a
-        .process_incoming(vec![SyncItem::CardUpdated {
-            field_label: "email".to_string(),
-            new_value: "b@example.com".to_string(),
-            timestamp: 1001,
-        }])
+        .process_incoming(
+            vec![SyncItem::CardUpdated {
+                field_label: "email".to_string(),
+                new_value: "b@example.com".to_string(),
+                timestamp: 1001,
+            }],
+            &[0x99u8; 32],
+        )
         .unwrap();
 
     assert_eq!(

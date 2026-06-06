@@ -557,9 +557,10 @@ impl<'a, T: Transport> SyncController<'a, T> {
         &self,
         orchestrator: &mut DeviceSyncOrchestrator<'_>,
         incoming: Vec<SyncItem>,
+        sender_device_id: &[u8; 32],
     ) -> VauchiResult<Vec<SyncItem>> {
         let applied = orchestrator
-            .process_incoming(incoming)
+            .process_incoming(incoming, sender_device_id)
             .map_err(VauchiError::DeviceSync)?;
 
         Ok(applied)

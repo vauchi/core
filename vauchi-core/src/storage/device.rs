@@ -8,7 +8,7 @@ use rusqlite::params;
 
 use super::{Storage, StorageError};
 use crate::identity::device::DeviceRegistry;
-use crate::sync::device_sync::{InterDeviceSyncState, VersionVector};
+use crate::sync::device_sync::{FieldStamp, InterDeviceSyncState, VersionVector};
 
 impl Storage {
     // === Device Operations ===
@@ -372,7 +372,7 @@ impl Storage {
     /// local one (G3 of `2026-06-06-multi-device-sync-live-wiring`).
     pub fn save_field_timestamps(
         &self,
-        timestamps: &std::collections::HashMap<String, u64>,
+        timestamps: &std::collections::HashMap<String, FieldStamp>,
     ) -> Result<(), StorageError> {
         let json = serde_json::to_string(timestamps)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -392,7 +392,7 @@ impl Storage {
     /// Returns an empty map if none have been persisted yet.
     pub fn load_field_timestamps(
         &self,
-    ) -> Result<std::collections::HashMap<String, u64>, StorageError> {
+    ) -> Result<std::collections::HashMap<String, FieldStamp>, StorageError> {
         let result = self.conn.query_row(
             "SELECT timestamps_json_encrypted FROM sync_field_timestamps WHERE id = 1",
             [],
@@ -408,9 +408,31 @@ impl Storage {
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
                 let json = String::from_utf8(decrypted)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                let map = serde_json::from_str(&json)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                Ok(map)
+                // Current shape: `{key: FieldStamp}`. Fall back to the
+                // pre-tie-break G3 shape `{key: u64}` so a device upgraded
+                // through G3 keeps its data (legacy device_id defaults to
+                // all-zero, the lowest tie-break rank).
+                if let Ok(map) =
+                    serde_json::from_str::<std::collections::HashMap<String, FieldStamp>>(&json)
+                {
+                    Ok(map)
+                } else {
+                    let legacy: std::collections::HashMap<String, u64> =
+                        serde_json::from_str(&json)
+                            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                    Ok(legacy
+                        .into_iter()
+                        .map(|(k, ts)| {
+                            (
+                                k,
+                                FieldStamp {
+                                    timestamp: ts,
+                                    device_id: [0u8; 32],
+                                },
+                            )
+                        })
+                        .collect())
+                }
             }
             Ok(_) => Ok(std::collections::HashMap::new()),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(std::collections::HashMap::new()),

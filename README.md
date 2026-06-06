@@ -14,8 +14,9 @@
 
 # Vauchi
 
-A privacy-focused platform for exchanging contact
-information that stays up-to-date.
+Living contact cards you exchange in person — they
+keep themselves up to date, for good. No accounts, no
+platform in the middle, no one else in the room.
 
 ## The Problem
 
@@ -32,9 +33,14 @@ platforms you may no longer want to use.
 
 ## The Solution
 
-Vauchi lets you exchange "living" contact cards. When you
-update your information, everyone you've shared it with
-automatically receives the update - securely and privately.
+You exchange a contact card in person — a single,
+deliberate moment, like a handshake. From then on the
+card stays alive: change your number, your job, your
+city, and everyone you've shared it with simply sees
+the update. No "my number changed" messages, no company
+sitting in the middle of your relationships. The
+relationship is yours and theirs — and no one else is
+in the room.
 
 ## Key Principles
 

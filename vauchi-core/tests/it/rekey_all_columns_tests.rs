@@ -111,6 +111,11 @@ fn fixtures() -> Vec<(&'static str, &'static str, &'static [u8])> {
         ("device_info", "device_info_encrypted", b"{\"id\":\"dev1\"}"),
         ("version_vector", "vector_json_encrypted", b"{\"v\":7}"),
         (
+            "sync_field_timestamps",
+            "timestamps_json_encrypted",
+            b"{\"field:email\":1700000000000}",
+        ),
+        (
             "contact_sync_timestamps",
             "last_sync_at_encrypted",
             b"\x00\x00\x00\x00\x68\x4F\x12\x34",
@@ -359,6 +364,18 @@ fn populate_every_column(storage: &Storage, key: &SymmetricKey) {
          (id, vector_json, vector_json_encrypted, updated_at) \
          VALUES (1, '', ?1, ?2)",
         params![enc("version_vector", "vector_json_encrypted"), now],
+    )
+    .unwrap();
+
+    // ── sync_field_timestamps (singleton) ─────────────────────
+    conn.execute(
+        "INSERT OR REPLACE INTO sync_field_timestamps \
+         (id, timestamps_json_encrypted, updated_at) \
+         VALUES (1, ?1, ?2)",
+        params![
+            enc("sync_field_timestamps", "timestamps_json_encrypted"),
+            now
+        ],
     )
     .unwrap();
 
@@ -635,6 +652,7 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
         ("device_registry", "registry_json_encrypted"),
         ("device_info", "device_info_encrypted"),
         ("version_vector", "vector_json_encrypted"),
+        ("sync_field_timestamps", "timestamps_json_encrypted"),
         ("deletion_state", "state_json_encrypted"),
         ("duress_settings", "alert_contact_ids_encrypted"),
         ("duress_settings", "alert_message_encrypted"),

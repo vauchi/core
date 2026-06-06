@@ -89,6 +89,14 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             orchestrator.version_vector = vector;
         }
 
+        // Load conflict-resolution field timestamps so the LWW gate in
+        // `process_incoming` survives across sync cycles (G3). Without this
+        // a reloaded orchestrator starts empty and an older incoming change
+        // would overwrite a newer local one.
+        orchestrator.field_timestamps = storage
+            .load_field_timestamps()
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?;
+
         Ok(orchestrator)
     }
 
@@ -126,6 +134,9 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             }
             self.storage
                 .save_version_vector(&self.version_vector)
+                .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            self.storage
+                .save_field_timestamps(&self.field_timestamps)
                 .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             Ok(())
         })();
@@ -385,6 +396,12 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             }
             // If incoming is older or equal, we reject it (don't add to applied)
         }
+
+        // Persist the updated timestamps so the LWW gate survives a reload
+        // (G3). Idempotent when nothing applied.
+        self.storage
+            .save_field_timestamps(&self.field_timestamps)
+            .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
 
         Ok(applied)
     }

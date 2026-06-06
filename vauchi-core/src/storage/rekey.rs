@@ -105,6 +105,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("contact_shared_avatars", "avatar_encrypted"),
     // V44 in-progress recovery state
     ("recovery_progress", "progress_encrypted"),
+    // V48 device-sync LWW field timestamps
+    ("sync_field_timestamps", "timestamps_json_encrypted"),
 ];
 
 /// Encrypted columns intentionally skipped by rekey, with documented reason.
@@ -175,7 +177,7 @@ impl Storage {
         self.wal_checkpoint()?;
 
         let old_key = &self.encryption_key;
-        const TOTAL_TABLES: u32 = 30;
+        const TOTAL_TABLES: u32 = 31;
         let mut completed: u32 = 0;
 
         let report = |completed: &mut u32, table: &str| {
@@ -220,6 +222,9 @@ impl Storage {
 
             self.rekey_version_vector(old_key, &new_key)?;
             report(&mut completed, "version_vector");
+
+            self.rekey_field_timestamps(old_key, &new_key)?;
+            report(&mut completed, "field_timestamps");
 
             self.rekey_sync_timestamps(old_key, &new_key)?;
             report(&mut completed, "sync_timestamps");
@@ -749,6 +754,38 @@ impl Storage {
                     params![new_enc],
                 )
                 .map_err(|e| StorageError::Migration(format!("Update version_vector: {}", e)))?;
+        }
+        Ok(())
+    }
+
+    fn rekey_field_timestamps(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        let result: Result<(Option<Vec<u8>>,), _> = self.conn.query_row(
+            "SELECT timestamps_json_encrypted FROM sync_field_timestamps WHERE id = 1",
+            [],
+            |row| Ok((row.get(0)?,)),
+        );
+
+        if let Ok((Some(enc),)) = result
+            && !enc.is_empty()
+        {
+            let plain = decrypt(old_key, &enc).map_err(|e| {
+                StorageError::Migration(format!("Decrypt sync_field_timestamps: {}", e))
+            })?;
+            let new_enc = encrypt(new_key, &plain).map_err(|e| {
+                StorageError::Migration(format!("Encrypt sync_field_timestamps: {}", e))
+            })?;
+            self.conn
+                .execute(
+                    "UPDATE sync_field_timestamps SET timestamps_json_encrypted = ?1 WHERE id = 1",
+                    params![new_enc],
+                )
+                .map_err(|e| {
+                    StorageError::Migration(format!("Update sync_field_timestamps: {}", e))
+                })?;
         }
         Ok(())
     }

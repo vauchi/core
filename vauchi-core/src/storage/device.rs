@@ -360,6 +360,64 @@ impl Storage {
         }
     }
 
+    // === Conflict-resolution field timestamps (G3) ===
+
+    /// Saves the conflict-resolution field timestamps (encrypted).
+    ///
+    /// Persists the orchestrator's `field_timestamps` map (conflict-key ->
+    /// last-write Unix-ms) so the LWW gate in
+    /// `DeviceSyncOrchestrator::process_incoming` survives across sync
+    /// cycles. Without this a reloaded orchestrator starts with empty
+    /// timestamps and would let an older incoming change overwrite a newer
+    /// local one (G3 of `2026-06-06-multi-device-sync-live-wiring`).
+    pub fn save_field_timestamps(
+        &self,
+        timestamps: &std::collections::HashMap<String, u64>,
+    ) -> Result<(), StorageError> {
+        let json = serde_json::to_string(timestamps)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let now = self.now_secs();
+        self.conn.execute(
+            "INSERT OR REPLACE INTO sync_field_timestamps \
+             (id, timestamps_json_encrypted, updated_at) VALUES (1, ?1, ?2)",
+            params![encrypted, now as i64],
+        )?;
+        Ok(())
+    }
+
+    /// Loads the conflict-resolution field timestamps (decrypted).
+    ///
+    /// Returns an empty map if none have been persisted yet.
+    pub fn load_field_timestamps(
+        &self,
+    ) -> Result<std::collections::HashMap<String, u64>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT timestamps_json_encrypted FROM sync_field_timestamps WHERE id = 1",
+            [],
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                Ok(encrypted)
+            },
+        );
+
+        match result {
+            Ok(Some(encrypted)) if !encrypted.is_empty() => {
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let map = serde_json::from_str(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(map)
+            }
+            Ok(_) => Ok(std::collections::HashMap::new()),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(std::collections::HashMap::new()),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
     // === Device Data Wipe ===
 
     /// Wipes all device-specific data from storage.
@@ -372,6 +430,7 @@ impl Storage {
         self.conn.execute("DELETE FROM device_sync_state", [])?;
         self.conn
             .execute("DELETE FROM device_sync_checkpoints", [])?;
+        self.conn.execute("DELETE FROM sync_field_timestamps", [])?;
         Ok(())
     }
 

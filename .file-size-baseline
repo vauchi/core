@@ -183,7 +183,7 @@ vauchi-core/src/recovery/mod.rs 1253
 # (+1 for #[allow(clippy::let_underscore_must_use)] attr on intentional
 #  best-effort VACUUM INTO backup site, problem
 #  2026-05-21-silent-failures-in-security-paths)
-vauchi-core/src/storage/migration.rs 1860
+vauchi-core/src/storage/migration.rs 1878
 
 # EXEMPT — rekey ledger: all encrypted columns must be co-located for correctness (audit C1)
 # (+4 for #[allow(clippy::let_underscore_must_use)] attr + comment on
@@ -194,7 +194,7 @@ vauchi-core/src/storage/migration.rs 1860
 #  (65) + too_many_lines (1089). Growth is method signatures + docs +
 #  Ok(()) tails; the flow stays co-located per the EXEMPT rationale.
 #  Problem 2026-06-06-core-function-complexity.)
-vauchi-core/src/storage/rekey.rs 1579
+vauchi-core/src/storage/rekey.rs 1616
 
 # SPLIT — Phase 3: extract connection management
 vauchi-core/src/storage/mod.rs 1079

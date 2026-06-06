@@ -706,3 +706,67 @@ fn test_offline_changes_sync_on_reconnect() {
     assert!(!sync_message.items.is_empty());
     assert_eq!(sync_message.items.len(), 1);
 }
+
+// G3: the LWW gate must survive an orchestrator reload. A local edit's
+// timestamp is persisted (field_timestamps) so a later-loaded orchestrator
+// rejects an older incoming edit and accepts a newer one — without this,
+// load() starts empty and an older remote change would overwrite a newer
+// local one (2026-06-06-multi-device-sync-live-wiring).
+// @scenario: device_management :: Concurrent edits converge by last-write-wins
+#[test]
+fn field_timestamps_persist_across_reload_for_lww() {
+    let storage = create_test_storage();
+    let master_seed = [0x55u8; 32];
+    // DeviceInfo::derive is deterministic from (seed, index), so re-deriving
+    // yields an equivalent device (DeviceInfo isn't Clone).
+    let registry = create_test_registry(
+        &master_seed,
+        &create_test_device(&master_seed, 0, "Device 0"),
+    );
+
+    // Record a local edit to the "email" field at t=1000 and persist it.
+    {
+        let mut orch = DeviceSyncOrchestrator::new(
+            &storage,
+            create_test_device(&master_seed, 0, "Device 0"),
+            registry.clone(),
+        );
+        orch.record_local_change(SyncItem::CardUpdated {
+            field_label: "email".to_string(),
+            new_value: "new@example.com".to_string(),
+            timestamp: 1000,
+        })
+        .unwrap();
+    }
+
+    // Reload a fresh orchestrator — field_timestamps must be restored.
+    let mut reloaded = DeviceSyncOrchestrator::load(
+        &storage,
+        create_test_device(&master_seed, 0, "Device 0"),
+        registry.clone(),
+    )
+    .unwrap();
+
+    // An OLDER incoming edit to the same field is rejected (LWW).
+    let stale = reloaded
+        .process_incoming(vec![SyncItem::CardUpdated {
+            field_label: "email".to_string(),
+            new_value: "stale@example.com".to_string(),
+            timestamp: 500,
+        }])
+        .unwrap();
+    assert!(
+        stale.is_empty(),
+        "older incoming edit must lose to the persisted newer local timestamp"
+    );
+
+    // A NEWER incoming edit to the same field is applied.
+    let fresh = reloaded
+        .process_incoming(vec![SyncItem::CardUpdated {
+            field_label: "email".to_string(),
+            new_value: "fresh@example.com".to_string(),
+            timestamp: 1500,
+        }])
+        .unwrap();
+    assert_eq!(fresh.len(), 1, "newer incoming edit must win");
+}

@@ -501,6 +501,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "drop_app_preferences",
             action: MigrationAction::Sql(MIGRATION_V47_DROP_APP_PREFERENCES),
         },
+        Migration {
+            version: 48,
+            name: "sync_field_timestamps",
+            action: MigrationAction::Sql(MIGRATION_V48_SYNC_FIELD_TIMESTAMPS),
+        },
     ]
 }
 
@@ -869,6 +874,19 @@ const MIGRATION_V46_APP_PREFERENCES: &str = "
 /// retired; existing dev databases drop the table on next open.
 const MIGRATION_V47_DROP_APP_PREFERENCES: &str = "
     DROP TABLE IF EXISTS app_preferences;
+";
+
+/// Migration v48: conflict-resolution field timestamps (device-sync LWW).
+///
+/// Single-row table holding the encrypted `field_timestamps` map so the
+/// LWW gate in `DeviceSyncOrchestrator::process_incoming` survives across
+/// sync cycles (G3 of `2026-06-06-multi-device-sync-live-wiring`).
+const MIGRATION_V48_SYNC_FIELD_TIMESTAMPS: &str = "
+    CREATE TABLE IF NOT EXISTS sync_field_timestamps (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        timestamps_json_encrypted BLOB NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
 ";
 
 /// Migration v1: Baseline schema.

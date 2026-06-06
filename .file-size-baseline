@@ -252,7 +252,11 @@ vauchi-core/src/storage/mod.rs 1079
 # (+3 for AppScreen::EmergencyBroadcast variant + id + from_screen_id —
 #  2026-06-02 humble-ui core engines sweep)
 # (+6 for AppScreen::NfcExchange variant + screen_id — NFC graduation)
-vauchi-app/src/ui/app_engine/mod.rs 1688
+# (-240 2026-06-06: extracted handle_action's inline guard groups into
+#  app_engine/dispatch.rs to clear clippy cognitive_complexity (62) +
+#  too_many_lines; the dispatch is now a flat call sequence.
+#  Problem 2026-06-06-core-function-complexity.)
+vauchi-app/src/ui/app_engine/mod.rs 1448
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts

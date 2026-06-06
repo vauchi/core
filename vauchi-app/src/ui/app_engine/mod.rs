@@ -19,6 +19,7 @@ mod link_exchange;
 mod link_responder;
 mod multi_stage_exchange;
 mod navigation;
+mod result_routing;
 mod routing;
 mod screens;
 

@@ -283,6 +283,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn recommended_mode_is_first_in_picker() {
         let engine = ModeSelectionEngine::new(full_caps());

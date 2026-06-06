@@ -9,6 +9,7 @@
 //! frontends see a single uniform interface.
 
 mod ble_handshake;
+mod completion;
 mod device_link;
 #[cfg(all(feature = "network-http", feature = "storage"))]
 mod device_link_initiator;

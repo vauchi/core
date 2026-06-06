@@ -256,7 +256,9 @@ vauchi-core/src/storage/mod.rs 1079
 #  app_engine/dispatch.rs to clear clippy cognitive_complexity (62) +
 #  too_many_lines; the dispatch is now a flat call sequence.
 #  Problem 2026-06-06-core-function-complexity.)
-vauchi-app/src/ui/app_engine/mod.rs 1448
+# (+1 2026-06-06: `mod completion;` declaration for the handle_completion
+#  decomposition — see routing.rs entry below.)
+vauchi-app/src/ui/app_engine/mod.rs 1449
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -303,7 +305,11 @@ vauchi-app/src/ui/app_engine/mod.rs 1448
 #  BLE graduation slice 4: the live BleExchangeEngine was deaf to hardware
 #  events without it. 2026-05-11-ble-exchange-engine-graduation)
 # (+15 for StartNfcExchange routing arm + hardware-event guard — NFC graduation)
-vauchi-app/src/ui/app_engine/routing.rs 1689
+# (-870 2026-06-06: extracted handle_completion's per-screen match arms into
+#  app_engine/completion.rs to clear clippy cognitive_complexity (69) +
+#  too_many_lines (790); handle_completion is now a flat dispatcher.
+#  Problem 2026-06-06-core-function-complexity.)
+vauchi-app/src/ui/app_engine/routing.rs 819
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)

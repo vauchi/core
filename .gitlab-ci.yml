@@ -568,7 +568,11 @@ test:core:
     expire_in: 1 week
 
 test:cucumber:
-  extends: [.linux-runner, .validation-rust, .timeout-quick]
+  # timeout-standard (30m), not timeout-quick (10m): this job compiles the
+  # full workspace before running cucumber, and a cold-cache build can take
+  # ~9m on its own — under the 10m quick limit it flakes (killed mid-run)
+  # whenever the cache is cold.
+  extends: [.linux-runner, .validation-rust, .timeout-standard]
   stage: test
   allow_failure: false
   needs:

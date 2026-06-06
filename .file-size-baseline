@@ -189,7 +189,12 @@ vauchi-core/src/storage/migration.rs 1860
 # (+4 for #[allow(clippy::let_underscore_must_use)] attr + comment on
 #  intentional best-effort ROLLBACK in error path, problem
 #  2026-05-21-silent-failures-in-security-paths)
-vauchi-core/src/storage/rekey.rs 1394
+# (+185 2026-06-06: decomposed the 1089-line rekey_with_progress into 31
+#  per-table rekey_<table> helpers to clear clippy cognitive_complexity
+#  (65) + too_many_lines (1089). Growth is method signatures + docs +
+#  Ok(()) tails; the flow stays co-located per the EXEMPT rationale.
+#  Problem 2026-06-06-core-function-complexity.)
+vauchi-core/src/storage/rekey.rs 1579
 
 # SPLIT — Phase 3: extract connection management
 vauchi-core/src/storage/mod.rs 1079

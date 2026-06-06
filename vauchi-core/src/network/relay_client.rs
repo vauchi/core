@@ -277,19 +277,24 @@ impl<T: Transport> RelayClient<T> {
         &mut self,
         master_seed: &[u8; 32],
         ciphertext: Vec<u8>,
-        ratchet_msg: &RatchetMessage,
         now: u64,
     ) -> Result<MessageId, NetworkError> {
         let self_token = compute_self_token(master_seed, current_day_epoch(now));
 
+        // Device sync carries no Double Ratchet: `ciphertext` is already
+        // sealed by `DeviceSyncOrchestrator::encrypt_for_device` (ECDH from
+        // the shared master seed + HKDF + XChaCha20-Poly1305). The wire
+        // `EncryptedUpdate` requires a `RatchetHeader`, so device-sync blobs
+        // carry a synthetic zero header that the device-sync receive path
+        // ignores — it decrypts via `decrypt_from_device`, not the ratchet.
         let encrypted_update = EncryptedUpdate {
             recipient_id: ContactId::from(token_hex(&self_token)),
             sender_id: ContactId::from(self.our_identity_id.clone()),
             ratchet_header: RatchetHeader {
-                dh_public: crate::identifiers::DhPublicKey::from(ratchet_msg.dh_public),
-                dh_generation: ratchet_msg.dh_generation,
-                message_index: ratchet_msg.message_index,
-                previous_chain_length: ratchet_msg.previous_chain_length,
+                dh_public: crate::identifiers::DhPublicKey::from([0u8; 32]),
+                dh_generation: 0,
+                message_index: 0,
+                previous_chain_length: 0,
             },
             ciphertext,
         };

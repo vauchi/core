@@ -528,27 +528,22 @@ impl<'a, T: Transport> SyncController<'a, T> {
             return Ok(());
         }
 
-        // Serialize + encrypt for target device
+        // Serialize + seal for the target device. `encrypt_for_device` is
+        // ECDH (our device exchange key × the target device public key, both
+        // derived from the shared master seed) + HKDF + XChaCha20-Poly1305 —
+        // self-contained authenticated encryption with no interactive
+        // handshake. No Double Ratchet: every same-seed device can already
+        // derive this key, so a ratchet adds no confidentiality (see the
+        // `2026-06-06-multi-device-sync-live-wiring` investigation §2).
         let payload_bytes = serde_json::to_vec(&sync_msg.items)
             .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
         let ciphertext = orchestrator
             .encrypt_for_device(target_public_key, &payload_bytes)
             .map_err(VauchiError::DeviceSync)?;
 
-        // We need a ratchet for device sync — if not available, skip
-        let device_id_hex = hex::encode(target_device_id);
-        let ratchet = self.ratchets.get_mut(&device_id_hex).ok_or_else(|| {
-            VauchiError::InvalidState(format!("No ratchet for device {}", device_id_hex))
-        })?;
-
-        let ratchet_msg = ratchet
-            .encrypt(&ciphertext)
-            .map_err(|e| VauchiError::InvalidState(e.to_string()))?;
-
         self.relay.send_device_sync_message(
             master_seed,
             ciphertext,
-            &ratchet_msg,
             self.storage.clock().unix_seconds(),
         )?;
 

@@ -215,12 +215,12 @@ fn test_device_sync_uses_self_token_as_recipient_id() {
     client.connect().unwrap();
 
     let master_seed = [0xEE; 32];
-    let (mut ratchet, _) = create_test_ratchet();
+    // Device sync carries no Double Ratchet — the ciphertext is already
+    // sealed by `encrypt_for_device` (ECDH from the shared master seed).
     let ciphertext = b"encrypted-sync-payload".to_vec();
-    let ratchet_msg = ratchet.encrypt(&ciphertext).unwrap();
 
     let msg_id = client
-        .send_device_sync_message(&master_seed, ciphertext.clone(), &ratchet_msg, 0)
+        .send_device_sync_message(&master_seed, ciphertext.clone(), 0)
         .unwrap();
     assert!(!msg_id.as_str().is_empty());
 
@@ -237,6 +237,15 @@ fn test_device_sync_uses_self_token_as_recipient_id() {
             update.recipient_id.as_str().len(),
             64,
             "Self-token must be 64-char hex"
+        );
+        // Synthetic zero ratchet header: device sync does not use the ratchet.
+        assert_eq!(
+            update.ciphertext, ciphertext,
+            "Device-sync ciphertext rides verbatim (no ratchet re-encryption)"
+        );
+        assert_eq!(
+            update.ratchet_header.dh_generation, 0,
+            "Device-sync ratchet header is synthetic/zero"
         );
     } else {
         panic!("Expected EncryptedUpdate for device sync");

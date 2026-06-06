@@ -113,213 +113,241 @@ fn split_vcard_blocks(text: &str) -> Vec<String> {
     blocks
 }
 
-/// Parse a single vCard block (content between BEGIN/END, exclusive).
-fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<String>)> {
-    let version = detect_version(block);
-    let lines = unfold_lines(block, version);
+/// Extract a property value and unescape it, returning `None` when the
+/// result is empty so callers can skip blank fields in one step.
+fn extract_clean(stripped: &str) -> Option<String> {
+    let val = extract_value(stripped)?;
+    let unescaped = unescape_vcard(&val);
+    if unescaped.is_empty() {
+        None
+    } else {
+        Some(unescaped)
+    }
+}
 
-    let mut display_name: Option<String> = None;
-    let mut n_fallback: Option<String> = None;
-    let mut uid: Option<String> = None;
-    let mut nickname: Option<String> = None;
-    let mut avatar_data: Option<Vec<u8>> = None;
-    let mut fields: Vec<(FieldType, String, String)> = Vec::new();
+/// Mutable accumulator for the fields parsed out of one vCard block.
+///
+/// `apply_line` dispatches a single unfolded line into the right slot; the
+/// per-property push helpers keep each dispatch arm to a single call so the
+/// dispatch stays flat and readable.
+#[derive(Default)]
+struct VCardFields {
+    display_name: Option<String>,
+    n_fallback: Option<String>,
+    uid: Option<String>,
+    nickname: Option<String>,
+    avatar_data: Option<Vec<u8>>,
+    fields: Vec<(FieldType, String, String)>,
+}
 
-    // Collect group labels (e.g., item1.X-ABLabel → label for item1.*)
-    let group_labels = collect_group_labels(&lines);
-
-    for line in &lines {
-        // Skip empty lines and version line
-        if line.is_empty() {
-            continue;
+impl VCardFields {
+    /// Push a value-bearing field whose label is resolved from group/type.
+    fn push_labeled(
+        &mut self,
+        field_type: FieldType,
+        stripped: &str,
+        group: Option<&str>,
+        group_labels: &[(String, String)],
+        default_label: &str,
+        version: VCardVersion,
+    ) {
+        if let Some(value) = extract_clean(stripped) {
+            let label = resolve_label(stripped, group, group_labels, default_label, version);
+            self.fields
+                .push((field_type, label, truncate_chars(&value, MAX_VALUE_LENGTH)));
         }
+    }
 
-        // Strip group prefix (e.g., "item1.TEL" → "TEL"), remember group
-        let (group, stripped) = strip_group_prefix(line);
-
-        let upper = stripped.to_uppercase();
-        if upper.starts_with("VERSION:") {
-            continue;
+    /// Push a value-bearing field with a fixed (non-resolved) label.
+    fn push_fixed(&mut self, field_type: FieldType, label: &str, stripped: &str) {
+        if let Some(value) = extract_clean(stripped) {
+            self.fields.push((
+                field_type,
+                label.to_string(),
+                truncate_chars(&value, MAX_VALUE_LENGTH),
+            ));
         }
+    }
 
-        // Skip X-ABLabel lines (used for group labels, already collected)
-        if upper.starts_with("X-ABLABEL") {
-            continue;
+    /// Record the structured-name (`N`) fallback display name.
+    fn set_n_fallback(&mut self, stripped: &str) {
+        if let Some(val) = extract_value(stripped) {
+            let name = parse_n_value(&val);
+            if !name.is_empty() {
+                self.n_fallback = Some(truncate_chars(&name, MAX_DISPLAY_NAME_LENGTH));
+            }
         }
+    }
 
-        if upper.starts_with("FN") {
-            if let Some(val) = extract_value(stripped) {
-                let unescaped = unescape_vcard(&val);
-                if !unescaped.is_empty() {
-                    display_name = Some(truncate_chars(&unescaped, MAX_DISPLAY_NAME_LENGTH));
-                }
-            }
-        } else if upper.starts_with("N:") || upper.starts_with("N;") {
-            if let Some(val) = extract_value(stripped) {
-                let name = parse_n_value(&val);
-                if !name.is_empty() {
-                    n_fallback = Some(truncate_chars(&name, MAX_DISPLAY_NAME_LENGTH));
-                }
-            }
-        } else if upper.starts_with("UID") {
-            if let Some(val) = extract_value(stripped) {
-                let unescaped = unescape_vcard(&val);
-                if !unescaped.is_empty() {
-                    uid = Some(truncate_chars(&unescaped, MAX_VALUE_LENGTH));
-                }
-            }
-        } else if upper.starts_with("NICKNAME") {
-            if let Some(val) = extract_value(stripped) {
-                let unescaped = unescape_vcard(&val);
-                if !unescaped.is_empty() {
-                    nickname = Some(truncate_chars(&unescaped, MAX_DISPLAY_NAME_LENGTH));
-                }
-            }
-        } else if upper.starts_with("TEL") {
-            if let Some(val) = extract_value(stripped) {
-                let label =
-                    resolve_label(stripped, group.as_deref(), &group_labels, "Mobile", version);
-                let unescaped = unescape_vcard(&val);
-                if !unescaped.is_empty() {
-                    fields.push((
-                        FieldType::Phone,
-                        label,
-                        truncate_chars(&unescaped, MAX_VALUE_LENGTH),
-                    ));
-                }
-            }
-        } else if upper.starts_with("EMAIL") {
-            if let Some(val) = extract_value(stripped) {
-                let label = resolve_label(
-                    stripped,
-                    group.as_deref(),
-                    &group_labels,
-                    "Personal",
-                    version,
-                );
-                let unescaped = unescape_vcard(&val);
-                if !unescaped.is_empty() {
-                    fields.push((
-                        FieldType::Email,
-                        label,
-                        truncate_chars(&unescaped, MAX_VALUE_LENGTH),
-                    ));
-                }
-            }
-        } else if upper.starts_with("ADR") {
-            if let Some(val) = extract_value(stripped) {
-                let label =
-                    resolve_label(stripped, group.as_deref(), &group_labels, "Home", version);
-                let addr = format_adr(&val);
-                if !addr.is_empty() {
-                    fields.push((
-                        FieldType::Address,
-                        label,
-                        truncate_chars(&addr, MAX_VALUE_LENGTH),
-                    ));
-                }
-            }
-        } else if upper.starts_with("URL") {
-            if let Some(val) = extract_value(stripped) {
-                let label = resolve_label(
-                    stripped,
-                    group.as_deref(),
-                    &group_labels,
-                    "Website",
-                    version,
-                );
-                let unescaped = unescape_vcard(&val);
-                if !unescaped.is_empty() {
-                    fields.push((
-                        FieldType::Website,
-                        label,
-                        truncate_chars(&unescaped, MAX_VALUE_LENGTH),
-                    ));
-                }
-            }
-        } else if upper.starts_with("BDAY") {
-            if let Some(val) = extract_value(stripped) {
-                let unescaped = unescape_vcard(&val);
-                // Try to normalize date to YYYY-MM-DD
-                let normalized = normalize_date(&unescaped);
-                if !normalized.is_empty() {
-                    fields.push((FieldType::Birthday, "Birthday".to_string(), normalized));
-                }
-            }
-        } else if upper.starts_with("NOTE") {
-            if let Some(val) = extract_value(stripped) {
-                let unescaped = unescape_vcard(&val);
-                if !unescaped.is_empty() {
-                    fields.push((
-                        FieldType::Custom,
-                        "Notes".to_string(),
-                        truncate_chars(&unescaped, MAX_VALUE_LENGTH),
-                    ));
-                }
-            }
-        } else if upper.starts_with("ORG") {
-            if let Some(val) = extract_value(stripped) {
-                let unescaped = unescape_vcard(&val);
-                // ORG value may have semicolons for sub-units
-                let org = unescaped
-                    .replace(';', ", ")
-                    .trim_matches(',')
-                    .trim()
-                    .to_string();
-                let org = org
-                    .trim_end_matches(", ")
-                    .trim_end_matches(',')
-                    .trim()
-                    .to_string();
-                if !org.is_empty() {
-                    fields.push((
-                        FieldType::Custom,
-                        "Organization".to_string(),
-                        truncate_chars(&org, MAX_VALUE_LENGTH),
-                    ));
-                }
-            }
-        } else if upper.starts_with("TITLE") {
-            if let Some(val) = extract_value(stripped) {
-                let unescaped = unescape_vcard(&val);
-                if !unescaped.is_empty() {
-                    fields.push((
-                        FieldType::Custom,
-                        "Title".to_string(),
-                        truncate_chars(&unescaped, MAX_VALUE_LENGTH),
-                    ));
-                }
-            }
-        } else if upper.starts_with("PHOTO") {
-            avatar_data = parse_photo(stripped, version);
-        } else if (upper.starts_with("X-SOCIALPROFILE") || upper.starts_with("IMPP"))
-            && let Some(val) = extract_value(stripped)
-        {
-            let label = resolve_label(stripped, group.as_deref(), &group_labels, "Social", version);
-            let unescaped = unescape_vcard(&val);
-            if !unescaped.is_empty() {
-                fields.push((
-                    FieldType::Social,
+    /// Push a formatted postal address (`ADR`).
+    fn push_adr(
+        &mut self,
+        stripped: &str,
+        group: Option<&str>,
+        group_labels: &[(String, String)],
+        version: VCardVersion,
+    ) {
+        if let Some(val) = extract_value(stripped) {
+            let label = resolve_label(stripped, group, group_labels, "Home", version);
+            let addr = format_adr(&val);
+            if !addr.is_empty() {
+                self.fields.push((
+                    FieldType::Address,
                     label,
-                    truncate_chars(&unescaped, MAX_VALUE_LENGTH),
+                    truncate_chars(&addr, MAX_VALUE_LENGTH),
                 ));
             }
         }
     }
 
+    /// Push a normalized birthday (`BDAY`).
+    fn push_bday(&mut self, stripped: &str) {
+        if let Some(val) = extract_value(stripped) {
+            let unescaped = unescape_vcard(&val);
+            // Try to normalize date to YYYY-MM-DD
+            let normalized = normalize_date(&unescaped);
+            if !normalized.is_empty() {
+                self.fields
+                    .push((FieldType::Birthday, "Birthday".to_string(), normalized));
+            }
+        }
+    }
+
+    /// Push an organization (`ORG`), collapsing sub-unit semicolons.
+    fn push_org(&mut self, stripped: &str) {
+        if let Some(val) = extract_value(stripped) {
+            let unescaped = unescape_vcard(&val);
+            // ORG value may have semicolons for sub-units
+            let org = unescaped
+                .replace(';', ", ")
+                .trim_matches(',')
+                .trim()
+                .to_string();
+            let org = org
+                .trim_end_matches(", ")
+                .trim_end_matches(',')
+                .trim()
+                .to_string();
+            if !org.is_empty() {
+                self.fields.push((
+                    FieldType::Custom,
+                    "Organization".to_string(),
+                    truncate_chars(&org, MAX_VALUE_LENGTH),
+                ));
+            }
+        }
+    }
+
+    /// Dispatch one unfolded vCard line into the accumulator.
+    fn apply_line(&mut self, line: &str, group_labels: &[(String, String)], version: VCardVersion) {
+        // Skip empty lines.
+        if line.is_empty() {
+            return;
+        }
+
+        // Strip group prefix (e.g., "item1.TEL" → "TEL"), remember group
+        let (group, stripped) = strip_group_prefix(line);
+        let group = group.as_deref();
+        let upper = stripped.to_uppercase();
+
+        // VERSION is read by detect_version; X-ABLabel lines are collected
+        // separately as group labels — both are handled elsewhere.
+        if upper.starts_with("VERSION:") || upper.starts_with("X-ABLABEL") {
+            return;
+        }
+
+        if upper.starts_with("FN") {
+            if let Some(value) = extract_clean(stripped) {
+                self.display_name = Some(truncate_chars(&value, MAX_DISPLAY_NAME_LENGTH));
+            }
+        } else if upper.starts_with("N:") || upper.starts_with("N;") {
+            self.set_n_fallback(stripped);
+        } else if upper.starts_with("UID") {
+            if let Some(value) = extract_clean(stripped) {
+                self.uid = Some(truncate_chars(&value, MAX_VALUE_LENGTH));
+            }
+        } else if upper.starts_with("NICKNAME") {
+            if let Some(value) = extract_clean(stripped) {
+                self.nickname = Some(truncate_chars(&value, MAX_DISPLAY_NAME_LENGTH));
+            }
+        } else if upper.starts_with("TEL") {
+            self.push_labeled(
+                FieldType::Phone,
+                stripped,
+                group,
+                group_labels,
+                "Mobile",
+                version,
+            );
+        } else if upper.starts_with("EMAIL") {
+            self.push_labeled(
+                FieldType::Email,
+                stripped,
+                group,
+                group_labels,
+                "Personal",
+                version,
+            );
+        } else if upper.starts_with("ADR") {
+            self.push_adr(stripped, group, group_labels, version);
+        } else if upper.starts_with("URL") {
+            self.push_labeled(
+                FieldType::Website,
+                stripped,
+                group,
+                group_labels,
+                "Website",
+                version,
+            );
+        } else if upper.starts_with("BDAY") {
+            self.push_bday(stripped);
+        } else if upper.starts_with("NOTE") {
+            self.push_fixed(FieldType::Custom, "Notes", stripped);
+        } else if upper.starts_with("ORG") {
+            self.push_org(stripped);
+        } else if upper.starts_with("TITLE") {
+            self.push_fixed(FieldType::Custom, "Title", stripped);
+        } else if upper.starts_with("PHOTO") {
+            self.avatar_data = parse_photo(stripped, version);
+        } else if upper.starts_with("X-SOCIALPROFILE") || upper.starts_with("IMPP") {
+            self.push_labeled(
+                FieldType::Social,
+                stripped,
+                group,
+                group_labels,
+                "Social",
+                version,
+            );
+        }
+    }
+}
+
+/// Parse a single vCard block (content between BEGIN/END, exclusive).
+fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<String>)> {
+    let version = detect_version(block);
+    let lines = unfold_lines(block, version);
+
+    // Collect group labels (e.g., item1.X-ABLabel → label for item1.*)
+    let group_labels = collect_group_labels(&lines);
+
+    let mut acc = VCardFields::default();
+    for line in &lines {
+        acc.apply_line(line, &group_labels, version);
+    }
+
     // Determine display name
-    let name = display_name.or(n_fallback).unwrap_or_default();
+    let name = acc.display_name.or(acc.n_fallback).unwrap_or_default();
     if name.is_empty() {
         return None; // Cannot create a card without a name
     }
 
     let mut card = ContactCard::new(&name);
 
-    if let Some(nick) = nickname {
+    if let Some(nick) = acc.nickname {
         card.set_nickname(&nick);
     }
 
-    if let Some(avatar) = avatar_data
+    if let Some(avatar) = acc.avatar_data
         && let Err(e) = card.set_avatar(avatar)
     {
         // ADR-042: set_avatar normalizes any input image to WebP <= 32 KB.
@@ -334,7 +362,7 @@ fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<Stri
         );
     }
 
-    for (field_type, label, value) in fields {
+    for (field_type, label, value) in acc.fields {
         let field = ContactField::new(field_type.clone(), &label, &value, now);
         if let Err(e) = card.add_field(field) {
             // ADR-042-shape lenient import: keep the contact, drop only
@@ -352,7 +380,7 @@ fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<Stri
         }
     }
 
-    Some((card, uid))
+    Some((card, acc.uid))
 }
 
 /// Detect vCard version from content. Defaults to 3.0.

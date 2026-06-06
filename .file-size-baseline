@@ -391,7 +391,12 @@ vauchi-core/tests/it/migration_tests.rs 1226
 vauchi-app/src/ui/exchange/mod.rs 3175
 # (+2 for 2026-05-21-core-ui-icon-on-wire: inline `icon: ...` lines in
 #   sample_fields / sample_shared_info Field constructors.)
-vauchi-app/src/ui/contact_detail.rs 1425
+# (+4 2026-06-06: ContactDetailEngine::build_screen decomposed into
+#  perspective_toggle / their_info_components (+ contact_info_panel,
+#  their_fields_components, delivery_status_panel) / my_info_components /
+#  delete_confirm / build_actions to clear too_many_lines. Tier 2 of the
+#  complexity sweep, 2026-06-06-core-function-complexity.)
+vauchi-app/src/ui/contact_detail.rs 1429
 
 # EXEMPT — BLE exchange sub-flow: inline tests access private state (proximity_runner, shake_envelope_sent)
 # (+63 for slice 32m T2.1: BleExchangeFlow.negotiated_mtu field +

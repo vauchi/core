@@ -416,307 +416,17 @@ impl ContactDetailEngine {
 
         // Mode toggle — only shown when shared info is available
         if self.shared_info.is_some() {
-            let their_info_selected = self.view_mode == ContactViewMode::TheirInfo;
-            let my_info_selected = self.view_mode == ContactViewMode::MyInfoForThem;
-            components.push(Component::ToggleList {
-                id: "view_mode".into(),
-                label: "Perspective".into(),
-                items: vec![
-                    ToggleItem {
-                        id: "their_info".into(),
-                        label: "Their Info".into(),
-                        selected: their_info_selected,
-                        subtitle: Some("What they share with me".into()),
-                        a11y: Some(A11y {
-                            label: Some(format!(
-                                "Their Info, {}",
-                                if their_info_selected {
-                                    "selected"
-                                } else {
-                                    "not selected"
-                                }
-                            )),
-                            hint: Some("Double tap to toggle".into()),
-                            role: Some(AccessibilityRole::Toggle),
-                        }),
-                        info_key: None,
-                    },
-                    ToggleItem {
-                        id: "my_info_for_them".into(),
-                        label: "My Info for Them".into(),
-                        selected: my_info_selected,
-                        subtitle: Some("What I share with them".into()),
-                        a11y: Some(A11y {
-                            label: Some(format!(
-                                "My Info for Them, {}",
-                                if my_info_selected {
-                                    "selected"
-                                } else {
-                                    "not selected"
-                                }
-                            )),
-                            hint: Some("Double tap to toggle".into()),
-                            role: Some(AccessibilityRole::Toggle),
-                        }),
-                        info_key: None,
-                    },
-                ],
-                a11y: Some(A11y {
-                    label: Some("Perspective options".into()),
-                    hint: Some("Select items to include".into()),
-                    role: None,
-                }),
-            });
+            components.push(self.perspective_toggle());
         }
 
         match self.view_mode {
-            ContactViewMode::TheirInfo => {
-                // Avatar preview at top
-                components.push(Component::AvatarPreview {
-                    id: "avatar".into(),
-                    image_data: self.avatar_data.clone(),
-                    initials: self.contact.avatar_initials.clone(),
-                    bg_color: None,
-                    brightness: 0.0,
-                    editable: false,
-                    a11y: Some(A11y {
-                        label: Some(format!("{}'s avatar", self.contact.name)),
-                        hint: None,
-                        role: Some(AccessibilityRole::Image),
-                    }),
-                });
-
-                // Build contact_info items — always show initials, add trust level if set
-                let mut contact_info_items = vec![InfoItem {
-                    icon: None,
-                    title: "Initials".into(),
-                    detail: self.contact.avatar_initials.clone(),
-                }];
-                if !self.trust_level.is_empty() {
-                    contact_info_items.push(InfoItem {
-                        icon: None,
-                        title: "Trust".into(),
-                        detail: self.trust_level.clone(),
-                    });
-                }
-                if show_verified_badge(self.is_verified) {
-                    contact_info_items.push(InfoItem {
-                        icon: Some("checkmark.seal".into()),
-                        title: "Verified".into(),
-                        detail: "Yes".into(),
-                    });
-                }
-                if show_recovery_trusted_indicator(self.is_recovery_trusted) {
-                    contact_info_items.push(InfoItem {
-                        icon: Some("shield".into()),
-                        title: "Recovery Trusted".into(),
-                        detail: "Yes".into(),
-                    });
-                }
-                if !self.fingerprint.is_empty() {
-                    contact_info_items.push(InfoItem {
-                        icon: None,
-                        title: "Fingerprint".into(),
-                        detail: self.fingerprint.clone(),
-                    });
-                }
-                if !self.reciprocity_status.is_empty() {
-                    contact_info_items.push(InfoItem {
-                        icon: None,
-                        title: "Exchange status".into(),
-                        detail: self.reciprocity_status.clone(),
-                    });
-                }
-                components.push(Component::InfoPanel {
-                    id: "contact_info".into(),
-                    icon: None,
-                    title: self.contact.name.clone(),
-                    items: contact_info_items,
-                    a11y: Some(A11y {
-                        label: Some(self.contact.name.clone()),
-                        hint: None,
-                        role: Some(AccessibilityRole::Heading),
-                    }),
-                });
-                // Their fields — read-only, no visibility column.
-                // Each field is followed by an inline-editable private note.
-                for field in &self.fields {
-                    components.push(Component::FieldList {
-                        id: format!("field_{}", field.id),
-                        fields: vec![field.clone()],
-                        visibility_mode: VisibilityMode::ReadOnly,
-                        available_groups: vec![],
-                        a11y: Some(A11y {
-                            label: Some("Contact fields".into()),
-                            hint: None,
-                            role: None,
-                        }),
-                    });
-                    let note_value = self.field_notes.get(&field.id).cloned().unwrap_or_default();
-                    components.push(Component::EditableText {
-                        id: format!("field_note:{}", field.id),
-                        label: "Private note for this field".into(),
-                        value: note_value,
-                        editing: false,
-                        validation_error: None,
-                        a11y: Some(A11y {
-                            label: Some("Private field note, editable".into()),
-                            hint: Some("Double tap to edit".into()),
-                            role: Some(AccessibilityRole::TextField),
-                        }),
-                        info_key: None,
-                    });
-                }
-                // Private note about the contact — only visible to me, never shared
-                components.push(Component::EditableText {
-                    id: "personal_note".into(),
-                    label: "Private note".into(),
-                    value: self.personal_note.clone(),
-                    editing: false,
-                    validation_error: None,
-                    a11y: Some(A11y {
-                        label: Some("Personal note, editable".into()),
-                        hint: Some("Double tap to edit".into()),
-                        role: Some(AccessibilityRole::TextField),
-                    }),
-                    info_key: None,
-                });
-                // Trust & permissions group (local-only, never shared with the contact)
-                components.push(Component::SettingsGroup {
-                    id: "trust_permissions".into(),
-                    label: "Trust & Permissions".into(),
-                    items: vec![SettingsItem {
-                        id: "proposal_trusted".into(),
-                        label: "Can propose contacts".into(),
-                        kind: SettingsItemKind::Toggle {
-                            enabled: self.proposal_trusted,
-                        },
-                        a11y: Some(A11y {
-                            label: Some("Can propose contacts toggle".into()),
-                            hint: Some(
-                                "Allow this contact to suggest other people you should connect with".into(),
-                            ),
-                            role: None,
-                        }),
-                        info_key: None,
-                    }],
-                });
-                // Recovery permissions group — gate the recovery-trustee toggle
-                // (Pair 3 ContactDetail engine extension, 2026-04-28).
-                components.push(Component::SettingsGroup {
-                    id: "recovery_permissions".into(),
-                    label: "Recovery".into(),
-                    items: vec![SettingsItem {
-                        id: "recovery_trusted".into(),
-                        label: "Trust for recovery".into(),
-                        kind: SettingsItemKind::Toggle {
-                            enabled: self.is_recovery_trusted,
-                        },
-                        a11y: Some(A11y {
-                            label: Some("Trust for recovery toggle".into()),
-                            hint: Some(
-                                "Allow this contact to help you recover access if you lose your device".into(),
-                            ),
-                            role: None,
-                        }),
-                        info_key: None,
-                    }],
-                });
-                // Delivery status summary (J1: update propagation)
-                if let Some(ref summary) = self.delivery_summary {
-                    let mut items = Vec::new();
-                    if summary.failed == 0 && summary.pending == 0 {
-                        items.push(InfoItem {
-                            icon: None,
-                            title: "Status".into(),
-                            detail: "All delivered".into(),
-                        });
-                    } else {
-                        items.push(InfoItem {
-                            icon: None,
-                            title: "Delivered".into(),
-                            detail: summary.delivered.to_string(),
-                        });
-                        if summary.pending > 0 {
-                            items.push(InfoItem {
-                                icon: None,
-                                title: "Pending".into(),
-                                detail: summary.pending.to_string(),
-                            });
-                        }
-                        if summary.failed > 0 {
-                            items.push(InfoItem {
-                                icon: None,
-                                title: "Failed".into(),
-                                detail: summary.failed.to_string(),
-                            });
-                        }
-                    }
-                    components.push(Component::InfoPanel {
-                        id: "delivery_status".into(),
-                        icon: None,
-                        title: "Update Delivery".into(),
-                        items,
-                        a11y: Some(A11y {
-                            label: Some("Update Delivery".into()),
-                            hint: None,
-                            role: Some(AccessibilityRole::Heading),
-                        }),
-                    });
-                }
-            }
-            ContactViewMode::MyInfoForThem => {
-                if let Some(ref shared) = self.shared_info {
-                    components.push(Component::InfoPanel {
-                        id: "shared_name_info".into(),
-                        icon: None,
-                        title: "They see me as".into(),
-                        items: vec![InfoItem {
-                            icon: None,
-                            title: "Display Name".into(),
-                            detail: shared.shared_display_name.clone(),
-                        }],
-                        a11y: Some(A11y {
-                            label: Some("They see me as".into()),
-                            hint: None,
-                            role: Some(AccessibilityRole::Heading),
-                        }),
-                    });
-                    // My fields — show which groups grant visibility
-                    components.push(Component::FieldList {
-                        id: "my_fields".into(),
-                        fields: shared.my_fields.clone(),
-                        visibility_mode: VisibilityMode::PerGroup,
-                        available_groups: shared.visible_groups.clone(),
-                        a11y: Some(A11y {
-                            label: Some("Contact fields".into()),
-                            hint: Some("Manage group visibility".into()),
-                            role: None,
-                        }),
-                    });
-                }
-            }
+            ContactViewMode::TheirInfo => components.extend(self.their_info_components()),
+            ContactViewMode::MyInfoForThem => components.extend(self.my_info_components()),
         }
 
         // InlineConfirm for irrevocable delete (imported contacts only)
         if self.pending_delete {
-            components.push(Component::InlineConfirm {
-                id: "delete_contact".into(),
-                warning: format!(
-                    "Permanently delete \"{}\"? This cannot be undone.",
-                    self.contact.name
-                ),
-                confirm_text: "Delete".into(),
-                cancel_text: "Cancel".into(),
-                destructive: true,
-                a11y: Some(A11y {
-                    label: Some("Confirm contact deletion".into()),
-                    hint: Some(
-                        "This will permanently delete the contact and cannot be undone".into(),
-                    ),
-                    role: Some(AccessibilityRole::Alert),
-                }),
-            });
+            components.push(self.delete_confirm());
         }
 
         let title = match self.view_mode {
@@ -731,59 +441,379 @@ impl ContactDetailEngine {
             title,
             subtitle: self.contact.subtitle.clone(),
             components,
-            actions: {
-                let mut actions: Vec<ScreenAction> = Vec::new();
-                actions.push(ScreenAction {
-                    id: "edit".into(),
-                    label: "Edit".into(),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: None,
-                });
-                if verify_button_visible(self.is_verified, self.trust_level_enum) {
-                    actions.push(ScreenAction {
-                        id: "verify_fingerprint".into(),
-                        label: "Verify Fingerprint".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        a11y: None,
-                    });
-                }
-                actions.push(ScreenAction {
-                    id: "toggle_hidden".into(),
-                    label: if self.is_hidden {
-                        "Unhide contact".into()
-                    } else {
-                        "Hide contact".into()
-                    },
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                });
-                actions.push(ScreenAction {
-                    id: footer_action_id(self.is_imported).into(),
-                    label: if self.is_imported {
-                        "Delete Contact".into()
-                    } else {
-                        "Archive Contact".into()
-                    },
-                    style: if self.is_imported {
-                        ActionStyle::Destructive
-                    } else {
-                        ActionStyle::Secondary
-                    },
-                    enabled: true,
-                    a11y: None,
-                });
-                // Back is the frontend's job now: every frontend renders a
-                // core-driven back affordance from `can_go_back` (2026-06-05-
-                // core-driven-back-chrome). Dropping the footer "Back" leaves
-                // Edit (primary) + a small secondary/destructive set.
-                actions
-            },
+            actions: self.build_actions(),
             progress: None,
             ..Default::default()
         }
+    }
+
+    fn perspective_toggle(&self) -> Component {
+        let their_info_selected = self.view_mode == ContactViewMode::TheirInfo;
+        let my_info_selected = self.view_mode == ContactViewMode::MyInfoForThem;
+        Component::ToggleList {
+            id: "view_mode".into(),
+            label: "Perspective".into(),
+            items: vec![
+                ToggleItem {
+                    id: "their_info".into(),
+                    label: "Their Info".into(),
+                    selected: their_info_selected,
+                    subtitle: Some("What they share with me".into()),
+                    a11y: Some(A11y {
+                        label: Some(format!(
+                            "Their Info, {}",
+                            if their_info_selected {
+                                "selected"
+                            } else {
+                                "not selected"
+                            }
+                        )),
+                        hint: Some("Double tap to toggle".into()),
+                        role: Some(AccessibilityRole::Toggle),
+                    }),
+                    info_key: None,
+                },
+                ToggleItem {
+                    id: "my_info_for_them".into(),
+                    label: "My Info for Them".into(),
+                    selected: my_info_selected,
+                    subtitle: Some("What I share with them".into()),
+                    a11y: Some(A11y {
+                        label: Some(format!(
+                            "My Info for Them, {}",
+                            if my_info_selected {
+                                "selected"
+                            } else {
+                                "not selected"
+                            }
+                        )),
+                        hint: Some("Double tap to toggle".into()),
+                        role: Some(AccessibilityRole::Toggle),
+                    }),
+                    info_key: None,
+                },
+            ],
+            a11y: Some(A11y {
+                label: Some("Perspective options".into()),
+                hint: Some("Select items to include".into()),
+                role: None,
+            }),
+        }
+    }
+
+    fn their_info_components(&self) -> Vec<Component> {
+        let mut components = Vec::new();
+        // Avatar preview at top
+        components.push(Component::AvatarPreview {
+            id: "avatar".into(),
+            image_data: self.avatar_data.clone(),
+            initials: self.contact.avatar_initials.clone(),
+            bg_color: None,
+            brightness: 0.0,
+            editable: false,
+            a11y: Some(A11y {
+                label: Some(format!("{}'s avatar", self.contact.name)),
+                hint: None,
+                role: Some(AccessibilityRole::Image),
+            }),
+        });
+        components.push(self.contact_info_panel());
+        components.extend(self.their_fields_components());
+        // Private note about the contact — only visible to me, never shared
+        components.push(Component::EditableText {
+            id: "personal_note".into(),
+            label: "Private note".into(),
+            value: self.personal_note.clone(),
+            editing: false,
+            validation_error: None,
+            a11y: Some(A11y {
+                label: Some("Personal note, editable".into()),
+                hint: Some("Double tap to edit".into()),
+                role: Some(AccessibilityRole::TextField),
+            }),
+            info_key: None,
+        });
+        // Trust & permissions group (local-only, never shared with the contact)
+        components.push(Component::SettingsGroup {
+            id: "trust_permissions".into(),
+            label: "Trust & Permissions".into(),
+            items: vec![SettingsItem {
+                id: "proposal_trusted".into(),
+                label: "Can propose contacts".into(),
+                kind: SettingsItemKind::Toggle {
+                    enabled: self.proposal_trusted,
+                },
+                a11y: Some(A11y {
+                    label: Some("Can propose contacts toggle".into()),
+                    hint: Some(
+                        "Allow this contact to suggest other people you should connect with".into(),
+                    ),
+                    role: None,
+                }),
+                info_key: None,
+            }],
+        });
+        // Recovery permissions group — gate the recovery-trustee toggle
+        // (Pair 3 ContactDetail engine extension, 2026-04-28).
+        components.push(Component::SettingsGroup {
+            id: "recovery_permissions".into(),
+            label: "Recovery".into(),
+            items: vec![SettingsItem {
+                id: "recovery_trusted".into(),
+                label: "Trust for recovery".into(),
+                kind: SettingsItemKind::Toggle {
+                    enabled: self.is_recovery_trusted,
+                },
+                a11y: Some(A11y {
+                    label: Some("Trust for recovery toggle".into()),
+                    hint: Some(
+                        "Allow this contact to help you recover access if you lose your device"
+                            .into(),
+                    ),
+                    role: None,
+                }),
+                info_key: None,
+            }],
+        });
+        if let Some(panel) = self.delivery_status_panel() {
+            components.push(panel);
+        }
+        components
+    }
+
+    fn contact_info_panel(&self) -> Component {
+        // Build contact_info items — always show initials, add trust level if set
+        let mut contact_info_items = vec![InfoItem {
+            icon: None,
+            title: "Initials".into(),
+            detail: self.contact.avatar_initials.clone(),
+        }];
+        if !self.trust_level.is_empty() {
+            contact_info_items.push(InfoItem {
+                icon: None,
+                title: "Trust".into(),
+                detail: self.trust_level.clone(),
+            });
+        }
+        if show_verified_badge(self.is_verified) {
+            contact_info_items.push(InfoItem {
+                icon: Some("checkmark.seal".into()),
+                title: "Verified".into(),
+                detail: "Yes".into(),
+            });
+        }
+        if show_recovery_trusted_indicator(self.is_recovery_trusted) {
+            contact_info_items.push(InfoItem {
+                icon: Some("shield".into()),
+                title: "Recovery Trusted".into(),
+                detail: "Yes".into(),
+            });
+        }
+        if !self.fingerprint.is_empty() {
+            contact_info_items.push(InfoItem {
+                icon: None,
+                title: "Fingerprint".into(),
+                detail: self.fingerprint.clone(),
+            });
+        }
+        if !self.reciprocity_status.is_empty() {
+            contact_info_items.push(InfoItem {
+                icon: None,
+                title: "Exchange status".into(),
+                detail: self.reciprocity_status.clone(),
+            });
+        }
+        Component::InfoPanel {
+            id: "contact_info".into(),
+            icon: None,
+            title: self.contact.name.clone(),
+            items: contact_info_items,
+            a11y: Some(A11y {
+                label: Some(self.contact.name.clone()),
+                hint: None,
+                role: Some(AccessibilityRole::Heading),
+            }),
+        }
+    }
+
+    fn their_fields_components(&self) -> Vec<Component> {
+        let mut components = Vec::new();
+        // Their fields — read-only, no visibility column.
+        // Each field is followed by an inline-editable private note.
+        for field in &self.fields {
+            components.push(Component::FieldList {
+                id: format!("field_{}", field.id),
+                fields: vec![field.clone()],
+                visibility_mode: VisibilityMode::ReadOnly,
+                available_groups: vec![],
+                a11y: Some(A11y {
+                    label: Some("Contact fields".into()),
+                    hint: None,
+                    role: None,
+                }),
+            });
+            let note_value = self.field_notes.get(&field.id).cloned().unwrap_or_default();
+            components.push(Component::EditableText {
+                id: format!("field_note:{}", field.id),
+                label: "Private note for this field".into(),
+                value: note_value,
+                editing: false,
+                validation_error: None,
+                a11y: Some(A11y {
+                    label: Some("Private field note, editable".into()),
+                    hint: Some("Double tap to edit".into()),
+                    role: Some(AccessibilityRole::TextField),
+                }),
+                info_key: None,
+            });
+        }
+        components
+    }
+
+    fn delivery_status_panel(&self) -> Option<Component> {
+        let summary = self.delivery_summary.as_ref()?;
+        let mut items = Vec::new();
+        if summary.failed == 0 && summary.pending == 0 {
+            items.push(InfoItem {
+                icon: None,
+                title: "Status".into(),
+                detail: "All delivered".into(),
+            });
+        } else {
+            items.push(InfoItem {
+                icon: None,
+                title: "Delivered".into(),
+                detail: summary.delivered.to_string(),
+            });
+            if summary.pending > 0 {
+                items.push(InfoItem {
+                    icon: None,
+                    title: "Pending".into(),
+                    detail: summary.pending.to_string(),
+                });
+            }
+            if summary.failed > 0 {
+                items.push(InfoItem {
+                    icon: None,
+                    title: "Failed".into(),
+                    detail: summary.failed.to_string(),
+                });
+            }
+        }
+        Some(Component::InfoPanel {
+            id: "delivery_status".into(),
+            icon: None,
+            title: "Update Delivery".into(),
+            items,
+            a11y: Some(A11y {
+                label: Some("Update Delivery".into()),
+                hint: None,
+                role: Some(AccessibilityRole::Heading),
+            }),
+        })
+    }
+
+    fn my_info_components(&self) -> Vec<Component> {
+        let mut components = Vec::new();
+        if let Some(ref shared) = self.shared_info {
+            components.push(Component::InfoPanel {
+                id: "shared_name_info".into(),
+                icon: None,
+                title: "They see me as".into(),
+                items: vec![InfoItem {
+                    icon: None,
+                    title: "Display Name".into(),
+                    detail: shared.shared_display_name.clone(),
+                }],
+                a11y: Some(A11y {
+                    label: Some("They see me as".into()),
+                    hint: None,
+                    role: Some(AccessibilityRole::Heading),
+                }),
+            });
+            // My fields — show which groups grant visibility
+            components.push(Component::FieldList {
+                id: "my_fields".into(),
+                fields: shared.my_fields.clone(),
+                visibility_mode: VisibilityMode::PerGroup,
+                available_groups: shared.visible_groups.clone(),
+                a11y: Some(A11y {
+                    label: Some("Contact fields".into()),
+                    hint: Some("Manage group visibility".into()),
+                    role: None,
+                }),
+            });
+        }
+        components
+    }
+
+    fn delete_confirm(&self) -> Component {
+        Component::InlineConfirm {
+            id: "delete_contact".into(),
+            warning: format!(
+                "Permanently delete \"{}\"? This cannot be undone.",
+                self.contact.name
+            ),
+            confirm_text: "Delete".into(),
+            cancel_text: "Cancel".into(),
+            destructive: true,
+            a11y: Some(A11y {
+                label: Some("Confirm contact deletion".into()),
+                hint: Some("This will permanently delete the contact and cannot be undone".into()),
+                role: Some(AccessibilityRole::Alert),
+            }),
+        }
+    }
+
+    fn build_actions(&self) -> Vec<ScreenAction> {
+        let mut actions: Vec<ScreenAction> = Vec::new();
+        actions.push(ScreenAction {
+            id: "edit".into(),
+            label: "Edit".into(),
+            style: ActionStyle::Primary,
+            enabled: true,
+            a11y: None,
+        });
+        if verify_button_visible(self.is_verified, self.trust_level_enum) {
+            actions.push(ScreenAction {
+                id: "verify_fingerprint".into(),
+                label: "Verify Fingerprint".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            });
+        }
+        actions.push(ScreenAction {
+            id: "toggle_hidden".into(),
+            label: if self.is_hidden {
+                "Unhide contact".into()
+            } else {
+                "Hide contact".into()
+            },
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: None,
+        });
+        actions.push(ScreenAction {
+            id: footer_action_id(self.is_imported).into(),
+            label: if self.is_imported {
+                "Delete Contact".into()
+            } else {
+                "Archive Contact".into()
+            },
+            style: if self.is_imported {
+                ActionStyle::Destructive
+            } else {
+                ActionStyle::Secondary
+            },
+            enabled: true,
+            a11y: None,
+        });
+        // Back is the frontend's job now: every frontend renders a
+        // core-driven back affordance from `can_go_back` (2026-06-05-
+        // core-driven-back-chrome). Dropping the footer "Back" leaves
+        // Edit (primary) + a small secondary/destructive set.
+        actions
     }
 }
 

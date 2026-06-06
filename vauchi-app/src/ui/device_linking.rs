@@ -227,463 +227,512 @@ impl DeviceLinkingEngine {
 
     fn build_screen(&self) -> ScreenModel {
         match &self.step {
-            DeviceLinkStep::TransportSelection => ScreenModel {
-                screen_id: "link_transport".into(),
-                title: "Link New Device".into(),
-                subtitle: Some("How would you like to link?".into()),
-                components: vec![Component::InfoPanel {
-                    id: "link_transport_info".into(),
-                    icon: Some("link".into()),
-                    title: "Choose how to connect with your new device.".into(),
-                    items: vec![
-                        InfoItem {
-                            icon: Some("wifi".into()),
-                            title: "Link via Internet".into(),
-                            detail: "Uses the relay server over the network.".into(),
-                        },
-                        InfoItem {
-                            icon: Some("qrcode".into()),
-                            title: "Link Offline (multipart QR)".into(),
-                            detail: "Coming soon — shows a stub for now.".into(),
-                        },
-                    ],
-                    a11y: Some(A11y {
-                        label: Some("Device link transport selection".into()),
-                        hint: Some("Pick a transport to start the device link flow.".into()),
-                        role: Some(AccessibilityRole::Heading),
-                    }),
-                }],
-                actions: vec![
-                    ScreenAction {
-                        id: TRANSPORT_INTERNET_ACTION_ID.into(),
-                        label: "Link via Internet".into(),
-                        style: ActionStyle::Primary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                    ScreenAction {
-                        id: TRANSPORT_OFFLINE_ACTION_ID.into(),
-                        label: "Link Offline".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                    ScreenAction {
-                        id: CANCEL_ACTION_ID.into(),
-                        label: "Cancel".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                ],
-                progress: self.progress(),
-                ..Default::default()
-            },
-            DeviceLinkStep::OfflineStub => ScreenModel {
-                screen_id: "link_offline_stub".into(),
-                title: "Offline Linking".into(),
-                subtitle: None,
-                components: vec![Component::InfoPanel {
-                    id: "offline_stub".into(),
-                    icon: Some("info".into()),
-                    title: "Offline linking is not yet available".into(),
-                    items: vec![InfoItem {
-                        icon: None,
-                        title: "Use Internet linking for now".into(),
-                        detail: "Multipart-QR offline linking ships in a future release.".into(),
-                    }],
-                    a11y: None,
-                }],
-                actions: vec![
-                    ScreenAction {
-                        id: BACK_TO_TRANSPORT_ACTION_ID.into(),
-                        label: "Back".into(),
-                        style: ActionStyle::Primary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                    ScreenAction {
-                        id: CANCEL_ACTION_ID.into(),
-                        label: "Cancel".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                ],
-                progress: self.progress(),
-                ..Default::default()
-            },
-            DeviceLinkStep::ShowQr => ScreenModel {
-                screen_id: "link_show_qr".into(),
-                title: "Link Device".into(),
-                subtitle: None,
-                components: vec![
-                    Component::QrCode {
-                        id: "qr".into(),
-                        data: self.qr_data.clone(),
-                        mode: QrMode::Display,
-                        label: Some("Scan on new device".into()),
-                        scan_quality: None,
-                        a11y: Some(A11y {
-                            label: Some("Device link QR code".into()),
-                            hint: Some(
-                                "Scan this code on your new device to begin linking.".into(),
-                            ),
-                            role: Some(AccessibilityRole::Image),
-                        }),
-                    },
-                    Component::Text {
-                        id: "join_hint".into(),
-                        content: "To join from another device, use: vauchi device join <qr_data>"
-                            .into(),
-                        style: TextStyle::Caption,
-                    },
-                ],
-                actions: vec![ScreenAction {
-                    id: CANCEL_ACTION_ID.into(),
-                    label: "Cancel".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                }],
-                progress: self.progress(),
-                ..Default::default()
-            },
-            DeviceLinkStep::VerifyCode => {
-                let code = self.verification_code.as_deref().unwrap_or("------");
-                ScreenModel {
-                    screen_id: "link_verify".into(),
-                    title: "Verify Device".into(),
-                    subtitle: None,
-                    components: vec![
-                        Component::Text {
-                            id: "code".into(),
-                            content: code.to_string(),
-                            style: TextStyle::Title,
-                        },
-                        Component::InfoPanel {
-                            id: "verify_info".into(),
-                            icon: Some("shield".into()),
-                            title: "Verify this code".into(),
-                            items: vec![InfoItem {
-                                icon: None,
-                                title: "Compare codes".into(),
-                                detail: "Ensure both devices show the same code".into(),
-                            }],
-                            a11y: None,
-                        },
-                    ],
-                    actions: vec![
-                        ScreenAction {
-                            id: CONFIRM_ACTION_ID.into(),
-                            label: "Confirm".into(),
-                            style: ActionStyle::Primary,
-                            enabled: true,
-                            a11y: None,
-                        },
-                        ScreenAction {
-                            id: REJECT_ACTION_ID.into(),
-                            label: "Reject".into(),
-                            style: ActionStyle::Destructive,
-                            enabled: true,
-                            a11y: None,
-                        },
-                    ],
-                    progress: self.progress(),
-                    ..Default::default()
-                }
+            DeviceLinkStep::TransportSelection => self.transport_selection_screen(),
+            DeviceLinkStep::OfflineStub => self.offline_stub_screen(),
+            DeviceLinkStep::ShowQr => self.show_qr_screen(),
+            DeviceLinkStep::VerifyCode => self.verify_code_screen(),
+            DeviceLinkStep::Syncing => self.syncing_screen(),
+            DeviceLinkStep::Complete => self.complete_screen(),
+            DeviceLinkStep::QrPending => self.qr_pending_screen(),
+            DeviceLinkStep::WaitingForRequest { expires_at } => {
+                self.waiting_for_request_screen(expires_at)
             }
-            DeviceLinkStep::Syncing => ScreenModel {
-                screen_id: "link_syncing".into(),
-                title: "Syncing".into(),
-                subtitle: None,
-                components: vec![Component::StatusIndicator {
-                    id: "syncing".into(),
-                    icon: None,
-                    title: "Syncing data...".into(),
-                    detail: None,
-                    status: Status::InProgress,
-                    a11y: Some(A11y {
-                        label: Some("Syncing data status".into()),
-                        hint: Some("Data is being synced to the new device.".into()),
-                        role: None,
-                    }),
-                }],
-                actions: vec![],
-                progress: self.progress(),
-                ..Default::default()
-            },
-            DeviceLinkStep::Complete => ScreenModel {
-                screen_id: "link_complete".into(),
-                title: "Device Linked".into(),
-                subtitle: None,
-                components: vec![Component::StatusIndicator {
-                    id: "complete".into(),
-                    icon: None,
-                    title: "Device Linked".into(),
-                    detail: None,
-                    status: Status::Success,
-                    a11y: Some(A11y {
-                        label: Some("Device Linked status".into()),
-                        hint: Some("Your new device has been linked successfully.".into()),
-                        role: None,
-                    }),
-                }],
-                actions: vec![ScreenAction {
-                    id: DONE_ACTION_ID.into(),
-                    label: "Done".into(),
+            DeviceLinkStep::QrExpired => self.qr_expired_screen(),
+            DeviceLinkStep::ConfirmingDevice {
+                device_name, code, ..
+            } => self.confirming_device_screen(device_name, code),
+            DeviceLinkStep::VerifyingProximity { code, .. } => {
+                self.verifying_proximity_screen(code)
+            }
+            DeviceLinkStep::Completing => self.completing_screen(),
+            DeviceLinkStep::LinkFailed { message } => self.link_failed_screen(message),
+        }
+    }
+
+    fn transport_selection_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_transport".into(),
+            title: "Link New Device".into(),
+            subtitle: Some("How would you like to link?".into()),
+            components: vec![Component::InfoPanel {
+                id: "link_transport_info".into(),
+                icon: Some("link".into()),
+                title: "Choose how to connect with your new device.".into(),
+                items: vec![
+                    InfoItem {
+                        icon: Some("wifi".into()),
+                        title: "Link via Internet".into(),
+                        detail: "Uses the relay server over the network.".into(),
+                    },
+                    InfoItem {
+                        icon: Some("qrcode".into()),
+                        title: "Link Offline (multipart QR)".into(),
+                        detail: "Coming soon — shows a stub for now.".into(),
+                    },
+                ],
+                a11y: Some(A11y {
+                    label: Some("Device link transport selection".into()),
+                    hint: Some("Pick a transport to start the device link flow.".into()),
+                    role: Some(AccessibilityRole::Heading),
+                }),
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: TRANSPORT_INTERNET_ACTION_ID.into(),
+                    label: "Link via Internet".into(),
                     style: ActionStyle::Primary,
                     enabled: true,
                     a11y: None,
-                }],
-                progress: self.progress(),
-                ..Default::default()
-            },
-            DeviceLinkStep::QrPending => ScreenModel {
-                screen_id: "link_qr_pending".into(),
-                title: "Link Device".into(),
-                subtitle: None,
-                components: vec![Component::StatusIndicator {
-                    id: "qr_pending".into(),
+                },
+                ScreenAction {
+                    id: TRANSPORT_OFFLINE_ACTION_ID.into(),
+                    label: "Link Offline".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: CANCEL_ACTION_ID.into(),
+                    label: "Cancel".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn offline_stub_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_offline_stub".into(),
+            title: "Offline Linking".into(),
+            subtitle: None,
+            components: vec![Component::InfoPanel {
+                id: "offline_stub".into(),
+                icon: Some("info".into()),
+                title: "Offline linking is not yet available".into(),
+                items: vec![InfoItem {
                     icon: None,
-                    title: "Generating link...".into(),
-                    detail: None,
-                    status: Status::InProgress,
-                    a11y: Some(A11y {
-                        label: Some("Generating device link".into()),
-                        hint: Some("Preparing the QR code for the new device.".into()),
-                        role: None,
-                    }),
+                    title: "Use Internet linking for now".into(),
+                    detail: "Multipart-QR offline linking ships in a future release.".into(),
                 }],
-                actions: vec![ScreenAction {
+                a11y: None,
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: BACK_TO_TRANSPORT_ACTION_ID.into(),
+                    label: "Back".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
                     id: CANCEL_ACTION_ID.into(),
                     label: "Cancel".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
-                }],
-                progress: self.progress(),
-                ..Default::default()
-            },
-            DeviceLinkStep::WaitingForRequest { expires_at } => ScreenModel {
-                screen_id: "link_waiting".into(),
-                title: "Link Device".into(),
-                subtitle: None,
-                components: vec![
-                    Component::QrCode {
-                        id: "qr".into(),
-                        data: self.qr_data.clone(),
-                        mode: QrMode::Display,
-                        label: Some("Scan on new device".into()),
-                        scan_quality: None,
-                        a11y: Some(A11y {
-                            label: Some("Device link QR code".into()),
-                            hint: Some(
-                                "Scan this code on your new device to begin linking.".into(),
-                            ),
-                            role: Some(AccessibilityRole::Image),
-                        }),
-                    },
-                    Component::Text {
-                        id: "expires_at".into(),
-                        content: format!("Expires at {expires_at}"),
-                        style: TextStyle::Caption,
-                    },
-                ],
-                actions: vec![ScreenAction {
+                },
+            ],
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn show_qr_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_show_qr".into(),
+            title: "Link Device".into(),
+            subtitle: None,
+            components: vec![
+                Component::QrCode {
+                    id: "qr".into(),
+                    data: self.qr_data.clone(),
+                    mode: QrMode::Display,
+                    label: Some("Scan on new device".into()),
+                    scan_quality: None,
+                    a11y: Some(A11y {
+                        label: Some("Device link QR code".into()),
+                        hint: Some("Scan this code on your new device to begin linking.".into()),
+                        role: Some(AccessibilityRole::Image),
+                    }),
+                },
+                Component::Text {
+                    id: "join_hint".into(),
+                    content: "To join from another device, use: vauchi device join <qr_data>"
+                        .into(),
+                    style: TextStyle::Caption,
+                },
+            ],
+            actions: vec![ScreenAction {
+                id: CANCEL_ACTION_ID.into(),
+                label: "Cancel".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            }],
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn verify_code_screen(&self) -> ScreenModel {
+        let code = self.verification_code.as_deref().unwrap_or("------");
+        ScreenModel {
+            screen_id: "link_verify".into(),
+            title: "Verify Device".into(),
+            subtitle: None,
+            components: vec![
+                Component::Text {
+                    id: "code".into(),
+                    content: code.to_string(),
+                    style: TextStyle::Title,
+                },
+                Component::InfoPanel {
+                    id: "verify_info".into(),
+                    icon: Some("shield".into()),
+                    title: "Verify this code".into(),
+                    items: vec![InfoItem {
+                        icon: None,
+                        title: "Compare codes".into(),
+                        detail: "Ensure both devices show the same code".into(),
+                    }],
+                    a11y: None,
+                },
+            ],
+            actions: vec![
+                ScreenAction {
+                    id: CONFIRM_ACTION_ID.into(),
+                    label: "Confirm".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: REJECT_ACTION_ID.into(),
+                    label: "Reject".into(),
+                    style: ActionStyle::Destructive,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn syncing_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_syncing".into(),
+            title: "Syncing".into(),
+            subtitle: None,
+            components: vec![Component::StatusIndicator {
+                id: "syncing".into(),
+                icon: None,
+                title: "Syncing data...".into(),
+                detail: None,
+                status: Status::InProgress,
+                a11y: Some(A11y {
+                    label: Some("Syncing data status".into()),
+                    hint: Some("Data is being synced to the new device.".into()),
+                    role: None,
+                }),
+            }],
+            actions: vec![],
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn complete_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_complete".into(),
+            title: "Device Linked".into(),
+            subtitle: None,
+            components: vec![Component::StatusIndicator {
+                id: "complete".into(),
+                icon: None,
+                title: "Device Linked".into(),
+                detail: None,
+                status: Status::Success,
+                a11y: Some(A11y {
+                    label: Some("Device Linked status".into()),
+                    hint: Some("Your new device has been linked successfully.".into()),
+                    role: None,
+                }),
+            }],
+            actions: vec![ScreenAction {
+                id: DONE_ACTION_ID.into(),
+                label: "Done".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+                a11y: None,
+            }],
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn qr_pending_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_qr_pending".into(),
+            title: "Link Device".into(),
+            subtitle: None,
+            components: vec![Component::StatusIndicator {
+                id: "qr_pending".into(),
+                icon: None,
+                title: "Generating link...".into(),
+                detail: None,
+                status: Status::InProgress,
+                a11y: Some(A11y {
+                    label: Some("Generating device link".into()),
+                    hint: Some("Preparing the QR code for the new device.".into()),
+                    role: None,
+                }),
+            }],
+            actions: vec![ScreenAction {
+                id: CANCEL_ACTION_ID.into(),
+                label: "Cancel".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            }],
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn waiting_for_request_screen(&self, expires_at: &u64) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_waiting".into(),
+            title: "Link Device".into(),
+            subtitle: None,
+            components: vec![
+                Component::QrCode {
+                    id: "qr".into(),
+                    data: self.qr_data.clone(),
+                    mode: QrMode::Display,
+                    label: Some("Scan on new device".into()),
+                    scan_quality: None,
+                    a11y: Some(A11y {
+                        label: Some("Device link QR code".into()),
+                        hint: Some("Scan this code on your new device to begin linking.".into()),
+                        role: Some(AccessibilityRole::Image),
+                    }),
+                },
+                Component::Text {
+                    id: "expires_at".into(),
+                    content: format!("Expires at {expires_at}"),
+                    style: TextStyle::Caption,
+                },
+            ],
+            actions: vec![ScreenAction {
+                id: CANCEL_ACTION_ID.into(),
+                label: "Cancel".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            }],
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn qr_expired_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_qr_expired".into(),
+            title: "QR Code Expired".into(),
+            subtitle: None,
+            components: vec![Component::StatusIndicator {
+                id: "qr_expired".into(),
+                icon: Some("clock".into()),
+                title: "QR code expired".into(),
+                detail: Some("Generate a new code to continue linking.".into()),
+                status: Status::Warning,
+                a11y: Some(A11y {
+                    label: Some("Device link QR expired".into()),
+                    hint: Some(
+                        "The 5-minute QR window elapsed. Retry to generate a new code.".into(),
+                    ),
+                    role: None,
+                }),
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: RETRY_ACTION_ID.into(),
+                    label: "Generate New QR".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
                     id: CANCEL_ACTION_ID.into(),
                     label: "Cancel".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
-                }],
-                progress: self.progress(),
-                ..Default::default()
-            },
-            DeviceLinkStep::QrExpired => ScreenModel {
-                screen_id: "link_qr_expired".into(),
-                title: "QR Code Expired".into(),
-                subtitle: None,
-                components: vec![Component::StatusIndicator {
-                    id: "qr_expired".into(),
-                    icon: Some("clock".into()),
-                    title: "QR code expired".into(),
-                    detail: Some("Generate a new code to continue linking.".into()),
-                    status: Status::Warning,
-                    a11y: Some(A11y {
-                        label: Some("Device link QR expired".into()),
-                        hint: Some(
-                            "The 5-minute QR window elapsed. Retry to generate a new code.".into(),
-                        ),
-                        role: None,
-                    }),
-                }],
-                actions: vec![
-                    ScreenAction {
-                        id: RETRY_ACTION_ID.into(),
-                        label: "Generate New QR".into(),
-                        style: ActionStyle::Primary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                    ScreenAction {
-                        id: CANCEL_ACTION_ID.into(),
-                        label: "Cancel".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                ],
-                progress: self.progress(),
-                ..Default::default()
-            },
-            DeviceLinkStep::ConfirmingDevice {
-                device_name, code, ..
-            } => ScreenModel {
-                screen_id: "link_confirming_device".into(),
-                title: "Device Wants to Link".into(),
-                subtitle: Some(format!("Device: {device_name}")),
-                components: vec![
-                    Component::Text {
-                        id: "code".into(),
-                        content: code.clone(),
-                        style: TextStyle::Title,
-                    },
-                    Component::InfoPanel {
-                        id: "confirm_device_info".into(),
-                        icon: Some("shield".into()),
-                        title: "Verify this code matches the new device".into(),
-                        items: vec![InfoItem {
-                            icon: None,
-                            title: "Compare codes".into(),
-                            detail: "Both devices must show the same code before proceeding."
-                                .into(),
-                        }],
-                        a11y: None,
-                    },
-                ],
-                actions: vec![
-                    ScreenAction {
-                        id: CODES_MATCH_ACTION_ID.into(),
-                        label: "Codes Match — Verify Proximity".into(),
-                        style: ActionStyle::Primary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                    ScreenAction {
-                        id: DENY_ACTION_ID.into(),
-                        label: "Deny".into(),
-                        style: ActionStyle::Destructive,
-                        enabled: true,
-                        a11y: None,
-                    },
-                ],
-                progress: self.progress(),
-                ..Default::default()
-            },
-            DeviceLinkStep::VerifyingProximity { code, .. } => ScreenModel {
-                screen_id: "link_verifying_proximity".into(),
-                title: "Verify Proximity".into(),
-                subtitle: None,
-                components: vec![
-                    Component::Text {
-                        id: "code".into(),
-                        content: code.clone(),
-                        style: TextStyle::Title,
-                    },
-                    Component::InfoPanel {
-                        id: "proximity_info".into(),
-                        icon: Some("wave.3.right".into()),
-                        title: "Confirm the new device is near you".into(),
-                        items: vec![InfoItem {
-                            icon: None,
-                            title: "Manual confirmation".into(),
-                            detail: "Tap Confirm once you can see the same code on the new device."
-                                .into(),
-                        }],
-                        a11y: None,
-                    },
-                ],
-                actions: vec![
-                    ScreenAction {
-                        id: CONFIRM_MANUAL_ACTION_ID.into(),
-                        label: "Confirm".into(),
-                        style: ActionStyle::Primary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                    ScreenAction {
-                        id: CANCEL_ACTION_ID.into(),
-                        label: "Cancel".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                ],
-                progress: self.progress(),
-                ..Default::default()
-            },
-            DeviceLinkStep::Completing => ScreenModel {
-                screen_id: "link_completing".into(),
-                title: "Completing Link".into(),
-                subtitle: None,
-                components: vec![Component::StatusIndicator {
-                    id: "completing".into(),
-                    icon: None,
-                    title: "Sending credentials...".into(),
-                    detail: Some("Transferring identity to the new device.".into()),
-                    status: Status::InProgress,
-                    a11y: Some(A11y {
-                        label: Some("Completing device link".into()),
-                        hint: Some("Sending credentials to the new device.".into()),
-                        role: None,
-                    }),
-                }],
-                actions: vec![ScreenAction {
+                },
+            ],
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn confirming_device_screen(&self, device_name: &str, code: &str) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_confirming_device".into(),
+            title: "Device Wants to Link".into(),
+            subtitle: Some(format!("Device: {device_name}")),
+            components: vec![
+                Component::Text {
+                    id: "code".into(),
+                    content: code.to_string(),
+                    style: TextStyle::Title,
+                },
+                Component::InfoPanel {
+                    id: "confirm_device_info".into(),
+                    icon: Some("shield".into()),
+                    title: "Verify this code matches the new device".into(),
+                    items: vec![InfoItem {
+                        icon: None,
+                        title: "Compare codes".into(),
+                        detail: "Both devices must show the same code before proceeding.".into(),
+                    }],
+                    a11y: None,
+                },
+            ],
+            actions: vec![
+                ScreenAction {
+                    id: CODES_MATCH_ACTION_ID.into(),
+                    label: "Codes Match — Verify Proximity".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: DENY_ACTION_ID.into(),
+                    label: "Deny".into(),
+                    style: ActionStyle::Destructive,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn verifying_proximity_screen(&self, code: &str) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_verifying_proximity".into(),
+            title: "Verify Proximity".into(),
+            subtitle: None,
+            components: vec![
+                Component::Text {
+                    id: "code".into(),
+                    content: code.to_string(),
+                    style: TextStyle::Title,
+                },
+                Component::InfoPanel {
+                    id: "proximity_info".into(),
+                    icon: Some("wave.3.right".into()),
+                    title: "Confirm the new device is near you".into(),
+                    items: vec![InfoItem {
+                        icon: None,
+                        title: "Manual confirmation".into(),
+                        detail: "Tap Confirm once you can see the same code on the new device."
+                            .into(),
+                    }],
+                    a11y: None,
+                },
+            ],
+            actions: vec![
+                ScreenAction {
+                    id: CONFIRM_MANUAL_ACTION_ID.into(),
+                    label: "Confirm".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
                     id: CANCEL_ACTION_ID.into(),
                     label: "Cancel".into(),
                     style: ActionStyle::Secondary,
                     enabled: true,
                     a11y: None,
-                }],
-                progress: self.progress(),
-                ..Default::default()
-            },
-            DeviceLinkStep::LinkFailed { message } => ScreenModel {
-                screen_id: "link_failed".into(),
-                title: "Linking Failed".into(),
-                subtitle: None,
-                components: vec![Component::StatusIndicator {
-                    id: "link_failed".into(),
-                    icon: Some("exclamationmark.triangle".into()),
-                    title: "Linking failed".into(),
-                    detail: Some(message.clone()),
-                    status: Status::Failed,
-                    a11y: Some(A11y {
-                        label: Some("Device link failed".into()),
-                        hint: Some("The device link could not be completed.".into()),
-                        role: None,
-                    }),
-                }],
-                actions: vec![
-                    ScreenAction {
-                        id: RETRY_ACTION_ID.into(),
-                        label: "Try Again".into(),
-                        style: ActionStyle::Primary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                    ScreenAction {
-                        id: CANCEL_ACTION_ID.into(),
-                        label: "Cancel".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                ],
-                progress: self.progress(),
-                ..Default::default()
-            },
+                },
+            ],
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn completing_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_completing".into(),
+            title: "Completing Link".into(),
+            subtitle: None,
+            components: vec![Component::StatusIndicator {
+                id: "completing".into(),
+                icon: None,
+                title: "Sending credentials...".into(),
+                detail: Some("Transferring identity to the new device.".into()),
+                status: Status::InProgress,
+                a11y: Some(A11y {
+                    label: Some("Completing device link".into()),
+                    hint: Some("Sending credentials to the new device.".into()),
+                    role: None,
+                }),
+            }],
+            actions: vec![ScreenAction {
+                id: CANCEL_ACTION_ID.into(),
+                label: "Cancel".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            }],
+            progress: self.progress(),
+            ..Default::default()
+        }
+    }
+
+    fn link_failed_screen(&self, message: &str) -> ScreenModel {
+        ScreenModel {
+            screen_id: "link_failed".into(),
+            title: "Linking Failed".into(),
+            subtitle: None,
+            components: vec![Component::StatusIndicator {
+                id: "link_failed".into(),
+                icon: Some("exclamationmark.triangle".into()),
+                title: "Linking failed".into(),
+                detail: Some(message.to_string()),
+                status: Status::Failed,
+                a11y: Some(A11y {
+                    label: Some("Device link failed".into()),
+                    hint: Some("The device link could not be completed.".into()),
+                    role: None,
+                }),
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: RETRY_ACTION_ID.into(),
+                    label: "Try Again".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: CANCEL_ACTION_ID.into(),
+                    label: "Cancel".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+            progress: self.progress(),
+            ..Default::default()
         }
     }
 }

@@ -8,6 +8,7 @@
 
 mod builder;
 mod contacts;
+#[cfg(feature = "network-http")]
 mod device_sync_loop;
 mod devices;
 mod emergency;

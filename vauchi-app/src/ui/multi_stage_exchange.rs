@@ -509,18 +509,17 @@ impl MultiStageExchangeEngine {
                 id: COMPONENT_ID_OWN_QR.into(),
                 data: data.clone(),
                 mode: QrMode::Display,
-                label: Some("Show this to your contact".into()),
+                // The QR label doubles as the exchange status: "Show this"
+                // while waiting, then the live progress once the exchange is
+                // running (e.g. "Transferring 3/5"). Folding the status into
+                // the QR caption lets the non-scrolling layout fit the
+                // full-width QR + camera + buttons on a compact screen — there
+                // is no separate status row to push them off-screen.
+                label: Some(own_qr_label(&self.state)),
                 scan_quality: None,
                 a11y: None,
             });
         }
-
-        // Status narration — the single element that changes during the
-        // exchange. Sits below the own-QR so its reflow never moves the
-        // QR the peer is scanning.
-        let status =
-            build_status_indicator(&self.state, self.audio_proximity, self.accel_proximity);
-        components.push(status);
 
         // Peer scanner + action buttons share one `Row` so the screen
         // fits the viewport without scrolling (`ScreenLayout::Fixed`):
@@ -734,97 +733,41 @@ impl MultiStageExchangeEngine {
     }
 }
 
-/// Build the per-state status narration row (active rendering).
+/// The own-QR caption, which doubles as the exchange status.
 ///
-/// Pure helper so frontend tests assert on the same shape the engine
-/// emits and so the per-state mapping stays in one place.
-pub(crate) fn build_status_indicator(
-    state: &ProtocolState,
-    audio: AudioProximityState,
-    accel: AccelerometerProximityState,
-) -> Component {
-    let (title, detail, status) = match state {
-        ProtocolState::Idle | ProtocolState::Advertising => {
-            ("Waiting for peer…", None, Status::Pending)
-        }
-        ProtocolState::Discovered => (
-            "Peer found",
-            Some("Starting exchange…".to_string()),
-            Status::InProgress,
-        ),
+/// "Show this" while waiting for a peer, then a short live-progress
+/// string once the exchange is running (e.g. "Transferring 3/5"). Folding
+/// the status into the QR label replaced the separate `StatusIndicator`
+/// row so the non-scrolling exchange layout fits the full-width QR +
+/// camera + buttons on a compact screen. Pure helper so frontend tests
+/// assert on the same per-state mapping the engine emits.
+///
+/// Proximity (audio/accel) narration is intentionally not surfaced here —
+/// the caption stays short enough to sit under the QR.
+pub(crate) fn own_qr_label(state: &ProtocolState) -> String {
+    match state {
+        ProtocolState::Idle | ProtocolState::Advertising => "Show this".to_string(),
+        ProtocolState::Discovered => "Connecting…".to_string(),
         ProtocolState::Transferring {
-            chunks_received,
-            peer_chunks_total,
             chunks_sent,
             chunks_total,
+            ..
         } => {
-            let detail = if *peer_chunks_total > 0 || *chunks_total > 0 {
-                Some(format!(
-                    "Receiving {chunks_received}/{peer_chunks_total} · Sending {chunks_sent}/{chunks_total}"
-                ))
+            if *chunks_total > 0 {
+                format!("Transferring {chunks_sent}/{chunks_total}")
             } else {
-                None
-            };
-            ("Transferring…", detail, Status::InProgress)
+                "Transferring…".to_string()
+            }
         }
-        ProtocolState::Verifying => ("Verifying exchange…", None, Status::InProgress),
-        ProtocolState::Confirming => ("Confirming…", None, Status::InProgress),
-        ProtocolState::Complete | ProtocolState::RetryReady => (
-            "Almost done",
-            Some("Keep pointing at the other phone…".to_string()),
-            Status::InProgress,
-        ),
-        ProtocolState::Finalized => (
-            "Almost done",
-            Some("Keep pointing at the other phone…".to_string()),
-            Status::InProgress,
-        ),
-        ProtocolState::Failed(_) => ("Exchange failed", None, Status::Failed),
-        // ProtocolState is #[non_exhaustive]; future variants surface
-        // here as a generic in-progress narration until they get a
-        // dedicated copy.
-        _ => ("Exchange in progress…", None, Status::InProgress),
-    };
-
-    // Layer the audio-proximity narration into the detail when the
-    // engine is past Pending. Pending (Glance + Hover pre-handshake)
-    // leaves the detail untouched; Listening and Confirmed append a
-    // user-facing hint about the ongoing ultrasonic handshake. Failed
-    // never reaches this helper — `build_screen` routes Audio-Failed
-    // to `build_audio_failed_screen` upstream.
-    let detail = match audio {
-        AudioProximityState::Pending | AudioProximityState::Failed => detail,
-        AudioProximityState::Listening => Some(match detail {
-            Some(base) => format!("{base} · Listening for proximity chirp"),
-            None => "Listening for proximity chirp".to_string(),
-        }),
-        AudioProximityState::Confirmed => Some(match detail {
-            Some(base) => format!("{base} · Devices confirmed close"),
-            None => "Devices confirmed close".to_string(),
-        }),
-    };
-    // Layer accelerometer narration after audio so a TapHoverShake
-    // exchange running both signals surfaces both hints. Failed never
-    // reaches this helper — `build_screen` routes accel-Failed to
-    // `build_accel_failed_screen` upstream.
-    let detail = match accel {
-        AccelerometerProximityState::Pending | AccelerometerProximityState::Failed => detail,
-        AccelerometerProximityState::Listening => Some(match detail {
-            Some(base) => format!("{base} · Recording motion"),
-            None => "Recording motion".to_string(),
-        }),
-        AccelerometerProximityState::Confirmed => Some(match detail {
-            Some(base) => format!("{base} · Shake confirmed"),
-            None => "Shake confirmed".to_string(),
-        }),
-    };
-    Component::StatusIndicator {
-        id: COMPONENT_ID_STATUS.into(),
-        icon: None,
-        title: title.into(),
-        detail,
-        status,
-        a11y: None,
+        ProtocolState::Verifying => "Verifying…".to_string(),
+        ProtocolState::Confirming => "Confirming…".to_string(),
+        ProtocolState::Complete | ProtocolState::RetryReady | ProtocolState::Finalized => {
+            "Almost done".to_string()
+        }
+        ProtocolState::Failed(_) => "Exchange failed".to_string(),
+        // ProtocolState is #[non_exhaustive]; future variants surface a
+        // generic caption until they get dedicated copy.
+        _ => "Working…".to_string(),
     }
 }
 
@@ -1287,64 +1230,11 @@ mod tests {
         );
     }
 
-    // @internal
-    #[test]
-    fn audio_proximity_listening_appends_to_status_detail() {
-        let mut engine = MultiStageExchangeEngine::new_hover();
-        engine.set_state(ProtocolState::Discovered);
-        engine.set_audio_proximity(AudioProximityState::Listening);
-        let screen = engine.current_screen();
-        let status = first_status_indicator(&screen).expect("status indicator");
-        let Component::StatusIndicator { detail, .. } = status else {
-            panic!("expected StatusIndicator");
-        };
-        assert!(
-            detail
-                .as_ref()
-                .is_some_and(|d| d.contains("Listening for proximity chirp")),
-            "Listening must surface in status detail; got {detail:?}",
-        );
-    }
-
-    // @internal
-    #[test]
-    fn audio_proximity_confirmed_appends_to_status_detail() {
-        let mut engine = MultiStageExchangeEngine::new_hover();
-        engine.set_state(ProtocolState::Discovered);
-        engine.set_audio_proximity(AudioProximityState::Confirmed);
-        let screen = engine.current_screen();
-        let status = first_status_indicator(&screen).expect("status indicator");
-        let Component::StatusIndicator { detail, .. } = status else {
-            panic!("expected StatusIndicator");
-        };
-        assert!(
-            detail
-                .as_ref()
-                .is_some_and(|d| d.contains("Devices confirmed close")),
-            "Confirmed must surface in status detail; got {detail:?}",
-        );
-    }
-
-    // @internal
-    #[test]
-    fn audio_proximity_pending_leaves_status_detail_unchanged() {
-        // Glance regression gate: with audio_proximity Pending, the
-        // status indicator detail must match the pre-1.C.2 narration
-        // for the same protocol state. The "Peer found / Starting
-        // exchange…" detail is the ProtocolState::Discovered shape.
-        let mut engine = MultiStageExchangeEngine::new_glance();
-        engine.set_state(ProtocolState::Discovered);
-        let screen = engine.current_screen();
-        let status = first_status_indicator(&screen).expect("status indicator");
-        let Component::StatusIndicator { detail, .. } = status else {
-            panic!("expected StatusIndicator");
-        };
-        let detail_str = detail.as_deref().unwrap_or("");
-        assert!(
-            !detail_str.contains("Listening") && !detail_str.contains("Devices confirmed close"),
-            "Pending must not surface audio narration; got {detail_str:?}",
-        );
-    }
+    // Proximity (audio/accel) narration was removed from the active
+    // screen's status; the own-QR label now carries the protocol-state
+    // caption and no longer reflects proximity progress. The former
+    // status-detail narration tests for Listening/Confirmed/Pending were
+    // deleted because they asserted removed behavior.
 
     // @internal
     #[test]
@@ -1461,43 +1351,9 @@ mod tests {
         );
     }
 
-    // @internal
-    #[test]
-    fn accel_proximity_listening_appends_to_status_detail() {
-        let mut engine = MultiStageExchangeEngine::new_hover();
-        engine.set_state(ProtocolState::Discovered);
-        engine.set_accel_proximity(AccelerometerProximityState::Listening);
-        let screen = engine.current_screen();
-        let status = first_status_indicator(&screen).expect("status indicator");
-        let Component::StatusIndicator { detail, .. } = status else {
-            panic!("expected StatusIndicator");
-        };
-        assert!(
-            detail
-                .as_ref()
-                .is_some_and(|d| d.contains("Recording motion")),
-            "Listening must surface accel narration in detail; got {detail:?}",
-        );
-    }
-
-    // @internal
-    #[test]
-    fn accel_proximity_confirmed_appends_to_status_detail() {
-        let mut engine = MultiStageExchangeEngine::new_hover();
-        engine.set_state(ProtocolState::Discovered);
-        engine.set_accel_proximity(AccelerometerProximityState::Confirmed);
-        let screen = engine.current_screen();
-        let status = first_status_indicator(&screen).expect("status indicator");
-        let Component::StatusIndicator { detail, .. } = status else {
-            panic!("expected StatusIndicator");
-        };
-        assert!(
-            detail
-                .as_ref()
-                .is_some_and(|d| d.contains("Shake confirmed")),
-            "Confirmed must surface accel narration in detail; got {detail:?}",
-        );
-    }
+    // The accel Listening/Confirmed status-detail narration tests were
+    // deleted alongside the audio ones: proximity narration no longer
+    // appears on the active screen.
 
     // @internal
     #[test]
@@ -1578,7 +1434,7 @@ mod tests {
 
     // @internal
     #[test]
-    fn idle_emits_waiting_status_with_peer_scanner() {
+    fn idle_emits_show_this_label_with_peer_scanner() {
         let engine = MultiStageExchangeEngine::new_glance();
         let screen = engine.current_screen();
         assert_eq!(screen.screen_id, SCREEN_ID);
@@ -1595,14 +1451,9 @@ mod tests {
             find_peer_scan(&screen).is_some(),
             "Idle must compose camera scanner"
         );
-        let status = first_status_indicator(&screen).expect("status indicator");
-        match status {
-            Component::StatusIndicator { title, status, .. } => {
-                assert_eq!(title, "Waiting for peer…");
-                assert_eq!(*status, Status::Pending);
-            }
-            _ => unreachable!(),
-        }
+        // The active screen no longer emits a StatusIndicator — the own-QR
+        // label carries the status. In Idle that caption is "Show this".
+        assert_eq!(own_qr_label(&ProtocolState::Idle), "Show this");
         assert_eq!(
             action_ids(&screen),
             vec![SWITCH_CAMERA_ACTION_ID, CANCEL_ACTION_ID]
@@ -1627,102 +1478,57 @@ mod tests {
     // @internal
     #[test]
     fn discovered_state_narrates_starting_exchange() {
-        let engine = engine_with_state(ProtocolState::Discovered);
-        match first_status_indicator(&engine.current_screen()).unwrap() {
-            Component::StatusIndicator {
-                title,
-                detail,
-                status,
-                ..
-            } => {
-                assert_eq!(title, "Peer found");
-                assert_eq!(detail.as_deref(), Some("Starting exchange…"));
-                assert_eq!(*status, Status::InProgress);
-            }
-            _ => unreachable!(),
-        }
+        assert_eq!(own_qr_label(&ProtocolState::Discovered), "Connecting…");
     }
 
     // @internal
     #[test]
     fn transferring_state_includes_chunk_progress() {
-        let engine = engine_with_state(ProtocolState::Transferring {
-            chunks_sent: 3,
-            chunks_total: 7,
-            chunks_received: 5,
-            peer_chunks_total: 9,
-        });
-        match first_status_indicator(&engine.current_screen()).unwrap() {
-            Component::StatusIndicator {
-                title,
-                detail,
-                status,
-                ..
-            } => {
-                assert_eq!(title, "Transferring…");
-                assert_eq!(detail.as_deref(), Some("Receiving 5/9 · Sending 3/7"),);
-                assert_eq!(*status, Status::InProgress);
-            }
-            _ => unreachable!(),
-        }
+        assert_eq!(
+            own_qr_label(&ProtocolState::Transferring {
+                chunks_sent: 3,
+                chunks_total: 7,
+                chunks_received: 5,
+                peer_chunks_total: 9,
+            }),
+            "Transferring 3/7",
+        );
     }
 
     // @internal
     #[test]
     fn transferring_with_zero_totals_omits_progress_detail() {
-        let engine = engine_with_state(ProtocolState::Transferring {
-            chunks_sent: 0,
-            chunks_total: 0,
-            chunks_received: 0,
-            peer_chunks_total: 0,
-        });
-        match first_status_indicator(&engine.current_screen()).unwrap() {
-            Component::StatusIndicator { detail, .. } => {
-                assert!(
-                    detail.is_none(),
-                    "expected no progress detail when totals are zero"
-                );
-            }
-            _ => unreachable!(),
-        }
+        assert_eq!(
+            own_qr_label(&ProtocolState::Transferring {
+                chunks_sent: 0,
+                chunks_total: 0,
+                chunks_received: 0,
+                peer_chunks_total: 0,
+            }),
+            "Transferring…",
+            "all-zero totals must omit the progress fraction",
+        );
     }
 
     // @internal
     #[test]
     fn verifying_state_narrates_verifying() {
-        let engine = engine_with_state(ProtocolState::Verifying);
-        match first_status_indicator(&engine.current_screen()).unwrap() {
-            Component::StatusIndicator { title, status, .. } => {
-                assert_eq!(title, "Verifying exchange…");
-                assert_eq!(*status, Status::InProgress);
-            }
-            _ => unreachable!(),
-        }
+        assert_eq!(own_qr_label(&ProtocolState::Verifying), "Verifying…");
     }
 
     // @internal
     #[test]
     fn confirming_state_narrates_confirming() {
-        let engine = engine_with_state(ProtocolState::Confirming);
-        match first_status_indicator(&engine.current_screen()).unwrap() {
-            Component::StatusIndicator { title, .. } => {
-                assert_eq!(title, "Confirming…");
-            }
-            _ => unreachable!(),
-        }
+        assert_eq!(own_qr_label(&ProtocolState::Confirming), "Confirming…");
     }
 
     // @internal
     #[test]
     fn complete_before_session_ended_keeps_active_chrome() {
         let engine = engine_with_state(ProtocolState::Complete);
-        match first_status_indicator(&engine.current_screen()).unwrap() {
-            Component::StatusIndicator { title, detail, .. } => {
-                assert_eq!(title, "Almost done");
-                assert_eq!(detail.as_deref(), Some("Keep pointing at the other phone…"));
-            }
-            _ => unreachable!(),
-        }
+        // The active own-QR caption reads "Almost done" while Complete
+        // before the session ends.
+        assert_eq!(own_qr_label(&ProtocolState::Complete), "Almost done");
         // Still active — switch_camera + cancel.
         assert_eq!(
             action_ids(&engine.current_screen()),
@@ -1795,6 +1601,46 @@ mod tests {
             _ => unreachable!(),
         }
         assert_eq!(action_ids(&screen), vec![RETRY_ACTION_ID, CANCEL_ACTION_ID]);
+    }
+
+    // Direct full-mapping coverage of the own-QR caption helper (CC-03:
+    // exact-value asserts on every arm). The active screen folds this
+    // string into the own-QR `label`; per-state tests above pin the
+    // engine-side wiring, this pins the pure mapping including the
+    // non-exhaustive fallback.
+    // @internal
+    #[test]
+    fn own_qr_label_maps_every_protocol_state() {
+        assert_eq!(own_qr_label(&ProtocolState::Idle), "Show this");
+        assert_eq!(own_qr_label(&ProtocolState::Advertising), "Show this");
+        assert_eq!(own_qr_label(&ProtocolState::Discovered), "Connecting…");
+        assert_eq!(
+            own_qr_label(&ProtocolState::Transferring {
+                chunks_sent: 2,
+                chunks_total: 5,
+                chunks_received: 1,
+                peer_chunks_total: 5,
+            }),
+            "Transferring 2/5",
+        );
+        assert_eq!(
+            own_qr_label(&ProtocolState::Transferring {
+                chunks_sent: 0,
+                chunks_total: 0,
+                chunks_received: 0,
+                peer_chunks_total: 0,
+            }),
+            "Transferring…",
+        );
+        assert_eq!(own_qr_label(&ProtocolState::Verifying), "Verifying…");
+        assert_eq!(own_qr_label(&ProtocolState::Confirming), "Confirming…");
+        assert_eq!(own_qr_label(&ProtocolState::Complete), "Almost done");
+        assert_eq!(own_qr_label(&ProtocolState::RetryReady), "Almost done");
+        assert_eq!(own_qr_label(&ProtocolState::Finalized), "Almost done");
+        assert_eq!(
+            own_qr_label(&ProtocolState::Failed("boom".into())),
+            "Exchange failed",
+        );
     }
 
     // ── Camera gate ─────────────────────────────────────────────

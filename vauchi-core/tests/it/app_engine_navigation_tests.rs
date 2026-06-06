@@ -1047,21 +1047,21 @@ fn apply_multi_stage_audio_proximity_routes_to_engine_setter() {
         "apply_multi_stage_audio_proximity must succeed when the active engine is MultiStageExchange",
     );
 
-    // The Listening state must surface in the active screen's status
-    // indicator narration (engine renders "Listening for proximity
-    // chirp" via build_status_indicator's audio layering).
+    // Proximity narration was removed from the active screen: the engine
+    // no longer renders a StatusIndicator while active (the own-QR label
+    // carries the protocol-state caption instead), and proximity progress
+    // is intentionally not surfaced. The bridge's only contract here is
+    // that the setter is routed to the active engine, asserted above via
+    // `applied`. Confirm the active screen exposes no StatusIndicator
+    // narration for the Listening proximity state.
     let screen = engine.current_screen();
-    let narration = screen
+    let has_status_indicator = screen
         .components
         .iter()
-        .find_map(|c| match c {
-            vauchi_app::ui::Component::StatusIndicator { detail, .. } => detail.clone(),
-            _ => None,
-        })
-        .unwrap_or_default();
+        .any(|c| matches!(c, vauchi_app::ui::Component::StatusIndicator { .. }));
     assert!(
-        narration.contains("Listening for proximity chirp"),
-        "Listening must appear in the status indicator detail; got: {narration:?}",
+        !has_status_indicator,
+        "active multi-stage screen must not render a StatusIndicator after proximity narration removal",
     );
 }
 

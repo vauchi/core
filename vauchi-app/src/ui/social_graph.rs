@@ -152,44 +152,7 @@ impl SocialGraphEngine {
         let mut components = Vec::new();
 
         // Network summary panel — totals, trusted %, cautions, groups.
-        components.push(Component::InfoPanel {
-            id: "network_summary".into(),
-            icon: Some("network".into()),
-            title: "Your Network".into(),
-            items: vec![
-                InfoItem {
-                    icon: Some("contacts".into()),
-                    title: "Contacts".into(),
-                    detail: self.total_count().to_string(),
-                },
-                InfoItem {
-                    icon: Some("verified".into()),
-                    title: "Trusted".into(),
-                    detail: format!("{}%", self.verified_percent()),
-                },
-                InfoItem {
-                    icon: Some("warning".into()),
-                    title: "Need re-verify".into(),
-                    detail: self.count_at(SocialTrustLevel::Cautious).to_string(),
-                },
-                InfoItem {
-                    icon: Some("groups".into()),
-                    title: "Groups".into(),
-                    detail: self.group_count.to_string(),
-                },
-            ],
-            a11y: Some(A11y {
-                label: Some(format!(
-                    "Network summary: {} contacts, {} percent trusted, {} need re-verification, {} groups",
-                    self.total_count(),
-                    self.verified_percent(),
-                    self.count_at(SocialTrustLevel::Cautious),
-                    self.group_count,
-                )),
-                hint: None,
-                role: None,
-            }),
-        });
+        components.push(self.network_summary_panel());
 
         // Filter chip row — radio-style ToggleList. "All" + one chip
         // per non-empty trust level (always shown if currently selected
@@ -274,6 +237,47 @@ impl SocialGraphEngine {
             actions: vec![],
             progress: None,
             ..Default::default()
+        }
+    }
+
+    fn network_summary_panel(&self) -> Component {
+        Component::InfoPanel {
+            id: "network_summary".into(),
+            icon: Some("network".into()),
+            title: "Your Network".into(),
+            items: vec![
+                InfoItem {
+                    icon: Some("contacts".into()),
+                    title: "Contacts".into(),
+                    detail: self.total_count().to_string(),
+                },
+                InfoItem {
+                    icon: Some("verified".into()),
+                    title: "Trusted".into(),
+                    detail: format!("{}%", self.verified_percent()),
+                },
+                InfoItem {
+                    icon: Some("warning".into()),
+                    title: "Need re-verify".into(),
+                    detail: self.count_at(SocialTrustLevel::Cautious).to_string(),
+                },
+                InfoItem {
+                    icon: Some("groups".into()),
+                    title: "Groups".into(),
+                    detail: self.group_count.to_string(),
+                },
+            ],
+            a11y: Some(A11y {
+                label: Some(format!(
+                    "Network summary: {} contacts, {} percent trusted, {} need re-verification, {} groups",
+                    self.total_count(),
+                    self.verified_percent(),
+                    self.count_at(SocialTrustLevel::Cautious),
+                    self.group_count,
+                )),
+                hint: None,
+                role: None,
+            }),
         }
     }
 }

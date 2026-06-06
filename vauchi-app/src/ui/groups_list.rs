@@ -54,57 +54,7 @@ impl GroupsEngine {
         let mut components = Vec::new();
 
         // Mode toggle (radio-style: only one selected at a time)
-        let members_selected = self.mode == GroupsMode::Members;
-        let visibility_selected = self.mode == GroupsMode::Visibility;
-        components.push(Component::ToggleList {
-            id: "mode_toggle".into(),
-            label: "View Mode".into(),
-            items: vec![
-                ToggleItem {
-                    id: "members".into(),
-                    label: "Members".into(),
-                    selected: members_selected,
-                    subtitle: Some("Which contacts are in each group".into()),
-                    a11y: Some(A11y {
-                        label: Some(format!(
-                            "Members, {}",
-                            if members_selected {
-                                "selected"
-                            } else {
-                                "not selected"
-                            }
-                        )),
-                        hint: Some("Double tap to toggle".into()),
-                        role: Some(AccessibilityRole::Toggle),
-                    }),
-                    info_key: None,
-                },
-                ToggleItem {
-                    id: "visibility".into(),
-                    label: "Visibility".into(),
-                    selected: visibility_selected,
-                    subtitle: Some("Which of your fields each group sees".into()),
-                    a11y: Some(A11y {
-                        label: Some(format!(
-                            "Visibility, {}",
-                            if visibility_selected {
-                                "selected"
-                            } else {
-                                "not selected"
-                            }
-                        )),
-                        hint: Some("Double tap to toggle".into()),
-                        role: Some(AccessibilityRole::Toggle),
-                    }),
-                    info_key: None,
-                },
-            ],
-            a11y: Some(A11y {
-                label: Some("View Mode options".into()),
-                hint: Some("Select items to include".into()),
-                role: None,
-            }),
-        });
+        components.push(self.mode_toggle());
 
         // Group list with mode-dependent detail text
         let items: Vec<ActionListItem> = self
@@ -162,6 +112,60 @@ impl GroupsEngine {
             }],
             progress: None,
             ..Default::default()
+        }
+    }
+
+    fn mode_toggle(&self) -> Component {
+        let members_selected = self.mode == GroupsMode::Members;
+        let visibility_selected = self.mode == GroupsMode::Visibility;
+        Component::ToggleList {
+            id: "mode_toggle".into(),
+            label: "View Mode".into(),
+            items: vec![
+                ToggleItem {
+                    id: "members".into(),
+                    label: "Members".into(),
+                    selected: members_selected,
+                    subtitle: Some("Which contacts are in each group".into()),
+                    a11y: Some(A11y {
+                        label: Some(format!(
+                            "Members, {}",
+                            if members_selected {
+                                "selected"
+                            } else {
+                                "not selected"
+                            }
+                        )),
+                        hint: Some("Double tap to toggle".into()),
+                        role: Some(AccessibilityRole::Toggle),
+                    }),
+                    info_key: None,
+                },
+                ToggleItem {
+                    id: "visibility".into(),
+                    label: "Visibility".into(),
+                    selected: visibility_selected,
+                    subtitle: Some("Which of your fields each group sees".into()),
+                    a11y: Some(A11y {
+                        label: Some(format!(
+                            "Visibility, {}",
+                            if visibility_selected {
+                                "selected"
+                            } else {
+                                "not selected"
+                            }
+                        )),
+                        hint: Some("Double tap to toggle".into()),
+                        role: Some(AccessibilityRole::Toggle),
+                    }),
+                    info_key: None,
+                },
+            ],
+            a11y: Some(A11y {
+                label: Some("View Mode options".into()),
+                hint: Some("Select items to include".into()),
+                role: None,
+            }),
         }
     }
 }

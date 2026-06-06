@@ -348,6 +348,64 @@ impl MyInfoEngine {
 
         components
     }
+
+    fn build_actions(&self) -> Vec<ScreenAction> {
+        let view_label = match &self.view_mode {
+            MyInfoViewMode::EntryView => "Group View",
+            MyInfoViewMode::GroupView { .. } => "Entry View",
+            MyInfoViewMode::PreviewAs { .. } => unreachable!("handled above"),
+        };
+
+        let at_field_limit = self.own_fields.len() >= vauchi_core::contact_card::MAX_FIELDS;
+        let mut actions = Vec::new();
+
+        // Exchange shortcut when user has no contacts
+        if self.show_exchange_prompt {
+            actions.push(ScreenAction {
+                id: "go_exchange".into(),
+                label: "Exchange Now".into(),
+                style: ActionStyle::Primary,
+                enabled: true,
+                a11y: None,
+            });
+        }
+
+        actions.extend([
+            ScreenAction {
+                id: "add_field".into(),
+                label: if at_field_limit {
+                    format!(
+                        "Field limit reached ({})",
+                        vauchi_core::contact_card::MAX_FIELDS
+                    )
+                } else {
+                    "Add Entry".into()
+                },
+                style: if self.show_exchange_prompt {
+                    ActionStyle::Secondary
+                } else {
+                    ActionStyle::Primary
+                },
+                enabled: !at_field_limit,
+                a11y: None,
+            },
+            ScreenAction {
+                id: "toggle_view".into(),
+                label: view_label.into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            },
+            ScreenAction {
+                id: "preview-as-picker".into(),
+                label: "Preview as...".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            },
+        ]);
+        actions
+    }
 }
 
 impl WorkflowEngine for MyInfoEngine {
@@ -416,60 +474,7 @@ impl WorkflowEngine for MyInfoEngine {
 
         components.extend(self.sync_status_components());
 
-        let view_label = match &self.view_mode {
-            MyInfoViewMode::EntryView => "Group View",
-            MyInfoViewMode::GroupView { .. } => "Entry View",
-            MyInfoViewMode::PreviewAs { .. } => unreachable!("handled above"),
-        };
-
-        let at_field_limit = self.own_fields.len() >= vauchi_core::contact_card::MAX_FIELDS;
-        let mut actions = Vec::new();
-
-        // Exchange shortcut when user has no contacts
-        if self.show_exchange_prompt {
-            actions.push(ScreenAction {
-                id: "go_exchange".into(),
-                label: "Exchange Now".into(),
-                style: ActionStyle::Primary,
-                enabled: true,
-                a11y: None,
-            });
-        }
-
-        actions.extend([
-            ScreenAction {
-                id: "add_field".into(),
-                label: if at_field_limit {
-                    format!(
-                        "Field limit reached ({})",
-                        vauchi_core::contact_card::MAX_FIELDS
-                    )
-                } else {
-                    "Add Entry".into()
-                },
-                style: if self.show_exchange_prompt {
-                    ActionStyle::Secondary
-                } else {
-                    ActionStyle::Primary
-                },
-                enabled: !at_field_limit,
-                a11y: None,
-            },
-            ScreenAction {
-                id: "toggle_view".into(),
-                label: view_label.into(),
-                style: ActionStyle::Secondary,
-                enabled: true,
-                a11y: None,
-            },
-            ScreenAction {
-                id: "preview-as-picker".into(),
-                label: "Preview as...".into(),
-                style: ActionStyle::Secondary,
-                enabled: true,
-                a11y: None,
-            },
-        ]);
+        let actions = self.build_actions();
 
         ScreenModel {
             screen_id: "my_info".into(),

@@ -124,11 +124,38 @@ impl RecoveryClaimReviewEngine {
             ),
         };
 
-        let mut actions = Vec::new();
+        let actions = self.build_actions();
 
-        match (&self.mode, &self.context.confidence) {
-            // High confidence: simple vouch/accept
-            (ReviewMode::Vouching, Confidence::High) => {
+        ScreenModel {
+            screen_id: "recovery_claim_review".into(),
+            title: format!("Recovery: {}", self.context.contact_name),
+            subtitle: None,
+            components: vec![Component::StatusIndicator {
+                id: "confidence".into(),
+                icon: Some(status_icon.into()),
+                title: "Verification Confidence".into(),
+                detail: Some(detail),
+                status,
+                a11y: None,
+            }],
+            actions,
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    fn build_actions(&self) -> Vec<ScreenAction> {
+        match &self.context.confidence {
+            Confidence::High => self.actions_high(),
+            Confidence::Medium => self.actions_medium(),
+            Confidence::Low => self.actions_low(),
+        }
+    }
+
+    fn actions_high(&self) -> Vec<ScreenAction> {
+        let mut actions = Vec::new();
+        match &self.mode {
+            ReviewMode::Vouching => {
                 actions.push(ScreenAction {
                     id: "vouch".into(),
                     label: "Vouch".into(),
@@ -144,7 +171,7 @@ impl RecoveryClaimReviewEngine {
                     a11y: None,
                 });
             }
-            (ReviewMode::Acceptance, Confidence::High) => {
+            ReviewMode::Acceptance => {
                 actions.push(ScreenAction {
                     id: "accept".into(),
                     label: "Accept".into(),
@@ -160,8 +187,14 @@ impl RecoveryClaimReviewEngine {
                     a11y: None,
                 });
             }
-            // Medium: vouch/accept + remind
-            (ReviewMode::Vouching, Confidence::Medium) => {
+        }
+        actions
+    }
+
+    fn actions_medium(&self) -> Vec<ScreenAction> {
+        let mut actions = Vec::new();
+        match &self.mode {
+            ReviewMode::Vouching => {
                 actions.push(ScreenAction {
                     id: "vouch".into(),
                     label: "Vouch".into(),
@@ -184,7 +217,7 @@ impl RecoveryClaimReviewEngine {
                     a11y: None,
                 });
             }
-            (ReviewMode::Acceptance, Confidence::Medium) => {
+            ReviewMode::Acceptance => {
                 actions.push(ScreenAction {
                     id: "accept".into(),
                     label: "Accept".into(),
@@ -207,8 +240,14 @@ impl RecoveryClaimReviewEngine {
                     a11y: None,
                 });
             }
-            // Low: verify + accept_anyway/vouch + reject
-            (ReviewMode::Vouching, Confidence::Low) => {
+        }
+        actions
+    }
+
+    fn actions_low(&self) -> Vec<ScreenAction> {
+        let mut actions = Vec::new();
+        match &self.mode {
+            ReviewMode::Vouching => {
                 actions.push(ScreenAction {
                     id: "verify_other".into(),
                     label: "Verify Another Way".into(),
@@ -231,7 +270,7 @@ impl RecoveryClaimReviewEngine {
                     a11y: None,
                 });
             }
-            (ReviewMode::Acceptance, Confidence::Low) => {
+            ReviewMode::Acceptance => {
                 actions.push(ScreenAction {
                     id: "verify_other".into(),
                     label: "Verify Another Way".into(),
@@ -255,23 +294,7 @@ impl RecoveryClaimReviewEngine {
                 });
             }
         }
-
-        ScreenModel {
-            screen_id: "recovery_claim_review".into(),
-            title: format!("Recovery: {}", self.context.contact_name),
-            subtitle: None,
-            components: vec![Component::StatusIndicator {
-                id: "confidence".into(),
-                icon: Some(status_icon.into()),
-                title: "Verification Confidence".into(),
-                detail: Some(detail),
-                status,
-                a11y: None,
-            }],
-            actions,
-            progress: None,
-            ..Default::default()
-        }
+        actions
     }
 
     fn build_verify_screen(&self) -> ScreenModel {

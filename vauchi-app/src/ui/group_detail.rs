@@ -141,37 +141,39 @@ impl GroupDetailEngine {
             title: self.group_name.clone(),
             subtitle: None,
             components,
-            actions: {
-                let mut actions: Vec<ScreenAction> = self
-                    .members
-                    .iter()
-                    .map(|m| ScreenAction {
-                        id: format!("preview-as-member:{}", m.id),
-                        label: format!("Preview as {}", m.name),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        a11y: None,
-                    })
-                    .collect();
-                actions.push(ScreenAction {
-                    id: "rename".into(),
-                    label: "Rename".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                });
-                actions.push(ScreenAction {
-                    id: "delete_group".into(),
-                    label: "Delete Group".into(),
-                    style: ActionStyle::Destructive,
-                    enabled: true,
-                    a11y: None,
-                });
-                actions
-            },
+            actions: self.build_actions(),
             progress: None,
             ..Default::default()
         }
+    }
+
+    fn build_actions(&self) -> Vec<ScreenAction> {
+        let mut actions: Vec<ScreenAction> = self
+            .members
+            .iter()
+            .map(|m| ScreenAction {
+                id: format!("preview-as-member:{}", m.id),
+                label: format!("Preview as {}", m.name),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                a11y: None,
+            })
+            .collect();
+        actions.push(ScreenAction {
+            id: "rename".into(),
+            label: "Rename".into(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: None,
+        });
+        actions.push(ScreenAction {
+            id: "delete_group".into(),
+            label: "Delete Group".into(),
+            style: ActionStyle::Destructive,
+            enabled: true,
+            a11y: None,
+        });
+        actions
     }
 
     fn visible_field_count(&self) -> usize {

@@ -221,7 +221,27 @@ impl RecoveryEngine {
             });
         }
 
-        components.push(Component::InfoPanel {
+        components.push(self.how_it_works_panel());
+
+        ScreenModel {
+            screen_id: "recovery_status".into(),
+            title: "Social Recovery".into(),
+            subtitle: None,
+            components,
+            actions: vec![ScreenAction {
+                id: "start_recovery_process".into(),
+                label: "Start Recovery Process".into(),
+                style: ActionStyle::Primary,
+                enabled: quorum_met,
+                a11y: None,
+            }],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    fn how_it_works_panel(&self) -> Component {
+        Component::InfoPanel {
             id: "how_it_works".into(),
             icon: None,
             title: "How it works".into(),
@@ -254,22 +274,6 @@ impl RecoveryEngine {
                 },
             ],
             a11y: None,
-        });
-
-        ScreenModel {
-            screen_id: "recovery_status".into(),
-            title: "Social Recovery".into(),
-            subtitle: None,
-            components,
-            actions: vec![ScreenAction {
-                id: "start_recovery_process".into(),
-                label: "Start Recovery Process".into(),
-                style: ActionStyle::Primary,
-                enabled: quorum_met,
-                a11y: None,
-            }],
-            progress: None,
-            ..Default::default()
         }
     }
 

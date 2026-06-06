@@ -253,53 +253,7 @@ impl FormDialogEngine {
             _ => InputType::Text,
         };
 
-        let mut components = vec![
-            Component::TextInput {
-                id: "field_value".into(),
-                label: "Value".into(),
-                value: self.get_value("field_value").into(),
-                placeholder: Some(placeholder.into()),
-                max_length: Some(200),
-                validation_error: None,
-                input_type,
-                a11y: Some(A11y {
-                    label: Some("Value input".into()),
-                    hint: Some(placeholder.into()),
-                    role: Some(AccessibilityRole::TextField),
-                }),
-                info_key: None,
-            },
-            Component::TextInput {
-                id: "field_label".into(),
-                label: "Display Name (optional)".into(),
-                value: self.get_value("field_label").into(),
-                placeholder: Some("e.g. Work, Personal, Mobile".into()),
-                max_length: Some(50),
-                validation_error: None,
-                input_type: InputType::Text,
-                a11y: Some(A11y {
-                    label: Some("Display Name (optional) input".into()),
-                    hint: Some("e.g. Work, Personal, Mobile".into()),
-                    role: Some(AccessibilityRole::TextField),
-                }),
-                info_key: None,
-            },
-            Component::TextInput {
-                id: "field_note".into(),
-                label: "Comment (your eyes only, optional)".into(),
-                value: self.get_value("field_note").into(),
-                placeholder: Some("Only visible to you".into()),
-                max_length: Some(100),
-                validation_error: None,
-                input_type: InputType::Text,
-                a11y: Some(A11y {
-                    label: Some("Comment (your eyes only, optional) input".into()),
-                    hint: Some("Only visible to you".into()),
-                    role: Some(AccessibilityRole::TextField),
-                }),
-                info_key: None,
-            },
-        ];
+        let mut components = self.add_field_inputs(placeholder, input_type);
 
         // Group visibility toggles (form step only — picking groups
         // before picking a type would be confusing).
@@ -372,151 +326,215 @@ impl FormDialogEngine {
         }
     }
 
+    fn add_field_inputs(&self, placeholder: &str, input_type: InputType) -> Vec<Component> {
+        vec![
+            Component::TextInput {
+                id: "field_value".into(),
+                label: "Value".into(),
+                value: self.get_value("field_value").into(),
+                placeholder: Some(placeholder.into()),
+                max_length: Some(200),
+                validation_error: None,
+                input_type,
+                a11y: Some(A11y {
+                    label: Some("Value input".into()),
+                    hint: Some(placeholder.into()),
+                    role: Some(AccessibilityRole::TextField),
+                }),
+                info_key: None,
+            },
+            Component::TextInput {
+                id: "field_label".into(),
+                label: "Display Name (optional)".into(),
+                value: self.get_value("field_label").into(),
+                placeholder: Some("e.g. Work, Personal, Mobile".into()),
+                max_length: Some(50),
+                validation_error: None,
+                input_type: InputType::Text,
+                a11y: Some(A11y {
+                    label: Some("Display Name (optional) input".into()),
+                    hint: Some("e.g. Work, Personal, Mobile".into()),
+                    role: Some(AccessibilityRole::TextField),
+                }),
+                info_key: None,
+            },
+            Component::TextInput {
+                id: "field_note".into(),
+                label: "Comment (your eyes only, optional)".into(),
+                value: self.get_value("field_note").into(),
+                placeholder: Some("Only visible to you".into()),
+                max_length: Some(100),
+                validation_error: None,
+                input_type: InputType::Text,
+                a11y: Some(A11y {
+                    label: Some("Comment (your eyes only, optional) input".into()),
+                    hint: Some("Only visible to you".into()),
+                    role: Some(AccessibilityRole::TextField),
+                }),
+                info_key: None,
+            },
+        ]
+    }
+
     fn build_screen(&self) -> ScreenModel {
         match &self.dialog_type {
             FormDialogType::AddField { .. } => self.build_add_field_screen(),
-            FormDialogType::EditField { field_label, .. } => ScreenModel {
-                screen_id: "form_edit_field".into(),
-                title: "Edit Field".into(),
-                subtitle: None,
-                components: vec![
-                    Component::Text {
-                        id: "field_info".into(),
-                        content: format!("Editing: {field_label}"),
-                        style: TextStyle::Subtitle,
-                    },
-                    Component::TextInput {
-                        id: "field_value".into(),
-                        label: "Value".into(),
-                        value: self.get_value("field_value").into(),
-                        placeholder: Some("Enter new value".into()),
-                        max_length: Some(200),
-                        validation_error: None,
-                        input_type: InputType::Text,
-                        a11y: Some(A11y {
-                            label: Some("Value input".into()),
-                            hint: Some("Enter new value".into()),
-                            role: Some(AccessibilityRole::TextField),
-                        }),
-                        info_key: None,
-                    },
-                    Component::TextInput {
-                        id: "field_note".into(),
-                        label: "Comment (your eyes only, optional)".into(),
-                        value: self.get_value("field_note").into(),
-                        placeholder: Some("Only visible to you".into()),
-                        max_length: Some(100),
-                        validation_error: None,
-                        input_type: InputType::Text,
-                        a11y: Some(A11y {
-                            label: Some("Comment (your eyes only, optional) input".into()),
-                            hint: Some("Only visible to you".into()),
-                            role: Some(AccessibilityRole::TextField),
-                        }),
-                        info_key: None,
-                    },
-                ],
-                actions: vec![
-                    ScreenAction {
-                        id: "submit".into(),
-                        label: "Save".into(),
-                        style: ActionStyle::Primary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                    ScreenAction {
-                        id: "cancel".into(),
-                        label: "Cancel".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                ],
-                progress: None,
-                ..Default::default()
-            },
-            FormDialogType::EditName { .. } => ScreenModel {
-                screen_id: "form_edit_name".into(),
-                title: "Edit Display Name".into(),
-                subtitle: None,
-                components: vec![Component::TextInput {
-                    id: "display_name".into(),
-                    label: "Display Name".into(),
-                    value: self.get_value("display_name").into(),
-                    placeholder: Some("Your name".into()),
-                    max_length: Some(50),
-                    validation_error: None,
-                    input_type: InputType::Text,
-                    a11y: Some(A11y {
-                        label: Some("Display Name input".into()),
-                        hint: Some("Your name".into()),
-                        role: Some(AccessibilityRole::TextField),
-                    }),
-                    info_key: None,
-                }],
-                actions: vec![
-                    ScreenAction {
-                        id: "submit".into(),
-                        label: "Save".into(),
-                        style: ActionStyle::Primary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                    ScreenAction {
-                        id: "cancel".into(),
-                        label: "Cancel".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                ],
-                progress: None,
-                ..Default::default()
-            },
-            FormDialogType::EditRelayUrl { .. } => ScreenModel {
-                screen_id: "form_edit_relay_url".into(),
-                title: "Edit Relay URL".into(),
-                subtitle: None,
-                components: vec![Component::TextInput {
-                    id: "relay_url".into(),
-                    label: "Relay URL".into(),
-                    value: self.get_value("relay_url").into(),
-                    placeholder: Some("https://relay.example.com".into()),
-                    max_length: Some(200),
-                    validation_error: None,
-                    input_type: InputType::Text,
-                    a11y: Some(A11y {
-                        label: Some("Relay URL input".into()),
-                        hint: Some("https://relay.example.com".into()),
-                        role: Some(AccessibilityRole::TextField),
-                    }),
-                    info_key: None,
-                }],
-                actions: vec![
-                    ScreenAction {
-                        id: "submit".into(),
-                        label: "Save".into(),
-                        style: ActionStyle::Primary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                    ScreenAction {
-                        id: "cancel".into(),
-                        label: "Cancel".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        a11y: None,
-                    },
-                ],
-                progress: None,
-                ..Default::default()
-            },
+            FormDialogType::EditField { field_label, .. } => {
+                self.build_edit_field_screen(field_label)
+            }
+            FormDialogType::EditName { .. } => self.build_edit_name_screen(),
+            FormDialogType::EditRelayUrl { .. } => self.build_edit_relay_url_screen(),
             FormDialogType::CreateGroup => {
                 self.build_group_name_screen("form_create_group", "New Group", "Create")
             }
             FormDialogType::RenameGroup { .. } => {
                 self.build_group_name_screen("form_rename_group", "Rename Group", "Rename")
             }
+        }
+    }
+
+    fn build_edit_field_screen(&self, field_label: &str) -> ScreenModel {
+        ScreenModel {
+            screen_id: "form_edit_field".into(),
+            title: "Edit Field".into(),
+            subtitle: None,
+            components: vec![
+                Component::Text {
+                    id: "field_info".into(),
+                    content: format!("Editing: {field_label}"),
+                    style: TextStyle::Subtitle,
+                },
+                Component::TextInput {
+                    id: "field_value".into(),
+                    label: "Value".into(),
+                    value: self.get_value("field_value").into(),
+                    placeholder: Some("Enter new value".into()),
+                    max_length: Some(200),
+                    validation_error: None,
+                    input_type: InputType::Text,
+                    a11y: Some(A11y {
+                        label: Some("Value input".into()),
+                        hint: Some("Enter new value".into()),
+                        role: Some(AccessibilityRole::TextField),
+                    }),
+                    info_key: None,
+                },
+                Component::TextInput {
+                    id: "field_note".into(),
+                    label: "Comment (your eyes only, optional)".into(),
+                    value: self.get_value("field_note").into(),
+                    placeholder: Some("Only visible to you".into()),
+                    max_length: Some(100),
+                    validation_error: None,
+                    input_type: InputType::Text,
+                    a11y: Some(A11y {
+                        label: Some("Comment (your eyes only, optional) input".into()),
+                        hint: Some("Only visible to you".into()),
+                        role: Some(AccessibilityRole::TextField),
+                    }),
+                    info_key: None,
+                },
+            ],
+            actions: vec![
+                ScreenAction {
+                    id: "submit".into(),
+                    label: "Save".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: "cancel".into(),
+                    label: "Cancel".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    fn build_edit_name_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "form_edit_name".into(),
+            title: "Edit Display Name".into(),
+            subtitle: None,
+            components: vec![Component::TextInput {
+                id: "display_name".into(),
+                label: "Display Name".into(),
+                value: self.get_value("display_name").into(),
+                placeholder: Some("Your name".into()),
+                max_length: Some(50),
+                validation_error: None,
+                input_type: InputType::Text,
+                a11y: Some(A11y {
+                    label: Some("Display Name input".into()),
+                    hint: Some("Your name".into()),
+                    role: Some(AccessibilityRole::TextField),
+                }),
+                info_key: None,
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: "submit".into(),
+                    label: "Save".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: "cancel".into(),
+                    label: "Cancel".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+            progress: None,
+            ..Default::default()
+        }
+    }
+
+    fn build_edit_relay_url_screen(&self) -> ScreenModel {
+        ScreenModel {
+            screen_id: "form_edit_relay_url".into(),
+            title: "Edit Relay URL".into(),
+            subtitle: None,
+            components: vec![Component::TextInput {
+                id: "relay_url".into(),
+                label: "Relay URL".into(),
+                value: self.get_value("relay_url").into(),
+                placeholder: Some("https://relay.example.com".into()),
+                max_length: Some(200),
+                validation_error: None,
+                input_type: InputType::Text,
+                a11y: Some(A11y {
+                    label: Some("Relay URL input".into()),
+                    hint: Some("https://relay.example.com".into()),
+                    role: Some(AccessibilityRole::TextField),
+                }),
+                info_key: None,
+            }],
+            actions: vec![
+                ScreenAction {
+                    id: "submit".into(),
+                    label: "Save".into(),
+                    style: ActionStyle::Primary,
+                    enabled: true,
+                    a11y: None,
+                },
+                ScreenAction {
+                    id: "cancel".into(),
+                    label: "Cancel".into(),
+                    style: ActionStyle::Secondary,
+                    enabled: true,
+                    a11y: None,
+                },
+            ],
+            progress: None,
+            ..Default::default()
         }
     }
 

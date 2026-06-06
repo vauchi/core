@@ -463,37 +463,41 @@ impl ExchangeEngine {
                 progress: Some(self.progress()),
                 ..Default::default()
             },
-            ExchangeStep::Failed => {
-                let mut actions = vec![ScreenAction {
-                    id: "retry".into(),
-                    label: "Retry".into(),
-                    style: ActionStyle::Primary,
-                    enabled: true,
-                    a11y: None,
-                }];
-                // BLE failures offer QR and relay fallbacks
-                if self.qr_fallback_available {
-                    actions.push(ScreenAction {
-                        id: "fallback_qr".into(),
-                        label: "Switch to QR".into(),
-                        style: ActionStyle::Secondary,
-                        enabled: true,
-                        // d4-a11y (selective): "Switch to QR" names a
-                        // transport whose consequence isn't self-evident —
-                        // add a hint. label/role stay None (the visible
-                        // label is the accessible name; no redundant role).
-                        a11y: Some(A11y {
-                            label: None,
-                            hint: Some(
-                                "Abandons this attempt and restarts the exchange using camera QR codes."
-                                    .into(),
-                            ),
-                            role: None,
-                        }),
-                    });
-                }
-                if self.ble_fallback_available {
-                    actions.push(ScreenAction {
+            ExchangeStep::Failed => self.build_failed_screen(),
+        }
+    }
+
+    fn build_failed_screen(&self) -> ScreenModel {
+        let mut actions = vec![ScreenAction {
+            id: "retry".into(),
+            label: "Retry".into(),
+            style: ActionStyle::Primary,
+            enabled: true,
+            a11y: None,
+        }];
+        // BLE failures offer QR and relay fallbacks
+        if self.qr_fallback_available {
+            actions.push(ScreenAction {
+                id: "fallback_qr".into(),
+                label: "Switch to QR".into(),
+                style: ActionStyle::Secondary,
+                enabled: true,
+                // d4-a11y (selective): "Switch to QR" names a
+                // transport whose consequence isn't self-evident —
+                // add a hint. label/role stay None (the visible
+                // label is the accessible name; no redundant role).
+                a11y: Some(A11y {
+                    label: None,
+                    hint: Some(
+                        "Abandons this attempt and restarts the exchange using camera QR codes."
+                            .into(),
+                    ),
+                    role: None,
+                }),
+            });
+        }
+        if self.ble_fallback_available {
+            actions.push(ScreenAction {
                         id: "fallback_relay".into(),
                         label: "Switch to encrypted relay".into(),
                         style: ActionStyle::Secondary,
@@ -507,35 +511,33 @@ impl ExchangeEngine {
                             role: None,
                         }),
                     });
-                }
-                actions.push(ScreenAction {
-                    id: "cancel".into(),
-                    label: "Cancel".into(),
-                    style: ActionStyle::Secondary,
-                    enabled: true,
-                    a11y: None,
-                });
-                ScreenModel {
-                    screen_id: "exchange_failed".into(),
-                    title: "Failed".into(),
-                    subtitle: None,
-                    components: vec![Component::StatusIndicator {
-                        id: "failed_status".into(),
-                        icon: None,
-                        title: "Exchange Failed".into(),
-                        detail: self.failure_detail.clone(),
-                        status: Status::Failed,
-                        a11y: Some(A11y {
-                            label: Some("Exchange failed".into()),
-                            hint: Some("The exchange did not complete. Retry or cancel.".into()),
-                            role: None,
-                        }),
-                    }],
-                    actions,
-                    progress: Some(self.progress()),
-                    ..Default::default()
-                }
-            }
+        }
+        actions.push(ScreenAction {
+            id: "cancel".into(),
+            label: "Cancel".into(),
+            style: ActionStyle::Secondary,
+            enabled: true,
+            a11y: None,
+        });
+        ScreenModel {
+            screen_id: "exchange_failed".into(),
+            title: "Failed".into(),
+            subtitle: None,
+            components: vec![Component::StatusIndicator {
+                id: "failed_status".into(),
+                icon: None,
+                title: "Exchange Failed".into(),
+                detail: self.failure_detail.clone(),
+                status: Status::Failed,
+                a11y: Some(A11y {
+                    label: Some("Exchange failed".into()),
+                    hint: Some("The exchange did not complete. Retry or cancel.".into()),
+                    role: None,
+                }),
+            }],
+            actions,
+            progress: Some(self.progress()),
+            ..Default::default()
         }
     }
 }

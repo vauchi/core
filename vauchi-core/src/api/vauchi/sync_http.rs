@@ -41,11 +41,10 @@ use super::{Vauchi, VauchiSyncOutcome};
 use crate::api::error::{VauchiError, VauchiResult};
 use crate::api::sync_controller::SyncController;
 use crate::contact::Contact;
-use crate::network::mailbox_token::{batch_register_tokens, current_day_epoch};
 use crate::network::{
     AckStatus, Acknowledgment, HttpTransport, HttpTransportAdapter, HttpTransportConfig,
-    MessagePayload, OhttpClient, PinnedCertificate, RegisterMailbox, RelayClient, Transport,
-    TransportConfig, create_envelope,
+    MessagePayload, OhttpClient, PinnedCertificate, RelayClient, Transport, TransportConfig,
+    create_envelope,
 };
 
 impl Vauchi {
@@ -311,8 +310,33 @@ impl Vauchi {
             return Ok(0);
         }
 
-        // 3. Route + apply each blob, build per-blob ACK envelopes.
-        let outcomes = process_received_blobs(identity, &self.storage, contacts, blobs);
+        // 2b. Partition self-token (device-sync) blobs out of the contact
+        //     path: they are sealed for the shared identity, not a contact,
+        //     so the contact router cannot decrypt them. Apply + ACK each.
+        let self_tokens = self.self_token_hexes(identity);
+        let (device_blobs, contact_blobs): (Vec<_>, Vec<_>) = blobs
+            .into_iter()
+            .partition(|(_, token, _)| self_tokens.contains(token));
+
+        let mut device_applied = 0usize;
+        for (message_id, _token, ciphertext) in &device_blobs {
+            device_applied += self
+                .apply_device_sync_blob(identity, ciphertext)
+                .unwrap_or(0);
+            let ack = create_envelope(
+                MessagePayload::Acknowledgment(Acknowledgment {
+                    message_id: message_id.clone().into(),
+                    status: AckStatus::Stored,
+                    error: None,
+                }),
+                self.clock.unix_seconds(),
+            );
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = adapter.send(&ack);
+        }
+
+        // 3. Route + apply each contact blob, build per-blob ACK envelopes.
+        let outcomes = process_received_blobs(identity, &self.storage, contacts, contact_blobs);
         let received = outcomes.iter().filter(|o| o.decrypted).count();
         let rejected = outcomes
             .iter()
@@ -359,43 +383,11 @@ impl Vauchi {
             let _ = adapter.send(&ack_envelope);
         }
 
-        Ok(received)
+        Ok(received + device_applied)
     }
 
-    /// Register mailbox tokens on the adapter for fetch routing.
-    ///
-    /// Computes contact tokens from shared keys and a self-token from the
-    /// master seed, registers them via `RegisterMailbox` messages. Tokens
-    /// are padded to 256 per batch and shuffled to prevent relay inference.
-    fn register_tokens(
-        &self,
-        identity: &crate::identity::Identity,
-        contacts: &[Contact],
-        adapter: &mut HttpTransportAdapter,
-    ) -> VauchiResult<()> {
-        // Collect shared keys from exchanged contacts
-        let contact_keys: Vec<[u8; 32]> = contacts
-            .iter()
-            .filter_map(|c| c.shared_key().map(|k| *k.as_bytes()))
-            .collect();
-
-        let day = current_day_epoch(self.clock.unix_seconds());
-        let master_seed = identity.master_seed();
-
-        // Build padded token batches (256 per batch, shuffled)
-        let batches = batch_register_tokens(self.rng.as_ref(), &contact_keys, master_seed, day, 0);
-
-        // Register each batch with the adapter
-        for tokens in batches {
-            let envelope = create_envelope(
-                MessagePayload::RegisterMailbox(RegisterMailbox { tokens }),
-                self.clock.unix_seconds(),
-            );
-            adapter.send(&envelope).map_err(VauchiError::Network)?;
-        }
-
-        Ok(())
-    }
+    // `register_tokens` moved to `device_sync_loop.rs` (it registers the
+    // same self-token the device-sync receive partition keys on).
 
     // =====================================================================
     // Send phase
@@ -469,6 +461,11 @@ impl Vauchi {
 
         // Run the sync cycle (sends pending updates, processes ACKs)
         let result = ctrl.sync(self.rng.as_ref())?;
+
+        // Flush queued device-sync items to linked devices over the same
+        // connection (best-effort; never fails the contact-card cycle).
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = self.run_device_sync_send(&mut ctrl, identity);
 
         // Persist advanced ratchet states.
         // SyncController.sync() advances ratchets via .encrypt() but

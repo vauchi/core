@@ -20,13 +20,6 @@ pub(crate) fn screen_to_json(screen: &ScreenModel) -> Result<String, MobileError
     })
 }
 
-/// Serialize an `ActionResult` to JSON.
-pub(crate) fn action_result_to_json(result: &ActionResult) -> Result<String, MobileError> {
-    serde_json::to_string(result).map_err(|e| MobileError::Other {
-        detail: format!("Failed to serialize ActionResult: {e}"),
-    })
-}
-
 /// Envelope returned by `navigate_back_json` (and the `navigate_to_json_for_test`
 /// seam). Carries
 /// the rendered `ScreenModel` plus any `Command`s emitted by the
@@ -75,6 +68,39 @@ pub(crate) fn action_result_envelope_to_json(
     };
     serde_json::to_string(&envelope).map_err(|e| MobileError::Other {
         detail: format!("Failed to serialize ActionResultEnvelope: {e}"),
+    })
+}
+
+/// Envelope returned by `handle_hardware_event`. Carries the optional
+/// `ActionResult` (`None` when the event only advanced an engine-held machine,
+/// e.g. a multi-stage tick) plus **all** `Command`s the event produced, drained
+/// from `pending_commands`.
+///
+/// Without this, command-driven transports stall: a hardware event (BLE
+/// connected / characteristic notified, NFC data, audio response) makes core
+/// emit `Command`s (KeyOffer write, data chunks, NFC APDU) into
+/// `pending_commands`, but the old `handle_hardware_event` returned only the
+/// `ActionResult` and never drained them — so the radio never executed them and
+/// the exchange hung at "Exchanging cards" with zero data flowing.
+#[derive(Serialize)]
+struct HardwareEventEnvelope<'a> {
+    action_result: Option<&'a ActionResult>,
+    commands: &'a [Command],
+}
+
+/// Serialize the optional `ActionResult` + drained `Command`s into the
+/// hardware-event envelope JSON shape
+/// `{"action_result": <ActionResult>|null, "commands": [...]}`.
+pub(crate) fn hardware_event_envelope_to_json(
+    result: Option<&ActionResult>,
+    commands: &[Command],
+) -> Result<String, MobileError> {
+    let envelope = HardwareEventEnvelope {
+        action_result: result,
+        commands,
+    };
+    serde_json::to_string(&envelope).map_err(|e| MobileError::Other {
+        detail: format!("Failed to serialize HardwareEventEnvelope: {e}"),
     })
 }
 

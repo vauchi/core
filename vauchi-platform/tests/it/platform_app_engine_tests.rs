@@ -838,14 +838,16 @@ fn qr_scanned_hardware_event_routes_to_session_when_on_multi_stage_screen() {
     // the post-scan state push asynchronously. Returning Some here
     // would mean the engine handled it directly (the legacy path),
     // which is the leak we just fixed.
-    let result = engine
+    let result_json = engine
         .handle_hardware_event(MobileEvent::QrScanned {
             data: "garbage-not-an-init-frame".into(),
         })
         .expect("hardware event accepted");
+    let v: serde_json::Value =
+        serde_json::from_str(&result_json).expect("parse hardware event envelope");
     assert!(
-        result.is_none(),
-        "QrScanned on multi_stage_exchange must be routed to session, not the engine — got {result:?}",
+        v["action_result"].is_null(),
+        "QrScanned on multi_stage_exchange must be routed to session (no ActionResult), got {v:?}",
     );
 }
 
@@ -908,12 +910,11 @@ fn biometric_unlock_succeeded_hardware_event_returns_unlocked_outcome_when_no_du
 
     let result_json = engine
         .handle_hardware_event(MobileEvent::BiometricUnlockSucceeded)
-        .expect("biometric event accepted")
-        .expect("biometric event must produce an ActionResult envelope");
+        .expect("biometric event accepted");
     let v: serde_json::Value =
         serde_json::from_str(&result_json).expect("parse biometric result envelope");
     assert_eq!(
-        v["BiometricUnlockOutcome"]["outcome"], "Unlocked",
+        v["action_result"]["BiometricUnlockOutcome"]["outcome"], "Unlocked",
         "fresh engine without duress must yield Unlocked, got {v:?}",
     );
 }

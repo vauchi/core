@@ -30,7 +30,7 @@ use vauchi_core::crypto::SymmetricKey;
 
 use crate::error::MobileError;
 use crate::json_helpers::{
-    action_result_envelope_to_json, action_result_to_json, app_screen_from_json,
+    action_result_envelope_to_json, app_screen_from_json, hardware_event_envelope_to_json,
     screen_envelope_to_json, screen_to_json, user_action_from_json,
 };
 
@@ -470,10 +470,7 @@ impl PlatformAppEngine {
     ///     applyResult(result)
     /// }
     /// ```
-    pub fn handle_hardware_event(
-        &self,
-        event: crate::MobileEvent,
-    ) -> Result<Option<String>, MobileError> {
+    pub fn handle_hardware_event(&self, event: crate::MobileEvent) -> Result<String, MobileError> {
         let hw_event: vauchi_core::Event = event.into();
         // Pair 4 — auto-route QrScanned to the live multi-stage session
         // when the multi-stage screen is active. The frontend never has
@@ -488,76 +485,77 @@ impl PlatformAppEngine {
                 .current_app_screen(),
             AppScreen::MultiStageExchange { .. }
         );
-        if on_multi_stage && let vauchi_core::Event::QrScanned { .. } = &hw_event {
-            // T1.2c: route through the AppEngine-owned machine.
-            // The cycle-thread bridge is dead. Rendering re-fetches
-            // via `current_screen_json` on the next frontend poll.
-            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            let m_event = engine.forward_multi_stage_hardware_event(&hw_event);
-            engine.apply_multi_stage_event(m_event);
-            return Ok(None);
-        }
 
-        // Slice 32m T2.2c — BLE event routing into the
-        // AppEngine-owned `BleHandshakeMachine`. Gated on
-        // `ble_handshake_session_active()` so this is a no-op until
-        // a frontend explicitly calls `ensure_ble_handshake_session`
-        // (the Android consumer rewire in Phase 4.2). Additive on
-        // top of `engine.handle_hardware_event` below so the
-        // existing `ExchangeEngine::BleExchangeFlow` proximity path
-        // continues to run undisturbed. Net effect today:
-        // `Event::BleMtuNegotiated` lands on the machine's
-        // `update_mtu` whenever a session is held; all other BLE
-        // events fall through to the regular routing.
-        if matches!(
-            &hw_event,
-            vauchi_core::Event::BleConnected { .. }
-                | vauchi_core::Event::BleCharacteristicNotified { .. }
-                | vauchi_core::Event::BleCharacteristicRead { .. }
-                | vauchi_core::Event::BleMtuNegotiated { .. }
-                | vauchi_core::Event::BleDisconnected { .. }
-        ) {
-            let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-                detail: format!("Lock failed: {e}"),
-            })?;
-            if engine.ble_handshake_session_active() {
-                let _ = engine.forward_ble_hardware_event(&hw_event);
-            }
-        }
-
-        // ADR-031: biometric unlock arrives as a hardware event, not as
-        // a typed PAE method. Core consults its duress-PIN state and
-        // pads the wall-clock to `BIOMETRIC_UNLOCK_MIN_DURATION` so
-        // the unlock-screen timing can't leak whether duress is
-        // configured. The outcome rides back to the frontend as
-        // `ActionResult::BiometricUnlockOutcome`. Retires the legacy
-        // `PlatformAppEngine::biometric_unlock_check` getter (Track B
-        // of `2026-05-11-pure-functional-core-program`).
-        if let vauchi_core::Event::BiometricUnlockSucceeded = &hw_event {
-            let outcome = self
-                .engine
-                .lock()
-                .map_err(|e| MobileError::Other {
+        // Resolve the optional `ActionResult` from whichever routing path the
+        // event takes. The `Command`s it emits accumulate in `pending_commands`
+        // regardless of path, and are drained into the envelope at the end — the
+        // fix for command-driven transports (BLE / NFC data / audio responses),
+        // whose commands were previously stranded and never executed.
+        let action_result: Option<vauchi_app::ui::ActionResult> =
+            if on_multi_stage && let vauchi_core::Event::QrScanned { .. } = &hw_event {
+                // T1.2c: route through the AppEngine-owned machine.
+                let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
                     detail: format!("Lock failed: {e}"),
-                })?
-                .vauchi_mut()
-                .biometric_unlock_check()
-                .map_err(|e| MobileError::Other {
-                    detail: e.to_string(),
                 })?;
-            let result = vauchi_app::ui::ActionResult::BiometricUnlockOutcome { outcome };
-            return Ok(Some(action_result_to_json(&result)?));
-        }
+                let m_event = engine.forward_multi_stage_hardware_event(&hw_event);
+                engine.apply_multi_stage_event(m_event);
+                None
+            } else {
+                // Slice 32m T2.2c — BLE event routing into the AppEngine-owned
+                // `BleHandshakeMachine`, gated on an active session. Additive on top
+                // of the regular `engine.handle_hardware_event` below so the existing
+                // `ExchangeEngine::BleExchangeFlow` proximity path runs undisturbed.
+                if matches!(
+                    &hw_event,
+                    vauchi_core::Event::BleConnected { .. }
+                        | vauchi_core::Event::BleCharacteristicNotified { .. }
+                        | vauchi_core::Event::BleCharacteristicRead { .. }
+                        | vauchi_core::Event::BleMtuNegotiated { .. }
+                        | vauchi_core::Event::BleDisconnected { .. }
+                ) {
+                    let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+                        detail: format!("Lock failed: {e}"),
+                    })?;
+                    if engine.ble_handshake_session_active() {
+                        let _ = engine.forward_ble_hardware_event(&hw_event);
+                    }
+                }
 
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        match engine.handle_hardware_event(hw_event) {
-            Some(result) => Ok(Some(action_result_to_json(&result)?)),
-            None => Ok(None),
-        }
+                // ADR-031: biometric unlock arrives as a hardware event. Core
+                // consults its duress-PIN state and pads the wall-clock to
+                // `BIOMETRIC_UNLOCK_MIN_DURATION` so the unlock-screen timing can't
+                // leak whether duress is configured.
+                if let vauchi_core::Event::BiometricUnlockSucceeded = &hw_event {
+                    let outcome = self
+                        .engine
+                        .lock()
+                        .map_err(|e| MobileError::Other {
+                            detail: format!("Lock failed: {e}"),
+                        })?
+                        .vauchi_mut()
+                        .biometric_unlock_check()
+                        .map_err(|e| MobileError::Other {
+                            detail: e.to_string(),
+                        })?;
+                    Some(vauchi_app::ui::ActionResult::BiometricUnlockOutcome { outcome })
+                } else {
+                    let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+                        detail: format!("Lock failed: {e}"),
+                    })?;
+                    engine.handle_hardware_event(hw_event)
+                }
+            };
+
+        // Drain every command the event produced and ship it alongside the
+        // result so the frontend executes it on the hardware.
+        let commands = self
+            .engine
+            .lock()
+            .map_err(|e| MobileError::Other {
+                detail: format!("Lock failed: {e}"),
+            })?
+            .drain_pending_commands();
+        hardware_event_envelope_to_json(action_result.as_ref(), &commands)
     }
 
     /// Advance the animated QR to the next frame.

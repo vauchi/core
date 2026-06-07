@@ -11,8 +11,91 @@
 //! `vauchi-platform` mobile bridge (which builds native ContactDetail
 //! views from `MobileContact` via the same canonical predicates).
 
+use crate::ui::*;
 use vauchi_core::contact::trust::TrustLevel;
 use vauchi_core::exchange::reciprocity::Reciprocity;
+
+/// A contact's owner-private tag, reduced to what the renderer needs
+/// (ADR-051 contact annotations). The wire shape is UI-only — `id` +
+/// `label`-style `name` — so it carries no domain branching.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ContactTag {
+    /// Stable tag id, used to build the per-row `remove_tag:<id>` action.
+    pub id: String,
+    /// Display name of the tag.
+    pub name: String,
+}
+
+/// Build the contact-detail tag affordances: the current-tags list (each
+/// row removable via `remove_tag:<id>`), the add-tag text input, and —
+/// only while a query is being typed — the autocomplete-or-create
+/// suggestion list (each row commits via `add_tag:<name>`, which
+/// `Vauchi::add_tag_to_contact` resolves to reuse-or-create).
+///
+/// Pure presentation: the engine owns the data, the AppEngine intercept
+/// owns persistence. Component/field names stay UI-shaped (Wire Humble).
+pub fn tag_components(tags: &[ContactTag], query: &str, suggestions: &[String]) -> Vec<Component> {
+    let mut out = Vec::with_capacity(3);
+
+    out.push(Component::ActionList {
+        id: "contact_tags".into(),
+        items: tags
+            .iter()
+            .map(|t| ActionListItem {
+                id: format!("remove_tag:{}", t.id),
+                label: t.name.clone(),
+                icon: None,
+                detail: None,
+                a11y: Some(A11y {
+                    label: Some(format!("Remove tag {}", t.name)),
+                    hint: Some("Removes this tag from the contact".into()),
+                    role: None,
+                }),
+                info_key: None,
+            })
+            .collect(),
+    });
+
+    out.push(Component::TextInput {
+        id: "add_tag".into(),
+        label: "Add tag".into(),
+        value: query.to_string(),
+        placeholder: Some("Tag name".into()),
+        max_length: None,
+        validation_error: None,
+        input_type: InputType::Text,
+        a11y: Some(A11y {
+            label: Some("Add a tag to this contact".into()),
+            hint: None,
+            role: Some(AccessibilityRole::TextField),
+        }),
+        info_key: None,
+    });
+
+    if !query.is_empty() {
+        out.push(Component::ActionList {
+            id: "tag_suggestions".into(),
+            items: suggestions
+                .iter()
+                .map(|name| ActionListItem {
+                    id: format!("add_tag:{name}"),
+                    label: name.clone(),
+                    icon: None,
+                    detail: None,
+                    a11y: Some(A11y {
+                        label: Some(format!("Add tag {name}")),
+                        hint: None,
+                        role: None,
+                    }),
+                    info_key: None,
+                })
+                .collect(),
+        });
+    }
+
+    out
+}
 
 /// Action id the contact-detail footer button carries, derived from
 /// whether the contact is imported.

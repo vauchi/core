@@ -8,7 +8,7 @@
 //! Exchanged contacts keep ShowToast + undo for archive (unchanged).
 
 use vauchi_app::ui::{
-    AccessibilityRole, ActionResult, Component, ContactDetailEngine, Field, Item,
+    AccessibilityRole, ActionResult, Component, ContactDetailEngine, ContactTag, Field, Item,
     UiFieldVisibility, UserAction, WorkflowEngine,
 };
 
@@ -230,4 +230,108 @@ fn archive_contact_still_uses_show_toast() {
         },
         "archive_contact must still return ShowToast with undo"
     );
+}
+
+// ── Phase 4a: contact tags (owner-private annotation vocabulary) ───────────
+//
+// Engine-level rendering only. Add/remove persistence flows through the
+// AppEngine intercept (it needs `Vauchi`) and is covered separately.
+
+/// Find the items of a flat `ActionList` with the given id, if present.
+fn action_list_items<'a>(
+    screen: &'a vauchi_app::ui::ScreenModel,
+    id: &str,
+) -> Option<&'a Vec<vauchi_app::ui::ActionListItem>> {
+    screen.components.iter().find_map(|c| match c {
+        Component::ActionList { id: cid, items } if cid == id => Some(items),
+        _ => None,
+    })
+}
+
+fn tagged_engine() -> ContactDetailEngine {
+    exchanged_engine().with_tags(vec![
+        ContactTag {
+            id: "t1".into(),
+            name: "climbing".into(),
+        },
+        ContactTag {
+            id: "t2".into(),
+            name: "work".into(),
+        },
+    ])
+}
+
+// @internal
+#[test]
+fn contact_detail_renders_current_tags_with_remove_ids() {
+    let screen = tagged_engine().current_screen();
+    let items = action_list_items(&screen, "contact_tags")
+        .expect("contact_tags ActionList must be present");
+    assert_eq!(
+        items.iter().map(|i| i.label.as_str()).collect::<Vec<_>>(),
+        vec!["climbing", "work"],
+        "tag labels render in order"
+    );
+    assert_eq!(items[0].id, "remove_tag:t1");
+    assert_eq!(items[1].id, "remove_tag:t2");
+}
+
+// @internal
+#[test]
+fn contact_detail_with_no_tags_renders_empty_tag_list() {
+    let screen = exchanged_engine().current_screen();
+    let items = action_list_items(&screen, "contact_tags")
+        .expect("contact_tags ActionList must be present even when empty");
+    assert!(items.is_empty(), "no tags ⇒ empty list, got {items:?}");
+}
+
+// @internal
+#[test]
+fn contact_detail_renders_add_tag_input() {
+    let screen = tagged_engine().current_screen();
+    let value = screen.components.iter().find_map(|c| match c {
+        Component::TextInput { id, value, .. } if id == "add_tag" => Some(value.clone()),
+        _ => None,
+    });
+    assert_eq!(
+        value,
+        Some(String::new()),
+        "add_tag TextInput present and empty by default"
+    );
+}
+
+// @internal
+#[test]
+fn no_suggestions_list_when_query_empty() {
+    let screen = tagged_engine().current_screen();
+    assert!(
+        action_list_items(&screen, "tag_suggestions").is_none(),
+        "empty query ⇒ no suggestions list rendered"
+    );
+}
+
+// @internal
+#[test]
+fn suggestions_render_as_add_tag_actions_and_echo_query() {
+    let mut engine = tagged_engine();
+    engine.set_tag_query("cl".into(), vec!["climbing".into(), "climbing-gym".into()]);
+    let screen = engine.current_screen();
+
+    let items = action_list_items(&screen, "tag_suggestions")
+        .expect("non-empty query ⇒ tag_suggestions list present");
+    assert_eq!(
+        items.iter().map(|i| i.id.as_str()).collect::<Vec<_>>(),
+        vec!["add_tag:climbing", "add_tag:climbing-gym"],
+        "each suggestion carries an autocomplete-or-create add_tag action"
+    );
+    assert_eq!(
+        items.iter().map(|i| i.label.as_str()).collect::<Vec<_>>(),
+        vec!["climbing", "climbing-gym"]
+    );
+
+    let value = screen.components.iter().find_map(|c| match c {
+        Component::TextInput { id, value, .. } if id == "add_tag" => Some(value.clone()),
+        _ => None,
+    });
+    assert_eq!(value, Some("cl".into()), "input echoes the typed query");
 }

@@ -13,7 +13,7 @@ use crate::ui::*;
 // the bare name the call site uses — import it directly. The other
 // predicates (`verify_button_visible`, `show_verified_badge`,
 // `show_recovery_trusted_indicator`) come in via the glob unchanged.
-use crate::ui::contact_detail_rules::footer_action_id;
+use crate::ui::contact_detail_rules::{ContactTag, footer_action_id, tag_components};
 use vauchi_core::contact::trust::TrustLevel;
 
 /// Which perspective the user is viewing.
@@ -92,6 +92,15 @@ pub struct ContactDetailEngine {
     pending_delete: bool,
     /// Avatar image bytes (WebP) for the AvatarPreview component.
     avatar_data: Option<Vec<u8>>,
+    /// Owner-private tags applied to this contact (ADR-051), rendered as a
+    /// removable list. Loaded by the screen factory via
+    /// `Vauchi::tags_for_contact`.
+    tags: Vec<ContactTag>,
+    /// Transient in-progress add-tag query (never persisted).
+    tag_input: String,
+    /// Transient autocomplete suggestions for `tag_input`, computed by the
+    /// AppEngine intercept via `Vauchi::tag_name_suggestions`.
+    tag_suggestions: Vec<String>,
 }
 
 impl ContactDetailEngine {
@@ -116,6 +125,9 @@ impl ContactDetailEngine {
             delivery_summary: None,
             pending_delete: false,
             avatar_data: None,
+            tags: Vec::new(),
+            tag_input: String::new(),
+            tag_suggestions: Vec::new(),
         }
     }
 
@@ -145,6 +157,9 @@ impl ContactDetailEngine {
             delivery_summary: None,
             pending_delete: false,
             avatar_data: None,
+            tags: Vec::new(),
+            tag_input: String::new(),
+            tag_suggestions: Vec::new(),
         }
     }
 
@@ -158,6 +173,23 @@ impl ContactDetailEngine {
     pub fn with_field_notes(mut self, field_notes: HashMap<String, String>) -> Self {
         self.field_notes = field_notes;
         self
+    }
+
+    /// Attach the contact's owner-private tags (ADR-051), rendered as a
+    /// removable list. Loaded by the screen factory via
+    /// `Vauchi::tags_for_contact`.
+    pub fn with_tags(mut self, tags: Vec<ContactTag>) -> Self {
+        self.tags = tags;
+        self
+    }
+
+    /// Set the in-progress add-tag query and its autocomplete suggestions.
+    /// Called by the AppEngine intercept on each keystroke after computing
+    /// suggestions via `Vauchi::tag_name_suggestions`; transient state that
+    /// is never persisted and is cleared once a tag is committed.
+    pub fn set_tag_query(&mut self, query: String, suggestions: Vec<String>) {
+        self.tag_input = query;
+        self.tag_suggestions = suggestions;
     }
 
     /// Attach trust data (trust level label and proposal_trusted flag).
@@ -373,6 +405,12 @@ impl ContactDetailEngine {
             }),
             info_key: None,
         });
+        // Owner-private tags (ADR-051): removable list + add input + suggestions
+        components.extend(tag_components(
+            &self.tags,
+            &self.tag_input,
+            &self.tag_suggestions,
+        ));
         // Trust & permissions group (local-only, never shared with the contact)
         components.push(Component::SettingsGroup {
             id: "trust_permissions".into(),

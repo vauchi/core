@@ -529,3 +529,45 @@ fn test_recovery_trust_independent_of_blocked_hidden() {
     assert!(!contact.is_recovery_trusted());
     assert!(contact.is_hidden());
 }
+
+// @scenario: contact-annotations.feature - Exchange time is recorded and exposed
+//
+// T0.2: one accessor for "when did this contact enter my address book",
+// total over both kinds — exchange time for exchanged, import time for
+// imported. Search/UI read this instead of branching on kind.
+// @internal
+#[test]
+fn test_acquired_at_returns_exchange_time_for_exchanged() {
+    let card = ContactCard::new("Exchanged User");
+    let contact = Contact::from_exchange([7u8; 32], card, SymmetricKey::generate(), 1_700_000_000);
+
+    assert_eq!(
+        contact.acquired_at(),
+        1_700_000_000,
+        "exchanged contact's acquired_at must be its exchange timestamp"
+    );
+}
+
+// @scenario: contact-annotations.feature - Exchange time is recorded and exposed
+// @internal
+#[test]
+fn test_acquired_at_returns_import_time_for_imported() {
+    let card = ContactCard::new("Imported User");
+    let contact = Contact::from_import(
+        card,
+        vauchi_core::contact::ImportSource::Manual,
+        None,
+        1_650_000_000,
+    );
+
+    assert_eq!(
+        contact.acquired_at(),
+        1_650_000_000,
+        "imported contact's acquired_at must be its import timestamp"
+    );
+    assert_eq!(
+        contact.exchange_timestamp(),
+        None,
+        "imported contact has no exchange timestamp (exchange-only accessor)"
+    );
+}

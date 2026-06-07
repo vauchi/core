@@ -394,6 +394,19 @@ impl Contact {
         self.kind.exchanged_data().map(|d| d.exchange_timestamp)
     }
 
+    /// Returns when this contact entered the address book, regardless of kind:
+    /// the exchange timestamp for exchanged contacts, the import timestamp for
+    /// imported ones. Unlike [`Contact::exchange_timestamp`] (exchange-only,
+    /// returns `Option`), this is total — every contact has an acquisition
+    /// time. The contact-search time facet reads this so callers need not
+    /// branch on [`ContactKind`].
+    pub fn acquired_at(&self) -> u64 {
+        match &self.kind {
+            ContactKind::Exchanged(d) => d.exchange_timestamp,
+            ContactKind::Imported(d) => d.imported_at,
+        }
+    }
+
     /// Returns whether the fingerprint was manually verified.
     /// Returns `false` for imported contacts (no fingerprint to verify).
     pub fn is_fingerprint_verified(&self) -> bool {

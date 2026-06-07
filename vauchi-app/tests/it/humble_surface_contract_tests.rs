@@ -8,7 +8,7 @@
 //! Asserts that every `pub fn` inside an `impl PlatformAppEngine { … }`
 //! block in `core/vauchi-platform/src/**` either:
 //!
-//!   (a) appears in `HUMBLE_ALLOWLIST` — the 25-method genuine binding
+//!   (a) appears in `HUMBLE_ALLOWLIST` — the 26-method genuine binding
 //!       surface every frontend renders against, or
 //!   (b) is one of the `SURPLUS_RATCHET_CEILING` known-legacy methods
 //!       still pending retirement in Phase 3 of the program.
@@ -45,7 +45,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The 25-method Humble surface — the binding surface every frontend
+/// The 26-method Humble surface — the binding surface every frontend
 /// is allowed to depend on per ADR-021 / ADR-043. Source of truth for
 /// Phase 0 / Task 0.2 of the pure-functional-core program plan.
 ///

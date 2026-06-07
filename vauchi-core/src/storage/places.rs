@@ -9,7 +9,7 @@
 //! the storage key (`data_encrypted` BLOB) — ADR-051. Proximity lookups load
 //! and decrypt the (small) vocabulary and compute distances in Rust.
 
-use crate::contact::place::{PLACE_MATCH_RADIUS_M, Place, PlaceData};
+use crate::contact::place::{ExchangeLocation, PLACE_MATCH_RADIUS_M, Place, PlaceData};
 
 use super::{Storage, StorageError};
 
@@ -97,6 +97,66 @@ impl Storage {
             }
         }
         Ok(best.map(|(_, p)| p))
+    }
+
+    // === Per-contact exchange location (contacts.exchange_location_encrypted) ===
+
+    /// Saves a contact's exchange location, encrypted at rest with the storage
+    /// key (ADR-051). Overwrites any existing value.
+    pub fn save_exchange_location(
+        &self,
+        contact_id: &str,
+        location: &ExchangeLocation,
+    ) -> Result<(), StorageError> {
+        let json =
+            serde_json::to_vec(location).map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, &json)
+            .map_err(|e| StorageError::Encryption(format!("Encrypt exchange location: {e}")))?;
+        let rows = self.conn.execute(
+            "UPDATE contacts SET exchange_location_encrypted = ?1 WHERE id = ?2",
+            rusqlite::params![encrypted, contact_id],
+        )?;
+        if rows == 0 {
+            return Err(StorageError::NotFound("Contact not found".to_string()));
+        }
+        Ok(())
+    }
+
+    /// Loads a contact's exchange location, or `None` if unset.
+    pub fn load_exchange_location(
+        &self,
+        contact_id: &str,
+    ) -> Result<Option<ExchangeLocation>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT exchange_location_encrypted FROM contacts WHERE id = ?1",
+            rusqlite::params![contact_id],
+            |row| row.get::<_, Option<Vec<u8>>>(0),
+        );
+        match result {
+            Ok(Some(encrypted)) => {
+                let json =
+                    crate::crypto::decrypt(&self.encryption_key, &encrypted).map_err(|e| {
+                        StorageError::Encryption(format!("Decrypt exchange location: {e}"))
+                    })?;
+                let loc: ExchangeLocation = serde_json::from_slice(&json)
+                    .map_err(|e| StorageError::InvalidData(e.to_string()))?;
+                Ok(Some(loc))
+            }
+            Ok(None) => Ok(None),
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                Err(StorageError::NotFound("Contact not found".to_string()))
+            }
+            Err(e) => Err(StorageError::from(e)),
+        }
+    }
+
+    /// Clears a contact's exchange location.
+    pub fn delete_exchange_location(&self, contact_id: &str) -> Result<(), StorageError> {
+        self.conn.execute(
+            "UPDATE contacts SET exchange_location_encrypted = NULL WHERE id = ?1",
+            rusqlite::params![contact_id],
+        )?;
+        Ok(())
     }
 
     /// Encrypts and writes a place row (insert-or-replace).

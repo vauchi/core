@@ -22,6 +22,7 @@ mod identity;
 mod import;
 mod merge;
 mod onboarding;
+mod places;
 mod propagation;
 #[cfg(feature = "network-http")]
 mod receive_routing;

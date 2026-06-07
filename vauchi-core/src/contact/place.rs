@@ -47,6 +47,20 @@ pub struct PlaceData {
     pub longitude: f64,
 }
 
+/// A contact's exchange location: the coordinates captured at an in-person
+/// exchange ("where we met"), optionally linked to a named [`Place`] once the
+/// owner names it (ADR-051). Stored encrypted per-contact; never shared.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExchangeLocation {
+    /// Latitude in decimal degrees.
+    pub latitude: f64,
+    /// Longitude in decimal degrees.
+    pub longitude: f64,
+    /// Linked named-place id, set when the owner names this location.
+    #[serde(default)]
+    pub place_id: Option<String>,
+}
+
 impl Place {
     /// Creates a new named place at the given coordinates.
     pub fn new(name: &str, latitude: f64, longitude: f64, now: u64) -> Self {

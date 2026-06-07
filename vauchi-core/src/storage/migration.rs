@@ -516,6 +516,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "named_places",
             action: MigrationAction::Sql(MIGRATION_V50_PLACES),
         },
+        Migration {
+            version: 51,
+            name: "contact_exchange_location",
+            action: MigrationAction::Sql(MIGRATION_V51_EXCHANGE_LOCATION),
+        },
     ]
 }
 
@@ -862,6 +867,12 @@ const MIGRATION_V50_PLACES: &str = "
         created_at INTEGER NOT NULL
     );
 ";
+
+/// Migration v51: per-contact exchange location (ADR-051). Encrypted
+/// `ExchangeLocation` (coords + optional named-place link) recording *where we
+/// met*, mirroring `personal_notes_encrypted`. Owner-private; never shared.
+const MIGRATION_V51_EXCHANGE_LOCATION: &str =
+    "ALTER TABLE contacts ADD COLUMN exchange_location_encrypted BLOB;";
 
 /// Migration v44: In-progress recovery state persistence.
 ///

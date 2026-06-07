@@ -111,6 +111,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("tags", "name_encrypted"),
     // V50 owner-private named places (ADR-051)
     ("places", "data_encrypted"),
+    // V51 per-contact exchange location (ADR-051)
+    ("contacts", "exchange_location_encrypted"),
 ];
 
 /// Encrypted columns intentionally skipped by rekey, with documented reason.
@@ -296,6 +298,9 @@ impl Storage {
             self.rekey_places(old_key, &new_key)?;
             report(&mut completed, "places");
 
+            self.rekey_exchange_location(old_key, &new_key)?;
+            report(&mut completed, "exchange_location");
+
             Ok(())
         })();
 
@@ -466,6 +471,37 @@ impl Storage {
                     params![new_enc, id],
                 )
                 .map_err(|e| StorageError::Migration(format!("Update tag {}: {}", id, e)))?;
+        }
+        Ok(())
+    }
+
+    /// Re-encrypt per-contact exchange locations (nullable column, ADR-051)
+    fn rekey_exchange_location(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, exchange_location_encrypted FROM contacts WHERE exchange_location_encrypted IS NOT NULL")
+            .map_err(|e| StorageError::Migration(format!("Read exchange locations: {}", e)))?;
+        let rows: Vec<(String, Vec<u8>)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| StorageError::Migration(format!("Query exchange locations: {}", e)))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| StorageError::Migration(format!("Collect exchange locations: {}", e)))?;
+        for (id, enc) in &rows {
+            let new_enc = rekey_or_heal(new_key, old_key, enc).map_err(|e| {
+                StorageError::Migration(format!("Rekey exchange location {}: {}", id, e))
+            })?;
+            self.conn
+                .execute(
+                    "UPDATE contacts SET exchange_location_encrypted = ?1 WHERE id = ?2",
+                    params![new_enc, id],
+                )
+                .map_err(|e| {
+                    StorageError::Migration(format!("Update exchange location {}: {}", id, e))
+                })?;
         }
         Ok(())
     }

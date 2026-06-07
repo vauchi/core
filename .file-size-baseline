@@ -193,7 +193,9 @@ vauchi-core/src/recovery/mod.rs 1253
 #  (version history co-located). Problem 2026-06-07-contact-annotations.)
 # (+17 2026-06-07: migration v50 named-places table — contact-annotations
 #  T2.3; migration ledger structural exemption)
-vauchi-core/src/storage/migration.rs 1916
+# (+11 2026-06-07: migration v51 contacts.exchange_location_encrypted —
+#  contact-annotations T2.2; migration ledger structural exemption)
+vauchi-core/src/storage/migration.rs 1927
 
 # EXEMPT — rekey ledger: all encrypted columns must be co-located for correctness (audit C1)
 # (+4 for #[allow(clippy::let_underscore_must_use)] attr + comment on
@@ -210,7 +212,9 @@ vauchi-core/src/storage/migration.rs 1916
 #  2026-06-07-contact-annotations.)
 # (+33 2026-06-07: rekey_places + ENCRYPTED_COLUMNS entry for
 #  places.data_encrypted — contact-annotations T2.3; co-located EXEMPT)
-vauchi-core/src/storage/rekey.rs 1684
+# (+36 2026-06-07: rekey_exchange_location + ENCRYPTED_COLUMNS entry —
+#  contact-annotations T2.2; co-located EXEMPT)
+vauchi-core/src/storage/rekey.rs 1720
 
 # SPLIT — Phase 3: extract connection management
 vauchi-core/src/storage/mod.rs 1079

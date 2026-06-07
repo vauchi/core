@@ -224,6 +224,68 @@ impl TagSyncData {
     }
 }
 
+/// Serializable form of an owner-private named [`Place`] for device sync.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaceSyncData {
+    pub id: String,
+    pub name: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub created_at: u64,
+}
+
+impl PlaceSyncData {
+    pub fn from_place(place: &crate::contact::place::Place) -> Self {
+        PlaceSyncData {
+            id: place.id.clone(),
+            name: place.name.clone(),
+            latitude: place.latitude,
+            longitude: place.longitude,
+            created_at: place.created_at,
+        }
+    }
+
+    pub fn to_place(&self) -> crate::contact::place::Place {
+        crate::contact::place::Place {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            latitude: self.latitude,
+            longitude: self.longitude,
+            created_at: self.created_at,
+        }
+    }
+}
+
+/// A contact's exchange location for device sync, keyed by `contact_id`
+/// (kind-agnostic: applies to exchanged and imported contacts alike).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactExchangeLocation {
+    pub contact_id: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    #[serde(default)]
+    pub place_id: Option<String>,
+}
+
+impl ContactExchangeLocation {
+    pub fn from_parts(contact_id: &str, loc: &crate::contact::place::ExchangeLocation) -> Self {
+        ContactExchangeLocation {
+            contact_id: contact_id.to_string(),
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            place_id: loc.place_id.clone(),
+        }
+    }
+
+    pub fn location(&self) -> crate::contact::place::ExchangeLocation {
+        crate::contact::place::ExchangeLocation {
+            latitude: self.latitude,
+            longitude: self.longitude,
+            place_id: self.place_id.clone(),
+        }
+    }
+}
+
 /// Payload for syncing all contacts during device linking.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceSyncPayload {
@@ -238,6 +300,12 @@ pub struct DeviceSyncPayload {
     /// payloads from older devices that predate tags.
     #[serde(default)]
     pub tags: Vec<TagSyncData>,
+    /// Owner-private named places (ADR-051). `#[serde(default)]` for back-compat.
+    #[serde(default)]
+    pub places: Vec<PlaceSyncData>,
+    /// Per-contact exchange locations (ADR-051). `#[serde(default)]` back-compat.
+    #[serde(default)]
+    pub exchange_locations: Vec<ContactExchangeLocation>,
     /// Version number for conflict resolution.
     pub version: u64,
 }
@@ -250,6 +318,8 @@ impl DeviceSyncPayload {
             imported_contacts: Vec::new(),
             own_card_json: String::new(),
             tags: Vec::new(),
+            places: Vec::new(),
+            exchange_locations: Vec::new(),
             version: 0,
         }
     }
@@ -277,6 +347,8 @@ impl DeviceSyncPayload {
             imported_contacts: imported,
             own_card_json,
             tags: Vec::new(),
+            places: Vec::new(),
+            exchange_locations: Vec::new(),
             version,
         }
     }
@@ -285,6 +357,20 @@ impl DeviceSyncPayload {
     #[must_use]
     pub fn with_tags(mut self, tags: Vec<TagSyncData>) -> Self {
         self.tags = tags;
+        self
+    }
+
+    /// Attaches named places to this payload (builder style).
+    #[must_use]
+    pub fn with_places(mut self, places: Vec<PlaceSyncData>) -> Self {
+        self.places = places;
+        self
+    }
+
+    /// Attaches per-contact exchange locations to this payload (builder style).
+    #[must_use]
+    pub fn with_exchange_locations(mut self, locs: Vec<ContactExchangeLocation>) -> Self {
+        self.exchange_locations = locs;
         self
     }
 

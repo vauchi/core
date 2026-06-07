@@ -150,6 +150,34 @@ impl Storage {
         }
     }
 
+    /// Lists every contact that has a recorded exchange location, as
+    /// `(contact_id, location)` pairs. Used to gather per-contact locations for
+    /// device sync.
+    pub fn list_exchange_locations(&self) -> Result<Vec<(String, ExchangeLocation)>, StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT id, exchange_location_encrypted FROM contacts
+                 WHERE exchange_location_encrypted IS NOT NULL",
+            )
+            .map_err(StorageError::from)?;
+        let rows: Vec<(String, Vec<u8>)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(StorageError::from)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(StorageError::from)?;
+        rows.into_iter()
+            .map(|(id, enc)| {
+                let json = crate::crypto::decrypt(&self.encryption_key, &enc).map_err(|e| {
+                    StorageError::Encryption(format!("Decrypt exchange location: {e}"))
+                })?;
+                let loc: ExchangeLocation = serde_json::from_slice(&json)
+                    .map_err(|e| StorageError::InvalidData(e.to_string()))?;
+                Ok((id, loc))
+            })
+            .collect()
+    }
+
     /// Clears a contact's exchange location.
     pub fn delete_exchange_location(&self, contact_id: &str) -> Result<(), StorageError> {
         self.conn.execute(

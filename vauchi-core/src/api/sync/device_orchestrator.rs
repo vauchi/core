@@ -14,8 +14,8 @@ use crate::crypto::{HKDF, SymmetricKey, encryption};
 use crate::identity::device::{DeviceInfo, DeviceRegistry};
 use crate::storage::Storage;
 use crate::sync::device_sync::{
-    DeviceSyncError, DeviceSyncPayload, FieldStamp, InterDeviceSyncState, SyncItem, TagSyncData,
-    VersionVector,
+    ContactExchangeLocation, DeviceSyncError, DeviceSyncPayload, FieldStamp, InterDeviceSyncState,
+    PlaceSyncData, SyncItem, TagSyncData, VersionVector,
 };
 
 /// Domain separation for device-to-device encryption key derivation.
@@ -220,10 +220,29 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .map(TagSyncData::from_tag)
             .collect();
 
+        // Load named places + per-contact exchange locations (ADR-051)
+        let places: Vec<PlaceSyncData> = self
+            .storage
+            .list_places()
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+            .iter()
+            .map(PlaceSyncData::from_place)
+            .collect();
+        let exchange_locations: Vec<ContactExchangeLocation> = self
+            .storage
+            .list_exchange_locations()
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+            .iter()
+            .map(|(id, loc)| ContactExchangeLocation::from_parts(id, loc))
+            .collect();
+
         // Get current version
         let version = self.version_vector.get(self.current_device.device_id());
 
-        Ok(DeviceSyncPayload::new(&contacts, &own_card, version).with_tags(tags))
+        Ok(DeviceSyncPayload::new(&contacts, &own_card, version)
+            .with_tags(tags)
+            .with_places(places)
+            .with_exchange_locations(exchange_locations))
     }
 
     /// Applies a full sync payload received during device linking.
@@ -265,6 +284,20 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             for tag_data in &payload.tags {
                 self.storage
                     .save_tag(&tag_data.to_tag())
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            }
+
+            // Restore named places (ADR-051), preserving their ids.
+            for place_data in &payload.places {
+                self.storage
+                    .save_place(&place_data.to_place())
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            }
+
+            // Restore per-contact exchange locations (contacts saved above exist).
+            for loc in &payload.exchange_locations {
+                self.storage
+                    .save_exchange_location(&loc.contact_id, &loc.location())
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
 

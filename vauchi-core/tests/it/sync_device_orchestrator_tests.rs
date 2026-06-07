@@ -224,6 +224,59 @@ fn test_orchestrator_syncs_tags_round_trip() {
     assert!(synced.contains(contact.id()), "membership synced");
 }
 
+// @scenario: contact-annotations.feature - Tags sync to my other linked devices
+// @internal
+#[test]
+fn test_orchestrator_syncs_places_and_exchange_locations() {
+    use vauchi_core::contact::place::ExchangeLocation;
+    let master_seed = [0x42u8; 32];
+
+    // Device A: a contact met at a named place.
+    let storage_a = create_test_storage();
+    let device_a = create_test_device(&master_seed, 0, "Device A");
+    let registry_a = create_test_registry(&master_seed, &device_a);
+    let contact = create_test_contact("Bob");
+    storage_a.save_contact(&contact).unwrap();
+    let place = storage_a
+        .create_place("The Anchor Bar", 52.52, 13.405)
+        .unwrap();
+    storage_a
+        .save_exchange_location(
+            contact.id(),
+            &ExchangeLocation {
+                latitude: 52.52,
+                longitude: 13.405,
+                place_id: Some(place.id.clone()),
+            },
+        )
+        .unwrap();
+
+    let orchestrator_a = DeviceSyncOrchestrator::new(&storage_a, device_a, registry_a);
+    let payload = orchestrator_a.create_full_sync_payload().unwrap();
+    assert_eq!(payload.places.len(), 1, "place in payload");
+    assert_eq!(payload.exchange_locations.len(), 1, "location in payload");
+
+    // Device B receives it.
+    let storage_b = create_test_storage();
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+    let registry_b = create_test_registry(&master_seed, &device_b);
+    let mut orchestrator_b = DeviceSyncOrchestrator::new(&storage_b, device_b, registry_b);
+    orchestrator_b.apply_full_sync(payload).unwrap();
+
+    // Place + per-contact location restored with ids intact.
+    let synced_place = storage_b
+        .get_place(&place.id)
+        .unwrap()
+        .expect("place synced");
+    assert_eq!(synced_place.name, "The Anchor Bar");
+    let synced_loc = storage_b
+        .load_exchange_location(contact.id())
+        .unwrap()
+        .expect("exchange location synced");
+    assert_eq!(synced_loc.place_id.as_deref(), Some(place.id.as_str()));
+    assert!((synced_loc.latitude - 52.52).abs() < 1e-9);
+}
+
 /// Test marking items as synced clears pending queue
 // @scenario: device_management :: Changes sync between devices
 #[test]

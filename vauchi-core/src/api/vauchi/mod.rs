@@ -32,6 +32,7 @@ mod security;
 mod setup;
 #[cfg(feature = "network-http")]
 mod sync_http;
+mod tags;
 mod visibility;
 
 pub use builder::VauchiBuilder;

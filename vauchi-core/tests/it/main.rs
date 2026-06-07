@@ -39,6 +39,7 @@ mod api_relay_exchange_tests;
 mod api_shared_avatars_tests;
 mod api_shared_names_tests;
 mod api_sync_controller_tests;
+mod api_tags_tests;
 mod api_vauchi_exchange_qr_tests;
 mod api_vauchi_recovery_offline_tests;
 mod api_vauchi_recovery_tests;

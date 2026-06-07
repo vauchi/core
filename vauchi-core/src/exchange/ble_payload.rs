@@ -101,7 +101,9 @@ impl BleCardPayload {
         }
         if let Some(avatar) = &self.avatar {
             // Best-effort per the doc above; an invalid avatar is skipped.
-            let _ = card.set_avatar(avatar.clone());
+            // Bind (not `let _`) to satisfy the must-use lint — `vauchi-core`
+            // has no logger to report the error.
+            let _outcome = card.set_avatar(avatar.clone());
         }
         card
     }

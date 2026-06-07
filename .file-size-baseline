@@ -339,7 +339,9 @@ vauchi-app/src/ui/app_engine/routing.rs 560
 # (+5 for AppScreen::EmergencyBroadcast engine constructor + use —
 #  2026-06-02 humble-ui core engines sweep)
 # (+18 for AppScreen::NfcExchange factory arm — NFC graduation)
-vauchi-app/src/ui/app_engine/screens.rs 1499
+# (+12 for BLE/Magic completion P2: AppScreen::BleExchange sources the
+#  role-tiebreak token from the identity at engine construction, 2026-06-07)
+vauchi-app/src/ui/app_engine/screens.rs 1511
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081
@@ -402,7 +404,11 @@ vauchi-app/src/ui/contact_detail.rs 1429
 # (+63 for slice 32m T2.1: BleExchangeFlow.negotiated_mtu field +
 #  BleMtuNegotiated handler arm + 3 inline tests pinning the
 #  consumption seam + the subscribe-notify-hypothesis verification)
-vauchi-app/src/ui/exchange/ble.rs 1120
+# (+69 for BLE/Magic completion P1-P4: role-tiebreak field +
+#  decide_initiator + force_success wiring, and the rewritten/added flow
+#  tests, 2026-06-07. Some vestigial received_card/try_complete/Complete
+#  machinery remains pending a follow-up tidy that will shrink this.)
+vauchi-app/src/ui/exchange/ble.rs 1189
 
 # EXEMPT — state machine: 9 ProtocolState variants + camera-gate transitions need cohesion;
 # inline tests access private state (state, peer_name, session_ended, camera_gate, scan_quality_tracker).

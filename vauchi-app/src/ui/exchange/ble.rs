@@ -190,7 +190,10 @@ pub(super) struct BleExchangeFlow {
     step: BleStep,
     connected_device: Option<String>,
     proximity_runner: Option<ProximityRunner>,
-    /// Card bytes received from BLE exchange (set on handshake complete).
+    /// VESTIGIAL (P4): the encrypted card transfer is owned by the real
+    /// `BleHandshakeMachine`, so this is never populated anymore. It,
+    /// `try_complete`, and `BleHardwareOutcome::Complete` are kept inert
+    /// to bound the P4 diff — a follow-up tidy removes them outright.
     received_card: Option<Vec<u8>>,
     /// Whether our shake envelope has been sent to the peer.
     shake_envelope_sent: bool,
@@ -375,11 +378,14 @@ impl BleExchangeFlow {
                 return self.handle_shake_envelope(data);
             }
 
-            // Card data
-            self.received_card = Some(data.clone());
-            if self.proximity_runner.as_ref().is_some_and(|r| r.is_done()) {
-                return self.try_complete(vec![]);
-            }
+            // The encrypted card transfer is owned by the real
+            // `BleHandshakeMachine` (P2/P3). The hollow flow no longer
+            // treats notified bytes as a card — doing so raced the real
+            // machine to a garbage completion that tore the session down.
+            // Everything non-Shake is consumed so the flow holds its step
+            // while the real handshake runs; terminal Success is driven by
+            // the machine's completion via
+            // `BleExchangeEngine::force_success`.
             return BleHardwareOutcome::Consumed { commands: vec![] };
         }
 
@@ -411,8 +417,8 @@ impl BleExchangeFlow {
             if self.mode == ExchangeMode::Shake && uuid == SHAKE_ENVELOPE_CHAR {
                 return self.handle_shake_envelope(data);
             }
-            self.received_card = Some(data.clone());
-            return self.try_complete(vec![]);
+            // Card transfer is the real machine's job (P3); consume.
+            return BleHardwareOutcome::Consumed { commands: vec![] };
         }
         BleHardwareOutcome::Ignored
     }
@@ -616,42 +622,40 @@ mod tests {
 
     // @internal
     #[test]
-    fn impact_event_during_exchange_completes_with_card() {
+    fn impact_after_notify_advances_to_verifying_without_self_completing() {
+        // P4: the hollow flow no longer treats a BLE notification as the
+        // card — the real `BleHandshakeMachine` owns the encrypted card
+        // transfer — so it never self-completes. Proximity-done advances
+        // to Verifying; terminal Success is driven by the machine via
+        // `BleExchangeEngine::force_success`.
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump, vec![]);
         advance_to_exchanging(&mut flow);
 
-        // Receive card data first
-        flow.handle_event(&Event::BleCharacteristicNotified {
+        let consumed = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "card-char".into(),
             data: vec![1, 2, 3],
         });
+        assert!(matches!(consumed, BleHardwareOutcome::Consumed { .. }));
+        assert_eq!(*flow.step(), BleStep::Exchanging);
 
-        // Then impact → should complete
         let outcome = flow.handle_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 3000, // 3g > 2.5g threshold
         });
-
-        assert_eq!(*flow.step(), BleStep::Complete);
-        match outcome {
-            BleHardwareOutcome::Complete {
-                card_bytes,
-                commands,
-            } => {
-                assert_eq!(card_bytes, vec![1, 2, 3]);
-                assert!(commands.iter().any(|c| matches!(c, Command::BleDisconnect)));
-            }
-            other => panic!("Expected Complete, got {other:?}"),
-        }
+        assert_eq!(*flow.step(), BleStep::Verifying);
+        assert!(
+            matches!(outcome, BleHardwareOutcome::StepAdvanced { .. }),
+            "proximity-done must advance to Verifying, not Complete, got {outcome:?}"
+        );
     }
 
     // @internal
     #[test]
-    fn proximity_done_before_card_advances_to_verifying() {
+    fn proximity_done_then_notify_stays_in_verifying() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump, vec![]);
         advance_to_exchanging(&mut flow);
 
-        // Impact first (no card yet)
+        // Impact first (no card yet) → Verifying.
         let outcome = flow.handle_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 3000,
@@ -659,18 +663,14 @@ mod tests {
         assert_eq!(*flow.step(), BleStep::Verifying);
         assert!(matches!(outcome, BleHardwareOutcome::StepAdvanced { .. }));
 
-        // Then card → complete
+        // P4: a later notification is consumed (the real machine owns the
+        // card transfer); the flow does not self-complete.
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "card-char".into(),
             data: vec![4, 5, 6],
         });
-        assert_eq!(*flow.step(), BleStep::Complete);
-        match outcome {
-            BleHardwareOutcome::Complete { card_bytes, .. } => {
-                assert_eq!(card_bytes, vec![4, 5, 6]);
-            }
-            other => panic!("Expected Complete, got {other:?}"),
-        }
+        assert_eq!(*flow.step(), BleStep::Verifying);
+        assert!(matches!(outcome, BleHardwareOutcome::Consumed { .. }));
     }
 
     // @internal
@@ -693,7 +693,7 @@ mod tests {
 
     // @internal
     #[test]
-    fn magic_audio_response_completes_exchange_with_card() {
+    fn magic_audio_response_verifies_proximity_without_self_completing() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![]);
         advance_to_exchanging(&mut flow);
 
@@ -703,7 +703,7 @@ mod tests {
             data: vec![10, 20, 30],
         });
 
-        // Audio response → proximity done → exchange complete.
+        // Audio response → proximity done → Verifying (no self-complete).
         // Build a real FSK-encoded sample buffer so the proximity
         // runner's decode succeeds and the verified flag flips.
         let modem_config = vauchi_core::exchange::audio_modem::AudioConfig::default();
@@ -714,20 +714,16 @@ mod tests {
             sample_rate: modem_config.sample_rate,
         });
 
-        assert_eq!(*flow.step(), BleStep::Complete);
+        assert_eq!(*flow.step(), BleStep::Verifying);
         match outcome {
-            BleHardwareOutcome::Complete {
-                card_bytes,
-                commands,
-            } => {
-                assert_eq!(card_bytes, vec![10, 20, 30]);
-                // Should include AudioStop from runner + BleDisconnect from flow
+            BleHardwareOutcome::StepAdvanced { commands } => {
+                // The runner still stops audio; the flow no longer emits a
+                // completion BleDisconnect (the real machine owns that).
                 assert!(commands.iter().any(|c| matches!(c, Command::AudioStop)));
-                assert!(commands.iter().any(|c| matches!(c, Command::BleDisconnect)));
             }
-            other => panic!("Expected Complete, got {other:?}"),
+            other => panic!("Expected StepAdvanced to Verifying, got {other:?}"),
         }
-        // Verify proximity result is available
+        // The proximity runner still produced a verified result.
         let prox = flow.proximity_runner.as_ref().unwrap().result().unwrap();
         assert!(prox.verified);
         assert!((prox.confidence - 0.85).abs() < f32::EPSILON);
@@ -746,22 +742,17 @@ mod tests {
         // since card data isn't here yet
         assert!(flow.proximity_runner.as_ref().unwrap().result().is_some());
 
-        // Now receive card → should complete (audio failure = lower trust, not blocked)
-        // We need to process a BLE event to trigger the flow check.
-        // Provide card data — flow should detect proximity is done and complete.
+        // P4: a later BLE notification is consumed; the flow does not
+        // self-complete even after a proximity timeout (the real machine
+        // owns the card transfer and completion).
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "card-char".into(),
             data: vec![7, 8, 9],
         });
+        assert!(matches!(outcome, BleHardwareOutcome::Consumed { .. }));
+        assert_ne!(*flow.step(), BleStep::Complete);
 
-        assert_eq!(*flow.step(), BleStep::Complete);
-        match outcome {
-            BleHardwareOutcome::Complete { card_bytes, .. } => {
-                assert_eq!(card_bytes, vec![7, 8, 9]);
-            }
-            other => panic!("Expected Complete, got {other:?}"),
-        }
-        // Proximity was a timeout — verified = false but exchange still completed
+        // Proximity was a timeout — verified = false; result still readable.
         let prox = flow.proximity_runner.as_ref().unwrap().result().unwrap();
         assert!(!prox.verified);
         assert_eq!(prox.confidence, 0.0);
@@ -801,7 +792,7 @@ mod tests {
 
     // @internal
     #[test]
-    fn shake_peer_envelope_completes_with_card() {
+    fn shake_peer_envelope_verifies_proximity_without_self_completing() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Shake, vec![]);
         advance_to_exchanging(&mut flow);
 
@@ -811,25 +802,23 @@ mod tests {
         let (our_envelope, _) = runner.finish_recording().unwrap();
         flow.shake_envelope_sent = true;
 
-        // Receive card data
-        flow.handle_event(&Event::BleCharacteristicNotified {
+        // A card-data notification is consumed (not mistaken for a card).
+        let consumed = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "card-char".into(),
             data: vec![10, 20, 30],
         });
+        assert!(matches!(consumed, BleHardwareOutcome::Consumed { .. }));
 
-        // Receive peer's envelope (same data = perfect correlation)
+        // Receive peer's envelope (same data = perfect correlation) →
+        // proximity verifies and advances to Verifying, but the flow no
+        // longer self-completes (the real machine drives Success).
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: SHAKE_ENVELOPE_CHAR.into(),
             data: our_envelope,
         });
 
-        assert_eq!(*flow.step(), BleStep::Complete);
-        match outcome {
-            BleHardwareOutcome::Complete { card_bytes, .. } => {
-                assert_eq!(card_bytes, vec![10, 20, 30]);
-            }
-            other => panic!("Expected Complete, got {other:?}"),
-        }
+        assert_eq!(*flow.step(), BleStep::Verifying);
+        assert!(matches!(outcome, BleHardwareOutcome::StepAdvanced { .. }));
         let prox = flow.proximity_runner.as_ref().unwrap().result().unwrap();
         assert!(prox.verified);
         assert!(prox.confidence <= 0.5); // Capped per spec
@@ -855,29 +844,31 @@ mod tests {
         assert_eq!(*flow.step(), BleStep::Verifying);
         assert!(matches!(outcome, BleHardwareOutcome::StepAdvanced { .. }));
 
-        // Then card → complete
+        // P4: a later card notification is consumed (the real machine
+        // owns the card transfer); the flow stays in Verifying.
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "card-char".into(),
             data: vec![1, 2, 3],
         });
-        assert_eq!(*flow.step(), BleStep::Complete);
-        assert!(matches!(outcome, BleHardwareOutcome::Complete { .. }));
+        assert_eq!(*flow.step(), BleStep::Verifying);
+        assert!(matches!(outcome, BleHardwareOutcome::Consumed { .. }));
     }
 
     // @internal
     #[test]
-    fn shake_non_envelope_char_is_card_data() {
+    fn shake_non_envelope_notification_is_consumed() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Shake, vec![]);
         advance_to_exchanging(&mut flow);
 
-        // Data on a non-envelope UUID is treated as card data
+        // P4: a non-envelope BLE notification is consumed (the real
+        // machine owns the encrypted card transfer); the hollow flow no
+        // longer stores it as a card.
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "some-other-char".into(),
             data: vec![1, 2],
         });
-        assert_eq!(*flow.step(), BleStep::Exchanging); // Still exchanging
+        assert_eq!(*flow.step(), BleStep::Exchanging);
         assert!(matches!(outcome, BleHardwareOutcome::Consumed { .. }));
-        assert!(flow.received_card.is_some());
     }
 
     // ── Failure tests ──────────────────────────────────────────────
@@ -941,24 +932,25 @@ mod tests {
 
     // @internal
     #[test]
-    fn bump_weak_impact_completes_with_unverified_proximity() {
+    fn bump_weak_impact_advances_to_verifying_with_unverified_proximity() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump, vec![]);
         advance_to_exchanging(&mut flow);
 
-        // Card data
+        // Notification consumed (not mistaken for a card).
         flow.handle_event(&Event::BleCharacteristicNotified {
             uuid: "c".into(),
             data: vec![1, 2],
         });
 
-        // Weak impact (1g < 2.5g threshold) — still completes (impact doesn't block)
+        // Weak impact (1g < 2.5g) resolves proximity (unverified) and
+        // advances to Verifying; the flow does not self-complete.
         let outcome = flow.handle_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 1000, // 1g
         });
 
-        assert_eq!(*flow.step(), BleStep::Complete);
-        assert!(matches!(outcome, BleHardwareOutcome::Complete { .. }));
+        assert_eq!(*flow.step(), BleStep::Verifying);
+        assert!(matches!(outcome, BleHardwareOutcome::StepAdvanced { .. }));
         let prox = flow.proximity_runner.as_ref().unwrap().result().unwrap();
         assert!(!prox.verified);
         assert!(prox.confidence < 0.6);
@@ -990,21 +982,18 @@ mod tests {
 
     // @internal
     #[test]
-    fn complete_step_ignores_events() {
+    fn verifying_step_ignores_stray_discovery_events() {
         let mut flow = BleExchangeFlow::new(ExchangeMode::Bump, vec![]);
         advance_to_exchanging(&mut flow);
-        // Get card + impact to complete
-        flow.handle_event(&Event::BleCharacteristicNotified {
-            uuid: "c".into(),
-            data: vec![1],
-        });
+        // Impact resolves proximity → Verifying (the flow's terminal step;
+        // real completion is the machine's job via force_success).
         flow.handle_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 3000,
         });
-        assert_eq!(*flow.step(), BleStep::Complete);
+        assert_eq!(*flow.step(), BleStep::Verifying);
 
-        // Further events ignored
+        // A stray re-discovery is ignored.
         let outcome = flow.handle_event(&Event::BleDeviceDiscovered {
             id: "d2".into(),
             rssi: -50,

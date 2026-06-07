@@ -78,6 +78,14 @@ impl BleExchangeEngine {
         }
     }
 
+    /// Drive the chrome to the terminal Success screen. Called by the
+    /// AppEngine when the real `BleHandshakeMachine` reports `Completed`:
+    /// the hollow flow no longer self-completes from BLE data bytes (P4),
+    /// so the real completion is what flips the UI to success.
+    pub fn force_success(&mut self) {
+        self.screen = BleScreen::Success;
+    }
+
     fn progress(&self) -> Progress {
         Progress {
             current_step: self.flow.step().step_number(0),
@@ -423,6 +431,20 @@ mod tests {
             .collect();
         assert!(!ids.iter().any(|i| i == "fallback_qr"));
         assert!(ids.iter().any(|i| i == "retry"));
+    }
+
+    // @internal
+    #[test]
+    fn force_success_flips_chrome_to_success_screen() {
+        // P4: the real `BleHandshakeMachine` completion drives the chrome
+        // to Success (the hollow flow no longer self-completes).
+        let mut engine = BleExchangeEngine::new(ExchangeMode::Magic, true, vec![]);
+        assert_eq!(
+            engine.current_screen().screen_id,
+            "exchange_ble_discovering"
+        );
+        engine.force_success();
+        assert_eq!(engine.current_screen().screen_id, "exchange_success");
     }
 
     // @internal

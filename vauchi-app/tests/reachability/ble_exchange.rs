@@ -30,7 +30,6 @@ use vauchi_app::ui::{
     BleExchangeEngine, WorkflowEngine,
 };
 use vauchi_core::Event;
-use vauchi_core::exchange::audio_modem::{AudioConfig, generate_fsk_samples};
 use vauchi_core::exchange::mode::ExchangeMode;
 
 /// Discovering exposes only `cancel`.
@@ -88,28 +87,22 @@ fn verifying_factory() -> BleExchangeEngine {
     e
 }
 
-/// Success root (Magic mode) — discover → connect → card arrives → audio
-/// proximity completes via an FSK-encoded sample buffer.
+/// Success root (Magic mode) — discover → connect → real-machine
+/// completion drives Success via `force_success` (P4).
 fn success_factory() -> BleExchangeEngine {
     let mut e = BleExchangeEngine::new(ExchangeMode::Magic, true, vec![]);
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
         rssi: -45,
-        adv_data: vec![],
+        adv_data: vec![0xFF; 33],
     });
     e.handle_hardware_event(Event::BleConnected {
         device_id: "peer-1".into(),
     });
-    e.handle_hardware_event(Event::BleCharacteristicNotified {
-        uuid: "card".into(),
-        data: vec![1, 2, 3],
-    });
-    let modem = AudioConfig::default();
-    let samples = generate_fsk_samples(&[0xAA], &modem);
-    e.handle_hardware_event(Event::AudioSamplesRecorded {
-        samples,
-        sample_rate: modem.sample_rate,
-    });
+    // P4: the hollow flow no longer self-completes from notified bytes;
+    // the real `BleHandshakeMachine` completion drives Success via
+    // `force_success`.
+    e.force_success();
     e
 }
 

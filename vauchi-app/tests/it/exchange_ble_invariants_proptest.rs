@@ -23,7 +23,6 @@
 use proptest::prelude::*;
 use vauchi_app::ui::{BleExchangeEngine, WorkflowEngine};
 use vauchi_core::Event;
-use vauchi_core::exchange::audio_modem::{AudioConfig, generate_fsk_samples};
 use vauchi_core::exchange::mode::ExchangeMode;
 
 /// Strategy: arbitrary BLE / proximity / hardware-error events that
@@ -89,16 +88,11 @@ fn drive_magic_to_success() -> BleExchangeEngine {
     e.handle_hardware_event(Event::BleConnected {
         device_id: "peer-1".into(),
     });
-    e.handle_hardware_event(Event::BleCharacteristicNotified {
-        uuid: "card".into(),
-        data: vec![1, 2, 3],
-    });
-    let modem = AudioConfig::default();
-    let samples = generate_fsk_samples(&[0xAA], &modem);
-    e.handle_hardware_event(Event::AudioSamplesRecorded {
-        samples,
-        sample_rate: modem.sample_rate,
-    });
+    // P4: the hollow flow no longer self-completes from notified bytes;
+    // the real `BleHandshakeMachine` completion drives the chrome to
+    // Success via `force_success`. Call it to reach the terminal screen
+    // (the invariant under test is that Success stays terminal).
+    e.force_success();
     assert_eq!(e.current_screen().screen_id, "exchange_success");
     e
 }

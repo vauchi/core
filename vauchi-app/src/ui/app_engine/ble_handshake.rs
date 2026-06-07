@@ -221,7 +221,19 @@ impl AppEngine {
     /// is driven separately.
     pub fn apply_ble_machine_event(&mut self, event: BleMachineEvent) -> bool {
         match event {
-            BleMachineEvent::Completed(result) => self.persist_ble_exchanged_contact(&result),
+            BleMachineEvent::Completed(result) => {
+                let persisted = self.persist_ble_exchanged_contact(&result);
+                // Drive the chrome to its terminal Success screen. The
+                // hollow `BleExchangeFlow` no longer self-completes from
+                // BLE data bytes (P4), so the real machine's completion is
+                // what flips the UI to success.
+                if let Some(any) = self.engine.as_any_mut()
+                    && let Some(active) = any.downcast_mut::<crate::ui::BleExchangeEngine>()
+                {
+                    active.force_success();
+                }
+                persisted
+            }
             _ => false,
         }
     }

@@ -92,7 +92,9 @@ vauchi-platform/src/multistage_exchange.rs 1105
 #  AwaitingCardExchange, handle_direct_card_received decrypt+complete, usb_card_key
 #  HKDF derivation, USB proximity-exempt branch — 2026-06-05-usb-card-exchange-protocol;
 #  structural exemption — state machine, do not split)
-vauchi-core/src/exchange/session.rs 2001
+# (+5 2026-06-07: Event::LocationResult arm in apply_hardware_event —
+#  contact-annotations T2.1; state machine, do not split)
+vauchi-core/src/exchange/session.rs 2006
 # (+29 for Phase 1.C.3a foothold of
 #  2026-05-11-hover-graduation-plan.md: audio_proximity field
 #  + getter on MultiStageSession, AudioProximityState import.
@@ -150,7 +152,10 @@ vauchi-core/src/exchange/multistage/session.rs 1818
 #  design §3.2)
 # (+24 for Command::DirectSendCard + Event::DirectCardReceived + variant_name arm —
 #  USB card-exchange protocol 2026-06-05; command/event facade)
-vauchi-core/src/platform.rs 1150
+# (+17 2026-06-07: Command::LocationRequest + Event::LocationResult +
+#  variant_name arm — contact-annotations T2.1; command/event protocol enum,
+#  co-located by design)
+vauchi-core/src/platform.rs 1167
 
 # EXEMPT — transport layer: all relay methods must be co-located for protocol coherence
 # (+2 for #[tracing::instrument] on send_update + fetch — profiling, no logic change)

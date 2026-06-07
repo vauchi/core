@@ -275,6 +275,13 @@ pub enum Command {
         ciphertext: Vec<u8>,
         is_initiator: bool,
     },
+    /// Request the device's current location (ADR-051 contact annotations):
+    /// used at an in-person exchange to record *where we met*. The frontend
+    /// resolves permission and replies with [`Event::LocationResult`], or
+    /// [`Event::PermissionDenied { transport: "location" }`] if the user
+    /// declines, or [`Event::HardwareUnavailable`] if there is no location
+    /// provider. `timeout_ms` bounds how long the frontend waits for a fix.
+    LocationRequest { timeout_ms: u32 },
 }
 
 /// Screen orientation a frontend should pin to via
@@ -349,6 +356,7 @@ impl Command {
             Self::SetScreenBrightness { .. } => "SetScreenBrightness",
             Self::SetIdleTimerDisabled { .. } => "SetIdleTimerDisabled",
             Self::SetOrientationLock { .. } => "SetOrientationLock",
+            Self::LocationRequest { .. } => "LocationRequest",
         }
     }
 }
@@ -421,6 +429,15 @@ pub enum Event {
     /// exists but the OS permission was denied. Frontends should send this
     /// when a runtime permission prompt is rejected (camera, BLE, microphone).
     PermissionDenied { transport: String },
+
+    /// The device's current location, in reply to [`Command::LocationRequest`]
+    /// (ADR-051 contact annotations). Coordinates are decimal degrees;
+    /// `accuracy_meters` is the provider's reported horizontal accuracy, if any.
+    LocationResult {
+        latitude: f64,
+        longitude: f64,
+        accuracy_meters: Option<f32>,
+    },
 
     // ── Accelerometer ───────────────────────────────────────────────
     /// Accelerometer sample from the device.

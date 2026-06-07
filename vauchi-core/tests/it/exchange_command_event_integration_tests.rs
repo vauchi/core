@@ -273,3 +273,53 @@ fn nfc_session_ignores_ble_events() {
         "NFC session should ignore BLE events"
     );
 }
+
+// −− Location seam (ADR-051 contact annotations, T2.1) −−−−−−−−−−−−−−−−−−−−−−−−−
+
+// @scenario: contact-annotations.feature - Exchange captures coordinates
+// @internal
+#[test]
+fn location_command_and_event_round_trip_and_name() {
+    // variant_name is payload-free and stable for diagnostics.
+    assert_eq!(
+        Command::LocationRequest { timeout_ms: 5000 }.variant_name(),
+        "LocationRequest"
+    );
+
+    // Both cross the wire via serde — round-trip preserves fields.
+    let cmd = Command::LocationRequest { timeout_ms: 8000 };
+    let cmd_back: Command = serde_json::from_str(&serde_json::to_string(&cmd).unwrap()).unwrap();
+    assert_eq!(cmd, cmd_back);
+
+    let evt = Event::LocationResult {
+        latitude: 52.5200,
+        longitude: 13.4050,
+        accuracy_meters: Some(12.5),
+    };
+    let evt_back: Event = serde_json::from_str(&serde_json::to_string(&evt).unwrap()).unwrap();
+    assert_eq!(evt, evt_back);
+}
+
+// @scenario: contact-annotations.feature - Exchange captures coordinates
+// @internal
+#[test]
+fn exchange_session_ignores_location_result() {
+    let mut session = qr_session("Alice");
+    let before = format!("{:?}", session.state());
+
+    // A location fix is an annotation, not a handshake event — the state
+    // machine must accept it without erroring or changing state.
+    session
+        .apply_hardware_event(Event::LocationResult {
+            latitude: 1.0,
+            longitude: 2.0,
+            accuracy_meters: None,
+        })
+        .expect("LocationResult must be accepted by the session");
+
+    assert_eq!(
+        before,
+        format!("{:?}", session.state()),
+        "LocationResult must not change exchange state"
+    );
+}

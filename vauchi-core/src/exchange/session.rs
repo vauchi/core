@@ -1010,7 +1010,12 @@ impl ExchangeSession {
             // by the binding's GATT chunker (and, post-32m T2.2, by
             // `BleExchangeFlow` to size its writes). The core
             // `ExchangeSession` state machine has no opinion on it.
-            | Event::BleMtuNegotiated { .. } => Ok(()),
+            | Event::BleMtuNegotiated { .. }
+            // LocationResult is a contact *annotation* (ADR-051 "where we
+            // met"), not a handshake event. The exchange state machine
+            // ignores it; the annotation layer captures it at exchange
+            // completion (contact-annotations T2.2).
+            | Event::LocationResult { .. } => Ok(()),
         }
     }
 

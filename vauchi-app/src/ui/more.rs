@@ -69,6 +69,7 @@ const MORE_SECTIONS: &[MoreSection] = &[
         id: "data",
         label: "Data",
         items: &[
+            ("tags", "Tags"),
             ("archived_contacts", "Archived Contacts"),
             ("contact_duplicates", "Merge Contacts"),
             (IMPORT_CONTACTS_ACTION_ID, "Import Contacts"),

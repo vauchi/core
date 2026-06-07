@@ -139,6 +139,8 @@ pub enum AppScreen {
     /// Social graph view — contacts grouped by trust level.
     SocialGraph,
     Groups,
+    /// Owner-private tag management list (ADR-051).
+    Tags,
     GroupDetail {
         group_id: String,
     },
@@ -286,6 +288,7 @@ impl AppScreen {
             Self::RecoveryHelp => "recovery_help",
             Self::SocialGraph => "social_graph",
             Self::Groups => "groups",
+            Self::Tags => "tags",
             Self::GroupDetail { .. } => "group_detail",
             Self::Privacy => "privacy",
             Self::Support => "support",
@@ -338,6 +341,7 @@ impl AppScreen {
             "recovery_help" => Self::RecoveryHelp,
             "social_graph" => Self::SocialGraph,
             "groups" => Self::Groups,
+            "tags" => Self::Tags,
             "privacy" => Self::Privacy,
             "support" => Self::Support,
             "contact_duplicates" => Self::ContactDuplicates,
@@ -372,6 +376,7 @@ impl AppScreen {
             | Self::ArchivedContacts
             | Self::VerifyFingerprint { .. } => Some("contacts"),
             Self::GroupDetail { .. } => Some("groups"),
+            Self::Tags => Some("more"),
             Self::RecoveryHelp | Self::RecoveryClaimReview => Some("recovery"),
             Self::DeviceLinking | Self::DeviceReplacement => Some("device_management"),
             _ => None,
@@ -1275,6 +1280,10 @@ impl WorkflowEngine for AppEngine {
         // Detail-screen interception (MyInfo entry detail, contact detail).
         // See `dispatch::intercept_contact_screen`.
         if let Some(result) = self.intercept_contact_screen(&action) {
+            return result;
+        }
+
+        if let Some(result) = self.intercept_tag_delete(&action) {
             return result;
         }
 

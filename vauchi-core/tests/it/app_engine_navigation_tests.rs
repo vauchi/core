@@ -749,6 +749,7 @@ fn more_engine_has_expected_navigation_targets() {
         "device_management",
         "device_replacement",
         "recovery",
+        "tags",
         "archived_contacts",
         "contact_duplicates",
         "import_contacts",

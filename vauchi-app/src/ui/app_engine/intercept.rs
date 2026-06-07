@@ -15,6 +15,7 @@ use crate::ui::engine::WorkflowEngine;
 use crate::ui::form_dialog::FormDialogType;
 use crate::ui::info_content;
 use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
+use crate::ui::tags_list::TagsEngine;
 
 impl AppEngine {
     /// Persist a consent toggle on the Privacy screen by flipping the
@@ -513,6 +514,38 @@ impl AppEngine {
             }
             _ => None,
         }
+    }
+
+    /// Intercept the tag-delete confirmation on the Tags management screen
+    /// (ADR-051). Reads the armed tag id from the engine, deletes it via
+    /// `Vauchi::delete_tag`, then applies the optimistic row drop. The
+    /// `cancel_delete_tag` action needs no storage, so the engine handles it
+    /// directly and it is not intercepted here.
+    pub(super) fn intercept_tag_delete(&mut self, action: &UserAction) -> Option<ActionResult> {
+        if self.screen != AppScreen::Tags {
+            return None;
+        }
+        let UserAction::ActionPressed { action_id } = action else {
+            return None;
+        };
+        if action_id != "confirm_delete_tag" {
+            return None;
+        }
+        let tag_id = self
+            .engine
+            .as_any()
+            .and_then(|a| a.downcast_ref::<TagsEngine>())
+            .and_then(|e| e.pending_delete_id())
+            .map(str::to_string)?;
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = self.vauchi.delete_tag(&tag_id);
+        self.engine
+            .as_any_mut()
+            .and_then(|a| a.downcast_mut::<TagsEngine>())
+            .map(|engine| {
+                engine.confirm_delete();
+                ActionResult::UpdateScreen(engine.current_screen())
+            })
     }
 
     /// Intercept the "exit-preview" action when MyInfo is in PreviewAs mode.

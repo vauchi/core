@@ -52,6 +52,7 @@ use crate::ui::recovery_status::RecoveryEngine;
 use crate::ui::settings::{SettingsConfig, SettingsEngine};
 use crate::ui::support::SupportEngine;
 use crate::ui::sync_status::SyncStatusEngine;
+use crate::ui::tags_list::{TagSummary, TagsEngine};
 use vauchi_core::api::Vauchi;
 
 impl AppEngine {
@@ -470,6 +471,19 @@ impl AppEngine {
                     .collect();
                 let group_count = vauchi.list_groups().map(|g| g.len()).unwrap_or(0);
                 Box::new(crate::ui::SocialGraphEngine::new(entries, group_count))
+            }
+            AppScreen::Tags => {
+                let tags: Vec<TagSummary> = vauchi
+                    .list_tags()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|t| TagSummary {
+                        id: t.id,
+                        name: t.name,
+                        member_count: t.contact_ids.len(),
+                    })
+                    .collect();
+                Box::new(TagsEngine::new(tags))
             }
             AppScreen::Groups => {
                 let all_groups = vauchi.list_groups().unwrap_or_default();

@@ -70,6 +70,7 @@ const EXPECTED_MORE_ACTION_IDS: &[&str] = &[
     "recovery",
     "backup",
     // data
+    "tags",
     "archived_contacts",
     "contact_duplicates",
     "import_contacts",

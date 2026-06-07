@@ -279,6 +279,15 @@ impl BleHandshakeSession {
         &self.state
     }
 
+    /// The derived session key, available once the handshake has
+    /// produced it (responder: after `process_key_offer`; initiator:
+    /// after `process_key_ack`). Used as the exchanged contact's
+    /// transport key + Double Ratchet seed when persisting the peer
+    /// card. `None` before key agreement.
+    pub fn session_key(&self) -> Option<&SymmetricKey> {
+        self.session_key.as_ref()
+    }
+
     /// Phase 1 (Initiator): Create and serialize a KeyOffer message.
     ///
     /// Produces a 121-byte message (KeyOffer wire format is shared
@@ -691,7 +700,11 @@ impl BleHandshakeSession {
             let their_offer_timestamp = self
                 .their_timestamp
                 .ok_or_else(|| ExchangeError::InvalidState("No peer timestamp".into()))?;
-            let aad = build_aad(&their_identity, &self.our_identity_key, their_offer_timestamp);
+            let aad = build_aad(
+                &their_identity,
+                &self.our_identity_key,
+                their_offer_timestamp,
+            );
             let plaintext = encryption::decrypt_with_ad(session_key, their_encrypted, &aad)
                 .map_err(|_| ExchangeError::BleDecryptionFailed)?;
             let card = BleCardPayload::from_bytes(&plaintext)

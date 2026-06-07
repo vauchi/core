@@ -534,7 +534,11 @@ impl PlatformAppEngine {
                         detail: format!("Lock failed: {e}"),
                     })?;
                     if engine.ble_handshake_session_active() {
-                        let _ = engine.forward_ble_hardware_event(&hw_event);
+                        let m_event = engine.forward_ble_hardware_event(&hw_event);
+                        // P3 — on Completed, persist the decrypted peer card +
+                        // Double Ratchet as an exchanged contact. Inert for
+                        // every other machine event.
+                        engine.apply_ble_machine_event(m_event);
                     }
                 }
 

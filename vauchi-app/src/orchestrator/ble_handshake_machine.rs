@@ -226,6 +226,13 @@ impl BleHandshakeMachine {
         self.role
     }
 
+    /// The handshake's derived session key, once key agreement has
+    /// produced it. Used to persist the exchanged contact (transport
+    /// key + Double Ratchet seed) when the machine reaches `Completed`.
+    pub fn session_key(&self) -> Option<&vauchi_core::crypto::SymmetricKey> {
+        self.inner.session_key()
+    }
+
     /// Currently negotiated usable MTU (payload bytes per chunk).
     pub fn mtu_usable(&self) -> usize {
         self.mtu_usable
@@ -436,23 +443,39 @@ impl BleHandshakeMachine {
                 let Some(commitment) = self.pending_intermediate.take() else {
                     return self.mark_failed("No pending commitment".into());
                 };
-                match self
+                let reveal = match self
                     .inner
                     .process_committed_payload(&commitment, encrypted_card)
                 {
-                    Ok(reveal) => {
-                        self.phase = BleMachinePhase::Verifying;
+                    Ok(reveal) => reveal,
+                    Err(e) => {
+                        return self
+                            .mark_failed(format!("Failed to process committed payload: {e:?}"));
+                    }
+                };
+                // Send our reveal so the initiator can finalize, then
+                // complete our own side immediately. By Phase 3 the
+                // responder has already verified the initiator's
+                // commitment and holds the (decryptable) reciprocal card,
+                // so `complete_exchange` takes an empty reveal (per its
+                // doc: "responder: reveal is empty, already verified in
+                // Phase 3"). Without this the responder sat in `Verifying`
+                // forever — the initiator emits nothing after it
+                // completes, so no closing notification ever arrived and
+                // the responder never persisted the contact.
+                let reveal_cmd = Command::BleWriteCharacteristic {
+                    uuid: CHAR_HANDSHAKE_NOTIFY.into(),
+                    data: reveal,
+                };
+                match self.inner.complete_exchange(&[]) {
+                    Ok(result) => {
+                        self.phase = BleMachinePhase::Completed;
                         (
-                            BleMachineEvent::VerifyingStarted,
-                            vec![Command::BleWriteCharacteristic {
-                                uuid: CHAR_HANDSHAKE_NOTIFY.into(),
-                                data: reveal,
-                            }],
+                            BleMachineEvent::Completed(Box::new(result)),
+                            vec![reveal_cmd],
                         )
                     }
-                    Err(e) => {
-                        self.mark_failed(format!("Failed to process committed payload: {e:?}"))
-                    }
+                    Err(e) => self.mark_failed(format!("Responder completion failed: {e:?}")),
                 }
             }
         }

@@ -222,3 +222,79 @@ fn discovery_is_idempotent_once_session_active() {
     engine.start_ble_handshake_on_discovery(&[]);
     assert_eq!(engine.ble_machine_phase(), phase_a);
 }
+
+// ── P3: two-party exchange persists each other's contact + ratchet ────
+
+fn engine_named(name: &str) -> AppEngine {
+    let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");
+    vauchi.create_identity(name).expect("identity");
+    AppEngine::new(vauchi)
+}
+
+fn token_of(engine: &AppEngine) -> Vec<u8> {
+    engine
+        .vauchi()
+        .identity()
+        .expect("identity")
+        .signing_public_key()
+        .to_vec()
+}
+
+/// Route one side's pending BLE writes to the other as notifications on
+/// the same characteristic — a GATT write on uuid X surfaces at the peer
+/// as data on uuid X — applying any resulting machine event (which
+/// persists the contact on `Completed`). Returns the number of writes
+/// routed, so the caller can pump to a fixpoint.
+fn pump(from: &mut AppEngine, to: &mut AppEngine) -> usize {
+    let mut routed = 0;
+    for cmd in from.drain_pending_commands() {
+        if let vauchi_core::Command::BleWriteCharacteristic { uuid, data } = cmd {
+            routed += 1;
+            let ev =
+                to.forward_ble_hardware_event(&Event::BleCharacteristicNotified { uuid, data });
+            to.apply_ble_machine_event(ev);
+        }
+    }
+    routed
+}
+
+// @internal
+#[test]
+fn two_party_ble_exchange_persists_each_others_contact() {
+    let mut alice = engine_named("Alice");
+    let mut bob = engine_named("Bob");
+    let alice_token = token_of(&alice);
+    let bob_token = token_of(&bob);
+
+    // Each discovers the other → builds a session with the tiebreak role.
+    alice.start_ble_handshake_on_discovery(&bob_token);
+    bob.start_ble_handshake_on_discovery(&alice_token);
+    assert!(alice.ble_handshake_session_active());
+    assert!(bob.ble_handshake_session_active());
+
+    // Connect both; the initiator emits its KeyOffer on connect.
+    let ea = alice.forward_ble_hardware_event(&Event::BleConnected {
+        device_id: "bob".into(),
+    });
+    alice.apply_ble_machine_event(ea);
+    let eb = bob.forward_ble_hardware_event(&Event::BleConnected {
+        device_id: "alice".into(),
+    });
+    bob.apply_ble_machine_event(eb);
+
+    // Pump writes back and forth until the exchange settles.
+    for _ in 0..50 {
+        let a = pump(&mut alice, &mut bob);
+        let b = pump(&mut bob, &mut alice);
+        if a + b == 0 {
+            break;
+        }
+    }
+
+    let alice_contacts = alice.vauchi().list_contacts().expect("list");
+    let bob_contacts = bob.vauchi().list_contacts().expect("list");
+    assert_eq!(alice_contacts.len(), 1, "Alice should have exactly Bob");
+    assert_eq!(alice_contacts[0].display_name(), "Bob");
+    assert_eq!(bob_contacts.len(), 1, "Bob should have exactly Alice");
+    assert_eq!(bob_contacts[0].display_name(), "Alice");
+}

@@ -46,10 +46,11 @@ use super::{AppEngine, AppScreen};
 use crate::orchestrator::ble_handshake_machine::{
     BleHandshakeMachine, BleMachineEvent, BleMachinePhase, BleRole, decide_ble_role,
 };
+use vauchi_core::Contact;
 use vauchi_core::Event;
 use vauchi_core::contact_card::ContactCard;
-use vauchi_core::crypto::X3DHKeyPair;
-use vauchi_core::exchange::BleCardPayload;
+use vauchi_core::crypto::{DoubleRatchetState, X3DHKeyPair};
+use vauchi_core::exchange::{BleCardPayload, BleExchangeResult};
 
 /// Wraps the machine on `AppEngine`. Same shape as
 /// `multi_stage_exchange::MultiStageHolder`.
@@ -209,5 +210,91 @@ impl AppEngine {
         if was && !is {
             self.cancel_ble_handshake_session();
         }
+    }
+
+    /// Apply a [`BleMachineEvent`] returned by
+    /// [`Self::forward_ble_hardware_event`]. On `Completed`, persist the
+    /// decrypted peer card as an exchanged contact (with its Double
+    /// Ratchet) so it appears in the contact list and future encrypted
+    /// card updates from this peer decrypt. Returns `true` when a
+    /// contact was created. Other events are inert here — engine chrome
+    /// is driven separately.
+    pub fn apply_ble_machine_event(&mut self, event: BleMachineEvent) -> bool {
+        match event {
+            BleMachineEvent::Completed(result) => self.persist_ble_exchanged_contact(&result),
+            _ => false,
+        }
+    }
+
+    /// Persist a completed BLE exchange: build the peer `Contact` from
+    /// the decrypted `remote_card` + the handshake session key, store it,
+    /// and save the role-correct Double Ratchet (parity with the
+    /// multi-stage path — without it, future card updates from this peer
+    /// would silently fail to decrypt). Best-effort: a missing session
+    /// key / identity leaves the exchange complete on-screen but
+    /// uncreated rather than panicking on the completion path. Returns
+    /// `true` when the contact was added.
+    fn persist_ble_exchanged_contact(&mut self, result: &BleExchangeResult) -> bool {
+        // Clone the owned session key off the held machine under a short
+        // borrow so the `self.vauchi` persistence calls below don't fight
+        // the borrow.
+        let Some(shared_key) = self
+            .ble_handshake_session
+            .as_ref()
+            .and_then(|h| h.machine.session_key().cloned())
+        else {
+            log::warn!("BLE: completion without a session key — contact not created");
+            return false;
+        };
+        let Some(identity) = self.vauchi.identity() else {
+            return false;
+        };
+        let our_identity = *identity.signing_public_key();
+        let our_x3dh = identity.x3dh_keypair();
+        let their_identity = result.remote_card.identity_key;
+        let their_exchange_key = result.remote_card.exchange_key;
+        let now = self.vauchi.clock().unix_seconds();
+
+        // Ratchet role convention matches
+        // `ExchangeSession::build_exchange_ratchet`: the lexicographically
+        // smaller identity is the ratchet initiator. This coincides with
+        // the BLE connect tiebreak (the advertised token *is* the identity
+        // signing key), but is derived independently from the identities
+        // so the two stay correct even if the token source ever changes.
+        let is_initiator = our_identity < their_identity;
+        let ratchet = if is_initiator {
+            match DoubleRatchetState::initialize_initiator(&shared_key, their_exchange_key) {
+                Ok(r) => r,
+                Err(e) => {
+                    log::warn!("BLE: ratchet init (initiator) failed: {e:?}");
+                    return false;
+                }
+            }
+        } else {
+            DoubleRatchetState::initialize_responder(&shared_key, our_x3dh)
+        };
+
+        let card = result.remote_card.to_contact_card(now);
+        let contact = Contact::from_exchange_full(
+            their_identity,
+            card,
+            shared_key,
+            vauchi_core::types::ProximityConfidence::Unknown,
+            vauchi_core::types::ExchangeTransport::Ble,
+            now,
+        );
+        let contact_id = contact.id().to_string();
+        if self.vauchi.add_contact(contact).is_err() {
+            log::warn!("BLE: failed to add exchanged contact");
+            return false;
+        }
+        if self
+            .vauchi
+            .save_exchange_ratchet(&contact_id, &ratchet, is_initiator)
+            .is_err()
+        {
+            log::warn!("BLE: failed to persist exchange ratchet for {contact_id}");
+        }
+        true
     }
 }

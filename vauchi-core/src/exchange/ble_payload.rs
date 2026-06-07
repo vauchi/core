@@ -12,6 +12,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::contact_card::{ContactCard, ContactField, FieldType};
+
 /// Full contact card payload exchanged during BLE proximity exchange.
 ///
 /// Serialized with `postcard`, then encrypted with XChaCha20-Poly1305.
@@ -75,6 +77,35 @@ impl BleCardPayload {
         postcard::from_bytes(bytes)
     }
 
+    /// Reconstruct a [`ContactCard`] from this received payload, for
+    /// persisting the peer as an exchanged contact. The BLE wire format
+    /// carries only `(label, value)` field tuples — the original
+    /// [`FieldType`] is not transported — so every reconstructed field
+    /// defaults to [`FieldType::Custom`]. A well-behaved peer sends a
+    /// WebP ≤ 32 KB avatar (ADR-042 enforces this on the sender's own
+    /// card); an avatar that fails that constraint is silently skipped
+    /// (best-effort — `vauchi-core` has no logger, and a missing avatar
+    /// must not fail the whole exchange).
+    pub fn to_contact_card(&self, now: u64) -> ContactCard {
+        let mut card = ContactCard::new(&self.display_name);
+        for (label, value) in &self.fields {
+            // `add_field` only errors on the per-card field cap; a peer
+            // that sent more is truncated rather than failing the whole
+            // exchange.
+            if card
+                .add_field(ContactField::new(FieldType::Custom, label, value, now))
+                .is_err()
+            {
+                break;
+            }
+        }
+        if let Some(avatar) = &self.avatar {
+            // Best-effort per the doc above; an invalid avatar is skipped.
+            let _ = card.set_avatar(avatar.clone());
+        }
+        card
+    }
+
     /// CRC16/CCITT-FALSE over concatenated fields.
     fn compute_crc16(
         identity_key: &[u8; 32],
@@ -120,5 +151,47 @@ impl BleCardPayload {
         }
 
         crc
+    }
+}
+
+// INLINE_TEST_REQUIRED: exercises the wire-payload → ContactCard
+// reconstruction (field-type defaulting) without a storage round-trip.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // @internal
+    #[test]
+    fn to_contact_card_carries_name_and_fields_defaulting_type_to_custom() {
+        let payload = BleCardPayload::new(
+            [7u8; 32],
+            "Dana".into(),
+            [8u8; 32],
+            vec![
+                ("Email".into(), "dana@example.com".into()),
+                ("Phone".into(), "555".into()),
+            ],
+            None,
+        );
+        let card = payload.to_contact_card(1_000);
+
+        assert_eq!(card.display_name(), "Dana");
+        let fields: Vec<(&str, &str)> = card
+            .fields()
+            .iter()
+            .map(|f| (f.label(), f.value()))
+            .collect();
+        assert_eq!(
+            fields,
+            vec![("Email", "dana@example.com"), ("Phone", "555")]
+        );
+        // The BLE wire format drops the original FieldType, so every
+        // reconstructed field defaults to Custom.
+        assert!(
+            card.fields()
+                .iter()
+                .all(|f| matches!(f.field_type(), FieldType::Custom)),
+            "reconstructed fields must default to FieldType::Custom",
+        );
     }
 }

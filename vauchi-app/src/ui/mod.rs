@@ -63,6 +63,7 @@ mod social_graph;
 mod support;
 #[cfg(feature = "network-rustls")]
 mod sync_status;
+mod tags_list;
 #[cfg(any(test, feature = "test-support"))]
 pub mod testing;
 pub use action::{ActionResult, ContactActionKind, PostOnboardingDestination, UserAction};
@@ -157,6 +158,7 @@ pub use social_graph::{SocialContactEntry, SocialGraphEngine, SocialTrustLevel};
 pub use support::SupportEngine;
 #[cfg(feature = "network-rustls")]
 pub use sync_status::SyncStatusEngine;
+pub use tags_list::{TagSummary, TagsEngine};
 
 /// Map a [`VauchiEvent`] to the screen IDs it invalidates.
 ///

@@ -56,3 +56,4 @@ mod settings;
 mod social_graph;
 mod support;
 mod sync_status;
+mod tags;

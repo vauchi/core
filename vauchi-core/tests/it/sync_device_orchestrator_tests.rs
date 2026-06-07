@@ -189,6 +189,41 @@ fn test_orchestrator_apply_full_sync() {
     assert_eq!(contacts[0].display_name(), "Bob");
 }
 
+// @scenario: contact-annotations.feature - Tags sync to my other linked devices
+// @internal
+#[test]
+fn test_orchestrator_syncs_tags_round_trip() {
+    let master_seed = [0x42u8; 32];
+
+    // Device A: a tag applied to a contact.
+    let storage_a = create_test_storage();
+    let device_a = create_test_device(&master_seed, 0, "Device A");
+    let registry_a = create_test_registry(&master_seed, &device_a);
+    let contact = create_test_contact("Bob");
+    storage_a.save_contact(&contact).unwrap();
+    let tag = storage_a.create_tag("berlin-trip").unwrap();
+    storage_a.add_to_tag(&tag.id, contact.id()).unwrap();
+
+    let orchestrator_a = DeviceSyncOrchestrator::new(&storage_a, device_a, registry_a);
+    let payload = orchestrator_a.create_full_sync_payload().unwrap();
+    assert_eq!(payload.tags.len(), 1, "tag included in sync payload");
+
+    // Device B: fresh storage receives the payload.
+    let storage_b = create_test_storage();
+    let device_b = create_test_device(&master_seed, 1, "Device B");
+    let registry_b = create_test_registry(&master_seed, &device_b);
+    let mut orchestrator_b = DeviceSyncOrchestrator::new(&storage_b, device_b, registry_b);
+    orchestrator_b.apply_full_sync(payload).unwrap();
+
+    // Device B has the same tag — same id, name, and membership.
+    let synced = storage_b
+        .get_tag(&tag.id)
+        .unwrap()
+        .expect("tag synced with its original id");
+    assert_eq!(synced.name, "berlin-trip");
+    assert!(synced.contains(contact.id()), "membership synced");
+}
+
 /// Test marking items as synced clears pending queue
 // @scenario: device_management :: Changes sync between devices
 #[test]

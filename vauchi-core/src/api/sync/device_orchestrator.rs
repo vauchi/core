@@ -14,7 +14,8 @@ use crate::crypto::{HKDF, SymmetricKey, encryption};
 use crate::identity::device::{DeviceInfo, DeviceRegistry};
 use crate::storage::Storage;
 use crate::sync::device_sync::{
-    DeviceSyncError, DeviceSyncPayload, FieldStamp, InterDeviceSyncState, SyncItem, VersionVector,
+    DeviceSyncError, DeviceSyncPayload, FieldStamp, InterDeviceSyncState, SyncItem, TagSyncData,
+    VersionVector,
 };
 
 /// Domain separation for device-to-device encryption key derivation.
@@ -210,10 +211,19 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
             .unwrap_or_else(|| ContactCard::new(""));
 
+        // Load owner-private tags (ADR-051)
+        let tags: Vec<TagSyncData> = self
+            .storage
+            .list_tags()
+            .map_err(|e| DeviceSyncError::Deserialization(e.to_string()))?
+            .iter()
+            .map(TagSyncData::from_tag)
+            .collect();
+
         // Get current version
         let version = self.version_vector.get(self.current_device.device_id());
 
-        Ok(DeviceSyncPayload::new(&contacts, &own_card, version))
+        Ok(DeviceSyncPayload::new(&contacts, &own_card, version).with_tags(tags))
     }
 
     /// Applies a full sync payload received during device linking.
@@ -248,6 +258,13 @@ impl<'a> DeviceSyncOrchestrator<'a> {
                 let contact = imported_data.to_contact()?;
                 self.storage
                     .save_contact(&contact)
+                    .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
+            }
+
+            // Restore owner-private tags (ADR-051), preserving their ids.
+            for tag_data in &payload.tags {
+                self.storage
+                    .save_tag(&tag_data.to_tag())
                     .map_err(|e| DeviceSyncError::Serialization(e.to_string()))?;
             }
 

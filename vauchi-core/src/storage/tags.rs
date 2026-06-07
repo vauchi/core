@@ -38,6 +38,28 @@ impl Storage {
         Ok(tag)
     }
 
+    /// Inserts or replaces a tag with a caller-supplied id, preserving its
+    /// `contact_ids` and `created_at`. Used by device sync to restore tags with
+    /// their original ids (unlike [`Storage::create_tag`], which generates a new
+    /// id). The name is encrypted at rest.
+    pub fn save_tag(&self, tag: &Tag) -> Result<(), StorageError> {
+        let name_encrypted = crate::crypto::encrypt(&self.encryption_key, tag.name.as_bytes())
+            .map_err(|e| StorageError::Encryption(format!("Encrypt tag name: {e}")))?;
+        let mut ids: Vec<String> = tag.contact_ids.iter().cloned().collect();
+        ids.sort();
+        let contact_ids_json =
+            serde_json::to_string(&ids).map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        self.conn
+            .execute(
+                "INSERT OR REPLACE INTO tags (id, name_encrypted, contact_ids_json, created_at)
+                 VALUES (?1, ?2, ?3, ?4)",
+                rusqlite::params![tag.id, name_encrypted, contact_ids_json, tag.created_at],
+            )
+            .map_err(StorageError::from)?;
+        Ok(())
+    }
+
     /// Returns the tag with the given ID, or `None` if not found.
     pub fn get_tag(&self, id: &str) -> Result<Option<Tag>, StorageError> {
         let result = self.conn.query_row(

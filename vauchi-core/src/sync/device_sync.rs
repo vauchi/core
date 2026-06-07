@@ -183,6 +183,47 @@ impl ImportedContactSyncData {
     }
 }
 
+/// Serializable form of an owner-private `Tag` for device sync (ADR-051).
+///
+/// Tags are owner-private and never leave the owner's devices; the device-sync
+/// payload itself is encrypted device-to-device, so the name travels in
+/// plaintext inside that envelope (like `card_json`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TagSyncData {
+    /// Stable tag id (preserved across devices).
+    pub id: String,
+    /// Tag name.
+    pub name: String,
+    /// Contact ids carrying this tag.
+    pub contact_ids: Vec<String>,
+    /// Creation timestamp.
+    pub created_at: u64,
+}
+
+impl TagSyncData {
+    /// Builds sync data from a tag.
+    pub fn from_tag(tag: &crate::contact::Tag) -> Self {
+        let mut contact_ids: Vec<String> = tag.contact_ids.iter().cloned().collect();
+        contact_ids.sort();
+        TagSyncData {
+            id: tag.id.clone(),
+            name: tag.name.clone(),
+            contact_ids,
+            created_at: tag.created_at,
+        }
+    }
+
+    /// Reconstructs a tag from sync data.
+    pub fn to_tag(&self) -> crate::contact::Tag {
+        crate::contact::Tag {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            contact_ids: self.contact_ids.iter().cloned().collect(),
+            created_at: self.created_at,
+        }
+    }
+}
+
 /// Payload for syncing all contacts during device linking.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceSyncPayload {
@@ -193,6 +234,10 @@ pub struct DeviceSyncPayload {
     pub imported_contacts: Vec<ImportedContactSyncData>,
     /// User's own contact card.
     pub own_card_json: String,
+    /// Owner-private tags (ADR-051). `#[serde(default)]` for back-compat with
+    /// payloads from older devices that predate tags.
+    #[serde(default)]
+    pub tags: Vec<TagSyncData>,
     /// Version number for conflict resolution.
     pub version: u64,
 }
@@ -204,6 +249,7 @@ impl DeviceSyncPayload {
             contacts: Vec::new(),
             imported_contacts: Vec::new(),
             own_card_json: String::new(),
+            tags: Vec::new(),
             version: 0,
         }
     }
@@ -230,8 +276,16 @@ impl DeviceSyncPayload {
             contacts: exchanged,
             imported_contacts: imported,
             own_card_json,
+            tags: Vec::new(),
             version,
         }
+    }
+
+    /// Attaches owner-private tags to this payload (builder style).
+    #[must_use]
+    pub fn with_tags(mut self, tags: Vec<TagSyncData>) -> Self {
+        self.tags = tags;
+        self
     }
 
     /// Serializes the payload to JSON.

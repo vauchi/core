@@ -12,6 +12,7 @@ pub mod kind;
 pub mod labels;
 pub mod local_group;
 pub mod merge;
+pub mod place;
 pub mod statistics;
 pub mod tag;
 pub mod trust;

@@ -94,6 +94,11 @@ pub mod tags;
 mod tags;
 
 #[cfg(feature = "testing")]
+pub mod places;
+#[cfg(not(feature = "testing"))]
+mod places;
+
+#[cfg(feature = "testing")]
 pub mod ux;
 #[cfg(not(feature = "testing"))]
 mod ux;

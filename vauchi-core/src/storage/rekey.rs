@@ -109,6 +109,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("sync_field_timestamps", "timestamps_json_encrypted"),
     // V49 owner-private contact tags (ADR-051)
     ("tags", "name_encrypted"),
+    // V50 owner-private named places (ADR-051)
+    ("places", "data_encrypted"),
 ];
 
 /// Encrypted columns intentionally skipped by rekey, with documented reason.
@@ -291,6 +293,9 @@ impl Storage {
             self.rekey_tags(old_key, &new_key)?;
             report(&mut completed, "tags");
 
+            self.rekey_places(old_key, &new_key)?;
+            report(&mut completed, "places");
+
             Ok(())
         })();
 
@@ -461,6 +466,34 @@ impl Storage {
                     params![new_enc, id],
                 )
                 .map_err(|e| StorageError::Migration(format!("Update tag {}: {}", id, e)))?;
+        }
+        Ok(())
+    }
+
+    /// Re-encrypt places: data_encrypted (named-place vocabulary, ADR-051)
+    fn rekey_places(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, data_encrypted FROM places")
+            .map_err(|e| StorageError::Migration(format!("Read places: {}", e)))?;
+        let rows: Vec<(String, Vec<u8>)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| StorageError::Migration(format!("Query places: {}", e)))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| StorageError::Migration(format!("Collect places: {}", e)))?;
+        for (id, enc) in &rows {
+            let new_enc = rekey_or_heal(new_key, old_key, enc)
+                .map_err(|e| StorageError::Migration(format!("Rekey place {}: {}", id, e)))?;
+            self.conn
+                .execute(
+                    "UPDATE places SET data_encrypted = ?1 WHERE id = ?2",
+                    params![new_enc, id],
+                )
+                .map_err(|e| StorageError::Migration(format!("Update place {}: {}", id, e)))?;
         }
         Ok(())
     }

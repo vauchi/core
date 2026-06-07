@@ -511,6 +511,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "contact_tags",
             action: MigrationAction::Sql(MIGRATION_V49_TAGS),
         },
+        Migration {
+            version: 50,
+            name: "named_places",
+            action: MigrationAction::Sql(MIGRATION_V50_PLACES),
+        },
     ]
 }
 
@@ -842,6 +847,18 @@ const MIGRATION_V49_TAGS: &str = "
         id TEXT PRIMARY KEY,
         name_encrypted BLOB NOT NULL,
         contact_ids_json TEXT NOT NULL DEFAULT '[]',
+        created_at INTEGER NOT NULL
+    );
+";
+
+/// Migration v50: Named places — owner-private `(name → coords)` vocabulary
+/// for the exchange-place annotation (ADR-051). Name AND coordinates are
+/// owner-private, so the whole `PlaceData` payload is stored **encrypted**
+/// (`data_encrypted` BLOB); `id`/`created_at` are clear for keying/ordering.
+const MIGRATION_V50_PLACES: &str = "
+    CREATE TABLE IF NOT EXISTS places (
+        id TEXT PRIMARY KEY,
+        data_encrypted BLOB NOT NULL,
         created_at INTEGER NOT NULL
     );
 ";

@@ -191,7 +191,9 @@ vauchi-core/src/recovery/mod.rs 1253
 # (+21 2026-06-07: migration v49 `tags` table — owner-private Tag
 #  vocabulary, encrypted name. Migration ledger is a structural exemption
 #  (version history co-located). Problem 2026-06-07-contact-annotations.)
-vauchi-core/src/storage/migration.rs 1899
+# (+17 2026-06-07: migration v50 named-places table — contact-annotations
+#  T2.3; migration ledger structural exemption)
+vauchi-core/src/storage/migration.rs 1916
 
 # EXEMPT — rekey ledger: all encrypted columns must be co-located for correctness (audit C1)
 # (+4 for #[allow(clippy::let_underscore_must_use)] attr + comment on
@@ -206,7 +208,9 @@ vauchi-core/src/storage/migration.rs 1899
 #  tags.name_encrypted column. Co-located per the EXEMPT rationale —
 #  all encrypted columns rekeyed together. Problem
 #  2026-06-07-contact-annotations.)
-vauchi-core/src/storage/rekey.rs 1651
+# (+33 2026-06-07: rekey_places + ENCRYPTED_COLUMNS entry for
+#  places.data_encrypted — contact-annotations T2.3; co-located EXEMPT)
+vauchi-core/src/storage/rekey.rs 1684
 
 # SPLIT — Phase 3: extract connection management
 vauchi-core/src/storage/mod.rs 1079

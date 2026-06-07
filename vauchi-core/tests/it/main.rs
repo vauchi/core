@@ -316,6 +316,7 @@ mod performance_threshold_tests;
 mod phase3_engine_proptest;
 mod pin_cache_tests;
 mod pin_config_verification_tests;
+mod place_tests;
 mod pre_signed_operations_tests;
 mod preview_as_proptest;
 mod propagation_sync_item_variant_tests;

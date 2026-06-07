@@ -40,23 +40,21 @@ fn glance_full_flow_mode_to_multistage_handoff() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Step 1: Mode selection screen
-    let screen = engine.current_screen();
-    assert_eq!(screen.screen_id, "exchange_mode_selection");
-
-    // Step 2: Select Glance mode
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:quick".to_string(),
-        item_id: "mode:glance".to_string(),
-    });
-
-    // Step 3: Group selection (groups exist in config)
+    // Step 1: G4 group-first — starts on group selection.
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_group_selection");
 
-    // Step 4: Continue with groups → Field preview
+    // Step 2: Continue with groups → mode selection.
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".to_string(),
+    });
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "exchange_mode_selection");
+
+    // Step 3: Select Glance → field preview (continued with groups).
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "category:quick".to_string(),
+        item_id: "mode:glance".to_string(),
     });
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_field_preview");
@@ -105,15 +103,15 @@ fn tap_hover_shake_mode_pick_hands_off_to_multi_stage() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Select TapHoverShake
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:fun".to_string(),
-        item_id: "mode:tap_hover_shake".to_string(),
+    // G4 group-first: skip groups → mode selection.
+    let _ = engine.handle_action(UserAction::ActionPressed {
+        action_id: "skip".to_string(),
     });
 
-    // Skip groups -> multi-stage handoff
-    let result = engine.handle_action(UserAction::ActionPressed {
-        action_id: "skip".to_string(),
+    // Select TapHoverShake → multi-stage handoff (no groups → no preview).
+    let result = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "category:fun".to_string(),
+        item_id: "mode:tap_hover_shake".to_string(),
     });
     assert!(
         matches!(
@@ -148,19 +146,21 @@ fn link_full_flow_mode_to_field_preview_hands_off() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Select Link mode
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:remote".to_string(),
-        item_id: "mode:link".to_string(),
-    });
-
-    // Group selection
+    // G4 group-first: starts on group selection.
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_group_selection");
 
-    // Continue → Field preview
+    // Continue → mode selection.
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".to_string(),
+    });
+    let screen = engine.current_screen();
+    assert_eq!(screen.screen_id, "exchange_mode_selection");
+
+    // Select Link → field preview (continued with groups).
+    let _ = engine.handle_action(UserAction::ListItemSelected {
+        component_id: "category:remote".to_string(),
+        item_id: "mode:link".to_string(),
     });
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "exchange_field_preview");

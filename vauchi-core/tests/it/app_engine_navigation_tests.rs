@@ -236,21 +236,10 @@ fn navigate_away_and_back_preserves_engine_state() {
     vauchi.create_group("Family").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate to Exchange — starts on mode selection (canonical root id)
+    // Navigate to Exchange — G4 group-first: with a group present the
+    // engine starts directly on the in-engine group-selection sub-step.
     let first_visit = engine.navigate_to(AppScreen::Exchange);
-    assert_eq!(first_visit.screen_id, "exchange");
-
-    // Pick any mode — with a group present the engine advances to the
-    // in-engine group-selection sub-step (before any sub-flow handoff).
-    let _ = engine.handle_action(UserAction::ListItemSelected {
-        component_id: "category:fun".into(),
-        item_id: "mode:tap_tap".into(),
-    });
-    let sub_screen = engine.current_screen();
-    assert_eq!(
-        sub_screen.screen_id, "exchange_group_selection",
-        "after picking a mode with groups, should be at the in-engine group step"
-    );
+    assert_eq!(first_visit.screen_id, "exchange_group_selection");
 
     // Navigate away to Home — the Exchange engine should be cached at the
     // group-selection sub-step.
@@ -258,11 +247,11 @@ fn navigate_away_and_back_preserves_engine_state() {
     assert_eq!(home.screen_id, "my_info");
 
     // Navigate back to Exchange — should restore the cached engine on its
-    // sub-step, NOT reset to mode selection.
+    // sub-step, NOT reset.
     let restored = engine.navigate_to(AppScreen::Exchange);
     assert_eq!(
         restored.screen_id, "exchange_group_selection",
-        "cached engine should preserve internal state (group step, not mode selection)"
+        "cached engine should preserve internal state (group step)"
     );
 }
 

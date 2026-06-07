@@ -300,6 +300,15 @@ impl AppEngine {
             log::warn!("BLE: failed to add exchanged contact");
             return false;
         }
+        // G4: file the new contact into the groups chosen in the exchange
+        // preamble (best-effort — a group failure doesn't undo the
+        // exchange). Same `pending_exchange_groups` carry the multi-stage
+        // path uses; populated by `start_exchange_to` on mode dispatch.
+        let pending_groups = std::mem::take(&mut self.pending_exchange_groups);
+        for group_id in &pending_groups {
+            // Best-effort; bind (not `let _`) to satisfy the must-use lint.
+            let _added = self.vauchi.add_contact_to_group(group_id, &contact_id);
+        }
         if self
             .vauchi
             .save_exchange_ratchet(&contact_id, &ratchet, is_initiator)

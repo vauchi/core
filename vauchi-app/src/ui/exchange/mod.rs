@@ -76,6 +76,10 @@ pub struct ExchangeEngine {
     scanned_data: Option<String>,
     /// Groups selected by the user before exchange.
     selected_groups: Vec<String>,
+    /// G4: whether to show the field preview after mode selection —
+    /// set by the group step (`continue` = yes, `skip` = no), read
+    /// after mode is chosen (group-first ordering).
+    show_preview_after_mode: bool,
     /// ADR-031: Protocol session for hardware command/event exchange.
     session: Option<ExchangeSession>,
     /// User-friendly error detail shown on the Failed screen (T1-2).
@@ -141,9 +145,9 @@ impl ExchangeEngine {
     /// If mode is pre-set, skip mode selection (backward compat / tests).
     /// Otherwise start at ModeSelection.
     fn initial_step(config: &ExchangeConfig) -> ExchangeStep {
-        if config.mode.is_none() {
-            return ExchangeStep::ModeSelection;
-        }
+        // G4 (group-first): when groups exist the exchange begins with group
+        // selection, then mode (a shared ritual chosen together). No groups →
+        // straight to mode selection.
         if config.available_groups.is_empty() {
             ExchangeStep::ModeSelection
         } else {
@@ -164,6 +168,7 @@ impl ExchangeEngine {
             config,
             scanned_data: None,
             selected_groups: Vec::new(),
+            show_preview_after_mode: false,
             session: None,
             failure_detail: None,
             ble_fallback_available: false,
@@ -207,6 +212,7 @@ impl ExchangeEngine {
             config,
             scanned_data: None,
             selected_groups: Vec::new(),
+            show_preview_after_mode: false,
             session: Some(session),
             failure_detail: None,
             ble_fallback_available: false,
@@ -811,13 +817,16 @@ impl WorkflowEngine for ExchangeEngine {
                         // Record the selection step so a BACK press from
                         // the sub-flow rewinds here (see navigate_back_within).
                         self.step_history.push(ExchangeStep::ModeSelection);
-                        // Advance to group selection or, when the card has
-                        // no groups, straight to the mode-specific sub-flow.
-                        if self.config.available_groups.is_empty() {
-                            return self.enter_mode_sub_flow();
+                        // G4 (group-first): group selection already happened
+                        // before mode. Show the field preview if the user chose
+                        // "continue" at the group step (even with no groups
+                        // toggled); "skip" goes straight to the sub-flow.
+                        if self.show_preview_after_mode {
+                            self.field_preview = Some(self.build_field_preview_config());
+                            self.step = ExchangeStep::FieldPreview;
+                            return ActionResult::NavigateTo(self.build_screen());
                         }
-                        self.step = ExchangeStep::GroupSelection;
-                        return ActionResult::NavigateTo(self.build_screen());
+                        return self.enter_mode_sub_flow();
                     }
                     ModeSelectionResult::Screen(screen) => {
                         return ActionResult::UpdateScreen(*screen);
@@ -847,19 +856,31 @@ impl WorkflowEngine for ExchangeEngine {
             (ExchangeStep::GroupSelection, UserAction::ActionPressed { action_id })
                 if action_id == "continue" || action_id == "skip" =>
             {
-                // Record the group step so BACK from field-preview / sub-flow
+                // Record the group step so BACK from mode / preview / sub-flow
                 // rewinds here (see navigate_back_within).
                 self.step_history.push(ExchangeStep::GroupSelection);
+                // "continue" shows the field preview after mode; "skip" clears
+                // the chosen groups and skips the preview.
+                self.show_preview_after_mode = action_id == "continue";
                 if action_id == "skip" {
                     self.selected_groups.clear();
-                    // Skip → straight to the mode-specific sub-flow (no
-                    // preview needed), via the shared router so grouped
-                    // TapTap/Glance/Hover keep their NFC/multi-stage screens.
+                }
+                // G4 (group-first): mode selection comes after groups. When the
+                // mode was pre-set (deep link / tests) there is no picker — go
+                // straight to the field preview (continue) or the sub-flow
+                // (skip); otherwise show the mode picker.
+                if self.config.mode.is_some() {
+                    if self.show_preview_after_mode {
+                        self.field_preview = Some(self.build_field_preview_config());
+                        self.step = ExchangeStep::FieldPreview;
+                        return ActionResult::NavigateTo(self.build_screen());
+                    }
                     return self.enter_mode_sub_flow();
                 }
-                // Continue with groups → show field preview
-                self.field_preview = Some(self.build_field_preview_config());
-                self.step = ExchangeStep::FieldPreview;
+                self.mode_selection = Some(ModeSelectionEngine::new(
+                    self.config.device_capabilities.clone(),
+                ));
+                self.step = ExchangeStep::ModeSelection;
                 ActionResult::NavigateTo(self.build_screen())
             }
             // Field preview actions
@@ -1518,18 +1539,18 @@ mod tests {
     }
 
     #[test]
-    fn mode_selection_pick_with_groups_goes_to_group_selection() {
+    fn group_selection_precedes_mode_when_groups_exist() {
+        // G4 (group-first): with groups present, the exchange begins at
+        // GroupSelection; continue/skip then advances to mode selection.
         let mut config = config_mode_selection();
         config.available_groups = vec![("g1".into(), "Work".into())];
         let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
-        assert_eq!(engine.step, ExchangeStep::ModeSelection);
-
-        let _ = engine.handle_action(UserAction::ListItemSelected {
-            component_id: "category:quick".into(),
-            item_id: "mode:glance".into(),
-        });
-
         assert_eq!(engine.step, ExchangeStep::GroupSelection);
+
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "skip".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
     }
 
     // Fix C of `2026-06-02-exchange-back-cancel-broken`: BACK/Cancel on
@@ -1712,16 +1733,22 @@ mod tests {
         config.available_groups = vec![("g1".into(), "Work".into())];
         let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
 
-        // Mode selection → GroupSelection
+        // Group-first: the exchange begins at GroupSelection.
+        assert_eq!(engine.step, ExchangeStep::GroupSelection);
+        // Choose a group, then continue → ModeSelection.
+        let _ = engine.handle_action(UserAction::ItemToggled {
+            component_id: "group_picker".into(),
+            item_id: "g1".into(),
+        });
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "continue".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
+
+        // Pick a mode → FieldPreview (groups were chosen).
         let _ = engine.handle_action(UserAction::ListItemSelected {
             component_id: "category:quick".into(),
             item_id: "mode:glance".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::GroupSelection);
-
-        // Continue → FieldPreview
-        let _ = engine.handle_action(UserAction::ActionPressed {
-            action_id: "continue".into(),
         });
         assert_eq!(engine.step, ExchangeStep::FieldPreview);
 
@@ -1780,6 +1807,12 @@ mod tests {
         );
         assert_eq!(engine.step, ExchangeStep::GroupSelection);
 
+        // Choose a group so the continue path shows the field preview (mode is
+        // pre-set, so there is no mode-selection step).
+        let _ = engine.handle_action(UserAction::ItemToggled {
+            component_id: "group_picker".into(),
+            item_id: "g1".into(),
+        });
         // Continue → FieldPreview
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "continue".into(),
@@ -1845,14 +1878,17 @@ mod tests {
         config.available_groups = vec![("g1".into(), "Work".into())];
         let mut engine = ExchangeEngine::new(config, vauchi_core::clock::SystemClock::shared());
 
-        let _ = engine.handle_action(UserAction::ListItemSelected {
+        // Group-first: begins at GroupSelection. Skip groups → ModeSelection.
+        assert_eq!(engine.step, ExchangeStep::GroupSelection);
+        let _ = engine.handle_action(UserAction::ActionPressed {
+            action_id: "skip".into(),
+        });
+        assert_eq!(engine.step, ExchangeStep::ModeSelection);
+
+        // Pick Glance → hand off to multi-stage (no groups selected).
+        let result = engine.handle_action(UserAction::ListItemSelected {
             component_id: "category:quick".into(),
             item_id: "mode:glance".into(),
-        });
-        assert_eq!(engine.step, ExchangeStep::GroupSelection);
-
-        let result = engine.handle_action(UserAction::ActionPressed {
-            action_id: "skip".into(),
         });
         assert!(
             matches!(

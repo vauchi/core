@@ -29,6 +29,7 @@ mod receive_routing;
 #[cfg(feature = "network-http")]
 mod recovery;
 mod recovery_offline;
+mod search;
 mod security;
 mod setup;
 #[cfg(feature = "network-http")]
@@ -46,6 +47,7 @@ pub use import::{ImportResult, ImportWarning};
 #[allow(unused_imports)]
 // re-exported for integration tests; lint can't see external consumers
 pub use receive_routing::{BlobOutcome, process_received_blobs};
+pub use search::SearchFacets;
 pub use security::BIOMETRIC_UNLOCK_MIN_DURATION;
 pub use setup::SetupProgress;
 #[cfg(feature = "network-http")]

@@ -125,21 +125,15 @@ impl AppEngine {
     }
 
     /// Capture pending text/toggle input that later steps consume
-    /// (onboarding display name, backup password + level). These guards
-    /// *fall through* — they mutate pending state, they never resolve the
-    /// action — so this returns `()` rather than an `ActionResult`.
+    /// (backup password + level). These guards *fall through* — they mutate
+    /// pending state, they never resolve the action — so this returns `()`
+    /// rather than an `ActionResult`.
+    ///
+    /// Onboarding display-name capture used to live here too; it was removed
+    /// once `complete_onboarding` started reading the name straight off the
+    /// still-live `OnboardingEngine`
+    /// (#2026-06-07-app-engine-dispatch-tier-consolidation, Phase 1).
     pub(super) fn capture_pending_input(&mut self, action: &UserAction) {
-        // Capture display name during onboarding for identity persistence
-        if self.screen == AppScreen::Onboarding
-            && let UserAction::TextChanged {
-                component_id,
-                value,
-            } = action
-            && component_id == "display_name"
-        {
-            self.pending_display_name = Some(value.clone());
-        }
-
         // Capture backup password and level toggle during backup flow
         if self.screen == AppScreen::Backup {
             match action {

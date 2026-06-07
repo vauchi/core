@@ -18,21 +18,24 @@ use vauchi_core::contact_card::FieldType;
 impl AppEngine {
     /// Onboarding complete: create identity + persist onboarding groups/fields.
     pub(super) fn complete_onboarding(&mut self) -> ActionResult {
-        let name = match self.pending_display_name.take() {
-            Some(n) if !n.trim().is_empty() => n,
-            _ => {
-                return ActionResult::ValidationError {
-                    component_id: "display_name".into(),
-                    message: "Please enter a display name".into(),
-                };
-            }
-        };
-        // Extract data from the active onboarding engine before identity
-        // creation (engine will be discarded after navigating away).
+        // All onboarding input lives on the engine — it captures the display
+        // name, group selection, and ContactInfo fields as the user advances
+        // (and is still alive at completion time). Read everything from it
+        // here rather than from a duplicated AppEngine-level `pending_*` field
+        // (#2026-06-07-app-engine-dispatch-tier-consolidation, Phase 1).
         let onboarding_engine = self
             .engine
             .as_any()
             .and_then(|a| a.downcast_ref::<crate::ui::onboarding::OnboardingEngine>());
+        let name = onboarding_engine
+            .map(|ob| ob.onboarding_data().display_name.clone())
+            .unwrap_or_default();
+        if name.trim().is_empty() {
+            return ActionResult::ValidationError {
+                component_id: "display_name".into(),
+                message: "Please enter a display name".into(),
+            };
+        }
         let onboarding_groups: Vec<String> = onboarding_engine
             .map(|ob| {
                 ob.onboarding_data()

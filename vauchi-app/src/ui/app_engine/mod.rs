@@ -403,8 +403,6 @@ pub struct AppEngine {
     screen: AppScreen,
     engine: Box<dyn WorkflowEngine>,
     engine_cache: HashMap<AppScreen, Box<dyn WorkflowEngine>>,
-    /// Captured from onboarding TextChanged events for identity persistence.
-    pending_display_name: Option<String>,
     /// Group ids chosen in the exchange group-selection preamble,
     /// carried across the ExchangeEngine->MultiStageExchange handoff so
     /// `persist_exchanged_contact` can assign the new contact + show the
@@ -616,7 +614,6 @@ impl AppEngine {
             screen,
             engine,
             engine_cache: HashMap::new(),
-            pending_display_name: None,
             pending_exchange_groups: Vec::new(),
             pending_backup_password: None,
             pending_backup_full: true,

@@ -28,6 +28,11 @@ content-updates = ["vauchi-app/content-updates", "tokio"]
 diagnostic-scanner = ["vauchi-core/diagnostic-scanner"]
 # YOLO-based QR detector (adds ort ONNX runtime)
 diagnostic-yolo = ["diagnostic-scanner", "vauchi-core/diagnostic-yolo"]
+# Weakens Argon2id KDF params for fast test execution (forwards to
+# vauchi-core/test-kdf). Test-only — vauchi-core's compile_error guard
+# forbids it in release builds. Required so the Argon2-heavy duress/auth
+# platform tests don't hit nextest's 180s slow-timeout; mirrors test:core.
+test-kdf = ["vauchi-core/test-kdf"]
 
 [dependencies]
 # Core Vauchi library (with rustls for Android/iOS - no OpenSSL dependency)

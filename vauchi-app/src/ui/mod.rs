@@ -18,6 +18,7 @@ mod backup_recovery;
 mod change_password;
 mod component;
 mod contact_detail;
+mod contact_detail_rules;
 mod contact_edit;
 mod contact_limit;
 mod contact_list;
@@ -79,10 +80,11 @@ pub use component::{
     UiFieldVisibility, VisibilityMode,
 };
 pub use contact_detail::{
-    ContactDetailEngine, ContactNotFoundEngine, ContactViewMode, DeliverySummary,
-    ReciprocityBannerKind, SharedInfoView, footer_action_id as contact_detail_footer_action_id,
-    reciprocity_banner, show_recovery_trusted_indicator, show_verified_badge,
-    verify_button_visible,
+    ContactDetailEngine, ContactNotFoundEngine, ContactViewMode, DeliverySummary, SharedInfoView,
+};
+pub use contact_detail_rules::{
+    ReciprocityBannerKind, footer_action_id as contact_detail_footer_action_id, reciprocity_banner,
+    show_recovery_trusted_indicator, show_verified_badge, verify_button_visible,
 };
 pub use contact_edit::{ContactEditEngine, EditableContact, EditableField};
 pub use contact_limit::ContactLimitEngine;

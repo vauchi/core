@@ -10,6 +10,7 @@ use super::AppScreen;
 use crate::i18n::Locale;
 use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::contact_detail::ContactDetailEngine;
+use crate::ui::contact_detail_rules::ContactTag;
 use crate::ui::engine::WorkflowEngine;
 use crate::ui::form_dialog::FormDialogType;
 use crate::ui::info_content;
@@ -438,6 +439,80 @@ impl AppEngine {
             return Some(ActionResult::UpdateScreen(self.engine.current_screen()));
         }
         None
+    }
+
+    /// Intercept add-tag typing, tag commit, and tag removal on the
+    /// ContactDetail screen (ADR-051 contact annotations).
+    ///
+    /// - `TextChanged { "add_tag" }` → recompute autocomplete suggestions
+    ///   via `Vauchi::tag_name_suggestions` and stash them on the engine as
+    ///   transient state. No storage write and no `invalidate_screen`: the
+    ///   in-progress query must survive the re-render.
+    /// - `ActionPressed { "add_tag:<name>" }` → `add_tag_to_contact`
+    ///   (autocomplete-or-create; core dedups by name), then optimistically
+    ///   add the returned tag to the in-memory engine and clear the query.
+    /// - `ActionPressed { "remove_tag:<id>" }` → `remove_tag_from_contact`,
+    ///   then optimistically drop the row from the in-memory engine.
+    ///
+    /// Persistence-then-optimistic-render mirrors the hide/trust toggles:
+    /// `invalidate_screen` only clears the cache, it does not rebuild
+    /// `self.engine`, so a fresh tag row must be applied in memory. Storage
+    /// errors are swallowed (best-effort) — the in-memory edit is only
+    /// applied when the corresponding `Vauchi` call succeeded, so the engine
+    /// stays consistent with storage on the next genuine reload.
+    pub(super) fn intercept_tag_action(
+        &mut self,
+        contact_id: &str,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        match action {
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if component_id == "add_tag" => {
+                let suggestions = self.vauchi.tag_name_suggestions(value).unwrap_or_default();
+                self.engine
+                    .as_any_mut()
+                    .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
+                    .map(|engine| {
+                        engine.set_tag_query(value.clone(), suggestions);
+                        ActionResult::UpdateScreen(engine.current_screen())
+                    })
+            }
+            UserAction::ActionPressed { action_id } if action_id.starts_with("add_tag:") => {
+                let name = action_id.strip_prefix("add_tag:").unwrap_or_default();
+                let added = self.vauchi.add_tag_to_contact(contact_id, name).ok();
+                self.engine
+                    .as_any_mut()
+                    .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
+                    .map(|engine| {
+                        if let Some(tag) = added {
+                            engine.add_tag_row(ContactTag {
+                                id: tag.id,
+                                name: tag.name,
+                            });
+                        }
+                        ActionResult::UpdateScreen(engine.current_screen())
+                    })
+            }
+            UserAction::ActionPressed { action_id } if action_id.starts_with("remove_tag:") => {
+                let tag_id = action_id.strip_prefix("remove_tag:").unwrap_or_default();
+                let removed = self
+                    .vauchi
+                    .remove_tag_from_contact(tag_id, contact_id)
+                    .is_ok();
+                self.engine
+                    .as_any_mut()
+                    .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
+                    .map(|engine| {
+                        if removed {
+                            engine.remove_tag_row(tag_id);
+                        }
+                        ActionResult::UpdateScreen(engine.current_screen())
+                    })
+            }
+            _ => None,
+        }
     }
 
     /// Intercept the "exit-preview" action when MyInfo is in PreviewAs mode.

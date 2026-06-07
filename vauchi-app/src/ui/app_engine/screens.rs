@@ -18,6 +18,7 @@ use crate::ui::component::{
 use crate::ui::contact_detail::{
     ContactDetailEngine, ContactNotFoundEngine, DeliverySummary, SharedInfoView,
 };
+use crate::ui::contact_detail_rules::ContactTag;
 use crate::ui::contact_edit::{ContactEditEngine, EditableContact, EditableField};
 use crate::ui::contact_limit::ContactLimitEngine;
 use crate::ui::contact_list::{ContactListEngine, IndexedItem};
@@ -719,9 +720,22 @@ impl AppEngine {
 
                     let avatar_data = contact.card().avatar().map(|a| a.to_vec());
 
+                    // Owner-private tags for this contact (ADR-051). Reduced to
+                    // the UI-shaped {id, name} the renderer needs.
+                    let tags: Vec<ContactTag> = vauchi
+                        .tags_for_contact(contact_id)
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|t| ContactTag {
+                            id: t.id,
+                            name: t.name,
+                        })
+                        .collect();
+
                     let build_engine = |engine: ContactDetailEngine| {
                         let mut e = engine
                             .with_avatar_data(avatar_data)
+                            .with_tags(tags)
                             .with_field_notes(field_notes)
                             .with_trust(trust_level, proposal_trusted)
                             .with_reciprocity(reciprocity_status)

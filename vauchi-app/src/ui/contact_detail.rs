@@ -192,6 +192,24 @@ impl ContactDetailEngine {
         self.tag_suggestions = suggestions;
     }
 
+    /// Optimistically add a tag row after a successful
+    /// `Vauchi::add_tag_to_contact`, and clear the in-progress query.
+    /// Idempotent by id, so re-adding an existing tag (autocomplete-or-create
+    /// returning the same tag) does not duplicate the row.
+    pub fn add_tag_row(&mut self, tag: ContactTag) {
+        if !self.tags.iter().any(|t| t.id == tag.id) {
+            self.tags.push(tag);
+        }
+        self.tag_input.clear();
+        self.tag_suggestions.clear();
+    }
+
+    /// Optimistically remove a tag row after a successful
+    /// `Vauchi::remove_tag_from_contact`.
+    pub fn remove_tag_row(&mut self, tag_id: &str) {
+        self.tags.retain(|t| t.id != tag_id);
+    }
+
     /// Attach trust data (trust level label and proposal_trusted flag).
     pub fn with_trust(mut self, trust_level: String, proposal_trusted: bool) -> Self {
         self.trust_level = trust_level;

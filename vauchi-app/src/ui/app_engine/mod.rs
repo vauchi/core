@@ -408,10 +408,6 @@ pub struct AppEngine {
     /// `persist_exchanged_contact` can assign the new contact + show the
     /// group on the success screen (2026-06-04-exchange-terminal-screens).
     pending_exchange_groups: Vec<String>,
-    /// Captured from backup TextChanged events for backup execution.
-    pending_backup_password: Option<String>,
-    /// Captured from backup ItemToggled events (default: Full).
-    pending_backup_full: bool,
     /// Navigation history stack for back-button support.
     nav_history: Vec<AppScreen>,
     /// Field pending undo after delete from MyInfoEntryDetail.
@@ -615,8 +611,6 @@ impl AppEngine {
             engine,
             engine_cache: HashMap::new(),
             pending_exchange_groups: Vec::new(),
-            pending_backup_password: None,
-            pending_backup_full: true,
             nav_history: Vec::new(),
             pending_field_undo: None,
             pending_contact_undo: None,
@@ -1250,10 +1244,6 @@ impl WorkflowEngine for AppEngine {
         if let Some(result) = self.intercept_global_chrome(&action) {
             return result;
         }
-
-        // Capture pending onboarding/backup input (falls through — does not
-        // resolve the action). See `dispatch::capture_pending_input`.
-        self.capture_pending_input(&action);
 
         self.persist_settings_toggle(&action);
         self.persist_consent_toggle(&action);

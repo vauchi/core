@@ -377,28 +377,31 @@ impl AppEngine {
     /// picker + password entry through core. This helper handles the
     /// export side only.
     pub(super) fn execute_backup(&mut self) -> ActionResult {
-        use crate::ui::backup_recovery::BackupRecoveryEngine;
+        use crate::ui::backup_recovery::{BackupLevel, BackupMode, BackupRecoveryEngine};
 
-        // Read mode from the engine via downcast (avoids fragile string matching)
-        let is_restore = self
-            .engine
-            .as_any()
-            .and_then(|a| a.downcast_ref::<BackupRecoveryEngine>())
-            .is_some_and(|e| *e.mode() == crate::ui::backup_recovery::BackupMode::Restore);
+        // The backup password, level toggle, and restore blob all live on the
+        // engine (it captures them as the user advances and zeroizes the
+        // password on drop). Read everything in one borrow, then release it
+        // before the mutable engine/vauchi calls
+        // (#2026-06-07-app-engine-dispatch-tier-consolidation, Phase 1).
+        let (is_restore, backup_hex, password, is_full) = {
+            let e = self
+                .engine
+                .as_any()
+                .and_then(|a| a.downcast_ref::<BackupRecoveryEngine>());
+            (
+                e.is_some_and(|e| *e.mode() == BackupMode::Restore),
+                e.map(|e| e.restore_data().trim().to_string())
+                    .unwrap_or_default(),
+                e.map(|e| e.password().to_string()).unwrap_or_default(),
+                e.map(|e| *e.level() == BackupLevel::Full).unwrap_or(true),
+            )
+        };
 
         if is_restore {
             // Restore from a pasted/typed backup blob (keyboard frontends).
-            // The blob lives on the engine (`restore_data`); the password was
-            // captured into `pending_backup_password` by the AppScreen::Backup
-            // TextChanged intercept. Mobile's file-picker restore runs through
-            // `execute_backup_restore` instead and never reaches here.
-            let backup_hex = self
-                .engine
-                .as_any()
-                .and_then(|a| a.downcast_ref::<BackupRecoveryEngine>())
-                .map(|e| e.restore_data().trim().to_string())
-                .unwrap_or_default();
-            let password = self.pending_backup_password.take().unwrap_or_default();
+            // Mobile's file-picker restore runs through `execute_backup_restore`
+            // instead and never reaches here.
             if backup_hex.is_empty() || password.is_empty() {
                 self.engine.processing_failed();
                 return ActionResult::NavigateTo(self.engine.current_screen());
@@ -415,23 +418,20 @@ impl AppEngine {
             };
         }
 
-        let password = match self.pending_backup_password.take() {
-            Some(p) => p,
-            None => {
-                self.engine.processing_failed();
-                self.pending_backup_full = true;
-                return ActionResult::NavigateTo(self.engine.current_screen());
-            }
-        };
+        // `is_full` now tracks the engine's live level toggle directly, so a
+        // retry after a failed export uses the level the user still sees on
+        // screen (the old AppEngine copy was reset to Full on failure, which
+        // could silently export Full after an identity-only selection).
+        if password.is_empty() {
+            self.engine.processing_failed();
+            return ActionResult::NavigateTo(self.engine.current_screen());
+        }
 
-        let result = if self.pending_backup_full {
+        let result = if is_full {
             self.vauchi.export_full_backup(&password)
         } else {
             self.vauchi.export_backup(&password)
         };
-
-        // Reset captured state
-        self.pending_backup_full = true;
 
         match result {
             Ok(data) => {

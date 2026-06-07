@@ -124,36 +124,6 @@ impl AppEngine {
         None
     }
 
-    /// Capture pending text/toggle input that later steps consume
-    /// (backup password + level). These guards *fall through* — they mutate
-    /// pending state, they never resolve the action — so this returns `()`
-    /// rather than an `ActionResult`.
-    ///
-    /// Onboarding display-name capture used to live here too; it was removed
-    /// once `complete_onboarding` started reading the name straight off the
-    /// still-live `OnboardingEngine`
-    /// (#2026-06-07-app-engine-dispatch-tier-consolidation, Phase 1).
-    pub(super) fn capture_pending_input(&mut self, action: &UserAction) {
-        // Capture backup password and level toggle during backup flow
-        if self.screen == AppScreen::Backup {
-            match action {
-                UserAction::TextChanged {
-                    component_id,
-                    value,
-                } if component_id == "password" => {
-                    self.pending_backup_password = Some(value.clone());
-                }
-                UserAction::ItemToggled {
-                    component_id,
-                    item_id,
-                } if component_id == "backup_level" && item_id == "level_toggle" => {
-                    self.pending_backup_full = !self.pending_backup_full;
-                }
-                _ => {}
-            }
-        }
-    }
-
     /// Per-screen interception for the detail screens that first need a
     /// cloned id out of the current `AppScreen` (MyInfo entry detail and
     /// contact detail). Delegates to the fine-grained `intercept_*` methods.

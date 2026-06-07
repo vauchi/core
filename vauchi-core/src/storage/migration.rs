@@ -506,6 +506,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "sync_field_timestamps",
             action: MigrationAction::Sql(MIGRATION_V48_SYNC_FIELD_TIMESTAMPS),
         },
+        Migration {
+            version: 49,
+            name: "contact_tags",
+            action: MigrationAction::Sql(MIGRATION_V49_TAGS),
+        },
     ]
 }
 
@@ -820,6 +825,22 @@ const MIGRATION_V35_LOCAL_GROUPS: &str = "
     CREATE TABLE IF NOT EXISTS local_groups (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        contact_ids_json TEXT NOT NULL DEFAULT '[]',
+        created_at INTEGER NOT NULL
+    );
+";
+
+/// Migration v49: Contact Tags — owner-private annotation vocabulary (ADR-051).
+///
+/// Tag names are owner-private (potentially sensitive, e.g. "ex-colleague")
+/// and are stored **encrypted** with the storage key (`name_encrypted` BLOB),
+/// unlike `local_groups.name`. `contact_ids_json` is a plaintext JSON array of
+/// contact IDs (the membership shape, no name attached). Tags never cross the
+/// exchange wire.
+const MIGRATION_V49_TAGS: &str = "
+    CREATE TABLE IF NOT EXISTS tags (
+        id TEXT PRIMARY KEY,
+        name_encrypted BLOB NOT NULL,
         contact_ids_json TEXT NOT NULL DEFAULT '[]',
         created_at INTEGER NOT NULL
     );

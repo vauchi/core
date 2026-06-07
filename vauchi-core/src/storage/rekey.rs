@@ -107,6 +107,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("recovery_progress", "progress_encrypted"),
     // V48 device-sync LWW field timestamps
     ("sync_field_timestamps", "timestamps_json_encrypted"),
+    // V49 owner-private contact tags (ADR-051)
+    ("tags", "name_encrypted"),
 ];
 
 /// Encrypted columns intentionally skipped by rekey, with documented reason.
@@ -286,6 +288,9 @@ impl Storage {
             self.rekey_shared_avatars(old_key, &new_key)?;
             report(&mut completed, "shared_avatars");
 
+            self.rekey_tags(old_key, &new_key)?;
+            report(&mut completed, "tags");
+
             Ok(())
         })();
 
@@ -426,6 +431,36 @@ impl Storage {
                 "UPDATE contact_field_notes SET note_encrypted = ?1 WHERE contact_id = ?2 AND field_id = ?3",
                 params![new_enc, contact_id, field_id],
             ).map_err(|e| StorageError::Migration(format!("Update field_note {}:{}: {}", contact_id, field_id, e)))?;
+        }
+        Ok(())
+    }
+
+    /// Re-encrypt tags: name_encrypted (owner-private tag vocabulary, ADR-051)
+    fn rekey_tags(
+        &self,
+        old_key: &SymmetricKey,
+        new_key: &SymmetricKey,
+    ) -> Result<(), StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, name_encrypted FROM tags")
+            .map_err(|e| StorageError::Migration(format!("Read tags: {}", e)))?;
+
+        let rows: Vec<(String, Vec<u8>)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|e| StorageError::Migration(format!("Query tags: {}", e)))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| StorageError::Migration(format!("Collect tags: {}", e)))?;
+
+        for (id, enc) in &rows {
+            let new_enc = rekey_or_heal(new_key, old_key, enc)
+                .map_err(|e| StorageError::Migration(format!("Rekey tag {}: {}", id, e)))?;
+            self.conn
+                .execute(
+                    "UPDATE tags SET name_encrypted = ?1 WHERE id = ?2",
+                    params![new_enc, id],
+                )
+                .map_err(|e| StorageError::Migration(format!("Update tag {}: {}", id, e)))?;
         }
         Ok(())
     }

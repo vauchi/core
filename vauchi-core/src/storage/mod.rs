@@ -89,6 +89,11 @@ pub mod local_groups;
 mod local_groups;
 
 #[cfg(feature = "testing")]
+pub mod tags;
+#[cfg(not(feature = "testing"))]
+mod tags;
+
+#[cfg(feature = "testing")]
 pub mod ux;
 #[cfg(not(feature = "testing"))]
 mod ux;

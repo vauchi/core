@@ -2,12 +2,17 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Tests for the `Tag` domain type (owner-private annotation vocabulary).
-//!
-//! Storage CRUD and encryption are covered separately (T1.1b / T1.2);
-//! these exercise the in-memory type behaviour. See `ADR-051`.
+//! Tests for contact tags (owner-private annotation vocabulary) — the `Tag`
+//! domain type and its encrypted storage CRUD (`tags` table, migration v49).
+//! See `ADR-051`.
 
 use vauchi_core::contact::Tag;
+use vauchi_core::crypto::SymmetricKey;
+use vauchi_core::storage::Storage;
+
+fn open_storage() -> Storage {
+    Storage::in_memory(SymmetricKey::generate()).unwrap()
+}
 
 // @scenario: contact-annotations.feature - Create a new tag on a contact
 // @internal
@@ -67,4 +72,128 @@ fn remove_contact_reports_presence() {
     );
     assert!(!tag.contains("c1"));
     assert!(tag.contact_ids.is_empty());
+}
+
+// ── Storage CRUD (encrypted name, migration v49) ──────────────────────────────
+
+// @scenario: contact-annotations.feature - Create a new tag on a contact
+// @internal
+#[test]
+fn create_tag_round_trips_through_get() {
+    let storage = open_storage();
+
+    let created = storage.create_tag("climbing-gym").unwrap();
+    let loaded = storage.get_tag(&created.id).unwrap().unwrap();
+
+    assert_eq!(loaded.id, created.id);
+    assert_eq!(loaded.name, "climbing-gym", "name must decrypt back");
+    assert!(loaded.contact_ids.is_empty());
+}
+
+// @scenario: contact-annotations.feature - Create a new tag on a contact
+// @internal
+#[test]
+fn get_missing_tag_returns_none() {
+    let storage = open_storage();
+    assert!(storage.get_tag("does-not-exist").unwrap().is_none());
+}
+
+// @scenario: contact-annotations.feature - Create a new tag on a contact
+// @internal
+#[test]
+fn list_tags_returns_all_created() {
+    let storage = open_storage();
+    storage.create_tag("work").unwrap();
+    storage.create_tag("family").unwrap();
+
+    let names: Vec<String> = storage
+        .list_tags()
+        .unwrap()
+        .into_iter()
+        .map(|t| t.name)
+        .collect();
+
+    assert_eq!(names.len(), 2);
+    assert!(names.contains(&"work".to_string()));
+    assert!(names.contains(&"family".to_string()));
+}
+
+// @scenario: contact-annotations.feature - Create a new tag on a contact
+// @internal
+#[test]
+fn add_and_remove_membership_persists() {
+    let storage = open_storage();
+    let tag = storage.create_tag("berlin-trip").unwrap();
+
+    storage.add_to_tag(&tag.id, "c1").unwrap();
+    storage.add_to_tag(&tag.id, "c1").unwrap(); // idempotent
+    storage.add_to_tag(&tag.id, "c2").unwrap();
+
+    let loaded = storage.get_tag(&tag.id).unwrap().unwrap();
+    assert_eq!(loaded.contact_ids.len(), 2, "no duplicate membership");
+    assert!(loaded.contains("c1") && loaded.contains("c2"));
+
+    storage.remove_from_tag(&tag.id, "c1").unwrap();
+    let after = storage.get_tag(&tag.id).unwrap().unwrap();
+    assert!(!after.contains("c1"));
+    assert!(after.contains("c2"));
+}
+
+// @scenario: contact-annotations.feature - Create a new tag on a contact
+// @internal
+#[test]
+fn delete_tag_reports_existence_and_removes() {
+    let storage = open_storage();
+    let tag = storage.create_tag("temp").unwrap();
+
+    assert!(
+        storage.delete_tag(&tag.id).unwrap(),
+        "delete reports existed"
+    );
+    assert!(storage.get_tag(&tag.id).unwrap().is_none());
+    assert!(
+        !storage.delete_tag(&tag.id).unwrap(),
+        "second delete reports absent"
+    );
+}
+
+// @scenario: contact-annotations.feature - Tags are never shared (at-rest)
+// @internal
+#[test]
+fn tag_name_is_encrypted_at_rest() {
+    let storage = open_storage();
+    let tag = storage.create_tag("ex-colleague").unwrap();
+
+    // Read the raw BLOB straight from the table — it must NOT contain the
+    // plaintext name (ADR-051: tag names encrypted at rest).
+    let raw: Vec<u8> = storage
+        .connection()
+        .query_row(
+            "SELECT name_encrypted FROM tags WHERE id = ?1",
+            rusqlite::params![tag.id],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    let needle = b"ex-colleague";
+    assert!(
+        !raw.windows(needle.len()).any(|w| w == needle),
+        "plaintext tag name must not appear in the stored BLOB"
+    );
+}
+
+// @scenario: contact-annotations.feature - Create a new tag on a contact
+// @internal
+#[test]
+fn tag_name_survives_storage_rekey() {
+    let mut storage = open_storage();
+    let tag = storage.create_tag("berlin-trip").unwrap();
+    storage.add_to_tag(&tag.id, "c1").unwrap();
+
+    // Rotate the storage key — rekey must re-encrypt the tag name.
+    storage.rekey(SymmetricKey::generate()).unwrap();
+
+    let loaded = storage.get_tag(&tag.id).unwrap().unwrap();
+    assert_eq!(loaded.name, "berlin-trip", "name must decrypt after rekey");
+    assert!(loaded.contains("c1"), "membership preserved across rekey");
 }

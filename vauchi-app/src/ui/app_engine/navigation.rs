@@ -213,6 +213,12 @@ impl AppEngine {
             // PlatformAppEngine to avoid double-driving the engine on
             // mobile.
             self.sync_multi_stage_lifecycle(&old_screen, &screen);
+            // BLE/Magic completion P2: tear down the engine-owned BLE
+            // handshake machine on exit of the BleExchange screen (the
+            // session is built lazily on peer discovery, not on entry,
+            // because its initiator/responder role is unknown until the
+            // tiebreak tokens are compared).
+            self.sync_ble_handshake_lifecycle(&old_screen, &screen);
         }
 
         // Cache the old engine if its screen is cacheable

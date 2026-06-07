@@ -68,6 +68,27 @@ pub enum BleRole {
     Responder,
 }
 
+/// Decide this device's BLE role from the symmetric role-tiebreak
+/// tokens. Both peers advertise + scan symmetrically; the device whose
+/// token is lexicographically smaller becomes the **initiator**
+/// (central, connects + sends the KeyOffer), the other the
+/// **responder** (peripheral). Equal tokens — effectively impossible
+/// for distinct identities — default to responder so neither side
+/// double-connects.
+///
+/// This is the single source of truth for the tiebreak, shared by the
+/// chrome-side [`super::super::ui::exchange::ble::BleExchangeFlow`]
+/// (decides whether to emit `BleConnect`) and the crypto-side
+/// `AppEngine::start_ble_handshake_on_discovery` (decides the session
+/// role). Keeping it in one place means the two can never disagree.
+pub fn decide_ble_role(own_token: &[u8], peer_token: &[u8]) -> BleRole {
+    if own_token < peer_token {
+        BleRole::Initiator
+    } else {
+        BleRole::Responder
+    }
+}
+
 /// Observable phase of the BLE handshake machine. 1:1 with
 /// [`BleHandshakeState`] (renamed for engine-side ergonomics — the
 /// underlying protocol model is unchanged).

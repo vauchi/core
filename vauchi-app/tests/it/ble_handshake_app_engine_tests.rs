@@ -155,3 +155,70 @@ fn forward_disconnect_marks_machine_failed() {
         Some(BleMachinePhase::Failed { .. })
     ));
 }
+
+// ── P2: session built on discovery, role from the tiebreak token ──────
+
+// @internal
+#[test]
+fn discovery_larger_peer_token_starts_initiator_session() {
+    // The peer advertises a token that sorts above this device's 32-byte
+    // identity key (0xFF * 33 ≥ any 32-byte value), so we win the
+    // tiebreak and start as initiator — derived from the live identity,
+    // not a fixture card.
+    let mut engine = fresh_engine();
+    assert!(!engine.ble_handshake_session_active());
+
+    engine.start_ble_handshake_on_discovery(&[0xFF; 33]);
+    assert!(
+        engine.ble_handshake_session_active(),
+        "discovery must build the handshake session",
+    );
+
+    let _ = engine.forward_ble_hardware_event(&Event::BleConnected {
+        device_id: "d1".into(),
+    });
+    assert_eq!(
+        engine.ble_machine_phase(),
+        Some(BleMachinePhase::Handshaking),
+        "initiator role must advance to Handshaking on connect",
+    );
+    assert!(
+        !engine.drain_pending_commands().is_empty(),
+        "initiator must enqueue the KeyOffer on connect",
+    );
+}
+
+// @internal
+#[test]
+fn discovery_smaller_peer_token_starts_responder_session() {
+    // An empty peer token sorts below our identity key, so we are the
+    // responder and must wait for the initiator's KeyOffer write rather
+    // than advancing on connect.
+    let mut engine = fresh_engine();
+    engine.start_ble_handshake_on_discovery(&[]);
+    assert!(engine.ble_handshake_session_active());
+
+    let _ = engine.forward_ble_hardware_event(&Event::BleConnected {
+        device_id: "d1".into(),
+    });
+    // Both roles reach Handshaking on connect; the role differentiator is
+    // that the responder emits NO KeyOffer — it waits for the initiator's
+    // KeyOffer write (see `on_connected`). The initiator case
+    // (discovery_larger_peer_token_…) asserts the complementary command.
+    assert!(
+        engine.drain_pending_commands().is_empty(),
+        "responder must not emit a KeyOffer on connect",
+    );
+}
+
+// @internal
+#[test]
+fn discovery_is_idempotent_once_session_active() {
+    let mut engine = fresh_engine();
+    engine.start_ble_handshake_on_discovery(&[0xFF; 33]);
+    let phase_a = engine.ble_machine_phase();
+    // A second discovery with a different token must not rebuild the
+    // already-held session.
+    engine.start_ble_handshake_on_discovery(&[]);
+    assert_eq!(engine.ble_machine_phase(), phase_a);
+}

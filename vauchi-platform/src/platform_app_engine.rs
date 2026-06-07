@@ -501,6 +501,23 @@ impl PlatformAppEngine {
                 engine.apply_multi_stage_event(m_event);
                 None
             } else {
+                // BLE/Magic completion P2 — a peer discovery on the BLE
+                // exchange screen builds the AppEngine-owned handshake session.
+                // The role is decided from the peer's advertised tiebreak
+                // token (in `adv_data`), matching `BleExchangeFlow`'s connect
+                // decision. Idempotent; falls through to the engine below,
+                // which emits `BleConnect` for the tiebreak winner. Once the
+                // session is active, the `BleConnected`/data events route into
+                // the real machine via the gate that follows.
+                if let vauchi_core::Event::BleDeviceDiscovered { adv_data, .. } = &hw_event {
+                    let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
+                        detail: format!("Lock failed: {e}"),
+                    })?;
+                    if matches!(engine.current_app_screen(), AppScreen::BleExchange { .. }) {
+                        engine.start_ble_handshake_on_discovery(adv_data);
+                    }
+                }
+
                 // Slice 32m T2.2c — BLE event routing into the AppEngine-owned
                 // `BleHandshakeMachine`, gated on an active session. Additive on top
                 // of the regular `engine.handle_hardware_event` below so the existing

@@ -15,6 +15,8 @@ use vauchi_core::exchange::mode::ExchangeMode;
 use vauchi_core::exchange::proximity_runner::{ProximityMethod, ProximityRunner};
 use vauchi_core::{Command, Event};
 
+use crate::orchestrator::ble_handshake_machine::{BleRole, decide_ble_role};
+
 // ── Step enum ──────────────────────────────────────────────────────────────
 
 /// Steps specific to the BLE exchange sub-flow.
@@ -229,7 +231,12 @@ impl BleExchangeFlow {
     /// (peripheral). Equal tokens — effectively impossible for distinct
     /// identities — default to responder so neither side double-connects.
     fn decides_initiator(&self, peer_token: &[u8]) -> bool {
-        self.own_token.as_slice() < peer_token
+        // Single source of truth — the AppEngine's session-role decision
+        // uses the same fn, so chrome and crypto can never disagree.
+        matches!(
+            decide_ble_role(&self.own_token, peer_token),
+            BleRole::Initiator
+        )
     }
 
     /// Last MTU reported by the GATT stack via `Event::BleMtuNegotiated`,

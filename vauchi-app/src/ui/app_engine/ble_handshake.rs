@@ -42,11 +42,12 @@
 //!   [`AppEngine::ble_machine_phase`] — read-side test seams and
 //!   cabi screen-rendering helpers.
 
-use super::AppEngine;
+use super::{AppEngine, AppScreen};
 use crate::orchestrator::ble_handshake_machine::{
-    BleHandshakeMachine, BleMachineEvent, BleMachinePhase, BleRole,
+    BleHandshakeMachine, BleMachineEvent, BleMachinePhase, BleRole, decide_ble_role,
 };
 use vauchi_core::Event;
+use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::X3DHKeyPair;
 use vauchi_core::exchange::BleCardPayload;
 
@@ -144,5 +145,69 @@ impl AppEngine {
         self.ble_handshake_session
             .as_ref()
             .map(|h| h.machine.phase())
+    }
+
+    /// Derive this device's BLE handshake inputs from the live identity
+    /// and own card: `(identity signing key, X3DH keypair, card
+    /// payload)`. `None` when there is no identity yet (the caller skips
+    /// session creation). The card's `exchange_key` must equal the
+    /// returned keypair's public key, so both come from
+    /// `identity.x3dh_keypair()` — documented to agree with
+    /// `exchange_public_key`.
+    fn build_ble_session_inputs(&self) -> Option<([u8; 32], X3DHKeyPair, BleCardPayload)> {
+        let identity = self.vauchi.identity()?;
+        let identity_key = *identity.signing_public_key();
+        let x3dh = identity.x3dh_keypair();
+        let exchange_pub = *x3dh.public_key();
+        let display_name = identity.display_name().to_string();
+        let card = self
+            .vauchi
+            .own_card()
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| ContactCard::new(&display_name));
+        let fields = card
+            .fields()
+            .iter()
+            .map(|f| (f.label().to_string(), f.value().to_string()))
+            .collect();
+        let avatar = card.avatar().map(|a| a.to_vec());
+        let ble_card =
+            BleCardPayload::new(identity_key, display_name, exchange_pub, fields, avatar);
+        Some((identity_key, x3dh, ble_card))
+    }
+
+    /// Build the BLE handshake session when a peer is discovered. The
+    /// role is decided from the symmetric tiebreak tokens — this
+    /// device's identity signing key (the same value the engine
+    /// advertises) vs the peer's advertised `peer_token` — via the
+    /// shared [`decide_ble_role`], so the session role always agrees
+    /// with `BleExchangeFlow`'s connect decision. Idempotent:
+    /// `ensure_ble_handshake_session` is a no-op once a session is held,
+    /// so re-discoveries never rebuild it. The subsequent
+    /// `BleConnected` / data events drive the machine through
+    /// `forward_ble_hardware_event`.
+    pub fn start_ble_handshake_on_discovery(&mut self, peer_token: &[u8]) {
+        if self.ble_handshake_session_active() {
+            return;
+        }
+        let Some((identity_key, x3dh, card)) = self.build_ble_session_inputs() else {
+            log::warn!("BLE: cannot start handshake — no identity / card");
+            return;
+        };
+        let role = decide_ble_role(&identity_key, peer_token);
+        self.ensure_ble_handshake_session(role, identity_key, x3dh, card);
+    }
+
+    /// Tear down the BLE handshake session when leaving the BLE exchange
+    /// screen. The session is built lazily on discovery (its role is
+    /// unknown at screen entry), so there is no entry branch — only
+    /// teardown. Mirrors `sync_multi_stage_lifecycle`.
+    pub(super) fn sync_ble_handshake_lifecycle(&mut self, old: &AppScreen, new: &AppScreen) {
+        let was = matches!(old, AppScreen::BleExchange { .. });
+        let is = matches!(new, AppScreen::BleExchange { .. });
+        if was && !is {
+            self.cancel_ble_handshake_session();
+        }
     }
 }

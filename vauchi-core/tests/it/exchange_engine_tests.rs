@@ -251,7 +251,11 @@ fn exchange_failed_fallback_actions_have_a11y_hints() {
     // qr_fallback_available.
     // Post BLE graduation the BLE flow lives in the dedicated
     // `BleExchangeEngine`; `has_camera = true` gates the QR fallback offer.
-    let mut engine = BleExchangeEngine::new(vauchi_core::exchange::mode::ExchangeMode::Magic, true);
+    let mut engine = BleExchangeEngine::new(
+        vauchi_core::exchange::mode::ExchangeMode::Magic,
+        true,
+        vec![],
+    );
     let _ = engine.handle_hardware_event(vauchi_core::Event::BleDisconnected {
         reason: "peer hung up".to_string(),
     });

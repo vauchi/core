@@ -53,13 +53,13 @@ const FAILED_HANDLED: &[&str] = &[
 
 /// Discovering root — a fresh engine renders the discovering screen.
 fn discovering_factory() -> BleExchangeEngine {
-    BleExchangeEngine::new(ExchangeMode::Magic, true)
+    BleExchangeEngine::new(ExchangeMode::Magic, true, vec![])
 }
 
 /// Exchanging root — `BleDeviceDiscovered` advances Discovering → Handshaking,
 /// which renders the shared exchanging screen.
 fn exchanging_factory() -> BleExchangeEngine {
-    let mut e = BleExchangeEngine::new(ExchangeMode::Magic, true);
+    let mut e = BleExchangeEngine::new(ExchangeMode::Magic, true, vec![]);
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
         rssi: -45,
@@ -72,7 +72,7 @@ fn exchanging_factory() -> BleExchangeEngine {
 /// yet advances Exchanging → Verifying (per the flow's
 /// `proximity_done_before_card_advances_to_verifying` path).
 fn verifying_factory() -> BleExchangeEngine {
-    let mut e = BleExchangeEngine::new(ExchangeMode::Bump, true);
+    let mut e = BleExchangeEngine::new(ExchangeMode::Bump, true, vec![]);
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
         rssi: -45,
@@ -91,7 +91,7 @@ fn verifying_factory() -> BleExchangeEngine {
 /// Success root (Magic mode) — discover → connect → card arrives → audio
 /// proximity completes via an FSK-encoded sample buffer.
 fn success_factory() -> BleExchangeEngine {
-    let mut e = BleExchangeEngine::new(ExchangeMode::Magic, true);
+    let mut e = BleExchangeEngine::new(ExchangeMode::Magic, true, vec![]);
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
         rssi: -45,
@@ -116,7 +116,7 @@ fn success_factory() -> BleExchangeEngine {
 /// Failed root — `BleDisconnected` from Discovering flips to the failed screen
 /// with all fallbacks (camera present).
 fn failed_factory() -> BleExchangeEngine {
-    let mut e = BleExchangeEngine::new(ExchangeMode::Magic, true);
+    let mut e = BleExchangeEngine::new(ExchangeMode::Magic, true, vec![]);
     e.handle_hardware_event(Event::BleDisconnected {
         reason: "peer hung up".into(),
     });

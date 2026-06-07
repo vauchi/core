@@ -80,7 +80,7 @@ fn arb_post_complete_event() -> impl Strategy<Value = Event> {
 /// terminal `Success` screen. Post BLE graduation the BLE flow lives in
 /// the dedicated engine, not the legacy `ExchangeEngine` sub-flow.
 fn drive_magic_to_success() -> BleExchangeEngine {
-    let mut e = BleExchangeEngine::new(ExchangeMode::Magic, true);
+    let mut e = BleExchangeEngine::new(ExchangeMode::Magic, true, vec![]);
     e.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
         rssi: -45,

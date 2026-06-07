@@ -199,10 +199,18 @@ pub(super) struct BleExchangeFlow {
     /// so a re-negotiation mid-session overwrites cleanly without
     /// resetting connection state.
     negotiated_mtu: Option<u32>,
+    /// This device's role-tiebreak token (advertised in
+    /// `BleStartAdvertising.payload`). Two peers discover each other
+    /// symmetrically; on discovery each compares its own token against
+    /// the peer's (carried in `BleDeviceDiscovered.adv_data`) and the
+    /// lexicographically smaller token initiates the connection. Moving
+    /// this compare into core retires the Android `compareTokens`
+    /// frontend logic (ADR-043 Humble UI).
+    own_token: Vec<u8>,
 }
 
 impl BleExchangeFlow {
-    pub(super) fn new(mode: ExchangeMode) -> Self {
+    pub(super) fn new(mode: ExchangeMode, own_token: Vec<u8>) -> Self {
         Self {
             mode,
             step: BleStep::Discovering,
@@ -211,7 +219,17 @@ impl BleExchangeFlow {
             received_card: None,
             shake_envelope_sent: false,
             negotiated_mtu: None,
+            own_token,
         }
+    }
+
+    /// Whether this device should initiate the BLE connection (become
+    /// central) given the peer's advertised tiebreak token. The smaller
+    /// token wins and connects; the other waits as responder
+    /// (peripheral). Equal tokens — effectively impossible for distinct
+    /// identities — default to responder so neither side double-connects.
+    fn decides_initiator(&self, peer_token: &[u8]) -> bool {
+        self.own_token.as_slice() < peer_token
     }
 
     /// Last MTU reported by the GATT stack via `Event::BleMtuNegotiated`,
@@ -280,14 +298,20 @@ impl BleExchangeFlow {
     }
 
     fn handle_discovering(&mut self, event: &Event) -> BleHardwareOutcome {
-        if let Event::BleDeviceDiscovered { id, .. } = event {
+        if let Event::BleDeviceDiscovered { id, adv_data, .. } = event {
             self.connected_device = Some(id.clone());
             self.step = BleStep::Handshaking;
-            return BleHardwareOutcome::StepAdvanced {
-                commands: vec![Command::BleConnect {
-                    device_id: id.clone(),
-                }],
-            };
+            if self.decides_initiator(adv_data) {
+                // We win the tiebreak → initiate the connection (central).
+                return BleHardwareOutcome::StepAdvanced {
+                    commands: vec![Command::BleConnect {
+                        device_id: id.clone(),
+                    }],
+                };
+            }
+            // Responder (peripheral) → wait for the initiator to connect;
+            // the `BleConnected` event drives the next step.
+            return BleHardwareOutcome::StepAdvanced { commands: vec![] };
         }
         BleHardwareOutcome::Ignored
     }
@@ -434,14 +458,16 @@ mod tests {
 
     // @internal
     #[test]
-    fn discovery_emits_connect_on_device_found() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+    fn discovery_initiator_with_smaller_token_emits_connect() {
+        // Our token sorts before the peer's → we win the tiebreak and
+        // initiate the connection (central).
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![0x01]);
         assert_eq!(*flow.step(), BleStep::Discovering);
 
         let outcome = flow.handle_event(&Event::BleDeviceDiscovered {
             id: "device-1".into(),
             rssi: -42,
-            adv_data: vec![],
+            adv_data: vec![0x09], // peer token > ours
         });
 
         assert_eq!(*flow.step(), BleStep::Handshaking);
@@ -459,8 +485,55 @@ mod tests {
 
     // @internal
     #[test]
+    fn discovery_responder_with_larger_token_does_not_connect() {
+        // Our token sorts after the peer's → we are the responder
+        // (peripheral) and must NOT connect; we wait for `BleConnected`.
+        // This is the symmetric double-connect the Android
+        // `compareTokens` tiebreaker existed to prevent, now owned by
+        // core (ADR-043).
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![0x09]);
+
+        let outcome = flow.handle_event(&Event::BleDeviceDiscovered {
+            id: "device-1".into(),
+            rssi: -42,
+            adv_data: vec![0x01], // peer token < ours
+        });
+
+        assert_eq!(*flow.step(), BleStep::Handshaking);
+        match outcome {
+            BleHardwareOutcome::StepAdvanced { commands } => {
+                assert!(
+                    commands.is_empty(),
+                    "responder must not emit BleConnect, got {commands:?}"
+                );
+            }
+            other => panic!("Expected StepAdvanced, got {other:?}"),
+        }
+    }
+
+    // @internal
+    #[test]
+    fn discovery_equal_tokens_default_to_responder() {
+        // Astronomically rare for distinct identities, but equal tokens
+        // must still not double-connect: both default to responder.
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![0x05]);
+        let outcome = flow.handle_event(&Event::BleDeviceDiscovered {
+            id: "device-1".into(),
+            rssi: -42,
+            adv_data: vec![0x05],
+        });
+        match outcome {
+            BleHardwareOutcome::StepAdvanced { commands } => {
+                assert!(commands.is_empty(), "equal tokens must not connect");
+            }
+            other => panic!("Expected StepAdvanced, got {other:?}"),
+        }
+    }
+
+    // @internal
+    #[test]
     fn discovery_ignores_non_ble_events() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![]);
         let outcome = flow.handle_event(&Event::QrScanned {
             data: "test".into(),
         });
@@ -473,7 +546,7 @@ mod tests {
     // @internal
     #[test]
     fn connection_starts_proximity_and_advances_to_exchanging() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![]);
         // Discover
         flow.handle_event(&Event::BleDeviceDiscovered {
             id: "d1".into(),
@@ -509,7 +582,7 @@ mod tests {
     // @internal
     #[test]
     fn bump_connection_starts_accelerometer() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump, vec![]);
         flow.handle_event(&Event::BleDeviceDiscovered {
             id: "d1".into(),
             rssi: -40,
@@ -537,7 +610,7 @@ mod tests {
     // @internal
     #[test]
     fn impact_event_during_exchange_completes_with_card() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump, vec![]);
         advance_to_exchanging(&mut flow);
 
         // Receive card data first
@@ -568,7 +641,7 @@ mod tests {
     // @internal
     #[test]
     fn proximity_done_before_card_advances_to_verifying() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump, vec![]);
         advance_to_exchanging(&mut flow);
 
         // Impact first (no card yet)
@@ -596,7 +669,7 @@ mod tests {
     // @internal
     #[test]
     fn card_without_proximity_stays_in_exchanging() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump, vec![]);
         advance_to_exchanging(&mut flow);
 
         let outcome = flow.handle_event(&Event::BleCharacteristicNotified {
@@ -614,7 +687,7 @@ mod tests {
     // @internal
     #[test]
     fn magic_audio_response_completes_exchange_with_card() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![]);
         advance_to_exchanging(&mut flow);
 
         // Receive card data
@@ -656,7 +729,7 @@ mod tests {
     // @internal
     #[test]
     fn magic_audio_timeout_does_not_block_exchange() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![]);
         advance_to_exchanging(&mut flow);
 
         // Simulate audio timeout (runner times out, producing failed result)
@@ -704,7 +777,7 @@ mod tests {
     // @internal
     #[test]
     fn shake_sends_envelope_after_recording() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Shake);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Shake, vec![]);
         advance_to_exchanging(&mut flow);
 
         // Feed enough samples
@@ -722,7 +795,7 @@ mod tests {
     // @internal
     #[test]
     fn shake_peer_envelope_completes_with_card() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Shake);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Shake, vec![]);
         advance_to_exchanging(&mut flow);
 
         // Record samples and finish recording
@@ -758,7 +831,7 @@ mod tests {
     // @internal
     #[test]
     fn shake_peer_envelope_before_card_advances_to_verifying() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Shake);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Shake, vec![]);
         advance_to_exchanging(&mut flow);
 
         feed_accel_samples(&mut flow, 50);
@@ -787,7 +860,7 @@ mod tests {
     // @internal
     #[test]
     fn shake_non_envelope_char_is_card_data() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Shake);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Shake, vec![]);
         advance_to_exchanging(&mut flow);
 
         // Data on a non-envelope UUID is treated as card data
@@ -806,7 +879,7 @@ mod tests {
     #[test]
     fn ble_disconnect_fails_at_any_step() {
         for mode in [ExchangeMode::Magic, ExchangeMode::Bump, ExchangeMode::Shake] {
-            let mut flow = BleExchangeFlow::new(mode);
+            let mut flow = BleExchangeFlow::new(mode, vec![]);
             let outcome = flow.handle_event(&Event::BleDisconnected {
                 reason: "timeout".into(),
             });
@@ -820,7 +893,7 @@ mod tests {
     // @internal
     #[test]
     fn ble_hardware_error_fails() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![]);
         let outcome = flow.handle_event(&Event::HardwareError {
             transport: "BLE".into(),
             error: "adapter off".into(),
@@ -836,7 +909,7 @@ mod tests {
     // @internal
     #[test]
     fn ble_unavailable_fails() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![]);
         let outcome = flow.handle_event(&Event::HardwareUnavailable {
             transport: "ble".into(),
         });
@@ -849,7 +922,7 @@ mod tests {
     // @internal
     #[test]
     fn non_ble_hardware_error_is_ignored() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![]);
         let outcome = flow.handle_event(&Event::HardwareError {
             transport: "NFC".into(),
             error: "not supported".into(),
@@ -862,7 +935,7 @@ mod tests {
     // @internal
     #[test]
     fn bump_weak_impact_completes_with_unverified_proximity() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump, vec![]);
         advance_to_exchanging(&mut flow);
 
         // Card data
@@ -887,7 +960,7 @@ mod tests {
     // @internal
     #[test]
     fn bump_strong_impact_has_capped_confidence() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump, vec![]);
         advance_to_exchanging(&mut flow);
 
         flow.handle_event(&Event::BleCharacteristicNotified {
@@ -911,7 +984,7 @@ mod tests {
     // @internal
     #[test]
     fn complete_step_ignores_events() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump, vec![]);
         advance_to_exchanging(&mut flow);
         // Get card + impact to complete
         flow.handle_event(&Event::BleCharacteristicNotified {
@@ -990,7 +1063,7 @@ mod tests {
     // @internal
     #[test]
     fn ble_mtu_negotiated_event_is_consumed_not_ignored() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Bump, vec![]);
         advance_to_exchanging(&mut flow);
 
         let outcome = flow.handle_event(&Event::BleMtuNegotiated {
@@ -1014,7 +1087,7 @@ mod tests {
     // @internal
     #[test]
     fn ble_mtu_negotiated_during_handshaking_is_consumed_not_ignored() {
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![]);
         // Step into Handshaking via BleDeviceDiscovered, but stop
         // before BleConnected. MTU often arrives between connection
         // and subscription on Android (post-connect `requestMtu`).
@@ -1061,7 +1134,7 @@ mod tests {
         // would then need a Command variant before T3.1 can retire
         // the delegate trait. Today this passes trivially because no
         // such variant exists; it pins the contract going into T2.2.
-        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic);
+        let mut flow = BleExchangeFlow::new(ExchangeMode::Magic, vec![]);
         let mut emitted: Vec<Command> = Vec::new();
 
         let push = |out: BleHardwareOutcome, sink: &mut Vec<Command>| match out {

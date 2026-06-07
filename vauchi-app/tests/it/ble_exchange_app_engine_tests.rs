@@ -94,10 +94,13 @@ fn forwarding_ble_discovery_advances_engine_to_exchanging() {
 
     // A discovered peer drives Discovering → Handshaking, which renders the
     // shared exchanging screen and emits a connect command.
+    // Peer advertises a token that sorts above this device's 32-byte
+    // identity token (0xFF * 33 ≥ any 32-byte value), so this device wins
+    // the tiebreak and initiates the connection.
     let result = engine.handle_hardware_event(Event::BleDeviceDiscovered {
         id: "peer-1".into(),
         rssi: -45,
-        adv_data: vec![],
+        adv_data: vec![0xFF; 33],
     });
     match result {
         Some(ActionResult::Commands { commands }) => assert!(

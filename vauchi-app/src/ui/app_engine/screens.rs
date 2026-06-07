@@ -909,10 +909,22 @@ impl AppEngine {
                 Box::new(crate::ui::LinkResponderEngine::new(payload.clone()))
             }
             AppScreen::LinkExchange => Box::new(crate::ui::LinkExchangeEngine::new()),
-            AppScreen::BleExchange { mode } => Box::new(crate::ui::BleExchangeEngine::new(
-                *mode,
-                device_capabilities.has_camera,
-            )),
+            AppScreen::BleExchange { mode } => {
+                // Role-tiebreak token: this device's stable signing public
+                // key. The engine advertises it; on discovery each peer
+                // compares its own token against the other's and exactly one
+                // initiates the connection (ADR-043 — core owns the tiebreak,
+                // retiring the Android `compareTokens` frontend logic).
+                let own_token = vauchi
+                    .identity()
+                    .map(|id| id.signing_public_key().to_vec())
+                    .unwrap_or_default();
+                Box::new(crate::ui::BleExchangeEngine::new(
+                    *mode,
+                    device_capabilities.has_camera,
+                    own_token,
+                ))
+            }
             AppScreen::NfcExchange => {
                 // The NFC engine signs its key offer with the full identity, so
                 // reconstruct it via the storage-bytes round-trip (Identity has

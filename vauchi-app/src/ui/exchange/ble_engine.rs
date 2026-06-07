@@ -54,19 +54,27 @@ pub struct BleExchangeEngine {
     /// `screen_entered` is idempotent across re-renders.
     started: bool,
     cancelled: bool,
+    /// This device's role-tiebreak token, advertised in the
+    /// `BleStartAdvertising.payload` so the peer can compare and exactly
+    /// one side initiates the connection (see [`BleExchangeFlow`]).
+    own_token: Vec<u8>,
 }
 
 impl BleExchangeEngine {
     /// Build a fresh BLE engine for `mode` (Magic/Bump/Shake). `has_camera`
-    /// gates the QR fallback offer on the failed screen.
-    pub fn new(mode: ExchangeMode, has_camera: bool) -> Self {
+    /// gates the QR fallback offer on the failed screen. `own_token` is this
+    /// device's role-tiebreak token (a stable per-identity value); the engine
+    /// advertises it and [`BleExchangeFlow`] compares it against the peer's to
+    /// pick exactly one initiator.
+    pub fn new(mode: ExchangeMode, has_camera: bool, own_token: Vec<u8>) -> Self {
         Self {
             mode,
-            flow: BleExchangeFlow::new(mode),
+            flow: BleExchangeFlow::new(mode, own_token.clone()),
             screen: BleScreen::Active,
             has_camera,
             started: false,
             cancelled: false,
+            own_token,
         }
     }
 
@@ -80,12 +88,12 @@ impl BleExchangeEngine {
 
     /// The advertise + scan commands that open a BLE exchange (lifted from the
     /// legacy `ExchangeEngine::start_ble_mode`).
-    fn start_commands() -> Vec<Command> {
+    fn start_commands(&self) -> Vec<Command> {
         let service_uuid = vauchi_core::exchange::VAUCHI_BLE_SERVICE_UUID.to_string();
         vec![
             Command::BleStartAdvertising {
                 service_uuid: service_uuid.clone(),
-                payload: vec![],
+                payload: self.own_token.clone(),
             },
             Command::BleStartScanning { service_uuid },
         ]
@@ -253,7 +261,7 @@ impl WorkflowEngine for BleExchangeEngine {
             return Vec::new();
         }
         self.started = true;
-        Self::start_commands()
+        self.start_commands()
     }
 
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
@@ -272,7 +280,7 @@ impl WorkflowEngine for BleExchangeEngine {
                     UserAction::ActionPressed { action_id } if action_id == ACTION_RETRY => {
                         // Fresh attempt: reset the wrapped flow and re-emit the
                         // start commands on the next `screen_entered`.
-                        self.flow = BleExchangeFlow::new(self.mode);
+                        self.flow = BleExchangeFlow::new(self.mode, self.own_token.clone());
                         self.screen = BleScreen::Active;
                         self.started = false;
                         ActionResult::UpdateScreen(self.build_screen())
@@ -338,17 +346,20 @@ mod tests {
     use super::*;
 
     fn discover(engine: &mut BleExchangeEngine) -> Option<ActionResult> {
+        // Peer advertises a non-empty token; this engine's default
+        // (empty) token sorts smaller, so it wins the tiebreak and
+        // initiates the connection.
         engine.handle_hardware_event(Event::BleDeviceDiscovered {
             id: "d1".into(),
             rssi: -40,
-            adv_data: vec![],
+            adv_data: vec![0x01],
         })
     }
 
     // @internal
     #[test]
     fn new_engine_renders_discovering_and_not_cancelled() {
-        let engine = BleExchangeEngine::new(ExchangeMode::Magic, true);
+        let engine = BleExchangeEngine::new(ExchangeMode::Magic, true, vec![]);
         assert_eq!(
             engine.current_screen().screen_id,
             "exchange_ble_discovering"
@@ -359,7 +370,7 @@ mod tests {
     // @internal
     #[test]
     fn screen_entered_emits_advertise_then_scan_once() {
-        let mut engine = BleExchangeEngine::new(ExchangeMode::Bump, true);
+        let mut engine = BleExchangeEngine::new(ExchangeMode::Bump, true, vec![]);
         let cmds = engine.screen_entered();
         assert_eq!(cmds.len(), 2);
         assert!(matches!(cmds[0], Command::BleStartAdvertising { .. }));
@@ -371,7 +382,7 @@ mod tests {
     // @internal
     #[test]
     fn discovery_event_emits_connect_command_and_advances() {
-        let mut engine = BleExchangeEngine::new(ExchangeMode::Magic, true);
+        let mut engine = BleExchangeEngine::new(ExchangeMode::Magic, true, vec![]);
         let result = discover(&mut engine).expect("an active engine handles BLE events");
         match result {
             ActionResult::Commands { commands } => assert!(matches!(
@@ -386,7 +397,7 @@ mod tests {
     // @internal
     #[test]
     fn disconnect_transitions_to_failed_with_all_fallbacks() {
-        let mut engine = BleExchangeEngine::new(ExchangeMode::Shake, true);
+        let mut engine = BleExchangeEngine::new(ExchangeMode::Shake, true, vec![]);
         let _ = engine.handle_hardware_event(Event::BleDisconnected {
             reason: "lost".into(),
         });
@@ -402,7 +413,7 @@ mod tests {
     // @internal
     #[test]
     fn no_qr_fallback_offered_without_camera() {
-        let mut engine = BleExchangeEngine::new(ExchangeMode::Magic, false);
+        let mut engine = BleExchangeEngine::new(ExchangeMode::Magic, false, vec![]);
         let _ = engine.handle_hardware_event(Event::BleDisconnected { reason: "x".into() });
         let ids: Vec<String> = engine
             .current_screen()
@@ -417,7 +428,7 @@ mod tests {
     // @internal
     #[test]
     fn cancel_completes_and_marks_cancelled() {
-        let mut engine = BleExchangeEngine::new(ExchangeMode::Magic, true);
+        let mut engine = BleExchangeEngine::new(ExchangeMode::Magic, true, vec![]);
         let result = engine.handle_action(UserAction::ActionPressed {
             action_id: "cancel".into(),
         });
@@ -428,7 +439,7 @@ mod tests {
     // @internal
     #[test]
     fn retry_from_failed_resets_to_active_and_re_emits_start() {
-        let mut engine = BleExchangeEngine::new(ExchangeMode::Bump, true);
+        let mut engine = BleExchangeEngine::new(ExchangeMode::Bump, true, vec![]);
         let _ = engine.handle_hardware_event(Event::BleDisconnected { reason: "x".into() });
         assert_eq!(engine.current_screen().screen_id, "exchange_failed");
         let _ = engine.handle_action(UserAction::ActionPressed {

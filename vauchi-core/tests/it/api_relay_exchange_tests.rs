@@ -161,3 +161,40 @@ fn test_relay_contact_cannot_be_recovery_trusted() {
         other => panic!("Expected InvalidState, got: {other:?}"),
     }
 }
+
+// @scenario: contact-annotations.feature - Exchange time is recorded and exposed
+//
+// Regression for the relay-path `0` timestamp bug (problem record
+// 2026-06-07-contact-annotations, T0.1): relay-accepted contacts must
+// stamp the real exchange time from the clock, not 0 — otherwise the
+// time facet of contact search is blank for relay exchanges.
+// @internal
+#[test]
+fn test_accept_relay_exchange_records_exchange_time() {
+    use std::time::{Duration, SystemTime};
+    use vauchi_core::clock::FakeClock;
+
+    // A known, non-zero instant injected via FakeClock.
+    const KNOWN_SECS: u64 = 1_700_000_000;
+    let clock = FakeClock::new(SystemTime::UNIX_EPOCH + Duration::from_secs(KNOWN_SECS)).shared();
+    let mut wb = Vauchi::in_memory_with_clock(clock).unwrap();
+    wb.create_identity("Alice").unwrap();
+
+    let bob_identity = X3DHKeyPair::generate();
+    let bob_ephemeral = X3DHKeyPair::generate();
+
+    let alice_identity = wb.identity().unwrap();
+    let alice_x3dh = alice_identity.x3dh_keypair();
+    let (_, bob_ephemeral_pub) = X3DH::initiate(&bob_ephemeral, alice_x3dh.public_key()).unwrap();
+
+    let contact_id = wb
+        .accept_relay_exchange(bob_identity.public_key(), &bob_ephemeral_pub, "Bob")
+        .unwrap();
+
+    let contact = wb.get_contact(&contact_id).unwrap().unwrap();
+    assert_eq!(
+        contact.exchange_timestamp(),
+        Some(KNOWN_SECS),
+        "relay-accepted contact must record the real exchange time, not 0"
+    );
+}

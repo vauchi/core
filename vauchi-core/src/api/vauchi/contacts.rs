@@ -172,7 +172,12 @@ impl Vauchi {
 
         // Create contact
         let card = crate::ContactCard::new(display_name);
-        let contact = Contact::from_exchange(*identity_key, card, shared_secret.clone(), 0);
+        let contact = Contact::from_exchange(
+            *identity_key,
+            card,
+            shared_secret.clone(),
+            self.clock.unix_seconds(),
+        );
         let contact_id = contact.id().to_string();
 
         let manager = ContactManager::new(&self.storage, self.events.clone());

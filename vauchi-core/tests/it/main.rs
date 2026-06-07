@@ -381,6 +381,7 @@ mod sync_progress_tests;
 mod sync_receive_routing_tests;
 mod sync_state_tests;
 mod sync_status_engine_tests;
+mod tag_tests;
 mod tcp_transport_tests;
 mod text_normalization_tests;
 mod theme_integration_tests;

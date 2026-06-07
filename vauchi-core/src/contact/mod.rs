@@ -13,6 +13,7 @@ pub mod labels;
 pub mod local_group;
 pub mod merge;
 pub mod statistics;
+pub mod tag;
 pub mod trust;
 pub mod warnings;
 
@@ -26,6 +27,7 @@ pub use labels::{
     Group, GroupError, GroupManager, MAX_LABELS, SUGGESTED_LABELS, resolve_visible_fields,
 };
 pub use local_group::LocalGroup;
+pub use tag::Tag;
 pub use trust::TrustLevel;
 pub use visibility::{FieldVisibility, VisibilityRules};
 

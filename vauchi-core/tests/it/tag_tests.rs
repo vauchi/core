@@ -6,9 +6,13 @@
 //! domain type and its encrypted storage CRUD (`tags` table, migration v49).
 //! See `ADR-051`.
 
+use std::collections::BTreeSet;
+
+use proptest::prelude::*;
 use vauchi_core::contact::Tag;
 use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::Storage;
+use vauchi_core::sync::device_sync::TagSyncData;
 
 fn open_storage() -> Storage {
     Storage::in_memory(SymmetricKey::generate()).unwrap()
@@ -196,4 +200,96 @@ fn tag_name_survives_storage_rekey() {
     let loaded = storage.get_tag(&tag.id).unwrap().unwrap();
     assert_eq!(loaded.name, "berlin-trip", "name must decrypt after rekey");
     assert!(loaded.contains("c1"), "membership preserved across rekey");
+}
+
+// ── Adversarial names (CC-14): round-trip through encrypted storage ────────────
+
+// @scenario: contact-annotations.feature - Create a new tag on a contact
+// @internal
+#[test]
+fn create_tag_round_trips_adversarial_names() {
+    let storage = open_storage();
+    let long = "x".repeat(2000);
+    let payloads: [&str; 7] = [
+        "a",                            // minimal
+        &long,                          // very long
+        "café — naïve 日本語 🏷",        // unicode + emoji
+        "null\u{0}byte",                // embedded NUL
+        "Robert'); DROP TABLE tags;--", // SQL-injection shape
+        "  internal   spaces   here",   // internal whitespace preserved
+        "\u{202e}rtl-override",         // unicode control char
+    ];
+    for name in payloads {
+        let tag = storage.create_tag(name).unwrap();
+        let loaded = storage.get_tag(&tag.id).unwrap().unwrap();
+        assert_eq!(&loaded.name, name, "name must round-trip exactly: {name:?}");
+    }
+    assert_eq!(storage.list_tags().unwrap().len(), payloads.len());
+}
+
+// ── Property: TagSyncData round-trips (CC-04) ─────────────────────────────────
+
+fn name_strategy() -> impl Strategy<Value = String> {
+    "[\\PC]{1,40}".prop_filter("non-empty", |s| !s.is_empty())
+}
+
+proptest! {
+    /// A tag survives `Tag → TagSyncData → (serde JSON) → Tag` with identical
+    /// id, name, and membership.
+    // @internal
+    #[test]
+    fn prop_tag_sync_data_round_trips(
+        name in name_strategy(),
+        members in prop::collection::vec("[a-z0-9]{1,12}", 0..8),
+    ) {
+        let mut tag = Tag::new(&name, 123);
+        for m in &members {
+            tag.add_contact(m);
+        }
+
+        let sync = TagSyncData::from_tag(&tag);
+        let json = serde_json::to_string(&sync).unwrap();
+        let back: TagSyncData = serde_json::from_str(&json).unwrap();
+        let restored = back.to_tag();
+
+        prop_assert_eq!(&restored.id, &tag.id);
+        prop_assert_eq!(&restored.name, &name);
+        prop_assert_eq!(&restored.contact_ids, &tag.contact_ids);
+    }
+}
+
+// ── Stateful property (CC-13): membership matches a model ──────────────────────
+
+proptest! {
+    /// Random add/remove operations across a small (tag × contact) grid keep the
+    /// persisted membership exactly equal to an in-memory model set.
+    // @internal
+    #[test]
+    fn prop_tag_membership_matches_model(
+        ops in prop::collection::vec((0usize..3, 0usize..3, any::<bool>()), 1..50),
+    ) {
+        let storage = open_storage();
+        let tag_ids: Vec<String> = (0..3)
+            .map(|i| storage.create_tag(&format!("t{i}")).unwrap().id)
+            .collect();
+        let contacts = ["c0", "c1", "c2"];
+
+        let mut model: BTreeSet<(usize, usize)> = BTreeSet::new();
+        for (t, c, add) in ops {
+            if add {
+                storage.add_to_tag(&tag_ids[t], contacts[c]).unwrap();
+                model.insert((t, c));
+            } else {
+                storage.remove_from_tag(&tag_ids[t], contacts[c]).unwrap();
+                model.remove(&(t, c));
+            }
+        }
+
+        for (t, tid) in tag_ids.iter().enumerate() {
+            let tag = storage.get_tag(tid).unwrap().unwrap();
+            for (c, cid) in contacts.iter().enumerate() {
+                prop_assert_eq!(tag.contains(cid), model.contains(&(t, c)));
+            }
+        }
+    }
 }

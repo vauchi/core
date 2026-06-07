@@ -116,8 +116,9 @@ pub mod api;
 pub use api::{
     AppPasswordConfig, AuthMode, AuthResult, BIOMETRIC_UNLOCK_MIN_DURATION, BiometricUnlockOutcome,
     BroadcastResult, ConsentStatus, DeviceSyncOrchestrator, DuressAlert, DuressAlertType,
-    EmergencyWipeStatus, HandlerId, RecoveryReadiness, SetupProgress, SyncError, SyncManager,
-    Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult, VauchiSyncOutcome,
+    EmergencyWipeStatus, GroupDraft, HandlerId, RecoveryReadiness, SetupProgress, SyncError,
+    SyncManager, Vauchi, VauchiBuilder, VauchiConfig, VauchiError, VauchiEvent, VauchiResult,
+    VauchiSyncOutcome,
 };
 #[cfg(all(feature = "network-rustls", feature = "network-http"))]
 pub use api::{PERIODIC_SYNC_INTERVAL_SECONDS, PERIODIC_SYNC_MAX_RETRIES};

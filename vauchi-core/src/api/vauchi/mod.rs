@@ -49,6 +49,7 @@ pub use security::BIOMETRIC_UNLOCK_MIN_DURATION;
 pub use setup::SetupProgress;
 #[cfg(feature = "network-http")]
 pub use sync_http::{PERIODIC_SYNC_INTERVAL_SECONDS, PERIODIC_SYNC_MAX_RETRIES};
+pub use tags::GroupDraft;
 
 use std::sync::{Arc, Mutex};
 

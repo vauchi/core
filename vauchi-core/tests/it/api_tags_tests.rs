@@ -7,8 +7,8 @@
 //! Covers autocomplete-or-create, per-contact tag listing, suggestions, and
 //! validation. See `ADR-051`.
 
-use vauchi_core::Vauchi;
 use vauchi_core::exchange::{X3DH, X3DHKeyPair};
+use vauchi_core::{ContactField, FieldType, Vauchi};
 
 /// Vauchi with an identity.
 fn setup() -> Vauchi {
@@ -174,4 +174,102 @@ fn find_tag_by_name_is_trimmed_and_case_insensitive() {
     let found = wb.find_tag_by_name("  work  ").unwrap().unwrap();
     assert_eq!(found.id, created.id);
     assert!(wb.find_tag_by_name("missing").unwrap().is_none());
+}
+
+// ── Tag → Group promotion (draft → review → confirm) ──────────────────────────
+
+// @scenario: contact-annotations.feature - Promoting a tag drafts a group
+// @internal
+#[test]
+fn begin_tag_promotion_drafts_members_and_persists_nothing() {
+    let wb = setup();
+    let bob = add_contact(&wb, "Bob");
+    let carol = add_contact(&wb, "Carol");
+    let tag = wb.add_tag_to_contact(&bob, "work").unwrap();
+    wb.add_tag_to_contact(&carol, "work").unwrap();
+
+    let draft = wb.begin_tag_promotion(&tag.id).unwrap();
+
+    assert_eq!(draft.name, "work");
+    assert_eq!(draft.contact_ids.len(), 2);
+    assert!(draft.contact_ids.contains(&bob) && draft.contact_ids.contains(&carol));
+
+    // Draft is side-effect-free: no group saved, tag still present (= cancel).
+    assert!(wb.list_groups().unwrap().is_empty(), "no group persisted");
+    assert_eq!(wb.list_tags().unwrap().len(), 1, "tag untouched");
+}
+
+// @scenario: contact-annotations.feature - Promoting a tag drafts a group
+// @internal
+#[test]
+fn begin_tag_promotion_inherits_default_visible_fields() {
+    let wb = setup();
+    wb.add_own_field(ContactField::new(FieldType::Email, "Work", "a@b.com", 0))
+        .unwrap();
+    let card = wb.own_card().unwrap().unwrap();
+    let field_id = card.fields()[0].id().to_string();
+    wb.set_field_shown(&field_id, true).unwrap(); // → Everyone (default-visible)
+
+    let bob = add_contact(&wb, "Bob");
+    let tag = wb.add_tag_to_contact(&bob, "work").unwrap();
+
+    let draft = wb.begin_tag_promotion(&tag.id).unwrap();
+    assert!(
+        draft.visible_fields.contains(&field_id),
+        "draft inherits the owner's current default-visible fields"
+    );
+}
+
+// @scenario: contact-annotations.feature - Confirming the promotion saves and consumes
+// @internal
+#[test]
+fn confirm_tag_promotion_creates_group_with_reviewed_fields_and_consumes_tag() {
+    let wb = setup();
+    let bob = add_contact(&wb, "Bob");
+    let tag = wb.add_tag_to_contact(&bob, "work").unwrap();
+
+    // Owner confirms with a reviewed visible-field set (the edit step).
+    let group_id = wb
+        .confirm_tag_promotion(&tag.id, vec!["Work Email".to_string()])
+        .unwrap();
+
+    let group = wb.get_group(&group_id).unwrap();
+    assert_eq!(group.name(), "work");
+    assert!(group.contains_contact(&bob), "members carried over");
+    assert!(
+        group.is_field_visible("Work Email"),
+        "reviewed visible field applied"
+    );
+
+    // Replace semantics: the tag is consumed.
+    assert!(
+        wb.list_tags().unwrap().is_empty(),
+        "tag deleted after promotion"
+    );
+}
+
+// @scenario: contact-annotations.feature - Confirming the promotion saves and consumes
+// @internal
+#[test]
+fn confirm_tag_promotion_uses_reviewed_not_inherited_fields() {
+    let wb = setup();
+    let bob = add_contact(&wb, "Bob");
+    let tag = wb.add_tag_to_contact(&bob, "work").unwrap();
+
+    // Confirm with an empty reviewed set (owner hid everything on review).
+    let group_id = wb.confirm_tag_promotion(&tag.id, vec![]).unwrap();
+
+    let group = wb.get_group(&group_id).unwrap();
+    assert!(
+        group.visible_fields().is_empty(),
+        "confirm honours the reviewed set, not auto-inherited defaults"
+    );
+}
+
+// @scenario: contact-annotations.feature - Promoting a tag drafts a group
+// @internal
+#[test]
+fn begin_tag_promotion_unknown_tag_errors() {
+    let wb = setup();
+    assert!(wb.begin_tag_promotion("no-such-tag").is_err());
 }

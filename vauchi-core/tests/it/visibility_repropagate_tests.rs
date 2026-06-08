@@ -354,3 +354,91 @@ fn test_repropagate_uses_effective_visibility() {
         "Re-propagation should queue update using effective visibility"
     );
 }
+
+// ── Default-closed in groups mode (2026-06-08-sync-card-update-not-group-filtered, A) ──
+
+/// Own card with `work` + `personal`, a `Work` group exposing only `work`,
+/// Bob in `Work`. Returns the engine and Bob's id.
+fn vauchi_with_work_group_and_bob() -> (Vauchi, String) {
+    let wb = create_test_vauchi();
+    wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
+        .unwrap();
+    wb.add_own_field(ContactField::new(
+        FieldType::Phone,
+        "personal",
+        "+12025550123",
+        0,
+    ))
+    .unwrap();
+    let bob_id = add_contact_with_ratchet(&wb, "Bob");
+    let work = wb.create_group("Work").unwrap();
+    wb.set_group_field_visibility(work.id(), "work", true)
+        .unwrap();
+    wb.add_contact_to_group(work.id(), &bob_id).unwrap();
+    (wb, bob_id)
+}
+
+// @internal
+#[test]
+fn groups_mode_field_in_no_group_is_hidden() {
+    // `personal` is in no group → default-closed in groups mode → hidden.
+    let (wb, bob_id) = vauchi_with_work_group_and_bob();
+    assert!(
+        wb.get_effective_field_visibility(&bob_id, "work").unwrap(),
+        "Work group grants `work` → visible"
+    );
+    assert!(
+        !wb.get_effective_field_visibility(&bob_id, "personal")
+            .unwrap(),
+        "`personal` is in no group → must be hidden (default-closed in groups mode)"
+    );
+}
+
+// @internal
+#[test]
+fn ungrouped_contact_in_groups_mode_sees_no_fields() {
+    // Groups exist, but Carol is in none → default-closed → sees nothing.
+    let (wb, _bob_id) = vauchi_with_work_group_and_bob();
+    let carol_id = add_contact_with_ratchet(&wb, "Carol");
+    assert!(
+        !wb.get_effective_field_visibility(&carol_id, "work")
+            .unwrap(),
+        "Ungrouped contact in groups mode sees no fields, even `work`"
+    );
+    assert!(
+        !wb.get_effective_field_visibility(&carol_id, "personal")
+            .unwrap(),
+        "Ungrouped contact in groups mode sees no fields"
+    );
+}
+
+// @internal
+#[test]
+fn per_contact_override_grants_even_in_groups_mode() {
+    // Override is Layer C — highest precedence — so it can grant a field that
+    // no group grants, even in groups mode.
+    let (wb, _bob_id) = vauchi_with_work_group_and_bob();
+    let dave_id = add_contact_with_ratchet(&wb, "Dave");
+    wb.set_contact_visibility_override(&dave_id, "personal", true)
+        .unwrap();
+    assert!(
+        wb.get_effective_field_visibility(&dave_id, "personal")
+            .unwrap(),
+        "Per-contact override grants `personal` despite no group granting it"
+    );
+}
+
+// @internal
+#[test]
+fn no_groups_mode_preserves_default_open() {
+    // Control: with NO groups at all, fall back to Layer-A default-open
+    // (empty per-contact rules → can_see Everyone). Must not regress.
+    let wb = create_test_vauchi();
+    wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
+        .unwrap();
+    let bob_id = add_contact_with_ratchet(&wb, "Bob");
+    assert!(
+        wb.get_effective_field_visibility(&bob_id, "work").unwrap(),
+        "No-groups mode → default-open fallback keeps `work` visible"
+    );
+}

@@ -174,4 +174,77 @@ mod tests {
             "no matching group → empty allow (share nothing), still Some"
         );
     }
+
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        /// The resolved allow-list is **sound** (⊆ the union of the selected
+        /// groups' visible_fields), **floored** (never contains a
+        /// Nobody-default field), and **complete** (contains every union
+        /// field that is not Nobody). No selection → None. This is the G4
+        /// invariant a future refactor must not break.
+        // @internal
+        #[test]
+        fn resolver_is_sound_floored_and_complete(
+            nobody_idx in prop::collection::hash_set(0usize..5, 0..5),
+            group_sets in prop::collection::vec(
+                prop::collection::hash_set(0usize..5, 0..5),
+                0..4,
+            ),
+            selected_idx in prop::collection::hash_set(0usize..4, 0..4),
+        ) {
+            let fid = |i: usize| format!("f{i}");
+
+            let mut rules = VisibilityRules::new();
+            for i in 0..5usize {
+                if nobody_idx.contains(&i) {
+                    rules.set_nobody(&fid(i));
+                } else {
+                    rules.set_everyone(&fid(i));
+                }
+            }
+
+            let groups: Vec<Group> = group_sets
+                .iter()
+                .enumerate()
+                .map(|(gi, set)| {
+                    let vis: Vec<String> = set.iter().map(|&i| fid(i)).collect();
+                    let refs: Vec<&str> = vis.iter().map(|s| s.as_str()).collect();
+                    group(&format!("grp{gi}"), &refs)
+                })
+                .collect();
+
+            // Some selected ids (e.g. grp3 when only 2 groups exist) match no
+            // group — the resolver must ignore them.
+            let selected: Vec<String> =
+                selected_idx.iter().map(|&gi| format!("grp{gi}")).collect();
+
+            let allow = resolve_exchange_allow(&selected, &groups, &rules);
+
+            if selected.is_empty() {
+                prop_assert_eq!(allow, None, "no selection → share all (None)");
+            } else {
+                let allow = allow.expect("Some when groups are selected");
+                let union: HashSet<String> = groups
+                    .iter()
+                    .filter(|g| selected.iter().any(|id| id == g.id()))
+                    .flat_map(|g| g.visible_fields().iter().cloned())
+                    .collect();
+                let nobody_set: HashSet<String> =
+                    nobody_idx.iter().map(|&i| fid(i)).collect();
+
+                for f in &allow {
+                    prop_assert!(union.contains(f), "soundness: {} not in union", f);
+                    prop_assert!(!nobody_set.contains(f), "floor: Nobody {} leaked", f);
+                }
+                for f in &union {
+                    if !nobody_set.contains(f) {
+                        prop_assert!(allow.contains(f), "completeness: {} dropped", f);
+                    }
+                }
+            }
+        }
+    }
 }

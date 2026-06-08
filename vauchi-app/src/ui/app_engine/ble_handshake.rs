@@ -432,4 +432,87 @@ mod tests {
             "empty group → share nothing, got {labels:?}"
         );
     }
+
+    /// Route one side's pending BLE writes to the other as notifications on
+    /// the same characteristic (a GATT write on uuid X surfaces at the peer
+    /// as data on uuid X), applying any resulting machine event (which
+    /// persists the contact on `Completed`). Returns the writes routed.
+    fn pump(from: &mut AppEngine, to: &mut AppEngine) -> usize {
+        let mut routed = 0;
+        for cmd in from.drain_pending_commands() {
+            if let vauchi_core::Command::BleWriteCharacteristic { uuid, data } = cmd {
+                routed += 1;
+                let ev =
+                    to.forward_ble_hardware_event(&vauchi_core::Event::BleCharacteristicNotified {
+                        uuid,
+                        data,
+                    });
+                to.apply_ble_machine_event(ev);
+            }
+        }
+        routed
+    }
+
+    // @internal
+    #[test]
+    fn two_device_ble_exchange_peer_receives_only_group_visible_fields() {
+        // End-to-end G4 ratchet: Alice shares to a Work group exposing only
+        // Email; after a full two-device BLE exchange Bob's stored contact
+        // card must carry Email and NOT Phone — the privacy guarantee.
+        let (mut alice, work) = engine_with_card_and_group();
+        alice.pending_exchange_groups = vec![work];
+
+        let mut vauchi_bob = Vauchi::in_memory().expect("in-memory vauchi");
+        vauchi_bob.create_identity("Bob").expect("identity");
+        let mut bob = AppEngine::new(vauchi_bob);
+
+        let alice_token = alice
+            .vauchi
+            .identity()
+            .expect("alice identity")
+            .signing_public_key()
+            .to_vec();
+        let bob_token = bob
+            .vauchi
+            .identity()
+            .expect("bob identity")
+            .signing_public_key()
+            .to_vec();
+
+        // Each discovers the other → builds a session with the tiebreak role.
+        alice.start_ble_handshake_on_discovery(&bob_token);
+        bob.start_ble_handshake_on_discovery(&alice_token);
+
+        // Connect both; the initiator emits its KeyOffer on connect.
+        let ea = alice.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
+            device_id: "bob".into(),
+        });
+        alice.apply_ble_machine_event(ea);
+        let eb = bob.forward_ble_hardware_event(&vauchi_core::Event::BleConnected {
+            device_id: "alice".into(),
+        });
+        bob.apply_ble_machine_event(eb);
+
+        // Pump writes back and forth until the exchange settles.
+        for _ in 0..50 {
+            let a = pump(&mut alice, &mut bob);
+            let b = pump(&mut bob, &mut alice);
+            if a + b == 0 {
+                break;
+            }
+        }
+
+        let bob_contacts = bob.vauchi.list_contacts().expect("list contacts");
+        assert_eq!(bob_contacts.len(), 1, "Bob should have exactly Alice");
+        let alice_card = bob_contacts[0].card();
+        let labels: Vec<&str> = alice_card.fields().iter().map(|f| f.label()).collect();
+        assert!(
+            labels.contains(&"Email"),
+            "Email is in the Work group → must reach Bob; got {labels:?}"
+        );
+        assert!(
+            !labels.contains(&"Phone"),
+            "Phone is NOT in the Work group → must NOT reach Bob; got {labels:?}"
+        );
+    }
 }

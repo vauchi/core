@@ -106,3 +106,23 @@ fn test_deserialization_rejects_truncated_bytes() {
     let truncated = &bytes[..bytes.len() / 2];
     NfcCardPayload::from_bytes(truncated).expect_err("expected error");
 }
+
+// @internal
+#[test]
+fn nfc_payload_carries_no_card_fields_only_name_and_keys() {
+    // G4 ratchet: NFC (TapTap) transmits only identity / display-name / keys
+    // at tap time — never card fields. Card data propagates later via the
+    // relay, where group visibility already applies. If a field-bearing
+    // member is ever added to NfcCardPayload, this pins it so a group filter
+    // must be added too. See 2026-06-08-exchange-card-not-group-filtered.
+    let payload = NfcCardPayload::new([0x01; 32], "Alice".to_string(), [0x02; 32]);
+    let value = serde_json::to_value(&payload).expect("serialize");
+    let obj = value.as_object().expect("payload serializes to an object");
+    let mut keys: Vec<&str> = obj.keys().map(|k| k.as_str()).collect();
+    keys.sort_unstable();
+    assert_eq!(
+        keys,
+        vec!["crc16", "display_name", "exchange_key", "identity_key"],
+        "NfcCardPayload must carry no card-field data — only name + keys"
+    );
+}

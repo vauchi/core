@@ -87,11 +87,9 @@ fn test_vauchi_remove_own_field() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    // Add field
     let field = ContactField::new(FieldType::Phone, "phone", "+1234567890", 0);
     wb.add_own_field(field).unwrap();
 
-    // Remove field
     let removed = wb.remove_own_field("phone").unwrap();
     assert!(removed);
 
@@ -104,11 +102,9 @@ fn test_vauchi_remove_own_field() {
 fn test_vauchi_contact_operations() {
     let wb = create_test_vauchi();
 
-    // Initially no contacts
     assert_eq!(wb.contact_count().unwrap(), 0);
     assert!(wb.list_contacts().unwrap().is_empty());
 
-    // Add contact
     let contact = Contact::from_exchange(
         [1u8; 32],
         ContactCard::new("Bob"),
@@ -118,15 +114,12 @@ fn test_vauchi_contact_operations() {
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
-    // Verify contact exists
     assert_eq!(wb.contact_count().unwrap(), 1);
     wb.get_contact(&contact_id).unwrap().expect("expected Some");
 
-    // Search contacts
     let results = wb.search_contacts("bob").unwrap();
     assert_eq!(results.len(), 1);
 
-    // Remove contact
     let removed = wb.remove_contact(&contact_id).unwrap();
     assert!(removed);
     assert_eq!(wb.contact_count().unwrap(), 0);
@@ -146,11 +139,9 @@ fn test_vauchi_verify_fingerprint() {
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
-    // Initially not verified
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
     assert!(!loaded.is_fingerprint_verified());
 
-    // Verify
     wb.verify_contact_fingerprint(&contact_id).unwrap();
 
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
@@ -199,11 +190,9 @@ fn test_contact_fingerprint_format() {
 fn test_vauchi_own_fingerprint() {
     let mut wb = create_test_vauchi();
 
-    // No identity yet
     let result = wb.own_fingerprint();
     result.expect_err("expected error");
 
-    // Create identity
     wb.create_identity("Alice").unwrap();
 
     let fp = wb.own_fingerprint().unwrap();
@@ -226,11 +215,9 @@ fn test_vauchi_own_fingerprint() {
 fn test_vauchi_public_id() {
     let mut wb = create_test_vauchi();
 
-    // No identity yet
     let result = wb.public_id();
     assert!(matches!(result, Err(VauchiError::IdentityNotInitialized)));
 
-    // Create identity
     wb.create_identity("Alice").unwrap();
 
     let public_id = wb.public_id().unwrap();
@@ -277,7 +264,6 @@ fn test_propagate_card_update_to_contacts() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    // Create a contact with ratchet
     let bob_key = [1u8; 32];
     let contact = Contact::from_exchange(
         bob_key,
@@ -288,13 +274,11 @@ fn test_propagate_card_update_to_contacts() {
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
-    // Initialize ratchet for Bob
     let shared_secret = SymmetricKey::generate();
     let their_dh = X3DHKeyPair::generate();
     wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
         .unwrap();
 
-    // Get old card, update it
     let old_card = wb.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
     let _ = new_card.add_field(ContactField::new(
@@ -304,11 +288,9 @@ fn test_propagate_card_update_to_contacts() {
         0,
     ));
 
-    // Propagate update
     let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 1);
 
-    // Verify pending update was created
     let pending = wb.storage().get_pending_updates(&contact_id).unwrap();
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].update_type, "card_delta");
@@ -320,7 +302,6 @@ fn test_propagate_skips_contacts_without_ratchet() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    // Create a contact WITHOUT ratchet
     let contact = Contact::from_exchange(
         [1u8; 32],
         ContactCard::new("Bob"),
@@ -329,7 +310,6 @@ fn test_propagate_skips_contacts_without_ratchet() {
     );
     wb.add_contact(contact).unwrap();
 
-    // Get old card, update it
     let old_card = wb.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
     let _ = new_card.add_field(ContactField::new(
@@ -352,7 +332,6 @@ fn test_propagate_empty_delta_not_queued() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    // Create a contact with ratchet
     let contact = Contact::from_exchange(
         [1u8; 32],
         ContactCard::new("Bob"),
@@ -362,7 +341,6 @@ fn test_propagate_empty_delta_not_queued() {
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
-    // Initialize ratchet
     let shared_secret = SymmetricKey::generate();
     let their_dh = X3DHKeyPair::generate();
     wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
@@ -373,7 +351,6 @@ fn test_propagate_empty_delta_not_queued() {
     let queued = wb.propagate_card_update(&card, &card).unwrap();
     assert_eq!(queued, 0);
 
-    // Verify no pending updates
     let pending = wb.storage().get_pending_updates(&contact_id).unwrap();
     assert!(pending.is_empty());
 }
@@ -386,11 +363,9 @@ fn test_propagate_respects_visibility_rules() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    // Create the email field first to get its ID
     let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com", 0);
     let email_field_id = email_field.id().to_string();
 
-    // Create a contact with ratchet
     let mut contact = Contact::from_exchange(
         [1u8; 32],
         ContactCard::new("Bob"),
@@ -406,13 +381,11 @@ fn test_propagate_respects_visibility_rules() {
         .set_nobody(&email_field_id);
     wb.add_contact(contact).unwrap();
 
-    // Initialize ratchet
     let shared_secret = SymmetricKey::generate();
     let their_dh = X3DHKeyPair::generate();
     wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
         .unwrap();
 
-    // Create old and new cards - add only email field
     let old_card = wb.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
 
@@ -435,12 +408,10 @@ fn test_propagate_partial_visibility() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    // Create fields first to get their IDs
     let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com", 0);
     let email_field_id = email_field.id().to_string();
     let phone_field = ContactField::new(FieldType::Phone, "phone", "+1234567890", 0);
 
-    // Create a contact with ratchet
     let mut contact = Contact::from_exchange(
         [1u8; 32],
         ContactCard::new("Bob"),
@@ -456,7 +427,6 @@ fn test_propagate_partial_visibility() {
         .set_nobody(&email_field_id);
     wb.add_contact(contact).unwrap();
 
-    // Initialize ratchet
     let shared_secret = SymmetricKey::generate();
     let their_dh = X3DHKeyPair::generate();
     wb.create_ratchet_as_initiator(&contact_id, &shared_secret, *their_dh.public_key())
@@ -469,11 +439,9 @@ fn test_propagate_partial_visibility() {
     let _ = new_card.add_field(email_field);
     let _ = new_card.add_field(phone_field);
 
-    // Propagate - should queue update with only phone field
     let queued = wb.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 1, "Update should be queued for visible field");
 
-    // Verify the pending update was created
     let pending = wb.storage().get_pending_updates(&contact_id).unwrap();
     assert_eq!(pending.len(), 1);
 }
@@ -487,16 +455,13 @@ fn test_process_incoming_card_update() {
     use vauchi_core::exchange::X3DHKeyPair;
     use vauchi_core::sync::delta::{CardDelta, CekWrappedPayload, VersionedPayload};
 
-    // Create Alice's Vauchi
     let mut alice_wb = create_test_vauchi();
     alice_wb.create_identity("Alice").unwrap();
 
-    // Create Bob's identity and keypair for ratchet
     let bob_identity = Identity::create("Bob", 0);
     let bob_dh = X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
-    // Add Bob as a contact on Alice's side
     let contact = Contact::from_exchange(
         *bob_identity.signing_public_key(),
         ContactCard::new("Bob"),
@@ -515,7 +480,6 @@ fn test_process_incoming_card_update() {
         )
         .unwrap();
 
-    // Bob creates and encrypts an update
     let mut bob_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
@@ -547,14 +511,11 @@ fn test_process_incoming_card_update() {
     let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    // Alice processes the incoming update
     let changed = alice_wb.process_card_update(&bob_id, &encrypted).unwrap();
 
-    // Verify the changes were applied
     assert!(!changed.is_empty());
     assert!(changed.iter().any(|f| f == "work"));
 
-    // Verify Bob's card was updated
     let bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
     let bob_card = bob_contact.card();
     assert!(bob_card.fields().iter().any(|f| f.label() == "work"));
@@ -566,14 +527,11 @@ fn test_update_display_name() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    // Verify initial name
     assert_eq!(wb.identity().unwrap().display_name(), "Alice");
     assert_eq!(wb.own_card().unwrap().unwrap().display_name(), "Alice");
 
-    // Update display name
     wb.update_display_name("Alice Smith").unwrap();
 
-    // Verify both identity and card are updated
     assert_eq!(wb.identity().unwrap().display_name(), "Alice Smith");
     assert_eq!(
         wb.own_card().unwrap().unwrap().display_name(),
@@ -649,11 +607,9 @@ fn test_update_display_name_empty_fails() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    // Empty name should fail
     let result = wb.update_display_name("");
     result.expect_err("expected error");
 
-    // Whitespace-only should fail
     let result = wb.update_display_name("   ");
     result.expect_err("expected error");
 }
@@ -664,7 +620,6 @@ fn test_update_display_name_too_long_fails() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    // Name over 100 chars should fail
     let long_name = "a".repeat(101);
     let result = wb.update_display_name(&long_name);
     result.expect_err("expected error");
@@ -675,7 +630,6 @@ fn test_update_display_name_too_long_fails() {
 fn test_update_display_name_no_identity_fails() {
     let mut wb = create_test_vauchi();
 
-    // No identity yet
     let result = wb.update_display_name("Alice");
     assert!(matches!(result, Err(VauchiError::IdentityNotInitialized)));
 }
@@ -692,12 +646,10 @@ fn test_process_update_rejects_invalid_signature() {
     let mut alice_wb = create_test_vauchi();
     alice_wb.create_identity("Alice").unwrap();
 
-    // Create Bob's identity
     let bob_identity = Identity::create("Bob", 0);
     let bob_dh = X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
 
-    // Add Bob as a contact
     let contact = Contact::from_exchange(
         *bob_identity.signing_public_key(),
         ContactCard::new("Bob"),
@@ -707,7 +659,6 @@ fn test_process_update_rejects_invalid_signature() {
     let bob_id = contact.id().to_string();
     alice_wb.add_contact(contact).unwrap();
 
-    // Initialize ratchet
     alice_wb
         .create_ratchet_as_responder(
             &bob_id,
@@ -747,7 +698,6 @@ fn test_process_update_rejects_invalid_signature() {
     let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    // Should fail signature verification
     let result = alice_wb.process_card_update(&bob_id, &encrypted);
     assert!(matches!(result, Err(VauchiError::SignatureInvalid)));
 }
@@ -757,7 +707,6 @@ fn test_process_update_rejects_invalid_signature() {
 // @internal
 #[test]
 fn test_process_card_update_truncated_message() {
-    // Truncated ratchet message should fail deserialization
     let mut alice_wb = create_test_vauchi();
     alice_wb.create_identity("Alice").unwrap();
 
@@ -812,7 +761,6 @@ fn test_process_card_update_empty_payload() {
         )
         .unwrap();
 
-    // Empty payload
     let result = alice_wb.process_card_update(&bob_id, &[]);
     assert!(result.is_err(), "Empty payload should be rejected");
 }
@@ -845,14 +793,12 @@ fn test_process_card_update_malformed_json_in_ratchet() {
         )
         .unwrap();
 
-    // Encrypt malformed JSON inside a valid ratchet message
     let mut bob_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let garbage_json = b"{ this is not valid json }}}";
     let ratchet_msg = bob_ratchet.encrypt(garbage_json).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    // Should decrypt successfully but fail to parse as CardDelta
     let result = alice_wb.process_card_update(&bob_id, &encrypted);
     assert!(result.is_err(), "Malformed delta JSON should be rejected");
 }

@@ -61,7 +61,6 @@ fn build_test_cert(spki: &[u8]) -> Vec<u8> {
 }
 
 // =============================================================================
-// Pin Format Validation Tests
 // =============================================================================
 
 /// @scenario: certificate_pinning :: Pin is SHA-256 hash of DER certificate
@@ -108,7 +107,6 @@ fn test_pin_format_garbage_input() {
 }
 
 // =============================================================================
-// MITM Detection Tests
 // =============================================================================
 
 /// @scenario: certificate_pinning :: Detect MITM with forged certificate
@@ -250,7 +248,6 @@ fn test_graceful_pin_rotation_many_pins() {
 }
 
 // =============================================================================
-// SPKI Pinning Properties
 // =============================================================================
 
 /// @scenario: certificate_pinning :: SPKI pin survives cert renewal (same key)

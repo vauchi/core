@@ -74,7 +74,6 @@ fn test_verify_checksum_invalid_format() {
 fn test_verify_checksum_wrong_algorithm_prefix() {
     let data = b"hello world";
 
-    // Wrong algorithm prefix
     let wrong_algo = "md5:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
     let result = verify_checksum(data, wrong_algo);
     assert!(matches!(result, Err(IntegrityError::InvalidFormat)));

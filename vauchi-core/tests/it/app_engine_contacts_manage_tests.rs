@@ -96,7 +96,6 @@ fn contact_edit_nonexistent_shows_not_found() {
 fn contact_detail_edit_navigates_to_edit_screen() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-    // Add a contact
     let card = ContactCard::new("Bob");
     let shared_key = SymmetricKey::generate();
     let contact = Contact::from_exchange([2u8; 32], card, shared_key, 0);
@@ -104,7 +103,6 @@ fn contact_detail_edit_navigates_to_edit_screen() {
     vauchi.add_contact(contact).unwrap();
 
     let mut engine = AppEngine::new(vauchi);
-    // Navigate to ContactDetail for Bob
     engine.navigate_to(AppScreen::ContactDetail {
         contact_id: bob_id.clone(),
     });
@@ -115,7 +113,6 @@ fn contact_detail_edit_navigates_to_edit_screen() {
         }
     );
 
-    // Press the "edit" button
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "edit".into(),
     });
@@ -214,7 +211,6 @@ fn group_detail_shows_real_name_and_members() {
         screen.title, "Family",
         "Title should be the real group name"
     );
-    // With no contacts added, members list should be empty
     let has_member_list = screen.components.iter().any(|c| {
         matches!(c, Component::List { id, items, ..
         } if id == "members" && items.is_empty())
@@ -230,7 +226,6 @@ fn groups_list_item_selected_routes_to_group_detail() {
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::Groups);
 
-    // Select a group from the list
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "groups".into(),
         item_id: "g1".into(),
@@ -274,7 +269,6 @@ fn duplicate_detection_empty_shows_no_duplicates() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::ContactDuplicates);
-    // With no pairs, should show "no duplicates" text
     assert!(
         screen.components.iter().any(|c| matches!(c,
             Component::Text { content, ..
@@ -352,7 +346,6 @@ fn contact_merge_shows_both_contacts() {
         secondary_name: "Bob".into(),
         secondary_fields: vec!["phone: +1234567890".into()],
     });
-    // Should have subtitle text with both names
     assert!(
         screen.components.iter().any(|c| matches!(c,
             Component::Text { content, ..
@@ -441,7 +434,6 @@ fn contact_limit_edit_then_save() {
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::ContactLimit);
 
-    // Enter edit mode
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "edit".into(),
     });
@@ -450,7 +442,6 @@ fn contact_limit_edit_then_save() {
         "edit should update screen, got {result:?}"
     );
 
-    // Type a number
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "limit_input".into(),
         value: "100".into(),
@@ -474,12 +465,10 @@ fn contact_limit_save_invalid_returns_update_screen_with_validation_error() {
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::ContactLimit);
 
-    // Enter edit mode
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "edit".into(),
     });
 
-    // Type invalid input
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "limit_input".into(),
         value: "not_a_number".into(),
@@ -521,18 +510,15 @@ fn contact_limit_cancel_edit_restores_value() {
     let mut engine = AppEngine::new(vauchi);
     engine.navigate_to(AppScreen::ContactLimit);
 
-    // Enter edit mode
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "edit".into(),
     });
 
-    // Type something
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "limit_input".into(),
         value: "999".into(),
     });
 
-    // Cancel
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel_edit".into(),
     });

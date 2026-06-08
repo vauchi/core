@@ -12,8 +12,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::contact_card::ContactCard;
 
-// ── CardSnapshot type ────────────────────────────────────────────────────────
-
 /// An immutable, timestamped snapshot of a [`ContactCard`].
 ///
 /// Created via [`CardSnapshot::freeze`] which takes ownership of the card and
@@ -79,10 +77,6 @@ impl CardSnapshot {
         })
     }
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 // INLINE_TEST_REQUIRED: tests access CardSnapshot internals (card/created_at fields) and
 // verify snapshot isolation semantics that require constructing ContactCard directly.

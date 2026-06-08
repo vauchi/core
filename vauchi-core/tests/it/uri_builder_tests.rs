@@ -190,7 +190,6 @@ fn test_address_generates_map_query() {
     let uri = field.to_uri();
     assert!(uri.is_some(), "expected Some value");
     let uri_str = uri.unwrap();
-    // Should be a geo: URI or maps URL
     assert!(uri_str.starts_with("geo:") || uri_str.contains("maps"));
 }
 
@@ -207,7 +206,6 @@ fn test_address_is_url_encoded() {
     let uri = field.to_uri();
     assert!(uri.is_some(), "expected Some value");
     let uri_str = uri.unwrap();
-    // Spaces and commas should be encoded
     assert!(!uri_str.contains(' ') || uri_str.contains("%20") || uri_str.contains('+'));
 }
 
@@ -249,7 +247,6 @@ fn test_custom_field_value_type_detection(
 fn test_custom_field_uses_heuristic_for_uri() {
     let field = ContactField::new(FieldType::Custom, "Signal", "+1-555-987-6543", 0);
     let uri = field.to_uri();
-    // Should detect as phone and return tel: URI
     assert!(uri.is_some(), "expected Some value");
     assert!(uri.unwrap().starts_with("tel:"));
 }
@@ -317,7 +314,6 @@ fn test_blocked_scheme(#[case] scheme: &str) {
 }
 
 // ============================================================
-// Edge Cases
 // ============================================================
 
 // @internal
@@ -343,7 +339,6 @@ fn test_special_characters_in_email_encoded() {
     let field = ContactField::new(FieldType::Email, "Test", "test&user@example.com", 0);
     let uri = field.to_uri();
     assert!(uri.is_some(), "expected Some value");
-    // & should be safe in mailto but let's verify it's handled
     assert!(uri.unwrap().contains("test"));
 }
 
@@ -439,7 +434,6 @@ fn test_social_secondary_actions() {
 fn test_custom_field_secondary_actions() {
     let field = ContactField::new(FieldType::Custom, "Notes", "+1-555-987-6543", 0);
     let actions = field.to_secondary_actions();
-    // Detected as phone, should have Call, SMS, Copy
     assert_eq!(actions.len(), 3);
     assert!(actions.contains(&ContactAction::Call("+1-555-987-6543".to_string())));
     assert!(actions.contains(&ContactAction::SendSms("+1-555-987-6543".to_string())));
@@ -489,7 +483,6 @@ fn test_directions_uri_special_chars_encoded() {
     let uri = field.to_directions_uri();
     assert!(uri.is_some(), "expected Some value");
     let uri_str = uri.unwrap();
-    // Apostrophe and # should be encoded
     assert!(!uri_str.contains('\'') || uri_str.contains("%27"));
     assert!(!uri_str.contains('#') || uri_str.contains("%23"));
 }
@@ -576,7 +569,6 @@ fn test_contact_with_multiple_actionable_fields() {
     ))
     .unwrap();
 
-    // All fields should generate valid URIs
     for field in card.fields() {
         let uri = field.to_uri();
         assert!(uri.is_some(), "Field {} should have a URI", field.label());
@@ -748,7 +740,6 @@ fn test_international_phone_formats() {
 // @internal
 #[test]
 fn test_action_type_categorization() {
-    // Verify action types for icon mapping
     let phone = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567", 0);
     assert!(matches!(phone.to_action(), ContactAction::Call(_)));
 
@@ -763,7 +754,6 @@ fn test_action_type_categorization() {
 }
 
 // ============================================================
-// Security Integration Tests
 // ============================================================
 
 /// Security test: XSS attempt in website field blocked
@@ -828,7 +818,6 @@ fn test_custom_field_malicious_url_blocked() {
 }
 
 // ============================================================
-// Edge Case Integration Tests
 // ============================================================
 
 /// Edge case: Very long URL
@@ -848,7 +837,6 @@ fn test_very_long_url() {
 fn test_unicode_domain_url() {
     let field = ContactField::new(FieldType::Website, "IDN", "https://例え.jp", 0);
     let uri = field.to_uri();
-    // Should preserve or encode the unicode domain
     assert!(uri.is_some(), "expected Some value");
 }
 
@@ -875,7 +863,6 @@ fn test_address_special_characters() {
     );
     let uri = field.to_uri();
     assert!(uri.is_some(), "expected Some value");
-    // Special characters should be encoded
     let uri_str = uri.unwrap();
     assert!(uri_str.contains("geo:") || uri_str.contains("maps"));
 }

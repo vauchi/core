@@ -15,7 +15,6 @@ use vauchi_core::{
 };
 
 // =============================================================================
-// Field Limit Tests
 // =============================================================================
 
 /// Maximum number of fields allowed per card
@@ -27,7 +26,6 @@ use vauchi_core::contact_card::MAX_FIELDS;
 fn test_card_at_max_fields_rejects_addition() {
     let mut card = ContactCard::new("Test");
 
-    // Add fields up to limit
     for i in 0..MAX_FIELDS {
         let result = card.add_field(ContactField::new(
             FieldType::Custom,
@@ -40,7 +38,6 @@ fn test_card_at_max_fields_rejects_addition() {
 
     assert_eq!(card.fields().len(), MAX_FIELDS);
 
-    // Try to add one more - should fail
     let result = card.add_field(ContactField::new(FieldType::Custom, "extra", "value", 0));
     assert!(result.is_err(), "Should reject field beyond limit");
 }
@@ -51,7 +48,6 @@ fn test_card_at_max_fields_rejects_addition() {
 fn test_card_at_max_fields_allows_modification() {
     let mut card = ContactCard::new("Test");
 
-    // Add fields up to limit
     for i in 0..MAX_FIELDS {
         card.add_field(ContactField::new(
             FieldType::Custom,
@@ -62,7 +58,6 @@ fn test_card_at_max_fields_allows_modification() {
         .unwrap();
     }
 
-    // Modify existing field - should succeed
     let field_id = card.fields()[0].id().to_string();
     let result = card.update_field_value(&field_id, "new_value", 0);
     assert!(result.is_ok(), "Should allow modifying existing field");
@@ -74,7 +69,6 @@ fn test_card_at_max_fields_allows_modification() {
 fn test_card_at_max_fields_allows_removal() {
     let mut card = ContactCard::new("Test");
 
-    // Add fields up to limit
     for i in 0..MAX_FIELDS {
         card.add_field(ContactField::new(
             FieldType::Custom,
@@ -85,13 +79,11 @@ fn test_card_at_max_fields_allows_removal() {
         .unwrap();
     }
 
-    // Remove a field - should succeed
     let field_id = card.fields()[0].id().to_string();
     let result = card.remove_field(&field_id);
     assert!(result.is_ok(), "Should allow removing field");
     assert_eq!(card.fields().len(), MAX_FIELDS - 1);
 
-    // Now can add another field
     let result = card.add_field(ContactField::new(FieldType::Custom, "new", "value", 0));
     assert!(result.is_ok(), "Should allow adding after removal");
 }
@@ -224,7 +216,6 @@ fn test_empty_string_field_value() {
 }
 
 // =============================================================================
-// Delta Edge Cases
 // =============================================================================
 
 /// Test: Delta with only display name change
@@ -246,7 +237,6 @@ fn test_delta_with_many_fields() {
     let mut old = ContactCard::new("Test");
     let mut new = ContactCard::new("Test");
 
-    // Add same 10 fields to both
     for i in 0..10 {
         old.add_field(ContactField::new(
             FieldType::Custom,
@@ -296,13 +286,11 @@ fn test_delta_apply_preserves_display_name() {
     let mut target = old.clone();
     let delta = CardDelta::compute(&old, &new, 0);
 
-    // Apply should not change display name
     let _ = delta.apply(&mut target, 0);
     assert_eq!(target.display_name(), "Preserved Name");
 }
 
 // =============================================================================
-// Device Registry Edge Cases
 // =============================================================================
 
 /// Test: Device registry at max devices
@@ -315,7 +303,6 @@ fn test_device_registry_at_max_devices() {
     let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
-    // Add up to max
     for i in 1..MAX_DEVICES {
         let device = DeviceInfo::derive(&master_seed, i as u32, format!("Device {}", i), 0);
         registry
@@ -352,7 +339,6 @@ fn test_device_revocation_when_at_two() {
 }
 
 // =============================================================================
-// Visibility Edge Cases
 // =============================================================================
 
 /// Test: Visibility with all fields hidden
@@ -372,14 +358,12 @@ fn test_visibility_all_fields_hidden() {
 
     let mut contact = wb.get_contact(&contact_id).unwrap().unwrap();
 
-    // Hide all potential fields
     contact.visibility_rules_mut().unwrap().set_nobody("field1");
     contact.visibility_rules_mut().unwrap().set_nobody("field2");
     contact.visibility_rules_mut().unwrap().set_nobody("field3");
 
     wb.storage().save_contact(&contact).unwrap();
 
-    // Verify all are hidden
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
     let rules = loaded.visibility_rules();
     assert!(matches!(
@@ -414,7 +398,6 @@ fn test_visibility_default_is_everyone() {
     let contact = wb.get_contact(&contact_id).unwrap().unwrap();
     let rules = contact.visibility_rules();
 
-    // Non-configured field should default to Everyone
     assert!(matches!(
         rules.unwrap().get("any-field"),
         FieldVisibility::Everyone
@@ -422,7 +405,6 @@ fn test_visibility_default_is_everyone() {
 }
 
 // =============================================================================
-// Identity Edge Cases
 // =============================================================================
 
 /// Test: Identity with very long display name
@@ -457,7 +439,6 @@ fn test_backup_with_complex_password() {
 }
 
 // =============================================================================
-// Contact Edge Cases
 // =============================================================================
 
 /// Test: Contact with very long display name
@@ -499,7 +480,6 @@ fn test_contact_search_case_insensitive() {
     wb.add_contact(contact2).unwrap();
     wb.add_contact(contact3).unwrap();
 
-    // Search should find all
     let results = wb.search_contacts("alice").unwrap();
     assert_eq!(results.len(), 3);
 
@@ -541,7 +521,6 @@ fn test_contact_search_partial_match() {
 }
 
 // =============================================================================
-// Storage Edge Cases
 // =============================================================================
 
 /// Test: Saving same contact twice updates
@@ -564,7 +543,6 @@ fn test_saving_contact_twice_updates() {
 
     wb.add_contact(contact).unwrap();
 
-    // Modify and save again
     let mut contact = wb.get_contact(&contact_id).unwrap().unwrap();
     let field_id = contact.card().fields()[0].id().to_string();
     let mut card = contact.card().clone();
@@ -573,7 +551,6 @@ fn test_saving_contact_twice_updates() {
     contact.update_card(card, 0);
     wb.storage().save_contact(&contact).unwrap();
 
-    // Verify update persisted
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
     let email = loaded
         .card()
@@ -592,7 +569,6 @@ fn test_contact_count_accuracy() {
 
     assert_eq!(wb.contact_count().unwrap(), 0);
 
-    // Add 3 contacts
     for i in 0..3 {
         let contact = Contact::from_exchange(
             [i as u8; 32],
@@ -604,12 +580,10 @@ fn test_contact_count_accuracy() {
     }
     assert_eq!(wb.contact_count().unwrap(), 3);
 
-    // Remove one
     let contacts = wb.list_contacts().unwrap();
     wb.remove_contact(contacts[0].id()).unwrap();
     assert_eq!(wb.contact_count().unwrap(), 2);
 
-    // Add another
     let contact = Contact::from_exchange(
         [99u8; 32],
         ContactCard::new("New"),

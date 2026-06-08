@@ -20,7 +20,6 @@ fn setup_vauchi_with_data() -> Vauchi {
     let mut v = Vauchi::in_memory().unwrap();
     v.create_identity("Alice Smith").unwrap();
 
-    // Add fields to own card
     v.add_own_field(ContactField::new(
         FieldType::Email,
         "work",
@@ -36,7 +35,6 @@ fn setup_vauchi_with_data() -> Vauchi {
     ))
     .unwrap();
 
-    // Add exchanged contacts via storage
     let card_bob = ContactCard::new("Bob");
     let key_bob = SymmetricKey::generate();
     let bob = Contact::from_exchange([0xBB; 32], card_bob, key_bob, 0);
@@ -47,7 +45,6 @@ fn setup_vauchi_with_data() -> Vauchi {
     let carol = Contact::from_exchange([0xCC; 32], card_carol, key_carol, 0);
     v.update_contact(&carol).unwrap();
 
-    // Add an imported contact
     let card_dave = ContactCard::new("Dave");
     let dave = Contact::from_import(
         card_dave,
@@ -68,11 +65,9 @@ fn setup_vauchi_with_data() -> Vauchi {
 fn full_backup_api_roundtrip() {
     let v = setup_vauchi_with_data();
 
-    // Export full backup
     let backup_hex = v.export_full_backup(BACKUP_PASSWORD).unwrap();
     assert!(!backup_hex.is_empty());
 
-    // Import on a fresh Vauchi instance
     let mut v2 = Vauchi::in_memory().unwrap();
     v2.import_full_backup(&backup_hex, BACKUP_PASSWORD).unwrap();
 
@@ -139,7 +134,6 @@ fn full_backup_api_import_rejects_existing_identity() {
     let v = setup_vauchi_with_data();
     let backup_hex = v.export_full_backup(BACKUP_PASSWORD).unwrap();
 
-    // Create a second instance WITH an identity already
     let mut v2 = Vauchi::in_memory().unwrap();
     v2.create_identity("Already Here").unwrap();
 

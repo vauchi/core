@@ -15,8 +15,6 @@ use crate::exchange::capability::types::DeviceCapabilities;
 use crate::exchange::exchange_id::ExchangeId;
 use crate::exchange::mode::ExchangeMode;
 
-// ── Payload type ─────────────────────────────────────────────────────────────
-
 /// Bootstrap payload included in the first message of an exchange session.
 ///
 /// Sent by the initiator to declare the proposed mode, the device's
@@ -54,8 +52,6 @@ impl ExchangeModePayload {
         now_secs > self.timestamp.saturating_add(u64::from(self.ttl_seconds))
     }
 }
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 // INLINE_TEST_REQUIRED: tests verify serde roundtrip fidelity for ExchangeModePayload
 // including ExchangeId hex serialization which is not visible from outside the module.

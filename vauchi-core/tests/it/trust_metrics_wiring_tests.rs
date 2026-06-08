@@ -201,7 +201,6 @@ fn test_verifier_chain_exchange_records_method_in_trust_metrics() {
 // @scenario: contact_exchange :: Transport proximity is derived correctly for each transport type
 #[test]
 fn test_transport_proximity_derivation() {
-    // Verify the derivation logic that build_trust_metrics relies on
     assert_eq!(
         TransportProximity::for_transport(ExchangeTransport::Usb),
         TransportProximity::Physical,
@@ -276,11 +275,9 @@ fn test_mutual_qr_exchange_both_sides_have_trust_metrics() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Both start QR display
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
-    // Cross-scan
     let alice_qr = alice_session.qr().unwrap().clone();
     let bob_qr = bob_session.qr().unwrap().clone();
 
@@ -291,13 +288,11 @@ fn test_mutual_qr_exchange_both_sides_have_trust_metrics() {
         .apply(ExchangeEvent::ProcessQR(alice_qr))
         .unwrap();
 
-    // Acknowledge
     alice_session
         .apply(ExchangeEvent::TheyScannedOurQR)
         .unwrap();
     bob_session.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
 
-    // Key agreement
     alice_session
         .apply(ExchangeEvent::PerformKeyAgreement)
         .unwrap();
@@ -305,11 +300,9 @@ fn test_mutual_qr_exchange_both_sides_have_trust_metrics() {
         .apply(ExchangeEvent::PerformKeyAgreement)
         .unwrap();
 
-    // Proximity check
     alice_session.run_proximity_check();
     bob_session.run_proximity_check();
 
-    // Complete
     alice_session
         .apply(ExchangeEvent::CompleteExchange(bob_card))
         .unwrap();
@@ -334,7 +327,6 @@ fn test_mutual_qr_exchange_both_sides_have_trust_metrics() {
         .trust_metrics()
         .expect("Bob's contact must have trust_metrics");
 
-    // Both used QR transport
     assert_eq!(alice_metrics.transport, ExchangeTransport::Qr);
     assert_eq!(bob_metrics.transport, ExchangeTransport::Qr);
 
@@ -342,7 +334,6 @@ fn test_mutual_qr_exchange_both_sides_have_trust_metrics() {
     assert_eq!(alice_metrics.proximity, ProximityConfidence::High);
     assert_eq!(bob_metrics.proximity, ProximityConfidence::High);
 
-    // Both have valid timestamps
     assert!(alice_metrics.timestamp > 0);
     assert!(bob_metrics.timestamp > 0);
 }

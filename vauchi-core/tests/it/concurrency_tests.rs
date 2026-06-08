@@ -20,7 +20,6 @@ use vauchi_core::storage::Storage;
 use vauchi_core::{ContactCard, ContactField, FieldType};
 
 // =============================================================================
-// HELPER FUNCTIONS
 // =============================================================================
 
 /// Open storage with retries for CI environments where heavy parallel test
@@ -61,7 +60,6 @@ fn create_test_contact(name: &str) -> Contact {
 }
 
 // =============================================================================
-// SEQUENTIAL OPERATION TESTS
 // =============================================================================
 
 // @internal
@@ -70,7 +68,6 @@ fn test_sequential_contact_operations() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();
 
-    // Perform many sequential operations
     let mut contact_ids = Vec::new();
 
     for i in 0..100 {
@@ -80,17 +77,14 @@ fn test_sequential_contact_operations() {
         contact_ids.push(id);
     }
 
-    // Verify all contacts exist
     let contacts = storage.list_contacts().unwrap();
     assert_eq!(contacts.len(), 100);
 
-    // Verify each can be loaded individually
     for id in &contact_ids {
         let loaded = storage.load_contact(id).unwrap();
         assert!(loaded.is_some(), "expected Some value");
     }
 
-    // Delete half and verify
     for id in contact_ids.iter().take(50) {
         storage.delete_contact(id).unwrap();
     }
@@ -107,7 +101,6 @@ fn test_sequential_pending_update_operations() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();
 
-    // Queue many updates
     for i in 0..50 {
         let update = PendingUpdate {
             id: format!("update-{}", i),
@@ -122,7 +115,6 @@ fn test_sequential_pending_update_operations() {
         storage.queue_update(&update).unwrap();
     }
 
-    // Verify all queued
     let updates = storage.get_all_pending_updates().unwrap();
     assert_eq!(updates.len(), 50);
 
@@ -136,7 +128,6 @@ fn test_sequential_pending_update_operations() {
 }
 
 // =============================================================================
-// FILE-BASED CONCURRENT ACCESS TESTS
 // =============================================================================
 
 // @internal
@@ -147,14 +138,12 @@ fn test_multiple_connections_same_file() {
 
     let key = SymmetricKey::generate();
 
-    // Create first connection and write data
     {
         let storage1 = Storage::open(&db_path, key.clone()).unwrap();
         let contact = create_test_contact("Alice");
         storage1.save_contact(&contact).unwrap();
     }
 
-    // Create second connection and read data
     {
         let storage2 = Storage::open(&db_path, key.clone()).unwrap();
         let contacts = storage2.list_contacts().unwrap();
@@ -162,14 +151,12 @@ fn test_multiple_connections_same_file() {
         assert_eq!(contacts[0].card().display_name(), "Alice");
     }
 
-    // Create third connection and add more
     {
         let storage3 = Storage::open(&db_path, key.clone()).unwrap();
         let contact = create_test_contact("Bob");
         storage3.save_contact(&contact).unwrap();
     }
 
-    // Verify with fourth connection
     {
         let storage4 = Storage::open(&db_path, key).unwrap();
         let contacts = storage4.list_contacts().unwrap();
@@ -185,7 +172,6 @@ fn test_concurrent_readers_file_based() {
 
     let key = SymmetricKey::generate();
 
-    // Setup: create some data
     {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
         for i in 0..10 {
@@ -210,10 +196,8 @@ fn test_concurrent_readers_file_based() {
 
             let contacts = storage.list_contacts().unwrap();
 
-            // Verify we read correct data
             assert_eq!(contacts.len(), 10, "Thread {} saw wrong count", thread_id);
 
-            // Read each contact
             for contact in &contacts {
                 let loaded = storage.load_contact(contact.id()).unwrap();
                 assert!(loaded.is_some(), "expected Some value");
@@ -224,7 +208,6 @@ fn test_concurrent_readers_file_based() {
         handles.push(handle);
     }
 
-    // Wait for all threads to complete
     for handle in handles {
         let thread_id = handle.join().expect("Thread panicked");
         assert!(thread_id < 5);
@@ -239,7 +222,6 @@ fn test_sequential_writers_file_based() {
 
     let key = SymmetricKey::generate();
 
-    // Initialize database
     {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
         let _ = storage.list_contacts().unwrap(); // Just init
@@ -265,21 +247,17 @@ fn test_sequential_writers_file_based() {
         handles.push(handle);
     }
 
-    // Wait for all threads to complete
     for handle in handles {
         handle.join().expect("Thread panicked");
     }
 
-    // Verify all data was written
     let storage = Storage::open(&db_path, key).unwrap();
     let contacts = storage.list_contacts().unwrap();
 
-    // Should have 5 threads * 10 contacts = 50 total
     assert_eq!(contacts.len(), 50);
 }
 
 // =============================================================================
-// READ-AFTER-WRITE CONSISTENCY TESTS
 // =============================================================================
 
 // @internal
@@ -290,7 +268,6 @@ fn test_read_after_write_consistency() {
 
     let key = SymmetricKey::generate();
 
-    // Write from one connection
     let contact = create_test_contact("Consistency Test");
     let contact_id = contact.id().to_string();
     {
@@ -315,32 +292,26 @@ fn test_update_visibility_consistency() {
 
     let key = SymmetricKey::generate();
 
-    // Create contact
     let contact = create_test_contact("Visibility Test");
     let contact_id = contact.id().to_string();
 
-    // Save and update from different connections
     {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
         storage.save_contact(&contact).unwrap();
     }
 
-    // Update own card from another connection
     {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
         let card = ContactCard::new("Updated Name");
         storage.save_own_card(&card).unwrap();
     }
 
-    // Verify both changes persisted
     {
         let storage = Storage::open(&db_path, key).unwrap();
 
-        // Contact should exist
         let loaded = storage.load_contact(&contact_id).unwrap();
         assert!(loaded.is_some(), "expected Some value");
 
-        // Own card should be updated
         let own_card = storage.load_own_card().unwrap();
         assert!(own_card.is_some(), "expected Some value");
         assert_eq!(own_card.unwrap().display_name(), "Updated Name");
@@ -348,7 +319,6 @@ fn test_update_visibility_consistency() {
 }
 
 // =============================================================================
-// STRESS TESTS
 // =============================================================================
 
 // @internal
@@ -359,7 +329,6 @@ fn test_rapid_open_close_cycles() {
 
     let key = SymmetricKey::generate();
 
-    // Initialize
     {
         let storage = Storage::open(&db_path, key.clone()).unwrap();
         let contact = create_test_contact("Initial");
@@ -382,21 +351,18 @@ fn test_interleaved_reads_writes() {
 
     let key = SymmetricKey::generate();
 
-    // Initialize
     {
         let _ = Storage::open(&db_path, key.clone()).unwrap();
     }
 
     // Interleaved read-write operations with retry for SQLite contention
     for i in 0..20 {
-        // Write
         {
             let storage = open_with_retry(&db_path, key.clone(), 5);
             let contact = create_test_contact(&format!("Contact {}", i));
             storage.save_contact(&contact).unwrap();
         }
 
-        // Read and verify count
         {
             let storage = open_with_retry(&db_path, key.clone(), 5);
             let contacts = storage.list_contacts().unwrap();
@@ -415,11 +381,9 @@ fn test_delete_nonexistent_is_idempotent() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();
 
-    // Deleting non-existent contact should not error
     let result = storage.delete_contact("does-not-exist");
     assert!(result.is_ok(), "expected success");
 
-    // Deleting same non-existent ID multiple times should all succeed
     for _ in 0..10 {
         let result = storage.delete_contact("still-does-not-exist");
         assert!(result.is_ok(), "expected success");
@@ -432,7 +396,6 @@ fn test_double_save_overwrites() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();
 
-    // Save contact
     let mut card = ContactCard::new("Original Name");
     card.add_field(ContactField::new(
         FieldType::Email,
@@ -447,11 +410,9 @@ fn test_double_save_overwrites() {
 
     storage.save_contact(&contact).unwrap();
 
-    // Load and verify
     let loaded = storage.load_contact(&id).unwrap().unwrap();
     assert_eq!(loaded.card().display_name(), "Original Name");
 
-    // Create new contact with same public key to get same ID
     let mut card2 = ContactCard::new("Updated Name");
     card2
         .add_field(ContactField::new(
@@ -467,7 +428,6 @@ fn test_double_save_overwrites() {
     // Save should overwrite (upsert behavior)
     storage.save_contact(&contact2).unwrap();
 
-    // Verify updated
     let loaded2 = storage.load_contact(&id).unwrap().unwrap();
     assert_eq!(loaded2.card().display_name(), "Updated Name");
 }

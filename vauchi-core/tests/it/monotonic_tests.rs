@@ -78,7 +78,6 @@ fn shared_constructors_return_dyn_handles() {
 
     // Canonical injection pattern: keep the concrete Arc to drive
     // `advance()`, hand a cloned `dyn` handle to the system under test.
-    // Both share one inner offset via the Arc.
     let fake = Arc::new(FakeMonotonicClock::new());
     let injected: Arc<dyn MonotonicClock> = fake.clone();
     let f0 = injected.now();

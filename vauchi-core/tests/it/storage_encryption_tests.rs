@@ -71,7 +71,6 @@ fn test_own_card_stored_as_encrypted_blob() {
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
 
-    // The encrypted column should contain a BLOB, not readable JSON
     let result: Option<Vec<u8>> = raw_conn
         .query_row(
             "SELECT card_json_encrypted FROM own_card WHERE id = 1",
@@ -262,26 +261,21 @@ fn test_load_all_labels_encrypted() {
 fn test_migration_v13_adds_encrypted_columns() {
     let (dir, _storage) = open_storage();
 
-    // Verify columns exist by querying the schema
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
 
-    // Check own_card has card_json_encrypted column
     raw_conn
         .prepare("SELECT card_json_encrypted FROM own_card LIMIT 0")
         .expect("own_card.card_json_encrypted column should exist");
 
-    // Check device_registry has registry_json_encrypted column
     raw_conn
         .prepare("SELECT registry_json_encrypted FROM device_registry LIMIT 0")
         .expect("device_registry.registry_json_encrypted column should exist");
 
-    // Check device_sync_state has state_json_encrypted column
     raw_conn
         .prepare("SELECT state_json_encrypted FROM device_sync_state LIMIT 0")
         .expect("device_sync_state.state_json_encrypted column should exist");
 
-    // Check visibility_labels has encrypted columns
     raw_conn
         .prepare("SELECT contacts_json_encrypted, visible_fields_json_encrypted FROM visibility_labels LIMIT 0")
         .expect("visibility_labels encrypted columns should exist");
@@ -322,7 +316,6 @@ fn test_migration_v13_fallback_reads_plaintext() {
         let card = ContactCard::new("PreMigration");
         let card_json = serde_json::to_string(&card).unwrap();
 
-        // Write plaintext JSON to the old column and null out encrypted
         storage
             .connection()
             .execute(
@@ -361,7 +354,6 @@ fn test_device_registry_json_export_with_encrypted_storage() {
         .expect("JSON export should work");
     assert!(!json.is_empty());
 
-    // The JSON should be valid
     let _: serde_json::Value = serde_json::from_str(&json).unwrap();
 }
 
@@ -375,11 +367,9 @@ fn test_rekey_preserves_own_card() {
     let card = ContactCard::new("ReKeyTest");
     storage.save_own_card(&card).unwrap();
 
-    // Rekey to a new encryption key
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    // Data should still be readable after rekey
     let loaded = storage.load_own_card().unwrap().expect("Card should exist");
     assert_eq!(loaded.display_name(), "ReKeyTest");
 }

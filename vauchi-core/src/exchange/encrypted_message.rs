@@ -90,7 +90,6 @@ impl EncryptedExchangeMessage {
         our_identity_key: &[u8; 32],
         our_display_name: &str,
     ) -> Result<(Self, SymmetricKey), ExchangeError> {
-        // Perform X3DH key agreement to get shared secret and ephemeral key
         let (shared_secret, ephemeral_public_key) = X3DH::initiate(our_keys, their_public)?;
 
         // Create the payload to encrypt (includes our X3DH public key for responses)
@@ -100,11 +99,9 @@ impl EncryptedExchangeMessage {
             display_name: our_display_name.to_string(),
         };
 
-        // Serialize payload to JSON
         let payload_bytes =
             serde_json::to_vec(&payload).map_err(|_| ExchangeError::SerializationFailed)?;
 
-        // Encrypt with the shared secret
         let ciphertext =
             encrypt(&shared_secret, &payload_bytes).map_err(|_| ExchangeError::CryptoError)?;
 
@@ -133,7 +130,6 @@ impl EncryptedExchangeMessage {
         &self,
         our_keys: &X3DHKeyPair,
     ) -> Result<(DecryptedExchangePayload, SymmetricKey), ExchangeError> {
-        // Derive the shared secret using X3DH::respond
         // DH1 uses sender_exchange_key for identity binding. The X3DH
         // primitive still takes raw 32-byte references; the wire-side
         // newtype is unwrapped here to keep core crypto untouched.
@@ -143,11 +139,9 @@ impl EncryptedExchangeMessage {
             self.ephemeral_public_key.as_bytes(),
         )?;
 
-        // Decrypt the ciphertext
         let payload_bytes =
             decrypt(&shared_secret, &self.ciphertext).map_err(|_| ExchangeError::CryptoError)?;
 
-        // Deserialize the payload
         let payload: ExchangePayload = serde_json::from_slice(&payload_bytes)
             .map_err(|_| ExchangeError::SerializationFailed)?;
 

@@ -219,7 +219,6 @@ fn low_confidence_accept_anyway_shows_confirm() {
     });
     match result {
         ActionResult::UpdateScreen(screen) => {
-            // Should show InlineConfirm for risky acceptance
             let has_confirm = screen
                 .components
                 .iter()

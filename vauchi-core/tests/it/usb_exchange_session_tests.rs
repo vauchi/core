@@ -117,7 +117,6 @@ fn full_usb_exchange_ceremony_via_commands() {
     };
 
     // Step 2: Frontend exchanges payloads over TCP (simulated here by swapping)
-    // Alice receives Bob's payload, Bob receives Alice's payload
 
     // Step 3: Frontend reports received payloads as hardware events
     alice_session
@@ -129,7 +128,6 @@ fn full_usb_exchange_ceremony_via_commands() {
         })
         .expect("bob process payload");
 
-    // Both should be in AwaitingKeyAgreement
     assert!(matches!(
         alice_session.state(),
         ExchangeState::AwaitingKeyAgreement { .. }
@@ -383,7 +381,6 @@ fn full_usb_exchange_over_tcp_loopback() {
         other => panic!("expected DirectSend from bob, got {:?}", other),
     };
 
-    // Verify roles
     assert!(alice_init, "alice should be initiator");
     assert!(!bob_init, "bob should be responder");
 
@@ -414,7 +411,6 @@ fn full_usb_exchange_over_tcp_loopback() {
         })
         .expect("bob processes alice payload");
 
-    // Both should be in AwaitingKeyAgreement
     assert!(
         matches!(
             alice_session.state(),
@@ -430,7 +426,6 @@ fn full_usb_exchange_over_tcp_loopback() {
         "bob should be in AwaitingKeyAgreement"
     );
 
-    // Complete key agreement
     alice_session
         .apply(ExchangeEvent::PerformKeyAgreement)
         .expect("alice key agreement");
@@ -438,7 +433,6 @@ fn full_usb_exchange_over_tcp_loopback() {
         .apply(ExchangeEvent::PerformKeyAgreement)
         .expect("bob key agreement");
 
-    // Both should now be in AwaitingCardExchange
     assert!(
         matches!(
             alice_session.state(),
@@ -463,7 +457,6 @@ fn usb_direct_payload_on_qr_session_is_rejected() {
     let bob_id = create_identity("Bob");
     let bob_card = create_card(&bob_id);
 
-    // Create a QR session, not USB
     let mut session = ExchangeSession::new_qr(
         identity,
         card,

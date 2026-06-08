@@ -89,7 +89,6 @@ fn update_imported_contact_field_succeeds() {
     wb.add_imported_contact_field(&id, FieldType::Email, "work", "carol@old.com")
         .unwrap();
 
-    // Retrieve the field ID
     let contact = wb.get_contact(&id).unwrap().unwrap();
     let field_id = contact
         .card()
@@ -100,11 +99,9 @@ fn update_imported_contact_field_succeeds() {
         .id()
         .to_string();
 
-    // Update the field value
     wb.update_imported_contact_field(&id, &field_id, "carol@new.com")
         .unwrap();
 
-    // Verify the update persisted
     let updated = wb.get_contact(&id).unwrap().unwrap();
     let field = updated
         .card()
@@ -198,7 +195,6 @@ fn remove_imported_contact_field_succeeds() {
     let wb = new_vauchi();
     let id = add_imported(&wb, "Grace Import");
 
-    // Add a field first
     wb.add_imported_contact_field(&id, FieldType::Email, "home", "grace@home.com")
         .unwrap();
 
@@ -212,10 +208,8 @@ fn remove_imported_contact_field_succeeds() {
         .id()
         .to_string();
 
-    // Remove the field
     wb.remove_imported_contact_field(&id, &field_id).unwrap();
 
-    // Verify the field is gone
     let after = wb.get_contact(&id).unwrap().unwrap();
     assert!(
         after.card().fields().iter().all(|f| f.id() != field_id),

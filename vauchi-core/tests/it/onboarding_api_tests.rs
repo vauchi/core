@@ -132,7 +132,6 @@ fn periodic_sync_constants_match_audit_recommendation() {
 }
 
 // =============================================================================
-// Vauchi API Integration Tests
 // =============================================================================
 
 // @scenario: onboarding:api_advance (#26)
@@ -140,15 +139,12 @@ fn periodic_sync_constants_match_audit_recommendation() {
 fn test_api_get_and_advance_onboarding() {
     let vauchi = create_test_vauchi();
 
-    // Get initial progress
     let progress = vauchi.get_onboarding_progress().unwrap();
     assert_eq!(progress.current_step(), OnboardingStep::IdentityCheck);
 
-    // Advance
     let progress = vauchi.advance_onboarding().unwrap();
     assert_eq!(progress.current_step(), OnboardingStep::LinkChoice);
 
-    // Progress persists
     let progress = vauchi.get_onboarding_progress().unwrap();
     assert_eq!(progress.current_step(), OnboardingStep::LinkChoice);
 }
@@ -161,7 +157,6 @@ fn test_api_skip_onboarding_step() {
     let progress = vauchi.skip_onboarding_step().unwrap();
     assert_eq!(progress.current_step(), OnboardingStep::LinkChoice);
 
-    // Skipped step should not be in completed_steps
     assert!(
         !progress
             .completed_steps
@@ -175,11 +170,9 @@ fn test_api_skip_onboarding_step() {
 fn test_api_reset_onboarding() {
     let vauchi = create_test_vauchi();
 
-    // Advance a few steps
     vauchi.advance_onboarding().unwrap();
     vauchi.advance_onboarding().unwrap();
 
-    // Reset
     vauchi.reset_onboarding().unwrap();
 
     let progress = vauchi.get_onboarding_progress().unwrap();
@@ -197,7 +190,6 @@ fn test_api_is_onboarding_complete() {
         "Should not be complete initially"
     );
 
-    // Advance through all steps
     for _ in 0..6 {
         vauchi.advance_onboarding().unwrap();
     }
@@ -218,7 +210,6 @@ fn test_api_completion_percentage() {
     vauchi.advance_onboarding().unwrap();
     assert_eq!(vauchi.onboarding_completion_percentage().unwrap(), 16); // 1/6
 
-    // Advance through all
     for _ in 0..5 {
         vauchi.advance_onboarding().unwrap();
     }
@@ -260,7 +251,6 @@ fn test_create_suggested_groups() {
 fn test_create_suggested_groups_skips_duplicates() {
     let vauchi = create_test_vauchi();
 
-    // Create Family first
     vauchi.create_suggested_groups(&["Family"]).unwrap();
 
     // Create again with overlap — should skip Family, create Friends
@@ -272,7 +262,6 @@ fn test_create_suggested_groups_skips_duplicates() {
 }
 
 // =============================================================================
-// End-to-End Onboarding Flow Tests
 // =============================================================================
 
 // @scenario: onboarding:skip_step_at_what_next_completes
@@ -312,7 +301,6 @@ fn test_skip_step_at_what_next_marks_complete() {
 }
 
 // =============================================================================
-// Identity Check Tests
 // =============================================================================
 
 // @scenario: onboarding:identity_check_create_new
@@ -372,7 +360,6 @@ fn test_link_choice_link_device_returns_start_device_link() {
     use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
-    // Navigate to LinkChoice
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "have_identity".into(),
     });
@@ -392,7 +379,6 @@ fn test_link_choice_restore_backup_returns_start_backup_import() {
     use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
-    // Navigate to LinkChoice
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "have_identity".into(),
     });
@@ -421,7 +407,6 @@ fn test_link_choice_back_returns_to_identity_check() {
     use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
-    // Navigate to LinkChoice
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "have_identity".into(),
     });
@@ -458,7 +443,6 @@ fn test_link_choice_unknown_action_returns_update_screen() {
     use vauchi_app::ui::{ActionResult, OnboardingEngine, UserAction, WorkflowEngine};
 
     let mut engine = OnboardingEngine::new();
-    // Navigate to LinkChoice
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "have_identity".into(),
     });
@@ -529,7 +513,6 @@ fn test_full_onboarding_flow() {
         OnboardingStep::WhatNext
     );
 
-    // Verify completion percentage before final advance
     assert_eq!(
         vauchi.onboarding_completion_percentage().unwrap(),
         83,
@@ -548,7 +531,6 @@ fn test_full_onboarding_flow() {
         "Should be 100% after completion"
     );
 
-    // Verify all steps completed
     let progress = vauchi.get_onboarding_progress().unwrap();
     assert_eq!(
         progress.completed_steps.len(),

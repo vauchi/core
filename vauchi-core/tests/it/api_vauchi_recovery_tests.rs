@@ -142,7 +142,6 @@ fn add_recovery_voucher_appends_to_existing_progress() {
     let wb = vauchi_with_identity("Alice");
     let claim = wb.create_recovery_claim(&[3u8; 32]).unwrap();
 
-    // Sign a real voucher with a separate helper identity.
     let helper = Identity::create("Bob", 0);
     let voucher = build_voucher(&claim, &helper);
     let voucher_bytes = voucher.to_bytes();
@@ -151,7 +150,6 @@ fn add_recovery_voucher_appends_to_existing_progress() {
 
     assert_eq!(updated.voucher_count(), 1, "must accept signed voucher");
 
-    // Verify persistence: re-load progress and confirm the voucher is
     // still there.
     let reloaded = wb.get_recovery_progress().unwrap().unwrap();
     assert_eq!(reloaded.voucher_count(), 1);

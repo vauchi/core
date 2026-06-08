@@ -48,7 +48,6 @@ fn multiple_events_have_increasing_timestamps() {
 
     let events = log.events();
     assert_eq!(events.len(), 3);
-    // Timestamps should be non-decreasing
     assert!(events[1].elapsed_ms >= events[0].elapsed_ms);
     assert!(events[2].elapsed_ms >= events[1].elapsed_ms);
 }
@@ -84,15 +83,12 @@ fn all_event_variants_are_serializable() {
 
     let jsonl = log.to_jsonl();
     assert!(!jsonl.is_empty());
-    // Each event should be on its own line
     let lines: Vec<&str> = jsonl.lines().collect();
     assert_eq!(lines.len(), 9);
 
-    // Each line should be valid JSON
     for line in &lines {
         let parsed: serde_json::Value = serde_json::from_str(line)
             .unwrap_or_else(|e| panic!("Invalid JSON line: {}: {}", line, e));
-        // Each should have elapsed_ms and event fields
         assert!(
             parsed.get("elapsed_ms").is_some(),
             "Missing elapsed_ms in: {}",
@@ -153,7 +149,6 @@ fn to_markdown_with_events() {
     assert!(md.contains("SessionStarted (qr)"));
     assert!(md.contains("QrGenerated"));
     assert!(md.contains("ExchangeCompleted"));
-    // First event should have numeric timestamp
     assert!(md.contains("| 0 |") || md.contains("| 1 |"));
 }
 

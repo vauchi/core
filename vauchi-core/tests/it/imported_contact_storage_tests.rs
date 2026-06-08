@@ -74,7 +74,6 @@ fn list_contacts_includes_both_kinds() {
     assert!(ids.contains(&exchanged_id.as_str()));
     assert!(ids.contains(&imported_id.as_str()));
 
-    // Verify kinds
     let bob = contacts.iter().find(|c| c.id() == exchanged_id).unwrap();
     assert!(bob.is_exchanged());
     let carol = contacts.iter().find(|c| c.id() == imported_id).unwrap();
@@ -131,7 +130,6 @@ fn imported_contact_roundtrip_preserves_metadata() {
     let contact = make_imported("Frank Meta", ImportSource::AndroidPlatform);
     let id = contact.id().to_string();
 
-    // Capture original metadata
     let original_data = contact.kind().imported_data().unwrap();
     let original_source = original_data.source.clone();
     let original_imported_at = original_data.imported_at;
@@ -181,7 +179,6 @@ fn existing_exchanged_contacts_unaffected() {
     );
     assert_eq!(loaded.display_name(), original_display);
 
-    // Verify contact_kind is 'exchanged' implicitly by checking kind
     assert!(loaded.kind().exchanged_data().is_some());
     assert_eq!(*loaded.public_key().unwrap(), original_pk);
 }

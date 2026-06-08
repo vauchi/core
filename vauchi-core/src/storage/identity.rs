@@ -9,15 +9,12 @@ use rusqlite::params;
 use super::{Storage, StorageError};
 
 impl Storage {
-    // === Identity Operations ===
-
     /// Saves identity backup data (encrypted).
     pub fn save_identity(
         &self,
         backup_data: &[u8],
         display_name: &str,
     ) -> Result<(), StorageError> {
-        // Encrypt the backup data
         let encrypted = crate::crypto::encrypt(&self.encryption_key, backup_data)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
@@ -71,8 +68,6 @@ impl Storage {
         self.conn.execute("DELETE FROM identity WHERE id = 1", [])?;
         Ok(())
     }
-
-    // === App Password / Duress PIN Operations ===
 
     /// Saves the app password hash and salt to the identity table.
     ///
@@ -136,7 +131,6 @@ impl Storage {
                 duress_salt_bytes,
                 duress_enabled,
             )) => {
-                // Decrypt the password hash
                 let hash_bytes = crate::crypto::decrypt(&self.encryption_key, &hash_enc)
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
@@ -148,7 +142,6 @@ impl Storage {
                     StorageError::InvalidData("password salt has invalid length".into())
                 })?;
 
-                // Decrypt duress hash if present
                 let duress_hash = if let Some(enc) = duress_hash_enc {
                     let bytes = crate::crypto::decrypt(&self.encryption_key, &enc)
                         .map_err(|e| StorageError::Encryption(e.to_string()))?;
@@ -179,10 +172,7 @@ impl Storage {
                     ),
                 ))
             }
-            Ok((None, _, _, _, _)) | Ok((_, None, _, _, _)) => {
-                // No password set
-                Ok(None)
-            }
+            Ok((None, _, _, _, _)) | Ok((_, None, _, _, _)) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(StorageError::Database(e)),
         }

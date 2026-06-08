@@ -19,7 +19,6 @@ use std::collections::HashSet;
 use vauchi_core::contact::{GroupError, GroupManager, MAX_LABELS};
 
 // =============================================================================
-// Test Helpers
 // =============================================================================
 
 fn create_manager_with_labels(names: &[&str]) -> (GroupManager, Vec<String>) {
@@ -66,23 +65,16 @@ fn create_manager_with_labels(names: &[&str]) -> (GroupManager, Vec<String>) {
 fn test_label_crud_operations() {
     let mut manager = GroupManager::new();
 
-    // =========================================================================
-    // CREATE - Basic label creation
-    // =========================================================================
-
-    // Create a new label
     let family = manager.create_group("Family", 0).unwrap();
     assert_eq!(family.name(), "Family");
     assert_eq!(family.contact_count(), 0);
     assert!(family.visible_fields().is_empty());
     let family_id = family.id().to_string();
 
-    // Verify it exists
     assert_eq!(manager.group_count(), 1);
     manager.get_group(&family_id).expect("expected Some");
     manager.get_group_by_name("Family").expect("expected Some");
 
-    // Create additional labels
     let friends = manager.create_group("Friends", 0).unwrap();
     let friends_id = friends.id().to_string();
 
@@ -90,10 +82,6 @@ fn test_label_crud_operations() {
     let professional_id = professional.id().to_string();
 
     assert_eq!(manager.group_count(), 3);
-
-    // =========================================================================
-    // CREATE - Error cases
-    // =========================================================================
 
     // Cannot create duplicate label name
     let duplicate_result = manager.create_group("Family", 0);
@@ -115,37 +103,23 @@ fn test_label_crud_operations() {
     let long_result = manager.create_group(&long_name, 0);
     assert!(matches!(long_result, Err(GroupError::InvalidName(_))));
 
-    // =========================================================================
-    // READ - Retrieve labels
-    // =========================================================================
-
-    // Get by ID
     let retrieved = manager.get_group(&family_id).unwrap();
     assert_eq!(retrieved.name(), "Family");
 
-    // Get by name
     let by_name = manager.get_group_by_name("Friends").unwrap();
     assert_eq!(by_name.id(), friends_id);
 
-    // List all labels
     let all_labels = manager.all_groups();
     assert_eq!(all_labels.len(), 3);
 
-    // =========================================================================
-    // UPDATE - Rename labels
-    // =========================================================================
-
-    // Rename a label
     manager
         .rename_group(&friends_id, "Close Friends", 0)
         .unwrap();
     let renamed = manager.get_group(&friends_id).unwrap();
     assert_eq!(renamed.name(), "Close Friends");
 
-    // Old name should no longer work
     assert!(manager.get_group_by_name("Friends").is_none());
 
-    // New name should work
     manager
         .get_group_by_name("Close Friends")
         .expect("expected Some");
@@ -164,7 +138,6 @@ fn test_label_crud_operations() {
         Err(GroupError::InvalidName(_))
     ));
 
-    // Cannot rename non-existent label
     let rename_missing_result = manager.rename_group("non-existent-id", "New Name", 0);
     assert!(matches!(
         rename_missing_result,
@@ -175,34 +148,23 @@ fn test_label_crud_operations() {
     manager.rename_group(&family_id, "Family", 0).unwrap();
     assert_eq!(manager.get_group(&family_id).unwrap().name(), "Family");
 
-    // =========================================================================
-    // DELETE - Remove labels
-    // =========================================================================
-
-    // Add a contact to a label before deletion
     manager
         .add_contact_to_group(&professional_id, "bob-id", 0)
         .unwrap();
 
-    // Delete the label
     let deleted = manager.delete_group(&professional_id).unwrap();
     assert_eq!(deleted.name(), "Professional");
 
-    // Label should no longer exist
     assert!(manager.get_group(&professional_id).is_none());
     assert!(manager.get_group_by_name("Professional").is_none());
     assert_eq!(manager.group_count(), 2);
 
-    // Cannot delete non-existent label
     let delete_missing_result = manager.delete_group("non-existent-id");
     assert!(matches!(
         delete_missing_result,
         Err(GroupError::NotFound(_))
     ));
 
-    // =========================================================================
-    // Verify suggested labels constant
-    // =========================================================================
     use vauchi_core::contact::SUGGESTED_LABELS;
     assert_eq!(
         SUGGESTED_LABELS,
@@ -219,18 +181,15 @@ fn test_label_crud_operations() {
 fn test_label_max_limit() {
     let mut manager = GroupManager::new();
 
-    // Create maximum number of labels
     for i in 0..MAX_LABELS {
         manager.create_group(&format!("Label{}", i), 0).unwrap();
     }
 
     assert_eq!(manager.group_count(), MAX_LABELS);
 
-    // Cannot create one more
     let result = manager.create_group("OneMore", 0);
     assert!(matches!(result, Err(GroupError::MaxLabelsReached)));
 
-    // Delete one label
     let label_ids: Vec<String> = manager
         .all_groups()
         .iter()
@@ -238,7 +197,6 @@ fn test_label_max_limit() {
         .collect();
     manager.delete_group(&label_ids[0]).unwrap();
 
-    // Now we can create one more
     manager.create_group("NewLabel", 0).unwrap();
     assert_eq!(manager.group_count(), MAX_LABELS);
 }
@@ -275,21 +233,14 @@ fn test_contact_assignment_to_label() {
     let friends_id = &label_ids[1];
     let colleagues_id = &label_ids[2];
 
-    // Contact IDs
     let bob = "bob-id";
     let carol = "carol-id";
     let dave = "dave-id";
     let eve = "eve-id";
 
-    // =========================================================================
-    // Add single contact to a label
-    // =========================================================================
-
-    // Add Bob to Family
     let added = manager.add_contact_to_group(family_id, bob, 0).unwrap();
     assert!(added, "Bob should be newly added");
 
-    // Verify Bob is in Family
     let family = manager.get_group(family_id).unwrap();
     assert!(family.contains_contact(bob));
     assert_eq!(family.contact_count(), 1);
@@ -298,11 +249,6 @@ fn test_contact_assignment_to_label() {
     let added_again = manager.add_contact_to_group(family_id, bob, 0).unwrap();
     assert!(!added_again, "Bob is already in Family");
 
-    // =========================================================================
-    // Add multiple contacts to a label
-    // =========================================================================
-
-    // Add Bob, Carol, and Dave to Friends
     manager.add_contact_to_group(friends_id, bob, 0).unwrap();
     manager.add_contact_to_group(friends_id, carol, 0).unwrap();
     manager.add_contact_to_group(friends_id, dave, 0).unwrap();
@@ -313,16 +259,10 @@ fn test_contact_assignment_to_label() {
     assert!(friends.contains_contact(carol));
     assert!(friends.contains_contact(dave));
 
-    // =========================================================================
-    // Contact in multiple labels
-    // =========================================================================
-
-    // Carol is also a colleague
     manager
         .add_contact_to_group(colleagues_id, carol, 0)
         .unwrap();
 
-    // Carol should be in both Friends and Colleagues
     let carol_labels = manager.groups_for_contact(carol);
     assert_eq!(carol_labels.len(), 2);
 
@@ -330,15 +270,9 @@ fn test_contact_assignment_to_label() {
     assert!(carol_label_names.contains("Friends"));
     assert!(carol_label_names.contains("Colleagues"));
 
-    // Bob is in Family and Friends
     let bob_labels = manager.groups_for_contact(bob);
     assert_eq!(bob_labels.len(), 2);
 
-    // =========================================================================
-    // Remove contact from label
-    // =========================================================================
-
-    // Remove Dave from Friends
     let removed = manager
         .remove_contact_from_group(friends_id, dave, 0)
         .unwrap();
@@ -354,11 +288,6 @@ fn test_contact_assignment_to_label() {
         .unwrap();
     assert!(!removed_again, "Dave is already not in Friends");
 
-    // =========================================================================
-    // Unlabeled contacts
-    // =========================================================================
-
-    // Eve is not in any label
     let all_contacts = vec![bob, carol, dave, eve];
     let unlabeled = manager.ungrouped_contacts(&all_contacts);
 
@@ -366,22 +295,13 @@ fn test_contact_assignment_to_label() {
     assert!(unlabeled.contains(&dave.to_string()));
     assert!(unlabeled.contains(&eve.to_string()));
 
-    // =========================================================================
     // Remove contact from all labels (e.g., when deleting contact)
-    // =========================================================================
 
-    // Bob is in Family and Friends
     assert_eq!(manager.groups_for_contact(bob).len(), 2);
 
-    // Remove Bob from all labels
     manager.remove_contact_from_all_groups(bob, 0);
 
-    // Bob should be in no labels
     assert_eq!(manager.groups_for_contact(bob).len(), 0);
-
-    // =========================================================================
-    // Error cases
-    // =========================================================================
 
     // Cannot add to non-existent label
     let add_missing_result = manager.add_contact_to_group("non-existent", bob, 0);
@@ -416,44 +336,33 @@ fn test_contact_assignment_to_label() {
 fn test_cascading_visibility_changes() {
     let mut manager = GroupManager::new();
 
-    // Create labels with different field visibility
     let family = manager.create_group("Family", 0).unwrap();
     let family_id = family.id().to_string();
 
     let friends = manager.create_group("Friends", 0).unwrap();
     let friends_id = friends.id().to_string();
 
-    // Setup field visibility for Family: home-address, personal-phone
     let family = manager.get_group_mut(&family_id).unwrap();
     family.add_visible_field("home-address", 0);
     family.add_visible_field("personal-phone", 0);
     family.add_visible_field("birthday", 0);
 
-    // Setup field visibility for Friends: personal-phone, personal-email
     let friends = manager.get_group_mut(&friends_id).unwrap();
     friends.add_visible_field("personal-phone", 0);
     friends.add_visible_field("personal-email", 0);
 
-    // Contact IDs
     let bob = "bob-id";
     let carol = "carol-id";
     let dave = "dave-id";
 
-    // =========================================================================
     // Initial state: No one sees any fields via labels
-    // =========================================================================
 
     assert_eq!(manager.can_see_via_labels(bob, "home-address"), None);
     assert_eq!(manager.can_see_via_labels(bob, "personal-phone"), None);
     assert!(manager.visible_fields_via_labels(bob).is_empty());
 
-    // =========================================================================
-    // Adding Bob to Family grants visibility to Family fields
-    // =========================================================================
-
     manager.add_contact_to_group(&family_id, bob, 0).unwrap();
 
-    // Bob should now see Family fields
     assert_eq!(
         manager.can_see_via_labels(bob, "home-address"),
         Some(true),
@@ -470,28 +379,21 @@ fn test_cascading_visibility_changes() {
         "Bob should see birthday after joining Family"
     );
 
-    // Bob should NOT see Friends-only fields
     assert_eq!(
         manager.can_see_via_labels(bob, "personal-email"),
         None,
         "Bob should not see personal-email (not in Friends)"
     );
 
-    // Verify visible fields set
     let bob_visible = manager.visible_fields_via_labels(bob);
     assert_eq!(bob_visible.len(), 3);
     assert!(bob_visible.contains("home-address"));
     assert!(bob_visible.contains("personal-phone"));
     assert!(bob_visible.contains("birthday"));
 
-    // =========================================================================
-    // Adding Carol to both labels grants union of visibility
-    // =========================================================================
-
     manager.add_contact_to_group(&family_id, carol, 0).unwrap();
     manager.add_contact_to_group(&friends_id, carol, 0).unwrap();
 
-    // Carol should see all fields from both labels
     let carol_visible = manager.visible_fields_via_labels(carol);
     assert_eq!(carol_visible.len(), 4); // home-address, personal-phone, birthday, personal-email
 
@@ -500,10 +402,6 @@ fn test_cascading_visibility_changes() {
     assert!(carol_visible.contains("birthday"));
     assert!(carol_visible.contains("personal-email"));
 
-    // =========================================================================
-    // Dave is only in Friends
-    // =========================================================================
-
     manager.add_contact_to_group(&friends_id, dave, 0).unwrap();
 
     let dave_visible = manager.visible_fields_via_labels(dave);
@@ -511,15 +409,10 @@ fn test_cascading_visibility_changes() {
     assert!(!dave_visible.contains("home-address"));
     assert!(!dave_visible.contains("birthday"));
 
-    // =========================================================================
-    // Removing Bob from Family revokes visibility
-    // =========================================================================
-
     manager
         .remove_contact_from_group(&family_id, bob, 0)
         .unwrap();
 
-    // Bob should no longer see Family fields
     assert_eq!(
         manager.can_see_via_labels(bob, "home-address"),
         None,
@@ -531,28 +424,18 @@ fn test_cascading_visibility_changes() {
         "Bob should not see birthday after leaving Family"
     );
 
-    // Bob is now in no labels
     assert!(manager.visible_fields_via_labels(bob).is_empty());
-
-    // =========================================================================
-    // Removing Carol from Friends reduces her visibility
-    // =========================================================================
 
     manager
         .remove_contact_from_group(&friends_id, carol, 0)
         .unwrap();
 
-    // Carol should still see Family fields but not Friends-only fields
     let carol_visible = manager.visible_fields_via_labels(carol);
     assert_eq!(carol_visible.len(), 3); // Only Family fields now
     assert!(carol_visible.contains("home-address"));
     assert!(carol_visible.contains("personal-phone"));
     assert!(carol_visible.contains("birthday"));
     assert!(!carol_visible.contains("personal-email")); // Friends-only
-
-    // =========================================================================
-    // Adding field to label cascades to all contacts in label
-    // =========================================================================
 
     let family = manager.get_group_mut(&family_id).unwrap();
     family.add_visible_field("emergency-contact", 0);
@@ -561,14 +444,9 @@ fn test_cascading_visibility_changes() {
     let carol_visible = manager.visible_fields_via_labels(carol);
     assert!(carol_visible.contains("emergency-contact"));
 
-    // =========================================================================
-    // Removing field from label cascades to all contacts
-    // =========================================================================
-
     let family = manager.get_group_mut(&family_id).unwrap();
     family.remove_visible_field("home-address", 0);
 
-    // Carol should no longer see home-address
     let carol_visible = manager.visible_fields_via_labels(carol);
     assert!(!carol_visible.contains("home-address"));
 }
@@ -597,7 +475,6 @@ fn test_cascading_visibility_changes() {
 fn test_label_based_field_visibility() {
     let mut manager = GroupManager::new();
 
-    // Create labels
     let family = manager.create_group("Family", 0).unwrap();
     let family_id = family.id().to_string();
 
@@ -607,22 +484,16 @@ fn test_label_based_field_visibility() {
     let colleagues = manager.create_group("Colleagues", 0).unwrap();
     let colleagues_id = colleagues.id().to_string();
 
-    // Contact IDs
     let bob = "bob-id";
     let carol = "carol-id";
     let dave = "dave-id";
     let eve = "eve-id";
-
-    // =========================================================================
-    // Associate fields with labels
-    // =========================================================================
 
     // Family sees: home-address, personal-phone
     let family = manager.get_group_mut(&family_id).unwrap();
     family.add_visible_field("home-address", 0);
     family.add_visible_field("personal-phone", 0);
 
-    // Close Friends sees: personal-phone, personal-email
     let close_friends = manager.get_group_mut(&close_friends_id).unwrap();
     close_friends.add_visible_field("personal-phone", 0);
     close_friends.add_visible_field("personal-email", 0);
@@ -632,14 +503,8 @@ fn test_label_based_field_visibility() {
     colleagues.add_visible_field("work-email", 0);
     colleagues.add_visible_field("work-phone", 0);
 
-    // =========================================================================
-    // Assign contacts to labels
-    // =========================================================================
-
-    // Bob is Family
     manager.add_contact_to_group(&family_id, bob, 0).unwrap();
 
-    // Carol is Close Friend and Colleague
     manager
         .add_contact_to_group(&close_friends_id, carol, 0)
         .unwrap();
@@ -647,18 +512,12 @@ fn test_label_based_field_visibility() {
         .add_contact_to_group(&colleagues_id, carol, 0)
         .unwrap();
 
-    // Dave is Colleague only
     manager
         .add_contact_to_group(&colleagues_id, dave, 0)
         .unwrap();
 
-    // Eve is not in any label
-
-    // =========================================================================
     // Test field visibility per contact
-    // =========================================================================
 
-    // Bob sees Family fields
     assert_eq!(manager.can_see_via_labels(bob, "home-address"), Some(true));
     assert_eq!(
         manager.can_see_via_labels(bob, "personal-phone"),
@@ -680,7 +539,6 @@ fn test_label_based_field_visibility() {
     assert_eq!(manager.can_see_via_labels(carol, "work-phone"), Some(true));
     assert_eq!(manager.can_see_via_labels(carol, "home-address"), None); // Family only
 
-    // Dave sees only Colleagues fields
     assert_eq!(manager.can_see_via_labels(dave, "work-email"), Some(true));
     assert_eq!(manager.can_see_via_labels(dave, "work-phone"), Some(true));
     assert_eq!(manager.can_see_via_labels(dave, "personal-email"), None);
@@ -689,11 +547,8 @@ fn test_label_based_field_visibility() {
     assert_eq!(manager.can_see_via_labels(eve, "work-email"), None);
     assert_eq!(manager.can_see_via_labels(eve, "home-address"), None);
 
-    // =========================================================================
     // Per-contact override: Grant visibility to non-member
-    // =========================================================================
 
-    // Eve is not in Family, but we grant her home-address specifically
     manager.set_contact_override(eve, "home-address", true);
 
     assert_eq!(
@@ -702,11 +557,8 @@ fn test_label_based_field_visibility() {
         "Eve should see home-address via per-contact override"
     );
 
-    // =========================================================================
     // Per-contact override: Revoke visibility from member
-    // =========================================================================
 
-    // Carol is in Close Friends which shows personal-email
     // But we specifically hide it from her
     manager.set_contact_override(carol, "personal-email", false);
 
@@ -716,19 +568,14 @@ fn test_label_based_field_visibility() {
         "Carol should NOT see personal-email due to per-contact override"
     );
 
-    // Carol still sees other fields from her labels
     assert_eq!(
         manager.can_see_via_labels(carol, "personal-phone"),
         Some(true)
     );
     assert_eq!(manager.can_see_via_labels(carol, "work-email"), Some(true));
 
-    // =========================================================================
     // Override takes precedence over label
-    // =========================================================================
 
-    // Bob is in Family which shows home-address
-    // Override to hide it
     manager.set_contact_override(bob, "home-address", false);
     assert_eq!(
         manager.can_see_via_labels(bob, "home-address"),
@@ -736,14 +583,9 @@ fn test_label_based_field_visibility() {
         "Per-contact override should hide field despite label membership"
     );
 
-    // Bob's visible_fields_via_labels should reflect the override
     let bob_visible = manager.visible_fields_via_labels(bob);
     assert!(!bob_visible.contains("home-address"));
     assert!(bob_visible.contains("personal-phone")); // Still visible
-
-    // =========================================================================
-    // Remove override restores label visibility
-    // =========================================================================
 
     manager.remove_contact_override(bob, "home-address");
 
@@ -753,11 +595,6 @@ fn test_label_based_field_visibility() {
         "After removing override, label visibility should apply"
     );
 
-    // =========================================================================
-    // Clear all overrides for a contact
-    // =========================================================================
-
-    // Carol has a hidden personal-email override
     assert_eq!(
         manager.get_contact_override(carol, "personal-email"),
         Some(false)
@@ -765,16 +602,13 @@ fn test_label_based_field_visibility() {
 
     manager.clear_contact_overrides(carol);
 
-    // Override should be gone, label visibility applies
     assert_eq!(manager.get_contact_override(carol, "personal-email"), None);
     assert_eq!(
         manager.can_see_via_labels(carol, "personal-email"),
         Some(true)
     );
 
-    // =========================================================================
     // View which labels show a field
-    // =========================================================================
 
     // personal-phone is in Family and Close Friends
     let labels = manager.all_groups();

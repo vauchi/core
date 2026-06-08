@@ -43,7 +43,6 @@ fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
 fn test_set_field_private_queues_update() {
     let wb = create_test_vauchi();
 
-    // Add a field to own card
     wb.add_own_field(ContactField::new(
         FieldType::Email,
         "work",
@@ -52,21 +51,17 @@ fn test_set_field_private_queues_update() {
     ))
     .unwrap();
 
-    // Add a contact with ratchet
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
 
-    // No pending updates initially
     let pending_before = wb.storage().get_pending_updates(&bob_id).unwrap();
     assert!(
         pending_before.is_empty(),
         "No pending updates before visibility change"
     );
 
-    // Set field private and repropagate
     wb.set_field_private_and_repropagate(&bob_id, "work")
         .unwrap();
 
-    // Should have queued an update
     let pending_after = wb.storage().get_pending_updates(&bob_id).unwrap();
     assert!(
         !pending_after.is_empty(),
@@ -113,7 +108,6 @@ fn test_repropagate_skips_no_ratchet() {
     ))
     .unwrap();
 
-    // Add contact WITHOUT ratchet
     let identity = Identity::create("Carol", 0);
     let contact = Contact::from_exchange(
         *identity.signing_public_key(),
@@ -181,7 +175,6 @@ fn test_set_field_restricted_queues_update() {
 }
 
 // ============================================================
-// Label-aware re-propagation tests
 // ============================================================
 
 // @scenario: visibility_control :: Add contact to group updates their visibility
@@ -200,14 +193,12 @@ fn test_add_contact_to_label_triggers_repropagate() {
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
     let label = wb.create_group("Work").unwrap();
 
-    // Set field visible in this label
     wb.set_group_field_visibility(label.id(), "work", true)
         .unwrap();
 
     let pending_before = wb.storage().get_pending_updates(&bob_id).unwrap();
     assert!(pending_before.is_empty());
 
-    // Add contact to label AND repropagate
     wb.add_contact_to_group_and_repropagate(label.id(), &bob_id)
         .unwrap();
 
@@ -237,7 +228,6 @@ fn test_remove_contact_from_label_triggers_repropagate() {
     // Add contact to label first (without repropagate to keep pending clean)
     wb.add_contact_to_group(label.id(), &bob_id).unwrap();
 
-    // Now remove and repropagate
     wb.remove_contact_from_group_and_repropagate(label.id(), &bob_id)
         .unwrap();
 
@@ -268,7 +258,6 @@ fn test_set_label_field_visibility_repropagates_to_all_members() {
     wb.add_contact_to_group(label.id(), &bob_id).unwrap();
     wb.add_contact_to_group(label.id(), &carol_id).unwrap();
 
-    // Set field visibility for the label and repropagate to all members
     wb.set_group_field_visibility_and_repropagate(label.id(), "work", true)
         .unwrap();
 
@@ -303,7 +292,6 @@ fn test_set_contact_override_triggers_repropagate() {
     let pending_before = wb.storage().get_pending_updates(&bob_id).unwrap();
     assert!(pending_before.is_empty());
 
-    // Set per-contact override and repropagate
     wb.set_contact_visibility_override_and_repropagate(&bob_id, "personal", false)
         .unwrap();
 
@@ -320,7 +308,6 @@ fn test_set_contact_override_triggers_repropagate() {
 fn test_repropagate_uses_effective_visibility() {
     let wb = create_test_vauchi();
 
-    // Add two fields
     wb.add_own_field(ContactField::new(
         FieldType::Email,
         "work",
@@ -338,17 +325,14 @@ fn test_repropagate_uses_effective_visibility() {
 
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
 
-    // Create a label that shows only work email
     let label = wb.create_group("Work").unwrap();
     wb.set_group_field_visibility(label.id(), "work", true)
         .unwrap();
 
-    // Add bob to the label and set personal-phone to hidden via override
     wb.add_contact_to_group(label.id(), &bob_id).unwrap();
     wb.set_contact_visibility_override(&bob_id, "personal-phone", false)
         .unwrap();
 
-    // Verify effective visibility
     assert!(
         wb.get_effective_field_visibility(&bob_id, "work").unwrap(),
         "Work field should be visible via label"

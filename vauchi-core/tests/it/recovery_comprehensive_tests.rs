@@ -58,7 +58,6 @@ fn test_recovery_threshold_too_high() {
 // @scenario: contact_recovery :: Recovery threshold limits
 #[test]
 fn test_verification_threshold_limits() {
-    // Too low
     let result = RecoverySettings::new(3, 0);
     assert!(matches!(
         result,
@@ -114,7 +113,6 @@ fn test_recovery_claim_expiration() {
     let old_pk = [0x01u8; 32];
     let new_pk = [0x02u8; 32];
 
-    // Create claim with timestamp 49 hours ago
     let now = 1_800_000_000;
     let old_timestamp = now - (49 * 60 * 60); // 49 hours ago
 
@@ -131,11 +129,9 @@ fn test_recovery_claim_expiration() {
 // @scenario: contact_recovery :: Generate recovery claim QR code
 #[test]
 fn test_invalid_claim_format() {
-    // Too short
     let result = RecoveryClaim::from_bytes(&[0u8; 10]);
     assert!(matches!(result, Err(RecoveryError::InvalidFormat)));
 
-    // Wrong version
     let mut bytes = vec![99u8]; // Invalid version
     bytes.extend_from_slice(&[0u8; 72]);
     let result = RecoveryClaim::from_bytes(&bytes);
@@ -143,7 +139,6 @@ fn test_invalid_claim_format() {
 }
 
 // =============================================================================
-// Vouching Tests
 // =============================================================================
 
 /// Scenario: Create voucher after in-person verification
@@ -199,7 +194,6 @@ fn test_cannot_self_vouch() {
 
     let claim = RecoveryClaim::new(&old_pk, &new_pk, 1_700_000_000);
 
-    // Try to vouch with the same keypair as the new identity
     let result = vauchi_core::RecoveryVoucher::create_from_claim(&claim, &new_keypair, None, 0);
     assert!(matches!(result, Err(RecoveryError::SelfVouching)));
 }
@@ -232,11 +226,9 @@ fn test_voucher_tamper_detection() {
     let mut voucher =
         vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, None, 0);
 
-    // Tamper with the new_pk
     let tampered_pk = [0x99u8; 32];
     voucher.set_new_pk_for_testing(&tampered_pk);
 
-    // Verification should fail
     assert!(!voucher.verify());
 }
 
@@ -258,7 +250,6 @@ fn test_voucher_requires_known_contact() {
 }
 
 // =============================================================================
-// Recovery Proof Tests
 // =============================================================================
 
 /// Scenario: Create recovery proof when threshold met
@@ -310,7 +301,6 @@ fn test_collect_multiple_vouchers() {
 
     let mut proof = RecoveryProof::new(&old_pk, &new_pk, 3, 1_700_000_000);
 
-    // Add 3 vouchers from different contacts
     for _i in 0..3 {
         let voucher_keypair = SigningKeyPair::generate();
         let voucher =
@@ -331,7 +321,6 @@ fn test_reject_insufficient_vouchers() {
 
     let mut proof = RecoveryProof::new(&old_pk, &new_pk, 3, 1_700_000_000);
 
-    // Add only 2 vouchers
     for _ in 0..2 {
         let voucher_keypair = SigningKeyPair::generate();
         let voucher =
@@ -378,7 +367,6 @@ fn test_reject_mismatched_keys() {
     let mut proof = RecoveryProof::new(&old_pk, &new_pk, 3, 1_700_000_000);
     let voucher_keypair = SigningKeyPair::generate();
 
-    // Create voucher for different old_pk
     let voucher =
         vauchi_core::RecoveryVoucher::create(&different_old_pk, &new_pk, &voucher_keypair, None, 0);
     let result = proof.add_voucher(voucher);
@@ -395,12 +383,10 @@ fn test_reject_invalid_signature() {
 
     let voucher_keypair = SigningKeyPair::generate();
 
-    // Create a valid voucher, then tamper with it to invalidate the signature
     let mut voucher =
         vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &voucher_keypair, None, 0);
     voucher.set_new_pk_for_testing(&[0x88u8; 32]);
 
-    // Tampered voucher should fail verification
     assert!(
         !voucher.verify(),
         "Tampered voucher should fail signature verification"
@@ -465,7 +451,6 @@ fn test_verify_with_mutual_contacts_high() {
 
     let mut proof = RecoveryProof::new(&old_pk, &new_pk, 3, 1_700_000_000);
 
-    // Create 3 vouchers
     let keypair1 = SigningKeyPair::generate();
     let keypair2 = SigningKeyPair::generate();
     let keypair3 = SigningKeyPair::generate();
@@ -610,7 +595,6 @@ fn test_verify_with_no_mutual_contacts() {
 }
 
 // =============================================================================
-// Conflict Detection Tests
 // =============================================================================
 
 /// Scenario: Detect conflicting recovery claims
@@ -625,7 +609,6 @@ fn test_detect_conflicting_claims() {
     let mut proof1 = RecoveryProof::new(&old_pk, &new_pk_1, 2, 0);
     let mut proof2 = RecoveryProof::new(&old_pk, &new_pk_2, 2, 0);
 
-    // Add vouchers to each
     for _ in 0..2 {
         let kp = SigningKeyPair::generate();
         proof1
@@ -674,7 +657,6 @@ fn test_no_conflict_empty() {
 }
 
 // =============================================================================
-// Revocation Tests
 // =============================================================================
 
 /// Scenario: Revoke recovery proof with old private key
@@ -701,7 +683,6 @@ fn test_revocation_wrong_key() {
     let old_pk = *old_keypair.public_key().as_bytes();
     let new_pk = [0x02u8; 32];
 
-    // Try to revoke with wrong keypair
     let revocation = RecoveryRevocation::create(&old_pk, &new_pk, &wrong_keypair, 0);
 
     // Signature will be valid (for wrong key) but won't match old_pk
@@ -726,7 +707,6 @@ fn test_revocation_roundtrip() {
 }
 
 // =============================================================================
-// Reminder Tests
 // =============================================================================
 
 /// Scenario: Remind me later - default 7 days
@@ -748,7 +728,6 @@ fn test_reminder_default_period() {
 fn test_reminder_is_due() {
     let old_pk = [0x01u8; 32];
 
-    // Create reminder 8 days ago
     let now = 1_800_000_000;
     let old_timestamp = now - (8 * 24 * 60 * 60);
 
@@ -788,14 +767,12 @@ fn test_claim_expires_during_collection() {
     let old_pk = [0x01u8; 32];
     let new_pk = [0x02u8; 32];
 
-    // Create claim that's already expired
     let now = 1_800_000_000;
     let old_timestamp = now - (49 * 60 * 60);
 
     let expired_claim = RecoveryClaim::new_with_timestamp(&old_pk, &new_pk, old_timestamp);
     assert!(expired_claim.is_expired(now));
 
-    // Voucher creation should fail for expired claim
     let voucher_keypair = SigningKeyPair::generate();
     let result = vauchi_core::RecoveryVoucher::create_from_claim(
         &expired_claim,
@@ -924,7 +901,6 @@ fn test_threshold_only_counts_trusted_vouchers() {
 
     let mut proof = RecoveryProof::new(&old_pk, &new_pk, 3, 1_700_000_000);
 
-    // Add two trusted vouchers
     let v1 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp1, None, 0);
     let v2 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp2, None, 0);
     assert!(
@@ -936,7 +912,6 @@ fn test_threshold_only_counts_trusted_vouchers() {
         "expected success"
     );
 
-    // Untrusted voucher should be rejected
     let v3 = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp3_untrusted, None, 0);
     assert!(matches!(
         proof.add_voucher_trusted(v3, &trusted_pks),
@@ -979,7 +954,6 @@ fn test_trusted_voucher_still_validates_signature() {
 
     let mut proof = RecoveryProof::new(&old_pk, &new_pk, 1, 1_700_000_000);
 
-    // Create a voucher and tamper with it
     let mut voucher = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, &kp, None, 0);
     let tampered_new_pk = [0x99u8; 32];
     voucher.set_new_pk_for_testing(&tampered_new_pk);
@@ -1024,7 +998,6 @@ fn test_full_trusted_recovery_flow() {
     let old_pk = [0x01u8; 32];
     let new_pk = [0x02u8; 32];
 
-    // Generate 3 trusted keypairs
     let kp1 = SigningKeyPair::generate();
     let kp2 = SigningKeyPair::generate();
     let kp3 = SigningKeyPair::generate();
@@ -1036,7 +1009,6 @@ fn test_full_trusted_recovery_flow() {
 
     let mut proof = RecoveryProof::new(&old_pk, &new_pk, 3, 1_700_000_000);
 
-    // Add 3 trusted vouchers
     for kp in [&kp1, &kp2, &kp3] {
         let voucher = vauchi_core::RecoveryVoucher::create(&old_pk, &new_pk, kp, None, 0);
         proof.add_voucher_trusted(voucher, &trusted_pks).unwrap();

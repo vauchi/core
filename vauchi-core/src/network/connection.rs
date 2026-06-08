@@ -109,7 +109,6 @@ impl<T: Transport> ConnectionManager<T> {
         self.transport.connect(&self.config)?;
         self.reconnect_attempt = 0;
 
-        // Perform handshake if identity is set
         if self.identity.is_some() {
             self.send_handshake()?;
         }
@@ -301,7 +300,6 @@ mod tests {
 
         conn.connect().unwrap();
 
-        // Simulate disconnect
         conn.transport_mut()
             .set_state(ConnectionState::Disconnected);
 
@@ -401,7 +399,6 @@ mod tests {
     fn test_connection_manager_send_receive() {
         let mut transport = MockTransport::new();
 
-        // Queue a message to receive
         let incoming = create_envelope(
             MessagePayload::Presence(crate::network::message::PresenceUpdate {
                 status: crate::network::message::PresenceStatus::Away,
@@ -414,7 +411,6 @@ mod tests {
         let mut conn = ConnectionManager::new(transport, create_test_config());
         conn.connect().unwrap();
 
-        // Receive
         let received = conn.receive().unwrap().unwrap();
         assert_eq!(received.message_id, incoming.message_id);
     }

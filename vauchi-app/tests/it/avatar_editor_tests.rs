@@ -273,7 +273,6 @@ fn cancel_completes_with_cancelled_flag() {
 #[test]
 fn mandelbrot_regenerate_updates_preview() {
     let mut engine = AvatarEditorEngine::new("Alice".into(), false);
-    // Enter generator
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "source_generate".into(),
     });

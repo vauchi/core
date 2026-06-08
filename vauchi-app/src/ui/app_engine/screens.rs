@@ -130,7 +130,6 @@ impl AppEngine {
                     _ => (String::new(), Vec::new(), None),
                 };
 
-                // Build group tabs
                 let group_tabs: Vec<MyInfoGroupTab> = all_groups
                     .iter()
                     .map(|g| {
@@ -726,7 +725,6 @@ impl AppEngine {
                     // Build shared info (my card as seen by this contact)
                     let shared_info = Self::build_shared_info(vauchi, contact_id);
 
-                    // Trust data
                     let trust_level = contact.trust_level().to_string();
                     let trust_level_enum = contact.trust_level();
                     let proposal_trusted = contact.is_proposal_trusted();

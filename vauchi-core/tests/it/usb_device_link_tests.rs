@@ -82,7 +82,6 @@ fn full_device_link_over_tcp_transport() {
         // Round 2: Receive encrypted request
         let encrypted_request = transport.recv().expect("recv request");
 
-        // Prepare confirmation and verify
         let (confirmation, request) = initiator
             .prepare_confirmation(&encrypted_request)
             .expect("prepare confirmation");
@@ -112,7 +111,6 @@ fn full_device_link_over_tcp_transport() {
     assert!(!qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()));
     assert!(qr.verify_signature());
 
-    // Create responder from received QR
     let mut responder = DeviceLinkResponder::from_qr(
         qr,
         "New Desktop".to_string(),

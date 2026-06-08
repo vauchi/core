@@ -11,7 +11,6 @@ use x25519_dalek::{PublicKey, StaticSecret};
 use vauchi_core::recovery::{RecoveryError, sealed_box};
 
 // ---------------------------------------------------------------------------
-// Helpers
 // ---------------------------------------------------------------------------
 
 fn generate_keypair() -> (StaticSecret, PublicKey) {
@@ -21,7 +20,6 @@ fn generate_keypair() -> (StaticSecret, PublicKey) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests
 // ---------------------------------------------------------------------------
 
 // @scenario: contact_recovery :: Seal and unseal a payload with the correct recipient key

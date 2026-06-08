@@ -99,11 +99,9 @@ pub enum ExchangeEvent {
     /// Explicitly fail the session.
     Fail(ExchangeError),
 
-    // --- NFC events ---
     /// NFC tap completed; contains their payload bytes.
     NfcTapComplete { their_payload: Vec<u8> },
 
-    // --- BLE events ---
     /// Start a BLE exchange (begin advertising/scanning).
     StartBleExchange,
     /// BLE payloads exchanged; contains their payload bytes and device ID.
@@ -114,7 +112,6 @@ pub enum ExchangeEvent {
     /// BLE proximity verified (challenge-response passed).
     BleProximityVerified,
 
-    // --- Proximity events ---
     /// Proximity check completed with a confidence level.
     ProximityCheckCompleted { confidence: ProximityConfidence },
 }
@@ -822,11 +819,9 @@ impl ExchangeSession {
             return Err(ExchangeError::SessionTimeout);
         }
         match event {
-            // QR events
             ExchangeEvent::StartQR => self.handle_start_qr(),
             ExchangeEvent::ProcessQR(qr) => self.handle_process_qr(qr),
             ExchangeEvent::TheyScannedOurQR => self.handle_they_scanned_our_qr(),
-            // Shared events
             ExchangeEvent::PerformKeyAgreement => self.handle_perform_key_agreement(),
             ExchangeEvent::CompleteExchange(card) => {
                 self.handle_complete_exchange(card).map(|_| ())
@@ -838,18 +833,15 @@ impl ExchangeSession {
                 self.fail(err);
                 Ok(())
             }
-            // NFC
             ExchangeEvent::NfcTapComplete { their_payload } => {
                 self.handle_nfc_tap_complete(their_payload)
             }
-            // BLE
             ExchangeEvent::StartBleExchange => self.handle_start_ble_exchange(),
             ExchangeEvent::BlePayloadExchanged {
                 their_payload,
                 device_id,
             } => self.handle_ble_payload_exchanged(their_payload, device_id),
             ExchangeEvent::BleProximityVerified => self.handle_ble_proximity_verified(),
-            // Proximity
             ExchangeEvent::ProximityCheckCompleted { confidence } => {
                 self.proximity_confidence = confidence;
                 Ok(())
@@ -1379,7 +1371,6 @@ impl ExchangeSession {
         contact.set_relay_url(self.their_relay_url.take());
         contact.set_relay_noise_pubkey(self.their_relay_noise_pubkey.take());
 
-        // Record trust metrics from exchange signals
         contact.set_trust_metrics(Some(self.build_trust_metrics()));
 
         self.state = ExchangeState::Complete {
@@ -1566,7 +1557,6 @@ impl ExchangeSession {
         contact.set_relay_url(self.their_relay_url.take());
         contact.set_relay_noise_pubkey(self.their_relay_noise_pubkey.take());
 
-        // Record trust metrics from exchange signals
         contact.set_trust_metrics(Some(self.build_trust_metrics()));
 
         self.state = ExchangeState::Complete {
@@ -1576,8 +1566,6 @@ impl ExchangeSession {
 
         Ok(contact)
     }
-
-    // ---- QR handlers ----
 
     fn handle_start_qr(&mut self) -> Result<(), ExchangeError> {
         if self.transport != ExchangeTransport::Qr {
@@ -1620,7 +1608,6 @@ impl ExchangeSession {
             }
         };
 
-        // Verify their QR
         if qr.is_expired(self.clock.unix_seconds()) {
             return Err(ExchangeError::QRExpired);
         }
@@ -1631,7 +1618,6 @@ impl ExchangeSession {
         let their_public_key = *qr.public_key();
         let their_exchange_key = *qr.exchange_key();
 
-        // Self-exchange check
         if their_public_key == *self.identity.signing_public_key() {
             return Err(ExchangeError::SelfExchange);
         }
@@ -1682,8 +1668,6 @@ impl ExchangeSession {
         Ok(())
     }
 
-    // ---- Direct transport handlers (USB/TCP) ----
-
     fn handle_direct_payload_received(
         &mut self,
         their_payload: String,
@@ -1724,7 +1708,6 @@ impl ExchangeSession {
         let their_public_key = *qr.public_key();
         let their_exchange_key = *qr.exchange_key();
 
-        // Self-exchange check
         if their_public_key == *self.identity.signing_public_key() {
             return Err(ExchangeError::SelfExchange);
         }
@@ -1791,8 +1774,6 @@ impl ExchangeSession {
         self.handle_complete_exchange(their_card).map(|_| ())
     }
 
-    // ---- NFC handlers ----
-
     fn handle_nfc_tap_complete(&mut self, their_payload: Vec<u8>) -> Result<(), ExchangeError> {
         if self.transport != ExchangeTransport::Nfc {
             return Err(ExchangeError::InvalidState(
@@ -1818,7 +1799,6 @@ impl ExchangeSession {
         let their_public_key = *parsed.identity_key();
         let their_exchange_key = *parsed.exchange_key();
 
-        // Self-exchange check
         if their_public_key == *self.identity.signing_public_key() {
             return Err(ExchangeError::SelfExchange);
         }
@@ -1829,8 +1809,6 @@ impl ExchangeSession {
         };
         Ok(())
     }
-
-    // ---- BLE handlers ----
 
     fn handle_start_ble_exchange(&mut self) -> Result<(), ExchangeError> {
         if self.transport != ExchangeTransport::Ble {
@@ -1879,7 +1857,6 @@ impl ExchangeSession {
         let their_public_key = *parsed.identity_key();
         let their_exchange_key = *parsed.exchange_key();
 
-        // Self-exchange check
         if their_public_key == *self.identity.signing_public_key() {
             return Err(ExchangeError::SelfExchange);
         }
@@ -1998,7 +1975,6 @@ pub enum DuplicateAction {
     Cancel,
 }
 
-// Add InvalidState variant to ExchangeError
 impl From<&str> for ExchangeError {
     fn from(s: &str) -> Self {
         ExchangeError::InvalidState(s.to_string())

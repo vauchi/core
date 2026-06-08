@@ -375,10 +375,8 @@ pub fn generate_qr_bitmap(
     let size_px = size;
     let scale = size_px as f32 / total_modules as f32;
 
-    // Pre-fill with light background
     let mut pixels = vec![light; (size_px * size_px) as usize];
 
-    // Paint dark modules
     let colors = code.to_colors();
     for (i, color) in colors.iter().enumerate() {
         if *color == qrcode::Color::Dark {

@@ -302,7 +302,6 @@ fn test_cek_deletion_is_idempotent() {
     let cek = ContentEncryptionKey::generate();
     storage.save_contact_cek(contact.id(), &cek).unwrap();
 
-    // Delete once
     storage.delete_contact_cek(contact.id()).unwrap();
     assert!(storage.load_contact_cek(contact.id()).unwrap().is_none());
 
@@ -335,13 +334,11 @@ fn test_revoked_sender_persists_after_contact_deletion() {
     let contact = test_contact("frank");
     storage.save_contact(&contact).unwrap();
 
-    // Revoke and delete
     storage
         .record_revoked_sender(contact.id(), 1700000000)
         .unwrap();
     storage.delete_contact(contact.id()).unwrap();
 
-    // Tombstone should persist
     assert!(storage.is_sender_revoked(contact.id()).unwrap());
 }
 

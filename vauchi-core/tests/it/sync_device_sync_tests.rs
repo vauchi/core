@@ -91,7 +91,6 @@ fn test_sync_item_card_updated() {
         0,
     ));
 
-    // Create a SyncItem representing a card field update
     let item = SyncItem::CardUpdated {
         field_label: "mobile".to_string(),
         new_value: "+1987654321".to_string(),
@@ -100,7 +99,6 @@ fn test_sync_item_card_updated() {
 
     assert!(matches!(item, SyncItem::CardUpdated { .. }));
 
-    // Verify timestamp is accessible for conflict resolution
     assert_eq!(item.timestamp(), 1000);
 }
 
@@ -152,7 +150,6 @@ fn test_conflict_resolution_last_write_wins() {
     let device_b_id = [0xBB; 32];
     let resolved = SyncItem::resolve_conflict(&item_a, &item_b, &device_a_id, &device_b_id);
 
-    // Device B's change should win
     if let SyncItem::CardUpdated { new_value, .. } = resolved {
         assert_eq!(new_value, "b@test.com");
     } else {

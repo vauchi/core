@@ -59,7 +59,6 @@ fn link_exchange_yields_live_updatable_contacts_on_both_sides() {
         .complete_link_exchange(&alice_payload, &bob_x3dh)
         .expect("bob completes alice's bootstrap");
 
-    // Both sides hold a live, updatable Link Exchanged contact with the peer's
     // relay routing — not a frozen import.
     for (v, peer_id, peer_relay) in [
         (&alice, &bob_in_alice, "https://relay.bob.example"),

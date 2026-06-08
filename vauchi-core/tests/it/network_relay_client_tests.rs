@@ -71,7 +71,6 @@ fn test_relay_client_send_update() {
     assert!(!msg_id.as_str().is_empty());
     assert_eq!(client.in_flight_count(), 1);
 
-    // Check the message was sent
     let sent = client.connection().transport().sent_messages();
     assert_eq!(sent.len(), 1);
 
@@ -94,7 +93,6 @@ fn test_relay_client_acknowledgment_tracking() {
 
     let (mut alice_ratchet, _) = create_test_ratchet();
 
-    // Send a message
     let _msg_id = client
         .send_update(
             0,
@@ -115,7 +113,6 @@ fn test_relay_client_acknowledgment_tracking() {
     assert_eq!(result.acknowledged[0], "update-1");
     assert_eq!(client.in_flight_count(), 0);
 
-    // Verify ACK events include delivery status
     assert_eq!(result.ack_events.len(), 1);
     assert_eq!(result.ack_events[0].update_id, "update-1");
     assert_eq!(result.ack_events[0].status, AckStatus::Delivered);
@@ -130,7 +127,6 @@ fn test_process_incoming_captures_failed_ack_events() {
 
     let (mut alice_ratchet, _) = create_test_ratchet();
 
-    // Send a message
     let msg_id = client
         .send_update(
             0,
@@ -160,13 +156,11 @@ fn test_process_incoming_captures_failed_ack_events() {
 
     let result = client.process_incoming().unwrap();
 
-    // Failed ACKs should NOT appear in acknowledged list
     assert!(
         result.acknowledged.is_empty(),
         "Failed ACK should not be in acknowledged list"
     );
 
-    // But they SHOULD appear in ack_events for delivery tracking
     assert_eq!(result.ack_events.len(), 1);
     assert_eq!(result.ack_events[0].update_id, "update-fail");
     assert_eq!(result.ack_events[0].status, AckStatus::Failed);
@@ -188,7 +182,6 @@ fn test_relay_client_timeout_detection() {
 
     let (mut alice_ratchet, _) = create_test_ratchet();
 
-    // Send a message
     client
         .send_update(
             0,
@@ -221,7 +214,6 @@ fn test_relay_client_max_pending_limit() {
 
     let (mut alice_ratchet, _) = create_test_ratchet();
 
-    // Send up to limit
     client
         .send_update(0, "r1", &mut alice_ratchet, b"1", "u1", None)
         .unwrap();
@@ -229,7 +221,6 @@ fn test_relay_client_max_pending_limit() {
         .send_update(0, "r2", &mut alice_ratchet, b"2", "u2", None)
         .unwrap();
 
-    // Third should fail
     let result = client.send_update(0, "r3", &mut alice_ratchet, b"3", "u3", None);
     assert!(result.is_err(), "expected error");
     assert!(result.unwrap_err().to_string().contains("Too many pending"));
@@ -283,10 +274,8 @@ fn test_relay_client_send_raw_update() {
 
     let (mut alice_ratchet, _) = create_test_ratchet();
 
-    // Encrypt externally
     let ratchet_msg = alice_ratchet.encrypt(b"raw message").unwrap();
 
-    // Send raw
     let msg_id = client
         .send_raw_update(0, "recipient-id", &ratchet_msg, "raw-update-1", None)
         .unwrap();
@@ -408,7 +397,6 @@ fn test_suppress_presence_included_in_handshake() {
     client.connection_mut().set_identity(identity);
     client.connect().unwrap();
 
-    // Verify suppress_presence is in the handshake JSON
     let sent_raw = client.connection().transport().sent_raw();
     assert!(!sent_raw.is_empty(), "Handshake should have been sent");
 

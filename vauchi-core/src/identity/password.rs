@@ -69,16 +69,13 @@ const MIN_REQUIRED_SCORE: Score = Score::Three;
 /// assert!(matches!(strength, PasswordStrength::Strong | PasswordStrength::VeryStrong));
 /// ```
 pub fn validate_password(password: &str) -> Result<PasswordStrength, IdentityError> {
-    // Check minimum length first
     if password.len() < MIN_PASSWORD_LENGTH {
         return Err(IdentityError::WeakPassword);
     }
 
-    // Use zxcvbn to estimate entropy
     let estimate = zxcvbn::zxcvbn(password, &[]);
     let score = estimate.score();
 
-    // Require minimum score
     if score < MIN_REQUIRED_SCORE {
         return Err(IdentityError::WeakPassword);
     }

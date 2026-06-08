@@ -104,7 +104,6 @@ fn offline_banner_is_idempotent_across_repeated_renders() {
 fn offline_banner_persists_after_screen_navigation() {
     let mut engine = unlocked_engine();
     engine.set_network_online(false);
-    // Navigate to a different screen, then re-read via the
     // overlay-applying entrypoint. The banner state is owned by
     // AppEngine, not by the per-screen workflow engine, so it
     // must survive a screen change.

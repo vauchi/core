@@ -56,11 +56,9 @@ impl X3DH {
         our_keys: &X3DHKeyPair,
         their_public: &[u8; 32],
     ) -> Result<(SymmetricKey, [u8; 32]), ExchangeError> {
-        // Generate ephemeral key for this exchange
         let ephemeral_secret = EphemeralSecret::random_from_rng(OsRng);
         let ephemeral_public = PublicKey::from(&ephemeral_secret);
 
-        // Convert their public key
         let their_public_key = PublicKey::from(*their_public);
 
         // DH1: our_static × their_static (identity binding)
@@ -94,7 +92,6 @@ impl X3DH {
         their_identity_public: &[u8; 32],
         their_ephemeral_public: &[u8; 32],
     ) -> Result<SymmetricKey, ExchangeError> {
-        // Convert their ephemeral public key
         let their_ephemeral = PublicKey::from(*their_ephemeral_public);
 
         // DH1: our_static × their_static (identity binding — mirrors initiator)

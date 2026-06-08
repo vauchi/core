@@ -58,7 +58,6 @@ mod visibility_e2e_tests {
         let email_field_id = "email-id";
         let phone_field_id = "phone-id";
 
-        // Assign fields to labels
         label_manager
             .get_group_mut(&work_label_id)
             .unwrap()
@@ -68,12 +67,10 @@ mod visibility_e2e_tests {
             .unwrap()
             .add_visible_field(phone_field_id, 0);
 
-        // Assign Bob to Work label
         label_manager
             .add_contact_to_group(&work_label_id, contact_id, 0)
             .unwrap();
 
-        // Bob should see email but not phone
         assert_eq!(
             label_manager.can_see_via_labels(contact_id, email_field_id),
             Some(true)
@@ -83,12 +80,10 @@ mod visibility_e2e_tests {
             None
         );
 
-        // Assign Bob to Personal label too
         label_manager
             .add_contact_to_group(&personal_label_id, contact_id, 0)
             .unwrap();
 
-        // Now Bob should see both
         assert_eq!(
             label_manager.can_see_via_labels(contact_id, email_field_id),
             Some(true)

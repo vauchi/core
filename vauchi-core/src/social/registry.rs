@@ -77,10 +77,8 @@ impl SocialNetwork {
     /// assert_eq!(twitter.profile_url("@alice"), "https://twitter.com/alice");
     /// ```
     pub fn profile_url(&self, username: &str) -> String {
-        // Clean up the username
         let clean_username = Self::normalize_username(username, &self.id);
 
-        // If already a full URL, return as-is
         if clean_username.starts_with("http://") || clean_username.starts_with("https://") {
             return clean_username;
         }
@@ -93,7 +91,6 @@ impl SocialNetwork {
     fn normalize_username(username: &str, network_id: &str) -> String {
         let username = username.trim();
 
-        // Remove leading @ for applicable networks
         let username = if username.starts_with('@')
             && matches!(network_id, "twitter" | "instagram" | "threads" | "mastodon")
         {
@@ -102,9 +99,7 @@ impl SocialNetwork {
             username
         };
 
-        // For Mastodon, handle full handles like @user@instance.social
         if network_id == "mastodon" && username.contains('@') {
-            // Keep as-is for federation handles
             return username.to_string();
         }
 

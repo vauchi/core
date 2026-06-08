@@ -137,7 +137,6 @@ fn app_engine_detects_persisted_identity() {
     let storage_key = SymmetricKey::generate();
     let db_path = dir.path().join("vauchi.db");
 
-    // Create identity with file-backed storage, then drop it
     {
         let config =
             VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key.clone());
@@ -205,7 +204,6 @@ fn navigate_to_exchange_without_identity_card() {
     let vauchi = Vauchi::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Should be on onboarding, navigate to exchange anyway
     let screen = engine.navigate_to(AppScreen::Exchange);
     assert!(!screen.screen_id.is_empty());
 }
@@ -280,7 +278,6 @@ fn lock_screen_engine_not_cached() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate to Lock, then away
     let lock = engine.navigate_to(AppScreen::Lock);
     assert_eq!(lock.screen_id, "lock_screen");
     // Intermediate step: navigate away — fresh lock screen asserted below
@@ -301,7 +298,6 @@ fn navigate_creates_fresh_engine_first_time() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // First navigation to each screen should create a fresh engine
     let contacts = engine.navigate_to(AppScreen::Contacts);
     assert_eq!(contacts.screen_id, "contacts");
 
@@ -325,7 +321,6 @@ fn invalidate_screen_removes_cached_engine() {
     engine.navigate_to(AppScreen::Contacts);
     engine.navigate_to(AppScreen::MyInfo);
 
-    // Invalidate Contacts cache
     engine.invalidate_screen(&AppScreen::Contacts);
 
     // Navigate back — should get fresh engine (not the cached one)
@@ -340,15 +335,12 @@ fn invalidate_all_clears_entire_cache() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Cache multiple screens
     engine.navigate_to(AppScreen::Contacts);
     engine.navigate_to(AppScreen::Settings);
     engine.navigate_to(AppScreen::MyInfo);
 
-    // Invalidate all
     engine.invalidate_all();
 
-    // Both should get fresh engines
     let contacts = engine.navigate_to(AppScreen::Contacts);
     assert_eq!(contacts.screen_id, "contacts");
     let settings = engine.navigate_to(AppScreen::Settings);
@@ -364,7 +356,6 @@ fn back_from_contact_detail_returns_to_contacts() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate: Home -> Contacts -> ContactDetail
     engine.navigate_to(AppScreen::Contacts);
     engine.navigate_to(AppScreen::ContactDetail {
         contact_id: "nonexistent".into(),
@@ -401,7 +392,6 @@ fn navigate_back_from_duress_pin_returns_to_settings() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate: Home -> Settings -> DuressPin
     engine.navigate_to(AppScreen::Settings);
     engine.navigate_to(AppScreen::DuressPin);
     assert_eq!(engine.current_app_screen(), &AppScreen::DuressPin);
@@ -422,7 +412,6 @@ fn navigate_back_from_settings_returns_to_home() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate: Home -> Settings
     engine.navigate_to(AppScreen::Settings);
     assert_eq!(engine.current_app_screen(), &AppScreen::Settings);
 
@@ -455,7 +444,6 @@ fn navigate_back_does_not_create_circular_history() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate: Home -> Contacts -> Settings
     engine.navigate_to(AppScreen::Contacts);
     engine.navigate_to(AppScreen::Settings);
 
@@ -731,7 +719,6 @@ fn more_engine_has_expected_navigation_targets() {
         .collect();
 
     // Expected items as of 2026-05-03 — extended for Android's
-    // MoreScreen retirement
     // (`2026-05-01-more-engine-extension-android-retirement`):
     // dropped `device_linking` (the link flow) in favor of
     // `device_management` (the landing list, more sensible default
@@ -1159,7 +1146,6 @@ fn extend_pending_commands_appends_to_drain_queue() {
     // Phase 1.C.3e-v of 2026-05-11-hover-graduation-plan.md —
     // PlatformAppEngine's audio-listener bridge forwards
     // session-side audio commands into AppEngine via this method.
-    // Verify the queue accepts pushes + drain returns them in order.
     use vauchi_core::{Command, Orientation};
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
@@ -1188,7 +1174,6 @@ fn extend_pending_commands_appends_to_drain_queue() {
 fn extend_pending_commands_preserves_existing_queue() {
     // Bridge may extend while AppEngine already has engine-emitted
     // commands buffered (from a prior screen_entered or ActionResult).
-    // Both classes should drain together.
     use vauchi_core::Command;
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();

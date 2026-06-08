@@ -71,7 +71,6 @@ fn test_full_exchange_two_sessions() {
     assert!(alice_init.data.starts_with("INI2"));
     assert!(bob_init.data.starts_with("INI2"));
 
-    // Both scan each other's INIT
     let alice_state = alice.process_scanned_qr(&bob_init.data);
     let bob_state = bob.process_scanned_qr(&alice_init.data);
     assert!(matches!(
@@ -132,11 +131,9 @@ fn test_full_exchange_with_relay_metadata() {
     let alice_init = alice.get_display_qr().unwrap();
     let bob_init = bob.get_display_qr().unwrap();
 
-    // Both scan each other's INIT
     alice.process_scanned_qr(&bob_init.data);
     bob.process_scanned_qr(&alice_init.data);
 
-    // Exchange until complete
     for _ in 0..100 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
@@ -156,7 +153,6 @@ fn test_full_exchange_with_relay_metadata() {
     assert!(matches!(alice.get_state(), ProtocolState::Finalized));
     assert!(matches!(bob.get_state(), ProtocolState::Finalized));
 
-    // Verify relay metadata was exchanged
     assert_eq!(
         alice.peer_relay_url(),
         Some("https://bob-relay.example.com")
@@ -169,7 +165,6 @@ fn test_full_exchange_with_relay_metadata() {
     );
     assert_eq!(bob.peer_relay_noise_pubkey(), Some([0xAA; 32]));
 
-    // Card data should still be correct
     assert_eq!(alice.get_received_data().unwrap(), bob_card);
     assert_eq!(bob.get_received_data().unwrap(), alice_card);
 }
@@ -345,7 +340,6 @@ fn test_audio_proximity_pending_to_failed_rejected() {
 // @internal
 #[test]
 fn test_audio_proximity_confirmed_is_terminal_success() {
-    // Confirmed is the security claim; the orchestrator should not
     // transition out of it within a session. (A new session resets
     // to Pending via construction.)
     let mut s = MultiStageSession::new(b"card".to_vec());

@@ -47,13 +47,11 @@ pub fn process_revocation(
     revocation: &IdentityRevoked,
     storage: &Storage,
 ) -> Result<(), crate::storage::StorageError> {
-    // 1. Look up contact
     let contact = match storage.load_contact(revocation.sender_id.as_str())? {
         Some(c) => c,
         None => return Ok(()), // No such contact — no-op
     };
 
-    // 2. Reject stale revocation (predates current exchange)
     // Only exchanged contacts have exchange timestamps and public keys
     let Some(exchange_ts) = contact.exchange_timestamp() else {
         return Ok(()); // Imported contact — no revocation possible
@@ -62,7 +60,6 @@ pub fn process_revocation(
         return Ok(());
     }
 
-    // 3. Verify signature against stored public key
     let Some(public_key) = contact.public_key() else {
         return Ok(()); // Imported contact — no public key to verify
     };
@@ -70,13 +67,12 @@ pub fn process_revocation(
         return Ok(());
     }
 
-    // 4. Crypto-shred: delete CEK (card becomes permanently unreadable)
+    // Crypto-shred: delete CEK (card becomes permanently unreadable)
     storage.delete_contact_cek(revocation.sender_id.as_str())?;
 
-    // 5. Delete contact row
     storage.delete_contact(revocation.sender_id.as_str())?;
 
-    // 6. Record tombstone (prevents future updates from revoked sender)
+    // Record tombstone (prevents future updates from revoked sender)
     storage.record_revoked_sender(revocation.sender_id.as_str(), revocation.timestamp)?;
 
     Ok(())

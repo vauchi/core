@@ -193,7 +193,6 @@ impl AnimatedQrSession {
 
         let b64_data = parts[3];
 
-        // Verify CRC32
         let expected_crc =
             u32::from_str_radix(crc_hex, 16).map_err(|_| AnimatedQrError::MalformedFrame {
                 reason: format!("cannot parse CRC32 hex: '{}'", crc_hex),
@@ -206,7 +205,6 @@ impl AnimatedQrSession {
             });
         }
 
-        // Decode base64url
         let chunk =
             URL_SAFE_NO_PAD
                 .decode(b64_data)
@@ -214,7 +212,6 @@ impl AnimatedQrSession {
                     reason: format!("invalid base64url data: {}", e),
                 })?;
 
-        // Initialize or validate total
         match self.expected_total {
             None => {
                 self.expected_total = Some(total);
@@ -228,7 +225,6 @@ impl AnimatedQrSession {
             _ => {}
         }
 
-        // Store chunk (ignore duplicates)
         if self.received_chunks[index].is_none() {
             self.received_chunks[index] = Some(chunk);
             self.received_count += 1;

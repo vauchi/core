@@ -100,7 +100,6 @@ fn contact_visibility_collected_input_format() {
 #[test]
 fn contact_visibility_toggle_then_collected_input_reflects_change() {
     let mut engine = make_engine();
-    // Toggle phone from hidden to visible
     let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "field_toggles".into(),
         item_id: "phone".into(),

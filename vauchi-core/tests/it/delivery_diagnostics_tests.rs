@@ -13,7 +13,6 @@ fn test_diagnostics_reports_connectivity_state() {
     let diag = ConnectivityDiagnostics::new();
     let report = diag.run().unwrap();
 
-    // New instance should report initial state
     assert!(
         report.offline_queue_depth >= 0,
         "Queue depth should be >= 0"

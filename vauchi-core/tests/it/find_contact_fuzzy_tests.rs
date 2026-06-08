@@ -81,15 +81,12 @@ fn test_find_contact_fuzzy_matches_id_prefix() {
 fn test_find_contact_fuzzy_deduplicates_name_and_id_matches() {
     let wb = create_test_vauchi();
 
-    // Create a contact whose name happens to contain its own ID prefix
     // (unlikely in practice, but we test deduplication)
     let id = add_named_contact(&wb, "TestContact", [1u8; 32]);
 
-    // Search by name - should find by name match
     let results_by_name = wb.find_contact_fuzzy("TestContact").unwrap();
     assert_eq!(results_by_name.len(), 1);
 
-    // Search by ID prefix - should find by ID match
     let prefix = &id[..6];
     let results_by_id = wb.find_contact_fuzzy(prefix).unwrap();
     assert!(
@@ -142,7 +139,6 @@ fn test_find_contact_fuzzy_union_of_name_and_id_without_duplicates() {
     let id_alice = add_named_contact(&wb, "Alice", [1u8; 32]);
     add_named_contact(&wb, "Bob", [2u8; 32]);
 
-    // Search by name
     let by_name = wb.find_contact_fuzzy("Alice").unwrap();
     assert_eq!(by_name.len(), 1);
     assert_eq!(by_name[0].display_name(), "Alice");
@@ -151,7 +147,6 @@ fn test_find_contact_fuzzy_union_of_name_and_id_without_duplicates() {
     let prefix = &id_alice[..8];
     let by_id = wb.find_contact_fuzzy(prefix).unwrap();
 
-    // Each result should appear at most once
     let mut seen_ids: Vec<String> = by_id.iter().map(|c| c.id().to_string()).collect();
     seen_ids.sort();
     seen_ids.dedup();

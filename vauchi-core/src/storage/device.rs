@@ -11,8 +11,6 @@ use crate::identity::device::DeviceRegistry;
 use crate::sync::device_sync::{FieldStamp, InterDeviceSyncState, VersionVector};
 
 impl Storage {
-    // === Device Operations ===
-
     /// Saves current device info (encrypted).
     pub fn save_device_info(
         &self,
@@ -201,8 +199,6 @@ impl Storage {
         Ok(count > 0)
     }
 
-    // === Device Sync State Operations ===
-
     /// Saves inter-device sync state for a specific device (encrypted).
     pub fn save_device_sync_state(&self, state: &InterDeviceSyncState) -> Result<(), StorageError> {
         let state_json = state.to_json();
@@ -308,8 +304,6 @@ impl Storage {
         )?;
         Ok(rows > 0)
     }
-
-    // === Version Vector Operations ===
 
     /// Saves the local version vector (encrypted).
     pub fn save_version_vector(&self, vector: &VersionVector) -> Result<(), StorageError> {
@@ -440,8 +434,6 @@ impl Storage {
         }
     }
 
-    // === Device Data Wipe ===
-
     /// Wipes all device-specific data from storage.
     ///
     /// Deletes rows from: `device_info`, `device_sync_state`, and
@@ -455,8 +447,6 @@ impl Storage {
         self.conn.execute("DELETE FROM sync_field_timestamps", [])?;
         Ok(())
     }
-
-    // === Sync Checkpoint Operations ===
 
     /// Saves a sync checkpoint for a target device (encrypted).
     ///

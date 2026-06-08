@@ -204,7 +204,6 @@ pub fn scan_qr_yolo(
     }
     let img = GrayImage::from_raw(width, height, luma_data.to_vec()).expect("dims verified above");
 
-    // Step 1: YOLO detection (uses pre-allocated buffer internally)
     let detect_start = std::time::Instant::now();
     let detections = match detector.detect(&img, confidence_threshold) {
         Ok(d) => d,
@@ -232,12 +231,10 @@ pub fn scan_qr_yolo(
         };
     }
 
-    // Step 2: For each detection, crop → multi-decoder attempt
     let decode_start = std::time::Instant::now();
     for det in &detections {
         let patch = crate::diagnostic::yolo_detector::crop_detection(&img, det, 0.15);
 
-        // Fast path: rqrr raw decode
         let rqrr_result = decode_rqrr(patch.clone());
         if rqrr_result.decoded.is_some() {
             return ScanResult {

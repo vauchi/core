@@ -227,7 +227,6 @@ fn failed_retry_preserves_link_mode() {
 }
 
 // ================================================================
-// Progress tracking
 //
 // Link-flow progress (share-url → waiting → retrieving → terminal)
 // graduated to `LinkExchangeEngine::progress`; its per-screen

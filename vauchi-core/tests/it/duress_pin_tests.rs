@@ -20,7 +20,6 @@ use vauchi_core::{AppPasswordConfig, AuthMode, AuthResult, BiometricUnlockOutcom
 use common::helpers::{create_vauchi_with_identity, setup_alice_bob_exchange};
 
 // =============================================================================
-// Password KDF Tests
 // =============================================================================
 
 // @scenario: duress_mode :: Enable duress PIN in settings
@@ -28,11 +27,9 @@ use common::helpers::{create_vauchi_with_identity, setup_alice_bob_exchange};
 fn test_create_password_config_produces_valid_hash() {
     let config = AppPasswordConfig::create("secure-pin-1234").expect("create should succeed");
 
-    // Hash and salt should be populated
     assert_ne!(config.password_hash(), &[0u8; 32]);
     assert_ne!(config.password_salt(), &[0u8; 16]);
 
-    // Duress should not be set up initially
     assert!(!config.duress_enabled());
     assert!(config.duress_hash().is_none());
     assert!(config.duress_salt().is_none());
@@ -79,7 +76,6 @@ fn test_verify_duress_password_returns_duress() {
         result
     );
 
-    // Normal password should still return Normal
     let result = config.verify("my-password");
     assert!(
         matches!(result, AuthResult::Normal),
@@ -238,7 +234,6 @@ fn test_change_password_no_duress_configured_works() {
 }
 
 // =============================================================================
-// Password Storage Tests
 // =============================================================================
 
 // @scenario: duress_mode :: Duress mode is opt-in and disabled by default
@@ -299,7 +294,6 @@ fn test_save_load_duress_password_roundtrip() {
         .save_identity(backup_data, "Test User")
         .expect("save identity should succeed");
 
-    // Set up normal password first
     let mut password_config =
         AppPasswordConfig::create("test-password").expect("create should succeed");
     storage
@@ -309,7 +303,6 @@ fn test_save_load_duress_password_roundtrip() {
         )
         .expect("save app password should succeed");
 
-    // Set up and save duress password
     password_config
         .setup_duress("duress-pin")
         .expect("setup duress should succeed");
@@ -346,7 +339,6 @@ fn test_disable_duress_clears_data() {
         .save_identity(backup_data, "Test User")
         .expect("save identity should succeed");
 
-    // Set up normal + duress
     let mut password_config =
         AppPasswordConfig::create("test-password").expect("create should succeed");
     storage
@@ -365,7 +357,6 @@ fn test_disable_duress_clears_data() {
         )
         .expect("save duress should succeed");
 
-    // Disable duress
     storage.disable_duress().expect("disable should succeed");
 
     let loaded = storage
@@ -379,7 +370,6 @@ fn test_disable_duress_clears_data() {
 }
 
 // =============================================================================
-// Decoy Contact Storage Tests
 // =============================================================================
 
 // @scenario: duress_mode :: Duress mode is opt-in and disabled by default
@@ -463,7 +453,6 @@ fn test_clear_all_decoy_contacts() {
 }
 
 // =============================================================================
-// Auth Mode Tests
 // =============================================================================
 
 // @scenario: duress_mode :: Duress mode is opt-in and disabled by default
@@ -520,7 +509,6 @@ fn test_authenticate_invalid_password_fails() {
 
     let result = wb.authenticate("wrong-pin");
     assert!(result.is_err(), "wrong password should return an error");
-    // Auth mode should remain Unauthenticated
     assert_eq!(wb.auth_mode(), AuthMode::Unauthenticated);
 }
 
@@ -586,14 +574,12 @@ fn test_change_app_password_round_trip() {
     wb.change_app_password("old-pin-1234", "new-pin-9876")
         .expect("rotate");
 
-    // Old no longer authenticates
     let old_result = wb.authenticate("old-pin-1234");
     assert!(
         old_result.is_err(),
         "old password must not authenticate after change_app_password"
     );
 
-    // New authenticates as Normal
     let new_mode = wb
         .authenticate("new-pin-9876")
         .expect("new password authenticates");
@@ -617,7 +603,6 @@ fn test_change_app_password_wrong_current_rejected_no_storage_change() {
         .expect("old still authenticates after rejected rotation");
     assert_eq!(mode, AuthMode::Normal);
 
-    // New does NOT authenticate
     let new_result = wb.authenticate("new-pin-9876");
     assert!(
         new_result.is_err(),
@@ -839,7 +824,6 @@ fn biometric_unlock_check_requests_floor_via_sleeper_seam() {
 }
 
 // =============================================================================
-// Mode-Aware Contact Loading Tests
 // =============================================================================
 
 // @scenario: duress_mode :: Normal credential shows real contacts
@@ -885,7 +869,6 @@ fn test_list_contacts_normal_mode_returns_real() {
 fn test_list_contacts_duress_mode_returns_decoy() {
     let (mut alice_wb, _bob_wb, _secret, _bob_id, _alice_id) = setup_alice_bob_exchange();
 
-    // Set up password + duress
     alice_wb
         .setup_app_password("my-pin")
         .expect("setup should succeed");
@@ -893,20 +876,17 @@ fn test_list_contacts_duress_mode_returns_decoy() {
         .setup_duress_password("duress-pin")
         .expect("setup duress should succeed");
 
-    // Add a decoy contact
     let decoy_card = ContactCard::new("Decoy Contact");
     alice_wb
         .add_decoy_contact("decoy-1", "Decoy Contact", &decoy_card)
         .expect("add decoy should succeed");
 
-    // Authenticate with duress
     let mode = alice_wb
         .authenticate("duress-pin")
         .expect("auth should succeed");
     assert_eq!(mode, AuthMode::Duress);
 
     let contacts = alice_wb.list_contacts().expect("list should succeed");
-    // Should see the decoy contact, not Bob
     assert_eq!(
         contacts.len(),
         1,
@@ -916,7 +896,6 @@ fn test_list_contacts_duress_mode_returns_decoy() {
 }
 
 // =============================================================================
-// Duress Settings Storage Tests
 // =============================================================================
 
 // @scenario: duress_mode :: Duress mode is opt-in and disabled by default
@@ -980,7 +959,6 @@ fn test_delete_duress_settings() {
 }
 
 // =============================================================================
-// Duress Alert Tests
 // =============================================================================
 
 // @scenario: duress_mode :: Duress unlock sends silent alert to trusted contacts
@@ -1008,7 +986,6 @@ fn test_queue_duress_alert_on_duress_authenticate() {
     let mode = wb.authenticate("duress-999").expect("auth should succeed");
     assert_eq!(mode, AuthMode::Duress);
 
-    // Verify that a duress alert was queued
     let alerts = wb.pending_duress_alerts();
     assert!(
         !alerts.is_empty(),
@@ -1032,7 +1009,6 @@ fn test_queue_duress_alert_without_settings_is_noop() {
     let mode = wb.authenticate("duress-999").expect("auth should succeed");
     assert_eq!(mode, AuthMode::Duress);
 
-    // No alerts should be queued
     let alerts = wb.pending_duress_alerts();
     assert!(
         alerts.is_empty(),
@@ -1082,7 +1058,6 @@ fn test_duress_alert_contains_timestamp_and_device_id() {
 }
 
 // =============================================================================
-// Full Duress Flow Test
 // =============================================================================
 
 // @scenario: duress_mode :: Duress credential shows decoy contacts

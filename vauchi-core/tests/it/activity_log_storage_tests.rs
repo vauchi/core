@@ -102,7 +102,6 @@ fn prune_removes_old_entries() {
     let deleted = storage.activity_log_prune(now, seven_days).unwrap();
     assert_eq!(deleted, 1, "one old entry should be pruned");
 
-    // Only the recent entry should remain
     let results = storage.activity_log_query_recent(now, seven_days).unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].event_key, "evt-recent");

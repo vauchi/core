@@ -48,7 +48,6 @@ fn create_test_contact_with_fields(
 }
 
 // ================================================================
-// Duplicate Detection API Tests
 // ================================================================
 
 // @internal
@@ -133,17 +132,14 @@ fn test_dismiss_duplicate_removes_from_results() {
     wb.add_contact(c1).unwrap();
     wb.add_contact(c2).unwrap();
 
-    // Before dismissal
     let before = wb.find_duplicates().unwrap();
     assert!(
         !before.is_empty(),
         "should find duplicates before dismissal"
     );
 
-    // Dismiss the pair
     wb.dismiss_duplicate(&id1, &id2).unwrap();
 
-    // After dismissal
     let after = wb.find_duplicates().unwrap();
     assert_eq!(
         after.len(),
@@ -164,7 +160,6 @@ fn test_dismiss_duplicate_order_independent() {
     wb.add_contact(c1).unwrap();
     wb.add_contact(c2).unwrap();
 
-    // Dismiss in reverse order
     wb.dismiss_duplicate(&id2, &id1).unwrap();
 
     let after = wb.find_duplicates().unwrap();
@@ -197,18 +192,15 @@ fn test_merge_contacts_combines_fields() {
 
     let merged = wb.merge_contacts(&primary_id, &secondary_id).unwrap();
 
-    // Merged contact should have both fields
     assert_eq!(merged.card().fields().len(), 2);
     assert!(merged.card().fields().iter().any(|f| f.label() == "email"));
     assert!(merged.card().fields().iter().any(|f| f.label() == "phone"));
 
-    // Primary still exists
     assert!(
         wb.get_contact(&primary_id).unwrap().is_some(),
         "expected Some value"
     );
 
-    // Secondary should be deleted
     assert!(wb.get_contact(&secondary_id).unwrap().is_none());
 }
 
@@ -241,7 +233,6 @@ fn test_merge_contacts_not_found_error() {
 }
 
 // ================================================================
-// Setup Progress / Onboarding API Tests
 // ================================================================
 
 // @internal
@@ -464,7 +455,6 @@ fn test_new_aha_moments_exist() {
     let all = AhaMomentType::all();
     assert_eq!(all.len(), 8, "should have 8 aha moment types");
 
-    // Verify the new types are in the list
     assert!(all.contains(&AhaMomentType::FirstFieldEdit));
     assert!(all.contains(&AhaMomentType::ThreeContactsReached));
     assert!(all.contains(&AhaMomentType::DeviceLinked));
@@ -502,7 +492,6 @@ fn test_device_linked_moment_has_content() {
 fn test_new_aha_moments_trigger_via_api() {
     let wb = create_vauchi_with_identity("Alice");
 
-    // FirstFieldEdit should trigger once
     let moment = wb
         .try_trigger_aha_moment(AhaMomentType::FirstFieldEdit)
         .unwrap();

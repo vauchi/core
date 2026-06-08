@@ -23,7 +23,6 @@ use vauchi_core::network::{
 };
 
 // ============================================================
-// Custom Strategies
 // ============================================================
 
 /// Strategy for generating 32-byte arrays (keys, IDs).
@@ -70,7 +69,6 @@ fn adversarial_password_strategy() -> impl Strategy<Value = String> {
         Just("Secure-Pass\u{0000}word-42!@#Strong".to_string()),
         // RTL + LTR mixed
         Just("Hello-مرحبا-World-عالم-42!Strong".to_string()),
-        // Combining diacriticals
         Just("Tes\u{0301}t-Pa\u{0308}ss-Wo\u{0327}rd-42!@#".to_string()),
     ]
 }
@@ -115,7 +113,6 @@ proptest! {
         let restored = Identity::import_backup(&backup, &password, 0)
             .unwrap_or_else(|e| panic!("import_backup should succeed for password: {:?}: {}", password, e));
 
-        // Verify cryptographic identity is preserved
         prop_assert_eq!(
             original.signing_public_key(),
             restored.signing_public_key(),
@@ -725,7 +722,6 @@ proptest! {
         let mut bob_ratchet =
             DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
-        // Alice encrypts several messages in order
         let mut encrypted_messages: Vec<(usize, _)> = Vec::new();
         let mut plaintexts: Vec<Vec<u8>> = Vec::new();
 
@@ -775,7 +771,6 @@ proptest! {
         let mut bob_ratchet =
             DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
-        // Alice encrypts all messages
         let mut messages = Vec::new();
         let mut expected_plaintexts = Vec::new();
         for i in 0..total {
@@ -830,7 +825,6 @@ proptest! {
         let encrypted = alice_ratchet.encrypt(plaintext)
             .expect("encryption should succeed");
 
-        // First decryption succeeds
         let decrypted = bob_ratchet.decrypt(&encrypted)
             .expect("first decryption should succeed");
         prop_assert_eq!(decrypted.as_slice(), plaintext.as_slice());

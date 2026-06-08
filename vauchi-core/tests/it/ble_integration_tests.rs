@@ -21,7 +21,6 @@ use vauchi_core::exchange::{
 };
 
 // ============================================================
-// BLE Advertisement
 // Feature: ble_exchange.feature @integration @advertisement
 // ============================================================
 
@@ -87,7 +86,6 @@ fn test_parse_advertisement() {
 }
 
 // ============================================================
-// BLE Device Discovery
 // Feature: ble_exchange.feature @integration @discovery
 // ============================================================
 
@@ -150,7 +148,6 @@ fn test_device_within_range() {
 }
 
 // ============================================================
-// BLE Exchange Session
 // Feature: ble_exchange.feature @integration @session
 // ============================================================
 
@@ -219,7 +216,6 @@ fn test_exchange_contact_data() {
     let mut alice_session = BLEExchangeSession::new(&alice_keypair);
     let mut bob_session = BLEExchangeSession::new(&bob_keypair);
 
-    // Alice advertises, Bob scans
     alice_session.start_advertising().unwrap();
     bob_session.start_scanning().unwrap();
 
@@ -229,7 +225,6 @@ fn test_exchange_contact_data() {
 
     bob_session.connect_to_device(&alice_device).unwrap();
 
-    // Exchange data
     let alice_card = b"Alice's contact card";
     let bob_card = b"Bob's contact card";
 
@@ -306,7 +301,6 @@ fn test_cancel_session() {
 }
 
 // ============================================================
-// Proximity Verification
 // Feature: ble_exchange.feature @integration @proximity
 // ============================================================
 
@@ -357,7 +351,6 @@ fn test_proximity_fails_when_too_far() {
 }
 
 // ============================================================
-// Error Handling
 // Feature: ble_exchange.feature @integration @error
 // ============================================================
 
@@ -403,7 +396,6 @@ fn test_cannot_exchange_without_connection() {
 }
 
 // ============================================================
-// Serialization
 // ============================================================
 
 /// Test: Advertisement serialization roundtrip

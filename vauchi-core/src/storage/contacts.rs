@@ -11,8 +11,6 @@ use super::{Storage, StorageError};
 use crate::contact::Contact;
 
 impl Storage {
-    // === Contact Operations ===
-
     /// Saves a contact to storage.
     ///
     /// If the contact has a CEK, the card is encrypted with the CEK (not the
@@ -22,11 +20,9 @@ impl Storage {
     /// Legacy contacts (no CEK) use storage-key encryption with plaintext
     /// display_name (existing behavior).
     pub fn save_contact(&self, contact: &Contact) -> Result<(), StorageError> {
-        // Serialize the contact card
         let card_json = serde_json::to_vec(contact.card())
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
-        // CEK-aware encryption: use CEK if present, otherwise storage key
         let (card_encrypted, display_name_db, cek_encrypted_param) =
             if let Some(cek) = contact.cek() {
                 let card_ct = cek
@@ -41,7 +37,6 @@ impl Storage {
                 (card_ct, contact.display_name().to_string(), None::<Vec<u8>>)
             };
 
-        // Branch on contact kind for crypto fields
         let (
             public_key_bytes,
             shared_key_encrypted,
@@ -60,7 +55,6 @@ impl Storage {
             imported_at_val,
             original_uid_val,
         ) = if let Some(ex) = contact.kind().exchanged_data() {
-            // Exchanged contact: encrypt all crypto fields
             let sk_encrypted =
                 crate::crypto::encrypt(&self.encryption_key, ex.shared_key.as_bytes())
                     .map_err(|e| StorageError::Encryption(e.to_string()))?;
@@ -543,7 +537,6 @@ impl Storage {
             }
         }
 
-        // Sort combined results by display_name
         contacts.sort_by(|a, b| {
             a.display_name()
                 .to_lowercase()
@@ -582,8 +575,6 @@ impl Storage {
             .execute("DELETE FROM contacts WHERE id = ?1", params![id])?;
         Ok(rows_affected > 0)
     }
-
-    // === Archived Contacts ===
 
     /// Lists contacts that are archived (but not soft-deleted).
     pub fn list_archived_contacts(&self) -> Result<Vec<Contact>, StorageError> {
@@ -645,8 +636,6 @@ impl Storage {
         Ok(contacts)
     }
 
-    // === Stale Soft-Delete Cleanup ===
-
     /// Finds contact IDs that were soft-deleted before the given timestamp.
     ///
     /// Used by the garbage collector to find contacts eligible for permanent deletion.
@@ -664,8 +653,6 @@ impl Storage {
 
         Ok(ids)
     }
-
-    // === Import Dedup ===
 
     /// Finds an imported contact by its original UID.
     ///

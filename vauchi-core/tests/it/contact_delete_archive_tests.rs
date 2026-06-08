@@ -165,7 +165,6 @@ fn imported_contact_defaults_not_deleted_not_archived() {
 }
 
 // ============================================================
-// Storage layer tests
 // ============================================================
 
 // @internal
@@ -396,7 +395,6 @@ fn vauchi_list_archived_contacts_excludes_from_active() {
     );
     assert_eq!(archived[0].id(), bob_id);
 
-    // Active list should exclude archived
     let active = wb.list_contacts().unwrap();
     assert_eq!(active.len(), 1, "Active list should exclude archived");
     assert_ne!(active[0].id(), bob_id);
@@ -511,7 +509,6 @@ fn undo_delete_after_hard_delete_returns_error() {
     let id = imported.id().to_string();
     wb.add_contact(imported).unwrap();
 
-    // Soft-delete then hard-delete
     wb.soft_delete_imported_contact(&id).unwrap();
     wb.hard_delete_imported_contact(&id).unwrap();
 
@@ -546,7 +543,6 @@ fn sync_item_contact_archived_roundtrip() {
         "Timestamp should be preserved"
     );
 
-    // Verify the contact_id is in the JSON
     assert!(
         json.contains("abc123"),
         "JSON should contain the contact_id"
@@ -617,10 +613,8 @@ fn apply_sync_contact_unarchived_clears_flag() {
     let bob_id = bob.id().to_string();
     wb.add_contact(bob).unwrap();
 
-    // First archive
     wb.archive_contact(&bob_id).unwrap();
 
-    // Then unarchive via sync
     let items = vec![SyncItem::ContactUnarchived {
         contact_id: bob_id.clone(),
         timestamp: 1_700_001_000,

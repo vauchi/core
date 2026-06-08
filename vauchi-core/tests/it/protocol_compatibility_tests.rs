@@ -209,7 +209,6 @@ const SERIALIZED_RATCHET_STATE_V1: &str = r#"{
 }"#;
 
 // =============================================================================
-// TESTS
 // =============================================================================
 
 // @internal
@@ -221,7 +220,6 @@ fn test_ratchet_message_compatibility_v1() {
     let msg: RatchetMessage = serde_json::from_str(RATCHET_MESSAGE_V1)
         .expect("Failed to deserialize RatchetMessage V1 golden fixture");
 
-    // Verify fields
     assert_eq!(msg.dh_generation, 5);
     assert_eq!(msg.message_index, 12);
     assert_eq!(msg.previous_chain_length, 10);
@@ -229,7 +227,6 @@ fn test_ratchet_message_compatibility_v1() {
     assert_eq!(msg.dh_public[31], 32);
     assert_eq!(msg.ciphertext, b"Hello World".to_vec());
 
-    // Round-trip test
     let reserialized = serde_json::to_string(&msg).unwrap();
     let reparsed: RatchetMessage = serde_json::from_str(&reserialized).unwrap();
     assert_eq!(msg.dh_generation, reparsed.dh_generation);
@@ -246,12 +243,10 @@ fn test_contact_card_compatibility_v1() {
     let card: ContactCard = serde_json::from_str(CONTACT_CARD_V1)
         .expect("Failed to deserialize ContactCard V1 golden fixture");
 
-    // Verify fields
     assert_eq!(card.id(), "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6");
     assert_eq!(card.display_name(), "Alice Smith");
     assert_eq!(card.fields().len(), 3);
 
-    // Verify field types and values
     let email_field = card.fields().iter().find(|f| f.label() == "Work").unwrap();
     assert_eq!(email_field.value(), "alice@example.com");
 
@@ -262,7 +257,6 @@ fn test_contact_card_compatibility_v1() {
         .unwrap();
     assert_eq!(phone_field.value(), "+1-555-123-4567");
 
-    // Round-trip test
     let reserialized = serde_json::to_string(&card).unwrap();
     let reparsed: ContactCard = serde_json::from_str(&reserialized).unwrap();
     assert_eq!(card.id(), reparsed.id());
@@ -275,7 +269,6 @@ fn test_contact_card_compatibility_v1() {
 fn test_field_type_variants_compatibility_v1() {
     use vauchi_core::ContactField;
 
-    // Test each FieldType variant
     let phone: ContactField = serde_json::from_str(FIELD_TYPE_PHONE_V1).unwrap();
     assert_eq!(phone.label(), "Mobile");
 
@@ -307,7 +300,6 @@ fn test_card_delta_added_compatibility_v1() {
     assert_eq!(delta.timestamp, 1700000000);
     assert_eq!(delta.changes.len(), 1);
 
-    // Verify it's an Added change
     match &delta.changes[0] {
         vauchi_core::sync::FieldChange::Added { field } => {
             assert_eq!(field.label(), "Personal");
@@ -387,13 +379,11 @@ fn test_device_registry_compatibility_v1() {
     assert_eq!(registry.version(), 2);
     assert_eq!(registry.all_devices().len(), 2);
 
-    // Verify first device
     let phone = &registry.all_devices()[0];
     assert_eq!(phone.device_name, "Phone");
     assert_eq!(phone.created_at, 1700000000);
     assert!(!phone.revoked);
 
-    // Verify second device
     let laptop = &registry.all_devices()[1];
     assert_eq!(laptop.device_name, "Laptop");
     assert_eq!(laptop.created_at, 1700000100);
@@ -496,7 +486,6 @@ fn test_serialized_ratchet_state_compatibility_v1() {
     let state: SerializedRatchetState = serde_json::from_str(SERIALIZED_RATCHET_STATE_V1)
         .expect("Failed to deserialize SerializedRatchetState V1");
 
-    // Verify key fields
     assert_eq!(state.dh_generation, 5);
     assert_eq!(state.send_message_count, 15);
     assert_eq!(state.recv_message_count, 12);
@@ -506,28 +495,23 @@ fn test_serialized_ratchet_state_compatibility_v1() {
     assert_eq!(state.root_key[0], 10);
     assert_eq!(state.root_key[31], 7);
 
-    // Verify their_dh is present
     state.their_dh.expect("expected Some");
     assert_eq!(state.their_dh.unwrap()[0], 8);
 
-    // Verify send_chain
     let (send_key, send_gen) = state.send_chain.unwrap();
     assert_eq!(send_key[0], 9);
     assert_eq!(send_gen, 3);
 
-    // Verify recv_chain
     let (recv_key, recv_gen) = state.recv_chain.unwrap();
     assert_eq!(recv_key[0], 10);
     assert_eq!(recv_gen, 2);
 
-    // Verify skipped_keys
     assert_eq!(state.skipped_keys.len(), 1);
     let ((dh_gen, msg_idx), key) = &state.skipped_keys[0];
     assert_eq!(*dh_gen, 4);
     assert_eq!(*msg_idx, 7);
     assert_eq!(key[0], 11);
 
-    // Round-trip test
     let reserialized = serde_json::to_string(&state).unwrap();
     let reparsed: SerializedRatchetState = serde_json::from_str(&reserialized).unwrap();
     assert_eq!(state.dh_generation, reparsed.dh_generation);
@@ -583,7 +567,6 @@ fn test_field_type_enum_variant_names() {
 // @internal
 #[test]
 fn test_sync_item_enum_variant_names() {
-    // Verify all SyncItem variant names are stable
     let card_updated = r#"{"CardUpdated":{"field_label":"x","new_value":"y","timestamp":0}}"#;
     let contact_removed = r#"{"ContactRemoved":{"contact_id":"x","timestamp":0}}"#;
     let visibility = r#"{"VisibilityChanged":{"contact_id":"x","field_label":"y","is_visible":true,"timestamp":0}}"#;

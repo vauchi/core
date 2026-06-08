@@ -83,7 +83,6 @@ fn run_asymmetric_exchange(
             bob_peer_displayed += 1;
         }
 
-        // Alice processes Bob's QR only after alice_scan_every_n new displays
         if let Some(bq) = &bq {
             if alice_peer_displayed - alice_last_scan_at >= alice_scan_every_n as u32 {
                 alice.process_scanned_qr(&bq.data);
@@ -91,7 +90,6 @@ fn run_asymmetric_exchange(
             }
         }
 
-        // Bob processes Alice's QR only after bob_scan_every_n new displays
         if let Some(aq) = &aq {
             if bob_peer_displayed - bob_last_scan_at >= bob_scan_every_n as u32 {
                 bob.process_scanned_qr(&aq.data);
@@ -107,7 +105,6 @@ fn run_asymmetric_exchange(
             std::thread::sleep(d);
         }
 
-        // Check terminal states
         let as_ = alice.get_state();
         let bs = bob.get_state();
         let alice_terminal = matches!(as_, ProtocolState::Finalized | ProtocolState::Failed(_));

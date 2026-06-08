@@ -227,7 +227,6 @@ fn test_init_qr_rejects_private_host_relay_url() {
         None,
     );
 
-    // Should fail SSRF validation during parse
     let result = parse_qr(&qr);
     assert!(result.is_err(), "private host relay URL should be rejected");
 }
@@ -259,7 +258,6 @@ fn test_init_qr_rejects_insecure_scheme() {
 // @internal
 #[test]
 fn test_init_qr_truncated_before_flags() {
-    // Build a valid prefix but truncate before flags byte
     let session_id = [38u8; 16];
     let _pubkey = [39u8; 32];
     let ephemeral = [40u8; 32];

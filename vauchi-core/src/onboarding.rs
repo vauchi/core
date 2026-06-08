@@ -202,23 +202,18 @@ pub fn display_name_suggestions(full_name: &str) -> Vec<String> {
 
     let mut suggestions = Vec::new();
 
-    // First name
     let first = parts[0];
     if !first.is_empty() {
         suggestions.push(first.to_string());
     }
 
-    // Shortened first name (if 5+ chars, take first 4 chars boundary)
     if first.chars().count() >= 5 {
-        // Find a character boundary at approximately 4 chars
         let short: String = first.chars().take(4).collect();
-        // Only add if it's different from the first name
         if short != first {
             suggestions.push(short);
         }
     }
 
-    // Initial + last name (only if there are multiple parts)
     if parts.len() >= 2 {
         let Some(initial) = first.chars().next() else {
             return suggestions;

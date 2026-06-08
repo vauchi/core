@@ -71,7 +71,6 @@ fn test_list_consent_records() {
     let records = storage.list_consent_records().unwrap();
     assert_eq!(records.len(), 2);
 
-    // Sorted by timestamp
     assert_eq!(records[0].0, "c1");
     assert_eq!(records[0].1, "analytics");
     assert!(records[0].2); // granted
@@ -99,7 +98,6 @@ fn test_consent_upsert_overwrites() {
     storage
         .execute_consent_upsert("c1", "analytics", true, 1000)
         .unwrap();
-    // Same ID should overwrite
     storage
         .execute_consent_upsert("c1", "analytics", false, 2000)
         .unwrap();

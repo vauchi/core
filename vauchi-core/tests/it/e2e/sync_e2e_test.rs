@@ -60,7 +60,6 @@ fn test_sync_update_propagation_happy_path() {
     let alice_contact_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
 
-    // Initialize ratchets
     let bob_dh = X3DHKeyPair::generate();
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -162,7 +161,6 @@ fn test_sync_manager_queue_happy_path() {
         .unwrap();
     assert!(!update_id.as_str().is_empty());
 
-    // Verify update is pending
     let pending = sync_manager.get_pending(contact_id).unwrap();
     assert_eq!(pending.len(), 1);
 
@@ -178,7 +176,6 @@ fn test_sync_manager_queue_happy_path() {
     // Simulate contact coming online - deliver update
     sync_manager.mark_delivered(&update_id).unwrap();
 
-    // Verify update is no longer pending
     let pending = sync_manager.get_pending(contact_id).unwrap();
     assert_eq!(pending.len(), 0);
 
@@ -200,7 +197,6 @@ fn test_full_three_user_workflow() {
     bob_wb.create_identity("Bob").unwrap();
     carol_wb.create_identity("Carol").unwrap();
 
-    // Alice sets up her card with work and personal info
     alice_wb
         .add_own_field(ContactField::new(
             FieldType::Email,
@@ -234,7 +230,6 @@ fn test_full_three_user_workflow() {
         ))
         .unwrap();
 
-    // Exchange with Bob
     let alice_pk = *alice_wb.identity().unwrap().signing_public_key();
     let bob_pk = *bob_wb.identity().unwrap().signing_public_key();
     let carol_pk = *carol_wb.identity().unwrap().signing_public_key();
@@ -250,7 +245,6 @@ fn test_full_three_user_workflow() {
     let alice_id_bob = alice_for_bob.id().to_string();
     bob_wb.add_contact(alice_for_bob).unwrap();
 
-    // Exchange with Carol
     let alice_carol_secret = SymmetricKey::generate();
     let carol_contact = Contact::from_exchange(
         carol_pk,
@@ -266,7 +260,6 @@ fn test_full_three_user_workflow() {
     let alice_id_carol = alice_for_carol.id().to_string();
     carol_wb.add_contact(alice_for_carol).unwrap();
 
-    // Set visibility - Bob sees work only, Carol sees all
     let mut bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
     bob_contact
         .visibility_rules_mut()
@@ -274,7 +267,6 @@ fn test_full_three_user_workflow() {
         .set_nobody("personal");
     alice_wb.storage().save_contact(&bob_contact).unwrap();
 
-    // Verify visibility rules
     let bob_contact = alice_wb.get_contact(&bob_id).unwrap().unwrap();
     let carol_contact = alice_wb.get_contact(&carol_id).unwrap().unwrap();
 
@@ -303,7 +295,6 @@ fn test_full_three_user_workflow() {
             .can_see("personal", &carol_id)
     );
 
-    // Alice updates her card
     let old_card = alice_wb.own_card().unwrap().unwrap();
     let work_email_id = old_card
         .fields()
@@ -323,7 +314,6 @@ fn test_full_three_user_workflow() {
     let delta = CardDelta::compute(&old_card, &new_card, 0);
     assert!(!delta.changes.is_empty());
 
-    // Apply updates to Bob and Carol
     let mut bob_alice_card = bob_wb
         .get_contact(&alice_id_bob)
         .unwrap()
@@ -340,7 +330,6 @@ fn test_full_three_user_workflow() {
         .clone();
     delta.apply(&mut carol_alice_card, 0).unwrap();
 
-    // Verify both have updated work email
     let bob_work_email = bob_alice_card
         .fields()
         .iter()
@@ -379,17 +368,14 @@ fn test_relay_update_delivery_happy_path() {
 
     let mut client = RelayClient::new(transport, config, "alice-identity".into());
 
-    // Connect to relay
     client.connect().unwrap();
     assert!(client.is_connected());
 
-    // Set up encryption
     let shared_secret = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
     let mut alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
-    // Send encrypted update through relay
     let update_payload = b"Card update data";
     let msg_id = client
         .send_update(
@@ -402,7 +388,6 @@ fn test_relay_update_delivery_happy_path() {
         )
         .unwrap();
 
-    // Verify update is tracked
     assert!(!msg_id.as_str().is_empty());
     assert_eq!(client.in_flight_count(), 1);
     assert!(
@@ -411,7 +396,6 @@ fn test_relay_update_delivery_happy_path() {
             .contains(&"update-001".to_string())
     );
 
-    // Clean up
     client.disconnect().unwrap();
     assert!(!client.is_connected());
 }

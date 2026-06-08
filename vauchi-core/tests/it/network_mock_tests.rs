@@ -43,11 +43,9 @@ fn test_mock_transport_send_receive() {
     let incoming = create_test_message();
     transport.queue_receive(incoming.clone());
 
-    // Receive it
     let received = transport.receive().unwrap().unwrap();
     assert_eq!(received.message_id, incoming.message_id);
 
-    // No more messages
     assert!(transport.receive().unwrap().is_none());
 }
 
@@ -86,7 +84,6 @@ fn test_mock_transport_auto_ack() {
     let message = create_test_message();
     transport.send(&message).unwrap();
 
-    // Should have an ack in the receive queue
     assert!(transport.has_pending());
     let ack = transport.receive().unwrap().unwrap();
 
@@ -104,7 +101,6 @@ fn test_mock_transport_auto_ack() {
 fn test_mock_transport_not_connected_error() {
     let mut transport = MockTransport::new();
 
-    // Try to send without connecting
     let message = create_test_message();
     let result = transport.send(&message);
 

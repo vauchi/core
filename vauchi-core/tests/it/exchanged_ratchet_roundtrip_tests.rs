@@ -98,7 +98,6 @@ fn in_person_exchange_double_ratchet_round_trips() {
         "both sides must derive the same X3DH shared secret"
     );
 
-    // Build both ratchets via the production seam. Role + key are derived
     // inside the seam — callers cannot pick the wrong ones.
     let (alice_ratchet, alice_is_initiator) = alice_session
         .build_exchange_ratchet(&alice_contact)

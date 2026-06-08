@@ -33,7 +33,6 @@ fn first_field_id(card: &ContactCard) -> String {
 }
 
 // ============================================================
-// Coalescing Tests
 // ============================================================
 
 // @scenario: performance :: Coalesce rapid edits before sync
@@ -57,21 +56,18 @@ fn test_rapid_edits_coalesce_into_single_sync_payload() {
         current_card = new_card;
     }
 
-    // Verify multiple updates are pending
     let pending_before = sync_manager.get_pending(contact_id).unwrap();
     assert!(
         pending_before.len() >= 2,
         "Should have multiple pending updates before coalescing"
     );
 
-    // Coalesce
     let result = sync_manager.coalesce_updates(contact_id).unwrap();
     assert!(
         result.is_some(),
         "Coalescing should produce a merged update"
     );
 
-    // After coalescing, should have exactly 1 pending card_update
     let pending_after = sync_manager.get_pending(contact_id).unwrap();
     let card_updates: Vec<_> = pending_after
         .iter()
@@ -112,11 +108,9 @@ fn test_coalesce_preserves_final_state() {
         .queue_card_update(contact_id, &card_v1, &card_v2)
         .unwrap();
 
-    // Coalesce
     let result = sync_manager.coalesce_updates(contact_id).unwrap();
     result.expect("expected Some");
 
-    // The coalesced payload should contain the field change
     let pending = sync_manager.get_pending(contact_id).unwrap();
     let card_update = pending
         .iter()
@@ -150,13 +144,11 @@ fn test_coalesce_skips_when_single_update() {
         .queue_card_update(contact_id, &original_card, &new_card)
         .unwrap();
 
-    // Coalesce with only 1 update should return None
     let result = sync_manager.coalesce_updates(contact_id).unwrap();
     assert!(result.is_none(), "Single update should not need coalescing");
 }
 
 // ============================================================
-// Batch Encryption Pipeline Tests
 // ============================================================
 
 // @scenario: performance :: Batch encryption for multi-contact sync
@@ -253,7 +245,6 @@ fn test_coalesce_does_not_affect_other_update_types() {
         .count();
     assert_eq!(visibility_before, 1);
 
-    // Coalesce should only merge card_updates
     sync_manager.coalesce_updates(contact_id).unwrap();
 
     let after = sync_manager.get_pending(contact_id).unwrap();

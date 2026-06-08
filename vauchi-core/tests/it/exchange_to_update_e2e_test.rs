@@ -129,7 +129,6 @@ fn test_full_path_exchange_to_card_update() {
         .expect("blog field must exist after update");
     assert_eq!(blog.value(), "https://alice.example");
 
-    // Phone field should be unchanged
     let phone = updated_card
         .fields()
         .iter()

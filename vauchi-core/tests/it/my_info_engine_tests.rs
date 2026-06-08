@@ -113,7 +113,6 @@ fn my_info_toggle_view_switches_mode() {
     let mut engine = MyInfoEngine::new(MyInfoProgress::default())
         .with_own_card("Demo".into(), sample_own_fields());
 
-    // Initially in entry view
     let screen = engine.current_screen();
     assert!(
         screen
@@ -122,7 +121,6 @@ fn my_info_toggle_view_switches_mode() {
             .any(|a| a.id == "toggle_view" && a.label == "Group View")
     );
 
-    // Toggle to group view
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "toggle_view".into(),
     });
@@ -251,7 +249,6 @@ fn my_info_shows_exchange_prompt_when_no_contacts() {
         .with_exchange_prompt(true);
     let screen = engine.current_screen();
 
-    // Should have an exchange_prompt InfoPanel
     let prompt = screen
         .components
         .iter()
@@ -289,14 +286,12 @@ fn my_info_hides_exchange_prompt_when_has_contacts() {
         .with_exchange_prompt(false);
     let screen = engine.current_screen();
 
-    // No exchange prompt
     let prompt = screen
         .components
         .iter()
         .any(|c| matches!(c, Component::InfoPanel { id, .. } if id == "exchange_prompt"));
     assert!(!prompt, "Should not show exchange prompt when has contacts");
 
-    // No go_exchange action
     assert!(
         !screen.actions.iter().any(|a| a.id == "go_exchange"),
         "Should not have go_exchange action"

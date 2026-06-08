@@ -53,13 +53,10 @@ pub fn pad(plaintext: &[u8]) -> Vec<u8> {
 
     let mut padded = Vec::with_capacity(target_size);
 
-    // Write original length as 4-byte big-endian prefix
     padded.extend_from_slice(&(plaintext.len() as u32).to_be_bytes());
 
-    // Copy plaintext
     padded.extend_from_slice(plaintext);
 
-    // Fill remaining space with random bytes
     let padding_len = target_size - needed;
     if padding_len > 0 {
         padded.resize(target_size, 0);
@@ -78,7 +75,6 @@ pub fn unpad(padded: &[u8]) -> Option<Vec<u8>> {
         return None;
     }
 
-    // Read original length from first 4 bytes
     let len = u32::from_be_bytes([padded[0], padded[1], padded[2], padded[3]]) as usize;
 
     // Validate: plaintext must fit within the padded buffer
@@ -113,7 +109,6 @@ fn select_bucket(size: usize) -> usize {
     } else if size <= BUCKET_LARGE {
         BUCKET_LARGE
     } else {
-        // Round up to next OVERFLOW_ALIGNMENT boundary
         size.div_ceil(OVERFLOW_ALIGNMENT) * OVERFLOW_ALIGNMENT
     }
 }
@@ -222,7 +217,6 @@ mod tests {
 
     #[test]
     fn test_all_bucket_sizes_are_consistent() {
-        // Test various sizes hit expected buckets
         for size in 0..=252 {
             let plaintext = vec![0u8; size];
             assert_eq!(pad(&plaintext).len(), BUCKET_SMALL, "size={}", size);
@@ -249,7 +243,6 @@ mod tests {
         let plaintext = b"test";
         let padded1 = pad(plaintext);
         let padded2 = pad(plaintext);
-        // Both should unpad to same value
         assert_eq!(unpad(&padded1).unwrap(), plaintext);
         assert_eq!(unpad(&padded2).unwrap(), plaintext);
         // The random tail portion should differ

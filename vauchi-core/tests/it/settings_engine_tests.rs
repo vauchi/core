@@ -79,12 +79,10 @@ fn settings_shows_all_groups() {
 fn settings_toggle_delivery_receipts() {
     let mut engine = SettingsEngine::new(sample_config());
 
-    // Initially enabled
     let screen = engine.current_screen();
     let receipts_enabled = find_toggle(&screen, "privacy", "delivery_receipts");
     assert!(receipts_enabled, "delivery_receipts should start enabled");
 
-    // Toggle off
     let result = engine.handle_action(UserAction::SettingsToggled {
         component_id: "privacy".into(),
         item_id: "delivery_receipts".into(),
@@ -107,12 +105,10 @@ fn settings_toggle_delivery_receipts() {
 fn settings_toggle_suppress_presence() {
     let mut engine = SettingsEngine::new(sample_config());
 
-    // Initially disabled
     let screen = engine.current_screen();
     let suppress = find_toggle(&screen, "privacy", "suppress_presence");
     assert!(!suppress, "suppress_presence should start disabled");
 
-    // Toggle on
     let result = engine.handle_action(UserAction::SettingsToggled {
         component_id: "privacy".into(),
         item_id: "suppress_presence".into(),
@@ -177,7 +173,6 @@ fn settings_confirm_emergency_wipe_completes() {
         matches!(trigger, ActionResult::UpdateScreen(_)),
         "trigger should show inline confirm, got {trigger:?}"
     );
-    // Confirm
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "confirm_emergency_wipe".into(),
     });
@@ -192,7 +187,6 @@ fn settings_confirm_emergency_wipe_completes() {
 #[test]
 fn settings_cancel_emergency_wipe_removes_inline_confirm() {
     let mut engine = SettingsEngine::new(sample_config());
-    // Trigger wipe
     let trigger = engine.handle_action(UserAction::ListItemSelected {
         component_id: "danger".into(),
         item_id: "emergency_wipe".into(),
@@ -201,7 +195,6 @@ fn settings_cancel_emergency_wipe_removes_inline_confirm() {
         matches!(trigger, ActionResult::UpdateScreen(_)),
         "trigger should show inline confirm, got {trigger:?}"
     );
-    // Cancel
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel_emergency_wipe".into(),
     });
@@ -393,13 +386,11 @@ fn settings_language_dropdown_selection_stores_id() {
 fn settings_accessibility_toggles() {
     let mut engine = SettingsEngine::new(sample_config());
 
-    // Initially all false
     let screen = engine.current_screen();
     assert!(!find_toggle(&screen, "accessibility", "reduce_motion"));
     assert!(!find_toggle(&screen, "accessibility", "high_contrast"));
     assert!(!find_toggle(&screen, "accessibility", "large_touch"));
 
-    // Toggle reduce_motion
     let result = engine.handle_action(UserAction::SettingsToggled {
         component_id: "accessibility".into(),
         item_id: "reduce_motion".into(),
@@ -501,7 +492,6 @@ fn settings_items_have_a11y_labels() {
     let mut engine = SettingsEngine::new(sample_config());
     let screen = engine.current_screen();
 
-    // Check every SettingsGroup's items have a11y
     for component in &screen.components {
         if let Component::SettingsGroup { id, items, .. } = component {
             for item in items {
@@ -543,14 +533,12 @@ fn settings_show_help_icons_appears_in_appearance_group() {
 fn settings_show_help_icons_toggle_flips_config() {
     let mut engine = SettingsEngine::new(sample_config());
 
-    // Initially enabled
     let screen = engine.current_screen();
     assert!(
         find_toggle(&screen, "appearance", "show_help_icons"),
         "show_help_icons should start enabled"
     );
 
-    // Toggle off
     let result = engine.handle_action(UserAction::SettingsToggled {
         component_id: "appearance".into(),
         item_id: "show_help_icons".into(),
@@ -563,7 +551,6 @@ fn settings_show_help_icons_toggle_flips_config() {
         "show_help_icons should be disabled after toggle"
     );
 
-    // Toggle on again
     let result = engine.handle_action(UserAction::SettingsToggled {
         component_id: "appearance".into(),
         item_id: "show_help_icons".into(),
@@ -619,7 +606,6 @@ fn settings_duress_pin_has_no_info_key_when_help_icons_disabled() {
 fn settings_other_items_have_no_info_key() {
     let engine = SettingsEngine::new(sample_config());
     let screen = engine.current_screen();
-    // Items other than duress_pin should not have info_key regardless of show_help_icons
     for component in &screen.components {
         if let Component::SettingsGroup { id, items, .. } = component {
             for item in items {

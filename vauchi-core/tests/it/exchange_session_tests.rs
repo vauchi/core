@@ -58,14 +58,12 @@ fn test_process_qr_transitions_to_peer_scanned() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    // Alice generates a QR with her identity and ephemeral key
     let alice_qr = ExchangeQR::generate(
         &alice_identity,
         &alice_ephemeral,
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Bob creates a session, starts displaying his QR, then scans Alice's
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
     let mut bob_session = ExchangeSession::new_qr(
@@ -99,7 +97,6 @@ fn test_process_qr_requires_displaying_qr_state() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Bob tries to process QR without first starting his own QR display
     let bob_card = ContactCard::new("Bob");
     let proximity = MockProximityVerifier::success();
     let mut bob_session = ExchangeSession::new_qr(
@@ -167,7 +164,6 @@ fn test_they_scanned_our_qr_transitions_to_awaiting_key_agreement() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Bob: Idle -> DisplayingQr -> PeerScanned -> AwaitingKeyAgreement
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session
         .apply(ExchangeEvent::ProcessQR(alice_qr))
@@ -244,7 +240,6 @@ fn test_session_timeout() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Fresh session should not be timed out
     assert!(!session.is_timed_out());
 }
 
@@ -262,10 +257,8 @@ fn test_session_resume() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Not interrupted yet
     assert!(!session.can_resume());
 
-    // Mark as interrupted
     session.mark_interrupted();
     assert!(session.can_resume());
 }
@@ -280,7 +273,6 @@ fn test_detect_duplicate_contact() {
     let alice_ephemeral = X3DHKeyPair::generate();
     let bob_identity = Identity::create("Bob", 0);
 
-    // Create an existing contact with Alice's public key
     let alice_card = ContactCard::new("Alice");
     let existing_alice = Contact::from_exchange(
         *alice_identity.signing_public_key(),
@@ -291,7 +283,6 @@ fn test_detect_duplicate_contact() {
 
     let contacts = vec![existing_alice];
 
-    // Alice generates QR with her identity and ephemeral key
     let alice_qr = ExchangeQR::generate(
         &alice_identity,
         &alice_ephemeral,
@@ -328,7 +319,6 @@ fn test_no_duplicate_for_new_contact() {
     let bob_identity = Identity::create("Bob", 0);
     let charlie_identity = Identity::create("Charlie", 0);
 
-    // Create an existing contact with Charlie's public key
     let charlie_card = ContactCard::new("Charlie");
     let existing_charlie = Contact::from_exchange(
         *charlie_identity.signing_public_key(),
@@ -359,7 +349,6 @@ fn test_no_duplicate_for_new_contact() {
         .apply(ExchangeEvent::ProcessQR(alice_qr))
         .unwrap();
 
-    // Should NOT detect a duplicate
     let duplicate = bob_session.check_duplicate(&contacts);
     assert!(duplicate.is_none());
 }

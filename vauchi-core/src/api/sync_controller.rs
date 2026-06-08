@@ -149,7 +149,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
 
         let mut result = SyncResult::default();
 
-        // Process incoming messages (acknowledgments)
         match self.relay.process_incoming() {
             Ok(incoming) => {
                 for update_id in incoming.acknowledged {
@@ -163,7 +162,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
                     }
                 }
 
-                // Route ACK events to delivery service for status tracking
                 for event in &incoming.ack_events {
                     let ack_status =
                         DeliveryAckStatus::from_network_ack(event.status, event.error.as_deref());
@@ -183,7 +181,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
             }
         }
 
-        // Check for timed out messages
         let timed_out = self.relay.check_timeouts();
         for update_id in &timed_out {
             if let Some(update) = self.find_update_by_id(update_id) {
@@ -197,7 +194,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
             result.timed_out += 1;
         }
 
-        // Get updates ready to send (pending or ready for retry)
         let mut ready_updates = match self.sync_manager.get_ready_for_retry() {
             Ok(updates) => updates,
             Err(e) => {
@@ -214,14 +210,11 @@ impl<'a, T: Transport> SyncController<'a, T> {
             ready_updates.truncate(batch_size);
         }
 
-        // Send each ready update
         let total = ready_updates.len();
         for (idx, update) in ready_updates.into_iter().enumerate() {
-            // Skip if no ratchet for this contact
             let ratchet = match self.ratchets.get_mut(&update.contact_id) {
                 Some(r) => r,
                 None => {
-                    // No ratchet available - skip this update
                     continue;
                 }
             };
@@ -269,7 +262,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
                 compute_mailbox_token(&key, current_day_epoch(self.storage.clock().unix_seconds()));
             let recipient_id = token_hex(&token);
 
-            // Send the update (anonymous sender ID if shared key available)
             match self.relay.send_update(
                 self.storage.clock().unix_seconds(),
                 &recipient_id,
@@ -325,7 +317,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
 
         let mut result = SyncResult::default();
 
-        // Get ratchet for this contact
         let ratchet = match self.ratchets.get_mut(contact_id) {
             Some(r) => r,
             None => {
@@ -361,7 +352,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
             compute_mailbox_token(&key, current_day_epoch(self.storage.clock().unix_seconds()));
         let recipient_id = token_hex(&token);
 
-        // Get pending updates for this contact
         let updates = self.sync_manager.get_pending(contact_id)?;
 
         for update in updates {
@@ -458,7 +448,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
                 state: new_state.clone(),
             });
 
-            // On transition to Connected: flush offline queue and process retries
             if was_disconnected && new_state == ConnectionState::Connected {
                 self.on_connectivity_restored(rng);
             }
@@ -469,7 +458,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
     ///
     /// Best-effort: errors are logged via events but don't propagate.
     fn on_connectivity_restored(&mut self, rng: &dyn crate::rng::SecureRng) {
-        // Process due retries
         if let Ok(tick_result) = self.retry_scheduler.tick(self.storage, rng)
             && (tick_result.rescheduled > 0 || tick_result.expired > 0)
         {
@@ -482,7 +470,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
             });
         }
 
-        // Flush offline queue — returns updates ready for sending
         if let Ok(flushed) = self.offline_manager.flush_queue(self.storage)
             && !flushed.is_empty()
         {
@@ -501,10 +488,6 @@ impl<'a, T: Transport> SyncController<'a, T> {
             .into_iter()
             .find(|u| u.id == update_id)
     }
-
-    // ============================================================
-    // Device Sync Integration (Phase 7)
-    // ============================================================
 
     /// Sends pending device sync items to another device via self-token routing.
     ///

@@ -90,11 +90,9 @@ fn test_find_label_fuzzy_returns_none_when_no_labels_exist() {
 fn test_find_label_fuzzy_prefers_name_match_over_id_prefix() {
     let wb = create_test_vauchi();
 
-    // Create two labels
     let label1 = wb.create_group("Friends").unwrap();
     wb.create_group("Colleagues").unwrap();
 
-    // Search by name should find the right one
     let found = wb.find_group_fuzzy("friends").unwrap();
 
     assert!(found.is_some(), "expected Some value");

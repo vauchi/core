@@ -12,7 +12,6 @@ use vauchi_core::crypto::ratchet::DoubleRatchetState;
 use vauchi_core::exchange::X3DHKeyPair;
 
 // =============================================================================
-// Basic Serialization Tests
 // =============================================================================
 
 /// Scenario: Ratchet state survives serialization roundtrip
@@ -24,22 +23,17 @@ fn test_ratchet_state_serialization_roundtrip() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    // Alice initializes as initiator
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
 
     // Alice sends a message (advances state)
     let msg1 = alice.encrypt(b"Hello Bob!").unwrap();
 
-    // Serialize state
     let serialized = alice.serialize();
 
-    // Deserialize state
     let mut alice_restored = DoubleRatchetState::deserialize(serialized).unwrap();
 
-    // Restored state should be able to encrypt
     let msg2 = alice_restored.encrypt(b"Second message").unwrap();
 
-    // Message indices should continue correctly
     assert_eq!(msg1.message_index, 0);
     assert_eq!(msg2.message_index, 1);
 }
@@ -53,11 +47,9 @@ fn test_both_parties_restore_state() {
     let bob_keypair = X3DHKeyPair::generate();
     let bob_public = *bob_keypair.public_key();
 
-    // Initialize both parties
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
-    // Alice sends, Bob receives
     let msg1 = alice.encrypt(b"Hello Bob!").unwrap();
     let plaintext1 = bob.decrypt(&msg1).unwrap();
     assert_eq!(plaintext1, b"Hello Bob!");
@@ -70,12 +62,10 @@ fn test_both_parties_restore_state() {
     let mut alice_restored = DoubleRatchetState::deserialize(alice_serialized).unwrap();
     let mut bob_restored = DoubleRatchetState::deserialize(bob_serialized).unwrap();
 
-    // Bob can now reply
     let msg2 = bob_restored.encrypt(b"Hi Alice!").unwrap();
     let plaintext2 = alice_restored.decrypt(&msg2).unwrap();
     assert_eq!(plaintext2, b"Hi Alice!");
 
-    // And conversation can continue
     let msg3 = alice_restored.encrypt(b"How are you?").unwrap();
     let plaintext3 = bob_restored.decrypt(&msg3).unwrap();
     assert_eq!(plaintext3, b"How are you?");
@@ -97,21 +87,17 @@ fn test_restore_mid_conversation() {
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
-    // Exchange several messages
     for i in 0..5 {
         let msg = alice.encrypt(format!("Message {}", i).as_bytes()).unwrap();
         bob.decrypt(&msg).unwrap();
     }
 
-    // Serialize after multiple messages
     let alice_state = alice.serialize();
     let bob_state = bob.serialize();
 
-    // Restore
     let mut alice = DoubleRatchetState::deserialize(alice_state).unwrap();
     let mut bob = DoubleRatchetState::deserialize(bob_state).unwrap();
 
-    // Should be able to continue with correct message indices
     let msg = alice.encrypt(b"After restore").unwrap();
     assert_eq!(msg.message_index, 5); // Continues from where we left off
 
@@ -139,15 +125,12 @@ fn test_dh_ratchet_state_survives() {
     let msg2 = bob.encrypt(b"Second").unwrap();
     alice.decrypt(&msg2).unwrap();
 
-    // Serialize after DH ratchet
     let alice_state = alice.serialize();
     let bob_state = bob.serialize();
 
-    // Restore
     let mut alice = DoubleRatchetState::deserialize(alice_state).unwrap();
     let mut bob = DoubleRatchetState::deserialize(bob_state).unwrap();
 
-    // Continue conversation - DH generation should be preserved
     let msg3 = alice.encrypt(b"Third").unwrap();
     bob.decrypt(&msg3).unwrap();
 
@@ -156,7 +139,6 @@ fn test_dh_ratchet_state_survives() {
 }
 
 // =============================================================================
-// Skipped Keys Persistence Tests
 // =============================================================================
 
 /// Scenario: Skipped message keys survive serialization
@@ -171,24 +153,19 @@ fn test_skipped_keys_survive_serialization() {
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
-    // Alice sends 3 messages
     let msg0 = alice.encrypt(b"Message 0").unwrap();
     let msg1 = alice.encrypt(b"Message 1").unwrap();
     let msg2 = alice.encrypt(b"Message 2").unwrap();
 
-    // Bob receives them out of order: 2, then crash, then 0, 1
     bob.decrypt(&msg2).unwrap(); // This will store keys for msg0, msg1
 
     // Serialize (skipped keys should be saved)
     let bob_state = bob.serialize();
 
-    // Check skipped keys are in serialized state
     assert_eq!(bob_state.skipped_keys.len(), 2);
 
-    // Restore
     let mut bob = DoubleRatchetState::deserialize(bob_state).unwrap();
 
-    // Should be able to decrypt the skipped messages
     let plaintext0 = bob.decrypt(&msg0).unwrap();
     let plaintext1 = bob.decrypt(&msg1).unwrap();
 
@@ -197,7 +174,6 @@ fn test_skipped_keys_survive_serialization() {
 }
 
 // =============================================================================
-// Responder State Tests
 // =============================================================================
 
 /// Scenario: Responder can restore before receiving first message
@@ -211,23 +187,18 @@ fn test_responder_restore_before_first_message() {
     // Initialize responder (hasn't received anything yet)
     let bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
-    // Serialize immediately
     let bob_state = bob.serialize();
 
-    // Restore
     let mut bob = DoubleRatchetState::deserialize(bob_state).unwrap();
 
-    // Alice sends first message
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let msg = alice.encrypt(b"Hello!").unwrap();
 
-    // Bob should be able to decrypt
     let plaintext = bob.decrypt(&msg).unwrap();
     assert_eq!(plaintext, b"Hello!");
 }
 
 // =============================================================================
-// Invalid Serialized State Tests
 // =============================================================================
 
 /// Scenario: Invalid serialized state is rejected
@@ -241,7 +212,6 @@ fn test_invalid_send_chain_rejected() {
     let alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut state = alice.serialize();
 
-    // Corrupt the send chain
     if let Some((ref mut key, _)) = state.send_chain {
         *key = [0xFF; 32]; // Set to all 0xFF
     }
@@ -253,7 +223,6 @@ fn test_invalid_send_chain_rejected() {
 }
 
 // =============================================================================
-// Stress Tests
 // =============================================================================
 
 /// Scenario: Many serialization cycles don't corrupt state
@@ -268,22 +237,18 @@ fn test_many_serialization_cycles() {
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
     for i in 0..20 {
-        // Send message
         let msg = alice.encrypt(format!("Message {}", i).as_bytes()).unwrap();
         bob.decrypt(&msg).unwrap();
 
-        // Serialize and restore both parties
         let alice_state = alice.serialize();
         let bob_state = bob.serialize();
 
         alice = DoubleRatchetState::deserialize(alice_state).unwrap();
         bob = DoubleRatchetState::deserialize(bob_state).unwrap();
 
-        // Bob replies
         let reply = bob.encrypt(format!("Reply {}", i).as_bytes()).unwrap();
         alice.decrypt(&reply).unwrap();
 
-        // Serialize and restore again
         let alice_state = alice.serialize();
         let bob_state = bob.serialize();
 
@@ -291,7 +256,6 @@ fn test_many_serialization_cycles() {
         bob = DoubleRatchetState::deserialize(bob_state).unwrap();
     }
 
-    // Final message should work
     let final_msg = alice.encrypt(b"Final message").unwrap();
     let plaintext = bob.decrypt(&final_msg).unwrap();
     assert_eq!(plaintext, b"Final message");

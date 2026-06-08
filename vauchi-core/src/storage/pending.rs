@@ -79,8 +79,6 @@ impl Storage {
         })
     }
 
-    // === Pending Updates Operations ===
-
     /// Queues a pending update for a contact (payload encrypted).
     pub fn queue_update(&self, update: &PendingUpdate) -> Result<(), StorageError> {
         let (status, error_msg, retry_at) = match &update.status {

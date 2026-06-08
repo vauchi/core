@@ -72,7 +72,6 @@ impl FieldTypeCatalog {
     pub fn new(registry: &SocialNetworkRegistry) -> Self {
         let mut entries = Vec::new();
 
-        // Contact category
         entries.push(CatalogEntry {
             key: "phone".to_string(),
             display_name: "Phone".to_string(),
@@ -92,7 +91,6 @@ impl FieldTypeCatalog {
             icon: None,
         });
 
-        // Social category (from registry, sorted by display name)
         for network in registry.all() {
             entries.push(CatalogEntry {
                 key: format!("social:{}", network.id()),
@@ -102,7 +100,6 @@ impl FieldTypeCatalog {
             });
         }
 
-        // Personal category
         entries.push(CatalogEntry {
             key: "address".to_string(),
             display_name: "Address".to_string(),
@@ -116,7 +113,6 @@ impl FieldTypeCatalog {
             icon: None,
         });
 
-        // Custom category
         entries.push(CatalogEntry {
             key: "custom".to_string(),
             display_name: "Custom".to_string(),

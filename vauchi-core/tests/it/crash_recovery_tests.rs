@@ -36,12 +36,10 @@ fn test_checkpoint_save_and_load() {
     let target_device = [0xAAu8; 32];
     let items = create_batch_items(50);
 
-    // Save checkpoint at item 25
     storage
         .save_sync_checkpoint(&target_device, &items, 25)
         .unwrap();
 
-    // Load checkpoint
     let loaded = storage.load_sync_checkpoint(&target_device).unwrap();
     assert!(loaded.is_some(), "Checkpoint should be loaded");
 
@@ -90,7 +88,6 @@ fn test_checkpoint_update_progress() {
     let target_device = [0xCCu8; 32];
     let items = create_batch_items(50);
 
-    // Save at 10
     storage
         .save_sync_checkpoint(&target_device, &items, 10)
         .unwrap();
@@ -118,7 +115,6 @@ fn test_checkpoint_clear_after_completion() {
         .save_sync_checkpoint(&target_device, &items, 50)
         .unwrap();
 
-    // Clear checkpoint after successful sync
     storage.clear_sync_checkpoint(&target_device).unwrap();
 
     let loaded = storage.load_sync_checkpoint(&target_device).unwrap();
@@ -205,7 +201,6 @@ fn test_batch_checkpoint_update_progress() {
         .save_batch_checkpoint(batch_id, 100, 10, "{\"step\":1}")
         .unwrap();
 
-    // Update progress
     storage
         .update_batch_checkpoint(batch_id, 50, "{\"step\":5}")
         .unwrap();
@@ -274,14 +269,11 @@ fn test_batch_checkpoint_crash_resume_scenario() {
 fn test_batch_checkpoint_no_orphans() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
 
-    // Create multiple batch checkpoints
     storage.save_batch_checkpoint("b1", 50, 25, "{}").unwrap();
     storage.save_batch_checkpoint("b2", 100, 50, "{}").unwrap();
 
-    // Clear one
     storage.clear_batch_checkpoint("b1").unwrap();
 
-    // The other should still exist
     assert!(storage.load_batch_checkpoint("b1").unwrap().is_none());
     assert!(
         storage.load_batch_checkpoint("b2").unwrap().is_some(),

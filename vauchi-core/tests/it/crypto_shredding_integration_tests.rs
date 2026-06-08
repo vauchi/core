@@ -30,11 +30,9 @@ fn test_smk_destruction_makes_data_irrecoverable() {
     let smk = identity.derive_smk();
     let sek = smk.derive_sek();
 
-    // Encrypt data with SEK
     let plaintext = b"Sensitive contact data";
     let ciphertext = encrypt(&sek, plaintext).unwrap();
 
-    // Recoverable with same SEK
     let recovered = decrypt(&sek, &ciphertext).unwrap();
     assert_eq!(recovered, plaintext);
 
@@ -52,7 +50,6 @@ fn test_smk_destruction_makes_data_irrecoverable() {
 }
 
 // ============================================================
-// FKEK derivation chain
 // ============================================================
 
 /// FKEK encrypts file keys; after SMK destruction those file keys
@@ -65,11 +62,9 @@ fn test_fkek_protects_file_keys() {
     let smk = identity.derive_smk();
     let fkek = smk.derive_fkek();
 
-    // Encrypt a file key with FKEK
     let file_key = [0x42u8; 32];
     let encrypted_file_key = encrypt(&fkek, &file_key).unwrap();
 
-    // Recoverable with same FKEK
     let recovered = decrypt(&fkek, &encrypted_file_key).unwrap();
     assert_eq!(recovered, file_key.as_slice());
 
@@ -131,7 +126,6 @@ fn test_smk_secure_storage_lifecycle() {
     let secure = Arc::new(MemoryKeyStorage::new());
     secure.save_key(SMK_KEY_NAME, smk.as_bytes()).unwrap();
 
-    // Encrypt data with SEK
     let plaintext = b"Protected data";
     let ciphertext = encrypt(&sek, plaintext).unwrap();
 
@@ -175,13 +169,11 @@ fn test_shredding_isolation_across_identities() {
     let smk_b = identity_b.derive_smk();
     let sek_b = smk_b.derive_sek();
 
-    // Both encrypt data
     let data_a = b"Alice's sensitive data";
     let data_b = b"Bob's sensitive data";
     let ct_a = encrypt(&sek_a, data_a).unwrap();
     let ct_b = encrypt(&sek_b, data_b).unwrap();
 
-    // Both can decrypt their own data
     assert_eq!(decrypt(&sek_a, &ct_a).unwrap(), data_a);
     assert_eq!(decrypt(&sek_b, &ct_b).unwrap(), data_b);
 
@@ -222,18 +214,15 @@ fn test_storage_keyed_by_sek() {
     let smk = identity.derive_smk();
     let sek = smk.derive_sek();
 
-    // Open storage with SEK
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("vauchi.db");
     let storage = Storage::open(&db_path, sek).unwrap();
 
-    // Save identity to storage
     let backup_data = identity.signing_public_key().to_vec();
     storage
         .save_identity(&backup_data, identity.display_name())
         .unwrap();
 
-    // Load back
     let loaded = storage.load_identity().unwrap();
     assert!(loaded.is_some(), "Identity should be loadable");
     let (loaded_data, _) = loaded.unwrap();

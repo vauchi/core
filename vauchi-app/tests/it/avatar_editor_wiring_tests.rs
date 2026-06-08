@@ -69,7 +69,6 @@ fn save_avatar_persists_and_navigates_back() {
     let avatar_data = vauchi_core::avatar::generate_initials_avatar([0, 128, 255], 32);
     let _ = engine.handle_hardware_event(Event::ImageReceived { data: avatar_data });
 
-    // Save
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "save".into(),
     });
@@ -301,7 +300,6 @@ fn contact_detail_shows_avatar_preview() {
 fn avatar_editor_shows_remove_option_when_avatar_exists() {
     let mut engine = engine_with_identity();
 
-    // Set an avatar
     let avatar_data = vauchi_core::avatar::generate_initials_avatar([255, 0, 0], 32);
     if let Ok(Some(mut card)) = engine.vauchi().own_card() {
         card.set_avatar(avatar_data).unwrap();
@@ -325,7 +323,6 @@ fn avatar_editor_shows_remove_option_when_avatar_exists() {
 fn remove_avatar_clears_and_completes() {
     let mut engine = engine_with_identity();
 
-    // Set an avatar
     let avatar_data = vauchi_core::avatar::generate_initials_avatar([255, 0, 0], 32);
     if let Ok(Some(mut card)) = engine.vauchi().own_card() {
         card.set_avatar(avatar_data).unwrap();

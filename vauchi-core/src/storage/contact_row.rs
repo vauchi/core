@@ -56,9 +56,7 @@ impl Storage {
     /// storage key, then decrypts the card with the CEK. Otherwise, decrypts
     /// the card with the storage key (legacy path).
     pub(super) fn row_to_contact(&self, row: ContactRow) -> Result<Contact, StorageError> {
-        // Decrypt card — CEK path or legacy path
         let (card, cek) = if let Some(ref cek_encrypted) = row.cek_encrypted {
-            // CEK path: decrypt CEK with storage key, then card with CEK
             let cek_bytes = crate::crypto::decrypt(&self.encryption_key, cek_encrypted)
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
             let cek_array: [u8; 32] = cek_bytes
@@ -73,7 +71,6 @@ impl Storage {
                 .map_err(|e| StorageError::Serialization(e.to_string()))?;
             (card, Some(cek))
         } else {
-            // Legacy path: decrypt card with storage key
             let card_json = crate::crypto::decrypt(&self.encryption_key, &row.card_encrypted)
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
             let card: ContactCard = serde_json::from_slice(&card_json)
@@ -81,7 +78,6 @@ impl Storage {
             (card, None)
         };
 
-        // Branch on contact_kind: imported contacts skip all crypto column parsing
         if row.contact_kind == "imported" {
             return self.row_to_imported_contact(row, card, cek);
         }
@@ -110,7 +106,6 @@ impl Storage {
         let mut contact =
             Contact::from_import_stored(row.id, card, source, imported_at, row.original_uid);
 
-        // Restore local-only flags
         if row.blocked != 0 {
             contact.set_blocked(true);
         }
@@ -122,7 +117,6 @@ impl Storage {
         }
         contact.set_card_updated_at(row.card_updated_at.map(|t| t as u64));
 
-        // Restore soft-delete / archive state
         if let Some(ts) = row.deleted_at {
             contact.soft_delete(ts as u64);
         }
@@ -148,7 +142,6 @@ impl Storage {
         card: ContactCard,
         cek: Option<ContentEncryptionKey>,
     ) -> Result<Contact, StorageError> {
-        // Decrypt shared key
         let shared_key_bytes =
             crate::crypto::decrypt(&self.encryption_key, &row.shared_key_encrypted)
                 .map_err(|e| StorageError::Encryption(e.to_string()))?;
@@ -176,7 +169,6 @@ impl Storage {
             crate::contact::VisibilityRules::new()
         };
 
-        // Create contact with all persisted fields
         let mut contact = Contact::from_sync_data_full(
             public_key,
             card,
@@ -189,7 +181,6 @@ impl Storage {
             row.recovery_trusted != 0,
         );
 
-        // Restore favorite flag from storage
         if row.favorite != 0 {
             contact.set_favorite(true);
         }
@@ -202,7 +193,6 @@ impl Storage {
             let _ = contact.set_proposal_trusted(true);
         }
 
-        // Attach CEK if this contact is CEK-protected
         if let Some(cek) = cek {
             contact.set_cek(cek);
         }
@@ -230,7 +220,6 @@ impl Storage {
         contact.set_has_recovered(row.has_recovered != 0);
         contact.set_card_updated_at(row.card_updated_at.map(|t| t as u64));
 
-        // Restore relay fields from storage
         contact.set_relay_url(row.relay_url);
         if let Some(pubkey_bytes) = row.relay_noise_pubkey {
             let pubkey: [u8; 32] = pubkey_bytes.try_into().map_err(|_| {
@@ -297,7 +286,6 @@ impl Storage {
             contact.set_confirmation_channel(c);
         }
 
-        // Restore soft-delete / archive state
         if let Some(ts) = row.deleted_at {
             contact.soft_delete(ts as u64);
         }

@@ -84,12 +84,10 @@ impl ReplayDetector {
     pub fn check_replay(&mut self, contact_id: &str, nonce: &[u8; 32], timestamp: u64) -> bool {
         let key = (contact_id.to_string(), *nonce);
 
-        // Check for duplicate nonce
         if self.seen_nonces.contains(&key) {
             return false;
         }
 
-        // Check for timestamp regression
         if let Some(&last_ts) = self.last_timestamps.get(contact_id)
             && timestamp + self.max_clock_skew_secs < last_ts
         {
@@ -101,7 +99,6 @@ impl ReplayDetector {
             self.evict_oldest();
         }
 
-        // Accept: record nonce and update timestamp
         self.seen_nonces.insert(key);
         let entry = self
             .last_timestamps

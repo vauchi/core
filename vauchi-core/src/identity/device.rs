@@ -112,7 +112,6 @@ impl DeviceInfo {
         id_info.extend_from_slice(&index_bytes);
         let device_id = HKDF::derive_key(None, master_seed, &id_info);
 
-        // Derive device exchange key seed
         let mut exchange_info = DEVICE_EXCHANGE_INFO.to_vec();
         exchange_info.extend_from_slice(&index_bytes);
         let exchange_seed = HKDF::derive_key(None, master_seed, &exchange_info);
@@ -329,13 +328,11 @@ impl DeviceRegistry {
         signing_key: &SigningKeyPair,
         now: u64,
     ) -> Result<(), DeviceError> {
-        if self.active_count() <= 1 {
-            // Check if we're trying to revoke the last active device
-            if let Some(device) = self.find_device(device_id)
-                && device.is_active()
-            {
-                return Err(DeviceError::CannotRemoveLastDevice);
-            }
+        if self.active_count() <= 1
+            && let Some(device) = self.find_device(device_id)
+            && device.is_active()
+        {
+            return Err(DeviceError::CannotRemoveLastDevice);
         }
 
         let device = self
@@ -430,12 +427,10 @@ impl DeviceRegistry {
         certificate: &DeviceRevocationCertificate,
         public_key: &crate::crypto::PublicKey,
     ) -> Result<(), DeviceError> {
-        // Verify certificate signature
         if !certificate.verify(public_key) {
             return Err(DeviceError::InvalidRegistrySignature);
         }
 
-        // Find and revoke the device
         let device = self
             .devices
             .iter_mut()
@@ -460,24 +455,20 @@ impl DeviceRegistry {
         new_primary_id: &[u8; 32],
         signing_key: &crate::crypto::SigningKeyPair,
     ) -> Result<(), DeviceError> {
-        // Find the target device index
         let target_idx = self
             .devices
             .iter()
             .position(|d| &d.device_id == new_primary_id)
             .ok_or(DeviceError::DeviceNotFound)?;
 
-        // Ensure the target device is not revoked
         if self.devices[target_idx].revoked {
             return Err(DeviceError::CannotTransferToRevoked);
         }
 
-        // If already primary (index 0), nothing to do
         if target_idx == 0 {
             return Ok(());
         }
 
-        // Move target device to position 0 (making it primary)
         let target_device = self.devices.remove(target_idx);
         self.devices.insert(0, target_device);
 
@@ -501,10 +492,6 @@ impl DeviceRegistry {
 pub fn check_identity_collision(our_pk: &[u8; 32], other_pk: &[u8; 32]) -> bool {
     our_pk == other_pk
 }
-
-// ============================================================
-// Phase 5: Device Revocation Types
-// ============================================================
 
 /// Default validity period for revocation certificates: 90 days (#82).
 const REVOCATION_CERT_VALIDITY_SECS: u64 = 90 * 24 * 3600;

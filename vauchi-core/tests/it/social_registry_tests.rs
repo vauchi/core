@@ -149,7 +149,6 @@ fn test_registry_all_sorted() {
     let registry = SocialNetworkRegistry::with_defaults();
     let all = registry.all();
 
-    // Verify sorted by display name
     for i in 1..all.len() {
         assert!(all[i - 1].display_name() <= all[i].display_name());
     }
@@ -173,7 +172,6 @@ fn test_specific_url_formats() {
         Some("https://youtube.com/@creator".to_string())
     );
 
-    // Substack uses subdomain
     assert_eq!(
         registry.profile_url("substack", "writer"),
         Some("https://writer.substack.com".to_string())
@@ -191,7 +189,6 @@ fn test_mastodon_handles() {
         "https://mastodon.social/@{username}",
     );
 
-    // Simple username
     assert_eq!(
         mastodon.profile_url("alice"),
         "https://mastodon.social/@alice"

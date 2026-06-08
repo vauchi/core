@@ -12,8 +12,6 @@ use crate::crypto::kdf::HKDF;
 use crate::crypto::ratchet::DoubleRatchetState;
 
 impl Storage {
-    // === Double Ratchet State Operations ===
-
     /// Derives a per-contact encryption key for ratchet state storage.
     ///
     /// Uses HKDF with the storage master key as IKM and the contact ID
@@ -33,12 +31,10 @@ impl Storage {
         state: &DoubleRatchetState,
         is_initiator: bool,
     ) -> Result<(), StorageError> {
-        // Serialize the ratchet state
         let serialized = state.serialize();
         let state_json = serde_json::to_vec(&serialized)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
 
-        // Encrypt with per-contact derived key
         let ratchet_key = self.derive_ratchet_key(contact_id);
         let state_encrypted = crate::crypto::encrypt(&ratchet_key, &state_json)
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
@@ -75,7 +71,6 @@ impl Storage {
 
         match result {
             Ok((encrypted, is_initiator)) => {
-                // Decrypt with per-contact derived key
                 let ratchet_key = self.derive_ratchet_key(contact_id);
                 // F6 audit fix: wrap in Zeroizing — contains root_key, DH secrets, chain keys
                 let mut state_json = crate::crypto::decrypt(&ratchet_key, &encrypted)

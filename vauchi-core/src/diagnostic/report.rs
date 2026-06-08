@@ -371,7 +371,6 @@ pub fn generate_comparison_report(
     let mut html = String::with_capacity(16384);
 
     write_header(&mut html)?;
-    // Override title
     html = html.replace(
         "<h1>QR Camera Tuner Report</h1>",
         "<h1>QR Scanner Backend Comparison</h1>",
@@ -395,7 +394,6 @@ fn write_comparison_chart(
     html: &mut String,
     benchmarks: &[BackendBenchmark],
 ) -> Result<(), ReportError> {
-    // Group by QR version
     let mut versions: Vec<u32> = benchmarks.iter().map(|b| b.qr_version).collect();
     versions.sort_unstable();
     versions.dedup();
@@ -551,7 +549,6 @@ fn write_throughput_section(
 
     writeln!(html, "</table>")?;
 
-    // SVG bar chart for throughput
     if !throughput.is_empty() {
         let max_bps = throughput
             .iter()

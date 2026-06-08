@@ -10,7 +10,6 @@
 use vauchi_core::sync::{SyncItem, VersionVector};
 
 // =============================================================================
-// Version Vector Basic Tests
 // =============================================================================
 
 /// Scenario: Version vector tracks device versions
@@ -22,16 +21,13 @@ fn test_version_vector_tracks_versions() {
 
     let mut vv = VersionVector::new();
 
-    // Initial versions should be 0
     assert_eq!(vv.get(&device_a), 0);
     assert_eq!(vv.get(&device_b), 0);
 
-    // Increment device A
     vv.increment(&device_a);
     assert_eq!(vv.get(&device_a), 1);
     assert_eq!(vv.get(&device_b), 0);
 
-    // Increment device B twice
     vv.increment(&device_b);
     vv.increment(&device_b);
     assert_eq!(vv.get(&device_b), 2);
@@ -56,7 +52,6 @@ fn test_version_vector_merge() {
     vv2.increment(&device_b); // B=2
     vv2.increment(&device_c); // C=1
 
-    // Merge: should take max of each
     let merged = VersionVector::merge(&vv1, &vv2);
 
     assert_eq!(merged.get(&device_a), 2); // max(2, 1) = 2
@@ -65,7 +60,6 @@ fn test_version_vector_merge() {
 }
 
 // =============================================================================
-// Concurrent Update Detection Tests
 // =============================================================================
 
 /// Scenario: Detect concurrent updates (neither dominates)
@@ -139,7 +133,6 @@ fn test_identical_vectors_behavior() {
 }
 
 // =============================================================================
-// Clock Skew Resilience Tests
 // =============================================================================
 
 /// Scenario: Conflict resolution works regardless of wall clock time
@@ -227,7 +220,6 @@ fn test_extreme_clock_skew() {
 }
 
 // =============================================================================
-// Version Vector Serialization Tests
 // =============================================================================
 
 /// Scenario: Version vector survives serialization roundtrip
@@ -250,7 +242,6 @@ fn test_version_vector_roundtrip() {
 }
 
 // =============================================================================
-// Multi-Device Sync Tests
 // =============================================================================
 
 /// Scenario: Three-way merge with concurrent updates
@@ -261,7 +252,6 @@ fn test_three_way_merge() {
     let device_b = [0x02u8; 32];
     let device_c = [0x03u8; 32];
 
-    // Initial shared state
     let mut base = VersionVector::new();
     base.increment(&device_a);
     base.increment(&device_b);
@@ -318,7 +308,6 @@ fn test_detect_local_state_behind() {
     // Remote dominates local - local is behind
     assert!(!local.is_concurrent_with(&remote));
 
-    // Local should apply remote's updates
     let merged = VersionVector::merge(&local, &remote);
     assert_eq!(merged.get(&device_b), 3);
 }

@@ -130,10 +130,8 @@ fn test_start_qr_from_non_idle_rejected() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // First StartQR: OK
     session.apply(ExchangeEvent::StartQR).unwrap();
 
-    // Second StartQR from DisplayingQr: should fail
     let result = session.apply(ExchangeEvent::StartQR);
     assert!(result.is_err(), "StartQR from DisplayingQr should fail");
 }
@@ -161,7 +159,6 @@ fn test_process_qr_from_idle_rejected() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Try ProcessQR without first doing StartQR
     let result = bob_session.apply(ExchangeEvent::ProcessQR(alice_qr));
     assert!(
         result.is_err(),
@@ -263,7 +260,6 @@ fn test_self_exchange_detected() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Alice clones identity and creates a session, then tries to scan her own QR.
     // Because `Identity::create` generates new keys each time, we need to use the
     // same identity. We achieve this by cloning the identity before creating session.
     let alice_card = vauchi_core::contact_card::ContactCard::new("Alice");
@@ -353,7 +349,6 @@ fn test_ratchet_rejects_foreign_messages() {
         DoubleRatchetState::initialize_initiator(&shared_secret_1, *bob_dh_1.public_key()).unwrap();
     let mut bob_2 = DoubleRatchetState::initialize_responder(&shared_secret_2, bob_dh_2);
 
-    // Alice from session 1 encrypts a message
     let enc = alice_1.encrypt(b"Wrong session").unwrap();
 
     // Bob from session 2 tries to decrypt it — should fail
@@ -377,7 +372,6 @@ fn test_ratchet_rejects_tampered_ciphertext() {
 
     let mut enc = alice.encrypt(b"Secret").unwrap();
 
-    // Tamper with the ciphertext
     if !enc.ciphertext.is_empty() {
         enc.ciphertext[0] ^= 0xFF;
     }
@@ -453,13 +447,11 @@ fn test_rekey_makes_old_key_ciphertexts_unreadable() {
     let old_key = SymmetricKey::generate();
     let new_key = SymmetricKey::generate();
 
-    // Create storage, save data
     let mut storage = vauchi_core::storage::Storage::open(&db_path, old_key.clone()).unwrap();
 
     let card = vauchi_core::contact_card::ContactCard::new("ReKeyTest");
     storage.save_own_card(&card).unwrap();
 
-    // Perform rekey
     storage.rekey(new_key.clone()).unwrap();
 
     // Drop and re-open with old key — must not be able to read data
@@ -493,11 +485,9 @@ fn test_rekey_preserves_all_encrypted_tables() {
 
     let mut storage = vauchi_core::storage::Storage::open(&db_path, key).unwrap();
 
-    // Save own card
     let card = vauchi_core::contact_card::ContactCard::new("RekeyAll");
     storage.save_own_card(&card).unwrap();
 
-    // Save device registry
     let device = vauchi_core::identity::RegisteredDevice {
         device_id: [0x42; 32],
         exchange_public_key: [0x43; 32],
@@ -511,7 +501,6 @@ fn test_rekey_preserves_all_encrypted_tables() {
     let registry = vauchi_core::identity::DeviceRegistry::new(device, &signing_key);
     storage.save_device_registry(&registry).unwrap();
 
-    // Rekey
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key.clone()).unwrap();
 
@@ -552,7 +541,6 @@ fn test_signature_wrong_key_rejected() {
     let message = b"important message";
     let signature = alice.sign(message);
 
-    // Bob's public key should NOT verify Alice's signature
     assert!(
         !bob.public_key().verify(message, &signature),
         "Signature should fail verification with wrong public key"
@@ -568,7 +556,6 @@ fn test_signature_tampered_message_rejected() {
     let original = b"original message";
     let signature = kp.sign(original);
 
-    // Tamper with the message
     let tampered = b"tampered message";
 
     assert!(
@@ -586,7 +573,6 @@ fn test_tampered_signature_rejected() {
     let message = b"test message";
     let signature = kp.sign(message);
 
-    // Tamper with the signature
     let mut bad_bytes = *signature.as_bytes();
     bad_bytes[0] ^= 0xFF;
     let tampered_sig = Signature::from_bytes(bad_bytes);
@@ -717,7 +703,6 @@ fn test_ratchet_forward_secrecy_across_steps() {
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
-    // Alice sends, Bob receives
     let enc1 = alice.encrypt(b"Message 1").unwrap();
     let dec1 = bob.decrypt(&enc1).unwrap();
     assert_eq!(dec1, b"Message 1");
@@ -786,7 +771,6 @@ fn test_invalid_signature_qr_rejected_via_data_string() {
     let alice_identity = vauchi_core::Identity::create("Alice", 0);
     let alice_ephemeral = X3DHKeyPair::generate();
 
-    // Generate a valid QR, encode to bytes, then tamper
     let valid_qr = ExchangeQR::generate(
         &alice_identity,
         &alice_ephemeral,

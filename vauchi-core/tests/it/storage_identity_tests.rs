@@ -21,19 +21,15 @@ fn test_save_and_load_identity() {
     let backup_data = b"encrypted identity backup data here";
     let display_name = "Alice";
 
-    // Initially no identity
     assert!(!storage.has_identity().unwrap());
     assert!(storage.load_identity().unwrap().is_none());
 
-    // Save identity
     storage
         .save_identity(backup_data, display_name)
         .expect("Should save identity");
 
-    // Now has identity
     assert!(storage.has_identity().unwrap());
 
-    // Load identity
     let (loaded_data, loaded_name) = storage
         .load_identity()
         .unwrap()
@@ -48,17 +44,14 @@ fn test_save_and_load_identity() {
 fn test_identity_replace_on_save() {
     let storage = create_test_storage();
 
-    // Save initial identity
     storage
         .save_identity(b"first backup", "First Name")
         .unwrap();
 
-    // Save replacement identity
     storage
         .save_identity(b"second backup", "Second Name")
         .unwrap();
 
-    // Should have the second one
     let (loaded_data, loaded_name) = storage
         .load_identity()
         .unwrap()
@@ -155,12 +148,10 @@ fn test_save_duress_password() {
     let storage = create_test_storage();
     storage.save_identity(b"backup data", "Alice").unwrap();
 
-    // Set app password first
     let hash = [0x42u8; 32];
     let salt = [0xABu8; 16];
     storage.save_app_password(&hash, &salt).unwrap();
 
-    // Set duress password
     let duress_hash = [0x99u8; 32];
     let duress_salt = [0xCDu8; 16];
     storage
@@ -186,7 +177,6 @@ fn test_disable_duress() {
     let storage = create_test_storage();
     storage.save_identity(b"backup data", "Alice").unwrap();
 
-    // Set app password and duress
     storage
         .save_app_password(&[0x42u8; 32], &[0xABu8; 16])
         .unwrap();
@@ -194,14 +184,11 @@ fn test_disable_duress() {
         .save_duress_password(&[0x99u8; 32], &[0xCDu8; 16])
         .unwrap();
 
-    // Verify duress is enabled
     let config = storage.load_password_config().unwrap().unwrap();
     assert!(config.duress_enabled());
 
-    // Disable duress
     storage.disable_duress().unwrap();
 
-    // Verify duress is disabled
     let config = storage.load_password_config().unwrap().unwrap();
     assert!(!config.duress_enabled());
     assert!(config.duress_hash().is_none());
@@ -216,12 +203,10 @@ fn test_update_app_password() {
     let storage = create_test_storage();
     storage.save_identity(b"backup data", "Alice").unwrap();
 
-    // Set initial password
     let hash1 = [0x11u8; 32];
     let salt1 = [0xAAu8; 16];
     storage.save_app_password(&hash1, &salt1).unwrap();
 
-    // Update password
     let hash2 = [0x22u8; 32];
     let salt2 = [0xBBu8; 16];
     storage.save_app_password(&hash2, &salt2).unwrap();

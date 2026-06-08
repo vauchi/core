@@ -32,7 +32,6 @@ fn test_default_tolerance_rejects_large_skew() {
 
     // Now try a message much older than tolerance
     let nonce_old = [0x02u8; 32];
-    // Set last_ts to now, then try with timestamp 2 minutes before
     let accepted = detector.check_replay("contact-1", &nonce_old, now - 121);
     assert!(
         !accepted,
@@ -46,7 +45,6 @@ fn test_high_tolerance_accepts_moderate_skew() {
     let mut detector = ReplayDetector::new(3600); // 1 hour tolerance
     let now = current_ts();
 
-    // Record a recent message
     let nonce1 = [0x01u8; 32];
     assert!(detector.check_replay("contact-1", &nonce1, now));
 
@@ -65,11 +63,9 @@ fn test_high_tolerance_rejects_beyond_window() {
     let mut detector = ReplayDetector::new(3600); // 1 hour tolerance
     let now = current_ts();
 
-    // Record recent
     let nonce1 = [0x01u8; 32];
     assert!(detector.check_replay("contact-1", &nonce1, now));
 
-    // A message from 2 hours ago should still be rejected
     let nonce2 = [0x02u8; 32];
     let accepted = detector.check_replay("contact-1", &nonce2, now - 7200);
     assert!(
@@ -111,7 +107,6 @@ fn test_same_nonce_different_contacts_accepted() {
 fn test_prune_removes_old_nonces() {
     let mut detector = ReplayDetector::new(60);
 
-    // Add nonces at different timestamps
     let nonce1 = [0x01u8; 32];
     let nonce2 = [0x02u8; 32];
     let nonce3 = [0x03u8; 32];
@@ -147,13 +142,11 @@ fn test_prune_removes_old_nonces() {
 fn test_replay_nonce_persisted_to_storage() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
 
-    // Save a nonce
     let nonce = [0xABu8; 32];
     storage
         .save_replay_nonce("contact-001", &nonce, 1000)
         .unwrap();
 
-    // Load nonces for this contact
     let nonces = storage.load_replay_nonces("contact-001").unwrap();
     assert_eq!(nonces.len(), 1);
     assert_eq!(nonces[0].0, nonce);
@@ -217,7 +210,6 @@ fn test_replay_detector_roundtrip_via_storage() {
 
     assert!(detector.check_replay("contact-x", &nonce, timestamp));
 
-    // Persist to storage
     storage
         .save_replay_nonce("contact-x", &nonce, timestamp)
         .unwrap();
@@ -230,7 +222,6 @@ fn test_replay_detector_roundtrip_via_storage() {
         detector2.check_replay("contact-x", stored_nonce, *stored_ts);
     }
 
-    // Now the duplicate nonce should be rejected
     assert!(
         !detector2.check_replay("contact-x", &nonce, timestamp),
         "Nonce loaded from storage should prevent replay"
@@ -256,7 +247,6 @@ fn test_duplicate_nonce_insert_is_idempotent() {
 }
 
 // ============================================================
-// Helpers
 // ============================================================
 
 fn current_ts() -> u64 {

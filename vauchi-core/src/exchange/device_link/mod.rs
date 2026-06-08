@@ -157,43 +157,34 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn test_device_link_full_flow() {
-        // Existing device (Device A) setup
         let master_seed_a = [0x42u8; 32];
         let identity_a = Identity::create("Alice", 0);
         let registry_a = create_test_registry(&identity_a);
 
-        // Device A creates link initiator
         let initiator = DeviceLinkInitiator::new(master_seed_a, &identity_a, registry_a, 0u64);
         let proof = create_valid_proof(initiator.proximity_challenge());
         let qr = initiator.qr();
 
-        // New device (Device B) scans QR
         let qr_string = qr.to_data_string();
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
         let mut responder =
             DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string(), 0u64).unwrap();
 
-        // Device B creates request
         let encrypted_request = responder.create_request(0u64).unwrap();
 
-        // Device A processes request and creates response
         let (encrypted_response, updated_registry, new_device) = initiator
             .process_request(&encrypted_request, &proof, 0u64)
             .unwrap();
 
-        // Device B processes response
         let response = responder.process_response(&encrypted_response).unwrap();
 
-        // Verify the new device got the correct seed
         assert_eq!(response.master_seed(), &master_seed_a);
         assert_eq!(response.display_name(), "Alice");
         assert_eq!(response.device_index(), 1); // Second device gets index 1
 
-        // Verify the new device info is correct
         assert_eq!(new_device.device_name(), "My Phone");
         assert_eq!(new_device.device_index(), 1);
 
-        // Verify the registry was updated
         assert_eq!(updated_registry.device_count(), 2);
     }
 
@@ -251,10 +242,6 @@ mod tests {
         assert_eq!(a.as_bytes()[3], b'-');
     }
 
-    // ============================================================
-    // Additional edge case tests (added for coverage)
-    // ============================================================
-
     #[test]
     fn test_device_link_response_with_sync_payload() {
         let master_seed = [0x42u8; 32];
@@ -272,7 +259,6 @@ mod tests {
 
         assert_eq!(response.sync_payload_json(), sync_payload);
 
-        // Test roundtrip preserves sync payload
         let bytes = response.to_bytes();
         let restored = DeviceLinkResponse::from_bytes(&bytes).unwrap();
         assert_eq!(restored.sync_payload_json(), sync_payload);
@@ -319,7 +305,6 @@ mod tests {
 
     #[test]
     fn test_device_link_qr_invalid_version() {
-        // Create valid-looking data but with wrong version
         let mut data = Vec::new();
         data.extend_from_slice(DEVICE_LINK_MAGIC);
         data.push(99); // Wrong version
@@ -336,7 +321,6 @@ mod tests {
 
     #[test]
     fn test_device_link_qr_truncated_data() {
-        // Data too short
         let data = BASE64.encode(b"WBDL\x01short");
         let result = DeviceLinkQR::from_data_string(&data);
 
@@ -348,7 +332,6 @@ mod tests {
         let identity = create_test_identity();
         let qr = DeviceLinkQR::generate(&identity, 0u64);
 
-        // Corrupt the signature
         let mut data = Vec::new();
         data.extend_from_slice(DEVICE_LINK_MAGIC);
         data.push(qr.version);
@@ -372,7 +355,6 @@ mod tests {
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry, 0u64);
         let proof = create_valid_proof(initiator.proximity_challenge());
 
-        // Create a request with empty device name
         let request = DeviceLinkRequest {
             device_name: "".to_string(),
             nonce: [0u8; 32],
@@ -386,14 +368,12 @@ mod tests {
 
     #[test]
     fn test_device_link_request_truncated_bytes() {
-        // Test with truncated data
         let result = DeviceLinkRequest::from_bytes(&[0u8; 10]);
         assert!(matches!(result, Err(ExchangeError::InvalidQRFormat)));
     }
 
     #[test]
     fn test_device_link_response_truncated_bytes() {
-        // Test with truncated data
         let result = DeviceLinkResponse::from_bytes(&[0u8; 10]);
         assert!(matches!(result, Err(ExchangeError::InvalidQRFormat)));
     }
@@ -422,7 +402,6 @@ mod tests {
 
         let image_string = qr.to_qr_image_string();
 
-        // Should produce a non-empty string with blocks
         assert!(!image_string.is_empty());
         assert!(image_string.contains('█') || image_string.contains(' '));
     }
@@ -451,10 +430,6 @@ mod tests {
         assert!(!qr.is_expired(0u64));
     }
 
-    // ============================================================
-    // Phase 8: Device Linking with Sync Payload Tests (TDD)
-    // ============================================================
-
     use crate::DeviceSyncOrchestrator;
     use crate::contact::Contact;
     use crate::contact_card::ContactCard;
@@ -475,13 +450,11 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn test_device_link_with_full_sync_payload() {
-        // Existing device (Device A) setup with data
         let master_seed = [0x42u8; 32];
         let identity = Identity::create("Alice", 0);
         let registry = create_test_registry(&identity);
         let storage = create_test_storage();
 
-        // Add some data to sync
         let contact = create_test_contact("Bob");
         storage.save_contact(&contact).unwrap();
 
@@ -496,37 +469,29 @@ mod tests {
         ));
         storage.save_own_card(&own_card).unwrap();
 
-        // Create orchestrator to generate sync payload
         let device_a = DeviceInfo::derive(&master_seed, 0, "Device A".to_string(), 0);
         let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry.clone());
         let sync_payload = orchestrator.create_full_sync_payload().unwrap();
         let sync_json = serde_json::to_string(&sync_payload).unwrap();
 
-        // Create initiator with sync payload
         let initiator = DeviceLinkInitiator::new(master_seed, &identity, registry.clone(), 0u64);
         let proof = create_valid_proof(initiator.proximity_challenge());
 
-        // New device scans QR
         let qr_string = initiator.qr().to_data_string();
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
         let mut responder =
             DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string(), 0u64).unwrap();
 
-        // Device B creates request
         let encrypted_request = responder.create_request(0u64).unwrap();
 
-        // Device A processes request with sync payload
         let (encrypted_response, _updated_registry, _new_device) = initiator
             .process_request_with_sync(&encrypted_request, &sync_json, &proof, 0u64)
             .unwrap();
 
-        // Device B processes response
         let response = responder.process_response(&encrypted_response).unwrap();
 
-        // Verify sync payload is included
         assert!(!response.sync_payload_json().is_empty());
 
-        // Parse and verify sync payload contents
         let received_payload: DeviceSyncPayload =
             serde_json::from_str(response.sync_payload_json()).unwrap();
         assert_eq!(received_payload.contact_count(), 1);
@@ -535,16 +500,13 @@ mod tests {
 
     #[test]
     fn test_new_device_applies_full_state() {
-        // Create sync payload
         let contact = create_test_contact("Bob");
         let own_card = ContactCard::new("Alice");
         let payload = DeviceSyncPayload::new(&[contact], &own_card, 1);
         let payload_json = serde_json::to_string(&payload).unwrap();
 
-        // New device receives and parses payload
         let received: DeviceSyncPayload = serde_json::from_str(&payload_json).unwrap();
 
-        // Verify payload contents
         assert_eq!(received.contact_count(), 1);
         assert_eq!(received.version, 1);
     }
@@ -552,7 +514,6 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn test_device_link_initiator_restored_flow() {
-        // Device A creates a QR and saves it
         let master_seed = [0x42u8; 32];
         let identity = Identity::create("Alice", 0);
         let registry = create_test_registry(&identity);
@@ -561,27 +522,22 @@ mod tests {
         let qr = initiator.qr();
         let qr_string = qr.to_data_string();
 
-        // Later, Device A restores the QR from saved string
         let restored_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
         let restored_initiator =
             DeviceLinkInitiatorRestored::new(master_seed, &identity, registry, restored_qr);
         let proof = create_valid_proof(restored_initiator.proximity_challenge());
 
-        // Device B scans the QR and creates request
         let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
         let mut responder =
             DeviceLinkResponder::from_qr(scanned_qr, "My Phone".to_string(), 0u64).unwrap();
         let encrypted_request = responder.create_request(0u64).unwrap();
 
-        // Device A processes request using restored initiator
         let (encrypted_response, updated_registry, new_device) = restored_initiator
             .process_request(&encrypted_request, &proof, 0u64)
             .unwrap();
 
-        // Device B processes response
         let response = responder.process_response(&encrypted_response).unwrap();
 
-        // Verify the flow worked correctly
         assert_eq!(response.master_seed(), &master_seed);
         assert_eq!(response.display_name(), "Alice");
         assert_eq!(response.device_index(), 1);
@@ -591,14 +547,11 @@ mod tests {
 
     #[test]
     fn test_identity_device_link_helper_methods() {
-        // Test the new Identity helper methods
         let identity = Identity::create("Alice", 0);
 
-        // Test initial_device_registry
         let registry = identity.initial_device_registry();
         assert_eq!(registry.device_count(), 1);
 
-        // Test create_device_link_initiator
         let initiator = identity.create_device_link_initiator(registry.clone(), 0u64);
         assert!(!initiator.qr().is_expired(0u64));
         assert_eq!(
@@ -606,15 +559,10 @@ mod tests {
             identity.signing_public_key()
         );
 
-        // Test restore_device_link_initiator
         let qr_string = initiator.qr().to_data_string();
         let restored_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
         let _restored = identity.restore_device_link_initiator(registry, restored_qr);
     }
-
-    // ============================================================
-    // Two-Phase Confirmation Flow Tests
-    // ============================================================
 
     #[test]
     fn test_confirmation_code_matches_both_sides() {
@@ -631,17 +579,13 @@ mod tests {
 
         let encrypted_request = responder.create_request(0u64).unwrap();
 
-        // Initiator prepares confirmation
         let (confirmation, _request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
-        // Responder computes confirmation code
         let responder_code = responder.compute_confirmation_code().unwrap();
 
-        // Both sides should show the same code
         assert_eq!(confirmation.confirmation_code, responder_code);
         assert_eq!(confirmation.device_name, "My Phone");
 
-        // Code should be in XXX-XXX format
         assert_eq!(confirmation.confirmation_code.len(), 7);
         assert_eq!(&confirmation.confirmation_code[3..4], "-");
     }
@@ -661,16 +605,13 @@ mod tests {
 
         let encrypted_request = responder.create_request(0u64).unwrap();
 
-        // Phase 1: Prepare confirmation
         let (confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
         assert_eq!(confirmation.device_name, "My Phone");
 
-        // Phase 2: Proximity verified, user confirms, complete the link
         let proof = create_valid_proof(initiator.proximity_challenge());
         let (encrypted_response, updated_registry, new_device) =
             initiator.confirm_link(&request, &proof, 0u64).unwrap();
 
-        // Device B processes response
         let response = responder.process_response(&encrypted_response).unwrap();
 
         assert_eq!(response.master_seed(), &master_seed);
@@ -790,7 +731,6 @@ mod tests {
 
         let encrypted_request = responder.create_request(0u64).unwrap();
 
-        // Old API should still work (with valid proximity proof)
         let (encrypted_response, updated_registry, new_device) = initiator
             .process_request(&encrypted_request, &proof, 0u64)
             .unwrap();
@@ -821,16 +761,13 @@ mod tests {
 
         let encrypted_request = responder.create_request(0u64).unwrap();
 
-        // Prepare confirmation on restored initiator
         let (confirmation, request) = restored_initiator
             .prepare_confirmation(&encrypted_request)
             .unwrap();
 
-        // Codes should match
         let responder_code = responder.compute_confirmation_code().unwrap();
         assert_eq!(confirmation.confirmation_code, responder_code);
 
-        // Proximity verified, confirm and complete
         let proof = create_valid_proof(restored_initiator.proximity_challenge());
         let (encrypted_response, updated_registry, new_device) = restored_initiator
             .confirm_link(&request, &proof, 0u64)

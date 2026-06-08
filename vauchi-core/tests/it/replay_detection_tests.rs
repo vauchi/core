@@ -27,14 +27,11 @@ fn test_same_message_decrypted_once() {
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
-    // Alice sends a message
     let msg = alice.encrypt(b"Secret message").unwrap();
 
-    // Bob decrypts it once - succeeds
     let plaintext = bob.decrypt(&msg).unwrap();
     assert_eq!(plaintext, b"Secret message");
 
-    // Bob tries to decrypt the same message again - should fail
     // The ratchet has advanced, so the key for this message_index is gone
     let result = bob.decrypt(&msg);
 
@@ -57,25 +54,21 @@ fn test_replay_after_chain_advance() {
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
-    // Alice sends message 0
     let msg0 = alice.encrypt(b"Message 0").unwrap();
     assert_eq!(msg0.message_index, 0);
 
-    // Bob decrypts it
     bob.decrypt(&msg0).unwrap();
 
     // Alice sends more messages (advances chain)
     let msg1 = alice.encrypt(b"Message 1").unwrap();
     let msg2 = alice.encrypt(b"Message 2").unwrap();
 
-    // Bob decrypts them
     bob.decrypt(&msg1).unwrap();
     bob.decrypt(&msg2).unwrap();
 
     // Attacker replays msg0
     let result = bob.decrypt(&msg0);
 
-    // Should fail - the key for index 0 is gone
     result.expect_err("expected error");
 }
 
@@ -90,12 +83,10 @@ fn test_out_of_order_vs_duplicate() {
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
-    // Alice sends 3 messages
     let msg0 = alice.encrypt(b"Message 0").unwrap();
     let msg1 = alice.encrypt(b"Message 1").unwrap();
     let msg2 = alice.encrypt(b"Message 2").unwrap();
 
-    // Bob receives them out of order: 2, 0, 1
     let p2 = bob.decrypt(&msg2).unwrap();
     assert_eq!(p2, b"Message 2");
 
@@ -108,7 +99,6 @@ fn test_out_of_order_vs_duplicate() {
     // Now all are decrypted. Try to replay msg1.
     let replay_result = bob.decrypt(&msg1);
 
-    // Should fail - already decrypted
     replay_result.expect_err("expected error");
 }
 
@@ -131,7 +121,6 @@ fn test_old_dh_generation_rejected() {
     let old_msg = alice.encrypt(b"Old message").unwrap();
     assert_eq!(old_msg.dh_generation, 0);
 
-    // Bob receives
     bob.decrypt(&old_msg).unwrap();
 
     // Bob replies (triggers DH ratchet)
@@ -152,7 +141,6 @@ fn test_old_dh_generation_rejected() {
 }
 
 // =============================================================================
-// Skipped Message Key Management
 // =============================================================================
 
 /// Scenario: Skipped keys are deleted after use
@@ -166,7 +154,6 @@ fn test_skipped_keys_deleted_after_use() {
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
-    // Alice sends 3 messages
     let msg0 = alice.encrypt(b"Message 0").unwrap();
     let msg1 = alice.encrypt(b"Message 1").unwrap();
     let msg2 = alice.encrypt(b"Message 2").unwrap();
@@ -201,7 +188,6 @@ fn test_too_many_skipped_messages() {
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
-    // Alice sends many messages
     let mut messages = Vec::new();
     for i in 0..1100 {
         messages.push(alice.encrypt(format!("Message {}", i).as_bytes()).unwrap());
@@ -211,12 +197,10 @@ fn test_too_many_skipped_messages() {
     // This exceeds MAX_SKIPPED_KEYS (1000)
     let result = bob.decrypt(&messages[1099]);
 
-    // Should fail with TooManySkipped
     assert!(matches!(result, Err(RatchetError::TooManySkipped)));
 }
 
 // =============================================================================
-// Timestamp Independence Tests
 // =============================================================================
 
 /// Scenario: Replay detection doesn't rely on timestamps alone
@@ -231,10 +215,8 @@ fn test_replay_detection_timestamp_independent() {
     let mut alice = DoubleRatchetState::initialize_initiator(&x3dh_secret, bob_public).unwrap();
     let mut bob = DoubleRatchetState::initialize_responder(&x3dh_secret, bob_keypair);
 
-    // Alice sends a message
     let msg = alice.encrypt(b"Test message").unwrap();
 
-    // Bob decrypts it
     bob.decrypt(&msg).unwrap();
 
     // Even if attacker could manipulate timestamps, the message_index
@@ -274,12 +256,10 @@ fn test_cross_chain_replay_prevention() {
     // Capture reply1's bytes
     let replay_msg = reply1.clone();
 
-    // More exchanges
     let reply2 = bob.encrypt(b"Bob 2").unwrap();
     alice.decrypt(&reply2).unwrap();
 
     // Try to replay Bob's old message to Alice
-    // Alice has already processed it and advanced
     let result = alice.decrypt(&replay_msg);
     result.expect_err("expected error");
 }

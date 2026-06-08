@@ -116,7 +116,6 @@ fn rqrr_raw_dimension_mismatch_zero_pixels_does_not_panic() {
 // @internal
 #[test]
 fn rqrr_preprocessed_decodes_clean_qr_via_fast_tier() {
-    // A clean, sharp QR should be decoded by the rxing fast tier
     // before any sharpness gate or fallback runs.
     let img = generate_qr_image("VAUCHI-FAST-PATH", 8);
     let (w, h) = img.dimensions();

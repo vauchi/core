@@ -202,14 +202,12 @@ impl ContactField {
 
     /// Validates the field value based on its type.
     pub fn validate(&self) -> Result<(), ValidationError> {
-        // Check max length
         if self.value.len() > MAX_VALUE_LENGTH {
             return Err(ValidationError::ValueTooLong {
                 max: MAX_VALUE_LENGTH,
             });
         }
 
-        // Type-specific validation
         match self.field_type {
             FieldType::Phone => self.validate_phone(),
             FieldType::Email => self.validate_email(),
@@ -228,13 +226,11 @@ impl ContactField {
             return Err(ValidationError::InvalidPhone);
         }
 
-        // Must have at least some digits
         let digit_count = value.chars().filter(|c| c.is_ascii_digit()).count();
         if digit_count < 7 {
             return Err(ValidationError::InvalidPhone);
         }
 
-        // Only allow digits, spaces, dashes, parentheses, and plus
         let valid_chars = value.chars().all(|c| {
             c.is_ascii_digit() || c == ' ' || c == '-' || c == '(' || c == ')' || c == '+'
         });
@@ -250,7 +246,6 @@ impl ContactField {
     fn validate_email(&self) -> Result<(), ValidationError> {
         let value = &self.value;
 
-        // Basic email validation: must have @ with text before and after
         if !value.contains('@') {
             return Err(ValidationError::InvalidEmail);
         }
@@ -263,7 +258,6 @@ impl ContactField {
         let local = parts[0];
         let domain = parts[1];
 
-        // Local part must not be empty
         if local.is_empty() {
             return Err(ValidationError::InvalidEmail);
         }
@@ -281,7 +275,6 @@ impl ContactField {
     /// Validates website URL format.
     fn validate_website(&self) -> Result<(), ValidationError> {
         let value = self.value.trim();
-        // Must start with http:// or https://, or contain a dot (domain)
         if value.starts_with("http://") || value.starts_with("https://") {
             return Ok(());
         }
@@ -295,12 +288,10 @@ impl ContactField {
     fn validate_birthday(&self) -> Result<(), ValidationError> {
         let value = &self.value;
 
-        // Check format: YYYY-MM-DD
         if value.len() != 10 || value.as_bytes()[4] != b'-' || value.as_bytes()[7] != b'-' {
             return Err(ValidationError::InvalidEmail); // Reuse validation error for invalid birthday
         }
 
-        // Parse components
         let year_str = &value[0..4];
         let month_str = &value[5..7];
         let day_str = &value[8..10];
@@ -313,12 +304,10 @@ impl ContactField {
             .map_err(|_| ValidationError::InvalidEmail)?;
         let day: u8 = day_str.parse().map_err(|_| ValidationError::InvalidEmail)?;
 
-        // Validate month range
         if !(1..=12).contains(&month) {
             return Err(ValidationError::InvalidEmail);
         }
 
-        // Validate day range based on month
         let days_in_month = match month {
             1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
             4 | 6 | 9 | 11 => 30,

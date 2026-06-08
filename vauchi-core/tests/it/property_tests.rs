@@ -50,7 +50,6 @@ fn timestamp_strategy() -> impl Strategy<Value = u64> {
 }
 
 // ============================================================
-// Serialization Roundtrip Properties
 // ============================================================
 
 proptest! {
@@ -136,13 +135,11 @@ proptest! {
             vv.increment(&device_id);
         }
 
-        // Verify the count is preserved after all increments
         prop_assert_eq!(vv.get(&device_id), count);
     }
 }
 
 // ============================================================
-// Cryptographic Properties
 // ============================================================
 
 proptest! {
@@ -241,7 +238,6 @@ proptest! {
         let keypair = SigningKeyPair::from_seed(&seed);
         let signature = keypair.sign(&message);
 
-        // Tamper with the message
         let mut tampered = message.clone();
         let idx = tamper_index.index(tampered.len());
         tampered[idx] = tampered[idx].wrapping_add(1);
@@ -264,7 +260,6 @@ proptest! {
     ) {
         let mut vv = VersionVector::new();
 
-        // Set initial state
         for _ in 0..initial_count {
             vv.increment(&device_id);
         }
@@ -418,7 +413,6 @@ proptest! {
 }
 
 // ============================================================
-// Field Visibility Properties
 // ============================================================
 
 proptest! {
@@ -542,7 +536,6 @@ mod extended_property_tests {
                 for i in 0..delta_count {
                     let old_card = card.clone();
 
-                    // Add a field
                     let field = ContactField::new(
                         FieldType::Custom,
                         &format!("field_{}", i),
@@ -557,13 +550,11 @@ mod extended_property_tests {
 
                     let delta = CardDelta::compute(&old_card, &card, 0);
 
-                    // Apply delta to a fresh copy
                     let mut verification_card = old_card.clone();
                     if !delta.is_empty() {
                         delta.apply(&mut verification_card, 0).unwrap();
                     }
 
-                    // Cards should match after applying delta
                     prop_assert_eq!(card.display_name(), verification_card.display_name());
                     prop_assert_eq!(card.fields().len(), verification_card.fields().len());
                 }
@@ -585,7 +576,6 @@ mod extended_property_tests {
                 let result = card.add_field(field);
                 prop_assert!(result.is_ok(), "add_field failed: {:?}", result);
 
-                // Verify roundtrip
                 let json = serde_json::to_string(&card).unwrap();
                 let restored: ContactCard = serde_json::from_str(&json).unwrap();
 
@@ -602,7 +592,6 @@ mod extended_property_tests {
             ) {
                 let mut card = ContactCard::new(&name);
 
-                // Add maximum number of fields
                 let max = vauchi_core::contact_card::MAX_FIELDS;
                 for i in 0..max {
                     let field = ContactField::new(
@@ -617,7 +606,6 @@ mod extended_property_tests {
 
                 prop_assert_eq!(card.fields().len(), max);
 
-                // 26th field should fail
                 let extra_field = ContactField::new(FieldType::Custom, "extra", "value", 0);
                 let result = card.add_field(extra_field);
                 prop_assert!(result.is_err(), "Should reject field 26");
@@ -638,13 +626,11 @@ mod extended_property_tests {
                 let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
                 for i in 0..exchanges {
-                    // Alice -> Bob
                     let alice_msg = format!("Alice message {}", i);
                     let enc_a = alice_ratchet.encrypt(alice_msg.as_bytes()).unwrap();
                     let dec_a = bob_ratchet.decrypt(&enc_a).unwrap();
                     prop_assert_eq!(dec_a, alice_msg.as_bytes());
 
-                    // Bob -> Alice
                     let bob_msg = format!("Bob message {}", i);
                     let enc_b = bob_ratchet.encrypt(bob_msg.as_bytes()).unwrap();
                     let dec_b = alice_ratchet.decrypt(&enc_b).unwrap();
@@ -672,7 +658,6 @@ mod extended_property_tests {
                     }
                 }
 
-                // Verify all devices have correct counts
                 for (device_id, expected_count) in expected {
                     prop_assert_eq!(vv.get(&device_id), expected_count);
                 }
@@ -693,11 +678,9 @@ mod extended_property_tests {
                 let mut card2 = ContactCard::new(&name);
                 card2.add_field(ContactField::new(FieldType::Custom, &label, &value2, 0)).unwrap();
 
-                // Compute delta twice
                 let delta1 = CardDelta::compute(&card1, &card2, 0);
                 let delta2 = CardDelta::compute(&card1, &card2, 0);
 
-                // Should be identical
                 prop_assert_eq!(delta1.changes.len(), delta2.changes.len());
             }
         }

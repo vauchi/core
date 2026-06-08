@@ -37,17 +37,14 @@ fn run_qr_exchange(
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Set relay metadata on sessions
     alice_session.set_our_relay_url(alice_relay_url);
     alice_session.set_our_relay_noise_pubkey(alice_relay_noise_pubkey);
     bob_session.set_our_relay_url(bob_relay_url);
     bob_session.set_our_relay_noise_pubkey(bob_relay_noise_pubkey);
 
-    // Both start QR display
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
-    // Alice scans Bob's QR, Bob scans Alice's QR
     let alice_qr = alice_session.qr().unwrap().clone();
     let bob_qr = bob_session.qr().unwrap().clone();
 
@@ -58,13 +55,11 @@ fn run_qr_exchange(
         .apply(ExchangeEvent::ProcessQR(alice_qr))
         .unwrap();
 
-    // Both sides acknowledge
     alice_session
         .apply(ExchangeEvent::TheyScannedOurQR)
         .unwrap();
     bob_session.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
 
-    // Key agreement
     alice_session
         .apply(ExchangeEvent::PerformKeyAgreement)
         .unwrap();
@@ -72,7 +67,6 @@ fn run_qr_exchange(
         .apply(ExchangeEvent::PerformKeyAgreement)
         .unwrap();
 
-    // Complete exchange
     alice_session
         .apply(ExchangeEvent::CompleteExchange(bob_card))
         .unwrap();
@@ -143,7 +137,6 @@ fn exchange_without_relay_metadata_leaves_contact_fields_empty() {
 // @internal
 #[test]
 fn exchange_with_partial_relay_metadata() {
-    // Alice has relay, Bob doesn't
     let (alice_contact, bob_contact) = run_qr_exchange(
         Some("https://alice-relay.com".to_string()),
         Some([11u8; 32]),

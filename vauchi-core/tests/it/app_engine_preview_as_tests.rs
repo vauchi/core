@@ -139,11 +139,9 @@ fn test_exit_preview_returns_to_edit_mode() {
     let (vauchi, contact_id) = vauchi_with_contact();
     let mut engine = AppEngine::new(vauchi);
 
-    // Enter preview mode
     engine.preview_as(contact_id);
     assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
 
-    // Handle exit-preview action
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "exit-preview".into(),
     });
@@ -162,10 +160,8 @@ fn test_exit_preview_removes_banner() {
     let (vauchi, contact_id) = vauchi_with_contact();
     let mut engine = AppEngine::new(vauchi);
 
-    // Enter preview mode
     engine.preview_as(contact_id);
 
-    // Exit preview
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "exit-preview".into(),
     });
@@ -191,7 +187,6 @@ fn test_exit_preview_screen_has_normal_my_info_actions() {
     let (vauchi, contact_id) = vauchi_with_contact();
     let mut engine = AppEngine::new(vauchi);
 
-    // Enter and exit preview mode
     engine.preview_as(contact_id);
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "exit-preview".into(),
@@ -225,7 +220,6 @@ fn test_preview_as_state_cleared_by_exit_preview_not_left_over() {
     let (vauchi, contact_id) = vauchi_with_contact();
     let mut engine = AppEngine::new(vauchi);
 
-    // Enter preview, then exit via action
     engine.preview_as(contact_id);
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "exit-preview".into(),

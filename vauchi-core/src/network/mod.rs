@@ -96,10 +96,8 @@ pub mod revocation;
 #[cfg(feature = "network-http")]
 pub mod tls_pinning;
 
-// Error types
 pub use error::NetworkError;
 
-// Message types
 pub use message::{
     AckStatus, Acknowledgment, DeletionStage, DeregisterMailbox, EmergencyAlert, EncryptedUpdate,
     ForwardingHint, ForwardingHints, GeoLocation, Handshake, IdentityDeletionNotice,
@@ -108,43 +106,33 @@ pub use message::{
     negotiate_version,
 };
 
-// Protocol utilities
 pub use protocol::{
     FRAME_HEADER_SIZE, MAX_MESSAGE_SIZE, create_envelope, decode_message, encode_message,
 };
 
-// Transport abstraction
 pub use transport::{ConnectionState, ProxyConfig, Transport, TransportConfig, TransportResult};
 
-// Mock transport for testing
 pub use mock::MockTransport;
 
-// Connection management
 pub use connection::ConnectionManager;
 
-// Relay client
 pub use relay_client::{AckEvent, IncomingResult, ProcessResult, RelayClient, RelayClientConfig};
 
-// Multi-relay support
 pub use multi_relay::{
     MultiRelayConfig, MultiRelayConfigBuilder, MultiRelayError, MultiRelayManager, RelayHealth,
     RelaySelector,
 };
 
-// Anonymous sender identifiers
 pub use anonymous::{
     AnonymousSender, SenderIndex, compute_anonymous_id, current_epoch, resolve_sender,
     resolve_sender_id,
 };
 
-// Certificate pinning
 pub use pinning::{PinnedCertificate, verify_pin};
 
-// Message classification
 mod classify;
 pub use classify::{MessageType, classify_message};
 
-// HTTP transport for relay v2 protocol
 #[cfg(feature = "network-http")]
 pub use http_transport::{HttpTransport, HttpTransportConfig};
 #[cfg(feature = "network-http")]
@@ -154,11 +142,9 @@ pub use vauchi_protocol::v2::FetchedBlob;
 #[cfg(feature = "network-http")]
 pub use ohttp_client::{OhttpClient, ResponseDecryptor};
 
-// HTTP transport adapter (implements Transport trait for v2 HTTP protocol)
 #[cfg(feature = "network-http")]
 pub use http_adapter::HttpTransportAdapter;
 
-// Delivery service (message delivery tracking, retries, offline queue)
 pub mod delivery;
 pub use delivery::error_messages::failure_to_user_message;
 pub use delivery::{

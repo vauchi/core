@@ -134,11 +134,9 @@ fn test_hkdf_derive_key_pair() {
 
     let (key1, key2) = HKDF::derive_key_pair(None, ikm, info);
 
-    // Both keys should be 32 bytes
     assert_eq!(key1.len(), 32);
     assert_eq!(key2.len(), 32);
 
-    // Keys should be different
     assert_ne!(*key1, *key2);
 }
 
@@ -233,7 +231,6 @@ fn test_hkdf_expand_no_overallocation() {
     let okm = HKDF::expand(&prk, info, 48).unwrap();
     assert_eq!(okm.len(), 48);
 
-    // Verify no over-allocation: capacity should be exactly what was requested
     // (hkdf crate writes into a pre-sized vec, no block-aligned allocation)
     assert_eq!(okm.capacity(), 48);
 }

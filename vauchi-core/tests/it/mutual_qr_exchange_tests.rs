@@ -16,7 +16,6 @@ use vauchi_core::exchange::{
 use vauchi_core::{ContactCard, Identity};
 
 // ============================================================
-// QR with ephemeral keys
 // ============================================================
 
 // @scenario: contact_exchange :: Mutual QR uses fresh ephemeral keys for forward secrecy
@@ -33,10 +32,8 @@ fn test_qr_generate_with_ephemeral() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Identity key should match
     assert_eq!(qr.public_key(), identity.signing_public_key());
 
-    // Exchange key should be the ephemeral, NOT the identity's exchange key
     assert_eq!(qr.exchange_key(), ephemeral.public_key());
     assert_ne!(
         qr.exchange_key(),
@@ -44,7 +41,6 @@ fn test_qr_generate_with_ephemeral() {
         "QR should NOT use identity's static exchange key"
     );
 
-    // Should be valid
     assert!(qr.verify_signature());
     assert!(!qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()));
 }
@@ -69,7 +65,6 @@ fn test_qr_ephemeral_changes_each_call() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Same identity key
     assert_eq!(qr1.public_key(), qr2.public_key());
 
     // Different exchange keys (different ephemerals)
@@ -79,7 +74,6 @@ fn test_qr_ephemeral_changes_each_call() {
         "Each call with different ephemerals should produce different exchange keys"
     );
 
-    // Both valid
     assert!(qr1.verify_signature());
     assert!(qr2.verify_signature());
 }
@@ -106,7 +100,6 @@ fn test_qr_ephemeral_roundtrip_via_data_string() {
 }
 
 // ============================================================
-// QR state machine transitions
 // ============================================================
 
 // @scenario: contact_exchange :: Default QR exchange uses mutual flow
@@ -174,7 +167,6 @@ fn test_scan_their_qr_transitions() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Alice starts QR
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
 
     // Bob also creates a QR (simulating his side)
@@ -185,7 +177,6 @@ fn test_scan_their_qr_transitions() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Alice scans Bob's QR
     alice_session
         .apply(ExchangeEvent::ProcessQR(bob_qr))
         .unwrap();
@@ -239,7 +230,6 @@ fn test_scan_rejects_expired() {
 fn test_scan_rejects_self_exchange() {
     let alice_identity = Identity::create("Alice", 0);
 
-    // Generate own QR before moving identity into session
     let own_ephemeral = X3DHKeyPair::generate();
     let own_qr = ExchangeQR::generate(
         &alice_identity,
@@ -269,7 +259,6 @@ fn test_scan_rejects_self_exchange() {
 }
 
 // ============================================================
-// Symmetric DH key agreement
 // ============================================================
 
 // @scenario: contact_exchange :: Successful QR code exchange with proximity
@@ -292,7 +281,6 @@ fn test_key_agreement_symmetric() {
 }
 
 // ============================================================
-// Full QR exchange lifecycle
 // ============================================================
 
 // @scenario: contact_exchange :: Successful QR code exchange with proximity
@@ -329,7 +317,6 @@ fn test_full_qr_exchange() {
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
-    // Get each other's QR codes
     let alice_qr = alice_session.qr().unwrap().clone();
     let bob_qr = bob_session.qr().unwrap().clone();
 
@@ -341,7 +328,6 @@ fn test_full_qr_exchange() {
         .apply(ExchangeEvent::ProcessQR(alice_qr))
         .unwrap();
 
-    // Both in PeerScanned state
     assert!(matches!(
         alice_session.state(),
         ExchangeState::PeerScanned { .. }
@@ -391,7 +377,6 @@ fn test_full_qr_exchange() {
         .apply(ExchangeEvent::CompleteExchange(alice_card))
         .unwrap();
 
-    // Both complete
     assert!(matches!(
         alice_session.state(),
         ExchangeState::Complete { .. }
@@ -401,7 +386,6 @@ fn test_full_qr_exchange() {
         ExchangeState::Complete { .. }
     ));
 
-    // Verify matching shared keys
     let alice_shared = match alice_session.state() {
         ExchangeState::Complete { contact } => contact.shared_key().unwrap().clone(),
         _ => panic!("Expected Complete"),
@@ -417,7 +401,6 @@ fn test_full_qr_exchange() {
         "Both sides should derive the same shared key"
     );
 
-    // Verify encryption works bidirectionally
     let msg = b"Hello from Alice via QR!";
     let ct = encrypt(&alice_shared, msg).unwrap();
     let pt = decrypt(&bob_shared, &ct).unwrap();
@@ -451,7 +434,6 @@ fn test_qr_uses_fresh_ephemeral_not_identity() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // The session's exchange key should NOT match identity's exchange key
     let session_exchange = session.our_exchange_public_key();
 
     assert_ne!(
@@ -475,7 +457,6 @@ fn test_they_scanned_requires_peer_scanned_state() {
     );
     session.apply(ExchangeEvent::StartQR).unwrap();
 
-    // Try TheyScannedOurQR without scanning their QR first
     let result = session.apply(ExchangeEvent::TheyScannedOurQR);
     assert!(result.is_err(), "Should fail when not in PeerScanned state");
 }
@@ -534,7 +515,6 @@ fn test_qr_contact_names_correct() {
         .apply(ExchangeEvent::CompleteExchange(alice_card))
         .unwrap();
 
-    // Verify contact names
     match alice_session.state() {
         ExchangeState::Complete { contact } => {
             assert_eq!(contact.display_name(), "Bob");

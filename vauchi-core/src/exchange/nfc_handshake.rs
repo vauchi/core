@@ -164,7 +164,6 @@ impl NfcHandshakeSession {
 
         let exchange_id = *their_nfc.token();
 
-        // Check idempotency cache
         if self.completed_cache.contains_key(&exchange_id) {
             return Err(ExchangeError::InvalidState(
                 "Exchange already processed".into(),
@@ -175,11 +174,9 @@ impl NfcHandshakeSession {
         let shared_key =
             derive_symmetric_key(&self.our_x3dh, their_nfc.exchange_key(), &exchange_id)?;
 
-        // Create our NFC payload (key ack)
         let our_nfc = ExchangeNfc::generate(identity, &self.our_x3dh, now);
         let our_nfc_bytes = our_nfc.to_bytes().to_vec();
 
-        // Encrypt our card
         let encrypted = encrypt_card(
             &shared_key,
             &self.our_identity_key,
@@ -224,7 +221,6 @@ impl NfcHandshakeSession {
         let shared_key =
             derive_symmetric_key(&self.our_x3dh, their_nfc.exchange_key(), &exchange_id)?;
 
-        // Decrypt their card
         let their_card = decrypt_and_validate_card(&shared_key, their_encrypted_card)?;
 
         // Encrypt our card with same key, fresh nonce

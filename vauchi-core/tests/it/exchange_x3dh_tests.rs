@@ -34,7 +34,6 @@ fn test_keypair_from_bytes_roundtrip() {
 // @internal
 #[test]
 fn test_x3dh_respond_key_differs_from_raw_dh() {
-    // Generate keypairs
     let responder_keys = X3DHKeyPair::generate();
     let initiator_keys = X3DHKeyPair::generate();
 
@@ -83,7 +82,6 @@ fn test_x3dh_identity_binding_wrong_key_fails() {
     let bob_keys = X3DHKeyPair::generate();
     let carol_keys = X3DHKeyPair::generate();
 
-    // Alice initiates with bob's public key
     let (alice_secret, ephemeral) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
 
     // Bob responds with CORRECT identity (alice's key) → should match
@@ -209,7 +207,6 @@ fn test_x3dh_forward_secrecy_different_sessions() {
     let (secret1, eph1) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
     let (secret2, eph2) = X3DH::initiate(&alice_keys, bob_keys.public_key()).unwrap();
 
-    // Different ephemeral keys
     assert_ne!(
         eph1.as_slice(),
         eph2.as_slice(),

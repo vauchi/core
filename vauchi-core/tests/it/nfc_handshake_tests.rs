@@ -62,7 +62,6 @@ fn test_double_key_offer_rejected() {
 }
 
 // ============================================================
-// Full Handshake
 // ============================================================
 
 // @internal
@@ -105,10 +104,8 @@ fn test_full_handshake_happy_path() {
         .process_encrypted_card(&alice_encrypted_card)
         .expect("process card");
 
-    // Alice confirms send success
     let alice_result = alice.confirm_send_success().expect("confirm send");
 
-    // Verify both sides have each other's data
     assert_eq!(alice_result.remote_card.display_name, "Bob");
     assert_eq!(bob_result.remote_card.display_name, "Alice");
     assert_eq!(
@@ -120,17 +117,14 @@ fn test_full_handshake_happy_path() {
         *alice_id.signing_public_key()
     );
 
-    // Verify CRC16 on both sides
     assert!(alice_result.remote_card.verify_crc16());
     assert!(bob_result.remote_card.verify_crc16());
 
-    // Verify states
     assert!(matches!(alice.state(), NfcHandshakeState::Complete { .. }));
     assert!(matches!(bob.state(), NfcHandshakeState::Complete { .. }));
 }
 
 // ============================================================
-// Failure Cases
 // ============================================================
 
 // @internal
@@ -214,7 +208,6 @@ fn test_tampered_ciphertext_rejected() {
         )
         .expect("key ack");
 
-    // Tamper with encrypted card
     if let Some(byte) = bob_encrypted_card.last_mut() {
         *byte ^= 0xFF;
     }
@@ -350,7 +343,6 @@ fn test_relay_fallback_without_shared_key_fails() {
 }
 
 // ============================================================
-// Identity Key Verification
 // ============================================================
 
 // @internal
@@ -387,7 +379,6 @@ fn test_exchange_preserves_identity_keys() {
         .expect("process card");
     let alice_result = alice.confirm_send_success().expect("confirm send");
 
-    // Both cards contain the correct signing public keys
     assert_eq!(
         alice_result.local_card.identity_key,
         *alice_id.signing_public_key()
@@ -399,7 +390,6 @@ fn test_exchange_preserves_identity_keys() {
 }
 
 // ============================================================
-// Property-Based Tests
 // ============================================================
 
 proptest! {

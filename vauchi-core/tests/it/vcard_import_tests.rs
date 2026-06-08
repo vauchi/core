@@ -118,7 +118,6 @@ fn test_import_vcard_21_outlook() {
     assert_eq!(phones.len(), 2);
     // First phone should be Mobile (CELL)
     assert_eq!(phones[0].0, "Mobile");
-    // Second should be Work
     assert_eq!(phones[1].0, "Work");
 }
 
@@ -412,7 +411,6 @@ fn test_social_profile() {
 // @internal
 #[test]
 fn test_unescape_backslash_sequences_via_note() {
-    // Verify unescaping of \n, \,, \;, \:, \\ through a NOTE field
     let vcf = b"BEGIN:VCARD\r\n\
                  VERSION:4.0\r\n\
                  FN:Test\r\n\

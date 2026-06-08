@@ -36,7 +36,6 @@ fn test_identity_has_device_info() {
 // @scenario: identity_management :: Restore identity from backup
 #[test]
 fn test_backup_restore_preserves_device_info() {
-    // Create identity with custom device info using public from_device_link
     let master_seed = [0x42u8; 32];
     let original = Identity::from_device_link(
         master_seed,

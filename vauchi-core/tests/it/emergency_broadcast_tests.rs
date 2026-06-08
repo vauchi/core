@@ -22,7 +22,6 @@ use vauchi_core::{EmergencyAlert, GeoLocation, Storage, SymmetricKey, VauchiEven
 use common::helpers::{create_vauchi_with_identity, setup_alice_bob_exchange, setup_ratchets};
 
 // =============================================================================
-// Config Storage Tests
 // =============================================================================
 
 // @scenario: emergency_broadcast :: Emergency broadcast is opt-in
@@ -82,7 +81,6 @@ fn test_delete_emergency_config() {
 }
 
 // =============================================================================
-// Alert Types Tests
 // =============================================================================
 
 // @scenario: emergency_broadcast :: Alert message content
@@ -132,7 +130,6 @@ fn test_geo_location_optional() {
 }
 
 // =============================================================================
-// Broadcast API Tests
 // =============================================================================
 
 // @scenario: emergency_broadcast :: Configure emergency broadcast contacts
@@ -162,7 +159,6 @@ fn test_configure_emergency_broadcast() {
 fn test_configure_emergency_broadcast_max_10_contacts() {
     let mut wb = create_vauchi_with_identity("Alice");
 
-    // Attempting to configure with more than 10 contacts should fail
     let ids: Vec<String> = (0..11).map(|i| format!("contact-{}", i)).collect();
     let result = wb.configure_emergency_broadcast(ids, "Help!".to_string(), false);
     assert!(
@@ -286,7 +282,6 @@ fn test_broadcast_dispatches_event() {
 }
 
 // =============================================================================
-// Storage-Level Config Tests
 // =============================================================================
 
 // @scenario: emergency_broadcast :: Configure emergency broadcast contacts

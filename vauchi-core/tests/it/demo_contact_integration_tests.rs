@@ -19,7 +19,6 @@ use vauchi_core::{
 };
 
 // ============================================================
-// Demo Contact Appearance
 // Scenario: Demo contact appears for users with no contacts
 // ============================================================
 
@@ -62,7 +61,6 @@ fn test_demo_contact_visually_distinct() {
 }
 
 // ============================================================
-// Demo Updates
 // Scenario: Demo contact sends periodic updates
 // ============================================================
 
@@ -77,7 +75,6 @@ fn test_demo_tips_exist() {
     assert!(!tips.is_empty(), "Should have demo tips");
     assert!(tips.len() >= 5, "Should have at least 5 tips");
 
-    // Each tip should have content
     for tip in &tips {
         assert!(!tip.id.is_empty(), "Tip should have ID");
         assert!(!tip.title.is_empty(), "Tip should have title");
@@ -132,7 +129,6 @@ fn test_demo_update_due_check() {
 }
 
 // ============================================================
-// Demo Contact Content
 // Scenario: Demo contact has rotating tips
 // ============================================================
 
@@ -145,7 +141,6 @@ fn test_demo_tips_multiple_categories() {
     let tips = get_demo_tips();
     let categories: std::collections::HashSet<_> = tips.iter().map(|t| t.category).collect();
 
-    // Check for expected categories
     assert!(
         categories.contains(&DemoTipCategory::GettingStarted),
         "Should have getting started tips"
@@ -197,7 +192,6 @@ fn test_demo_tips_rotate() {
         state.advance_to_next_tip(0);
     }
 
-    // Index should wrap
     assert!(
         state.current_tip_index < tip_count,
         "Index should wrap around"
@@ -205,7 +199,6 @@ fn test_demo_tips_rotate() {
 }
 
 // ============================================================
-// Demo Contact Dismissal
 // Scenario: Demo contact can be manually dismissed
 // ============================================================
 
@@ -249,12 +242,10 @@ fn test_demo_contact_auto_remove() {
 fn test_demo_contact_restore() {
     let mut state = DemoContactState::new_active(0);
 
-    // Dismiss
     state.dismiss();
     assert!(!state.is_active);
     assert!(state.was_dismissed);
 
-    // Restore
     state.restore();
     assert!(state.is_active, "Should be active after restore");
     assert!(!state.was_dismissed, "Dismissed flag should be cleared");
@@ -278,7 +269,6 @@ fn test_demo_contact_restore_after_auto_remove() {
 }
 
 // ============================================================
-// Demo Contact Privacy
 // Scenario: Demo contact is local only
 // ============================================================
 
@@ -301,7 +291,6 @@ fn test_demo_contact_local_only() {
 }
 
 // ============================================================
-// Persistence
 // Scenario: Demo contact state persists across app restarts
 // ============================================================
 
@@ -313,7 +302,6 @@ fn test_demo_contact_local_only() {
 fn test_demo_state_persists() {
     let mut state = DemoContactState::new_active(0);
 
-    // Make some changes
     state.advance_to_next_tip(0);
     state.advance_to_next_tip(0);
 
@@ -352,7 +340,6 @@ fn test_dismissal_persists() {
 fn test_update_history_persists() {
     let mut state = DemoContactState::new_active(0);
 
-    // Generate some updates
     for _ in 0..3 {
         state.advance_to_next_tip(0);
     }
@@ -368,7 +355,6 @@ fn test_update_history_persists() {
 }
 
 // ============================================================
-// Edge Cases
 // Scenario: Demo contact handles offline gracefully
 // ============================================================
 
@@ -381,14 +367,12 @@ fn test_demo_works_offline() {
     // Demo contact is entirely local, no network calls
     let mut state = DemoContactState::new_active(0);
 
-    // All operations are local
     let tip = state.current_tip();
     assert!(tip.is_some(), "expected Some value");
 
     let next = state.advance_to_next_tip(0);
     assert!(next.is_some(), "expected Some value");
 
-    // Card generation is local
     let card = generate_demo_contact_card(&next.unwrap());
     assert!(card.is_demo);
 }
@@ -406,7 +390,6 @@ fn test_update_not_due_when_inactive() {
 }
 
 // ============================================================
-// Full Workflow
 // ============================================================
 
 /// Test: Full demo contact lifecycle
@@ -475,10 +458,8 @@ fn test_shown_tip_tracking() {
 
     let initial_count = state.shown_tip_ids.len();
 
-    // Advance through tips
     state.advance_to_next_tip(0);
     state.advance_to_next_tip(0);
 
-    // Should have tracked more shown tips
     assert!(state.shown_tip_ids.len() >= initial_count);
 }

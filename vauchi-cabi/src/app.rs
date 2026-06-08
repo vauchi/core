@@ -692,12 +692,10 @@ pub unsafe extern "C" fn vauchi_app_set_event_callback(
             return;
         };
 
-        // Remove previous handler
         if let Some(old_id) = handler_id_slot.take() {
             engine.vauchi().remove_event_handler(old_id);
         }
 
-        // Register new handler if callback is non-null
         if let Some(handler) = handler {
             let new_id = engine
                 .vauchi()

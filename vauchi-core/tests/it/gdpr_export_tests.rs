@@ -18,7 +18,6 @@ use vauchi_core::storage::Storage;
 fn setup_storage_with_contacts() -> Storage {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
 
-    // Add a contact
     let mut card = ContactCard::new("Test Contact");
     card.add_field(ContactField::new(
         FieldType::Email,
@@ -31,7 +30,6 @@ fn setup_storage_with_contacts() -> Storage {
     let contact = Contact::from_exchange([1u8; 32], card, shared_key, 0);
     storage.save_contact(&contact).unwrap();
 
-    // Save own card
     let mut own_card = ContactCard::new("My Name");
     own_card
         .add_field(ContactField::new(
@@ -115,7 +113,6 @@ fn test_export_excludes_private_keys() {
 fn test_export_includes_consent_records() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
 
-    // Add consent records
     storage
         .execute_consent_upsert("consent-1", "data_processing", true, 1000)
         .unwrap();
@@ -237,7 +234,6 @@ fn test_export_includes_audit_log() {
 
     let export = export_all_data(&storage).unwrap();
 
-    // The two events we logged should appear, plus the export event itself is logged
     // but after the snapshot, so only our 2 events are in the export.
     assert_eq!(
         export.audit_log.len(),
@@ -262,7 +258,6 @@ fn test_encrypted_export_roundtrip() {
 
     let encrypted = export_encrypted(&storage, password).unwrap();
 
-    // Verify envelope structure: version || salt || ciphertext
     assert_eq!(encrypted[0], vauchi_core::api::GDPR_EXPORT_VERSION);
     assert!(encrypted.len() > 1 + vauchi_core::api::GDPR_SALT_LEN);
 

@@ -41,10 +41,8 @@ fn test_hidden_contact_appears_in_hidden_list() {
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
-    // Hide the contact
     wb.hide_contact(&contact_id).unwrap();
 
-    // Should appear in hidden list
     let hidden = wb.list_hidden_contacts().unwrap();
     assert_eq!(hidden.len(), 1);
     assert_eq!(hidden[0].id(), contact_id);
@@ -63,11 +61,9 @@ fn test_hide_contact_removes_from_main_list() {
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
-    // Verify visible initially
     let contacts = wb.list_contacts().unwrap();
     assert!(contacts.iter().any(|c| c.id() == contact_id));
 
-    // Hide
     wb.hide_contact(&contact_id).unwrap();
 
     // Verify the contact is hidden (hidden field is set)
@@ -81,7 +77,6 @@ fn test_hide_contact_removes_from_main_list() {
         "Hidden contact must not appear in list_contacts()"
     );
 
-    // Verify appears in hidden list
     let hidden = wb.list_hidden_contacts().unwrap();
     assert_eq!(hidden.len(), 1);
     assert_eq!(hidden[0].id(), contact_id);
@@ -105,11 +100,9 @@ fn test_hide_already_hidden_contact_is_idempotent() {
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
-    // Hide twice
     wb.hide_contact(&contact_id).unwrap();
     wb.hide_contact(&contact_id).unwrap();
 
-    // Should still be hidden, no error
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
     assert!(loaded.is_hidden());
 
@@ -130,19 +123,15 @@ fn test_unhide_contact_returns_to_main_list() {
     let contact_id = contact.id().to_string();
     wb.add_contact(contact).unwrap();
 
-    // Hide then unhide
     wb.hide_contact(&contact_id).unwrap();
     wb.unhide_contact(&contact_id).unwrap();
 
-    // Should no longer be hidden
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
     assert!(!loaded.is_hidden());
 
-    // Should not appear in hidden list
     let hidden = wb.list_hidden_contacts().unwrap();
     assert!(hidden.is_empty());
 
-    // Should reappear in main contact list
     let visible = wb.list_contacts().unwrap();
     assert!(
         visible.iter().any(|c| c.id() == contact_id),
@@ -162,7 +151,6 @@ fn test_unhide_already_visible_contact_is_idempotent() {
     // Unhide a contact that was never hidden
     wb.unhide_contact(&contact_id).unwrap();
 
-    // Should still not be hidden, no error
     let loaded = wb.get_contact(&contact_id).unwrap().unwrap();
     assert!(!loaded.is_hidden());
 

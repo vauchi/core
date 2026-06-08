@@ -41,7 +41,6 @@ fn test_registry_from_content_manager_bundled() {
 
     let registry = registry_from_content_manager(&content);
 
-    // Should have bundled networks
     assert!(!registry.is_empty());
     assert!(registry.get("twitter").is_some(), "expected Some value");
     assert!(registry.get("github").is_some(), "expected Some value");
@@ -106,10 +105,8 @@ fn test_new_network_after_cache_update() {
         ContentManager::new(config.clone(), vauchi_core::clock::SystemClock::shared()).unwrap();
     let registry1 = registry_from_content_manager(&content1);
 
-    // "newnetwork" should not exist in bundled
     assert!(registry1.get("newnetwork").is_none());
 
-    // Add new network to cache
     let cache = ContentCache::new(temp.path()).unwrap();
     let updated_networks = r#"[
         {"id": "twitter", "name": "Twitter / X", "url": "https://twitter.com/{username}"},
@@ -125,11 +122,9 @@ fn test_new_network_after_cache_update() {
         )
         .unwrap();
 
-    // Create new manager to pick up cache
     let content2 = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
     let registry2 = registry_from_content_manager(&content2);
 
-    // Now "newnetwork" should exist
     assert!(registry2.get("newnetwork").is_some(), "expected Some value");
     assert_eq!(
         registry2.get("newnetwork").unwrap().display_name(),
@@ -142,7 +137,6 @@ fn test_new_network_after_cache_update() {
 fn test_updated_url_template() {
     let temp = TempDir::new().unwrap();
 
-    // Update twitter URL template in cache
     let cache = ContentCache::new(temp.path()).unwrap();
     let updated_networks = r#"[
         {"id": "twitter", "name": "X (formerly Twitter)", "url": "https://x.com/{username}"}
@@ -161,7 +155,6 @@ fn test_updated_url_template() {
     let content = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
     let registry = registry_from_content_manager(&content);
 
-    // Should use updated URL
     let url = registry.profile_url("twitter", "alice").unwrap();
     assert!(url.contains("x.com")); // New domain
     assert!(!url.contains("twitter.com")); // Not old domain

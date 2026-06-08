@@ -19,15 +19,12 @@ use vauchi_core::exchange::{ExchangeQR, X3DH, X3DHKeyPair};
 // @internal
 #[test]
 fn test_x3dh_key_agreement_produces_same_secret() {
-    // Alice and Bob each have identity keys
     let alice_keys = X3DHKeyPair::generate();
     let bob_keys = X3DHKeyPair::generate();
 
-    // Alice initiates exchange with Bob's public key
     let (alice_secret, alice_ephemeral_public) =
         X3DH::initiate(&alice_keys, bob_keys.public_key()).expect("Key agreement should succeed");
 
-    // Bob responds using Alice's ephemeral public key
     let bob_secret = X3DH::respond(&bob_keys, alice_keys.public_key(), &alice_ephemeral_public)
         .expect("Key agreement should succeed");
 
@@ -44,13 +41,10 @@ fn test_x3dh_different_keys_different_secrets() {
     let bob = X3DHKeyPair::generate();
     let charlie = X3DHKeyPair::generate();
 
-    // Alice-Bob exchange
     let (alice_bob_secret, _alice_ephemeral) = X3DH::initiate(&alice, bob.public_key()).unwrap();
 
-    // Alice-Charlie exchange
     let (alice_charlie_secret, _) = X3DH::initiate(&alice, charlie.public_key()).unwrap();
 
-    // Secrets should be different
     assert_ne!(alice_bob_secret.as_bytes(), alice_charlie_secret.as_bytes());
 }
 
@@ -65,7 +59,6 @@ fn test_x3dh_ephemeral_keys_unique_per_session() {
     let (_, ephemeral1) = X3DH::initiate(&alice, bob.public_key()).unwrap();
     let (_, ephemeral2) = X3DH::initiate(&alice, bob.public_key()).unwrap();
 
-    // Each initiation should use a fresh ephemeral key
     assert_ne!(ephemeral1, ephemeral2);
 }
 
@@ -83,17 +76,14 @@ fn test_x3dh_shared_secret_usable_for_encryption() {
     let (alice_secret, ephemeral) = X3DH::initiate(&alice, bob.public_key()).unwrap();
     let bob_secret = X3DH::respond(&bob, alice.public_key(), &ephemeral).unwrap();
 
-    // Alice encrypts a message
     let message = b"Hello Bob!";
     let ciphertext = encrypt(&alice_secret, message).expect("Encryption should succeed");
 
-    // Bob decrypts with his derived key
     let decrypted = decrypt(&bob_secret, &ciphertext).expect("Decryption should succeed");
     assert_eq!(decrypted, message);
 }
 
 // =============================================================================
-// QR Code Protocol Tests
 // =============================================================================
 
 /// Tests that QR code contains public key
@@ -145,10 +135,8 @@ fn test_qr_expires_after_5_minutes() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Fresh QR should not be expired
     assert!(!qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()));
 
-    // Create a QR with timestamp 6 minutes in the past
     let old_qr = ExchangeQR::generate_with_timestamp(
         &identity,
         &ephemeral,
@@ -224,11 +212,9 @@ fn test_ble_discover_nearby_vauchi_users() {
     // When Alice opens the "Nearby" screen (discovers devices)
     let discovered = verifier.discover_nearby(Duration::from_secs(5)).unwrap();
 
-    // Then Alice should see Bob in the nearby users list
     assert_eq!(discovered.len(), 1);
     assert_eq!(discovered[0].name.as_deref(), Some("Bob's Phone"));
 
-    // And the signal strength should indicate close proximity
     assert!(discovered[0].rssi > -60); // Strong signal = close
 }
 
@@ -245,10 +231,8 @@ fn test_ble_exchange_succeeds_within_2_meters() {
     let verifier = MockBLEVerifier::new(vec![bob_device.clone()], 1.5); // 1.5 meters
 
     // When Alice taps on Bob to exchange
-    // The proximity verification should pass
     let result = verifier.verify_device_proximity(&verifier.devices[0]);
 
-    // Then contact cards should be exchanged
     result.expect("expected success");
 }
 
@@ -267,7 +251,6 @@ fn test_ble_exchange_blocked_when_too_far() {
     // When Alice attempts to exchange with Bob
     let result = verifier.verify_device_proximity(&verifier.devices[0]);
 
-    // Then the exchange should be blocked
     assert!(matches!(result, Err(ProximityError::TooFar)));
 }
 
@@ -347,7 +330,6 @@ fn test_ble_discovery_failure() {
     // When BLE hardware fails
     let verifier = MockBLEVerifier::failure();
 
-    // Discovery should return error
     let result = verifier.discover_nearby(Duration::from_secs(5));
     result.expect_err("expected error");
 }
@@ -373,7 +355,6 @@ fn test_manual_proximity_exchange_initiation() {
     let emit_result = verifier.emit_challenge(&challenge);
     emit_result.expect("expected success");
 
-    // And public keys should be exchanged
     let response_result = verifier.listen_for_response(Duration::from_secs(5));
     response_result.expect("expected success");
 }
@@ -441,7 +422,6 @@ fn test_exchange_message_is_encrypted_not_plaintext() {
     )
     .expect("Creating encrypted exchange message should succeed");
 
-    // Then the ciphertext should NOT contain the plaintext identity key or name
     let ciphertext_str = String::from_utf8_lossy(&encrypted_msg.ciphertext);
     assert!(
         !ciphertext_str.contains("Alice Smith"),
@@ -487,7 +467,6 @@ fn test_exchange_message_recipient_can_decrypt() {
         .decrypt(&bob)
         .expect("Bob should be able to decrypt");
 
-    // Then Bob should recover Alice's identity key, exchange key, and name
     assert_eq!(payload.identity_key, alice_identity_key);
     assert_eq!(payload.exchange_key, *alice.public_key());
     assert_eq!(payload.display_name, alice_display_name);
@@ -517,7 +496,6 @@ fn test_exchange_message_wrong_key_fails_decrypt() {
     // When Charlie (attacker) tries to decrypt
     let result = encrypted_msg.decrypt(&charlie);
 
-    // Then decryption should fail
     assert!(result.is_err(), "Wrong key should fail to decrypt");
 }
 
@@ -543,7 +521,6 @@ fn test_relay_cannot_read_exchange_message() {
     // 1. Ephemeral public key (random, unlinkable to identity)
     // 2. Ciphertext (opaque bytes)
 
-    // Verify no sensitive data leaks in the wire format
     let wire_bytes = encrypted_msg.to_bytes().unwrap();
     let wire_str = String::from_utf8_lossy(&wire_bytes);
 
@@ -572,7 +549,6 @@ fn test_encrypted_exchange_message_roundtrip() {
         EncryptedExchangeMessage::create(&alice, bob.public_key(), &[0x45u8; 32], "Test User")
             .expect("Creating message should succeed");
 
-    // Serialize and deserialize
     let bytes = original.to_bytes().expect("serialization should succeed");
     let restored =
         EncryptedExchangeMessage::from_bytes(&bytes).expect("Deserialization should succeed");

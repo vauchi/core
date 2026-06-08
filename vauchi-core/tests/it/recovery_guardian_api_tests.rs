@@ -39,21 +39,17 @@ fn test_guardian_token_seal_unseal_verify_lifecycle() {
     // Bob also has an Ed25519 identity (for the token)
     let bob_signing = SigningKeyPair::generate();
 
-    // Alice creates a guardian token for Bob
     let token = GuardianToken::create(&alice_signing, bob_signing.public_key(), 0);
     assert!(token.verify(), "freshly created token must verify");
 
-    // Alice encrypts the token to Bob's X25519 key
     let token_bytes = token.to_bytes();
     let sealed = sealed_box::seal(&token_bytes, &bob_x25519_public);
 
-    // Bob decrypts the entry
     let decrypted = sealed_box::open(&sealed, &bob_x25519_secret)
         .expect("Bob must be able to decrypt his own entry");
     let restored_token =
         GuardianToken::from_bytes(&decrypted).expect("decrypted bytes must deserialize to token");
 
-    // Bob verifies the token
     assert!(restored_token.verify(), "restored token must verify");
     assert_eq!(
         restored_token.designator_pk(),
@@ -76,13 +72,11 @@ fn test_non_guardian_cannot_decrypt_sealed_entry() {
     let bob_x25519_secret = StaticSecret::random_from_rng(OsRng);
     let bob_x25519_public = X25519PublicKey::from(&bob_x25519_secret);
 
-    // Eve is not a guardian
     let eve_x25519_secret = StaticSecret::random_from_rng(OsRng);
 
     let token = GuardianToken::create(&alice_signing, bob_signing.public_key(), 0);
     let sealed = sealed_box::seal(&token.to_bytes(), &bob_x25519_public);
 
-    // Eve tries to decrypt Bob's entry
     let result = sealed_box::open(&sealed, &eve_x25519_secret);
     assert!(
         result.is_err(),
@@ -116,11 +110,9 @@ fn test_guardian_hash_differs_per_designator() {
 // @scenario: contact_recovery :: Ed25519 to X25519 key conversion is deterministic
 #[test]
 fn test_ed25519_to_x25519_conversion_is_deterministic() {
-    // Create an Ed25519 keypair
     let signing = SigningKeyPair::generate();
     let ed25519_pk = signing.public_key();
 
-    // Convert to X25519
     let verifying_key =
         ed25519_dalek::VerifyingKey::from_bytes(ed25519_pk.as_bytes()).expect("valid Ed25519 key");
     let montgomery = verifying_key.to_montgomery();
@@ -142,7 +134,6 @@ fn test_ed25519_to_x25519_conversion_is_deterministic() {
 fn test_multiple_guardians_isolation() {
     let alice = SigningKeyPair::generate();
 
-    // Three guardians
     let bob_signing = SigningKeyPair::generate();
     let bob_secret = StaticSecret::random_from_rng(OsRng);
     let bob_public = X25519PublicKey::from(&bob_secret);
@@ -155,7 +146,6 @@ fn test_multiple_guardians_isolation() {
     let dave_secret = StaticSecret::random_from_rng(OsRng);
     let dave_public = X25519PublicKey::from(&dave_secret);
 
-    // Alice creates and seals one entry per guardian
     let sealed_entries: Vec<Vec<u8>> = [
         (bob_signing.public_key(), &bob_public),
         (charlie_signing.public_key(), &charlie_public),

@@ -195,14 +195,12 @@ fn key_agreement_logs_completion_and_proximity() {
     // CommandDispatched(AudioEmitChallenge), CommandDispatched(AudioListenForResponse)
     assert_eq!(log.events().len(), 8);
 
-    // Verify key agreement event exists
     assert!(
         log.events()
             .iter()
             .any(|e| matches!(&e.event, ExchangeDebugEvent::KeyAgreementCompleted))
     );
 
-    // Verify proximity events exist
     assert!(
         log.events()
             .iter()
@@ -324,7 +322,6 @@ fn no_debug_events_when_log_disabled() {
         MockProximityVerifier::success(),
         vauchi_core::clock::SystemClock::shared(),
     );
-    // Do NOT call enable_debug_log
 
     session.apply(ExchangeEvent::StartQR).unwrap();
 

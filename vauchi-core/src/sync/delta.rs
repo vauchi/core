@@ -123,26 +123,21 @@ impl CardDelta {
     pub fn compute(old: &ContactCard, new: &ContactCard, now: u64) -> Self {
         let mut changes = Vec::new();
 
-        // Check display name change
         if old.display_name() != new.display_name() {
             changes.push(FieldChange::DisplayNameChanged {
                 new_name: new.display_name().to_string(),
             });
         }
 
-        // Build lookup map for old fields
         let old_fields: std::collections::HashMap<&str, &ContactField> =
             old.fields().iter().map(|f| (f.id(), f)).collect();
 
-        // Build lookup map for new fields
         let new_fields: std::collections::HashMap<&str, &ContactField> =
             new.fields().iter().map(|f| (f.id(), f)).collect();
 
-        // Check for modified or removed fields
         for (id, old_field) in &old_fields {
             match new_fields.get(id) {
                 Some(new_field) => {
-                    // Field exists in both - check if modified
                     if old_field.value() != new_field.value() {
                         changes.push(FieldChange::Modified {
                             field_id: id.to_string(),
@@ -151,7 +146,6 @@ impl CardDelta {
                     }
                 }
                 None => {
-                    // Field was removed
                     changes.push(FieldChange::Removed {
                         field_id: id.to_string(),
                     });
@@ -159,7 +153,6 @@ impl CardDelta {
             }
         }
 
-        // Check for added fields
         for (id, new_field) in &new_fields {
             if !old_fields.contains_key(id) {
                 changes.push(FieldChange::Added {
@@ -418,10 +411,6 @@ struct SignableDelta<'a> {
     recipient_pk: &'a [u8; 32],
 }
 
-// =============================================================================
-// CEK-Wrapped Payload (Version 0x02)
-// =============================================================================
-
 /// Payload encrypted by Double Ratchet, containing CEK + CEK-encrypted card delta.
 ///
 /// The CEK (Content Encryption Key) is rotated with each card update.
@@ -498,10 +487,6 @@ impl CekWrappedPayload {
     }
 }
 
-// =============================================================================
-// Version-Tagged Payload Envelope
-// =============================================================================
-
 /// Version-tagged payload decoded from the inner Double Ratchet plaintext.
 ///
 /// The first byte determines the format:
@@ -553,10 +538,6 @@ impl VersionedPayload {
         }
     }
 }
-
-// =============================================================================
-// Reciprocity Confirmation Payload (v0x03)
-// =============================================================================
 
 const RECIPROCITY_DOMAIN: &[u8] = b"vauchi-reciprocity-confirm-v1";
 

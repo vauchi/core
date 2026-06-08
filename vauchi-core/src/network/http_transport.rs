@@ -594,8 +594,6 @@ impl HttpTransport {
         }
     }
 
-    // ── Internal helpers ────────────────────────────────────────────
-
     /// Post a request, routing through OHTTP if configured.
     ///
     /// When OHTTP is active: serializes as `{"action": action, ...fields}`,

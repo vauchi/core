@@ -653,7 +653,6 @@ fn test_receive_mixed_batch_preserves_order() {
         "idx 3: success"
     );
 
-    // Bob's card has the Email; Charlie's card too.
     let bob_at_alice = alice
         .storage()
         .load_contact(&bob_link.peer_contact_id)

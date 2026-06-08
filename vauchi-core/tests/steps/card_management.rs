@@ -9,7 +9,6 @@ use cucumber::{given, then, when};
 use crate::VauchiWorld;
 
 // ============================================================
-// Background steps
 // ============================================================
 
 #[given("I have an existing identity")]
@@ -41,7 +40,6 @@ fn have_card_with_name(world: &mut VauchiWorld, name: String) {
 
 #[given("I am viewing my contact card")]
 fn viewing_my_card(world: &mut VauchiWorld) {
-    // Load the card into the pending state
     let card = world.vauchi.own_card().unwrap().unwrap();
     world.current_card = Some(card);
 }
@@ -89,7 +87,6 @@ fn save_field(world: &mut VauchiWorld) {
         Err(e) => Err(format!("{e}")),
     };
 
-    // Refresh the cached card
     world.current_card = world.vauchi.own_card().unwrap();
 }
 

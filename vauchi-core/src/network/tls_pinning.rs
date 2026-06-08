@@ -23,8 +23,6 @@ use ureq::unversioned::transport::{
 
 use super::pinning::{PinnedCertificate, verify_pin};
 
-// ─── ServerCertVerifier ──────────────────────────────────────────────
-
 /// Wraps standard WebPKI validation and adds SPKI SHA-256 pin checking.
 ///
 /// Fail-closed: if pins are configured and none match, the connection is
@@ -87,8 +85,6 @@ impl ServerCertVerifier for PinningVerifier {
     }
 }
 
-// ─── rustls ClientConfig builder ─────────────────────────────────────
-
 /// Build a `rustls::ClientConfig` with SPKI pin verification.
 fn build_pinned_tls_config(pins: &[PinnedCertificate]) -> Result<rustls::ClientConfig, Error> {
     let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
@@ -113,8 +109,6 @@ fn build_pinned_tls_config(pins: &[PinnedCertificate]) -> Result<rustls::ClientC
         .with_custom_certificate_verifier(Arc::new(pinning_verifier))
         .with_no_client_auth())
 }
-
-// ─── ureq Connector + Transport ──────────────────────────────────────
 
 /// ureq `Connector` that performs TLS with a pinned `rustls::ClientConfig`.
 ///
@@ -211,8 +205,6 @@ impl Transport for PinnedTlsTransport {
         true
     }
 }
-
-// ─── Public API ──────────────────────────────────────────────────────
 
 /// Build a `ureq::Agent` with SPKI certificate pinning.
 ///

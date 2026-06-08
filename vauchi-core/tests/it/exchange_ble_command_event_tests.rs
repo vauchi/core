@@ -99,7 +99,6 @@ fn ble_connected_after_discovery_emits_key_offer_write() {
         .unwrap();
     let _ = session.drain_commands(); // drain BleConnect
 
-    // Connection established -- should emit KeyOffer write
     session
         .apply_hardware_event(Event::BleConnected {
             device_id: "peer-1".into(),
@@ -190,7 +189,6 @@ fn ble_full_initiator_flow_via_command_event() {
         })
         .unwrap();
 
-    // --- Step 3: Initiator should emit commitment + encrypted card ---
     let cmds = initiator.drain_commands();
     let commitment_write = cmds.iter().find(|c| {
         matches!(c, Command::BleWriteCharacteristic { uuid, .. }
@@ -234,7 +232,6 @@ fn ble_full_initiator_flow_via_command_event() {
         })
         .unwrap();
 
-    // --- Verify: exchange should be complete ---
     assert!(
         matches!(initiator.state(), ExchangeState::Complete { .. }),
         "initiator should be in Complete state, got {:?}",
@@ -315,7 +312,6 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
         })
         .unwrap();
 
-    // Responder processes
     let bob_hs = responder.ble_handshake_mut().unwrap();
     let (key_ack, encrypted_card) = bob_hs
         .process_key_offer(
@@ -339,7 +335,6 @@ fn ble_card_before_key_ack_is_buffered_and_processed() {
         "should not emit commands until both key_ack and card data arrive"
     );
 
-    // Now send key_ack -- should trigger Phase 2 processing
     initiator
         .apply_hardware_event(Event::BleCharacteristicNotified {
             uuid: CHAR_HANDSHAKE_NOTIFY.into(),

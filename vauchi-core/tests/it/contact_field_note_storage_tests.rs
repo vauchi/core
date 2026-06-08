@@ -78,16 +78,13 @@ fn test_delete_field_note() {
         .save_contact_field_note(&contact_id, "f1", b"some-encrypted-data")
         .unwrap();
 
-    // Verify it's there
     let notes_before = storage.load_contact_field_notes(&contact_id).unwrap();
     assert_eq!(notes_before.len(), 1, "Expected 1 note before delete");
 
-    // Delete it
     storage
         .delete_contact_field_note(&contact_id, "f1")
         .unwrap();
 
-    // Should be gone
     let notes_after = storage.load_contact_field_notes(&contact_id).unwrap();
     assert!(notes_after.is_empty(), "Expected empty after delete");
 }
@@ -104,7 +101,6 @@ fn test_cascade_on_contact_delete() {
         .save_contact_field_note(&contact_id, "f1", b"note-bytes")
         .unwrap();
 
-    // Notes exist
     let notes = storage.load_contact_field_notes(&contact_id).unwrap();
     assert_eq!(notes.len(), 1, "Expected 1 note before contact delete");
 
@@ -128,12 +124,10 @@ fn test_update_existing_note() {
 
     storage.save_contact(&contact).unwrap();
 
-    // Save initial note
     storage
         .save_contact_field_note(&contact_id, "f1", b"original-data")
         .unwrap();
 
-    // Overwrite with updated note
     storage
         .save_contact_field_note(&contact_id, "f1", b"updated-data")
         .unwrap();
@@ -228,7 +222,6 @@ fn test_delete_leaves_other_fields_intact() {
         .save_contact_field_note(&contact_id, "f2", b"note-2")
         .unwrap();
 
-    // Delete only f1
     storage
         .delete_contact_field_note(&contact_id, "f1")
         .unwrap();

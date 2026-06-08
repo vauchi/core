@@ -93,7 +93,6 @@ fn test_cek_serialization_roundtrip() {
 
     let ciphertext = cek.encrypt(plaintext).unwrap();
 
-    // Serialize and deserialize
     let bytes = cek.to_bytes();
     let restored = ContentEncryptionKey::from_bytes(bytes);
 
@@ -162,7 +161,6 @@ fn test_cek_clone_preserves_functionality() {
     let plaintext = b"test data for clone";
     let ciphertext = cek_original.encrypt(plaintext).unwrap();
 
-    // Cloned key should decrypt the same ciphertext
     let decrypted = cek_clone.decrypt(&ciphertext).unwrap();
     assert_eq!(decrypted, plaintext);
 }
@@ -174,10 +172,8 @@ fn test_cek_debug_redacted() {
     let cek = ContentEncryptionKey::generate();
     let debug_str = format!("{:?}", cek);
 
-    // Key material should be redacted
     assert!(debug_str.contains("REDACTED"));
     assert!(debug_str.contains("ContentEncryptionKey"));
-    // Should not contain raw key bytes
     assert!(!debug_str.contains("SymmetricKey"));
 }
 
@@ -216,7 +212,6 @@ fn test_cek_decrypt_truncated_ciphertext() {
     let plaintext = b"test";
 
     let mut ciphertext = cek.encrypt(plaintext).unwrap();
-    // Truncate the ciphertext
     ciphertext.truncate(10);
 
     let result = cek.decrypt(&ciphertext);
@@ -235,7 +230,6 @@ fn test_cek_multiple_clones_independent() {
     let ct1 = cek1.encrypt(plaintext).unwrap();
     let ct2 = cek2.encrypt(plaintext).unwrap();
 
-    // All clones should decrypt both ciphertexts
     assert_eq!(cek1.decrypt(&ct1).unwrap(), plaintext);
     assert_eq!(cek2.decrypt(&ct1).unwrap(), plaintext);
     assert_eq!(cek3.decrypt(&ct1).unwrap(), plaintext);
@@ -257,7 +251,6 @@ fn test_cek_to_bytes_from_bytes_consistency() {
     let ct1 = cek1.encrypt(plaintext).unwrap();
     let ct2 = cek2.encrypt(plaintext).unwrap();
 
-    // Both keys should decrypt ciphertexts from either key
     assert_eq!(cek1.decrypt(&ct1).unwrap(), plaintext);
     assert_eq!(cek1.decrypt(&ct2).unwrap(), plaintext);
     assert_eq!(cek2.decrypt(&ct1).unwrap(), plaintext);

@@ -89,7 +89,6 @@ fn test_sync_controller_sync_not_connected() {
 
     let mut controller = SyncController::new(relay, &storage, config, events);
 
-    // Should fail when not connected
     let result = controller.sync(&vauchi_core::rng::OsSecureRng::new());
     assert!(matches!(result, Err(VauchiError::Network(_))));
 }
@@ -141,7 +140,6 @@ fn test_sync_controller_pending_count() {
 
     let controller = SyncController::new(relay, &storage, config, events);
 
-    // Initially no pending
     assert_eq!(controller.pending_count().unwrap(), 0);
 }
 
@@ -155,7 +153,6 @@ fn test_sync_controller_in_flight_count() {
 
     let controller = SyncController::new(relay, &storage, config, events);
 
-    // Initially no in-flight
     assert_eq!(controller.in_flight_count(), 0);
 }
 
@@ -166,7 +163,6 @@ fn test_sync_controller_auto_sync_config() {
     let relay = create_test_relay();
     let events = Arc::new(EventDispatcher::new());
 
-    // Test with auto_sync enabled
     let config = SyncConfig {
         auto_sync: true,
         ..Default::default()
@@ -174,7 +170,6 @@ fn test_sync_controller_auto_sync_config() {
     let controller = SyncController::new(relay, &storage, config, events.clone());
     assert!(controller.is_auto_sync_enabled());
 
-    // Test with auto_sync disabled
     let relay2 = create_test_relay();
     let config2 = SyncConfig {
         auto_sync: false,
@@ -295,16 +290,13 @@ fn test_sync_controller_connection_state() {
 
     let mut controller = SyncController::new(relay, &storage, config, events);
 
-    // Initially disconnected
     assert_eq!(controller.connection_state(), ConnectionState::Disconnected);
 
-    // After connect
     controller
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
     assert_eq!(controller.connection_state(), ConnectionState::Connected);
 
-    // After disconnect
     controller
         .disconnect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
@@ -322,7 +314,6 @@ fn test_sync_controller_sync_status() {
 
     let controller = SyncController::new(relay, &storage, config, events);
 
-    // Should return empty map when no contacts
     let status = controller.sync_status().unwrap();
     assert!(status.is_empty());
 }
@@ -338,20 +329,15 @@ fn test_sync_controller_relay_accessors() {
 
     let mut controller = SyncController::new(relay, &storage, config, events);
 
-    // Read-only relay access
     let _relay = controller.relay();
     assert!(!controller.is_connected());
 
-    // Mutable relay access
     let _relay_mut = controller.relay_mut();
 
-    // Sync manager access
     let _sm = controller.sync_manager();
 
-    // Retry scheduler access
     let _rs = controller.retry_scheduler();
 
-    // Offline manager access
     let _om = controller.offline_manager();
 }
 
@@ -386,7 +372,6 @@ fn test_sync_controller_sync_contact_no_ratchet() {
         .connect(&vauchi_core::rng::OsSecureRng::new())
         .unwrap();
 
-    // Should fail with no ratchet
     let result = controller.sync_contact("contact-1");
     assert!(matches!(result, Err(VauchiError::InvalidState(_))));
 }
@@ -456,21 +441,18 @@ fn test_sync_controller_process_device_sync() {
 
     let controller = SyncController::new(relay, &storage, config, events);
 
-    // Create device orchestrator
     let master_seed = [0x42u8; 32];
     let device = create_test_device(&master_seed, 0, "Test Device");
     let registry = create_test_registry(&master_seed, &device);
 
     let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device, registry);
 
-    // Create incoming sync items
     let incoming = vec![SyncItem::CardUpdated {
         field_label: "phone".to_string(),
         new_value: "+1234567890".to_string(),
         timestamp: 1000,
     }];
 
-    // Process via controller
     let applied = controller.process_device_sync(&mut orchestrator, incoming, &[0x42u8; 32]);
     assert!(applied.is_ok(), "expected success");
     assert_eq!(applied.unwrap().len(), 1);

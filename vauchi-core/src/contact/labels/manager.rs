@@ -74,7 +74,6 @@ impl GroupManager {
     /// `modified_at`; production callers pass
     /// `vauchi.clock().unix_seconds()`, tests pass any fixed value.
     pub fn create_group(&mut self, name: &str, now: u64) -> Result<&Group, GroupError> {
-        // Validate name
         let name = name.trim();
         if name.is_empty() {
             return Err(GroupError::InvalidName("Name cannot be empty".to_string()));
@@ -85,17 +84,14 @@ impl GroupManager {
             ));
         }
 
-        // Check for duplicate
         if self.get_group_by_name(name).is_some() {
             return Err(GroupError::DuplicateName(name.to_string()));
         }
 
-        // Check limit
         if self.groups.len() >= MAX_LABELS {
             return Err(GroupError::MaxLabelsReached);
         }
 
-        // Create group
         let group = Group::new(name, now);
         let id = group.id().to_string();
         self.groups.insert(id.clone(), group);
@@ -112,7 +108,6 @@ impl GroupManager {
     ) -> Result<(), GroupError> {
         let new_name = new_name.trim();
 
-        // Validate new name
         if new_name.is_empty() {
             return Err(GroupError::InvalidName("Name cannot be empty".to_string()));
         }
@@ -122,14 +117,12 @@ impl GroupManager {
             ));
         }
 
-        // Check for duplicate (excluding this group)
         if let Some(existing) = self.get_group_by_name(new_name)
             && existing.id() != group_id
         {
             return Err(GroupError::DuplicateName(new_name.to_string()));
         }
 
-        // Find and rename
         let group = self
             .groups
             .get_mut(group_id)
@@ -253,12 +246,10 @@ impl GroupManager {
     /// Returns `Some(true)` if visible via groups, `Some(false)` if explicitly
     /// hidden via override, `None` to fall back to default VisibilityRules.
     pub fn can_see_via_labels(&self, contact_id: &str, field_id: &str) -> Option<bool> {
-        // Check per-contact override first
         if let Some(is_visible) = self.get_contact_override(contact_id, field_id) {
             return Some(is_visible);
         }
 
-        // Check if any group containing this contact shows this field
         let groups = self.groups_for_contact(contact_id);
         for group in groups {
             if group.is_field_visible(field_id) {
@@ -266,7 +257,6 @@ impl GroupManager {
             }
         }
 
-        // No group grants visibility - return None to fall back to default rules
         None
     }
 
@@ -304,12 +294,10 @@ impl GroupManager {
             .get_mut(target_id)
             .expect("target existence verified above");
 
-        // Union of contacts
         for contact_id in source.contacts() {
             target.add_contact(contact_id, now);
         }
 
-        // Union of visible fields
         for field_id in source.visible_fields() {
             target.add_visible_field(field_id, now);
         }
@@ -321,12 +309,10 @@ impl GroupManager {
     pub fn visible_fields_via_labels(&self, contact_id: &str) -> HashSet<String> {
         let mut visible = HashSet::new();
 
-        // Add fields from all groups the contact is in
         for group in self.groups_for_contact(contact_id) {
             visible.extend(group.visible_fields().clone());
         }
 
-        // Apply per-contact overrides
         if let Some(overrides) = self.per_contact_overrides.get(contact_id) {
             for (field_id, is_visible) in overrides {
                 if *is_visible {
@@ -356,10 +342,8 @@ pub fn resolve_visible_fields(
     contact_id: &str,
 ) -> HashSet<String> {
     if label_manager.is_empty() {
-        // No-group mode: use card's field_visibility rules
         card.field_visibility().everyone_field_ids()
     } else {
-        // Groups mode: use label-based visibility
         label_manager.visible_fields_via_labels(contact_id)
     }
 }
@@ -426,20 +410,17 @@ mod tests {
         let label = manager.create_group("Family", 0).unwrap();
         let label_id = label.id().to_string();
 
-        // Add contact and field
         manager
             .add_contact_to_group(&label_id, "bob-id", 0)
             .unwrap();
         let label = manager.get_group_mut(&label_id).unwrap();
         label.add_visible_field("personal-phone", 0);
 
-        // Bob should see the field
         assert_eq!(
             manager.can_see_via_labels("bob-id", "personal-phone"),
             Some(true)
         );
 
-        // Carol (not in label) shouldn't see it via labels
         assert_eq!(
             manager.can_see_via_labels("carol-id", "personal-phone"),
             None
@@ -452,23 +433,19 @@ mod tests {
         let label = manager.create_group("Friends", 0).unwrap();
         let label_id = label.id().to_string();
 
-        // Add Bob to Friends and set personal-phone as visible
         manager
             .add_contact_to_group(&label_id, "bob-id", 0)
             .unwrap();
         let label = manager.get_group_mut(&label_id).unwrap();
         label.add_visible_field("personal-phone", 0);
 
-        // Bob should see personal-phone via label
         assert_eq!(
             manager.can_see_via_labels("bob-id", "personal-phone"),
             Some(true)
         );
 
-        // Hide personal-phone specifically from Bob
         manager.set_contact_override("bob-id", "personal-phone", false);
 
-        // Bob should NOT see personal-phone due to override
         assert_eq!(
             manager.can_see_via_labels("bob-id", "personal-phone"),
             Some(false)
@@ -485,7 +462,6 @@ mod tests {
         let friends = manager.create_group("Friends", 0).unwrap();
         let friends_id = friends.id().to_string();
 
-        // Add Carol to both labels
         manager
             .add_contact_to_group(&family_id, "carol-id", 0)
             .unwrap();
@@ -493,14 +469,12 @@ mod tests {
             .add_contact_to_group(&friends_id, "carol-id", 0)
             .unwrap();
 
-        // Set different fields for each label
         let family = manager.get_group_mut(&family_id).unwrap();
         family.add_visible_field("home-address", 0);
 
         let friends = manager.get_group_mut(&friends_id).unwrap();
         friends.add_visible_field("phone", 0);
 
-        // Carol should see both fields (union of labels)
         let visible = manager.visible_fields_via_labels("carol-id");
         assert!(visible.contains("home-address"));
         assert!(visible.contains("phone"));
@@ -565,7 +539,6 @@ mod tests {
             .id()
             .to_string();
 
-        // Add different contacts and fields to each
         manager.add_contact_to_group(&target, "alice", 0).unwrap();
         manager.add_contact_to_group(&source, "bob", 0).unwrap();
         manager.add_contact_to_group(&source, "alice", 0).unwrap(); // overlap
@@ -585,17 +558,14 @@ mod tests {
 
         manager.merge_groups(&target, &source, 0).unwrap();
 
-        // Target has union of members
         let merged = manager.get_group(&target).unwrap();
         assert!(merged.contains_contact("alice"));
         assert!(merged.contains_contact("bob"));
         assert_eq!(merged.contact_count(), 2);
 
-        // Target has union of visible fields
         assert!(merged.is_field_visible("phone"));
         assert!(merged.is_field_visible("email"));
 
-        // Source group is deleted
         assert!(manager.get_group(&source).is_none());
         assert_eq!(manager.group_count(), 1);
     }
@@ -659,13 +629,11 @@ mod tests {
         let target = manager.create_group("Family", 0).unwrap().id().to_string();
         let source = manager.create_group("Friends", 0).unwrap().id().to_string();
 
-        // Bob is only in source, has an override
         manager.add_contact_to_group(&source, "bob", 0).unwrap();
         manager.set_contact_override("bob", "phone", false);
 
         manager.merge_groups(&target, &source, 0).unwrap();
 
-        // Bob's override is preserved
         assert_eq!(manager.get_contact_override("bob", "phone"), Some(false));
     }
 }

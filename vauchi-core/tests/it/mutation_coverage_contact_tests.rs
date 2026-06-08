@@ -333,7 +333,6 @@ fn soft_delete_then_undo_clears() {
 }
 
 // ============================================================
-// Archive: is_archived, archived_at, archive, unarchive
 // ============================================================
 
 // @internal

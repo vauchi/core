@@ -180,7 +180,6 @@ fn lock_screen_pin_accumulates_single_chars() {
         "unlock should be enabled after typing 4 chars"
     );
 
-    // The PinInput should report 4 filled positions
     let pin = screen
         .components
         .iter()
@@ -205,7 +204,6 @@ fn lock_screen_pin_accumulates_single_chars() {
 fn lock_screen_pin_backspace_removes_last_char() {
     let mut engine = LockScreenEngine::new(3);
 
-    // Type "1", "2", "3"
     for ch in ['1', '2', '3'] {
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "pin".into(),
@@ -244,7 +242,6 @@ fn lock_screen_pin_backspace_removes_last_char() {
 fn lock_screen_pin_backspace_on_empty_is_noop() {
     let mut engine = LockScreenEngine::new(3);
 
-    // Backspace on empty PIN
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
         value: String::new(),

@@ -192,7 +192,6 @@ fn test_sync_outcome_not_connected_after_disconnect() {
     // connect() will fail — no relay is running. That is expected.
     let _ = vauchi.connect();
 
-    // Disconnect clears any partial OHTTP state.
     vauchi.disconnect();
 
     let result = vauchi.sync().unwrap();

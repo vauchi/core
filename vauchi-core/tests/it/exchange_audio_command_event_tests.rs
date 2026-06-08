@@ -38,11 +38,9 @@ fn create_peer_scanned_sessions() -> (ExchangeSession, ExchangeSession) {
     let alice_qr = alice.qr().unwrap().to_data_string();
     let bob_qr = bob.qr().unwrap().to_data_string();
 
-    // Alice scans Bob's QR
     alice
         .apply_hardware_event(Event::QrScanned { data: bob_qr })
         .unwrap();
-    // Bob scans Alice's QR
     bob.apply_hardware_event(Event::QrScanned { data: alice_qr })
         .unwrap();
 
@@ -64,7 +62,6 @@ fn qr_key_agreement_emits_audio_commands() {
 
     let cmds = alice.drain_commands();
 
-    // Should emit audio challenge/listen commands for proximity verification
     let has_audio = cmds.iter().any(|c| {
         matches!(
             c,

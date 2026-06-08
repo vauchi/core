@@ -40,7 +40,6 @@ fn help_engine_implements_workflow_engine() {
     assert_eq!(screen.title, "Help & FAQ");
     assert!(screen.progress.is_none());
 
-    // First component is the search TextInput
     match &screen.components[0] {
         Component::TextInput { id, value, .. } => {
             assert_eq!(id, "help_search");

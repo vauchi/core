@@ -45,19 +45,16 @@ impl DeviceLinkQR {
 
     /// Generates a link QR with a specific timestamp (for testing).
     pub fn generate_with_timestamp(identity: &Identity, timestamp: u64) -> Self {
-        // Generate random link key
         let link_key: [u8; 32] = crate::crypto::random_bytes();
 
         let identity_public_key = *identity.signing_public_key();
 
-        // Create message to sign
         let mut message = Vec::new();
         message.push(DEVICE_LINK_VERSION);
         message.extend_from_slice(&identity_public_key);
         message.extend_from_slice(&link_key);
         message.extend_from_slice(&timestamp.to_be_bytes());
 
-        // Sign the message
         let signature = identity.sign(&message);
 
         DeviceLinkQR {
@@ -133,7 +130,6 @@ impl DeviceLinkQR {
             return Err(ExchangeError::InvalidQRFormat);
         }
 
-        // Check magic bytes
         if &bytes[0..4] != DEVICE_LINK_MAGIC {
             return Err(ExchangeError::InvalidQRFormat);
         }
@@ -169,7 +165,6 @@ impl DeviceLinkQR {
             signature,
         };
 
-        // Verify signature
         if !qr.verify_signature() {
             return Err(ExchangeError::InvalidSignature);
         }

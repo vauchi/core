@@ -300,7 +300,6 @@ fn test_execute_deletion_mixed_cek_and_legacy_contacts() {
 
     let result = manager.execute_deletion(&identity).unwrap();
 
-    // Both get revocations
     assert_eq!(result.revocations.len(), 2);
 
     // Bob's contact fully deleted (#48)

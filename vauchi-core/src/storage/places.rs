@@ -99,8 +99,6 @@ impl Storage {
         Ok(best.map(|(_, p)| p))
     }
 
-    // === Per-contact exchange location (contacts.exchange_location_encrypted) ===
-
     /// Saves a contact's exchange location, encrypted at rest with the storage
     /// key (ADR-051). Overwrites any existing value.
     pub fn save_exchange_location(

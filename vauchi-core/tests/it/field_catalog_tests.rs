@@ -184,7 +184,6 @@ fn test_app_engine_field_type_catalog() {
     let engine = AppEngine::new(vauchi);
     let catalog = engine.field_type_catalog();
 
-    // Should have base types + social networks
     assert!(
         catalog.len() >= 36,
         "Catalog should have at least 36 entries (6 base + 30 social)"

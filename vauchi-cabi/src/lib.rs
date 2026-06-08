@@ -395,7 +395,6 @@ mod tests {
             let handle = vauchi_workflow_create(wtype.as_ptr());
             assert!(!handle.is_null());
 
-            // Get initial screen (identity_check)
             let screen1_ptr = vauchi_workflow_current_screen(handle);
             let screen1_json = CStr::from_ptr(screen1_ptr).to_str().unwrap().to_string();
             vauchi_string_free(screen1_ptr);
@@ -405,7 +404,6 @@ mod tests {
             let result_ptr = vauchi_workflow_handle_action(handle, action.as_ptr());
             assert!(!result_ptr.is_null());
             let result_json = CStr::from_ptr(result_ptr).to_str().unwrap();
-            // Result should be valid JSON
             let _: serde_json::Value = serde_json::from_str(result_json).unwrap();
             vauchi_string_free(result_ptr);
 

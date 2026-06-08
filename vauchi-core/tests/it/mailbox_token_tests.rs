@@ -101,7 +101,6 @@ fn test_batch_tokens_no_duplicates() {
     let mut sorted = batches[0].clone();
     sorted.sort();
     sorted.dedup();
-    // Real tokens should be unique; random padding collision is astronomically unlikely
     assert!(sorted.len() >= 250);
 }
 

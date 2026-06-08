@@ -106,7 +106,6 @@ pub fn resolve_sender<'a>(
 ///
 /// Returns the contact's ID string if resolved, or None.
 pub fn resolve_sender_id(contacts: &[Contact], sender_id_hex: &str, now: u64) -> Option<String> {
-    // Decode hex → resolve via shared keys (current + previous epoch)
     if let Ok(anonymous_id_bytes) = hex::decode(sender_id_hex)
         && anonymous_id_bytes.len() == 32
     {

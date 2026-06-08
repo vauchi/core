@@ -49,20 +49,16 @@ fn test_orchestrator_record_local_change() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    // Create two devices
     let device_a = create_test_device(&master_seed, 0, "Device A");
     let device_b = create_test_device(&master_seed, 1, "Device B");
 
-    // Create registry with both devices
     let mut registry = create_test_registry(&master_seed, &device_a);
     registry
         .add_device(device_b.to_registered(&master_seed), &signing_key)
         .unwrap();
 
-    // Create orchestrator on Device A
     let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
 
-    // Record a local change
     let item = SyncItem::CardUpdated {
         field_label: "phone".to_string(),
         new_value: "+1234567890".to_string(),
@@ -70,7 +66,6 @@ fn test_orchestrator_record_local_change() {
     };
     orchestrator.record_local_change(item).unwrap();
 
-    // Verify the change is queued for Device B
     let pending = orchestrator.pending_for_device(device_b.device_id());
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].timestamp(), 1000);
@@ -96,10 +91,8 @@ fn test_orchestrator_pending_for_device() {
 
     let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
 
-    // Initially no pending items
     assert_eq!(orchestrator.pending_for_device(&device_b_id).len(), 0);
 
-    // Add some changes
     orchestrator
         .record_local_change(SyncItem::CardUpdated {
             field_label: "email".to_string(),
@@ -116,7 +109,6 @@ fn test_orchestrator_pending_for_device() {
         })
         .unwrap();
 
-    // Now should have 2 pending items
     assert_eq!(orchestrator.pending_for_device(&device_b_id).len(), 2);
 }
 
@@ -134,7 +126,6 @@ fn test_orchestrator_create_full_sync_payload() {
     let device_a = create_test_device(&master_seed, 0, "Device A");
     let registry = create_test_registry(&master_seed, &device_a);
 
-    // Add some contacts and own card to storage
     let mut own_card = ContactCard::new("Alice");
     let _ = own_card.add_field(ContactField::new(
         FieldType::Email,
@@ -147,10 +138,8 @@ fn test_orchestrator_create_full_sync_payload() {
     let contact = create_test_contact("Bob");
     storage.save_contact(&contact).unwrap();
 
-    // Create orchestrator
     let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
 
-    // Create full sync payload
     let payload = orchestrator.create_full_sync_payload().unwrap();
 
     assert_eq!(payload.contact_count(), 1);
@@ -176,14 +165,11 @@ fn test_orchestrator_apply_full_sync() {
     let contact = create_test_contact("Bob");
     let payload = DeviceSyncPayload::new(&[contact], &own_card, 1);
 
-    // Apply the sync payload
     orchestrator.apply_full_sync(payload).unwrap();
 
-    // Verify own card was saved
     let loaded_card = storage.load_own_card().unwrap().unwrap();
     assert_eq!(loaded_card.display_name(), "Alice");
 
-    // Verify contact was saved
     let contacts = storage.list_contacts().unwrap();
     assert_eq!(contacts.len(), 1);
     assert_eq!(contacts[0].display_name(), "Bob");
@@ -296,7 +282,6 @@ fn test_orchestrator_mark_synced() {
 
     let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
 
-    // Add a change
     orchestrator
         .record_local_change(SyncItem::CardUpdated {
             field_label: "email".to_string(),
@@ -307,10 +292,8 @@ fn test_orchestrator_mark_synced() {
 
     assert_eq!(orchestrator.pending_for_device(&device_b_id).len(), 1);
 
-    // Mark as synced
     orchestrator.mark_synced(&device_b_id, 1).unwrap();
 
-    // Now should be empty
     assert_eq!(orchestrator.pending_for_device(&device_b_id).len(), 0);
 }
 
@@ -330,7 +313,6 @@ fn test_orchestrator_version_vector_increment() {
     // Initially version is 0
     assert_eq!(orchestrator.version_vector().get(&device_a_id), 0);
 
-    // Record a change
     orchestrator
         .record_local_change(SyncItem::CardUpdated {
             field_label: "email".to_string(),
@@ -339,7 +321,6 @@ fn test_orchestrator_version_vector_increment() {
         })
         .unwrap();
 
-    // Version should be incremented
     assert_eq!(orchestrator.version_vector().get(&device_a_id), 1);
 }
 
@@ -351,11 +332,9 @@ fn test_orchestrator_load_persisted_state() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    // Get device_b_id first before consuming device_b
     let device_b = create_test_device(&master_seed, 1, "Device B");
     let device_b_id = *device_b.device_id();
 
-    // Create orchestrator and add some changes
     {
         let device_a = create_test_device(&master_seed, 0, "Device A");
         let mut registry = create_test_registry(&master_seed, &device_a);
@@ -373,7 +352,6 @@ fn test_orchestrator_load_persisted_state() {
             .unwrap();
     }
 
-    // Create new instances for loading
     let device_a2 = create_test_device(&master_seed, 0, "Device A");
     let device_b2 = create_test_device(&master_seed, 1, "Device B");
     let mut registry2 = create_test_registry(&master_seed, &device_a2);
@@ -381,10 +359,8 @@ fn test_orchestrator_load_persisted_state() {
         .add_device(device_b2.to_registered(&master_seed), &signing_key)
         .unwrap();
 
-    // Load state from storage
     let orchestrator = DeviceSyncOrchestrator::load(&storage, device_a2, registry2).unwrap();
 
-    // Should still have the pending item
     assert_eq!(orchestrator.pending_for_device(&device_b_id).len(), 1);
 }
 
@@ -414,13 +390,11 @@ fn test_encrypt_for_device() {
 
     let orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
 
-    // Encrypt some data for device B
     let plaintext = b"Hello from Device A!";
     let ciphertext = orchestrator
         .encrypt_for_device(&device_b_public_key, plaintext)
         .unwrap();
 
-    // Ciphertext should be different from plaintext
     assert_ne!(ciphertext, plaintext);
     // Ciphertext should be longer (includes nonce + tag)
     assert!(ciphertext.len() > plaintext.len());
@@ -435,19 +409,16 @@ fn test_decrypt_from_device() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    // Create both devices
     let device_a = create_test_device(&master_seed, 0, "Device A");
     let device_b = create_test_device(&master_seed, 1, "Device B");
     let device_a_public_key = *device_a.exchange_public_key();
     let device_b_public_key = *device_b.exchange_public_key();
 
-    // Registry for device A
     let mut registry_a = create_test_registry(&master_seed, &device_a);
     registry_a
         .add_device(device_b.to_registered(&master_seed), &signing_key)
         .unwrap();
 
-    // Registry for device B
     let device_a_for_b = create_test_device(&master_seed, 0, "Device A");
     let device_b_for_b = create_test_device(&master_seed, 1, "Device B");
     let mut registry_b = create_test_registry(&master_seed, &device_b_for_b);
@@ -491,7 +462,6 @@ fn test_wrong_device_cannot_decrypt() {
     // Create device C (different identity - attacker)
     let device_c = create_test_device(&different_seed, 0, "Device C");
 
-    // Registry for device A
     let mut registry_a = create_test_registry(&master_seed, &device_a);
     registry_a
         .add_device(device_b.to_registered(&master_seed), &signing_key)
@@ -552,12 +522,10 @@ fn test_conflict_resolution_last_write_wins() {
         timestamp: 2000,
     }];
 
-    // Process incoming items
     let applied = orchestrator
         .process_incoming(incoming_items, &[0x99u8; 32])
         .unwrap();
 
-    // The newer remote change should be applied
     assert_eq!(applied.len(), 1);
     match &applied[0] {
         SyncItem::CardUpdated { new_value, .. } => {
@@ -594,7 +562,6 @@ fn test_conflict_resolution_rejects_older() {
         timestamp: 1000,
     }];
 
-    // Process incoming items
     let applied = orchestrator
         .process_incoming(incoming_items, &[0x99u8; 32])
         .unwrap();
@@ -668,7 +635,6 @@ fn test_bidirectional_field_additions() {
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
 
-    // Set up Device A
     let device_a = create_test_device(&master_seed, 0, "Device A");
     let device_b_for_a = create_test_device(&master_seed, 1, "Device B");
     let device_b_id = *device_b_for_a.device_id();
@@ -677,7 +643,6 @@ fn test_bidirectional_field_additions() {
         .add_device(device_b_for_a.to_registered(&master_seed), &signing_key)
         .unwrap();
 
-    // Set up Device B
     let device_a_for_b = create_test_device(&master_seed, 0, "Device A");
     let device_b = create_test_device(&master_seed, 1, "Device B");
     let device_a_id = *device_a_for_b.device_id();
@@ -689,7 +654,6 @@ fn test_bidirectional_field_additions() {
     let mut orchestrator_a = DeviceSyncOrchestrator::new(&storage_a, device_a, registry_a);
     let mut orchestrator_b = DeviceSyncOrchestrator::new(&storage_b, device_b, registry_b);
 
-    // Device A adds phone
     orchestrator_a
         .record_local_change(SyncItem::CardUpdated {
             field_label: "phone".to_string(),
@@ -698,7 +662,6 @@ fn test_bidirectional_field_additions() {
         })
         .unwrap();
 
-    // Device B adds email
     orchestrator_b
         .record_local_change(SyncItem::CardUpdated {
             field_label: "email".to_string(),
@@ -707,11 +670,9 @@ fn test_bidirectional_field_additions() {
         })
         .unwrap();
 
-    // Exchange pending items
     let a_to_b = orchestrator_a.pending_for_device(&device_b_id).to_vec();
     let b_to_a = orchestrator_b.pending_for_device(&device_a_id).to_vec();
 
-    // Apply on each side
     let applied_on_b = orchestrator_b
         .process_incoming(a_to_b, &[0x99u8; 32])
         .unwrap();
@@ -744,7 +705,6 @@ fn test_offline_changes_queue() {
 
     let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
 
-    // Make multiple offline changes
     for i in 1..=5 {
         orchestrator
             .record_local_change(SyncItem::CardUpdated {
@@ -755,7 +715,6 @@ fn test_offline_changes_queue() {
             .unwrap();
     }
 
-    // All changes should be queued for Device B
     let pending = orchestrator.pending_for_device(&device_b_id);
     assert_eq!(pending.len(), 5);
 }
@@ -781,10 +740,8 @@ fn test_offline_changes_sync_on_reconnect() {
         .add_device(device_b.to_registered(&master_seed), &signing_key)
         .unwrap();
 
-    // Create orchestrator
     let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
 
-    // Make offline changes
     orchestrator
         .record_local_change(SyncItem::CardUpdated {
             field_label: "offline_field".to_string(),
@@ -793,14 +750,11 @@ fn test_offline_changes_sync_on_reconnect() {
         })
         .unwrap();
 
-    // Verify the change is in pending queue
     let pending = orchestrator.pending_for_device(&device_b_id);
     assert_eq!(pending.len(), 1);
 
-    // Create sync message for reconnection
     let sync_message = orchestrator.create_sync_message(&device_b_id).unwrap();
 
-    // Verify sync message contains the pending items
     assert!(!sync_message.items.is_empty());
     assert_eq!(sync_message.items.len(), 1);
 }
@@ -822,7 +776,6 @@ fn field_timestamps_persist_across_reload_for_lww() {
         &create_test_device(&master_seed, 0, "Device 0"),
     );
 
-    // Record a local edit to the "email" field at t=1000 and persist it.
     {
         let mut orch = DeviceSyncOrchestrator::new(
             &storage,

@@ -31,7 +31,6 @@ fn test_lazy_frontend_skips_they_scanned() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Bob starts his QR display too
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
     // 1. Bob scans Alice's QR -> moves to PeerScanned
@@ -62,14 +61,12 @@ fn test_formalized_state_machine() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Test transition using apply
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     assert!(matches!(
         alice_session.state(),
         ExchangeState::DisplayingQr { .. }
     ));
 
-    // Test invalid transition
     let res = alice_session.apply(ExchangeEvent::PerformKeyAgreement);
     assert!(res.is_err(), "expected error");
     assert!(matches!(res.unwrap_err(), ExchangeError::InvalidState(_)));

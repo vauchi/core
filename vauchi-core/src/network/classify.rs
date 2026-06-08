@@ -48,14 +48,12 @@ pub enum MessageType {
 /// }
 /// ```
 pub fn classify_message(data: &[u8]) -> MessageType {
-    // Need at least the frame header
     if data.len() < FRAME_HEADER_SIZE {
         return MessageType::Unknown;
     }
 
     let json = &data[FRAME_HEADER_SIZE..];
 
-    // Attempt to parse the envelope
     let envelope: SimpleEnvelope = match serde_json::from_slice(json) {
         Ok(e) => e,
         Err(_) => return MessageType::Unknown,

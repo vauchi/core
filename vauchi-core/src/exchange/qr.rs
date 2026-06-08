@@ -325,7 +325,6 @@ impl ExchangeQR {
             return Err(ExchangeError::DisplayNameTooLong(name_len));
         }
 
-        // Bounds check for name
         let name_end = 127 + name_len;
         if bytes.len() < name_end + 1 {
             // +1 for flags byte
@@ -337,11 +336,9 @@ impl ExchangeQR {
                 .map_err(|_| ExchangeError::InvalidQRFormat)?,
         );
 
-        // Parse flags byte
         let flags = bytes[name_end];
         let mut cursor = name_end + 1;
 
-        // Parse optional relay URL
         let relay_url = if flags & FLAG_HAS_RELAY_URL != 0 {
             if bytes.len() < cursor + 2 {
                 return Err(ExchangeError::InvalidQRFormat);
@@ -363,7 +360,6 @@ impl ExchangeQR {
             None
         };
 
-        // Parse optional relay Noise pubkey
         let relay_noise_pubkey = if flags & FLAG_HAS_RELAY_NOISE_PUBKEY != 0 {
             if bytes.len() < cursor + 32 {
                 return Err(ExchangeError::InvalidQRFormat);

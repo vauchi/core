@@ -120,17 +120,14 @@ impl MultiRelayConfig {
     ) -> Option<String> {
         match self.selector {
             RelaySelector::PrimaryFirst => {
-                // Try primary first
                 if let Some(primary) = &self.primary
                     && health.is_healthy(primary)
                 {
                     return Some(primary.clone());
                 }
-                // Fall back to first healthy
                 self.relays.iter().find(|r| health.is_healthy(r)).cloned()
             }
             RelaySelector::RoundRobin => {
-                // Find next healthy relay in round-robin order
                 let start = self.round_robin_index.load(Ordering::Relaxed);
                 for i in 0..self.relays.len() {
                     let index = (start + i) % self.relays.len();
@@ -299,7 +296,6 @@ impl RelayHealth {
                 if state.failure_count == 0 {
                     return true;
                 }
-                // Check if cooldown has elapsed
                 self.should_retry(relay)
             }
         }
@@ -434,10 +430,6 @@ impl MultiRelayManager {
     pub fn health(&self) -> &RelayHealth {
         &self.health
     }
-
-    // ========================================
-    // Per-Contact Relay Routing
-    // ========================================
 
     /// Register a relay URL learned from a contact exchange.
     ///

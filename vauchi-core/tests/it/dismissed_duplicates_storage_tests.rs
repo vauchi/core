@@ -27,13 +27,11 @@ fn test_dismiss_duplicate_normalized_order() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
     let storage = wb.storage();
 
-    // Dismiss with reversed order
     storage.dismiss_duplicate("id_z", "id_a").unwrap();
 
     let dismissed = storage.load_dismissed_duplicates().unwrap();
     // Should be stored normalized (id_a, id_z)
     assert!(dismissed.contains(&("id_a".to_string(), "id_z".to_string())));
-    // Should NOT contain the un-normalized version
     assert!(!dismissed.contains(&("id_z".to_string(), "id_a".to_string())));
 }
 
@@ -112,7 +110,6 @@ fn test_dismiss_does_not_reappear_after_reload() {
 
     storage.dismiss_duplicate("id_a", "id_b").unwrap();
 
-    // Load twice to verify it's persisted
     let dismissed1 = storage.load_dismissed_duplicates().unwrap();
     let dismissed2 = storage.load_dismissed_duplicates().unwrap();
     assert_eq!(dismissed1, dismissed2, "Dismissed pairs should be stable");

@@ -21,27 +21,23 @@ fn create_vauchi_with_identity(name: &str) -> Vauchi {
 fn test_transition_to_no_group_mode() {
     let wb = create_vauchi_with_identity("Alice");
 
-    // Add a field to own card
     let field = ContactField::new(FieldType::Email, "Email", "alice@example.com", 0);
     wb.add_own_field(field).unwrap();
 
     let card = wb.own_card().unwrap().unwrap();
     let field_id = card.fields()[0].id().to_string();
 
-    // Create a label and set the field visible in it
     let label = wb.create_group("Friends").unwrap();
     let label_id = label.id().to_string();
     wb.set_group_field_visibility(&label_id, &field_id, true)
         .unwrap();
 
-    // Verify field is visible in label
     let label = wb.get_group(&label_id).unwrap();
     assert!(
         label.is_field_visible(&field_id),
         "field should be visible in label before deletion"
     );
 
-    // Verify field is NOT in field_visibility before deletion
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         !card.is_field_shown(&field_id),
@@ -51,11 +47,9 @@ fn test_transition_to_no_group_mode() {
     // Delete the last label — triggers transition to no-group mode
     wb.delete_group(&label_id).unwrap();
 
-    // Verify no labels remain
     let labels = wb.list_groups().unwrap();
     assert_eq!(labels.len(), 0, "all labels should be deleted");
 
-    // Verify field has been migrated to field_visibility on the card
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         card.is_field_shown(&field_id),
@@ -68,7 +62,6 @@ fn test_transition_to_no_group_mode() {
 fn test_transition_preserves_field_visibility_when_adding_first_group() {
     let wb = create_vauchi_with_identity("Alice");
 
-    // Add a field to own card
     let field = ContactField::new(FieldType::Email, "Email", "alice@example.com", 0);
     wb.add_own_field(field).unwrap();
 
@@ -78,7 +71,6 @@ fn test_transition_preserves_field_visibility_when_adding_first_group() {
     // Set field as shown (no-group mode)
     wb.set_field_shown(&field_id, true).unwrap();
 
-    // Verify field is in field_visibility
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         card.is_field_shown(&field_id),
@@ -101,23 +93,19 @@ fn test_transition_preserves_field_visibility_when_adding_first_group() {
 fn test_delete_non_last_label_no_migration() {
     let wb = create_vauchi_with_identity("Alice");
 
-    // Add a field to own card
     let field = ContactField::new(FieldType::Email, "Email", "alice@example.com", 0);
     wb.add_own_field(field).unwrap();
 
     let card = wb.own_card().unwrap().unwrap();
     let field_id = card.fields()[0].id().to_string();
 
-    // Create two labels
     let label1 = wb.create_group("Friends").unwrap();
     let label1_id = label1.id().to_string();
     let _label2 = wb.create_group("Work").unwrap();
 
-    // Set field visible in label1
     wb.set_group_field_visibility(&label1_id, &field_id, true)
         .unwrap();
 
-    // Verify field is NOT in field_visibility
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         !card.is_field_shown(&field_id),
@@ -134,7 +122,6 @@ fn test_delete_non_last_label_no_migration() {
         "should not migrate to field_visibility when other groups still exist"
     );
 
-    // Verify label2 still exists
     let labels = wb.list_groups().unwrap();
     assert_eq!(labels.len(), 1, "one label should remain");
 }
@@ -144,20 +131,17 @@ fn test_delete_non_last_label_no_migration() {
 fn test_set_field_shown_api() {
     let wb = create_vauchi_with_identity("Alice");
 
-    // Add a field to own card
     let field = ContactField::new(FieldType::Email, "Email", "alice@example.com", 0);
     wb.add_own_field(field).unwrap();
 
     let card = wb.own_card().unwrap().unwrap();
     let field_id = card.fields()[0].id().to_string();
 
-    // Initially not shown
     assert!(
         !card.is_field_shown(&field_id),
         "field should not be shown initially"
     );
 
-    // Set field shown
     wb.set_field_shown(&field_id, true).unwrap();
 
     // Verify it's shown (reload from storage)
@@ -167,10 +151,8 @@ fn test_set_field_shown_api() {
         "field should be shown after set_field_shown(true)"
     );
 
-    // Set field hidden again
     wb.set_field_shown(&field_id, false).unwrap();
 
-    // Verify it's hidden
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         !card.is_field_shown(&field_id),
@@ -183,7 +165,6 @@ fn test_set_field_shown_api() {
 fn test_transition_migrates_all_visible_fields() {
     let wb = create_vauchi_with_identity("Alice");
 
-    // Add multiple fields
     wb.add_own_field(ContactField::new(
         FieldType::Email,
         "Email",
@@ -203,7 +184,6 @@ fn test_transition_migrates_all_visible_fields() {
     let email_id = card.fields()[0].id().to_string();
     let phone_id = card.fields()[1].id().to_string();
 
-    // Create label and set both fields visible
     let label = wb.create_group("Friends").unwrap();
     let label_id = label.id().to_string();
     wb.set_group_field_visibility(&label_id, &email_id, true)
@@ -211,10 +191,8 @@ fn test_transition_migrates_all_visible_fields() {
     wb.set_group_field_visibility(&label_id, &phone_id, true)
         .unwrap();
 
-    // Delete last label
     wb.delete_group(&label_id).unwrap();
 
-    // Both fields should be migrated to field_visibility
     let card = wb.own_card().unwrap().unwrap();
     assert!(
         card.is_field_shown(&email_id),
@@ -231,7 +209,6 @@ fn test_transition_migrates_all_visible_fields() {
 fn test_transition_does_not_migrate_hidden_fields() {
     let wb = create_vauchi_with_identity("Alice");
 
-    // Add two fields
     wb.add_own_field(ContactField::new(
         FieldType::Email,
         "Email",
@@ -257,7 +234,6 @@ fn test_transition_does_not_migrate_hidden_fields() {
     wb.set_group_field_visibility(&label_id, &email_id, true)
         .unwrap();
 
-    // Delete last label
     wb.delete_group(&label_id).unwrap();
 
     // Only email should be migrated; phone was never visible

@@ -166,7 +166,6 @@ mod tests {
 
         assert_eq!(smk_original.as_bytes(), smk_restored.as_bytes());
 
-        // Derived keys should also match
         let sek_original = smk_original.derive_sek();
         let sek_restored = smk_restored.derive_sek();
         assert_eq!(sek_original.as_bytes(), sek_restored.as_bytes());

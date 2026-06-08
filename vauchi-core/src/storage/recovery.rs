@@ -12,8 +12,6 @@ use super::{Storage, StorageError};
 use crate::recovery::{RecoveryProgress, RecoverySettings};
 
 impl Storage {
-    // === Recovery Response Operations ===
-
     /// Saves a recovery response to storage (encrypted).
     ///
     /// Records the user's response (accept, reject, or remind_me_later) to
@@ -90,8 +88,6 @@ impl Storage {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
-
-    // === Recovery Rate Limit Operations ===
 
     /// Checks the recovery rate limit for a given identity public key.
     ///
@@ -183,8 +179,6 @@ impl Storage {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
-
-    // === Recovery Progress Persistence ===
 
     /// Saves in-progress recovery state (encrypted).
     ///

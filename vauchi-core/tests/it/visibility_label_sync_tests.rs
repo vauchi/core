@@ -16,7 +16,6 @@ use vauchi_core::contact::{Group, GroupManager};
 use vauchi_core::sync::SyncItem;
 
 // =============================================================================
-// Test Helpers
 // =============================================================================
 
 fn now() -> u64 {
@@ -44,10 +43,6 @@ fn now() -> u64 {
 // @internal
 #[test]
 fn test_label_sync_across_devices() {
-    // =========================================================================
-    // Setup: Device A creates labels
-    // =========================================================================
-
     let mut device_a_manager = GroupManager::new();
 
     let family = device_a_manager.create_group("Family", 0).unwrap();
@@ -56,7 +51,6 @@ fn test_label_sync_across_devices() {
     let friends = device_a_manager.create_group("Close Friends", 0).unwrap();
     let friends_id = friends.id().to_string();
 
-    // Add contacts and fields
     device_a_manager
         .add_contact_to_group(&family_id, "bob-id", 0)
         .unwrap();
@@ -74,13 +68,8 @@ fn test_label_sync_across_devices() {
     let friends = device_a_manager.get_group_mut(&friends_id).unwrap();
     friends.add_visible_field("personal-email", 0);
 
-    // =========================================================================
-    // Create SyncItem::LabelChange for syncing to Device B
-    // =========================================================================
-
     let timestamp = now();
 
-    // Family label sync item
     let family_label = device_a_manager.get_group(&family_id).unwrap();
     let family_sync = SyncItem::LabelChange {
         label_id: family_label.id().to_string(),
@@ -102,11 +91,6 @@ fn test_label_sync_across_devices() {
         timestamp,
     };
 
-    // =========================================================================
-    // Verify SyncItem contents
-    // =========================================================================
-
-    // Verify Family sync item
     if let SyncItem::LabelChange {
         label_id,
         label_name,
@@ -130,9 +114,7 @@ fn test_label_sync_across_devices() {
         panic!("Expected LabelChange variant");
     }
 
-    // =========================================================================
     // Simulate Device B receiving the sync and reconstructing labels
-    // =========================================================================
 
     // Apply Family sync - simulate Device B receiving and applying it
     if let SyncItem::LabelChange {
@@ -155,7 +137,6 @@ fn test_label_sync_across_devices() {
             timestamp,
         );
 
-        // Verify the label can be reconstructed correctly on Device B
         assert_eq!(label.name(), "Family");
         assert_eq!(label.contact_count(), 2);
         assert!(label.contains_contact("bob-id"));
@@ -163,10 +144,6 @@ fn test_label_sync_across_devices() {
         assert!(label.is_field_visible("home-address"));
         assert!(label.is_field_visible("personal-phone"));
     }
-
-    // =========================================================================
-    // Test label deletion sync
-    // =========================================================================
 
     let deleted_sync = SyncItem::LabelChange {
         label_id: friends_id.clone(),
@@ -187,10 +164,6 @@ fn test_label_sync_across_devices() {
         assert!(is_deleted, "is_deleted should be true for deletion");
     }
 
-    // =========================================================================
-    // Verify SyncItem timestamp accessor
-    // =========================================================================
-
     let sync_item = SyncItem::LabelChange {
         label_id: "test-id".to_string(),
         label_name: "Test".to_string(),
@@ -202,9 +175,7 @@ fn test_label_sync_across_devices() {
 
     assert_eq!(sync_item.timestamp(), 12345);
 
-    // =========================================================================
     // Test conflict resolution for labels
-    // =========================================================================
 
     // Device A updates label at timestamp 1000
     let item_a = SyncItem::LabelChange {
@@ -229,7 +200,6 @@ fn test_label_sync_across_devices() {
     let device_a_id = [0xAA; 32];
     let device_b_id = [0xBB; 32];
 
-    // Later timestamp wins
     let resolved = SyncItem::resolve_conflict(&item_a, &item_b, &device_a_id, &device_b_id);
 
     if let SyncItem::LabelChange {
@@ -248,9 +218,7 @@ fn test_label_sync_across_devices() {
         panic!("Expected LabelChange variant");
     }
 
-    // =========================================================================
     // Verify labels are local-only (not transmitted to contacts)
-    // =========================================================================
 
     // This is a design verification - labels exist in GroupManager, not in Contact
     // The contact card sent to others never contains label information
@@ -279,21 +247,17 @@ fn test_label_sync_across_devices() {
 fn test_delete_contact_clears_overrides() {
     let mut manager = GroupManager::new();
 
-    // Create labels
     let family_id = manager.create_group("Family", 0).unwrap().id().to_string();
     let friends_id = manager.create_group("Friends", 0).unwrap().id().to_string();
 
     let bob = "bob-id";
 
-    // Add Bob to both labels
     manager.add_contact_to_group(&family_id, bob, 0).unwrap();
     manager.add_contact_to_group(&friends_id, bob, 0).unwrap();
 
-    // Set some per-contact overrides
     manager.set_contact_override(bob, "field-1", true);
     manager.set_contact_override(bob, "field-2", false);
 
-    // Verify state
     assert_eq!(manager.groups_for_contact(bob).len(), 2);
     manager
         .get_all_contact_overrides(bob)
@@ -302,7 +266,6 @@ fn test_delete_contact_clears_overrides() {
     // Remove Bob from all labels (simulates contact deletion)
     manager.remove_contact_from_all_groups(bob, 0);
 
-    // Bob should be in no labels
     assert_eq!(manager.groups_for_contact(bob).len(), 0);
 
     // Per-contact overrides should be cleared
@@ -327,7 +290,6 @@ fn test_set_visible_fields_bulk() {
         .id()
         .to_string();
 
-    // Set multiple fields at once
     let work_fields: HashSet<String> = [
         "work-email".to_string(),
         "work-phone".to_string(),
@@ -340,7 +302,6 @@ fn test_set_visible_fields_bulk() {
     let label = manager.get_group_mut(&label_id).unwrap();
     label.set_visible_fields(work_fields, 0);
 
-    // Verify all fields are set
     let label = manager.get_group(&label_id).unwrap();
     assert_eq!(label.visible_fields().len(), 4);
     assert!(label.is_field_visible("work-email"));
@@ -349,13 +310,11 @@ fn test_set_visible_fields_bulk() {
     assert!(label.is_field_visible("title"));
     assert!(!label.is_field_visible("personal-email"));
 
-    // Replace with different set
     let minimal_fields: HashSet<String> = ["work-email".to_string()].into_iter().collect();
 
     let label = manager.get_group_mut(&label_id).unwrap();
     label.set_visible_fields(minimal_fields, 0);
 
-    // Verify replacement
     let label = manager.get_group(&label_id).unwrap();
     assert_eq!(label.visible_fields().len(), 1);
     assert!(label.is_field_visible("work-email"));
@@ -418,7 +377,6 @@ fn test_label_timestamps() {
 fn test_label_manager_serialization() {
     let mut manager = GroupManager::new();
 
-    // Create labels with data
     let family_id = manager.create_group("Family", 0).unwrap().id().to_string();
     let friends_id = manager.create_group("Friends", 0).unwrap().id().to_string();
 
@@ -436,13 +394,10 @@ fn test_label_manager_serialization() {
 
     manager.set_contact_override("bob", "special-field", true);
 
-    // Serialize
     let json = serde_json::to_string(&manager).unwrap();
 
-    // Deserialize
     let restored: GroupManager = serde_json::from_str(&json).unwrap();
 
-    // Verify restored state
     assert_eq!(restored.group_count(), 2);
 
     let family = restored.get_group(&family_id).unwrap();
@@ -458,7 +413,6 @@ fn test_label_manager_serialization() {
     assert_eq!(friends.contact_count(), 1);
     assert!(friends.contains_contact("dave"));
 
-    // Verify per-contact override
     assert_eq!(
         restored.get_contact_override("bob", "special-field"),
         Some(true)

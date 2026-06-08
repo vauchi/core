@@ -147,7 +147,6 @@ fn nfc_exchange_sets_high_confidence_without_running_verifier() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Generate a valid NFC payload from Bob's side
     let bob_ephemeral = vauchi_core::exchange::X3DHKeyPair::generate();
     let bob_nfc = vauchi_core::exchange::ExchangeNfc::generate(
         &bob,
@@ -162,7 +161,6 @@ fn nfc_exchange_sets_high_confidence_without_running_verifier() {
     });
     assert!(tap_result.is_ok(), "NFC tap should succeed");
 
-    // Key agreement should succeed and set High confidence
     // even though the proximity verifier would fail
     let ka_result = session.apply(ExchangeEvent::PerformKeyAgreement);
     assert!(
@@ -170,7 +168,6 @@ fn nfc_exchange_sets_high_confidence_without_running_verifier() {
         "Key agreement must succeed for NFC despite failing verifier"
     );
 
-    // Verify we're in AwaitingCardExchange with the correct confidence
     assert!(
         matches!(session.state(), ExchangeState::AwaitingCardExchange { .. }),
         "NFC should reach AwaitingCardExchange state, got {:?}",

@@ -45,7 +45,6 @@ fn test_ble_card_payload_crc16_detects_corruption() {
         "CRC16 must verify on fresh payload"
     );
 
-    // Serialize, corrupt one byte, deserialize, verify CRC fails
     let mut bytes = original.to_bytes().expect("serialization should succeed");
     bytes[0] ^= 0xFF; // flip a byte in the identity_key
     let corrupted = BleCardPayload::from_bytes(&bytes).expect("deserialization should still work");

@@ -280,7 +280,6 @@ fn test_identity_revoked_forged_signature_rejected() {
 
     let mut revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
 
-    // Tamper with the signature
     revoked.signature[0] ^= 0xFF;
     revoked.signature[63] ^= 0xFF;
 
@@ -316,7 +315,6 @@ fn test_identity_revoked_tampered_timestamp_rejected() {
 
     let mut revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
 
-    // Tamper with the timestamp
     revoked.timestamp += 1;
 
     assert!(
@@ -334,7 +332,6 @@ fn test_identity_revoked_tampered_recipient_rejected() {
 
     let mut revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
 
-    // Tamper with recipient
     revoked.recipient_id = hex::encode([0xCC; 32]).into();
 
     assert!(

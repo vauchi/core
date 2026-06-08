@@ -72,10 +72,8 @@ fn adoption_copies_nickname_from_imported_to_exchanged() {
     wb.set_display_name_preference(&exchanged_id, DisplayNamePreference::Custom)
         .unwrap();
 
-    // Hard-delete the imported contact
     wb.hard_delete_imported_contact(&imported_id).unwrap();
 
-    // Verify: exchanged has the adopted nickname, imported is gone
     let nick_after = wb.get_contact_nickname(&exchanged_id).unwrap();
     assert_eq!(
         nick_after.as_deref(),
@@ -104,7 +102,6 @@ fn adoption_copies_custom_avatar_from_imported_to_exchanged() {
     let exchanged_id = add_exchanged(&wb, "Bob", 2);
     let imported_id = add_imported(&wb, "Bob Import");
 
-    // Set custom avatar on imported
     let png = tiny_png();
     wb.set_contact_custom_avatar(&imported_id, &png).unwrap();
 
@@ -118,10 +115,8 @@ fn adoption_copies_custom_avatar_from_imported_to_exchanged() {
     wb.set_avatar_preference(&exchanged_id, AvatarPreference::Custom)
         .unwrap();
 
-    // Hard-delete the imported contact
     wb.hard_delete_imported_contact(&imported_id).unwrap();
 
-    // Verify: exchanged has the custom avatar, preference is Custom
     let avatar_after = wb.get_contact_custom_avatar(&exchanged_id).unwrap();
     assert!(
         avatar_after.is_some(),
@@ -165,10 +160,8 @@ fn adoption_saves_imported_info_to_notes() {
     let combined = format!("{existing}\n---\n{imported_summary}");
     wb.add_personal_note(&exchanged_id, &combined).unwrap();
 
-    // Hard-delete the imported contact
     wb.hard_delete_imported_contact(&imported_id).unwrap();
 
-    // Verify: combined note is present on exchanged
     let note_after = wb
         .read_personal_note(&exchanged_id)
         .unwrap()
@@ -192,13 +185,11 @@ fn skip_adoption_hard_deletes_imported_leaves_exchanged_unchanged() {
     let exchanged_id = add_exchanged(&wb, "Bob", 4);
     let imported_id = add_imported(&wb, "Bob Import");
 
-    // Set data on imported to confirm it doesn't leak to exchanged
     wb.set_contact_nickname(&imported_id, "Bobby").unwrap();
 
     // No adoption — just hard-delete the imported contact
     wb.hard_delete_imported_contact(&imported_id).unwrap();
 
-    // Verify: exchanged is untouched, imported is gone
     let nick = wb.get_contact_nickname(&exchanged_id).unwrap();
     assert!(
         nick.is_none(),

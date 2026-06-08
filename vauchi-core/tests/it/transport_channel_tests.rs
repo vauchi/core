@@ -89,6 +89,5 @@ fn test_transport_caps_unknown_bits_truncated() {
     // Future flags (bits 6-15) should be silently ignored
     let bytes = [0xFF, 0xFF];
     let caps = TransportCaps::from_bytes(bytes);
-    // Only known bits survive
     assert_eq!(caps, TransportCaps::all());
 }

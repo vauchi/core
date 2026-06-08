@@ -63,7 +63,6 @@ fn test_sync_progress_dispatched_via_handler() {
     let events = received.lock().unwrap();
     assert_eq!(events.len(), 5, "Should have received 5 progress events");
 
-    // Verify incrementing processed count
     for (idx, event) in events.iter().enumerate() {
         if let VauchiEvent::SyncProgress {
             total, processed, ..
@@ -102,14 +101,12 @@ fn test_sync_progress_total_matches_ready_updates() {
     let events = received.lock().unwrap();
     assert_eq!(events.len(), total);
 
-    // All events should report the same total
     for event in events.iter() {
         if let VauchiEvent::SyncProgress { total: t, .. } = event {
             assert_eq!(*t, total, "All progress events should have total={}", total);
         }
     }
 
-    // Last event should have processed == total
     if let VauchiEvent::SyncProgress { processed, .. } = events.last().unwrap() {
         assert_eq!(
             *processed, total,

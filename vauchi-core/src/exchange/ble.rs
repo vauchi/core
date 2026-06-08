@@ -206,10 +206,6 @@ impl BLEProximityVerifier for MockBLEVerifier {
     }
 }
 
-// ============================================================
-// BLE Advertisement
-// ============================================================
-
 /// Vauchi BLE service UUID (custom 128-bit UUID)
 pub const VAUCHI_BLE_SERVICE_UUID: &str = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
 
@@ -285,10 +281,6 @@ impl BLEAdvertisement {
     }
 }
 
-// ============================================================
-// BLE Exchange State
-// ============================================================
-
 /// State of a BLE exchange session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
@@ -317,10 +309,6 @@ pub enum BLEExchangeState {
     /// An error occurred.
     Error(String),
 }
-
-// ============================================================
-// BLE Exchange Error
-// ============================================================
 
 /// BLE exchange errors.
 #[derive(Debug, Clone)]
@@ -351,10 +339,6 @@ impl std::fmt::Display for BLEError {
 }
 
 impl std::error::Error for BLEError {}
-
-// ============================================================
-// BLE Exchange Session
-// ============================================================
 
 /// Manages a BLE exchange session.
 ///
@@ -449,7 +433,6 @@ impl BLEExchangeSession {
 
     /// Connect to a discovered device.
     pub fn connect_to_device(&mut self, device: &BLEDevice) -> Result<(), BLEError> {
-        // Require exchange token
         let peer_token = device.exchange_token.ok_or(BLEError::NoExchangeToken)?;
 
         match &self.state {
@@ -498,10 +481,6 @@ impl BLEExchangeSession {
         self.state = BLEExchangeState::Cancelled;
     }
 }
-
-// ============================================================
-// BLE Exchange Payload (174 bytes)
-// ============================================================
 
 /// BLE payload magic bytes.
 const BLE_MAGIC: &[u8; 4] = b"VBLE";
@@ -637,10 +616,6 @@ impl ExchangeBle {
         Ok(ExchangeBle { inner })
     }
 }
-
-// ============================================================
-// BLE Transport Trait (platform abstraction)
-// ============================================================
 
 /// Trait for platform-specific BLE transport operations.
 ///

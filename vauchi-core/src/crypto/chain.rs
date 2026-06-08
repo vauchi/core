@@ -89,10 +89,8 @@ impl ChainKey {
             return Err(ChainError::GenerationLimitExceeded);
         }
 
-        // Derive message key
         let message_key_bytes = HKDF::derive_key(None, &self.key, MESSAGE_KEY_INFO);
 
-        // Derive next chain key
         let next_chain_key_bytes = HKDF::derive_key(None, &self.key, CHAIN_KEY_INFO);
 
         let message_key = MessageKey {
@@ -202,7 +200,6 @@ mod tests {
         let (msg2, chain2) = chain1.ratchet().unwrap();
         let (msg3, _chain3) = chain2.ratchet().unwrap();
 
-        // All message keys should be different
         assert_ne!(
             msg1.symmetric_key().as_bytes(),
             msg2.symmetric_key().as_bytes()
@@ -227,7 +224,6 @@ mod tests {
         let (msg1, next1) = chain1.ratchet().unwrap();
         let (msg2, next2) = chain2.ratchet().unwrap();
 
-        // Same input should produce same output
         assert_eq!(
             msg1.symmetric_key().as_bytes(),
             msg2.symmetric_key().as_bytes()
@@ -251,13 +247,11 @@ mod tests {
     fn test_chain_key_skip_forward() {
         let chain = ChainKey::new([0u8; 32]);
 
-        // Skip to generation 5
         let (skipped_keys, final_chain) = chain.skip_to(5).unwrap();
 
         assert_eq!(skipped_keys.len(), 5);
         assert_eq!(final_chain.generation(), 5);
 
-        // Verify generations of skipped keys
         for (i, key) in skipped_keys.iter().enumerate() {
             assert_eq!(key.generation(), i as u32);
         }
@@ -268,15 +262,12 @@ mod tests {
         let chain1 = ChainKey::new([99u8; 32]);
         let chain2 = ChainKey::new([99u8; 32]);
 
-        // Skip forward
         let (skipped, _) = chain1.skip_to(3).unwrap();
 
-        // Sequential ratchet
         let (msg0, chain2) = chain2.ratchet().unwrap();
         let (msg1, chain2) = chain2.ratchet().unwrap();
         let (msg2, _) = chain2.ratchet().unwrap();
 
-        // Should produce same keys
         assert_eq!(
             skipped[0].symmetric_key().as_bytes(),
             msg0.symmetric_key().as_bytes()
@@ -309,11 +300,9 @@ mod tests {
     fn test_chain_key_skip_limit() {
         let chain = ChainKey::new([0u8; 32]);
 
-        // Skipping MAX_SKIP + 1 should fail
         let result = chain.skip_to(MAX_SKIP + 1);
         assert!(matches!(result, Err(ChainError::SkipLimitExceeded)));
 
-        // Skipping exactly MAX_SKIP should succeed
         let result = chain.skip_to(MAX_SKIP);
         result.expect("expected success");
     }

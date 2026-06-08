@@ -58,7 +58,6 @@ fn imported_kind_reports_is_imported_true() {
 }
 
 // ========================================
-// Accessor methods
 // ========================================
 
 // @internal
@@ -113,7 +112,6 @@ fn imported_data_accessor_returns_none_for_exchanged() {
 }
 
 // ========================================
-// ImportSource serde roundtrip
 // ========================================
 
 // @internal
@@ -135,7 +133,6 @@ fn import_source_serde_roundtrip() {
 }
 
 // ========================================
-// ImportedData with original_uid
 // ========================================
 
 // @internal

@@ -51,7 +51,6 @@ fn contact_detail_shows_personal_note() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
 
-    // Add a contact
     let card = ContactCard::new("Bob");
     let shared_key = SymmetricKey::generate();
     let contact = Contact::from_exchange([2u8; 32], card, shared_key, 0);
@@ -64,7 +63,6 @@ fn contact_detail_shows_personal_note() {
         .save_personal_notes(&bob_id, note_text.as_bytes())
         .unwrap();
 
-    // Build the ContactDetail screen via AppEngine
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::ContactDetail {
         contact_id: bob_id.clone(),
@@ -224,7 +222,6 @@ fn contact_detail_shows_field_notes() {
         .save_contact_field_note(&bob_id, &field_id, note_text.as_bytes())
         .unwrap();
 
-    // Build the ContactDetail screen via AppEngine
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::ContactDetail {
         contact_id: bob_id.clone(),
@@ -287,7 +284,6 @@ fn contact_detail_shows_empty_field_note_when_none_saved() {
     let carol_id = contact.id().to_string();
     vauchi.add_contact(contact).unwrap();
 
-    // No field note saved
     let mut engine = AppEngine::new(vauchi);
     let screen = engine.navigate_to(AppScreen::ContactDetail {
         contact_id: carol_id,

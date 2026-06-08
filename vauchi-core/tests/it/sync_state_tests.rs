@@ -226,7 +226,6 @@ fn test_sync_coalesce_updates() {
     let storage = create_test_storage();
     let mut manager = SyncManager::new(&storage);
 
-    // Queue multiple updates
     let card1 = ContactCard::new("Alice");
     let mut card2 = ContactCard::new("Alice");
     let _ = card2.add_field(ContactField::new(
@@ -258,11 +257,9 @@ fn test_sync_coalesce_updates() {
 
     assert_eq!(manager.get_pending("contact-1").unwrap().len(), 2);
 
-    // Coalesce
     let merged_id = manager.coalesce_updates("contact-1").unwrap();
     merged_id.expect("expected Some");
 
-    // Should now have only one update
     assert_eq!(manager.get_pending("contact-1").unwrap().len(), 1);
 }
 
@@ -318,7 +315,6 @@ fn test_sync_state_tracks_last_sync_timestamp() {
         0,
     ));
 
-    // Get current timestamp before the update
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -447,7 +443,6 @@ fn test_sync_grouped_excludes_not_ready_failed() {
 
     let grouped = manager.get_ready_grouped_by_relay().unwrap();
 
-    // Only the pending one should be in the result
     let relay = grouped
         .get(&Some("https://relay.example.com".to_string()))
         .unwrap();

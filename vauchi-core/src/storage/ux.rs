@@ -16,8 +16,6 @@ use crate::types::DemoContactState;
 use crate::types::OnboardingProgress;
 
 impl Storage {
-    // === Aha Moments Operations ===
-
     /// Saves the aha moments tracker state (encrypted).
     pub fn save_aha_tracker(&self, tracker: &AhaMomentTracker) -> Result<(), StorageError> {
         let json = tracker
@@ -79,8 +77,6 @@ impl Storage {
             None => Ok(AhaMomentTracker::new()),
         }
     }
-
-    // === Demo Contact Operations ===
 
     /// Saves the demo contact state (encrypted).
     pub fn save_demo_contact_state(&self, state: &DemoContactState) -> Result<(), StorageError> {
@@ -155,8 +151,6 @@ impl Storage {
         }
     }
 
-    // === Onboarding Progress Operations ===
-
     /// Saves the onboarding progress (encrypted).
     pub fn save_onboarding_progress(
         &self,
@@ -221,8 +215,6 @@ impl Storage {
         }
     }
 
-    // === Backup Reminder Operations ===
-
     /// Saves the backup reminder state (encrypted).
     pub fn save_backup_reminder_state(
         &self,
@@ -273,8 +265,6 @@ impl Storage {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
-
-    // === Combined UX State Operations ===
 
     /// Saves both aha tracker and demo contact state atomically (encrypted).
     pub fn save_ux_state(
@@ -359,16 +349,13 @@ mod tests {
     fn test_aha_tracker_load_or_create() {
         let storage = test_storage();
 
-        // First call creates new
         let tracker = storage.load_or_create_aha_tracker().unwrap();
         assert_eq!(tracker.seen_count(), 0);
 
-        // Save it
         let mut tracker = tracker;
         tracker.mark_seen(AhaMomentType::CardCreationComplete);
         storage.save_aha_tracker(&tracker).unwrap();
 
-        // Load again
         let loaded = storage.load_or_create_aha_tracker().unwrap();
         assert!(loaded.has_seen(AhaMomentType::CardCreationComplete));
     }
@@ -405,7 +392,6 @@ mod tests {
     fn test_demo_contact_load_or_create() {
         let storage = test_storage();
 
-        // First call creates active state
         let state = storage.load_or_create_demo_contact_state().unwrap();
         assert!(state.is_active);
     }
@@ -414,15 +400,12 @@ mod tests {
     fn test_is_demo_contact_active() {
         let storage = test_storage();
 
-        // Not initialized yet
         assert!(!storage.is_demo_contact_active().unwrap());
 
-        // Save active state
         let state = DemoContactState::new_active(0);
         storage.save_demo_contact_state(&state).unwrap();
         assert!(storage.is_demo_contact_active().unwrap());
 
-        // Dismiss and save
         let mut state = state;
         state.dismiss();
         storage.save_demo_contact_state(&state).unwrap();

@@ -185,7 +185,6 @@ fn home_screen_no_setup_progress() {
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "my_info");
 
-    // Setup progress should no longer be shown on MyInfo
     let has_progress = screen.components.iter().any(|c| {
         matches!(c, vauchi_app::ui::Component::StatusIndicator { id, ..
         } if id == "setup_progress")
@@ -230,13 +229,11 @@ fn add_field_after_onboarding_identity_creation() {
         "Type selection should update screen, got {result:?}"
     );
 
-    // Type a value
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
         value: "test@example.com".into(),
     });
 
-    // Submit
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "submit".into(),
     });

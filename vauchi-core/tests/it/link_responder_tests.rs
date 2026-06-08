@@ -196,7 +196,6 @@ fn blob_received_with_garbage_ciphertext_transitions_to_failed_decrypt() {
 }
 
 // ================================================================
-// Failure paths
 // ================================================================
 
 // @internal

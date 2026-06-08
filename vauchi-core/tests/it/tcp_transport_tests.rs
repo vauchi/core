@@ -112,7 +112,6 @@ fn exchange_with_realistic_qr_payload() {
 fn recv_invalid_magic_is_rejected() {
     let (mut client, mut server) = loopback_pair();
 
-    // Send garbage instead of protocol magic
     use std::io::Write;
     client.write_all(b"XXXX").expect("write garbage");
     client.write_all(&[1]).expect("write version");

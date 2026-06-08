@@ -82,15 +82,12 @@ impl YoloDetector {
         let w = self.input_width as usize;
         let h = self.input_height as usize;
 
-        // Fast resize using fast_image_resize (SIMD-accelerated)
         self.prepare_input_fast(img, w, h);
 
-        // Create tensor view from pre-allocated buffer (zero-copy)
         let input_tensor =
             ort::value::TensorRef::from_array_view(([1usize, 3, h, w], &*self.input_buf))
                 .map_err(|e| format!("tensor: {e}"))?;
 
-        // Run inference
         let outputs = self
             .session
             .run(ort::inputs![input_tensor])
@@ -150,7 +147,6 @@ impl YoloDetector {
 
         let (src_w, src_h) = img.dimensions();
 
-        // Downscale grayscale to target size using SIMD
         let resized_data = if src_w == w as u32 && src_h == h as u32 {
             img.as_raw().clone()
         } else {

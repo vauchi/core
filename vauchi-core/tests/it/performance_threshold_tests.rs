@@ -69,7 +69,6 @@ fn test_query_under_50ms_with_1000_contacts() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key.clone()).unwrap();
 
-    // Insert 1000 contacts with properly encrypted data
     for i in 0..1000u32 {
         let pk = {
             let mut bytes = [0u8; 32];
@@ -117,7 +116,6 @@ fn test_pagination_under_100ms_per_page() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key.clone()).unwrap();
 
-    // Insert 500 contacts
     for i in 0..500u32 {
         let pk = {
             let mut bytes = [0u8; 32];
@@ -272,7 +270,6 @@ fn test_queue_100_pending_updates_under_2s() {
     }
     let queue_elapsed = start_queue.elapsed();
 
-    // Retrieve all pending updates
     let start_list = Instant::now();
     let pending = storage.get_all_pending_updates().unwrap();
     let list_elapsed = start_list.elapsed();
@@ -295,7 +292,6 @@ fn test_sequential_ratchet_operations() {
     use vauchi_core::crypto::ratchet::DoubleRatchetState;
     use vauchi_core::exchange::X3DHKeyPair;
 
-    // Set up 10 independent ratchet pairs
     let mut results = Vec::with_capacity(10);
     let start = Instant::now();
 

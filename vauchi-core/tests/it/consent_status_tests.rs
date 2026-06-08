@@ -17,7 +17,6 @@ fn create_test_vauchi() -> Vauchi {
 fn test_get_consent_status_returns_granted_with_timestamp_after_grant() {
     let wb = create_test_vauchi();
 
-    // Grant consent
     wb.grant_consent(ConsentType::DataProcessing).unwrap();
 
     let status = wb.get_consent_status(ConsentType::DataProcessing).unwrap();
@@ -68,7 +67,6 @@ fn test_get_consent_status_returns_not_granted_when_never_set() {
 fn test_get_consent_status_returns_not_granted_after_revoke() {
     let wb = create_test_vauchi();
 
-    // Grant then revoke
     wb.grant_consent(ConsentType::ContactSharing).unwrap();
     wb.revoke_consent(ConsentType::ContactSharing).unwrap();
 
@@ -112,7 +110,6 @@ fn test_get_consent_status_returns_different_statuses_for_different_types() {
     let wb = create_test_vauchi();
 
     wb.grant_consent(ConsentType::DataProcessing).unwrap();
-    // RecoveryVouching left un-granted
 
     let dp_status = wb.get_consent_status(ConsentType::DataProcessing).unwrap();
     let rv_status = wb

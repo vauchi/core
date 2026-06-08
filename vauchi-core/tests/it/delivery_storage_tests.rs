@@ -77,7 +77,6 @@ fn test_update_delivery_status() {
 
     storage.create_delivery_record(&record).unwrap();
 
-    // Update to Sent
     let updated = storage
         .update_delivery_status("msg-002", &DeliveryStatus::Sent, timestamp + 1)
         .unwrap();
@@ -87,14 +86,12 @@ fn test_update_delivery_status() {
     assert_eq!(retrieved.status, DeliveryStatus::Sent);
     assert_eq!(retrieved.updated_at, timestamp + 1);
 
-    // Update to Stored
     storage
         .update_delivery_status("msg-002", &DeliveryStatus::Stored, timestamp + 2)
         .unwrap();
     let retrieved = storage.get_delivery_record("msg-002").unwrap().unwrap();
     assert_eq!(retrieved.status, DeliveryStatus::Stored);
 
-    // Update to Delivered
     storage
         .update_delivery_status("msg-002", &DeliveryStatus::Delivered, timestamp + 3)
         .unwrap();
@@ -143,7 +140,6 @@ fn test_get_delivery_records_for_recipient() {
     let storage = test_storage();
     let timestamp = now();
 
-    // Create records for two recipients
     for i in 0..3 {
         let record = DeliveryRecord {
             message_id: format!("msg-alice-{}", i),
@@ -187,7 +183,6 @@ fn test_get_pending_deliveries() {
     let storage = test_storage();
     let timestamp = now();
 
-    // Create records with different statuses
     let statuses = vec![
         ("msg-1", DeliveryStatus::Queued),
         ("msg-2", DeliveryStatus::Sent),
@@ -231,7 +226,6 @@ fn test_count_deliveries_by_status() {
     let storage = test_storage();
     let timestamp = now();
 
-    // Create 3 Stored, 2 Delivered, 1 Failed
     for i in 0..3 {
         let record = DeliveryRecord {
             message_id: format!("stored-{}", i),
@@ -298,7 +292,6 @@ fn test_expire_old_deliveries() {
     let past = now_ts - 1000;
     let future = now_ts + 1000;
 
-    // Create records: one expired, one not expired, one no expiry
     let records = vec![
         ("expired", past, Some(past)),    // Already expired
         ("active", now_ts, Some(future)), // Not yet expired
@@ -317,11 +310,9 @@ fn test_expire_old_deliveries() {
         storage.create_delivery_record(&record).unwrap();
     }
 
-    // Run expiration
     let expired_count = storage.expire_old_deliveries(now_ts).unwrap();
     assert_eq!(expired_count, 1);
 
-    // Check statuses
     let expired_record = storage.get_delivery_record("expired").unwrap().unwrap();
     assert_eq!(expired_record.status, DeliveryStatus::Expired);
 
@@ -348,20 +339,16 @@ fn test_delete_delivery_record() {
     };
     storage.create_delivery_record(&record).unwrap();
 
-    // Verify it exists
     assert!(
         storage.get_delivery_record("to-delete").unwrap().is_some(),
         "expected Some value"
     );
 
-    // Delete it
     let deleted = storage.delete_delivery_record("to-delete").unwrap();
     assert!(deleted);
 
-    // Verify it's gone
     assert!(storage.get_delivery_record("to-delete").unwrap().is_none());
 
-    // Try to delete non-existent
     let deleted = storage.delete_delivery_record("nonexistent").unwrap();
     assert!(!deleted);
 }
@@ -384,7 +371,6 @@ fn test_delivery_status_progression() {
     };
     storage.create_delivery_record(&record).unwrap();
 
-    // Progress through statuses
     let statuses = [
         DeliveryStatus::Sent,
         DeliveryStatus::Stored,
@@ -421,7 +407,6 @@ fn test_message_expiration_warning() {
     let one_day = 86400u64;
     let thirty_days = 30 * one_day;
 
-    // Create records with various expiration states:
     // - One expiring in 1 day (should warn)
     // - One expiring in 2 days (should warn)
     // - One expiring in 7 days (outside warning threshold)
@@ -470,7 +455,6 @@ fn test_message_expiration_warning() {
         })
         .collect();
 
-    // Should find msg-1day and msg-2day
     assert_eq!(approaching_expiry.len(), 2);
     let ids: Vec<_> = approaching_expiry
         .iter()
@@ -501,7 +485,6 @@ fn test_ttl_extension_request() {
     let seven_days = 7 * one_day;
     let original_expiry = now_ts + one_day; // Expires tomorrow
 
-    // Create a record approaching expiration
     let record = DeliveryRecord {
         message_id: "msg-extend".to_string(),
         recipient_id: "contact".to_string(),
@@ -512,7 +495,6 @@ fn test_ttl_extension_request() {
     };
     storage.create_delivery_record(&record).unwrap();
 
-    // Verify original expiry
     let before = storage.get_delivery_record("msg-extend").unwrap().unwrap();
     assert_eq!(before.expires_at, Some(original_expiry));
 
@@ -522,7 +504,6 @@ fn test_ttl_extension_request() {
         .unwrap();
     assert!(extended);
 
-    // Verify new expiry
     let after = storage.get_delivery_record("msg-extend").unwrap().unwrap();
     assert_eq!(after.expires_at, Some(original_expiry + seven_days));
 
@@ -545,7 +526,6 @@ fn test_ttl_extension_edge_cases() {
     let storage = test_storage();
     let now_ts = now();
 
-    // Create record with no expiry
     let no_expiry = DeliveryRecord {
         message_id: "msg-no-ttl".to_string(),
         recipient_id: "contact".to_string(),
@@ -580,7 +560,6 @@ fn test_delivery_receipt_privacy() {
     let storage = test_storage();
     let timestamp = now();
 
-    // Create delivery records for different senders
     // The point: recipient_id is stored, but no sender tracking
     let records = vec![
         ("msg-from-alice", "recipient-bob"),
@@ -606,7 +585,6 @@ fn test_delivery_receipt_privacy() {
         .unwrap();
     assert_eq!(bob_deliveries.len(), 2);
 
-    // Verify records don't contain any sender information in the struct
     for record in &bob_deliveries {
         // DeliveryRecord has: message_id, recipient_id, status, timestamps
         // Critically: NO sender_id field - this is by design for privacy
@@ -642,11 +620,9 @@ fn test_relay_quota_exceeded() {
     let storage = test_storage();
     let timestamp = now();
 
-    // Create a queue with a small limit for testing
     // Note: In practice, the OfflineQueue helper is used for quota checks
     let _queue = OfflineQueue::with_max_size(5);
 
-    // Fill the queue to capacity
     for i in 0..5 {
         let record = DeliveryRecord {
             message_id: format!("msg-{}", i),
@@ -659,7 +635,6 @@ fn test_relay_quota_exceeded() {
         storage.create_delivery_record(&record).unwrap();
     }
 
-    // Verify queue is full using pending deliveries count
     let pending = storage.get_pending_deliveries().unwrap();
     assert_eq!(pending.len(), 5);
 
@@ -671,12 +646,10 @@ fn test_relay_quota_exceeded() {
     assert_eq!(count, 5);
 
     // Simulate quota handling: oldest acknowledged can be removed
-    // First, deliver oldest message
     storage
         .update_delivery_status("msg-0", &DeliveryStatus::Delivered, timestamp + 100)
         .unwrap();
 
-    // Now we have 4 queued, 1 delivered
     let queued_count = storage
         .count_deliveries_by_status(&DeliveryStatus::Queued)
         .unwrap();
@@ -689,7 +662,6 @@ fn test_relay_quota_exceeded() {
     // Remove delivered (acknowledged) to make room
     storage.delete_delivery_record("msg-0").unwrap();
 
-    // Now can add new pending delivery
     let new_record = DeliveryRecord {
         message_id: "msg-5".to_string(),
         recipient_id: "contact".to_string(),
@@ -722,7 +694,6 @@ fn test_delivery_order_verification() {
     let storage = test_storage();
     let base_time = now();
 
-    // Create messages in order A -> B -> C but with non-sequential IDs
     // to verify ordering is by timestamp, not ID
     let messages = vec![
         ("msg-z", base_time + 1), // First update
@@ -742,7 +713,6 @@ fn test_delivery_order_verification() {
         storage.create_delivery_record(&record).unwrap();
     }
 
-    // Get records for recipient - should be ordered by created_at DESC
     let bob_records = storage
         .get_delivery_records_for_recipient("contact-bob")
         .unwrap();
@@ -797,7 +767,6 @@ fn test_out_of_order_delivery_reordering() {
         .get_delivery_records_by_status(&DeliveryStatus::Delivered)
         .unwrap();
 
-    // Should be reordered by creation time, not arrival order
     assert_eq!(delivered.len(), 3);
     assert_eq!(delivered[0].message_id, "msg-0"); // Oldest first
     assert_eq!(delivered[1].message_id, "msg-1");
@@ -865,7 +834,6 @@ fn test_startup_maintenance_cleans_old_terminal_records() {
     };
     storage.create_delivery_record(&record).unwrap();
 
-    // Run startup maintenance
     let cleaned = storage.run_startup_maintenance();
     assert!(
         cleaned.is_ok(),
@@ -875,7 +843,6 @@ fn test_startup_maintenance_cleans_old_terminal_records() {
     let count = cleaned.unwrap();
     assert_eq!(count, 3, "Should clean 3 old terminal records");
 
-    // Verify old terminal records are gone
     assert!(
         storage
             .get_delivery_record("old-delivered")
@@ -890,7 +857,6 @@ fn test_startup_maintenance_cleans_old_terminal_records() {
     );
     assert!(storage.get_delivery_record("old-failed").unwrap().is_none());
 
-    // Verify recent and non-terminal records kept
     assert!(
         storage
             .get_delivery_record("recent-delivered")

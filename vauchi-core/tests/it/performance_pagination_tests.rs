@@ -40,7 +40,6 @@ fn populate_contacts(storage: &Storage, count: usize) {
 }
 
 // ============================================================
-// Pagination Tests
 // ============================================================
 
 // @scenario: performance :: Batch contact loading with pagination
@@ -57,7 +56,6 @@ fn test_list_contacts_paginated_returns_correct_subset() {
     let page2 = storage.list_contacts_paginated(10, 10).unwrap();
     assert_eq!(page2.len(), 10, "Second page should have 10 contacts");
 
-    // Pages should not overlap
     let page1_ids: Vec<String> = page1.iter().map(|c| c.id().to_string()).collect();
     let page2_ids: Vec<String> = page2.iter().map(|c| c.id().to_string()).collect();
     for id in &page2_ids {
@@ -73,7 +71,6 @@ fn test_list_contacts_paginated_respects_ordering() {
     populate_contacts(&storage, 50);
 
     let page = storage.list_contacts_paginated(0, 50).unwrap();
-    // Should be ordered by display_name
     for i in 1..page.len() {
         assert!(
             page[i - 1].display_name() <= page[i].display_name(),
@@ -138,13 +135,11 @@ fn test_list_contacts_paginated_all_contacts_across_pages() {
         53,
         "All contacts should be retrievable across pages"
     );
-    // No duplicates
     let unique: std::collections::HashSet<_> = all_ids.iter().collect();
     assert_eq!(unique.len(), 53, "No duplicate contacts across pages");
 }
 
 // ============================================================
-// Search Tests
 // ============================================================
 
 // @scenario: performance :: Search performance with many contacts
@@ -154,7 +149,6 @@ fn test_search_contacts_by_name() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     populate_contacts(&storage, 100);
 
-    // Search for "Contact 0042"
     let results = storage.search_contacts("0042").unwrap();
     assert_eq!(results.len(), 1, "Should find exactly one match for '0042'");
     assert_eq!(results[0].display_name(), "Contact 0042");
@@ -166,7 +160,6 @@ fn test_search_contacts_partial_match() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     populate_contacts(&storage, 100);
 
-    // Search for "Contact 00" should match Contact 0000..0009
     let results = storage.search_contacts("Contact 00").unwrap();
     assert!(
         results.len() >= 10,
@@ -222,7 +215,6 @@ fn test_search_contacts_with_1000_contacts() {
 }
 
 // ============================================================
-// Contact Count with Pagination
 // ============================================================
 
 // @scenario: performance :: Batch contact loading with pagination

@@ -648,7 +648,6 @@ fn form_dialog_cancel_dirty_edit_shows_inline_confirm() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditName {
         current_name: "Alice".into(),
     });
-    // Make form dirty
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Bob".into(),
@@ -677,7 +676,6 @@ fn form_dialog_confirm_discard_completes() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditName {
         current_name: "Alice".into(),
     });
-    // Make dirty
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Bob".into(),
@@ -686,7 +684,6 @@ fn form_dialog_confirm_discard_completes() {
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });
-    // Confirm discard
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "confirm_discard".into(),
     });
@@ -705,7 +702,6 @@ fn form_dialog_cancel_discard_removes_inline_confirm() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditName {
         current_name: "Alice".into(),
     });
-    // Make dirty
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Bob".into(),
@@ -738,7 +734,6 @@ fn form_dialog_cancel_dirty_add_field_shows_inline_confirm() {
     let mut engine = FormDialogEngine::new(FormDialogType::AddField {
         available_groups: vec![],
     });
-    // Make dirty by entering a value
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
         value: "test@example.com".into(),
@@ -767,7 +762,6 @@ fn form_dialog_second_cancel_removes_inline_confirm() {
     let mut engine = FormDialogEngine::new(FormDialogType::EditName {
         current_name: "Alice".into(),
     });
-    // Make dirty
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Bob".into(),

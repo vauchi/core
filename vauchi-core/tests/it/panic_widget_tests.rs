@@ -28,12 +28,10 @@ const SMK_KEY_NAME: &str = "smk";
 fn setup_widget_test_env() -> (tempfile::TempDir, MemoryKeyStorage) {
     let dir = tempfile::tempdir().unwrap();
 
-    // Create database
     let db_path = dir.path().join("vauchi.db");
     let storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
     drop(storage); // Close the connection
 
-    // Create identity file
     let identity = Identity::create("WidgetTestUser", 0);
     std::fs::write(
         dir.path().join("identity.json"),
@@ -41,14 +39,12 @@ fn setup_widget_test_env() -> (tempfile::TempDir, MemoryKeyStorage) {
     )
     .unwrap();
 
-    // Create key files
     let keys_dir = dir.path().join("keys");
     std::fs::create_dir_all(&keys_dir).unwrap();
     std::fs::write(keys_dir.join("key1"), b"secret key material 1").unwrap();
     std::fs::write(keys_dir.join("key2"), b"secret key material 2").unwrap();
     std::fs::write(keys_dir.join("key3"), b"secret key material 3").unwrap();
 
-    // Create pre-signed messages
     let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
     msgs.save(dir.path()).unwrap();
 
@@ -86,7 +82,6 @@ fn test_widget_panic_shred_destroys_database() {
     // Execute widget panic shred
     let report = widget_panic_shred(dir.path(), &secure_storage).unwrap();
 
-    // Database should be destroyed
     assert!(
         report.sqlite_destroyed,
         "Report should indicate database was destroyed"
@@ -116,7 +111,6 @@ fn test_widget_panic_shred_destroys_keys() {
     // Execute widget panic shred
     let report = widget_panic_shred(dir.path(), &secure_storage).unwrap();
 
-    // All key files should be destroyed
     assert_eq!(
         report.key_files_destroyed, 3,
         "All 3 key files should be destroyed"
@@ -138,7 +132,6 @@ fn test_widget_panic_shred_destroys_identity() {
     let (dir, secure_storage) = setup_widget_test_env();
     let identity_path = dir.path().join("identity.json");
 
-    // Verify identity file exists
     assert!(
         identity_path.exists(),
         "Identity file should exist before shred"
@@ -147,7 +140,6 @@ fn test_widget_panic_shred_destroys_identity() {
     // Execute widget panic shred
     let report = widget_panic_shred(dir.path(), &secure_storage).unwrap();
 
-    // Identity file should be destroyed
     assert!(
         report.identity_file_destroyed,
         "Report should indicate identity was destroyed"
@@ -169,7 +161,6 @@ fn test_widget_panic_shred_returns_report() {
 
     let report = widget_panic_shred(dir.path(), &secure_storage).unwrap();
 
-    // Report should reflect all operations
     assert!(report.smk_destroyed, "SMK should be destroyed");
     assert!(
         report.identity_file_destroyed,
@@ -211,7 +202,6 @@ fn test_widget_panic_shred_works_without_vauchi_init() {
     std::fs::create_dir_all(&keys_dir).unwrap();
     std::fs::write(keys_dir.join("key1"), b"key material").unwrap();
 
-    // Set up SMK in secure storage
     let secure_storage = MemoryKeyStorage::new();
     let smk = vauchi_core::crypto::ShreddingMasterKey::derive_from_seed(&[0x77; 32]);
     secure_storage
@@ -221,7 +211,6 @@ fn test_widget_panic_shred_works_without_vauchi_init() {
     // Execute widget panic shred — NO Vauchi instance, NO Storage, NO Identity
     let report = widget_panic_shred(dir.path(), &secure_storage).unwrap();
 
-    // Should succeed and destroy everything
     assert!(report.smk_destroyed, "SMK should be destroyed");
     assert!(
         report.identity_file_destroyed,
@@ -233,7 +222,6 @@ fn test_widget_panic_shred_works_without_vauchi_init() {
         "Database should be destroyed (even fake)"
     );
 
-    // Verify files are actually gone
     assert!(!db_path.exists(), "Database should not exist");
     assert!(!identity_path.exists(), "Identity should not exist");
 }
@@ -251,7 +239,6 @@ fn test_widget_panic_shred_on_empty_directory_succeeds() {
     // No files, no SMK — should still succeed gracefully
     let report = widget_panic_shred(dir.path(), &secure_storage).unwrap();
 
-    // Nothing to destroy, but should not error
     assert_eq!(report.key_files_destroyed, 0);
     // SMK wasn't present, but deletion attempt shouldn't fail
     // (MemoryKeyStorage.delete_key succeeds even for non-existent keys)
@@ -292,7 +279,6 @@ fn test_widget_panic_shred_destroys_smk() {
 fn test_widget_panic_shred_loads_pre_signed_before_destruction() {
     let (dir, secure_storage) = setup_widget_test_env();
 
-    // Verify pre-signed messages file exists
     let pre_signed_path = PreSignedShredMessages::file_path(dir.path());
     assert!(
         pre_signed_path.exists(),
@@ -301,7 +287,6 @@ fn test_widget_panic_shred_loads_pre_signed_before_destruction() {
 
     let report = widget_panic_shred(dir.path(), &secure_storage).unwrap();
 
-    // Pre-signed file should have been loaded and then deleted
     assert!(
         report.pre_signed_deleted,
         "Pre-signed messages should be deleted after use"
@@ -313,7 +298,6 @@ fn test_widget_panic_shred_loads_pre_signed_before_destruction() {
 }
 
 // =============================================================================
-// WidgetConfirmationMode Tests
 // =============================================================================
 
 /// Test that WidgetConfirmationMode variants are properly constructible.

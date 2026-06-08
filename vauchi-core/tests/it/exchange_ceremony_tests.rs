@@ -15,7 +15,6 @@ use vauchi_core::exchange::*;
 use vauchi_core::{ContactCard, Identity};
 
 // ============================================================
-// Session key agreement cross-check
 // ============================================================
 
 /// Verify QR session key agreement produces matching keys and they
@@ -102,7 +101,6 @@ fn test_qr_ceremony_shared_keys_match_and_encrypt() {
         "Shared key must not be all zeros"
     );
 
-    // Bidirectional encryption works
     let msg = b"Ceremony test message";
     let ct = encrypt(&alice_key, msg).unwrap();
     let pt = decrypt(&bob_key, &ct).unwrap();
@@ -359,7 +357,6 @@ fn test_encrypted_message_secret_matches_raw_x3dh() {
     let (msg, alice_secret) =
         EncryptedExchangeMessage::create(&alice, bob.public_key(), &[0x42u8; 32], "Alice").unwrap();
 
-    // Decrypt to get Bob's secret
     let (_payload, bob_secret) = msg.decrypt(&bob).unwrap();
 
     // Both must match
@@ -407,7 +404,6 @@ fn test_transcript_binding_includes_identity_keys() {
     let card_b = ContactCard::new("Alice-B");
     let bob_card = ContactCard::new("Bob");
 
-    // Create Bob's session to generate a valid QR
     let bob_proximity = MockProximityVerifier::success();
     let mut bob_session = ExchangeSession::new_qr(
         bob_identity,
@@ -477,7 +473,6 @@ fn test_transcript_binding_includes_ephemeral_keys() {
     let alice_identity_2 = Identity::create("Alice", 0);
     let bob_identity = Identity::create("Bob", 0);
 
-    // Different ephemeral keys
     let x3dh_1 = X3DHKeyPair::from_bytes([0x01u8; 32]);
     let x3dh_2 = X3DHKeyPair::from_bytes([0x02u8; 32]);
 

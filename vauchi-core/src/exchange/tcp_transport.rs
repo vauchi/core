@@ -75,21 +75,18 @@ pub fn send_payload(stream: &mut TcpStream, payload: &[u8]) -> Result<(), TcpTra
 ///
 /// Reads: magic (4) + version (1) + length (4 BE) + payload.
 pub fn recv_payload(stream: &mut TcpStream) -> Result<Vec<u8>, TcpTransportError> {
-    // Read magic
     let mut magic = [0u8; 4];
     stream.read_exact(&mut magic)?;
     if &magic != PROTOCOL_MAGIC {
         return Err(TcpTransportError::InvalidMagic);
     }
 
-    // Read version
     let mut version = [0u8; 1];
     stream.read_exact(&mut version)?;
     if version[0] != PROTOCOL_VERSION {
         return Err(TcpTransportError::UnsupportedVersion(version[0]));
     }
 
-    // Read length
     let mut len_buf = [0u8; 4];
     stream.read_exact(&mut len_buf)?;
     let len = u32::from_be_bytes(len_buf);
@@ -100,7 +97,6 @@ pub fn recv_payload(stream: &mut TcpStream) -> Result<Vec<u8>, TcpTransportError
         return Err(TcpTransportError::ConnectionClosed);
     }
 
-    // Read payload
     let mut payload = vec![0u8; len as usize];
     stream.read_exact(&mut payload)?;
     Ok(payload)
@@ -127,8 +123,6 @@ pub fn exchange_payloads(
         Ok(theirs)
     }
 }
-
-// ── Frontend utility ────────────────────────────────────────────
 
 /// TCP transport utility for desktop frontends.
 ///

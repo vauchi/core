@@ -142,7 +142,6 @@ fn preprocess_reports_timing() {
 // @internal
 #[test]
 fn preprocess_output_is_binary() {
-    // Adaptive threshold should produce only 0 and 255 values
     let img = make_checkerboard(200, 200);
     let config = PreprocessConfig {
         target_width: 0, // skip downscale
@@ -182,7 +181,6 @@ fn preprocessed_qr_still_decodable() {
         }
     }
 
-    // First verify raw rqrr can decode the noisy image
     let raw_result = scan_qr_from_luma(ScannerBackend::RqrrRaw, img.as_raw(), w, h);
     assert_eq!(
         raw_result.decoded.as_deref(),
@@ -190,7 +188,6 @@ fn preprocessed_qr_still_decodable() {
         "raw rqrr should decode noisy QR (baseline)"
     );
 
-    // Now verify preprocessing doesn't break decodability.
     // Use conservative config appropriate for small synthetic images:
     // large tiles, no downscale, no threshold.
     let config = PreprocessConfig {
@@ -230,7 +227,6 @@ fn downscale_reduces_dimensions() {
     };
     let result = preprocess_frame(img, &config);
     assert_eq!(result.image.width(), 720);
-    // Height should be proportionally scaled
     let expected_h = (1080.0_f64 * 720.0 / 1920.0).round() as u32;
     assert_eq!(result.image.height(), expected_h);
 }

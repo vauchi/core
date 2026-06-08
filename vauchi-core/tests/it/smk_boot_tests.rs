@@ -55,16 +55,13 @@ fn test_smk_stored_and_loaded_from_secure_storage() {
     let identity = Identity::create("Alice", 0);
     let smk = identity.derive_smk();
 
-    // Store SMK in SecureStorage
     let secure = Arc::new(MemoryKeyStorage::new());
     secure.save_key(SMK_KEY_NAME, smk.as_bytes()).unwrap();
 
-    // Load SMK from SecureStorage
     let smk_bytes = secure.load_key(SMK_KEY_NAME).unwrap().unwrap();
     let smk_loaded: [u8; 32] = smk_bytes.try_into().unwrap();
     let smk_restored = ShreddingMasterKey::from_bytes(smk_loaded);
 
-    // Derived SEK should match
     let sek1 = smk.derive_sek();
     let sek2 = smk_restored.derive_sek();
     assert_eq!(sek1.as_bytes(), sek2.as_bytes());
@@ -83,7 +80,6 @@ fn test_boot_with_smk_derived_sek_opens_storage() {
     let secure = Arc::new(MemoryKeyStorage::new());
     secure.save_key(SMK_KEY_NAME, smk.as_bytes()).unwrap();
 
-    // Open storage with SEK and save data
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("vauchi.db");
     {
@@ -132,7 +128,6 @@ fn test_migrate_old_key_to_smk_preserves_data() {
         // Store SMK in SecureStorage BEFORE re-encryption (see plan rationale)
         secure.save_key(SMK_KEY_NAME, smk.as_bytes()).unwrap();
 
-        // Rekey to SMK-derived SEK
         storage.rekey(sek).unwrap();
     }
 
@@ -163,10 +158,8 @@ fn test_migrate_smk_stored_before_rekey_for_safety() {
     // (orphaned but harmless, overwritten on retry)
     secure.save_key(SMK_KEY_NAME, smk.as_bytes()).unwrap();
 
-    // Verify SMK is stored before we touch the database
     assert!(secure.has_key(SMK_KEY_NAME).unwrap());
 
-    // Now rekey
     let mut storage = Storage::open(dir.path().join("vauchi.db"), old_key).unwrap();
     let sek = smk.derive_sek();
     storage.rekey(sek).unwrap();
@@ -184,14 +177,12 @@ fn test_after_migration_old_key_cannot_decrypt() {
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("vauchi.db");
 
-    // Save data with old key
     {
         let storage = Storage::open(&db_path, old_key.clone()).unwrap();
         let card = ContactCard::new("OldKeyTest");
         storage.save_own_card(&card).unwrap();
     }
 
-    // Migrate to SMK
     let smk = ShreddingMasterKey::derive_from_seed(&[0x42; 32]);
     let sek = smk.derive_sek();
     {
@@ -199,7 +190,6 @@ fn test_after_migration_old_key_cannot_decrypt() {
         storage.rekey(sek).unwrap();
     }
 
-    // Old key should not decrypt
     let old_storage = Storage::open(&db_path, old_key).unwrap();
     match old_storage.load_own_card() {
         Ok(None) => {} // Plaintext fallback returns empty string
@@ -228,12 +218,10 @@ fn test_smk_destruction_makes_data_irrecoverable() {
         storage.save_own_card(&card).unwrap();
     }
 
-    // Destroy SMK from SecureStorage
     secure.secure_delete_key(SMK_KEY_NAME).unwrap();
     assert!(!secure.has_key(SMK_KEY_NAME).unwrap());
 
     // Without SMK, we can't derive SEK → can't decrypt
-    // Using a random key should fail
     let random_storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
     match random_storage.load_own_card() {
         Ok(None) => {} // Plaintext fallback returns empty
@@ -260,10 +248,8 @@ fn test_vauchi_create_identity_stores_smk() {
     vauchi.set_secure_storage(secure.clone());
     vauchi.create_identity("Alice").unwrap();
 
-    // SMK should now be in SecureStorage
     assert!(secure.has_key(SMK_KEY_NAME).unwrap());
 
-    // Verify the stored SMK can derive the correct SEK
     let smk_bytes = secure.load_key(SMK_KEY_NAME).unwrap().unwrap();
     assert_eq!(smk_bytes.len(), 32);
 }
@@ -293,7 +279,6 @@ fn test_vauchi_boot_with_smk_from_secure_storage() {
         let config = VauchiConfig::with_storage_path(&db_path);
         let vauchi = Vauchi::with_secure_storage(config, secure.clone()).unwrap();
 
-        // Should be able to load data
         let card = vauchi.own_card().unwrap();
         let card = card.expect("expected Some");
         assert_eq!(card.display_name(), "Alice");

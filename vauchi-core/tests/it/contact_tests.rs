@@ -47,9 +47,7 @@ fn test_fingerprint_format() {
     let contact = create_test_contact();
     let fp = contact.fingerprint();
 
-    // Should be formatted with spaces every 4 chars
     assert!(fp.contains(' '));
-    // Should be uppercase
     assert_eq!(fp, fp.to_uppercase());
 }
 
@@ -60,7 +58,6 @@ fn test_fingerprint_format() {
 fn test_visibility_rules() {
     let mut contact = create_test_contact();
 
-    // Initially no specific rules
     assert!(
         contact
             .visibility_rules()
@@ -68,7 +65,6 @@ fn test_visibility_rules() {
             .can_see("any_field", contact.id())
     );
 
-    // Set a field as private
     contact
         .visibility_rules_mut()
         .unwrap()
@@ -122,7 +118,6 @@ fn test_contact_update_card() {
     let mut contact = create_test_contact();
     assert_eq!(contact.display_name(), "Test User");
 
-    // Update with new card
     let new_card = ContactCard::new("Updated User");
     contact.update_card(new_card, 0);
 
@@ -183,7 +178,6 @@ fn test_contact_id_is_hex_encoded_public_key() {
 
     let contact = Contact::from_exchange(public_key, card, shared_key, 0);
 
-    // ID should be hex-encoded public key
     assert_eq!(contact.id(), hex::encode(public_key));
 }
 
@@ -192,7 +186,6 @@ fn test_contact_id_is_hex_encoded_public_key() {
 #[test]
 fn test_fingerprint_readability() {
     let mut public_key = [0u8; 32];
-    // Set known values for predictable fingerprint
     public_key[0] = 0xAB;
     public_key[1] = 0xCD;
     public_key[2] = 0xEF;
@@ -204,15 +197,12 @@ fn test_fingerprint_readability() {
 
     let fp = contact.fingerprint();
 
-    // Should start with known values grouped
     assert!(fp.starts_with("ABCD EF01"));
-    // Should have proper spacing
     let parts: Vec<&str> = fp.split(' ').collect();
     assert!(parts.iter().all(|p| p.len() == 4));
 }
 
 // ============================================================
-// Hidden Contacts Tests
 // ============================================================
 
 // @scenario: contacts_management :: Hide contact from main list
@@ -230,12 +220,10 @@ fn test_contact_hidden_default_false() {
 fn test_contact_hide_and_unhide() {
     let mut contact = create_test_contact();
 
-    // Hide the contact
     contact.hide();
     assert!(contact.is_hidden());
     assert!(!contact.is_visible_in_main_list());
 
-    // Unhide the contact
     contact.unhide();
     assert!(!contact.is_hidden());
     assert!(contact.is_visible_in_main_list());
@@ -255,7 +243,6 @@ fn test_contact_set_hidden() {
 }
 
 // ============================================================
-// Blocked Contacts Tests
 // ============================================================
 
 // @scenario: contacts_management :: Block a contact
@@ -275,13 +262,11 @@ fn test_contact_blocked_default_false() {
 fn test_contact_block_and_unblock() {
     let mut contact = create_test_contact();
 
-    // Block the contact
     contact.block();
     assert!(contact.is_blocked());
     assert!(!contact.should_process_updates());
     assert!(!contact.should_send_updates());
 
-    // Unblock the contact
     contact.unblock();
     assert!(!contact.is_blocked());
     assert!(contact.should_process_updates());
@@ -356,7 +341,6 @@ fn test_contact_from_sync_data_full() {
 }
 
 // ========================================
-// Recovery Trust Tests
 // ========================================
 
 // @scenario: identity_management :: Social recovery setup
@@ -433,7 +417,6 @@ fn test_recovered_contact_trust_lifecycle() {
     contact.accept_recovery([99u8; 32], new_key, 0).unwrap();
     assert_eq!(contact.trust_level(), TrustLevel::Cautious);
 
-    // Cautious blocks recovery trust
     let result = contact.trust_for_recovery();
     assert!(
         result.is_err(),
@@ -444,7 +427,6 @@ fn test_recovered_contact_trust_lifecycle() {
     contact.mark_fingerprint_verified().unwrap();
     assert_eq!(contact.trust_level(), TrustLevel::Verified);
 
-    // Now recovery trust works again
     contact.trust_for_recovery().unwrap();
     assert!(contact.is_recovery_trusted());
 }

@@ -74,10 +74,6 @@ pub enum LinkModeError {
     MalformedCardPayload(String),
 }
 
-// =========================================================================
-// Initiator
-// =========================================================================
-
 /// Result of initiator URL generation.
 pub struct LinkInitiation {
     /// The URL to share (contains ephemeral public key + nonce).
@@ -190,10 +186,6 @@ pub fn initiator_complete(
     let commands = build_initiator_deposit(&keys, encrypted_card);
     Ok((keys, commands))
 }
-
-// =========================================================================
-// Responder
-// =========================================================================
 
 /// Parsed Link URL components.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -432,7 +424,6 @@ pub fn responder_respond_with_card_bytes(
     }
     let keys = EscrowKeys::derive(shared_secret.as_bytes(), EscrowRole::Responder);
 
-    // Encrypt the raw card bytes with the freshly-derived `card_key`.
     let encrypted = keys
         .encrypt_card(raw_card_bytes)
         .map_err(|e| LinkModeError::CardCryptoFailed(e.to_string()))?;
@@ -676,10 +667,6 @@ pub fn derive_link_shared_key(
     let derived = HKDF::derive_key(None, &shared[..], LINK_SHARED_KEY_INFO);
     Ok(SymmetricKey::from_bytes(*derived))
 }
-
-// =========================================================================
-// Internal helpers
-// =========================================================================
 
 /// Derive the handshake slot hash from the nonce.
 ///

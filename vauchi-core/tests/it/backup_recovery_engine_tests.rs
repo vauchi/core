@@ -61,7 +61,6 @@ fn backup_restore_flow_to_password() {
 fn backup_password_validation() {
     let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
 
-    // Continue with empty password should fail
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -76,7 +75,6 @@ fn backup_password_validation() {
         other => panic!("Expected ValidationError, got {:?}", other),
     }
 
-    // The continue button should be disabled when password is empty
     let screen = engine.current_screen();
     let continue_action = screen.actions.iter().find(|a| a.id == "continue").unwrap();
     assert!(!continue_action.enabled);
@@ -87,7 +85,6 @@ fn backup_password_validation() {
 fn backup_confirm_password_mismatch() {
     let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
 
-    // Enter password
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "my-secret".into(),
@@ -100,7 +97,6 @@ fn backup_confirm_password_mismatch() {
         action_id: "continue".into(),
     });
 
-    // Enter mismatching confirmation
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirm_password".into(),
         value: "wrong".into(),
@@ -126,7 +122,6 @@ fn backup_confirm_password_mismatch() {
 fn backup_confirm_match_to_processing() {
     let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
 
-    // Enter password
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "my-secret".into(),
@@ -139,7 +134,6 @@ fn backup_confirm_match_to_processing() {
         action_id: "continue".into(),
     });
 
-    // Enter matching confirmation
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirm_password".into(),
         value: "my-secret".into(),
@@ -168,7 +162,6 @@ fn backup_confirm_match_to_processing() {
 fn backup_restore_skips_confirm() {
     let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), false);
 
-    // Enter password
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "my-secret".into(),
@@ -181,7 +174,6 @@ fn backup_restore_skips_confirm() {
         action_id: "continue".into(),
     });
 
-    // Should go directly to processing, skipping confirm
     match result {
         ActionResult::NavigateTo(screen) => {
             assert_eq!(screen.screen_id, "backup_processing");
@@ -197,7 +189,6 @@ fn backup_restore_skips_confirm() {
 fn backup_processing_complete() {
     let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
 
-    // Navigate to processing
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "pw".into(),
@@ -217,7 +208,6 @@ fn backup_processing_complete() {
         action_id: "continue".into(),
     });
 
-    // Signal completion
     engine.processing_complete();
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "backup_complete");
@@ -230,7 +220,6 @@ fn backup_processing_complete() {
     assert_eq!(screen.actions.len(), 1);
     assert_eq!(screen.actions[0].id, "done");
 
-    // Done should complete
     let mut engine_done = BackupRecoveryEngine::new(Some(BackupMode::Create), false);
     let _ = engine_done.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
@@ -258,7 +247,6 @@ fn backup_processing_complete() {
 fn backup_processing_failed() {
     let mut engine = BackupRecoveryEngine::new(Some(BackupMode::Restore), false);
 
-    // Navigate to processing
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "password".into(),
         value: "pw".into(),
@@ -271,7 +259,6 @@ fn backup_processing_failed() {
         action_id: "continue".into(),
     });
 
-    // Signal failure
     engine.processing_failed();
     let screen = engine.current_screen();
     assert_eq!(screen.screen_id, "backup_failed");
@@ -285,7 +272,6 @@ fn backup_processing_failed() {
     assert_eq!(screen.actions[0].id, "retry");
     assert_eq!(screen.actions[1].id, "cancel");
 
-    // Retry should go back to password
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "retry".into(),
     });
@@ -302,13 +288,11 @@ fn backup_processing_failed() {
 fn backup_back_navigation() {
     let mut engine = BackupRecoveryEngine::new(None, false);
 
-    // Go to create password
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create".into(),
     });
     assert_eq!(engine.current_screen().screen_id, "backup_password");
 
-    // Back to choose
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "back".into(),
     });
@@ -352,11 +336,9 @@ fn backup_back_navigation() {
 fn backup_processing_complete_guard_ignores_wrong_step() {
     let mut engine = BackupRecoveryEngine::new(None, false);
 
-    // Calling processing_complete from ChooseMode should be a no-op
     engine.processing_complete();
     assert_eq!(engine.current_screen().screen_id, "backup_choose");
 
-    // Calling processing_failed from ChooseMode should be a no-op
     engine.processing_failed();
     assert_eq!(engine.current_screen().screen_id, "backup_choose");
 }
@@ -439,7 +421,6 @@ fn backup_level_toggle_switches_to_identity_only_and_back() {
     let mut engine = BackupRecoveryEngine::new(None, false);
     assert_eq!(*engine.level(), BackupLevel::Full);
 
-    // Toggle to identity-only
     let result = engine.handle_action(UserAction::ItemToggled {
         component_id: "backup_level".into(),
         item_id: "level_toggle".into(),
@@ -452,7 +433,6 @@ fn backup_level_toggle_switches_to_identity_only_and_back() {
         other => panic!("Expected UpdateScreen, got {:?}", other),
     }
 
-    // Toggle back to full
     let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "backup_level".into(),
         item_id: "level_toggle".into(),

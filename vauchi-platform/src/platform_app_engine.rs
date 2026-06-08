@@ -998,7 +998,6 @@ impl PlatformAppEngine {
             detail: format!("Lock failed: {e}"),
         })?;
 
-        // Remove previous handler if any
         let mut handler_id_slot = self
             .event_handler_id
             .lock()

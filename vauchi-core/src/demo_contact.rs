@@ -325,7 +325,6 @@ mod tests {
     fn test_demo_state_current_tip_wraps_modulo_len() {
         let mut state = DemoContactState::new_active(0);
         let len = get_demo_tips().len();
-        // Equivalent index by modulus must yield the same tip.
         state.current_tip_index = len * 3 + 2;
         let tip = state.current_tip().expect("expected Some");
         assert_eq!(tip.id, get_demo_tips()[2].id);
@@ -344,7 +343,6 @@ mod tests {
         );
         assert_eq!(tip.id, get_demo_tips()[1].id);
         assert_eq!(state.update_count, 1);
-        // The newly shown tip is appended to shown_tip_ids.
         assert!(state.shown_tip_ids.contains(&get_demo_tips()[1].id));
     }
 
@@ -377,11 +375,9 @@ mod tests {
     fn test_demo_state_advance_does_not_duplicate_shown_ids() {
         let mut state = DemoContactState::new_active(0);
         let len = get_demo_tips().len();
-        // Advance twice through the full catalog — every tip is now shown.
         for _ in 0..(len * 2) {
             state.advance_to_next_tip(0);
         }
-        // shown_tip_ids must contain each id exactly once.
         let mut sorted = state.shown_tip_ids.clone();
         sorted.sort();
         let mut dedup = sorted.clone();
@@ -416,7 +412,6 @@ mod tests {
     // @internal
     #[test]
     fn test_demo_state_restore_clears_both_flags() {
-        // Restore must reset BOTH dismissed and auto_removed.
         let mut state = DemoContactState::new_active(0);
         state.dismiss();
         state.auto_remove();
@@ -464,7 +459,6 @@ mod tests {
         assert!(card.is_demo);
         assert_eq!(card.tip_title, "Title");
         assert_eq!(card.tip_content, "Content");
-        // Debug formatting of the category must end up in tip_category.
         assert_eq!(card.tip_category, "Privacy");
     }
 
@@ -521,12 +515,10 @@ mod tests {
     fn test_tip_rotation_wraps_to_specific_index() {
         let mut state = DemoContactState::new_active(0);
         let tip_count = get_demo_tips().len();
-        // Start at 0. After tip_count advances, we are back at 0.
         for _ in 0..tip_count {
             state.advance_to_next_tip(0);
         }
         assert_eq!(state.current_tip_index, 0);
-        // After tip_count + 3 total advances, we are at index 3.
         for _ in 0..3 {
             state.advance_to_next_tip(0);
         }

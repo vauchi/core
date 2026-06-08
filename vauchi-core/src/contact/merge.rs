@@ -108,7 +108,6 @@ pub fn merge_contacts(primary: &Contact, secondary: &Contact) -> Contact {
         .map(|f| (format!("{:?}", f.field_type()), f.label().to_string()))
         .collect();
 
-    // Add unique fields from secondary
     let mut merged_card = primary.card().clone();
     for field in secondary.card().fields() {
         let sig = (
@@ -201,12 +200,10 @@ fn string_similarity(a: &str, b: &str) -> f64 {
         return 0.0;
     }
 
-    // Check if one contains the other
     if a_lower.contains(&b_lower) || b_lower.contains(&a_lower) {
         return 0.8;
     }
 
-    // Simple character overlap ratio
     let a_chars: std::collections::HashSet<char> = a_lower.chars().collect();
     let b_chars: std::collections::HashSet<char> = b_lower.chars().collect();
     let intersection = a_chars.intersection(&b_chars).count();

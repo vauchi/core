@@ -81,21 +81,18 @@ pub fn preprocess_frame(img: GrayImage, config: &PreprocessConfig) -> Preprocess
         };
     }
 
-    // 2. Downscale
     let img = if config.target_width > 0 && img.width() > config.target_width {
         downscale_luma(img, config.target_width)
     } else {
         img
     };
 
-    // 3. CLAHE
     let mut img = if config.apply_clahe {
         apply_clahe(img, config.clahe_clip_limit, config.clahe_tile_size)
     } else {
         img
     };
 
-    // 4. Unsharp mask
     if config.apply_unsharp {
         apply_unsharp_mask(&mut img, config.unsharp_sigma, config.unsharp_amount);
     }
@@ -205,7 +202,6 @@ fn apply_clahe(img: GrayImage, clip_limit: f32, tile_size: u32) -> GrayImage {
             let y1 = (y0 + th).min(h);
             let pixel_count = ((x1 - x0) * (y1 - y0)) as f32;
 
-            // Build histogram
             let mut hist = [0u32; 256];
             for y in y0..y1 {
                 for x in x0..x1 {
@@ -213,7 +209,6 @@ fn apply_clahe(img: GrayImage, clip_limit: f32, tile_size: u32) -> GrayImage {
                 }
             }
 
-            // Clip histogram
             let clip = (clip_limit * pixel_count / 256.0) as u32;
             let mut excess = 0u32;
             for h in hist.iter_mut() {
@@ -248,7 +243,6 @@ fn apply_clahe(img: GrayImage, clip_limit: f32, tile_size: u32) -> GrayImage {
         for x in 0..w {
             let val = img.get_pixel(x, y)[0] as usize;
 
-            // Tile center coordinates
             let fx = (x as f32 - half_tw) / tw as f32;
             let fy = (y as f32 - half_th) / th as f32;
             let tx0 = (fx.floor() as i32).clamp(0, nx as i32 - 1) as u32;

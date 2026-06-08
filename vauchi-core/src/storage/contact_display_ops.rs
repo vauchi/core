@@ -72,8 +72,6 @@ impl Storage {
         Ok(())
     }
 
-    // === Custom Avatar Operations ===
-
     /// Saves an encrypted custom avatar for a contact.
     pub fn save_contact_custom_avatar(
         &self,
@@ -146,7 +144,6 @@ impl Storage {
         }
     }
 
-    // === Shared Name Operations ===
     //
     // Encrypted with the storage key (self.encryption_key), not the contact's shared key.
     // Shared names are local-only data — the flat set received from the sender.
@@ -212,8 +209,6 @@ impl Storage {
         }
         Ok(names)
     }
-
-    // === Shared Avatar Operations ===
 
     /// Adds or updates a shared avatar for a contact.
     ///
@@ -283,8 +278,6 @@ impl Storage {
         }
         Ok(avatars)
     }
-
-    // === Display Preference Operations ===
 
     /// Saves the display name preference for a contact.
     pub fn save_display_name_preference(

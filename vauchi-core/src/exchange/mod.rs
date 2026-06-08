@@ -138,13 +138,11 @@ pub use verifier_event::{ProximityVerifierEvent, VerifierEventLog, VerifierMetho
 pub use verifier_harness::{PeerCapabilities, Scenario, SimulatedPeer, VerificationOutcome};
 pub use x3dh::{X3DH, X3DHKeyPair};
 
-// Multi-stage exchange re-exports
 pub use multistage::session::{AccelStateError, AudioStateError, MultiStageSession};
 pub use multistage::types::{
     AccelerometerProximityState, AudioProximityState, ProtocolState, QrPayload,
 };
 
-// Exchange mode foundation re-exports
 pub use card_snapshot::CardSnapshot;
 pub use exchange_id::ExchangeId;
 pub use exchange_record::{

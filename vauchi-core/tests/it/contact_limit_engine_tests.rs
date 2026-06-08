@@ -51,16 +51,13 @@ fn contact_limit_edit_shows_save_and_cancel() {
 #[test]
 fn contact_limit_save_valid_number_completes() {
     let mut engine = make_engine();
-    // Enter edit mode
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "edit".into(),
     });
-    // Set a valid number
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "limit_input".into(),
         value: "100".into(),
     });
-    // Save
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "save".into(),
     });
@@ -72,16 +69,13 @@ fn contact_limit_save_valid_number_completes() {
 #[test]
 fn contact_limit_save_invalid_number_returns_validation_error() {
     let mut engine = make_engine();
-    // Enter edit mode
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "edit".into(),
     });
-    // Set an invalid value
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "limit_input".into(),
         value: "not_a_number".into(),
     });
-    // Save
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "save".into(),
     });
@@ -102,11 +96,9 @@ fn contact_limit_save_invalid_number_returns_validation_error() {
 #[test]
 fn contact_limit_cancel_edit_returns_to_view_mode() {
     let mut engine = make_engine();
-    // Enter edit mode
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "edit".into(),
     });
-    // Cancel
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel_edit".into(),
     });
@@ -125,7 +117,6 @@ fn contact_limit_cancel_edit_returns_to_view_mode() {
 #[test]
 fn contact_limit_text_changed_updates_value() {
     let mut engine = make_engine();
-    // Enter edit mode first
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "edit".into(),
     });

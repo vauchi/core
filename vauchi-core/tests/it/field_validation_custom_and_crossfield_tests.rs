@@ -116,7 +116,6 @@ fn test_custom_field_special_characters_symbols() {
 fn test_custom_field_mixed_scripts() {
     use vauchi_core::contact_card::{ContactField, FieldType};
 
-    // Mixed script values
     let mixed_values = vec![
         "Hello こんにちは 你好",
         "Name: Иван (Ivan)",
@@ -151,7 +150,6 @@ fn test_custom_field_control_characters() {
 }
 
 // =============================================================================
-// Cross-Field Dependencies Tests
 // Traces to: _private/features/field_validation.feature @multiple @all-types
 // =============================================================================
 
@@ -161,10 +159,8 @@ fn test_custom_field_control_characters() {
 fn test_cross_field_dependencies_independent_validation() {
     use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 
-    // Each field type should validate independently
     let mut card = ContactCard::new("Test User");
 
-    // Add multiple fields of different types
     let phone = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567", 0);
     let email = ContactField::new(FieldType::Email, "Work", "test@example.com", 0);
     let social = ContactField::new(FieldType::Social, "Twitter", "@testuser", 0);
@@ -172,7 +168,6 @@ fn test_cross_field_dependencies_independent_validation() {
     let address = ContactField::new(FieldType::Address, "Home", "123 Main St", 0);
     let custom = ContactField::new(FieldType::Custom, "Signal", "test.123", 0);
 
-    // All should add successfully
     card.add_field(phone).expect("expected success");
     card.add_field(email).expect("expected success");
     card.add_field(social).expect("expected success");
@@ -190,16 +185,13 @@ fn test_cross_field_dependencies_validation_isolation() {
 
     let mut card = ContactCard::new("Test User");
 
-    // Add a valid phone
     let valid_phone = ContactField::new(FieldType::Phone, "Mobile", "+1-555-123-4567", 0);
     card.add_field(valid_phone).expect("expected success");
 
-    // Try to add an invalid email - should fail
     let invalid_email = ContactField::new(FieldType::Email, "Work", "not-an-email", 0);
     let result = card.add_field(invalid_email);
     assert!(result.is_err(), "Invalid email should be rejected");
 
-    // Valid phone should still be there
     assert_eq!(card.fields().len(), 1, "Only valid field should remain");
     assert_eq!(card.fields()[0].label(), "Mobile");
 }
@@ -219,11 +211,9 @@ fn test_cross_field_dependencies_update_isolation() {
     let email_id = email.id().to_string();
     card.add_field(email).unwrap();
 
-    // Update phone to invalid - should fail
     let result = card.update_field_value(&phone_id, "invalid", 0);
     assert!(result.is_err(), "Invalid phone update should fail");
 
-    // Email should be unaffected
     let email_field = card.fields().iter().find(|f| f.id() == email_id).unwrap();
     assert_eq!(
         email_field.value(),
@@ -242,7 +232,6 @@ fn test_cross_field_dependencies_update_isolation() {
 fn test_max_field_length_enforcement_at_limit() {
     use vauchi_core::contact_card::{ContactField, FieldType};
 
-    // Value exactly at max length should be valid
     let max_value = "a".repeat(MAX_VALUE_LENGTH);
     let field = ContactField::new(FieldType::Custom, "Custom", &max_value, 0);
     assert!(
@@ -257,7 +246,6 @@ fn test_max_field_length_enforcement_at_limit() {
 fn test_max_field_length_enforcement_over_limit() {
     use vauchi_core::contact_card::{ContactField, FieldType, ValidationError};
 
-    // Value over max length should be rejected
     let over_max = "a".repeat(MAX_VALUE_LENGTH + 1);
     let field = ContactField::new(FieldType::Custom, "Custom", &over_max, 0);
     let result = field.validate();
@@ -315,7 +303,6 @@ fn test_max_field_length_enforcement_per_field_type() {
 
     let over_max = "a".repeat(MAX_VALUE_LENGTH + 1);
 
-    // All field types should reject over-length values
     let field_types = vec![
         (FieldType::Phone, "Mobile"),
         (FieldType::Email, "Work"),
@@ -334,7 +321,6 @@ fn test_max_field_length_enforcement_per_field_type() {
             field_type
         );
         if let Err(ValidationError::ValueTooLong { .. }) = result {
-            // Expected
         } else {
             panic!(
                 "{:?} field should return ValueTooLong error, got {:?}",
@@ -351,7 +337,6 @@ fn test_max_field_length_card_rejects_overlong() {
 
     let mut card = ContactCard::new("Test User");
 
-    // Try to add a field with over-length value
     let over_max = "a".repeat(MAX_VALUE_LENGTH + 1);
     let field = ContactField::new(FieldType::Custom, "Custom", &over_max, 0);
 
@@ -369,16 +354,13 @@ fn test_max_field_length_update_rejects_overlong() {
 
     let mut card = ContactCard::new("Test User");
 
-    // Add a valid field
     let field = ContactField::new(FieldType::Custom, "Custom", "valid value", 0);
     let field_id = field.id().to_string();
     card.add_field(field).unwrap();
 
-    // Try to update to over-length value
     let over_max = "a".repeat(MAX_VALUE_LENGTH + 1);
     let result = card.update_field_value(&field_id, &over_max, 0);
 
-    // Validation should fail
     assert!(
         result.is_err(),
         "Card should reject updating to over-length value"

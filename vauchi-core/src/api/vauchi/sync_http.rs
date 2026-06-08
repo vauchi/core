@@ -60,7 +60,6 @@ impl Vauchi {
     /// 4. Return combined outcome.
     #[tracing::instrument(level = "info", skip_all, name = "vauchi.sync")]
     pub fn sync(&mut self) -> VauchiResult<VauchiSyncOutcome> {
-        // 1. Gate checks
         if self.identity.is_none() {
             return Ok(VauchiSyncOutcome::NoIdentity);
         }
@@ -117,7 +116,6 @@ impl Vauchi {
         // Load contacts once — shared by register_tokens, receive, and send phases.
         let contacts = self.storage.list_contacts().unwrap_or_default();
 
-        // Create ephemeral adapter with OHTTP key
         let mut adapter = self.create_ohttp_adapter(ohttp_key)?;
 
         // Connect adapter (relay health check)
@@ -125,7 +123,6 @@ impl Vauchi {
             .connect(&TransportConfig::default())
             .map_err(VauchiError::Network)?;
 
-        // Receive phase
         let received = self.run_receive_phase(identity, &contacts, &mut adapter)?;
 
         // Capture version policy from relay response headers before adapter is moved.
@@ -134,7 +131,6 @@ impl Vauchi {
         // Send phase — adapter moves into RelayClient → SyncController
         let send_result = self.run_send_phase(identity, &contacts, adapter)?;
 
-        // Combine results
         let mut errors: Vec<String> = Vec::new();
         for (ctx, msg) in &send_result.errors {
             errors.push(format!("{ctx}: {msg}"));

@@ -45,15 +45,12 @@ fn test_qr_exchange_key_agreement_succeeds() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Both start QR
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
-    // Get QR codes
     let alice_qr = alice_session.qr().unwrap().clone();
     let bob_qr = bob_session.qr().unwrap().clone();
 
-    // Both scan each other's QR
     alice_session
         .apply(ExchangeEvent::ProcessQR(bob_qr))
         .unwrap();
@@ -66,7 +63,6 @@ fn test_qr_exchange_key_agreement_succeeds() {
         "Should be in PeerScanned after scanning"
     );
 
-    // Confirm other party scanned
     alice_session
         .apply(ExchangeEvent::TheyScannedOurQR)
         .unwrap();
@@ -79,7 +75,6 @@ fn test_qr_exchange_key_agreement_succeeds() {
         "Should be in AwaitingKeyAgreement after TheyScannedOurQR"
     );
 
-    // Key agreement should succeed
     let result = alice_session.apply(ExchangeEvent::PerformKeyAgreement);
     assert!(
         result.is_ok(),
@@ -138,7 +133,6 @@ fn test_nfc_skips_proximity() {
     let result = session.apply(ExchangeEvent::NfcTapComplete { their_payload });
 
     // NFC tap should transition directly — no proximity step needed
-    // The result might fail due to invalid payload format, but it should NOT
     // fail due to "proximity not verified" — it should attempt to parse the payload
     if let Err(ref e) = result {
         // InvalidNfcFormat is acceptable (mock payload), but InvalidState would mean

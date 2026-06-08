@@ -30,7 +30,6 @@ fn normalize_avatar_small_image_stays_within_budget() {
     let png = png_of_size(64, 64);
     let result = normalize_avatar(&png).unwrap();
     assert!(result.len() <= MAX_AVATAR_SIZE);
-    // Should be valid WebP
     assert_eq!(&result[..4], b"RIFF");
 }
 
@@ -111,7 +110,6 @@ fn validate_size_normal_card_ok() {
 #[test]
 fn validate_size_oversized_card_fails() {
     let mut card = ContactCard::new("Alice");
-    // Add many large fields to push serialized size over 64 KB
     for i in 0..200 {
         let value = "X".repeat(350);
         let field = ContactField::new(FieldType::Custom, &format!("note-{i}"), &value, 0);
@@ -136,7 +134,6 @@ fn field_visibility_mut_allows_modification() {
     // Mutate visibility through the mutable accessor
     card.field_visibility_mut().set_nobody(&field_id);
 
-    // Verify via the immutable accessor
     assert!(
         !card.is_field_shown(&field_id),
         "field should be hidden after set_nobody"

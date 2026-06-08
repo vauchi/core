@@ -62,8 +62,6 @@ impl Storage {
         })
     }
 
-    // === Retry Queue Operations ===
-
     /// Creates a new retry entry (payload encrypted).
     pub fn create_retry_entry(&self, entry: &RetryEntry) -> Result<(), StorageError> {
         let payload_encrypted = crate::crypto::encrypt(&self.encryption_key, &entry.payload)

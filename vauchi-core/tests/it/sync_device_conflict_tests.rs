@@ -137,7 +137,6 @@ fn test_conflict_rapid_updates_only_latest_applied() {
     // The field_timestamps map ends at 3000.
     assert_eq!(applied.len(), 3);
 
-    // Now if an older update arrives, it should be rejected
     let stale = vec![SyncItem::CardUpdated {
         field_label: "phone".to_string(),
         new_value: "+000".to_string(),
@@ -244,7 +243,6 @@ fn test_conflict_deletion_schedule_and_cancel_independent() {
 }
 
 // ============================================================
-// Coverage gap tests
 // ============================================================
 
 /// Test devices_with_pending returns correct device IDs
@@ -269,7 +267,6 @@ fn test_orchestrator_devices_with_pending() {
     // Initially no devices with pending
     assert!(orchestrator.devices_with_pending().is_empty());
 
-    // Record a change
     orchestrator
         .record_local_change(SyncItem::CardUpdated {
             field_label: "email".to_string(),
@@ -278,7 +275,6 @@ fn test_orchestrator_devices_with_pending() {
         })
         .unwrap();
 
-    // Device B should now have pending items
     let pending_devices = orchestrator.devices_with_pending();
     assert_eq!(pending_devices.len(), 1);
     assert_eq!(pending_devices[0], device_b_id);
@@ -339,7 +335,6 @@ fn test_orchestrator_add_remove_device() {
     // No other devices initially (only device_a in registry, it's excluded from device_states)
     assert!(orchestrator.devices_with_pending().is_empty());
 
-    // Add a new device
     let new_device_id = [0xAAu8; 32];
     orchestrator.add_device(new_device_id);
 
@@ -355,7 +350,6 @@ fn test_orchestrator_add_remove_device() {
     let pending = orchestrator.pending_for_device(&new_device_id);
     assert_eq!(pending.len(), 1);
 
-    // Remove the device
     orchestrator.remove_device(&new_device_id).unwrap();
     let pending = orchestrator.pending_for_device(&new_device_id);
     assert!(
@@ -383,7 +377,6 @@ fn test_orchestrator_add_device_idempotent() {
 
     let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
 
-    // Record a change
     orchestrator
         .record_local_change(SyncItem::CardUpdated {
             field_label: "email".to_string(),
@@ -392,7 +385,6 @@ fn test_orchestrator_add_device_idempotent() {
         })
         .unwrap();
 
-    // Adding device_b again should not reset its state
     orchestrator.add_device(device_b_id);
 
     // Pending items should still be there (or_insert_with, not insert)
@@ -440,7 +432,6 @@ fn test_orchestrator_checkpoint_lifecycle() {
 
     let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_a, registry);
 
-    // Record some items
     for i in 0..3 {
         orchestrator
             .record_local_change(SyncItem::CardUpdated {
@@ -454,19 +445,16 @@ fn test_orchestrator_checkpoint_lifecycle() {
     let items = orchestrator.pending_for_device(&device_b_id).to_vec();
     assert_eq!(items.len(), 3);
 
-    // Save checkpoint after sending 2 items
     orchestrator
         .save_checkpoint(&device_b_id, &items, 2)
         .unwrap();
 
-    // Load checkpoint
     let checkpoint = orchestrator.load_checkpoint(&device_b_id).unwrap();
     assert!(checkpoint.is_some(), "expected Some value");
     let (loaded_items, sent_count) = checkpoint.unwrap();
     assert_eq!(loaded_items.len(), 3);
     assert_eq!(sent_count, 2);
 
-    // Clear checkpoint
     orchestrator.clear_checkpoint(&device_b_id).unwrap();
 
     // Load again — should be None
@@ -529,7 +517,6 @@ fn test_conflict_visibility_changed() {
 
     let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
 
-    // Apply visibility change at t=1000
     let items = vec![SyncItem::VisibilityChanged {
         contact_id: "contact-1".to_string(),
         field_label: "phone".to_string(),
@@ -539,7 +526,6 @@ fn test_conflict_visibility_changed() {
     let applied = orchestrator.process_incoming(items, &[0x99u8; 32]).unwrap();
     assert_eq!(applied.len(), 1);
 
-    // Older visibility change should be rejected
     let stale = vec![SyncItem::VisibilityChanged {
         contact_id: "contact-1".to_string(),
         field_label: "phone".to_string(),
@@ -577,7 +563,6 @@ fn test_conflict_label_change() {
 
     let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
 
-    // Apply label change at t=2000
     let items = vec![SyncItem::LabelChange {
         label_id: "label-1".to_string(),
         label_name: "Work".to_string(),
@@ -589,7 +574,6 @@ fn test_conflict_label_change() {
     let applied = orchestrator.process_incoming(items, &[0x99u8; 32]).unwrap();
     assert_eq!(applied.len(), 1);
 
-    // Older label change for same label_id should be rejected
     let stale = vec![SyncItem::LabelChange {
         label_id: "label-1".to_string(),
         label_name: "Office".to_string(),
@@ -615,7 +599,6 @@ fn test_conflict_contact_trust_changed() {
 
     let mut orchestrator = DeviceSyncOrchestrator::new(&storage, device_b, registry);
 
-    // Apply trust change at t=1000
     let items = vec![SyncItem::ContactTrustChanged {
         contact_id: "contact-1".to_string(),
         recovery_trusted: true,
@@ -624,7 +607,6 @@ fn test_conflict_contact_trust_changed() {
     let applied = orchestrator.process_incoming(items, &[0x99u8; 32]).unwrap();
     assert_eq!(applied.len(), 1);
 
-    // Newer trust change for same contact should win
     let newer = vec![SyncItem::ContactTrustChanged {
         contact_id: "contact-1".to_string(),
         recovery_trusted: false,
@@ -633,7 +615,6 @@ fn test_conflict_contact_trust_changed() {
     let applied = orchestrator.process_incoming(newer, &[0x99u8; 32]).unwrap();
     assert_eq!(applied.len(), 1, "Newer trust change should be applied");
 
-    // Stale trust change should be rejected
     let stale = vec![SyncItem::ContactTrustChanged {
         contact_id: "contact-1".to_string(),
         recovery_trusted: true,

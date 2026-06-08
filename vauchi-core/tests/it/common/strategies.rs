@@ -10,7 +10,6 @@
 use proptest::prelude::*;
 
 // ============================================================
-// String Strategies
 // ============================================================
 
 /// Strategy for generating valid display names (non-empty, reasonable length).
@@ -57,7 +56,6 @@ pub fn device_name_strategy() -> impl Strategy<Value = String> {
 }
 
 // ============================================================
-// Byte Array Strategies
 // ============================================================
 
 /// Strategy for generating 32-byte arrays (keys, IDs).
@@ -80,7 +78,6 @@ pub fn byte_vec_strategy(min: usize, max: usize) -> impl Strategy<Value = Vec<u8
 }
 
 // ============================================================
-// Numeric Strategies
 // ============================================================
 
 /// Strategy for generating timestamps (reasonable Unix epoch range).
@@ -114,7 +111,6 @@ pub fn large_count_strategy() -> impl Strategy<Value = usize> {
 }
 
 // ============================================================
-// Field Type Strategies
 // ============================================================
 
 /// Strategy for generating random FieldType values.
@@ -130,7 +126,6 @@ pub fn field_type_strategy() -> impl Strategy<Value = vauchi_core::FieldType> {
 }
 
 // ============================================================
-// Composite Strategies
 // ============================================================
 
 /// Strategy for generating (label, value) pairs.

@@ -19,7 +19,6 @@ use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::storage::{OfflineQueue, PendingUpdate, Storage, UpdateStatus};
 
 // =============================================================================
-// Test Helpers
 // =============================================================================
 
 fn test_storage() -> Storage {
@@ -48,7 +47,6 @@ fn create_visibility_update(id: &str, contact_id: &str, field_id: &str) -> Pendi
 }
 
 // =============================================================================
-// Group Membership Tests
 // =============================================================================
 // Traces to: visibility_control.feature @groups scenarios
 // - Create a visibility group
@@ -70,14 +68,12 @@ fn create_visibility_update(id: &str, contact_id: &str, field_id: &str) -> Pendi
 fn test_visibility_group_add_remove() {
     let mut manager = GroupManager::new();
 
-    // Create visibility groups
     let work_label = manager.create_group("Work Contacts", 0).unwrap();
     let work_id = work_label.id().to_string();
 
     let friends_label = manager.create_group("Close Friends", 0).unwrap();
     let friends_id = friends_label.id().to_string();
 
-    // Add visible fields to each group
     let work_label = manager.get_group_mut(&work_id).unwrap();
     work_label.add_visible_field("work-email", 0);
     work_label.add_visible_field("work-phone", 0);
@@ -86,7 +82,6 @@ fn test_visibility_group_add_remove() {
     friends_label.add_visible_field("personal-email", 0);
     friends_label.add_visible_field("home-address", 0);
 
-    // Contacts
     let bob_id = "bob-id";
     let carol_id = "carol-id";
     let dave_id = "dave-id";
@@ -95,10 +90,8 @@ fn test_visibility_group_add_remove() {
     assert_eq!(manager.can_see_via_labels(bob_id, "work-email"), None);
     assert_eq!(manager.can_see_via_labels(carol_id, "personal-email"), None);
 
-    // Add Bob to Work Contacts
     manager.add_contact_to_group(&work_id, bob_id, 0).unwrap();
 
-    // Bob should now see work fields
     assert_eq!(
         manager.can_see_via_labels(bob_id, "work-email"),
         Some(true),
@@ -117,7 +110,6 @@ fn test_visibility_group_add_remove() {
         "Bob should not see personal-email (not in Close Friends)"
     );
 
-    // Add Carol to both groups
     manager.add_contact_to_group(&work_id, carol_id, 0).unwrap();
     manager
         .add_contact_to_group(&friends_id, carol_id, 0)
@@ -130,7 +122,6 @@ fn test_visibility_group_add_remove() {
     assert!(carol_visible.contains("personal-email"));
     assert!(carol_visible.contains("home-address"));
 
-    // Dave is not in any group
     assert_eq!(
         manager.can_see_via_labels(dave_id, "work-email"),
         None,
@@ -142,19 +133,16 @@ fn test_visibility_group_add_remove() {
         "Dave should not see personal-email (not in any group)"
     );
 
-    // Remove Bob from Work Contacts
     manager
         .remove_contact_from_group(&work_id, bob_id, 0)
         .unwrap();
 
-    // Bob should no longer see work fields
     assert_eq!(
         manager.can_see_via_labels(bob_id, "work-email"),
         None,
         "Bob should not see work-email after leaving Work Contacts"
     );
 
-    // Verify label contents
     let work_label = manager.get_group(&work_id).unwrap();
     assert!(!work_label.contains_contact(bob_id));
     assert!(work_label.contains_contact(carol_id));
@@ -169,7 +157,6 @@ fn test_visibility_group_add_remove() {
 fn test_visibility_group_grants_all_fields() {
     let mut manager = GroupManager::new();
 
-    // Create a group with multiple fields
     let family_label = manager.create_group("Family", 0).unwrap();
     let family_id = family_label.id().to_string();
 
@@ -188,7 +175,6 @@ fn test_visibility_group_grants_all_fields() {
         "Contact should see no fields before joining group"
     );
 
-    // Add contact to group
     manager
         .add_contact_to_group(&family_id, contact_id, 0)
         .unwrap();
@@ -215,28 +201,23 @@ fn test_visibility_group_grants_all_fields() {
 fn test_visibility_group_with_per_contact_override() {
     let mut manager = GroupManager::new();
 
-    // Create group
     let label = manager.create_group("Friends", 0).unwrap();
     let label_id = label.id().to_string();
 
-    // Add field to group
     let label = manager.get_group_mut(&label_id).unwrap();
     label.add_visible_field("personal-phone", 0);
 
     let contact_id = "special-friend";
 
-    // Add contact to group
     manager
         .add_contact_to_group(&label_id, contact_id, 0)
         .unwrap();
 
-    // Contact should see the field via group
     assert_eq!(
         manager.can_see_via_labels(contact_id, "personal-phone"),
         Some(true)
     );
 
-    // Set per-contact override to hide the field
     manager.set_contact_override(contact_id, "personal-phone", false);
 
     // Override takes precedence - contact should NOT see the field
@@ -246,10 +227,8 @@ fn test_visibility_group_with_per_contact_override() {
         "Per-contact override should hide field despite group membership"
     );
 
-    // Remove override
     manager.remove_contact_override(contact_id, "personal-phone");
 
-    // Contact should see field again via group
     assert_eq!(
         manager.can_see_via_labels(contact_id, "personal-phone"),
         Some(true),
@@ -258,7 +237,6 @@ fn test_visibility_group_with_per_contact_override() {
 }
 
 // =============================================================================
-// Offline Propagation Tests
 // =============================================================================
 // Traces to: visibility_control.feature @propagation scenarios
 // - Visibility change when contact is offline
@@ -285,26 +263,22 @@ fn test_visibility_propagation_offline() {
     storage.queue_update(&bob_update).unwrap();
     storage.queue_update(&carol_update).unwrap();
 
-    // Verify updates are queued
     assert_eq!(
         storage.count_all_pending_updates().unwrap(),
         2,
         "Both visibility updates should be queued"
     );
 
-    // Verify Bob's update is queued
     let bob_updates = storage.get_pending_updates(bob_id).unwrap();
     assert_eq!(bob_updates.len(), 1);
     assert_eq!(bob_updates[0].update_type, "visibility_change");
 
-    // Verify Carol's update is queued
     let carol_updates = storage.get_pending_updates(carol_id).unwrap();
     assert_eq!(carol_updates.len(), 1);
 
     // Simulate Bob coming online and receiving the update
     storage.mark_update_sent(&bob_update.id).unwrap();
 
-    // Bob's update should be removed, Carol's should remain
     assert_eq!(storage.get_pending_updates(bob_id).unwrap().len(), 0);
     assert_eq!(storage.get_pending_updates(carol_id).unwrap().len(), 1);
     assert_eq!(storage.count_all_pending_updates().unwrap(), 1);
@@ -342,7 +316,6 @@ fn test_visibility_propagation_multiple_changes() {
         storage.queue_update(&update).unwrap();
     }
 
-    // Get updates - should be ordered by created_at
     let pending = storage.get_pending_updates(contact_id).unwrap();
     assert_eq!(pending.len(), 3);
     assert_eq!(pending[0].id, "update-1"); // earliest
@@ -360,21 +333,17 @@ fn test_visibility_propagation_queue_limits() {
     let storage = test_storage();
     let queue = OfflineQueue::with_max_size(5);
 
-    // Fill the queue
     for i in 0..5 {
         let update = create_visibility_update(&format!("update-{}", i), "contact", "field");
         storage.queue_update(&update).unwrap();
     }
 
-    // Queue should be full
     assert!(queue.is_full(&storage).unwrap());
     assert!(!queue.can_queue(&storage).unwrap());
     assert_eq!(queue.remaining_capacity(&storage).unwrap(), 0);
 
-    // Remove one update
     storage.delete_pending_update("update-0").unwrap();
 
-    // Queue should have space again
     assert!(!queue.is_full(&storage).unwrap());
     assert!(queue.can_queue(&storage).unwrap());
     assert_eq!(queue.remaining_capacity(&storage).unwrap(), 1);
@@ -412,7 +381,6 @@ fn test_visibility_propagation_flush_contact_queue() {
 }
 
 // =============================================================================
-// Visibility Templates Tests
 // =============================================================================
 // Traces to: visibility_control.feature @new-contact scenarios
 // - Apply template visibility to new contact
@@ -433,7 +401,6 @@ fn test_visibility_templates() {
         // Work fields are visible by default (Everyone)
         rules.set_everyone("work-email");
         rules.set_everyone("work-phone");
-        // Personal fields are hidden
         rules.set_nobody("personal-email");
         rules.set_nobody("personal-phone");
         rules.set_nobody("home-address");
@@ -464,7 +431,6 @@ fn test_visibility_templates() {
 
     let contact_id = "new-contact";
 
-    // Apply Professional template
     let professional = professional_template();
     assert!(
         professional.can_see("work-email", contact_id),
@@ -487,7 +453,6 @@ fn test_visibility_templates() {
         "Professional template: home-address should be hidden"
     );
 
-    // Apply Personal template
     let personal = personal_template();
     assert!(
         !personal.can_see("work-email", contact_id),
@@ -502,7 +467,6 @@ fn test_visibility_templates() {
         "Personal template: home-address should be visible"
     );
 
-    // Apply Minimal template
     let minimal = minimal_template();
     assert!(
         !minimal.can_see("work-email", contact_id),
@@ -547,7 +511,6 @@ fn test_visibility_templates_per_contact() {
     carol_rules.set_nobody("work-email");
     carol_rules.set_nobody("work-phone");
 
-    // Get visible fields for each
     let bob_visible = bob_rules.visible_fields("bob", &all_fields);
     let carol_visible = carol_rules.visible_fields("carol", &all_fields);
 
@@ -570,19 +533,15 @@ fn test_visibility_templates_per_contact() {
 fn test_visibility_templates_with_contacts_list() {
     let mut rules = VisibilityRules::new();
 
-    // Make work-email visible only to Bob and Carol
     let mut allowed = HashSet::new();
     allowed.insert("bob-id".to_string());
     allowed.insert("carol-id".to_string());
     rules.set_contacts("work-email", allowed);
 
-    // Make personal-phone visible to everyone
     rules.set_everyone("personal-phone");
 
-    // Make home-address private
     rules.set_nobody("home-address");
 
-    // Test visibility
     assert!(
         rules.can_see("work-email", "bob-id"),
         "Bob should see work-email"
@@ -608,7 +567,6 @@ fn test_visibility_templates_with_contacts_list() {
 }
 
 // =============================================================================
-// Bulk Operations Tests
 // =============================================================================
 // Traces to: visibility_control.feature @bulk scenarios
 // - Set visibility for all fields at once
@@ -635,7 +593,6 @@ fn test_visibility_bulk_operations() {
         rules.set_contacts(field, bob_only.clone());
     }
 
-    // Verify all 10 fields are visible only to Bob
     for field in &fields {
         assert!(rules.can_see(field, "bob-id"), "Bob should see {}", field);
         assert!(
@@ -650,11 +607,9 @@ fn test_visibility_bulk_operations() {
         );
     }
 
-    // Verify Bob sees all 10 fields
     let bob_visible = rules.visible_fields("bob-id", &fields);
     assert_eq!(bob_visible.len(), 10, "Bob should see all 10 fields");
 
-    // Verify Carol and Dave see no fields
     let carol_visible = rules.visible_fields("carol-id", &fields);
     assert_eq!(carol_visible.len(), 0, "Carol should see no fields");
 
@@ -671,7 +626,6 @@ fn test_visibility_bulk_operations() {
 fn test_visibility_bulk_reset_to_default() {
     let fields = vec!["field-1", "field-2", "field-3", "field-4", "field-5"];
 
-    // Set custom visibility for various fields
     let mut rules = VisibilityRules::new();
     rules.set_nobody("field-1");
     rules.set_nobody("field-2");
@@ -680,7 +634,6 @@ fn test_visibility_bulk_reset_to_default() {
     some_contacts.insert("alice".to_string());
     rules.set_contacts("field-3", some_contacts);
 
-    // Verify custom rules are in effect
     assert!(!rules.can_see("field-1", "anyone"));
     assert!(!rules.can_see("field-2", "anyone"));
     assert!(!rules.can_see("field-3", "bob"));
@@ -716,7 +669,6 @@ fn test_visibility_bulk_reset_to_default() {
 fn test_visibility_bulk_label_operations() {
     let mut manager = GroupManager::new();
 
-    // Create a label
     let label = manager.create_group("Work", 0).unwrap();
     let label_id = label.id().to_string();
 
@@ -734,7 +686,6 @@ fn test_visibility_bulk_label_operations() {
         label.add_visible_field(field, 0);
     }
 
-    // Verify all fields are in the label
     let label = manager.get_group(&label_id).unwrap();
     assert_eq!(label.visible_fields().len(), 5);
     for field in &work_fields {
@@ -751,7 +702,6 @@ fn test_visibility_bulk_label_operations() {
         manager.add_contact_to_group(&label_id, contact, 0).unwrap();
     }
 
-    // Verify all contacts see all work fields
     for contact in &contacts {
         let visible = manager.visible_fields_via_labels(contact);
         assert_eq!(visible.len(), 5, "{} should see all 5 work fields", contact);
@@ -763,13 +713,11 @@ fn test_visibility_bulk_label_operations() {
         label.remove_visible_field(field, 0);
     }
 
-    // Verify fields were removed
     let label = manager.get_group(&label_id).unwrap();
     assert_eq!(label.visible_fields().len(), 3);
     assert!(!label.is_field_visible("work-address"));
     assert!(!label.is_field_visible("company-name"));
 
-    // Contacts should now see only 3 fields
     for contact in &contacts {
         let visible = manager.visible_fields_via_labels(contact);
         assert_eq!(visible.len(), 3, "{} should see 3 work fields", contact);
@@ -787,13 +735,11 @@ fn test_visibility_bulk_clear_overrides() {
 
     let contact_id = "special-contact";
 
-    // Set multiple per-contact overrides
     manager.set_contact_override(contact_id, "field-1", true);
     manager.set_contact_override(contact_id, "field-2", false);
     manager.set_contact_override(contact_id, "field-3", true);
     manager.set_contact_override(contact_id, "field-4", false);
 
-    // Verify overrides are in effect
     assert_eq!(
         manager.get_contact_override(contact_id, "field-1"),
         Some(true)
@@ -806,13 +752,11 @@ fn test_visibility_bulk_clear_overrides() {
     // Bulk clear all overrides for the contact
     manager.clear_contact_overrides(contact_id);
 
-    // Verify all overrides are gone
     assert_eq!(manager.get_contact_override(contact_id, "field-1"), None);
     assert_eq!(manager.get_contact_override(contact_id, "field-2"), None);
     assert_eq!(manager.get_contact_override(contact_id, "field-3"), None);
     assert_eq!(manager.get_contact_override(contact_id, "field-4"), None);
 
-    // Verify there are no overrides for this contact
     assert!(manager.get_all_contact_overrides(contact_id).is_none());
 }
 
@@ -825,14 +769,12 @@ fn test_visibility_bulk_clear_overrides() {
 fn test_visibility_bulk_remove_contact_from_all_labels() {
     let mut manager = GroupManager::new();
 
-    // Create multiple labels
     let family = manager.create_group("Family", 0).unwrap().id().to_string();
     let friends = manager.create_group("Friends", 0).unwrap().id().to_string();
     let work = manager.create_group("Work", 0).unwrap().id().to_string();
 
     let contact_id = "departing-contact";
 
-    // Add contact to all labels
     manager
         .add_contact_to_group(&family, contact_id, 0)
         .unwrap();
@@ -844,14 +786,12 @@ fn test_visibility_bulk_remove_contact_from_all_labels() {
     // Also set some per-contact overrides
     manager.set_contact_override(contact_id, "special-field", true);
 
-    // Verify contact is in all groups
     let contact_groups = manager.groups_for_contact(contact_id);
     assert_eq!(contact_groups.len(), 3);
 
     // Bulk remove contact from all groups (e.g., when deleting the contact)
     manager.remove_contact_from_all_groups(contact_id, 0);
 
-    // Verify contact is removed from all groups
     let contact_groups = manager.groups_for_contact(contact_id);
     assert_eq!(contact_groups.len(), 0, "Contact should be in no groups");
 

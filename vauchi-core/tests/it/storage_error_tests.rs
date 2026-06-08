@@ -113,7 +113,6 @@ fn load_replay_nonces_happy_path_returns_inserted_nonces_in_order() {
 }
 
 // ============================================================
-// Contact trust-input deserialization
 // (site 8 of _private/.../2026-05-21-silent-failures-in-security-paths)
 //
 // `Storage::row_to_contact` used to swallow JSON deserialization errors

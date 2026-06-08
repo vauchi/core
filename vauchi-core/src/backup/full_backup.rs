@@ -31,8 +31,6 @@ pub(crate) const FULL_BACKUP_VERSION: u8 = 0x03;
 /// HKDF domain separation info for v3 backup key derivation.
 const HKDF_INFO: &[u8] = b"vauchi-backup-v3";
 
-// ── Input data for export ──────────────────────────────────────────────────
-
 /// Identity data required for a full backup export.
 pub struct FullBackupIdentityData {
     pub display_name: String,
@@ -46,8 +44,6 @@ impl Drop for FullBackupIdentityData {
         self.master_seed.zeroize();
     }
 }
-
-// ── Envelope types (serialized as JSON inside the ciphertext) ──────────────
 
 /// The top-level JSON structure inside the encrypted v3 backup.
 #[derive(Debug, Serialize, Deserialize)]
@@ -85,8 +81,6 @@ pub struct LabelSection {
     pub contacts: Vec<String>,
 }
 
-// ── Key derivation ─────────────────────────────────────────────────────────
-
 /// Derives the v3 encryption key: Argon2id base key -> HKDF domain separation.
 fn derive_v3_key(password: &str, salt: &[u8; 16]) -> Result<SymmetricKey, BackupError> {
     let base_key =
@@ -104,8 +98,6 @@ fn derive_v3_key(password: &str, salt: &[u8; 16]) -> Result<SymmetricKey, Backup
     Ok(key)
 }
 
-// ── Export ──────────────────────────────────────────────────────────────────
-
 /// Exports a full v3 backup containing identity, contacts, own card, and labels.
 ///
 /// ## Format
@@ -121,7 +113,6 @@ pub fn export_full_backup(
     password: &str,
     now: u64,
 ) -> Result<Vec<u8>, BackupError> {
-    // Build identity section
     let identity = IdentitySection {
         display_name: identity_data.display_name.clone(),
         master_seed_b64: BASE64.encode(identity_data.master_seed),
@@ -129,7 +120,6 @@ pub fn export_full_backup(
         device_name: identity_data.device_name.clone(),
     };
 
-    // Build contact entries via existing ContactBackupEntry serialization
     let contact_values: Vec<serde_json::Value> = contacts
         .iter()
         .map(|c| {
@@ -138,7 +128,6 @@ pub fn export_full_backup(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    // Build label sections
     let label_sections: Vec<LabelSection> = labels
         .iter()
         .map(|(id, name, contact_ids)| LabelSection {
@@ -148,7 +137,6 @@ pub fn export_full_backup(
         })
         .collect();
 
-    // Assemble envelope
     let envelope = FullBackupEnvelope {
         version: 3,
         created_at: now,
@@ -160,18 +148,14 @@ pub fn export_full_backup(
         },
     };
 
-    // Serialize to JSON
     let plaintext = Zeroizing::new(
         serde_json::to_vec(&envelope).map_err(|e| BackupError::Serialization(e.to_string()))?,
     );
 
-    // Generate random 16-byte salt
     let salt: [u8; 16] = random_bytes();
 
-    // Derive v3 encryption key (Argon2id + HKDF domain separation)
     let key = derive_v3_key(password, &salt)?;
 
-    // Encrypt
     let ciphertext =
         encrypt(&key, &plaintext).map_err(|e| BackupError::EncryptionFailed(e.to_string()))?;
 
@@ -182,8 +166,6 @@ pub fn export_full_backup(
     out.extend_from_slice(&ciphertext);
     Ok(out)
 }
-
-// ── Import ─────────────────────────────────────────────────────────────────
 
 /// Imports a full v3 backup, returning the decrypted envelope.
 ///
@@ -204,14 +186,11 @@ pub fn import_full_backup(data: &[u8], password: &str) -> Result<FullBackupEnvel
         .expect("salt slice is exactly 16 bytes");
     let ciphertext = &data[17..];
 
-    // Derive v3 decryption key
     let key = derive_v3_key(password, &salt)?;
 
-    // Decrypt
     let plaintext =
         Zeroizing::new(decrypt(&key, ciphertext).map_err(|_| BackupError::DecryptionFailed)?);
 
-    // Parse JSON envelope
     let envelope: FullBackupEnvelope = serde_json::from_slice(&plaintext)
         .map_err(|e| BackupError::Deserialization(e.to_string()))?;
 

@@ -65,13 +65,11 @@ pub fn setup_alice_bob_exchange() -> (Vauchi, Vauchi, SymmetricKey, String, Stri
 
     let shared_secret = SymmetricKey::generate();
 
-    // Alice adds Bob as contact
     let bob_contact =
         Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone(), 0);
     let bob_contact_id = bob_contact.id().to_string();
     alice_wb.add_contact(bob_contact).unwrap();
 
-    // Bob adds Alice as contact
     let alice_card = alice_wb
         .own_card()
         .unwrap()
@@ -118,7 +116,6 @@ pub fn setup_three_users() -> (
 
     let mut secrets = std::collections::HashMap::new();
 
-    // Alice <-> Bob
     let ab_secret = SymmetricKey::generate();
     secrets.insert(("alice".to_string(), "bob".to_string()), ab_secret.clone());
     alice
@@ -137,7 +134,6 @@ pub fn setup_three_users() -> (
     ))
     .unwrap();
 
-    // Alice <-> Carol
     let ac_secret = SymmetricKey::generate();
     secrets.insert(
         ("alice".to_string(), "carol".to_string()),
@@ -160,7 +156,6 @@ pub fn setup_three_users() -> (
         ))
         .unwrap();
 
-    // Bob <-> Carol
     let bc_secret = SymmetricKey::generate();
     secrets.insert(("bob".to_string(), "carol".to_string()), bc_secret.clone());
     bob.add_contact(Contact::from_exchange(

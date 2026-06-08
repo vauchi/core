@@ -356,7 +356,6 @@ fn test_manual_confirmation_sets_medium_confidence() {
         .apply(ExchangeEvent::PerformKeyAgreement)
         .unwrap();
 
-    // Run proximity check -- manual verifier confirmed, gets Medium confidence
     bob_session.run_proximity_check();
 
     let alice_card = ContactCard::new("Alice");
@@ -480,7 +479,6 @@ fn test_proximity_check_uses_qr_challenge_not_zeros() {
         .apply(ExchangeEvent::PerformKeyAgreement)
         .unwrap();
 
-    // Manually run proximity check
     bob_session.run_proximity_check();
 
     // AU-1: Verify the verifier received the QR's challenge, not zeros

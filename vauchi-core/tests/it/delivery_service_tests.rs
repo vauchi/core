@@ -73,7 +73,6 @@ fn test_handle_delivered_ack_removes_retry_entry() {
 
     create_test_delivery(&storage, "msg-1", DeliveryStatus::Stored);
 
-    // Pre-existing retry entry should be cleaned up on delivery
     let ts = now();
     let retry = RetryEntry {
         message_id: "msg-1".to_string(),
@@ -206,7 +205,6 @@ fn test_handle_ack_for_unknown_message_returns_error() {
         "ACK for unknown message should return NotFound error"
     );
 
-    // Verify it's specifically a NotFound error
     let err = result.unwrap_err();
     let err_msg = err.to_string();
     assert!(
@@ -274,7 +272,6 @@ fn test_run_cleanup_expires_old_records() {
     assert_eq!(result.expired, 1, "One record should be expired");
     assert_eq!(result.cleaned_up, 0, "No records old enough for cleanup");
 
-    // Verify the expired record was marked
     let expired = storage.get_delivery_record("msg-expired").unwrap().unwrap();
     assert_eq!(
         expired.status,
@@ -282,7 +279,6 @@ fn test_run_cleanup_expires_old_records() {
         "Past-expiry record should be marked Expired"
     );
 
-    // Verify others are untouched
     let valid = storage.get_delivery_record("msg-valid").unwrap().unwrap();
     assert_eq!(valid.status, DeliveryStatus::Sent);
     let no_exp = storage
@@ -308,7 +304,6 @@ fn test_run_cleanup_removes_old_terminal_records() {
         thirty_one_days_ago,
         None,
     );
-    // Update its updated_at to be old
     storage
         .update_delivery_status(
             "msg-old-delivered",
@@ -332,7 +327,6 @@ fn test_run_cleanup_removes_old_terminal_records() {
         "One old terminal record should be cleaned up"
     );
 
-    // Old record should be removed
     assert!(
         storage
             .get_delivery_record("msg-old-delivered")
@@ -341,7 +335,6 @@ fn test_run_cleanup_removes_old_terminal_records() {
         "Old delivered record should be removed"
     );
 
-    // Recent record should survive
     assert!(
         storage
             .get_delivery_record("msg-recent-delivered")
@@ -370,7 +363,6 @@ fn test_handle_device_ack_tracks_per_device_delivery() {
     let storage = test_storage();
     let service = DeliveryService::new();
 
-    // Create message-level delivery record
     create_test_delivery(&storage, "msg-multi", DeliveryStatus::Stored);
 
     // Register 3 target devices
@@ -428,7 +420,6 @@ fn test_handle_device_ack_tracks_per_device_delivery() {
         "3/3 devices — fully delivered"
     );
 
-    // Message-level status should now be Delivered
     let record = storage.get_delivery_record("msg-multi").unwrap().unwrap();
     assert_eq!(
         record.status,
@@ -487,7 +478,6 @@ fn test_handle_device_ack_failed_device_not_fully_delivered() {
     assert_eq!(summary.failed_devices, 1);
     assert!(!summary.is_fully_delivered());
 
-    // Message-level should NOT be Delivered
     let record = storage.get_delivery_record("msg-fail").unwrap().unwrap();
     assert_ne!(
         record.status,

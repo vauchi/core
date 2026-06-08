@@ -170,8 +170,6 @@ fn take_rest(s: &str, pos: usize) -> &str {
     s.get(pos..).unwrap_or("")
 }
 
-// ── Formatting ──────────────────────────────────────────────────────────
-
 /// Format an INIT stage QR string with optional relay metadata.
 ///
 /// v2 layout (`INI2` prefix): `INI2<sid:24><eph:48><ch:48><name_len:2><name><flags:3>[<url_len:3><url>][<pubkey:48>]`
@@ -398,8 +396,6 @@ pub fn format_shake_qr(session_id: &[u8; 16], sealed_envelope: &[u8]) -> String 
     )
 }
 
-// ── Parsing ─────────────────────────────────────────────────────────────
-
 /// Parse a QR string into a [`StageQr`] variant.
 pub fn parse_qr(raw: &str) -> Result<StageQr, QrCodecError> {
     if raw.len() < PREFIX_LEN {
@@ -570,7 +566,6 @@ fn parse_data(body: &str) -> Result<StageQr, QrCodecError> {
     let crc = u16::from_be_bytes(crc_bytes);
     let payload = base45::decode(payload_encoded)?;
 
-    // Verify CRC
     let computed_crc = crc16::compute(&payload);
     if crc != computed_crc {
         return Err(QrCodecError::CrcMismatch {

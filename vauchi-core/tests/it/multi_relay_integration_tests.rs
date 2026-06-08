@@ -17,7 +17,6 @@ use std::time::{Duration, Instant};
 use vauchi_core::network::{MultiRelayConfig, RelayHealth, RelaySelector};
 
 // ============================================================
-// Multi-Relay Configuration
 // Feature: relay_network.feature @multi-relay
 // ============================================================
 
@@ -82,7 +81,6 @@ fn test_primary_relay_preference() {
 }
 
 // ============================================================
-// Relay Selection Strategy
 // Feature: relay_network.feature @load-balancing
 // ============================================================
 
@@ -104,7 +102,6 @@ fn test_round_robin_selection() {
     let _third = config.select_relay(&vauchi_core::rng::OsSecureRng::new());
     let fourth = config.select_relay(&vauchi_core::rng::OsSecureRng::new());
 
-    // Should cycle through relays
     assert_eq!(first, fourth, "Should wrap around");
     assert_ne!(first, second);
 }
@@ -144,7 +141,6 @@ fn test_primary_first_selection() {
         .build()
         .unwrap();
 
-    // Should always return primary when healthy
     for _ in 0..5 {
         assert_eq!(
             config.select_relay(&vauchi_core::rng::OsSecureRng::new()),
@@ -154,7 +150,6 @@ fn test_primary_first_selection() {
 }
 
 // ============================================================
-// Relay Health Tracking
 // Feature: relay_network.feature @failover
 // ============================================================
 
@@ -206,14 +201,12 @@ fn test_relay_recovery_after_cooldown() {
 fn test_exponential_backoff_on_failures() {
     let mut health = RelayHealth::new();
 
-    // Record multiple failures
     for _ in 0..3 {
         health.record_failure("https://relay.vauchi.app");
     }
 
     let cooldown = health.cooldown_remaining("https://relay.vauchi.app");
 
-    // Cooldown should be longer after multiple failures
     assert!(cooldown > Duration::from_secs(0));
 }
 
@@ -224,12 +217,10 @@ fn test_exponential_backoff_on_failures() {
 fn test_success_resets_failures() {
     let mut health = RelayHealth::new();
 
-    // Record failures
     health.record_failure("https://relay.vauchi.app");
     health.record_failure("https://relay.vauchi.app");
     assert!(!health.is_healthy("https://relay.vauchi.app"));
 
-    // Success should reset
     health.record_success("https://relay.vauchi.app");
     assert!(health.is_healthy("https://relay.vauchi.app"));
 }
@@ -265,7 +256,6 @@ fn test_cooldown_gate_driven_by_injected_monotonic_clock() {
 }
 
 // ============================================================
-// Serialization
 // ============================================================
 
 /// Test: Config serialization

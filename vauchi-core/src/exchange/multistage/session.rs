@@ -195,13 +195,11 @@ enum TransportDecryptError {
 /// 6. **Confirming** — reveal key verified, sending/receiving confirmation
 /// 7. **Complete** — both sides confirmed, peer data available
 pub struct MultiStageSession {
-    // Local data
     local_card: Vec<u8>,
     display_name: String,
     commitment: Commitment,
     session_id: [u8; 16],
 
-    // Our keys
     ephemeral_secret: Option<X25519Secret>,
     ephemeral_public: X25519Public,
     // Copy of the transport ephemeral secret, retained past `ephemeral_secret`'s
@@ -219,14 +217,12 @@ pub struct MultiStageSession {
     peer_commitment_hash: Option<[u8; 32]>,
     peer_session_id: Option<[u8; 16]>,
 
-    // Transport encryption
     transport_key: Option<[u8; 32]>,
 
     // Outbound chunks (transport-encrypted commitment ciphertext)
     outbound_chunks: Vec<Vec<u8>>,
     outbound_total: u16,
 
-    // Inbound tracking
     inbound_buffer: Option<ReassemblyBuffer>,
     inbound_bitmap: Option<ChunkBitmap>,
     peer_ack_bitmap: Option<ChunkBitmap>,
@@ -238,10 +234,8 @@ pub struct MultiStageSession {
     // arrived yet" were indistinguishable from outside the session.
     transport_decrypt_failures: u32,
 
-    // Reveal key received from peer
     peer_reveal_key: Option<[u8; 32]>,
 
-    // Protocol state
     state: ProtocolState,
 
     // Received peer data (populated at Complete)
@@ -364,10 +358,8 @@ impl MultiStageSession {
         relay_url: Option<String>,
         relay_noise_pubkey: Option<[u8; 32]>,
     ) -> Self {
-        // Generate session ID
         let session_id: [u8; 16] = crate::crypto::random_bytes();
 
-        // Generate X25519 ephemeral keypair
         let ephemeral_secret = X25519Secret::random_from_rng(OsRng);
         let ephemeral_public = X25519Public::from(&ephemeral_secret);
 
@@ -903,7 +895,6 @@ impl MultiStageSession {
             }
             ProtocolState::Discovered => {
                 // Transient state — should move to Transferring quickly
-                // Return first data chunk if available
                 self.display_cycle += 1;
                 self.get_data_chunk_qr()
             }
@@ -1142,8 +1133,6 @@ impl MultiStageSession {
         }
     }
 
-    // --- Private helpers ---
-
     fn build_init_qr(&self) -> String {
         // INID (INIT+Data) disabled for now — the combined QR is too dense for
         // older cameras (Samsung S7). The COMBO QR still optimizes the RDYY phase.
@@ -1177,14 +1166,12 @@ impl MultiStageSession {
             return self.state.clone();
         }
 
-        // Store peer info
         self.peer_session_id = Some(session_id);
         self.peer_ephemeral = Some(ephemeral);
         self.peer_commitment_hash = Some(commitment_hash);
         self.peer_relay_url = relay_url;
         self.peer_relay_noise_pubkey = relay_noise_pubkey;
 
-        // Derive transport key via X25519 DH + HKDF
         match self.ephemeral_secret.take() {
             Some(secret) => {
                 let peer_public = X25519Public::from(ephemeral);
@@ -1206,7 +1193,6 @@ impl MultiStageSession {
             }
         }
 
-        // Prepare outbound: chunk the commitment ciphertext and transport-encrypt each chunk
         self.prepare_outbound_chunks();
 
         // Transition to Transferring (skip Discovered for efficiency)
@@ -1226,7 +1212,6 @@ impl MultiStageSession {
         relay_noise_pubkey: Option<[u8; 32]>,
         ciphertext: Vec<u8>,
     ) -> ProtocolState {
-        // Process the INIT portion first
         let state = self.handle_init(
             session_id,
             ephemeral,
@@ -1235,7 +1220,6 @@ impl MultiStageSession {
             relay_noise_pubkey,
         );
 
-        // If INIT processing failed, return the error state
         if matches!(state, ProtocolState::Failed(_)) {
             return state;
         }
@@ -1279,7 +1263,6 @@ impl MultiStageSession {
             None => return self.state.clone(),
         };
 
-        // Initialize inbound buffer on first DATA chunk
         if self.inbound_buffer.is_none() {
             self.inbound_buffer = Some(ReassemblyBuffer::new(chunk_total));
             self.inbound_bitmap = Some(ChunkBitmap::new(chunk_total));
@@ -1345,7 +1328,6 @@ impl MultiStageSession {
     /// Attempt to verify and decrypt peer data using the given reveal key.
     /// Called from handle_verify and from try_process_stashed_reveal_key.
     fn process_reveal_key(&mut self, reveal_key: [u8; 32]) -> ProtocolState {
-        // Reassemble received chunks into full ciphertext
         let ciphertext = match self.inbound_buffer.as_ref().and_then(|b| b.assemble()) {
             Some(ct) => ct,
             None => {
@@ -1354,7 +1336,6 @@ impl MultiStageSession {
             }
         };
 
-        // Verify commitment hash
         let peer_hash = match &self.peer_commitment_hash {
             Some(h) => *h,
             None => {
@@ -1379,7 +1360,6 @@ impl MultiStageSession {
             return self.state.clone();
         }
 
-        // Decrypt with reveal key
         match Commitment::open_with_key(&reveal_key, &ciphertext) {
             Ok(plaintext) => {
                 self.received_data = Some(plaintext);
@@ -1461,14 +1441,12 @@ impl MultiStageSession {
             return None;
         }
 
-        // Find the next un-ACK'd chunk to send (round-robin)
         let start = self.current_chunk_idx;
         let total = self.outbound_total;
 
         for offset in 0..total {
             let idx = (start + offset) % total;
 
-            // Check if peer already ACK'd this chunk
             let already_acked = self
                 .peer_ack_bitmap
                 .as_ref()
@@ -1478,7 +1456,6 @@ impl MultiStageSession {
             if !already_acked {
                 self.current_chunk_idx = (idx + 1) % total;
 
-                // Build ACK bitmap of what we've received
                 let ack_bytes = self
                     .inbound_bitmap
                     .as_ref()

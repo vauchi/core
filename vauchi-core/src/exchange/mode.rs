@@ -12,8 +12,6 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-// ── Primary enum ────────────────────────────────────────────────────────────
-
 /// All supported contact-exchange modes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
@@ -117,8 +115,6 @@ impl ExchangeMode {
     }
 }
 
-// ── Supporting enums ────────────────────────────────────────────────────────
-
 /// UI grouping for mode selection screen.
 ///
 /// Not serialized — used for display grouping only, not persisted.
@@ -200,8 +196,6 @@ pub enum DeviceRequirement {
     UsbPort,
 }
 
-// ── ModeConfig ──────────────────────────────────────────────────────────────
-
 /// Complete static configuration for one exchange mode.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModeConfig {
@@ -213,8 +207,6 @@ pub struct ModeConfig {
     pub timeout: Duration,
     pub requires: &'static [DeviceRequirement],
 }
-
-// ── Static catalog ──────────────────────────────────────────────────────────
 
 static MODE_GLANCE: ModeConfig = ModeConfig {
     // G3: Glance is BLE data transport bootstrapped by a one-sided QR scan —
@@ -327,8 +319,6 @@ static MODE_CABLE: ModeConfig = ModeConfig {
     timeout: Duration::from_secs(60),
     requires: &[DeviceRequirement::UsbPort],
 };
-
-// ── Tests ───────────────────────────────────────────────────────────────────
 
 // INLINE_TEST_REQUIRED: static catalog constants (MODE_GLANCE…MODE_LINK) are not visible outside this module; tests verify exact field values against them
 #[cfg(test)]

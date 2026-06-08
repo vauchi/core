@@ -19,7 +19,6 @@ use vauchi_core::recovery::guardian::GuardianToken;
 use vauchi_core::recovery::sealed_box;
 
 // ---------------------------------------------------------------------------
-// Helpers
 // ---------------------------------------------------------------------------
 
 fn generate_x25519_keypair() -> (StaticSecret, X25519PublicKey) {
@@ -324,7 +323,6 @@ fn test_sealed_box_open_tag_bytes_flipped_fails() {
 #[test]
 fn test_guardian_token_verify_all_zero_designator_pk_returns_false() {
     let guardian = SigningKeyPair::generate();
-    // Create a valid token, then construct a token with all-zero designator_pk.
     // We use create_with_claimed_pk to plant a zeroed claimed pk.
     let fake_signer = SigningKeyPair::generate();
     let zero_pk = vauchi_core::crypto::PublicKey::from_bytes([0u8; 32]);
@@ -359,7 +357,6 @@ fn test_guardian_token_verify_all_zero_signature_returns_false() {
     let designator = SigningKeyPair::generate();
     let guardian = SigningKeyPair::generate();
 
-    // Serialize, zero the signature bytes, and deserialize.
     let token = GuardianToken::create(&designator, guardian.public_key(), 0);
     let mut bytes = token.to_bytes();
 

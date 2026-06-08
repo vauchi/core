@@ -33,7 +33,6 @@ fn backup_reminder_state_serde_roundtrip() {
 // @internal
 #[test]
 fn backup_reminder_state_serde_backward_compat() {
-    // Legacy JSON without frequency field should deserialize with default Weekly
     let json = r#"{"last_backup_timestamp":null,"reminders_enabled":true,"reminder_count":0}"#;
     let state = BackupReminderState::from_json(json).unwrap();
     assert_eq!(state.frequency, ReminderFrequency::Weekly);
@@ -173,20 +172,17 @@ fn reminder_frequency_label_roundtrip() {
 fn backup_reminder_storage_roundtrip() {
     let vauchi = Vauchi::in_memory().unwrap();
 
-    // Initially returns default
     let loaded = vauchi.load_backup_reminder_state().unwrap();
     assert!(loaded.reminders_enabled);
     assert_eq!(loaded.reminder_count, 0);
     assert_eq!(loaded.last_backup_timestamp, None);
 
-    // Save custom state
     let mut state = BackupReminderState::new();
     state.reminders_enabled = false;
     state.reminder_count = 5;
     state.last_backup_timestamp = Some(1_700_000_000);
     vauchi.save_backup_reminder_state(&state).unwrap();
 
-    // Load back
     let restored = vauchi.load_backup_reminder_state().unwrap();
     assert!(!restored.reminders_enabled);
     assert_eq!(restored.reminder_count, 5);
@@ -206,10 +202,8 @@ fn export_backup_updates_reminder_state() {
     let state_before = vauchi.load_backup_reminder_state().unwrap();
     assert_eq!(state_before.last_backup_timestamp, None);
 
-    // Export backup
     let _backup = vauchi.export_backup(BACKUP_PASSWORD).unwrap();
 
-    // After export, backup timestamp should be set
     let state_after = vauchi.load_backup_reminder_state().unwrap();
     assert!(
         state_after.last_backup_timestamp.is_some(),

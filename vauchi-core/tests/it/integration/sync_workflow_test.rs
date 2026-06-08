@@ -19,11 +19,9 @@ use vauchi_core::{
 fn test_sync_manager_workflow() {
     use vauchi_core::Storage;
 
-    // Create storage
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let mut sync_manager = SyncManager::new(&storage);
 
-    // Queue a card update
     let mut old_card = ContactCard::new("Test");
     old_card
         .add_field(ContactField::new(
@@ -49,22 +47,17 @@ fn test_sync_manager_workflow() {
         .unwrap();
     assert!(!update_id.as_str().is_empty());
 
-    // Check pending updates
     let pending = sync_manager.get_pending("contact-1").unwrap();
     assert_eq!(pending.len(), 1);
 
-    // Check sync state
     let state = sync_manager.get_sync_state("contact-1").unwrap();
     assert!(matches!(state, vauchi_core::SyncState::Pending { .. }));
 
-    // Mark as delivered
     sync_manager.mark_delivered(&update_id).unwrap();
 
-    // Verify update was removed
     let pending = sync_manager.get_pending("contact-1").unwrap();
     assert_eq!(pending.len(), 0);
 
-    // State should now be synced
     let state = sync_manager.get_sync_state("contact-1").unwrap();
     assert!(matches!(state, vauchi_core::SyncState::Synced { .. }));
 }
@@ -84,17 +77,14 @@ fn test_relay_client_workflow() {
 
     let mut client = RelayClient::new(transport, config, "test-identity".into());
 
-    // Connect
     client.connect().unwrap();
     assert!(client.is_connected());
 
-    // Set up ratchet for encryption
     let bob_dh = X3DHKeyPair::generate();
     let shared_secret = SymmetricKey::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
-    // Send an update
     let msg_id = client
         .send_update(
             0,
@@ -109,11 +99,9 @@ fn test_relay_client_workflow() {
     assert!(!msg_id.as_str().is_empty());
     assert_eq!(client.in_flight_count(), 1);
 
-    // Check in-flight tracking
     let update_ids = client.in_flight_update_ids();
     assert!(update_ids.contains(&"update-1".to_string()));
 
-    // Disconnect
     client.disconnect().unwrap();
     assert!(!client.is_connected());
 }
@@ -162,7 +150,6 @@ fn test_field_modification_and_removal_propagation() {
         .unwrap();
         let old = card.clone();
 
-        // Get field ID and modify
         let field_id = card.fields()[0].id().to_string();
         card.update_field_value(&field_id, "alice.smith@newcompany.com", 0)
             .unwrap();
@@ -227,7 +214,6 @@ fn test_field_modification_and_removal_propagation() {
         let alice_id = alice_contact.id().to_string();
         bob_wb.add_contact(alice_contact).unwrap();
 
-        // Set up ratchets
         let bob_dh = X3DHKeyPair::generate();
         let alice_ratchet =
             DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -242,7 +228,6 @@ fn test_field_modification_and_removal_propagation() {
             .save_ratchet_state(&alice_id, &bob_ratchet, false)
             .unwrap();
 
-        // Alice adds a field
         let old_card = alice_wb.own_card().unwrap().unwrap();
         alice_wb
             .add_own_field(ContactField::new(
@@ -259,7 +244,6 @@ fn test_field_modification_and_removal_propagation() {
             .unwrap();
         assert_eq!(queued, 1, "Should queue update for Bob");
 
-        // Verify Bob can decrypt and receive the added field
         let pending = alice_wb.storage().get_pending_updates(&bob_id).unwrap();
         assert!(!pending.is_empty(), "Should have pending update");
 
@@ -285,7 +269,6 @@ fn test_field_modification_and_removal_propagation() {
         };
         let delta: CardDelta = serde_json::from_slice(&delta_bytes).unwrap();
 
-        // Verify the delta contains the added field
         assert!(
             delta
                 .changes

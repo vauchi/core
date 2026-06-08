@@ -100,7 +100,6 @@ fn existing_contact_without_relay_loads_after_migration() {
     // still load correctly (NULL relay columns → None fields)
     let storage = open_storage();
 
-    // Save without relay fields
     let contact = make_contact("Legacy");
     storage.save_contact(&contact).unwrap();
 
@@ -153,7 +152,6 @@ fn update_contact_relay_url_persists() {
     contact.set_relay_url(Some("https://old-relay.example.com".to_string()));
     storage.save_contact(&contact).unwrap();
 
-    // Update relay URL
     contact.set_relay_url(Some("https://new-relay.example.com".to_string()));
     storage.save_contact(&contact).unwrap();
 
@@ -170,7 +168,6 @@ fn clear_contact_relay_url_persists() {
     contact.set_relay_url(Some("https://frank.relay".to_string()));
     storage.save_contact(&contact).unwrap();
 
-    // Clear relay URL
     contact.set_relay_url(None);
     storage.save_contact(&contact).unwrap();
 

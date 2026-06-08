@@ -144,7 +144,6 @@ fn rekey_handles_mixed_plaintext_and_ciphertext_in_same_column() {
     let (_dir, mut storage) = open_storage_with_contact();
     let key1 = storage.key().clone();
 
-    // Add second contact.
     let other_id = "c2";
     let other_pk = [0x99u8; 32];
     let card_enc = vauchi_core::crypto::encrypt(&key1, b"{\"name\":\"Carol\"}").unwrap();

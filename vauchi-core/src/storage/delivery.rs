@@ -10,8 +10,6 @@ use super::error::{DeliveryRecord, DeliveryStatus};
 use super::{Storage, StorageError};
 
 impl Storage {
-    // === Delivery Records Operations ===
-
     /// Creates a new delivery record.
     pub fn create_delivery_record(&self, record: &DeliveryRecord) -> Result<(), StorageError> {
         let (status_str, status_reason) = status_to_db(&record.status);

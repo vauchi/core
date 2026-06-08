@@ -24,7 +24,6 @@ use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::{Contact, Identity, SymmetricKey, Vauchi};
 
 // ============================================================
-// Helpers
 // ============================================================
 
 /// Add `field_count` email fields to the own card, return field IDs.
@@ -166,9 +165,7 @@ proptest! {
         );
     }
 
-    // ============================================================
     // Property: group membership determines visibility (no overrides)
-    // ============================================================
 
     /// A contact in a group sees exactly the fields that group makes visible
     /// (when no per-contact overrides exist and no fallback VisibilityRules are set).
@@ -222,9 +219,7 @@ proptest! {
         }
     }
 
-    // ============================================================
     // Property: override removal restores group-based visibility
-    // ============================================================
 
     /// After removing a hide-override, the field returns to its group-based
     /// visibility (visible if in the group's visible_fields, hidden otherwise).
@@ -283,9 +278,7 @@ proptest! {
         );
     }
 
-    // ============================================================
     // Property: multi-group union — contact sees union of all fields
-    // ============================================================
 
     /// A contact in multiple groups sees the union of all fields visible
     /// across those groups. Each group contributes its visible_fields set,
@@ -335,9 +328,7 @@ proptest! {
         }
     }
 
-    // ============================================================
     // Property: determinism — same state always produces same result
-    // ============================================================
 
     /// Calling `get_effective_field_visibility` twice on identical state
     /// must return the same result (no side effects, pure read).
@@ -352,7 +343,6 @@ proptest! {
         let field_ids = add_own_fields(&vauchi, field_count);
         let contact_id = add_contact(&vauchi, "Iris");
 
-        // Set up some random visibility using seed
         let group = vauchi.create_group("DeterminismGroup").unwrap();
         let gid = group.id().to_string();
         if seed & 1 == 1 {
@@ -385,9 +375,7 @@ proptest! {
         }
     }
 
-    // ============================================================
     // Property: build_shared_info iteration consistency
-    // ============================================================
 
     /// `build_shared_info` iterates own-card fields and calls
     /// `get_effective_field_visibility` per field. This property verifies
@@ -412,13 +400,11 @@ proptest! {
             let g = vauchi.create_group(&format!("G{}", i)).unwrap();
             group_ids.push(g.id().to_string());
         }
-        // Assign contact to groups based on seed
         for (g_idx, gid) in group_ids.iter().enumerate() {
             if (seed >> (4 + g_idx)) & 1 == 1 {
                 vauchi.add_contact_to_group(gid, &contact_id).unwrap();
             }
         }
-        // Assign fields to groups based on seed
         for (f_idx, fid) in field_ids.iter().enumerate() {
             for (g_idx, gid) in group_ids.iter().enumerate() {
                 if (seed >> (8 + f_idx * 4 + g_idx)) & 1 == 1 {

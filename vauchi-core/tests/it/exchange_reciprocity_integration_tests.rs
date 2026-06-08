@@ -28,7 +28,6 @@ fn drive_mutual_qr_exchange() -> (ExchangeSession, ExchangeSession) {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Both start QR display
     session_a.apply(ExchangeEvent::StartQR).unwrap();
     session_b.apply(ExchangeEvent::StartQR).unwrap();
 
@@ -42,7 +41,6 @@ fn drive_mutual_qr_exchange() -> (ExchangeSession, ExchangeSession) {
     session_a.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
     session_b.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
 
-    // Both perform key agreement
     session_a.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
     session_b.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
 

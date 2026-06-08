@@ -23,7 +23,6 @@ fn test_chunker_single_chunk_small_payload() {
     assert_eq!(index, 0);
     assert_eq!(total, 1);
 
-    // Verify payload data
     assert_eq!(&chunk[BLE_CHUNK_OVERHEAD..], &data[..]);
 }
 
@@ -39,7 +38,6 @@ fn test_chunker_multiple_chunks() {
     assert_eq!(chunker.total_chunks(), expected_chunks);
     assert_eq!(expected_chunks, 3);
 
-    // Every chunk should have the correct total_chunks in its header
     for i in 0..expected_chunks {
         let chunk = chunker.chunk(i).expect("chunk should exist");
         let total = u16::from_le_bytes([chunk[2], chunk[3]]);
@@ -82,12 +80,10 @@ fn test_reassembly_out_of_order() {
     let chunker = BleChunker::new(&data, mtu_usable);
     let total = chunker.total_chunks();
 
-    // Collect all chunks
     let chunks: Vec<Vec<u8>> = (0..total)
         .map(|i| chunker.chunk(i).expect("chunk should exist"))
         .collect();
 
-    // Insert in reverse order
     let mut reassembler = BleReassembler::new(total).unwrap();
     for chunk in chunks.iter().rev() {
         reassembler
@@ -112,7 +108,6 @@ fn test_reassembly_duplicate_chunk_is_idempotent() {
 
     let mut reassembler = BleReassembler::new(total).unwrap();
 
-    // Insert first chunk twice
     let chunk0 = chunker.chunk(0).expect("chunk 0 should exist");
     reassembler
         .insert_chunk(&chunk0)
@@ -138,7 +133,6 @@ fn test_reassembly_incomplete_returns_none() {
 
     let mut reassembler = BleReassembler::new(total).unwrap();
 
-    // Insert only the first chunk
     let chunk0 = chunker.chunk(0).expect("chunk 0 should exist");
     reassembler
         .insert_chunk(&chunk0)
@@ -157,7 +151,6 @@ fn test_chunk_index_out_of_range() {
     let chunker = BleChunker::new(&data, mtu_usable);
     assert_eq!(chunker.total_chunks(), 1);
 
-    // Index >= total should return None
     assert!(chunker.chunk(1).is_none());
     assert!(chunker.chunk(100).is_none());
     assert!(chunker.chunk(u16::MAX).is_none());

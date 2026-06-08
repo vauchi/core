@@ -53,7 +53,6 @@ pub fn decode_message(data: &[u8]) -> Result<MessageEnvelope, NetworkError> {
     let envelope: MessageEnvelope =
         serde_json::from_slice(data).map_err(|e| NetworkError::InvalidMessage(e.to_string()))?;
 
-    // Version check
     if envelope.version != PROTOCOL_VERSION {
         return Err(NetworkError::InvalidMessage(format!(
             "Unsupported protocol version: {}",
@@ -104,7 +103,6 @@ mod tests {
 
         let encoded = encode_message(&envelope).unwrap();
 
-        // Skip the 4-byte length prefix
         let decoded = decode_message(&encoded[FRAME_HEADER_SIZE..]).unwrap();
 
         assert_eq!(decoded.version, envelope.version);
@@ -117,10 +115,8 @@ mod tests {
         let envelope = create_test_envelope();
         let encoded = encode_message(&envelope).unwrap();
 
-        // First 4 bytes should be length prefix
         let length = read_frame_length(&encoded[..4].try_into().unwrap());
 
-        // Remaining bytes should be the JSON payload
         assert_eq!(length, encoded.len() - FRAME_HEADER_SIZE);
     }
 

@@ -35,12 +35,10 @@ fn test_accept_relay_exchange_creates_contact() {
     // Bob initiates X3DH toward Alice
     let (_, bob_ephemeral_pub) = X3DH::initiate(&bob_ephemeral, alice_x3dh.public_key()).unwrap();
 
-    // Alice accepts via the new API
     let contact_id = wb
         .accept_relay_exchange(bob_identity.public_key(), &bob_ephemeral_pub, "Bob")
         .unwrap();
 
-    // Verify contact was created
     let contact = wb.get_contact(&contact_id).unwrap();
     assert!(contact.is_some(), "Contact must exist after accept");
     assert_eq!(
@@ -90,7 +88,6 @@ fn test_accept_relay_exchange_rejects_duplicate() {
 
     let (_, bob_ephemeral_pub) = X3DH::initiate(&bob_ephemeral, alice_x3dh.public_key()).unwrap();
 
-    // First exchange succeeds
     wb.accept_relay_exchange(bob_identity.public_key(), &bob_ephemeral_pub, "Bob")
         .unwrap();
 
@@ -104,7 +101,6 @@ fn test_accept_relay_exchange_rejects_duplicate() {
 #[test]
 fn test_accept_relay_exchange_requires_identity() {
     let wb = Vauchi::in_memory().unwrap();
-    // No identity created
 
     let bob_identity = X3DHKeyPair::generate();
     let bob_ephemeral = X3DHKeyPair::generate();

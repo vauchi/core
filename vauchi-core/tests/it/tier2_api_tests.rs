@@ -35,12 +35,10 @@ fn test_vauchi_find_device_by_prefix_with_registry() {
     let identity = wb.identity().unwrap();
     let registry = identity.initial_device_registry();
 
-    // Get the primary device's hex ID
     let primary = registry.primary_device().unwrap();
     let hex_id = primary.device_id_hex();
     let prefix = &hex_id[..8];
 
-    // Save registry to storage
     wb.storage().save_device_registry(&registry).unwrap();
 
     // Find device by prefix through the facade
@@ -58,7 +56,6 @@ fn test_vauchi_find_device_by_prefix_no_registry() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    // No registry saved -> should return None
     let found = wb.find_device_by_prefix("abcd").unwrap();
     assert!(
         found.is_none(),
@@ -78,7 +75,6 @@ fn test_get_delivery_status_for_contact_returns_matching_records() {
 
     let timestamp = now();
 
-    // Insert delivery records directly into storage for two different contacts
     let record1 = DeliveryRecord {
         message_id: "msg-001".to_string(),
         recipient_id: "contact-aaa".to_string(),
@@ -108,7 +104,6 @@ fn test_get_delivery_status_for_contact_returns_matching_records() {
     wb.storage().create_delivery_record(&record2).unwrap();
     wb.storage().create_delivery_record(&record3).unwrap();
 
-    // Query for contact-aaa only
     let results = wb.get_delivery_status_for_contact("contact-aaa").unwrap();
     assert_eq!(
         results.len(),
@@ -116,12 +111,10 @@ fn test_get_delivery_status_for_contact_returns_matching_records() {
         "Should return exactly 2 records for contact-aaa"
     );
 
-    // Verify all returned records belong to the correct contact
     for record in &results {
         assert_eq!(record.recipient_id, "contact-aaa");
     }
 
-    // Verify specific message IDs are present
     let message_ids: Vec<&str> = results.iter().map(|r| r.message_id.as_str()).collect();
     assert!(message_ids.contains(&"msg-001"), "Should contain msg-001");
     assert!(message_ids.contains(&"msg-003"), "Should contain msg-003");
@@ -148,7 +141,6 @@ fn test_get_failed_deliveries_returns_only_failed() {
 
     let timestamp = now();
 
-    // Insert records with various statuses
     let records = vec![
         DeliveryRecord {
             message_id: "msg-ok".to_string(),
@@ -246,7 +238,6 @@ fn test_apply_sync_items_processes_contact_added() {
     let mut wb = create_test_vauchi();
     wb.create_identity("Alice").unwrap();
 
-    // Verify no contacts initially
     assert_eq!(wb.contact_count().unwrap(), 0);
 
     let bob_id = contact_id_for_seed(0xAA);
@@ -258,7 +249,6 @@ fn test_apply_sync_items_processes_contact_added() {
     let applied = wb.apply_sync_items(items).unwrap();
     assert_eq!(applied, 1, "Should have applied 1 sync item");
 
-    // Verify the contact was added
     assert_eq!(wb.contact_count().unwrap(), 1);
     let contact = wb.get_contact(&bob_id).unwrap();
     assert!(contact.is_some(), "Contact should exist after sync");
@@ -273,7 +263,6 @@ fn test_apply_sync_items_processes_contact_removed() {
 
     let charlie_id = contact_id_for_seed(0xCC);
 
-    // First add a contact via sync
     let add_items = vec![SyncItem::ContactAdded {
         contact_data: make_contact_sync_data(0xCC, "Charlie"),
         timestamp: now(),
@@ -281,7 +270,6 @@ fn test_apply_sync_items_processes_contact_removed() {
     wb.apply_sync_items(add_items).unwrap();
     assert_eq!(wb.contact_count().unwrap(), 1);
 
-    // Now remove it via sync
     let remove_items = vec![SyncItem::ContactRemoved {
         contact_id: charlie_id.clone(),
         timestamp: now() + 1,
@@ -289,7 +277,6 @@ fn test_apply_sync_items_processes_contact_removed() {
     let applied = wb.apply_sync_items(remove_items).unwrap();
     assert_eq!(applied, 1, "Should have applied the removal");
 
-    // Verify it's gone
     let contact = wb.get_contact(&charlie_id).unwrap();
     assert!(contact.is_none(), "Contact should be removed after sync");
 }
@@ -302,14 +289,12 @@ fn test_apply_sync_items_processes_visibility_changed() {
 
     let diana_id = contact_id_for_seed(0xDD);
 
-    // Add a contact first
     let add_items = vec![SyncItem::ContactAdded {
         contact_data: make_contact_sync_data(0xDD, "Diana"),
         timestamp: now(),
     }];
     wb.apply_sync_items(add_items).unwrap();
 
-    // Change visibility
     let vis_items = vec![SyncItem::VisibilityChanged {
         contact_id: diana_id.clone(),
         field_label: "email".to_string(),
@@ -320,7 +305,6 @@ fn test_apply_sync_items_processes_visibility_changed() {
     let applied = wb.apply_sync_items(vis_items).unwrap();
     assert_eq!(applied, 1, "Should have applied visibility change");
 
-    // Verify the override was persisted
     let overrides = wb.get_contact_visibility_overrides(&diana_id).unwrap();
     assert_eq!(
         overrides.get("email"),

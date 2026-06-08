@@ -19,14 +19,12 @@ fn settings_toggle_persists_after_navigate_away_and_back() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate to Settings
     let screen = engine.navigate_to(AppScreen::Settings);
     assert!(
         find_settings_toggle(&screen, "privacy", "delivery_receipts"),
         "delivery_receipts should default to enabled"
     );
 
-    // Toggle delivery_receipts off
     let result = engine.handle_action(UserAction::SettingsToggled {
         component_id: "privacy".into(),
         item_id: "delivery_receipts".into(),
@@ -41,7 +39,6 @@ fn settings_toggle_persists_after_navigate_away_and_back() {
         other => panic!("Expected UpdateScreen, got {other:?}"),
     }
 
-    // Navigate away to Home
     engine.navigate_to(AppScreen::MyInfo);
 
     // Invalidate Settings cache to force fresh engine from vauchi.config()
@@ -62,7 +59,6 @@ fn settings_toggle_suppress_presence_persists() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate to Settings
     let screen = engine.navigate_to(AppScreen::Settings);
     assert!(
         !find_settings_toggle(&screen, "privacy", "suppress_presence"),
@@ -75,7 +71,6 @@ fn settings_toggle_suppress_presence_persists() {
         item_id: "suppress_presence".into(),
     });
 
-    // Navigate away and invalidate
     engine.navigate_to(AppScreen::MyInfo);
     engine.invalidate_screen(&AppScreen::Settings);
 
@@ -94,10 +89,8 @@ fn settings_emergency_wipe_navigates_to_shred() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate to Settings
     engine.navigate_to(AppScreen::Settings);
 
-    // Select emergency_wipe from the danger group
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "danger".into(),
         item_id: "emergency_wipe".into(),
@@ -133,7 +126,6 @@ fn duress_pin_setup_persists_via_handle_completion() {
     vauchi.setup_app_password("123456").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate to DuressPin screen
     engine.navigate_to(AppScreen::DuressPin);
 
     // Step 1: Press "configure" on overview
@@ -171,7 +163,6 @@ fn duress_pin_setup_persists_via_handle_completion() {
         result
     );
 
-    // Verify duress was actually persisted in storage
     let vauchi = engine.vauchi();
     assert!(
         vauchi.is_duress_enabled().unwrap(),
@@ -190,10 +181,8 @@ fn duress_pin_disable_persists_via_handle_completion() {
     assert!(vauchi.is_duress_enabled().unwrap());
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate to DuressPin screen
     engine.navigate_to(AppScreen::DuressPin);
 
-    // Press "disable" then "confirm_disable"
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "disable".into(),
     });
@@ -359,7 +348,6 @@ fn change_password_mismatch_disables_submit() {
         component_id: "new_password".into(),
         value: "new-pin-9876".into(),
     });
-    // Confirm differs from new
     let result = engine.handle_action(UserAction::TextChanged {
         component_id: "confirm_password".into(),
         value: "different".into(),
@@ -386,7 +374,6 @@ fn lock_screen_wrong_pin_stays_locked() {
     let mut engine = engine_with_password("123456");
     assert_eq!(engine.current_app_screen(), &AppScreen::Lock);
 
-    // Enter wrong PIN and press unlock
     enter_pin(&mut engine, "999999");
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "unlock".into(),
@@ -411,7 +398,6 @@ fn lock_screen_correct_pin_unlocks() {
     let mut engine = engine_with_password("123456");
     assert_eq!(engine.current_app_screen(), &AppScreen::Lock);
 
-    // Enter correct PIN and press unlock
     enter_pin(&mut engine, "123456");
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "unlock".into(),
@@ -438,7 +424,6 @@ fn lock_screen_empty_pin_does_not_unlock() {
     let mut engine = engine_with_password("123456");
     assert_eq!(engine.current_app_screen(), &AppScreen::Lock);
 
-    // Press unlock without entering any PIN
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "unlock".into(),
     });
@@ -460,7 +445,6 @@ fn lock_screen_empty_pin_does_not_unlock() {
 fn lock_screen_tracks_failed_attempts() {
     let mut engine = engine_with_password("123456");
 
-    // Enter wrong PIN twice
     for _ in 0..2 {
         enter_pin(&mut engine, "000000");
         // Intermediate step: trigger failed attempt — attempt count asserted below
@@ -468,19 +452,15 @@ fn lock_screen_tracks_failed_attempts() {
             action_id: "unlock".into(),
         });
         // Clear PIN for next attempt — navigate back to lock to get fresh engine
-        // Actually LockScreenEngine should still be active, but PIN persists.
         // We need to clear the entered PIN for the next attempt.
-        // The lock screen should show remaining attempts in the validation error.
     }
 
-    // Should still be on Lock screen
     assert_eq!(
         engine.current_app_screen(),
         &AppScreen::Lock,
         "should remain locked after failed attempts"
     );
 
-    // The screen should show attempt tracking info
     let screen = engine.current_screen();
     let has_validation_error = screen.components.iter().any(|c| {
         matches!(

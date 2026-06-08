@@ -19,7 +19,6 @@ fn test_visibility_control_happy_path() {
     let mut alice_wb: Vauchi = Vauchi::in_memory().unwrap();
     alice_wb.create_identity("Alice").unwrap();
 
-    // Add fields to Alice's card
     alice_wb
         .add_own_field(ContactField::new(
             FieldType::Phone,

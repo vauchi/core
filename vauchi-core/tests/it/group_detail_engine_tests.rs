@@ -99,11 +99,9 @@ fn group_detail_delete_shows_inline_confirm() {
 #[test]
 fn group_detail_confirm_delete_completes() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
-    // First trigger the delete to enter pending state
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete_group".into(),
     });
-    // Then confirm
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "confirm_delete_group".into(),
     });
@@ -118,11 +116,9 @@ fn group_detail_confirm_delete_completes() {
 #[test]
 fn group_detail_cancel_delete_removes_inline_confirm() {
     let mut engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
-    // Trigger delete
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete_group".into(),
     });
-    // Cancel
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel_delete_group".into(),
     });
@@ -157,7 +153,6 @@ fn group_detail_has_preview_as_member_actions() {
     let engine = GroupDetailEngine::new("g1".into(), "Family".into(), sample_members());
     let screen = engine.current_screen();
 
-    // Each member should have a corresponding "preview-as-member:<id>" action.
     let action_ids: Vec<&str> = screen.actions.iter().map(|a| a.id.as_str()).collect();
     assert!(
         action_ids.contains(&"preview-as-member:c1"),

@@ -108,7 +108,6 @@ proptest! {
             apply_op(&wb, &cid, op);
         }
 
-        // Read back current state
         let shared_names: Vec<SharedName> = wb
             .list_contact_shared_names(&cid)
             .expect("list_contact_shared_names must not error");

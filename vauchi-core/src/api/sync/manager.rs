@@ -99,7 +99,6 @@ impl<'a> SyncManager<'a> {
         old_card: &ContactCard,
         new_card: &ContactCard,
     ) -> Result<String, SyncError> {
-        // Compute delta
         let mut delta = CardDelta::compute(old_card, new_card, self.storage.clock().unix_seconds());
 
         if delta.changes.is_empty() {
@@ -116,7 +115,6 @@ impl<'a> SyncManager<'a> {
         delta.set_version(next_version);
         self.record_applied_version(contact_id, next_version);
 
-        // Serialize delta
         let payload =
             serde_json::to_vec(&delta).map_err(|e| SyncError::Serialization(e.to_string()))?;
 
@@ -183,15 +181,12 @@ impl<'a> SyncManager<'a> {
     ///
     /// Also updates the contact's last sync timestamp.
     pub fn mark_delivered(&self, update_id: &str) -> Result<bool, SyncError> {
-        // Get the update first to find the contact_id
         if let Some(update) = self.storage.get_pending_update(update_id)? {
             let contact_id = update.contact_id;
 
-            // Delete the update
             let deleted = self.storage.mark_update_sent(update_id)?;
 
             if deleted {
-                // Update the contact's last sync timestamp
                 let now = self.storage.clock().unix_seconds();
                 self.storage.set_contact_last_sync(&contact_id, now)?;
             }
@@ -232,12 +227,10 @@ impl<'a> SyncManager<'a> {
         let pending = self.storage.get_pending_updates(contact_id)?;
 
         if pending.is_empty() {
-            // Get actual last sync time from storage
             let last_sync = self.storage.get_contact_last_sync(contact_id)?.unwrap_or(0);
             return Ok(SyncState::Synced { last_sync });
         }
 
-        // Check if any update is currently being sent
         let is_syncing = pending
             .iter()
             .any(|u| matches!(u.status, UpdateStatus::Sending));
@@ -245,7 +238,6 @@ impl<'a> SyncManager<'a> {
             return Ok(SyncState::Syncing);
         }
 
-        // Check for failed updates
         let failed = pending
             .iter()
             .find(|u| matches!(u.status, UpdateStatus::Failed { .. }));
@@ -258,7 +250,6 @@ impl<'a> SyncManager<'a> {
             });
         }
 
-        // Has pending updates
         let last_attempt = pending
             .iter()
             .filter_map(|u| {
@@ -280,7 +271,6 @@ impl<'a> SyncManager<'a> {
     pub fn sync_status(&self) -> Result<HashMap<String, SyncState>, SyncError> {
         let all_pending = self.storage.get_all_pending_updates()?;
 
-        // Group by contact_id
         let mut by_contact: HashMap<String, Vec<&PendingUpdate>> = HashMap::new();
         for update in &all_pending {
             by_contact
@@ -305,7 +295,6 @@ impl<'a> SyncManager<'a> {
     pub fn coalesce_updates(&self, contact_id: &str) -> Result<Option<String>, SyncError> {
         let pending = self.storage.get_pending_updates(contact_id)?;
 
-        // Only coalesce if there are multiple card_update entries
         let card_updates: Vec<_> = pending
             .iter()
             .filter(|u| u.update_type == "card_update")
@@ -315,7 +304,6 @@ impl<'a> SyncManager<'a> {
             return Ok(None);
         }
 
-        // Parse and merge all deltas
         let mut merged_changes = Vec::new();
         let mut highest_version = 0u32;
 
@@ -330,7 +318,6 @@ impl<'a> SyncManager<'a> {
             return Ok(None);
         }
 
-        // Create merged delta
         let now = self.storage.clock().unix_seconds();
 
         // Generate random nonce for replay detection
@@ -360,7 +347,6 @@ impl<'a> SyncManager<'a> {
             target_relay_url: None,
         };
 
-        // Remove old updates and add merged one
         for update in card_updates {
             self.storage.mark_update_sent(&update.id)?;
         }
@@ -410,7 +396,6 @@ impl<'a> SyncManager<'a> {
             return SyncState::Synced { last_sync: 0 };
         }
 
-        // Check for syncing
         let is_syncing = updates
             .iter()
             .any(|u| matches!(u.status, UpdateStatus::Sending));
@@ -418,7 +403,6 @@ impl<'a> SyncManager<'a> {
             return SyncState::Syncing;
         }
 
-        // Check for failed
         let failed = updates
             .iter()
             .find(|u| matches!(u.status, UpdateStatus::Failed { .. }));
@@ -431,7 +415,6 @@ impl<'a> SyncManager<'a> {
             };
         }
 
-        // Pending
         SyncState::Pending {
             queued_count: updates.len(),
             last_attempt: None,

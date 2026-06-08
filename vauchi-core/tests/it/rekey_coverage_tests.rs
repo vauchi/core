@@ -121,11 +121,9 @@ fn test_rekey_preserves_cek_encrypted() {
         rusqlite::params![card_enc, sk_enc, test_cek],
     ).unwrap();
 
-    // Rekey
     let key2 = SymmetricKey::generate();
     storage.rekey(key2.clone()).unwrap();
 
-    // Verify readable with new key
     let loaded: Vec<u8> = storage
         .connection()
         .query_row(

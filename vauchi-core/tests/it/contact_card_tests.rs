@@ -98,11 +98,9 @@ fn test_contact_card_show_hide_field() {
     // Default: hidden (no explicit visibility rule)
     assert!(!card.is_field_shown(&field_id));
 
-    // Show it
     card.set_field_shown(&field_id, true);
     assert!(card.is_field_shown(&field_id));
 
-    // Hide it
     card.set_field_shown(&field_id, false);
     assert!(!card.is_field_shown(&field_id));
 }

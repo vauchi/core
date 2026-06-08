@@ -467,7 +467,6 @@ fn callback_receives_events_during_verification() {
         .unwrap();
 
     let events = received.lock().unwrap();
-    // Should have received at least InProgress + Completed
     assert!(
         events.len() >= 2,
         "Expected at least 2 events, got {}",
@@ -540,7 +539,6 @@ fn no_callback_does_not_panic() {
         VerifierMethod::Ultrasonic,
         Box::new(MockProximityVerifier::success()),
     );
-    // No set_event_callback call
 
     let emit = [1u8; 16];
     let listen = [2u8; 16];

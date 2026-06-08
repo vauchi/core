@@ -75,8 +75,6 @@ impl DebugSession {
             .join("\n")
     }
 
-    // --- UX event methods ---
-
     /// Log a screen appearing.
     pub fn log_screen_appeared(&mut self, screen: ScreenId) {
         self.push_event(LogEventKind::ScreenAppeared { screen });
@@ -215,8 +213,6 @@ impl DebugSession {
             }
         }
     }
-
-    // --- Internal ---
 
     fn push_event(&mut self, kind: LogEventKind) {
         if !self.active {

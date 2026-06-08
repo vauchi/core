@@ -56,7 +56,6 @@ fn nfc_data_received_with_valid_payload_completes_exchange() {
     let mut alice = nfc_session("Alice");
     let mut bob = nfc_session("Bob");
 
-    // Get Bob's NFC payload from his initial commands
     bob.emit_initial_commands();
     let bob_cmds = bob.drain_commands();
     let bob_payload = match &bob_cmds[0] {
@@ -64,12 +63,10 @@ fn nfc_data_received_with_valid_payload_completes_exchange() {
         _ => panic!("expected NfcActivate"),
     };
 
-    // Alice receives Bob's NFC payload via tap
     alice
         .apply_hardware_event(Event::NfcDataReceived { data: bob_payload })
         .unwrap();
 
-    // After NFC tap, session should reach AwaitingKeyAgreement or beyond
     // The NFC tap is the proximity proof — key agreement should auto-proceed
     assert!(
         !matches!(alice.state(), ExchangeState::Failed { .. }),
@@ -89,7 +86,6 @@ fn nfc_data_received_with_valid_payload_completes_exchange() {
 fn nfc_hardware_unavailable_does_not_crash() {
     let mut session = nfc_session("Alice");
 
-    // NFC unavailable should not fail the session fatally
     session
         .apply_hardware_event(Event::HardwareUnavailable {
             transport: "NFC".into(),
@@ -122,7 +118,6 @@ fn nfc_tap_emits_deactivate_after_processing() {
         .apply_hardware_event(Event::NfcDataReceived { data: bob_payload })
         .unwrap();
 
-    // After processing, NFC interface should be deactivated
     let cmds = alice.drain_commands();
     let has_deactivate = cmds.iter().any(|c| matches!(c, Command::NfcDeactivate));
     assert!(

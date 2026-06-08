@@ -883,7 +883,6 @@ impl AppEngine {
             .and_then(|a| a.downcast_ref::<crate::ui::avatar_editor::AvatarEditorEngine>());
         if let Some(editor) = editor {
             if editor.avatar_removed() {
-                // Clear avatar from own card
                 if let Ok(Some(mut card)) = self.vauchi.own_card() {
                     card.clear_avatar();
                     if let Err(e) = self.vauchi.update_own_card(&card) {

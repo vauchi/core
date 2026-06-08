@@ -21,14 +21,12 @@ fn dual_vauchi_instance_sees_each_others_identity_writes() {
     let storage_key = SymmetricKey::generate();
     let db_path = dir.path().join("vauchi.db");
 
-    // Both instances open the same DB simultaneously.
     let config_a = VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key.clone());
     let mut vauchi_a = Vauchi::new(config_a).unwrap();
 
     let config_b = VauchiConfig::with_storage_path(&db_path).with_storage_key(storage_key);
     let mut vauchi_b = Vauchi::new(config_b).unwrap();
 
-    // Both initially see no identity.
     assert!(!vauchi_a.has_identity());
     assert!(!vauchi_b.has_identity());
 

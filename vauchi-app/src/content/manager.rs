@@ -306,7 +306,6 @@ impl ContentManager {
             }
         }
 
-        // Save updated manifest
         self.cache.save_manifest(&remote)?;
         // best-effort: see check_for_updates rationale
         #[allow(clippy::let_underscore_must_use)]
@@ -331,7 +330,6 @@ impl ContentManager {
         let cached = self.cache.get_manifest();
         let mut updates = Vec::new();
 
-        // Check networks
         if let Some(remote_entry) = &remote.content.networks {
             let needs_update = cached
                 .as_ref()

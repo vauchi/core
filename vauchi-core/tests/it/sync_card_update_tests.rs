@@ -38,13 +38,11 @@ fn setup_exchange_with_ratchets() -> (
 
     let shared_secret = SymmetricKey::generate();
 
-    // Alice adds Bob as contact
     let bob_contact =
         Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone(), 0);
     let bob_contact_id = bob_contact.id().to_string();
     alice_wb.add_contact(bob_contact).unwrap();
 
-    // Bob adds Alice as contact
     let alice_contact = Contact::from_exchange(
         alice_pk,
         ContactCard::new("Alice"),
@@ -112,7 +110,6 @@ fn create_valid_update(
     };
     let payload = VersionedPayload::encode_cek(&wrapped);
 
-    // Load Bob's ratchet for Alice, encrypt, save updated state
     let (mut bob_ratchet, is_init) = bob_wb
         .storage()
         .load_ratchet_state(alice_contact_id)
@@ -176,7 +173,6 @@ fn test_process_single_valid_update() {
 
     assert!(result.is_ok(), "Valid update should succeed: {:?}", result);
 
-    // Verify card was updated
     let contact = alice_wb
         .storage()
         .load_contact(&bob_contact_id)
@@ -208,7 +204,6 @@ fn test_sender_revoked_rejected() {
         &new_card,
     );
 
-    // Mark sender as revoked
     alice_wb
         .storage()
         .record_revoked_sender(&bob_contact_id, 1000)
@@ -267,7 +262,6 @@ fn test_contact_blocked_rejected() {
         &new_card,
     );
 
-    // Block the contact
     alice_wb.block_contact(&bob_contact_id).unwrap();
 
     let result = process_single_card_update(
@@ -320,7 +314,6 @@ fn test_invalid_ratchet_message_rejected() {
     let (alice_wb, _bob_wb, _shared_secret, bob_contact_id, _alice_contact_id) =
         setup_exchange_with_ratchets();
 
-    // Send garbage that isn't valid JSON for RatchetMessage
     let result = process_single_card_update(
         alice_wb.identity().unwrap(),
         alice_wb.storage(),
@@ -451,7 +444,6 @@ fn test_replay_detected() {
         ))
         .unwrap();
 
-    // Create and process the first update
     let ciphertext1 = create_valid_update(
         &bob_wb,
         &alice_signing_pk,
@@ -480,7 +472,6 @@ fn test_replay_detected() {
         .save_replay_nonce(&bob_contact_id, &test_nonce, 1000)
         .unwrap();
 
-    // Create an update whose delta has the pre-recorded nonce
     let mut new_card2 = ContactCard::new("Bob");
     new_card2
         .add_field(ContactField::new(
@@ -552,7 +543,6 @@ fn test_batch_partial_failure() {
         ))
         .unwrap();
 
-    // Valid update
     let valid_ciphertext = create_valid_update(
         &bob_wb,
         &alice_signing_pk,
@@ -624,7 +614,6 @@ fn test_decode_versioned_payload_cek_wrapped() {
 
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
 
-    // CEK-wrap the delta
     let cek = ContentEncryptionKey::generate();
     let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
 
@@ -636,7 +625,6 @@ fn test_decode_versioned_payload_cek_wrapped() {
     };
     let payload = VersionedPayload::encode_cek(&wrapped);
 
-    // Encrypt with ratchet
     let (mut bob_ratchet, is_init) = bob_wb
         .storage()
         .load_ratchet_state(&alice_contact_id)
@@ -771,7 +759,6 @@ fn test_field_note_cleaned_on_inbound_field_removed() {
     let alice_signing_pk = *alice_wb.identity().unwrap().signing_public_key();
 
     // Bob's card starts with TWO fields: Email (will be removed) and Phone (will be kept).
-    // Alice has a private note on both fields.
     let mut old_card = ContactCard::new("Bob");
     old_card
         .add_field(ContactField::new(
@@ -801,7 +788,6 @@ fn test_field_note_cleaned_on_inbound_field_removed() {
     alice_bob_contact.update_card(old_card.clone(), 0);
     alice_wb.storage().save_contact(&alice_bob_contact).unwrap();
 
-    // Alice writes private notes on both of Bob's fields.
     alice_wb
         .storage()
         .save_contact_field_note(
@@ -815,7 +801,6 @@ fn test_field_note_cleaned_on_inbound_field_removed() {
         .save_contact_field_note(&bob_contact_id, &retained_field_id, b"best number to call")
         .unwrap();
 
-    // Verify both notes exist before the update.
     let notes_before = alice_wb
         .storage()
         .load_contact_field_notes(&bob_contact_id)
@@ -826,7 +811,6 @@ fn test_field_note_cleaned_on_inbound_field_removed() {
         "Both field notes should exist before update"
     );
 
-    // Bob sends an update that removes only the email field; phone stays.
     let mut new_card = ContactCard::new("Bob");
     new_card
         .add_field(ContactField::new(

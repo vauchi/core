@@ -212,7 +212,6 @@ fn test_ux_state_encrypted_in_db() {
         demo_plain.is_none_or(|s| s.is_empty()),
         "plaintext demo_contact_json should be cleared"
     );
-    // Encrypted columns should have data
     assert!(
         aha_enc.is_some() && !aha_enc.unwrap().is_empty(),
         "aha_tracker_json_encrypted should have data"
@@ -263,7 +262,6 @@ fn test_audit_log_encrypted_in_db() {
         details_plain.is_none_or(|s| s.is_empty()),
         "plaintext details should be cleared"
     );
-    // Encrypted details should have data
     assert!(
         details_enc.is_some() && !details_enc.unwrap().is_empty(),
         "details_encrypted should have data"
@@ -306,7 +304,6 @@ fn test_rekey_preserves_ux_state() {
     let demo_state = DemoContactState::new_active(0);
     storage.save_ux_state(&tracker, &demo_state).unwrap();
 
-    // Rekey
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
@@ -324,12 +321,10 @@ fn test_rekey_preserves_audit_log() {
         .log_audit_event("test_event", Some("sensitive details"))
         .unwrap();
 
-    // Rekey
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
     drop(storage);
 
-    // Verify at DB level that the record still exists
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
     let count: i64 = raw_conn
@@ -407,11 +402,9 @@ fn test_rekey_preserves_encrypted_personal_notes() {
         .save_personal_notes(&contact_id, note_text.as_bytes())
         .unwrap();
 
-    // Rekey
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    // Data should still be readable.
     let loaded = storage.load_personal_notes(&contact_id).unwrap().unwrap();
     assert_eq!(
         String::from_utf8(loaded).unwrap(),
@@ -442,11 +435,9 @@ fn test_rekey_heals_plaintext_field_notes() {
             .unwrap();
     }
 
-    // Rekey should NOT crash.
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    // Data should be readable after rekey.
     let loaded = storage.load_contact_field_notes(&contact_id).unwrap();
     assert_eq!(loaded.len(), 1, "Should have one field note");
     assert_eq!(
@@ -455,7 +446,6 @@ fn test_rekey_heals_plaintext_field_notes() {
         "Plaintext field notes should survive rekey via self-healing"
     );
 
-    // Verify the DB column now contains encrypted data.
     {
         let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
         let raw: Vec<u8> = raw_conn
@@ -488,11 +478,9 @@ fn test_rekey_preserves_encrypted_field_notes() {
         .save_contact_field_note(&contact_id, field_id, b"personal phone")
         .unwrap();
 
-    // Rekey
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
-    // Data should still be readable.
     let loaded = storage.load_contact_field_notes(&contact_id).unwrap();
     assert_eq!(
         String::from_utf8(loaded[field_id].clone()).unwrap(),
@@ -510,7 +498,6 @@ fn test_notes_stored_encrypted_at_rest() {
     storage.save_contact(&contact).unwrap();
     let contact_id = contact.id().to_string();
 
-    // Save via API
     storage
         .save_personal_notes(&contact_id, b"secret note")
         .unwrap();

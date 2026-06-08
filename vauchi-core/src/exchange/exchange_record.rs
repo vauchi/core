@@ -13,8 +13,6 @@ use serde::{Deserialize, Serialize};
 
 use super::mode::{DataTransport, ExchangeContext, ExchangeMode, ProximityMethod};
 
-// ── ProximityResult ──────────────────────────────────────────────────────────
-
 /// Outcome of a single proximity verification attempt during an exchange.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProximityResult {
@@ -26,8 +24,6 @@ pub struct ProximityResult {
     pub succeeded: bool,
 }
 
-// ── ReverificationRecord ─────────────────────────────────────────────────────
-
 /// A post-exchange proximity check used to re-confirm a contact's presence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReverificationRecord {
@@ -38,8 +34,6 @@ pub struct ReverificationRecord {
     /// Unix timestamp (seconds) when the reverification was performed.
     pub timestamp: u64,
 }
-
-// ── ExchangeRecord ───────────────────────────────────────────────────────────
 
 /// Full record of a completed (or attempted) contact exchange.
 ///
@@ -82,8 +76,6 @@ impl ExchangeRecord {
     pub fn trust_level(&self) -> ExchangeTrustLevel {
         ExchangeTrustLevel::from_score(self.trust_score())
     }
-
-    // ── Private helpers ──────────────────────────────────────────────────────
 
     /// Transport-axis score (how local / trustworthy the data channel is).
     fn transport_locality(&self) -> f64 {
@@ -131,8 +123,6 @@ impl ExchangeRecord {
         stacked.max(base)
     }
 }
-
-// ── ExchangeTrustLevel ────────────────────────────────────────────────────────
 
 /// Discrete trust tier derived from a two-axis exchange trust score.
 ///
@@ -189,8 +179,6 @@ impl ExchangeTrustLevel {
         }
     }
 }
-
-// ── Tests ────────────────────────────────────────────────────────────────────
 
 // INLINE_TEST_REQUIRED: trust scoring logic depends on private helper methods
 // (transport_locality, proximity_confidence) not visible outside this module.

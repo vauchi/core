@@ -39,7 +39,6 @@ fn create_local_group() {
         "created_at must be a non-zero unix timestamp"
     );
 
-    // Verify persistence
     let loaded = storage.get_local_group(&group.id).unwrap();
     assert!(loaded.is_some(), "created group must be retrievable");
     let loaded = loaded.unwrap();
@@ -156,7 +155,6 @@ fn delete_group() {
     let after = storage.get_local_group(&group.id).unwrap();
     assert!(after.is_none(), "deleted group must not be findable");
 
-    // Deleting again returns false
     let deleted_again = storage.delete_local_group(&group.id).unwrap();
     assert!(
         !deleted_again,

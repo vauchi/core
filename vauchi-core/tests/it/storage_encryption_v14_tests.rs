@@ -140,7 +140,6 @@ fn test_device_info_stored_as_encrypted_blob() {
     let blob = result.expect("Encrypted blob should exist");
     assert!(!blob.is_empty());
 
-    // The old plaintext device_name column should be empty
     let name: String = raw_conn
         .query_row(
             "SELECT device_name FROM device_info WHERE id = 1",
@@ -311,7 +310,6 @@ fn test_pending_update_payload_stored_encrypted() {
     let blob = result.expect("Encrypted payload should exist");
     assert!(!blob.is_empty());
 
-    // Raw blob should not contain the plaintext
     assert!(
         !String::from_utf8_lossy(&blob).contains("sensitive payload"),
         "Encrypted blob should not contain plaintext"

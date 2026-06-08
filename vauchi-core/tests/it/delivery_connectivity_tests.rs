@@ -63,10 +63,8 @@ fn test_connectivity_restored_processes_retries_and_queue() {
     let offline_manager = OfflineManager::new();
     let ts = now();
 
-    // Set up: 1 due retry entry
     create_retry(&storage, "retry-msg", 1, ts - 10);
 
-    // Set up: 2 offline-queued updates
     create_offline_update(&storage, &offline_manager, "offline-1");
     create_offline_update(&storage, &offline_manager, "offline-2");
 
@@ -76,7 +74,6 @@ fn test_connectivity_restored_processes_retries_and_queue() {
         .unwrap();
     let flushed = offline_manager.flush_queue(&storage).unwrap();
 
-    // Verify retry was processed
     assert_eq!(tick_result.due, 1, "One retry should be due");
     assert_eq!(
         tick_result.rescheduled, 1,
@@ -87,7 +84,6 @@ fn test_connectivity_restored_processes_retries_and_queue() {
         "retry-msg should be in ready IDs"
     );
 
-    // Verify offline queue was flushed
     assert_eq!(flushed.len(), 2, "Two offline updates should be ready");
 }
 
@@ -120,7 +116,6 @@ fn test_combined_retry_and_offline_counts() {
     // 2 due retries (1 will expire, 1 will reschedule)
     create_retry(&storage, "retry-expire", 5, ts - 10); // at max attempts
     create_retry(&storage, "retry-ok", 2, ts - 10);
-    // Create delivery record for the expiring one
     let delivery = DeliveryRecord {
         message_id: "retry-expire".to_string(),
         recipient_id: "test-recipient".to_string(),

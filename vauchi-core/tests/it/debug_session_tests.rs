@@ -78,7 +78,6 @@ fn log_screen_appeared() {
     session.log_screen_appeared(ScreenId::ExchangeStart);
 
     let events = session.events();
-    // First event is DebugModeActivated, second is ScreenAppeared
     assert_eq!(events.len(), 2);
     assert!(matches!(
         &events[1].kind,
@@ -262,7 +261,6 @@ fn activate_twice_is_idempotent_when_already_active() {
     let events_before = session.events().len();
     session.activate(); // second activation
 
-    // Re-activation should not clear existing events or add a duplicate activation event
     assert!(session.is_active());
     assert_eq!(session.events().len(), events_before);
 }
@@ -277,7 +275,6 @@ fn to_markdown_empty_session() {
     assert!(md.contains("# Debug Session Report"));
     assert!(md.contains("inactive"));
     assert!(md.contains("0 events"));
-    // Empty session should not contain a table
     assert!(!md.contains("|---:|---|"));
 }
 

@@ -128,12 +128,10 @@ fn saturday_night_at_that_bar() {
     let sat_start = 1_700_000_000u64;
     let sat_end = 1_700_086_400u64; // +24h
 
-    // Bob: met Saturday night at The Anchor Bar.
     let bob = add_contact_at(&wb, "Bob", 1_700_040_000);
     wb.set_exchange_location(&bob, 52.52, 13.405).unwrap();
     wb.name_exchange_place(&bob, "The Anchor Bar").unwrap();
 
-    // Carol: met Tuesday at The Office.
     let carol = add_contact_at(&wb, "Carol", 1_699_000_000);
     wb.set_exchange_location(&carol, 48.0, 2.0).unwrap();
     wb.name_exchange_place(&carol, "The Office").unwrap();

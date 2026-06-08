@@ -287,7 +287,6 @@ fn test_decrypt_xchacha20_corrupted_tag() {
 fn test_decrypt_xchacha20_ad_corrupted_tag() {
     let key = SymmetricKey::generate();
     let mut ciphertext = encrypt_with_ad(&key, b"test", b"ad").unwrap();
-    // Corrupt the tag
     let last = ciphertext.len() - 1;
     ciphertext[last] ^= 0xFF;
     let result = decrypt_with_ad(&key, &ciphertext, b"ad");
@@ -315,7 +314,6 @@ fn test_encrypt_with_ad_nonce_determinism() {
 #[test]
 fn test_unrecognized_tag_rejected() {
     let key = SymmetricKey::generate();
-    // Create a "ciphertext" with an unrecognized tag byte
     let mut fake_ciphertext = vec![0xFF]; // Invalid tag
     fake_ciphertext.extend_from_slice(&[0; 12]); // padding
     fake_ciphertext.extend_from_slice(&[0; 16]); // padding

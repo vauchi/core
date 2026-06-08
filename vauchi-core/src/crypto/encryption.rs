@@ -121,7 +121,6 @@ impl SymmetricKey {
 /// why XChaCha20 was chosen over AES-GCM (96-bit nonce, birthday-bound
 /// at ~2^32 encryptions per key).
 pub fn encrypt(key: &SymmetricKey, plaintext: &[u8]) -> Result<Vec<u8>, EncryptionError> {
-    // Generate cryptographically random 24-byte nonce from OS CSPRNG
     let nonce_bytes: [u8; XCHACHA20_NONCE_SIZE] = super::random_bytes();
 
     let cipher = XChaCha20Poly1305::new(key.as_bytes().into());

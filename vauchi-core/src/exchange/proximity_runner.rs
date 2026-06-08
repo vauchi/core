@@ -98,7 +98,6 @@ impl ProximityRunner {
         }
 
         match (self.method, event) {
-            // Audio: samples received — decode and verify
             (
                 ProximityMethod::Audio,
                 Event::AudioSamplesRecorded {
@@ -122,7 +121,6 @@ impl ProximityRunner {
                 vec![Command::AudioStop]
             }
 
-            // Accelerometer: accumulate samples for correlation
             (
                 ProximityMethod::Accelerometer,
                 Event::AccelerometerData {
@@ -141,7 +139,6 @@ impl ProximityRunner {
                 vec![]
             }
 
-            // Impact: detect peak from ImpactDetected event
             (
                 ProximityMethod::Impact,
                 Event::ImpactDetected {
@@ -336,7 +333,6 @@ mod tests {
         assert!(result.verified);
         assert!(result.confidence > 0.0);
         assert!(result.confidence <= 0.6); // Capped per spec
-        // Should emit AccelerometerStop
         assert!(matches!(cmds[0], Command::AccelerometerStop));
     }
 
@@ -439,15 +435,12 @@ mod tests {
         assert!(runner.is_done());
         let first_confidence = runner.result().unwrap().confidence;
 
-        // Feed another event — should be ignored
         runner.feed_event(&Event::ImpactDetected {
             timestamp_ms: 0,
             magnitude_milli_g: 10000,
         });
         assert_eq!(runner.result().unwrap().confidence, first_confidence);
     }
-
-    // ── Shake envelope workflow tests ──────────────────────────────
 
     fn feed_shake_samples(runner: &mut ProximityRunner, count: usize) {
         for i in 0..count {
@@ -536,8 +529,6 @@ mod tests {
         assert!(runner.is_done());
         assert!(!runner.result().unwrap().verified);
     }
-
-    // ── Cross-correlation unit tests ──────────────────────────────
 
     // @internal
     #[test]

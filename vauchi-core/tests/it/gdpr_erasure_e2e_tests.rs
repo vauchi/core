@@ -25,7 +25,6 @@ use vauchi_core::storage::{DeletionState, MemoryKeyStorage, SecureStorage, Stora
 const SMK_KEY_NAME: &str = "smk";
 
 // ============================================================
-// Helpers
 // ============================================================
 
 fn in_memory_storage() -> Storage {
@@ -189,7 +188,6 @@ fn test_cancellation_restores_full_access() {
 
     manager.schedule_deletion().unwrap();
 
-    // Verify deletion is scheduled.
     let state_after_schedule = manager.deletion_state().unwrap();
     assert!(
         matches!(state_after_schedule, DeletionState::Scheduled { .. }),

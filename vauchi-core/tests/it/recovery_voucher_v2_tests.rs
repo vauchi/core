@@ -14,7 +14,6 @@ use vauchi_core::recovery::guardian::GuardianToken;
 use vauchi_core::{RecoveryClaim, RecoveryError, RecoveryProof, RecoveryVoucher};
 
 // =============================================================================
-// Voucher v2 serialization roundtrip
 // =============================================================================
 
 // @scenario: contact_recovery :: Serialize and deserialize v2 recovery voucher with guardian token
@@ -117,7 +116,6 @@ fn test_voucher_v2_from_bytes_preserves_token() {
 }
 
 // =============================================================================
-// Voucher version byte
 // =============================================================================
 
 // @scenario: contact_recovery :: Version byte is 2 for voucher with token and 1 without
@@ -229,11 +227,9 @@ fn test_proof_rejects_voucher_with_invalid_token_signature() {
     let old_pk = *old_keypair.public_key().as_bytes();
     let new_pk = *new_keypair.public_key().as_bytes();
 
-    // Create a valid token, then tamper with guardian_pk to break the signature
     let mut token = GuardianToken::create(&old_keypair, voucher_keypair.public_key(), 0);
     token.set_guardian_pk_for_testing(impostor_keypair.public_key().as_bytes());
 
-    // The tampered token should not verify
     assert!(
         !token.verify(),
         "tampered token must fail verification before being used in test"

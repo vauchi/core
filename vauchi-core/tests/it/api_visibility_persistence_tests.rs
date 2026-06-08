@@ -15,7 +15,6 @@ fn setup_with_fields() -> (Vauchi, String) {
     let mut wb = Vauchi::in_memory().unwrap();
     wb.create_identity("Alice").unwrap();
 
-    // Add fields to own card
     wb.add_own_field(ContactField::new(
         FieldType::Email,
         "Work Email",
@@ -53,13 +52,11 @@ fn test_toggle_visibility_persists() {
         .unwrap();
     assert!(visible, "Fields should be visible by default");
 
-    // Toggle: hide the field
     let new_state = wb
         .toggle_field_visibility(&contact_id, "Work Email")
         .unwrap();
     assert!(!new_state, "Toggle should return new state (hidden)");
 
-    // Verify persistence: read back
     let visible_after = wb
         .get_effective_field_visibility(&contact_id, "Work Email")
         .unwrap();
@@ -71,7 +68,6 @@ fn test_toggle_visibility_persists() {
 fn test_toggle_visibility_per_field() {
     let (wb, contact_id) = setup_with_fields();
 
-    // Hide email only
     wb.toggle_field_visibility(&contact_id, "Work Email")
         .unwrap();
 
@@ -91,10 +87,8 @@ fn test_toggle_visibility_per_field() {
 fn test_toggle_twice_restores_visibility() {
     let (wb, contact_id) = setup_with_fields();
 
-    // Toggle off
     wb.toggle_field_visibility(&contact_id, "Work Email")
         .unwrap();
-    // Toggle on
     wb.toggle_field_visibility(&contact_id, "Work Email")
         .unwrap();
 

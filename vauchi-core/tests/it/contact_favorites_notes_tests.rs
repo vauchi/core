@@ -31,7 +31,6 @@ fn create_test_storage() -> Storage {
 }
 
 // ============================================================
-// Favorites Tests
 // ============================================================
 
 // @scenario: contacts_management :: Mark contact as favorite
@@ -40,13 +39,11 @@ fn create_test_storage() -> Storage {
 fn test_contact_set_favorite_marks_contact() {
     let mut contact = create_test_contact_with_name("Bob", 0x01);
 
-    // Default should be not favorite
     assert!(
         !contact.is_favorite(),
         "New contact should not be favorite by default"
     );
 
-    // Mark as favorite
     contact.set_favorite(true);
     assert!(
         contact.is_favorite(),
@@ -60,11 +57,9 @@ fn test_contact_set_favorite_marks_contact() {
 fn test_contact_remove_favorite_unmarks_contact() {
     let mut contact = create_test_contact_with_name("Bob", 0x01);
 
-    // Mark as favorite first
     contact.set_favorite(true);
     assert!(contact.is_favorite());
 
-    // Remove favorite
     contact.set_favorite(false);
     assert!(
         !contact.is_favorite(),
@@ -84,7 +79,6 @@ fn test_contacts_sorted_favorites_first() {
     bob.set_favorite(true);
 
     // effective_sort_key should put favorites first
-    // Favorites should have a sort key that comes before non-favorites
     let alice_key = alice.effective_sort_key();
     let bob_key = bob.effective_sort_key();
 
@@ -104,11 +98,9 @@ fn test_contact_favorite_persists_in_storage() {
     let mut contact = create_test_contact_with_name("Bob", 0x01);
     let contact_id = contact.id().to_string();
 
-    // Mark as favorite and save
     contact.set_favorite(true);
     storage.save_contact(&contact).unwrap();
 
-    // Load back and verify
     let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
     assert!(
         loaded.is_favorite(),
@@ -124,15 +116,12 @@ fn test_contact_remove_favorite_persists_in_storage() {
     let mut contact = create_test_contact_with_name("Bob", 0x01);
     let contact_id = contact.id().to_string();
 
-    // Mark as favorite, save
     contact.set_favorite(true);
     storage.save_contact(&contact).unwrap();
 
-    // Remove favorite, save again
     contact.set_favorite(false);
     storage.save_contact(&contact).unwrap();
 
-    // Load back
     let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
     assert!(
         !loaded.is_favorite(),
@@ -158,14 +147,12 @@ fn test_contact_favorite_independent_of_other_flags() {
     assert!(contact.is_favorite());
     assert!(contact.is_hidden());
 
-    // Removing favorite doesn't affect other flags
     contact.set_favorite(false);
     assert!(!contact.is_favorite());
     assert!(contact.is_hidden());
 }
 
 // ============================================================
-// Notes Tests
 // ============================================================
 
 // @scenario: contacts_management :: Add personal note to contact
@@ -178,7 +165,6 @@ fn test_contact_set_note_stores_note() {
 
     storage.save_contact(&contact).unwrap();
 
-    // Set a note
     let note = "Met at conference 2024";
     let note_encrypted =
         vauchi_core::crypto::encrypt(&SymmetricKey::generate(), note.as_bytes()).unwrap();
@@ -186,7 +172,6 @@ fn test_contact_set_note_stores_note() {
         .save_personal_notes(&contact_id, &note_encrypted)
         .unwrap();
 
-    // Load back
     let loaded_notes = storage.load_personal_notes(&contact_id).unwrap();
     assert!(
         loaded_notes.is_some(),
@@ -210,7 +195,6 @@ fn test_contact_edit_note_updates_note() {
 
     storage.save_contact(&contact).unwrap();
 
-    // Set initial note
     let note1 = "Met at conference 2024";
     let note1_enc = vauchi_core::crypto::encrypt(&enc_key, note1.as_bytes()).unwrap();
     storage
@@ -227,7 +211,6 @@ fn test_contact_edit_note_updates_note() {
     // Load back — should be updated
     let loaded = storage.load_personal_notes(&contact_id).unwrap().unwrap();
 
-    // Decrypt and verify it's the updated note
     let decrypted = vauchi_core::crypto::decrypt(&enc_key, &loaded).unwrap();
     assert_eq!(
         String::from_utf8(decrypted).unwrap(),
@@ -246,7 +229,6 @@ fn test_contact_delete_note_removes_note() {
 
     storage.save_contact(&contact).unwrap();
 
-    // Set a note
     let note_enc = vauchi_core::crypto::encrypt(&SymmetricKey::generate(), b"Some note").unwrap();
     storage.save_personal_notes(&contact_id, &note_enc).unwrap();
 
@@ -276,7 +258,6 @@ fn test_contact_notes_not_included_in_exchange_payload() {
     // 2. The exchange payload
     // 3. Any sync message
 
-    // Verify by creating a contact, adding notes to storage, then checking
     // that the contact card (which IS shared) does not contain notes
     let storage = create_test_storage();
     let contact = create_test_contact_with_name("Bob", 0x02);
@@ -284,7 +265,6 @@ fn test_contact_notes_not_included_in_exchange_payload() {
 
     storage.save_contact(&contact).unwrap();
 
-    // Add a note to storage
     let note_enc =
         vauchi_core::crypto::encrypt(&SymmetricKey::generate(), b"Secret note about Bob").unwrap();
     storage.save_personal_notes(&contact_id, &note_enc).unwrap();

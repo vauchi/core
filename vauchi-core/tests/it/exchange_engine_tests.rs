@@ -221,7 +221,6 @@ fn with_session_auto_enables_debug_log() {
     let engine =
         ExchangeEngine::with_session(config, session, vauchi_core::clock::SystemClock::shared());
 
-    // Debug log should be auto-enabled with at least SessionStarted
     let log = engine
         .session()
         .unwrap()

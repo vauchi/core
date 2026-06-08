@@ -125,12 +125,10 @@ fn duress_configure_goes_to_pin() {
 #[test]
 fn duress_enter_pin_validation() {
     let mut engine = DuressPinEngine::new(default_config());
-    // Navigate to EnterPin
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "configure".into(),
     });
 
-    // Try to continue with empty PIN
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -145,7 +143,6 @@ fn duress_enter_pin_validation() {
         other => panic!("expected ValidationError, got {:?}", other),
     }
 
-    // Enter a PIN via TextChanged
     let result = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
         value: "123456".into(),
@@ -155,7 +152,6 @@ fn duress_enter_pin_validation() {
         "TextChanged should return UpdateScreen"
     );
 
-    // Now continue should succeed
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -172,7 +168,6 @@ fn duress_enter_pin_validation() {
 #[test]
 fn duress_pin_mismatch_error() {
     let mut engine = DuressPinEngine::new(default_config());
-    // Navigate to EnterPin, enter PIN, advance to ConfirmPin
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "configure".into(),
     });
@@ -184,7 +179,6 @@ fn duress_pin_mismatch_error() {
         action_id: "continue".into(),
     });
 
-    // Enter a different confirm PIN
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirm_pin".into(),
         value: "654321".into(),
@@ -243,7 +237,6 @@ fn duress_alerts_save_enables() {
     let mut engine = DuressPinEngine::new(default_config());
     assert!(!engine.config().enabled, "should start disabled");
 
-    // Navigate all the way to ConfigureAlerts
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "configure".into(),
     });
@@ -262,14 +255,12 @@ fn duress_alerts_save_enables() {
         action_id: "continue".into(),
     });
 
-    // Update alert message
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "alert_message".into(),
         value: "I need help".into(),
     });
     assert_eq!(engine.config().alert_message, "I need help");
 
-    // Toggle include_location
     let _ = engine.handle_action(UserAction::ItemToggled {
         component_id: "alerts".into(),
         item_id: "include_location".into(),
@@ -279,7 +270,6 @@ fn duress_alerts_save_enables() {
         "include_location should be toggled on"
     );
 
-    // Save
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "save".into(),
     });
@@ -311,7 +301,6 @@ fn duress_disable_shows_inline_confirm() {
         has_confirm,
         "disable should show a destructive InlineConfirm"
     );
-    // Config should still be enabled until confirmed
     assert!(
         engine.config().enabled,
         "should remain enabled until confirmed"
@@ -323,11 +312,9 @@ fn duress_disable_shows_inline_confirm() {
 #[test]
 fn duress_confirm_disable_completes() {
     let mut engine = DuressPinEngine::new(enabled_config());
-    // Show confirmation
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "disable".into(),
     });
-    // Confirm disable
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "confirm_disable".into(),
     });
@@ -389,7 +376,6 @@ fn duress_back_navigation() {
         other => panic!("expected NavigateTo overview, got {:?}", other),
     }
 
-    // Navigate forward to ConfirmPin
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "configure".into(),
     });
@@ -413,7 +399,6 @@ fn duress_back_navigation() {
         other => panic!("expected NavigateTo enter_pin, got {:?}", other),
     }
 
-    // Navigate forward again to ConfigureAlerts
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
         value: "123456".into(),
@@ -446,12 +431,10 @@ fn duress_back_navigation() {
 #[test]
 fn duress_pin_accumulates_single_chars() {
     let mut engine = DuressPinEngine::new(default_config());
-    // Navigate to EnterPin
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "configure".into(),
     });
 
-    // Type "1", "2", "3", "4", "5", "6" one char at a time
     for ch in ['1', '2', '3', '4', '5', '6'] {
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "pin".into(),
@@ -473,7 +456,6 @@ fn duress_pin_accumulates_single_chars() {
         other => panic!("expected NavigateTo, got {:?}", other),
     }
 
-    // Now type the same PIN in confirm step, one char at a time
     for ch in ['1', '2', '3', '4', '5', '6'] {
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "confirm_pin".into(),
@@ -500,12 +482,10 @@ fn duress_pin_accumulates_single_chars() {
 #[test]
 fn duress_pin_backspace_removes_last_char() {
     let mut engine = DuressPinEngine::new(default_config());
-    // Navigate to EnterPin
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "configure".into(),
     });
 
-    // Type "1", "2", "3"
     for ch in ['1', '2', '3'] {
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "pin".into(),
@@ -513,7 +493,6 @@ fn duress_pin_backspace_removes_last_char() {
         });
     }
 
-    // Backspace
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "pin".into(),
         value: String::new(),

@@ -64,7 +64,6 @@ fn arb_phase3_action() -> impl Strategy<Value = UserAction> {
             "[a-z]{3,10}",
         ]
         .prop_map(|action_id| UserAction::ActionPressed { action_id }),
-        // TextChanged
         (
             prop_oneof![
                 Just("password".to_string()),
@@ -88,7 +87,6 @@ fn arb_phase3_action() -> impl Strategy<Value = UserAction> {
                 component_id,
                 value,
             }),
-        // ItemToggled
         (
             prop_oneof![
                 Just("alerts".to_string()),
@@ -476,13 +474,11 @@ proptest! {
     fn backup_create_forward_progress(password in "[a-zA-Z0-9]{4,20}") {
         let mut engine = make_backup(None);
 
-        // Choose Create
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "create".into(),
         });
         prop_assert_eq!(engine.current_screen().screen_id, "backup_password");
 
-        // Enter password
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "password".into(),
             value: password.clone(),
@@ -492,7 +488,6 @@ proptest! {
         });
         prop_assert_eq!(engine.current_screen().screen_id, "backup_confirm");
 
-        // Confirm password
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "confirm_password".into(),
             value: password,
@@ -518,18 +513,15 @@ proptest! {
     fn backup_restore_forward_progress(password in "[a-zA-Z0-9]{4,20}") {
         let mut engine = make_backup(None);
 
-        // Choose Restore
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "restore".into(),
         });
         prop_assert_eq!(engine.current_screen().screen_id, "backup_password");
 
-        // Enter password
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "password".into(),
             value: password,
         });
-        // Restore requires the pasted backup blob before continuing.
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "backup_data".into(),
             value: "deadbeef".into(),
@@ -561,7 +553,6 @@ proptest! {
         });
         prop_assert_eq!(engine.current_screen().screen_id, "duress_enter_pin");
 
-        // Enter PIN
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "pin".into(),
             value: pin.clone(),
@@ -571,7 +562,6 @@ proptest! {
         });
         prop_assert_eq!(engine.current_screen().screen_id, "duress_confirm_pin");
 
-        // Confirm PIN
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "confirm_pin".into(),
             value: pin,
@@ -600,7 +590,6 @@ proptest! {
         });
         prop_assert_eq!(engine.current_screen().screen_id, "shred_confirm");
 
-        // Type DELETE
         let _ = engine.handle_action(UserAction::TextChanged {
             component_id: "confirmation".into(),
             value: "DELETE".into(),

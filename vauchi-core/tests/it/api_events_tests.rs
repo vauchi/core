@@ -82,7 +82,6 @@ fn test_event_dispatcher_multiple_handlers() {
 
     let dispatcher = EventDispatcher::new();
 
-    // Add 3 handlers
     for _ in 0..3 {
         let count_clone = count.clone();
         dispatcher.on_event(move |_| {
@@ -95,7 +94,6 @@ fn test_event_dispatcher_multiple_handlers() {
         EventOrigin::Local,
     ));
 
-    // All 3 handlers should be called
     assert_eq!(count.load(Ordering::SeqCst), 3);
 }
 
@@ -132,7 +130,6 @@ fn test_event_dispatcher_remove_handler() {
         count_b_clone.fetch_add(1, Ordering::SeqCst);
     });
 
-    // Both fire on dispatch
     dispatcher.dispatch(VauchiEvent::contact_added(
         "test".into(),
         EventOrigin::Local,
@@ -140,7 +137,6 @@ fn test_event_dispatcher_remove_handler() {
     assert_eq!(count_a.load(Ordering::SeqCst), 1);
     assert_eq!(count_b.load(Ordering::SeqCst), 1);
 
-    // Remove handler A
     assert!(
         dispatcher.remove_handler(id_a),
         "Should find and remove handler A"
@@ -163,7 +159,6 @@ fn test_event_dispatcher_remove_handler() {
         "Handler B should still fire"
     );
 
-    // Removing unknown ID returns false
     assert!(
         !dispatcher.remove_handler(999),
         "Unknown ID should return false"

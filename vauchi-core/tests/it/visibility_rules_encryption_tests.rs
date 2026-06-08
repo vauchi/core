@@ -34,7 +34,6 @@ fn test_migration_v18_adds_encrypted_column() {
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
 
-    // The visibility_rules_encrypted column should exist
     raw_conn
         .prepare("SELECT visibility_rules_encrypted FROM contacts LIMIT 0")
         .expect("contacts.visibility_rules_encrypted column should exist");
@@ -80,7 +79,6 @@ fn test_contact_with_visibility_rules_roundtrip() {
     let shared_key = SymmetricKey::generate();
     let public_key = [42u8; 32];
 
-    // Create visibility rules with mixed settings
     let mut rules = VisibilityRules::new();
     rules.set_everyone("email-field");
     rules.set_nobody("phone-field");
@@ -95,7 +93,6 @@ fn test_contact_with_visibility_rules_roundtrip() {
 
     let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
 
-    // Verify visibility rules survived the roundtrip
     assert_eq!(
         loaded.visibility_rules().unwrap().get("email-field"),
         &vauchi_core::contact::FieldVisibility::Everyone
@@ -173,7 +170,6 @@ fn test_visibility_rules_stored_encrypted_not_plaintext() {
 
     storage.save_contact(&contact).unwrap();
 
-    // Open raw connection and verify
     let db_path = dir.path().join("vauchi.db");
     let raw_conn = rusqlite::Connection::open(&db_path).unwrap();
 
@@ -188,7 +184,6 @@ fn test_visibility_rules_stored_encrypted_not_plaintext() {
     let blob = encrypted.expect("visibility_rules_encrypted should be non-NULL");
     assert!(!blob.is_empty(), "Encrypted blob should not be empty");
 
-    // The encrypted blob should not contain plaintext
     let blob_str = String::from_utf8_lossy(&blob);
     assert!(
         !blob_str.contains("secret-phone-field"),
@@ -233,7 +228,6 @@ fn test_list_contacts_with_encrypted_visibility_rules() {
     let contacts = storage.list_contacts().unwrap();
     assert_eq!(contacts.len(), 3);
 
-    // Each contact should have its visibility rules intact
     for (i, contact) in contacts.iter().enumerate() {
         assert_eq!(
             contact

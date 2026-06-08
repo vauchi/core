@@ -107,7 +107,6 @@ fn add_contact_relay_deduplication() {
     manager.add_contact_relay("https://alice.relay");
     manager.add_contact_relay("https://alice.relay");
 
-    // Should only be tracked once
     let urls = manager.contact_relay_urls();
     assert_eq!(
         urls.iter().filter(|u| **u == "https://alice.relay").count(),
@@ -221,7 +220,6 @@ fn mixed_relay_contacts_route_independently() {
     let bob = make_contact("Bob", None, None);
     let carol = make_contact("Carol", Some("https://carol.relay"), None);
 
-    // Each contact routes independently
     assert_eq!(
         manager.relay_for_contact(&alice, &vauchi_core::rng::OsSecureRng::new()),
         "https://alice.relay"
@@ -269,10 +267,8 @@ fn group_contacts_by_relay() {
 
     // Home relay: Bob
     assert!(groups.get("https://home.relay").unwrap().contains(&"Bob"));
-    // Alice's relay: Alice, Carol
     let alice_relay = groups.get("https://alice.relay").unwrap();
     assert!(alice_relay.contains(&"Alice"));
     assert!(alice_relay.contains(&"Carol"));
-    // Dave's relay: Dave
     assert!(groups.get("https://dave.relay").unwrap().contains(&"Dave"));
 }

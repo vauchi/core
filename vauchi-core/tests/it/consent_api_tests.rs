@@ -25,14 +25,11 @@ fn create_test_vauchi() -> Vauchi {
 fn test_consent_grant_and_check() {
     let wb = create_test_vauchi();
 
-    // Not granted initially
     let granted = wb.check_consent(&ConsentType::RecoveryVouching).unwrap();
     assert!(!granted, "Consent should not be granted initially");
 
-    // Grant consent
     wb.grant_consent(ConsentType::RecoveryVouching).unwrap();
 
-    // Now granted
     let granted = wb.check_consent(&ConsentType::RecoveryVouching).unwrap();
     assert!(granted, "Consent should be granted after grant_consent()");
 }
@@ -42,7 +39,6 @@ fn test_consent_grant_and_check() {
 fn test_consent_revoke() {
     let wb = create_test_vauchi();
 
-    // Grant then revoke
     wb.grant_consent(ConsentType::ContactSharing).unwrap();
     assert!(wb.check_consent(&ConsentType::ContactSharing).unwrap());
 
@@ -81,21 +77,17 @@ fn test_consent_multiple_types_independent() {
 fn test_consent_export_log() {
     let wb = create_test_vauchi();
 
-    // Empty log initially
     let log = wb.export_consent_log().unwrap();
     assert!(log.is_empty(), "Consent log should be empty initially");
 
-    // Grant and revoke some consents
     wb.grant_consent(ConsentType::RecoveryVouching).unwrap();
     wb.grant_consent(ConsentType::ContactSharing).unwrap();
 
     wb.revoke_consent(ConsentType::RecoveryVouching).unwrap();
 
-    // Log should have 3 entries
     let log = wb.export_consent_log().unwrap();
     assert_eq!(log.len(), 3, "Should have 3 consent log entries");
 
-    // Verify all types are present
     let vouching_entries: Vec<&ConsentRecord> = log
         .iter()
         .filter(|r| r.consent_type == ConsentType::RecoveryVouching)
@@ -123,11 +115,9 @@ fn test_consent_export_log() {
 fn test_consent_grant_idempotent() {
     let wb = create_test_vauchi();
 
-    // Grant twice
     wb.grant_consent(ConsentType::RecoveryVouching).unwrap();
     wb.grant_consent(ConsentType::RecoveryVouching).unwrap();
 
-    // Should still be granted
     assert!(wb.check_consent(&ConsentType::RecoveryVouching).unwrap());
 
     // Log has 2 entries (both grants)

@@ -10,8 +10,6 @@ use super::error::{DeliverySummary, DeviceDeliveryRecord, DeviceDeliveryStatus};
 use super::{Storage, StorageError};
 
 impl Storage {
-    // === Device Delivery Operations ===
-
     /// Creates a new device delivery record.
     pub fn create_device_delivery(
         &self,

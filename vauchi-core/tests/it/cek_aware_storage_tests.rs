@@ -169,7 +169,6 @@ fn test_cek_contact_card_not_decryptable_with_storage_key_alone() {
     let contact = make_contact_with_cek("Alice CEK");
     storage.save_contact(&contact).unwrap();
 
-    // Read card_encrypted column and try to decrypt with storage key
     let card_encrypted: Vec<u8> = storage
         .connection()
         .query_row(
@@ -228,17 +227,14 @@ fn test_search_contacts_finds_cek_protected_name() {
     let legacy = Contact::from_exchange(pk2, card2, SymmetricKey::generate(), 0);
     storage.save_contact(&legacy).unwrap();
 
-    // Search should find Alice even though display_name is NULL in DB
     let results = storage.search_contacts("Alice").unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].display_name(), "Alice Encrypted");
 
-    // Search should find Bob via legacy path
     let results = storage.search_contacts("Bob").unwrap();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].display_name(), "Bob Plaintext");
 
-    // Empty search returns all
     let all = storage.search_contacts("").unwrap();
     assert_eq!(all.len(), 2);
 }

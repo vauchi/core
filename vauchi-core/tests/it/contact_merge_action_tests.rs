@@ -27,7 +27,6 @@ fn make_contact(name: &str, fields: &[(FieldType, &str, &str)]) -> Contact {
 }
 
 // ============================================================
-// Merge Duplicate Contacts
 // @scenario: contacts_management :: Merge duplicate contacts
 // ============================================================
 
@@ -178,7 +177,6 @@ fn test_merge_contacts_preserves_blocked_from_primary() {
 }
 
 // ============================================================
-// Dismiss Duplicate Suggestion
 // @scenario: contacts_management :: Dismiss duplicate suggestion
 // ============================================================
 
@@ -217,7 +215,6 @@ fn test_filter_dismissed_removes_dismissed_pairs() {
     let duplicates = find_duplicates(&contacts);
     assert!(duplicates.len() >= 2, "Should detect multiple pairs");
 
-    // Dismiss the first pair
     let mut dismissed = HashSet::new();
     let key = normalize_pair_key(&duplicates[0].id1, &duplicates[0].id2);
     dismissed.insert(key.clone());
@@ -229,7 +226,6 @@ fn test_filter_dismissed_removes_dismissed_pairs() {
         "Should have one fewer pair after dismissal"
     );
 
-    // Verify the dismissed pair is not in the result
     for pair in &filtered {
         let pair_key = normalize_pair_key(&pair.id1, &pair.id2);
         assert_ne!(
@@ -287,7 +283,6 @@ fn test_filter_dismissed_order_independent() {
     assert_eq!(duplicates.len(), 1);
 
     let mut dismissed = HashSet::new();
-    // Insert in reverse order
     let key = normalize_pair_key(&duplicates[0].id2, &duplicates[0].id1);
     dismissed.insert(key);
 

@@ -222,10 +222,8 @@ impl DoubleRatchetState {
         x3dh_secret: &SymmetricKey,
         their_dh_public: [u8; 32],
     ) -> Result<Self, RatchetError> {
-        // Generate our first DH keypair
         let our_dh = X3DHKeyPair::generate();
 
-        // Perform initial DH to get first root key and send chain
         let dh_output = our_dh.diffie_hellman(&their_dh_public)?;
         let (root_key_z, send_chain_key_z) =
             HKDF::derive_key_pair(Some(x3dh_secret.as_bytes()), &*dh_output, ROOT_RATCHET_INFO);
@@ -273,14 +271,12 @@ impl DoubleRatchetState {
     ///
     /// Advances the sending chain and returns an encrypted message.
     pub fn encrypt(&mut self, plaintext: &[u8]) -> Result<RatchetMessage, RatchetError> {
-        // Ensure we have a sending chain
         let send_chain = self.send_chain.as_ref().ok_or_else(|| {
             RatchetError::InvalidMessage(
                 "Cannot send: no sending chain (responder must receive first)".into(),
             )
         })?;
 
-        // Ratchet the chain to get message key
         let (message_key, next_chain) = send_chain.ratchet()?;
         self.send_chain = Some(next_chain);
 
@@ -312,10 +308,8 @@ impl DoubleRatchetState {
     ///
     /// Handles DH ratchet steps and out-of-order messages.
     pub fn decrypt(&mut self, message: &RatchetMessage) -> Result<Vec<u8>, RatchetError> {
-        // Build associated data from message header for AEAD verification
         let ad = message.associated_data();
 
-        // Try skipped keys first
         if let Some(key) = self.try_skipped_key(message) {
             let padded = decrypt_with_ad(key.symmetric_key(), &message.ciphertext, &ad)
                 .map_err(RatchetError::from)?;
@@ -324,7 +318,6 @@ impl DoubleRatchetState {
             });
         }
 
-        // Check if we need to perform a DH ratchet
         let their_dh_changed = self
             .their_dh
             .map(|k| !bool::from(k.ct_eq(&message.dh_public)))
@@ -341,14 +334,11 @@ impl DoubleRatchetState {
                 self.skip_messages_for_gen(message.previous_chain_length, prev_gen)?;
             }
 
-            // Perform DH ratchet
             self.dh_ratchet(&message.dh_public)?;
         }
 
-        // Skip messages in current chain if needed (using message's generation)
         self.skip_messages_for_gen(message.message_index, message.dh_generation)?;
 
-        // Get the message key
         let recv_chain = self
             .recv_chain
             .as_ref()
@@ -358,7 +348,6 @@ impl DoubleRatchetState {
         self.recv_chain = Some(next_chain);
         self.recv_message_count = message.message_index + 1;
 
-        // Decrypt with AEAD associated data and unpad
         let padded = decrypt_with_ad(message_key.symmetric_key(), &message.ciphertext, &ad)
             .map_err(RatchetError::from)?;
         padding::unpad(&padded)
@@ -390,7 +379,6 @@ impl DoubleRatchetState {
             return Err(RatchetError::TooManySkipped);
         }
 
-        // Skip forward and store keys
         let (skipped, new_chain) = recv_chain.skip_to(until)?;
         self.recv_chain = Some(new_chain);
 
@@ -414,7 +402,6 @@ impl DoubleRatchetState {
         self.recv_chain = Some(ChainKey::new(*recv_chain_key_z));
         self.recv_message_count = 0;
 
-        // Generate new DH keypair
         self.previous_send_chain_length = self.send_message_count;
         self.our_dh = X3DHKeyPair::generate();
 

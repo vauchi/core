@@ -92,7 +92,6 @@ fn test_propagate_with_cek_rotates_cek() {
     bob.set_cek(old_cek);
     alice.storage().save_contact(&bob).unwrap();
 
-    // Update card
     let old_card = alice.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
     let _ = new_card.add_field(ContactField::new(
@@ -102,11 +101,9 @@ fn test_propagate_with_cek_rotates_cek() {
         0,
     ));
 
-    // Propagate
     let queued = alice.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 1);
 
-    // CEK should have been rotated
     let new_cek = alice
         .storage()
         .load_contact_cek(&bob_id)
@@ -169,7 +166,6 @@ fn test_process_cek_wrapped_update_saves_cek() {
     let mut bob_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
-    // Create a delta
     let old_card = ContactCard::new("Bob");
     let new_card = ContactCard::new("Bob Updated");
 
@@ -190,11 +186,9 @@ fn test_process_cek_wrapped_update_saves_cek() {
 
     let versioned = VersionedPayload::encode_cek(&wrapped);
 
-    // Ratchet-encrypt the versioned payload
     let ratchet_msg = bob_ratchet.encrypt(&versioned).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    // Alice processes the update
     let changed = alice.process_card_update(&bob_id, &encrypted).unwrap();
     assert!(!changed.is_empty());
 
@@ -258,7 +252,6 @@ fn test_process_update_from_revoked_sender_rejected() {
     let (alice, bob_id, bob_identity, bob_dh, shared_secret) = setup_alice_with_bob_ratchet();
     let alice_pk = alice.identity().unwrap().signing_public_key();
 
-    // Record Bob as revoked
     alice
         .storage()
         .record_revoked_sender(&bob_id, 1700000000)
@@ -287,7 +280,6 @@ fn test_process_update_from_revoked_sender_rejected() {
     let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    // Alice should reject the update
     let result = alice.process_card_update(&bob_id, &encrypted);
     assert!(
         result.is_err(),
@@ -304,7 +296,6 @@ fn test_process_cek_wrapped_update_applies_delta() {
     let mut bob_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
-    // Bob's delta: add email field
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new("Bob");
     let _ = new_card.add_field(ContactField::new(
@@ -317,7 +308,6 @@ fn test_process_cek_wrapped_update_applies_delta() {
     let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     delta.sign(&bob_identity, alice_pk);
 
-    // CEK-wrap the delta
     let cek = ContentEncryptionKey::generate();
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
     let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
@@ -332,11 +322,9 @@ fn test_process_cek_wrapped_update_applies_delta() {
     let ratchet_msg = bob_ratchet.encrypt(&versioned).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    // Process
     let changed = alice.process_card_update(&bob_id, &encrypted).unwrap();
     assert!(changed.iter().any(|f| f == "personal"));
 
-    // Verify Bob's card was updated
     let bob_contact = alice.get_contact(&bob_id).unwrap().unwrap();
     assert!(
         bob_contact
@@ -360,7 +348,6 @@ fn test_cek_wrapped_forged_signature_rejected() {
     let mut bob_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
-    // Create a valid delta
     let old_card = ContactCard::new("Bob");
     let new_card = ContactCard::new("Bob Tampered");
 
@@ -386,7 +373,6 @@ fn test_cek_wrapped_forged_signature_rejected() {
     let ratchet_msg = bob_ratchet.encrypt(&payload).unwrap();
     let encrypted = serde_json::to_vec(&ratchet_msg).unwrap();
 
-    // Alice should reject the forged update
     let result = alice.process_card_update(&bob_id, &encrypted);
     assert!(
         result.is_err(),
@@ -406,7 +392,6 @@ fn test_migrate_contacts_generates_cek() {
     // Bob has no CEK (legacy contact)
     assert!(alice.storage().load_contact_cek(&bob_id).unwrap().is_none());
 
-    // Run migration
     let migrated = alice.migrate_contacts_to_cek().unwrap();
     assert_eq!(migrated, 1);
 
@@ -423,11 +408,9 @@ fn test_migrate_contacts_generates_cek() {
 fn test_migrate_contacts_queues_updates() {
     let (alice, bob_id) = setup_alice_as_sender_to_bob();
 
-    // Run migration
     let migrated = alice.migrate_contacts_to_cek().unwrap();
     assert_eq!(migrated, 1);
 
-    // A pending update should be queued for Bob
     let pending = alice.storage().get_pending_updates(&bob_id).unwrap();
     assert_eq!(
         pending.len(),
@@ -453,7 +436,6 @@ fn test_migrate_skips_contacts_with_existing_cek() {
     let migrated = alice.migrate_contacts_to_cek().unwrap();
     assert_eq!(migrated, 0);
 
-    // CEK should be unchanged
     let stored = alice.storage().load_contact_cek(&bob_id).unwrap().unwrap();
     assert_eq!(stored.to_bytes(), cek_bytes);
 }
@@ -473,7 +455,6 @@ fn test_migrate_contacts_skips_no_ratchet() {
     );
     alice.add_contact(contact).unwrap();
 
-    // Migration should skip contacts without ratchet
     let migrated = alice.migrate_contacts_to_cek().unwrap();
     assert_eq!(migrated, 0);
 }
@@ -485,7 +466,6 @@ fn test_migrate_contacts_skips_no_ratchet() {
 // @internal
 #[test]
 fn test_cek_wrapped_end_to_end_flow() {
-    // Setup: Alice and Bob with mutual ratchets
     let shared_secret = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
 
@@ -499,7 +479,6 @@ fn test_cek_wrapped_end_to_end_flow() {
     bob.create_identity("Bob").unwrap();
     let bob_pub_key = *bob.identity().unwrap().signing_public_key();
 
-    // Alice adds Bob using Bob's actual public key
     let bob_contact = Contact::from_exchange(
         bob_pub_key,
         ContactCard::new("Bob"),
@@ -521,7 +500,6 @@ fn test_cek_wrapped_end_to_end_flow() {
         alice.storage().save_contact(&bob_on_alice).unwrap();
     }
 
-    // Bob adds Alice using Alice's actual public key
     let alice_contact = Contact::from_exchange(
         alice_pub_key,
         ContactCard::new("Alice"),
@@ -537,7 +515,6 @@ fn test_cek_wrapped_end_to_end_flow() {
     )
     .unwrap();
 
-    // Alice updates her card and propagates
     let old_card = alice.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
     let _ = new_card.add_field(ContactField::new(
@@ -550,11 +527,9 @@ fn test_cek_wrapped_end_to_end_flow() {
     let queued = alice.propagate_card_update(&old_card, &new_card).unwrap();
     assert_eq!(queued, 1);
 
-    // Get the queued encrypted payload
     let pending = alice.storage().get_pending_updates(&bob_id).unwrap();
     assert_eq!(pending.len(), 1);
 
-    // Bob processes the update
     let changed = bob
         .process_card_update(&alice_id, &pending[0].payload)
         .unwrap();

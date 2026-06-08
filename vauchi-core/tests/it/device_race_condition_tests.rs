@@ -13,7 +13,6 @@ use vauchi_core::SigningKeyPair;
 use vauchi_core::identity::{DeviceInfo, DeviceRegistry, MAX_DEVICES};
 
 // =============================================================================
-// Concurrent Device Linking Tests
 // =============================================================================
 
 /// Scenario: Two devices try to link simultaneously
@@ -45,14 +44,12 @@ fn test_concurrent_device_linking_thread_safety() {
         })
         .collect();
 
-    // Collect results
     let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
 
     // All should succeed (no duplicates since different indices)
     let success_count = results.iter().filter(|r| r.is_ok()).count();
     assert_eq!(success_count, 4);
 
-    // Verify registry state
     let registry = registry.lock().unwrap();
     assert_eq!(registry.active_count(), 5);
 }
@@ -87,7 +84,6 @@ fn test_concurrent_same_device_index() {
 
     let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
 
-    // Only one should succeed, rest should get DuplicateDevice
     let success_count = results.iter().filter(|r| r.is_ok()).count();
     assert_eq!(success_count, 1);
 
@@ -133,7 +129,6 @@ fn test_concurrent_revoke_and_add() {
     let result1 = handle1.join().unwrap();
     let result2 = handle2.join().unwrap();
 
-    // Both operations should succeed
     assert!(result1.is_ok() || result2.is_ok(), "expected success");
 
     let registry = registry.lock().unwrap();
@@ -142,7 +137,6 @@ fn test_concurrent_revoke_and_add() {
 }
 
 // =============================================================================
-// Maximum Device Limit Tests
 // =============================================================================
 
 /// Scenario: Cannot exceed maximum devices
@@ -155,7 +149,6 @@ fn test_max_devices_enforced() {
     let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
-    // Add devices up to max
     for i in 1..MAX_DEVICES {
         let device = DeviceInfo::derive(&master_seed, i as u32, format!("Device {}", i), 0);
         registry
@@ -165,7 +158,6 @@ fn test_max_devices_enforced() {
 
     assert_eq!(registry.active_count(), MAX_DEVICES);
 
-    // Try to add one more
     let extra_device = DeviceInfo::derive(&master_seed, MAX_DEVICES as u32, "Extra".to_string(), 0);
     let result = registry.add_device(extra_device.to_registered(&master_seed), &signing_key);
 
@@ -183,7 +175,6 @@ fn test_add_after_revoke_at_max() {
     let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
-    // Add devices up to max, track the last device_id
     let mut last_device_id: [u8; 32] = *device0.device_id();
     for i in 1..MAX_DEVICES {
         let device = DeviceInfo::derive(&master_seed, i as u32, format!("Device {}", i), 0);
@@ -195,14 +186,12 @@ fn test_add_after_revoke_at_max() {
 
     assert_eq!(registry.active_count(), MAX_DEVICES);
 
-    // Revoke last device
     registry
         .revoke_device(&last_device_id, &signing_key, 0)
         .unwrap();
 
     assert_eq!(registry.active_count(), MAX_DEVICES - 1);
 
-    // Now can add another
     let new_device = DeviceInfo::derive(
         &master_seed,
         MAX_DEVICES as u32,
@@ -216,7 +205,6 @@ fn test_add_after_revoke_at_max() {
 }
 
 // =============================================================================
-// Device Already Linked Tests
 // =============================================================================
 
 /// Scenario: Link device that's already linked (same identity)
@@ -229,15 +217,12 @@ fn test_link_already_linked_device_same_identity() {
     let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
-    // Try to add the same device again
     let result = registry.add_device(device0.to_registered(&master_seed), &signing_key);
 
-    // Should fail with duplicate device error
     assert!(result.is_err(), "expected error");
 }
 
 // =============================================================================
-// Version Vector Consistency Tests
 // =============================================================================
 
 /// Scenario: Version increments correctly
@@ -252,7 +237,6 @@ fn test_version_increments_on_changes() {
 
     let initial_version = registry.version();
 
-    // Add a device
     let device1 = DeviceInfo::derive(&master_seed, 1, "Device 1".to_string(), 0);
     registry
         .add_device(device1.to_registered(&master_seed), &signing_key)
@@ -262,7 +246,6 @@ fn test_version_increments_on_changes() {
 
     let after_add_version = registry.version();
 
-    // Revoke a device
     registry
         .revoke_device(device1.device_id(), &signing_key, 0)
         .unwrap();
@@ -284,10 +267,8 @@ fn test_cannot_unlink_last_device() {
     let device0 = DeviceInfo::derive(&master_seed, 0, "Device 0".to_string(), 0);
     let mut registry = DeviceRegistry::new(device0.to_registered(&master_seed), &signing_key);
 
-    // Try to revoke the only device
     let result = registry.revoke_device(device0.device_id(), &signing_key, 0);
 
-    // Should fail - cannot unlink last device
     assert!(result.is_err(), "expected error");
     assert_eq!(registry.active_count(), 1);
 }

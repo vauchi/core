@@ -71,7 +71,6 @@ fn test_track_multiple_devices_for_message() {
         storage.create_device_delivery(&record).unwrap();
     }
 
-    // Get all device records for message
     let records = storage
         .get_device_deliveries_for_message("msg-001")
         .unwrap();
@@ -94,7 +93,6 @@ fn test_update_device_delivery_status() {
     };
     storage.create_device_delivery(&record).unwrap();
 
-    // Update to Delivered
     storage
         .update_device_delivery_status(
             "msg-002",
@@ -137,7 +135,6 @@ fn test_get_delivery_summary() {
         storage.create_device_delivery(&record).unwrap();
     }
 
-    // Get summary: "Delivered to X of Y devices"
     let summary = storage.get_delivery_summary("msg-003").unwrap();
     assert_eq!(summary.total_devices, 3);
     assert_eq!(summary.delivered_devices, 2);
@@ -151,7 +148,6 @@ fn test_is_fully_delivered() {
     let storage = test_storage();
     let timestamp = now();
 
-    // All devices delivered
     for i in 0..2 {
         let record = DeviceDeliveryRecord {
             message_id: "msg-full".to_string(),
@@ -173,7 +169,6 @@ fn test_delete_device_deliveries_for_message() {
     let storage = test_storage();
     let timestamp = now();
 
-    // Create records for a message
     for i in 0..3 {
         let record = DeviceDeliveryRecord {
             message_id: "msg-delete".to_string(),
@@ -193,7 +188,6 @@ fn test_delete_device_deliveries_for_message() {
         3
     );
 
-    // Delete all for message
     let deleted = storage
         .delete_device_deliveries_for_message("msg-delete")
         .unwrap();
@@ -237,7 +231,6 @@ fn test_get_pending_device_deliveries() {
         storage.create_device_delivery(&record).unwrap();
     }
 
-    // Get all pending
     let pending = storage.get_pending_device_deliveries().unwrap();
     assert_eq!(pending.len(), 3); // 3 pending records
 }
@@ -259,7 +252,6 @@ fn test_device_delivery_status_transitions() {
     };
     storage.create_device_delivery(&record).unwrap();
 
-    // Pending -> Stored
     storage
         .update_device_delivery_status(
             "msg-trans",
@@ -275,7 +267,6 @@ fn test_device_delivery_status_transitions() {
         .unwrap();
     assert_eq!(r.status, DeviceDeliveryStatus::Stored);
 
-    // Stored -> Delivered
     storage
         .update_device_delivery_status(
             "msg-trans",

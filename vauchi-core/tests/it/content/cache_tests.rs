@@ -130,7 +130,6 @@ fn test_cache_rejects_invalid_checksum() {
     let result = cache.save_content(ContentType::Networks, "networks.json", data, wrong_checksum);
     result.expect_err("expected error");
 
-    // File should not exist
     assert!(
         cache
             .get_content(ContentType::Networks, "networks.json")
@@ -151,7 +150,6 @@ fn test_cache_atomic_write_no_partial_files() {
         .save_content(ContentType::Networks, "test.json", data, &checksum)
         .unwrap();
 
-    // No .tmp files should remain
     let tmp_path = temp.path().join("content/networks/test.json.tmp");
     assert!(!tmp_path.exists());
 }
@@ -265,7 +263,6 @@ fn test_cache_last_check_time() {
     // Initially no last check time
     assert!(cache.get_last_check_time().is_none());
 
-    // Set last check time
     let now = std::time::SystemTime::now();
     cache.set_last_check_time(now).unwrap();
 
@@ -310,7 +307,6 @@ fn test_cache_help_content_roundtrip() {
         help_de
     );
 
-    // Verify files exist in help subdirectory
     assert!(temp.path().join("content/help/en.json").exists());
     assert!(temp.path().join("content/help/de.json").exists());
 }

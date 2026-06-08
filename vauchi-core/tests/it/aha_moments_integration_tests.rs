@@ -19,7 +19,6 @@ use vauchi_core::{
 };
 
 // ============================================================
-// Card Creation Celebration
 // Scenario: Card creation shows completion message
 // ============================================================
 
@@ -50,7 +49,6 @@ fn test_card_creation_aha_moment_triggers() {
 fn test_card_creation_shown_once() {
     let mut tracker = AhaMomentTracker::new();
 
-    // First trigger succeeds
     let first = tracker.try_trigger(AhaMomentType::CardCreationComplete);
     assert!(first.is_some(), "expected Some value");
 
@@ -60,7 +58,6 @@ fn test_card_creation_shown_once() {
 }
 
 // ============================================================
-// First Edit Feedback
 // Scenario: First edit shows would-update feedback
 // ============================================================
 
@@ -97,7 +94,6 @@ fn test_first_edit_shown_once() {
 }
 
 // ============================================================
-// First Contact Celebration
 // Scenario: First contact added celebration
 // ============================================================
 
@@ -130,7 +126,6 @@ fn test_first_contact_celebration_with_name() {
 fn test_subsequent_contacts_no_celebration() {
     let mut tracker = AhaMomentTracker::new();
 
-    // First contact triggers
     let first =
         tracker.try_trigger_with_context(AhaMomentType::FirstContactAdded, "Bob".to_string());
     assert!(first.is_some(), "expected Some value");
@@ -142,7 +137,6 @@ fn test_subsequent_contacts_no_celebration() {
 }
 
 // ============================================================
-// First Received Update
 // Scenario: First received update shows diff view
 // ============================================================
 
@@ -186,7 +180,6 @@ fn test_subsequent_updates_no_aha_moment() {
 }
 
 // ============================================================
-// First Outbound Update
 // Scenario: First outbound update shows delivery confirmation
 // ============================================================
 
@@ -210,7 +203,6 @@ fn test_first_outbound_delivery_confirmation() {
 }
 
 // ============================================================
-// Persistence
 // Scenario: Aha moments are tracked per milestone
 // ============================================================
 
@@ -223,13 +215,10 @@ fn test_first_outbound_delivery_confirmation() {
 fn test_moments_tracked_per_milestone() {
     let mut tracker = AhaMomentTracker::new();
 
-    // See card creation
     tracker.mark_seen(AhaMomentType::CardCreationComplete);
 
-    // First edit should still trigger
     assert!(tracker.should_trigger(AhaMomentType::FirstEdit));
 
-    // Card creation should not repeat
     assert!(!tracker.should_trigger(AhaMomentType::CardCreationComplete));
 }
 
@@ -242,7 +231,6 @@ fn test_moments_tracked_per_milestone() {
 fn test_moments_persist_across_restarts() {
     let mut tracker = AhaMomentTracker::new();
 
-    // Mark some moments as seen
     tracker.mark_seen(AhaMomentType::CardCreationComplete);
     tracker.mark_seen(AhaMomentType::FirstEdit);
 
@@ -252,12 +240,10 @@ fn test_moments_persist_across_restarts() {
     // Deserialize (simulate app restart)
     let restored = AhaMomentTracker::from_json(&json).expect("Should deserialize");
 
-    // Verify persistence
     assert!(restored.has_seen(AhaMomentType::CardCreationComplete));
     assert!(restored.has_seen(AhaMomentType::FirstEdit));
     assert!(!restored.has_seen(AhaMomentType::FirstContactAdded));
 
-    // Triggers should reflect persisted state
     let card_moment = restored
         .clone()
         .try_trigger(AhaMomentType::CardCreationComplete);
@@ -265,7 +251,6 @@ fn test_moments_persist_across_restarts() {
 }
 
 // ============================================================
-// Full Workflow Integration
 // ============================================================
 
 /// Test: Full aha moment workflow through user journey
@@ -337,7 +322,6 @@ fn test_full_user_journey_aha_moments() {
     let restored = AhaMomentTracker::from_json(&json).unwrap();
     assert_eq!(restored.seen_count(), 8);
 
-    // No more aha moments should trigger
     for moment_type in AhaMomentType::all() {
         assert!(
             !restored.should_trigger(*moment_type),
@@ -347,7 +331,6 @@ fn test_full_user_journey_aha_moments() {
 }
 
 // ============================================================
-// Context Interpolation
 // ============================================================
 
 /// Test: All context interpolation works correctly
@@ -357,17 +340,14 @@ fn test_full_user_journey_aha_moments() {
 // @internal
 #[test]
 fn test_context_interpolation() {
-    // FirstContactAdded with name
     let moment = AhaMoment::with_context(AhaMomentType::FirstContactAdded, "Alice".to_string());
     assert!(moment.message().contains("Alice"));
     assert!(moment.message().contains("update"));
 
-    // FirstUpdateReceived with name
     let moment = AhaMoment::with_context(AhaMomentType::FirstUpdateReceived, "Bob".to_string());
     assert!(moment.message().contains("Bob"));
     assert!(moment.message().contains("instantly"));
 
-    // FirstOutboundDelivered with count
     let moment = AhaMoment::with_context(AhaMomentType::FirstOutboundDelivered, "5".to_string());
     assert!(moment.message().contains("5 contacts"));
 
@@ -389,7 +369,6 @@ fn test_context_interpolation() {
 fn test_vauchi_api_aha_moment_integration() {
     let mut wb: Vauchi = Vauchi::in_memory().unwrap();
 
-    // Create identity
     wb.create_identity("Test User").unwrap();
     assert!(wb.has_identity());
 
@@ -405,14 +384,12 @@ fn test_vauchi_api_aha_moment_integration() {
         .unwrap();
     assert!(moment2.is_none(), "Should not repeat");
 
-    // Check has_seen
     assert!(
         wb.has_seen_aha_moment(AhaMomentType::CardCreationComplete)
             .unwrap()
     );
     assert!(!wb.has_seen_aha_moment(AhaMomentType::FirstEdit).unwrap());
 
-    // Check seen count
     assert_eq!(wb.aha_moments_seen_count().unwrap(), 1);
 
     // Trigger first edit with context
@@ -420,7 +397,6 @@ fn test_vauchi_api_aha_moment_integration() {
     assert!(edit_moment.is_some(), "expected Some value");
     assert_eq!(wb.aha_moments_seen_count().unwrap(), 2);
 
-    // Reset and verify
     wb.reset_aha_moments().unwrap();
     assert_eq!(wb.aha_moments_seen_count().unwrap(), 0);
     assert!(
@@ -446,10 +422,8 @@ fn test_edit_triggers_first_edit_moment() {
     ))
     .unwrap();
 
-    // The API should have recorded that an edit happened
     // and potentially triggered the FirstEdit aha moment
 
-    // Verify the field was added
     let card = wb.own_card().unwrap().unwrap();
     assert!(card.fields().iter().any(|f| f.label() == "work"));
 }
@@ -461,7 +435,6 @@ fn test_edit_triggers_first_edit_moment() {
 fn test_add_contact_triggers_first_contact_moment() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
 
-    // Add first contact
     let bob = Contact::from_exchange(
         [1u8; 32],
         ContactCard::new("Bob"),
@@ -488,31 +461,24 @@ fn test_vauchi_api_demo_contact_integration() {
     let mut wb: Vauchi = Vauchi::in_memory().unwrap();
     wb.create_identity("Test User").unwrap();
 
-    // Initialize demo contact for new user
     wb.initialize_demo_contact().unwrap();
 
-    // Check demo contact is active
     assert!(wb.is_demo_contact_active().unwrap());
 
-    // Get demo contact card
     let card = wb.demo_contact_card().unwrap();
     assert!(card.is_some(), "expected Some value");
     let card = card.unwrap();
     assert!(card.is_demo);
     assert!(!card.tip_title.is_empty());
 
-    // Advance to next tip
     let next_tip = wb.advance_demo_contact().unwrap();
     assert!(next_tip.is_some(), "expected Some value");
 
-    // Dismiss demo contact
     wb.dismiss_demo_contact().unwrap();
     assert!(!wb.is_demo_contact_active().unwrap());
 
-    // Card should now be None
     assert!(wb.demo_contact_card().unwrap().is_none());
 
-    // Restore
     wb.restore_demo_contact().unwrap();
     assert!(wb.is_demo_contact_active().unwrap());
 
@@ -530,7 +496,6 @@ fn test_vauchi_api_demo_contact_integration() {
 fn test_demo_contact_skipped_with_contacts() {
     let wb: Vauchi = Vauchi::in_memory().unwrap();
 
-    // Add a contact first
     let alice = Contact::from_exchange(
         [1u8; 32],
         ContactCard::new("Alice"),
@@ -539,7 +504,6 @@ fn test_demo_contact_skipped_with_contacts() {
     );
     wb.add_contact(alice).unwrap();
 
-    // Try to initialize demo contact
     wb.initialize_demo_contact().unwrap();
 
     // Demo should not be active (user already has contacts)

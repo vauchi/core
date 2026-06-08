@@ -38,13 +38,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Command {
-    // ── QR ───────────────────────────────────────────────────────────
     /// Display a QR code containing `data`.
     QrDisplay { data: String },
     /// Request the frontend to open a QR scanner (camera).
     QrRequestScan,
 
-    // ── BLE ──────────────────────────────────────────────────────────
     /// Start advertising the vauchi BLE service with the given payload.
     BleStartAdvertising {
         service_uuid: String,
@@ -61,7 +59,6 @@ pub enum Command {
     /// Disconnect from the current BLE peer.
     BleDisconnect,
 
-    // ── NFC ──────────────────────────────────────────────────────────
     /// Activate the NFC interface and prepare to exchange `payload`.
     NfcActivate { payload: Vec<u8> },
     /// Deactivate the NFC interface.
@@ -73,7 +70,6 @@ pub enum Command {
     /// `Event::NfcDataReceived`.
     NfcSendApdu { data: Vec<u8> },
 
-    // ── Audio (ultrasonic proximity) ─────────────────────────────────
     /// Emit ultrasonic PCM samples encoding a challenge.
     ///
     /// Core has already FSK-encoded the challenge bytes; the frontend
@@ -89,13 +85,11 @@ pub enum Command {
     /// Stop all audio operations.
     AudioStop,
 
-    // ── Accelerometer ───────────────────────────────────────────────
     /// Start accelerometer sampling for proximity verification.
     AccelerometerStart,
     /// Stop accelerometer sampling.
     AccelerometerStop,
 
-    // ── Relay escrow ────────────────────────────────────────────────
     /// Deposit encrypted card into relay escrow gate.
     RelayEscrowDeposit {
         gate_hash: Vec<u8>,
@@ -119,16 +113,13 @@ pub enum Command {
         slot_hash: Vec<u8>,
     },
 
-    // ── Link mode ───────────────────────────────────────────────────
     /// Show system share sheet with a URL.
     ShowShareSheet { url: String },
 
-    // ── BLE cleanup ────────────────────────────────────────────────
     // Appended (not inserted) to preserve serde discriminant ordering.
     /// Stop BLE scanning (saves battery after discovery completes).
     BleStopScanning,
 
-    // ── Direct transport (USB/TCP) ─────────────────────────────────
     // Appended to preserve serde discriminant ordering.
     /// Send an exchange payload over a direct transport (USB cable / local TCP).
     ///
@@ -169,7 +160,6 @@ pub enum Command {
     /// cancels.
     ImagePickFromFile,
 
-    // ── Camera control (multi-stage exchange) ──────────────────────
     // Appended to preserve serde discriminant ordering.
     /// Switch the active camera between front- and rear-facing.
     ///
@@ -203,7 +193,6 @@ pub enum Command {
         purpose: FilePickPurpose,
     },
 
-    // ── Screen presentation hardware (multi-stage exchange) ────────
     // Appended to preserve serde discriminant ordering.
     /// Set the device screen brightness, optionally restoring the
     /// platform default when `level` is `None`.
@@ -261,7 +250,6 @@ pub enum Command {
     /// `android/app/src/main/kotlin/app/vauchi/ui/FaceToFaceExchangeScreen.kt`.
     SetOrientationLock { orientation: Option<Orientation> },
 
-    // ── USB / direct-transport card exchange ───────────────────────
     // Appended to preserve serde discriminant ordering.
     /// Send our AEAD-encrypted `ContactCard` to the peer over the established
     /// USB / direct-TCP connection (the second leg of the wired exchange, after
@@ -369,7 +357,6 @@ impl Command {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Event {
-    // ── QR ───────────────────────────────────────────────────────────
     /// The user scanned a QR code containing `data`.
     QrScanned { data: String },
 
@@ -391,7 +378,6 @@ pub enum Event {
         frame_skipped: bool,
     },
 
-    // ── BLE ──────────────────────────────────────────────────────────
     /// A BLE peripheral was discovered during scanning.
     BleDeviceDiscovered {
         id: String,
@@ -407,18 +393,15 @@ pub enum Event {
     /// BLE connection lost or closed.
     BleDisconnected { reason: String },
 
-    // ── NFC ──────────────────────────────────────────────────────────
     /// NFC data received from a tap exchange.
     NfcDataReceived { data: Vec<u8> },
 
-    // ── Audio ────────────────────────────────────────────────────────
     /// Raw PCM samples from a microphone listen.
     ///
     /// Core decodes the FSK signal internally — the frontend ships
     /// whatever it captured at its native rate. Mono float PCM.
     AudioSamplesRecorded { samples: Vec<f32>, sample_rate: u32 },
 
-    // ── Errors ───────────────────────────────────────────────────────
     /// A hardware operation failed.
     HardwareError { transport: String, error: String },
     /// The requested hardware is not available on this platform.
@@ -439,7 +422,6 @@ pub enum Event {
         accuracy_meters: Option<f32>,
     },
 
-    // ── Accelerometer ───────────────────────────────────────────────
     /// Accelerometer sample from the device.
     ///
     /// Acceleration is reported in milli-g (thousandths of standard gravity)
@@ -456,13 +438,11 @@ pub enum Event {
         magnitude_milli_g: i32,
     },
 
-    // ── Relay escrow ────────────────────────────────────────────────
     /// Relay escrow gate has reached required deposit count.
     RelayEscrowReady { gate_hash: Vec<u8> },
     /// Relay escrow deposit/retrieve failed or gate expired.
     RelayEscrowFailed { gate_hash: Vec<u8>, reason: String },
 
-    // ── Link mode ───────────────────────────────────────────────────
     /// User shared the link via share sheet.
     LinkShared,
     /// Link was opened by peer, providing their public key.
@@ -472,7 +452,6 @@ pub enum Event {
     /// Blob retrieved from relay escrow gate (response to `RelayEscrowRetrieve`).
     RelayEscrowBlobReceived { gate_hash: Vec<u8>, blob: Vec<u8> },
 
-    // ── Direct transport (USB/TCP) ─────────────────────────────────
     /// Peer's exchange payload received over a direct transport.
     ///
     /// Sent by the frontend after completing the TCP exchange requested
@@ -530,7 +509,6 @@ pub enum Event {
     /// Per `_private/docs/designs/2026-05-28-slice-32m-phase-0-event-command-mapping-design.md` §3.2.
     BleMtuNegotiated { device_id: String, mtu: u32 },
 
-    // ── USB / direct-transport card exchange ───────────────────────
     // Appended to preserve serde discriminant ordering.
     /// The peer's AEAD-encrypted `ContactCard`, reported by the frontend after
     /// the second USB / direct-TCP swap requested by [`Command::DirectSendCard`].
@@ -543,8 +521,6 @@ pub enum Event {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // ── Command construction ────────────────────────────────
 
     // @internal
     #[test]
@@ -584,8 +560,6 @@ mod tests {
             } if timeout_ms == 5000 && sample_rate == 44100
         ));
     }
-
-    // ── Event construction ──────────────────────────
 
     // @internal
     #[test]
@@ -647,8 +621,6 @@ mod tests {
         assert!(matches!(evt, Event::HardwareError { transport, error }
                 if transport == "NFC" && error == "no reader detected"));
     }
-
-    // ── Serialization roundtrips ────────────────────────────────────
 
     // @internal
     #[test]
@@ -817,8 +789,6 @@ mod tests {
         }
     }
 
-    // ── Clone + equality ────────────────────────────────────────────
-
     // @internal
     #[test]
     fn command_clone_equals_original() {
@@ -840,8 +810,6 @@ mod tests {
         let cloned = evt.clone();
         assert_eq!(evt, cloned);
     }
-
-    // ── All variants covered ────────────────────────────────────────
 
     // @internal
     #[test]

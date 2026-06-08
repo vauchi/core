@@ -16,7 +16,6 @@ use vauchi_core::{
 };
 
 // =============================================================================
-// Connection Management Tests
 // =============================================================================
 
 /// Test: Relay client connects and disconnects cleanly
@@ -34,14 +33,11 @@ fn test_relay_connect_disconnect() {
 
     let mut client = RelayClient::new(transport, config, "test-id".into());
 
-    // Initially not connected
     assert!(!client.is_connected());
 
-    // Connect
     client.connect().unwrap();
     assert!(client.is_connected());
 
-    // Disconnect
     client.disconnect().unwrap();
     assert!(!client.is_connected());
 }
@@ -61,19 +57,16 @@ fn test_relay_reconnection() {
 
     let mut client = RelayClient::new(transport, config, "test-id".into());
 
-    // First connection cycle
     client.connect().unwrap();
     assert!(client.is_connected());
     client.disconnect().unwrap();
     assert!(!client.is_connected());
 
-    // Reconnect
     client.connect().unwrap();
     assert!(client.is_connected());
 }
 
 // =============================================================================
-// Message Delivery Tests
 // =============================================================================
 
 /// Test: Sending update through relay
@@ -94,13 +87,11 @@ fn test_relay_send_update() {
     let mut client = RelayClient::new(transport, config, "sender-id".into());
     client.connect().unwrap();
 
-    // Set up encryption
     let shared_secret = SymmetricKey::generate();
     let bob_dh = X3DHKeyPair::generate();
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
-    // Send update
     let msg_id = client
         .send_update(
             0,
@@ -138,7 +129,6 @@ fn test_relay_multiple_in_flight() {
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
-    // Send multiple updates
     client
         .send_update(0, "recipient1", &mut ratchet, b"data1", "update-001", None)
         .unwrap();
@@ -158,7 +148,6 @@ fn test_relay_multiple_in_flight() {
 }
 
 // =============================================================================
-// Sync Manager Integration Tests
 // =============================================================================
 
 /// Test: Sync manager queues updates for delivery
@@ -189,7 +178,6 @@ fn test_sync_manager_queue_for_relay() {
         ))
         .unwrap();
 
-    // Queue for multiple contacts
     let update1 = sync_manager
         .queue_card_update("contact-1", &old_card, &new_card)
         .unwrap();
@@ -200,7 +188,6 @@ fn test_sync_manager_queue_for_relay() {
     assert!(!update1.is_empty());
     assert!(!update2.is_empty());
 
-    // Check pending for each contact
     let pending1 = sync_manager.get_pending("contact-1").unwrap();
     let pending2 = sync_manager.get_pending("contact-2").unwrap();
 
@@ -222,18 +209,14 @@ fn test_sync_manager_mark_delivered() {
         .queue_card_update("contact-1", &old_card, &new_card)
         .unwrap();
 
-    // Initially pending
     let pending = sync_manager.get_pending("contact-1").unwrap();
     assert_eq!(pending.len(), 1);
 
-    // Mark delivered
     sync_manager.mark_delivered(&update_id).unwrap();
 
-    // No longer pending
     let pending = sync_manager.get_pending("contact-1").unwrap();
     assert_eq!(pending.len(), 0);
 
-    // State should be synced
     let state = sync_manager.get_sync_state("contact-1").unwrap();
     assert!(matches!(state, vauchi_core::SyncState::Synced { .. }));
 }
@@ -266,7 +249,6 @@ fn test_sync_state_pending_count() {
 }
 
 // =============================================================================
-// Full Workflow Tests
 // =============================================================================
 
 /// Test: Complete update propagation flow
@@ -277,7 +259,6 @@ fn test_sync_state_pending_count() {
 // @internal
 #[test]
 fn test_full_update_propagation() {
-    // Set up Alice and Bob
     let mut alice_wb: Vauchi = Vauchi::in_memory().unwrap();
     let mut bob_wb: Vauchi = Vauchi::in_memory().unwrap();
 
@@ -288,7 +269,6 @@ fn test_full_update_propagation() {
     let bob_pk = *bob_wb.identity().unwrap().signing_public_key();
     let shared_secret = SymmetricKey::generate();
 
-    // Exchange contacts
     let bob_contact =
         Contact::from_exchange(bob_pk, ContactCard::new("Bob"), shared_secret.clone(), 0);
     let bob_id = bob_contact.id().to_string();
@@ -303,7 +283,6 @@ fn test_full_update_propagation() {
     let alice_id = alice_contact.id().to_string();
     bob_wb.add_contact(alice_contact).unwrap();
 
-    // Set up ratchets
     let bob_dh = X3DHKeyPair::generate();
     let alice_ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
@@ -318,7 +297,6 @@ fn test_full_update_propagation() {
         .save_ratchet_state(&alice_id, &bob_ratchet, false)
         .unwrap();
 
-    // Alice updates her card
     let old_card = alice_wb.own_card().unwrap().unwrap();
     alice_wb
         .add_own_field(ContactField::new(
@@ -330,17 +308,14 @@ fn test_full_update_propagation() {
         .unwrap();
     let new_card = alice_wb.own_card().unwrap().unwrap();
 
-    // Propagate update
     let queued = alice_wb
         .propagate_card_update(&old_card, &new_card)
         .unwrap();
     assert_eq!(queued, 1);
 
-    // Verify pending update exists
     let pending = alice_wb.storage().get_pending_updates(&bob_id).unwrap();
     assert_eq!(pending.len(), 1);
 
-    // Bob decrypts and applies
     let (mut bob_ratchet, _) = bob_wb
         .storage()
         .load_ratchet_state(&alice_id)
@@ -361,12 +336,10 @@ fn test_full_update_propagation() {
     };
     let delta: vauchi_core::sync::CardDelta = serde_json::from_slice(&delta_bytes).unwrap();
 
-    // Apply to Bob's view of Alice
     let bob_alice_contact = bob_wb.get_contact(&alice_id).unwrap().unwrap();
     let mut alice_card_at_bob = bob_alice_contact.card().clone();
     delta.apply(&mut alice_card_at_bob, 0).unwrap();
 
-    // Verify Bob has the new field
     assert_eq!(alice_card_at_bob.fields().len(), 1);
     assert!(
         alice_card_at_bob
@@ -377,7 +350,6 @@ fn test_full_update_propagation() {
 }
 
 // =============================================================================
-// Configuration Tests
 // =============================================================================
 
 /// Test: Relay client config values are respected
@@ -415,7 +387,6 @@ fn test_default_transport_config() {
 }
 
 // =============================================================================
-// Edge Cases
 // =============================================================================
 
 /// Test: Empty payload handling
@@ -439,7 +410,6 @@ fn test_relay_empty_payload() {
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
 
-    // Empty payload should still work
     let result = client.send_update(0, "recipient-id", &mut ratchet, b"", "update-empty", None);
     result.expect("expected success");
 }

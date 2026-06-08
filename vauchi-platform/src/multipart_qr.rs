@@ -212,10 +212,8 @@ impl MultipartDecoder {
             });
         }
 
-        // Decode the base64 data
         let chunk_bytes = URL_SAFE_NO_PAD.decode(b64_data)?;
 
-        // Verify CRC32
         let actual_crc = crc32fast::hash(&chunk_bytes);
         let expected_crc =
             u32::from_str_radix(expected_crc_hex, 16).map_err(MultipartQrError::InvalidCrcHex)?;
@@ -231,7 +229,6 @@ impl MultipartDecoder {
         // Store total on first chunk
         self.total = Some(total);
 
-        // Check for duplicate
         if self.chunks.contains_key(&index) {
             return Ok(false);
         }

@@ -302,12 +302,10 @@ impl BackupReminderState {
     /// Check if a reminder is due.
     /// `fallback_timestamp` is identity creation time (used when no backup exists).
     pub fn is_reminder_due(&self, now: u64, fallback_timestamp: u64) -> bool {
-        // Respect frequency setting
         let threshold = match self.frequency.threshold_secs() {
             Some(t) => t,
             None => return false,
         };
-        // Also respect legacy field
         if !self.reminders_enabled {
             return false;
         }

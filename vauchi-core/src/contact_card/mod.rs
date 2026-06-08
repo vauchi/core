@@ -268,7 +268,6 @@ impl ContactCard {
             return Err(ContactCardError::MaxFieldsReached);
         }
 
-        // Validate the field before adding
         field.validate()?;
 
         self.fields.push(field);
@@ -358,7 +357,6 @@ impl ContactCard {
     /// Fields not in the list are appended at the end in their original order.
     /// Returns an error if any ID in `field_ids` does not match an existing field.
     pub fn reorder_fields(&mut self, field_ids: &[&str]) -> Result<(), ContactCardError> {
-        // Validate that all provided IDs exist
         for &id in field_ids {
             if !self.fields.iter().any(|f| f.id() == id) {
                 return Err(ContactCardError::FieldNotFound);
@@ -367,14 +365,12 @@ impl ContactCard {
 
         let mut reordered: Vec<ContactField> = Vec::with_capacity(self.fields.len());
 
-        // First, add fields in the specified order
         for &id in field_ids {
             if let Some(pos) = self.fields.iter().position(|f| f.id() == id) {
                 reordered.push(self.fields.remove(pos));
             }
         }
 
-        // Then append remaining fields in their original order
         reordered.append(&mut self.fields);
 
         self.fields = reordered;

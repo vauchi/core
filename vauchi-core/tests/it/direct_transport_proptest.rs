@@ -127,7 +127,6 @@ fn adversarial_non_utf8_payload_rejected() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Invalid UTF-8 sequence
     let result = session.apply_hardware_event(Event::DirectPayloadReceived {
         data: vec![0xFF, 0xFE, 0x80, 0x81, 0xC0],
     });
@@ -262,7 +261,6 @@ fn adversarial_replay_same_payload_twice() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // First apply succeeds
     session
         .apply_hardware_event(Event::DirectPayloadReceived {
             data: bob_payload.clone(),

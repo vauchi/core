@@ -76,7 +76,6 @@ fn apply_sync_deletion_scheduled_writes_state_to_storage() {
 #[test]
 fn apply_sync_deletion_cancelled_clears_state() {
     let wb = make_vauchi();
-    // Set state to Scheduled first.
     wb.storage()
         .save_deletion_state(&DeletionState::Scheduled {
             scheduled_at: 100,
@@ -97,7 +96,6 @@ fn apply_sync_deletion_cancelled_clears_state() {
 }
 
 // ============================================================
-// ImportedContactRemoved
 // ============================================================
 
 // @internal
@@ -152,7 +150,6 @@ fn apply_sync_imported_contact_removed_nonexistent_is_skipped_non_fatally() {
 }
 
 // ============================================================
-// PersonalNoteChanged
 // ============================================================
 
 // @internal
@@ -178,7 +175,6 @@ fn apply_sync_personal_note_changed_persists_note() {
 }
 
 // ============================================================
-// ProposalTrustChanged
 // ============================================================
 
 // @internal
@@ -252,7 +248,6 @@ fn apply_sync_label_change_creates_then_updates_with_fields() {
     let bob_id = bob.id().to_string();
     wb.add_contact(bob).unwrap();
 
-    // First create the label.
     let create = vec![SyncItem::LabelChange {
         label_id: "label-friends".to_string(),
         label_name: "Friends".to_string(),
@@ -310,7 +305,6 @@ fn apply_sync_label_change_with_is_deleted_removes_label() {
 }
 
 // ============================================================
-// VisibilityChanged
 // ============================================================
 
 // @internal
@@ -346,7 +340,6 @@ fn apply_sync_imported_contact_add_update_remove_roundtrip() {
     let imported_id = imported_contact.id().to_string();
     let sync_data = ImportedContactSyncData::from_contact(&imported_contact).unwrap();
 
-    // Add
     let applied = wb
         .apply_sync_items(vec![SyncItem::ImportedContactAdded {
             contact_data: sync_data.clone(),
@@ -356,7 +349,6 @@ fn apply_sync_imported_contact_add_update_remove_roundtrip() {
     assert_eq!(applied, 1);
     assert!(wb.get_contact(&imported_id).unwrap().is_some());
 
-    // Update with a new card. Reuse the original ID via from_sync_data
     // path: build an updated ImportedContactSyncData with the same id,
     // changed display_name.
     let mut updated_sync_data = sync_data;
@@ -375,7 +367,6 @@ fn apply_sync_imported_contact_add_update_remove_roundtrip() {
     let after_update = wb.get_contact(&imported_id).unwrap().unwrap();
     assert_eq!(after_update.display_name(), "Dora Updated");
 
-    // Remove
     let applied = wb
         .apply_sync_items(vec![SyncItem::ImportedContactRemoved {
             contact_id: imported_id.to_string(),

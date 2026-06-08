@@ -15,7 +15,6 @@ use vauchi_core::contact_card::{ContactCard, ContactField, FieldType};
 use vauchi_core::text::normalize_text;
 
 // ============================================================
-// Strategies
 // ============================================================
 
 /// CJK Unified Ideographs (U+4E00..U+9FFF).

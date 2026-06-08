@@ -76,7 +76,6 @@ impl Identity {
     ///
     /// Generates a random master seed and derives all keypairs from it.
     pub fn create(display_name: &str, now: u64) -> Self {
-        // Generate random master seed
         let master_seed: [u8; 32] = random_bytes();
 
         Self::from_seed(master_seed, normalize_text(display_name), now)
@@ -122,21 +121,16 @@ impl Identity {
         device_name: String,
         now: u64,
     ) -> Self {
-        // Derive signing keypair from master seed
         let signing_keypair = SigningKeyPair::from_seed(&master_seed);
 
-        // Cache the signing public key bytes
         let signing_public_key = *signing_keypair.public_key().as_bytes();
 
-        // Derive exchange keypair using HKDF with domain separation
         // master_seed is IKM (high-entropy input), no salt needed
         let exchange_seed = HKDF::derive_key(None, &master_seed, b"Vauchi_Exchange_Seed_v2");
 
-        // Create X25519 keypair and store the actual public key
         let x3dh = X3DHKeyPair::from_bytes(*exchange_seed);
         let exchange_public_key = *x3dh.public_key();
 
-        // Create device info for this device
         let device_info = DeviceInfo::derive(&master_seed, device_index, device_name, now);
 
         Identity {
@@ -192,7 +186,6 @@ impl Identity {
     /// The keypair is derived from the master seed using HKDF with domain
     /// separation, ensuring consistency with exchange_public_key.
     pub fn x3dh_keypair(&self) -> X3DHKeyPair {
-        // Derive X25519 secret from master_seed using HKDF
         // Uses same derivation as exchange_public_key for consistency
         let x25519_secret = HKDF::derive_key(None, &self.master_seed, b"Vauchi_Exchange_Seed_v2");
         X3DHKeyPair::from_bytes(*x25519_secret)
@@ -332,13 +325,10 @@ impl Identity {
     ///
     /// Backup format: `version_byte (0x02) || salt (16 bytes) || ciphertext`
     pub fn export_backup(&self, password: &str) -> Result<IdentityBackup, IdentityError> {
-        // Validate password strength using zxcvbn
         password::validate_password(password)?;
 
-        // Generate random salt
         let salt: [u8; 16] = random_bytes();
 
-        // Derive encryption key from password using Argon2id
         let encryption_key = derive_key_argon2id(password.as_bytes(), &salt)
             .map_err(|_| IdentityError::BackupFailed)?;
 
@@ -362,7 +352,6 @@ impl Identity {
         plaintext.extend_from_slice(&device_name_len);
         plaintext.extend_from_slice(device_name_bytes);
 
-        // Encrypt the data (uses XChaCha20-Poly1305)
         let ciphertext =
             encrypt(&encryption_key, &plaintext).map_err(|_| IdentityError::BackupFailed)?;
 
@@ -415,7 +404,6 @@ impl Identity {
             .try_into()
             .map_err(|_| IdentityError::RestoreFailed)?;
 
-        // Derive decryption key using Argon2id
         let decryption_key = derive_key_argon2id(password.as_bytes(), &salt)
             .map_err(|_| IdentityError::RestoreFailed)?;
 

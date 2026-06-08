@@ -139,7 +139,6 @@ impl VersionPolicy {
 ///
 /// Only supports UTC (`Z` suffix). This avoids pulling in `chrono` for a single parse site.
 fn parse_iso8601_to_unix(s: &str) -> Result<u64, String> {
-    // Expected: "2024-01-15T00:00:00Z" (20 chars)
     if !s.ends_with('Z') || s.len() != 20 {
         return Err(format!("unsupported ISO 8601 format: {s}"));
     }
@@ -168,7 +167,6 @@ fn parse_iso8601_to_unix(s: &str) -> Result<u64, String> {
         return Err(format!("invalid time components in: {s}"));
     }
 
-    // Days from Unix epoch (1970-01-01) to the start of the given date.
     let days = days_since_epoch(year, month, day)?;
     let timestamp =
         days * 86400 + u64::from(hour) * 3600 + u64::from(minute) * 60 + u64::from(second);

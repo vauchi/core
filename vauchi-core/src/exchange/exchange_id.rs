@@ -53,8 +53,6 @@ impl fmt::Debug for ExchangeId {
     }
 }
 
-// ── Custom serde: hex string ─────────────────────────────────────────────────
-
 mod hex_bytes {
     use super::ExchangeId;
     use serde::{Deserialize, Deserializer, Serializer};
@@ -90,8 +88,6 @@ impl<'de> Deserialize<'de> for ExchangeId {
         hex_bytes::deserialize(d)
     }
 }
-
-// ── Tests ────────────────────────────────────────────────────────────────────
 
 // INLINE_TEST_REQUIRED: tests access ExchangeId internals (hex_bytes module) not exposed publicly
 #[cfg(test)]

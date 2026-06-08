@@ -28,7 +28,6 @@ fn test_visible_fields_no_groups_mode() {
     card.add_field(field1).unwrap();
     card.add_field(field2).unwrap();
 
-    // Mark only field1 as shown
     card.set_field_shown(&field1_id, true);
 
     let label_manager = GroupManager::new();
@@ -66,7 +65,6 @@ fn test_visible_fields_groups_mode() {
     let label = label_manager.create_group("Friends", 0).unwrap();
     let label_id = label.id().to_string();
 
-    // Add contact to Friends and make field1 visible via label
     label_manager
         .add_contact_to_group(&label_id, "contact-123", 0)
         .unwrap();

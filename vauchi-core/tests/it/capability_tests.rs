@@ -453,7 +453,6 @@ fn test_connection_type_variants() {
         ConnectionType::Ethernet,
         ConnectionType::Offline,
     ];
-    // All variants should be constructible and distinct
     for (i, a) in variants.iter().enumerate() {
         for (j, b) in variants.iter().enumerate() {
             if i != j {

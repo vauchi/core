@@ -9,7 +9,6 @@ use cucumber::{given, then, when};
 use crate::VauchiWorld;
 
 // ============================================================
-// Background steps
 // ============================================================
 
 #[given("the Vauchi application is installed")]
@@ -23,7 +22,6 @@ fn secure_storage_available(_world: &mut VauchiWorld) {
 }
 
 // ============================================================
-// Identity creation
 // ============================================================
 
 #[given("I am launching Vauchi for the first time")]
@@ -75,7 +73,6 @@ fn see_setup_screen(_world: &mut VauchiWorld) {
 }
 
 // ============================================================
-// Display name setup
 // ============================================================
 
 #[when(expr = "I enter {string} as my display name")]
@@ -102,7 +99,6 @@ fn taken_to_main(_world: &mut VauchiWorld) {
 }
 
 // ============================================================
-// Display name validation
 // ============================================================
 
 #[when("I try to set an empty display name")]
@@ -130,13 +126,10 @@ fn cannot_proceed(world: &mut VauchiWorld) {
 }
 
 // ============================================================
-// Identity backup
 // ============================================================
 
 #[given("I am on the settings screen")]
-fn on_settings_screen(_world: &mut VauchiWorld) {
-    // UI state
-}
+fn on_settings_screen(_world: &mut VauchiWorld) {}
 
 #[when(expr = "I select {string}")]
 fn select_option(_world: &mut VauchiWorld, _option: String) {
@@ -186,7 +179,6 @@ fn backup_encrypted(_world: &mut VauchiWorld) {
 }
 
 // ============================================================
-// Password strength
 // ============================================================
 
 #[given("I am creating an identity backup")]
@@ -198,7 +190,6 @@ fn creating_backup(_world: &mut VauchiWorld) {
 fn enter_password(world: &mut VauchiWorld, password: String) {
     world.pending_password = Some(password.clone());
 
-    // Check password strength via the API
     use vauchi_core::identity::password::validate_password;
     let result = validate_password(&password);
     match result {
@@ -226,13 +217,10 @@ fn backup_not_created(world: &mut VauchiWorld) {
 }
 
 // ============================================================
-// Identity details
 // ============================================================
 
 #[when("I view my identity details")]
-fn view_identity_details(_world: &mut VauchiWorld) {
-    // UI action
-}
+fn view_identity_details(_world: &mut VauchiWorld) {}
 
 #[then("I should see my public key fingerprint")]
 fn see_fingerprint(world: &mut VauchiWorld) {
@@ -243,7 +231,6 @@ fn see_fingerprint(world: &mut VauchiWorld) {
 #[then("the fingerprint should be displayed in a human-readable format")]
 fn fingerprint_readable(world: &mut VauchiWorld) {
     let pid = world.vauchi.public_id().unwrap();
-    // Public ID is hex-encoded
     assert!(pid.chars().all(|c| c.is_ascii_hexdigit()));
 }
 

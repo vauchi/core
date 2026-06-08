@@ -101,7 +101,6 @@ fn test_max_devices_limit() {
 
     let mut registry = DeviceRegistry::new(device0.to_registered(&seed), &signing_key);
 
-    // Add devices up to limit
     for i in 1..MAX_DEVICES {
         let device = DeviceInfo::derive(&seed, i as u32, format!("Device {}", i), 0);
         registry
@@ -111,7 +110,6 @@ fn test_max_devices_limit() {
 
     assert_eq!(registry.active_count(), MAX_DEVICES);
 
-    // Adding one more should fail
     let extra = DeviceInfo::derive(&seed, MAX_DEVICES as u32, "Extra".to_string(), 0);
     let result = registry.add_device(extra.to_registered(&seed), &signing_key);
     assert!(matches!(result, Err(DeviceError::MaxDevicesReached)));
@@ -233,7 +231,6 @@ fn test_device_revocation_certificate_creation() {
     let signing_key = test_signing_keypair();
     let device = DeviceInfo::derive(&seed, 1, "Lost Device".to_string(), 0);
 
-    // Create a revocation certificate
     let certificate = DeviceRevocationCertificate::create(
         device.device_id(),
         "Lost device - reported stolen".to_string(),
@@ -300,7 +297,6 @@ fn test_registry_broadcast_message_creation() {
 
     let registry = DeviceRegistry::new(device.to_registered(&seed), &signing_key);
 
-    // Create broadcast message for contacts
     let broadcast = RegistryBroadcast::new(&registry, &signing_key, 0);
 
     assert_eq!(broadcast.version(), registry.version());
@@ -388,7 +384,6 @@ fn test_apply_revocation_to_contact_registry() {
         .add_device(device1.to_registered(&seed), &signing_key)
         .unwrap();
 
-    // Create revocation certificate for device1
     let certificate = DeviceRevocationCertificate::create(
         device1.device_id(),
         "Revoked".to_string(),
@@ -576,7 +571,6 @@ fn test_find_device_by_prefix_only_matches_active_devices() {
         .add_device(device1.to_registered(&seed), &signing_key)
         .unwrap();
 
-    // Revoke device1
     registry
         .revoke_device(
             device1

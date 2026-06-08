@@ -30,8 +30,6 @@ use vauchi_core::storage::Storage;
 // =============================================================================
 // security.feature @attacks: "Brute force protection on backup password"
 // - Key derivation should be computationally expensive (Argon2id)
-// - Each attempt should take significant time
-// - A strong password should be practically uncrackable
 
 /// Scenario: Argon2id makes brute-force attacks computationally infeasible
 // @scenario: security :: Brute force protection on backup password
@@ -45,7 +43,6 @@ fn test_brute_force_protection() {
     let result = derive_key_argon2id(password, &salt);
     let duration = start.elapsed();
 
-    // Derivation should succeed
     result.expect("expected success");
 
     // Argon2id with m=64MB, t=3, p=4 should take meaningful time
@@ -57,7 +54,6 @@ fn test_brute_force_protection() {
         duration.as_millis()
     );
 
-    // Verify different passwords produce different keys
     let wrong_password = b"wrong-password";
     let key_correct = derive_key_argon2id(password, &salt).unwrap();
     let key_wrong = derive_key_argon2id(wrong_password, &salt).unwrap();
@@ -68,7 +64,6 @@ fn test_brute_force_protection() {
         "Different passwords should produce different keys"
     );
 
-    // Verify same password + salt produces consistent key
     let key_repeat = derive_key_argon2id(password, &salt).unwrap();
     assert_eq!(
         key_correct.as_bytes(),
@@ -91,7 +86,6 @@ fn test_brute_force_rate_calculation() {
     let password = b"test-password";
     let salt = [0x01u8; 32];
 
-    // Run 5 iterations and verify minimum time
     let mut total_ms = 0u128;
     for _ in 0..5 {
         let start = std::time::Instant::now();
@@ -133,13 +127,11 @@ fn test_qr_screenshot_attack_prevention() {
 
     let qr = ExchangeQR::generate_with_timestamp(&identity, &ephemeral, six_minutes_ago);
 
-    // QR should be marked as expired
     assert!(
         qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
         "QR code from 6 minutes ago should be expired"
     );
 
-    // Verify recently generated QR is not expired
     let fresh_qr = ExchangeQR::generate(
         &identity,
         &ephemeral,
@@ -168,7 +160,6 @@ fn test_expired_qr_rejected_in_session() {
         ExchangeQR::generate_with_timestamp(&alice_identity, &alice_ephemeral, six_minutes_ago);
     let qr_data = expired_qr.to_data_string();
 
-    // Bob tries to use Alice's expired QR
     let bob_identity = Identity::create("Bob", 0);
     let bob_card = vauchi_core::ContactCard::new("Bob");
     let bob_proximity = MockProximityVerifier::success();
@@ -179,7 +170,6 @@ fn test_expired_qr_rejected_in_session() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Bob starts his QR display first
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
     // Parsing the QR data should succeed (signature is valid)
@@ -195,10 +185,8 @@ fn test_expired_qr_rejected_in_session() {
         "Parsed QR should be marked expired"
     );
 
-    // Processing expired QR in session should fail
     let result = bob_session.apply(ExchangeEvent::ProcessQR(parsed_qr.unwrap()));
 
-    // The session should reject expired QR
     assert!(
         matches!(result, Err(ExchangeError::QRExpired)),
         "Session should reject expired QR, got: {:?}",
@@ -212,7 +200,6 @@ fn test_expired_qr_rejected_in_session() {
 fn test_qr_clock_drift_detection() {
     use vauchi_core::exchange::check_clock_drift;
 
-    // QR from 5 seconds ago should be fine
     let five_sec_ago = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -228,7 +215,6 @@ fn test_qr_clock_drift_detection() {
         "5 second drift should be acceptable"
     );
 
-    // QR from 60 seconds ago should fail clock drift check
     let sixty_sec_ago = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -249,7 +235,6 @@ fn test_qr_clock_drift_detection() {
 // Test 3: BLE Relay Attack Prevention (Proximity Verification Required)
 // =============================================================================
 // security.feature @attacks: "Relay attack prevention on BLE"
-// - Distance-bounding protocol should detect relay attacks
 // - Proximity verification is mandatory before key agreement
 // - TooFar error when device is beyond allowed range
 
@@ -257,17 +242,14 @@ fn test_qr_clock_drift_detection() {
 // @scenario: security :: Relay attack prevention on BLE
 #[test]
 fn test_ble_relay_attack_prevention() {
-    // Setup: Attacker is relaying BLE signals from 5 meters away
     let verifier = MockBLEVerifier::success_at_distance(5.0); // 5 meters = too far
     let device = &verifier.devices[0];
 
-    // Device should not be within the 2-meter allowed range
     assert!(
         !verifier.is_within_range(device, 2.0),
         "Device at 5m should not be within 2m range"
     );
 
-    // Proximity verification should fail with TooFar
     let result = verifier.verify_device_proximity(device);
     assert!(
         matches!(result, Err(ProximityError::TooFar)),
@@ -302,15 +284,12 @@ fn test_exchange_requires_mutual_scan() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Bob starts his QR display
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
-    // Bob scans Alice's QR -> moves to PeerScanned
     bob_session
         .apply(ExchangeEvent::ProcessQR(alice_qr))
         .unwrap();
 
-    // Bob tries to skip directly to key agreement without TheyScannedOurQR - should fail
     let result = bob_session.apply(ExchangeEvent::PerformKeyAgreement);
     assert!(
         result.is_err(),
@@ -345,10 +324,8 @@ fn test_exchange_succeeds_with_mutual_scan() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Bob starts his QR display
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
-    // Bob scans Alice's QR -> PeerScanned
     bob_session
         .apply(ExchangeEvent::ProcessQR(alice_qr))
         .unwrap();
@@ -356,7 +333,6 @@ fn test_exchange_succeeds_with_mutual_scan() {
     // Alice scans Bob's QR (signal that they scanned ours)
     bob_session.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
 
-    // Key agreement should now succeed
     let result = bob_session.apply(ExchangeEvent::PerformKeyAgreement);
     assert!(
         result.is_ok(),
@@ -368,7 +344,6 @@ fn test_exchange_succeeds_with_mutual_scan() {
 // Test 4: Memory Dump Protection (Sensitive Data Zeroed After Use)
 // =============================================================================
 // security.feature @data: "Memory dump protection"
-// - Sensitive data should be zeroed after use
 // - Keys implement Drop with zeroize
 
 /// Verify that Debug formatting on SymmetricKey does not leak key bytes.
@@ -394,7 +369,6 @@ fn test_debug_format_excludes_key_material() {
         debug_output
     );
 
-    // Verify no hex-encoded key bytes appear in debug output
     let hex_key = hex::encode(key_bytes);
     assert!(
         !debug_output.contains(&hex_key),
@@ -413,7 +387,6 @@ fn test_signing_key_generation_and_uniqueness() {
     let keypair1 = SigningKeyPair::generate();
     let keypair2 = SigningKeyPair::generate();
 
-    // Verify signing works
     let message = b"test message";
     let signature = keypair1.sign(message);
     assert!(
@@ -429,7 +402,6 @@ fn test_signing_key_generation_and_uniqueness() {
         "Different keys must produce different signatures"
     );
 
-    // Cross-verify: keypair2's signature should NOT verify with keypair1's public key
     assert!(
         !keypair1.public_key().verify(message, &signature2),
         "Cross-key verification must fail"
@@ -443,7 +415,6 @@ fn test_kdf_output_zeroed() {
     let password = b"my-password";
     let salt = [0x42u8; 32];
 
-    // Derive key
     let key = derive_key_argon2id(password, &salt).unwrap();
 
     // Key should be non-zero
@@ -453,14 +424,12 @@ fn test_kdf_output_zeroed() {
         "Derived key should be non-zero"
     );
 
-    // Debug output should be redacted
     let debug_output = format!("{:?}", key);
     assert!(
         debug_output.contains("REDACTED"),
         "Debug output should redact derived key"
     );
 
-    // Drop zeroes the key
     drop(key);
 }
 
@@ -468,10 +437,6 @@ fn test_kdf_output_zeroed() {
 // Test 5: Audit Log Export (Security Events Exportable)
 // =============================================================================
 // security.feature @audit: "Security events logged" and "Export security log"
-// - Events should be logged locally
-// - Logs should include timestamp and event type
-// - Logs should not contain sensitive data
-// - Logs should be available for security review
 
 /// Scenario: Audit events are logged and retrievable
 // @scenario: security :: Security events logged
@@ -484,7 +449,6 @@ fn test_audit_log_export() {
 
     let storage = Storage::open(&db_path, encryption_key).unwrap();
 
-    // Log some security events
     storage
         .log_audit_event("exchange_initiated", Some("contact_id_123"))
         .unwrap();
@@ -495,13 +459,10 @@ fn test_audit_log_export() {
         .log_audit_event("signature_verification_failed", Some("attacker_key_xyz"))
         .unwrap();
 
-    // Export audit log
     let audit_entries = storage.list_audit_log().unwrap();
 
-    // Verify events were logged
     assert_eq!(audit_entries.len(), 3, "Should have 3 audit entries");
 
-    // Verify event types are correct
     let event_types: Vec<&str> = audit_entries
         .iter()
         .map(|(event_type, _, _)| event_type.as_str())
@@ -511,7 +472,6 @@ fn test_audit_log_export() {
     assert!(event_types.contains(&"exchange_completed"));
     assert!(event_types.contains(&"signature_verification_failed"));
 
-    // Verify each entry has a timestamp
     for (_, _, timestamp) in &audit_entries {
         assert!(*timestamp > 0, "Timestamp should be non-zero");
     }
@@ -528,7 +488,6 @@ fn test_audit_log_no_sensitive_data() {
 
     let storage = Storage::open(&db_path, encryption_key).unwrap();
 
-    // Log event with details
     storage
         .log_audit_event("test_event", Some("safe_details"))
         .unwrap();
@@ -538,11 +497,9 @@ fn test_audit_log_no_sensitive_data() {
 
     let (event_type, details, _) = &audit_entries[0];
 
-    // Event type should be present
     assert_eq!(event_type, "test_event");
 
     // Details are stored encrypted and decrypted on retrieval
-    // The actual content should not contain raw keys or passwords
     if let Some(d) = details {
         assert!(
             !d.contains("BEGIN PRIVATE KEY"),
@@ -560,7 +517,6 @@ fn test_audit_log_no_sensitive_data() {
 // =============================================================================
 // security.feature @audit: "logs should not contain sensitive data"
 // - Private keys should never appear in debug output
-// - Key bytes should be redacted in Display/Debug traits
 
 /// Scenario: SymmetricKey Debug output is redacted
 // @scenario: security :: Security events logged
@@ -573,7 +529,6 @@ fn test_key_material_never_logged() {
     // Format the key for "logging"
     let debug_output = format!("{:?}", key);
 
-    // The actual key bytes should NOT appear in the debug output
     for byte in key_bytes {
         let hex_byte = format!("{:02x}", byte);
         // Individual bytes might coincidentally appear, but the full
@@ -583,7 +538,6 @@ fn test_key_material_never_logged() {
         }
     }
 
-    // Should explicitly say REDACTED
     assert!(
         debug_output.contains("REDACTED"),
         "Debug output should contain REDACTED, got: {}",
@@ -629,17 +583,14 @@ fn test_kdf_no_intermediate_leakage() {
     // The returned key is the only output
     assert_eq!(key.as_bytes().len(), 32);
 
-    // Debug should be redacted
     let debug = format!("{:?}", key);
     assert!(debug.contains("REDACTED"));
 
-    // Password bytes should definitely not appear in debug output
     let password_str = String::from_utf8_lossy(password);
     assert!(!debug.contains(&*password_str));
 }
 
 // =============================================================================
-// Additional Security Hardening Tests
 // =============================================================================
 
 /// Scenario: Exchange token is cryptographically random
@@ -649,7 +600,6 @@ fn test_exchange_token_randomness() {
     let identity = Identity::create("Test", 0);
     let ephemeral = X3DHKeyPair::generate();
 
-    // Generate multiple QRs and verify tokens are unique
     let qr1 = ExchangeQR::generate(
         &identity,
         &ephemeral,
@@ -702,7 +652,6 @@ fn test_audio_challenge_randomness() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Audio challenges should be different
     assert_ne!(
         qr1.audio_challenge(),
         qr2.audio_challenge(),
@@ -723,7 +672,6 @@ fn test_qr_signature_prevents_tampering() {
     );
     let qr_data = qr.to_data_string();
 
-    // Decode, tamper, re-encode
     let mut bytes =
         base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &qr_data).unwrap();
 
@@ -734,7 +682,6 @@ fn test_qr_signature_prevents_tampering() {
 
     let tampered_data = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &bytes);
 
-    // Parsing tampered QR should fail signature verification
     let result = ExchangeQR::from_data_string(&tampered_data);
     assert!(
         result.is_err(),

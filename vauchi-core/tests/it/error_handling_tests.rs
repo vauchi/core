@@ -16,7 +16,6 @@ use vauchi_core::{
 };
 
 // =============================================================================
-// Network Failure Tests
 // =============================================================================
 
 /// Test: Sync state remains pending when delivery fails
@@ -51,7 +50,6 @@ fn test_sync_state_pending_on_undelivered() {
         .queue_card_update("contact-1", &old_card, &new_card)
         .unwrap();
 
-    // State should remain pending
     let state = sync_manager.get_sync_state("contact-1").unwrap();
     assert!(
         matches!(state, vauchi_core::SyncState::Pending { .. }),
@@ -74,7 +72,6 @@ fn test_relay_disconnect_clears_state() {
 
     let mut client = RelayClient::new(transport, config, "test-identity".into());
 
-    // Connect and send a message
     client.connect().unwrap();
     assert!(client.is_connected());
 
@@ -95,11 +92,9 @@ fn test_relay_disconnect_clears_state() {
         .unwrap();
     assert_eq!(client.in_flight_count(), 1);
 
-    // Disconnect
     client.disconnect().unwrap();
     assert!(!client.is_connected());
 
-    // In-flight messages should still be tracked for retry
     // (implementation-dependent behavior)
 }
 
@@ -114,7 +109,6 @@ fn test_multiple_pending_updates_queued() {
     let card2 = ContactCard::new("Version 2");
     let card3 = ContactCard::new("Version 3");
 
-    // Queue multiple updates
     sync_manager
         .queue_card_update("contact-1", &card1, &card2)
         .unwrap();
@@ -122,7 +116,6 @@ fn test_multiple_pending_updates_queued() {
         .queue_card_update("contact-1", &card2, &card3)
         .unwrap();
 
-    // Should have 2 pending updates
     let pending = sync_manager.get_pending("contact-1").unwrap();
     assert_eq!(pending.len(), 2, "Both updates should be queued");
 
@@ -135,7 +128,6 @@ fn test_multiple_pending_updates_queued() {
 }
 
 // =============================================================================
-// Crypto Failure Tests
 // =============================================================================
 
 /// Test: Decrypt fails with wrong ratchet state
@@ -152,11 +144,9 @@ fn test_decrypt_fails_with_wrong_ratchet() {
         DoubleRatchetState::initialize_initiator(&shared_secret1, *bob_dh1.public_key()).unwrap();
     let mut wrong_bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret2, bob_dh2);
 
-    // Alice encrypts with secret1
     let plaintext = b"Secret message";
     let encrypted = alice_ratchet.encrypt(plaintext).unwrap();
 
-    // Bob tries to decrypt with ratchet from secret2
     let result = wrong_bob_ratchet.decrypt(&encrypted);
     assert!(result.is_err(), "Decrypt should fail with wrong key");
 }
@@ -172,16 +162,13 @@ fn test_decrypt_fails_with_corrupted_ciphertext() {
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let mut bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
-    // Alice encrypts
     let plaintext = b"Secret message";
     let mut encrypted = alice_ratchet.encrypt(plaintext).unwrap();
 
-    // Corrupt the ciphertext
     if !encrypted.ciphertext.is_empty() {
         encrypted.ciphertext[0] ^= 0xFF;
     }
 
-    // Bob tries to decrypt corrupted message
     let result = bob_ratchet.decrypt(&encrypted);
     assert!(
         result.is_err(),
@@ -212,16 +199,13 @@ fn test_delta_signature_rejects_wrong_signer() {
     let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     let recipient_pk = &[0u8; 32];
 
-    // Alice signs the delta
     delta.sign(&alice, recipient_pk);
 
-    // Verify with Alice's key should pass
     assert!(
         delta.verify(alice.signing_public_key(), recipient_pk),
         "Should verify with correct key"
     );
 
-    // Verify with Eve's key should fail
     assert!(
         !delta.verify(eve.signing_public_key(), recipient_pk),
         "Should reject wrong signer"
@@ -251,10 +235,8 @@ fn test_delta_signature_rejects_tampered_delta() {
     let mut delta = CardDelta::compute(&old_card, &new_card, 0);
     let recipient_pk = &[0u8; 32];
 
-    // Alice signs the delta
     delta.sign(&alice, recipient_pk);
 
-    // Verify original signature
     assert!(delta.verify(alice.signing_public_key(), recipient_pk));
 
     // Tamper with the delta (add another change)
@@ -262,7 +244,6 @@ fn test_delta_signature_rejects_tampered_delta() {
         new_name: "Eve".to_string(),
     });
 
-    // Signature should now fail
     assert!(
         !delta.verify(alice.signing_public_key(), recipient_pk),
         "Should reject tampered delta"
@@ -270,7 +251,6 @@ fn test_delta_signature_rejects_tampered_delta() {
 }
 
 // =============================================================================
-// Storage Failure Tests
 // =============================================================================
 
 /// Test: Loading non-existent contact returns None
@@ -326,7 +306,6 @@ fn test_contact_roundtrip_preserves_data() {
 }
 
 // =============================================================================
-// Protocol Violation Tests
 // =============================================================================
 
 /// Test: Delta with no changes is empty
@@ -401,7 +380,6 @@ fn test_mark_nonexistent_update_delivered() {
 }
 
 // =============================================================================
-// Identity Error Tests
 // =============================================================================
 
 /// Test: Wrong password fails backup import
@@ -427,7 +405,6 @@ fn test_corrupted_backup_fails_import() {
     let password = "SecureP@ssw0rd123!";
     let mut backup = identity.export_backup(password).unwrap();
 
-    // Corrupt the backup
     let bytes = backup.as_bytes_mut();
     if bytes.len() > 10 {
         bytes[10] ^= 0xFF;
@@ -450,7 +427,6 @@ fn test_empty_password_rejected_for_backup() {
 }
 
 // =============================================================================
-// Visibility Error Tests
 // =============================================================================
 
 /// Test: Setting visibility on non-existent field is handled
@@ -470,13 +446,11 @@ fn test_visibility_on_nonexistent_field() {
 
     let mut contact = wb.get_contact(&contact_id).unwrap().unwrap();
 
-    // Setting visibility on non-existent field shouldn't panic
     contact
         .visibility_rules_mut()
         .unwrap()
         .set_nobody("nonexistent-field-id");
 
-    // Save should succeed even with visibility set on nonexistent field
     let result = wb.storage().save_contact(&contact);
     assert!(
         result.is_ok(),

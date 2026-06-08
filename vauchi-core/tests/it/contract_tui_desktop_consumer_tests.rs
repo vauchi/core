@@ -186,7 +186,6 @@ fn provider_contract_exchange_types_accessible() {
     verifier.confirm();
     assert!(verifier.is_confirmed());
 
-    // Verify event variants the desktop depends on
     assert!(matches!(ExchangeEvent::StartQR, ExchangeEvent::StartQR));
     assert!(matches!(
         ExchangeEvent::TheyScannedOurQR,

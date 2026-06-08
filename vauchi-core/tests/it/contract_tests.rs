@@ -165,7 +165,6 @@ fn action_result_variants_validate_against_schema() {
     let validator =
         jsonschema::validator_for(&schema_value).expect("Failed to compile action-result schema");
 
-    // Build a minimal ScreenModel for variants that carry one.
     let screen = ScreenModel {
         screen_id: "test_screen".into(),
         title: "Test".into(),
@@ -267,7 +266,6 @@ fn malformed_user_action_json_returns_error_not_panic() {
 }
 
 // ============================================================
-// Content Repo Contract Tests
 // ============================================================
 //
 // These tests verify that core's parsers can consume the actual
@@ -282,7 +280,6 @@ fn malformed_user_action_json_returns_error_not_panic() {
 // @internal
 #[test]
 fn embedded_themes_json_parses_successfully() {
-    // Load at runtime, not via include_bytes!: the sibling themes/ repo lives
     // outside the cargo workspace, so a compile-time include escapes the source
     // tree that cargo-mutants relocates (mutation build error). VAUCHI_THEMES_DIR
     // is an absolute path exported by the mutation/CI jobs; fall back to the
@@ -340,7 +337,6 @@ fn locale_files_are_valid_json() {
         en_obj.len()
     );
 
-    // Verify all locale files parse and have the same keys as en.json
     for entry in std::fs::read_dir(&locales_dir).expect("locales/ must be readable") {
         let entry = entry.expect("dir entry");
         let path = entry.path();

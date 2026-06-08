@@ -207,10 +207,8 @@ fn app_engine_navigates_to_archived_contacts_from_contacts() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate to contacts tab
     engine.navigate_to(AppScreen::Contacts);
 
-    // Press view_archived
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "view_archived".to_string(),
     });

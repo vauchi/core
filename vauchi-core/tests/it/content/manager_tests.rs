@@ -101,7 +101,6 @@ fn test_manager_should_check_respects_interval() {
         ..Default::default()
     };
 
-    // Set last check time to now
     let cache = ContentCache::new(temp.path()).unwrap();
     cache
         .set_last_check_time(std::time::SystemTime::now())
@@ -140,7 +139,6 @@ fn test_manager_should_check_when_interval_elapsed() {
         ..Default::default()
     };
 
-    // Set last check time to 2 seconds ago
     let cache = ContentCache::new(temp.path()).unwrap();
     let two_secs_ago = std::time::SystemTime::now() - Duration::from_secs(2);
     cache.set_last_check_time(two_secs_ago).unwrap();
@@ -159,7 +157,6 @@ fn test_manager_get_locale_returns_bundled_english() {
     let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
     let locale = manager.locale("en");
-    // English should always be available as bundled
     assert!(locale.is_some(), "expected Some value");
 }
 
@@ -181,7 +178,6 @@ fn test_manager_help_returns_none_when_cache_empty() {
     let config = test_config(&temp);
     let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
-    // No bundled help content; should return None
     let help = manager.help("en");
     assert!(help.is_none());
 }
@@ -269,9 +265,7 @@ fn test_manager_record_check_time() {
     let config = test_config(&temp);
     let manager = ContentManager::new(config, vauchi_core::clock::SystemClock::shared()).unwrap();
 
-    // Record check time
     manager.record_check_time().unwrap();
 
-    // Should not need to check again immediately
     assert!(!manager.should_check_now());
 }

@@ -119,7 +119,6 @@ fn test_get_recovery_readiness_with_no_contacts() {
 fn test_get_recovery_readiness_excludes_non_trusted_contacts() {
     let wb = create_test_vauchi();
 
-    // Add 5 contacts, none trusted for recovery
     for i in 0u8..5 {
         let mut pk = [0u8; 32];
         pk[0] = i + 30;

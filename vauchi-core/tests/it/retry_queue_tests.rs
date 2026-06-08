@@ -45,7 +45,6 @@ fn test_calculate_next_retry_time() {
     let queue = RetryQueue::new();
     let base_time = 1000u64;
 
-    // First retry: base_time + 1s
     assert_eq!(queue.next_retry_time(base_time, 0), 1001);
 
     // Second retry: base_time + 2s
@@ -92,7 +91,6 @@ fn test_get_due_retries() {
     let storage = test_storage();
     let now_ts = now();
 
-    // Create entries: 2 due, 1 not due
     let entries = vec![
         ("msg-1", now_ts - 10),  // Due (past)
         ("msg-2", now_ts - 5),   // Due (past)
@@ -137,7 +135,6 @@ fn test_increment_retry_attempt() {
     };
     storage.create_retry_entry(&entry).unwrap();
 
-    // Increment attempt
     let new_next_retry = timestamp + 100;
     storage
         .increment_retry_attempt("retry-inc", new_next_retry)
@@ -258,7 +255,6 @@ fn test_retry_entry_for_recipient() {
     let storage = test_storage();
     let timestamp = now();
 
-    // Create entries for two recipients
     for i in 0..3 {
         let entry = RetryEntry {
             message_id: format!("alice-{}", i),
@@ -306,7 +302,6 @@ fn test_retry_backoff_with_jitter_varies() {
         delays.push(queue.backoff_seconds_with_jitter(3, &vauchi_core::rng::OsSecureRng::new())); // attempt 3 => base 8s
     }
 
-    // With jitter, not all delays should be identical
     let first = delays[0];
     let all_same = delays.iter().all(|d| *d == first);
     assert!(

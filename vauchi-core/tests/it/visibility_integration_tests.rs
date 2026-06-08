@@ -48,22 +48,18 @@ mod visibility_integration_tests {
     fn test_field_label_association() {
         let mut manager = create_test_label_manager();
 
-        // Create a label
         let label_id = manager
             .create_group("Work Contacts", 0)
             .unwrap()
             .id()
             .to_string();
 
-        // Create card and get field ID
         let card = create_test_contact_card();
         let field_id = card.fields()[0].id();
 
-        // Associate field with label
         let label = manager.get_group_mut(&label_id).unwrap();
         label.add_visible_field(field_id, 0);
 
-        // Verify association
         let label = manager.get_group(&label_id).unwrap();
         assert!(label.is_field_visible(field_id));
     }
@@ -73,11 +69,9 @@ mod visibility_integration_tests {
     fn test_multiple_label_field_visibility() {
         let mut manager = create_test_label_manager();
 
-        // Create multiple labels
         let work_id = manager.create_group("Work", 0).unwrap().id().to_string();
         let friends_id = manager.create_group("Friends", 0).unwrap().id().to_string();
 
-        // Create field and associate with both labels
         let card = create_test_contact_card();
         let field_id = card.fields()[0].id();
 
@@ -90,7 +84,6 @@ mod visibility_integration_tests {
             .unwrap()
             .add_visible_field(field_id, 0);
 
-        // Verify field is visible to both labels
         assert!(
             manager
                 .get_group(&work_id)
@@ -110,18 +103,14 @@ mod visibility_integration_tests {
     fn test_contact_label_assignment() {
         let mut manager = create_test_label_manager();
 
-        // Create labels
         let label_id = manager.create_group("Family", 0).unwrap().id().to_string();
 
-        // Create contact ID
         let contact_id = "family-member-id";
 
-        // Assign contact to label
         manager
             .add_contact_to_group(&label_id, contact_id, 0)
             .unwrap();
 
-        // Verify assignment
         let contact_labels = manager.groups_for_contact(contact_id);
         assert_eq!(contact_labels.len(), 1);
         assert_eq!(contact_labels[0].id(), label_id);
@@ -132,7 +121,6 @@ mod visibility_integration_tests {
     fn test_visibility_enforcement() {
         let mut manager = create_test_label_manager();
 
-        // Create label and contact
         let label_id = manager
             .create_group("Restricted", 0)
             .unwrap()
@@ -142,7 +130,6 @@ mod visibility_integration_tests {
         let field_id = "secret-field";
         let contact_id = "some-contact";
 
-        // Associate field with label
         manager
             .get_group_mut(&label_id)
             .unwrap()
@@ -152,7 +139,6 @@ mod visibility_integration_tests {
         let can_see = manager.can_see_via_labels(contact_id, field_id);
         assert_eq!(can_see, None);
 
-        // Add contact to label
         manager
             .add_contact_to_group(&label_id, contact_id, 0)
             .unwrap();
@@ -167,26 +153,22 @@ mod visibility_integration_tests {
     fn test_per_contact_override() {
         let mut manager = create_test_label_manager();
 
-        // Create label and field
         let label_id = manager.create_group("Group", 0).unwrap().id().to_string();
 
         let field_id = "shared-field";
         let contact_id = "override-contact";
 
-        // Associate field with label
         manager
             .get_group_mut(&label_id)
             .unwrap()
             .add_visible_field(field_id, 0);
 
-        // Grant override to specific contact
         manager.set_contact_override(contact_id, field_id, true);
 
         // Test visibility: override allows visibility even without label membership
         let can_see = manager.can_see_via_labels(contact_id, field_id);
         assert_eq!(can_see, Some(true));
 
-        // Remove override
         manager.remove_contact_override(contact_id, field_id);
 
         // Test visibility: removed override requires label membership

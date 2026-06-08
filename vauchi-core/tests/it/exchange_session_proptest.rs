@@ -41,7 +41,6 @@ fn make_session_and_peer() -> (ExchangeSession, ExchangeQR, ContactCard) {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Generate peer's QR by starting their session
     peer_session.apply(ExchangeEvent::StartQR).unwrap();
     let peer_qr = peer_session.qr().unwrap().clone();
 
@@ -125,12 +124,10 @@ proptest! {
     ) {
         let (mut session, peer_qr, peer_card) = make_session_and_peer();
 
-        // Apply some random events before failing
         for &i in &pre_events {
             let _ = session.apply(event_from_index(i, &peer_qr, &peer_card));
         }
 
-        // Fail the session
         session
             .apply(ExchangeEvent::Fail(ExchangeError::Interrupted))
             .unwrap();
@@ -185,26 +182,21 @@ fn happy_path_qr_exchange_always_completes() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Both start QR
     alice.apply(ExchangeEvent::StartQR).unwrap();
     bob.apply(ExchangeEvent::StartQR).unwrap();
 
     let alice_qr = alice.qr().unwrap().clone();
     let bob_qr = bob.qr().unwrap().clone();
 
-    // Both scan each other
     alice.apply(ExchangeEvent::ProcessQR(bob_qr)).unwrap();
     bob.apply(ExchangeEvent::ProcessQR(alice_qr)).unwrap();
 
-    // Both confirm the other scanned
     alice.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
     bob.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
 
-    // Both perform key agreement
     alice.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
     bob.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
 
-    // Both complete with each other's card
     alice
         .apply(ExchangeEvent::CompleteExchange(bob_card))
         .unwrap();
@@ -220,7 +212,6 @@ fn happy_path_qr_exchange_always_completes() {
         "Bob must reach Complete state"
     );
 
-    // Both should produce contacts with matching shared keys
     let alice_key = match alice.state() {
         ExchangeState::Complete { contact } => contact.shared_key().unwrap().as_bytes().to_vec(),
         _ => unreachable!(),

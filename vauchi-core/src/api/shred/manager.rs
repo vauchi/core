@@ -58,11 +58,9 @@ impl<'a> ShredManager<'a> {
     /// Delegates to DeletionManager for grace period tracking.
     /// Refreshes pre-signed messages for later use by panic/hard shred.
     pub fn soft_shred(&self) -> Result<ShredToken, ShredError> {
-        // 1. Delegate to DeletionManager for grace period
         let dm = DeletionManager::new(self.storage);
         dm.schedule_deletion()?;
 
-        // 2. Refresh pre-signed messages file
         let _ = self.refresh_pre_signed_messages();
 
         Ok(ShredToken::new(self.storage.clock().unix_seconds()))

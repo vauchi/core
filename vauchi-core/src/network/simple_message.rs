@@ -233,7 +233,6 @@ pub fn create_signed_handshake(
 ) -> SimpleHandshake {
     let client_id = identity.public_id();
 
-    // Generate random 32-byte nonce
     let nonce_bytes: [u8; 32] = crate::crypto::random_bytes();
 
     let timestamp = now;
@@ -322,7 +321,6 @@ mod tests {
         let pk_hex = handshake.identity_public_key.as_ref().unwrap();
         let timestamp = handshake.timestamp.unwrap();
 
-        // Decode hex values
         let nonce_bytes: Vec<u8> = (0..nonce_hex.len())
             .step_by(2)
             .map(|i| u8::from_str_radix(&nonce_hex[i..i + 2], 16).unwrap())

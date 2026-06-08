@@ -69,7 +69,6 @@ pub fn generate_fsk_samples(data: &[u8], config: &AudioConfig) -> Vec<f32> {
 
     let mut samples = Vec::new();
 
-    // Generate preamble
     for i in 0..preamble_samples {
         let t = i as f32 / sample_rate;
         let sample = (2.0 * std::f32::consts::PI * preamble_freq * t).sin();
@@ -80,7 +79,6 @@ pub fn generate_fsk_samples(data: &[u8], config: &AudioConfig) -> Vec<f32> {
     let gap_samples = (sample_rate * 0.005) as usize;
     samples.extend(vec![0.0; gap_samples]);
 
-    // Generate FSK data
     for byte in data {
         for bit_idx in 0..8 {
             let bit = (byte >> (7 - bit_idx)) & 1;
@@ -94,7 +92,6 @@ pub fn generate_fsk_samples(data: &[u8], config: &AudioConfig) -> Vec<f32> {
         }
     }
 
-    // Trailing silence
     samples.extend(vec![0.0; gap_samples]);
 
     samples
@@ -127,7 +124,6 @@ pub fn decode_fsk_samples(
     // Find preamble (19kHz burst)
     let preamble_start = find_preamble(samples, sample_rate)?;
 
-    // Skip preamble + gap
     let data_start = preamble_start + (sample_rate * 0.055) as usize;
 
     if data_start >= samples.len() {
@@ -139,7 +135,6 @@ pub fn decode_fsk_samples(
     let mut bit_count = 0;
     let mut sample_idx = data_start;
 
-    // Decode until we run out of samples or detect silence
     while sample_idx + samples_per_bit <= samples.len() {
         let chunk = &samples[sample_idx..sample_idx + samples_per_bit];
 
@@ -147,7 +142,6 @@ pub fn decode_fsk_samples(
         let power_carrier = goertzel(chunk, carrier, sample_rate);
         let power_shift = goertzel(chunk, carrier + shift, sample_rate);
 
-        // Check if signal is present (above noise floor)
         let threshold = 0.01;
         if power_carrier < threshold && power_shift < threshold {
             break; // End of signal
@@ -265,7 +259,6 @@ mod tests {
 
         let samples = generate_fsk_samples(&data, &config);
 
-        // Should have preamble + gap + data + trailing
         assert!(samples.len() > 1000);
 
         // Decode should recover original data — recorded at the
@@ -304,7 +297,6 @@ mod tests {
         let power_target = goertzel(&samples, freq, sample_rate);
         let power_other = goertzel(&samples, 15000.0, sample_rate);
 
-        // Target frequency should have much higher power
         assert!(power_target > power_other * 5.0);
     }
 
@@ -365,7 +357,6 @@ mod tests {
         let config = AudioConfig::default();
         let sample_rate = config.sample_rate as f32;
 
-        // Generate just a preamble
         let preamble_freq = 19000.0;
         let preamble_samples = (sample_rate * 0.05) as usize;
         let mut samples: Vec<f32> = vec![0.0; 1000]; // Leading silence

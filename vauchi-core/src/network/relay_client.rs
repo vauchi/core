@@ -164,26 +164,21 @@ impl<T: Transport> RelayClient<T> {
         update_id: &str,
         shared_key: Option<&[u8; 32]>,
     ) -> Result<MessageId, NetworkError> {
-        // Check in-flight limit
         if self.in_flight.len() >= self.config.max_pending_messages {
             return Err(NetworkError::SendFailed("Too many pending messages".into()));
         }
 
-        // Encrypt with Double Ratchet
         let ratchet_msg = ratchet
             .encrypt(payload)
             .map_err(|e| NetworkError::Encryption(e.to_string()))?;
 
-        // Convert to wire format
         let anon_id_hex = anonymous_sender_hex(shared_key, now);
         let envelope =
             self.create_update_envelope(recipient_id, &ratchet_msg, anon_id_hex.as_deref(), now);
         let message_id = envelope.message_id.clone();
 
-        // Send
         self.connection.send(&envelope)?;
 
-        // Track in-flight
         self.in_flight.insert(
             message_id.clone(),
             InFlightMessage {
@@ -354,7 +349,6 @@ impl<T: Transport> RelayClient<T> {
             match envelope.payload {
                 MessagePayload::Acknowledgment(ack) => {
                     if let Some(in_flight) = self.in_flight.remove(&ack.message_id) {
-                        // Record ACK event for delivery tracking
                         result.ack_events.push(AckEvent {
                             update_id: in_flight.update_id.clone(),
                             status: ack.status,

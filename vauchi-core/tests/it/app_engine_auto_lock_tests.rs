@@ -54,7 +54,6 @@ fn unlocked_engine_with_password() -> AppEngine {
 fn backgrounding_with_password_locks_on_resume() {
     let mut engine = unlocked_engine_with_password();
 
-    // Navigate to some screen
     engine.navigate_to(AppScreen::Settings);
     assert_eq!(engine.current_app_screen(), &AppScreen::Settings);
 

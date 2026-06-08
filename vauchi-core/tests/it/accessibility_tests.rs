@@ -22,7 +22,6 @@ use vauchi_core::ContactCard;
 use vauchi_core::contact_card::{ContactField, FieldType};
 
 // ============================================================
-// Semantic Labels
 // Feature: accessibility.feature @screen-reader
 // ============================================================
 
@@ -32,7 +31,6 @@ use vauchi_core::contact_card::{ContactField, FieldType};
 // @scenario: accessibility :: Contact details are fully announced
 #[test]
 fn test_field_type_has_accessibility_label() {
-    // Each field type should have a semantic label for screen readers
     let field_types = [
         (FieldType::Phone, "phone"),
         (FieldType::Email, "email"),
@@ -69,7 +67,6 @@ fn test_contact_field_accessibility_description() {
 
     let description = get_field_accessibility_description(&field);
 
-    // Description should include the type, label, and value context
     assert!(
         !description.is_empty(),
         "Field should have accessibility description"
@@ -108,7 +105,6 @@ fn test_contact_card_accessibility_summary() {
 
     let summary = get_card_accessibility_summary(&card);
 
-    // Summary should include display name and field count
     assert!(
         summary.contains("Alice Smith"),
         "Summary should include display name"
@@ -151,7 +147,6 @@ fn test_field_type_has_localization_key() {
 }
 
 // ============================================================
-// Keyboard Navigation Order
 // Feature: accessibility.feature @keyboard
 // ============================================================
 
@@ -163,7 +158,6 @@ fn test_field_type_has_localization_key() {
 fn test_keyboard_navigation_order() {
     let mut card = ContactCard::new("Test User");
 
-    // Add fields in intended display order
     card.add_field(ContactField::new(
         FieldType::Phone,
         "Mobile",
@@ -188,7 +182,6 @@ fn test_keyboard_navigation_order() {
 
     let fields = card.fields();
 
-    // Verify fields maintain their logical order
     assert_eq!(fields.len(), 3, "Should have 3 fields");
 
     // Tab order should match display order (0-indexed)
@@ -229,7 +222,6 @@ fn test_reordered_fields_update_tab_order() {
 
     let fields = card.fields();
 
-    // After reorder, tab indices should reflect new order
     assert_eq!(
         get_field_tab_index(&fields[0], &card),
         0,
@@ -255,7 +247,6 @@ fn test_reordered_fields_update_tab_order() {
 fn test_focusable_elements_order() {
     let field = ContactField::new(FieldType::Email, "Work", "test@example.com", 0);
 
-    // Email field should have focusable actions
     let focusable_actions = get_focusable_actions(&field);
 
     assert!(
@@ -361,14 +352,12 @@ fn test_status_colors_contrast() {
     let themes = all_themes();
 
     // Minimum contrast for status colors (decorative, with icon/text backup)
-    // Set to 2.0 to accommodate popular themes while ensuring basic visibility
     // Note: gruvbox-light warning (2.19:1) is borderline but acceptable
     const STATUS_COLOR_MIN_CONTRAST: f64 = 2.0;
 
     for theme in &themes {
         let bg = parse_hex(&theme.colors.bg_primary);
 
-        // Status colors should have sufficient contrast against background
         let status_colors = [
             ("success", &theme.colors.success),
             ("error", &theme.colors.error),
@@ -484,7 +473,6 @@ fn test_font_scaling_intermediate_values() {
             factor * 100.0
         );
 
-        // Scaled values should be proportional
         let base_size = 16.0;
         let scaled = scale.apply(base_size);
         assert!(
@@ -502,14 +490,12 @@ fn test_font_scaling_intermediate_values() {
 // @scenario: accessibility :: Text zoom support on desktop
 #[test]
 fn test_font_scaling_bounds() {
-    // Below 100% should clamp to minimum
     let scale_low = FontScale::new(0.5);
     assert!(
         scale_low.factor() >= 1.0,
         "Scale below 100% should clamp to minimum"
     );
 
-    // Above 200% should clamp to maximum
     let scale_high = FontScale::new(3.0);
     assert!(
         scale_high.factor() <= 2.0,
@@ -525,7 +511,6 @@ fn test_font_scaling_bounds() {
 fn test_font_scaling_preserves_minimum_size() {
     let scale = FontScale::new(1.0);
 
-    // Even at minimum scale, certain elements should have minimum sizes
     let minimum_touch_target = 44.0; // iOS HIG minimum
     let scaled_target = scale.apply(minimum_touch_target);
 
@@ -549,7 +534,6 @@ fn test_display_name_scaling() {
         let scale = FontScale::new(factor);
         let scaled_size = scale.apply(base_font_size);
 
-        // Verify scaling is applied correctly
         assert!(
             (scaled_size - base_font_size * factor.min(2.0)).abs() < 0.001,
             "Display name at {}x should scale to {}pt",
@@ -558,7 +542,6 @@ fn test_display_name_scaling() {
         );
     }
 
-    // Verify display name is still accessible after scaling
     assert!(
         !card.display_name().is_empty(),
         "Display name should be available for rendering"
@@ -566,7 +549,6 @@ fn test_display_name_scaling() {
 }
 
 // ============================================================
-// Helper Functions
 // ============================================================
 
 /// Get accessibility label for a field type

@@ -218,7 +218,6 @@ fn test_clock_skew_tolerance() {
 }
 
 // ============================================================
-// Epoch Boundary Handling Tests
 // Traces to: features/anonymous_sender.feature @epoch
 // "Epoch boundary handling"
 // ============================================================
@@ -250,7 +249,6 @@ fn test_epoch_boundary_handling() {
         "IDs must differ across epoch boundary"
     );
 
-    // Receiver in epoch N+1 should resolve both:
     // - Message from epoch N (boundary tolerance)
     // - Message from epoch N+1 (current epoch)
     let result_n = resolve_sender(&contacts, &id_epoch_n, epoch_n_plus_1);
@@ -276,7 +274,6 @@ fn test_epoch_boundary_handling() {
 }
 
 // ============================================================
-// Sender Unlinkability Tests
 // Traces to: features/anonymous_sender.feature @privacy
 // "Relay cannot link sender across epochs"
 // ============================================================
@@ -428,12 +425,10 @@ fn test_replay_prevention_same_epoch_requires_message_dedup() {
 
     // NOTE: Actual replay prevention must be implemented at the message
     // processing layer, not at the anonymous ID resolution layer.
-    // The message layer should maintain a set of seen message IDs and
     // reject duplicates.
 }
 
 // ============================================================
-// SenderIndex Tests
 // Traces to: features/anonymous_sender.feature @resolution
 // SenderIndex provides O(1) lookup vs O(n) resolve_sender.
 // ============================================================
@@ -516,7 +511,6 @@ fn test_sender_index_multiple_contacts() {
     let epoch = 500;
     let index = SenderIndex::build(&contacts, epoch);
 
-    // Each contact should resolve correctly
     for contact in &contacts {
         let anon_id = compute_anonymous_id(contact.shared_key().unwrap().as_bytes(), epoch);
         let result = index.resolve(&anon_id);
@@ -533,7 +527,6 @@ fn test_sender_index_multiple_contacts() {
 #[test]
 fn test_sender_index_stale_detection() {
     let contacts: Vec<Contact> = vec![];
-    // Build for a past epoch
     let past_epoch = 1;
     let index = SenderIndex::build(&contacts, past_epoch);
     assert!(index.is_stale(0), "Index built for epoch 1 should be stale");
@@ -573,7 +566,6 @@ fn test_sender_index_future_epoch_not_resolved() {
 }
 
 // ============================================================
-// Epoch Calculation Tests
 // Traces to: features/anonymous_sender.feature @epoch
 // ============================================================
 
@@ -581,7 +573,6 @@ fn test_sender_index_future_epoch_not_resolved() {
 // @internal
 #[test]
 fn test_epoch_calculation_formula() {
-    // Verify epoch = unix_timestamp / 3600
     // Slice 14 made `now` explicit; pin a 2026 wall-clock value so
     // the range assertion is deterministic.
     let now: u64 = 1_770_000_000;
@@ -598,7 +589,6 @@ fn test_epoch_calculation_formula() {
 }
 
 // ============================================================
-// HKDF Context String Test
 // Traces to: features/anonymous_sender.feature @privacy
 // "Derivation context prevents cross-protocol confusion"
 // ============================================================
@@ -631,7 +621,6 @@ fn test_anonymous_id_is_exactly_32_bytes() {
 // @internal
 #[test]
 fn test_anonymous_id_derived_via_hkdf_is_full_entropy() {
-    // Verify the output looks like a proper HKDF derivation: high entropy,
     // no obvious patterns. Check byte distribution across multiple keys.
     let mut unique_bytes = std::collections::HashSet::new();
     for i in 0u8..50 {
@@ -639,7 +628,6 @@ fn test_anonymous_id_derived_via_hkdf_is_full_entropy() {
         let id = compute_anonymous_id(&key, 1000);
         unique_bytes.extend(id.iter().copied());
     }
-    // 50 different 32-byte IDs should use a large portion of the byte space
     assert!(
         unique_bytes.len() > 200,
         "HKDF output should use diverse byte values (got {} unique out of 256)",
@@ -822,7 +810,6 @@ fn test_adversarial_sender_index_rejects_crafted_ids() {
 
     let index = SenderIndex::build(&contacts, 1000);
 
-    // Try all-zeros, all-ones, and sequential pattern
     assert!(index.resolve(&[0u8; 32]).is_none());
     assert!(index.resolve(&[0xFFu8; 32]).is_none());
     let mut seq = [0u8; 32];
@@ -860,7 +847,6 @@ fn test_adversarial_near_collision_keys() {
 // @internal
 #[test]
 fn test_hkdf_context_ensures_domain_separation() {
-    // Verify that the anonymous ID derivation uses a unique context
     // by checking that raw HKDF with the same key+epoch but different
     // context produces a different result.
     use vauchi_core::crypto::HKDF;
@@ -927,7 +913,6 @@ fn test_resolve_sender_id_malformed_hex() {
     let key = SymmetricKey::generate();
     let contacts = vec![make_contact_with_key("Alice", key)];
 
-    // Non-hex string
     let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, "not-valid-hex!", 0);
     assert!(result.is_none(), "Malformed hex should return None");
 
@@ -935,7 +920,6 @@ fn test_resolve_sender_id_malformed_hex() {
     let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, "abcdef", 0);
     assert!(result.is_none(), "Short hex should return None");
 
-    // Empty string
     let result = vauchi_core::network::anonymous::resolve_sender_id(&contacts, "", 0);
     assert!(result.is_none(), "Empty string should return None");
 }
@@ -952,7 +936,6 @@ fn test_resolve_sender_id_epoch_boundary() {
     // deterministic post-Clock-seam (slice 14).
     let now: u64 = 1_770_000_000;
 
-    // Generate anonymous ID for previous epoch
     let prev_epoch = current_epoch(now) - 1;
     let anon = AnonymousSender::compute(contact.shared_key().unwrap().as_bytes(), prev_epoch);
     let sender_id_hex = hex::encode(anon.anonymous_id);
@@ -1013,10 +996,8 @@ fn test_send_update_with_shared_key_uses_anonymous_id() {
             update.sender_id, "real-sender-id",
             "sender_id should be anonymous, not the real identity"
         );
-        // Verify it's a valid hex-encoded 32-byte value
         let decoded = hex::decode(&update.sender_id).expect("sender_id should be valid hex");
         assert_eq!(decoded.len(), 32, "Anonymous sender ID should be 32 bytes");
-        // Verify it matches the expected anonymous ID
         let expected = AnonymousSender::for_current_epoch(&shared_key, 0);
         assert_eq!(
             decoded,

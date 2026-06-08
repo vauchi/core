@@ -75,7 +75,6 @@ fn test_tick_processes_due_retries_only() {
     );
     assert_eq!(result.expired, 0, "No entries should be expired");
 
-    // Verify the future entry is untouched
     let future = storage.get_retry_entry("future").unwrap().unwrap();
     assert_eq!(future.attempt, 0, "Future entry should not be touched");
 }
@@ -125,13 +124,11 @@ fn test_tick_removes_max_attempt_entries() {
     assert_eq!(result.expired, 1, "One entry should be expired");
     assert_eq!(result.rescheduled, 1, "One entry should be rescheduled");
 
-    // Max-attempt entry should be deleted
     assert!(
         storage.get_retry_entry("max-out").unwrap().is_none(),
         "Max-attempt retry entry should be deleted"
     );
 
-    // Delivery status should be updated to permanent failure
     let delivery = storage.get_delivery_record("max-out").unwrap().unwrap();
     assert!(
         matches!(delivery.status, DeliveryStatus::Failed { .. }),
@@ -139,7 +136,6 @@ fn test_tick_removes_max_attempt_entries() {
         delivery.status
     );
 
-    // Under-max entry should still exist with incremented attempt
     let still_ok = storage.get_retry_entry("still-ok").unwrap().unwrap();
     assert_eq!(still_ok.attempt, 3);
 }

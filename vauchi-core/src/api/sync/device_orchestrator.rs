@@ -357,10 +357,6 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         Ok(())
     }
 
-    // ============================================================
-    // Device-to-device encryption (Phase 4)
-    // ============================================================
-
     /// Encrypts data for another device using ECDH + XChaCha20-Poly1305.
     ///
     /// Uses the current device's exchange key to perform ECDH with the target
@@ -406,10 +402,6 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         let key_bytes = HKDF::derive_key(None, &*shared_secret, DEVICE_SYNC_INFO);
         Ok(SymmetricKey::from_bytes(*key_bytes))
     }
-
-    // ============================================================
-    // Conflict Resolution (Phase 5)
-    // ============================================================
 
     /// Processes incoming sync items from another device.
     ///
@@ -513,10 +505,6 @@ impl<'a> DeviceSyncOrchestrator<'a> {
         }
     }
 
-    // ============================================================
-    // Bidirectional Sync (Phase 6)
-    // ============================================================
-
     /// Creates a sync message containing all pending items for a target device.
     ///
     /// This is used when reconnecting to send all queued changes to another device.
@@ -533,10 +521,6 @@ impl<'a> DeviceSyncOrchestrator<'a> {
             sender_device_id: *self.current_device.device_id(),
         })
     }
-
-    // ============================================================
-    // Sync Checkpoints (Phase 7)
-    // ============================================================
 
     /// Saves a sync checkpoint before sending items to a target device.
     ///

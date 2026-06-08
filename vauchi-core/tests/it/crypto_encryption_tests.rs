@@ -113,11 +113,9 @@ fn test_encrypt_with_ad_prevents_ad_mismatch() {
 
     let encrypted = encrypt_with_ad(&key, data, ad).unwrap();
 
-    // Correct AD decrypts fine
     let decrypted = decrypt_with_ad(&key, &encrypted, ad).unwrap();
     assert_eq!(data.as_slice(), decrypted.as_slice());
 
-    // Wrong AD fails authentication
     let result = decrypt_with_ad(&key, &encrypted, b"context B");
     assert!(result.is_err(), "Wrong AD must fail AEAD authentication");
 }

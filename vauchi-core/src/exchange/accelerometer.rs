@@ -170,7 +170,6 @@ impl ProximityVerifier for AccelerometerVerifier {
             .backend
             .record_motion(duration, self.config.sample_rate_hz)?;
 
-        // Compute magnitude envelope
         let envelope: Vec<f32> = samples.iter().map(|s| s.magnitude()).collect();
 
         *self.local_envelope.lock().expect("mutex poisoned") = Some(envelope);

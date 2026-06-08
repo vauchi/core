@@ -61,7 +61,6 @@ fn test_encrypted_message_roundtrip_with_identity_binding() {
 
     let (payload, bob_secret) = msg.decrypt(&bob).unwrap();
 
-    // Payload correctly recovered
     assert_eq!(payload.identity_key, alice_identity);
     assert_eq!(payload.exchange_key, *alice.public_key());
     assert_eq!(payload.display_name, "Alice");

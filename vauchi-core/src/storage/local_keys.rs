@@ -51,17 +51,14 @@ pub fn load_or_generate_fallback_key(data_dir: &Path) -> Result<SymmetricKey, St
         return Ok(SymmetricKey::from_bytes(arr));
     }
 
-    // Generate a new random key
     let key = SymmetricKey::generate();
 
-    // Ensure parent directory exists
     std::fs::create_dir_all(data_dir)
         .map_err(|e| StorageError::Encryption(format!("Failed to create data directory: {e}")))?;
 
     std::fs::write(&key_path, key.as_bytes())
         .map_err(|e| StorageError::Encryption(format!("Failed to write fallback key: {e}")))?;
 
-    // Set restrictive permissions on Unix
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -114,7 +111,6 @@ pub fn load_or_generate_backup_password(data_dir: &Path) -> Result<String, Stora
     std::fs::write(&password_path, &password)
         .map_err(|e| StorageError::Encryption(format!("Failed to write backup password: {e}")))?;
 
-    // Set restrictive permissions on Unix
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

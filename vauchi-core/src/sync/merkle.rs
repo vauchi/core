@@ -135,7 +135,6 @@ mod tests {
     #[test]
     fn test_empty_tree() {
         let tree = MerkleTree::from_contact_hashes(vec![]);
-        // Root should be hash of empty string.
         let expected = hash_bytes(b"");
         assert_eq!(tree.root_hash(), &expected);
     }

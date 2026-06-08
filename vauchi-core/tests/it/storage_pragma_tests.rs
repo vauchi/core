@@ -134,7 +134,6 @@ fn test_auto_vacuum_full() {
 }
 
 // ============================================================================
-// File permission tests
 // ============================================================================
 
 /// Database file should be created with 0600 permissions (owner-only).
@@ -171,7 +170,6 @@ fn test_existing_database_permissions_preserved() {
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("test.db");
 
-    // Create DB, then drop it
     {
         let _storage = Storage::open(&db_path, SymmetricKey::generate()).unwrap();
     }
@@ -224,7 +222,6 @@ fn test_search_1000_contacts_under_200ms() {
 
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
 
-    // Insert 1000 contacts with distinct display names.
     // We use raw SQL to avoid needing encryption for card/key fields
     // (they're BLOBs, so dummy data works for index benchmarking).
     let conn = storage.connection();

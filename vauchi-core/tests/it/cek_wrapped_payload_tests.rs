@@ -107,7 +107,6 @@ fn test_cek_wrapped_with_real_encryption() {
     // Full flow: create delta bytes → CEK encrypt → wrap → version tag → decode → CEK decrypt
     let delta_json = br#"{"version":1,"timestamp":1700000000,"changes":[{"DisplayNameChanged":{"new_name":"Alice Updated"}}]}"#;
 
-    // Sender side
     let cek = ContentEncryptionKey::generate();
     let cek_ciphertext = cek.encrypt(delta_json).unwrap();
 
@@ -120,7 +119,6 @@ fn test_cek_wrapped_with_real_encryption() {
 
     let versioned_bytes = VersionedPayload::encode_cek(&wrapped);
 
-    // Recipient side
     let decoded = VersionedPayload::decode(&versioned_bytes).unwrap();
     match decoded {
         VersionedPayload::CekWrapped(p) => {

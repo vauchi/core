@@ -93,7 +93,6 @@ fn arb_user_action() -> impl Strategy<Value = UserAction> {
 /// Sequence of "continue/advance" actions that take the engine from
 /// IdentityCheck all the way to WhatNext (full path, no skipping).
 fn advance_to_what_next(engine: &mut OnboardingEngine, name: &str) {
-    // IdentityCheck -> DefaultName
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
@@ -149,7 +148,6 @@ proptest! {
     fn screen_stability(actions in prop::collection::vec(arb_user_action(), 0..30)) {
         let mut engine = OnboardingEngine::new();
 
-        // Navigate past IdentityCheck to DefaultName
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "create_new".into(),
         });
@@ -194,7 +192,6 @@ proptest! {
         prop_assume!(!real_ids.contains(&bogus_id.as_str()));
 
         let mut engine = OnboardingEngine::new();
-        // Navigate past IdentityCheck to DefaultName, then set name
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "create_new".into(),
         });
@@ -300,7 +297,6 @@ proptest! {
         let group_name = GROUP_NAMES[group_idx];
         let mut engine = OnboardingEngine::new();
 
-        // Navigate to groups_setup
         let _ = engine.handle_action(UserAction::ActionPressed {
             action_id: "create_new".into(),
         });
@@ -312,7 +308,6 @@ proptest! {
             action_id: "continue".into(),
         });
 
-        // Capture original state
         let original = engine.data()
             .selected_groups
             .iter()
@@ -320,7 +315,6 @@ proptest! {
             .unwrap()
             .selected;
 
-        // Toggle once
         let _ = engine.handle_action(UserAction::ItemToggled {
             component_id: "groups".into(),
             item_id: group_name.into(),
@@ -333,7 +327,6 @@ proptest! {
             .selected;
         prop_assert_ne!(after_first, original);
 
-        // Toggle again
         let _ = engine.handle_action(UserAction::ItemToggled {
             component_id: "groups".into(),
             item_id: group_name.into(),

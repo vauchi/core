@@ -90,7 +90,6 @@ fn test_execute_deletion_succeeds_after_grace_period() {
         .schedule_deletion_with_execute_at(1000, 999)
         .unwrap();
 
-    // Now execute should succeed
     let identity = Identity::create("Test", 0);
     let result = manager.execute_deletion(&identity);
     assert!(
@@ -115,7 +114,6 @@ fn test_deletion_state_persisted_across_manager_instances() {
         manager.schedule_deletion().unwrap();
     }
 
-    // New manager instance should see the scheduled state
     let manager2 = DeletionManager::new(&storage);
     let state = manager2.deletion_state().unwrap();
     assert!(
@@ -130,7 +128,6 @@ fn test_cancel_deletion_when_not_scheduled() {
     let storage = Storage::in_memory(SymmetricKey::generate()).unwrap();
     let manager = DeletionManager::new(&storage);
 
-    // Should be a no-op or return Ok
     let result = manager.cancel_deletion();
     assert!(result.is_ok(), "Cancel when not scheduled should be ok");
 }
@@ -143,7 +140,6 @@ fn test_schedule_deletion_when_already_scheduled() {
 
     manager.schedule_deletion().unwrap();
 
-    // Scheduling again should be an error or no-op
     let result = manager.schedule_deletion();
     assert!(
         result.is_err(),

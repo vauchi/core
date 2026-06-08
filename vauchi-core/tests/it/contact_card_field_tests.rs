@@ -117,7 +117,6 @@ fn test_note_serde_roundtrip() {
 // @internal
 #[test]
 fn test_note_backward_compat_deserialize() {
-    // Old JSON without note field should deserialize fine
     let json =
         r#"{"id":"abc","field_type":"Phone","label":"Work","value":"+41...","updated_at":0}"#;
     let f: ContactField = serde_json::from_str(json).unwrap();
@@ -133,7 +132,6 @@ fn test_field_note_truncated_multibyte_utf8() {
     let f = ContactField::new(FieldType::Custom, "Note", "val", 0).with_note(cjk_note);
     let note = f.note().unwrap();
     assert_eq!(note.chars().count(), 500);
-    // All characters should be the same CJK character
     assert!(note.chars().all(|c| c == '\u{4e16}'));
 }
 
@@ -391,7 +389,6 @@ fn test_field_type_is_social_per_variant() {
 fn test_validate_value_too_long_returns_specific_error() {
     use vauchi_core::contact_card::ValidationError;
     use vauchi_core::contact_card::field::MAX_VALUE_LENGTH;
-    // Build a value that exceeds MAX_VALUE_LENGTH bytes.
     let f = ContactField::new(FieldType::Custom, "k", &"x".repeat(MAX_VALUE_LENGTH + 1), 0);
     let err = f.validate().unwrap_err();
     // Pin the exact variant — kills mutations that swap which error is

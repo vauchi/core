@@ -65,7 +65,6 @@ impl ExchangeNfc {
         timestamp: u64,
     ) -> Self {
         let bytes = build_exchange_payload(NFC_MAGIC, identity, ephemeral, token, timestamp);
-        // Parse back to get structured data
         let inner = parse_exchange_payload(&bytes, NFC_MAGIC, ExchangeError::InvalidNfcFormat)
             .expect("Freshly built payload should parse");
         ExchangeNfc { inner }
@@ -122,16 +121,11 @@ impl ExchangeNfc {
     }
 }
 
-// ============================================================
-// APDU Protocol for HCE-based NFC exchange
-// ============================================================
-
 pub mod apdu {
     /// Vauchi NFC Application Identifier (AID).
     /// F0 56 41 55 43 48 49 01 — "VAUCHI" with prefix F0 and version 01.
     pub const AID: &[u8] = &[0xF0, 0x56, 0x41, 0x55, 0x43, 0x48, 0x49, 0x01];
 
-    // Status words
     /// ISO 7816 status word indicating successful command execution (SW1=90, SW2=00).
     pub const SW_SUCCESS: [u8; 2] = [0x90, 0x00];
     /// ISO 7816 status word indicating the requested AID was not found on the card (SW1=6A, SW2=82).
@@ -139,7 +133,6 @@ pub mod apdu {
     /// ISO 7816 status word indicating conditions of use not satisfied (SW1=69, SW2=85).
     pub const SW_CONDITIONS_NOT_SATISFIED: [u8; 2] = [0x69, 0x85];
 
-    // APDU instruction codes
     const INS_SELECT: u8 = 0xA4;
     const INS_EXCHANGE_DATA: u8 = 0xE0;
     const INS_CARD_EXCHANGE: u8 = 0xE2;

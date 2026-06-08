@@ -158,11 +158,9 @@ fn test_complete_exchange_needs_identity() {
 fn test_start_exchange_with_identity_fails_at_network() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-    // With no real relay, start_relay_exchange should fail at the network layer
     let result = vauchi.start_relay_exchange(Some(300));
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
-    // Should be a network error, not an identity error
     assert!(
         !err.contains("identity"),
         "expected network error, got identity error: {err}"
@@ -175,7 +173,6 @@ fn test_start_exchange_with_identity_fails_at_network() {
 fn test_claim_exchange_with_identity_fails_at_network() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Bob").unwrap();
-    // With no real relay, claim should fail at the network layer
     let result = vauchi.claim_relay_exchange("999999");
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();

@@ -109,7 +109,6 @@ fn test_identity_revoked_sign_and_verify() {
 
     let revoked = IdentityRevoked::create(&identity, &recipient_id, timestamp);
 
-    // Verify the signature using the signing public key
     assert!(revoked.verify(identity.signing_public_key()));
 }
 
@@ -123,7 +122,6 @@ fn test_identity_revoked_rejects_tampered_timestamp() {
 
     let mut revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
 
-    // Tamper with timestamp
     revoked.timestamp = 1700000001;
 
     assert!(!revoked.verify(identity.signing_public_key()));
@@ -139,7 +137,6 @@ fn test_identity_revoked_rejects_wrong_key() {
 
     let revoked = IdentityRevoked::create(&identity, &recipient_id, 1700000000);
 
-    // Wrong public key should not verify
     assert!(!revoked.verify(other_identity.signing_public_key()));
 }
 
@@ -182,10 +179,8 @@ fn test_process_revocation_deletes_contact_and_records_tombstone() {
     let result = process_revocation(&revoked, &storage);
     result.expect("expected success");
 
-    // Contact should be deleted
     assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
 
-    // Tombstone should be recorded
     assert!(storage.is_sender_revoked(alice_contact.id()).unwrap());
 }
 
@@ -199,11 +194,9 @@ fn test_process_revocation_rejects_invalid_signature() {
     let bob_pk = [0xBBu8; 32];
     let bob_id = hex::encode(bob_pk);
 
-    // Store Alice as contact
     let alice_contact = make_contact_with_pk(*identity.signing_public_key(), "Alice");
     storage.save_contact(&alice_contact).unwrap();
 
-    // Create revocation signed by Mallory but claiming to be from Alice
     let future_ts = alice_contact.exchange_timestamp().unwrap() + 1;
     let mut spoofed = IdentityRevoked::create(&mallory, &bob_id, future_ts);
     spoofed.sender_id = alice_contact.id().to_string().into();
@@ -263,12 +256,10 @@ fn test_process_revocation_unknown_sender_noop() {
 fn test_update_after_revocation_discarded_via_tombstone() {
     let storage = test_storage();
 
-    // Record a tombstone
     storage
         .record_revoked_sender("alice_id", 1700000000)
         .unwrap();
 
-    // Tombstone should block future updates
     assert!(storage.is_sender_revoked("alice_id").unwrap());
 }
 
@@ -312,7 +303,6 @@ fn test_revocation_with_future_timestamp() {
     storage.save_contact(&alice_contact).unwrap();
 
     let exchange_ts = alice_contact.exchange_timestamp().unwrap();
-    // Far future timestamp
     let future_ts = exchange_ts + 10000;
 
     let revocation = IdentityRevoked::create(&alice, &bob_id, future_ts);

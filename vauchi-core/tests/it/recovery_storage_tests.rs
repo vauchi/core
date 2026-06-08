@@ -49,7 +49,6 @@ fn test_recovery_response_overwrite() {
     storage
         .save_recovery_response("claim-1", "contact-a", "reject", None)
         .unwrap();
-    // Overwrite with accept
     storage
         .save_recovery_response("claim-1", "contact-a", "accept", None)
         .unwrap();
@@ -136,7 +135,6 @@ fn test_multiple_recovery_responses() {
 }
 
 // ============================================================
-// Recovery Settings coverage tests
 // ============================================================
 
 use vauchi_core::recovery::RecoverySettings;

@@ -16,14 +16,12 @@ use vauchi_core::exchange::{
 use vauchi_core::{ContactCard, Identity};
 
 // ============================================================
-// Error variants
 // ============================================================
 
 // @scenario: contact_exchange :: NFC exchange reports descriptive error on failure
 // @scenario: contact_exchange :: NFC tap too brief to complete exchange
 #[test]
 fn test_nfc_error_variants_exist() {
-    // Verify the NFC error variants are usable
     let err1 = ExchangeError::InvalidNfcFormat;
     let err2 = ExchangeError::NfcExpired;
     let err3 = ExchangeError::NfcSessionLost;
@@ -36,7 +34,6 @@ fn test_nfc_error_variants_exist() {
 }
 
 // ============================================================
-// ExchangeNfc payload
 // ============================================================
 
 // @scenario: contact_exchange :: NFC tap generates exchange payload
@@ -114,7 +111,6 @@ fn test_nfc_tamper_rejection() {
     );
     let mut bytes = payload.to_bytes();
 
-    // Tamper with exchange key
     bytes[38] ^= 0xFF;
 
     let parsed = ExchangeNfc::from_bytes(&bytes).expect("Should parse bytes");
@@ -137,7 +133,6 @@ fn test_nfc_magic_check() {
     );
     let mut bytes = payload.to_bytes();
 
-    // Wrong magic
     bytes[0..4].copy_from_slice(b"XXXX");
 
     let result = ExchangeNfc::from_bytes(&bytes);
@@ -160,7 +155,6 @@ fn test_nfc_version_check() {
     );
     let mut bytes = payload.to_bytes();
 
-    // Wrong version
     bytes[4] = 99;
 
     let result = ExchangeNfc::from_bytes(&bytes);
@@ -281,15 +275,12 @@ fn test_nfc_identity_key_matches_signer() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // The identity key in the payload should be the signing key
     assert_eq!(payload.identity_key(), identity.signing_public_key());
 
-    // The exchange key should NOT be the identity key
     assert_ne!(payload.exchange_key(), payload.identity_key());
 }
 
 // ============================================================
-// APDU protocol
 // ============================================================
 
 // We need access to the apdu module — it's re-exported via nfc_active
@@ -392,7 +383,6 @@ fn test_nfc_phase2_response_exceeds_short_apdu() {
 }
 
 // ============================================================
-// Session integration
 // ============================================================
 
 // @scenario: contact_exchange :: NFC exchange session starts in AwaitingNfcTap
@@ -432,7 +422,6 @@ fn test_nfc_tap_transitions_to_key_agreement() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Bob generates his NFC payload
     let bob_eph = X3DHKeyPair::generate();
     let bob_payload = ExchangeNfc::generate(
         &bob_identity,
@@ -440,7 +429,6 @@ fn test_nfc_tap_transitions_to_key_agreement() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Alice receives Bob's tap
     alice_session
         .apply(ExchangeEvent::NfcTapComplete {
             their_payload: bob_payload.to_bytes().to_vec(),
@@ -497,7 +485,6 @@ fn test_nfc_expired_payload_rejected_by_session() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Bob's expired payload
     let bob_eph = X3DHKeyPair::generate();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -522,7 +509,6 @@ fn test_nfc_rejects_wrong_transport() {
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    // QR session
     let mut session = ExchangeSession::new_qr(
         identity,
         card,
@@ -545,7 +531,6 @@ fn test_nfc_rejects_wrong_transport() {
 fn test_nfc_self_exchange_rejected() {
     let alice_identity = Identity::create("Alice", 0);
 
-    // Generate NFC payload with Alice's own identity
     let eph = X3DHKeyPair::generate();
     let self_payload = ExchangeNfc::generate(
         &alice_identity,
@@ -574,7 +559,6 @@ fn test_nfc_self_exchange_rejected() {
 }
 
 // ============================================================
-// Full NFC lifecycle
 // ============================================================
 
 // @scenario: contact_exchange :: Successful NFC exchange with proximity
@@ -634,7 +618,6 @@ fn test_nfc_full_exchange_via_session() {
         })
         .unwrap();
 
-    // Both should be in AwaitingKeyAgreement
     assert!(matches!(
         alice_session.state(),
         ExchangeState::AwaitingKeyAgreement { .. }
@@ -693,14 +676,12 @@ fn test_nfc_full_exchange_payload_crypto() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Both parse each other's payload
     let alice_parsed = ExchangeNfc::from_bytes(&bob_nfc.to_bytes()).unwrap();
     let bob_parsed = ExchangeNfc::from_bytes(&alice_nfc.to_bytes()).unwrap();
 
     assert!(alice_parsed.verify_signature());
     assert!(bob_parsed.verify_signature());
 
-    // Symmetric DH
     let alice_shared = alice_eph
         .diffie_hellman(alice_parsed.exchange_key())
         .unwrap();
@@ -753,7 +734,6 @@ fn test_nfc_apdu_round_trip_simulation() {
     let alice_eph = X3DHKeyPair::generate();
     let bob_eph = X3DHKeyPair::generate();
 
-    // Alice generates her NFC payload
     let alice_payload = ExchangeNfc::generate(
         &alice_identity,
         &alice_eph,
@@ -761,7 +741,6 @@ fn test_nfc_apdu_round_trip_simulation() {
     );
     let alice_bytes = alice_payload.to_bytes();
 
-    // Bob generates his NFC payload
     let bob_payload = ExchangeNfc::generate(
         &bob_identity,
         &bob_eph,
@@ -773,7 +752,6 @@ fn test_nfc_apdu_round_trip_simulation() {
     let bob_received = ExchangeNfc::from_bytes(&alice_bytes).unwrap();
     let alice_received = ExchangeNfc::from_bytes(&bob_bytes).unwrap();
 
-    // Both verify
     assert!(bob_received.verify_signature());
     assert!(alice_received.verify_signature());
 
@@ -836,7 +814,6 @@ fn test_nfc_payload_with_different_identities() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Verify they have different identities but both are valid
     assert_ne!(alice_payload.identity_key(), bob_payload.identity_key());
     assert!(alice_payload.verify_signature());
     assert!(bob_payload.verify_signature());
@@ -850,14 +827,12 @@ fn test_nfc_signature_failure_with_wrong_key() {
 
     let ephemeral = X3DHKeyPair::generate();
 
-    // Create payload with Alice's identity
     let alice_payload = ExchangeNfc::generate(
         &alice,
         &ephemeral,
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Try to forge with Bob's identity but Alice's signature
     // (This would require Bob to have access to Alice's signing key, which is impossible)
     // Instead, just verify that signature check catches tampering
     let mut bytes = alice_payload.to_bytes();

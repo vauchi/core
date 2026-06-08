@@ -19,7 +19,6 @@ use vauchi_core::exchange::{
 use vauchi_core::identity::Identity;
 
 // ============================================================
-// Helpers
 // ============================================================
 
 fn make_test_key() -> SymmetricKey {
@@ -43,7 +42,6 @@ fn make_test_card(identity: &Identity, name: &str) -> BleCardPayload {
 }
 
 // ============================================================
-// Property-Based Tests
 // ============================================================
 
 // @scenario: ble_exchange :: Encrypt-decrypt roundtrip preserves arbitrary data
@@ -112,7 +110,6 @@ proptest! {
 }
 
 // ============================================================
-// Adversarial Tests
 // ============================================================
 
 // @scenario: ble_exchange :: Empty display name roundtrips correctly

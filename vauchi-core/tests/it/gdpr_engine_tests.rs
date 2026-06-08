@@ -82,11 +82,9 @@ fn gdpr_delete_navigates_to_confirmation() {
 #[test]
 fn gdpr_confirm_delete_completes() {
     let mut engine = GdprEngine::new(None, "All consents granted".into());
-    // First navigate to confirmation
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete".into(),
     });
-    // Then confirm
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "confirm_delete".into(),
     });

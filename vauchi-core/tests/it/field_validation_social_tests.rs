@@ -21,7 +21,6 @@ fn test_social_handle_platform_rules_twitter() {
     // Twitter usernames: 4-15 chars, alphanumeric + underscore
     let twitter = registry.get("twitter").expect("Twitter should exist");
 
-    // Valid Twitter handles
     let valid_handles = vec!["alice", "bob_smith", "user1234", "@alice", "A1B2"];
 
     for handle in valid_handles {
@@ -93,16 +92,13 @@ fn test_social_handle_platform_rules_mastodon() {
     // Mastodon: @user@instance.social format
     let mastodon = registry.get("mastodon").expect("Mastodon should exist");
 
-    // Federated handle
     let federated = "user@fosstodon.org";
     let url = mastodon.profile_url(federated);
-    // Should preserve the federation handle
     assert!(
         url.contains("user@fosstodon.org") || url.contains("mastodon.social"),
         "Mastodon should handle federated handle"
     );
 
-    // Simple handle
     let simple = "@alice";
     let url = mastodon.profile_url(simple);
     assert!(

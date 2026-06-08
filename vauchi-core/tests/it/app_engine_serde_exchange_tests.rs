@@ -134,7 +134,6 @@ fn app_screen_form_dialog_serde_roundtrip() {
 fn entry_detail_delete_returns_show_toast_with_undo() {
     let mut vauchi = Vauchi::in_memory().unwrap();
     vauchi.create_identity("Alice").unwrap();
-    // Add a field to delete
     let field = ContactField::new(FieldType::Phone, "Mobile", "+1234567890", 0);
     let field_id = field.id().to_string();
     let mut card = vauchi
@@ -166,7 +165,6 @@ fn entry_detail_delete_returns_show_toast_with_undo() {
         }
         other => panic!("Expected ShowToast, got {:?}", other),
     }
-    // Should have navigated back to MyInfo
     assert_eq!(engine.current_app_screen(), &AppScreen::MyInfo);
 }
 
@@ -188,7 +186,6 @@ fn entry_detail_delete_undo_restores_field() {
         field_id: field_id.clone(),
     });
 
-    // Delete the field
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "delete".into(),
     });
@@ -197,21 +194,18 @@ fn entry_detail_delete_undo_restores_field() {
         other => panic!("Expected ShowToast, got {:?}", other),
     };
 
-    // Verify field is gone
     let card = engine.vauchi().own_card().unwrap().unwrap();
     assert!(
         card.fields().iter().all(|f| f.id() != field_id),
         "field should be deleted"
     );
 
-    // Undo
     let result = engine.handle_action(UserAction::UndoPressed { action_id: undo_id });
     assert!(
         matches!(result, ActionResult::UpdateScreen(_)),
         "undo should return UpdateScreen"
     );
 
-    // Verify field is restored
     let card = engine.vauchi().own_card().unwrap().unwrap();
     assert!(
         card.fields().iter().any(|f| f.id() == field_id),

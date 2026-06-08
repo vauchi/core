@@ -28,7 +28,6 @@ fn test_delivery_status_screen_shows_records_from_storage() {
 
     let timestamp = now();
 
-    // Insert delivery records via storage
     vauchi
         .storage()
         .create_delivery_record(&DeliveryRecord {
@@ -146,7 +145,6 @@ fn test_delivery_status_screen_shows_retry_for_failed() {
 
     assert_eq!(screen.screen_id, "delivery_status");
 
-    // Failed records should produce a "Retry Failed" action
     let retry_action = screen.actions.iter().find(|a| a.id == "retry_all");
     assert!(
         retry_action.is_some(),

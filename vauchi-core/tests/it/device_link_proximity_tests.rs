@@ -99,7 +99,6 @@ fn test_build_response_succeeds_after_proximity_verified() {
 
     let (_confirmation, request) = initiator.prepare_confirmation(&encrypted_request).unwrap();
 
-    // Valid proximity proof, then confirm should succeed
     let proof = ProximityProof::Ultrasonic {
         challenge_response: initiator.proximity_challenge(),
         verified_at: now_unix_secs(),
@@ -130,7 +129,6 @@ fn test_proximity_challenge_deterministic() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Same initiator should produce the same challenge every time
     let challenge1 = initiator.proximity_challenge();
     let challenge2 = initiator.proximity_challenge();
     assert_eq!(challenge1, challenge2);
@@ -190,7 +188,6 @@ fn test_both_sides_derive_same_challenge() {
     )
     .unwrap();
 
-    // Both sides derive the same challenge from the shared link key
     let initiator_challenge = initiator.proximity_challenge();
     let responder_challenge = responder.proximity_challenge();
 
@@ -213,12 +210,10 @@ fn test_restored_initiator_requires_proximity() {
     );
     let qr_string = initiator.qr().to_data_string();
 
-    // Restore initiator from saved QR
     let restored_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
     let restored_initiator =
         DeviceLinkInitiatorRestored::new(master_seed, &identity, registry, restored_qr);
 
-    // Responder side
     let scanned_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
     let mut responder = DeviceLinkResponder::from_qr(
         scanned_qr,
@@ -234,7 +229,6 @@ fn test_restored_initiator_requires_proximity() {
         .prepare_confirmation(&encrypted_request)
         .unwrap();
 
-    // Should fail with wrong proximity proof
     let wrong_proof = ProximityProof::Ultrasonic {
         challenge_response: [0xFFu8; 16],
         verified_at: now_unix_secs(),
@@ -951,7 +945,6 @@ fn test_self_linking_restored_initiator_rejected() {
     );
     let qr_string = initiator.qr().to_data_string();
 
-    // Restore initiator from saved QR
     let restored_qr = DeviceLinkQR::from_data_string(&qr_string).unwrap();
     let restored_initiator =
         DeviceLinkInitiatorRestored::new(master_seed, &identity, registry, restored_qr);
@@ -989,7 +982,6 @@ fn test_self_linking_restored_initiator_rejected() {
 // @internal
 #[test]
 fn test_different_device_name_allowed() {
-    // Sanity check: a different device name should succeed
     let master_seed = [0x42u8; 32];
     let identity = Identity::create("Alice", 0);
     let registry = create_test_registry(&identity);

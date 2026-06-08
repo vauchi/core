@@ -245,16 +245,13 @@ mod tests {
     fn test_label_display_name_override() {
         let mut label = Group::new("Family", 0);
 
-        // Initially None
         assert_eq!(label.display_name_override(), None);
 
-        // Set override
         label
             .set_display_name_override(Some("Matt"), 0)
             .expect("valid name should succeed");
         assert_eq!(label.display_name_override(), Some("Matt"));
 
-        // Clear override
         label
             .set_display_name_override(None, 0)
             .expect("clearing should succeed");
@@ -265,27 +262,22 @@ mod tests {
     fn test_label_display_name_override_validation() {
         let mut label = Group::new("Friends", 0);
 
-        // Empty string should fail
         let result = label.set_display_name_override(Some(""), 0);
         assert!(matches!(result, Err(GroupError::InvalidName(_))));
 
-        // Whitespace-only should fail
         let result = label.set_display_name_override(Some("   "), 0);
         assert!(matches!(result, Err(GroupError::InvalidName(_))));
 
-        // Too long (>100 chars) should fail
         let long_name = "a".repeat(101);
         let result = label.set_display_name_override(Some(&long_name), 0);
         assert!(matches!(result, Err(GroupError::InvalidName(_))));
 
-        // Exactly 100 chars should succeed
         let max_name = "b".repeat(100);
         label
             .set_display_name_override(Some(&max_name), 0)
             .expect("100 chars should succeed");
         assert_eq!(label.display_name_override(), Some(max_name.as_str()));
 
-        // Whitespace trimming
         label
             .set_display_name_override(Some("  Dr. Egloff  "), 0)
             .expect("trimmed name should succeed");
@@ -296,16 +288,13 @@ mod tests {
     fn test_label_resolve_display_name() {
         let mut label = Group::new("Business", 0);
 
-        // Without override, returns default
         assert_eq!(label.resolve_display_name("Mattia Egloff"), "Mattia Egloff");
 
-        // With override, returns override
         label
             .set_display_name_override(Some("Dr. Egloff"), 0)
             .expect("valid name");
         assert_eq!(label.resolve_display_name("Mattia Egloff"), "Dr. Egloff");
 
-        // After clearing, returns default again
         label
             .set_display_name_override(None, 0)
             .expect("clearing should succeed");

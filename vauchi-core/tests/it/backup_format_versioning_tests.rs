@@ -14,7 +14,6 @@ use vauchi_core::identity::{IdentityBackup, IdentityError};
 const BACKUP_VERSION_V2: u8 = 0x02;
 
 // =============================================================================
-// V1 FORMAT AUTO-DETECTION
 // =============================================================================
 
 /// Tests that non-v2 backups are rejected.
@@ -24,33 +23,28 @@ const BACKUP_VERSION_V2: u8 = 0x02;
 // @scenario: backup_format_versioning :: Non-v2 backup format rejected
 #[test]
 fn test_non_v2_format_rejected() {
-    // Create a v2 backup first to get valid identity data
     let identity = Identity::create("Legacy User", 0);
     let password = "SecureP@ssw0rd!2024";
     let v2_backup = identity.export_backup(password).unwrap();
     let v2_bytes = v2_backup.as_bytes();
 
-    // Verify v2 backup starts with version byte 0x02
     assert_eq!(
         v2_bytes[0], BACKUP_VERSION_V2,
         "New backups should use v2 format"
     );
 
-    // Non-v2 backup data should be rejected
     let mock_data = vec![0x00u8; 100]; // First byte is 0x00, not 0x02
     let mock_backup = IdentityBackup::new(mock_data);
 
     let result = Identity::import_backup(&mock_backup, password, 0);
     assert!(result.is_err(), "Non-v2 data should fail to restore");
 
-    // Verify error is RestoreFailed
     match result {
         Err(IdentityError::RestoreFailed) => (), // Expected — rejected immediately
         Err(e) => panic!("Expected RestoreFailed, got error: {:?}", e),
         Ok(_) => panic!("Expected RestoreFailed, but got success"),
     }
 
-    // All non-0x02 first bytes should be rejected
     for first_byte in [0x00u8, 0x01, 0x03, 0xFF, 0x10] {
         let mut test_data = vec![first_byte];
         test_data.extend_from_slice(&[0u8; 99]);
@@ -61,7 +55,6 @@ fn test_non_v2_format_rejected() {
 }
 
 // =============================================================================
-// V2 PARAMETER VALIDATION
 // =============================================================================
 
 /// Tests that v2 backup import rejects invalid parameters.
@@ -71,7 +64,6 @@ fn test_non_v2_format_rejected() {
 // @scenario: backup_format_versioning :: V2 backup uses OWASP-recommended Argon2id parameters
 #[test]
 fn test_v2_parameter_validation() {
-    // Empty backup should be rejected
     let empty_backup = IdentityBackup::new(vec![]);
     let result = Identity::import_backup(&empty_backup, "password", 0);
     assert!(
@@ -120,7 +112,6 @@ fn test_v2_parameter_validation() {
 }
 
 // =============================================================================
-// CORRUPTED BACKUP DETECTION
 // =============================================================================
 
 /// Tests that corrupted backup data triggers AEAD authentication failure.
@@ -131,13 +122,11 @@ fn test_v2_parameter_validation() {
 // @scenario: identity_management :: Restore corrupted backup
 #[test]
 fn test_corrupted_backup_detection() {
-    // Create a valid v2 backup
     let identity = Identity::create("Corruption Test User", 0);
     let password = "SecureP@ssw0rd!2024";
     let backup = identity.export_backup(password).unwrap();
     let original_bytes = backup.as_bytes().to_vec();
 
-    // Verify original backup works
     let restored = Identity::import_backup(&backup, password, 0);
     assert!(
         restored.is_ok(),
@@ -174,7 +163,6 @@ fn test_corrupted_backup_detection() {
         );
     }
 
-    // Test truncation
     for truncate_by in [1, 8, 16, 32] {
         if truncate_by >= original_bytes.len() {
             continue;
@@ -193,7 +181,6 @@ fn test_corrupted_backup_detection() {
 }
 
 // =============================================================================
-// VERSION UPGRADE PATH
 // =============================================================================
 
 /// Tests that v1 to v2 migration is lossless.
@@ -203,7 +190,6 @@ fn test_corrupted_backup_detection() {
 // @scenario: backup_format_versioning :: Restoring legacy backup and re-exporting creates v2
 #[test]
 fn test_version_upgrade_path() {
-    // Create an identity and export as v2
     let original_identity = Identity::create("Migration Test User", 0);
     let original_public_id = original_identity.public_id();
     let original_display_name = original_identity.display_name().to_string();
@@ -213,17 +199,14 @@ fn test_version_upgrade_path() {
     let password = "SecureP@ssw0rd!2024";
     let v2_backup = original_identity.export_backup(password).unwrap();
 
-    // Verify it's v2 format
     assert_eq!(
         v2_backup.as_bytes()[0],
         BACKUP_VERSION_V2,
         "New backup should be v2"
     );
 
-    // Restore from v2 backup
     let restored_identity = Identity::import_backup(&v2_backup, password, 0).unwrap();
 
-    // Re-export - should still be v2
     let re_exported = restored_identity.export_backup(password).unwrap();
     assert_eq!(
         re_exported.as_bytes()[0],
@@ -231,7 +214,6 @@ fn test_version_upgrade_path() {
         "Re-exported backup should be v2"
     );
 
-    // Verify all identity data is preserved through the round-trip
     assert_eq!(
         restored_identity.public_id(),
         original_public_id,
@@ -253,7 +235,6 @@ fn test_version_upgrade_path() {
         "Exchange key should match after migration"
     );
 
-    // Verify the re-exported backup can be restored too
     let final_restored = Identity::import_backup(&re_exported, password, 0).unwrap();
     assert_eq!(
         final_restored.public_id(),
@@ -263,7 +244,6 @@ fn test_version_upgrade_path() {
 }
 
 // =============================================================================
-// FUTURE VERSION REJECTION
 // =============================================================================
 
 /// Tests that unknown/future backup versions are rejected gracefully.
@@ -279,7 +259,6 @@ fn test_future_version_rejection() {
     // These should be rejected immediately (only v2 = 0x02 is accepted)
     for future_version in [0x03u8, 0x04, 0x10, 0x20, 0x7F, 0x80, 0xFE, 0xFF] {
         let mut mock_future_backup = vec![future_version];
-        // Add enough data to pass minimum length checks
         mock_future_backup.extend_from_slice(&[0u8; 200]);
 
         let future_backup = IdentityBackup::new(mock_future_backup);
@@ -302,7 +281,6 @@ fn test_future_version_rejection() {
         "Version 0x01 should be rejected"
     );
 
-    // Verify actual v2 still works after testing future versions
     let identity = Identity::create("Future Version Test", 0);
     let valid_backup = identity.export_backup(password).unwrap();
     let restored = Identity::import_backup(&valid_backup, password, 0);
@@ -310,7 +288,6 @@ fn test_future_version_rejection() {
 }
 
 // =============================================================================
-// ADDITIONAL EDGE CASES
 // =============================================================================
 
 /// Tests wrong password detection for v2 backups.
@@ -327,18 +304,15 @@ fn test_v2_wrong_password() {
 
     let backup = identity.export_backup(correct_password).unwrap();
 
-    // Correct password works
     let result = Identity::import_backup(&backup, correct_password, 0);
     assert!(result.is_ok(), "Correct password should work");
 
-    // Wrong password fails
     let result = Identity::import_backup(&backup, wrong_password, 0);
     assert!(
         matches!(result, Err(IdentityError::RestoreFailed)),
         "Wrong password should fail"
     );
 
-    // Empty password fails
     // Note: Password validation happens on export, not import
     let result = Identity::import_backup(&backup, "", 0);
     assert!(
@@ -369,14 +343,12 @@ fn test_v2_format_structure() {
         "V2 backup should be at least 58 bytes (1+16+41 minimum ciphertext)"
     );
 
-    // First byte is version
     assert_eq!(bytes[0], BACKUP_VERSION_V2, "First byte should be version");
 
     // Next 16 bytes are salt (should be random, so check they're not all zeros)
     let salt = &bytes[1..17];
     assert!(salt.iter().any(|&b| b != 0), "Salt should not be all zeros");
 
-    // Verify different backups have different salts
     let backup2 = identity.export_backup(password).unwrap();
     let salt2 = &backup2.as_bytes()[1..17];
     assert_ne!(salt, salt2, "Each backup should have unique salt");
@@ -393,15 +365,12 @@ fn test_device_info_preservation() {
     let identity = Identity::create("Device Info Test", 0);
     let password = "SecureP@ssw0rd!2024";
 
-    // Capture original device info
     let original_device_index = identity.device_index();
     let original_device_name = identity.device_info().device_name().to_string();
 
-    // Export and restore
     let backup = identity.export_backup(password).unwrap();
     let restored = Identity::import_backup(&backup, password, 0).unwrap();
 
-    // Verify device info is preserved
     assert_eq!(
         restored.device_index(),
         original_device_index,
@@ -432,23 +401,18 @@ fn test_re_export_with_different_password() {
     let password_a = "OriginalP@ssw0rd!2024";
     let password_b = "DifferentP@ssw0rd!2025";
 
-    // Export with password A
     let backup_a = identity.export_backup(password_a).unwrap();
 
-    // Restore from backup A
     let restored = Identity::import_backup(&backup_a, password_a, 0).unwrap();
 
-    // Re-export with password B
     let backup_b = restored.export_backup(password_b).unwrap();
 
-    // New backup should NOT decrypt with old password
     let result = Identity::import_backup(&backup_b, password_a, 0);
     assert!(
         result.is_err(),
         "Re-exported backup should not decrypt with old password"
     );
 
-    // New backup should decrypt with new password
     let final_restored = Identity::import_backup(&backup_b, password_b, 0).unwrap();
     assert_eq!(
         final_restored.public_id(),
@@ -473,7 +437,6 @@ fn test_backup_import_creates_identical_signing_keys() {
 
     let backup = identity.export_backup(password).unwrap();
 
-    // Import the same backup twice
     let clone_a = Identity::import_backup(&backup, password, 0).unwrap();
     let clone_b = Identity::import_backup(&backup, password, 0).unwrap();
 

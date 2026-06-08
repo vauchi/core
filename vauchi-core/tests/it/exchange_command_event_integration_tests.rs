@@ -62,13 +62,11 @@ fn qr_full_round_trip_via_commands_and_events() {
     let mut alice = qr_session("Alice");
     let mut bob = qr_session("Bob");
 
-    // Both start QR and emit initial commands
     alice.apply(ExchangeEvent::StartQR).unwrap();
     alice.emit_initial_commands();
     bob.apply(ExchangeEvent::StartQR).unwrap();
     bob.emit_initial_commands();
 
-    // Get QR data from display commands
     let alice_cmds = alice.drain_commands();
     let bob_cmds = bob.drain_commands();
 
@@ -88,18 +86,15 @@ fn qr_full_round_trip_via_commands_and_events() {
         })
         .expect("Bob should emit QrDisplay");
 
-    // Alice scans Bob's QR
     alice
         .apply_hardware_event(Event::QrScanned { data: bob_qr_data })
         .unwrap();
 
-    // Bob scans Alice's QR
     bob.apply_hardware_event(Event::QrScanned {
         data: alice_qr_data,
     })
     .unwrap();
 
-    // Both should be in PeerScanned state
     assert!(
         matches!(alice.state(), ExchangeState::PeerScanned { .. }),
         "Alice should be PeerScanned, got {:?}",
@@ -120,7 +115,6 @@ fn nfc_full_round_trip_via_commands_and_events() {
     let mut alice = nfc_session("Alice");
     let mut bob = nfc_session("Bob");
 
-    // Both emit initial NfcActivate with payload
     alice.emit_initial_commands();
     bob.emit_initial_commands();
 
@@ -162,7 +156,6 @@ fn nfc_full_round_trip_via_commands_and_events() {
     })
     .unwrap();
 
-    // Both should have advanced past AwaitingNfcTap
     assert!(
         !matches!(alice.state(), ExchangeState::AwaitingNfcTap),
         "Alice should advance past AwaitingNfcTap"
@@ -172,7 +165,6 @@ fn nfc_full_round_trip_via_commands_and_events() {
         "Bob should advance past AwaitingNfcTap"
     );
 
-    // Both should emit NfcDeactivate
     let alice_cmds = alice.drain_commands();
     let bob_cmds = bob.drain_commands();
     assert!(
@@ -201,7 +193,6 @@ fn ble_to_qr_fallback_produces_working_qr_session() {
     session.emit_initial_commands();
     let _ = session.drain_commands(); // drain BLE commands
 
-    // BLE unavailable -> should fall back to QR
     session
         .apply_hardware_event(Event::HardwareUnavailable {
             transport: "BLE".into(),
@@ -218,11 +209,9 @@ fn ble_to_qr_fallback_produces_working_qr_session() {
         "BLE fallback should produce QrDisplay command"
     );
 
-    // The QR data should be scannable
     let qr_str = qr_data.unwrap();
     assert!(!qr_str.is_empty(), "QR data should not be empty");
 
-    // Another session should be able to scan this QR
     let mut bob = qr_session("Bob");
     bob.apply(ExchangeEvent::StartQR).unwrap();
     bob.apply_hardware_event(Event::QrScanned { data: qr_str })
@@ -241,7 +230,6 @@ fn qr_session_ignores_ble_events() {
     let mut session = qr_session("Alice");
     session.apply(ExchangeEvent::StartQR).unwrap();
 
-    // BLE events on a QR session should not crash or change state
     session
         .apply_hardware_event(Event::BleDeviceDiscovered {
             id: "rogue".into(),
@@ -250,7 +238,6 @@ fn qr_session_ignores_ble_events() {
         })
         .unwrap();
 
-    // Should still be in DisplayingQr
     assert!(
         matches!(session.state(), ExchangeState::DisplayingQr { .. }),
         "QR session should ignore BLE events"

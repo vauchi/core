@@ -50,7 +50,6 @@ fn advance_to_card_exchange() -> (ExchangeSession, ExchangeSession) {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Both display their QR codes
     alice.apply(ExchangeEvent::StartQR).unwrap();
     bob.apply(ExchangeEvent::StartQR).unwrap();
 
@@ -65,7 +64,6 @@ fn advance_to_card_exchange() -> (ExchangeSession, ExchangeSession) {
     alice.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
     bob.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
 
-    // Key agreement
     alice.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
     bob.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
 
@@ -73,7 +71,6 @@ fn advance_to_card_exchange() -> (ExchangeSession, ExchangeSession) {
 }
 
 // =============================================================================
-// Self-Exchange Prevention Tests
 // =============================================================================
 
 /// Scenario: Scanning own QR code should fail with SelfExchange error.
@@ -94,7 +91,6 @@ fn test_self_exchange_rejected() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Display our QR
     session.apply(ExchangeEvent::StartQR).unwrap();
     let our_qr = session.qr().unwrap().clone();
 
@@ -114,7 +110,6 @@ fn test_different_identity_exchange_succeeds() {
     let alice = Identity::create("Alice", 0);
     let bob = Identity::create("Bob", 0);
 
-    // Alice generates QR
     let mut alice_session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -124,7 +119,6 @@ fn test_different_identity_exchange_succeeds() {
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     let alice_qr = alice_session.qr().unwrap().clone();
 
-    // Bob displays his QR first, then scans Alice's
     let mut bob_session = ExchangeSession::new_qr(
         bob,
         ContactCard::new("Bob"),
@@ -142,7 +136,6 @@ fn test_different_identity_exchange_succeeds() {
 }
 
 // =============================================================================
-// QR Code Expiration Tests
 // =============================================================================
 
 /// Scenario: QR code expiration (5 minutes)
@@ -153,7 +146,6 @@ fn test_qr_expiration() {
     let alice = Identity::create("Alice", 0);
     let ephemeral = X3DHKeyPair::generate();
 
-    // Fresh QR should not be expired
     let fresh_qr = ExchangeQR::generate(
         &alice,
         &ephemeral,
@@ -180,7 +172,6 @@ fn test_expired_qr_rejected_on_process() {
     let expired_qr = ExchangeQR::generate_with_timestamp(&alice, &ephemeral, expired_ts);
     assert!(expired_qr.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()));
 
-    // Bob starts his session and displays QR
     let mut bob_session = ExchangeSession::new_qr(
         bob,
         ContactCard::new("Bob"),
@@ -189,7 +180,6 @@ fn test_expired_qr_rejected_on_process() {
     );
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
-    // Attempt to process expired QR should fail
     let result = bob_session.apply(ExchangeEvent::ProcessQR(expired_qr));
     assert!(
         matches!(result, Err(ExchangeError::QRExpired)),
@@ -198,7 +188,6 @@ fn test_expired_qr_rejected_on_process() {
 }
 
 // =============================================================================
-// Duplicate Contact Tests
 // =============================================================================
 
 /// Scenario: Exchange with existing contact detected
@@ -211,7 +200,6 @@ fn test_duplicate_contact_detection() {
     let alice = Identity::create("Alice", 0);
     let bob = Identity::create("Bob", 0);
 
-    // Alice generates QR
     let mut alice_session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -221,7 +209,6 @@ fn test_duplicate_contact_detection() {
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     let alice_qr = alice_session.qr().unwrap().clone();
 
-    // Bob already has Alice as a contact
     let existing_alice = vauchi_core::Contact::from_exchange(
         *alice_qr.public_key(),
         ContactCard::new("Alice"),
@@ -229,7 +216,6 @@ fn test_duplicate_contact_detection() {
         0,
     );
 
-    // Bob starts his session, displays QR, then scans Alice's QR
     let mut bob_session = ExchangeSession::new_qr(
         bob,
         ContactCard::new("Bob"),
@@ -241,7 +227,6 @@ fn test_duplicate_contact_detection() {
         .apply(ExchangeEvent::ProcessQR(alice_qr))
         .unwrap();
 
-    // Check for duplicate
     let contacts = [existing_alice];
     let duplicate = bob_session.check_duplicate(&contacts);
     duplicate.expect("expected Some");
@@ -257,7 +242,6 @@ fn test_no_duplicate_for_new_contact() {
     let bob = Identity::create("Bob", 0);
     let charlie = Identity::create("Charlie", 0);
 
-    // Bob already has Charlie, not Alice
     let existing_charlie = vauchi_core::Contact::from_exchange(
         *charlie.signing_public_key(),
         ContactCard::new("Charlie"),
@@ -265,7 +249,6 @@ fn test_no_duplicate_for_new_contact() {
         0,
     );
 
-    // Alice generates QR
     let mut alice_session = ExchangeSession::new_qr(
         alice,
         ContactCard::new("Alice"),
@@ -275,7 +258,6 @@ fn test_no_duplicate_for_new_contact() {
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     let alice_qr = alice_session.qr().unwrap().clone();
 
-    // Bob displays QR, scans Alice's
     let mut bob_session = ExchangeSession::new_qr(
         bob,
         ContactCard::new("Bob"),
@@ -296,7 +278,6 @@ fn test_no_duplicate_for_new_contact() {
 }
 
 // =============================================================================
-// Session Timeout Tests
 // =============================================================================
 
 /// Scenario: Session timeout detection
@@ -312,7 +293,6 @@ fn test_session_timeout_detection() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Fresh session should not be timed out
     assert!(!session.is_timed_out());
 }
 
@@ -333,7 +313,6 @@ fn test_interrupted_session_resumable() {
     // Fresh session cannot be resumed (not interrupted)
     assert!(!session.can_resume());
 
-    // Mark as interrupted
     session.mark_interrupted();
 
     // Now can be resumed (within timeout)
@@ -341,7 +320,6 @@ fn test_interrupted_session_resumable() {
 }
 
 // =============================================================================
-// Invalid State Transition Tests
 // =============================================================================
 
 /// Scenario: Cannot ProcessQR from Idle state (must call StartQR first)
@@ -352,7 +330,6 @@ fn test_cannot_process_qr_from_idle() {
     let bob = Identity::create("Bob", 0);
     let ephemeral = X3DHKeyPair::generate();
 
-    // Generate a QR from Bob for Alice to scan
     let bob_qr = ExchangeQR::generate(
         &bob,
         &ephemeral,
@@ -478,7 +455,6 @@ fn test_cannot_process_qr_from_peer_scanned() {
     );
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
-    // Bob scans Alice's QR -> PeerScanned
     bob_session
         .apply(ExchangeEvent::ProcessQR(alice_qr.clone()))
         .unwrap();
@@ -487,7 +463,6 @@ fn test_cannot_process_qr_from_peer_scanned() {
         ExchangeState::PeerScanned { .. }
     ));
 
-    // Attempt to process another QR from PeerScanned should fail
     let result = bob_session.apply(ExchangeEvent::ProcessQR(alice_qr));
     assert!(
         matches!(result, Err(ExchangeError::InvalidState(_))),
@@ -496,7 +471,6 @@ fn test_cannot_process_qr_from_peer_scanned() {
 }
 
 // =============================================================================
-// Card Access Tests
 // =============================================================================
 
 /// Scenario: Our card is accessible during exchange
@@ -516,7 +490,6 @@ fn test_our_card_accessible() {
 }
 
 // =============================================================================
-// Signature Verification Tests
 // =============================================================================
 
 /// Scenario: Generated QR has valid signature
@@ -561,10 +534,8 @@ fn test_valid_signature_accepted() {
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     let alice_qr = alice_session.qr().unwrap().clone();
 
-    // Verify the QR has valid signature before scanning
     assert!(alice_qr.verify_signature());
 
-    // Bob should accept it
     let mut bob_session = ExchangeSession::new_qr(
         bob,
         ContactCard::new("Bob"),
@@ -581,7 +552,6 @@ fn test_valid_signature_accepted() {
 }
 
 // =============================================================================
-// QR Reuse Prevention Tests
 // =============================================================================
 
 /// Scenario: QR reuse is detected by check_qr_reuse
@@ -599,10 +569,8 @@ fn test_qr_reuse_detected() {
 
     let qr_hash = [42u8; 32];
 
-    // First use succeeds
     session.check_qr_reuse(&qr_hash).expect("expected success");
 
-    // Second use with same hash should fail
     let result = session.check_qr_reuse(&qr_hash);
     assert!(
         matches!(result, Err(ExchangeError::QRAlreadyUsed)),
@@ -630,7 +598,6 @@ fn test_different_qr_hashes_independent() {
 }
 
 // =============================================================================
-// Full Flow Completion Tests
 // =============================================================================
 
 /// Scenario: Complete exchange flow produces Complete state
@@ -641,7 +608,6 @@ fn test_different_qr_hashes_independent() {
 fn test_complete_exchange_flow() {
     let (mut alice_session, mut bob_session) = advance_to_card_exchange();
 
-    // Both should be in AwaitingCardExchange
     assert!(matches!(
         alice_session.state(),
         ExchangeState::AwaitingCardExchange { .. }
@@ -651,7 +617,6 @@ fn test_complete_exchange_flow() {
         ExchangeState::AwaitingCardExchange { .. }
     ));
 
-    // Complete exchange
     alice_session
         .apply(ExchangeEvent::CompleteExchange(ContactCard::new("Bob")))
         .unwrap();
@@ -670,7 +635,6 @@ fn test_complete_exchange_flow() {
 }
 
 // =============================================================================
-// Explicit Fail Tests
 // =============================================================================
 
 /// Scenario: Session can be explicitly failed from any state
@@ -713,7 +677,6 @@ fn test_explicit_fail_from_displaying_qr() {
 }
 
 // =============================================================================
-// Transport Enforcement Tests
 // =============================================================================
 
 /// Scenario: QR events are rejected on NFC transport sessions
@@ -728,7 +691,6 @@ fn test_qr_events_rejected_on_nfc_transport() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // StartQR should fail on NFC transport
     let result = nfc_session.apply(ExchangeEvent::StartQR);
     assert!(
         matches!(result, Err(ExchangeError::InvalidState(_))),
@@ -748,7 +710,6 @@ fn test_qr_events_rejected_on_ble_transport() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // StartQR should fail on BLE transport
     let result = ble_session.apply(ExchangeEvent::StartQR);
     assert!(
         matches!(result, Err(ExchangeError::InvalidState(_))),
@@ -757,7 +718,6 @@ fn test_qr_events_rejected_on_ble_transport() {
 }
 
 // =============================================================================
-// Exchange Public Key Accessibility
 // =============================================================================
 
 /// Scenario: Our exchange public key is accessible

@@ -72,7 +72,6 @@ fn test_ohttp_cache_clear_does_not_affect_other_relays() {
         .save_ohttp_key("https://relay-b.example.com", &[3, 4])
         .unwrap();
 
-    // Clear only relay-a.
     storage
         .clear_ohttp_key("https://relay-a.example.com")
         .unwrap();

@@ -77,7 +77,6 @@ fn shred_confirm_requires_delete_text() {
         "wipe should be disabled without DELETE text"
     );
 
-    // Type DELETE and check it becomes enabled
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "confirmation".into(),
         value: "DELETE".into(),
@@ -169,7 +168,6 @@ fn shred_confirm_delete_starts_wipe() {
 fn shred_wipe_complete() {
     let mut engine = EmergencyShredEngine::new();
 
-    // Navigate to Wiping step
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -181,7 +179,6 @@ fn shred_wipe_complete() {
         action_id: "wipe".into(),
     });
 
-    // Signal wipe complete
     engine.wipe_complete();
 
     let screen = engine.current_screen();
@@ -197,7 +194,6 @@ fn shred_wipe_complete() {
         other => panic!("expected StatusIndicator, got {:?}", other),
     }
 
-    // Pressing done returns WipeComplete
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "done".into(),
     });
@@ -208,14 +204,12 @@ fn shred_wipe_complete() {
 // @internal
 #[test]
 fn shred_cancel_returns_complete() {
-    // Cancel from warning
     let mut engine = EmergencyShredEngine::new();
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "cancel".into(),
     });
     assert_eq!(result, ActionResult::Complete);
 
-    // Cancel from confirm
     let mut engine = EmergencyShredEngine::new();
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),

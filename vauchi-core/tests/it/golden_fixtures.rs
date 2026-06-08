@@ -80,7 +80,6 @@ fn walk_all_screens() -> Vec<(String, ScreenModel)> {
     let screen = engine.current_screen();
     screens.push(("default_name".to_string(), screen));
 
-    // Enter a name, then advance
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Alice".into(),
@@ -227,7 +226,6 @@ fn regenerate_all_fixtures() {
     let dir = fixtures_dir();
     fs::create_dir_all(&dir).unwrap();
 
-    // Remove stale fixture files for removed screens
     let stale_files = [
         "welcome.json",
         "skip_gate.json",

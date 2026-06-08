@@ -108,13 +108,11 @@ fn contact_list_search_case_insensitive() {
 fn contact_list_search_empty_restores_all() {
     let mut engine = ContactListEngine::new(sample_contacts());
 
-    // First filter down
     let _ = engine.handle_action(UserAction::SearchChanged {
         component_id: "contacts".into(),
         query: "Ali".into(),
     });
 
-    // Then clear the search
     let result = engine.handle_action(UserAction::SearchChanged {
         component_id: "contacts".into(),
         query: String::new(),
@@ -151,7 +149,6 @@ fn contact_list_empty_shows_guidance() {
     let engine = ContactListEngine::new(vec![]);
     let screen = engine.current_screen();
 
-    // Empty list should show InfoPanel, not ContactList
     let info = screen
         .components
         .iter()
@@ -172,7 +169,6 @@ fn contact_list_empty_shows_guidance() {
         _ => unreachable!(),
     }
 
-    // Should also have an exchange action
     let exchange_action = screen.actions.iter().find(|a| a.id == "go_exchange");
     assert!(
         exchange_action.is_some(),
@@ -358,9 +354,7 @@ fn contacts_with_groups() -> (Vec<IndexedItem>, Vec<(String, String)>) {
 
 fn group_memberships() -> std::collections::HashMap<String, Vec<String>> {
     let mut m = std::collections::HashMap::new();
-    // Alice and Charlie are in Family
     m.insert("g1".to_string(), vec!["c1".to_string(), "c3".to_string()]);
-    // Bob is in Work
     m.insert("g2".to_string(), vec!["c2".to_string()]);
     m
 }
@@ -394,11 +388,9 @@ fn group_filter_clear_shows_all() {
     let memberships = group_memberships();
     let mut engine = ContactListEngine::with_groups(contacts, groups, memberships);
 
-    // Set filter
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "filter_group:g1".into(),
     });
-    // Clear filter
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "filter_group_clear".into(),
     });
@@ -416,7 +408,6 @@ fn group_filter_clear_shows_all() {
 #[test]
 fn group_filter_combines_with_search() {
     let (mut contacts, groups) = contacts_with_groups();
-    // Give Alice a field
     contacts[0].searchable = vec!["alice@example.com".into()];
     let memberships = group_memberships();
     let mut engine = ContactListEngine::with_groups(contacts, groups, memberships);
@@ -449,7 +440,6 @@ fn available_groups_shown_in_screen() {
     let engine = ContactListEngine::with_groups(contacts, groups, memberships);
     let screen = engine.current_screen();
 
-    // Should have filter_group actions
     let group_actions: Vec<_> = screen
         .actions
         .iter()

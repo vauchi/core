@@ -146,7 +146,6 @@ impl Storage {
         group_id: &str,
         modify: impl FnOnce(&mut HashSet<String>),
     ) -> Result<(), StorageError> {
-        // Load current set
         let current_json: String = self
             .conn
             .query_row(

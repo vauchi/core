@@ -47,7 +47,6 @@ fn form_dialog_add_field_type_selection_shows_value_inputs() {
         },
     });
 
-    // Select "email" type from flat list
     let result = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "email".into(),
@@ -81,7 +80,6 @@ fn form_dialog_edit_name_tracks_text_changes() {
             current_name: "Old Name".into(),
         },
     });
-    // Change the display name
     let result = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "New Name".into(),
@@ -89,7 +87,6 @@ fn form_dialog_edit_name_tracks_text_changes() {
     match result {
         ActionResult::UpdateScreen(screen) => {
             assert_eq!(screen.screen_id, "form_edit_name");
-            // Verify the TextInput now shows "New Name"
             let has_new_value = screen.components.iter().any(|c| {
                 matches!(c, Component::TextInput { id, value, ..
                 } if id == "display_name" && value == "New Name")
@@ -134,14 +131,12 @@ fn form_dialog_edit_name_saves_display_name() {
     vauchi.create_identity("Alice").unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate to FormDialog for EditName
     engine.navigate_to(AppScreen::FormDialog {
         dialog_type: FormDialogType::EditName {
             current_name: "Alice".into(),
         },
     });
 
-    // Type new name
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Bob".into(),
@@ -217,7 +212,6 @@ fn form_dialog_add_field_saves_to_own_card() {
         },
     });
 
-    // Select type, then enter value
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "phone".into(),
@@ -250,7 +244,6 @@ fn form_dialog_add_field_empty_value_returns_validation_error() {
         },
     });
 
-    // Select a type first
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "phone".into(),
@@ -311,7 +304,6 @@ fn form_dialog_edit_field_saves_value() {
         },
     });
 
-    // Change value
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "field_value".into(),
         value: "+41 79 999 99 99".into(),
@@ -346,7 +338,6 @@ fn form_dialog_cancel_navigates_back() {
         action_id: "cancel".into(),
     });
 
-    // Cancel should navigate back to MyInfo
     match result {
         ActionResult::NavigateTo(screen) => {
             assert_eq!(screen.screen_id, "my_info");
@@ -494,7 +485,6 @@ fn form_dialog_add_social_field_stores_as_social_type() {
         },
     });
 
-    // Select "social:github" from the catalog type list
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "social:github".into(),
@@ -512,7 +502,6 @@ fn form_dialog_add_social_field_stores_as_social_type() {
         "Should navigate back after submit, got {result:?}"
     );
 
-    // Verify: field is stored as FieldType::Social, NOT Custom
     let card = engine.vauchi().own_card().unwrap().unwrap();
     let social_fields: Vec<_> = card
         .fields()
@@ -546,7 +535,6 @@ fn form_dialog_add_social_field_uses_display_name_as_label() {
         },
     });
 
-    // Select "social:github", don't set a custom label
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "entry_types".into(),
         item_id: "social:github".into(),

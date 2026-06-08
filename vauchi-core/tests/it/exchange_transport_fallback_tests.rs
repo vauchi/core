@@ -41,7 +41,6 @@ fn ble_unavailable_with_camera_falls_back_to_qr() {
     session.emit_initial_commands();
     let _ = session.drain_commands(); // drain initial BLE commands
 
-    // BLE hardware reports unavailable
     session
         .apply_hardware_event(Event::HardwareUnavailable {
             transport: "BLE".into(),
@@ -110,7 +109,6 @@ fn set_device_capabilities_is_accessible() {
         ..Default::default()
     };
     session.set_device_capabilities(caps);
-    // Verify session is still usable after setting capabilities
     assert!(
         matches!(
             session.state(),

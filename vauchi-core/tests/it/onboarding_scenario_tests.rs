@@ -23,12 +23,10 @@ fn test_go_back_preserves_data() {
     let mut progress = OnboardingProgress::new(0);
     assert_eq!(progress.current_step(), OnboardingStep::IdentityCheck);
 
-    // Advance to DefaultName
     progress.advance(0); // → LinkChoice
     progress.advance(0); // → DefaultName
     assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
 
-    // Go back to LinkChoice
     let prev = progress.current_step().previous();
     assert_eq!(prev, Some(OnboardingStep::LinkChoice));
 
@@ -101,7 +99,6 @@ fn test_onboarding_progress_survives_serialization() {
 #[test]
 fn test_reset_clears_all_progress() {
     let mut progress = OnboardingProgress::new(0);
-    // Complete most of onboarding
     for _ in 0..5 {
         progress.advance(0);
     }
@@ -127,18 +124,15 @@ fn test_reset_clears_all_progress() {
 // @internal
 #[test]
 fn test_reset_does_not_destroy_identity() {
-    // This is a guard-rail: reset_onboarding should NOT touch
     // the identity (which is the user's key material). It only
     // resets the onboarding wizard state. The actual identity
     // preservation is tested in onboarding_api_tests.rs.
     let mut progress = OnboardingProgress::new(0);
-    // Complete onboarding
     while !progress.is_complete() {
         progress.advance(0);
     }
     assert!(progress.is_complete());
 
-    // Reset
     progress.reset(0);
     assert!(!progress.is_complete());
     // Progress is a separate struct from Identity — reset is safe
@@ -154,7 +148,6 @@ fn test_reset_does_not_destroy_identity() {
 fn test_onboarding_completion_unblocks_exchange() {
     let mut progress = OnboardingProgress::new(0);
 
-    // Complete onboarding fully
     while !progress.is_complete() {
         progress.advance(0);
     }

@@ -84,7 +84,6 @@ const DEVICE_SYNC_STATE_COLUMNS_V1: &[&str] =
 const VERSION_VECTOR_COLUMNS_V1: &[&str] = &["id", "vector_json", "updated_at"];
 
 // =============================================================================
-// HELPER FUNCTIONS
 // =============================================================================
 
 /// Gets all table names from a SQLite database.
@@ -127,7 +126,6 @@ fn get_index_names(conn: &Connection) -> Vec<String> {
 }
 
 // =============================================================================
-// SCHEMA STRUCTURE TESTS
 // =============================================================================
 
 // @internal
@@ -141,7 +139,6 @@ fn test_schema_has_all_expected_tables() {
     let key2 = SymmetricKey::generate();
     let _ = Storage::in_memory(key2).unwrap();
 
-    // Create a fresh storage and check tables
     let temp_key = SymmetricKey::generate();
     let temp_storage = Storage::in_memory(temp_key).unwrap();
 
@@ -149,10 +146,8 @@ fn test_schema_has_all_expected_tables() {
     // Since we can't access conn directly, we verify by attempting operations
     // that would fail if tables don't exist
 
-    // Verify contacts table works
     temp_storage.list_contacts().expect("expected success");
 
-    // Verify pending_updates table works
     temp_storage
         .get_all_pending_updates()
         .expect("expected success");
@@ -167,7 +162,6 @@ fn test_schema_has_all_expected_tables() {
 // @internal
 #[test]
 fn test_schema_tables_via_raw_connection() {
-    // Create a raw SQLite connection and initialize schema manually
     let conn = Connection::open_in_memory().unwrap();
 
     // Execute the same schema as Storage
@@ -251,7 +245,6 @@ fn test_schema_tables_via_raw_connection() {
     )
     .unwrap();
 
-    // Verify all expected tables exist
     let tables = get_table_names(&conn);
     for expected in EXPECTED_TABLES_V1 {
         assert!(
@@ -261,7 +254,6 @@ fn test_schema_tables_via_raw_connection() {
         );
     }
 
-    // Verify contacts columns
     let contacts_cols = get_column_names(&conn, "contacts");
     for col in CONTACTS_COLUMNS_V1 {
         assert!(
@@ -271,7 +263,6 @@ fn test_schema_tables_via_raw_connection() {
         );
     }
 
-    // Verify own_card columns
     let own_card_cols = get_column_names(&conn, "own_card");
     for col in OWN_CARD_COLUMNS_V1 {
         assert!(
@@ -281,7 +272,6 @@ fn test_schema_tables_via_raw_connection() {
         );
     }
 
-    // Verify identity columns
     let identity_cols = get_column_names(&conn, "identity");
     for col in IDENTITY_COLUMNS_V1 {
         assert!(
@@ -291,7 +281,6 @@ fn test_schema_tables_via_raw_connection() {
         );
     }
 
-    // Verify pending_updates columns
     let pending_cols = get_column_names(&conn, "pending_updates");
     for col in PENDING_UPDATES_COLUMNS_V1 {
         assert!(
@@ -301,7 +290,6 @@ fn test_schema_tables_via_raw_connection() {
         );
     }
 
-    // Verify contact_ratchets columns
     let ratchets_cols = get_column_names(&conn, "contact_ratchets");
     for col in CONTACT_RATCHETS_COLUMNS_V1 {
         assert!(
@@ -311,7 +299,6 @@ fn test_schema_tables_via_raw_connection() {
         );
     }
 
-    // Verify device_info columns
     let device_info_cols = get_column_names(&conn, "device_info");
     for col in DEVICE_INFO_COLUMNS_V1 {
         assert!(
@@ -321,7 +308,6 @@ fn test_schema_tables_via_raw_connection() {
         );
     }
 
-    // Verify device_registry columns
     let registry_cols = get_column_names(&conn, "device_registry");
     for col in DEVICE_REGISTRY_COLUMNS_V1 {
         assert!(
@@ -331,7 +317,6 @@ fn test_schema_tables_via_raw_connection() {
         );
     }
 
-    // Verify device_sync_state columns
     let sync_state_cols = get_column_names(&conn, "device_sync_state");
     for col in DEVICE_SYNC_STATE_COLUMNS_V1 {
         assert!(
@@ -341,7 +326,6 @@ fn test_schema_tables_via_raw_connection() {
         );
     }
 
-    // Verify version_vector columns
     let vector_cols = get_column_names(&conn, "version_vector");
     for col in VERSION_VECTOR_COLUMNS_V1 {
         assert!(
@@ -351,7 +335,6 @@ fn test_schema_tables_via_raw_connection() {
         );
     }
 
-    // Verify indexes exist
     let indexes = get_index_names(&conn);
     assert!(
         indexes.contains(&"idx_pending_contact".to_string()),
@@ -364,7 +347,6 @@ fn test_schema_tables_via_raw_connection() {
 }
 
 // =============================================================================
-// DATA PERSISTENCE TESTS
 // =============================================================================
 
 // @internal
@@ -375,10 +357,8 @@ fn test_own_card_persistence() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();
 
-    // Initially no card
     assert!(storage.load_own_card().unwrap().is_none());
 
-    // Save a card
     let mut card = ContactCard::new("Test User");
     card.add_field(vauchi_core::ContactField::new(
         vauchi_core::FieldType::Email,
@@ -390,7 +370,6 @@ fn test_own_card_persistence() {
 
     storage.save_own_card(&card).unwrap();
 
-    // Load it back
     let loaded = storage.load_own_card().unwrap().unwrap();
     assert_eq!(loaded.display_name(), "Test User");
     assert_eq!(loaded.fields().len(), 1);
@@ -405,10 +384,8 @@ fn test_pending_updates_persistence() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();
 
-    // Initially empty
     assert!(storage.get_all_pending_updates().unwrap().is_empty());
 
-    // Queue an update
     let update = PendingUpdate {
         id: "test-update-1".to_string(),
         contact_id: "contact-123".to_string(),
@@ -422,7 +399,6 @@ fn test_pending_updates_persistence() {
 
     storage.queue_update(&update).unwrap();
 
-    // Load it back
     let loaded = storage.get_all_pending_updates().unwrap();
     assert_eq!(loaded.len(), 1);
     assert_eq!(loaded[0].id, "test-update-1");
@@ -443,7 +419,6 @@ fn test_contact_persistence_roundtrip() {
     let key = SymmetricKey::generate();
     let storage = Storage::in_memory(key).unwrap();
 
-    // Create a contact
     let mut card = ContactCard::new("Alice");
     card.add_field(ContactField::new(
         FieldType::Email,
@@ -458,27 +433,22 @@ fn test_contact_persistence_roundtrip() {
 
     let contact = Contact::from_exchange(public_key, card, shared_key, 0);
 
-    // Save
     storage.save_contact(&contact).unwrap();
 
-    // Load
     let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
     assert_eq!(loaded.card().display_name(), "Alice");
     assert_eq!(loaded.card().fields().len(), 1);
 }
 
 // =============================================================================
-// SCHEMA EVOLUTION TESTS
 // =============================================================================
 
 // @internal
 #[test]
 fn test_create_table_if_not_exists_is_idempotent() {
-    // Running schema creation twice should not fail
     let key1 = SymmetricKey::generate();
     let storage1 = Storage::in_memory(key1).unwrap();
 
-    // Save some data
     let card = vauchi_core::ContactCard::new("Test");
     storage1.save_own_card(&card).unwrap();
 
@@ -507,7 +477,6 @@ fn test_nullable_columns_work() {
     let contact = Contact::from_exchange(public_key, card, shared_key, 0);
     storage.save_contact(&contact).unwrap();
 
-    // Should load successfully even with null visibility_rules_json
     let loaded = storage.load_contact(contact.id()).unwrap().unwrap();
     assert_eq!(loaded.card().display_name(), "Bob");
 }
@@ -562,17 +531,14 @@ fn test_migration_v19_adds_password_columns() {
     // Run migrations up to V18 (current baseline)
     run_migrations_up_to(&conn, &key, 18);
 
-    // Verify the new columns do NOT exist yet
     let identity_cols = get_column_names(&conn, "identity");
     assert!(
         !identity_cols.contains(&"password_hash_encrypted".to_string()),
         "password_hash_encrypted should not exist before V19"
     );
 
-    // Now run V19
     run_migrations_up_to(&conn, &key, 19);
 
-    // Verify all new columns exist
     let identity_cols = get_column_names(&conn, "identity");
     let expected_new_cols = [
         "password_hash_encrypted",
@@ -612,27 +578,22 @@ fn test_migration_v20_creates_duress_settings_table() {
     let conn = Connection::open_in_memory().unwrap();
     let key = SymmetricKey::generate();
 
-    // Run migrations up to V19
     run_migrations_up_to(&conn, &key, 19);
 
-    // Verify duress_settings does NOT exist yet
     let tables = get_table_names(&conn);
     assert!(
         !tables.contains(&"duress_settings".to_string()),
         "duress_settings should not exist before V20"
     );
 
-    // Now run V20
     run_migrations_up_to(&conn, &key, 20);
 
-    // Verify table exists
     let tables = get_table_names(&conn);
     assert!(
         tables.contains(&"duress_settings".to_string()),
         "duress_settings table should exist after V20"
     );
 
-    // Verify columns
     let cols = get_column_names(&conn, "duress_settings");
     let expected = [
         "id",
@@ -683,27 +644,22 @@ fn test_migration_v21_creates_decoy_contacts_table() {
     let conn = Connection::open_in_memory().unwrap();
     let key = SymmetricKey::generate();
 
-    // Run migrations up to V20
     run_migrations_up_to(&conn, &key, 20);
 
-    // Verify decoy_contacts does NOT exist yet
     let tables = get_table_names(&conn);
     assert!(
         !tables.contains(&"decoy_contacts".to_string()),
         "decoy_contacts should not exist before V21"
     );
 
-    // Now run V21
     run_migrations_up_to(&conn, &key, 21);
 
-    // Verify table exists
     let tables = get_table_names(&conn);
     assert!(
         tables.contains(&"decoy_contacts".to_string()),
         "decoy_contacts table should exist after V21"
     );
 
-    // Verify columns
     let cols = get_column_names(&conn, "decoy_contacts");
     let expected = [
         "id",
@@ -720,7 +676,6 @@ fn test_migration_v21_creates_decoy_contacts_table() {
         );
     }
 
-    // Verify we can insert and retrieve a decoy contact
     conn.execute(
         "INSERT INTO decoy_contacts (id, display_name, card_encrypted, created_at, updated_at) VALUES ('dc-1', 'Decoy Alice', X'DEADBEEF', 1000, 1000)",
         [],
@@ -743,11 +698,9 @@ fn test_schema_version_after_all_migrations() {
     let conn = Connection::open_in_memory().unwrap();
     let key = SymmetricKey::generate();
 
-    // Run ALL migrations
     let migrations = all_migrations();
     MigrationRunner::run(&conn, &key, &migrations, None, 0).unwrap();
 
-    // Verify final schema version
     let version = MigrationRunner::current_version(&conn).unwrap();
     assert_eq!(
         version, 51,
@@ -759,13 +712,11 @@ fn test_schema_version_after_all_migrations() {
 // @internal
 #[test]
 fn test_migration_v19_is_safe_on_fresh_identity_table() {
-    // V19 uses ALTER TABLE which should work even if the identity table has no rows
     let conn = Connection::open_in_memory().unwrap();
     let key = SymmetricKey::generate();
 
     run_migrations_up_to(&conn, &key, 19);
 
-    // Verify we can still insert into identity with the new nullable columns
     conn.execute(
         "INSERT INTO identity (id, backup_data_encrypted, display_name, created_at) VALUES (1, X'00', 'test', 1000)",
         [],
@@ -833,27 +784,22 @@ fn test_migration_v22_creates_emergency_config_table() {
     let conn = Connection::open_in_memory().unwrap();
     let key = SymmetricKey::generate();
 
-    // Run migrations up to V21
     run_migrations_up_to(&conn, &key, 21);
 
-    // Verify emergency_config does NOT exist yet
     let tables = get_table_names(&conn);
     assert!(
         !tables.contains(&"emergency_config".to_string()),
         "emergency_config should not exist before V22"
     );
 
-    // Now run V22
     run_migrations_up_to(&conn, &key, 22);
 
-    // Verify table exists
     let tables = get_table_names(&conn);
     assert!(
         tables.contains(&"emergency_config".to_string()),
         "emergency_config table should exist after V22"
     );
 
-    // Verify columns
     let cols = get_column_names(&conn, "emergency_config");
     let expected = [
         "id",
@@ -918,7 +864,6 @@ fn test_add_column_idempotent_via_double_migration() {
     let migrations = all_migrations();
     MigrationRunner::run(&conn, &key, &migrations, None, 0).unwrap();
 
-    // Verify v14 columns exist
     let has_card_encrypted: bool = conn
         .prepare("PRAGMA table_info(own_card)")
         .unwrap()
@@ -933,7 +878,6 @@ fn test_add_column_idempotent_via_double_migration() {
     // Running migrations again should be a no-op (version guard)
     MigrationRunner::run(&conn, &key, &migrations, None, 0).unwrap();
 
-    // Verify the column still exists and nothing broke
     let still_has: bool = conn
         .prepare("PRAGMA table_info(own_card)")
         .unwrap()
@@ -958,11 +902,9 @@ fn test_rekey_is_atomic() {
     let key = SymmetricKey::generate();
     let mut storage = Storage::in_memory(key).unwrap();
 
-    // Save some data
     let card = vauchi_core::ContactCard::new("AtomicTest");
     storage.save_own_card(&card).unwrap();
 
-    // Rekey to a new key
     let new_key = SymmetricKey::generate();
     storage.rekey(new_key).unwrap();
 
@@ -973,7 +915,6 @@ fn test_rekey_is_atomic() {
 }
 
 // =============================================================================
-// DOWNGRADE PREVENTION
 // =============================================================================
 
 // @internal
@@ -982,7 +923,6 @@ fn test_migration_rejects_newer_schema_version() {
     let conn = Connection::open_in_memory().unwrap();
     let key = SymmetricKey::generate();
 
-    // Run all migrations to establish full schema
     let migrations = all_migrations();
     MigrationRunner::run(&conn, &key, &migrations, None, 0).unwrap();
 
@@ -994,7 +934,6 @@ fn test_migration_rejects_newer_schema_version() {
     )
     .unwrap();
 
-    // Running migrations again should fail with a downgrade error
     let result = MigrationRunner::run(&conn, &key, &migrations, None, 0);
     assert!(
         result.is_err(),
@@ -1010,7 +949,6 @@ fn test_migration_rejects_newer_schema_version() {
 }
 
 // =============================================================================
-// MIGRATION RUNNER FRAMEWORK TESTS
 // =============================================================================
 
 use vauchi_core::storage::migration::{Migration, MigrationAction};
@@ -1143,7 +1081,6 @@ fn test_migration_sql_failure_rolls_back() {
         .unwrap();
     assert!(!table_exists, "good_table should not exist after rollback");
 
-    // Schema version should still be 0
     let version = MigrationRunner::current_version(&conn).unwrap();
     assert_eq!(version, 0, "Version should be 0 after rollback");
 }

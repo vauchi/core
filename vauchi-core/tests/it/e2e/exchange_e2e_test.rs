@@ -30,7 +30,6 @@ fn test_contact_exchange_happy_path() {
     alice_wb.create_identity("Alice").unwrap();
     bob_wb.create_identity("Bob").unwrap();
 
-    // Add fields to Alice's card
     alice_wb
         .add_own_field(ContactField::new(
             FieldType::Email,
@@ -48,7 +47,6 @@ fn test_contact_exchange_happy_path() {
         ))
         .unwrap();
 
-    // Add fields to Bob's card
     bob_wb
         .add_own_field(ContactField::new(
             FieldType::Email,
@@ -91,7 +89,6 @@ fn test_contact_exchange_happy_path() {
         DoubleRatchetState::initialize_initiator(&shared_secret, *bob_dh.public_key()).unwrap();
     let bob_ratchet = DoubleRatchetState::initialize_responder(&shared_secret, bob_dh);
 
-    // Save ratchet states for future communication
     alice_wb
         .storage()
         .save_ratchet_state(&bob_contact_id, &alice_ratchet, true)
@@ -112,7 +109,6 @@ fn test_contact_exchange_happy_path() {
     assert_eq!(alice_in_bob.display_name(), "Alice");
     assert_eq!(alice_in_bob.card().fields().len(), 2);
 
-    // Ratchet states are persisted
     let alice_ratchet_loaded = alice_wb
         .storage()
         .load_ratchet_state(&bob_contact_id)

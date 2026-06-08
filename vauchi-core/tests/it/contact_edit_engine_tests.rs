@@ -57,7 +57,6 @@ fn edit_fields_has_name_input_and_field_list() {
     let engine = make_engine();
     let screen = engine.current_screen();
 
-    // First component: TextInput for display_name
     match &screen.components[0] {
         Component::TextInput {
             id, label, value, ..
@@ -210,12 +209,10 @@ fn edit_visibility_shows_toggle_lists() {
 #[test]
 fn edit_toggle_group_visibility() {
     let mut engine = make_engine();
-    // Advance to visibility step
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 
-    // Toggle "Friends" on for phone1
     let result = engine.handle_action(UserAction::ItemToggled {
         component_id: "vis_phone1".into(),
         item_id: "Friends".into(),
@@ -232,7 +229,6 @@ fn edit_toggle_group_visibility() {
         other => panic!("Expected UpdateScreen, got {:?}", other),
     }
 
-    // Verify data model updated
     let phone_field = engine
         .edited_contact()
         .fields
@@ -411,7 +407,6 @@ fn edit_data_persists_across_steps() {
         action_id: "continue".into(),
     });
 
-    // Verify name is visible in preview
     let screen = engine.current_screen();
     match &screen.components[0] {
         Component::Preview { name, .. } => {
@@ -420,7 +415,6 @@ fn edit_data_persists_across_steps() {
         other => panic!("Expected CardPreview, got {:?}", other),
     }
 
-    // Also verify via accessor
     assert_eq!(engine.edited_contact().display_name, "Updated Alice");
 }
 
@@ -470,7 +464,6 @@ fn edit_preview_carries_core_derived_initials() {
 // @internal
 #[test]
 fn edit_preview_visible_fields_drop_hidden_entries() {
-    // Build a contact with one Shown field and one Hidden field.
     let contact = EditableContact {
         display_name: "Alice".into(),
         fields: vec![

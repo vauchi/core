@@ -120,7 +120,6 @@ fn test_new_field_propagated_to_all_contacts_by_default() {
 fn test_contacts_variant_enforced_at_propagation() {
     let wb = create_test_vauchi();
 
-    // Create the field first to get its ID
     let email_field = ContactField::new(FieldType::Email, "email", "alice@company.com", 0);
     let email_id = email_field.id().to_string();
 
@@ -135,7 +134,6 @@ fn test_contacts_variant_enforced_at_propagation() {
     });
 
     // Bob's visibility rules: default (Everyone) — Bob can see everything
-    // Carol's visibility rules: email restricted to non-matching contacts
 
     let old_card = wb.own_card().unwrap().unwrap();
     let mut new_card = old_card.clone();
@@ -171,14 +169,12 @@ fn test_display_name_change_passes_through_nobody_rules() {
     rules.set_nobody("field_1");
     rules.set_nobody("field_2");
 
-    // Create cards with only a name change
     let old = ContactCard::new("Alice");
     let new = ContactCard::new("Alice Smith");
 
     let delta = CardDelta::compute(&old, &new, 0);
     let filtered = delta.filter_for_contact("bob", &rules);
 
-    // Display name change should survive filtering
     assert!(
         !filtered.is_empty(),
         "Display name change must pass through visibility filter"
@@ -233,7 +229,6 @@ fn test_remove_rule_reverts_to_everyone_at_delta_level() {
 
     let delta = CardDelta::compute(&old, &new, 0);
 
-    // Initially hidden
     let mut rules = VisibilityRules::new();
     rules.set_nobody(&email_id);
 
@@ -312,7 +307,6 @@ fn test_mixed_visibility_propagation() {
         rules.set_nobody(&phone_id);
     });
 
-    // Dave: both fields hidden
     let dave_id = add_contact_with_ratchet_and_visibility(&wb, "Dave", |rules| {
         rules.set_nobody(&email_id);
         rules.set_nobody(&phone_id);

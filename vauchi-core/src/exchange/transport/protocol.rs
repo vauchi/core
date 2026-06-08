@@ -136,7 +136,6 @@ impl ExchangeProtocol {
         let mut peer_nonce = [0u8; NONCE_SIZE];
         peer_nonce.copy_from_slice(&peer_offer[64..80]);
 
-        // X25519 Diffie-Hellman
         let dh_secret = self.ephemeral_secret.diffie_hellman(&peer_ephemeral);
         if !dh_secret.was_contributory() {
             return Err(ExchangeError::InvalidDhOutput(crate::crypto::DhError));

@@ -196,7 +196,6 @@ fn test_delta_roundtrip() {
 
     let delta = CardDelta::compute(&old, &new, 0);
 
-    // Apply to a copy of old
     let mut result = old.clone();
     delta.apply(&mut result, 0).unwrap();
 
@@ -217,10 +216,8 @@ fn test_delta_sign_and_verify() {
     let recipient_pk = &[0u8; 32];
     delta.sign(&identity, recipient_pk);
 
-    // Verify with correct public key
     assert!(delta.verify(identity.signing_public_key(), recipient_pk));
 
-    // Verify with wrong sender key should fail
     let other_identity = Identity::create("Other User", 0);
     assert!(!delta.verify(other_identity.signing_public_key(), recipient_pk));
 
@@ -243,7 +240,6 @@ fn test_delta_signature_binds_sender_and_recipient() {
     let old = ContactCard::new("Alice");
     let new = ContactCard::new("Alice Updated");
 
-    // Alice signs delta for Bob
     let mut delta = CardDelta::compute(&old, &new, 0);
     delta.sign(&alice, bob.signing_public_key());
 
@@ -379,13 +375,11 @@ fn test_delta_filter_for_contact_some_hidden() {
 
     let delta = CardDelta::compute(&old, &new, 0);
 
-    // Hide email from Bob
     let mut rules = VisibilityRules::new();
     rules.set_nobody(&email_id);
 
     let filtered = delta.filter_for_contact("bob", &rules);
 
-    // Bob should only see the phone field
     assert_eq!(filtered.changes.len(), 1);
     assert!(
         matches!(&filtered.changes[0], FieldChange::Added { field } if field.label() == "phone")
@@ -413,7 +407,6 @@ fn test_delta_filter_for_contact_restricted_access() {
     allowed.insert("charlie".to_string());
     rules.set_contacts(&email_id, allowed);
 
-    // Bob is not in the allowed list
     let bob_filtered = delta.filter_for_contact("bob", &rules);
     assert!(bob_filtered.is_empty());
 
@@ -451,7 +444,6 @@ fn test_delta_filter_display_name_always_visible() {
 // @internal
 #[test]
 fn test_filter_with_allows_matching_fields() {
-    // Create old card with two fields
     let work_field = ContactField::new(FieldType::Email, "work", "old@co.com", 0);
     let work_id = work_field.id().to_string();
     let mobile_field = ContactField::new(FieldType::Phone, "mobile", "+1234567890", 0);
@@ -461,7 +453,6 @@ fn test_filter_with_allows_matching_fields() {
     old.add_field(work_field).expect("add work field");
     old.add_field(mobile_field).expect("add mobile field");
 
-    // Create new card by cloning and modifying both fields
     let mut new = old.clone();
     for field in new.fields_mut() {
         field.set_value(
@@ -475,7 +466,6 @@ fn test_filter_with_allows_matching_fields() {
     }
 
     let delta = CardDelta::compute(&old, &new, 0);
-    // Both fields should be detected as modified
     let change_count = delta.changes.len();
     assert!(
         change_count >= 1,
@@ -494,7 +484,6 @@ fn test_filter_with_allows_matching_fields() {
         .filter(|c| matches!(c, FieldChange::Modified { field_id, .. } if field_id == &work_id))
         .collect();
 
-    // The mobile field changes should be filtered out
     let mobile_changes: Vec<_> = filtered
         .changes
         .iter()
@@ -532,7 +521,6 @@ fn test_filter_with_always_includes_display_name() {
 // @internal
 #[test]
 fn test_filter_with_handles_added_and_removed() {
-    // Start with a card containing work+mobile
     let work_field = ContactField::new(FieldType::Email, "work", "a@co.com", 0);
     let work_id = work_field.id().to_string();
     let mobile_field = ContactField::new(FieldType::Phone, "mobile", "+1234567890", 0);
@@ -624,7 +612,6 @@ fn test_card_delta_with_validation_summary_roundtrip() {
 
     let mut delta = CardDelta::compute(&old, &new, 0);
 
-    // Attach validation summary
     let mut summary = HashMap::new();
     summary.insert(
         "email-field-1".to_string(),
@@ -635,13 +622,10 @@ fn test_card_delta_with_validation_summary_roundtrip() {
     );
     delta.validation_summary = Some(summary);
 
-    // Serialize to JSON
     let json = serde_json::to_string(&delta).expect("serialize");
 
-    // Deserialize back
     let restored: CardDelta = serde_json::from_str(&json).expect("deserialize");
 
-    // Assert the summary is preserved
     let restored_summary = restored
         .validation_summary
         .expect("validation_summary should be Some after roundtrip");
@@ -683,7 +667,6 @@ fn test_card_delta_none_summary_not_serialized() {
 
     let delta = CardDelta::compute(&old, &new, 0);
 
-    // By default, validation_summary should be None
     assert!(
         delta.validation_summary.is_none(),
         "Freshly computed delta should have no validation_summary"
@@ -713,7 +696,6 @@ fn test_card_delta_filter_preserves_validation_summary() {
 
     let mut delta = CardDelta::compute(&old, &new, 0);
 
-    // Attach validation summary
     let mut summary = HashMap::new();
     summary.insert(
         email_id.clone(),
@@ -727,7 +709,6 @@ fn test_card_delta_filter_preserves_validation_summary() {
     let rules = VisibilityRules::new();
     let filtered = delta.filter_for_contact("bob", &rules);
 
-    // The filtered delta should preserve the validation_summary
     assert!(
         filtered.validation_summary.is_some(),
         "Filtered delta should preserve validation_summary"

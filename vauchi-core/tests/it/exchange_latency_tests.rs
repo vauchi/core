@@ -90,7 +90,6 @@ fn latency_summary_computes_deltas_for_full_qr_flow() {
 
     let summary = log.latency_summary().expect("should have summary");
 
-    // All deltas should be present for a full flow
     assert!(summary.session_to_qr_generated_ms.is_some());
     assert!(summary.qr_generated_to_scanned_ms.is_some());
     assert!(summary.qr_scanned_to_key_agreement_ms.is_some());
@@ -273,7 +272,6 @@ fn full_qr_session_produces_latency_summary() {
         .latency_summary()
         .expect("full flow should produce summary");
 
-    // All segments present
     assert!(summary.session_to_qr_generated_ms.is_some());
     assert!(summary.qr_generated_to_scanned_ms.is_some());
     assert!(summary.qr_scanned_to_key_agreement_ms.is_some());

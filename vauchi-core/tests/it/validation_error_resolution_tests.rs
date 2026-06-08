@@ -24,7 +24,6 @@ fn onboarding_empty_name_returns_update_screen_with_error() {
         action_id: "create_new".into(),
     });
 
-    // Now on DefaultName step. Submit with empty name.
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
@@ -70,17 +69,14 @@ fn onboarding_valid_name_after_error_navigates_forward() {
     let vauchi = Vauchi::in_memory().unwrap();
     let mut engine = AppEngine::new(vauchi);
 
-    // Navigate to name step
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
 
-    // Trigger validation error
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
 
-    // Now enter a valid name and submit
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Alice".into(),

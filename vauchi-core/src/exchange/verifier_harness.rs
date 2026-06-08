@@ -141,7 +141,6 @@ impl Scenario {
     /// builds a VerifierChain with mock verifiers configured per the
     /// scenario conditions, and runs it.
     pub fn run(&self) -> VerificationOutcome {
-        // Find common methods (intersection of both peers' capabilities)
         let a_methods: HashSet<_> = self.peer_a.caps.available_methods().into_iter().collect();
         let b_methods: HashSet<_> = self.peer_b.caps.available_methods().into_iter().collect();
         let common: Vec<_> = priority_ordered_methods()
@@ -157,7 +156,6 @@ impl Scenario {
             };
         }
 
-        // Build chain with mock verifiers
         let mut chain = VerifierChain::new();
         for method in &common {
             let verifier: Box<dyn super::ProximityVerifier> = if self.force_all_timeout {

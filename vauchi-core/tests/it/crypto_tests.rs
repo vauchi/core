@@ -39,7 +39,6 @@ fn test_generate_ed25519_keypair_unique() {
     let keypair1 = SigningKeyPair::generate();
     let keypair2 = SigningKeyPair::generate();
 
-    // Two generated keypairs should be different
     assert_ne!(
         keypair1.public_key().as_bytes(),
         keypair2.public_key().as_bytes(),
@@ -58,7 +57,6 @@ fn test_keypair_from_seed_deterministic() {
     let keypair1 = SigningKeyPair::from_seed(&seed);
     let keypair2 = SigningKeyPair::from_seed(&seed);
 
-    // Same seed should produce same keypair
     assert_eq!(
         keypair1.public_key().as_bytes(),
         keypair2.public_key().as_bytes(),
@@ -92,9 +90,7 @@ fn test_public_key_fingerprint() {
 
     let fingerprint = public_key.fingerprint();
 
-    // Fingerprint should be non-empty hex string
     assert!(!fingerprint.is_empty(), "Fingerprint should not be empty");
-    // Fingerprint should only contain hex characters
     assert!(
         fingerprint.chars().all(|c| c.is_ascii_hexdigit()),
         "Fingerprint should be hexadecimal"
@@ -244,7 +240,6 @@ fn test_decrypt_tampered_ciphertext_fails() {
 
     let mut ciphertext = encrypt(&key, plaintext).expect("Encryption should succeed");
 
-    // Tamper with the ciphertext
     if let Some(byte) = ciphertext.last_mut() {
         *byte ^= 0xFF;
     }

@@ -202,7 +202,6 @@ mod tests {
     fn test_tracker_try_trigger() {
         let mut tracker = AhaMomentTracker::new();
 
-        // First trigger should succeed
         let moment = tracker.try_trigger(AhaMomentType::CardCreationComplete);
         assert!(moment.is_some(), "expected Some value");
         assert_eq!(
@@ -210,7 +209,6 @@ mod tests {
             AhaMomentType::CardCreationComplete
         );
 
-        // Second trigger should fail
         let moment = tracker.try_trigger(AhaMomentType::CardCreationComplete);
         assert!(moment.is_none());
     }

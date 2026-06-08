@@ -59,22 +59,18 @@ pub fn compute_statistics(contacts: &[Contact], now: u64) -> ContactStatistics {
     let mut recovery_count = 0;
 
     for contact in contacts {
-        // Count exchange methods (only for exchanged contacts)
         if let Some(transport) = contact.exchange_transport() {
             *exchange_method_breakdown.entry(transport).or_insert(0) += 1;
         }
 
-        // Count field types from each contact's card
         for field in contact.card().fields() {
             *field_distribution.entry(field.field_type()).or_insert(0) += 1;
         }
 
-        // Count recoveries
         if contact.has_recovered() {
             recovery_count += 1;
         }
 
-        // Categorize freshness
         match contact.card_updated_at() {
             Some(updated_at) => {
                 if now.saturating_sub(updated_at) <= FRESHNESS_THRESHOLD_SECS {

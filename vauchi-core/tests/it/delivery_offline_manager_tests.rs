@@ -44,11 +44,9 @@ fn test_send_or_queue_offline_enqueues() {
     let storage = test_storage();
     let manager = OfflineManager::new();
 
-    // Queue while offline
     let result = manager.send_or_queue(&storage, test_update("msg-1", "alice"), false);
     assert!(result.is_ok(), "Queuing while offline should succeed");
 
-    // Verify it's in storage
     let pending = storage.get_all_pending_updates().unwrap();
     assert_eq!(pending.len(), 1, "One update should be queued");
     assert_eq!(pending[0].id, "msg-1");
@@ -78,7 +76,6 @@ fn test_send_or_queue_rejects_when_full() {
     let storage = test_storage();
     let manager = OfflineManager::with_offline_queue(OfflineQueue::with_max_size(2));
 
-    // Fill the queue
     manager
         .send_or_queue(&storage, test_update("msg-1", "alice"), false)
         .unwrap();
@@ -86,7 +83,6 @@ fn test_send_or_queue_rejects_when_full() {
         .send_or_queue(&storage, test_update("msg-2", "alice"), false)
         .unwrap();
 
-    // Third should fail
     let result = manager.send_or_queue(&storage, test_update("msg-3", "alice"), false);
     assert!(
         result.is_err(),

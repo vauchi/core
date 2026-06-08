@@ -28,7 +28,6 @@ fn test_add_contact_at_limit_minus_one_succeeds() {
     // Set a low limit for testing (avoid creating 10,000 contacts in a unit test)
     wb.storage().set_contact_limit(3).unwrap();
 
-    // Add contacts up to limit - 1
     wb.add_contact(make_contact("Bob")).unwrap();
     wb.add_contact(make_contact("Carol")).unwrap();
 
@@ -44,7 +43,6 @@ fn test_add_contact_at_limit_minus_one_succeeds() {
 fn test_add_contact_reaches_exact_limit() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
 
-    // Set limit to 2
     wb.storage().set_contact_limit(2).unwrap();
 
     wb.add_contact(make_contact("Bob")).unwrap();
@@ -62,13 +60,11 @@ fn test_add_contact_reaches_exact_limit() {
 fn test_add_contact_exceeds_limit_returns_error() {
     let wb = common::helpers::create_vauchi_with_identity("Alice");
 
-    // Set limit to 2
     wb.storage().set_contact_limit(2).unwrap();
 
     wb.add_contact(make_contact("Bob")).unwrap();
     wb.add_contact(make_contact("Carol")).unwrap();
 
-    // The 3rd contact should be rejected
     let result = wb.add_contact(make_contact("Dave"));
     assert!(
         matches!(&result, Err(VauchiError::ContactLimitReached(2))),
@@ -110,7 +106,6 @@ fn test_exceed_limit_contact_not_persisted() {
     wb.add_contact(make_contact("Bob")).unwrap();
     let _ = wb.add_contact(make_contact("Carol")); // Should fail
 
-    // Only 1 contact should be stored
     assert_eq!(wb.contact_count().unwrap(), 1);
     let contacts = wb.list_contacts().unwrap();
     assert_eq!(contacts.len(), 1);
@@ -132,7 +127,6 @@ fn test_add_contact_after_removal_succeeds() {
     // At limit, remove one
     wb.remove_contact(&bob_id).unwrap();
 
-    // Should be able to add again
     let result = wb.add_contact(make_contact("Dave"));
     assert!(result.is_ok(), "Should succeed after removing a contact");
     assert_eq!(wb.contact_count().unwrap(), 2);

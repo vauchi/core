@@ -31,7 +31,6 @@ fn test_phone_international_format_e164_valid() {
     for number in valid_e164_numbers {
         let field = ContactField::new(FieldType::Phone, "Mobile", number, 0);
         let result = field.validate();
-        // E.164 numbers with + and digits should pass current validation
         if number.chars().filter(|c| c.is_ascii_digit()).count() >= 7 {
             assert!(result.is_ok(), "E.164 number '{}' should be valid", number);
         }
@@ -70,7 +69,6 @@ fn test_phone_international_format_with_formatting() {
 fn test_phone_international_format_invalid() {
     use vauchi_core::contact_card::{ContactField, FieldType, ValidationError};
 
-    // Invalid phone numbers
     let invalid_numbers = vec![
         ("abc", "letters only"),
         ("123", "too short"),
@@ -189,7 +187,6 @@ fn test_email_rfc5322_invalid() {
     for (email, reason) in invalid_emails {
         let field = ContactField::new(FieldType::Email, "Work", email, 0);
         let result = field.validate();
-        // Most of these should fail, but some edge cases may pass basic validation
         if email.is_empty() || email == "@" || !email.contains('@') {
             assert!(
                 result.is_err(),

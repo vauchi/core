@@ -221,7 +221,6 @@ impl super::transport::Transport for HttpTransportAdapter {
     }
 
     fn receive(&mut self) -> TransportResult<Option<MessageEnvelope>> {
-        // 1. Process any queued acknowledgments
         let acks: Vec<_> = self.ack_queue.drain(..).collect();
         for (recipient_id, blob_id) in acks {
             // Best-effort ACK — don't fail the receive cycle
@@ -229,7 +228,6 @@ impl super::transport::Transport for HttpTransportAdapter {
             let _ = self.http.acknowledge(&recipient_id, &blob_id);
         }
 
-        // 2. Return a buffered blob if available
         if let Some(blob) = self.pending_blobs.pop_front() {
             return Self::blob_to_envelope(&blob).map(Some);
         }

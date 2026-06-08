@@ -172,7 +172,6 @@ impl CpalAudioBackend {
             .play()
             .map_err(|e| ProximityError::HardwareError(format!("Play error: {}", e)))?;
 
-        // Wait for playback to complete
         let samples_len = samples.lock().expect("mutex poisoned").len();
         let duration_ms = (samples_len as f32 / sample_rate as f32 * 1000.0) as u64 + 100;
 

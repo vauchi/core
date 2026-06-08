@@ -34,10 +34,8 @@ fn test_storage_save_load_contact() {
     let contact = create_test_contact("Alice");
     let contact_id = contact.id().to_string();
 
-    // Save
     storage.save_contact(&contact).unwrap();
 
-    // Load
     let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
 
     assert_eq!(loaded.id(), contact.id());
@@ -50,7 +48,6 @@ fn test_storage_save_load_contact() {
 fn test_storage_list_contacts() {
     let storage = create_test_storage();
 
-    // Create contacts with different public keys
     let mut contact1 = create_test_contact("Alice");
     let mut contact2 = create_test_contact("Bob");
 
@@ -193,7 +190,6 @@ fn test_storage_update_status() {
 
     storage.queue_update(&update).unwrap();
 
-    // Update to failed status
     storage
         .update_pending_status(
             "update-1",
@@ -227,12 +223,10 @@ fn test_storage_save_load_ratchet_state() {
     let ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key()).unwrap();
 
-    // Save ratchet state
     storage
         .save_ratchet_state(contact.id(), &ratchet, true)
         .unwrap();
 
-    // Load ratchet state
     let (loaded, is_initiator) = storage.load_ratchet_state(contact.id()).unwrap().unwrap();
 
     assert!(is_initiator);
@@ -256,16 +250,13 @@ fn test_storage_ratchet_state_encryption() {
     let mut ratchet =
         DoubleRatchetState::initialize_initiator(&shared_secret, *their_dh.public_key()).unwrap();
 
-    // Encrypt a message to advance the ratchet
     let _msg = ratchet.encrypt(b"test message").unwrap();
 
-    // Save and load
     storage
         .save_ratchet_state(contact.id(), &ratchet, true)
         .unwrap();
     let (mut loaded, _) = storage.load_ratchet_state(contact.id()).unwrap().unwrap();
 
-    // The loaded ratchet should be able to continue encrypting
     let msg2 = loaded.encrypt(b"another message").unwrap();
     assert!(!msg2.ciphertext.is_empty());
 }
@@ -291,16 +282,13 @@ fn test_storage_ratchet_deleted_with_contact() {
         .save_ratchet_state(&contact_id, &ratchet, true)
         .unwrap();
 
-    // Verify ratchet exists
     assert!(
         storage.load_ratchet_state(&contact_id).unwrap().is_some(),
         "expected Some value"
     );
 
-    // Delete contact
     storage.delete_contact(&contact_id).unwrap();
 
-    // Ratchet should also be deleted
     assert!(storage.load_ratchet_state(&contact_id).unwrap().is_none());
 }
 
@@ -340,7 +328,6 @@ fn test_storage_ratchet_per_contact_key_isolation() {
     storage.save_contact(&alice).unwrap();
     storage.save_contact(&bob).unwrap();
 
-    // Create and save ratchet state for Alice
     let secret_a = SymmetricKey::generate();
     let dh_a = X3DHKeyPair::generate();
     let ratchet_a =
@@ -349,7 +336,6 @@ fn test_storage_ratchet_per_contact_key_isolation() {
         .save_ratchet_state(alice.id(), &ratchet_a, true)
         .unwrap();
 
-    // Create and save ratchet state for Bob
     let secret_b = SymmetricKey::generate();
     let dh_b = X3DHKeyPair::generate();
     let ratchet_b =
@@ -381,18 +367,14 @@ fn test_storage_save_load_device_info() {
     let device_name = "My Phone";
     let created_at = 1234567890u64;
 
-    // Initially no device info
     assert!(!storage.has_device_info().unwrap());
 
-    // Save device info
     storage
         .save_device_info(&device_id, device_index, device_name, created_at)
         .unwrap();
 
-    // Now has device info
     assert!(storage.has_device_info().unwrap());
 
-    // Load and verify
     let (loaded_id, loaded_index, loaded_name, loaded_created) =
         storage.load_device_info().unwrap().unwrap();
 
@@ -433,16 +415,12 @@ fn test_storage_save_load_device_registry() {
     let device = DeviceInfo::derive(&master_seed, 0, "Primary".to_string(), 0);
     let registry = DeviceRegistry::new(device.to_registered(&master_seed), &signing_key);
 
-    // Initially no registry
     assert!(!storage.has_device_registry().unwrap());
 
-    // Save registry
     storage.save_device_registry(&registry).unwrap();
 
-    // Now has registry
     assert!(storage.has_device_registry().unwrap());
 
-    // Load and verify
     let loaded = storage.load_device_registry().unwrap().unwrap();
     assert_eq!(loaded.version(), registry.version());
     assert_eq!(loaded.active_count(), 1);
@@ -489,7 +467,6 @@ fn test_storage_save_load_device_sync_state() {
     let storage = create_test_storage();
     let device_id = [0x42u8; 32];
 
-    // Create sync state with pending items
     let mut state = InterDeviceSyncState::new(device_id);
     state.queue_item(SyncItem::CardUpdated {
         field_label: "email".to_string(),
@@ -502,10 +479,8 @@ fn test_storage_save_load_device_sync_state() {
         timestamp: 2000,
     });
 
-    // Save
     storage.save_device_sync_state(&state).unwrap();
 
-    // Load
     let loaded = storage.load_device_sync_state(&device_id).unwrap().unwrap();
 
     assert_eq!(loaded.device_id(), &device_id);
@@ -562,10 +537,8 @@ fn test_storage_save_load_version_vector() {
     vector.increment(&device_a);
     vector.increment(&device_b);
 
-    // Save
     storage.save_version_vector(&vector).unwrap();
 
-    // Load
     let loaded = storage.load_version_vector().unwrap().unwrap();
 
     assert_eq!(loaded.get(&device_a), 2);
@@ -586,7 +559,6 @@ fn test_storage_version_vector_update() {
     vector1.increment(&device_a);
     storage.save_version_vector(&vector1).unwrap();
 
-    // Update with new version
     let mut vector2 = VersionVector::new();
     vector2.increment(&device_a);
     vector2.increment(&device_a);
@@ -626,7 +598,6 @@ fn test_storage_recovery_trusted_persistence() {
     let loaded = storage.load_contact(&contact_id).unwrap().unwrap();
     assert!(loaded.is_recovery_trusted());
 
-    // Now untrust and save again
     contact.untrust_for_recovery().unwrap();
     storage.save_contact(&contact).unwrap();
 
@@ -676,7 +647,6 @@ fn test_record_and_load_delta_version() {
     let version = storage.last_delta_version(&contact_id).unwrap();
     assert_eq!(version, 42);
 
-    // Update to higher version
     storage.record_delta_version(&contact_id, 100).unwrap();
     let version = storage.last_delta_version(&contact_id).unwrap();
     assert_eq!(version, 100);
@@ -699,17 +669,14 @@ fn test_last_delta_version_nonexistent_contact() {
 fn test_wipe_device_data() {
     let storage = create_test_storage();
 
-    // Save device info
     let device_id = [0x42u8; 32];
     storage
         .save_device_info(&device_id, 0, "Test Device", 1000)
         .unwrap();
     assert!(storage.has_device_info().unwrap());
 
-    // Wipe
     storage.wipe_device_data().unwrap();
 
-    // Device info should be gone
     assert!(!storage.has_device_info().unwrap());
 }
 
@@ -725,7 +692,6 @@ fn test_is_replay_nonce() {
     // Fresh nonce is not a replay
     assert!(!storage.is_replay_nonce("contact-1", &nonce).unwrap());
 
-    // Record the nonce
     storage
         .save_replay_nonce("contact-1", &nonce, 1000)
         .unwrap();
@@ -754,9 +720,7 @@ fn test_cleanup_replay_nonces() {
     let removed = storage.cleanup_replay_nonces(3000).unwrap();
     assert_eq!(removed, 1);
 
-    // Old nonce should be gone
     assert!(!storage.is_replay_nonce("c1", &old_nonce).unwrap());
-    // New nonce should remain
     assert!(storage.is_replay_nonce("c1", &new_nonce).unwrap());
 }
 
@@ -770,18 +734,15 @@ fn test_load_device_registry_json() {
 
     let storage = create_test_storage();
 
-    // No registry initially
     let json = storage.load_device_registry_json().unwrap();
     assert!(json.is_none());
 
-    // Create and save a registry
     let master_seed = [0x42u8; 32];
     let signing_key = SigningKeyPair::from_seed(&master_seed);
     let device = DeviceInfo::derive(&master_seed, 0, "Test".to_string(), 0);
     let registry = DeviceRegistry::new(device.to_registered(&master_seed), &signing_key);
     storage.save_device_registry(&registry).unwrap();
 
-    // Load as JSON
     let json = storage.load_device_registry_json().unwrap();
     assert!(json.is_some(), "expected Some value");
     let json_str = json.unwrap();

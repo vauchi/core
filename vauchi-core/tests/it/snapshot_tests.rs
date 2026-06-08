@@ -12,7 +12,6 @@
 //! whether the change is intentional.
 
 // =============================================================================
-// CONTACT CARD SNAPSHOTS
 // =============================================================================
 
 // @internal
@@ -23,7 +22,6 @@ fn test_contact_card_serialization_snapshot() {
     // Create a card with known ID (normally random)
     let card_json = r#"{"schema_version":0,"id":"snapshot-card-001","display_name":"Snapshot User","fields":[{"id":"field-001","field_type":"Email","label":"Work","value":"work@example.com","updated_at":0},{"id":"field-002","field_type":"Phone","label":"Mobile","value":"+1234567890","updated_at":0}]}"#;
 
-    // Deserialize and re-serialize to verify format stability
     let card: ContactCard = serde_json::from_str(card_json).unwrap();
     let reserialized = serde_json::to_string(&card).unwrap();
 
@@ -39,7 +37,6 @@ fn test_contact_card_serialization_snapshot() {
 fn test_field_type_serialization_snapshot() {
     use vauchi_core::FieldType;
 
-    // Each variant should serialize to its exact name
     assert_eq!(
         serde_json::to_string(&FieldType::Phone).unwrap(),
         "\"Phone\""
@@ -83,7 +80,6 @@ fn test_contact_field_serialization_snapshot() {
 }
 
 // =============================================================================
-// CARD DELTA SNAPSHOTS
 // =============================================================================
 
 // @internal
@@ -99,7 +95,6 @@ fn test_field_change_added_serialization_snapshot() {
     let change = FieldChange::Added { field };
     let serialized = serde_json::to_string(&change).unwrap();
 
-    // Verify the enum variant name is "Added" and structure is correct
     assert!(serialized.contains("\"Added\""));
     assert!(serialized.contains("\"field\""));
     assert!(serialized.contains("\"new-field\""));
@@ -117,7 +112,6 @@ fn test_field_change_modified_serialization_snapshot() {
 
     let serialized = serde_json::to_string(&change).unwrap();
 
-    // Expected format
     let expected = r#"{"Modified":{"field_id":"existing-field","new_value":"updated-value"}}"#;
     assert_eq!(serialized, expected);
 }
@@ -153,7 +147,6 @@ fn test_field_change_display_name_changed_serialization_snapshot() {
 }
 
 // =============================================================================
-// SYNC ITEM SNAPSHOTS
 // =============================================================================
 
 // @internal
@@ -209,7 +202,6 @@ fn test_sync_item_visibility_changed_serialization_snapshot() {
 }
 
 // =============================================================================
-// DEVICE SNAPSHOTS
 // =============================================================================
 
 // @internal
@@ -229,7 +221,6 @@ fn test_registered_device_serialization_snapshot() {
 
     let serialized = serde_json::to_string(&device).unwrap();
 
-    // Verify key fields are present
     assert!(serialized.contains("\"device_id\""));
     assert!(serialized.contains("\"exchange_public_key\""));
     assert!(serialized.contains("\"device_name\":\"Test Phone\""));
@@ -237,7 +228,6 @@ fn test_registered_device_serialization_snapshot() {
     assert!(serialized.contains("\"revoked\":false"));
     assert!(serialized.contains("\"revoked_at\":null"));
 
-    // Round-trip test
     let reparsed: RegisteredDevice = serde_json::from_str(&serialized).unwrap();
     assert_eq!(reparsed.device_name, "Test Phone");
     assert_eq!(reparsed.created_at, 1700000000);
@@ -265,7 +255,6 @@ fn test_registered_device_revoked_serialization_snapshot() {
 }
 
 // =============================================================================
-// RATCHET MESSAGE SNAPSHOTS
 // =============================================================================
 
 // @internal
@@ -283,14 +272,12 @@ fn test_ratchet_message_serialization_snapshot() {
 
     let serialized = serde_json::to_string(&msg).unwrap();
 
-    // Verify structure
     assert!(serialized.contains("\"dh_public\""));
     assert!(serialized.contains("\"dh_generation\":10"));
     assert!(serialized.contains("\"message_index\":25"));
     assert!(serialized.contains("\"previous_chain_length\":20"));
     assert!(serialized.contains("\"ciphertext\""));
 
-    // Round-trip
     let reparsed: RatchetMessage = serde_json::from_str(&serialized).unwrap();
     assert_eq!(reparsed.dh_generation, 10);
     assert_eq!(reparsed.message_index, 25);
@@ -298,7 +285,6 @@ fn test_ratchet_message_serialization_snapshot() {
 }
 
 // =============================================================================
-// VISIBILITY RULES SNAPSHOTS
 // =============================================================================
 
 // @internal
@@ -353,7 +339,6 @@ fn test_visibility_rules_serialization_snapshot() {
 
     let serialized = serde_json::to_string(&rules).unwrap();
 
-    // Verify structure
     assert!(serialized.contains("\"rules\""));
     assert!(serialized.contains("\"email\""));
     assert!(serialized.contains("\"phone\""));
@@ -362,7 +347,6 @@ fn test_visibility_rules_serialization_snapshot() {
 }
 
 // =============================================================================
-// SOCIAL NETWORK SNAPSHOTS
 // =============================================================================
 
 // @internal
@@ -373,19 +357,16 @@ fn test_social_network_serialization_snapshot() {
     let network = SocialNetwork::new("github", "GitHub", "https://github.com/{username}");
     let serialized = serde_json::to_string(&network).unwrap();
 
-    // Verify structure
     assert!(serialized.contains("\"id\":\"github\""));
     assert!(serialized.contains("\"display_name\":\"GitHub\""));
     assert!(serialized.contains("\"profile_url_template\":\"https://github.com/{username}\""));
 
-    // Round-trip
     let reparsed: SocialNetwork = serde_json::from_str(&serialized).unwrap();
     assert_eq!(reparsed.id(), "github");
     assert_eq!(reparsed.display_name(), "GitHub");
 }
 
 // =============================================================================
-// ARRAY ENCODING SNAPSHOTS
 // =============================================================================
 
 // @internal
@@ -393,7 +374,6 @@ fn test_social_network_serialization_snapshot() {
 fn test_byte_array_32_serialization_format() {
     use vauchi_core::crypto::ratchet::RatchetMessage;
 
-    // Create a message with known bytes
     let msg = RatchetMessage {
         dh_public: [0u8; 32],
         dh_generation: 0,
@@ -428,7 +408,6 @@ fn test_byte_vec_serialization_format() {
 
     let serialized = serde_json::to_string(&msg).unwrap();
 
-    // Vec<u8> should serialize as JSON array
     assert!(
         serialized.contains("[72,101,108,108,111]"),
         "Vec<u8> should serialize as JSON array of numbers"

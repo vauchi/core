@@ -65,7 +65,6 @@ fn test_reassembly_buffer() {
     assert_eq!(chunker.total_chunks(), 3); // 4 + 4 + 2
 
     let mut buffer = ReassemblyBuffer::new(3);
-    // Insert out of order
     buffer.insert(2, chunker.chunk(2).unwrap().to_vec());
     assert!(!buffer.is_complete());
     buffer.insert(0, chunker.chunk(0).unwrap().to_vec());

@@ -144,7 +144,6 @@ fn test_e2e_abort_mid_transfer() {
         }
     }
 
-    // Abort
     alice.cancel();
     bob.cancel();
 
@@ -170,7 +169,6 @@ fn test_e2e_one_side_cancel_other_unaffected() {
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&ai.data);
 
-    // Alice cancels immediately after INIT exchange
     alice.cancel();
     assert!(matches!(alice.get_state(), ProtocolState::Failed(_)));
 
@@ -276,7 +274,6 @@ fn test_e2e_invalid_qr_rejected_gracefully() {
     // Malformed INIT fields => parse_qr returns Err => state unchanged
     assert_eq!(state2, ProtocolState::Advertising);
 
-    // Empty string
     let state3 = alice.process_scanned_qr("");
     assert_eq!(state3, ProtocolState::Advertising);
 
@@ -412,7 +409,6 @@ fn test_e2e_binary_payload_all_byte_values() {
 // @internal
 #[test]
 fn test_e2e_identical_cards() {
-    // Both sides exchange the exact same data
     let card = b"identical data on both sides".to_vec();
     let (alice, bob) = run_full_exchange(card.clone(), card.clone());
 
@@ -435,7 +431,6 @@ fn test_atomicity_data_not_available_in_complete() {
     let mut alice = MultiStageSession::new(alice_card);
     let mut bob = MultiStageSession::new(bob_card);
 
-    // INIT
     let ai = alice.get_display_qr().unwrap();
     let bi = bob.get_display_qr().unwrap();
     alice.process_scanned_qr(&bi.data);
@@ -458,7 +453,6 @@ fn test_atomicity_data_not_available_in_complete() {
         }
     }
 
-    // Both are in Complete but NOT Finalized yet
     assert_eq!(alice.get_state(), ProtocolState::Complete);
     assert_eq!(bob.get_state(), ProtocolState::Complete);
 
@@ -500,7 +494,6 @@ fn test_atomicity_one_side_stops_scanning_no_finalize() {
     let mut alice = MultiStageSession::new(alice_card);
     let mut bob = MultiStageSession::new(bob_card);
 
-    // INIT
     let ai = alice.get_display_qr().unwrap();
     let bi = bob.get_display_qr().unwrap();
     alice.process_scanned_qr(&bi.data);
@@ -531,7 +524,6 @@ fn test_atomicity_one_side_stops_scanning_no_finalize() {
     for _ in 0..100 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
-        // Alice scans Bob's READY
         if let Some(bq) = &bq {
             alice.process_scanned_qr(&bq.data);
         }
@@ -540,12 +532,10 @@ fn test_atomicity_one_side_stops_scanning_no_finalize() {
     }
 
     // Alice may have received Bob's READY, but Bob never received Alice's
-    // Bob should NOT be Finalized
     assert!(
         !matches!(bob.get_state(), ProtocolState::Finalized),
         "Bob should not be Finalized without scanning Alice's READY"
     );
-    // Bob's data should not be available
     assert!(
         bob.get_received_data().is_none(),
         "Bob's data should not be available without finalization"
@@ -568,7 +558,6 @@ fn test_asymmetric_finalization_both_must_complete() {
     let mut alice = MultiStageSession::new(alice_card.clone());
     let mut bob = MultiStageSession::new(bob_card.clone());
 
-    // INIT
     let ai = alice.get_display_qr().unwrap();
     let bi = bob.get_display_qr().unwrap();
     alice.process_scanned_qr(&bi.data);
@@ -655,7 +644,6 @@ fn test_data_not_available_in_complete() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());
     let mut bob = MultiStageSession::new(b"Bob".to_vec());
 
-    // Exchange INIT
     let ai = alice.get_display_qr().unwrap();
     let bi = bob.get_display_qr().unwrap();
     alice.process_scanned_qr(&bi.data);
@@ -706,7 +694,6 @@ fn test_fail_qr_roundtrip() {
 fn test_fail_qr_aborts_peer() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());
 
-    // Move to Advertising
     let _ai = alice.get_display_qr().unwrap();
     assert_eq!(alice.get_state(), ProtocolState::Advertising);
 
@@ -727,7 +714,6 @@ fn test_fail_qr_ignored_when_finalized() {
     let (mut alice, _bob) = run_full_exchange(b"Alice".to_vec(), b"Bob".to_vec());
     assert_eq!(alice.get_state(), ProtocolState::Finalized);
 
-    // Late FAIL from peer should be ignored
     use vauchi_core::exchange::multistage::qr_codec;
     let fail_qr = qr_codec::format_fail_qr(&[0u8; 16]);
     let state = alice.process_scanned_qr(&fail_qr);
@@ -749,7 +735,6 @@ fn test_adaptive_display_durations() {
         init_qr.display_duration_ms
     );
 
-    // Exchange INITs
     let bi = bob.get_display_qr().unwrap();
     alice.process_scanned_qr(&bi.data);
     bob.process_scanned_qr(&init_qr.data);
@@ -762,7 +747,6 @@ fn test_adaptive_display_durations() {
         data_qr.display_duration_ms
     );
 
-    // Drive to Complete
     for _ in 0..500 {
         let aq = alice.get_display_qr();
         let bq = bob.get_display_qr();
@@ -796,12 +780,10 @@ fn test_adaptive_display_durations() {
 // @internal
 #[test]
 fn test_clear_sensitive_covers_all_security_fields() {
-    // Run a full exchange to populate all fields
     let alice_card = b"name:Alice\nemail:alice@example.com".to_vec();
     let bob_card = b"name:Bob\nemail:bob@example.com".to_vec();
     let (mut alice, _bob) = run_full_exchange(alice_card, bob_card);
 
-    // Verify fields are populated before cancel
     assert!(
         matches!(alice.get_state(), ProtocolState::Finalized),
         "Exchange must complete for all fields to be populated"
@@ -832,7 +814,6 @@ fn test_complete_shows_only_combo() {
     let mut alice = MultiStageSession::new(b"Alice".to_vec());
     let mut bob = MultiStageSession::new(b"Bob".to_vec());
 
-    // Drive to Complete
     let ai = alice.get_display_qr().unwrap();
     let bi = bob.get_display_qr().unwrap();
     alice.process_scanned_qr(&bi.data);
@@ -875,7 +856,6 @@ fn test_complete_shows_only_combo() {
 }
 
 // ============================================================
-// Transport-decrypt failure observability
 // (site 1 of _private/.../2026-05-21-silent-failures-in-security-paths)
 //
 // Pre-2026-05-23 `transport_decrypt` returned `Option<Vec<u8>>`, conflating

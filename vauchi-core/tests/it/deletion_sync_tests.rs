@@ -21,7 +21,6 @@ fn test_deletion_scheduled_sync_item() {
 
     assert_eq!(item.timestamp(), 1700000000);
 
-    // Serialization roundtrip
     let json = serde_json::to_string(&item).unwrap();
     let decoded: SyncItem = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded.timestamp(), 1700000000);
@@ -49,7 +48,6 @@ fn test_deletion_cancelled_sync_item() {
 
     assert_eq!(item.timestamp(), 1700000500);
 
-    // Serialization roundtrip
     let json = serde_json::to_string(&item).unwrap();
     let decoded: SyncItem = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded.timestamp(), 1700000500);

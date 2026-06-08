@@ -40,7 +40,6 @@ fn exchange_as_initiator(wb: &Vauchi) -> String {
     // Alice initiates X3DH toward Bob
     let (shared_secret, _) = X3DH::initiate(&alice_x3dh, bob_x3dh.public_key()).unwrap();
 
-    // Create contact
     let card = ContactCard::new("Bob");
     let contact =
         Contact::from_exchange(*bob_identity.public_key(), card, shared_secret.clone(), 0);
@@ -120,7 +119,6 @@ fn test_prepare_card_update_requires_ratchet() {
 #[test]
 fn test_prepare_card_update_requires_identity() {
     let wb = Vauchi::in_memory().unwrap();
-    // No identity
 
     let empty_card = ContactCard::new("Alice");
     let current_card = ContactCard::new("Alice");
@@ -151,7 +149,6 @@ fn test_prepare_card_update_rejects_blocked_contact() {
     let wb = setup_with_card("Alice");
     let contact_id = exchange_as_initiator(&wb);
 
-    // Block the contact
     wb.block_contact(&contact_id).unwrap();
 
     let empty_card = ContactCard::new("Alice");

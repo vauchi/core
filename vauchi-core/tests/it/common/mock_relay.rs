@@ -219,14 +219,12 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<State>>) -> std::io
 
     let mut reader = BufReader::new(stream.try_clone()?);
 
-    // Read request line
     let mut request_line = String::new();
     reader.read_line(&mut request_line)?;
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or("").to_string();
     let path = parts.next().unwrap_or("").to_string();
 
-    // Read headers
     let mut headers = Vec::new();
     let mut content_length: usize = 0;
     loop {
@@ -247,7 +245,6 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<State>>) -> std::io
         }
     }
 
-    // Read body
     let mut body = vec![0u8; content_length];
     if content_length > 0 {
         reader.read_exact(&mut body)?;

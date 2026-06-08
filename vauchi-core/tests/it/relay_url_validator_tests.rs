@@ -200,7 +200,6 @@ fn null_bytes_in_url_rejected() {
 // @internal
 #[test]
 fn unicode_homoglyph_url_rejected_or_accepted() {
-    // Unicode domain names should be parsed but may be suspicious
     // At minimum, the URL must parse correctly
     let result = validate_relay_url("https://rеlay.example.com"); // Cyrillic 'е'
     // Either accepted (punycode) or rejected — but must not panic

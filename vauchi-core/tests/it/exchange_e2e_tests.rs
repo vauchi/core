@@ -15,7 +15,6 @@ use vauchi_core::exchange::{
 use vauchi_core::{ContactCard, Identity};
 
 // ============================================================
-// Full Exchange Flow Tests
 // Feature: contact_exchange.feature @e2e
 // ============================================================
 
@@ -92,7 +91,6 @@ fn test_full_exchange_produces_matching_shared_keys() {
         .apply(ExchangeEvent::CompleteExchange(alice_card.clone()))
         .unwrap();
 
-    // Both should have completed
     assert!(
         matches!(alice_session.state(), ExchangeState::Complete { .. }),
         "Alice should be in Complete state"
@@ -102,7 +100,6 @@ fn test_full_exchange_produces_matching_shared_keys() {
         "Bob should be in Complete state"
     );
 
-    // Get the shared keys from completed contacts
     let alice_shared_key = match alice_session.state() {
         ExchangeState::Complete { contact } => contact
             .shared_key()
@@ -116,14 +113,12 @@ fn test_full_exchange_produces_matching_shared_keys() {
         _ => panic!("Bob should be complete"),
     };
 
-    // CRITICAL: Both should have derived the SAME shared key
     assert_eq!(
         alice_shared_key.as_bytes(),
         bob_shared_key.as_bytes(),
         "Alice and Bob should have the same shared key"
     );
 
-    // Verify encryption/decryption works bidirectionally
     let message = b"Hello from Alice!";
     let ciphertext = encrypt(alice_shared_key, message).unwrap();
     let decrypted = decrypt(bob_shared_key, &ciphertext).unwrap();
@@ -166,7 +161,6 @@ fn test_qr_contains_ephemeral_exchange_key() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // QR should have the ephemeral exchange key, not the identity's static key
     let exchange_key = qr.exchange_key();
     let signing_key = qr.public_key();
 
@@ -175,7 +169,6 @@ fn test_qr_contains_ephemeral_exchange_key() {
         "Exchange key should be different from signing key"
     );
 
-    // Exchange key should match the ephemeral, NOT identity's exchange key
     assert_eq!(
         exchange_key,
         ephemeral.public_key(),
@@ -189,7 +182,6 @@ fn test_qr_contains_ephemeral_exchange_key() {
 }
 
 // ============================================================
-// State Machine Transition Tests
 // ============================================================
 
 /// Test: StartQR transitions from Idle to DisplayingQr
@@ -238,7 +230,6 @@ fn test_process_qr_requires_displaying_qr_state() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Bob generates a QR
     let bob_ephemeral = X3DHKeyPair::generate();
     let bob_qr = ExchangeQR::generate(
         &bob_identity,
@@ -270,7 +261,6 @@ fn test_they_scanned_requires_peer_scanned_state() {
     );
     session.apply(ExchangeEvent::StartQR).unwrap();
 
-    // Try TheyScannedOurQR without scanning their QR first
     let result = session.apply(ExchangeEvent::TheyScannedOurQR);
     assert!(result.is_err(), "Should fail when not in PeerScanned state");
 }
@@ -298,7 +288,6 @@ fn test_complete_state_transition_sequence() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Idle
     assert!(matches!(alice_session.state(), ExchangeState::Idle));
     assert!(matches!(bob_session.state(), ExchangeState::Idle));
 
@@ -381,7 +370,6 @@ fn test_complete_state_transition_sequence() {
 }
 
 // ============================================================
-// Edge Cases
 // ============================================================
 
 /// Test: Wrong DH key produces different shared secret
@@ -392,13 +380,11 @@ fn test_wrong_dh_key_produces_different_secret() {
     let bob_keys = X3DHKeyPair::generate();
     let eve_keys = X3DHKeyPair::generate();
 
-    // Alice computes shared with Bob
     let alice_shared = alice_keys.diffie_hellman(bob_keys.public_key()).unwrap();
 
     // Alice computes shared with Eve (wrong party)
     let alice_eve_shared = alice_keys.diffie_hellman(eve_keys.public_key()).unwrap();
 
-    // Keys should NOT match
     assert_ne!(
         alice_shared, alice_eve_shared,
         "DH with wrong party should produce different key"
@@ -411,7 +397,6 @@ fn test_wrong_dh_key_produces_different_secret() {
 fn test_self_exchange_rejected() {
     let alice_identity = Identity::create("Alice", 0);
 
-    // Generate own QR before moving identity into session
     let own_ephemeral = X3DHKeyPair::generate();
     let own_qr = ExchangeQR::generate(
         &alice_identity,
@@ -496,7 +481,6 @@ fn test_session_uses_fresh_ephemeral_not_identity_key() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // The session's exchange key should NOT match identity's exchange key
     let session_exchange = session.our_exchange_public_key();
 
     assert_ne!(
@@ -528,7 +512,6 @@ fn test_contact_names_correct_after_exchange() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Run full exchange
     alice_session.apply(ExchangeEvent::StartQR).unwrap();
     bob_session.apply(ExchangeEvent::StartQR).unwrap();
 
@@ -561,7 +544,6 @@ fn test_contact_names_correct_after_exchange() {
         .apply(ExchangeEvent::CompleteExchange(alice_card))
         .unwrap();
 
-    // Verify contact names
     match alice_session.state() {
         ExchangeState::Complete { contact } => {
             assert_eq!(contact.display_name(), "Bob");

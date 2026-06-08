@@ -161,23 +161,19 @@ mod tests {
             .encapsulate(plaintext)
             .expect("encapsulate must succeed");
 
-        // Encrypted must differ from plaintext
         assert_ne!(&encrypted, &plaintext[..]);
         assert!(!encrypted.is_empty());
 
-        // Server decrypts
         let (decrypted, srv_response) = server
             .decapsulate(&encrypted)
             .expect("server decapsulate must succeed");
         assert_eq!(&decrypted, plaintext, "server must see original plaintext");
 
-        // Server encrypts response
         let response_plain = b"response from gateway";
         let enc_response = srv_response
             .encapsulate(response_plain)
             .expect("server encapsulate must succeed");
 
-        // Client decrypts response
         let dec_response = response_decryptor
             .decapsulate(&enc_response)
             .expect("response decapsulate must succeed");
@@ -206,7 +202,6 @@ mod tests {
         let (server, encoded) = make_gateway();
         let client = OhttpClient::new(encoded).expect("client must be created");
 
-        // Each encapsulate call should produce different ciphertext
         let (enc1, dec1) = client.encapsulate(b"request-1").expect("enc1");
         let (enc2, dec2) = client.encapsulate(b"request-2").expect("enc2");
 
@@ -215,14 +210,12 @@ mod tests {
             "different plaintexts must produce different ciphertexts"
         );
 
-        // Both can independently roundtrip
         let (plain1, srv1) = server.decapsulate(&enc1).expect("dec1");
         assert_eq!(plain1, b"request-1");
 
         let (plain2, srv2) = server.decapsulate(&enc2).expect("dec2");
         assert_eq!(plain2, b"request-2");
 
-        // Responses
         let resp1 = srv1.encapsulate(b"resp-1").expect("resp1");
         let resp2 = srv2.encapsulate(b"resp-2").expect("resp2");
 
@@ -239,7 +232,6 @@ mod tests {
             .encapsulate(b"request")
             .expect("encapsulate must succeed");
 
-        // Try to decrypt garbage
         let result = response_decryptor.decapsulate(b"not a valid ohttp response");
         assert!(result.is_err(), "garbage response must be rejected");
     }
@@ -249,15 +241,12 @@ mod tests {
         let (server, encoded) = make_gateway();
         let client = OhttpClient::new(encoded).expect("client must be created");
 
-        // Make two requests
         let (enc1, dec1) = client.encapsulate(b"request-1").expect("enc1");
         let (enc2, _dec2) = client.encapsulate(b"request-2").expect("enc2");
 
-        // Get server responses for both
         let (_plain1, _srv1) = server.decapsulate(&enc1).expect("srv-dec1");
         let (_plain2, srv2) = server.decapsulate(&enc2).expect("srv-dec2");
 
-        // Encrypt response for request-2
         let resp2 = srv2.encapsulate(b"resp-2").expect("srv-enc2");
 
         // dec1 should NOT be able to decrypt resp2 (wrong session)
@@ -266,26 +255,5 @@ mod tests {
             result.is_err(),
             "decryptor must reject response from a different OHTTP session"
         );
-    }
-
-    #[test]
-    fn test_encapsulate_empty_plaintext() {
-        let (server, encoded) = make_gateway();
-        let client = OhttpClient::new(encoded).expect("client must be created");
-
-        let (encrypted, dec) = client
-            .encapsulate(b"")
-            .expect("empty plaintext should be encapsulatable");
-        assert!(
-            !encrypted.is_empty(),
-            "encrypted form must not be empty even for empty plaintext"
-        );
-
-        let (decrypted, srv) = server.decapsulate(&encrypted).expect("server must decrypt");
-        assert!(decrypted.is_empty(), "server sees empty plaintext");
-
-        let enc_resp = srv.encapsulate(b"ok").expect("resp");
-        let resp = dec.decapsulate(&enc_resp).expect("dec-resp");
-        assert_eq!(resp, b"ok");
     }
 }

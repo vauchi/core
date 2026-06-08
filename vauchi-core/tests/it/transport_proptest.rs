@@ -58,9 +58,7 @@ proptest! {
         let offer_b = bob.create_offer(0u64).unwrap();
         let shared_a = alice.process_offer(&offer_b).unwrap();
         let shared_b = bob.process_offer(&offer_a).unwrap();
-        // Both sides derive same key
         prop_assert_eq!(shared_a.as_bytes(), shared_b.as_bytes());
-        // Encrypt with Alice's key, decrypt with Bob's key
         let encrypted = ExchangeProtocol::encrypt_card(&data, &shared_a).unwrap();
         let decrypted = ExchangeProtocol::decrypt_card(&encrypted, &shared_b).unwrap();
         prop_assert_eq!(data, decrypted);

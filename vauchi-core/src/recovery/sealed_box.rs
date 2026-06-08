@@ -34,10 +34,6 @@ const DOMAIN: &[u8] = b"vauchi-sealed-box-v1";
 /// Minimum size of a valid sealed blob: ephemeral_pk (32) + nonce (24) + tag (16).
 const MIN_SEALED_LEN: usize = 32 + 24 + 16;
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
 /// Seal `plaintext` so only the holder of `recipient_pk`'s secret key can open it.
 ///
 /// Uses an ephemeral X25519 keypair for the DH exchange; the sender is anonymous.
@@ -46,7 +42,6 @@ const MIN_SEALED_LEN: usize = 32 + 24 + 16;
 ///
 /// `ephemeral_pk (32) || nonce (24) || ciphertext+tag`
 pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Vec<u8> {
-    // 1. Generate ephemeral keypair.
     let ephemeral_secret = StaticSecret::random_from_rng(OsRng);
     let ephemeral_pk = PublicKey::from(&ephemeral_secret);
 
@@ -56,12 +51,10 @@ pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Vec<u8> {
     // 3. Derive symmetric key via HKDF-SHA256 (ADR-007).
     let key = HKDF::derive_key(None, shared.as_bytes(), DOMAIN);
 
-    // 4. Generate a random 192-bit nonce.
     let mut nonce_bytes = [0u8; 24];
     OsRng.fill_bytes(&mut nonce_bytes);
     let nonce = XNonce::from(nonce_bytes);
 
-    // 5. Encrypt.
     let cipher = XChaCha20Poly1305::new_from_slice(key.as_ref())
         .expect("32-byte key is always valid for XChaCha20Poly1305");
     let ciphertext = cipher
@@ -88,7 +81,6 @@ pub fn open(sealed: &[u8], recipient_secret: &StaticSecret) -> Result<Vec<u8>, R
         return Err(RecoveryError::InvalidFormat);
     }
 
-    // 1. Parse fields.
     let ephemeral_pk_bytes: [u8; 32] = sealed[..32].try_into().expect("slice length checked above");
     let ephemeral_pk = PublicKey::from(ephemeral_pk_bytes);
 
@@ -105,7 +97,6 @@ pub fn open(sealed: &[u8], recipient_secret: &StaticSecret) -> Result<Vec<u8>, R
     // 3. Derive symmetric key via HKDF-SHA256 (ADR-007).
     let key = HKDF::derive_key(None, shared.as_bytes(), DOMAIN);
 
-    // 4. Decrypt + authenticate.
     let cipher = XChaCha20Poly1305::new_from_slice(key.as_ref())
         .expect("32-byte key is always valid for XChaCha20Poly1305");
     cipher

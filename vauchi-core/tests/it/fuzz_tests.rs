@@ -12,7 +12,6 @@
 use proptest::prelude::*;
 
 // =============================================================================
-// ARBITRARY GENERATORS
 // =============================================================================
 
 /// Generate arbitrary bytes of given length
@@ -26,7 +25,6 @@ fn arbitrary_json_string() -> impl Strategy<Value = String> {
 }
 
 // =============================================================================
-// CONTACT CARD FUZZ TESTS
 // =============================================================================
 
 proptest! {
@@ -50,7 +48,6 @@ proptest! {
     ) {
         let mut card = vauchi_core::ContactCard::new(&name);
 
-        // Add fields that might be added
         if !email.is_empty() {
             let _ = card.add_field(vauchi_core::ContactField::new(
                 vauchi_core::FieldType::Email,
@@ -69,18 +66,15 @@ proptest! {
         ));
         }
 
-        // Serialize and deserialize
         let serialized = serde_json::to_string(&card).unwrap();
         let deserialized: vauchi_core::ContactCard = serde_json::from_str(&serialized).unwrap();
 
-        // Verify
         prop_assert_eq!(card.display_name(), deserialized.display_name());
         prop_assert_eq!(card.fields().len(), deserialized.fields().len());
     }
 }
 
 // =============================================================================
-// CONTACT FIELD FUZZ TESTS
 // =============================================================================
 
 proptest! {
@@ -104,7 +98,6 @@ proptest! {
 }
 
 // =============================================================================
-// SYNC ITEM FUZZ TESTS
 // =============================================================================
 
 proptest! {
@@ -128,7 +121,6 @@ proptest! {
 }
 
 // =============================================================================
-// RATCHET MESSAGE FUZZ TESTS
 // =============================================================================
 
 proptest! {
@@ -174,7 +166,6 @@ proptest! {
 }
 
 // =============================================================================
-// VISIBILITY RULES FUZZ TESTS
 // =============================================================================
 
 proptest! {
@@ -231,7 +222,6 @@ proptest! {
 }
 
 // =============================================================================
-// DEVICE REGISTRY FUZZ TESTS
 // =============================================================================
 
 proptest! {
@@ -247,7 +237,6 @@ proptest! {
 }
 
 // =============================================================================
-// SOCIAL NETWORK FUZZ TESTS
 // =============================================================================
 
 proptest! {
@@ -281,7 +270,6 @@ proptest! {
 }
 
 // =============================================================================
-// ENCRYPTION FUZZ TESTS
 // =============================================================================
 
 proptest! {
@@ -295,11 +283,9 @@ proptest! {
 
         let key = SymmetricKey::generate();
 
-        // Encrypt should succeed for any input
         let ciphertext = encrypt(&key, &data);
         prop_assert!(ciphertext.is_ok(), "encrypt failed: {:?}", ciphertext);
 
-        // Decrypt should succeed and return original
         let plaintext = decrypt(&key, &ciphertext.unwrap());
         prop_assert!(plaintext.is_ok(), "decrypt failed: {:?}", plaintext);
         prop_assert_eq!(data, plaintext.unwrap());
@@ -314,7 +300,6 @@ proptest! {
 
         let key = SymmetricKey::generate();
 
-        // Decrypting garbage should return an error, not panic
         let result = decrypt(&key, &data);
         let _ = result;
     }
@@ -330,14 +315,12 @@ proptest! {
 
         let ciphertext = encrypt(&key1, &data).unwrap();
 
-        // Decrypting with wrong key should fail
         let result = decrypt(&key2, &ciphertext);
         prop_assert!(result.is_err(), "wrong-key decrypt should fail but got {:?}", result);
     }
 }
 
 // =============================================================================
-// HKDF FUZZ TESTS
 // =============================================================================
 
 proptest! {
@@ -352,7 +335,6 @@ proptest! {
         let salt = [0u8; 32];
         let info = b"test-info";
 
-        // Should not panic regardless of input
         let result = HKDF::derive(Some(&salt), &ikm, info, 32);
         prop_assert!(result.is_ok(), "HKDF derive failed: {:?}", result);
         prop_assert_eq!(result.unwrap().len(), 32);
@@ -375,7 +357,6 @@ proptest! {
 }
 
 // =============================================================================
-// KEY GENERATION FUZZ TESTS
 // =============================================================================
 
 proptest! {
@@ -396,7 +377,6 @@ proptest! {
 }
 
 // =============================================================================
-// SIGNING FUZZ TESTS
 // =============================================================================
 
 proptest! {
@@ -413,10 +393,8 @@ proptest! {
 
         let keypair = SigningKeyPair::generate();
 
-        // Sign should work for any input
         let signature = keypair.sign(&message);
 
-        // Verify should succeed for valid signature
         let is_valid = keypair.public_key().verify(&message, &signature);
         prop_assert!(is_valid);
     }
@@ -436,7 +414,6 @@ proptest! {
         let keypair = SigningKeyPair::generate();
         let signature = keypair.sign(&message1);
 
-        // Verifying with different message should fail
         let is_valid = keypair.public_key().verify(&message2, &signature);
         prop_assert!(!is_valid);
     }
@@ -462,7 +439,6 @@ proptest! {
 
         let corrupted_signature = Signature::from_bytes(sig_bytes);
 
-        // Verification should fail
         let is_valid = keypair.public_key().verify(&message, &corrupted_signature);
         prop_assert!(!is_valid);
     }

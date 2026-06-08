@@ -24,7 +24,6 @@ use common::helpers::setup_alice_bob_exchange;
 fn setup_duress_with_decoy() -> (vauchi_core::Vauchi, String /* bob_real_id */) {
     let (mut alice_wb, _bob_wb, _secret, bob_id, _alice_id) = setup_alice_bob_exchange();
 
-    // Set up password + duress
     alice_wb
         .setup_app_password("normal-pin")
         .expect("setup app password");
@@ -32,13 +31,11 @@ fn setup_duress_with_decoy() -> (vauchi_core::Vauchi, String /* bob_real_id */) 
         .setup_duress_password("duress-pin")
         .expect("setup duress");
 
-    // Add a decoy contact
     let decoy_card = ContactCard::new("Decoy Dana");
     alice_wb
         .add_decoy_contact("decoy-dana", "Decoy Dana", &decoy_card)
         .expect("add decoy");
 
-    // Authenticate with duress PIN
     let mode = alice_wb.authenticate("duress-pin").expect("auth");
     assert_eq!(mode, AuthMode::Duress);
 
@@ -221,7 +218,6 @@ fn test_all_apis_normal_mode_still_return_real() {
         .setup_duress_password("duress-pin")
         .expect("setup duress");
 
-    // Add decoy
     let decoy_card = ContactCard::new("Decoy Dana");
     alice_wb
         .add_decoy_contact("decoy-dana", "Decoy Dana", &decoy_card)

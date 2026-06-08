@@ -168,7 +168,6 @@ proptest! {
                     let label = field_label(key);
                     let ts = clock;
                     clock += 1;
-                    // Both devices write the same field at the same timestamp.
                     let val_a = format!("{ts}-A-concurrent");
                     let val_b = format!("{ts}-B-concurrent");
                     orch_a

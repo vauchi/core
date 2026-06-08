@@ -9,8 +9,6 @@ use rusqlite::params;
 use super::{Storage, StorageError};
 
 impl Storage {
-    // === Consent Operations ===
-
     /// Inserts or updates a consent record.
     pub fn execute_consent_upsert(
         &self,
@@ -131,8 +129,6 @@ impl Storage {
 
         Ok(records)
     }
-
-    // === Deletion State Operations ===
 
     /// Saves the deletion state (encrypted).
     pub fn save_deletion_state(&self, state: &super::DeletionState) -> Result<(), StorageError> {

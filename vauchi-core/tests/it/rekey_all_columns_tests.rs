@@ -824,7 +824,6 @@ fn assert_every_column_round_trips(storage: &Storage, new_key: &SymmetricKey) {
 }
 
 // ============================================================
-// The big test
 // ============================================================
 
 // @scenario: security :: rekey re-encrypts every column in the registry

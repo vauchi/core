@@ -19,7 +19,6 @@ use common::helpers::{all_themes, theme_by_id, try_all_themes};
 use vauchi_app::theme::{DesignTokens, Theme, ThemeColors, ThemeMode, validate_hex_color};
 
 // ============================================================
-// Theme Structure
 // Feature: theming.feature @selection
 // ============================================================
 
@@ -74,7 +73,6 @@ fn test_theme_colors_complete() {
 }
 
 // ============================================================
-// Theme Mode
 // Feature: theming.feature @selection
 // ============================================================
 
@@ -141,7 +139,6 @@ fn test_all_themes_accessible() {
 // @scenario: theming :: Theme colors meet minimum contrast
 #[test]
 fn test_contrast_ratio_calculation() {
-    // White on black should have high contrast
     let white = "#ffffff";
     let black = "#000000";
 
@@ -217,7 +214,6 @@ fn test_low_contrast_fails() {
 }
 
 // ============================================================
-// Bundled Themes
 // Feature: theming.feature @catppuccin, @dracula, @nord, etc.
 // ============================================================
 
@@ -342,7 +338,6 @@ fn test_gruvbox_themes() {
 }
 
 // ============================================================
-// Theme Count and Listing
 // ============================================================
 
 /// Test: Have expected number of bundled themes
@@ -371,7 +366,6 @@ fn test_unique_theme_ids() {
 }
 
 // ============================================================
-// Hex Color Validation
 // ============================================================
 
 /// Test: Valid hex colors pass validation
@@ -395,7 +389,6 @@ fn test_invalid_hex_colors() {
 }
 
 // ============================================================
-// Theme Serialization
 // ============================================================
 
 /// Test: Themes can be serialized to JSON
@@ -414,7 +407,6 @@ fn test_theme_serialization() {
 }
 
 // ============================================================
-// Attribution
 // ============================================================
 
 /// Test: Third-party themes have attribution

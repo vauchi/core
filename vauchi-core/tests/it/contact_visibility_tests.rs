@@ -80,11 +80,9 @@ fn test_visible_fields() {
 fn test_set_everyone_explicit() {
     let mut rules = VisibilityRules::new();
 
-    // First set to nobody
     rules.set_nobody("phone");
     assert!(!rules.can_see("phone", "alice"));
 
-    // Then explicitly set to everyone
     rules.set_everyone("phone");
     assert!(rules.can_see("phone", "alice"));
     assert!(rules.can_see("phone", "anyone"));
@@ -96,7 +94,6 @@ fn test_set_everyone_explicit() {
 fn test_remove_reverts_to_default() {
     let mut rules = VisibilityRules::new();
 
-    // Set to nobody
     rules.set_nobody("secret");
     assert!(!rules.can_see("secret", "alice"));
 
@@ -137,10 +134,8 @@ fn test_visibility_rules_serialization() {
     allowed.insert("alice".to_string());
     rules.set_contacts("restricted", allowed);
 
-    // Serialize
     let json = serde_json::to_string(&rules).unwrap();
 
-    // Deserialize
     let restored: VisibilityRules = serde_json::from_str(&json).unwrap();
 
     assert!(!restored.can_see("private", "anyone"));
@@ -154,7 +149,6 @@ fn test_visibility_rules_serialization() {
 fn test_empty_contacts_set() {
     let mut rules = VisibilityRules::new();
 
-    // Set to empty contacts set - no one can see
     rules.set_contacts("field", HashSet::new());
 
     assert!(!rules.can_see("field", "alice"));
@@ -168,7 +162,6 @@ fn test_empty_contacts_set() {
 fn test_multiple_rules() {
     let mut rules = VisibilityRules::new();
 
-    // Set different visibility for multiple fields
     rules.set_nobody("private1");
     rules.set_nobody("private2");
     rules.set_everyone("public1");
@@ -177,7 +170,6 @@ fn test_multiple_rules() {
     allowed.insert("alice".to_string());
     rules.set_contacts("restricted", allowed);
 
-    // Check all rules work independently
     assert!(!rules.can_see("private1", "alice"));
     assert!(!rules.can_see("private2", "alice"));
     assert!(rules.can_see("public1", "anyone"));

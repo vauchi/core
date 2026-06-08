@@ -140,7 +140,6 @@ mod tests {
     // @internal
     #[test]
     fn quantization_error_within_bounds() {
-        // Test across the full range
         for i in 0..=100 {
             let original = i as f32 / 100.0 * MAX_G;
             let encoded = encode_envelope(&[original]);

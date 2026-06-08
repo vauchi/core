@@ -18,7 +18,6 @@ use vauchi_core::exchange::{
 use vauchi_core::{ContactCard, Identity};
 
 // ============================================================
-// ExchangeBle payload
 // ============================================================
 
 // @scenario: ble_exchange :: BLE payload generation contains identity and exchange keys
@@ -138,7 +137,6 @@ fn test_ble_payload_expiry() {
         "2-min old BLE payload should be expired"
     );
 
-    // Fresh
     let fresh = ExchangeBle::generate_with_timestamp(&identity, &ephemeral, [0u8; 32], now);
     assert!(
         !fresh.is_expired(vauchi_core::clock::SystemClock::shared().unix_seconds()),
@@ -147,13 +145,11 @@ fn test_ble_payload_expiry() {
 }
 
 // ============================================================
-// GATT constants
 // ============================================================
 
 // @scenario: ble_exchange :: GATT UUIDs have correct format
 #[test]
 fn test_gatt_uuid_validity() {
-    // UUIDs should be valid format: 8-4-4-4-12
     let uuids = [
         VAUCHI_BLE_SERVICE_UUID,
         CHAR_EXCHANGE_PAYLOAD,
@@ -170,13 +166,11 @@ fn test_gatt_uuid_validity() {
 // @scenario: ble_exchange :: GATT service and characteristic UUIDs match expected values
 #[test]
 fn test_gatt_service_uuid_match() {
-    // Service UUID should match the constant
     assert_eq!(
         VAUCHI_BLE_SERVICE_UUID,
         "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
     );
 
-    // Characteristic UUIDs should share the same base but differ in last 4 digits
     assert!(CHAR_EXCHANGE_PAYLOAD.ends_with("7891"));
     assert!(CHAR_CARD_EXCHANGE.ends_with("7892"));
     assert!(CHAR_CHALLENGE.ends_with("7893"));
@@ -222,14 +216,11 @@ fn test_mock_ble_transport_connect_read_write() {
 
     let mock = MockBLETransport::with_peer_payload(&payload_bytes);
 
-    // Connect
     mock.connect("device-1").expect("expected success");
 
-    // Read exchange payload
     let read = mock.read_characteristic(CHAR_EXCHANGE_PAYLOAD).unwrap();
     assert_eq!(read, payload_bytes);
 
-    // Write card exchange data
     assert!(
         mock.write_characteristic(CHAR_CARD_EXCHANGE, b"encrypted-card")
             .is_ok()
@@ -239,7 +230,6 @@ fn test_mock_ble_transport_connect_read_write() {
     assert_eq!(written.len(), 1);
     assert_eq!(written[0].0, CHAR_CARD_EXCHANGE);
 
-    // Disconnect
     mock.disconnect().expect("expected success");
 }
 
@@ -255,7 +245,6 @@ fn test_mock_ble_transport_failure() {
 }
 
 // ============================================================
-// Session integration
 // ============================================================
 
 // @scenario: ble_exchange :: New BLE session starts in AwaitingBleConnection
@@ -295,7 +284,6 @@ fn test_ble_payload_exchanged_transitions() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Bob generates his BLE payload
     let bob_eph = X3DHKeyPair::generate();
     let bob_payload = ExchangeBle::generate(
         &bob_identity,
@@ -303,7 +291,6 @@ fn test_ble_payload_exchanged_transitions() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Alice receives Bob's payload via BLE
     alice_session
         .apply(ExchangeEvent::BlePayloadExchanged {
             their_payload: bob_payload.to_bytes().to_vec(),
@@ -336,7 +323,6 @@ fn test_ble_proximity_verified_transitions() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Payload exchange
     let bob_eph = X3DHKeyPair::generate();
     let bob_payload = ExchangeBle::generate(
         &bob_identity,
@@ -350,7 +336,6 @@ fn test_ble_proximity_verified_transitions() {
         })
         .unwrap();
 
-    // Proximity verification
     alice_session
         .apply(ExchangeEvent::BleProximityVerified)
         .expect("Should transition to AwaitingKeyAgreement");
@@ -439,7 +424,6 @@ fn test_ble_full_lifecycle() {
         .apply(ExchangeEvent::CompleteExchange(alice_card))
         .unwrap();
 
-    // Both complete
     assert!(matches!(
         alice_session.state(),
         ExchangeState::Complete { .. }
@@ -453,7 +437,6 @@ fn test_ble_full_lifecycle() {
 // @scenario: ble_exchange :: Symmetric DH produces identical shared keys
 #[test]
 fn test_ble_shared_keys_match() {
-    // Verify symmetric DH produces matching keys
     let alice_eph = X3DHKeyPair::generate();
     let bob_eph = X3DHKeyPair::generate();
 
@@ -561,7 +544,6 @@ fn test_ble_rejects_wrong_transport() {
     let card = ContactCard::new("Alice");
     let proximity = MockProximityVerifier::success();
 
-    // QR session
     let mut session = ExchangeSession::new_qr(
         identity,
         card,
@@ -580,7 +562,6 @@ fn test_ble_rejects_wrong_transport() {
 }
 
 // ============================================================
-// Challenge-response
 // ============================================================
 
 // @scenario: ble_exchange :: Proximity verification requires AwaitingBleVerification state
@@ -597,7 +578,6 @@ fn test_ble_proximity_requires_verification_state() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Try to verify proximity without payload exchange
     let result = session.apply(ExchangeEvent::BleProximityVerified);
     assert!(
         result.is_err(),
@@ -671,32 +651,26 @@ fn test_ble_full_exchange_with_mock_transport() {
         vauchi_core::clock::SystemClock::shared().unix_seconds(),
     );
 
-    // Alice's mock transport has Bob's payload available to read
     let alice_transport = MockBLETransport::with_peer_payload(&bob_ble.to_bytes());
-    // Bob's mock transport has Alice's payload available to read
     let bob_transport = MockBLETransport::with_peer_payload(&alice_ble.to_bytes());
 
-    // Alice's side: scan, connect, read Bob's payload
     alice_transport.start_scanning().unwrap();
     alice_transport.connect("bob-device").unwrap();
     let bob_payload_bytes = alice_transport
         .read_characteristic(CHAR_EXCHANGE_PAYLOAD)
         .unwrap();
 
-    // Bob's side: advertise, read Alice's payload
     bob_transport.start_advertising(&bob_ble).unwrap();
     let alice_payload_bytes = bob_transport
         .read_characteristic(CHAR_EXCHANGE_PAYLOAD)
         .unwrap();
 
-    // Parse payloads
     let bob_received = ExchangeBle::from_bytes(&bob_payload_bytes).unwrap();
     let alice_received = ExchangeBle::from_bytes(&alice_payload_bytes).unwrap();
 
     assert!(bob_received.verify_signature());
     assert!(alice_received.verify_signature());
 
-    // Symmetric DH
     let alice_shared = alice_eph
         .diffie_hellman(bob_received.exchange_key())
         .unwrap();
@@ -709,7 +683,6 @@ fn test_ble_full_exchange_with_mock_transport() {
         "BLE exchange should produce matching keys"
     );
 
-    // Write card data via GATT
     alice_transport
         .write_characteristic(CHAR_CARD_EXCHANGE, b"alice-encrypted-card")
         .unwrap();
@@ -717,18 +690,15 @@ fn test_ble_full_exchange_with_mock_transport() {
         .write_characteristic(CHAR_CARD_EXCHANGE, b"bob-encrypted-card")
         .unwrap();
 
-    // Disconnect
     alice_transport.disconnect().unwrap();
     bob_transport.disconnect().unwrap();
 
-    // Verify written data
     let alice_written = alice_transport.get_written();
     assert_eq!(alice_written.len(), 1);
     assert_eq!(alice_written[0].0, CHAR_CARD_EXCHANGE);
 }
 
 // ============================================================
-// BLE error variants
 // ============================================================
 
 // @scenario: ble_exchange :: BLE error variants have proper display messages

@@ -265,7 +265,6 @@ impl AppEngine {
                     .as_any_mut()
                     .and_then(|a| a.downcast_mut::<MyInfoEntryDetailEngine>());
                 if let Some(engine) = engine {
-                    // Find current state and toggle
                     let is_visible = engine
                         .groups
                         .iter()

@@ -41,7 +41,6 @@ fn ensure_init() {
 }
 
 // ============================================================
-// Locale Support
 // ============================================================
 
 /// Test: All target locales are available
@@ -100,7 +99,6 @@ fn test_locale_info() {
 }
 
 // ============================================================
-// String Localization
 // ============================================================
 
 /// Test: Basic strings are localized
@@ -109,19 +107,15 @@ fn test_locale_info() {
 fn test_basic_string_localization() {
     ensure_init();
 
-    // English
     let en = get_string(Locale::English, "welcome.title");
     assert_eq!(en, "Welcome to Vauchi");
 
-    // German
     let de = get_string(Locale::German, "welcome.title");
     assert_eq!(de, "Willkommen bei Vauchi");
 
-    // French
     let fr = get_string(Locale::French, "welcome.title");
     assert_eq!(fr, "Bienvenue sur Vauchi");
 
-    // Spanish
     let es = get_string(Locale::Spanish, "welcome.title");
     assert_eq!(es, "Bienvenido a Vauchi");
 }
@@ -172,7 +166,6 @@ fn test_missing_key_handling() {
 }
 
 // ============================================================
-// String Interpolation
 // ============================================================
 
 /// Test: String interpolation with arguments
@@ -196,7 +189,6 @@ fn test_multiple_args_interpolation() {
         "update.sent",
         &[("count", "3"), ("name", "Alice")],
     );
-    // The string should contain both interpolated values
     assert!(!result.is_empty());
 }
 
@@ -216,7 +208,6 @@ fn test_interpolation_across_locales() {
 }
 
 // ============================================================
-// Common UI Strings
 // ============================================================
 
 /// Test: Navigation strings exist
@@ -280,7 +271,6 @@ fn test_error_strings() {
 }
 
 // ============================================================
-// RTL Support
 // ============================================================
 
 /// Test: RTL detection for current locales (all LTR)
@@ -325,7 +315,6 @@ fn test_rtl_canary_no_rtl_locales_without_layout_support() {
 }
 
 // ============================================================
-// Serialization
 // ============================================================
 
 /// Test: Locale can be serialized
@@ -341,7 +330,6 @@ fn test_locale_serialization() {
 }
 
 // ============================================================
-// Full Coverage
 // ============================================================
 
 /// Test: All English strings have German translations
@@ -350,7 +338,6 @@ fn test_locale_serialization() {
 fn test_german_coverage() {
     ensure_init();
 
-    // Check a representative sample of keys
     let keys = [
         "welcome.title",
         "welcome.subtitle",
@@ -397,7 +384,6 @@ fn test_spanish_coverage() {
 }
 
 // ============================================================
-// Locale File Parity
 // ============================================================
 
 /// Test: All locale files have the same keys as English

@@ -145,7 +145,6 @@ fn short_offer_rejected() {
         "offer shorter than 90 bytes must be rejected"
     );
 
-    // Empty offer
     let result = alice.process_offer(&[]);
     assert!(result.is_err(), "empty offer must be rejected");
 }

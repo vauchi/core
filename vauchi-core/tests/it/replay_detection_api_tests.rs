@@ -87,7 +87,6 @@ fn test_replay_rejects_duplicate_payload() {
     let (alice, bob_id, bob_identity, mut bob_ratchet) = setup_alice_receiving_from_bob();
     let alice_pk = alice.identity().unwrap().signing_public_key();
 
-    // First update succeeds
     let encrypted = create_encrypted_update(
         &bob_identity,
         &mut bob_ratchet,
@@ -111,7 +110,6 @@ fn test_replay_rejects_reused_nonce_different_encryption() {
     let (alice, bob_id, bob_identity, mut bob_ratchet) = setup_alice_receiving_from_bob();
     let alice_pk = alice.identity().unwrap().signing_public_key();
 
-    // Create a delta with a specific nonce
     let old_card = ContactCard::new("Bob");
     let mut new_card = ContactCard::new("Bob V2");
     new_card
@@ -122,7 +120,6 @@ fn test_replay_rejects_reused_nonce_different_encryption() {
     let saved_nonce = delta.nonce;
     let saved_timestamp = delta.timestamp;
 
-    // Encrypt and process first update
     let delta_bytes = serde_json::to_vec(&delta).unwrap();
     let cek = ContentEncryptionKey::generate();
     let cek_ciphertext = cek.encrypt(&delta_bytes).unwrap();
@@ -168,7 +165,6 @@ fn test_replay_accepts_fresh_nonces() {
     let (alice, bob_id, bob_identity, mut bob_ratchet) = setup_alice_receiving_from_bob();
     let alice_pk = alice.identity().unwrap().signing_public_key();
 
-    // First update with unique nonce
     let encrypted1 = create_encrypted_update(
         &bob_identity,
         &mut bob_ratchet,
@@ -190,7 +186,6 @@ fn test_replay_accepts_fresh_nonces() {
     let result2 = alice.process_card_update(&bob_id, &encrypted2);
     assert!(result2.is_ok(), "Second fresh nonce should succeed");
 
-    // Verify two nonces persisted
     let nonces = alice.storage().load_replay_nonces(&bob_id).unwrap();
     assert_eq!(nonces.len(), 2, "Two distinct nonces should be persisted");
 }
@@ -201,11 +196,9 @@ fn test_replay_nonce_persisted_after_successful_update() {
     let (alice, bob_id, bob_identity, mut bob_ratchet) = setup_alice_receiving_from_bob();
     let alice_pk = alice.identity().unwrap().signing_public_key();
 
-    // No nonces initially
     let nonces_before = alice.storage().load_replay_nonces(&bob_id).unwrap();
     assert!(nonces_before.is_empty(), "No nonces before any update");
 
-    // Process a valid update
     let encrypted = create_encrypted_update(
         &bob_identity,
         &mut bob_ratchet,
@@ -215,7 +208,6 @@ fn test_replay_nonce_persisted_after_successful_update() {
     );
     alice.process_card_update(&bob_id, &encrypted).unwrap();
 
-    // Nonce should now be persisted
     let nonces_after = alice.storage().load_replay_nonces(&bob_id).unwrap();
     assert_eq!(
         nonces_after.len(),

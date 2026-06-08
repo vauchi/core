@@ -33,7 +33,6 @@ fn make_test_card(identity: &Identity, name: &str) -> BleCardPayload {
 }
 
 // ============================================================
-// Crypto Primitive Tests
 // ============================================================
 
 // @scenario: ble_exchange :: X25519 shared secret symmetry
@@ -486,7 +485,6 @@ fn test_commitment_mismatch_rejected() {
         )
         .expect("process ack");
 
-    // Send wrong commitment
     let bad_commitment = [0xFFu8; 32];
     let result = bob.process_committed_payload(&bad_commitment, &alice_encrypted);
     assert!(
@@ -551,7 +549,6 @@ fn test_full_handshake_happy_path() {
     // Phase 4 (Responder): Complete
     let bob_result = bob.complete_exchange(&[]).expect("bob complete exchange");
 
-    // Verify cards were exchanged correctly
     assert_eq!(
         alice_result.remote_card.display_name, "Bob",
         "Alice must have Bob's card"
@@ -561,7 +558,6 @@ fn test_full_handshake_happy_path() {
         "Bob must have Alice's card"
     );
 
-    // Verify identity keys match
     assert_eq!(
         alice_result.remote_card.identity_key,
         *bob_id.signing_public_key(),
@@ -573,7 +569,6 @@ fn test_full_handshake_happy_path() {
         "Bob's remote card identity key must be Alice's"
     );
 
-    // Verify CRC16
     assert!(
         alice_result.remote_card.verify_crc16(),
         "Decrypted remote card must pass CRC16"
@@ -583,7 +578,6 @@ fn test_full_handshake_happy_path() {
         "Decrypted remote card must pass CRC16"
     );
 
-    // Verify fields transferred
     assert_eq!(
         alice_result.remote_card.fields,
         vec![("email".to_string(), "test@example.com".to_string())],
@@ -684,7 +678,6 @@ fn test_expired_key_offer_rejected() {
 }
 
 // ============================================================
-// Self-Exchange Prevention
 // ============================================================
 
 // @scenario: ble_exchange :: Self-exchange rejected in handshake
@@ -734,7 +727,6 @@ fn test_initiator_process_key_ack_rejects_self_identity() {
     // same identity key, so the ack the attacker produces is
     // structurally identical to a legitimate ack from Alice's own
     // perspective except the `their_identity` field equals
-    // Alice's own identity.
     let mut alice = BleHandshakeSession::new_initiator(
         &identity,
         card.clone(),
@@ -752,7 +744,6 @@ fn test_initiator_process_key_ack_rejects_self_identity() {
     // `create_key_offer`).
     let alice_identity: [u8; 32] = offer[1..33].try_into().expect("identity slice is 32 bytes");
 
-    // Build a structurally-valid ack via a non-matching responder
     // (process_key_offer on a same-identity responder would reject
     // the offer up-front per test_self_exchange_rejected), then
     // forge the their_identity field to Alice's own.
@@ -793,7 +784,6 @@ fn test_initiator_process_key_ack_rejects_self_identity() {
 // regardless of its content. Defends against stuck handshakes and a
 // degenerate replay where an attacker holds a captured ack for later
 // delivery. Mirrors the responder-side `test_expired_key_offer_rejected`.
-// Regression for
 // _private/docs/problems/2026-05-21-ble-initiator-missing-checks/
 // (Option B: deferred timestamp half).
 // @scenario: ble_exchange :: Initiator rejects ack after session timeout
@@ -823,7 +813,6 @@ fn test_initiator_process_key_ack_rejects_expired_session() {
 }
 
 // ============================================================
-// Edge Cases
 // ============================================================
 
 // @scenario: ble_exchange :: Complete exchange rejected in wrong state

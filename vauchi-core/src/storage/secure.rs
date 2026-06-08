@@ -179,7 +179,6 @@ impl FileKeyStorage {
                 StorageError::Encryption(format!("Failed to open file for overwrite: {}", e))
             })?;
 
-        // Pass 1: Overwrite with random data
         let mut random = vec![0u8; size];
         crate::crypto::random_fill(&mut random);
         file.write_all(&random).map_err(|e| {
@@ -189,7 +188,6 @@ impl FileKeyStorage {
             StorageError::Encryption(format!("Failed to sync after random overwrite: {}", e))
         })?;
 
-        // Pass 2: Overwrite with zeros
         file.seek(std::io::SeekFrom::Start(0)).map_err(|e| {
             StorageError::Encryption(format!("Failed to seek for zero overwrite: {}", e))
         })?;
@@ -200,7 +198,6 @@ impl FileKeyStorage {
             StorageError::Encryption(format!("Failed to sync after zero overwrite: {}", e))
         })?;
 
-        // Close handle, then remove file
         drop(file);
         std::fs::remove_file(path)
             .map_err(|e| StorageError::Encryption(format!("Failed to remove file: {}", e)))?;
@@ -211,20 +208,16 @@ impl FileKeyStorage {
 
 impl SecureStorage for FileKeyStorage {
     fn save_key(&self, name: &str, key: &[u8]) -> Result<(), StorageError> {
-        // Ensure directory exists
         std::fs::create_dir_all(&self.path)
             .map_err(|e| StorageError::Encryption(format!("Failed to create directory: {}", e)))?;
 
-        // Encrypt the key
         let encrypted = crate::crypto::encrypt(&self.encryption_key, key)
             .map_err(|e| StorageError::Encryption(format!("Encryption failed: {}", e)))?;
 
-        // Write to file
         let file_path = self.key_file_path(name);
         std::fs::write(&file_path, &encrypted)
             .map_err(|e| StorageError::Encryption(format!("Failed to write key file: {}", e)))?;
 
-        // Restrict file permissions to owner-only on Unix
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -240,16 +233,13 @@ impl SecureStorage for FileKeyStorage {
     fn load_key(&self, name: &str) -> Result<Option<Vec<u8>>, StorageError> {
         let file_path = self.key_file_path(name);
 
-        // Check if file exists
         if !file_path.exists() {
             return Ok(None);
         }
 
-        // Read encrypted data
         let encrypted = std::fs::read(&file_path)
             .map_err(|e| StorageError::Encryption(format!("Failed to read key file: {}", e)))?;
 
-        // Decrypt
         let key = crate::crypto::decrypt(&self.encryption_key, &encrypted)
             .map_err(|e| StorageError::Encryption(format!("Decryption failed: {}", e)))?;
 
@@ -325,10 +315,6 @@ mod tests {
     use crate::crypto::SymmetricKey;
     use tempfile::TempDir;
 
-    // =============================================================================
-    // SecureStorage Trait Tests (TDD - RED/GREEN phase)
-    // =============================================================================
-
     #[test]
     fn test_memory_storage_save_load() {
         let storage = MemoryKeyStorage::new();
@@ -369,10 +355,6 @@ mod tests {
         let loaded = storage.load_key("test_key").unwrap();
         assert_eq!(loaded, Some(vec![4, 5, 6]));
     }
-
-    // =============================================================================
-    // FileKeyStorage Tests
-    // =============================================================================
 
     #[test]
     fn test_file_storage_save_load() {
@@ -419,14 +401,11 @@ mod tests {
         let secret_key = vec![0x42; 32];
         storage.save_key("secret", &secret_key).unwrap();
 
-        // Read the file directly - it should be encrypted
         let file_content = std::fs::read(temp_dir.path().join("secret.key")).unwrap();
 
-        // File content should NOT equal the plaintext key
         assert_ne!(file_content, secret_key);
         assert!(file_content.len() > secret_key.len()); // Encrypted data has overhead
 
-        // But loading through the storage should return the original
         let loaded = storage.load_key("secret").unwrap();
         assert_eq!(loaded, Some(secret_key));
     }
@@ -440,10 +419,8 @@ mod tests {
         let storage1 = FileKeyStorage::new(temp_dir.path().to_path_buf(), encryption_key1);
         let storage2 = FileKeyStorage::new(temp_dir.path().to_path_buf(), encryption_key2);
 
-        // Save with key1
         storage1.save_key("test", &[1, 2, 3]).unwrap();
 
-        // Try to load with key2 - should fail
         let result = storage2.load_key("test");
         result.expect_err("expected error");
     }
@@ -481,7 +458,6 @@ mod tests {
         storage.secure_delete_key("secret").unwrap();
         assert!(!storage.has_key("secret").unwrap());
 
-        // File should not exist on disk
         let file_path = temp_dir.path().join("secret.key");
         assert!(!file_path.exists());
     }
@@ -500,14 +476,10 @@ mod tests {
         let original_size = original_content.len();
         assert!(original_size > 0);
 
-        // Manually perform the overwrite steps to verify content changes
-        // First, verify we can read the encrypted content
         assert!(file_path.exists());
 
-        // Now securely delete
         storage.secure_delete_key("overwrite_test").unwrap();
 
-        // File should be gone
         assert!(!file_path.exists());
     }
 
@@ -517,7 +489,6 @@ mod tests {
         let encryption_key = SymmetricKey::generate();
         let storage = FileKeyStorage::new(temp_dir.path().to_path_buf(), encryption_key);
 
-        // Deleting a key that doesn't exist should succeed silently
         let result = storage.secure_delete_key("nonexistent");
         result.expect("expected success");
     }
@@ -529,7 +500,6 @@ mod tests {
         storage.save_key("test", &[1, 2, 3]).unwrap();
         assert!(storage.has_key("test").unwrap());
 
-        // MemoryKeyStorage uses the default impl which delegates to delete_key
         storage.secure_delete_key("test").unwrap();
         assert!(!storage.has_key("test").unwrap());
     }
@@ -540,21 +510,14 @@ mod tests {
         let encryption_key = SymmetricKey::generate();
         let storage = FileKeyStorage::new(temp_dir.path().to_path_buf(), encryption_key);
 
-        // Try to use path traversal in name
         storage.save_key("../../../etc/passwd", &[1, 2, 3]).unwrap();
 
-        // Should be sanitized and saved as a safe filename
         let safe_path = temp_dir.path().join("_________etc_passwd.key");
         assert!(safe_path.exists());
 
-        // The parent directory should NOT have any new files
         let parent_dir = temp_dir.path().parent().unwrap();
         assert!(!parent_dir.join("etc").exists());
     }
-
-    // =============================================================================
-    // Platform Keyring Tests (only run when secure-storage feature is enabled)
-    // =============================================================================
 
     #[cfg(feature = "secure-storage")]
     mod keyring_tests {
@@ -575,14 +538,12 @@ mod tests {
             let storage = PlatformKeyring::new("vauchi-test-unit");
             let key = vec![0x42; 32];
 
-            // Clean up from any previous failed tests
             let _ = storage.delete_key("test_key_1");
 
             storage.save_key("test_key_1", &key).unwrap();
             let loaded = storage.load_key("test_key_1").unwrap();
             assert_eq!(loaded, Some(key));
 
-            // Clean up
             storage.delete_key("test_key_1").unwrap();
         }
 
@@ -599,7 +560,6 @@ mod tests {
         fn test_platform_keyring_delete() {
             let storage = PlatformKeyring::new("vauchi-test-unit");
 
-            // Clean up from any previous failed tests
             let _ = storage.delete_key("test_key_2");
 
             storage.save_key("test_key_2", &[1, 2, 3]).unwrap();

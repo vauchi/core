@@ -339,7 +339,6 @@ impl BleHandshakeSession {
             ));
         }
 
-        // Parse KeyOffer
         if their_offer.len() < KEY_OFFER_SIZE {
             return Err(ExchangeError::InvalidBleFormat);
         }
@@ -367,19 +366,16 @@ impl BleHandshakeSession {
                 .map_err(|_| ExchangeError::InvalidBleFormat)?,
         );
 
-        // Self-exchange check
         if their_identity == self.our_identity_key {
             return Err(ExchangeError::SelfExchange);
         }
 
-        // Expiry check
         if now.saturating_sub(their_timestamp) > BLE_HANDSHAKE_EXPIRY_SECS {
             return Err(ExchangeError::BleExpired);
         }
 
         let exchange_id = compute_exchange_id(&their_identity, &their_ephemeral);
 
-        // Idempotency check
         if self.completed_cache.contains_key(&exchange_id) {
             return Err(ExchangeError::InvalidState(
                 "Exchange already processed".into(),
@@ -400,7 +396,6 @@ impl BleHandshakeSession {
         // Build AAD: sender_identity || receiver_identity || timestamp
         let aad = build_aad(&self.our_identity_key, &their_identity, self.our_timestamp);
 
-        // Encrypt our card
         let plaintext = self
             .our_card
             .to_bytes()
@@ -483,7 +478,6 @@ impl BleHandshakeSession {
             return Err(ExchangeError::BleExpired);
         }
 
-        // Parse v3 KeyAck
         if their_ack.len() < KEY_ACK_SIZE {
             return Err(ExchangeError::InvalidBleFormat);
         }
@@ -549,7 +543,6 @@ impl BleHandshakeSession {
             their_nonce: &their_nonce,
         })?;
 
-        // Decrypt their card
         let their_aad = build_aad(&their_identity, &self.our_identity_key, their_ack_timestamp);
         let their_plaintext =
             encryption::decrypt_with_ad(&session_key, their_encrypted_card, &their_aad)
@@ -561,7 +554,6 @@ impl BleHandshakeSession {
             return Err(ExchangeError::BleDecryptionFailed);
         }
 
-        // Encrypt our card
         let our_aad = build_aad(&self.our_identity_key, &their_identity, self.our_timestamp);
         let our_plaintext = self
             .our_card
@@ -570,7 +562,6 @@ impl BleHandshakeSession {
         let our_encrypted = encryption::encrypt_with_ad(&session_key, &our_plaintext, &our_aad)
             .map_err(|_| ExchangeError::CryptoError)?;
 
-        // Compute our commitment
         let our_commitment = compute_commitment(&our_encrypted);
 
         self.session_key = Some(session_key);
@@ -616,7 +607,6 @@ impl BleHandshakeSession {
             }
         };
 
-        // Verify commitment
         let computed = compute_commitment(their_encrypted_card);
         let their_commitment_arr: [u8; 32] = their_commitment
             .try_into()

@@ -70,7 +70,6 @@ pub enum ContactError {
 /// visibility rules, and trust state. Imported contacts have no crypto fields.
 #[derive(Clone, Debug)]
 pub struct Contact {
-    // === Shared fields (both kinds) ===
     /// Their public key fingerprint (unique identifier) for exchanged contacts,
     /// or a UUID v4 for imported contacts.
     id: String,
@@ -80,7 +79,6 @@ pub struct Contact {
     card: ContactCard,
     /// Distinguishes exchanged (crypto) from imported (no crypto) contacts.
     kind: ContactKind,
-    // === Local-only flags (safe for both kinds) ===
     /// Whether this contact is hidden from the main contact list.
     hidden: bool,
     /// Whether this contact is blocked.
@@ -330,10 +328,6 @@ impl Contact {
         }
     }
 
-    // ========================================
-    // Kind accessors
-    // ========================================
-
     /// Returns the contact kind (Exchanged or Imported).
     pub fn kind(&self) -> &ContactKind {
         &self.kind
@@ -348,10 +342,6 @@ impl Contact {
     pub fn is_imported(&self) -> bool {
         self.kind.is_imported()
     }
-
-    // ========================================
-    // Shared getters (work for both kinds)
-    // ========================================
 
     /// Returns the contact's unique ID (public key fingerprint or UUID).
     pub fn id(&self) -> &str {
@@ -377,10 +367,6 @@ impl Contact {
     pub fn set_card_updated_at(&mut self, timestamp: Option<u64>) {
         self.card_updated_at = timestamp;
     }
-
-    // ========================================
-    // Exchanged-only getters (return Option)
-    // ========================================
 
     /// Returns the contact's public key, if this is an exchanged contact.
     pub fn public_key(&self) -> Option<&[u8; 32]> {
@@ -469,10 +455,6 @@ impl Contact {
             .exchanged_data()
             .and_then(|d| d.relay_noise_pubkey.as_ref())
     }
-
-    // ========================================
-    // Exchanged-only setters
-    // ========================================
 
     /// Sets the proximity confidence level (no-op for imported contacts).
     pub fn set_proximity_confidence(&mut self, confidence: ProximityConfidence) {
@@ -666,10 +648,6 @@ impl Contact {
             .to_uppercase()
     }
 
-    // ========================================
-    // Hidden Contacts (Plausible Deniability)
-    // ========================================
-
     /// Returns whether this contact is hidden from the main contact list.
     pub fn is_hidden(&self) -> bool {
         self.hidden
@@ -690,10 +668,6 @@ impl Contact {
         self.hidden = hidden;
     }
 
-    // ========================================
-    // Blocked Contacts
-    // ========================================
-
     /// Returns whether this contact is blocked.
     pub fn is_blocked(&self) -> bool {
         self.blocked
@@ -713,10 +687,6 @@ impl Contact {
     pub fn set_blocked(&mut self, blocked: bool) {
         self.blocked = blocked;
     }
-
-    // ========================================
-    // Recovery Trust
-    // ========================================
 
     /// Returns whether this contact is trusted for recovery purposes.
     /// Returns `false` for imported contacts.
@@ -778,10 +748,6 @@ impl Contact {
         Ok(())
     }
 
-    // ========================================
-    // Proposal Trust
-    // ========================================
-
     /// Returns whether this contact is trusted for simplified contact proposals.
     /// Returns `false` for imported contacts.
     pub fn is_proposal_trusted(&self) -> bool {
@@ -826,10 +792,6 @@ impl Contact {
         Ok(())
     }
 
-    // ========================================
-    // Favorite
-    // ========================================
-
     /// Returns whether this contact is a favorite.
     pub fn is_favorite(&self) -> bool {
         self.favorite
@@ -845,10 +807,6 @@ impl Contact {
         let prefix = if self.favorite { "0" } else { "1" };
         format!("{}:{}", prefix, self.display_name.to_lowercase())
     }
-
-    // ========================================
-    // Soft-Delete
-    // ========================================
 
     /// Returns the soft-deletion timestamp, if set.
     pub fn deleted_at(&self) -> Option<u64> {
@@ -869,10 +827,6 @@ impl Contact {
     pub fn undo_soft_delete(&mut self) {
         self.deleted_at = None;
     }
-
-    // ========================================
-    // Archive
-    // ========================================
 
     /// Returns whether this contact is archived.
     pub fn is_archived(&self) -> bool {
@@ -896,10 +850,6 @@ impl Contact {
         self.archived_at = None;
     }
 
-    // ========================================
-    // Content Encryption Key (CEK)
-    // ========================================
-
     /// Returns the CEK if present.
     pub fn cek(&self) -> Option<&ContentEncryptionKey> {
         self.cek.as_ref()
@@ -914,10 +864,6 @@ impl Contact {
     pub fn clear_cek(&mut self) {
         self.cek = None;
     }
-
-    // ========================================
-    // Trust Level (derived, read-only)
-    // ========================================
 
     /// Derives the trust level from cryptographic exchange facts.
     ///
@@ -970,10 +916,6 @@ impl Contact {
         }
         TrustLevel::Standard
     }
-
-    // ========================================
-    // Utility
-    // ========================================
 
     /// Returns true if this contact should be visible in the main contact list.
     pub fn is_visible_in_main_list(&self) -> bool {

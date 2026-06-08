@@ -116,7 +116,6 @@ impl ContentCache {
 fn atomic_write(path: &Path, data: &[u8]) -> Result<(), CacheError> {
     let temp_path = path.with_extension("tmp");
 
-    // Write to temp file
     fs::write(&temp_path, data)?;
 
     // Atomic rename

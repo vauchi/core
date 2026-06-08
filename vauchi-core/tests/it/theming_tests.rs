@@ -26,7 +26,6 @@ use vauchi_app::content::{
 use vauchi_app::theme::{Theme, ThemeError, ThemeMode, validate_hex_color};
 
 // ============================================================
-// Theme Preview Before Apply
 // Feature: theming.feature @selection
 // Scenario: Preview theme before applying
 // ============================================================
@@ -84,16 +83,13 @@ fn test_theme_preview_before_apply() {
     // Start preview (in-memory only, not persisted)
     let preview = ThemePreview::start_preview(current_theme_id, preview_theme.clone());
 
-    // Then the app should preview the theme colors
     assert!(preview.is_preview_active);
     let active = preview.active_theme().expect("Should have active theme");
     assert_eq!(active.id, "catppuccin-mocha");
     assert_eq!(active.colors.bg_primary, "#1e1e2e");
 
-    // Verify original theme is unchanged
     assert_eq!(preview.original_theme_id, current_theme_id);
 
-    // The preview should not affect persisted state
     // (In real implementation, storage would not be written to)
     assert_eq!(current_theme.id, "default-dark");
 }
@@ -113,14 +109,11 @@ fn test_theme_preview_cancel_returns_to_original() {
 
     let mut preview = ThemePreview::start_preview(current_theme_id, preview_theme);
 
-    // Verify preview is active
     assert!(preview.is_preview_active);
     assert_eq!(preview.active_theme().unwrap().id, "dracula");
 
-    // Cancel the preview
     preview.cancel();
 
-    // Should return to original theme
     assert!(!preview.is_preview_active);
     let active = preview.active_theme().expect("Should have active theme");
     assert_eq!(active.id, "default-dark");
@@ -139,22 +132,18 @@ fn test_theme_preview_sequence() {
     };
     let original_id = "default-light";
 
-    // Preview first theme
     let theme1 = theme_by_id("nord").unwrap();
     let preview = ThemePreview::start_preview(original_id, theme1);
     assert_eq!(preview.active_theme().unwrap().id, "nord");
 
-    // Switch preview to another theme
     let theme2 = theme_by_id("gruvbox-dark").unwrap();
     let preview = ThemePreview::start_preview(original_id, theme2);
     assert_eq!(preview.active_theme().unwrap().id, "gruvbox-dark");
 
-    // Original should still be preserved
     assert_eq!(preview.original_theme_id, original_id);
 }
 
 // ============================================================
-// System Dark Mode Following
 // Feature: theming.feature @system
 // Scenario: Follow system dark/light mode
 // ============================================================
@@ -199,7 +188,6 @@ impl ThemeResolver {
     fn get_theme_for_mode(&self, is_dark: bool) -> Option<Theme> {
         let suffix = if is_dark { "dark" } else { "light" };
 
-        // Try family-specific variant first
         let family_variant: String = match self.selected_theme_family.as_str() {
             "catppuccin" => {
                 if is_dark {
@@ -286,7 +274,6 @@ fn test_override_system_preference() {
     // And the user has explicitly selected "Catppuccin Mocha" (dark)
     let resolver = ThemeResolver::new(SystemThemePreference::Dark, "catppuccin");
 
-    // Then the app should use dark theme regardless of system setting
     let theme = resolver.resolve(false).expect("Should resolve theme"); // system is light
     assert_eq!(theme.mode, ThemeMode::Dark);
     assert_eq!(theme.id, "catppuccin-mocha");
@@ -304,11 +291,9 @@ fn test_solarized_auto_switching() {
     };
     let resolver = ThemeResolver::new(SystemThemePreference::System, "solarized");
 
-    // Dark mode
     let theme = resolver.resolve(true).unwrap();
     assert_eq!(theme.id, "solarized-dark");
 
-    // Light mode
     let theme = resolver.resolve(false).unwrap();
     assert_eq!(theme.id, "solarized-light");
 }
@@ -325,7 +310,6 @@ fn test_force_light_preference() {
     // Given the user has explicitly selected light preference
     let resolver = ThemeResolver::new(SystemThemePreference::Light, "gruvbox");
 
-    // Then the app should use light theme regardless of system setting
     let theme = resolver.resolve(true).expect("Should resolve theme"); // system is dark
     assert_eq!(theme.mode, ThemeMode::Light);
     assert_eq!(theme.id, "gruvbox-light");
@@ -337,7 +321,6 @@ fn test_force_light_preference() {
 }
 
 // ============================================================
-// Accent Color Customization
 // Feature: theming.feature @accent
 // Scenario: Choose accent color within theme
 // ============================================================
@@ -441,7 +424,6 @@ fn test_accent_color_customization() {
     let base = theme_by_id("catppuccin-mocha").unwrap();
     let default_accent = base.colors.accent.clone();
 
-    // Default accent should be blue
     assert_eq!(default_accent, "#89b4fa");
 
     // When the user selects "mauve" accent
@@ -449,7 +431,6 @@ fn test_accent_color_customization() {
         .with_accent(CatppuccinAccent::Mauve.mocha_hex())
         .unwrap();
 
-    // Then the accent color should be mauve
     assert_eq!(customized.effective_accent(), "#cba6f7");
 
     // The base theme accent is unchanged
@@ -484,7 +465,6 @@ fn test_invalid_accent_rejected() {
     let base = theme_by_id("default-dark").unwrap();
     let customized = CustomizedTheme::new(base);
 
-    // Invalid hex should be rejected
     assert!(
         customized.with_accent("not-a-color").is_err(),
         "expected error"
@@ -518,12 +498,10 @@ fn test_custom_accent_persists() {
         CustomizedTheme::new(base)
     };
 
-    // Then the "mauve" accent color should still be applied
     assert_eq!(restored.effective_accent(), "#cba6f7");
 }
 
 // ============================================================
-// Remote Theme Updates
 // Feature: theming.feature @remote
 // Scenario: Theme update with existing selection
 // ============================================================
@@ -578,7 +556,6 @@ fn test_remote_theme_updates() {
         )
         .unwrap();
 
-    // Verify cache was written
     let cached = cache.get_content(ContentType::Themes, "themes.json");
     assert!(cached.is_some(), "expected Some value");
     let cached_data = cached.unwrap();
@@ -612,13 +589,11 @@ fn test_new_theme_after_update() {
         )
         .unwrap();
 
-    // Parse cached themes
     let cached = cache
         .get_content(ContentType::Themes, "themes.json")
         .expect("Themes should be cached");
     let themes: Vec<Theme> = serde_json::from_slice(&cached).unwrap();
 
-    // Tokyo Night should now appear in theme selection
     assert!(
         themes.iter().any(|t| t.id == "tokyo-night"),
         "Tokyo Night should be available after update"
@@ -649,7 +624,6 @@ fn test_bundled_themes_always_available() {
     // When the user views available themes
     let bundled = all_themes();
 
-    // Then "Default Dark" and "Default Light" should be available
     assert!(
         bundled.iter().any(|t| t.id == "default-dark"),
         "Default Dark should be bundled"
@@ -659,7 +633,6 @@ fn test_bundled_themes_always_available() {
         "Default Light should be bundled"
     );
 
-    // And manager should work without network
     let networks = manager.networks();
     assert!(!networks.is_empty(), "Bundled content should work offline");
 }
@@ -684,13 +657,11 @@ fn test_theme_selection_preserved_after_update() {
     // (simulated by theme still existing with same ID but updated colors)
     let updated_theme = theme_by_id(&settings.selected_theme_id);
 
-    // Then the user's theme selection should be preserved
     assert!(updated_theme.is_some(), "expected Some value");
     assert_eq!(updated_theme.unwrap().id, "catppuccin-mocha");
 }
 
 // ============================================================
-// QR Code Theming Consistency
 // Feature: theming.feature @qr
 // Scenario: QR code remains readable in any theme
 // ============================================================
@@ -716,7 +687,6 @@ impl QrCodeDisplay {
             // QR itself always uses standard black-on-white for readability
             background: Self::STANDARD_BACKGROUND.to_string(),
             foreground: Self::STANDARD_FOREGROUND.to_string(),
-            // Container uses theme background
             container_bg: theme.colors.bg_primary.clone(),
         }
     }
@@ -777,7 +747,6 @@ fn test_qr_code_theming_consistency() {
     for theme in all_themes() {
         let qr_display = QrCodeDisplay::for_theme(&theme);
 
-        // QR code itself should remain standard black-on-white
         assert_eq!(
             qr_display.foreground,
             QrCodeDisplay::STANDARD_FOREGROUND,
@@ -791,7 +760,6 @@ fn test_qr_code_theming_consistency() {
             theme.id
         );
 
-        // Container should match theme
         assert_eq!(
             qr_display.container_bg, theme.colors.bg_primary,
             "Container should use theme bg for {}",
@@ -806,7 +774,6 @@ fn test_qr_code_theming_consistency() {
 // @scenario: theming :: QR code remains readable in any theme
 #[test]
 fn test_qr_code_high_contrast() {
-    // QR codes should display with high contrast
     let contrast = QrCodeDisplay::contrast_ratio(
         QrCodeDisplay::STANDARD_BACKGROUND,
         QrCodeDisplay::STANDARD_FOREGROUND,
@@ -864,7 +831,6 @@ fn test_qr_container_contrast_with_dark_theme() {
     let container_qr_contrast =
         QrCodeDisplay::contrast_ratio(&qr_display.container_bg, &qr_display.background).unwrap();
 
-    // Should have good contrast for visual separation
     assert!(
         container_qr_contrast > 10.0,
         "Dark container should contrast with white QR: {:.2}",

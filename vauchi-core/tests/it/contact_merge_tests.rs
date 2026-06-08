@@ -125,7 +125,6 @@ fn test_duplicates_sorted_by_similarity() {
     ];
     let dups = find_duplicates(&contacts);
     assert!(dups.len() >= 2);
-    // First duplicate should have higher similarity
     assert!(dups[0].similarity >= dups[1].similarity);
 }
 
@@ -172,7 +171,6 @@ fn test_duplicate_detection_nfc_vs_nfd() {
     let nfc_contact = make_contact("Jos\u{00E9}", &[]); // NFC: é
     let nfd_contact = make_contact("Jose\u{0301}", &[]); // NFD: e + combining acute
 
-    // After normalization in ContactCard::new, both should have identical names
     assert_eq!(
         nfc_contact.card().display_name(),
         nfd_contact.card().display_name(),
@@ -226,7 +224,6 @@ fn cross_kind_dedup_finds_phone_match() {
 // @internal
 #[test]
 fn different_phones_stay_below_threshold() {
-    // Contacts with different phone numbers should not be flagged as duplicates
     // from phone alone (need name match too).
     let a = make_contact(
         "Alice Smith",

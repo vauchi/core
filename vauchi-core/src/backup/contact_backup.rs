@@ -215,25 +215,20 @@ impl ContactBackupEntry {
 ///
 /// `CONTACT_BACKUP_VERSION (0x01) || salt (16 bytes) || ciphertext`
 pub fn export_contact_backup(contacts: &[Contact], password: &str) -> Result<Vec<u8>, BackupError> {
-    // Build the entries
     let entries: Vec<ContactBackupEntry> = contacts
         .iter()
         .map(ContactBackupEntry::from_contact)
         .collect::<Result<Vec<_>, _>>()?;
 
-    // Serialize to JSON
     let plaintext = Zeroizing::new(
         serde_json::to_vec(&entries).map_err(|e| BackupError::Serialization(e.to_string()))?,
     );
 
-    // Generate random 16-byte salt
     let salt: [u8; 16] = random_bytes();
 
-    // Derive encryption key
     let key =
         derive_key_argon2id(password.as_bytes(), &salt).map_err(|_| BackupError::KeyDerivation)?;
 
-    // Encrypt
     let ciphertext =
         encrypt(&key, &plaintext).map_err(|e| BackupError::EncryptionFailed(e.to_string()))?;
 

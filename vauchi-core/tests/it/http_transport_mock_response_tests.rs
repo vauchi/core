@@ -394,7 +394,6 @@ fn http_413_payload_too_large_maps_to_connection_failed() {
 }
 
 // ============================================================
-// X-Compat-Version header negotiation
 // ============================================================
 
 // @internal

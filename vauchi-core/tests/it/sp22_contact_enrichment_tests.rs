@@ -16,10 +16,8 @@ fn test_contact_card_nickname_field_add_and_retrieve() {
     // RED: ContactCard doesn't have nickname() method yet
     let mut card = ContactCard::new("Alice");
 
-    // Should be able to set nickname
     card.set_nickname("Al");
 
-    // Should be able to get nickname
     assert_eq!(card.nickname(), Some("Al"));
 }
 
@@ -30,7 +28,6 @@ fn test_contact_card_nickname_field_empty_clears() {
     let mut card = ContactCard::new("Alice");
     card.set_nickname("Al");
 
-    // Setting empty string should clear it
     card.set_nickname("");
 
     assert_eq!(card.nickname(), None);
@@ -39,14 +36,12 @@ fn test_contact_card_nickname_field_empty_clears() {
 // @internal
 #[test]
 fn test_contact_card_nickname_field_max_length() {
-    // RED: Nickname should respect max length constraint
     let mut card = ContactCard::new("Alice");
 
     // Max length should be 100 chars (or similar)
     let long_nickname = "a".repeat(101);
     card.set_nickname(&long_nickname);
 
-    // Should truncate to max length
     let nickname = card.nickname().unwrap();
     assert!(nickname.len() <= 100);
 }
@@ -71,34 +66,28 @@ fn test_birthday_field_iso8601_valid_date() {
 // @internal
 #[test]
 fn test_birthday_field_iso8601_invalid_date_format() {
-    // RED: Birthday validation should reject non-ISO 8601 formats
     use vauchi_core::contact_card::ContactField;
 
     let field = ContactField::new(FieldType::Birthday, "Birthday", "03/15/1995", 0);
 
-    // Should reject non-ISO 8601 format
     field.validate().expect_err("expected error");
 }
 
 // @internal
 #[test]
 fn test_birthday_field_iso8601_invalid_date_value() {
-    // RED: Birthday validation should reject impossible dates
     use vauchi_core::contact_card::ContactField;
 
     let field = ContactField::new(FieldType::Birthday, "Birthday", "2025-13-45", 0);
 
-    // Should reject invalid date components
     field.validate().expect_err("expected error");
 }
 
 // @internal
 #[test]
 fn test_contact_card_single_birthday_constraint() {
-    // RED: ContactCard should enforce single birthday
     let mut card = ContactCard::new("Alice");
 
-    // Add first birthday
     use vauchi_core::contact_card::ContactField;
     let birthday1 = ContactField::new(FieldType::Birthday, "Birthday", "1995-03-15", 0);
     card.add_field(birthday1)
@@ -108,7 +97,6 @@ fn test_contact_card_single_birthday_constraint() {
     let birthday2 = ContactField::new(FieldType::Birthday, "Birthday", "1990-01-01", 0);
     let result = card.add_field(birthday2);
 
-    // Should reject second birthday
     result.expect_err("expected error");
     assert_eq!(card.fields().len(), 1);
 }
@@ -116,7 +104,6 @@ fn test_contact_card_single_birthday_constraint() {
 // @internal
 #[test]
 fn test_birthday_field_leap_year_valid() {
-    // RED: Birthday should validate leap year dates
     use vauchi_core::contact_card::ContactField;
 
     let field = ContactField::new(FieldType::Birthday, "Birthday", "2000-02-29", 0);
@@ -126,7 +113,6 @@ fn test_birthday_field_leap_year_valid() {
 // @internal
 #[test]
 fn test_birthday_field_leap_year_invalid() {
-    // RED: Birthday should reject invalid leap year dates
     use vauchi_core::contact_card::ContactField;
 
     let field = ContactField::new(FieldType::Birthday, "Birthday", "1900-02-29", 0);

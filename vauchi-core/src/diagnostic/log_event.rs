@@ -39,7 +39,6 @@ pub enum ScreenId {
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum LogEventKind {
-    // --- Camera / QR tuner events ---
     DecodeSuccess {
         latency_ms: f32,
         frame_index: u32,
@@ -79,7 +78,6 @@ pub enum LogEventKind {
         path: String,
     },
 
-    // --- UX instrumentation events ---
     /// A screen became visible.
     ScreenAppeared {
         screen: ScreenId,

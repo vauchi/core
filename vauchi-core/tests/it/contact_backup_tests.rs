@@ -50,7 +50,6 @@ fn contact_backup_roundtrip() {
     let restored = import_contact_backup(&blob, password).unwrap();
     assert_eq!(restored.len(), 2, "must restore exactly 2 contacts");
 
-    // Order is preserved
     let r_alice = &restored[0];
     let r_bob = &restored[1];
 
@@ -163,7 +162,6 @@ fn contact_backup_truncated_data_fails() {
 // @internal
 #[test]
 fn contact_backup_unknown_version_fails() {
-    // Build a blob with an invalid version byte but enough salt+data
     let mut fake = vec![0xFFu8]; // unsupported version
     fake.extend_from_slice(&[0u8; 48]); // salt + some ciphertext-like bytes
     let result = import_contact_backup(&fake, "password");

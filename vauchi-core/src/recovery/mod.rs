@@ -84,10 +84,6 @@ pub enum RecoveryError {
     InvalidProof(String),
 }
 
-// =============================================================================
-// Recovery Response
-// =============================================================================
-
 /// Response to a recovery claim from another user.
 ///
 /// When a contact presents a recovery claim, the user can:
@@ -126,10 +122,6 @@ impl RecoveryResponse {
         }
     }
 }
-
-// =============================================================================
-// Recovery Rate Limiter
-// =============================================================================
 
 /// Rate limiter for recovery claims to prevent abuse.
 ///
@@ -171,10 +163,8 @@ impl RecoveryRateLimiter {
         let window_expired = now.saturating_sub(window_start) >= 3600;
 
         if window_expired {
-            // Window expired, new claim is always allowed
             true
         } else {
-            // Within the window, check count
             claim_count < self.max_claims_per_hour
         }
     }
@@ -324,7 +314,6 @@ impl RecoveryVoucher {
             return Err(RecoveryError::ClaimExpired);
         }
 
-        // Prevent self-vouching
         if voucher_keypair.public_key().as_bytes() == claim.new_pk().as_bytes() {
             return Err(RecoveryError::SelfVouching);
         }
@@ -351,7 +340,6 @@ impl RecoveryVoucher {
         let new_pk = new_pk.into();
         let voucher_pk = IdentityKey::from_bytes(*voucher_keypair.public_key().as_bytes());
 
-        // Build data to sign
         let data = Self::build_sign_data(&old_pk, &new_pk, &voucher_pk, timestamp);
         let signature = voucher_keypair.sign(&data);
 
@@ -469,7 +457,6 @@ impl RecoveryVoucher {
             .try_into()
             .map_err(|_| RecoveryError::InvalidFormat)?;
 
-        // Parse v2 guardian token
         let guardian_token = if version >= 2 && bytes.len() > 169 {
             if bytes.len() < 173 {
                 // Need at least 4 bytes for length prefix
@@ -641,22 +628,18 @@ impl RecoveryProof {
     /// - `DuplicateVoucher` if voucher from same contact already exists
     /// - `SelfVouching` if voucher is from the recovering identity
     pub fn add_voucher(&mut self, voucher: RecoveryVoucher) -> Result<(), RecoveryError> {
-        // Verify keys match
         if voucher.old_pk() != &self.old_pk || voucher.new_pk() != &self.new_pk {
             return Err(RecoveryError::MismatchedKeys);
         }
 
-        // Prevent self-vouching (voucher_pk == new_pk)
         if voucher.voucher_pk() == &self.new_pk {
             return Err(RecoveryError::SelfVouching);
         }
 
-        // Verify signature
         if !voucher.verify() {
             return Err(RecoveryError::InvalidSignature);
         }
 
-        // Validate guardian token if present
         if let Some(ref token) = voucher.guardian_token {
             if !token.verify() {
                 return Err(RecoveryError::InvalidSignature);
@@ -671,7 +654,6 @@ impl RecoveryProof {
             }
         }
 
-        // Check for duplicate
         if self
             .vouchers
             .iter()
@@ -709,7 +691,6 @@ impl RecoveryProof {
             return Err(RecoveryError::InsufficientVouchers(self.threshold));
         }
 
-        // Check for duplicates
         let mut seen_vouchers: HashSet<IdentityKey> = HashSet::new();
         for voucher in &self.vouchers {
             if !seen_vouchers.insert(voucher.voucher_pk) {
@@ -876,10 +857,6 @@ impl RecoverySettings {
     }
 }
 
-// =============================================================================
-// Recovery Reminder
-// =============================================================================
-
 /// Tracks a dismissed recovery notification for later reminder.
 ///
 /// When a user chooses "Remind Me Later" for a recovery proof,
@@ -957,10 +934,6 @@ impl RecoveryReminder {
     }
 }
 
-// =============================================================================
-// Recovery Conflict Detection
-// =============================================================================
-
 /// Represents a conflicting claim in a recovery conflict.
 #[derive(Debug, Clone)]
 pub struct ConflictingClaim {
@@ -1004,22 +977,18 @@ impl RecoveryConflict {
             return None;
         }
 
-        // Group proofs by old_pk
         let mut by_old_pk: HashMap<IdentityKey, Vec<&RecoveryProof>> = HashMap::new();
         for proof in proofs {
             by_old_pk.entry(*proof.old_pk()).or_default().push(proof);
         }
 
-        // Check each group for conflicts (different new_pks)
         for (old_pk, group) in by_old_pk {
-            // Collect unique new_pks with their voucher counts
             let mut new_pks: HashMap<IdentityKey, usize> = HashMap::new();
             for proof in &group {
                 let entry = new_pks.entry(*proof.new_pk()).or_insert(0);
                 *entry = (*entry).max(proof.voucher_count());
             }
 
-            // Conflict if more than one unique new_pk
             if new_pks.len() > 1 {
                 let claims: Vec<ConflictingClaim> = new_pks
                     .into_iter()
@@ -1046,10 +1015,6 @@ impl RecoveryConflict {
         &self.claims
     }
 }
-
-// =============================================================================
-// Recovery Progress
-// =============================================================================
 
 /// Progress of an in-flight recovery operation.
 ///
@@ -1094,22 +1059,18 @@ impl RecoveryProgress {
     /// Checks: key binding (old_pk/new_pk match claim), signature validity,
     /// no self-vouching, no duplicates. Mirrors `RecoveryProof::add_voucher`.
     pub fn add_voucher(&mut self, voucher: RecoveryVoucher) -> Result<usize, RecoveryError> {
-        // Verify keys match the claim
         if voucher.old_pk() != self.claim.old_pk() || voucher.new_pk() != self.claim.new_pk() {
             return Err(RecoveryError::MismatchedKeys);
         }
 
-        // Prevent self-vouching (voucher_pk == new_pk)
         if voucher.voucher_pk() == self.claim.new_pk() {
             return Err(RecoveryError::SelfVouching);
         }
 
-        // Verify signature
         if !voucher.verify() {
             return Err(RecoveryError::InvalidSignature);
         }
 
-        // Check for duplicate
         if self
             .vouchers
             .iter()
@@ -1122,10 +1083,6 @@ impl RecoveryProgress {
         Ok(self.vouchers.len())
     }
 }
-
-// =============================================================================
-// Recovery Revocation
-// =============================================================================
 
 /// A signed revocation of a recovery proof.
 ///
@@ -1164,7 +1121,6 @@ impl RecoveryRevocation {
 
         let revocation_type = "recovery_revocation".to_string();
 
-        // Build signing message
         let mut msg = Vec::new();
         msg.extend_from_slice(revocation_type.as_bytes());
         msg.extend_from_slice(old_pk.as_bytes());
@@ -1202,7 +1158,6 @@ impl RecoveryRevocation {
         let pk = PublicKey::from_bytes(*self.old_pk.as_bytes());
         let sig = Signature::from_bytes(self.signature);
 
-        // Reconstruct signing message
         let mut msg = Vec::new();
         msg.extend_from_slice(self.revocation_type.as_bytes());
         msg.extend_from_slice(self.old_pk.as_bytes());

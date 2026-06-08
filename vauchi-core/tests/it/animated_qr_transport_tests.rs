@@ -39,7 +39,6 @@ fn next_frame_cycles_around() {
 
     let frame0 = session.next_frame().expect("frame 0");
     let frame1 = session.next_frame().expect("frame 1");
-    // Should wrap around
     let frame0_again = session.next_frame().expect("frame 0 again");
 
     assert_eq!(
@@ -59,12 +58,10 @@ fn receive_out_of_order_reassembles_correctly() {
 
     assert_eq!(sender.frame_count(), 3);
 
-    // Collect all frames
     let f0 = sender.next_frame().unwrap();
     let f1 = sender.next_frame().unwrap();
     let f2 = sender.next_frame().unwrap();
 
-    // Process in reverse order
     let p2 = receiver.process_frame(&f2).expect("process f2");
     assert!(matches!(
         p2,
@@ -133,18 +130,15 @@ fn duplicate_frames_ignored() {
 fn invalid_frame_rejected() {
     let mut receiver = AnimatedQrSession::new_receiver(default_config());
 
-    // Completely malformed
     let result = receiver.process_frame("not-a-valid-frame");
     assert!(result.is_err(), "malformed frame should be rejected");
 
-    // Wrong number of parts
     let result = receiver.process_frame("0/1");
     assert!(
         result.is_err(),
         "frame with too few parts should be rejected"
     );
 
-    // Non-numeric index
     let result = receiver.process_frame("abc/2/deadbeef/AAAA");
     assert!(result.is_err(), "non-numeric index should be rejected");
 }

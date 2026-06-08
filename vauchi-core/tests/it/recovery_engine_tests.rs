@@ -417,7 +417,6 @@ fn complete_screen_explains_what_is_recovered() {
 
     let screen = engine.current_screen();
 
-    // Should have info about what is/isn't recovered
     let has_recovery_info = screen.components.iter().any(|c| match c {
         Component::Text { content, .. } => {
             content.contains("contact relationships") || content.contains("NOT recovered")

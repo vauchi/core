@@ -12,8 +12,6 @@ use crate::contact_card::ContactCard;
 use crate::crypto::cek::ContentEncryptionKey;
 
 impl Storage {
-    // === Personal Notes Operations ===
-
     /// Saves personal notes for a contact, encrypting at the storage layer.
     ///
     /// The caller passes plaintext bytes; this method encrypts with the storage
@@ -79,8 +77,6 @@ impl Storage {
 
     // Contact field notes: see storage/field_notes.rs
 
-    // === Contact Count & Limits ===
-
     /// Counts the total number of contacts in storage.
     pub fn count_contacts(&self) -> Result<usize, StorageError> {
         let count: i64 = self
@@ -118,8 +114,6 @@ impl Storage {
         )?;
         Ok(())
     }
-
-    // === Own Contact Card Operations ===
 
     /// Saves the user's own contact card (encrypted).
     pub fn save_own_card(&self, card: &ContactCard) -> Result<(), StorageError> {
@@ -175,8 +169,6 @@ impl Storage {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
-
-    // === Sync Timestamp Operations ===
 
     /// Sets the last sync timestamp for a contact.
     ///
@@ -234,8 +226,6 @@ impl Storage {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
-
-    // === Content Encryption Key (CEK) Operations ===
 
     /// Saves a CEK for a contact, encrypted with the storage master key.
     ///
@@ -362,8 +352,6 @@ impl Storage {
         Ok(())
     }
 
-    // === Revoked Senders Operations ===
-
     /// Records a revoked sender in the tombstone table.
     ///
     /// Prevents future updates from this sender from being processed,
@@ -393,8 +381,6 @@ impl Storage {
             Err(e) => Err(StorageError::Database(e)),
         }
     }
-
-    // === Dismissed Duplicates Operations ===
 
     /// Records a dismissed duplicate pair.
     ///

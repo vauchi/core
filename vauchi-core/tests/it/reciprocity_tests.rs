@@ -112,7 +112,6 @@ fn reciprocity_storage_null_defaults_to_unknown() {
     let contact = make_test_contact();
     let id = contact.id().to_string();
 
-    // Save without setting reciprocity
     storage.save_contact(&contact).unwrap();
 
     let loaded = storage.load_contact(&id).unwrap().unwrap();
@@ -216,9 +215,7 @@ fn confirmation_escrow_keys_roles_are_symmetric() {
     let shared_secret = [42u8; 32];
     let init = ConfirmationEscrowKeys::derive(&shared_secret, EscrowRole::Initiator);
     let resp = ConfirmationEscrowKeys::derive(&shared_secret, EscrowRole::Responder);
-    // Same gate
     assert_eq!(init.gate_hash, resp.gate_hash);
-    // Swapped slots
     assert_eq!(init.our_slot, resp.their_slot);
     assert_eq!(init.their_slot, resp.our_slot);
 }
@@ -314,7 +311,6 @@ fn key_agreement_derives_confirmation_tokens() {
         vauchi_core::clock::SystemClock::shared(),
     );
 
-    // Both start QR
     session_a.apply(ExchangeEvent::StartQR).unwrap();
     session_b.apply(ExchangeEvent::StartQR).unwrap();
 
@@ -323,13 +319,10 @@ fn key_agreement_derives_confirmation_tokens() {
     session_a.apply(ExchangeEvent::ProcessQR(qr_b)).unwrap();
     session_a.apply(ExchangeEvent::TheyScannedOurQR).unwrap();
 
-    // Before key agreement, tokens should be None
     assert!(session_a.our_confirmation_token().is_none());
 
-    // Perform key agreement
     session_a.apply(ExchangeEvent::PerformKeyAgreement).unwrap();
 
-    // After key agreement, tokens should be populated
     let our_token = session_a
         .our_confirmation_token()
         .expect("our_confirmation_token should be set after key agreement");
@@ -340,7 +333,6 @@ fn key_agreement_derives_confirmation_tokens() {
     // Tokens must be different (asymmetric — bound to different identity keys)
     assert_ne!(our_token, their_token);
 
-    // Escrow keys should also be populated
     let (gate, our_slot, their_slot) = session_a
         .confirmation_escrow()
         .expect("confirmation escrow should be set after key agreement");

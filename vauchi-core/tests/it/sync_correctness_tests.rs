@@ -319,7 +319,6 @@ fn test_concurrent_same_field_newer_wins() {
         )
         .unwrap();
 
-    // Newer wins
     assert_eq!(applied.len(), 1);
     match &applied[0] {
         SyncItem::CardUpdated { new_value, .. } => {
@@ -422,7 +421,6 @@ fn test_checkpoint_save_load_roundtrip() {
         .save_sync_checkpoint(&target_device_id, &items, 1)
         .unwrap();
 
-    // Load and verify
     let loaded = storage.load_sync_checkpoint(&target_device_id).unwrap();
     assert!(loaded.is_some(), "Checkpoint should exist");
 
@@ -452,7 +450,6 @@ fn test_checkpoint_clear() {
         .save_sync_checkpoint(&target_device_id, &items, 0)
         .unwrap();
 
-    // Verify exists
     assert!(
         storage
             .load_sync_checkpoint(&target_device_id)
@@ -460,10 +457,8 @@ fn test_checkpoint_clear() {
             .is_some()
     );
 
-    // Clear
     storage.clear_sync_checkpoint(&target_device_id).unwrap();
 
-    // Verify gone
     assert!(
         storage
             .load_sync_checkpoint(&target_device_id)

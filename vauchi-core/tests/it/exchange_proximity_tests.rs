@@ -64,10 +64,8 @@ fn test_manual_confirmation() {
     let verifier = ManualConfirmationVerifier::new();
     let challenge = [0u8; 16];
 
-    // Before confirmation, should fail
     assert!(!verifier.is_confirmed());
 
-    // After confirmation, should succeed
     verifier.confirm();
     assert!(verifier.is_confirmed());
 

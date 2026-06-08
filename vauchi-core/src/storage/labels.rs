@@ -34,7 +34,6 @@ impl Storage {
         let name_hmac =
             self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", label.name().as_bytes());
 
-        // Encrypt display_name_override if present, NULL otherwise
         let display_name_override_encrypted: Option<Vec<u8>> = match label.display_name_override() {
             Some(override_name) => {
                 let encrypted =
@@ -106,7 +105,6 @@ impl Storage {
         let contacts_json = self.decrypt_or_fallback(label.6.as_deref(), &label.2)?;
         let fields_json = self.decrypt_or_fallback(label.7.as_deref(), &label.3)?;
 
-        // Decrypt display_name_override if present
         let display_name_override = self.decrypt_optional_blob(label.9.as_deref())?;
 
         let contacts: HashSet<String> = serde_json::from_str(&contacts_json)
@@ -348,7 +346,6 @@ impl Storage {
     ///
     /// This saves all groups and all per-contact overrides.
     pub fn save_group_manager(&self, manager: &GroupManager) -> Result<(), StorageError> {
-        // Save all groups
         for group in manager.all_groups() {
             self.save_group(group)?;
         }
@@ -368,12 +365,10 @@ impl Storage {
 
         let mut manager = GroupManager::new();
 
-        // Reconstruct groups preserving stored IDs and all fields
         for group in groups {
             manager.insert_loaded_group(group);
         }
 
-        // Add per-contact overrides
         for (contact_id, field_overrides) in overrides {
             for (field_id, is_visible) in field_overrides {
                 manager.set_contact_override(&contact_id, &field_id, is_visible);
@@ -387,7 +382,6 @@ impl Storage {
     ///
     /// Returns the created label.
     pub fn create_group(&self, name: &str) -> Result<Group, StorageError> {
-        // Validate name
         let name = name.trim();
         if name.is_empty() {
             return Err(StorageError::Serialization(
@@ -414,7 +408,6 @@ impl Storage {
             ));
         }
 
-        // Check max labels
         let count = self
             .conn
             .query_row("SELECT COUNT(*) FROM visibility_labels", [], |row| {
@@ -428,7 +421,6 @@ impl Storage {
             )));
         }
 
-        // Create and save
         let label = Group::new(name, self.clock().unix_seconds());
         self.save_group(&label)?;
 
@@ -439,7 +431,6 @@ impl Storage {
     pub fn rename_group(&self, label_id: &str, new_name: &str) -> Result<(), StorageError> {
         let new_name = new_name.trim();
 
-        // Validate new name
         if new_name.is_empty() {
             return Err(StorageError::Serialization(
                 "Label name cannot be empty".to_string(),
@@ -468,7 +459,6 @@ impl Storage {
         let name_encrypted = crate::crypto::encrypt(&self.encryption_key, new_name.as_bytes())
             .map_err(|e| StorageError::Encryption(e.to_string()))?;
 
-        // Update
         let now = self.now_secs();
 
         let changes = self.conn.execute(
@@ -489,13 +479,10 @@ impl Storage {
         label_id: &str,
         contact_id: &str,
     ) -> Result<(), StorageError> {
-        // Load the label
         let mut label = self.load_group(label_id)?;
 
-        // Add the contact
         label.add_contact(contact_id, self.clock().unix_seconds());
 
-        // Save back
         self.save_group(&label)?;
 
         Ok(())
@@ -507,13 +494,10 @@ impl Storage {
         label_id: &str,
         contact_id: &str,
     ) -> Result<(), StorageError> {
-        // Load the label
         let mut label = self.load_group(label_id)?;
 
-        // Remove the contact
         label.remove_contact(contact_id, self.clock().unix_seconds());
 
-        // Save back
         self.save_group(&label)?;
 
         Ok(())
@@ -532,7 +516,6 @@ impl Storage {
             }
         }
 
-        // Also remove per-contact overrides
         self.delete_all_contact_overrides(contact_id)?;
 
         Ok(())
@@ -545,17 +528,14 @@ impl Storage {
         field_id: &str,
         is_visible: bool,
     ) -> Result<(), StorageError> {
-        // Load the label
         let mut label = self.load_group(label_id)?;
 
-        // Update visibility
         if is_visible {
             label.add_visible_field(field_id, self.clock().unix_seconds());
         } else {
             label.remove_visible_field(field_id, self.clock().unix_seconds());
         }
 
-        // Save back
         self.save_group(&label)?;
 
         Ok(())
@@ -619,7 +599,6 @@ mod tests {
         let labels = storage.load_all_groups().unwrap();
 
         assert_eq!(labels.len(), 3);
-        // Ordered by name
         assert_eq!(labels[0].name(), "Family");
         assert_eq!(labels[1].name(), "Friends");
         assert_eq!(labels[2].name(), "Work");
@@ -701,7 +680,6 @@ mod tests {
         let label = storage.create_group("New Label").unwrap();
         assert_eq!(label.name(), "New Label");
 
-        // Should be persisted
         let loaded = storage.load_group(label.id()).unwrap();
         assert_eq!(loaded.name(), "New Label");
     }
@@ -841,7 +819,6 @@ mod tests {
         label1.set_display_name_override(Some("Matt"), 0).unwrap();
 
         let label2 = Group::new("Work", 0);
-        // label2 has no override
 
         storage.save_group(&label1).unwrap();
         storage.save_group(&label2).unwrap();
@@ -860,23 +837,19 @@ mod tests {
     fn test_display_name_override_roundtrip_update() {
         let storage = test_storage();
 
-        // Create label with override
         let mut label = Group::new("Colleagues", 0);
         label
             .set_display_name_override(Some("Dr. Egloff"), 0)
             .unwrap();
         storage.save_group(&label).unwrap();
 
-        // Verify override persists
         let loaded = storage.load_group(label.id()).unwrap();
         assert_eq!(loaded.display_name_override(), Some("Dr. Egloff"));
 
-        // Clear override and re-save
         let mut updated = loaded;
         updated.set_display_name_override(None, 0).unwrap();
         storage.save_group(&updated).unwrap();
 
-        // Verify override is cleared
         let reloaded = storage.load_group(label.id()).unwrap();
         assert_eq!(reloaded.display_name_override(), None);
     }

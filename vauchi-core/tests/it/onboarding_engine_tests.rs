@@ -261,7 +261,6 @@ fn default_name_text_changed_updates_screen() {
     match result {
         ActionResult::UpdateScreen(screen) => {
             assert_eq!(screen.screen_id, "default_name");
-            // Continue button should now be enabled
             let continue_btn = screen.actions.iter().find(|a| a.id == "continue").unwrap();
             assert!(continue_btn.enabled);
         }
@@ -323,7 +322,6 @@ fn groups_toggle_selects_and_deselects() {
     let mut engine = OnboardingEngine::new();
     advance_to_groups_setup(&mut engine);
 
-    // Toggle Family on
     let result = engine.handle_action(UserAction::ItemToggled {
         component_id: "groups".into(),
         item_id: "Family".into(),
@@ -340,7 +338,6 @@ fn groups_toggle_selects_and_deselects() {
         other => panic!("Expected UpdateScreen, got {other:?}"),
     }
 
-    // Toggle Family off
     let result = engine.handle_action(UserAction::ItemToggled {
         component_id: "groups".into(),
         item_id: "Family".into(),
@@ -404,7 +401,6 @@ fn contact_info_has_quick_add_buttons() {
     assert_eq!(screen.screen_id, "contact_info");
     assert_eq!(screen.progress.as_ref().unwrap().current_step, 3);
 
-    // Should have quick-add action buttons, not a FieldList
     let has_field_list = screen
         .components
         .iter()
@@ -702,28 +698,22 @@ fn what_next_legacy_docs_action_ids_no_longer_complete() {
 fn full_flow_to_completion() {
     let mut engine = OnboardingEngine::new();
 
-    // IdentityCheck -> DefaultName
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "create_new".into(),
     });
-    // Enter name
     let _ = engine.handle_action(UserAction::TextChanged {
         component_id: "display_name".into(),
         value: "Alice".into(),
     });
-    // DefaultName -> GroupsSetup
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    // GroupsSetup -> ContactInfo
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    // ContactInfo -> WhatNext
     let _ = engine.handle_action(UserAction::ActionPressed {
         action_id: "continue".into(),
     });
-    // WhatNext -> CompleteWith
     let result = engine.handle_action(UserAction::ActionPressed {
         action_id: "start_app".into(),
     });

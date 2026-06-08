@@ -69,7 +69,6 @@ fn test_rollback_all_calls_both() {
 // @internal
 #[test]
 fn test_rollback_trait_is_object_safe() {
-    // Verify NfcRollback can be used as a trait object
     let rollback: Box<dyn NfcRollback> = Box::new(NoopNfcRollback);
     rollback
         .rollback_all("test-id")

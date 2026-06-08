@@ -41,13 +41,11 @@ fn test_pre_signed_message_refresh() {
     // When the refresh mechanism runs (before expiration)
     let refreshed = PreSignedShredMessages::refresh(&identity, 1_700_000_000);
 
-    // Then new pre-signed messages should be generated
     assert!(
         refreshed.refreshed_at >= original_refreshed_at,
         "Refreshed timestamp should be >= original"
     );
 
-    // And the signatures should still be valid
     let purge = &refreshed.purge_request;
     let mut message = Vec::with_capacity(32 + 32 + 8);
     message.extend_from_slice(&purge.public_key);
@@ -59,7 +57,6 @@ fn test_pre_signed_message_refresh() {
         "Refreshed purge request signature should be valid"
     );
 
-    // And deletion notice should be valid
     let notice = &refreshed.deletion_notice;
     let stage_byte = 1u8; // Confirmed
     let mut notice_message = Vec::with_capacity(32 + 1 + 8);
@@ -92,7 +89,6 @@ fn test_pre_signed_refresh_generates_new_purge_token() {
     let msgs_b = PreSignedShredMessages::refresh(&identity, 1_700_000_000);
     let token_b = msgs_b.purge_request.purge_token;
 
-    // Then the new purge token should differ from token A
     assert_ne!(
         token_a, token_b,
         "Refreshed purge token should be different for replay prevention"
@@ -115,7 +111,6 @@ fn test_pre_signed_refresh_generates_new_purge_token() {
 fn test_purge_token_rotation() {
     let identity = Identity::create("Charlie", 0);
 
-    // Generate multiple pre-signed messages
     let msgs1 = PreSignedShredMessages::generate(&identity, 1_700_000_000);
     let msgs2 = PreSignedShredMessages::generate(&identity, 1_700_000_000);
     let msgs3 = PreSignedShredMessages::generate(&identity, 1_700_000_000);
@@ -134,7 +129,6 @@ fn test_purge_token_rotation() {
         "Purge tokens should differ between generations"
     );
 
-    // All should have valid signatures
     for msgs in [&msgs1, &msgs2, &msgs3] {
         let purge = &msgs.purge_request;
         assert_eq!(
@@ -153,12 +147,10 @@ fn test_purge_token_rotation() {
 fn test_purge_token_rotation_maintains_signature_validity() {
     let identity = Identity::create("Dave", 0);
 
-    // Generate pre-signed messages and store multiple versions
     let versions: Vec<PreSignedShredMessages> = (0..5)
         .map(|_| PreSignedShredMessages::generate(&identity, 1_700_000_000))
         .collect();
 
-    // Each version should have a valid signature for its own token
     for msgs in &versions {
         let purge = &msgs.purge_request;
 
@@ -173,7 +165,6 @@ fn test_purge_token_rotation_maintains_signature_validity() {
         );
     }
 
-    // But a signature from one version should NOT verify with another's token
     if versions.len() >= 2 {
         let msgs_a = &versions[0];
         let msgs_b = &versions[1];
@@ -217,7 +208,6 @@ fn test_pre_signed_revocation() {
     // When the identity is "destroyed" (we drop it)
     drop(identity);
 
-    // Then the pre-signed deletion notice can still be verified
     let notice = &msgs.deletion_notice;
     let stage_byte = 1u8; // Confirmed
     let mut notice_message = Vec::with_capacity(32 + 1 + 8);
@@ -252,7 +242,6 @@ fn test_pre_signed_revocation_includes_public_key() {
     let identity = Identity::create("Frank", 0);
     let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
 
-    // Both messages should include the identity's public key
     assert_eq!(
         msgs.deletion_notice.public_key,
         *identity.signing_public_key(),
@@ -284,10 +273,8 @@ fn test_pre_signed_offline_storage() {
     // When I save them to disk
     msgs.save(dir.path()).unwrap();
 
-    // Then they should be loadable without network
     let loaded = PreSignedShredMessages::load(dir.path()).unwrap();
 
-    // And they should match the original
     assert_eq!(loaded.refreshed_at, msgs.refreshed_at);
     assert_eq!(
         loaded.deletion_notice.public_key,
@@ -333,7 +320,6 @@ fn test_pre_signed_offline_storage_survives_restart() {
     // Load the messages (simulating second app run)
     let loaded = PreSignedShredMessages::load(dir.path()).unwrap();
 
-    // Verify signatures are still valid with the stored public key
     let purge = &loaded.purge_request;
     let mut message = Vec::with_capacity(32 + 32 + 8);
     message.extend_from_slice(&purge.public_key);
@@ -358,7 +344,6 @@ fn test_pre_signed_offline_storage_unencrypted() {
     let msgs = PreSignedShredMessages::generate(&identity, 1_700_000_000);
     msgs.save(dir.path()).unwrap();
 
-    // Read raw bytes from disk
     let path = PreSignedShredMessages::file_path(dir.path());
     let raw_bytes = std::fs::read(&path).unwrap();
 
@@ -385,10 +370,8 @@ fn test_pre_signed_offline_airplane_mode() {
     original_msgs.save(dir.path()).unwrap();
 
     // Step 2: User goes offline (simulated by not having network)
-    // No network calls should be needed to use pre-signed messages
 
     // Step 3: User needs to shred while offline
-    // Load pre-signed messages from disk
     let loaded = PreSignedShredMessages::load(dir.path()).unwrap();
 
     // Messages should be ready to use (valid signatures)
@@ -419,7 +402,6 @@ fn test_pre_signed_refresh_isolation() {
     let alice_msgs = PreSignedShredMessages::generate(&alice, 1_700_000_000);
     let bob_msgs = PreSignedShredMessages::generate(&bob, 1_700_000_000);
 
-    // Alice's messages should use Alice's key
     assert_eq!(
         alice_msgs.purge_request.public_key,
         *alice.signing_public_key()
@@ -429,14 +411,12 @@ fn test_pre_signed_refresh_isolation() {
         *alice.signing_public_key()
     );
 
-    // Bob's messages should use Bob's key
     assert_eq!(bob_msgs.purge_request.public_key, *bob.signing_public_key());
     assert_eq!(
         bob_msgs.deletion_notice.public_key,
         *bob.signing_public_key()
     );
 
-    // Keys should be different
     assert_ne!(
         alice_msgs.purge_request.public_key,
         bob_msgs.purge_request.public_key

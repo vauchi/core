@@ -50,7 +50,6 @@ fn parse_card_payload_rejects_short_and_bad_version() {
 }
 
 // ================================================================
-// URL generation
 // ================================================================
 
 // @internal
@@ -87,7 +86,6 @@ fn handshake_slot_is_64_hex_chars() {
 }
 
 // ================================================================
-// URL parsing
 // ================================================================
 
 // @internal
@@ -129,7 +127,6 @@ fn parse_rejects_invalid_base64() {
 }
 
 // ================================================================
-// Responder commands
 // ================================================================
 
 // @internal
@@ -166,7 +163,6 @@ fn responder_handshake_deposit_contains_32_byte_epk() {
 }
 
 // ================================================================
-// Initiator completion
 // ================================================================
 
 // @internal
@@ -467,17 +463,14 @@ fn parse_deep_link_rejects_legacy_path_form() {
 // @internal
 #[test]
 fn parse_deep_link_rejects_malformed_query() {
-    // Missing pk
     assert_eq!(
         parse_exchange_deep_link("vauchi://exchange?n=AAAA"),
         Err(DeepLinkParseError::MalformedQuery),
     );
-    // Missing n
     assert_eq!(
         parse_exchange_deep_link("vauchi://exchange?pk=AAAA"),
         Err(DeepLinkParseError::MalformedQuery),
     );
-    // Bad base64 in pk
     assert_eq!(
         parse_exchange_deep_link("vauchi://exchange?pk=!@#$&n=AAAA"),
         Err(DeepLinkParseError::MalformedQuery),

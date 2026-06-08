@@ -209,7 +209,6 @@ fn v3_different_salt_different_ciphertext() {
         &blob2[1..17],
         "two exports must have different salts"
     );
-    // Overall ciphertext differs
     assert_ne!(blob1, blob2, "two exports must produce different blobs");
 
     // Both must still import correctly

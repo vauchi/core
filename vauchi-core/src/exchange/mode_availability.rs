@@ -12,8 +12,6 @@ use crate::exchange::capability::types::DeviceCapabilities;
 use crate::exchange::mode::{DeviceRequirement, ExchangeMode};
 use crate::types::AudioCapability;
 
-// ── Availability result ──────────────────────────────────────────────────────
-
 /// Availability status of an [`ExchangeMode`] on a specific device.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -25,8 +23,6 @@ pub enum ModeAvailability {
     /// One or more required hardware capabilities are absent.
     Unavailable { reason: String },
 }
-
-// ── Public functions ─────────────────────────────────────────────────────────
 
 /// Check whether `mode` can run on `caps`.
 ///
@@ -100,8 +96,6 @@ pub fn recommend_mode(caps: &DeviceCapabilities) -> ExchangeMode {
     ExchangeMode::Link
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
 fn requirement_name(req: &DeviceRequirement) -> &'static str {
     match req {
         DeviceRequirement::Camera => "camera",
@@ -114,8 +108,6 @@ fn requirement_name(req: &DeviceRequirement) -> &'static str {
         DeviceRequirement::UsbPort => "USB port",
     }
 }
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 // INLINE_TEST_REQUIRED: tests exercise check_mode_availability and recommend_mode against specific
 // DeviceCapabilities configurations that cannot be tested from outside this module without

@@ -65,15 +65,12 @@ pub fn is_valid_phone(value: &str) -> bool {
         return false;
     }
 
-    // Count digits
     let digit_count = value.chars().filter(|c| c.is_ascii_digit()).count();
 
-    // Must have at least 7 digits
     if digit_count < 7 {
         return false;
     }
 
-    // All characters must be phone-valid: digits, spaces, dashes, parens, plus, dots
     value.chars().all(|c| {
         c.is_ascii_digit() || c == ' ' || c == '-' || c == '(' || c == ')' || c == '+' || c == '.'
     })
@@ -148,22 +145,17 @@ pub fn is_safe_url(url: &str) -> bool {
         return false;
     }
 
-    // Extract scheme
     if let Some(scheme) = extract_scheme(url) {
-        // Must have :// or : after scheme for it to be valid
         if !url.contains(':') {
             return false;
         }
 
-        // Check if blocked first (explicit deny list)
         if is_blocked_scheme(scheme) {
             return false;
         }
 
-        // Must be in allowed list
         is_allowed_scheme(scheme)
     } else {
-        // No scheme found - not a valid URL
         false
     }
 }
@@ -270,7 +262,6 @@ impl ContactField {
             return None;
         }
 
-        // For Custom fields, use heuristic detection
         let effective_type = if self.field_type() == FieldType::Custom {
             self.detect_value_type().unwrap_or(FieldType::Custom)
         } else {
@@ -296,18 +287,15 @@ impl ContactField {
 
     /// Generate URI for website field.
     fn website_to_uri(&self, value: &str) -> Option<String> {
-        // Check for blocked schemes first
         if let Some(scheme) = extract_scheme(value)
             && is_blocked_scheme(scheme)
         {
             return None;
         }
 
-        // If already has valid protocol, use as-is
         if value.starts_with("https://") || value.starts_with("http://") {
             Some(value.to_string())
         } else if value.contains("://") {
-            // Has some other scheme - check if allowed
             if let Some(scheme) = extract_scheme(value) {
                 if is_allowed_scheme(scheme) {
                     Some(value.to_string())
@@ -318,7 +306,6 @@ impl ContactField {
                 None
             }
         } else {
-            // No protocol - add https://
             Some(format!("https://{}", value))
         }
     }
@@ -328,20 +315,17 @@ impl ContactField {
     /// Delegates to the `SocialNetworkRegistry` for URL templates, supporting
     /// all registered networks (38+) rather than a hardcoded subset.
     fn social_to_uri(&self, value: &str) -> Option<String> {
-        // Normalize label aliases to registry IDs
         let label_lower = match self.label().to_lowercase().as_str() {
             "x" => "twitter".to_string(),
             other => other.to_string(),
         };
         let username = normalize_social_username(value);
 
-        // Handle Mastodon federated handles (@user@instance or user@instance)
         if label_lower == "mastodon"
             && let Some(profile_url) = parse_mastodon_federated(username)
         {
             return Some(profile_url);
         }
-        // Not a federated handle — fall through to registry
 
         // Strip LinkedIn "in/" prefix if user included it (template already has it)
         let username = if label_lower == "linkedin" {
@@ -360,7 +344,6 @@ impl ContactField {
             return ContactAction::CopyToClipboard;
         }
 
-        // For Custom fields, use heuristic detection
         let effective_type = if self.field_type() == FieldType::Custom {
             self.detect_value_type().unwrap_or(FieldType::Custom)
         } else {
@@ -410,13 +393,11 @@ impl ContactField {
         let value = self.value().trim();
         let mut actions: Vec<ContactAction> = Vec::new();
 
-        // Empty values only offer copy
         if value.is_empty() {
             actions.push(ContactAction::CopyToClipboard);
             return actions;
         }
 
-        // For Custom fields, use heuristic detection
         let effective_type = if self.field_type() == FieldType::Custom {
             self.detect_value_type().unwrap_or(FieldType::Custom)
         } else {
@@ -456,7 +437,6 @@ impl ContactField {
             }
         }
 
-        // Always include copy as fallback
         actions.push(ContactAction::CopyToClipboard);
         actions
     }
@@ -474,7 +454,6 @@ impl ContactField {
             return None;
         }
 
-        // For Custom fields, use heuristic detection
         let effective_type = if self.field_type() == FieldType::Custom {
             self.detect_value_type().unwrap_or(FieldType::Custom)
         } else {
@@ -501,17 +480,14 @@ impl ContactField {
             return None;
         }
 
-        // Check for URL patterns first (most specific)
         if value.starts_with("https://") || value.starts_with("http://") {
             return Some(FieldType::Website);
         }
 
-        // Check for email pattern
         if self.looks_like_email(value) {
             return Some(FieldType::Email);
         }
 
-        // Check for phone pattern
         if self.looks_like_phone(value) {
             return Some(FieldType::Phone);
         }
@@ -521,7 +497,6 @@ impl ContactField {
 
     /// Heuristic check for email-like values.
     fn looks_like_email(&self, value: &str) -> bool {
-        // Must contain @ with content before and after
         if !value.contains('@') {
             return false;
         }
@@ -534,21 +509,17 @@ impl ContactField {
         let local = parts[0];
         let domain = parts[1];
 
-        // Basic validation
         !local.is_empty() && !domain.is_empty() && domain.contains('.')
     }
 
     /// Heuristic check for phone-like values.
     fn looks_like_phone(&self, value: &str) -> bool {
-        // Count digits
         let digit_count = value.chars().filter(|c| c.is_ascii_digit()).count();
 
-        // Must have at least 7 digits for a phone number
         if digit_count < 7 {
             return false;
         }
 
-        // Check that most characters are phone-valid
         let valid_chars = value.chars().filter(|c| {
             c.is_ascii_digit() || *c == ' ' || *c == '-' || *c == '(' || *c == ')' || *c == '+'
         });
@@ -591,7 +562,6 @@ mod tests {
 
     #[test]
     fn test_is_safe_url_allowed_schemes() {
-        // Allowed schemes should pass
         assert!(is_safe_url("https://example.com"));
         assert!(is_safe_url("http://example.com"));
         assert!(is_safe_url("tel:+1234567890"));
@@ -602,7 +572,6 @@ mod tests {
 
     #[test]
     fn test_is_safe_url_blocked_schemes() {
-        // Blocked schemes should fail
         assert!(!is_safe_url("javascript:alert(1)"));
         assert!(!is_safe_url("vbscript:msgbox(1)"));
         assert!(!is_safe_url("data:text/html,<script>alert(1)</script>"));
@@ -613,18 +582,15 @@ mod tests {
 
     #[test]
     fn test_is_safe_url_unknown_schemes() {
-        // Unknown schemes should fail (not in allowlist)
         assert!(!is_safe_url("custom://something"));
         assert!(!is_safe_url("myapp://deeplink"));
     }
 
     #[test]
     fn test_is_safe_url_edge_cases() {
-        // Empty/whitespace should fail
         assert!(!is_safe_url(""));
         assert!(!is_safe_url("   "));
 
-        // No scheme should fail
         assert!(!is_safe_url("example.com"));
         assert!(!is_safe_url("just some text"));
     }
@@ -644,7 +610,6 @@ mod tests {
         assert!(is_valid_relay_url("https://relay.vauchi.app"));
         assert!(is_valid_relay_url("https://relay.example.com/ws"));
         assert!(is_valid_relay_url("https://192.168.1.1:8443"));
-        // No host — must be rejected
         assert!(!is_valid_relay_url("https://"));
         assert!(!is_valid_relay_url("https:///path"));
         assert!(!is_valid_relay_url("https:///"));

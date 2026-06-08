@@ -22,7 +22,6 @@ use vauchi_core::onboarding::display_name_suggestions;
 use vauchi_core::types::{OnboardingProgress, OnboardingStep};
 
 // =============================================================================
-// OnboardingStep Tests
 // =============================================================================
 
 // @scenario: onboarding:step_order
@@ -52,7 +51,6 @@ fn test_step_index_is_zero_based() {
 // @scenario: onboarding:step_navigation
 #[test]
 fn test_step_next_and_previous() {
-    // IdentityCheck has no previous
     assert_eq!(OnboardingStep::IdentityCheck.previous(), None);
     assert_eq!(
         OnboardingStep::IdentityCheck.next(),
@@ -69,7 +67,6 @@ fn test_step_next_and_previous() {
         Some(OnboardingStep::GroupsSetup)
     );
 
-    // Middle step has both
     assert_eq!(
         OnboardingStep::ContactInfo.previous(),
         Some(OnboardingStep::GroupsSetup)
@@ -79,7 +76,6 @@ fn test_step_next_and_previous() {
         Some(OnboardingStep::WhatNext)
     );
 
-    // WhatNext has no next
     assert_eq!(
         OnboardingStep::WhatNext.previous(),
         Some(OnboardingStep::ContactInfo)
@@ -101,7 +97,6 @@ fn test_step_index_consistent_with_all() {
 }
 
 // =============================================================================
-// OnboardingProgress Tests
 // =============================================================================
 
 // @scenario: onboarding:new_progress (#1)
@@ -168,14 +163,12 @@ fn test_advance_through_all_steps() {
             .contains(&OnboardingStep::DefaultName)
     );
 
-    // Advance through remaining steps
     let step = progress.advance(0);
     assert_eq!(step, OnboardingStep::ContactInfo);
 
     let step = progress.advance(0);
     assert_eq!(step, OnboardingStep::WhatNext);
 
-    // Verify state before final advance
     assert!(!progress.is_complete());
 
     // Final advance at WhatNext marks completion
@@ -190,7 +183,6 @@ fn test_advance_through_all_steps() {
         "completed_at should be set"
     );
 
-    // Verify all steps are completed
     assert_eq!(progress.completed_steps.len(), 6);
 }
 
@@ -199,7 +191,6 @@ fn test_advance_through_all_steps() {
 fn test_skip_step_does_not_mark_completed() {
     let mut progress = OnboardingProgress::new(0);
 
-    // Skip IdentityCheck step
     let step = progress.skip_step(0);
     assert_eq!(
         step,
@@ -226,14 +217,12 @@ fn test_completion_percentage() {
     progress.advance(0); // IdentityCheck -> LinkChoice, IdentityCheck completed
     assert_eq!(progress.completion_percentage(), 16);
 
-    // Complete all steps
     progress.advance(0); // LinkChoice -> DefaultName
     progress.advance(0); // DefaultName -> GroupsSetup
     progress.advance(0); // GroupsSetup -> ContactInfo
     progress.advance(0); // ContactInfo -> WhatNext
     assert_eq!(progress.completion_percentage(), 83); // 5/6
 
-    // Final advance completes WhatNext
     progress.advance(0);
     assert_eq!(progress.completion_percentage(), 100); // 6/6
 }
@@ -243,7 +232,6 @@ fn test_completion_percentage() {
 fn test_idempotent_advance_at_final_step() {
     let mut progress = OnboardingProgress::new(0);
 
-    // Advance through all steps
     for _ in 0..6 {
         progress.advance(0);
     }
@@ -266,14 +254,12 @@ fn test_idempotent_advance_at_final_step() {
 fn test_reset_clears_all_progress() {
     let mut progress = OnboardingProgress::new(0);
 
-    // Advance through several steps
     progress.advance(0);
     progress.advance(0);
     progress.advance(0);
 
     assert_eq!(progress.completed_steps.len(), 3);
 
-    // Reset
     progress.reset(0);
 
     assert_eq!(progress.current_step(), OnboardingStep::IdentityCheck);
@@ -290,7 +276,6 @@ fn test_reset_clears_all_progress() {
 // @scenario: onboarding:serde_backward_compat
 #[test]
 fn test_serde_backward_compat_aliases() {
-    // JSON with old variant names should deserialize correctly
     let old_json = r#"{"current_step":"CreateIdentity","completed_steps":["AddFields"],"started_at":1000,"completed_at":null,"skipped_backup":false}"#;
     let progress = OnboardingProgress::from_json(old_json).expect("Old JSON should deserialize");
     assert_eq!(progress.current_step(), OnboardingStep::DefaultName);
@@ -359,7 +344,6 @@ fn test_json_serialization_roundtrip() {
 fn test_json_roundtrip_preserves_option_timestamps() {
     let mut progress = OnboardingProgress::new(0);
 
-    // Verify started_at is preserved
     let json = progress.to_json().unwrap();
     let restored = OnboardingProgress::from_json(&json).unwrap();
     assert_eq!(restored.started_at, progress.started_at);
@@ -393,7 +377,6 @@ fn test_default_matches_new() {
 }
 
 // =============================================================================
-// Storage Persistence Tests
 // =============================================================================
 
 // @scenario: onboarding:storage_roundtrip (#25)
@@ -432,11 +415,9 @@ fn test_storage_load_returns_none_when_empty() {
 fn test_storage_load_or_create() {
     let storage = vauchi_core::Storage::in_memory(vauchi_core::SymmetricKey::generate()).unwrap();
 
-    // First call creates new
     let progress = storage.load_or_create_onboarding_progress().unwrap();
     assert_eq!(progress.current_step(), OnboardingStep::IdentityCheck);
 
-    // Save and reload
     let mut progress = progress;
     progress.advance(0);
     storage.save_onboarding_progress(&progress).unwrap();
@@ -450,12 +431,10 @@ fn test_storage_load_or_create() {
 fn test_storage_overwrite_replaces_previous() {
     let storage = vauchi_core::Storage::in_memory(vauchi_core::SymmetricKey::generate()).unwrap();
 
-    // Save initial state
     let mut progress = OnboardingProgress::new(0);
     progress.advance(0);
     storage.save_onboarding_progress(&progress).unwrap();
 
-    // Save updated state
     progress.advance(0);
     progress.advance(0);
     storage.save_onboarding_progress(&progress).unwrap();
@@ -469,7 +448,6 @@ fn test_storage_overwrite_replaces_previous() {
 }
 
 // =============================================================================
-// Display Name Suggestions Tests
 // =============================================================================
 
 // @scenario: onboarding:display_name_full_name (#9)
@@ -572,7 +550,6 @@ fn test_display_name_suggestions_unicode() {
 }
 
 // =============================================================================
-// Mutation-coverage tests
 // =============================================================================
 // Pin specific values so arithmetic / comparison mutations cannot survive.
 

@@ -38,14 +38,12 @@ enum VCardVersion {
 /// This handles Windows-1252 approximately (0x80-0x9F range differs but
 /// those codepoints are rare in contact data — names, phones, emails).
 fn decode_to_string(data: &[u8]) -> String {
-    // Strip UTF-8 BOM if present
     let data = if data.starts_with(&[0xEF, 0xBB, 0xBF]) {
         &data[3..]
     } else {
         data
     };
 
-    // Try UTF-8 first (most common case)
     if let Ok(text) = std::str::from_utf8(data) {
         return text.to_string();
     }
@@ -204,7 +202,6 @@ impl VCardFields {
     fn push_bday(&mut self, stripped: &str) {
         if let Some(val) = extract_value(stripped) {
             let unescaped = unescape_vcard(&val);
-            // Try to normalize date to YYYY-MM-DD
             let normalized = normalize_date(&unescaped);
             if !normalized.is_empty() {
                 self.fields
@@ -217,7 +214,6 @@ impl VCardFields {
     fn push_org(&mut self, stripped: &str) {
         if let Some(val) = extract_value(stripped) {
             let unescaped = unescape_vcard(&val);
-            // ORG value may have semicolons for sub-units
             let org = unescaped
                 .replace(';', ", ")
                 .trim_matches(',')
@@ -240,12 +236,10 @@ impl VCardFields {
 
     /// Dispatch one unfolded vCard line into the accumulator.
     fn apply_line(&mut self, line: &str, group_labels: &[(String, String)], version: VCardVersion) {
-        // Skip empty lines.
         if line.is_empty() {
             return;
         }
 
-        // Strip group prefix (e.g., "item1.TEL" → "TEL"), remember group
         let (group, stripped) = strip_group_prefix(line);
         let group = group.as_deref();
         let upper = stripped.to_uppercase();
@@ -327,7 +321,6 @@ fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<Stri
     let version = detect_version(block);
     let lines = unfold_lines(block, version);
 
-    // Collect group labels (e.g., item1.X-ABLabel → label for item1.*)
     let group_labels = collect_group_labels(&lines);
 
     let mut acc = VCardFields::default();
@@ -335,7 +328,6 @@ fn parse_single_vcard(block: &str, now: u64) -> Option<(ContactCard, Option<Stri
         acc.apply_line(line, &group_labels, version);
     }
 
-    // Determine display name
     let name = acc.display_name.or(acc.n_fallback).unwrap_or_default();
     if name.is_empty() {
         return None; // Cannot create a card without a name
@@ -404,18 +396,14 @@ fn unfold_lines(block: &str, version: VCardVersion) -> Vec<String> {
     let raw_lines: Vec<&str> = block.lines().collect();
     let mut result: Vec<String> = Vec::new();
 
-    // First pass: standard RFC line unfolding (space/tab continuation)
     let mut unfolded: Vec<String> = Vec::new();
     for line in &raw_lines {
         if line.starts_with(' ') || line.starts_with('\t') {
-            // Continuation: append to previous line (strip leading whitespace char)
             if let Some(prev) = unfolded.last_mut() {
                 prev.push_str(&line[1..]);
             }
         } else if let Some(prev) = unfolded.last_mut() {
-            // Check if previous line ends with QP soft break
             if version == VCardVersion::V21 && prev.ends_with('=') {
-                // QP continuation: remove trailing '=' and append
                 prev.pop();
                 prev.push_str(line);
             } else {
@@ -426,7 +414,6 @@ fn unfold_lines(block: &str, version: VCardVersion) -> Vec<String> {
         }
     }
 
-    // Second pass: decode QUOTED-PRINTABLE for 2.1
     for line in unfolded {
         if version == VCardVersion::V21 && is_quoted_printable(&line) {
             result.push(decode_qp_line(&line));
@@ -446,12 +433,10 @@ fn is_quoted_printable(line: &str) -> bool {
 
 /// Decode QUOTED-PRINTABLE content in a property line.
 fn decode_qp_line(line: &str) -> String {
-    // Split into property name+params and value
     if let Some(colon_pos) = find_value_start(line) {
         let prefix = &line[..colon_pos + 1];
         let value = &line[colon_pos + 1..];
 
-        // Remove ENCODING=QUOTED-PRINTABLE and CHARSET params from prefix
         let clean_prefix = remove_qp_params(prefix);
         let decoded = decode_quoted_printable(value);
 
@@ -464,7 +449,6 @@ fn decode_qp_line(line: &str) -> String {
 /// Remove QP-related parameters from property prefix.
 /// `prefix` includes the trailing colon (e.g. `FN;ENCODING=QUOTED-PRINTABLE:`).
 fn remove_qp_params(prefix: &str) -> String {
-    // Strip trailing colon, work on params, re-add colon at the end
     let without_colon = prefix.strip_suffix(':').unwrap_or(prefix);
     let parts: Vec<&str> = without_colon.split(';').collect();
     let mut kept = Vec::new();
@@ -501,7 +485,6 @@ fn decode_quoted_printable(input: &str) -> String {
                 continue;
             }
         }
-        // Not a valid QP sequence, emit as-is
         let mut buf = [0u8; 4];
         let encoded = chars[i].encode_utf8(&mut buf);
         bytes.extend_from_slice(encoded.as_bytes());
@@ -535,10 +518,8 @@ fn collect_group_labels(lines: &[String]) -> Vec<(String, String)> {
 
 /// Strip group prefix (e.g., "item1.TEL" → (Some("item1"), "TEL")).
 fn strip_group_prefix(line: &str) -> (Option<String>, &str) {
-    // Group prefix is alphanumeric + hyphen before a dot
     if let Some(dot_pos) = line.find('.') {
         let prefix = &line[..dot_pos];
-        // Validate it looks like a group (alphanumeric or "itemN")
         if !prefix.is_empty()
             && prefix
                 .chars()
@@ -558,8 +539,6 @@ fn extract_value(line: &str) -> Option<String> {
 
 /// Find the position of the colon that separates params from value.
 fn find_value_start(line: &str) -> Option<usize> {
-    // The colon after the property name/params
-    // Skip past property name, handle params with semicolons
     let bytes = line.as_bytes();
     let mut in_quotes = false;
 
@@ -581,7 +560,6 @@ fn resolve_label(
     default: &str,
     version: VCardVersion,
 ) -> String {
-    // First check group labels (Apple style: item1.X-ABLabel)
     if let Some(g) = group {
         for (gname, glabel) in group_labels {
             if gname == g {
@@ -590,7 +568,6 @@ fn resolve_label(
         }
     }
 
-    // Extract TYPE from params
     let colon_pos = match find_value_start(line) {
         Some(p) => p,
         None => return default.to_string(),
@@ -598,18 +575,15 @@ fn resolve_label(
 
     let params_str = &line[..colon_pos];
 
-    // Split on ';' to get params
     let params: Vec<&str> = params_str.split(';').collect();
 
     for param in &params[1..] {
         let upper = param.to_uppercase();
         if let Some(types) = upper.strip_prefix("TYPE=") {
-            // May be comma-separated: TYPE=home,voice
             let type_val = types.split(',').next().unwrap_or(types);
             return normalize_type_label(type_val);
         }
 
-        // vCard 2.1 bare parameters
         if version == VCardVersion::V21
             && let Some(label) = recognize_bare_param(&upper)
         {
@@ -646,7 +620,6 @@ fn normalize_type_label(type_val: &str) -> String {
         "INTERNET" | "internet" => "Internet".to_string(),
         "IPHONE" | "iphone" => "iPhone".to_string(),
         other => {
-            // Title-case
             let mut chars = other.chars();
             match chars.next() {
                 Some(c) => {
@@ -706,7 +679,6 @@ fn parse_photo(line: &str, version: VCardVersion) -> Option<Vec<u8>> {
         VCardVersion::V40 => {
             // v4.0: data URI format: data:image/jpeg;base64,XXXX
             let b64 = if let Some(rest) = value.strip_prefix("data:") {
-                // Find base64, after the comma
                 rest.split_once(',').map(|(_, d)| d)?
             } else {
                 &value
@@ -723,7 +695,6 @@ fn parse_photo(line: &str, version: VCardVersion) -> Option<Vec<u8>> {
 
 /// Decode base64 photo data, enforcing size limit.
 fn decode_photo_base64(b64: &str) -> Option<Vec<u8>> {
-    // Strip whitespace that may be left from line unfolding
     let clean: String = b64.chars().filter(|c| !c.is_whitespace()).collect();
 
     let decoded = BASE64_STANDARD.decode(clean.as_bytes()).ok()?;
@@ -735,7 +706,6 @@ fn decode_photo_base64(b64: &str) -> Option<Vec<u8>> {
 fn normalize_date(value: &str) -> String {
     let trimmed = value.trim();
 
-    // Already YYYY-MM-DD?
     if trimmed.len() == 10
         && trimmed.as_bytes().get(4) == Some(&b'-')
         && trimmed.as_bytes().get(7) == Some(&b'-')
@@ -757,7 +727,6 @@ fn normalize_date(value: &str) -> String {
         return format!("0000-{rest}");
     }
 
-    // Return as-is if we can't normalize
     truncate_chars(trimmed, MAX_VALUE_LENGTH)
 }
 

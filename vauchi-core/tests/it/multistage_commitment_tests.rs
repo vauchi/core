@@ -14,7 +14,6 @@ fn test_commitment_create_and_verify() {
     assert_ne!(commitment.ciphertext(), plaintext.as_slice());
     assert_ne!(commitment.hash(), &[0u8; 32]);
 
-    // Verify with correct reveal key
     let decrypted = commitment.open().unwrap();
     assert_eq!(decrypted, plaintext);
 }
@@ -40,11 +39,9 @@ fn test_commitment_verify_from_parts() {
     let ciphertext = commitment.ciphertext().to_vec();
     let reveal_key = *commitment.reveal_key();
 
-    // Reconstruct and verify
     let decrypted = Commitment::open_with_key(&reveal_key, &ciphertext).unwrap();
     assert_eq!(decrypted, plaintext);
 
-    // Verify commitment hash
     assert!(Commitment::verify_hash(&reveal_key, &ciphertext, hash));
 }
 
@@ -99,7 +96,6 @@ fn test_commitment_with_context_binds_relay_url() {
 
     let commitment = Commitment::create_with_context(plaintext, context).unwrap();
 
-    // Verify with correct context passes
     assert!(Commitment::verify_hash_with_context(
         commitment.reveal_key(),
         commitment.ciphertext(),
@@ -142,7 +138,6 @@ fn test_commitment_context_includes_relay_and_pubkey() {
     let relay_url = b"https://relay.vauchi.app";
     let noise_pk = [0xABu8; 32];
 
-    // Build context the same way session.rs will
     let mut context = Vec::new();
     context.extend_from_slice(relay_url);
     context.extend_from_slice(&noise_pk);

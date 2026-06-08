@@ -13,6 +13,7 @@ fn make_engine() -> ExchangeEngine {
             device_capabilities: Default::default(),
             mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
             card_snapshot: None,
+            available_group_data: Vec::new(),
         },
         vauchi_core::clock::SystemClock::shared(),
     )
@@ -214,6 +215,7 @@ fn with_session_auto_enables_debug_log() {
         device_capabilities: Default::default(),
         mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
         card_snapshot: None,
+        available_group_data: Vec::new(),
     };
 
     let engine =

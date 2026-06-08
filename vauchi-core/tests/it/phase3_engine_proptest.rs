@@ -164,6 +164,7 @@ fn make_exchange() -> ExchangeEngine {
             device_capabilities: Default::default(),
             mode: Some(vauchi_core::exchange::mode::ExchangeMode::Glance),
             card_snapshot: None,
+            available_group_data: Vec::new(),
         },
         vauchi_core::clock::SystemClock::shared(),
     )

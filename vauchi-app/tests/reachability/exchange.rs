@@ -37,6 +37,7 @@ fn factory() -> ExchangeEngine {
             device_capabilities: Default::default(),
             mode: None,
             card_snapshot: None,
+            available_group_data: Vec::new(),
         },
         vauchi_core::clock::SystemClock::shared(),
     )

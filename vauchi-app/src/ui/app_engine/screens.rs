@@ -273,9 +273,8 @@ impl AppEngine {
             }
             AppScreen::Exchange => {
                 let card = vauchi.own_card().ok().flatten();
-                let available_groups = vauchi
-                    .list_groups()
-                    .unwrap_or_default()
+                let all_groups = vauchi.list_groups().unwrap_or_default();
+                let available_groups = all_groups
                     .iter()
                     .map(|g| (g.id().to_string(), g.name().to_string()))
                     .collect();
@@ -293,6 +292,7 @@ impl AppEngine {
                     device_capabilities: device_capabilities.clone(),
                     mode: None, // triggers mode selection screen
                     card_snapshot,
+                    available_group_data: all_groups,
                 };
 
                 // ADR-031: Create a protocol session if identity + card are available.

@@ -56,6 +56,14 @@ pub struct ExchangeConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema-gen", schemars(skip))]
     pub card_snapshot: Option<vauchi_core::exchange::card_snapshot::CardSnapshot>,
+    /// Owner's groups (with their `visible_fields`), used to resolve which
+    /// fields the selected exchange group(s) may see — fed to
+    /// [`group_filter::resolve_exchange_allow`] so the field preview matches
+    /// the card the BLE payload actually transmits. Empty = no group data
+    /// (share all). See `2026-06-08-exchange-card-not-group-filtered`.
+    #[serde(default)]
+    #[cfg_attr(feature = "schema-gen", schemars(skip))]
+    pub available_group_data: Vec<vauchi_core::Group>,
 }
 
 /// Engine that drives the QR exchange workflow.
@@ -396,10 +404,21 @@ impl ExchangeEngine {
             .as_ref()
             .map(|s| s.card().clone())
             .unwrap_or_else(|| ContactCard::new(&self.config.own_name));
+        // G2: resolve the fields the selected group(s) expose so the preview
+        // matches the card the BLE payload transmits. `None` (no groups) →
+        // empty set, which the builder treats as share-all. (Empty-group →
+        // `Some(∅)` also collapses to share-all here — a known display-only
+        // gap tracked as Slice 4b; the BLE payload already filters correctly.)
+        let visible_field_ids = group_filter::resolve_exchange_allow(
+            &self.selected_groups,
+            &self.config.available_group_data,
+            card.field_visibility(),
+        )
+        .unwrap_or_default();
         FieldPreviewConfig {
             card,
             display_name: self.config.own_name.clone(),
-            visible_field_ids: std::collections::HashSet::new(), // TODO: resolve from groups
+            visible_field_ids,
         }
     }
 
@@ -1016,6 +1035,7 @@ mod tests {
             // Pre-set mode to skip mode selection (tests focus on QR flow)
             mode: Some(ExchangeMode::Glance),
             card_snapshot: None,
+            available_group_data: Vec::new(),
         }
     }
 
@@ -1033,6 +1053,7 @@ mod tests {
             // like Glance). Carries the group-selection machinery tests.
             mode: Some(ExchangeMode::TapHoverShake),
             card_snapshot: None,
+            available_group_data: Vec::new(),
         }
     }
 
@@ -1159,6 +1180,7 @@ mod tests {
             },
             mode: None, // triggers mode selection
             card_snapshot: None,
+            available_group_data: Vec::new(),
         }
     }
 

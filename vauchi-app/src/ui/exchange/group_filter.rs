@@ -58,6 +58,26 @@ pub(crate) fn resolve_exchange_allow(
     Some(allow)
 }
 
+/// Storage-aware convenience: load the owner card and filter it to the fields
+/// the selected exchange group(s) may see. The single chokepoint the
+/// field-bearing transmit paths (BLE `build_ble_session_inputs`, Cable
+/// `DirectTransportEngine`) share so the privacy filter lives in one place.
+/// `None` only when there is no own card. See
+/// `2026-06-08-exchange-card-not-group-filtered`.
+pub(crate) fn filtered_own_card(
+    vauchi: &vauchi_core::api::Vauchi,
+    selected_group_ids: &[String],
+) -> Option<vauchi_core::contact_card::ContactCard> {
+    let card = vauchi.own_card().ok().flatten()?;
+    let groups = vauchi.list_groups().unwrap_or_default();
+    Some(
+        match resolve_exchange_allow(selected_group_ids, &groups, card.field_visibility()) {
+            Some(allow) => card.filtered_to(&allow),
+            None => card,
+        },
+    )
+}
+
 // INLINE_TEST_REQUIRED: tests exercise the `pub(crate)` resolver, which is
 // not reachable from a `tests/` integration directory.
 #[cfg(test)]

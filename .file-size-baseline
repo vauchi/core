@@ -280,7 +280,11 @@ vauchi-core/src/storage/mod.rs 1079
 #  decomposition — see routing.rs entry below.)
 # (+1 2026-06-06: `mod result_routing;` declaration for the route_result
 #  extraction, Tier 2 of the complexity sweep.)
-vauchi-app/src/ui/app_engine/mod.rs 1476
+# (+7 2026-06-08: create_engine pending_groups arg at the navigate call site +
+#  `#[cfg(test)] mod factory_filter_tests;` declaration with its
+#  INLINE_TEST_REQUIRED marker —
+#  2026-06-08-exchange-card-not-group-filtered G2 Slice 3.)
+vauchi-app/src/ui/app_engine/mod.rs 1483
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -361,7 +365,11 @@ vauchi-app/src/ui/app_engine/routing.rs 595
 # (+18 for AppScreen::NfcExchange factory arm — NFC graduation)
 # (+12 for BLE/Magic completion P2: AppScreen::BleExchange sources the
 #  role-tiebreak token from the identity at engine construction, 2026-06-07)
-vauchi-app/src/ui/app_engine/screens.rs 1599
+# (+5 for create_engine pending_groups param + DirectTransport arm group-filter
+#  wiring — 2026-06-08-exchange-card-not-group-filtered G2 Slice 3. The
+#  68-line factory wiring test lives in factory_filter_tests.rs, not inline,
+#  to keep this grandfathered factory from growing.)
+vauchi-app/src/ui/app_engine/screens.rs 1604
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

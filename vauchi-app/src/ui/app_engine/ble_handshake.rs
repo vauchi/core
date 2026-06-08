@@ -161,26 +161,16 @@ impl AppEngine {
         let x3dh = identity.x3dh_keypair();
         let exchange_pub = *x3dh.public_key();
         let display_name = identity.display_name().to_string();
-        let card = self
-            .vauchi
-            .own_card()
-            .ok()
-            .flatten()
-            .unwrap_or_else(|| ContactCard::new(&display_name));
-        // G2 privacy filter: share only the fields the selected exchange
-        // group(s) may see. `pending_exchange_groups` is set at the mode
-        // handoff (`result_routing.rs`) and consumed later at completion, so
-        // it is read by reference here. `None` (no groups) → full card.
-        // See `2026-06-08-exchange-card-not-group-filtered`.
-        let groups = self.vauchi.list_groups().unwrap_or_default();
-        let card = match crate::ui::exchange::group_filter::resolve_exchange_allow(
+        // G2 privacy filter (shared chokepoint): share only the fields the
+        // selected exchange group(s) may see. `pending_exchange_groups` is set
+        // at the mode handoff (`result_routing.rs`) and consumed later at
+        // completion, so it is read by reference here. `None` (no groups / no
+        // own card) → fall back to a bare card.
+        let card = crate::ui::exchange::group_filter::filtered_own_card(
+            &self.vauchi,
             &self.pending_exchange_groups,
-            &groups,
-            card.field_visibility(),
-        ) {
-            Some(allow) => card.filtered_to(&allow),
-            None => card,
-        };
+        )
+        .unwrap_or_else(|| ContactCard::new(&display_name));
         let fields = card
             .fields()
             .iter()

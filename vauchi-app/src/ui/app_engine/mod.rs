@@ -14,6 +14,11 @@ mod device_link;
 #[cfg(all(feature = "network-http", feature = "storage"))]
 mod device_link_initiator;
 mod dispatch;
+// INLINE_TEST_REQUIRED: factory_filter_tests drives the `pub(super)`
+// create_engine factory + the `pub(crate)` DirectTransportEngine::outgoing_card
+// seam — both crate-internal, so the test cannot live in a `tests/` directory.
+#[cfg(test)]
+mod factory_filter_tests;
 mod intercept;
 mod intercept_annotations;
 mod link_exchange;

@@ -271,6 +271,16 @@ impl BleHandshakeMachine {
             self.phase = BleMachinePhase::Handshaking;
             return (BleMachineEvent::None, Vec::new());
         }
+        // Idempotency: a duplicate `BleConnected` can arrive because the
+        // initiator is ALSO a peripheral — its own GATT server accepts the
+        // peer's connection, producing a second connect event. The KeyOffer is
+        // created exactly once; `create_key_offer` requires the `Idle` inner
+        // state, so a second call hit `InvalidState` and `mark_failed`,
+        // killing the handshake just as the peer's KeyAck arrived. If the offer
+        // already exists (state advanced past `Idle`), the duplicate is a no-op.
+        if !matches!(self.inner.state(), BleHandshakeState::Idle) {
+            return (BleMachineEvent::None, Vec::new());
+        }
         match self.inner.create_key_offer() {
             Ok(offer) => {
                 self.phase = BleMachinePhase::Handshaking;

@@ -93,6 +93,38 @@ fn initiator_on_connected_emits_key_offer_on_handshake_write() {
 
 // @internal
 #[test]
+fn initiator_duplicate_on_connected_is_idempotent_not_failed() {
+    // A second BleConnected arrives because the initiator is ALSO a peripheral
+    // (its own GATT server accepts the peer's connection). The duplicate must
+    // be a no-op — not re-create the KeyOffer and fail with InvalidState, which
+    // killed the S7-as-central handshake just as the peer's KeyAck arrived.
+    let mut m = fresh_initiator();
+    let (_e1, cmds1) = m.on_connected(0);
+    assert_eq!(cmds1.len(), 1, "first connect emits the KeyOffer");
+    assert_eq!(m.phase(), BleMachinePhase::Handshaking);
+
+    let (event2, cmds2) = m.on_connected(0);
+    assert!(
+        matches!(event2, BleMachineEvent::None),
+        "duplicate connect is a no-op event",
+    );
+    assert!(
+        cmds2.is_empty(),
+        "duplicate connect must not emit a second KeyOffer: {cmds2:?}",
+    );
+    assert_eq!(
+        m.phase(),
+        BleMachinePhase::Handshaking,
+        "machine stays Handshaking, not Failed",
+    );
+    assert!(
+        !m.is_terminal(),
+        "duplicate connect must not fail the machine"
+    );
+}
+
+// @internal
+#[test]
 fn responder_on_connected_is_no_op_pending_frontend_subscribe() {
     let mut m = fresh_responder();
     let (event, cmds) = m.on_connected(0);

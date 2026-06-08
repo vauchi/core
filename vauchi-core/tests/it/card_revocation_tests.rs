@@ -86,3 +86,35 @@ fn revoking_last_visible_field_queues_a_removal_update() {
          (was {after_grant}, now {after_revoke})"
     );
 }
+
+// @scenario: visibility_control :: Revoking an exchange-shared field notifies the contact
+#[test]
+fn revoking_exchange_shared_field_as_first_repropagation_emits_removal() {
+    let wb = create_test_vauchi();
+    wb.add_own_field(ContactField::new(FieldType::Email, "work", "a@co.com", 0))
+        .unwrap();
+    let work = own_field_id(&wb, "work");
+    let bob_id = add_contact_with_ratchet(&wb, "Bob");
+
+    let label = wb.create_group("Work").unwrap();
+    wb.set_group_field_visibility(label.id(), &work, true)
+        .unwrap();
+    wb.add_contact_to_group(label.id(), &bob_id).unwrap();
+
+    // Simulate exchange completion: snapshot the shared baseline ({work})
+    // WITHOUT any repropagation (mirrors persist_*_exchanged_contact).
+    wb.initialize_sent_baseline(&bob_id).unwrap();
+    let before = wb.storage().get_pending_updates(&bob_id).unwrap().len();
+
+    // Revoke as the FIRST repropagation — the baseline must let it emit a
+    // removal (without exchange-init this queued nothing).
+    wb.remove_contact_from_group_and_repropagate(label.id(), &bob_id)
+        .unwrap();
+    let after = wb.storage().get_pending_updates(&bob_id).unwrap().len();
+
+    assert!(
+        after > before,
+        "Revoking an exchange-shared field as the first repropagation must \
+         queue a removal (was {before}, now {after})"
+    );
+}

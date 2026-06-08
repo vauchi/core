@@ -431,6 +431,34 @@ impl Vauchi {
         self.repropagate_to_contact(contact_id)
     }
 
+    /// Records the contact's current effective-visible field set as the
+    /// last-sent baseline.
+    ///
+    /// Called at exchange completion, **after** the contact has been assigned
+    /// to its groups, so the baseline reflects the group-filtered card the peer
+    /// received. Without it, revoking an exchange-shared field as the very
+    /// first repropagation would have a `None` baseline and emit no `Removed`
+    /// (see `2026-06-08-card-revocation-not-propagated`). Idempotent and
+    /// best-effort: a missing own card / unknown contact is a no-op.
+    pub fn initialize_sent_baseline(&self, contact_id: &str) -> VauchiResult<()> {
+        let own_card = match self.storage.load_own_card()? {
+            Some(c) => c,
+            None => return Ok(()),
+        };
+        let visible: std::collections::HashSet<String> = own_card
+            .fields()
+            .iter()
+            .map(|f| f.id().to_string())
+            .filter(|fid| {
+                self.get_effective_field_visibility(contact_id, fid)
+                    .unwrap_or(false)
+            })
+            .collect();
+        self.storage
+            .save_last_sent_visible_fields(contact_id, &visible)?;
+        Ok(())
+    }
+
     /// Re-propagates the current card state to a single contact.
     ///
     /// Sends a "full card" delta so the contact receives the card as filtered

@@ -206,6 +206,10 @@ impl AppEngine {
                 #[allow(clippy::let_underscore_must_use)]
                 let _ = self.vauchi.add_contact_to_group(group_id, &contact_id);
             }
+            // Snapshot the revocation baseline
+            // (2026-06-08-card-revocation-not-propagated). Best-effort.
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = self.vauchi.initialize_sent_baseline(&contact_id);
             // Capture-at-exchange (ADR-051): QR is an in-person mode, so
             // record where this contact was met — same seam as multi-stage
             // and BLE. The Event::LocationResult reply is consumed in

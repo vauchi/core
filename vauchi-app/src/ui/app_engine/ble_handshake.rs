@@ -313,6 +313,9 @@ impl AppEngine {
             // Best-effort; bind (not `let _`) to satisfy the must-use lint.
             let _added = self.vauchi.add_contact_to_group(group_id, &contact_id);
         }
+        // Snapshot what this contact can now see as the revocation baseline
+        // (2026-06-08-card-revocation-not-propagated). Best-effort.
+        let _baseline = self.vauchi.initialize_sent_baseline(&contact_id);
         // Capture-at-exchange (ADR-051): BLE (Magic/Bump/Shake) is an in-person
         // mode, so record where this contact was met — same seam as the
         // multi-stage path. The Event::LocationResult reply is consumed in

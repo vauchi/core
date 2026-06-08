@@ -319,24 +319,6 @@ impl<T: Transport> RelayClient<T> {
         Ok(message_id)
     }
 
-    /// Sends an identity revocation message to a contact via the relay.
-    ///
-    /// Used during identity deletion (hard_shred / panic_shred) to notify
-    /// contacts that this identity has been revoked. The message is signed
-    /// (not encrypted) so it can be processed even without ratchet state.
-    pub fn send_identity_revoked(
-        &mut self,
-        revoked: &super::message::IdentityRevoked,
-        now: u64,
-    ) -> Result<MessageId, NetworkError> {
-        let envelope = create_envelope(MessagePayload::IdentityRevoked(revoked.clone()), now);
-        let message_id = envelope.message_id.clone();
-
-        self.connection.send(&envelope)?;
-
-        Ok(message_id)
-    }
-
     /// Processes incoming messages (acknowledgments, updates from others).
     ///
     /// Returns an `IncomingResult` containing:

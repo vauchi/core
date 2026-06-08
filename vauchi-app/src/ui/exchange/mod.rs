@@ -16,6 +16,7 @@ pub(crate) mod ble;
 pub mod ble_engine;
 pub mod direct_engine;
 pub(crate) mod field_preview;
+pub(crate) mod group_filter;
 pub(crate) mod mode_selection;
 pub(crate) mod nfc;
 pub mod nfc_engine;

@@ -219,6 +219,7 @@ mod tests {
     // CC-14 adversarial: `link_key` is parsed from a peer-scanned QR, so an
     // all-zeros key is attacker-reachable. It must surface as an error, never
     // a panic (ADR-002: no panic at a trust boundary; W4).
+    // @internal
     #[test]
     fn test_device_link_request_all_zeros_key_errors_not_panics() {
         let zero_key = [0u8; 32];
@@ -238,6 +239,7 @@ mod tests {
 
     // W-3: the confirmation code is HKDF-domain-separated off the link key,
     // yet still deterministic so initiator and responder agree on it.
+    // @internal
     #[test]
     fn test_confirmation_code_is_deterministic() {
         let link_key = [0x42u8; 32];

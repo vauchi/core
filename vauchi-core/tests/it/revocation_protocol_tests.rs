@@ -510,3 +510,53 @@ fn test_gdpr_deletion_revocation_shreds_at_recipient() {
         "Alice must be tombstoned"
     );
 }
+
+// Spy test: broadcast_identity_revocations actually transmits the revocation
+// blobs to the relay's /v2/send endpoint (the e2e shred test fed the blob
+// straight to process_revocation, bypassing the real network hop).
+// @scenario: privacy_compliance :: Revocation broadcast transmits to the relay
+// @internal
+#[test]
+fn test_broadcast_identity_revocations_transmits_to_relay() {
+    use crate::common::mock_relay::{CannedResponse, MockRelay};
+    use base64::Engine;
+    use vauchi_core::api::vauchi::VauchiBuilder;
+
+    let mock = MockRelay::start();
+    mock.queue(
+        "send",
+        CannedResponse::ok_json(br#"{"status":"ok","blob_id":"test-blob"}"#.to_vec()),
+    );
+
+    let dir = tempfile::tempdir().expect("temp dir");
+    let mut wb = VauchiBuilder::new()
+        .relay_url(mock.url())
+        .storage_path(dir.path().join("vauchi.db").to_str().expect("utf-8 path"))
+        .build()
+        .expect("build vauchi");
+    wb.create_identity("Alice").expect("create identity");
+
+    // A pre-built delivery (token + base64 VRV1 blob), as DeletionResult yields.
+    let revoker = Identity::create("Alice-revoked", 0);
+    let recipient_id = hex::encode([0xBBu8; 32]);
+    let rev = IdentityRevoked::create(&revoker, &recipient_id, 1_700_000_000);
+    let token = "ab".repeat(32);
+    let blob_b64 = base64::engine::general_purpose::STANDARD.encode(encode_revocation_blob(&rev));
+
+    let sent = wb.broadcast_identity_revocations(&[(token.clone(), blob_b64.clone())]);
+    assert_eq!(sent, 1, "the single delivery must be sent");
+
+    // The relay received a /v2/send addressed to the token, carrying the blob.
+    let req = mock.last_received();
+    assert_eq!(req.path, "/v2/send");
+    let body: serde_json::Value = serde_json::from_slice(&req.body).expect("JSON body");
+    assert_eq!(body["recipient_id"], token);
+    assert_eq!(body["ciphertext"], blob_b64);
+
+    // The transmitted blob round-trips back to the revocation.
+    let raw = base64::engine::general_purpose::STANDARD
+        .decode(body["ciphertext"].as_str().unwrap())
+        .unwrap();
+    let decoded = decode_revocation_blob(&raw).expect("relay-delivered blob decodes");
+    assert_eq!(decoded.recipient_id.as_str(), recipient_id);
+}

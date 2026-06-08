@@ -16,6 +16,7 @@ use crate::ui::engine::WorkflowEngine;
 use crate::ui::form_dialog::FormDialogType;
 use crate::ui::info_content;
 use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
+use crate::ui::places_list::PlacesEngine;
 use crate::ui::tag_promotion::TagPromotionEngine;
 use crate::ui::tags_list::TagsEngine;
 use vauchi_core::SearchFacets;
@@ -545,6 +546,36 @@ impl AppEngine {
         self.engine
             .as_any_mut()
             .and_then(|a| a.downcast_mut::<TagsEngine>())
+            .map(|engine| {
+                engine.confirm_delete();
+                ActionResult::UpdateScreen(engine.current_screen())
+            })
+    }
+
+    /// Intercept the place-delete confirmation on the Places management
+    /// screen (ADR-051). Reads the armed place id from the engine, deletes it
+    /// via `Vauchi::delete_place`, then applies the optimistic row drop.
+    pub(super) fn intercept_place_delete(&mut self, action: &UserAction) -> Option<ActionResult> {
+        if self.screen != AppScreen::Places {
+            return None;
+        }
+        let UserAction::ActionPressed { action_id } = action else {
+            return None;
+        };
+        if action_id != "confirm_delete_place" {
+            return None;
+        }
+        let place_id = self
+            .engine
+            .as_any()
+            .and_then(|a| a.downcast_ref::<PlacesEngine>())
+            .and_then(|e| e.pending_delete_id())
+            .map(str::to_string)?;
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = self.vauchi.delete_place(&place_id);
+        self.engine
+            .as_any_mut()
+            .and_then(|a| a.downcast_mut::<PlacesEngine>())
             .map(|engine| {
                 engine.confirm_delete();
                 ActionResult::UpdateScreen(engine.current_screen())

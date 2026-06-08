@@ -71,6 +71,7 @@ const EXPECTED_MORE_ACTION_IDS: &[&str] = &[
     "backup",
     // data
     "tags",
+    "places",
     "archived_contacts",
     "contact_duplicates",
     "import_contacts",

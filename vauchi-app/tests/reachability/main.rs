@@ -49,6 +49,7 @@ mod my_info;
 mod my_info_entry_detail;
 mod nfc_exchange;
 mod onboarding;
+mod places;
 mod recovery;
 mod recovery_claim_review;
 mod recovery_help;

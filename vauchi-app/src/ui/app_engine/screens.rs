@@ -45,6 +45,7 @@ use crate::ui::more::MoreEngine;
 use crate::ui::my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, OwnFieldInfo};
 use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 use crate::ui::onboarding::OnboardingEngine;
+use crate::ui::places_list::{PlaceSummary, PlacesEngine};
 use crate::ui::recovery_claim_review::{
     ClaimContext, Confidence, RecoveryClaimReviewEngine, ReviewMode,
 };
@@ -499,6 +500,18 @@ impl AppEngine {
                 // generic not-found screen (keeps a Back affordance).
                 Err(_) => Box::new(ContactNotFoundEngine::new(tag_id.clone())),
             },
+            AppScreen::Places => {
+                let places: Vec<PlaceSummary> = vauchi
+                    .list_places()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|p| PlaceSummary {
+                        id: p.id,
+                        name: p.name,
+                    })
+                    .collect();
+                Box::new(PlacesEngine::new(places))
+            }
             AppScreen::Tags => {
                 let tags: Vec<TagSummary> = vauchi
                     .list_tags()

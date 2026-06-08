@@ -750,6 +750,7 @@ fn more_engine_has_expected_navigation_targets() {
         "device_replacement",
         "recovery",
         "tags",
+        "places",
         "archived_contacts",
         "contact_duplicates",
         "import_contacts",

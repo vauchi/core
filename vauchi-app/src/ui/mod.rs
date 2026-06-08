@@ -52,6 +52,7 @@ pub mod multi_stage_exchange;
 mod my_info;
 mod my_info_entry_detail;
 mod onboarding;
+mod places_list;
 pub mod reciprocity_confirmer;
 pub mod recovery_claim_review;
 mod recovery_help;
@@ -147,6 +148,7 @@ pub use multi_stage_exchange::{
 pub use my_info::{MyInfoEngine, MyInfoGroupTab, MyInfoProgress, MyInfoViewMode, OwnFieldInfo};
 pub use my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 pub use onboarding::{FieldSetup, GroupSetup, OnboardingData, OnboardingEngine};
+pub use places_list::{PlaceSummary, PlacesEngine};
 pub use recovery_help::{ParsedClaimSummary, RecoveryHelpEngine};
 pub use recovery_status::RecoveryEngine;
 pub use render_context::RenderContext;

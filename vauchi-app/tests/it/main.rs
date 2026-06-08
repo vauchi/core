@@ -46,6 +46,7 @@ mod humble_surface_contract_tests;
 mod link_exchange_tests;
 mod multi_stage_machine_proptest;
 mod nfc_exchange_app_engine_tests;
+mod places_tests;
 mod tag_promotion_tests;
 mod tags_engine_tests;
 mod tags_intercepts_tests;

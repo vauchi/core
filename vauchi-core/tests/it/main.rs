@@ -74,6 +74,7 @@ mod ble_proptest;
 mod ble_rollback_tests;
 mod block_contact_api_tests;
 mod capability_tests;
+mod card_revocation_tests;
 mod cek_aware_storage_tests;
 mod cek_integration_tests;
 mod cek_wrapped_payload_tests;

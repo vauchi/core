@@ -45,3 +45,26 @@ fn direct_payload_received_roundtrips_through_mobile_enum() {
         other => panic!("expected DirectPayloadReceived, got {other:?}"),
     }
 }
+
+// @internal
+#[test]
+fn location_result_roundtrips_through_mobile_enum() {
+    let evt = MobileEvent::LocationResult {
+        latitude: 47.37,
+        longitude: 8.54,
+        accuracy_meters: Some(12.0),
+    };
+    let core: Event = evt.into();
+    match core {
+        Event::LocationResult {
+            latitude,
+            longitude,
+            accuracy_meters,
+        } => {
+            assert!((latitude - 47.37).abs() < 1e-9);
+            assert!((longitude - 8.54).abs() < 1e-9);
+            assert_eq!(accuracy_meters, Some(12.0));
+        }
+        other => panic!("expected LocationResult, got {other:?}"),
+    }
+}

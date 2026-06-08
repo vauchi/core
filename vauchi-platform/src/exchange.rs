@@ -301,6 +301,16 @@ pub enum MobileEvent {
     PermissionDenied {
         transport: String,
     },
+    /// Device location fix in reply to `Command::LocationRequest` (ADR-051
+    /// capture-at-exchange). Coordinates are decimal degrees; `accuracy_meters`
+    /// is the provider's reported horizontal accuracy, if any. A declined
+    /// permission / absent provider is reported via the generic
+    /// `PermissionDenied { transport: "location" }` / `HardwareUnavailable`.
+    LocationResult {
+        latitude: f64,
+        longitude: f64,
+        accuracy_meters: Option<f32>,
+    },
 }
 
 impl From<MobileEvent> for Event {
@@ -333,6 +343,15 @@ impl From<MobileEvent> for Event {
                 Self::HardwareUnavailable { transport }
             }
             MobileEvent::PermissionDenied { transport } => Self::PermissionDenied { transport },
+            MobileEvent::LocationResult {
+                latitude,
+                longitude,
+                accuracy_meters,
+            } => Self::LocationResult {
+                latitude,
+                longitude,
+                accuracy_meters,
+            },
             MobileEvent::AccelerometerData {
                 timestamp_ms,
                 x_milli_g,

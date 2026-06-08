@@ -258,6 +258,30 @@ fn pump(from: &mut AppEngine, to: &mut AppEngine) -> usize {
     routed
 }
 
+/// Like `pump`, but captures the non-BLE commands the sender emits, so a
+/// test can assert e.g. the capture-at-exchange `LocationRequest` queued at
+/// finalize (which plain `pump` would silently drop).
+fn pump_capture(
+    from: &mut AppEngine,
+    to: &mut AppEngine,
+    captured: &mut Vec<vauchi_core::Command>,
+) -> usize {
+    let mut routed = 0;
+    for cmd in from.drain_pending_commands() {
+        if let vauchi_core::Command::BleWriteCharacteristic { uuid, data } = &cmd {
+            routed += 1;
+            let ev = to.forward_ble_hardware_event(&Event::BleCharacteristicNotified {
+                uuid: uuid.clone(),
+                data: data.clone(),
+            });
+            to.apply_ble_machine_event(ev);
+        } else {
+            captured.push(cmd);
+        }
+    }
+    routed
+}
+
 // @internal
 #[test]
 fn two_party_ble_exchange_persists_each_others_contact() {
@@ -282,9 +306,11 @@ fn two_party_ble_exchange_persists_each_others_contact() {
     });
     bob.apply_ble_machine_event(eb);
 
-    // Pump writes back and forth until the exchange settles.
+    // Pump writes back and forth until the exchange settles, capturing the
+    // non-BLE commands Alice emits.
+    let mut alice_emitted: Vec<vauchi_core::Command> = Vec::new();
     for _ in 0..50 {
-        let a = pump(&mut alice, &mut bob);
+        let a = pump_capture(&mut alice, &mut bob, &mut alice_emitted);
         let b = pump(&mut bob, &mut alice);
         if a + b == 0 {
             break;
@@ -297,4 +323,13 @@ fn two_party_ble_exchange_persists_each_others_contact() {
     assert_eq!(alice_contacts[0].display_name(), "Bob");
     assert_eq!(bob_contacts.len(), 1, "Bob should have exactly Alice");
     assert_eq!(bob_contacts[0].display_name(), "Alice");
+
+    // ADR-051 capture-at-exchange: the in-person BLE finalize requests a
+    // location fix (same seam as multi-stage).
+    assert!(
+        alice_emitted
+            .iter()
+            .any(|c| matches!(c, vauchi_core::Command::LocationRequest { .. })),
+        "BLE finalize should queue Command::LocationRequest, got {alice_emitted:?}"
+    );
 }

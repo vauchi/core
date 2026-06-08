@@ -309,6 +309,11 @@ impl AppEngine {
             // Best-effort; bind (not `let _`) to satisfy the must-use lint.
             let _added = self.vauchi.add_contact_to_group(group_id, &contact_id);
         }
+        // Capture-at-exchange (ADR-051): BLE (Magic/Bump/Shake) is an in-person
+        // mode, so record where this contact was met — same seam as the
+        // multi-stage path. The Event::LocationResult reply is consumed in
+        // handle_hardware_event.
+        self.request_exchange_location(contact_id.clone());
         if self
             .vauchi
             .save_exchange_ratchet(&contact_id, &ratchet, is_initiator)

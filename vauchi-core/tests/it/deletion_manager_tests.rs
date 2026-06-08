@@ -307,3 +307,45 @@ fn test_execute_deletion_mixed_cek_and_legacy_contacts() {
         .load_contact_cek(&bob_id)
         .expect_err("expected error");
 }
+
+// @scenario: privacy_compliance :: Identity deletion produces relay-ready revocation deliveries
+// @internal
+#[test]
+fn test_execute_deletion_produces_decodable_deliveries() {
+    use base64::Engine;
+    use vauchi_core::network::mailbox_token::{
+        compute_mailbox_token, current_day_epoch, token_hex,
+    };
+    use vauchi_core::network::revocation::decode_revocation_blob;
+
+    let storage = test_storage();
+    let identity = Identity::create("Alice", 0);
+    let bob = make_contact_with_cek([0xBB; 32], "Bob");
+    storage.save_contact(&bob).unwrap();
+
+    let manager = DeletionManager::new(&storage);
+    manager.schedule_deletion_with_execute_at(0, 0).unwrap();
+    let result = manager.execute_deletion(&identity).unwrap();
+
+    assert_eq!(result.deliveries.len(), 1, "one delivery per contact");
+    let (token, blob_b64) = &result.deliveries[0];
+
+    // The blob decodes to a revocation signed by us, addressed to Bob.
+    let blob = base64::engine::general_purpose::STANDARD
+        .decode(blob_b64)
+        .unwrap();
+    let rev = decode_revocation_blob(&blob).expect("delivery blob must decode");
+    assert!(
+        rev.verify(identity.signing_public_key()),
+        "delivery must be signed by the deleter"
+    );
+    assert_eq!(rev.recipient_id.as_str(), bob.id());
+
+    // The token addresses Bob's mailbox, derived the same way the recipient
+    // registers it (epoch taken from the revocation to avoid clock coupling).
+    let expected = token_hex(&compute_mailbox_token(
+        bob.shared_key().unwrap().as_bytes(),
+        current_day_epoch(rev.timestamp),
+    ));
+    assert_eq!(token, &expected, "delivery must target Bob's mailbox token");
+}

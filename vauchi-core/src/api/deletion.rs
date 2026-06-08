@@ -10,8 +10,12 @@
 
 use std::path::Path;
 
+use base64::Engine;
+
 use crate::identity::Identity;
 use crate::network::IdentityRevoked;
+use crate::network::mailbox_token::{compute_mailbox_token, current_day_epoch, token_hex};
+use crate::network::revocation::encode_revocation_blob;
 use crate::storage::{DeletionState, Storage, StorageError};
 
 /// Duration of deletion grace period in seconds (7 days).
@@ -67,6 +71,11 @@ pub enum DeletionError {
 pub struct DeletionResult {
     /// `IdentityRevoked` messages to send to contacts via relay.
     pub revocations: Vec<IdentityRevoked>,
+    /// Ready-to-send `(mailbox_token_hex, base64_revocation_blob)` pairs, one
+    /// per contact with a shared key. Computed before each contact is shredded
+    /// (the token derives from the now-deleted shared key), so the caller can
+    /// broadcast after deletion via the relay `send` endpoint.
+    pub deliveries: Vec<(String, String)>,
 }
 
 /// Manages identity deletion with a 7-day grace period.
@@ -154,10 +163,22 @@ impl<'a> DeletionManager<'a> {
                     .map_err(|e| DeletionError::DeletionFailed(e.to_string()))?;
 
                 let mut revocations = Vec::with_capacity(contacts.len());
+                let mut deliveries = Vec::with_capacity(contacts.len());
+                let day_epoch = current_day_epoch(now);
 
                 for contact in &contacts {
                     // Generate signed IdentityRevoked message
                     let revoked = IdentityRevoked::create(identity, contact.id(), now);
+
+                    // Compute the relay delivery (mailbox token + magic-prefixed
+                    // blob) now, while the shared key still exists — the contact
+                    // is crypto-shredded below.
+                    if let Some(shared) = contact.shared_key() {
+                        let token = token_hex(&compute_mailbox_token(shared.as_bytes(), day_epoch));
+                        let blob = base64::engine::general_purpose::STANDARD
+                            .encode(encode_revocation_blob(&revoked));
+                        deliveries.push((token, blob));
+                    }
                     revocations.push(revoked);
 
                     // Crypto-shred: delete CEK (card becomes permanently unreadable)
@@ -183,7 +204,10 @@ impl<'a> DeletionManager<'a> {
                 let state = DeletionState::Executed { executed_at: now };
                 self.storage.save_deletion_state(&state)?;
 
-                Ok(DeletionResult { revocations })
+                Ok(DeletionResult {
+                    revocations,
+                    deliveries,
+                })
             }
             _ => Err(DeletionError::DeletionFailed(
                 "No deletion scheduled".to_string(),

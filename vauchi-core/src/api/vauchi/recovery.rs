@@ -278,6 +278,25 @@ impl Vauchi {
     fn create_guardian_transport(&self) -> HttpTransport {
         self.build_relay_transport(self.http_relay_url(), self.config.relay.connect_timeout_ms)
     }
+
+    /// Broadcasts pre-computed identity-revocation deliveries to the relay.
+    ///
+    /// Call with `DeletionResult::deliveries` after `execute_deletion`: each
+    /// `(mailbox_token_hex, base64_blob)` is sent to the contact's mailbox via
+    /// the relay `send` endpoint (over OHTTP), where the recipient's receive
+    /// path detects the magic prefix and runs `process_revocation`.
+    /// Best-effort — per-delivery failures are skipped. Returns the count
+    /// delivered.
+    pub fn broadcast_identity_revocations(&self, deliveries: &[(String, String)]) -> usize {
+        let transport = self.create_guardian_transport();
+        let mut sent = 0;
+        for (token, blob_b64) in deliveries {
+            if transport.send_update(token, blob_b64).is_ok() {
+                sent += 1;
+            }
+        }
+        sent
+    }
 }
 
 /// Computes the guardian storage hash: SHA-256(designator_pk || "guardians").

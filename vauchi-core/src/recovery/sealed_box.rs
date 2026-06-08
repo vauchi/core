@@ -34,6 +34,15 @@ const DOMAIN: &[u8] = b"vauchi-sealed-box-v1";
 /// Minimum size of a valid sealed blob: ephemeral_pk (32) + nonce (24) + tag (16).
 const MIN_SEALED_LEN: usize = 32 + 24 + 16;
 
+/// Derives the sealed-box symmetric key from a DH shared secret.
+///
+/// The only `vauchi-sealed-box-v1` derivation site: seal, open, and tests
+/// route through here so the domain string is never duplicated across
+/// derivation contexts (ADR-007; crypto-hygiene gate).
+fn derive_sealed_box_key(ikm: &[u8]) -> zeroize::Zeroizing<[u8; 32]> {
+    HKDF::derive_key(None, ikm, DOMAIN)
+}
+
 /// Seal `plaintext` so only the holder of `recipient_pk`'s secret key can open it.
 ///
 /// Uses an ephemeral X25519 keypair for the DH exchange; the sender is anonymous.
@@ -60,7 +69,7 @@ pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Result<Vec<u8>, Recov
     }
 
     // 3. Derive symmetric key via HKDF-SHA256 (ADR-007).
-    let key = HKDF::derive_key(None, shared.as_bytes(), DOMAIN);
+    let key = derive_sealed_box_key(shared.as_bytes());
 
     let mut nonce_bytes = [0u8; 24];
     OsRng.fill_bytes(&mut nonce_bytes);
@@ -112,7 +121,7 @@ pub fn open(sealed: &[u8], recipient_secret: &StaticSecret) -> Result<Vec<u8>, R
     }
 
     // 3. Derive symmetric key via HKDF-SHA256 (ADR-007).
-    let key = HKDF::derive_key(None, shared.as_bytes(), DOMAIN);
+    let key = derive_sealed_box_key(shared.as_bytes());
 
     let cipher = XChaCha20Poly1305::new_from_slice(key.as_ref())
         .expect("32-byte key is always valid for XChaCha20Poly1305");
@@ -134,11 +143,12 @@ mod tests {
     // open() must reject the non-contributory DH before it is tricked into
     // returning the forgery (problem record
     // 2026-06-08-sealed-box-noncontributory-dh).
+    // @internal: open() rejects a non-contributory (small-order) ephemeral
     #[test]
     fn open_rejects_forged_small_order_ephemeral() {
         let recipient_secret = StaticSecret::random_from_rng(OsRng);
 
-        let predictable_key = HKDF::derive_key(None, &[0u8; 32], DOMAIN);
+        let predictable_key = derive_sealed_box_key(&[0u8; 32]);
         let nonce_bytes = [7u8; 24];
         let cipher =
             XChaCha20Poly1305::new_from_slice(predictable_key.as_ref()).expect("32-byte key");

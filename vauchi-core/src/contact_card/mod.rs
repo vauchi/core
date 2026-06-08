@@ -232,6 +232,26 @@ impl ContactCard {
         &mut self.fields
     }
 
+    /// Returns a clone of this card containing only the fields whose id is in
+    /// `allowed_field_ids`. Per-field visibility rules for dropped fields are
+    /// pruned too, so a filtered card never carries metadata about fields it
+    /// does not include.
+    ///
+    /// This is the single chokepoint for building the **group-filtered card
+    /// shared at exchange time**: the caller resolves the audience's visible
+    /// field set (the union of the selected groups' `visible_fields`) and the
+    /// resulting card is what the preview renders, the snapshot freezes, and
+    /// the success summary reports — one already-filtered source of truth.
+    /// See problem `2026-06-08-exchange-card-not-group-filtered`.
+    pub fn filtered_to(&self, allowed_field_ids: &std::collections::HashSet<String>) -> Self {
+        let mut card = self.clone();
+        card.fields.retain(|f| allowed_field_ids.contains(f.id()));
+        card.field_visibility
+            .rules
+            .retain(|field_id, _| allowed_field_ids.contains(field_id));
+        card
+    }
+
     /// Adds a field to the card.
     pub fn add_field(&mut self, field: ContactField) -> Result<(), ContactCardError> {
         if self.fields.len() >= MAX_FIELDS {

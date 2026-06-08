@@ -29,6 +29,57 @@ fn test_add_and_remove_field() {
     assert!(card.fields().is_empty());
 }
 
+// W2 (2026-06-08-exchange-card-not-group-filtered): the group-filtered card
+// chokepoint. filtered_to returns only allow-listed fields, leaves the
+// original untouched (pure), and is safe under empty/superset allow-lists.
+// @internal
+#[test]
+fn test_filtered_to_keeps_only_allowed_fields() {
+    use std::collections::HashSet;
+    let mut card = ContactCard::new("Owner");
+    card.add_field(ContactField::new(FieldType::Email, "Work", "w@x.com", 0))
+        .unwrap();
+    card.add_field(ContactField::new(
+        FieldType::Phone,
+        "Mobile",
+        "+15551234567",
+        0,
+    ))
+    .unwrap();
+    card.add_field(ContactField::new(FieldType::Email, "Home", "h@x.com", 0))
+        .unwrap();
+
+    let keep_a = card.fields()[0].id().to_string();
+    let drop_b = card.fields()[1].id().to_string();
+    let keep_c = card.fields()[2].id().to_string();
+    let allow: HashSet<String> = HashSet::from([keep_a.clone(), keep_c.clone()]);
+
+    let filtered = card.filtered_to(&allow);
+
+    let ids: HashSet<String> = filtered
+        .fields()
+        .iter()
+        .map(|f| f.id().to_string())
+        .collect();
+    assert_eq!(
+        filtered.fields().len(),
+        2,
+        "only allow-listed fields remain"
+    );
+    assert!(ids.contains(&keep_a) && ids.contains(&keep_c));
+    assert!(!ids.contains(&drop_b), "non-allow-listed field is dropped");
+
+    // Purity: the source card is unchanged.
+    assert_eq!(card.fields().len(), 3);
+
+    // Empty allow-list → empty card (e.g. a group that shares nothing).
+    assert!(card.filtered_to(&HashSet::new()).fields().is_empty());
+
+    // Superset allow-list → all fields kept, no panic.
+    let superset: HashSet<String> = HashSet::from([keep_a, drop_b, keep_c, "ghost".to_string()]);
+    assert_eq!(card.filtered_to(&superset).fields().len(), 3);
+}
+
 // @scenario: onboarding_workflow :: Field visibility default empty (privacy-first)
 #[test]
 fn test_contact_card_field_visibility_default_empty() {

@@ -53,6 +53,11 @@ pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Result<Vec<u8>, Recov
 
     // 2. DH: ephemeral_secret × recipient_pk → shared secret.
     let shared = ephemeral_secret.diffie_hellman(recipient_pk);
+    // Reject small-order recipient keys: a non-contributory DH collapses
+    // the shared secret to all-zeros, making the HKDF key predictable.
+    if !shared.was_contributory() {
+        return Err(RecoveryError::WeakKey);
+    }
 
     // 3. Derive symmetric key via HKDF-SHA256 (ADR-007).
     let key = HKDF::derive_key(None, shared.as_bytes(), DOMAIN);
@@ -99,6 +104,12 @@ pub fn open(sealed: &[u8], recipient_secret: &StaticSecret) -> Result<Vec<u8>, R
 
     // 2. DH: recipient_secret × ephemeral_pk → shared secret.
     let shared = recipient_secret.diffie_hellman(&ephemeral_pk);
+    // Reject non-contributory DH: an attacker-supplied small-order
+    // ephemeral point collapses the shared secret to all-zeros, yielding
+    // a predictable key and a forgeable blob (2026-06-08 audit).
+    if !shared.was_contributory() {
+        return Err(RecoveryError::DecryptionFailed);
+    }
 
     // 3. Derive symmetric key via HKDF-SHA256 (ADR-007).
     let key = HKDF::derive_key(None, shared.as_bytes(), DOMAIN);

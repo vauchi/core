@@ -380,6 +380,7 @@ mod tests {
         card.fields.iter().map(|(label, _)| label.clone()).collect()
     }
 
+    // @internal
     #[test]
     fn ble_payload_shares_full_card_when_no_group_selected() {
         // pending_exchange_groups empty → resolver returns None → share all.
@@ -392,6 +393,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn ble_payload_filtered_to_selected_group_visible_fields() {
         // Work exposes only Email; selecting it must drop Phone from the
@@ -406,6 +408,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn ble_payload_empty_when_selected_group_exposes_nothing() {
         // Default-closed: a selected group with no visible_fields shares no

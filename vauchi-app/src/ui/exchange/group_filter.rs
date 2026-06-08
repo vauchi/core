@@ -101,6 +101,7 @@ mod tests {
         VisibilityRules::new()
     }
 
+    // @internal
     #[test]
     fn no_groups_selected_returns_none_share_all() {
         let groups = vec![group("g1", &["email"])];
@@ -108,6 +109,7 @@ mod tests {
         assert_eq!(allow, None, "no audience selected → share all (None)");
     }
 
+    // @internal
     #[test]
     fn single_group_allows_exactly_its_visible_fields() {
         let groups = vec![group("g1", &["email"])];
@@ -115,6 +117,7 @@ mod tests {
         assert_eq!(allow, Some(HashSet::from(["email".to_string()])));
     }
 
+    // @internal
     #[test]
     fn field_not_in_any_selected_group_is_excluded() {
         // Group exposes email only; phone is absent from the allow-list.
@@ -125,6 +128,7 @@ mod tests {
         assert!(!allow.contains("phone"), "phone is in no selected group");
     }
 
+    // @internal
     #[test]
     fn multiple_groups_union_their_visible_fields() {
         let groups = vec![group("g1", &["email"]), group("g2", &["phone"])];
@@ -136,6 +140,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn nobody_default_field_excluded_even_if_group_lists_it() {
         // Stale group allow-list still lists `ssn`, but the owner marked it
@@ -151,6 +156,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn everyone_default_field_in_group_is_included() {
         // The floor only excludes Nobody; Everyone (default) stays in.
@@ -161,6 +167,7 @@ mod tests {
         assert_eq!(allow, Some(HashSet::from(["email".to_string()])));
     }
 
+    // @internal
     #[test]
     fn empty_visible_fields_group_contributes_nothing_to_union() {
         let groups = vec![group("g1", &[]), group("g2", &["phone"])];
@@ -173,6 +180,7 @@ mod tests {
         );
     }
 
+    // @internal
     #[test]
     fn all_selected_groups_empty_yields_empty_allow_not_share_all() {
         // Default-closed: selecting groups that expose nothing shares nothing,
@@ -183,6 +191,7 @@ mod tests {
         assert_eq!(allow, Some(HashSet::new()), "Some(empty), not None");
     }
 
+    // @internal
     #[test]
     fn unknown_selected_group_id_is_ignored() {
         // A selected id with no matching Group contributes nothing.

@@ -36,6 +36,7 @@ mod display_hint_tests;
 mod drain_notifications_tests;
 mod exchange_ble_invariants_proptest;
 mod exchange_cancel_navigation_tests;
+mod exchange_group_filter_preview_tests;
 mod exchange_location_capture_tests;
 mod exchange_step_back_tests;
 mod f2_new_4_settings_nav_tests;

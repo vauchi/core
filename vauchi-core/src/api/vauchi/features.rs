@@ -461,20 +461,44 @@ impl Vauchi {
             None => return Ok(()),
         };
 
-        // Compute a "full card" delta from an empty card
+        // The fields currently visible to this contact (effective, group-aware)
+        // — also the new last-sent baseline.
+        let contact_id_owned = contact_id.to_string();
+        let new_visible: std::collections::HashSet<String> = own_card
+            .fields()
+            .iter()
+            .map(|f| f.id().to_string())
+            .filter(|fid| {
+                self.get_effective_field_visibility(&contact_id_owned, fid)
+                    .unwrap_or(false)
+            })
+            .collect();
+
+        // Add/modify delta for the currently-visible fields (from an empty
+        // baseline, so the receiver re-applies idempotently).
         let empty_card = ContactCard::new(own_card.display_name());
-        let delta = CardDelta::compute(&empty_card, &own_card, self.clock.unix_seconds());
-        if delta.is_empty() {
-            return Ok(());
+        let mut delta = CardDelta::compute(&empty_card, &own_card, self.clock.unix_seconds())
+            .filter_with(|field_id| new_visible.contains(field_id));
+
+        // Revocation (2026-06-08-card-revocation-not-propagated, fix C): fields
+        // the contact last saw but may no longer see get an explicit `Removed`
+        // change so the peer drops them. `None` baseline (first send) → no
+        // removals (we have no record of what was previously shared).
+        if let Some(prev) = self.storage.load_last_sent_visible_fields(contact_id)? {
+            for revoked in prev.difference(&new_visible) {
+                delta
+                    .changes
+                    .push(crate::sync::delta::FieldChange::Removed {
+                        field_id: revoked.clone(),
+                    });
+            }
         }
 
-        // Filter delta using effective visibility (labels + overrides + defaults)
-        let contact_id_owned = contact_id.to_string();
-        let mut delta = delta.filter_with(|field_id| {
-            self.get_effective_field_visibility(&contact_id_owned, field_id)
-                .unwrap_or(false)
-        });
         if delta.is_empty() {
+            // Nothing to add or remove; still record the baseline so a later
+            // revocation has a reference point.
+            self.storage
+                .save_last_sent_visible_fields(contact_id, &new_visible)?;
             return Ok(());
         }
 
@@ -534,6 +558,11 @@ impl Vauchi {
             target_relay_url: None,
         };
         self.storage.queue_update(&update)?;
+
+        // Record the visible-field baseline this send established, so a later
+        // revocation can diff against it (fix C).
+        self.storage
+            .save_last_sent_visible_fields(contact_id, &new_visible)?;
 
         Ok(())
     }

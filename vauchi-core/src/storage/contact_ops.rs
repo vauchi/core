@@ -352,6 +352,51 @@ impl Storage {
         Ok(())
     }
 
+    /// Returns the set of field ids last sent (visible) to a contact.
+    ///
+    /// `None` means nothing has been sent yet (no baseline — distinguishes
+    /// "never sent" from "sent nothing"). Used by `repropagate_to_contact` to
+    /// emit `Removed` deltas on revocation
+    /// (`2026-06-08-card-revocation-not-propagated`).
+    pub fn load_last_sent_visible_fields(
+        &self,
+        contact_id: &str,
+    ) -> Result<Option<std::collections::HashSet<String>>, StorageError> {
+        let raw: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT last_sent_visible_fields FROM contacts WHERE id = ?1",
+                params![contact_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => {
+                    StorageError::NotFound("Contact not found".to_string())
+                }
+                other => StorageError::Database(other),
+            })?;
+        match raw {
+            None => Ok(None),
+            Some(json) => Ok(Some(serde_json::from_str(&json).unwrap_or_default())),
+        }
+    }
+
+    /// Records the set of field ids last sent (visible) to a contact (the
+    /// baseline a later revocation is diffed against).
+    pub fn save_last_sent_visible_fields(
+        &self,
+        contact_id: &str,
+        fields: &std::collections::HashSet<String>,
+    ) -> Result<(), StorageError> {
+        let json = serde_json::to_string(fields)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        self.conn.execute(
+            "UPDATE contacts SET last_sent_visible_fields = ?1 WHERE id = ?2",
+            params![json, contact_id],
+        )?;
+        Ok(())
+    }
+
     /// Records a revoked sender in the tombstone table.
     ///
     /// Prevents future updates from this sender from being processed,

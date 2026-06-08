@@ -521,6 +521,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "contact_exchange_location",
             action: MigrationAction::Sql(MIGRATION_V51_EXCHANGE_LOCATION),
         },
+        Migration {
+            version: 52,
+            name: "contact_last_sent_visible_fields",
+            action: MigrationAction::Sql(MIGRATION_V52_LAST_SENT_VISIBLE_FIELDS),
+        },
     ]
 }
 
@@ -873,6 +878,16 @@ const MIGRATION_V50_PLACES: &str = "
 /// met*, mirroring `personal_notes_encrypted`. Owner-private; never shared.
 const MIGRATION_V51_EXCHANGE_LOCATION: &str =
     "ALTER TABLE contacts ADD COLUMN exchange_location_encrypted BLOB;";
+
+/// Migration v52: per-contact last-sent visible field-id set.
+///
+/// JSON-serialized `HashSet<String>` of the field ids last sent (visible) to
+/// the contact. `NULL` = nothing sent yet (no baseline). Used by
+/// `repropagate_to_contact` to emit `Removed` deltas when a field's
+/// visibility is revoked, so the peer drops the value instead of keeping it
+/// forever. See `2026-06-08-card-revocation-not-propagated`.
+const MIGRATION_V52_LAST_SENT_VISIBLE_FIELDS: &str =
+    "ALTER TABLE contacts ADD COLUMN last_sent_visible_fields TEXT;";
 
 /// Migration v44: In-progress recovery state persistence.
 ///

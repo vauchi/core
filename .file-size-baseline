@@ -195,7 +195,9 @@ vauchi-core/src/recovery/mod.rs 1253
 #  T2.3; migration ledger structural exemption)
 # (+11 2026-06-07: migration v51 contacts.exchange_location_encrypted —
 #  contact-annotations T2.2; migration ledger structural exemption)
-vauchi-core/src/storage/migration.rs 1927
+# (+15 2026-06-08: migration v52 contacts.last_sent_visible_fields —
+#  2026-06-08-card-revocation-not-propagated; migration ledger exemption)
+vauchi-core/src/storage/migration.rs 1942
 
 # EXEMPT — rekey ledger: all encrypted columns must be co-located for correctness (audit C1)
 # (+4 for #[allow(clippy::let_underscore_must_use)] attr + comment on

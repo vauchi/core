@@ -142,6 +142,15 @@ pub struct V2GuardianStoreRequest {
     pub guardian_hash: String,
     /// Encrypted entries (one per guardian, max 10).
     pub entries: Vec<V2GuardianEntry>,
+    /// Hex-encoded Ed25519 designator public key (64 hex chars). The relay
+    /// requires `SHA-256(designator_pk || "guardians") == guardian_hash`,
+    /// proving the caller owns the identity the hash derives from.
+    pub designator_pk: String,
+    /// Unix seconds; the relay rejects requests outside ±60s.
+    pub timestamp: u64,
+    /// Hex-encoded Ed25519 signature (128 hex chars) over
+    /// `domain || designator_pk || guardian_hash || timestamp_be`.
+    pub signature: String,
 }
 
 /// V2 guardian query request body.
@@ -158,6 +167,15 @@ pub struct V2GuardianQueryRequest {
 pub struct V2GuardianDeleteRequest {
     /// Hex-encoded guardian hash to delete (64 hex chars = 32 bytes).
     pub guardian_hash: String,
+    /// Hex-encoded Ed25519 designator public key (64 hex chars). The relay
+    /// requires `SHA-256(designator_pk || "guardians") == guardian_hash`,
+    /// proving the caller owns the identity the hash derives from.
+    pub designator_pk: String,
+    /// Unix seconds; the relay rejects requests outside ±60s.
+    pub timestamp: u64,
+    /// Hex-encoded Ed25519 signature (128 hex chars) over
+    /// `domain || designator_pk || guardian_hash || timestamp_be`.
+    pub signature: String,
 }
 
 /// Standard V2 response envelope.

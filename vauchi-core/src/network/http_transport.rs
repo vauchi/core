@@ -540,10 +540,16 @@ impl HttpTransport {
         &self,
         guardian_hash: &str,
         entries: Vec<V2GuardianEntry>,
+        designator_pk: &str,
+        timestamp: u64,
+        signature: &str,
     ) -> Result<(), NetworkError> {
         let req = V2GuardianStoreRequest {
             guardian_hash: guardian_hash.to_string(),
             entries,
+            designator_pk: designator_pk.to_string(),
+            timestamp,
+            signature: signature.to_string(),
         };
         let resp = self.post_action("guardian_store", &req)?;
         if resp.status == "ok" {
@@ -579,9 +585,18 @@ impl HttpTransport {
     }
 
     /// Deletes all guardian entries for a hash (identity purge).
-    pub fn guardian_delete(&self, guardian_hash: &str) -> Result<(), NetworkError> {
+    pub fn guardian_delete(
+        &self,
+        guardian_hash: &str,
+        designator_pk: &str,
+        timestamp: u64,
+        signature: &str,
+    ) -> Result<(), NetworkError> {
         let req = V2GuardianDeleteRequest {
             guardian_hash: guardian_hash.to_string(),
+            designator_pk: designator_pk.to_string(),
+            timestamp,
+            signature: signature.to_string(),
         };
         let resp = self.post_action("guardian_delete", &req)?;
         if resp.status == "ok" {

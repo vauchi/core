@@ -197,7 +197,9 @@ fn guardian_store_succeeds_when_relay_returns_ok() {
     let entries = vec![V2GuardianEntry {
         data: "ZW50cnk=".to_string(),
     }];
-    transport.guardian_store("guardian-hash", entries).unwrap();
+    transport
+        .guardian_store("guardian-hash", entries, "pk", 0, "sig")
+        .unwrap();
     assert_eq!(mock.last_received().path, "/v2/guardian_store");
 }
 
@@ -248,7 +250,9 @@ fn guardian_delete_succeeds_when_relay_returns_ok() {
     mock.queue("guardian_delete", ok_response_with(|_| {}));
 
     let transport = transport_pointing_at(&mock);
-    transport.guardian_delete("guardian-hash").unwrap();
+    transport
+        .guardian_delete("guardian-hash", "pk", 0, "sig")
+        .unwrap();
     assert_eq!(mock.last_received().path, "/v2/guardian_delete");
 }
 

@@ -71,7 +71,7 @@ fn guardian_store_constructs_request_and_fails_at_network() {
     let entries = vec![V2GuardianEntry {
         data: "ZW50cnktYg==".to_string(),
     }];
-    let r = t.guardian_store("guardian-hash-1", entries);
+    let r = t.guardian_store("guardian-hash-1", entries, "pk", 0, "sig");
     assert_is_network_error(r, "guardian_store");
 }
 
@@ -87,7 +87,7 @@ fn guardian_query_constructs_request_and_fails_at_network() {
 #[test]
 fn guardian_delete_constructs_request_and_fails_at_network() {
     let t = unreachable_transport();
-    let r = t.guardian_delete("guardian-hash-3");
+    let r = t.guardian_delete("guardian-hash-3", "pk", 0, "sig");
     assert_is_network_error(r, "guardian_delete");
 }
 

@@ -48,7 +48,13 @@ impl Vauchi {
         if guardians.is_empty() {
             // No guardians — delete any existing entries on relay
             let transport = self.create_guardian_transport();
-            transport.guardian_delete(&guardian_hash)?;
+            let (designator_pk, ts, sig) = sign_guardian_request(
+                b"guardian-delete",
+                identity,
+                &guardian_hash,
+                self.clock.unix_seconds(),
+            );
+            transport.guardian_delete(&guardian_hash, &designator_pk, ts, &sig)?;
             return Ok(());
         }
 
@@ -86,7 +92,13 @@ impl Vauchi {
 
         // Upload to relay
         let transport = self.create_guardian_transport();
-        transport.guardian_store(&guardian_hash, entries)?;
+        let (designator_pk, ts, sig) = sign_guardian_request(
+            b"guardian-store",
+            identity,
+            &guardian_hash,
+            self.clock.unix_seconds(),
+        );
+        transport.guardian_store(&guardian_hash, entries, &designator_pk, ts, &sig)?;
 
         Ok(())
     }
@@ -307,6 +319,29 @@ fn compute_guardian_hash(designator_pk: &[u8; 32]) -> String {
     hasher.update(designator_pk);
     hasher.update(b"guardians");
     hex::encode(hasher.finalize())
+}
+
+/// Signs a guardian store/delete request so the relay can authenticate the
+/// owner. `guardian_hash` is public (shared with guardians), so the relay
+/// proves possession of the designator private key and binds it to the hash.
+/// Signed message: `domain || designator_pk || guardian_hash || timestamp_be`;
+/// `domain` separates store from delete so signatures are not cross-replayable.
+/// Returns `(designator_pk_hex, timestamp, signature_hex)`.
+fn sign_guardian_request(
+    domain: &[u8],
+    identity: &crate::identity::Identity,
+    guardian_hash_hex: &str,
+    now: u64,
+) -> (String, u64, String) {
+    let pk = identity.signing_public_key();
+    let hash_bytes = hex::decode(guardian_hash_hex).expect("guardian_hash is self-computed hex");
+    let mut message = Vec::with_capacity(domain.len() + 32 + 32 + 8);
+    message.extend_from_slice(domain);
+    message.extend_from_slice(pk);
+    message.extend_from_slice(&hash_bytes);
+    message.extend_from_slice(&now.to_be_bytes());
+    let signature = identity.sign(&message);
+    (hex::encode(pk), now, hex::encode(signature.as_bytes()))
 }
 
 /// Converts an Ed25519 public key to an X25519 (Curve25519) public key.

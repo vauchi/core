@@ -280,7 +280,7 @@ vauchi-core/src/storage/mod.rs 1079
 #  decomposition — see routing.rs entry below.)
 # (+1 2026-06-06: `mod result_routing;` declaration for the route_result
 #  extraction, Tier 2 of the complexity sweep.)
-vauchi-app/src/ui/app_engine/mod.rs 1450
+vauchi-app/src/ui/app_engine/mod.rs 1476
 # (+78 on routing.rs for ADR-031 file-picker handler: pre-screen-guard
 #  branch + handle_file_picked + format_import_toast helper, Phase 2A
 #  of 2026-05-03-core-file-picker-command. Wires More-screen contacts
@@ -334,7 +334,7 @@ vauchi-app/src/ui/app_engine/mod.rs 1450
 # (-259 2026-06-06: moved route_result + its arm helpers to
 #  app_engine/result_routing.rs (Tier 2 of the complexity sweep); the
 #  Start* arms now share one start_exchange_to helper.)
-vauchi-app/src/ui/app_engine/routing.rs 560
+vauchi-app/src/ui/app_engine/routing.rs 595
 # (+13 on screens.rs for Phase 1.E.3 of 2026-05-11-hover-graduation-plan:
 #   AppScreen::MultiStageExchange { mode } match arm dispatches to
 #   new_hover() / new_glance() with explanatory comment block.)
@@ -361,7 +361,7 @@ vauchi-app/src/ui/app_engine/routing.rs 560
 # (+18 for AppScreen::NfcExchange factory arm — NFC graduation)
 # (+12 for BLE/Magic completion P2: AppScreen::BleExchange sources the
 #  role-tiebreak token from the identity at engine construction, 2026-06-07)
-vauchi-app/src/ui/app_engine/screens.rs 1511
+vauchi-app/src/ui/app_engine/screens.rs 1599
 
 # SPLIT — Phase 3: extract into crypto, storage, verification files
 vauchi-core/src/api/shred.rs 1081

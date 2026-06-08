@@ -12,7 +12,7 @@
 //! emit→consume round-trip is tested without driving a full exchange.
 //! Per-frontend native handlers that answer `LocationRequest` are separate.
 
-use vauchi_app::ui::{AppEngine, WorkflowEngine};
+use vauchi_app::ui::AppEngine;
 use vauchi_core::api::Vauchi;
 use vauchi_core::{Command, Event};
 

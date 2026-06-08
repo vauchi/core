@@ -15,6 +15,7 @@ mod device_link;
 mod device_link_initiator;
 mod dispatch;
 mod intercept;
+mod intercept_annotations;
 mod link_exchange;
 mod link_responder;
 mod multi_stage_exchange;

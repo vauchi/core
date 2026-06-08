@@ -444,15 +444,16 @@ impl MobileRelaySender {
 }
 
 impl vauchi_core::api::RevocationSender for MobileRelaySender {
-    fn send_revocation(
+    fn send_revocation_delivery(
         &mut self,
-        revocation: &vauchi_core::network::IdentityRevoked,
+        token: &str,
+        blob_b64: &str,
         now: u64,
     ) -> Result<bool, vauchi_core::api::ShredError> {
         self.client
             .connect()
             .map_err(|e| vauchi_core::api::ShredError::FileError(format!("Connect: {e}")))?;
-        self.client.send_revocation(revocation, now)
+        self.client.send_revocation_delivery(token, blob_b64, now)
     }
 }
 

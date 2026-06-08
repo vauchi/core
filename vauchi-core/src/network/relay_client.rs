@@ -492,17 +492,53 @@ impl<T: Transport> crate::api::PurgeSender for RelayClient<T> {
     }
 }
 
-impl<T: Transport> crate::api::RevocationSender for RelayClient<T> {
-    fn send_revocation(
+impl<T: Transport> RelayClient<T> {
+    /// Sends a pre-built revocation blob to a contact's mailbox token as an
+    /// ordinary `EncryptedUpdate`. Unlike a bare `IdentityRevoked` envelope
+    /// (which the HTTP transport drops), an `EncryptedUpdate` is delivered via
+    /// the relay `send` endpoint; the recipient detects the `VRV1` magic in
+    /// the ciphertext and routes it to `process_revocation`.
+    pub fn send_revocation_blob(
         &mut self,
-        revocation: &crate::network::IdentityRevoked,
+        token: &str,
+        ciphertext: Vec<u8>,
+        now: u64,
+    ) -> Result<MessageId, NetworkError> {
+        let encrypted_update = EncryptedUpdate {
+            recipient_id: ContactId::from(token.to_string()),
+            sender_id: ContactId::from(self.our_identity_id.clone()),
+            ratchet_header: RatchetHeader {
+                dh_public: crate::identifiers::DhPublicKey::from([0u8; 32]),
+                dh_generation: 0,
+                message_index: 0,
+                previous_chain_length: 0,
+            },
+            ciphertext,
+        };
+        let envelope = create_envelope(MessagePayload::EncryptedUpdate(encrypted_update), now);
+        let message_id = envelope.message_id.clone();
+        self.connection.send(&envelope)?;
+        Ok(message_id)
+    }
+}
+
+impl<T: Transport> crate::api::RevocationSender for RelayClient<T> {
+    fn send_revocation_delivery(
+        &mut self,
+        token: &str,
+        blob_b64: &str,
         now: u64,
     ) -> Result<bool, crate::api::ShredError> {
-        match self.send_identity_revoked(revocation, now) {
+        use base64::Engine;
+        let ciphertext = base64::engine::general_purpose::STANDARD
+            .decode(blob_b64)
+            .map_err(|e| {
+                crate::api::ShredError::FileError(format!("invalid revocation blob: {e}"))
+            })?;
+        match self.send_revocation_blob(token, ciphertext, now) {
             Ok(_) => Ok(true),
             Err(e) => Err(crate::api::ShredError::FileError(format!(
-                "Relay revocation failed: {}",
-                e
+                "Relay revocation failed: {e}"
             ))),
         }
     }

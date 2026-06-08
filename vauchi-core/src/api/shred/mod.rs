@@ -37,14 +37,20 @@ pub trait PurgeSender {
 /// Abstracted to allow testing without a real relay connection and to
 /// decouple the shred orchestration from the network layer.
 pub trait RevocationSender {
-    /// Sends an identity revocation message to a contact via the relay.
+    /// Delivers one pre-built revocation to a contact's mailbox token.
     ///
-    /// Returns `Ok(true)` if the relay acknowledged the message,
-    /// `Ok(false)` if the message was sent but not confirmed,
-    /// or `Err` if sending failed entirely.
-    fn send_revocation(
+    /// `blob_b64` is a `DeletionResult::deliveries` entry —
+    /// `base64(VRV1 || postcard(IdentityRevoked))` — and `token` is the
+    /// contact's daily-rotating mailbox token. The implementation ships the
+    /// blob to the relay `send` endpoint (an ordinary `EncryptedUpdate`, which
+    /// the HTTP transport actually delivers), so the recipient's receive path
+    /// detects the magic prefix and runs `process_revocation`.
+    ///
+    /// Returns `Ok(true)` if sent, `Ok(false)` if unconfirmed, `Err` on failure.
+    fn send_revocation_delivery(
         &mut self,
-        revocation: &crate::network::IdentityRevoked,
+        token: &str,
+        blob_b64: &str,
         now: u64,
     ) -> Result<bool, ShredError>;
 }
@@ -525,17 +531,16 @@ mod tests {
     }
 
     impl RevocationSender for MockRevocationSender {
-        fn send_revocation(
+        fn send_revocation_delivery(
             &mut self,
-            revocation: &crate::network::IdentityRevoked,
+            token: &str,
+            _blob_b64: &str,
             _now: u64,
         ) -> Result<bool, ShredError> {
             if self.should_fail {
                 return Err(ShredError::FileError("mock revocation failure".into()));
             }
-            self.revocations_sent
-                .borrow_mut()
-                .push(revocation.recipient_id.clone().into_string());
+            self.revocations_sent.borrow_mut().push(token.to_string());
             Ok(true)
         }
     }

@@ -103,11 +103,14 @@ impl<'a> ShredManager<'a> {
         // 1. Verify grace period has elapsed and generate revocations
         let deletion_result = dm.execute_deletion(self.identity)?;
 
-        // 2. Send revocation notifications to contacts (best-effort, while keys alive)
+        // 2. Send revocation deliveries to contacts (best-effort, while keys
+        //    alive). Each is a pre-built (token, blob) the relay actually
+        //    delivers — unlike the old per-IdentityRevoked path the HTTP
+        //    transport silently dropped.
         if let Some(sender) = revocation_sender {
-            for revocation in &deletion_result.revocations {
+            for (token, blob) in &deletion_result.deliveries {
                 if sender
-                    .send_revocation(revocation, self.storage.clock().unix_seconds())
+                    .send_revocation_delivery(token, blob, self.storage.clock().unix_seconds())
                     .unwrap_or(false)
                 {
                     report.contacts_notified += 1;
@@ -183,14 +186,30 @@ impl<'a> ShredManager<'a> {
             }
         };
 
-        // Sign fresh revocations for each contact (keys still available)
-        let revocations = {
+        // Build revocation deliveries (token + blob) for each contact while
+        // keys + shared secrets are still available — the relay actually
+        // delivers these (an EncryptedUpdate), unlike a bare IdentityRevoked.
+        let deliveries: Vec<(String, String)> = {
+            use base64::Engine;
             let now = self.storage.clock().unix_seconds();
+            let day_epoch = crate::network::mailbox_token::current_day_epoch(now);
             let contacts = self.storage.list_contacts().unwrap_or_default();
-            contacts
-                .iter()
-                .map(|c| crate::network::IdentityRevoked::create(self.identity, c.id(), now))
-                .collect::<Vec<_>>()
+            let mut d = Vec::with_capacity(contacts.len());
+            for c in &contacts {
+                if let Some(shared) = c.shared_key() {
+                    let rev = crate::network::IdentityRevoked::create(self.identity, c.id(), now);
+                    let token = crate::network::mailbox_token::token_hex(
+                        &crate::network::mailbox_token::compute_mailbox_token(
+                            shared.as_bytes(),
+                            day_epoch,
+                        ),
+                    );
+                    let blob = base64::engine::general_purpose::STANDARD
+                        .encode(crate::network::revocation::encode_revocation_blob(&rev));
+                    d.push((token, blob));
+                }
+            }
+            d
         };
 
         // ── Phase B: Destroy all key material ──
@@ -212,11 +231,12 @@ impl<'a> ShredManager<'a> {
                 .unwrap_or(false);
         }
 
-        // Send revocations to contacts (best-effort, keys already destroyed)
+        // Send revocation deliveries to contacts (best-effort, keys already
+        // destroyed; the blobs were signed in Phase A above).
         if let Some(sender) = revocation_sender {
-            for revocation in &revocations {
+            for (token, blob) in &deliveries {
                 if sender
-                    .send_revocation(revocation, self.storage.clock().unix_seconds())
+                    .send_revocation_delivery(token, blob, self.storage.clock().unix_seconds())
                     .unwrap_or(false)
                 {
                     report.contacts_notified += 1;

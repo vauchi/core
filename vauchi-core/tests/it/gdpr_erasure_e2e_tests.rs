@@ -19,7 +19,6 @@ use vauchi_core::contact::Contact;
 use vauchi_core::contact_card::ContactCard;
 use vauchi_core::crypto::{ShreddingMasterKey, SymmetricKey};
 use vauchi_core::identity::Identity;
-use vauchi_core::network::IdentityRevoked;
 use vauchi_core::storage::{DeletionState, MemoryKeyStorage, SecureStorage, Storage};
 
 const SMK_KEY_NAME: &str = "smk";
@@ -310,13 +309,13 @@ impl MockRevocationSender {
 }
 
 impl RevocationSender for MockRevocationSender {
-    fn send_revocation(
+    fn send_revocation_delivery(
         &mut self,
-        revocation: &IdentityRevoked,
+        token: &str,
+        _blob_b64: &str,
         _now: u64,
     ) -> Result<bool, ShredError> {
-        self.recipient_ids
-            .push(revocation.recipient_id.clone().into_string());
+        self.recipient_ids.push(token.to_string());
         Ok(true)
     }
 }

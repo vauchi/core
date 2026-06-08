@@ -109,3 +109,44 @@ pub fn open(sealed: &[u8], recipient_secret: &StaticSecret) -> Result<Vec<u8>, R
         .decrypt(&nonce, ciphertext)
         .map_err(|_| RecoveryError::DecryptionFailed)
 }
+
+// INLINE_TEST_REQUIRED: forges a blob using the private DOMAIN constant to
+// exercise the open()-side small-order-point rejection
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // An attacker who never knew the recipient's secret can still forge a
+    // sealed blob by choosing a small-order ephemeral point: DH against it
+    // collapses to the all-zero shared secret, so the HKDF key is
+    // predictable and the attacker can seal chosen plaintext under it.
+    // open() must reject the non-contributory DH before it is tricked into
+    // returning the forgery (problem record
+    // 2026-06-08-sealed-box-noncontributory-dh).
+    #[test]
+    fn open_rejects_forged_small_order_ephemeral() {
+        let recipient_secret = StaticSecret::random_from_rng(OsRng);
+
+        let predictable_key = HKDF::derive_key(None, &[0u8; 32], DOMAIN);
+        let nonce_bytes = [7u8; 24];
+        let cipher =
+            XChaCha20Poly1305::new_from_slice(predictable_key.as_ref()).expect("32-byte key");
+        let forged_ct = cipher
+            .encrypt(
+                &XNonce::from(nonce_bytes),
+                b"attacker-chosen token".as_ref(),
+            )
+            .expect("encrypt under predictable key");
+
+        let mut blob = Vec::new();
+        blob.extend_from_slice(&[0u8; 32]); // small-order ephemeral_pk
+        blob.extend_from_slice(&nonce_bytes);
+        blob.extend_from_slice(&forged_ct);
+
+        let result = open(&blob, &recipient_secret);
+        assert!(
+            matches!(result, Err(RecoveryError::DecryptionFailed)),
+            "open must reject a non-contributory ephemeral, not return the forgery: {result:?}"
+        );
+    }
+}

@@ -235,3 +235,33 @@ fn test_seal_open_empty_plaintext_at_min_length() {
     let opened = sealed_box::open(&sealed, &secret).expect("must open");
     assert!(opened.is_empty());
 }
+
+// ── Adversarial: small-order recipient keys (CC-14) ─────────────
+//
+// The known small-order X25519 points (libsodium blacklist). DH against
+// any of them collapses to the all-zero shared secret, so HKDF would
+// produce a predictable key and seal() would emit a forgeable blob.
+// seal() must reject them with WeakKey. Vodozemac-class — see problem
+// record 2026-06-08-sealed-box-noncontributory-dh.
+// @scenario: contact_recovery :: Seal rejects a small-order recipient key
+#[rstest]
+#[case("0000000000000000000000000000000000000000000000000000000000000000")]
+#[case("0100000000000000000000000000000000000000000000000000000000000000")]
+#[case("e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800")]
+#[case("5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157")]
+#[case("ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f")]
+#[case("edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f")]
+#[case("eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f")]
+fn test_seal_rejects_small_order_recipient(#[case] point_hex: &str) {
+    let bytes: [u8; 32] = hex::decode(point_hex)
+        .expect("valid hex vector")
+        .try_into()
+        .expect("32-byte point");
+    let recipient = PublicKey::from(bytes);
+
+    let result = sealed_box::seal(b"guardian token", &recipient);
+    assert!(
+        matches!(result, Err(RecoveryError::WeakKey)),
+        "seal must reject small-order recipient {point_hex}: {result:?}"
+    );
+}

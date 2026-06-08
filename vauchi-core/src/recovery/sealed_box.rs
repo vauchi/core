@@ -41,7 +41,13 @@ const MIN_SEALED_LEN: usize = 32 + 24 + 16;
 /// # Output format
 ///
 /// `ephemeral_pk (32) || nonce (24) || ciphertext+tag`
-pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Vec<u8> {
+///
+/// # Errors
+///
+/// Returns [`RecoveryError::WeakKey`] if `recipient_pk` is a small-order
+/// point, which would collapse the DH output to an all-zero (predictable)
+/// shared secret.
+pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Result<Vec<u8>, RecoveryError> {
     let ephemeral_secret = StaticSecret::random_from_rng(OsRng);
     let ephemeral_pk = PublicKey::from(&ephemeral_secret);
 
@@ -66,7 +72,7 @@ pub fn seal(plaintext: &[u8], recipient_pk: &PublicKey) -> Vec<u8> {
     out.extend_from_slice(ephemeral_pk.as_bytes());
     out.extend_from_slice(&nonce_bytes);
     out.extend_from_slice(&ciphertext);
-    out
+    Ok(out)
 }
 
 /// Open a sealed blob using the recipient's `StaticSecret`.

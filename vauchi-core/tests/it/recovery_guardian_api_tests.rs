@@ -43,7 +43,8 @@ fn test_guardian_token_seal_unseal_verify_lifecycle() {
     assert!(token.verify(), "freshly created token must verify");
 
     let token_bytes = token.to_bytes();
-    let sealed = sealed_box::seal(&token_bytes, &bob_x25519_public);
+    let sealed = sealed_box::seal(&token_bytes, &bob_x25519_public)
+        .expect("seal succeeds for a valid recipient key");
 
     let decrypted = sealed_box::open(&sealed, &bob_x25519_secret)
         .expect("Bob must be able to decrypt his own entry");
@@ -75,7 +76,8 @@ fn test_non_guardian_cannot_decrypt_sealed_entry() {
     let eve_x25519_secret = StaticSecret::random_from_rng(OsRng);
 
     let token = GuardianToken::create(&alice_signing, bob_signing.public_key(), 0);
-    let sealed = sealed_box::seal(&token.to_bytes(), &bob_x25519_public);
+    let sealed = sealed_box::seal(&token.to_bytes(), &bob_x25519_public)
+        .expect("seal succeeds for a valid recipient key");
 
     let result = sealed_box::open(&sealed, &eve_x25519_secret);
     assert!(
@@ -155,6 +157,7 @@ fn test_multiple_guardians_isolation() {
     .map(|(guardian_pk, x25519_pk)| {
         let token = GuardianToken::create(&alice, guardian_pk.clone(), 0);
         sealed_box::seal(&token.to_bytes(), x25519_pk)
+            .expect("seal succeeds for a valid recipient key")
     })
     .collect();
 

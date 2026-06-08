@@ -55,7 +55,7 @@ proptest! {
         let recipient_secret = StaticSecret::random_from_rng(rand::rngs::OsRng);
         let recipient_pk = PublicKey::from(&recipient_secret);
 
-        let sealed = sealed_box::seal(&plaintext, &recipient_pk);
+        let sealed = sealed_box::seal(&plaintext, &recipient_pk).expect("seal succeeds for a valid recipient key");
         let opened = sealed_box::open(&sealed, &recipient_secret)
             .expect("open must succeed with the correct recipient key");
 

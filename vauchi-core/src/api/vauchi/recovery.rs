@@ -72,7 +72,12 @@ impl Vauchi {
             let x25519_pk = ed25519_pk_to_x25519(guardian_ed25519_pk)?;
 
             // Encrypt token to guardian's X25519 key
-            let sealed = sealed_box::seal(&token_bytes, &x25519_pk);
+            let sealed = sealed_box::seal(&token_bytes, &x25519_pk).map_err(|_| {
+                VauchiError::InvalidState(format!(
+                    "Guardian {} has a small-order X25519 key",
+                    guardian.id()
+                ))
+            })?;
 
             entries.push(V2GuardianEntry {
                 data: base64::engine::general_purpose::STANDARD.encode(&sealed),

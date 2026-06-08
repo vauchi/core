@@ -53,6 +53,9 @@ pub enum RecoveryError {
     #[error("Decryption failed")]
     DecryptionFailed,
 
+    #[error("Peer public key is a small-order point")]
+    WeakKey,
+
     #[error("Serialization error: {0}")]
     SerializationError(String),
 

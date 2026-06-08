@@ -28,7 +28,8 @@ fn test_seal_unseal_roundtrip() {
     let (secret, public) = generate_keypair();
     let plaintext = b"guardian token payload for social recovery";
 
-    let sealed = sealed_box::seal(plaintext, &public);
+    let sealed =
+        sealed_box::seal(plaintext, &public).expect("seal succeeds for a valid recipient key");
     let opened = sealed_box::open(&sealed, &secret).expect("open must succeed");
 
     assert_eq!(
@@ -44,7 +45,8 @@ fn test_wrong_key_cannot_decrypt() {
     let (secret_b, _public_b) = generate_keypair();
 
     let plaintext = b"secret guardian token";
-    let sealed = sealed_box::seal(plaintext, &public_a);
+    let sealed =
+        sealed_box::seal(plaintext, &public_a).expect("seal succeeds for a valid recipient key");
 
     let result = sealed_box::open(&sealed, &secret_b);
     assert!(
@@ -59,7 +61,8 @@ fn test_tampered_ciphertext_fails() {
     let (secret, public) = generate_keypair();
     let plaintext = b"guardian token to tamper";
 
-    let mut sealed = sealed_box::seal(plaintext, &public);
+    let mut sealed =
+        sealed_box::seal(plaintext, &public).expect("seal succeeds for a valid recipient key");
     // Flip the last byte (inside the authentication tag)
     let last = sealed.last_mut().expect("sealed must be non-empty");
     *last ^= 0xFF;
@@ -77,7 +80,8 @@ fn test_sealed_box_output_size() {
     let (_secret, public) = generate_keypair();
     let plaintext = vec![0u8; 100];
 
-    let sealed = sealed_box::seal(&plaintext, &public);
+    let sealed =
+        sealed_box::seal(&plaintext, &public).expect("seal succeeds for a valid recipient key");
 
     // ephemeral_pk (32) + nonce (24) + ciphertext (100) + tag (16) = 172
     assert_eq!(
@@ -101,7 +105,8 @@ fn test_sealed_box_output_size_per_plaintext(#[case] plaintext_len: usize) {
     let (_secret, public) = generate_keypair();
     let plaintext = vec![0xAB; plaintext_len];
 
-    let sealed = sealed_box::seal(&plaintext, &public);
+    let sealed =
+        sealed_box::seal(&plaintext, &public).expect("seal succeeds for a valid recipient key");
 
     // Output = ephemeral_pk (32) + nonce (24) + ciphertext (plaintext_len) + tag (16)
     let expected = 32 + 24 + plaintext_len + 16;
@@ -131,7 +136,8 @@ fn test_open_with_wrong_key_returns_decryption_failed() {
     let (secret_b, _public_b) = generate_keypair();
 
     let plaintext = b"secret guardian token";
-    let sealed = sealed_box::seal(plaintext, &public_a);
+    let sealed =
+        sealed_box::seal(plaintext, &public_a).expect("seal succeeds for a valid recipient key");
 
     let result = sealed_box::open(&sealed, &secret_b);
     // Pin the exact error variant — distinguishes a wrong-key failure
@@ -147,7 +153,8 @@ fn test_open_with_wrong_key_returns_decryption_failed() {
 #[case(vec![0xFF; 64])] // larger
 fn test_seal_open_roundtrip_various_sizes(#[case] plaintext: Vec<u8>) {
     let (secret, public) = generate_keypair();
-    let sealed = sealed_box::seal(&plaintext, &public);
+    let sealed =
+        sealed_box::seal(&plaintext, &public).expect("seal succeeds for a valid recipient key");
     let opened = sealed_box::open(&sealed, &secret).expect("open must succeed");
     assert_eq!(opened, plaintext);
 }
@@ -158,8 +165,8 @@ fn test_seal_uses_fresh_ephemeral_key_each_call() {
     let (_secret, public) = generate_keypair();
     let plaintext = b"identical input";
 
-    let a = sealed_box::seal(plaintext, &public);
-    let b = sealed_box::seal(plaintext, &public);
+    let a = sealed_box::seal(plaintext, &public).expect("seal succeeds for a valid recipient key");
+    let b = sealed_box::seal(plaintext, &public).expect("seal succeeds for a valid recipient key");
 
     // The first 32 bytes are the ephemeral public key — must differ
     // each call. Catches mutations that fix the ephemeral keypair.
@@ -177,7 +184,8 @@ fn test_seal_uses_fresh_ephemeral_key_each_call() {
 fn test_tampered_ephemeral_pk_fails_decryption() {
     let (secret, public) = generate_keypair();
     let plaintext = b"some payload";
-    let mut sealed = sealed_box::seal(plaintext, &public);
+    let mut sealed =
+        sealed_box::seal(plaintext, &public).expect("seal succeeds for a valid recipient key");
     // Flip a bit in the ephemeral public key.
     sealed[0] ^= 0x01;
 
@@ -192,7 +200,8 @@ fn test_tampered_ephemeral_pk_fails_decryption() {
 fn test_tampered_nonce_fails_decryption() {
     let (secret, public) = generate_keypair();
     let plaintext = b"some payload";
-    let mut sealed = sealed_box::seal(plaintext, &public);
+    let mut sealed =
+        sealed_box::seal(plaintext, &public).expect("seal succeeds for a valid recipient key");
     // Flip a bit inside the nonce region.
     sealed[40] ^= 0x80;
 
@@ -205,7 +214,8 @@ fn test_tampered_nonce_fails_decryption() {
 fn test_truncated_ciphertext_fails_decryption() {
     let (secret, public) = generate_keypair();
     let plaintext = b"plaintext that survives truncation";
-    let mut sealed = sealed_box::seal(plaintext, &public);
+    let mut sealed =
+        sealed_box::seal(plaintext, &public).expect("seal succeeds for a valid recipient key");
     // Drop the last byte of the tag — remains >= MIN_SEALED_LEN if
     // plaintext is non-trivial.
     sealed.pop();
@@ -218,7 +228,7 @@ fn test_truncated_ciphertext_fails_decryption() {
 #[test]
 fn test_seal_open_empty_plaintext_at_min_length() {
     let (secret, public) = generate_keypair();
-    let sealed = sealed_box::seal(b"", &public);
+    let sealed = sealed_box::seal(b"", &public).expect("seal succeeds for a valid recipient key");
     // Empty plaintext means sealed is exactly 32 + 24 + 0 + 16 = 72 bytes
     // (MIN_SEALED_LEN). This tests the boundary of the length check.
     assert_eq!(sealed.len(), 72);

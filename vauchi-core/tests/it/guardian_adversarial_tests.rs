@@ -29,6 +29,7 @@ fn generate_x25519_keypair() -> (StaticSecret, X25519PublicKey) {
 
 fn valid_sealed_blob(recipient_pk: &X25519PublicKey) -> Vec<u8> {
     sealed_box::seal(b"test payload", recipient_pk)
+        .expect("seal succeeds for a valid recipient key")
 }
 
 // ---------------------------------------------------------------------------

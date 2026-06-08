@@ -565,6 +565,7 @@ impl AppEngine {
                 self.preview_as_contact.as_deref(),
                 &self.device_capabilities,
                 &self.render_context,
+                &self.pending_exchange_groups,
             );
         }
     }
@@ -593,7 +594,8 @@ impl AppEngine {
         };
         let caps = DeviceCapabilities::default();
         let initial_render_context = crate::ui::RenderContext::default();
-        let engine = Self::create_engine(&vauchi, &screen, None, &caps, &initial_render_context);
+        let engine =
+            Self::create_engine(&vauchi, &screen, None, &caps, &initial_render_context, &[]);
         let registry = vauchi_core::social::SocialNetworkRegistry::with_defaults();
         let field_catalog = vauchi_core::contact_card::FieldTypeCatalog::new(&registry);
 

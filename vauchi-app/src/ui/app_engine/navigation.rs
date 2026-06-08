@@ -178,6 +178,7 @@ impl AppEngine {
                 preview_as,
                 &self.device_capabilities,
                 &self.render_context,
+                &self.pending_exchange_groups,
             )
         });
 

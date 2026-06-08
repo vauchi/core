@@ -401,6 +401,7 @@ impl AppEngine {
             None,
             &self.device_capabilities,
             &self.render_context,
+            &self.pending_exchange_groups,
         );
         // best-effort discard: we don't need the old engine value
         #[allow(clippy::let_underscore_must_use)]
@@ -767,6 +768,7 @@ impl AppEngine {
             self.preview_as_contact.as_deref(),
             &self.device_capabilities,
             &self.render_context,
+            &self.pending_exchange_groups,
         );
 
         Some(ActionResult::ShowToast {
@@ -927,6 +929,7 @@ impl AppEngine {
             self.preview_as_contact.as_deref(),
             &self.device_capabilities,
             &self.render_context,
+            &self.pending_exchange_groups,
         );
     }
 }

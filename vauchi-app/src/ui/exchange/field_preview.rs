@@ -19,8 +19,10 @@ pub(super) struct FieldPreviewConfig {
     pub card: ContactCard,
     /// Display name to show (group override or card default).
     pub display_name: String,
-    /// Field IDs that are visible (shared). Empty = share all.
-    pub visible_field_ids: HashSet<String>,
+    /// Field IDs to share. `None` = share all (no group filter);
+    /// `Some(set)` = share exactly `set` (an empty set shares nothing —
+    /// default-closed, so a group exposing no fields shares none).
+    pub visible_field_ids: Option<HashSet<String>>,
 }
 
 /// Result of handling an action in the field preview engine.
@@ -36,14 +38,15 @@ pub(super) fn build_field_preview_screen(
     config: &FieldPreviewConfig,
     progress: Progress,
 ) -> ScreenModel {
-    let share_all = config.visible_field_ids.is_empty();
-
     let fields: Vec<Field> = config
         .card
         .fields()
         .iter()
         .map(|f| {
-            let visible = share_all || config.visible_field_ids.contains(f.id());
+            let visible = match &config.visible_field_ids {
+                None => true,
+                Some(allow) => allow.contains(f.id()),
+            };
             let visibility = if visible {
                 UiFieldVisibility::Shown
             } else {
@@ -165,7 +168,7 @@ mod tests {
         let config = FieldPreviewConfig {
             card: sample_card(),
             display_name: "Alice".into(),
-            visible_field_ids: HashSet::new(), // empty = share all
+            visible_field_ids: None,
         };
         let screen = build_field_preview_screen(&config, sample_progress());
         assert_eq!(screen.screen_id, "exchange_field_preview");
@@ -187,7 +190,7 @@ mod tests {
         let config = FieldPreviewConfig {
             card,
             display_name: "Alice".into(),
-            visible_field_ids: HashSet::from([email_id.clone()]),
+            visible_field_ids: Some(HashSet::from([email_id.clone()])),
         };
         let screen = build_field_preview_screen(&config, sample_progress());
 
@@ -212,7 +215,7 @@ mod tests {
         let config = FieldPreviewConfig {
             card: sample_card(),
             display_name: "Dr. Egloff".into(),
-            visible_field_ids: HashSet::new(),
+            visible_field_ids: None,
         };
         let screen = build_field_preview_screen(&config, sample_progress());
 
@@ -252,7 +255,7 @@ mod tests {
         let config = FieldPreviewConfig {
             card: sample_card(),
             display_name: "Alice".into(),
-            visible_field_ids: HashSet::new(),
+            visible_field_ids: None,
         };
         let screen = build_field_preview_screen(&config, sample_progress());
         assert_eq!(screen.actions.len(), 2);
@@ -267,7 +270,7 @@ mod tests {
         let config = FieldPreviewConfig {
             card,
             display_name: "Alice".into(),
-            visible_field_ids: HashSet::new(),
+            visible_field_ids: None,
         };
         let screen = build_field_preview_screen(&config, sample_progress());
         let fields = extract_fields(&screen);

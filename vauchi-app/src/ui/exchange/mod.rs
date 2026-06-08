@@ -406,15 +406,14 @@ impl ExchangeEngine {
             .unwrap_or_else(|| ContactCard::new(&self.config.own_name));
         // G2: resolve the fields the selected group(s) expose so the preview
         // matches the card the BLE payload transmits. `None` (no groups) →
-        // empty set, which the builder treats as share-all. (Empty-group →
-        // `Some(∅)` also collapses to share-all here — a known display-only
-        // gap tracked as Slice 4b; the BLE payload already filters correctly.)
+        // share all; `Some(set)` → share exactly `set` (empty set = share
+        // nothing, default-closed). One resolver shared with the BLE payload
+        // and the success summary, so the three cannot diverge.
         let visible_field_ids = group_filter::resolve_exchange_allow(
             &self.selected_groups,
             &self.config.available_group_data,
             card.field_visibility(),
-        )
-        .unwrap_or_default();
+        );
         FieldPreviewConfig {
             card,
             display_name: self.config.own_name.clone(),
@@ -1000,15 +999,18 @@ fn build_legacy_success_summary(
             )
         })
         .collect();
-    // What *we* shared, from the confirmed preview (empty visible set =
-    // share all). No preview (mode skipped it) → unknown → empty.
+    // What *we* shared, from the confirmed preview. `None` = no group
+    // filter (share all); `Some(set)` = exactly that set. No preview (mode
+    // skipped it) → unknown → empty.
     let my_visible_fields = field_preview
         .map(|fp| {
-            let share_all = fp.visible_field_ids.is_empty();
             fp.card
                 .fields()
                 .iter()
-                .filter(|f| share_all || fp.visible_field_ids.contains(f.id()))
+                .filter(|f| match &fp.visible_field_ids {
+                    None => true,
+                    Some(allow) => allow.contains(f.id()),
+                })
                 .map(|f| f.label().to_string())
                 .collect()
         })
@@ -1094,7 +1096,7 @@ mod tests {
         let preview = FieldPreviewConfig {
             card: mine,
             display_name: "Alice".into(),
-            visible_field_ids: HashSet::from([phone_id]),
+            visible_field_ids: Some(HashSet::from([phone_id])),
         };
 
         let summary = build_legacy_success_summary(&contact, Some(&preview));

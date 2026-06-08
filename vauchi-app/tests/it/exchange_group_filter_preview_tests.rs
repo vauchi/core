@@ -142,3 +142,43 @@ fn no_group_selected_shows_all_fields_in_preview() {
         "no group selected → full card, Phone shown"
     );
 }
+
+// @internal
+#[test]
+fn selecting_empty_group_hides_all_fields_in_preview() {
+    // Default-closed: a selected group that exposes nothing must render every
+    // field Hidden in the preview — NOT share-all. Regression for the
+    // empty-set footgun (Slice 4b): `Some(∅)` ≠ `None`.
+    let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");
+    vauchi.create_identity("Alice").expect("identity");
+    let mut card = vauchi
+        .own_card()
+        .expect("own_card")
+        .expect("create_identity saves a card");
+    card.add_field(ContactField::new(FieldType::Email, "Email", "a@b.com", 0))
+        .expect("add email");
+    card.add_field(ContactField::new(
+        FieldType::Phone,
+        "Phone",
+        "+12025550123",
+        0,
+    ))
+    .expect("add phone");
+    vauchi.update_own_card(&card).expect("update own card");
+    // "Empty" group: created but no fields exposed (no set_group_field_visibility).
+    let empty = vauchi.create_group("Empty").expect("create group");
+    let empty_id = empty.id().to_string();
+
+    let mut engine = AppEngine::new(vauchi);
+    let pairs = preview_field_visibilities(&mut engine, &[&empty_id]);
+    assert_eq!(
+        visibility_of(&pairs, "Email"),
+        UiFieldVisibility::Hidden,
+        "empty group exposes nothing → Email Hidden"
+    );
+    assert_eq!(
+        visibility_of(&pairs, "Phone"),
+        UiFieldVisibility::Hidden,
+        "empty group exposes nothing → Phone Hidden (not share-all)"
+    );
+}

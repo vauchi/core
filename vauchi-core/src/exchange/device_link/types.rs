@@ -35,6 +35,9 @@ pub(super) const PROXIMITY_PROOF_MAX_AGE_SECS: u64 = 60;
 /// Domain separator for confirmation code MAC.
 pub(super) const CONFIRMATION_MAC_DOMAIN: &[u8] = b"vauchi-device-link-confirm-mac-v1";
 
+/// Domain separator for the human-readable confirmation code derivation.
+pub(super) const CONFIRMATION_CODE_DOMAIN: &[u8] = b"vauchi-device-link-confirm-code-v1";
+
 /// Evidence of proximity verification.
 ///
 /// Platforms must construct this from real session data — not a bare boolean.
@@ -136,7 +139,14 @@ pub(super) fn derive_proximity_challenge(link_key: &[u8; 32]) -> [u8; 16] {
 /// HMAC-SHA256 with the link key as the signing key and the nonce as the
 /// message, then takes the first 3 bytes modulo 1_000_000 for a 6-digit code.
 pub(super) fn derive_confirmation_code(link_key: &[u8; 32], request_nonce: &[u8; 32]) -> String {
-    let mut mac = HmacSha256::new_from_slice(link_key).expect("HMAC accepts any key length");
+    // Domain-separate the key derivation (ADR-007), matching the sibling
+    // `compute_confirmation_mac` / `derive_proximity_challenge`. The raw
+    // `link_key` must not be used directly as an HMAC key: every derivation
+    // path off the link key gets its own info string so the code, the MAC,
+    // and the proximity challenge are cryptographically independent.
+    let derived_key = HKDF::derive(None, link_key, CONFIRMATION_CODE_DOMAIN, 32)
+        .expect("32 bytes is valid HKDF output length");
+    let mut mac = HmacSha256::new_from_slice(&derived_key).expect("HMAC accepts any key length");
     mac.update(request_nonce);
     let tag = mac.finalize().into_bytes();
     let bytes: &[u8] = tag.as_ref();

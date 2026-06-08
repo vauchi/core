@@ -236,6 +236,19 @@ mod tests {
         );
     }
 
+    // W-3: the confirmation code is HKDF-domain-separated off the link key,
+    // yet still deterministic so initiator and responder agree on it.
+    #[test]
+    fn test_confirmation_code_is_deterministic() {
+        let link_key = [0x42u8; 32];
+        let nonce = [0x07u8; 32];
+        let a = super::types::derive_confirmation_code(&link_key, &nonce);
+        let b = super::types::derive_confirmation_code(&link_key, &nonce);
+        assert_eq!(a, b, "same (link_key, nonce) must yield the same code");
+        assert_eq!(a.len(), 7, "code is formatted XXX-XXX");
+        assert_eq!(a.as_bytes()[3], b'-');
+    }
+
     // ============================================================
     // Additional edge case tests (added for coverage)
     // ============================================================

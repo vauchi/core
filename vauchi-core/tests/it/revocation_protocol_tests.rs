@@ -436,3 +436,77 @@ fn test_revocation_blob_decode_then_process_shreds_contact() {
     assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
     assert!(storage.is_sender_revoked(alice_contact.id()).unwrap());
 }
+
+// End-to-end: Alice deletes her identity (GDPR), and Bob — her contact —
+// receives the resulting delivery blob and crypto-shreds Alice. Proves the
+// sender→blob→recipient→shred chain the broadcast wiring delivers.
+// @scenario: privacy_compliance :: Identity deletion notifies contacts end-to-end
+// @internal
+#[test]
+fn test_gdpr_deletion_revocation_shreds_at_recipient() {
+    use base64::Engine;
+    use vauchi_core::api::DeletionManager;
+
+    let alice = Identity::create("Alice", 0);
+
+    // Alice's side: Bob is her contact; schedule + execute deletion.
+    let alice_storage = test_storage();
+    let mut bob_card = ContactCard::new("Bob");
+    bob_card
+        .add_field(ContactField::new(
+            FieldType::Email,
+            "email",
+            "bob@example.com",
+            0,
+        ))
+        .unwrap();
+    let alice_bob_contact = Contact::from_exchange(
+        [0xBBu8; 32],
+        bob_card,
+        SymmetricKey::generate(),
+        1_700_000_000,
+    );
+    alice_storage.save_contact(&alice_bob_contact).unwrap();
+
+    let dm = DeletionManager::new(&alice_storage);
+    dm.schedule_deletion_with_execute_at(0, 0).unwrap();
+    let result = dm.execute_deletion(&alice).expect("execute deletion");
+    assert_eq!(result.deliveries.len(), 1, "one delivery for Bob");
+    let (_token, blob_b64) = &result.deliveries[0];
+
+    // Bob's side: he has Alice as a contact, keyed by Alice's signing key.
+    let bob_storage = test_storage();
+    let bob_alice_contact = make_contact_with_pk(*alice.signing_public_key(), "Alice");
+    bob_storage.save_contact(&bob_alice_contact).unwrap();
+    assert!(
+        bob_storage
+            .load_contact(bob_alice_contact.id())
+            .unwrap()
+            .is_some()
+    );
+
+    // Bob receives the delivery blob → decodes → processes the revocation.
+    let blob = base64::engine::general_purpose::STANDARD
+        .decode(blob_b64)
+        .unwrap();
+    let rev = decode_revocation_blob(&blob).expect("delivery blob decodes");
+    assert!(
+        process_revocation(&rev, &bob_storage).expect("process"),
+        "valid revocation must shred"
+    );
+
+    // Alice is crypto-shredded from Bob's contacts + tombstoned.
+    assert!(
+        bob_storage
+            .load_contact(bob_alice_contact.id())
+            .unwrap()
+            .is_none(),
+        "Alice must be shredded from Bob's contacts"
+    );
+    assert!(
+        bob_storage
+            .is_sender_revoked(bob_alice_contact.id())
+            .unwrap(),
+        "Alice must be tombstoned"
+    );
+}

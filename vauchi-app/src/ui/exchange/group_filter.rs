@@ -44,9 +44,18 @@ pub(crate) fn resolve_exchange_allow(
     groups: &[Group],
     field_visibility: &VisibilityRules,
 ) -> Option<HashSet<String>> {
-    // RED stub — replaced in the GREEN commit.
-    let _ = (selected_group_ids, groups, field_visibility);
-    None
+    if selected_group_ids.is_empty() {
+        return None;
+    }
+    let mut allow: HashSet<String> = groups
+        .iter()
+        .filter(|g| selected_group_ids.iter().any(|id| id == g.id()))
+        .flat_map(|g| g.visible_fields().iter().cloned())
+        .collect();
+    // Layer-A `Nobody` floor: even a stale group allow-list cannot widen past
+    // a field the owner has marked private.
+    allow.retain(|fid| !matches!(field_visibility.get(fid), FieldVisibility::Nobody));
+    Some(allow)
 }
 
 // INLINE_TEST_REQUIRED: tests exercise the `pub(crate)` resolver, which is

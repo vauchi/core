@@ -167,6 +167,20 @@ impl AppEngine {
             .ok()
             .flatten()
             .unwrap_or_else(|| ContactCard::new(&display_name));
+        // G2 privacy filter: share only the fields the selected exchange
+        // group(s) may see. `pending_exchange_groups` is set at the mode
+        // handoff (`result_routing.rs`) and consumed later at completion, so
+        // it is read by reference here. `None` (no groups) → full card.
+        // See `2026-06-08-exchange-card-not-group-filtered`.
+        let groups = self.vauchi.list_groups().unwrap_or_default();
+        let card = match crate::ui::exchange::group_filter::resolve_exchange_allow(
+            &self.pending_exchange_groups,
+            &groups,
+            card.field_visibility(),
+        ) {
+            Some(allow) => card.filtered_to(&allow),
+            None => card,
+        };
         let fields = card
             .fields()
             .iter()

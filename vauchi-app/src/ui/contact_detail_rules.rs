@@ -178,6 +178,101 @@ pub fn reciprocity_banner(reciprocity: Reciprocity) -> Option<ReciprocityBannerK
     }
 }
 
+/// A contact's recorded exchange place (ADR-051), reduced to what the
+/// renderer needs. `name` is the linked named place, or `None` when the
+/// location is recorded but unnamed. The engine holds `Option<ContactPlace>`;
+/// `None` there means no location was recorded at all.
+#[cfg_attr(feature = "schema-gen", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ContactPlace {
+    pub name: Option<String>,
+}
+
+/// Build the contact-detail exchange-place affordances: a label for where
+/// the exchange happened, a name input (autocomplete-or-create against the
+/// named-place vocabulary), the suggestion list while typing, and a clear
+/// action. Returns empty when no location was recorded.
+///
+/// Pure presentation (Wire Humble): the engine owns the data, the AppEngine
+/// intercept owns persistence. Rows commit via `name_place:<name>` (→
+/// `Vauchi::name_exchange_place`) and `clear_exchange_place` (→
+/// `Vauchi::clear_exchange_location`).
+pub fn place_components(
+    place: &Option<ContactPlace>,
+    query: &str,
+    suggestions: &[String],
+) -> Vec<Component> {
+    let Some(place) = place else {
+        return Vec::new();
+    };
+    let mut out = Vec::with_capacity(4);
+
+    let label = match &place.name {
+        Some(name) => format!("Met at {name}"),
+        None => "Exchange location recorded".to_string(),
+    };
+    out.push(Component::Text {
+        id: "exchange_place_label".into(),
+        content: label,
+        style: TextStyle::Subtitle,
+    });
+
+    out.push(Component::TextInput {
+        id: "name_place".into(),
+        label: "Name this place".into(),
+        value: query.to_string(),
+        placeholder: Some("Place name".into()),
+        max_length: None,
+        validation_error: None,
+        input_type: InputType::Text,
+        a11y: Some(A11y {
+            label: Some("Name this exchange place".into()),
+            hint: None,
+            role: Some(AccessibilityRole::TextField),
+        }),
+        info_key: None,
+    });
+
+    if !query.is_empty() {
+        out.push(Component::ActionList {
+            id: "place_suggestions".into(),
+            items: suggestions
+                .iter()
+                .map(|name| ActionListItem {
+                    id: format!("name_place:{name}"),
+                    label: name.clone(),
+                    icon: None,
+                    detail: None,
+                    a11y: Some(A11y {
+                        label: Some(format!("Use place {name}")),
+                        hint: None,
+                        role: None,
+                    }),
+                    info_key: None,
+                })
+                .collect(),
+        });
+    }
+
+    out.push(Component::ActionList {
+        id: "place_actions".into(),
+        items: vec![ActionListItem {
+            id: "clear_exchange_place".into(),
+            label: "Remove location".into(),
+            icon: None,
+            detail: None,
+            a11y: Some(A11y {
+                label: Some("Remove the recorded exchange location".into()),
+                hint: None,
+                role: None,
+            }),
+            info_key: None,
+        }],
+    });
+
+    out
+}
+
 // INLINE_TEST_REQUIRED: G4 visibility-flag helpers are pure functions whose
 // invariants must stay co-located with the helpers — future TrustLevel /
 // Reciprocity variants must surface here first via exhaustive-match drift.

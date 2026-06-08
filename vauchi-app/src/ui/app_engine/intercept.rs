@@ -692,6 +692,74 @@ impl AppEngine {
         }
     }
 
+    /// Intercept exchange-place naming/clearing on the ContactDetail screen
+    /// (ADR-051). Mirrors the tag intercept: persist via `Vauchi`, then apply
+    /// an optimistic in-memory update (the storage write succeeded).
+    ///
+    /// - `TextChanged { "name_place" }` → recompute named-place suggestions.
+    /// - `ActionPressed { "name_place:<name>" }` → `name_exchange_place`.
+    /// - `ActionPressed { "clear_exchange_place" }` → `clear_exchange_location`.
+    pub(super) fn intercept_place_action(
+        &mut self,
+        contact_id: &str,
+        action: &UserAction,
+    ) -> Option<ActionResult> {
+        match action {
+            UserAction::TextChanged {
+                component_id,
+                value,
+            } if component_id == "name_place" => {
+                let suggestions = self.place_name_suggestions(value);
+                self.engine
+                    .as_any_mut()
+                    .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
+                    .map(|engine| {
+                        engine.set_place_query(value.clone(), suggestions);
+                        ActionResult::UpdateScreen(engine.current_screen())
+                    })
+            }
+            UserAction::ActionPressed { action_id } if action_id.starts_with("name_place:") => {
+                let name = action_id.strip_prefix("name_place:").unwrap_or_default();
+                let named = self.vauchi.name_exchange_place(contact_id, name).is_ok();
+                self.engine
+                    .as_any_mut()
+                    .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
+                    .map(|engine| {
+                        if named {
+                            engine.set_place_named(name.to_string());
+                        }
+                        ActionResult::UpdateScreen(engine.current_screen())
+                    })
+            }
+            UserAction::ActionPressed { action_id } if action_id == "clear_exchange_place" => {
+                let cleared = self.vauchi.clear_exchange_location(contact_id).is_ok();
+                self.engine
+                    .as_any_mut()
+                    .and_then(|a| a.downcast_mut::<ContactDetailEngine>())
+                    .map(|engine| {
+                        if cleared {
+                            engine.clear_exchange_place();
+                        }
+                        ActionResult::UpdateScreen(engine.current_screen())
+                    })
+            }
+            _ => None,
+        }
+    }
+
+    /// Named-place names matching `prefix` (trimmed, case-insensitive) — the
+    /// autocomplete source for naming a contact's exchange place.
+    fn place_name_suggestions(&self, prefix: &str) -> Vec<String> {
+        let needle = prefix.trim().to_lowercase();
+        self.vauchi
+            .list_places()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|p| needle.is_empty() || p.name.to_lowercase().contains(&needle))
+            .map(|p| p.name)
+            .collect()
+    }
+
     /// Intercept the "exit-preview" action when MyInfo is in PreviewAs mode.
     ///
     /// Clears `preview_as_contact`, invalidates the MyInfo cache, and rebuilds

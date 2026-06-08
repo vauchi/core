@@ -146,6 +146,9 @@ impl AppEngine {
             if let Some(result) = self.intercept_tag_action(&contact_id, action) {
                 return Some(result);
             }
+            if let Some(result) = self.intercept_place_action(&contact_id, action) {
+                return Some(result);
+            }
             if let Some(result) = self.intercept_proposal_trust_toggle(&contact_id, action) {
                 return Some(result);
             }

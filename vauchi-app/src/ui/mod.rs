@@ -85,9 +85,9 @@ pub use contact_detail::{
     ContactDetailEngine, ContactNotFoundEngine, ContactViewMode, DeliverySummary, SharedInfoView,
 };
 pub use contact_detail_rules::{
-    ContactTag, ReciprocityBannerKind, footer_action_id as contact_detail_footer_action_id,
-    reciprocity_banner, show_recovery_trusted_indicator, show_verified_badge, tag_components,
-    verify_button_visible,
+    ContactPlace, ContactTag, ReciprocityBannerKind,
+    footer_action_id as contact_detail_footer_action_id, place_components, reciprocity_banner,
+    show_recovery_trusted_indicator, show_verified_badge, tag_components, verify_button_visible,
 };
 pub use contact_edit::{ContactEditEngine, EditableContact, EditableField};
 pub use contact_limit::ContactLimitEngine;

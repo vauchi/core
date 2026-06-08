@@ -25,6 +25,7 @@ mod canonical_screen_id_tests;
 mod component_serialization_tests;
 mod contact_detail_engine_tests;
 mod contact_detail_intercepts_tests;
+mod contact_detail_place_tests;
 mod contact_list_faceted_tests;
 mod contact_list_intercepts_tests;
 mod contact_merge_engine_tests;

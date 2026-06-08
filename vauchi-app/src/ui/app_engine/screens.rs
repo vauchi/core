@@ -18,7 +18,7 @@ use crate::ui::component::{
 use crate::ui::contact_detail::{
     ContactDetailEngine, ContactNotFoundEngine, DeliverySummary, SharedInfoView,
 };
-use crate::ui::contact_detail_rules::ContactTag;
+use crate::ui::contact_detail_rules::{ContactPlace, ContactTag};
 use crate::ui::contact_edit::{ContactEditEngine, EditableContact, EditableField};
 use crate::ui::contact_limit::ContactLimitEngine;
 use crate::ui::contact_list::{ContactListEngine, IndexedItem};
@@ -773,10 +773,30 @@ impl AppEngine {
                         })
                         .collect();
 
+                    // Recorded exchange place (ADR-051): resolve the linked
+                    // named place to its name for display, if any.
+                    let exchange_place =
+                        vauchi
+                            .exchange_location(contact_id)
+                            .ok()
+                            .flatten()
+                            .map(|loc| {
+                                let name = loc.place_id.as_ref().and_then(|pid| {
+                                    vauchi
+                                        .list_places()
+                                        .unwrap_or_default()
+                                        .into_iter()
+                                        .find(|p| &p.id == pid)
+                                        .map(|p| p.name)
+                                });
+                                ContactPlace { name }
+                            });
+
                     let build_engine = |engine: ContactDetailEngine| {
                         let mut e = engine
                             .with_avatar_data(avatar_data)
                             .with_tags(tags)
+                            .with_exchange_place(exchange_place)
                             .with_field_notes(field_notes)
                             .with_trust(trust_level, proposal_trusted)
                             .with_reciprocity(reciprocity_status)

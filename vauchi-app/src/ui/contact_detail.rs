@@ -13,7 +13,9 @@ use crate::ui::*;
 // the bare name the call site uses — import it directly. The other
 // predicates (`verify_button_visible`, `show_verified_badge`,
 // `show_recovery_trusted_indicator`) come in via the glob unchanged.
-use crate::ui::contact_detail_rules::{ContactTag, footer_action_id, tag_components};
+use crate::ui::contact_detail_rules::{
+    ContactPlace, ContactTag, footer_action_id, place_components, tag_components,
+};
 use vauchi_core::contact::trust::TrustLevel;
 
 /// Which perspective the user is viewing.
@@ -101,6 +103,14 @@ pub struct ContactDetailEngine {
     /// Transient autocomplete suggestions for `tag_input`, computed by the
     /// AppEngine intercept via `Vauchi::tag_name_suggestions`.
     tag_suggestions: Vec<String>,
+    /// The contact's recorded exchange place (ADR-051), or `None` when no
+    /// location was captured. Loaded by the screen factory.
+    exchange_place: Option<ContactPlace>,
+    /// Transient in-progress place-name query (never persisted).
+    place_input: String,
+    /// Transient name suggestions for `place_input`, from the named-place
+    /// vocabulary, computed by the AppEngine intercept.
+    place_suggestions: Vec<String>,
 }
 
 impl ContactDetailEngine {
@@ -128,6 +138,9 @@ impl ContactDetailEngine {
             tags: Vec::new(),
             tag_input: String::new(),
             tag_suggestions: Vec::new(),
+            exchange_place: None,
+            place_input: String::new(),
+            place_suggestions: Vec::new(),
         }
     }
 
@@ -160,6 +173,9 @@ impl ContactDetailEngine {
             tags: Vec::new(),
             tag_input: String::new(),
             tag_suggestions: Vec::new(),
+            exchange_place: None,
+            place_input: String::new(),
+            place_suggestions: Vec::new(),
         }
     }
 
@@ -190,6 +206,37 @@ impl ContactDetailEngine {
     pub fn set_tag_query(&mut self, query: String, suggestions: Vec<String>) {
         self.tag_input = query;
         self.tag_suggestions = suggestions;
+    }
+
+    /// Attach the contact's recorded exchange place (ADR-051). Loaded by the
+    /// screen factory from `Vauchi::exchange_location`.
+    pub fn with_exchange_place(mut self, place: Option<ContactPlace>) -> Self {
+        self.exchange_place = place;
+        self
+    }
+
+    /// Set the in-progress place-name query and its suggestions (transient;
+    /// the AppEngine intercept computes the suggestions from the named-place
+    /// vocabulary on each keystroke).
+    pub fn set_place_query(&mut self, query: String, suggestions: Vec<String>) {
+        self.place_input = query;
+        self.place_suggestions = suggestions;
+    }
+
+    /// Optimistically record that the exchange place was named, after a
+    /// successful `Vauchi::name_exchange_place`, and clear the query.
+    pub fn set_place_named(&mut self, name: String) {
+        self.exchange_place = Some(ContactPlace { name: Some(name) });
+        self.place_input.clear();
+        self.place_suggestions.clear();
+    }
+
+    /// Optimistically clear the exchange place, after a successful
+    /// `Vauchi::clear_exchange_location`.
+    pub fn clear_exchange_place(&mut self) {
+        self.exchange_place = None;
+        self.place_input.clear();
+        self.place_suggestions.clear();
     }
 
     /// Optimistically add a tag row after a successful
@@ -428,6 +475,12 @@ impl ContactDetailEngine {
             &self.tags,
             &self.tag_input,
             &self.tag_suggestions,
+        ));
+        // Exchange place (ADR-051): label + name input + suggestions + clear.
+        components.extend(place_components(
+            &self.exchange_place,
+            &self.place_input,
+            &self.place_suggestions,
         ));
         // Trust & permissions group (local-only, never shared with the contact)
         components.push(Component::SettingsGroup {

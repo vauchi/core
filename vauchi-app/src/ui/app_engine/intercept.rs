@@ -11,12 +11,14 @@ use crate::i18n::Locale;
 use crate::ui::action::{ActionResult, UserAction};
 use crate::ui::contact_detail::ContactDetailEngine;
 use crate::ui::contact_detail_rules::ContactTag;
+use crate::ui::contact_list::ContactListEngine;
 use crate::ui::engine::WorkflowEngine;
 use crate::ui::form_dialog::FormDialogType;
 use crate::ui::info_content;
 use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
 use crate::ui::tag_promotion::TagPromotionEngine;
 use crate::ui::tags_list::TagsEngine;
+use vauchi_core::SearchFacets;
 
 impl AppEngine {
     /// Persist a consent toggle on the Privacy screen by flipping the
@@ -601,6 +603,93 @@ impl AppEngine {
         }
 
         None
+    }
+
+    /// Faceted contact search (ADR-051): on the Contacts screen, route the
+    /// search query + facet opt-ins through the canonical core API
+    /// (`Vauchi::search_contacts_faceted`) instead of the engine's plain
+    /// in-memory name match.
+    ///
+    /// - Toggling a `search_facets` item flips the opt-in and recomputes.
+    /// - A `SearchChanged` is only intercepted while faceting is active;
+    ///   otherwise it falls through so the engine keeps its (unchanged)
+    ///   in-memory name search.
+    pub(super) fn intercept_contact_facets(&mut self, action: &UserAction) -> Option<ActionResult> {
+        if self.screen != AppScreen::Contacts {
+            return None;
+        }
+        match action {
+            UserAction::ItemToggled {
+                component_id,
+                item_id,
+            } if component_id == "search_facets" => {
+                let query = {
+                    let engine = self
+                        .engine
+                        .as_any_mut()
+                        .and_then(|a| a.downcast_mut::<ContactListEngine>())?;
+                    engine.toggle_facet(item_id);
+                    engine.search_query().to_string()
+                };
+                self.apply_contact_facets(query);
+                Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+            }
+            UserAction::SearchChanged { query, .. } => {
+                let faceting = self
+                    .engine
+                    .as_any()
+                    .and_then(|a| a.downcast_ref::<ContactListEngine>())
+                    .is_some_and(ContactListEngine::any_facet);
+                if !faceting {
+                    return None;
+                }
+                if let Some(engine) = self
+                    .engine
+                    .as_any_mut()
+                    .and_then(|a| a.downcast_mut::<ContactListEngine>())
+                {
+                    engine.set_search_query(query.clone());
+                }
+                self.apply_contact_facets(query.clone());
+                Some(ActionResult::UpdateScreen(self.engine.current_screen()))
+            }
+            _ => None,
+        }
+    }
+
+    /// Recompute the faceted result set for the contact list's current facet
+    /// flags + `query`, and push it onto the engine. No facet enabled clears
+    /// faceted mode (the engine reverts to in-memory name search).
+    fn apply_contact_facets(&mut self, query: String) {
+        let Some((tags, comment, place)) = self
+            .engine
+            .as_any()
+            .and_then(|a| a.downcast_ref::<ContactListEngine>())
+            .map(ContactListEngine::facet_flags)
+        else {
+            return;
+        };
+        let ids = if tags || comment || place {
+            let facets = SearchFacets {
+                tags,
+                comment,
+                place,
+                time_range: None,
+            };
+            self.vauchi
+                .search_contacts_faceted(&query, &facets)
+                .map(|cs| cs.iter().map(|c| c.id().to_string()).collect::<Vec<_>>())
+                .ok()
+        } else {
+            None
+        };
+        if let Some(engine) = self
+            .engine
+            .as_any_mut()
+            .and_then(|a| a.downcast_mut::<ContactListEngine>())
+        {
+            engine.set_faceted_ids(ids);
+        }
     }
 
     /// Intercept the "exit-preview" action when MyInfo is in PreviewAs mode.

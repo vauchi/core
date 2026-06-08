@@ -1297,6 +1297,10 @@ impl WorkflowEngine for AppEngine {
             return result;
         }
 
+        if let Some(result) = self.intercept_contact_facets(&action) {
+            return result;
+        }
+
         // List-screen CTAs, duplicate merge/dismiss, recovery actions, and
         // unarchive. See `dispatch::intercept_list_and_recovery`.
         if let Some(result) = self.intercept_list_and_recovery(&action) {

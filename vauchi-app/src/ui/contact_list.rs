@@ -47,6 +47,16 @@ pub struct ContactListEngine {
     available_groups: Vec<(String, String)>,
     /// Group memberships: group_id -> list of contact_ids.
     group_memberships: HashMap<String, Vec<String>>,
+    /// Faceted-search opt-ins (ADR-051): match the query against tags /
+    /// comment / place in addition to the name. Default off → plain name
+    /// search (behaviour unchanged).
+    facet_tags: bool,
+    facet_comment: bool,
+    facet_place: bool,
+    /// When `Some`, faceted mode is active and the list is restricted to
+    /// these contact ids (computed by the AppEngine intercept via
+    /// `Vauchi::search_contacts_faceted`). `None` → plain in-memory search.
+    faceted_ids: Option<Vec<String>>,
 }
 
 impl ContactListEngine {
@@ -57,6 +67,10 @@ impl ContactListEngine {
             group_filter: None,
             available_groups: Vec::new(),
             group_memberships: HashMap::new(),
+            facet_tags: false,
+            facet_comment: false,
+            facet_place: false,
+            faceted_ids: None,
         }
     }
 
@@ -72,6 +86,79 @@ impl ContactListEngine {
             group_filter: None,
             available_groups: groups,
             group_memberships: memberships,
+            facet_tags: false,
+            facet_comment: false,
+            facet_place: false,
+            faceted_ids: None,
+        }
+    }
+
+    /// True if any annotation facet is enabled.
+    pub fn any_facet(&self) -> bool {
+        self.facet_tags || self.facet_comment || self.facet_place
+    }
+
+    /// Current facet opt-ins as `(tags, comment, place)`.
+    pub fn facet_flags(&self) -> (bool, bool, bool) {
+        (self.facet_tags, self.facet_comment, self.facet_place)
+    }
+
+    /// The current search query.
+    pub fn search_query(&self) -> &str {
+        &self.search_query
+    }
+
+    /// Flip one facet opt-in by id (`tags` | `comment` | `place`).
+    pub fn toggle_facet(&mut self, id: &str) {
+        match id {
+            "tags" => self.facet_tags = !self.facet_tags,
+            "comment" => self.facet_comment = !self.facet_comment,
+            "place" => self.facet_place = !self.facet_place,
+            _ => {}
+        }
+    }
+
+    /// Set the search query (used by the intercept when faceting).
+    pub fn set_search_query(&mut self, query: String) {
+        self.search_query = query;
+    }
+
+    /// Set (or clear) the faceted result restriction. `Some` activates
+    /// faceted mode (the list shows exactly these ids, intersected with the
+    /// group filter); `None` reverts to plain in-memory name search.
+    pub fn set_faceted_ids(&mut self, ids: Option<Vec<String>>) {
+        self.faceted_ids = ids;
+    }
+
+    fn search_facets_toggle(&self) -> Component {
+        let item = |id: &str, label: &str, selected: bool| ToggleItem {
+            id: id.into(),
+            label: label.into(),
+            selected,
+            subtitle: None,
+            a11y: Some(A11y {
+                label: Some(format!(
+                    "Search {label}, {}",
+                    if selected { "on" } else { "off" }
+                )),
+                hint: Some("Double tap to toggle".into()),
+                role: Some(AccessibilityRole::Toggle),
+            }),
+            info_key: None,
+        };
+        Component::ToggleList {
+            id: "search_facets".into(),
+            label: "Also search".into(),
+            items: vec![
+                item("tags", "Tags", self.facet_tags),
+                item("comment", "Notes", self.facet_comment),
+                item("place", "Places", self.facet_place),
+            ],
+            a11y: Some(A11y {
+                label: Some("Also search in".into()),
+                hint: Some("Choose which annotations the search matches.".into()),
+                role: None,
+            }),
         }
     }
 
@@ -80,8 +167,14 @@ impl ContactListEngine {
         // emitted Vec<Item> needs to be owned. Caching would add
         // complexity for a list that is small in practice (< 1000
         // contacts).
+        let faceted: Option<std::collections::HashSet<&str>> = self
+            .faceted_ids
+            .as_ref()
+            .map(|ids| ids.iter().map(String::as_str).collect());
         let query_lower = self.search_query.to_lowercase();
-        let search_active = !query_lower.is_empty();
+        // Plain name search only applies when not in faceted mode (core has
+        // already matched the query against name + the enabled facets).
+        let search_active = faceted.is_none() && !query_lower.is_empty();
 
         self.all_contacts
             .iter()
@@ -94,6 +187,9 @@ impl ContactListEngine {
                     {
                         return false;
                     }
+                }
+                if let Some(set) = &faceted {
+                    return set.contains(c.item.id.as_str());
                 }
                 if search_active {
                     let name_match = c.item.name.to_lowercase().contains(&query_lower);
@@ -162,11 +258,14 @@ impl WorkflowEngine for ContactListEngine {
                 a11y: None,
             }]
         } else {
-            vec![Component::List {
-                id: "contacts".into(),
-                items: filtered,
-                searchable: true,
-            }]
+            vec![
+                self.search_facets_toggle(),
+                Component::List {
+                    id: "contacts".into(),
+                    items: filtered,
+                    searchable: true,
+                },
+            ]
         };
 
         // Archived contacts link
@@ -212,10 +311,25 @@ impl WorkflowEngine for ContactListEngine {
         }
     }
 
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        Some(self)
+    }
+
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        Some(self)
+    }
+
     fn handle_action(&mut self, action: UserAction) -> ActionResult {
         match action {
             UserAction::SearchChanged { query, .. } => {
                 self.search_query = query;
+                ActionResult::UpdateScreen(self.current_screen())
+            }
+            UserAction::ItemToggled {
+                component_id,
+                item_id,
+            } if component_id == "search_facets" => {
+                self.toggle_facet(&item_id);
                 ActionResult::UpdateScreen(self.current_screen())
             }
             UserAction::ListItemSelected { item_id, .. } => ActionResult::OpenContact {

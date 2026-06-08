@@ -324,3 +324,98 @@ impl AppEngine {
         true
     }
 }
+
+// INLINE_TEST_REQUIRED: tests call the private `build_ble_session_inputs`
+// and set the private `pending_exchange_groups` field — neither is reachable
+// from a `tests/` integration directory.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vauchi_core::api::Vauchi;
+    use vauchi_core::contact_card::{ContactField, FieldType};
+
+    /// AppEngine over an in-memory Vauchi whose own card carries `Email` +
+    /// `Phone`, plus a "Work" group exposing only `Email`. Returns the engine
+    /// and the Work group id.
+    fn engine_with_card_and_group() -> (AppEngine, String) {
+        let mut vauchi = Vauchi::in_memory().expect("in-memory vauchi");
+        vauchi.create_identity("Alice").expect("identity");
+        let mut card = vauchi
+            .own_card()
+            .expect("own_card")
+            .expect("create_identity saves a card");
+        card.add_field(ContactField::new(FieldType::Email, "Email", "a@b.com", 0))
+            .expect("add email");
+        card.add_field(ContactField::new(
+            FieldType::Phone,
+            "Phone",
+            "+12025550123",
+            0,
+        ))
+        .expect("add phone");
+        vauchi.update_own_card(&card).expect("update own card");
+        let email_id = card
+            .fields()
+            .iter()
+            .find(|f| f.label() == "Email")
+            .expect("email field")
+            .id()
+            .to_string();
+        let work = vauchi.create_group("Work").expect("create group");
+        let work_id = work.id().to_string();
+        vauchi
+            .set_group_field_visibility(&work_id, &email_id, true)
+            .expect("expose email to Work");
+        (AppEngine::new(vauchi), work_id)
+    }
+
+    fn payload_labels(engine: &AppEngine) -> Vec<String> {
+        let (_id, _x3dh, card) = engine
+            .build_ble_session_inputs()
+            .expect("identity + card present");
+        card.fields.iter().map(|(label, _)| label.clone()).collect()
+    }
+
+    #[test]
+    fn ble_payload_shares_full_card_when_no_group_selected() {
+        // pending_exchange_groups empty → resolver returns None → share all.
+        let (engine, _work) = engine_with_card_and_group();
+        let labels = payload_labels(&engine);
+        assert!(labels.contains(&"Email".to_string()), "Email shared");
+        assert!(
+            labels.contains(&"Phone".to_string()),
+            "no group selected → full card (Phone shared)"
+        );
+    }
+
+    #[test]
+    fn ble_payload_filtered_to_selected_group_visible_fields() {
+        // Work exposes only Email; selecting it must drop Phone from the
+        // transmitted BLE payload (the privacy fix).
+        let (mut engine, work) = engine_with_card_and_group();
+        engine.pending_exchange_groups = vec![work];
+        let labels = payload_labels(&engine);
+        assert_eq!(
+            labels,
+            vec!["Email".to_string()],
+            "Work group exposes only Email; Phone must not be transmitted"
+        );
+    }
+
+    #[test]
+    fn ble_payload_empty_when_selected_group_exposes_nothing() {
+        // Default-closed: a selected group with no visible_fields shares no
+        // fields (Some(∅)), NOT the full card.
+        let (mut engine, _work) = engine_with_card_and_group();
+        let empty = engine
+            .vauchi
+            .create_group("Empty")
+            .expect("create empty group");
+        engine.pending_exchange_groups = vec![empty.id().to_string()];
+        let labels = payload_labels(&engine);
+        assert!(
+            labels.is_empty(),
+            "empty group → share nothing, got {labels:?}"
+        );
+    }
+}

@@ -213,6 +213,18 @@ impl Vauchi {
             ));
         }
 
+        // Notify contacts that this identity is revoked, BEFORE destroying the
+        // shared keys + identity the signed deliveries depend on. Best-effort;
+        // network builds only (no relay transport without `network-http`).
+        #[cfg(feature = "network-http")]
+        if let Some(identity) = self.identity.as_ref() {
+            let now = self.clock.unix_seconds();
+            let contacts = self.storage.list_contacts()?;
+            let deliveries =
+                crate::api::deletion::build_revocation_deliveries(identity, &contacts, now);
+            let _ = self.broadcast_identity_revocations(&deliveries);
+        }
+
         // Clear all contacts
         let contacts = self.storage.list_contacts()?;
         for contact in &contacts {

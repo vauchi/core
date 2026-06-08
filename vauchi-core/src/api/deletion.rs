@@ -78,6 +78,30 @@ pub struct DeletionResult {
     pub deliveries: Vec<(String, String)>,
 }
 
+/// Builds relay deliveries — `(mailbox_token_hex, base64 revocation blob)` —
+/// revoking `identity` to each contact, signed at `now`. Each token derives
+/// from a contact's shared key, which every deletion flow destroys moments
+/// later, so this must run first. Shared by the GDPR `execute_deletion` path
+/// and the emergency wipe.
+pub(crate) fn build_revocation_deliveries(
+    identity: &Identity,
+    contacts: &[crate::contact::Contact],
+    now: u64,
+) -> Vec<(String, String)> {
+    let day_epoch = current_day_epoch(now);
+    let mut deliveries = Vec::with_capacity(contacts.len());
+    for contact in contacts {
+        if let Some(shared) = contact.shared_key() {
+            let revoked = IdentityRevoked::create(identity, contact.id(), now);
+            let token = token_hex(&compute_mailbox_token(shared.as_bytes(), day_epoch));
+            let blob =
+                base64::engine::general_purpose::STANDARD.encode(encode_revocation_blob(&revoked));
+            deliveries.push((token, blob));
+        }
+    }
+    deliveries
+}
+
 /// Manages identity deletion with a 7-day grace period.
 ///
 /// Supports schedule/cancel/execute flow per GDPR requirements.
@@ -162,24 +186,13 @@ impl<'a> DeletionManager<'a> {
                     .list_contacts()
                     .map_err(|e| DeletionError::DeletionFailed(e.to_string()))?;
 
+                // Build relay deliveries before shredding (each token derives
+                // from a shared key the loop below destroys).
+                let deliveries = build_revocation_deliveries(identity, &contacts, now);
                 let mut revocations = Vec::with_capacity(contacts.len());
-                let mut deliveries = Vec::with_capacity(contacts.len());
-                let day_epoch = current_day_epoch(now);
 
                 for contact in &contacts {
-                    // Generate signed IdentityRevoked message
-                    let revoked = IdentityRevoked::create(identity, contact.id(), now);
-
-                    // Compute the relay delivery (mailbox token + magic-prefixed
-                    // blob) now, while the shared key still exists — the contact
-                    // is crypto-shredded below.
-                    if let Some(shared) = contact.shared_key() {
-                        let token = token_hex(&compute_mailbox_token(shared.as_bytes(), day_epoch));
-                        let blob = base64::engine::general_purpose::STANDARD
-                            .encode(encode_revocation_blob(&revoked));
-                        deliveries.push((token, blob));
-                    }
-                    revocations.push(revoked);
+                    revocations.push(IdentityRevoked::create(identity, contact.id(), now));
 
                     // Crypto-shred: delete CEK (card becomes permanently unreadable)
                     // This runs BEFORE state is marked Executed for crash safety

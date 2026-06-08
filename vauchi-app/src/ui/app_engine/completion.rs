@@ -206,6 +206,11 @@ impl AppEngine {
                 #[allow(clippy::let_underscore_must_use)]
                 let _ = self.vauchi.add_contact_to_group(group_id, &contact_id);
             }
+            // Capture-at-exchange (ADR-051): QR is an in-person mode, so
+            // record where this contact was met — same seam as multi-stage
+            // and BLE. The Event::LocationResult reply is consumed in
+            // handle_hardware_event.
+            self.request_exchange_location(contact_id.clone());
         }
 
         ActionResult::NavigateTo(screen)

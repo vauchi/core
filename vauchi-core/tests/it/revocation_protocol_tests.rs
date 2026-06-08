@@ -17,7 +17,8 @@ use vauchi_core::crypto::SymmetricKey;
 use vauchi_core::identity::Identity;
 use vauchi_core::network::message::IdentityRevoked;
 use vauchi_core::network::revocation::{
-    REVOCATION_DOMAIN_SEPARATOR, canonical_revocation_bytes, process_revocation,
+    REVOCATION_BLOB_MAGIC, REVOCATION_DOMAIN_SEPARATOR, canonical_revocation_bytes,
+    decode_revocation_blob, encode_revocation_blob, process_revocation,
 };
 use vauchi_core::storage::Storage;
 
@@ -357,4 +358,81 @@ fn test_identity_revoked_handles_uuid_recipient_id() {
         !revoked.verify(identity.signing_public_key()),
         "revocation for non-hex recipient_id must not verify"
     );
+}
+
+// === Revocation wire format + receive routing (Finding 3) ===
+
+// @scenario: privacy_compliance :: Revocation blob round-trips through encode/decode
+// @internal
+#[test]
+fn test_revocation_blob_roundtrip() {
+    let identity = Identity::create("Alice", 0);
+    let bob_id = hex::encode([0xBBu8; 32]);
+    let revoked = IdentityRevoked::create(&identity, &bob_id, 1234);
+
+    let blob = encode_revocation_blob(&revoked);
+    assert!(blob.starts_with(REVOCATION_BLOB_MAGIC));
+
+    let decoded = decode_revocation_blob(&blob).expect("magic blob must decode");
+    assert_eq!(decoded.sender_id, revoked.sender_id);
+    assert_eq!(decoded.recipient_id, revoked.recipient_id);
+    assert_eq!(decoded.timestamp, revoked.timestamp);
+    assert_eq!(decoded.signature, revoked.signature);
+}
+
+// @scenario: privacy_compliance :: Non-revocation blobs are not misclassified
+// @internal
+#[test]
+fn test_decode_rejects_non_revocation_blobs() {
+    // An encrypted-update ciphertext (no magic) must decode to None so it is
+    // never misrouted away from the update path.
+    assert!(decode_revocation_blob(b"").is_none());
+    assert!(decode_revocation_blob(b"VRV").is_none()); // shorter than the 4-byte magic
+    assert!(decode_revocation_blob(&[0xABu8; 200]).is_none());
+
+    // Correct magic but a too-short body fails to deserialize -> None (no panic).
+    let mut bad = REVOCATION_BLOB_MAGIC.to_vec();
+    bad.extend_from_slice(&[0xFFu8; 4]);
+    assert!(decode_revocation_blob(&bad).is_none());
+}
+
+// @scenario: privacy_compliance :: process_revocation reports whether it acted
+// @internal
+#[test]
+fn test_process_revocation_reports_outcome() {
+    let storage = test_storage();
+    let identity = Identity::create("Alice", 0);
+    let bob_id = hex::encode([0xBBu8; 32]);
+
+    // Unknown sender -> Ok(false) (no-op).
+    let unknown = IdentityRevoked::create(&identity, &bob_id, 1);
+    assert!(!process_revocation(&unknown, &storage).unwrap());
+
+    // Known contact, valid signature -> Ok(true) and the contact is shredded.
+    let alice_contact = make_contact_with_pk(*identity.signing_public_key(), "Alice");
+    storage.save_contact(&alice_contact).unwrap();
+    let future_ts = alice_contact.exchange_timestamp().unwrap() + 1;
+    let valid = IdentityRevoked::create(&identity, &bob_id, future_ts);
+    assert!(process_revocation(&valid, &storage).unwrap());
+    assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
+}
+
+// @scenario: privacy_compliance :: A received revocation blob shreds the contact
+// @internal
+#[test]
+fn test_revocation_blob_decode_then_process_shreds_contact() {
+    let storage = test_storage();
+    let identity = Identity::create("Alice", 0);
+    let bob_id = hex::encode([0xBBu8; 32]);
+    let alice_contact = make_contact_with_pk(*identity.signing_public_key(), "Alice");
+    storage.save_contact(&alice_contact).unwrap();
+    let future_ts = alice_contact.exchange_timestamp().unwrap() + 1;
+
+    // Simulate the receive path: encode -> blob -> decode -> process.
+    let blob = encode_revocation_blob(&IdentityRevoked::create(&identity, &bob_id, future_ts));
+    let decoded = decode_revocation_blob(&blob).expect("decode");
+    assert!(process_revocation(&decoded, &storage).unwrap());
+
+    assert!(storage.load_contact(alice_contact.id()).unwrap().is_none());
+    assert!(storage.is_sender_revoked(alice_contact.id()).unwrap());
 }

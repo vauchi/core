@@ -331,8 +331,34 @@ impl Vauchi {
             let _ = adapter.send(&ack);
         }
 
+        // 2c. Partition out signed identity-revocation blobs (magic-prefixed,
+        //     not encrypted). process_revocation verifies the signature against
+        //     the stored contact and is a no-op on every failure path, so a
+        //     forged or garbage revocation cannot delete a contact.
+        let (revocation_blobs, update_blobs): (Vec<_>, Vec<_>) =
+            contact_blobs.into_iter().partition(|(_, _, bytes)| {
+                crate::network::revocation::decode_revocation_blob(bytes).is_some()
+            });
+
+        for (message_id, _token, bytes) in &revocation_blobs {
+            if let Some(rev) = crate::network::revocation::decode_revocation_blob(bytes) {
+                #[allow(clippy::let_underscore_must_use)]
+                let _ = crate::network::revocation::process_revocation(&rev, &self.storage);
+            }
+            let ack = create_envelope(
+                MessagePayload::Acknowledgment(Acknowledgment {
+                    message_id: message_id.clone().into(),
+                    status: AckStatus::Stored,
+                    error: None,
+                }),
+                self.clock.unix_seconds(),
+            );
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = adapter.send(&ack);
+        }
+
         // 3. Route + apply each contact blob, build per-blob ACK envelopes.
-        let outcomes = process_received_blobs(identity, &self.storage, contacts, contact_blobs);
+        let outcomes = process_received_blobs(identity, &self.storage, contacts, update_blobs);
         let received = outcomes.iter().filter(|o| o.decrypted).count();
         let rejected = outcomes
             .iter()

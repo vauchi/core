@@ -46,25 +46,25 @@ pub fn canonical_revocation_bytes(
 pub fn process_revocation(
     revocation: &IdentityRevoked,
     storage: &Storage,
-) -> Result<(), crate::storage::StorageError> {
+) -> Result<bool, crate::storage::StorageError> {
     let contact = match storage.load_contact(revocation.sender_id.as_str())? {
         Some(c) => c,
-        None => return Ok(()), // No such contact — no-op
+        None => return Ok(false), // No such contact — no-op
     };
 
     // Only exchanged contacts have exchange timestamps and public keys
     let Some(exchange_ts) = contact.exchange_timestamp() else {
-        return Ok(()); // Imported contact — no revocation possible
+        return Ok(false); // Imported contact — no revocation possible
     };
     if revocation.timestamp < exchange_ts {
-        return Ok(());
+        return Ok(false);
     }
 
     let Some(public_key) = contact.public_key() else {
-        return Ok(()); // Imported contact — no public key to verify
+        return Ok(false); // Imported contact — no public key to verify
     };
     if !revocation.verify(public_key) {
-        return Ok(());
+        return Ok(false);
     }
 
     // Crypto-shred: delete CEK (card becomes permanently unreadable)
@@ -75,5 +75,31 @@ pub fn process_revocation(
     // Record tombstone (prevents future updates from revoked sender)
     storage.record_revoked_sender(revocation.sender_id.as_str(), revocation.timestamp)?;
 
-    Ok(())
+    Ok(true)
+}
+
+/// Magic prefix identifying a revocation blob on the wire.
+///
+/// Revocations are signed-but-not-encrypted, so a recipient must tell them
+/// apart from encrypted-update blobs (the relay sees only opaque bytes). The
+/// 4-byte magic plus the signature check in [`process_revocation`] makes
+/// misclassifying a real ciphertext as a revocation negligibly unlikely.
+pub const REVOCATION_BLOB_MAGIC: &[u8; 4] = b"VRV1";
+
+/// Serializes an `IdentityRevoked` into a relay blob: `MAGIC || postcard(rev)`.
+pub fn encode_revocation_blob(revocation: &IdentityRevoked) -> Vec<u8> {
+    let body =
+        postcard::to_allocvec(revocation).expect("IdentityRevoked serialization must not fail");
+    let mut blob = Vec::with_capacity(REVOCATION_BLOB_MAGIC.len() + body.len());
+    blob.extend_from_slice(REVOCATION_BLOB_MAGIC);
+    blob.extend_from_slice(&body);
+    blob
+}
+
+/// Parses a relay blob as an `IdentityRevoked` iff it carries the magic prefix
+/// and the body deserializes. Returns `None` for any other blob (e.g. an
+/// encrypted update), so the caller falls through to the update path.
+pub fn decode_revocation_blob(blob: &[u8]) -> Option<IdentityRevoked> {
+    let body = blob.strip_prefix(REVOCATION_BLOB_MAGIC.as_slice())?;
+    postcard::from_bytes(body).ok()
 }

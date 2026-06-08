@@ -8,7 +8,7 @@
 //! Asserts that every `pub fn` inside an `impl PlatformAppEngine { … }`
 //! block in `core/vauchi-platform/src/**` either:
 //!
-//!   (a) appears in `HUMBLE_ALLOWLIST` — the 26-method genuine binding
+//!   (a) appears in `HUMBLE_ALLOWLIST` — the 25-method genuine binding
 //!       surface every frontend renders against, or
 //!   (b) is one of the `SURPLUS_RATCHET_CEILING` known-legacy methods
 //!       still pending retirement in Phase 3 of the program.
@@ -45,7 +45,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The 26-method Humble surface — the binding surface every frontend
+/// The 25-method Humble surface — the binding surface every frontend
 /// is allowed to depend on per ADR-021 / ADR-043. Source of truth for
 /// Phase 0 / Task 0.2 of the pure-functional-core program plan.
 ///
@@ -57,7 +57,6 @@ const HUMBLE_ALLOWLIST: &[&str] = &[
     "available_screens_json",
     "boot",
     "can_go_back",
-    "current_screen_id",
     "current_screen_json",
     "current_tab_id",
     "dispatch_domain_command",
@@ -241,13 +240,22 @@ fn humble_allowlist_size_matches_plan() {
     // — the frontend injects native keychain access post-construction so the
     // crypto-shred `DomainCommand`s (`SoftShred` / `CancelShred`) can reach it.
     // ADR-031-legitimate (platform injection, not domain logic).
+    //
+    // `current_screen_id` retirement (2026-06-08, 27 -> 26 -> 25 vs the
+    // prior 26 baseline) under ADR-048's G1-G5 gates: zero hand-written
+    // frontend callers across all 10 consumer repos; the only in-tree
+    // callers were `vauchi-platform` integration tests, migrated in the
+    // same MR to parse `screen_id` off `current_screen_json` (the seam
+    // that already owns the self-heal + screen read). Tab-bar
+    // highlighting — its sole documented use — is owned by
+    // `current_tab_id`. See
+    // `_private/docs/problems/2026-06-08-pae-allowlist-further-shrink/`.
     assert_eq!(
         HUMBLE_ALLOWLIST.len(),
-        26,
-        "Humble allow-list size drifted from the 26 expected after \
-         retiring `navigate_to_json` (ADR-043 Am4 / CoreScreenIdMap \
-         rework S5: both frontends migrated off it, moved to the \
-         `PlatformAppEngineTestHelpers` test-only seam). \
+        25,
+        "Humble allow-list size drifted from the 25 expected after \
+         retiring `current_screen_id` (ADR-048 G1-G5: zero frontend \
+         callers, in-tree test callers migrated to `current_screen_json`). \
          Edits to this list require an ADR amendment (ADR-021/043 \
          for the Humble engine framing — incl. Amendment 3 for the \
          linchpin promotions — or ADR-048's G1-G5 gates for \

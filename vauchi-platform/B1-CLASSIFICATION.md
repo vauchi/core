@@ -78,10 +78,11 @@ for these.**
 `PlatformAppEngine` itself adds a number of methods that are NOT on
 `VauchiPlatform` (these are the Pure Humble UI surface):
 
-- `boot`, `current_screen_json`, `current_screen_id`, `current_tab_id`,
+- `boot`, `current_screen_json`, `current_tab_id`,
   `tab_info`, `sidebar_items`, `available_screens_json`,
   `navigate_back_json` (forward `navigate_to_json` retired — CoreScreenIdMap
-  rework S5, ADR-043 Am4)
+  rework S5, ADR-043 Am4; `current_screen_id` retired — ADR-048 G1-G5,
+  2026-06-08)
 - `handle_action_json`, `handle_hardware_event`, `advance_qr_frame_json`,
   `form_has_data`
 - `handle_deep_link_uri`

@@ -706,18 +706,6 @@ impl PlatformAppEngine {
         })
     }
 
-    /// Returns the current screen's screen_id (lightweight query).
-    ///
-    /// Useful for tab bar highlighting without deserializing the full ScreenModel.
-    pub fn current_screen_id(&self) -> Result<String, MobileError> {
-        let mut engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        self_heal_post_auth(&mut engine);
-        let model = engine.current_screen();
-        Ok(model.screen_id)
-    }
-
     /// Returns the canonical screen-id of the parent tab the active
     /// screen belongs to under the given layout, or `None` for
     /// transient overlays (Lock, FormDialog).

@@ -92,6 +92,15 @@ fn drive_onboarding(engine: &PlatformAppEngine) {
 // ============================================================================
 
 // @internal
+fn current_screen_id(engine: &PlatformAppEngine) -> String {
+    let json = engine.current_screen_json().expect("current_screen_json");
+    let v: serde_json::Value = serde_json::from_str(&json).expect("parse screen json");
+    v.get("screen_id")
+        .and_then(|s| s.as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
 #[test]
 fn new_engine_starts_on_onboarding() {
     let (engine, _dir) = create_engine();
@@ -102,9 +111,9 @@ fn new_engine_starts_on_onboarding() {
 
 // @internal
 #[test]
-fn current_screen_id_returns_lightweight_id() {
+fn initial_screen_id_is_identity_check() {
     let (engine, _dir) = create_engine();
-    let id = engine.current_screen_id().expect("screen id");
+    let id = current_screen_id(&engine);
     assert_eq!(id, "identity_check");
 }
 
@@ -248,7 +257,7 @@ fn sidebar_items_post_identity_is_broader_than_tab_info() {
 fn onboarding_flow_completes_and_transitions_to_my_info() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
-    let id = engine.current_screen_id().expect("screen id");
+    let id = current_screen_id(&engine);
     assert_eq!(id, "my_info", "should land on my_info after onboarding");
 }
 
@@ -465,7 +474,7 @@ fn invalidate_all_succeeds() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     engine.invalidate_all().expect("invalidate should succeed");
-    let id = engine.current_screen_id().expect("screen id");
+    let id = current_screen_id(&engine);
     assert_eq!(id, "my_info");
 }
 
@@ -671,9 +680,7 @@ fn drive_to_show_qr(engine: &PlatformAppEngine) {
         .expect("select tap_hover_shake mode");
     // Regardless of which ActionResult shape mode-selection returns, the
     // current screen must now be exchange_show_qr.
-    let id = engine
-        .current_screen_id()
-        .expect("screen id after mode select");
+    let id = current_screen_id(engine);
     assert_eq!(
         id, "exchange_show_qr",
         "expected show_qr after selecting TapHoverShake, got {id}"
@@ -726,9 +733,7 @@ fn drive_to_multi_stage(engine: &PlatformAppEngine) {
     engine
         .navigate_to_json_for_test(r#"{"MultiStageExchange":{"mode":"glance"}}"#.into())
         .expect("navigate to MultiStageExchange");
-    let id = engine
-        .current_screen_id()
-        .expect("screen id after navigate");
+    let id = current_screen_id(engine);
     assert_eq!(id, "multi_stage_exchange");
 }
 
@@ -740,7 +745,7 @@ fn picking_glance_from_mode_selection_auto_navigates_to_ble_exchange() {
     engine
         .navigate_to_json_for_test(r#""Exchange""#.into())
         .expect("navigate to Exchange");
-    assert_eq!(engine.current_screen_id().expect("screen id"), "exchange",);
+    assert_eq!(current_screen_id(&engine), "exchange",);
     // User picks Glance — G3: the quick mode is one-sided QR + BLE. No
     // further frontend call needed: AppEngine routes `StartBleExchange`
     // → `AppScreen::BleExchange`, the platform layer drives the BLE flow.
@@ -751,7 +756,7 @@ fn picking_glance_from_mode_selection_auto_navigates_to_ble_exchange() {
         )
         .expect("select Glance");
     assert_eq!(
-        engine.current_screen_id().expect("screen id after select"),
+        current_screen_id(&engine),
         "exchange_ble_discovering",
         "Glance must route through the BLE screen (G3) — frontend never makes this decision",
     );
@@ -788,12 +793,7 @@ fn navigate_to_multi_stage_auto_creates_session_no_frontend_call_needed() {
         .expect("navigate");
     // Engine is now on multi_stage_exchange. The frontend never asked
     // for a session — core created one.
-    assert_eq!(
-        engine
-            .current_screen_id()
-            .expect("screen id after navigate"),
-        "multi_stage_exchange",
-    );
+    assert_eq!(current_screen_id(&engine), "multi_stage_exchange",);
 
     // Poll once — this advances the AppEngine-owned multi-stage
     // machine and the platform wrapper fires the invalidation
@@ -884,7 +884,7 @@ fn text_changed_from_peer_scan_routes_to_multi_stage_session() {
         "TextChanged from peer_scan must update the multi-stage screen, got {v:?}",
     );
     assert_eq!(
-        engine.current_screen_id().expect("current screen"),
+        current_screen_id(&engine),
         "multi_stage_exchange",
         "scan must not navigate away from multi_stage_exchange",
     );
@@ -969,7 +969,7 @@ fn cancel_action_on_multi_stage_screen_stops_session_after_navigate() {
     engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "cancel"}}"#.into())
         .expect("cancel action");
-    let post_screen = engine.current_screen_id().expect("screen id");
+    let post_screen = current_screen_id(&engine);
     assert_ne!(
         post_screen, "multi_stage_exchange",
         "cancel must navigate away; still on multi_stage_exchange",

@@ -29,6 +29,15 @@ fn fresh_link_url() -> String {
 }
 
 // @internal
+fn current_screen_id(engine: &PlatformAppEngine) -> String {
+    let json = engine.current_screen_json().expect("current_screen_json");
+    let v: serde_json::Value = serde_json::from_str(&json).expect("parse screen json");
+    v.get("screen_id")
+        .and_then(|s| s.as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
 #[test]
 fn valid_uri_navigates_to_consent_screen() {
     let (engine, _dir) = create_engine();
@@ -103,9 +112,7 @@ fn after_dispatch_current_screen_is_consent_gate() {
     let (engine, _dir) = create_engine();
     let url = fresh_link_url();
     engine.handle_deep_link_uri(url).expect("dispatch ok");
-    let id = engine
-        .current_screen_id()
-        .expect("current_screen_id ok after dispatch");
+    let id = current_screen_id(&engine);
     assert_eq!(id, "deep_link_consent");
 }
 
@@ -125,7 +132,7 @@ fn grant_action_completes_consent_gate() {
     // ActionResult::Complete is wrapped in a "Complete" tag or causes
     // navigation to a non-consent screen — either way, the consent
     // gate is no longer active.
-    let screen_id_after = engine.current_screen_id().expect("screen id after grant");
+    let screen_id_after = current_screen_id(&engine);
     assert_ne!(
         screen_id_after, "deep_link_consent",
         "consent gate must release after grant; got result {v}"
@@ -141,7 +148,7 @@ fn deny_action_completes_consent_gate() {
     let _ = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "deny"}}"#.into())
         .expect("deny action ok");
-    let screen_id_after = engine.current_screen_id().expect("screen id after deny");
+    let screen_id_after = current_screen_id(&engine);
     assert_ne!(
         screen_id_after, "deep_link_consent",
         "consent gate must release after deny"

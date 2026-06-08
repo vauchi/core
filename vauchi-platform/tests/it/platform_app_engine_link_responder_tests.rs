@@ -57,6 +57,15 @@ fn fresh_link_url() -> String {
 }
 
 // @internal
+fn current_screen_id(engine: &PlatformAppEngine) -> String {
+    let json = engine.current_screen_json().expect("current_screen_json");
+    let v: serde_json::Value = serde_json::from_str(&json).expect("parse screen json");
+    v.get("screen_id")
+        .and_then(|s| s.as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
 #[test]
 fn grant_navigates_to_responder_with_no_frontend_escrow_commands() {
     let (engine, _dir) = create_engine();
@@ -64,16 +73,13 @@ fn grant_navigates_to_responder_with_no_frontend_escrow_commands() {
     engine
         .handle_deep_link_uri(fresh_link_url())
         .expect("deep link routes to consent");
-    assert_eq!(
-        engine.current_screen_id().expect("screen id"),
-        "deep_link_consent",
-    );
+    assert_eq!(current_screen_id(&engine), "deep_link_consent",);
 
     let grant_json = engine
         .handle_action_json(r#"{"ActionPressed": {"action_id": "grant"}}"#.into())
         .expect("grant action");
     assert_eq!(
-        engine.current_screen_id().expect("screen id after grant"),
+        current_screen_id(&engine),
         "link_responder_waiting",
         "grant must route to the responder waiting screen — action returned {grant_json}",
     );

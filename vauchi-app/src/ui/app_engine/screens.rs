@@ -1043,7 +1043,21 @@ impl AppEngine {
                 let identity = vauchi
                     .identity()
                     .and_then(reconstruct_identity_via_storage_bytes);
-                let card = vauchi.own_card().ok().flatten();
+                // G2 privacy filter: share only the fields the selected
+                // exchange group(s) may see (same resolver as the BLE path).
+                // None (no groups) → full card. See
+                // 2026-06-08-exchange-card-not-group-filtered.
+                let card = vauchi.own_card().ok().flatten().map(|c| {
+                    let groups = vauchi.list_groups().unwrap_or_default();
+                    match crate::ui::exchange::group_filter::resolve_exchange_allow(
+                        pending_groups,
+                        &groups,
+                        c.field_visibility(),
+                    ) {
+                        Some(allow) => c.filtered_to(&allow),
+                        None => c,
+                    }
+                });
                 let clock = vauchi.clock().clone();
                 Box::new(crate::ui::DirectTransportEngine::new(
                     identity,

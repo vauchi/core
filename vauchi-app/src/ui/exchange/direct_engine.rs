@@ -140,6 +140,7 @@ impl DirectTransportEngine {
     /// The card this engine will transmit to the peer (the session's frozen
     /// own card). `None` when the engine degraded to Failed. Test seam for the
     /// group-filter wiring (`2026-06-08-exchange-card-not-group-filtered`).
+    #[cfg(test)]
     pub(crate) fn outgoing_card(&self) -> Option<&ContactCard> {
         self.session.as_ref().map(|s| s.our_card())
     }

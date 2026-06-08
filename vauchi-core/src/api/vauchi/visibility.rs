@@ -192,18 +192,25 @@ impl Vauchi {
             return Ok(is_visible);
         }
 
-        // Check if any label containing this contact shows this field
+        // A group the contact is in that exposes this field grants it (Layer B).
         let labels = self.storage.get_groups_for_contact(contact_id)?;
-        for label in labels {
-            if label.is_field_visible(field_id) {
-                return Ok(true);
-            }
+        if labels.iter().any(|l| l.is_field_visible(field_id)) {
+            return Ok(true);
         }
 
-        // Fall back to contact's default visibility rules
-        // Note: The visibility rules determine what this contact can see of *our* card
-        // We use their contact_id to check if they're in the allowed list
-        // Imported contacts have no visibility rules; default to not visible
+        // Groups mode (any labels exist) is **default-closed**: a field that no
+        // group grants is hidden — matching exchange-time filtering so the
+        // initial share and later propagation agree
+        // (2026-06-08-sync-card-update-not-group-filtered, decision A). Before
+        // this, the Layer-A `can_see` fallback below ran unconditionally and
+        // leaked ungranted fields (default `Everyone`) to grouped contacts.
+        if !self.storage.load_all_groups()?.is_empty() {
+            return Ok(false);
+        }
+
+        // No-groups mode: no audience to restrict to — fall back to the
+        // contact's per-contact Layer-A rules (default `Everyone`). Imported
+        // contacts have no visibility rules; default to not visible.
         Ok(contact
             .visibility_rules()
             .is_some_and(|rules| rules.can_see(field_id, contact_id)))

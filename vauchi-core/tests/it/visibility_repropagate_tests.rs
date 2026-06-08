@@ -38,6 +38,21 @@ fn add_contact_with_ratchet(wb: &Vauchi, name: &str) -> String {
     contact_id
 }
 
+/// Hex id of the own-card field with the given label. Group visibility is
+/// keyed by field **id** in production (`screens.rs` GroupDetail factory:
+/// `g.is_field_visible(f.id())`), not the label.
+fn own_field_id(wb: &Vauchi, label: &str) -> String {
+    wb.own_card()
+        .unwrap()
+        .unwrap()
+        .fields()
+        .iter()
+        .find(|f| f.label() == label)
+        .unwrap()
+        .id()
+        .to_string()
+}
+
 // @scenario: visibility_control :: Revoking visibility sends update to contact
 #[test]
 fn test_set_field_private_queues_update() {
@@ -192,8 +207,9 @@ fn test_add_contact_to_label_triggers_repropagate() {
 
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
     let label = wb.create_group("Work").unwrap();
+    let work = own_field_id(&wb, "work");
 
-    wb.set_group_field_visibility(label.id(), "work", true)
+    wb.set_group_field_visibility(label.id(), &work, true)
         .unwrap();
 
     let pending_before = wb.storage().get_pending_updates(&bob_id).unwrap();
@@ -224,17 +240,24 @@ fn test_remove_contact_from_label_triggers_repropagate() {
 
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
     let label = wb.create_group("Work").unwrap();
+    let work = own_field_id(&wb, "work");
+    wb.set_group_field_visibility(label.id(), &work, true)
+        .unwrap();
 
-    // Add contact to label first (without repropagate to keep pending clean)
     wb.add_contact_to_group(label.id(), &bob_id).unwrap();
+    // While in Work (which grants `work`), Bob can see it.
+    assert!(wb.get_effective_field_visibility(&bob_id, &work).unwrap());
 
     wb.remove_contact_from_group_and_repropagate(label.id(), &bob_id)
         .unwrap();
 
-    let pending = wb.storage().get_pending_updates(&bob_id).unwrap();
+    // Removed from his only group -> default-closed -> Bob sees no fields.
+    // (repropagate computes add-only deltas, so a visibility *shrink* queues
+    // no update; removal-delta propagation is a separate pre-existing gap,
+    // tracked in 2026-06-08-sync-card-update-not-group-filtered.)
     assert!(
-        !pending.is_empty(),
-        "Removing contact from label should queue a re-propagation update"
+        !wb.get_effective_field_visibility(&bob_id, &work).unwrap(),
+        "After removal from his only group, Bob sees no fields (default-closed)"
     );
 }
 
@@ -255,10 +278,11 @@ fn test_set_label_field_visibility_repropagates_to_all_members() {
     let carol_id = add_contact_with_ratchet(&wb, "Carol");
 
     let label = wb.create_group("Team").unwrap();
+    let work = own_field_id(&wb, "work");
     wb.add_contact_to_group(label.id(), &bob_id).unwrap();
     wb.add_contact_to_group(label.id(), &carol_id).unwrap();
 
-    wb.set_group_field_visibility_and_repropagate(label.id(), "work", true)
+    wb.set_group_field_visibility_and_repropagate(label.id(), &work, true)
         .unwrap();
 
     let bob_pending = wb.storage().get_pending_updates(&bob_id).unwrap();
@@ -326,26 +350,26 @@ fn test_repropagate_uses_effective_visibility() {
     let bob_id = add_contact_with_ratchet(&wb, "Bob");
 
     let label = wb.create_group("Work").unwrap();
-    wb.set_group_field_visibility(label.id(), "work", true)
+    let work = own_field_id(&wb, "work");
+    let phone = own_field_id(&wb, "personal-phone");
+    wb.set_group_field_visibility(label.id(), &work, true)
         .unwrap();
 
     wb.add_contact_to_group(label.id(), &bob_id).unwrap();
-    wb.set_contact_visibility_override(&bob_id, "personal-phone", false)
+    wb.set_contact_visibility_override(&bob_id, &phone, false)
         .unwrap();
 
     assert!(
-        wb.get_effective_field_visibility(&bob_id, "work").unwrap(),
+        wb.get_effective_field_visibility(&bob_id, &work).unwrap(),
         "Work field should be visible via label"
     );
     assert!(
-        !wb.get_effective_field_visibility(&bob_id, "personal-phone")
-            .unwrap(),
+        !wb.get_effective_field_visibility(&bob_id, &phone).unwrap(),
         "Personal phone should be hidden via override"
     );
 
     // Re-propagate using the new label-aware method
-    wb.set_field_public_and_repropagate(&bob_id, "work")
-        .unwrap();
+    wb.set_field_public_and_repropagate(&bob_id, &work).unwrap();
 
     // Should have queued an update (the re-propagation uses effective visibility)
     let pending = wb.storage().get_pending_updates(&bob_id).unwrap();

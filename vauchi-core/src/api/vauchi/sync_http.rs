@@ -331,23 +331,29 @@ impl Vauchi {
             let _ = adapter.send(&ack);
         }
 
-        // 2c. Partition out signed identity-revocation blobs (magic-prefixed,
-        //     not encrypted). process_revocation verifies the signature against
-        //     the stored contact and is a no-op on every failure path, so a
-        //     forged or garbage revocation cannot delete a contact.
-        let (revocation_blobs, update_blobs): (Vec<_>, Vec<_>) =
-            contact_blobs.into_iter().partition(|(_, _, bytes)| {
-                crate::network::revocation::decode_revocation_blob(bytes).is_some()
-            });
-
-        for (message_id, _token, bytes) in &revocation_blobs {
-            if let Some(rev) = crate::network::revocation::decode_revocation_blob(bytes) {
-                #[allow(clippy::let_underscore_must_use)]
-                let _ = crate::network::revocation::process_revocation(&rev, &self.storage);
+        // 2c. Route signed identity-revocation blobs (magic-prefixed, not
+        //     encrypted) to process_revocation, which verifies the signature
+        //     against the stored contact and is a no-op on every failure path
+        //     (unknown/stale/forged) — so a forged or garbage revocation cannot
+        //     delete a contact. Decode once and carry the parsed revocation;
+        //     everything else stays on the encrypted-update path.
+        let mut update_blobs = Vec::with_capacity(contact_blobs.len());
+        for (message_id, token, bytes) in contact_blobs {
+            let Some(rev) = crate::network::revocation::decode_revocation_blob(&bytes) else {
+                update_blobs.push((message_id, token, bytes));
+                continue;
+            };
+            // ACK (let the relay drop the blob) only when processing did not hit
+            // a storage error: a transient failure must NOT be ACKed so a later
+            // sync retries, while a verified no-op and a successful shred both
+            // ACK. Otherwise a WAL-lock/disk-full would silently lose the
+            // revocation.
+            if crate::network::revocation::process_revocation(&rev, &self.storage).is_err() {
+                continue;
             }
             let ack = create_envelope(
                 MessagePayload::Acknowledgment(Acknowledgment {
-                    message_id: message_id.clone().into(),
+                    message_id: message_id.into(),
                     status: AckStatus::Stored,
                     error: None,
                 }),

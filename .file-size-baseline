@@ -173,7 +173,7 @@ vauchi-core/src/network/http_transport.rs 1253
 # (+32 for last_sync_unix_seconds capture in update_timing_after_sync +
 #  inline FakeClock test; humble-UI follow-up to ios!472 lets MyInfoEngine
 #  render "Last synced X ago" without the frontend owning the timestamp)
-vauchi-core/src/api/vauchi/sync_http.rs 1142
+vauchi-core/src/api/vauchi/sync_http.rs 1148
 
 # EXEMPT — security-critical: crypto + verification belong together
 vauchi-core/src/recovery/mod.rs 1253

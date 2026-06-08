@@ -120,10 +120,10 @@ fn exchange_failed_retry_restarts() {
     // not the legacy QR step — Retry now routes through the shared
     // `enter_mode_sub_flow` router like the forward paths.
     match result {
-        ActionResult::StartMultiStageExchange { mode } => {
+        ActionResult::StartBleExchange { mode } => {
             assert_eq!(mode, vauchi_core::exchange::mode::ExchangeMode::Glance);
         }
-        other => panic!("expected StartMultiStageExchange(Glance), got {:?}", other),
+        other => panic!("expected StartBleExchange(Glance) [G3], got {:?}", other),
     }
 
     // Scanned data should be cleared on retry. (The StartMultiStageExchange

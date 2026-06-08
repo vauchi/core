@@ -734,17 +734,16 @@ fn drive_to_multi_stage(engine: &PlatformAppEngine) {
 
 // @internal
 #[test]
-fn picking_glance_from_mode_selection_auto_navigates_to_multi_stage_exchange() {
+fn picking_glance_from_mode_selection_auto_navigates_to_ble_exchange() {
     let (engine, _dir) = create_engine();
     drive_onboarding(&engine);
     engine
         .navigate_to_json_for_test(r#""Exchange""#.into())
         .expect("navigate to Exchange");
     assert_eq!(engine.current_screen_id().expect("screen id"), "exchange",);
-    // User picks Glance — the simplest face-to-face mode. No further
-    // frontend call needed: AppEngine routes `StartMultiStageExchange`
-    // → `AppScreen::MultiStageExchange`, the platform layer
-    // auto-creates the session.
+    // User picks Glance — G3: the quick mode is one-sided QR + BLE. No
+    // further frontend call needed: AppEngine routes `StartBleExchange`
+    // → `AppScreen::BleExchange`, the platform layer drives the BLE flow.
     engine
         .handle_action_json(
             r#"{"ListItemSelected": {"component_id": "category:quick", "item_id": "mode:glance"}}"#
@@ -753,8 +752,8 @@ fn picking_glance_from_mode_selection_auto_navigates_to_multi_stage_exchange() {
         .expect("select Glance");
     assert_eq!(
         engine.current_screen_id().expect("screen id after select"),
-        "multi_stage_exchange",
-        "Glance must route through the multi-stage screen — frontend never makes this decision",
+        "exchange_ble_discovering",
+        "Glance must route through the BLE screen (G3) — frontend never makes this decision",
     );
 }
 

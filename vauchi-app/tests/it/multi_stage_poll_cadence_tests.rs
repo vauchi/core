@@ -62,14 +62,14 @@ fn multi_stage_poll_advances_frame_after_peer_scan_and_frame_window() {
     engine.navigate_to(AppScreen::Exchange);
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "category:quick".into(),
-        item_id: "mode:glance".into(),
+        item_id: "mode:hover".into(),
     });
     assert!(
         matches!(
             engine.current_app_screen(),
             AppScreen::MultiStageExchange { .. }
         ),
-        "picking Glance should navigate to MultiStageExchange, got {:?}",
+        "picking Hover should navigate to MultiStageExchange, got {:?}",
         engine.current_app_screen()
     );
 

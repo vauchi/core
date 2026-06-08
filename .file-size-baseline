@@ -428,7 +428,9 @@ vauchi-app/src/ui/contact_detail.rs 1429
 #  decide_initiator + force_success wiring, and the rewritten/added flow
 #  tests, 2026-06-07. Some vestigial received_card/try_complete/Complete
 #  machinery remains pending a follow-up tidy that will shrink this.)
-vauchi-app/src/ui/exchange/ble.rs 1189
+# (+13 for G3: proximity_method_for_mode -> Option (Glance has no proximity
+#  runner) + the Glance-None test, 2026-06-07)
+vauchi-app/src/ui/exchange/ble.rs 1202
 
 # EXEMPT — state machine: 9 ProtocolState variants + camera-gate transitions need cohesion;
 # inline tests access private state (state, peer_name, session_ended, camera_gate, scan_quality_tracker).

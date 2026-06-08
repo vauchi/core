@@ -306,11 +306,19 @@ impl ExchangeEngine {
     fn enter_mode_sub_flow(&mut self) -> ActionResult {
         match self.config.mode {
             Some(ExchangeMode::Link) => self.start_link_mode(),
-            Some(mode @ (ExchangeMode::Magic | ExchangeMode::Bump | ExchangeMode::Shake)) => {
+            Some(
+                mode @ (ExchangeMode::Magic
+                | ExchangeMode::Bump
+                | ExchangeMode::Shake
+                | ExchangeMode::Glance),
+            ) => {
                 // The BLE flow runs in its own `AppScreen::BleExchange` engine
                 // (`BleExchangeEngine`); this cached `ExchangeEngine` is kept for
                 // Cancel. Re-arm the picker so it is not a zombie (Fix A of
                 // 2026-06-02-exchange-back-cancel-broken).
+                // G3: Glance joins the BLE family — BLE data transport,
+                // bootstrapped by a one-sided QR scan, with no proximity signal
+                // (the engine runs no proximity runner for Glance).
                 self.mode_selection = Some(ModeSelectionEngine::new(
                     self.config.device_capabilities.clone(),
                 ));
@@ -327,23 +335,16 @@ impl ExchangeEngine {
                 ));
                 ActionResult::StartNfcExchange
             }
-            // Pair 4 — `Glance` is the canonical face-to-face mode
-            // (bilateral simultaneous QR with no proximity signal); route
-            // it through the core-driven `MultiStageExchange` screen so the
-            // multi-stage protocol drives both QR display and scan from a
-            // pure ScreenModel rather than the legacy bespoke step state
-            // machine. Phase 1.E of `2026-05-11-hover-graduation-plan.md`
-            // extended the handoff to `Hover` (QR + ultrasonic). The `mode`
-            // payload tells AppEngine which engine constructor to use
-            // (`new_hover` vs `new_glance`). TapHoverShake (P2.D of the
-            // TapHoverShake graduation plan) now joins them — it routes to
-            // the new engine running QR + audio proximity (the accel shake
-            // signal is a follow-up). This removes the last mode from the
-            // legacy `ExchangeStep::Qr` catch-all, the permanent fix for the
-            // android frozen-QR bug (`2026-06-03-android-animated-qr-stuck-frame-zero`).
-            Some(
-                mode @ (ExchangeMode::Glance | ExchangeMode::Hover | ExchangeMode::TapHoverShake),
-            ) => {
+            // Hover / TapHoverShake are the multi-stage-QR modes —
+            // bidirectional simultaneous QR + a proximity signal (Hover:
+            // ultrasonic audio; TapHoverShake: audio + accelerometer). They
+            // route through the core-driven `MultiStageExchange` screen so the
+            // multi-stage protocol drives both QR display and scan from a pure
+            // ScreenModel. The `mode` payload tells AppEngine which engine
+            // constructor to use (`new_hover` vs `new_tap_hover_shake`). (G3
+            // moved `Glance` out of this family to BLE + one-sided QR; the
+            // multi-stage-QR transport is Hover's, not Glance's.)
+            Some(mode @ (ExchangeMode::Hover | ExchangeMode::TapHoverShake)) => {
                 // The multi-stage flow runs in its own
                 // `AppScreen::MultiStageExchange` engine, but this
                 // `ExchangeEngine` is cached — Cancel navigates back to it.
@@ -1513,27 +1514,27 @@ mod tests {
     }
 
     #[test]
-    fn mode_selection_pick_advances_past_selection_via_multi_stage_handoff() {
+    fn mode_selection_pick_advances_past_selection_via_ble_handoff() {
         let mut engine = ExchangeEngine::new(
             config_mode_selection(),
             vauchi_core::clock::SystemClock::shared(),
         );
         assert_eq!(engine.step, ExchangeStep::ModeSelection);
 
-        // Pick Glance mode — Pair 4 hands this off to MultiStageExchange.
+        // Pick Glance mode — G3 hands this off to the BLE engine.
         let result = engine.handle_action(UserAction::ListItemSelected {
             component_id: "category:quick".into(),
             item_id: "mode:glance".into(),
         });
 
-        // Mode is recorded in config; the engine remains on
-        // ModeSelection because the flow leaves Exchange entirely
-        // when AppEngine routes the StartMultiStageExchange result.
+        // Mode is recorded in config; the engine remains on ModeSelection
+        // because the flow leaves Exchange entirely once AppEngine routes
+        // the StartBleExchange result.
         assert_eq!(engine.config.mode, Some(ExchangeMode::Glance));
         assert_eq!(engine.step, ExchangeStep::ModeSelection);
         assert!(
-            matches!(result, ActionResult::StartMultiStageExchange { .. }),
-            "Expected StartMultiStageExchange handoff, got {:?}",
+            matches!(result, ActionResult::StartBleExchange { .. }),
+            "Expected StartBleExchange handoff (G3), got {:?}",
             result
         );
     }
@@ -1623,7 +1624,7 @@ mod tests {
     }
 
     #[test]
-    fn glance_mode_routes_through_multi_stage_handoff() {
+    fn glance_mode_routes_to_ble_handoff() {
         // Pair 4 — Glance is the canonical bilateral simultaneous QR
         // mode and now hands off to the new core-driven
         // `MultiStageExchange` screen instead of the legacy
@@ -1652,11 +1653,11 @@ mod tests {
         assert!(
             matches!(
                 result,
-                ActionResult::StartMultiStageExchange {
+                ActionResult::StartBleExchange {
                     mode: ExchangeMode::Glance,
                 },
             ),
-            "Glance must hand off to multi-stage with mode payload; got {result:?}",
+            "Glance must hand off to BLE (G3) with mode payload; got {result:?}",
         );
     }
 
@@ -1871,7 +1872,7 @@ mod tests {
 
     // @internal
     #[test]
-    fn glance_with_groups_skip_routes_to_multi_stage() {
+    fn glance_with_groups_skip_routes_to_ble() {
         // Same bug class for the multi-stage modes: grouped Glance + Skip
         // must hand off to MultiStageExchange, not collapse to QR.
         let mut config = config_mode_selection();
@@ -1893,11 +1894,11 @@ mod tests {
         assert!(
             matches!(
                 result,
-                ActionResult::StartMultiStageExchange {
+                ActionResult::StartBleExchange {
                     mode: ExchangeMode::Glance
                 }
             ),
-            "grouped Glance + skip must hand off to MultiStageExchange, got {result:?}"
+            "grouped Glance + skip must hand off to BLE (G3), got {result:?}"
         );
     }
 }

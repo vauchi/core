@@ -178,10 +178,12 @@ mod tests {
             has_internet: true,
             ..Default::default()
         };
-        assert_eq!(
-            check_mode_availability(ExchangeMode::Glance, &caps),
-            ModeAvailability::Available,
-            "Glance needs only camera"
+        assert!(
+            matches!(
+                check_mode_availability(ExchangeMode::Glance, &caps),
+                ModeAvailability::Unavailable { .. }
+            ),
+            "G3: Glance now requires BLE (one-sided QR + BLE transfer)"
         );
         assert_eq!(
             check_mode_availability(ExchangeMode::Link, &caps),
@@ -230,14 +232,16 @@ mod tests {
     }
 
     #[test]
-    fn recommend_picks_glance_for_camera_only() {
-        // Desktop: camera + internet only — Hover/Magic/Shake all need audio or BLE
+    fn recommend_picks_glance_for_camera_and_ble() {
+        // G3: Glance now needs camera + BLE (one-sided QR + BLE transfer). A
+        // device with both but no audio / accelerometer / NFC can't do
+        // Hover / Magic / Shake / Bump / TapTap, so Glance is the
+        // recommendation (above Link in priority).
         let caps = DeviceCapabilities {
             has_camera: true,
-            has_internet: true,
+            has_ble: true,
             ..Default::default()
         };
-        // Glance only needs camera, comes before Link in priority (after BLE modes)
         assert_eq!(recommend_mode(&caps), ExchangeMode::Glance);
     }
 

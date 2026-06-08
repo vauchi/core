@@ -147,6 +147,12 @@ pub enum DataTransport {
 #[non_exhaustive]
 pub enum BootstrapMethod {
     QrMutualScan,
+    /// One-sided QR scan (Glance): one peer shows a static QR, the other
+    /// glances at it to bootstrap; the card then transfers over the
+    /// `data_transport` (BLE). The scan + BLE range is the co-presence proof —
+    /// no separate proximity signal. Distinct from `QrMutualScan` (Hover's
+    /// bidirectional multi-stage QR).
+    QrScan,
     BleDiscovery,
     NfcBootstrap,
     NfcAndBle,
@@ -211,13 +217,17 @@ pub struct ModeConfig {
 // ── Static catalog ──────────────────────────────────────────────────────────
 
 static MODE_GLANCE: ModeConfig = ModeConfig {
-    data_transport: DataTransport::QrMultiStage,
-    bootstrap: BootstrapMethod::QrMutualScan,
+    // G3: Glance is BLE data transport bootstrapped by a one-sided QR scan —
+    // the quick mode. No separate proximity: the QR scan + BLE range is the
+    // co-presence proof. (The bidirectional multi-stage-QR transport this
+    // config used to carry belongs to the Hover family, not Glance.)
+    data_transport: DataTransport::Ble,
+    bootstrap: BootstrapMethod::QrScan,
     proximity: &[],
     fallback_transport: Some(DataTransport::Relay),
     context: ExchangeContext::InPerson,
     timeout: Duration::from_secs(60),
-    requires: &[DeviceRequirement::Camera],
+    requires: &[DeviceRequirement::Ble, DeviceRequirement::Camera],
 };
 
 static MODE_HOVER: ModeConfig = ModeConfig {

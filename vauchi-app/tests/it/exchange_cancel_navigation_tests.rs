@@ -35,7 +35,7 @@ fn navigate_screen_id(result: &ActionResult) -> &str {
 fn cancel_on_multi_stage_exchange_lands_on_real_screen() {
     let mut engine = engine_with_identity();
 
-    // Enter the exchange flow and pick Glance — core hands off to the
+    // Enter the exchange flow and pick Hover — core hands off to the
     // dedicated `MultiStageExchange` screen (no groups → direct handoff).
     let entry = engine.navigate_to(AppScreen::Exchange);
     assert_eq!(
@@ -46,14 +46,14 @@ fn cancel_on_multi_stage_exchange_lands_on_real_screen() {
 
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "category:quick".into(),
-        item_id: "mode:glance".into(),
+        item_id: "mode:hover".into(),
     });
     assert!(
         matches!(
             engine.current_app_screen(),
             AppScreen::MultiStageExchange { .. }
         ),
-        "picking Glance should navigate to MultiStageExchange, got {:?}",
+        "picking Hover should navigate to MultiStageExchange, got {:?}",
         engine.current_app_screen()
     );
 
@@ -102,7 +102,7 @@ fn done_on_multi_stage_exchange_lands_on_contacts() {
     let _ = engine.navigate_to(AppScreen::Exchange);
     let _ = engine.handle_action(UserAction::ListItemSelected {
         component_id: "category:quick".into(),
-        item_id: "mode:glance".into(),
+        item_id: "mode:hover".into(),
     });
     assert!(matches!(
         engine.current_app_screen(),

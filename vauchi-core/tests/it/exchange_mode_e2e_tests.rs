@@ -34,7 +34,7 @@ fn config_with_mode_selection() -> ExchangeConfig {
 
 // @internal
 #[test]
-fn glance_full_flow_mode_to_multistage_handoff() {
+fn glance_full_flow_mode_to_ble_handoff() {
     let mut engine = ExchangeEngine::new(
         config_with_mode_selection(),
         vauchi_core::clock::SystemClock::shared(),
@@ -71,7 +71,7 @@ fn glance_full_flow_mode_to_multistage_handoff() {
     });
     assert_eq!(
         result,
-        ActionResult::StartMultiStageExchange {
+        ActionResult::StartBleExchange {
             mode: ExchangeMode::Glance
         }
     );
@@ -199,7 +199,7 @@ fn failed_retry_preserves_glance_mode() {
     });
     assert_eq!(
         result,
-        ActionResult::StartMultiStageExchange {
+        ActionResult::StartBleExchange {
             mode: ExchangeMode::Glance
         }
     );

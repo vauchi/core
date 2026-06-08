@@ -329,11 +329,19 @@ impl BleExchangeFlow {
     fn handle_handshaking(&mut self, event: &Event) -> BleHardwareOutcome {
         if let Event::BleConnected { .. } = event {
             self.step = BleStep::Exchanging;
-            // Start proximity runner for this mode
-            let proximity_method = proximity_method_for_mode(self.mode);
-            let runner = ProximityRunner::new(proximity_method);
-            let commands = runner.start();
-            self.proximity_runner = Some(runner);
+            // Start a proximity runner only for modes with a proximity signal
+            // (Magic/Bump/Shake). G3: Glance has none — the QR scan + BLE range
+            // is the co-presence proof, so no runner; the real handshake drives
+            // completion via `force_success`.
+            let commands = match proximity_method_for_mode(self.mode) {
+                Some(method) => {
+                    let runner = ProximityRunner::new(method);
+                    let commands = runner.start();
+                    self.proximity_runner = Some(runner);
+                    commands
+                }
+                None => Vec::new(),
+            };
             return BleHardwareOutcome::StepAdvanced { commands };
         }
         BleHardwareOutcome::Ignored
@@ -443,12 +451,14 @@ impl BleExchangeFlow {
 }
 
 /// Map exchange mode to the proximity verification method.
-fn proximity_method_for_mode(mode: ExchangeMode) -> ProximityMethod {
+fn proximity_method_for_mode(mode: ExchangeMode) -> Option<ProximityMethod> {
     match mode {
-        ExchangeMode::Magic => ProximityMethod::Audio,
-        ExchangeMode::Bump => ProximityMethod::Impact,
-        ExchangeMode::Shake => ProximityMethod::Accelerometer,
-        _ => ProximityMethod::Audio,
+        ExchangeMode::Magic => Some(ProximityMethod::Audio),
+        ExchangeMode::Bump => Some(ProximityMethod::Impact),
+        ExchangeMode::Shake => Some(ProximityMethod::Accelerometer),
+        // G3: Glance has no proximity signal — the QR scan + BLE range is the
+        // co-presence proof.
+        _ => None,
     }
 }
 
@@ -1009,7 +1019,7 @@ mod tests {
     fn magic_uses_audio_proximity() {
         assert_eq!(
             proximity_method_for_mode(ExchangeMode::Magic),
-            ProximityMethod::Audio
+            Some(ProximityMethod::Audio)
         );
     }
 
@@ -1018,7 +1028,7 @@ mod tests {
     fn bump_uses_impact_proximity() {
         assert_eq!(
             proximity_method_for_mode(ExchangeMode::Bump),
-            ProximityMethod::Impact
+            Some(ProximityMethod::Impact)
         );
     }
 
@@ -1027,8 +1037,11 @@ mod tests {
     fn shake_uses_accelerometer_proximity() {
         assert_eq!(
             proximity_method_for_mode(ExchangeMode::Shake),
-            ProximityMethod::Accelerometer
+            Some(ProximityMethod::Accelerometer)
         );
+
+        // G3: Glance has no proximity signal (QR scan + BLE range is the proof).
+        assert_eq!(proximity_method_for_mode(ExchangeMode::Glance), None);
     }
 
     // ── T2.1 RED — BLE MTU negotiation + subscribe-notify hypothesis ──

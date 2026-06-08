@@ -1419,6 +1419,29 @@
             }
           },
           "additionalProperties": false
+        },
+        {
+          "description": "Request the device's current location (ADR-051 contact annotations): used at an in-person exchange to record *where we met*. The frontend resolves permission and replies with [`Event::LocationResult`], or [`Event::PermissionDenied { transport: \"location\" }`] if the user declines, or [`Event::HardwareUnavailable`] if there is no location provider. `timeout_ms` bounds how long the frontend waits for a fix.",
+          "type": "object",
+          "required": [
+            "LocationRequest"
+          ],
+          "properties": {
+            "LocationRequest": {
+              "type": "object",
+              "required": [
+                "timeout_ms"
+              ],
+              "properties": {
+                "timeout_ms": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },

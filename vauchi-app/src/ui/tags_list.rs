@@ -83,12 +83,20 @@ impl TagsEngine {
                     subtitle: Some(detail),
                     avatar_initials: String::new(),
                     status: None,
-                    actions: vec![ListItemAction {
-                        id: "request_delete".into(),
-                        label: "Delete".into(),
-                        kind: ListItemActionKind::Custom,
-                        destructive: false,
-                    }],
+                    actions: vec![
+                        ListItemAction {
+                            id: "promote".into(),
+                            label: "Promote to Group".into(),
+                            kind: ListItemActionKind::Custom,
+                            destructive: false,
+                        },
+                        ListItemAction {
+                            id: "request_delete".into(),
+                            label: "Delete".into(),
+                            kind: ListItemActionKind::Custom,
+                            destructive: false,
+                        },
+                    ],
                     a11y: None,
                 }
             })

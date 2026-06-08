@@ -141,6 +141,10 @@ pub enum AppScreen {
     Groups,
     /// Owner-private tag management list (ADR-051).
     Tags,
+    /// Tag→group promotion review (ADR-051).
+    TagPromotion {
+        tag_id: String,
+    },
     GroupDetail {
         group_id: String,
     },
@@ -289,6 +293,7 @@ impl AppScreen {
             Self::SocialGraph => "social_graph",
             Self::Groups => "groups",
             Self::Tags => "tags",
+            Self::TagPromotion { .. } => "tag_promotion",
             Self::GroupDetail { .. } => "group_detail",
             Self::Privacy => "privacy",
             Self::Support => "support",
@@ -377,6 +382,7 @@ impl AppScreen {
             | Self::VerifyFingerprint { .. } => Some("contacts"),
             Self::GroupDetail { .. } => Some("groups"),
             Self::Tags => Some("more"),
+            Self::TagPromotion { .. } => Some("tags"),
             Self::RecoveryHelp | Self::RecoveryClaimReview => Some("recovery"),
             Self::DeviceLinking | Self::DeviceReplacement => Some("device_management"),
             _ => None,
@@ -1284,6 +1290,10 @@ impl WorkflowEngine for AppEngine {
         }
 
         if let Some(result) = self.intercept_tag_delete(&action) {
+            return result;
+        }
+
+        if let Some(result) = self.intercept_tag_promotion(&action) {
             return result;
         }
 

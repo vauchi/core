@@ -15,6 +15,7 @@ use crate::ui::engine::WorkflowEngine;
 use crate::ui::form_dialog::FormDialogType;
 use crate::ui::info_content;
 use crate::ui::my_info_entry_detail::{EntryContactInfo, MyInfoEntryDetailEngine};
+use crate::ui::tag_promotion::TagPromotionEngine;
 use crate::ui::tags_list::TagsEngine;
 
 impl AppEngine {
@@ -546,6 +547,60 @@ impl AppEngine {
                 engine.confirm_delete();
                 ActionResult::UpdateScreen(engine.current_screen())
             })
+    }
+
+    /// Intercept the tag→group promotion flow (ADR-051):
+    ///
+    /// - On the Tags screen, a per-row `promote` ListItemAction opens the
+    ///   promotion review (`AppScreen::TagPromotion`), whose factory builds
+    ///   the `GroupDraft` via `Vauchi::begin_tag_promotion`.
+    /// - On the review screen, `confirm_promotion` reads the reviewed field
+    ///   selection off the engine and calls `Vauchi::confirm_tag_promotion`
+    ///   (replace: creates the group, consumes the tag), then lands on the
+    ///   Groups list. A failed promotion stays on the review screen.
+    pub(super) fn intercept_tag_promotion(&mut self, action: &UserAction) -> Option<ActionResult> {
+        if self.screen == AppScreen::Tags
+            && let UserAction::ListItemAction {
+                component_id,
+                item_id,
+                action_id,
+            } = action
+            && component_id == "tags"
+            && action_id == "promote"
+        {
+            let screen = self.navigate_to(AppScreen::TagPromotion {
+                tag_id: item_id.clone(),
+            });
+            return Some(ActionResult::NavigateTo(screen));
+        }
+
+        if let AppScreen::TagPromotion { tag_id } = &self.screen {
+            let tag_id = tag_id.clone();
+            let UserAction::ActionPressed { action_id } = action else {
+                return None;
+            };
+            if action_id != "confirm_promotion" {
+                return None;
+            }
+            let fields = self
+                .engine
+                .as_any()
+                .and_then(|a| a.downcast_ref::<TagPromotionEngine>())
+                .map(|e| e.selected_field_ids())
+                .unwrap_or_default();
+            return Some(match self.vauchi.confirm_tag_promotion(&tag_id, fields) {
+                Ok(_group_id) => {
+                    // The tag is consumed (replace semantics); drop the cached
+                    // Tags engine so a later visit rebuilds from storage.
+                    self.invalidate_screen(&AppScreen::Tags);
+                    let screen = self.navigate_to(AppScreen::Groups);
+                    ActionResult::NavigateTo(screen)
+                }
+                Err(_) => ActionResult::UpdateScreen(self.engine.current_screen()),
+            });
+        }
+
+        None
     }
 
     /// Intercept the "exit-preview" action when MyInfo is in PreviewAs mode.

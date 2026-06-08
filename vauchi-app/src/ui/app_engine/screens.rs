@@ -52,6 +52,7 @@ use crate::ui::recovery_status::RecoveryEngine;
 use crate::ui::settings::{SettingsConfig, SettingsEngine};
 use crate::ui::support::SupportEngine;
 use crate::ui::sync_status::SyncStatusEngine;
+use crate::ui::tag_promotion::{PromotionField, TagPromotionEngine};
 use crate::ui::tags_list::{TagSummary, TagsEngine};
 use vauchi_core::api::Vauchi;
 
@@ -472,6 +473,32 @@ impl AppEngine {
                 let group_count = vauchi.list_groups().map(|g| g.len()).unwrap_or(0);
                 Box::new(crate::ui::SocialGraphEngine::new(entries, group_count))
             }
+            AppScreen::TagPromotion { tag_id } => match vauchi.begin_tag_promotion(tag_id) {
+                Ok(draft) => {
+                    let fields: Vec<PromotionField> = match vauchi.own_card() {
+                        Ok(Some(card)) => card
+                            .fields()
+                            .iter()
+                            .map(|f| PromotionField {
+                                field_id: f.id().to_string(),
+                                label: f.label().to_string(),
+                                value: f.value().to_string(),
+                                selected: draft.visible_fields.iter().any(|v| v == f.id()),
+                            })
+                            .collect(),
+                        _ => Vec::new(),
+                    };
+                    Box::new(TagPromotionEngine::new(
+                        draft.tag_id,
+                        draft.name,
+                        draft.contact_ids.len(),
+                        fields,
+                    ))
+                }
+                // Tag vanished between navigation and build — fall back to the
+                // generic not-found screen (keeps a Back affordance).
+                Err(_) => Box::new(ContactNotFoundEngine::new(tag_id.clone())),
+            },
             AppScreen::Tags => {
                 let tags: Vec<TagSummary> = vauchi
                     .list_tags()

@@ -63,10 +63,15 @@ fn renders_tags_with_member_counts_and_delete_action() {
         "singular member count"
     );
 
-    // Each row carries exactly one per-row delete affordance.
+    // Each row carries promote + delete per-row affordances.
     for item in &items {
         let ids: Vec<&str> = item.actions.iter().map(|a| a.id.as_str()).collect();
-        assert_eq!(ids, vec!["request_delete"], "row {} actions", item.id);
+        assert_eq!(
+            ids,
+            vec!["promote", "request_delete"],
+            "row {} actions",
+            item.id
+        );
     }
 }
 

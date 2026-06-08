@@ -440,22 +440,34 @@ impl AppEngine {
                 }
             }
             "execute" => {
-                // Borrow `identity` only long enough to run the delete;
-                // then the cache can be cleared (all data is gone).
-                let executed = match self.vauchi.identity() {
+                // Borrow `identity` only long enough to run the delete and
+                // capture the relay deliveries (signed pre-shred); then the
+                // cache can be cleared (all data is gone).
+                let deliveries = match self.vauchi.identity() {
                     Some(identity) => vauchi_core::api::DeletionManager::new(self.vauchi.storage())
                         .execute_deletion(identity)
-                        .is_ok(),
-                    None => false,
+                        .ok()
+                        .map(|result| result.deliveries),
+                    None => None,
                 };
-                if executed {
-                    self.engine_cache.clear();
-                    ActionResult::WipeComplete
-                } else {
-                    ActionResult::ShowToast {
+                match deliveries {
+                    Some(deliveries) => {
+                        // Notify contacts over the relay so they crypto-shred
+                        // this revoked identity. Best-effort: the blobs were
+                        // signed before the keys were shredded. Network builds
+                        // only — without a relay transport there is nowhere to
+                        // send (the `recovery` module is `network-http`-gated).
+                        #[cfg(feature = "network-http")]
+                        let _ = self.vauchi.broadcast_identity_revocations(&deliveries);
+                        #[cfg(not(feature = "network-http"))]
+                        let _ = &deliveries;
+                        self.engine_cache.clear();
+                        ActionResult::WipeComplete
+                    }
+                    None => ActionResult::ShowToast {
                         message: "Could not execute deletion.".into(),
                         undo_action_id: None,
-                    }
+                    },
                 }
             }
             "shred" => match self.vauchi.perform_emergency_wipe(true) {

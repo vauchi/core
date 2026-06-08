@@ -216,6 +216,26 @@ mod tests {
         assert!(result.is_err(), "expected error");
     }
 
+    // CC-14 adversarial: `link_key` is parsed from a peer-scanned QR, so an
+    // all-zeros key is attacker-reachable. It must surface as an error, never
+    // a panic (ADR-002: no panic at a trust boundary; W4).
+    #[test]
+    fn test_device_link_request_all_zeros_key_errors_not_panics() {
+        let zero_key = [0u8; 32];
+        let request = DeviceLinkRequest::new("dev".to_string(), 1);
+        assert!(
+            matches!(request.encrypt(&zero_key), Err(ExchangeError::CryptoError)),
+            "all-zeros key must error on encrypt, not panic"
+        );
+        assert!(
+            matches!(
+                DeviceLinkRequest::decrypt(b"ciphertext", &zero_key),
+                Err(ExchangeError::CryptoError)
+            ),
+            "all-zeros key must error on decrypt, not panic"
+        );
+    }
+
     // ============================================================
     // Additional edge case tests (added for coverage)
     // ============================================================

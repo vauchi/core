@@ -84,14 +84,16 @@ impl DeviceLinkRequest {
 
     /// Encrypts the request using the link key from the QR.
     pub fn encrypt(&self, link_key: &[u8; 32]) -> Result<Vec<u8>, ExchangeError> {
-        let key = SymmetricKey::from_bytes(*link_key);
+        let key =
+            SymmetricKey::try_from_bytes(*link_key).map_err(|_| ExchangeError::CryptoError)?;
         let plaintext = self.to_bytes();
         encrypt(&key, &plaintext).map_err(|_| ExchangeError::CryptoError)
     }
 
     /// Decrypts a request using the link key.
     pub fn decrypt(ciphertext: &[u8], link_key: &[u8; 32]) -> Result<Self, ExchangeError> {
-        let key = SymmetricKey::from_bytes(*link_key);
+        let key =
+            SymmetricKey::try_from_bytes(*link_key).map_err(|_| ExchangeError::CryptoError)?;
         let plaintext = decrypt(&key, ciphertext).map_err(|_| ExchangeError::CryptoError)?;
         Self::from_bytes(&plaintext)
     }

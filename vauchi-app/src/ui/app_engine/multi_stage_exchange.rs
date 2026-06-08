@@ -384,6 +384,11 @@ impl AppEngine {
             log::warn!("multi-stage: failed to persist exchange ratchet");
         }
 
+        // Capture-at-exchange (ADR-051): ask the frontend for the current
+        // location so we can record where this contact was met. The reply
+        // (Event::LocationResult) is consumed in handle_hardware_event.
+        self.request_exchange_location(contact_id.clone());
+
         // Assemble the rich success screen: what they shared (above),
         // which of our own fields this new contact can now see, and the
         // group(s) they joined (none on the multi-stage path yet).

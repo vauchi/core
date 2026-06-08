@@ -482,6 +482,11 @@ pub struct AppEngine {
     /// (brightness, idle timer, future orientation lock, haptics).
     /// Phase 2b of `2026-05-04-exchange-command-screen-presentation`.
     pending_commands: std::collections::VecDeque<vauchi_core::Command>,
+    /// Contact id awaiting an `Event::LocationResult` after an exchange
+    /// emitted `Command::LocationRequest` (ADR-051 capture-at-exchange).
+    /// Recorded via `Vauchi::set_exchange_location`; a location denial /
+    /// unavailability clears it.
+    pending_location_contact: Option<String>,
     /// Engine-owned link-mode responder machine (slice 32l Phase 2), live
     /// only on `AppScreen::DeepLinkResponder`. See `app_engine/link_responder.rs`.
     link_responder: Option<vauchi_core::exchange::link_responder::LinkResponderSession>,
@@ -644,6 +649,7 @@ impl AppEngine {
             network_online: true,
             sync_chrome_status: SyncChromeStatus::Idle,
             pending_commands: std::collections::VecDeque::new(),
+            pending_location_contact: None,
             link_responder: None,
             link_responder_x3dh: None,
             link_initiator: None,

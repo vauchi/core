@@ -78,6 +78,16 @@ impl AppEngine {
     ///
     /// Returns `None` if the current screen doesn't handle hardware events.
     #[tracing::instrument(level = "debug", skip_all, name = "app.handle_hardware_event")]
+    /// Queue a `Command::LocationRequest` and remember the contact it should
+    /// annotate (ADR-051 capture-at-exchange). The frontend replies with
+    /// `Event::LocationResult` (or a location `PermissionDenied` /
+    /// `HardwareUnavailable`), consumed in `handle_hardware_event`.
+    pub fn request_exchange_location(&mut self, contact_id: String) {
+        self.pending_location_contact = Some(contact_id);
+        self.pending_commands
+            .push_back(vauchi_core::Command::LocationRequest { timeout_ms: 10_000 });
+    }
+
     pub fn handle_hardware_event(&mut self, event: Event) -> Option<ActionResult> {
         // ADR-031 file-picker: dispatched by current screen, not by the
         // narrow screen guard below. The picker is reachable from More
@@ -91,6 +101,31 @@ impl AppEngine {
             Event::FilePickCancelledByUser => {
                 // User dismissed the picker — no-op. Frontend stays on
                 // the originating screen with no toast / alert.
+                return None;
+            }
+            // ADR-051 capture-at-exchange: record where a just-exchanged
+            // contact was met. Handled before the exchange-screen guard
+            // because the reply can arrive after navigating to the success
+            // / contact screen.
+            Event::LocationResult {
+                latitude,
+                longitude,
+                ..
+            } => {
+                if let Some(contact_id) = self.pending_location_contact.take() {
+                    #[allow(clippy::let_underscore_must_use)]
+                    let _ = self
+                        .vauchi
+                        .set_exchange_location(&contact_id, *latitude, *longitude);
+                }
+                return None;
+            }
+            Event::PermissionDenied { transport } | Event::HardwareUnavailable { transport }
+                if transport == "location" =>
+            {
+                // Declined / no provider — drop the pending capture silently
+                // (no toast on the post-exchange screen).
+                self.pending_location_contact = None;
                 return None;
             }
             _ => {}

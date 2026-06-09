@@ -12,16 +12,46 @@
 //! Rollout is phased — see problem record
 //! `2026-06-09-storage-per-domain-store-boundaries`.
 
+mod activity_log;
+mod consent;
+mod decoy;
+mod delivery;
 mod device;
+mod device_delivery;
+mod duress;
+mod emergency;
+mod field_notes;
 mod group;
+mod identity;
+mod ohttp_cache;
+mod pending;
+mod pin_cache;
 mod place;
+mod ratchet;
 mod recovery;
+mod retry;
 mod sync;
 mod tag;
+mod ux;
 
+pub use activity_log::ActivityLogStore;
+pub use consent::ConsentStore;
+pub use decoy::DecoyStore;
+pub use delivery::DeliveryStore;
 pub use device::DeviceStore;
+pub use device_delivery::DeviceDeliveryStore;
+pub use duress::DuressStore;
+pub use emergency::EmergencyStore;
+pub use field_notes::FieldNoteStore;
 pub use group::GroupStore;
+pub use identity::IdentityStore;
+pub use ohttp_cache::OhttpCacheStore;
+pub use pending::PendingStore;
+pub use pin_cache::PinCacheStore;
 pub use place::PlaceStore;
+pub use ratchet::RatchetStore;
 pub use recovery::RecoveryStore;
+pub use retry::RetryStore;
 pub use sync::SyncStore;
 pub use tag::TagStore;
+pub use ux::UxStore;

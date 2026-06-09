@@ -302,7 +302,6 @@ mod nfc_apdu_protocol_tests;
 mod nfc_card_payload_tests;
 mod nfc_handshake_tests;
 mod nfc_rollback_tests;
-mod noise_pubkey_pinning_tests;
 mod offline_queue_tests;
 mod ohttp_key_cache_tests;
 mod onboarding_api_tests;

@@ -9,7 +9,6 @@
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use subtle::ConstantTimeEq;
 use thiserror::Error;
 
 /// Maximum allowed relay URL length in bytes.
@@ -33,9 +32,6 @@ pub enum RelayUrlError {
 
     #[error("Invalid relay URL format: {0}")]
     InvalidFormat(String),
-
-    #[error("Relay Noise NK public key mismatch: pinned key does not match relay's actual key")]
-    NoisePubkeyMismatch,
 }
 
 /// Validates a relay URL for safety.
@@ -187,31 +183,6 @@ fn is_ipv6_ula(v6: &Ipv6Addr) -> bool {
 /// Returns true if IPv6 address is link-local (fe80::/10, RFC 4291).
 fn is_ipv6_link_local(v6: &Ipv6Addr) -> bool {
     (v6.segments()[0] & 0xffc0) == 0xfe80
-}
-
-/// Verifies a relay's Noise NK public key against an exchange-pinned value.
-///
-/// If `pinned` is `Some`, performs constant-time comparison with `actual`.
-/// If `pinned` is `None` (TOFU mode), accepts any key.
-///
-/// # Security
-///
-/// Uses `subtle::ConstantTimeEq` to prevent timing side-channels that
-/// could leak information about the expected key.
-pub fn verify_relay_noise_pubkey(
-    pinned: Option<&[u8; 32]>,
-    actual: &[u8; 32],
-) -> Result<(), RelayUrlError> {
-    if let Some(expected) = pinned {
-        if expected.ct_eq(actual).into() {
-            Ok(())
-        } else {
-            Err(RelayUrlError::NoisePubkeyMismatch)
-        }
-    } else {
-        // No pinned key — TOFU mode, accept any relay
-        Ok(())
-    }
 }
 
 /// Converts a WebSocket relay URL to its HTTP equivalent.

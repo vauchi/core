@@ -1031,6 +1031,19 @@ impl PlatformAppEngine {
         })?;
 
         match command {
+            DomainCommand::Sync => {
+                let vauchi = engine.vauchi_mut();
+                if !vauchi.has_ohttp_key() {
+                    vauchi.connect().map_err(|e| MobileError::Other {
+                        detail: format!("Connect: {e}"),
+                    })?;
+                }
+                let outcome = vauchi.sync().map_err(|e| MobileError::Other {
+                    detail: e.to_string(),
+                })?;
+                let result = crate::types::MobileSyncResult::try_from(outcome)?;
+                Ok(DomainCommandResult::SyncResult { result })
+            }
             DomainCommand::GrantConsent { consent_type } => {
                 let storage = engine.vauchi().storage();
                 let manager = vauchi_core::api::ConsentManager::new(storage);

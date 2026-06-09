@@ -40,7 +40,7 @@ use crate::types::{
     MobileFieldType, MobileGdprExport, MobileOnboardingProgress, MobileOnboardingStep,
     MobileRecoveryClaim, MobileRecoveryProgress, MobileRecoveryVerification, MobileRecoveryVoucher,
     MobileRetryEntry, MobileShredReport, MobileShredStatus, MobileShredToken, MobileSocialNetwork,
-    MobileVisibilityLabel, MobileVisibilityLabelDetail,
+    MobileSyncResult, MobileVisibilityLabel, MobileVisibilityLabelDetail,
 };
 
 /// Typed dispatch envelope for `PlatformAppEngine` operations that
@@ -412,11 +412,17 @@ pub enum DomainCommand {
     },
     // ── Sync / Delivery / Retry — read paths + simple writes (B7 batch 8) ──
     //
-    // The state-heavy methods (sync, get_sync_status, delivery
-    // receipts / suppress-presence flags, backup export/import) need
-    // engine-resident state and are deferred to a separate "sync
-    // orchestration" batch. This batch covers the 21 storage-only
+    // engine-resident-sync-orchestration design (2026-06-09) added Sync
+    // below; the persistent engine now owns the connect lifecycle. The
+    // remaining state-heavy methods (delivery receipts / suppress-presence
+    // flags live in core SettingsFlags now; backup export/import on PAE)
+    // are tracked separately. This batch covers the 21 storage-only
     // delegations that translate cleanly into dispatch arms today.
+    //
+    // User-initiated relay sync. Lazily connects the engine's Vauchi and
+    // syncs, honoring the C1/C2 timing throttle (TooSoon -> no-change
+    // result). Returns DomainCommandResult::SyncResult.
+    Sync,
     /// Total pending updates across all contacts.
     PendingUpdateCount,
     /// Read a delivery record by message id.
@@ -755,6 +761,12 @@ pub enum DomainCommandResult {
     /// Boolean result (`check_consent` etc.).
     Bool {
         value: bool,
+    },
+    /// Outcome of a user-initiated `Sync` (engine-resident sync). A
+    /// `TooSoon` throttle deferral arrives here as a no-change result,
+    /// not an error.
+    SyncResult {
+        result: MobileSyncResult,
     },
     /// Aggregated `MobileConsentStatus` (B7 batch 1).
     ConsentStatus {

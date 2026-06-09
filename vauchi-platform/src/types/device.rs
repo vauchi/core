@@ -99,6 +99,49 @@ pub struct MobileSyncResult {
     pub updated_contact_names: Vec<String>,
 }
 
+/// Maps a core sync outcome to the mobile result shape.
+///
+/// Throttle decision (engine-resident-sync-orchestration design §4):
+/// `TooSoon` is a benign no-change result, *not* an error — a
+/// user-initiated sync inside the C1/C2 privacy window reports
+/// "up to date" rather than failing. `NotConnected` / `NoIdentity`
+/// stay errors so the caller distinguishes them from a successful
+/// empty sync. The `Ok` field mapping mirrors the retired
+/// `VauchiPlatform::sync()` exactly (`received → cards_updated`,
+/// `sent → updates_sent`; `contacts_added` / `updated_contact_names`
+/// have no source in the outcome).
+impl TryFrom<vauchi_core::api::VauchiSyncOutcome> for MobileSyncResult {
+    type Error = crate::error::MobileError;
+
+    fn try_from(outcome: vauchi_core::api::VauchiSyncOutcome) -> Result<Self, Self::Error> {
+        use vauchi_core::api::VauchiSyncOutcome;
+        match outcome {
+            VauchiSyncOutcome::Ok { received, sent, .. } => Ok(MobileSyncResult {
+                contacts_added: 0,
+                cards_updated: received as u32,
+                updates_sent: sent as u32,
+                total: (received + sent) as u32,
+                has_changes: received > 0 || sent > 0,
+                updated_contact_names: vec![],
+            }),
+            VauchiSyncOutcome::TooSoon => Ok(MobileSyncResult {
+                contacts_added: 0,
+                cards_updated: 0,
+                updates_sent: 0,
+                total: 0,
+                has_changes: false,
+                updated_contact_names: vec![],
+            }),
+            VauchiSyncOutcome::NotConnected => Err(crate::error::MobileError::Other {
+                detail: "Not connected".into(),
+            }),
+            VauchiSyncOutcome::NoIdentity => Err(crate::error::MobileError::Other {
+                detail: "No identity".into(),
+            }),
+        }
+    }
+}
+
 /// Incoming device link request received via relay.
 ///
 /// Returned by `listen_for_device_link_request` on the existing device.

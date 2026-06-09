@@ -13,9 +13,15 @@
 //! `2026-06-09-storage-per-domain-store-boundaries`.
 
 mod device;
+mod group;
+mod place;
 mod recovery;
 mod sync;
+mod tag;
 
 pub use device::DeviceStore;
+pub use group::GroupStore;
+pub use place::PlaceStore;
 pub use recovery::RecoveryStore;
 pub use sync::SyncStore;
+pub use tag::TagStore;

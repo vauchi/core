@@ -4,10 +4,23 @@
 
 //! Tests for storage::recovery
 
-use vauchi_core::{Storage, SymmetricKey};
+use vauchi_core::{RecoveryStore, Storage, SymmetricKey};
 
 fn test_storage() -> Storage {
     Storage::in_memory(SymmetricKey::generate()).unwrap()
+}
+
+// A consumer scoped to the recovery domain receives only `&RecoveryStore`.
+// It is statically unable to reach contacts, identity, or any other table —
+// the type-level boundary introduced by the per-domain store seam.
+fn record_via_scoped_view(store: &RecoveryStore<'_>, claim_id: &str) -> Option<String> {
+    store
+        .save_recovery_response(claim_id, "contact-z", "accept", None)
+        .unwrap();
+    store
+        .get_recovery_response(claim_id)
+        .unwrap()
+        .map(|(_, response, _)| response)
 }
 
 // @scenario: contact_recovery :: Accept recovery and reconnect
@@ -224,4 +237,22 @@ fn test_recovery_rate_limit_independent_per_pk() {
     let (count_b, window_b) = storage.check_recovery_rate_limit(pk_b).unwrap();
     assert_eq!(count_b, 5);
     assert_eq!(window_b, 2000);
+}
+
+// @internal
+#[test]
+fn test_recovery_store_scoped_view_roundtrip() {
+    let storage = test_storage();
+
+    let response = record_via_scoped_view(&storage.recovery(), "claim-scoped");
+    assert_eq!(response.as_deref(), Some("accept"));
+
+    // The same row is visible through the forwarding API — the scoped view and
+    // the legacy methods share the one connection.
+    let (contact_id, via_forward, _) = storage
+        .get_recovery_response("claim-scoped")
+        .unwrap()
+        .unwrap();
+    assert_eq!(contact_id, "contact-z");
+    assert_eq!(via_forward, "accept");
 }

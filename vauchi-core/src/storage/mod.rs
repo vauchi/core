@@ -129,6 +129,7 @@ pub mod migration;
 mod ohttp_cache;
 mod pin_cache;
 pub mod secure;
+mod stores;
 
 pub use activity_log::ActivityLogRow;
 pub use error::{
@@ -137,6 +138,7 @@ pub use error::{
     UpdateStatus,
 };
 pub use secure::{FileKeyStorage, SecureStorage};
+pub use stores::RecoveryStore;
 
 #[cfg(any(test, feature = "testing"))]
 pub use secure::MemoryKeyStorage;

@@ -262,6 +262,45 @@ fn default_true() -> bool {
     true
 }
 
+/// Persisted user settings toggles, the core source of truth for the
+/// three config-backed flags. Encrypted in the `ux_state` table and
+/// self-seeded into `VauchiConfig` on construction so every `Vauchi`
+/// instance (mobile PAE engine, `open_vauchi()` transients, desktop)
+/// reads a consistent value that survives restart. Defaults mirror
+/// `VauchiConfig`'s defaults (settings-toggle-not-persisting P1).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SettingsFlags {
+    /// Send read/delivery receipts. Defaults to true.
+    #[serde(default = "default_true")]
+    pub delivery_receipts_enabled: bool,
+    /// Suppress presence announcements to the relay. Defaults to false.
+    #[serde(default)]
+    pub suppress_presence: bool,
+    /// Notify when a new contact is added. Defaults to false.
+    #[serde(default)]
+    pub contact_added_notifications: bool,
+}
+
+impl Default for SettingsFlags {
+    fn default() -> Self {
+        Self {
+            delivery_receipts_enabled: true,
+            suppress_presence: false,
+            contact_added_notifications: false,
+        }
+    }
+}
+
+impl SettingsFlags {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
 impl Default for BackupReminderState {
     fn default() -> Self {
         Self::new()

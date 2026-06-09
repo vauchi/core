@@ -339,7 +339,7 @@ impl Vauchi {
 
     /// Internal initializer shared by all constructors.
     fn init(
-        config: VauchiConfig,
+        mut config: VauchiConfig,
         secure_storage: Option<Arc<dyn SecureStorage>>,
         clock: Option<Arc<dyn Clock>>,
         rng: Option<Arc<dyn SecureRng>>,
@@ -363,6 +363,17 @@ impl Vauchi {
             }
             Storage::open(&config.storage_path, storage_key)?.with_clock(clock.clone())
         };
+
+        // Self-seed config from persisted settings flags so every Vauchi
+        // instance (mobile PAE engine, open_vauchi() transients, desktop)
+        // reads a consistent value that survives restart
+        // (settings-toggle-not-persisting P1). Absent/unreadable flags
+        // leave the caller-provided config untouched.
+        if let Ok(Some(flags)) = storage.load_settings_flags() {
+            config.delivery_receipts_enabled = flags.delivery_receipts_enabled;
+            config.suppress_presence = flags.suppress_presence;
+            config.contact_added_notifications = flags.contact_added_notifications;
+        }
 
         let events = Arc::new(EventDispatcher::new());
 

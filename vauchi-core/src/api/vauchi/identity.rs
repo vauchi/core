@@ -9,6 +9,7 @@ use std::sync::Arc;
 use crate::contact_card::{ContactCard, ContactField};
 use crate::identity::Identity;
 use crate::types::BackupReminderState;
+use crate::types::SettingsFlags;
 
 use crate::storage::SecureStorage;
 
@@ -544,6 +545,19 @@ impl Vauchi {
             .load_backup_reminder_state()
             .map(|opt| opt.unwrap_or_default())
             .map_err(Into::into)
+    }
+
+    /// Loads persisted settings flags, returning defaults if none persisted.
+    pub fn load_settings_flags(&self) -> VauchiResult<SettingsFlags> {
+        self.storage
+            .load_settings_flags()
+            .map(|opt| opt.unwrap_or_default())
+            .map_err(Into::into)
+    }
+
+    /// Saves settings flags to encrypted storage.
+    pub fn save_settings_flags(&self, flags: &SettingsFlags) -> VauchiResult<()> {
+        self.storage.save_settings_flags(flags).map_err(Into::into)
     }
 
     /// Saves backup reminder state to encrypted storage.

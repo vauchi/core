@@ -95,6 +95,8 @@ pub const ENCRYPTED_COLUMNS: &[(&str, &str)] = &[
     ("ux_state", "onboarding_progress_encrypted"),
     // V44 backup reminder
     ("ux_state", "backup_reminder_encrypted"),
+    // V53 settings flags
+    ("ux_state", "settings_flags_encrypted"),
     // V30 label display name override
     ("visibility_labels", "display_name_override_encrypted"),
     // V38 exchange state crash recovery
@@ -1185,14 +1187,15 @@ impl Storage {
         Ok(())
     }
 
-    /// Re-encrypt ux_state: aha_tracker, demo_contact, onboarding_progress, backup_reminder
+    /// Re-encrypt ux_state: aha_tracker, demo_contact, onboarding_progress,
+    /// backup_reminder, settings_flags
     fn rekey_ux_state(
         &self,
         old_key: &SymmetricKey,
         new_key: &SymmetricKey,
     ) -> Result<(), StorageError> {
         let result = self.conn.query_row(
-            "SELECT id, aha_tracker_json_encrypted, demo_contact_json_encrypted, onboarding_progress_encrypted, backup_reminder_encrypted FROM ux_state WHERE id = 1",
+            "SELECT id, aha_tracker_json_encrypted, demo_contact_json_encrypted, onboarding_progress_encrypted, backup_reminder_encrypted, settings_flags_encrypted FROM ux_state WHERE id = 1",
             [],
             |row| {
                 let id: i64 = row.get(0)?;
@@ -1200,11 +1203,20 @@ impl Storage {
                 let demo: Option<Vec<u8>> = row.get(2)?;
                 let onboarding: Option<Vec<u8>> = row.get(3)?;
                 let backup_reminder: Option<Vec<u8>> = row.get(4)?;
-                Ok((id, aha, demo, onboarding, backup_reminder))
+                let settings_flags: Option<Vec<u8>> = row.get(5)?;
+                Ok((id, aha, demo, onboarding, backup_reminder, settings_flags))
             },
         );
 
-        if let Ok((id, aha_enc, demo_enc, onboarding_enc, backup_reminder_enc)) = result {
+        if let Ok((
+            id,
+            aha_enc,
+            demo_enc,
+            onboarding_enc,
+            backup_reminder_enc,
+            settings_flags_enc,
+        )) = result
+        {
             if let Some(enc) = aha_enc
                 && !enc.is_empty()
             {
@@ -1263,6 +1275,24 @@ impl Storage {
                     )
                     .map_err(|e| {
                         StorageError::Migration(format!("Update backup_reminder: {}", e))
+                    })?;
+            }
+            if let Some(enc) = settings_flags_enc
+                && !enc.is_empty()
+            {
+                let plain = decrypt(old_key, &enc).map_err(|e| {
+                    StorageError::Migration(format!("Decrypt settings_flags: {}", e))
+                })?;
+                let new_enc = encrypt(new_key, &plain).map_err(|e| {
+                    StorageError::Migration(format!("Encrypt settings_flags: {}", e))
+                })?;
+                self.conn
+                    .execute(
+                        "UPDATE ux_state SET settings_flags_encrypted = ?1 WHERE id = ?2",
+                        params![new_enc, id],
+                    )
+                    .map_err(|e| {
+                        StorageError::Migration(format!("Update settings_flags: {}", e))
                     })?;
             }
         }

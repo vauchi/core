@@ -197,7 +197,9 @@ vauchi-core/src/recovery/mod.rs 1253
 #  contact-annotations T2.2; migration ledger structural exemption)
 # (+15 2026-06-08: migration v52 contacts.last_sent_visible_fields —
 #  2026-06-08-card-revocation-not-propagated; migration ledger exemption)
-vauchi-core/src/storage/migration.rs 1942
+# (+10 2026-06-09: migration v53 ux_state.settings_flags_encrypted —
+#  2026-06-08-settings-toggle-not-persisting P1; migration ledger exemption)
+vauchi-core/src/storage/migration.rs 1952
 
 # EXEMPT — rekey ledger: all encrypted columns must be co-located for correctness (audit C1)
 # (+4 for #[allow(clippy::let_underscore_must_use)] attr + comment on
@@ -216,7 +218,10 @@ vauchi-core/src/storage/migration.rs 1942
 #  places.data_encrypted — contact-annotations T2.3; co-located EXEMPT)
 # (+36 2026-06-07: rekey_exchange_location + ENCRYPTED_COLUMNS entry —
 #  contact-annotations T2.2; co-located EXEMPT)
-vauchi-core/src/storage/rekey.rs 1720
+# (+30 2026-06-09: settings_flags re-encrypt block in rekey_ux_state +
+#  ENCRYPTED_COLUMNS entry — 2026-06-08-settings-toggle-not-persisting P1;
+#  co-located EXEMPT, all encrypted columns rekeyed together)
+vauchi-core/src/storage/rekey.rs 1750
 
 # SPLIT — Phase 3: extract connection management
 vauchi-core/src/storage/mod.rs 1079

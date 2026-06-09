@@ -526,6 +526,11 @@ pub fn all_migrations() -> Vec<Migration> {
             name: "contact_last_sent_visible_fields",
             action: MigrationAction::Sql(MIGRATION_V52_LAST_SENT_VISIBLE_FIELDS),
         },
+        Migration {
+            version: 53,
+            name: "settings_flags",
+            action: MigrationAction::Sql(MIGRATION_V53_SETTINGS_FLAGS),
+        },
     ]
 }
 
@@ -835,6 +840,11 @@ const MIGRATION_V43_CONTACT_DISPLAY: &str = "
 /// Migration v44: Add backup_reminder column to ux_state.
 const MIGRATION_V44_BACKUP_REMINDER: &str =
     "ALTER TABLE ux_state ADD COLUMN backup_reminder_encrypted BLOB;";
+
+/// Migration v53: settings-flags singleton column on ux_state
+/// (settings-toggle-not-persisting P1).
+const MIGRATION_V53_SETTINGS_FLAGS: &str =
+    "ALTER TABLE ux_state ADD COLUMN settings_flags_encrypted BLOB;";
 
 const MIGRATION_V35_LOCAL_GROUPS: &str = "
     CREATE TABLE IF NOT EXISTS local_groups (

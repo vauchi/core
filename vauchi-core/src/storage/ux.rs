@@ -14,6 +14,7 @@ use crate::types::AhaMomentTracker;
 use crate::types::BackupReminderState;
 use crate::types::DemoContactState;
 use crate::types::OnboardingProgress;
+use crate::types::SettingsFlags;
 
 impl Storage {
     /// Saves the aha moments tracker state (encrypted).
@@ -259,6 +260,54 @@ impl Storage {
                 let state = BackupReminderState::from_json(&json)
                     .map_err(|e| StorageError::Serialization(e.to_string()))?;
                 Ok(Some(state))
+            }
+            Ok(_) => Ok(None),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Database(e)),
+        }
+    }
+
+    /// Saves the settings flags (encrypted).
+    pub fn save_settings_flags(&self, flags: &SettingsFlags) -> Result<(), StorageError> {
+        let json = flags
+            .to_json()
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        let encrypted = crate::crypto::encrypt(&self.encryption_key, json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
+        let now = self.now_secs();
+
+        self.conn.execute(
+            "INSERT OR REPLACE INTO ux_state (id, settings_flags_encrypted, updated_at)
+             VALUES (1, ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET settings_flags_encrypted = ?1, updated_at = ?2",
+            params![encrypted, now as i64],
+        )?;
+
+        Ok(())
+    }
+
+    /// Loads the settings flags (decrypted).
+    pub fn load_settings_flags(&self) -> Result<Option<SettingsFlags>, StorageError> {
+        let result = self.conn.query_row(
+            "SELECT settings_flags_encrypted FROM ux_state WHERE id = 1",
+            [],
+            |row| {
+                let encrypted: Option<Vec<u8>> = row.get(0)?;
+                Ok(encrypted)
+            },
+        );
+
+        match result {
+            Ok(Some(encrypted)) if !encrypted.is_empty() => {
+                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let json = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                let flags = SettingsFlags::from_json(&json)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(flags))
             }
             Ok(_) => Ok(None),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),

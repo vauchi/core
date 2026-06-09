@@ -1,0 +1,901 @@
+// SPDX-FileCopyrightText: 2026 Mattia Egloff <mattia.egloff@pm.me>
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Visibility-label domain persistence view (visibility_labels, contact_visibility_overrides).
+//!
+//! Part of problem record `2026-06-09-storage-per-domain-store-boundaries` (Phase 1).
+
+use crate::clock::Clock;
+use crate::crypto::SymmetricKey;
+use rusqlite::Connection;
+use std::sync::Arc;
+
+use std::collections::{HashMap, HashSet};
+
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+
+use super::super::{Storage, StorageError};
+use crate::crypto::HKDF;
+
+type HmacSha256 = Hmac<Sha256>;
+use crate::contact::{Group, GroupManager};
+
+/// Scoped persistence view for the visibility-label domain.
+pub struct LabelStore<'a> {
+    conn: &'a Connection,
+    key: &'a SymmetricKey,
+    clock: &'a Arc<dyn Clock>,
+}
+
+impl Storage {
+    /// Scoped persistence view for the visibility-label domain.
+    pub fn labels(&self) -> LabelStore<'_> {
+        LabelStore {
+            conn: &self.conn,
+            key: &self.encryption_key,
+            clock: &self.clock,
+        }
+    }
+}
+
+impl LabelStore<'_> {
+    fn now_secs(&self) -> u64 {
+        self.clock.unix_seconds()
+    }
+    /// Saves a visibility label to storage (encrypted).
+    ///
+    /// Label name is encrypted at rest with HMAC for lookups (#128).
+    pub fn save_group(&self, label: &Group) -> Result<(), StorageError> {
+        let contacts_json = serde_json::to_string(label.contacts())
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let fields_json = serde_json::to_string(label.visible_fields())
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        let contacts_encrypted = crate::crypto::encrypt(self.key, contacts_json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let fields_encrypted = crate::crypto::encrypt(self.key, fields_json.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
+        // Encrypt label name and compute HMAC for lookups (#128)
+        let name_encrypted = crate::crypto::encrypt(self.key, label.name().as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+        let name_hmac =
+            self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", label.name().as_bytes());
+
+        let display_name_override_encrypted: Option<Vec<u8>> = match label.display_name_override() {
+            Some(override_name) => {
+                let encrypted = crate::crypto::encrypt(self.key, override_name.as_bytes())
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                Some(encrypted)
+            }
+            None => None,
+        };
+
+        // Store label id in plaintext `name` column to satisfy UNIQUE constraint
+        // without leaking the actual name (which is in name_encrypted).
+        self.conn.execute(
+            "INSERT OR REPLACE INTO visibility_labels
+             (id, name, name_encrypted, name_hmac, contacts_json, visible_fields_json, contacts_json_encrypted, visible_fields_json_encrypted, created_at, modified_at, display_name_override_encrypted)
+             VALUES (?1, ?2, ?3, ?4, '[]', '[]', ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![
+                label.id(),
+                label.id(),
+                name_encrypted,
+                name_hmac,
+                contacts_encrypted,
+                fields_encrypted,
+                label.created_at() as i64,
+                label.modified_at() as i64,
+                display_name_override_encrypted,
+            ],
+        )?;
+
+        Ok(())
+    }
+    /// Loads a visibility label by ID (decrypted).
+    pub fn load_group(&self, label_id: &str) -> Result<Group, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted
+             FROM visibility_labels WHERE id = ?1",
+        )?;
+
+        let label = stmt.query_row([label_id], |row| {
+            let id: String = row.get(0)?;
+            let name: String = row.get(1)?;
+            let contacts_json: String = row.get(2)?;
+            let fields_json: String = row.get(3)?;
+            let created_at: i64 = row.get(4)?;
+            let modified_at: i64 = row.get(5)?;
+            let contacts_encrypted: Option<Vec<u8>> = row.get(6)?;
+            let fields_encrypted: Option<Vec<u8>> = row.get(7)?;
+            let name_encrypted: Option<Vec<u8>> = row.get(8)?;
+            let display_name_override_encrypted: Option<Vec<u8>> = row.get(9)?;
+
+            Ok((
+                id,
+                name,
+                contacts_json,
+                fields_json,
+                created_at,
+                modified_at,
+                contacts_encrypted,
+                fields_encrypted,
+                name_encrypted,
+                display_name_override_encrypted,
+            ))
+        })?;
+
+        // Decrypt label name (#128): prefer encrypted, fall back to plaintext
+        let name = self.decrypt_or_fallback(label.8.as_deref(), &label.1)?;
+
+        let contacts_json = self.decrypt_or_fallback(label.6.as_deref(), &label.2)?;
+        let fields_json = self.decrypt_or_fallback(label.7.as_deref(), &label.3)?;
+
+        let display_name_override = self.decrypt_optional_blob(label.9.as_deref())?;
+
+        let contacts: HashSet<String> = serde_json::from_str(&contacts_json)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let visible_fields: HashSet<String> = serde_json::from_str(&fields_json)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        Ok(Group::from_storage(
+            label.0,
+            name,
+            contacts,
+            visible_fields,
+            display_name_override,
+            label.4 as u64,
+            label.5 as u64,
+        ))
+    }
+    /// Loads all visibility labels (decrypted).
+    ///
+    /// Labels are sorted by decrypted name in Rust since encrypted names
+    /// cannot be sorted in SQL (#128).
+    pub fn load_all_groups(&self) -> Result<Vec<Group>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, contacts_json, visible_fields_json, created_at, modified_at, contacts_json_encrypted, visible_fields_json_encrypted, name_encrypted, display_name_override_encrypted
+             FROM visibility_labels",
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            let id: String = row.get(0)?;
+            let name: String = row.get(1)?;
+            let contacts_json: String = row.get(2)?;
+            let fields_json: String = row.get(3)?;
+            let created_at: i64 = row.get(4)?;
+            let modified_at: i64 = row.get(5)?;
+            let contacts_encrypted: Option<Vec<u8>> = row.get(6)?;
+            let fields_encrypted: Option<Vec<u8>> = row.get(7)?;
+            let name_encrypted: Option<Vec<u8>> = row.get(8)?;
+            let display_name_override_encrypted: Option<Vec<u8>> = row.get(9)?;
+
+            Ok((
+                id,
+                name,
+                contacts_json,
+                fields_json,
+                created_at,
+                modified_at,
+                contacts_encrypted,
+                fields_encrypted,
+                name_encrypted,
+                display_name_override_encrypted,
+            ))
+        })?;
+
+        let mut labels = Vec::new();
+        for row_result in rows {
+            let row = row_result?;
+            let name = self.decrypt_or_fallback(row.8.as_deref(), &row.1)?;
+            let contacts_json = self.decrypt_or_fallback(row.6.as_deref(), &row.2)?;
+            let fields_json = self.decrypt_or_fallback(row.7.as_deref(), &row.3)?;
+            let display_name_override = self.decrypt_optional_blob(row.9.as_deref())?;
+
+            let contacts: HashSet<String> = serde_json::from_str(&contacts_json)
+                .map_err(|e| StorageError::Serialization(e.to_string()))?;
+            let visible_fields: HashSet<String> = serde_json::from_str(&fields_json)
+                .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+            labels.push(Group::from_storage(
+                row.0,
+                name,
+                contacts,
+                visible_fields,
+                display_name_override,
+                row.4 as u64,
+                row.5 as u64,
+            ));
+        }
+
+        // Sort by decrypted name (can't ORDER BY in SQL with encrypted names)
+        labels.sort_by(|a, b| a.name().cmp(b.name()));
+
+        Ok(labels)
+    }
+    /// Decrypts an optional encrypted blob, returning None if the blob is NULL.
+    ///
+    /// Used for nullable encrypted columns like `display_name_override_encrypted`.
+    fn decrypt_optional_blob(
+        &self,
+        encrypted: Option<&[u8]>,
+    ) -> Result<Option<String>, StorageError> {
+        match encrypted {
+            Some(enc) if !enc.is_empty() => {
+                let decrypted = crate::crypto::decrypt(self.key, enc)
+                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
+                let s = String::from_utf8(decrypted)
+                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
+                Ok(Some(s))
+            }
+            _ => Ok(None),
+        }
+    }
+    /// Decrypts an encrypted blob, falling back to plaintext only for
+    /// pre-migration data (#156).
+    fn decrypt_or_fallback(
+        &self,
+        encrypted: Option<&[u8]>,
+        plaintext_fallback: &str,
+    ) -> Result<String, StorageError> {
+        if let Some(enc) = encrypted
+            && !enc.is_empty()
+        {
+            let decrypted = crate::crypto::decrypt(self.key, enc)
+                .map_err(|e| StorageError::Encryption(e.to_string()))?;
+            return String::from_utf8(decrypted)
+                .map_err(|e| StorageError::Serialization(e.to_string()));
+        }
+        // Plaintext fallback is only valid for pre-migration data where
+        // the plaintext columns contained real data. Post-migration, plaintext
+        // is always '[]'. Return an error if the fallback itself is empty/default
+        // so callers don't silently lose data.
+        if plaintext_fallback == "[]" {
+            return Err(StorageError::Encryption(
+                "encrypted column is empty and plaintext fallback contains no data".to_string(),
+            ));
+        }
+        Ok(plaintext_fallback.to_string())
+    }
+    /// Deletes a visibility label.
+    pub fn delete_group(&self, label_id: &str) -> Result<(), StorageError> {
+        let changes = self
+            .conn
+            .execute("DELETE FROM visibility_labels WHERE id = ?1", [label_id])?;
+
+        if changes == 0 {
+            return Err(StorageError::NotFound("Label not found".to_string()));
+        }
+
+        Ok(())
+    }
+    /// Saves a per-contact visibility override.
+    pub fn save_contact_override(
+        &self,
+        contact_id: &str,
+        field_id: &str,
+        is_visible: bool,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO contact_visibility_overrides
+             (contact_id, field_id, is_visible)
+             VALUES (?1, ?2, ?3)",
+            (contact_id, field_id, is_visible as i32),
+        )?;
+
+        Ok(())
+    }
+    /// Deletes a per-contact visibility override.
+    pub fn delete_contact_override(
+        &self,
+        contact_id: &str,
+        field_id: &str,
+    ) -> Result<(), StorageError> {
+        self.conn.execute(
+            "DELETE FROM contact_visibility_overrides
+             WHERE contact_id = ?1 AND field_id = ?2",
+            (contact_id, field_id),
+        )?;
+
+        Ok(())
+    }
+    /// Loads all per-contact overrides for a contact.
+    pub fn load_contact_overrides(
+        &self,
+        contact_id: &str,
+    ) -> Result<HashMap<String, bool>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT field_id, is_visible FROM contact_visibility_overrides
+             WHERE contact_id = ?1",
+        )?;
+
+        let rows = stmt.query_map([contact_id], |row| {
+            let field_id: String = row.get(0)?;
+            let is_visible: i32 = row.get(1)?;
+            Ok((field_id, is_visible != 0))
+        })?;
+
+        let mut overrides = HashMap::new();
+        for row_result in rows {
+            let (field_id, is_visible) = row_result?;
+            overrides.insert(field_id, is_visible);
+        }
+
+        Ok(overrides)
+    }
+    /// Loads all per-contact overrides (all contacts).
+    pub fn load_all_contact_overrides(
+        &self,
+    ) -> Result<HashMap<String, HashMap<String, bool>>, StorageError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT contact_id, field_id, is_visible FROM contact_visibility_overrides")?;
+
+        let rows = stmt.query_map([], |row| {
+            let contact_id: String = row.get(0)?;
+            let field_id: String = row.get(1)?;
+            let is_visible: i32 = row.get(2)?;
+            Ok((contact_id, field_id, is_visible != 0))
+        })?;
+
+        let mut all_overrides: HashMap<String, HashMap<String, bool>> = HashMap::new();
+        for row_result in rows {
+            let (contact_id, field_id, is_visible) = row_result?;
+            all_overrides
+                .entry(contact_id)
+                .or_default()
+                .insert(field_id, is_visible);
+        }
+
+        Ok(all_overrides)
+    }
+    /// Deletes all per-contact overrides for a contact.
+    pub fn delete_all_contact_overrides(&self, contact_id: &str) -> Result<(), StorageError> {
+        self.conn.execute(
+            "DELETE FROM contact_visibility_overrides WHERE contact_id = ?1",
+            [contact_id],
+        )?;
+
+        Ok(())
+    }
+    /// Saves a complete GroupManager to storage.
+    ///
+    /// This saves all groups and all per-contact overrides.
+    pub fn save_group_manager(&self, manager: &GroupManager) -> Result<(), StorageError> {
+        for group in manager.all_groups() {
+            self.save_group(group)?;
+        }
+
+        // Note: Per-contact overrides are saved individually as they're set
+        // This method primarily saves the group state
+
+        Ok(())
+    }
+    /// Loads a complete GroupManager from storage.
+    ///
+    /// This loads all groups and all per-contact overrides.
+    pub fn load_group_manager(&self) -> Result<GroupManager, StorageError> {
+        let groups = self.load_all_groups()?;
+        let overrides = self.load_all_contact_overrides()?;
+
+        let mut manager = GroupManager::new();
+
+        for group in groups {
+            manager.insert_loaded_group(group);
+        }
+
+        for (contact_id, field_overrides) in overrides {
+            for (field_id, is_visible) in field_overrides {
+                manager.set_contact_override(&contact_id, &field_id, is_visible);
+            }
+        }
+
+        Ok(manager)
+    }
+    /// Creates a label in storage.
+    ///
+    /// Returns the created label.
+    pub fn create_group(&self, name: &str) -> Result<Group, StorageError> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(StorageError::Serialization(
+                "Label name cannot be empty".to_string(),
+            ));
+        }
+        if name.chars().count() > 50 {
+            return Err(StorageError::Serialization(
+                "Label name cannot exceed 50 characters".to_string(),
+            ));
+        }
+
+        // Check for duplicate via HMAC lookup (#128)
+        let name_hmac = self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", name.as_bytes());
+        let existing = self.conn.query_row(
+            "SELECT COUNT(*) FROM visibility_labels WHERE name_hmac = ?1",
+            [&name_hmac],
+            |row| row.get::<_, i32>(0),
+        )?;
+
+        if existing > 0 {
+            return Err(StorageError::AlreadyExists(
+                "Label with this name already exists".to_string(),
+            ));
+        }
+
+        let count = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM visibility_labels", [], |row| {
+                row.get::<_, i32>(0)
+            })?;
+
+        if count >= crate::contact::MAX_LABELS as i32 {
+            return Err(StorageError::Serialization(format!(
+                "Maximum number of labels reached ({})",
+                crate::contact::MAX_LABELS
+            )));
+        }
+
+        let label = Group::new(name, self.clock.unix_seconds());
+        self.save_group(&label)?;
+
+        Ok(label)
+    }
+    /// Renames a label in storage.
+    pub fn rename_group(&self, label_id: &str, new_name: &str) -> Result<(), StorageError> {
+        let new_name = new_name.trim();
+
+        if new_name.is_empty() {
+            return Err(StorageError::Serialization(
+                "Label name cannot be empty".to_string(),
+            ));
+        }
+        if new_name.chars().count() > 50 {
+            return Err(StorageError::Serialization(
+                "Label name cannot exceed 50 characters".to_string(),
+            ));
+        }
+
+        // Check for duplicate via HMAC lookup (#128)
+        let new_name_hmac =
+            self.compute_lookup_hmac(b"Vauchi_Label_Name_HMAC_v1", new_name.as_bytes());
+        let existing = self.conn.query_row(
+            "SELECT COUNT(*) FROM visibility_labels WHERE name_hmac = ?1 AND id != ?2",
+            rusqlite::params![new_name_hmac, label_id],
+            |row| row.get::<_, i32>(0),
+        )?;
+
+        if existing > 0 {
+            return Err(StorageError::AlreadyExists(format!("Label: {}", new_name)));
+        }
+
+        // Encrypt new name (#128)
+        let name_encrypted = crate::crypto::encrypt(self.key, new_name.as_bytes())
+            .map_err(|e| StorageError::Encryption(e.to_string()))?;
+
+        let now = self.now_secs();
+
+        let changes = self.conn.execute(
+            "UPDATE visibility_labels SET name_encrypted = ?1, name_hmac = ?2, modified_at = ?3 WHERE id = ?4",
+            rusqlite::params![name_encrypted, new_name_hmac, now as i64, label_id],
+        )?;
+
+        if changes == 0 {
+            return Err(StorageError::NotFound("Label not found".to_string()));
+        }
+
+        Ok(())
+    }
+    /// Adds a contact to a label in storage.
+    pub fn add_contact_to_group(
+        &self,
+        label_id: &str,
+        contact_id: &str,
+    ) -> Result<(), StorageError> {
+        let mut label = self.load_group(label_id)?;
+
+        label.add_contact(contact_id, self.clock.unix_seconds());
+
+        self.save_group(&label)?;
+
+        Ok(())
+    }
+    /// Removes a contact from a label in storage.
+    pub fn remove_contact_from_group(
+        &self,
+        label_id: &str,
+        contact_id: &str,
+    ) -> Result<(), StorageError> {
+        let mut label = self.load_group(label_id)?;
+
+        label.remove_contact(contact_id, self.clock.unix_seconds());
+
+        self.save_group(&label)?;
+
+        Ok(())
+    }
+    /// Removes a contact from all labels in storage.
+    ///
+    /// Call this when deleting a contact.
+    pub fn remove_contact_from_all_groups(&self, contact_id: &str) -> Result<(), StorageError> {
+        let labels = self.load_all_groups()?;
+
+        for mut label in labels {
+            if label.contains_contact(contact_id) {
+                label.remove_contact(contact_id, self.clock.unix_seconds());
+                self.save_group(&label)?;
+            }
+        }
+
+        self.delete_all_contact_overrides(contact_id)?;
+
+        Ok(())
+    }
+    /// Sets a field's visibility for a label in storage.
+    pub fn set_group_field_visibility(
+        &self,
+        label_id: &str,
+        field_id: &str,
+        is_visible: bool,
+    ) -> Result<(), StorageError> {
+        let mut label = self.load_group(label_id)?;
+
+        if is_visible {
+            label.add_visible_field(field_id, self.clock.unix_seconds());
+        } else {
+            label.remove_visible_field(field_id, self.clock.unix_seconds());
+        }
+
+        self.save_group(&label)?;
+
+        Ok(())
+    }
+    /// Gets all labels that contain a specific contact.
+    pub fn get_groups_for_contact(&self, contact_id: &str) -> Result<Vec<Group>, StorageError> {
+        let labels = self.load_all_groups()?;
+
+        Ok(labels
+            .into_iter()
+            .filter(|l| l.contains_contact(contact_id))
+            .collect())
+    }
+    /// Computes a deterministic HMAC for encrypted column lookups (#128).
+    ///
+    /// Derives a dedicated HMAC key from the SEK via HKDF, then computes
+    /// HMAC-SHA256(hmac_key, data) — equality lookups on encrypted data
+    /// (e.g. label-name uniqueness) without decryption.
+    fn compute_lookup_hmac(&self, domain: &[u8], data: &[u8]) -> Vec<u8> {
+        let hmac_key_bytes = HKDF::derive_key(None, self.key.as_bytes(), domain);
+        let mut mac =
+            HmacSha256::new_from_slice(&*hmac_key_bytes).expect("HMAC accepts any key length");
+        mac.update(data);
+        mac.finalize().into_bytes().to_vec()
+    }
+}
+
+// INLINE_TEST_REQUIRED: tests access private storage internals and require in-memory DB setup
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::crypto::SymmetricKey;
+
+    fn test_storage() -> Storage {
+        let key = SymmetricKey::generate();
+        Storage::in_memory(key).unwrap()
+    }
+
+    #[test]
+    fn test_save_and_load_label() {
+        let storage = test_storage();
+
+        let mut label = Group::new("Family", 0);
+        label.add_contact("alice-id", 0);
+        label.add_contact("bob-id", 0);
+        label.add_visible_field("phone", 0);
+        label.add_visible_field("address", 0);
+
+        storage.save_group(&label).unwrap();
+
+        let loaded = storage.load_group(label.id()).unwrap();
+
+        assert_eq!(loaded.name(), "Family");
+        assert!(loaded.contains_contact("alice-id"));
+        assert!(loaded.contains_contact("bob-id"));
+        assert!(loaded.is_field_visible("phone"));
+        assert!(loaded.is_field_visible("address"));
+    }
+
+    #[test]
+    fn test_load_all_labels() {
+        let storage = test_storage();
+
+        let label1 = Group::new("Family", 0);
+        let label2 = Group::new("Friends", 0);
+        let label3 = Group::new("Work", 0);
+
+        storage.save_group(&label1).unwrap();
+        storage.save_group(&label2).unwrap();
+        storage.save_group(&label3).unwrap();
+
+        let labels = storage.load_all_groups().unwrap();
+
+        assert_eq!(labels.len(), 3);
+        assert_eq!(labels[0].name(), "Family");
+        assert_eq!(labels[1].name(), "Friends");
+        assert_eq!(labels[2].name(), "Work");
+    }
+
+    #[test]
+    fn test_delete_label() {
+        let storage = test_storage();
+
+        let label = Group::new("Temporary", 0);
+        storage.save_group(&label).unwrap();
+
+        storage.delete_group(label.id()).unwrap();
+
+        let result = storage.load_group(label.id());
+        result.expect_err("expected error");
+    }
+
+    #[test]
+    fn test_contact_overrides() {
+        let storage = test_storage();
+
+        storage
+            .save_contact_override("alice-id", "phone", true)
+            .unwrap();
+        storage
+            .save_contact_override("alice-id", "address", false)
+            .unwrap();
+        storage
+            .save_contact_override("bob-id", "email", true)
+            .unwrap();
+
+        let alice_overrides = storage.load_contact_overrides("alice-id").unwrap();
+        assert_eq!(alice_overrides.len(), 2);
+        assert_eq!(alice_overrides.get("phone"), Some(&true));
+        assert_eq!(alice_overrides.get("address"), Some(&false));
+
+        let bob_overrides = storage.load_contact_overrides("bob-id").unwrap();
+        assert_eq!(bob_overrides.len(), 1);
+        assert_eq!(bob_overrides.get("email"), Some(&true));
+    }
+
+    #[test]
+    fn test_delete_contact_override() {
+        let storage = test_storage();
+
+        storage
+            .save_contact_override("alice-id", "phone", true)
+            .unwrap();
+        storage
+            .delete_contact_override("alice-id", "phone")
+            .unwrap();
+
+        let overrides = storage.load_contact_overrides("alice-id").unwrap();
+        assert!(overrides.is_empty());
+    }
+
+    #[test]
+    fn test_delete_all_contact_overrides() {
+        let storage = test_storage();
+
+        storage
+            .save_contact_override("alice-id", "phone", true)
+            .unwrap();
+        storage
+            .save_contact_override("alice-id", "address", false)
+            .unwrap();
+
+        storage.delete_all_contact_overrides("alice-id").unwrap();
+
+        let overrides = storage.load_contact_overrides("alice-id").unwrap();
+        assert!(overrides.is_empty());
+    }
+
+    #[test]
+    fn test_create_label() {
+        let storage = test_storage();
+
+        let label = storage.create_group("New Label").unwrap();
+        assert_eq!(label.name(), "New Label");
+
+        let loaded = storage.load_group(label.id()).unwrap();
+        assert_eq!(loaded.name(), "New Label");
+    }
+
+    #[test]
+    fn test_create_duplicate_label() {
+        let storage = test_storage();
+
+        storage.create_group("Unique").unwrap();
+        let result = storage.create_group("Unique");
+
+        assert!(matches!(result, Err(StorageError::AlreadyExists(_))));
+    }
+
+    #[test]
+    fn test_rename_label() {
+        let storage = test_storage();
+
+        let label = storage.create_group("Old Name").unwrap();
+        storage.rename_group(label.id(), "New Name").unwrap();
+
+        let loaded = storage.load_group(label.id()).unwrap();
+        assert_eq!(loaded.name(), "New Name");
+    }
+
+    #[test]
+    fn test_add_remove_contact_from_label() {
+        let storage = test_storage();
+
+        let label = storage.create_group("Test").unwrap();
+        storage
+            .add_contact_to_group(label.id(), "alice-id")
+            .unwrap();
+
+        let loaded = storage.load_group(label.id()).unwrap();
+        assert!(loaded.contains_contact("alice-id"));
+
+        storage
+            .remove_contact_from_group(label.id(), "alice-id")
+            .unwrap();
+
+        let loaded = storage.load_group(label.id()).unwrap();
+        assert!(!loaded.contains_contact("alice-id"));
+    }
+
+    #[test]
+    fn test_remove_contact_from_all_labels() {
+        let storage = test_storage();
+
+        let label1 = storage.create_group("Label1").unwrap();
+        let label2 = storage.create_group("Label2").unwrap();
+
+        storage
+            .add_contact_to_group(label1.id(), "alice-id")
+            .unwrap();
+        storage
+            .add_contact_to_group(label2.id(), "alice-id")
+            .unwrap();
+        storage
+            .save_contact_override("alice-id", "phone", true)
+            .unwrap();
+
+        storage.remove_contact_from_all_groups("alice-id").unwrap();
+
+        let loaded1 = storage.load_group(label1.id()).unwrap();
+        let loaded2 = storage.load_group(label2.id()).unwrap();
+        let overrides = storage.load_contact_overrides("alice-id").unwrap();
+
+        assert!(!loaded1.contains_contact("alice-id"));
+        assert!(!loaded2.contains_contact("alice-id"));
+        assert!(overrides.is_empty());
+    }
+
+    #[test]
+    fn test_set_label_field_visibility() {
+        let storage = test_storage();
+
+        let label = storage.create_group("Test").unwrap();
+
+        storage
+            .set_group_field_visibility(label.id(), "phone", true)
+            .unwrap();
+        storage
+            .set_group_field_visibility(label.id(), "address", true)
+            .unwrap();
+
+        let loaded = storage.load_group(label.id()).unwrap();
+        assert!(loaded.is_field_visible("phone"));
+        assert!(loaded.is_field_visible("address"));
+
+        storage
+            .set_group_field_visibility(label.id(), "phone", false)
+            .unwrap();
+
+        let loaded = storage.load_group(label.id()).unwrap();
+        assert!(!loaded.is_field_visible("phone"));
+        assert!(loaded.is_field_visible("address"));
+    }
+
+    #[test]
+    fn test_save_and_load_label_with_display_name_override() {
+        let storage = test_storage();
+
+        let mut label = Group::new("Professional", 0);
+        label.add_contact("alice-id", 0);
+        label.add_visible_field("work-email", 0);
+        label
+            .set_display_name_override(Some("Dr. Egloff"), 0)
+            .unwrap();
+
+        storage.save_group(&label).unwrap();
+
+        let loaded = storage.load_group(label.id()).unwrap();
+
+        assert_eq!(loaded.name(), "Professional");
+        assert!(loaded.contains_contact("alice-id"));
+        assert!(loaded.is_field_visible("work-email"));
+        assert_eq!(loaded.display_name_override(), Some("Dr. Egloff"));
+    }
+
+    #[test]
+    fn test_save_and_load_label_without_display_name_override() {
+        let storage = test_storage();
+
+        let label = Group::new("Friends", 0);
+        storage.save_group(&label).unwrap();
+
+        let loaded = storage.load_group(label.id()).unwrap();
+        assert_eq!(loaded.display_name_override(), None);
+    }
+
+    #[test]
+    fn test_load_all_labels_preserves_display_name_override() {
+        let storage = test_storage();
+
+        let mut label1 = Group::new("Family", 0);
+        label1.set_display_name_override(Some("Matt"), 0).unwrap();
+
+        let label2 = Group::new("Work", 0);
+
+        storage.save_group(&label1).unwrap();
+        storage.save_group(&label2).unwrap();
+
+        let labels = storage.load_all_groups().unwrap();
+        assert_eq!(labels.len(), 2);
+
+        let family = labels.iter().find(|l| l.name() == "Family").unwrap();
+        let work = labels.iter().find(|l| l.name() == "Work").unwrap();
+
+        assert_eq!(family.display_name_override(), Some("Matt"));
+        assert_eq!(work.display_name_override(), None);
+    }
+
+    #[test]
+    fn test_display_name_override_roundtrip_update() {
+        let storage = test_storage();
+
+        let mut label = Group::new("Colleagues", 0);
+        label
+            .set_display_name_override(Some("Dr. Egloff"), 0)
+            .unwrap();
+        storage.save_group(&label).unwrap();
+
+        let loaded = storage.load_group(label.id()).unwrap();
+        assert_eq!(loaded.display_name_override(), Some("Dr. Egloff"));
+
+        let mut updated = loaded;
+        updated.set_display_name_override(None, 0).unwrap();
+        storage.save_group(&updated).unwrap();
+
+        let reloaded = storage.load_group(label.id()).unwrap();
+        assert_eq!(reloaded.display_name_override(), None);
+    }
+
+    #[test]
+    fn test_get_labels_for_contact() {
+        let storage = test_storage();
+
+        let label1 = storage.create_group("Family").unwrap();
+        let label2 = storage.create_group("Friends").unwrap();
+        let _label3 = storage.create_group("Work").unwrap();
+
+        storage
+            .add_contact_to_group(label1.id(), "alice-id")
+            .unwrap();
+        storage
+            .add_contact_to_group(label2.id(), "alice-id")
+            .unwrap();
+
+        let alice_labels = storage.get_groups_for_contact("alice-id").unwrap();
+        assert_eq!(alice_labels.len(), 2);
+
+        let names: Vec<_> = alice_labels.iter().map(|l| l.name()).collect();
+        assert!(names.contains(&"Family"));
+        assert!(names.contains(&"Friends"));
+    }
+}

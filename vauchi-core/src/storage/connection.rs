@@ -4,14 +4,10 @@
 
 //! Connection management, PRAGMA configuration, migrations, and core utilities.
 
-use hmac::{Hmac, Mac};
 use rusqlite::Connection;
-use sha2::Sha256;
 use std::path::Path;
 
-use crate::crypto::{HKDF, SymmetricKey};
-
-type HmacSha256 = Hmac<Sha256>;
+use crate::crypto::SymmetricKey;
 
 use super::migration;
 use super::{Storage, StorageError};
@@ -137,19 +133,6 @@ impl Storage {
     /// Returns the current schema version.
     pub fn schema_version(&self) -> Result<u32, StorageError> {
         migration::MigrationRunner::current_version(&self.conn)
-    }
-
-    /// Computes a deterministic HMAC for encrypted column lookups (#128).
-    ///
-    /// Derives a dedicated HMAC key from the SEK via HKDF, then computes
-    /// HMAC-SHA256(hmac_key, data). This allows equality lookups on encrypted
-    /// data without decryption (e.g., label name uniqueness checks).
-    pub(super) fn compute_lookup_hmac(&self, domain: &[u8], data: &[u8]) -> Vec<u8> {
-        let hmac_key_bytes = HKDF::derive_key(None, self.encryption_key.as_bytes(), domain);
-        let mut mac =
-            HmacSha256::new_from_slice(&*hmac_key_bytes).expect("HMAC accepts any key length");
-        mac.update(data);
-        mac.finalize().into_bytes().to_vec()
     }
 
     /// Forces a WAL checkpoint, merging all WAL frames into the main DB file (#81).

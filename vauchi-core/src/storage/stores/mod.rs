@@ -12,8 +12,10 @@
 //! Rollout is phased — see problem record
 //! `2026-06-09-storage-per-domain-store-boundaries`.
 
+mod device;
 mod recovery;
 mod sync;
 
+pub use device::DeviceStore;
 pub use recovery::RecoveryStore;
 pub use sync::SyncStore;

@@ -77,7 +77,9 @@ pub use identity::{Identity, IdentityBackup};
 #[cfg(feature = "storage")]
 pub mod storage;
 #[cfg(feature = "storage")]
-pub use storage::{PendingUpdate, RecoveryStore, Storage, StorageError, SyncStore, UpdateStatus};
+pub use storage::{
+    DeviceStore, PendingUpdate, RecoveryStore, Storage, StorageError, SyncStore, UpdateStatus,
+};
 
 pub mod exchange;
 #[cfg(any(test, feature = "testing"))]

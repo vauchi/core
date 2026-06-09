@@ -2,7 +2,14 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Device and sync state storage operations.
+//! Device, sync, and replay-nonce storage forwarders.
+//!
+//! Device-info / device-registry persistence now lives in
+//! [`DeviceStore`](super::DeviceStore) and sync state in
+//! [`SyncStore`](super::SyncStore); the methods below forward to them while
+//! call sites migrate (Phase 2 of problem record
+//! `2026-06-09-storage-per-domain-store-boundaries`). Replay-nonce defense
+//! (ADR-029) still lives here pending its own exchange/security store.
 
 use rusqlite::params;
 
@@ -11,7 +18,7 @@ use crate::identity::device::DeviceRegistry;
 use crate::sync::device_sync::{FieldStamp, InterDeviceSyncState, VersionVector};
 
 impl Storage {
-    /// Saves current device info (encrypted).
+    /// Forwards to [`DeviceStore::save_device_info`].
     pub fn save_device_info(
         &self,
         device_id: &[u8; 32],
@@ -19,192 +26,47 @@ impl Storage {
         device_name: &str,
         created_at: u64,
     ) -> Result<(), StorageError> {
-        let json = serde_json::json!({
-            "device_id": device_id.as_slice(),
-            "device_index": device_index,
-            "device_name": device_name,
-            "created_at": created_at,
-        });
-        let json_bytes =
-            serde_json::to_vec(&json).map_err(|e| StorageError::Serialization(e.to_string()))?;
-        let encrypted = crate::crypto::encrypt(&self.encryption_key, &json_bytes)
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
-
-        self.conn.execute(
-            "INSERT OR REPLACE INTO device_info (id, device_id, device_index, device_name, created_at, device_info_encrypted)
-             VALUES (1, ?1, ?2, '', ?3, ?4)",
-            params![
-                device_id.as_slice(),
-                device_index as i32,
-                created_at as i64,
-                encrypted,
-            ],
-        )?;
-        Ok(())
+        self.device()
+            .save_device_info(device_id, device_index, device_name, created_at)
     }
 
-    /// Loads current device info (decrypted).
-    /// Returns (device_id, device_index, device_name, created_at) if found.
+    /// Forwards to [`DeviceStore::load_device_info`].
     #[allow(clippy::type_complexity)]
     pub fn load_device_info(&self) -> Result<Option<([u8; 32], u32, String, u64)>, StorageError> {
-        let result = self.conn.query_row(
-            "SELECT device_info_encrypted, device_id, device_index, device_name, created_at FROM device_info WHERE id = 1",
-            [],
-            |row| {
-                Ok((
-                    row.get::<_, Option<Vec<u8>>>(0)?,
-                    row.get::<_, Vec<u8>>(1)?,
-                    row.get::<_, i32>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, i64>(4)?,
-                ))
-            },
-        );
-
-        match result {
-            Ok((Some(encrypted), _, _, _, _)) if !encrypted.is_empty() => {
-                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                let json: serde_json::Value = serde_json::from_slice(&decrypted)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                let device_id_vec: Vec<u8> = serde_json::from_value(json["device_id"].clone())
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                let device_id: [u8; 32] = device_id_vec
-                    .try_into()
-                    .map_err(|_| StorageError::Encryption("Invalid device ID length".into()))?;
-                let device_index = json["device_index"].as_u64().unwrap_or(0) as u32;
-                let device_name = json["device_name"].as_str().unwrap_or("").to_string();
-                let created_at = json["created_at"].as_u64().unwrap_or(0);
-                Ok(Some((device_id, device_index, device_name, created_at)))
-            }
-            Ok((_, device_id_vec, device_index, device_name, created_at))
-                if !device_name.is_empty() =>
-            {
-                // Plaintext fallback for pre-v14 data
-                let device_id: [u8; 32] = device_id_vec
-                    .try_into()
-                    .map_err(|_| StorageError::Encryption("Invalid device ID length".into()))?;
-                Ok(Some((
-                    device_id,
-                    device_index as u32,
-                    device_name,
-                    created_at as u64,
-                )))
-            }
-            Ok(_) => Ok(None),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(StorageError::Database(e)),
-        }
+        self.device().load_device_info()
     }
 
-    /// Checks if device info exists.
+    /// Forwards to [`DeviceStore::has_device_info`].
     pub fn has_device_info(&self) -> Result<bool, StorageError> {
-        let count: i64 =
-            self.conn
-                .query_row("SELECT COUNT(*) FROM device_info WHERE id = 1", [], |row| {
-                    row.get(0)
-                })?;
-        Ok(count > 0)
+        self.device().has_device_info()
     }
 
-    /// Saves the device registry (encrypted).
+    /// Forwards to [`DeviceStore::save_device_registry`].
     pub fn save_device_registry(&self, registry: &DeviceRegistry) -> Result<(), StorageError> {
-        let registry_json = serde_json::to_string(registry)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
-
-        let registry_encrypted =
-            crate::crypto::encrypt(&self.encryption_key, registry_json.as_bytes())
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
-
-        let now = self.now_secs();
-
-        self.conn.execute(
-            "INSERT OR REPLACE INTO device_registry (id, registry_json, registry_json_encrypted, version, updated_at)
-             VALUES (1, '', ?1, ?2, ?3)",
-            params![registry_encrypted, registry.version() as i64, now as i64,],
-        )?;
-        Ok(())
+        self.device().save_device_registry(registry)
     }
 
-    /// Loads the device registry (decrypted).
+    /// Forwards to [`DeviceStore::load_device_registry`].
     pub fn load_device_registry(&self) -> Result<Option<DeviceRegistry>, StorageError> {
-        let result = self.conn.query_row(
-            "SELECT registry_json_encrypted, registry_json FROM device_registry WHERE id = 1",
-            [],
-            |row| {
-                let encrypted: Option<Vec<u8>> = row.get(0)?;
-                let plaintext: String = row.get(1)?;
-                Ok((encrypted, plaintext))
-            },
-        );
-
-        match result {
-            Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
-                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                let json = String::from_utf8(decrypted)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                let registry: DeviceRegistry = serde_json::from_str(&json)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                Ok(Some(registry))
-            }
-            Ok((_, plaintext)) if !plaintext.is_empty() => {
-                let registry: DeviceRegistry = serde_json::from_str(&plaintext)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                Ok(Some(registry))
-            }
-            Ok(_) => Ok(None),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(StorageError::Database(e)),
-        }
+        self.device().load_device_registry()
     }
 
-    /// Loads the raw device registry JSON string.
-    ///
-    /// Used by GDPR export to include device information without
-    /// requiring knowledge of the DeviceRegistry struct.
+    /// Forwards to [`DeviceStore::load_device_registry_json`].
     pub fn load_device_registry_json(&self) -> Result<Option<String>, StorageError> {
-        let result = self.conn.query_row(
-            "SELECT registry_json_encrypted, registry_json FROM device_registry WHERE id = 1",
-            [],
-            |row| {
-                let encrypted: Option<Vec<u8>> = row.get(0)?;
-                let plaintext: String = row.get(1)?;
-                Ok((encrypted, plaintext))
-            },
-        );
-
-        match result {
-            Ok((Some(encrypted), _)) if !encrypted.is_empty() => {
-                let decrypted = crate::crypto::decrypt(&self.encryption_key, &encrypted)
-                    .map_err(|e| StorageError::Encryption(e.to_string()))?;
-                let json = String::from_utf8(decrypted)
-                    .map_err(|e| StorageError::Serialization(e.to_string()))?;
-                Ok(Some(json))
-            }
-            Ok((_, plaintext)) if !plaintext.is_empty() => Ok(Some(plaintext)),
-            Ok(_) => Ok(None),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(StorageError::Database(e)),
-        }
+        self.device().load_device_registry_json()
     }
 
-    /// Checks if device registry exists.
+    /// Forwards to [`DeviceStore::has_device_registry`].
     pub fn has_device_registry(&self) -> Result<bool, StorageError> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM device_registry WHERE id = 1",
-            [],
-            |row| row.get(0),
-        )?;
-        Ok(count > 0)
+        self.device().has_device_registry()
     }
 
-    /// Saves inter-device sync state for a specific device (encrypted).
+    /// Forwards to [`SyncStore::save_device_sync_state`].
     pub fn save_device_sync_state(&self, state: &InterDeviceSyncState) -> Result<(), StorageError> {
         self.sync().save_device_sync_state(state)
     }
 
-    /// Loads inter-device sync state for a specific device (decrypted).
+    /// Forwards to [`SyncStore::load_device_sync_state`].
     pub fn load_device_sync_state(
         &self,
         device_id: &[u8; 32],
@@ -212,27 +74,27 @@ impl Storage {
         self.sync().load_device_sync_state(device_id)
     }
 
-    /// Lists all inter-device sync states (decrypted).
+    /// Forwards to [`SyncStore::list_device_sync_states`].
     pub fn list_device_sync_states(&self) -> Result<Vec<InterDeviceSyncState>, StorageError> {
         self.sync().list_device_sync_states()
     }
 
-    /// Deletes inter-device sync state for a specific device.
+    /// Forwards to [`SyncStore::delete_device_sync_state`].
     pub fn delete_device_sync_state(&self, device_id: &[u8; 32]) -> Result<bool, StorageError> {
         self.sync().delete_device_sync_state(device_id)
     }
 
-    /// Saves the local version vector (encrypted).
+    /// Forwards to [`SyncStore::save_version_vector`].
     pub fn save_version_vector(&self, vector: &VersionVector) -> Result<(), StorageError> {
         self.sync().save_version_vector(vector)
     }
 
-    /// Loads the local version vector (decrypted).
+    /// Forwards to [`SyncStore::load_version_vector`].
     pub fn load_version_vector(&self) -> Result<Option<VersionVector>, StorageError> {
         self.sync().load_version_vector()
     }
 
-    /// Saves the conflict-resolution field timestamps (encrypted).
+    /// Forwards to [`SyncStore::save_field_timestamps`].
     pub fn save_field_timestamps(
         &self,
         timestamps: &std::collections::HashMap<String, FieldStamp>,
@@ -240,7 +102,7 @@ impl Storage {
         self.sync().save_field_timestamps(timestamps)
     }
 
-    /// Loads the conflict-resolution field timestamps (decrypted).
+    /// Forwards to [`SyncStore::load_field_timestamps`].
     pub fn load_field_timestamps(
         &self,
     ) -> Result<std::collections::HashMap<String, FieldStamp>, StorageError> {
@@ -249,19 +111,15 @@ impl Storage {
 
     /// Wipes all device-specific data from storage.
     ///
-    /// Drops the `device_info` row (device-owned) and delegates the sync-owned
-    /// tables (`device_sync_state`, `device_sync_checkpoints`,
-    /// `sync_field_timestamps`) to [`SyncStore::wipe_for_device_reset`]. Used
+    /// Delegates the `device_info` row to [`DeviceStore::clear_device_info`] and
+    /// the sync-owned tables to [`SyncStore::wipe_for_device_reset`]. Used
     /// during identity deletion or device unlinking.
     pub fn wipe_device_data(&self) -> Result<(), StorageError> {
-        self.conn.execute("DELETE FROM device_info", [])?;
+        self.device().clear_device_info()?;
         self.sync().wipe_for_device_reset()
     }
 
-    /// Saves a sync checkpoint for a target device (encrypted).
-    ///
-    /// Stores the list of sync items and how many have been sent so far,
-    /// allowing sync to resume from the last checkpoint after interruption.
+    /// Forwards to [`SyncStore::save_sync_checkpoint`].
     pub fn save_sync_checkpoint(
         &self,
         target_device_id: &[u8; 32],
@@ -272,10 +130,7 @@ impl Storage {
             .save_sync_checkpoint(target_device_id, items, sent_count)
     }
 
-    /// Loads a sync checkpoint for a target device (decrypted).
-    ///
-    /// Returns the list of sync items and the number already sent,
-    /// or `None` if no checkpoint exists for this device.
+    /// Forwards to [`SyncStore::load_sync_checkpoint`].
     pub fn load_sync_checkpoint(
         &self,
         target_device_id: &[u8; 32],
@@ -283,14 +138,12 @@ impl Storage {
         self.sync().load_sync_checkpoint(target_device_id)
     }
 
-    /// Clears a sync checkpoint for a target device.
-    ///
-    /// Called after sync completes successfully to remove the checkpoint.
+    /// Forwards to [`SyncStore::clear_sync_checkpoint`].
     pub fn clear_sync_checkpoint(&self, target_device_id: &[u8; 32]) -> Result<(), StorageError> {
         self.sync().clear_sync_checkpoint(target_device_id)
     }
 
-    /// Saves a batch checkpoint for crash recovery (encrypted).
+    /// Forwards to [`SyncStore::save_batch_checkpoint`].
     pub fn save_batch_checkpoint(
         &self,
         batch_id: &str,
@@ -302,7 +155,7 @@ impl Storage {
             .save_batch_checkpoint(batch_id, total_items, processed_items, state_json)
     }
 
-    /// Loads the latest batch checkpoint for a batch (decrypted).
+    /// Forwards to [`SyncStore::load_batch_checkpoint`].
     pub fn load_batch_checkpoint(
         &self,
         batch_id: &str,
@@ -310,7 +163,7 @@ impl Storage {
         self.sync().load_batch_checkpoint(batch_id)
     }
 
-    /// Updates the progress of an existing batch checkpoint (encrypted).
+    /// Forwards to [`SyncStore::update_batch_checkpoint`].
     pub fn update_batch_checkpoint(
         &self,
         batch_id: &str,
@@ -321,7 +174,7 @@ impl Storage {
             .update_batch_checkpoint(batch_id, processed_items, state_json)
     }
 
-    /// Clears all checkpoints for a batch after successful completion.
+    /// Forwards to [`SyncStore::clear_batch_checkpoint`].
     pub fn clear_batch_checkpoint(&self, batch_id: &str) -> Result<(), StorageError> {
         self.sync().clear_batch_checkpoint(batch_id)
     }

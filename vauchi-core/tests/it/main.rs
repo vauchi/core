@@ -145,6 +145,7 @@ mod demo_contact_integration_tests;
 mod device_link_proximity_tests;
 mod device_linking_engine_tests;
 mod device_race_condition_tests;
+mod device_store_tests;
 mod device_sync_convergence_proptest;
 #[cfg(feature = "diagnostic-scanner")]
 mod diagnostic_extended_pattern_tests;

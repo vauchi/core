@@ -174,9 +174,12 @@ vauchi-core/src/network/http_transport.rs 1253
 #  inline FakeClock test; humble-UI follow-up to ios!472 lets MyInfoEngine
 #  render "Last synced X ago" without the frontend owning the timestamp)
 # Phase 2 (2026-06-09, storage per-domain stores): per-domain accessor
-# insertion (self.storage.contacts().m()) wraps long call lines; the
-# four entries below absorbed the mechanical growth. Candidate for a
-# follow-up tidy using local `let c = self.storage.contacts();` bindings.
+# insertion (self.storage.contacts().m()) lengthens call lines that then
+# wrap on their ARGUMENTS, not the receiver — so a local
+# `let c = self.storage.contacts();` binding does NOT recover the lines
+# (verified: it only adds `let` lines). A real reduction needs a content
+# split (e.g. carve contact CRUD out of api/vauchi/contacts.rs). The four
+# entries below absorb the mechanical growth until then.
 vauchi-core/src/api/vauchi/sync_http.rs 1154
 vauchi-core/src/api/vauchi/contacts.rs 1036
 

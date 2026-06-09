@@ -135,6 +135,36 @@ fn contact_added_toggle_updates_vauchi_config() {
     );
 }
 
+// P2 (settings-toggle-not-persisting): the toggle must persist to durable
+// core `SettingsFlags` storage (not just in-memory `config_mut`), so the
+// choice survives restart via the P1 self-seed on the next `Vauchi::new`.
+// @internal
+#[test]
+fn settings_toggle_persists_to_settings_flags() {
+    let mut engine = engine_with_identity();
+    engine.navigate_to(AppScreen::Settings);
+
+    let _ = engine.handle_action(UserAction::SettingsToggled {
+        component_id: "privacy".into(),
+        item_id: "suppress_presence".into(),
+    });
+    let flags = engine.vauchi().load_settings_flags().unwrap();
+    assert!(
+        flags.suppress_presence,
+        "suppress_presence persisted to durable SettingsFlags"
+    );
+
+    let _ = engine.handle_action(UserAction::SettingsToggled {
+        component_id: "notifications".into(),
+        item_id: "contact_added".into(),
+    });
+    let flags = engine.vauchi().load_settings_flags().unwrap();
+    assert!(
+        flags.contact_added_notifications,
+        "contact_added persisted to durable SettingsFlags"
+    );
+}
+
 // GDPR export action returns the serialized data via GdprExportComplete
 // (core performs export_all_data; the frontend persists the payload).
 // @internal

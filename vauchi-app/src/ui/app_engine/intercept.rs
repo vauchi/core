@@ -78,6 +78,18 @@ impl AppEngine {
                 }
                 _ => {}
             }
+            // Persist the updated flags to durable core Storage so the choice
+            // survives restart and self-seeds config on the next launch
+            // (settings-toggle-not-persisting P2). Best-effort, like the
+            // backup-reminder arm below: a failed save leaves the previous
+            // durable value, the in-memory toggle still reflects in-session.
+            let flags = vauchi_core::types::SettingsFlags {
+                delivery_receipts_enabled: config.delivery_receipts_enabled,
+                suppress_presence: config.suppress_presence,
+                contact_added_notifications: config.contact_added_notifications,
+            };
+            #[allow(clippy::let_underscore_must_use)]
+            let _ = self.vauchi.save_settings_flags(&flags);
         }
 
         // Handle backup_reminders frequency cycling (ListItemSelected, not SettingsToggled)

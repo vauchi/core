@@ -17,7 +17,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use vauchi_core::{Identity, Storage, SymmetricKey, Vauchi, VauchiConfig};
+use vauchi_core::{Storage, SymmetricKey};
 
 // === Modules ===
 
@@ -30,9 +30,7 @@ mod exchange_view;
 mod json_helpers;
 mod mobile_contact_detail;
 mod mobile_contacts;
-mod mobile_delivery;
 mod mobile_gdpr;
-mod mobile_identity;
 mod mobile_import;
 mod mobile_visibility;
 mod multipart_qr;
@@ -182,12 +180,6 @@ impl vauchi_core::storage::SecureStorage for KeychainBridge {
 }
 
 // === Thread-safe state ===
-
-/// Serializable identity data for thread-safe storage.
-#[derive(Clone)]
-struct IdentityData {
-    backup_data: Vec<u8>,
-}
 
 /// Generate a new random storage key.
 ///
@@ -479,11 +471,8 @@ impl vauchi_core::api::PurgeSender for MobileRelaySender {
 pub struct VauchiPlatform {
     pub(crate) storage_path: PathBuf,
     pub(crate) storage_key: SymmetricKey,
-    relay_url: String,
     /// Optional PEM-encoded certificate for TLS pinning.
     pinned_cert_pem: Mutex<Option<String>>,
-    identity_data: Mutex<Option<IdentityData>>,
-    sync_status: Mutex<MobileSyncStatus>,
     /// Platform keychain for crypto-shredding operations.
     platform_keychain: Mutex<Option<Arc<dyn MobilePlatformKeychain>>>,
 }
@@ -505,69 +494,6 @@ impl VauchiPlatform {
         })
     }
 
-    /// Opens a Vauchi API instance backed by the same storage.
-    ///
-    /// Use this for operations that must dispatch events (e.g. hide/unhide contact).
-    /// Operations that only read data can continue using `open_storage()` directly.
-    pub(crate) fn open_vauchi(&self) -> Result<Vauchi, MobileError> {
-        let config = VauchiConfig::with_storage_path(&self.storage_path)
-            .with_relay_url(&self.relay_url)
-            .with_storage_key(self.storage_key.clone());
-        Vauchi::new(config).map_err(|e| MobileError::Other {
-            detail: e.to_string(),
-        })
-    }
-
-    /// Opens a Vauchi instance with identity loaded **and** the OHTTP
-    /// gateway key resolved (cache → bundled).
-    ///
-    /// Use for flows that immediately issue a relay request (device
-    /// link, shred, exchange). Resolving OHTTP here lets the call
-    /// chain's `build_relay_transport` wire encryption on the first
-    /// request — without this, `ohttp_key.is_none()` flips
-    /// `allow_direct = true` and the first request leaks the client
-    /// IP to the relay (ADR-037 §Bootstrap Exceptions).
-    ///
-    /// Neither step hits the network in production:
-    /// `OhttpConfig::bundled_gateway_key` is always set by default, so
-    /// key resolution is in-process.
-    ///
-    /// Returns `Err(IdentityNotInitialized)` if no identity exists —
-    /// relay-bound flows require one. If `connect()` fails (corrupt
-    /// bundled key, storage error), the returned `Vauchi` still has
-    /// the identity set and `build_relay_transport` falls back to the
-    /// `allow_direct` path — functionality preserved, privacy degraded.
-    pub(crate) fn open_vauchi_for_relay(&self) -> Result<Vauchi, MobileError> {
-        let mut vauchi = self.open_vauchi()?;
-        // `Vauchi::new` (in `init`) auto-loads identity from storage via
-        // `Identity::from_storage_bytes` — the same raw format
-        // `vauchi-core::Vauchi::create_identity` writes. When that
-        // succeeds we don't need (or want) to call `set_identity`
-        // again: it errors with `AlreadyInitialized`. F2-MED-2: pre-fix
-        // (encrypted-backup-only `get_identity`) hid this because
-        // get_identity returned `Identity not found` first; post-fix
-        // (raw-format-aware `get_identity`) both load paths succeed
-        // and the redundant `set_identity` surfaced as
-        // `Sync failed: detail=already initialized`.
-        if vauchi.identity().is_none() {
-            let identity = self.get_identity()?;
-            vauchi
-                .set_identity(identity)
-                .map_err(|e| MobileError::Other {
-                    detail: e.to_string(),
-                })?;
-        } else {
-            // Identity already loaded by Vauchi::new — but still
-            // require it to exist on disk to satisfy the
-            // "Identity not found" precondition every relay-bound
-            // flow expects. The check is cheap (in-memory cache hit
-            // after Vauchi::new's load).
-            let _ = self.get_identity()?;
-        }
-        let _ = vauchi.connect();
-        Ok(vauchi)
-    }
-
     /// Save a contact directly to storage.
     ///
     /// Used by integration tests that need exchanged or imported contacts
@@ -583,82 +509,6 @@ impl VauchiPlatform {
                 detail: e.to_string(),
             })
     }
-
-    /// Gets the identity from stored data.
-    ///
-    /// Falls back to disk when the in-memory cache is empty — same shape
-    /// as [`has_identity`]. F2-MED-2 (2026-05-09 device-test campaign)
-    /// repro'd a "Sync failed: detail=Identity not found" toast on
-    /// freshly-onboarded Pixel installs because onboarding writes via
-    /// the sibling `PlatformAppEngine` (which shares the data dir but
-    /// not this struct's `identity_data` mutex). Without the storage
-    /// fallback, the first `sync()` after onboarding hit
-    /// `data.as_ref()` → `None` → "Identity not found", even though
-    /// the identity was on disk.
-    ///
-    /// Two on-disk formats coexist today and both are accepted:
-    ///
-    ///   1. `IdentityBackup` encrypted with `__internal_storage_key__`
-    ///      — the format `VauchiPlatform::create_identity` writes
-    ///      directly. Tests construct identities this way.
-    ///   2. Raw `Identity::to_storage_bytes()` — the format
-    ///      `Vauchi::create_identity` (vauchi-core) writes when
-    ///      `PlatformAppEngine`'s `CreateIdentity` runs through it.
-    ///      This is the production layout used by every Pixel/iOS
-    ///      onboarding (the F2-MED-2 trigger).
-    ///
-    /// Both formats are tried in order; whichever decodes wins. Long-term
-    /// cleanup is to consolidate on a single format and retire the
-    /// duplicate caching in this struct entirely — but that is an
-    /// architectural sweep outside the scope of F2-MED-2.
-    pub(crate) fn get_identity(&self) -> Result<Identity, MobileError> {
-        // 1. Hot path — in-memory cache hit.
-        {
-            let data = lock_or(&self.identity_data)?;
-            if let Some(identity_data) = data.as_ref() {
-                return Self::decode_identity_blob(&identity_data.backup_data);
-            }
-        }
-
-        // 2. Storage fallback — a sibling instance (`PlatformAppEngine`)
-        //    may have written the identity after this struct was
-        //    constructed. Mirrors `has_identity`'s pattern; populates
-        //    the cache so subsequent calls take the hot path.
-        let storage = self.open_storage()?;
-        let (backup_data, _display_name) = storage
-            .identity()
-            .load_identity()
-            .map_err(|e| MobileError::Other {
-                detail: format!("Identity load failed: {e}"),
-            })?
-            .ok_or(MobileError::Other {
-                detail: "Identity not found".to_string(),
-            })?;
-
-        let cached = IdentityData {
-            backup_data: backup_data.clone(),
-        };
-        *lock_or(&self.identity_data)? = Some(cached);
-
-        Self::decode_identity_blob(&backup_data)
-    }
-
-    /// Decode a stored identity blob, accepting both formats currently
-    /// in use (see [`get_identity`] doc-comment). Tries the encrypted
-    /// `IdentityBackup` form first because it's what
-    /// `VauchiPlatform`'s own `create_identity` writes; falls through
-    /// to raw `Identity::to_storage_bytes()` when the blob comes from
-    /// `vauchi-core`'s `save_identity` (the production path on
-    /// Android via `PlatformAppEngine`).
-    fn decode_identity_blob(blob: &[u8]) -> Result<Identity, MobileError> {
-        Identity::from_storage_blob(
-            blob,
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        )
-        .map_err(|e| MobileError::Other {
-            detail: format!("Identity decode failed: {e}"),
-        })
-    }
 }
 
 #[uniffi::export]
@@ -672,7 +522,7 @@ impl VauchiPlatform {
     #[uniffi::constructor]
     pub fn new_with_secure_key(
         data_dir: String,
-        relay_url: String,
+        _relay_url: String,
         storage_key_bytes: Vec<u8>,
     ) -> Result<Arc<Self>, MobileError> {
         let data_path = PathBuf::from(&data_dir);
@@ -703,10 +553,7 @@ impl VauchiPlatform {
         Ok(Arc::new(VauchiPlatform {
             storage_path,
             storage_key,
-            relay_url,
             pinned_cert_pem: Mutex::new(None),
-            identity_data: Mutex::new(None),
-            sync_status: Mutex::new(MobileSyncStatus::Idle),
             platform_keychain: Mutex::new(None),
         }))
     }
@@ -716,7 +563,7 @@ impl VauchiPlatform {
     /// WARNING: This constructor stores the encryption key in a plaintext file.
     /// Use `new_with_secure_key` instead for production.
     #[uniffi::constructor]
-    pub fn new(data_dir: String, relay_url: String) -> Result<Arc<Self>, MobileError> {
+    pub fn new(data_dir: String, _relay_url: String) -> Result<Arc<Self>, MobileError> {
         let data_path = PathBuf::from(&data_dir);
 
         std::fs::create_dir_all(&data_path).map_err(|e| MobileError::StorageError {
@@ -752,10 +599,7 @@ impl VauchiPlatform {
         Ok(Arc::new(VauchiPlatform {
             storage_path,
             storage_key,
-            relay_url,
             pinned_cert_pem: Mutex::new(None),
-            identity_data: Mutex::new(None),
-            sync_status: Mutex::new(MobileSyncStatus::Idle),
             platform_keychain: Mutex::new(None),
         }))
     }
@@ -797,30 +641,6 @@ impl VauchiPlatform {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
-
-    fn create_test_instance() -> (Arc<VauchiPlatform>, TempDir) {
-        let dir = TempDir::new().unwrap();
-        let wb = VauchiPlatform::new(
-            dir.path().to_string_lossy().to_string(),
-            "http://localhost:8080".to_string(),
-        )
-        .unwrap();
-        (wb, dir)
-    }
-
-    // @scenario: identity_management:User creates a new identity
-    #[test]
-    fn test_create_identity() {
-        let (wb, _dir) = create_test_instance();
-        assert!(!wb.has_identity());
-
-        wb.create_identity("Alice".to_string()).unwrap();
-        assert!(wb.has_identity());
-
-        let name = wb.get_display_name().unwrap();
-        assert_eq!(name, "Alice");
-    }
 
     // @scenario: device_sync:Sync result aggregation
     #[test]
@@ -908,48 +728,12 @@ mod tests {
 
     // === Fingerprint Verification Tests (P0-4) ===
 
-    // @scenario: identity_management:Identity verification via public key fingerprint
-    #[test]
-    fn test_get_own_fingerprint() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        let fp = wb.get_own_fingerprint().unwrap();
-
-        // Must be 16 groups of 4 uppercase hex chars
-        let groups: Vec<&str> = fp.split(' ').collect();
-        assert_eq!(groups.len(), 16, "own fingerprint should have 16 groups");
-        for group in groups {
-            assert_eq!(group.len(), 4);
-            assert!(
-                group
-                    .chars()
-                    .all(|c: char| c.is_ascii_hexdigit() && !c.is_ascii_lowercase())
-            );
-        }
-    }
-
     // ── Import contacts via FFI ─────────────────────────────────────────────
     // Coverage moved to `tests/it/platform_app_engine_domain_command_tests.rs`
     // (search `import_contacts_from_vcf_*`) — the canonical surface is now
     // `DomainCommand::ImportContactsFromVcf` via `dispatch_domain_command`.
     // The legacy `VauchiPlatform::import_contacts_from_vcf` UniFFI export
     // was retired 2026-05-23 (Track A); no hand-written consumer existed.
-
-    // @internal
-    #[test]
-    fn test_open_vauchi_for_relay_without_identity_errors() {
-        let (wb, _dir) = create_test_instance();
-        let result = wb.open_vauchi_for_relay();
-        assert!(result.is_err(), "expected IdentityNotFound error");
-        assert!(
-            matches!(
-                &result,
-                Err(MobileError::Other { detail }) if detail == "Identity not found"
-            ),
-            "open_vauchi_for_relay should fail with Other(Identity not found) when no identity exists"
-        );
-    }
 
     // F2-MED-2 regression: ensures `get_identity` falls back to disk
     // when the in-memory cache is empty. The two `VauchiPlatform`
@@ -963,40 +747,6 @@ mod tests {
     // mirrors `has_identity`'s pattern and the cache is populated
     // lazily on first read.
     //
-    // @internal
-    #[test]
-    fn test_get_identity_storage_fallback_after_sibling_write() {
-        let dir = TempDir::new().unwrap();
-        let dir_path = dir.path().to_string_lossy().to_string();
-
-        // First instance writes the identity to disk.
-        let wb1 =
-            VauchiPlatform::new(dir_path.clone(), "http://localhost:8080".to_string()).unwrap();
-        wb1.create_identity("Alice".to_string()).unwrap();
-        let public_id_1 = wb1.get_public_id().unwrap();
-
-        // Second instance at the same dir starts with an empty
-        // `identity_data` cache — the production case where the sibling
-        // is `PlatformAppEngine`, not another `VauchiPlatform`.
-        let wb2 = VauchiPlatform::new(dir_path, "http://localhost:8080".to_string()).unwrap();
-
-        // get_identity must fall back to storage and return the
-        // identity that the sibling persisted.
-        let identity = wb2
-            .get_identity()
-            .expect("get_identity should fall back to storage when cache is empty");
-        assert_eq!(
-            identity.public_id(),
-            public_id_1,
-            "storage fallback should return the same identity the sibling wrote"
-        );
-
-        // Calling again should hit the now-populated cache (not visible
-        // from the API surface, but verified by no error path firing).
-        let identity_again = wb2.get_identity().unwrap();
-        assert_eq!(identity_again.public_id(), public_id_1);
-    }
-
     // F2-MED-2 regression part 2: ensures `get_identity` decodes the
     // raw `Identity::to_storage_bytes()` format that `vauchi-core`'s
     // `Vauchi::create_identity` writes (the production path on
@@ -1005,71 +755,4 @@ mod tests {
     // decoder only knew the encrypted-`IdentityBackup` format that
     // `VauchiPlatform`'s own `create_identity` writes.
     //
-    // @internal
-    #[test]
-    fn test_get_identity_decodes_vauchi_core_raw_storage_bytes_format() {
-        use vauchi_core::Identity;
-
-        let dir = TempDir::new().unwrap();
-        let dir_path = dir.path().to_string_lossy().to_string();
-        let wb = VauchiPlatform::new(dir_path, "http://localhost:8080".to_string()).unwrap();
-
-        // Bypass create_identity and write raw `to_storage_bytes` directly
-        // through the storage layer the platform uses — same shape as
-        // what `Vauchi::create_identity` (vauchi-core) produces when
-        // `PlatformAppEngine` orchestrates onboarding.
-        let identity = Identity::create(
-            "Carol",
-            vauchi_core::clock::SystemClock::shared().unix_seconds(),
-        );
-        let raw_bytes = identity.to_storage_bytes();
-        let display_name = identity.display_name().to_string();
-        let storage = wb.open_storage().unwrap();
-        storage
-            .identity()
-            .save_identity(&raw_bytes, &display_name)
-            .unwrap();
-        drop(storage);
-
-        let recovered = wb
-            .get_identity()
-            .expect("get_identity must accept Vauchi::to_storage_bytes blobs");
-        assert_eq!(
-            recovered.public_id(),
-            identity.public_id(),
-            "raw-format decoder must return the same identity the sibling wrote"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn test_open_vauchi_for_relay_with_identity_populates_ohttp_key() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        let vauchi = wb.open_vauchi_for_relay().unwrap();
-        assert!(vauchi.identity().is_some());
-        assert!(
-            vauchi.has_ohttp_key(),
-            "open_vauchi_for_relay should eagerly resolve the bundled \
-             OHTTP key so device-link/shred flows route through OHTTP \
-             on first use (ADR-037)"
-        );
-    }
-
-    // @internal
-    #[test]
-    fn test_open_vauchi_for_relay_transport_has_ohttp_wired() {
-        let (wb, _dir) = create_test_instance();
-        wb.create_identity("Alice".to_string()).unwrap();
-
-        let vauchi = wb.open_vauchi_for_relay().unwrap();
-        let transport = vauchi.build_relay_transport("http://localhost:8080".to_string(), 1_000);
-        assert!(
-            transport.has_ohttp(),
-            "transport built after open_vauchi_for_relay must have OHTTP wired — \
-             without this, device-link and shred leak the client IP to the relay \
-             (problem record 2026-04-17-ohttp-allow-direct-fallback)"
-        );
-    }
 }

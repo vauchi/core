@@ -693,19 +693,6 @@ impl PlatformAppEngine {
         screen_to_json(&model)
     }
 
-    /// Returns the available navigation screens as a JSON array.
-    ///
-    /// These are the screens that should appear in the navigation bar/tabs.
-    pub fn available_screens_json(&self) -> Result<String, MobileError> {
-        let engine = self.engine.lock().map_err(|e| MobileError::Other {
-            detail: format!("Lock failed: {e}"),
-        })?;
-        let screens = engine.available_screens();
-        serde_json::to_string(&screens).map_err(|e| MobileError::Other {
-            detail: format!("Failed to serialize screens: {e}"),
-        })
-    }
-
     /// Returns the canonical screen-id of the parent tab the active
     /// screen belongs to under the given layout, or `None` for
     /// transient overlays (Lock, FormDialog).

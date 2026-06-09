@@ -8,7 +8,7 @@
 //! Asserts that every `pub fn` inside an `impl PlatformAppEngine { … }`
 //! block in `core/vauchi-platform/src/**` either:
 //!
-//!   (a) appears in `HUMBLE_ALLOWLIST` — the 25-method genuine binding
+//!   (a) appears in `HUMBLE_ALLOWLIST` — the 24-method genuine binding
 //!       surface every frontend renders against, or
 //!   (b) is one of the `SURPLUS_RATCHET_CEILING` known-legacy methods
 //!       still pending retirement in Phase 3 of the program.
@@ -45,7 +45,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The 25-method Humble surface — the binding surface every frontend
+/// The 24-method Humble surface — the binding surface every frontend
 /// is allowed to depend on per ADR-021 / ADR-043. Source of truth for
 /// Phase 0 / Task 0.2 of the pure-functional-core program plan.
 ///
@@ -54,7 +54,6 @@ use std::path::{Path, PathBuf};
 /// removals reviewable.
 const HUMBLE_ALLOWLIST: &[&str] = &[
     "advance_qr_frame_json",
-    "available_screens_json",
     "boot",
     "can_go_back",
     "current_screen_json",
@@ -250,12 +249,20 @@ fn humble_allowlist_size_matches_plan() {
     // highlighting — its sole documented use — is owned by
     // `current_tab_id`. See
     // `_private/docs/problems/2026-06-08-pae-allowlist-further-shrink/`.
+    //
+    // `available_screens_json` retirement (2026-06-09, 25 -> 24) under
+    // ADR-048's G1-G5 gates: its only callers were iOS + Android, both
+    // feeding write-only view-model state nothing rendered (the tab bar
+    // uses `tab_info`); those callers deleted in ios!520 + android!509.
+    // The engine peer `available_screens()` stays — `tab_info` maps over
+    // it and the cabi export `vauchi_app_available_screens` serves
+    // desktop.
     assert_eq!(
         HUMBLE_ALLOWLIST.len(),
-        25,
-        "Humble allow-list size drifted from the 25 expected after \
-         retiring `current_screen_id` (ADR-048 G1-G5: zero frontend \
-         callers, in-tree test callers migrated to `current_screen_json`). \
+        24,
+        "Humble allow-list size drifted from the 24 expected after \
+         retiring `available_screens_json` (ADR-048 G1-G5: zero frontend \
+         callers once ios!520 + android!509 land; redundant wrapper test removed). \
          Edits to this list require an ADR amendment (ADR-021/043 \
          for the Humble engine framing — incl. Amendment 3 for the \
          linchpin promotions — or ADR-048's G1-G5 gates for \

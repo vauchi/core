@@ -79,10 +79,10 @@ for these.**
 `VauchiPlatform` (these are the Pure Humble UI surface):
 
 - `boot`, `current_screen_json`, `current_tab_id`,
-  `tab_info`, `sidebar_items`, `available_screens_json`,
+  `tab_info`, `sidebar_items`,
   `navigate_back_json` (forward `navigate_to_json` retired — CoreScreenIdMap
   rework S5, ADR-043 Am4; `current_screen_id` retired — ADR-048 G1-G5,
-  2026-06-08)
+  2026-06-08; `available_screens_json` retired — ADR-048 G1-G5, 2026-06-09)
 - `handle_action_json`, `handle_hardware_event`, `advance_qr_frame_json`,
   `form_has_data`
 - `handle_deep_link_uri`

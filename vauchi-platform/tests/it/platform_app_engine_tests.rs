@@ -377,19 +377,6 @@ fn can_go_back_plumbs_nav_history_through_boundary() {
     );
 }
 
-// @internal
-#[test]
-fn available_screens_returns_nav_bar_items() {
-    let (engine, _dir) = create_engine();
-    drive_onboarding(&engine);
-    let json = engine.available_screens_json().expect("available screens");
-    let screens: Vec<serde_json::Value> = serde_json::from_str(&json).expect("parse");
-    assert!(
-        screens.len() >= 4,
-        "should have at least 4 nav items, got {screens:?}"
-    );
-}
-
 // ============================================================================
 // Notification boundary (CC-05)
 // ============================================================================
